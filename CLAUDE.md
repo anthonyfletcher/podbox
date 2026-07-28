@@ -89,10 +89,15 @@ This tree is a custom build for **iPod Classic 6G/7G** and **iPod Video 5G/5.5G*
 
 Rockbox requires out-of-tree builds. Cross-compiler toolchains are built via `tools/rockboxdev.sh`.
 
-**Environment note:** the cross-compiler (`arm-elf-eabi-gcc`) does not exist on
-every machine this repo is checked out on. If it is missing, the build cannot be
-run locally -- ask rather than trying to install a toolchain. `sudo` is not
-available.
+**Environment note:** the cross-compiler (`arm-elf-eabi-gcc`) may not be present
+on the machine this repo is checked out on. If it is missing, the build cannot
+run locally -- ask rather than installing a toolchain, and do not assume `sudo`
+is available.
+
+**`ipodvideo` is the reference target.** It is the one that gets exercised on
+hardware; `ipod6g` builds clean and ships, but is not routinely run. Treat 6G
+behaviour as unverified unless it has actually been tested, and when a change
+affects both targets say plainly which one was checked.
 
 **The application layer is `apps-ipod/`, so every configure invocation needs
 `--appsdir=apps-ipod`.** `build-hw.sh` passes it; a hand-rolled configure that
@@ -196,8 +201,24 @@ There is no plugin system. Upstream's dynamically loaded `.rock` files, the
 (text and image viewers, properties, playing time) or deleted outright. Do not
 add one -- put the code in the core.
 
-`apps-ipod/plugins/` still exists but holds only support files (`plugin.lds` for
-the codec link, `credits.pl`, bitmaps, font/viewer config).
+**Watch for stubs left behind by the removal.** A plugin-backed feature could
+survive as an entry point that compiles, is reachable from a menu and does
+nothing. The pitch screen was the last of these and is now gone entirely --
+screen, keymap context, `ACTION_PS_*` codes, activity and settings. Nothing in
+`apps-ipod/` can change pitch or speed any more, so **do not go looking for a
+pitch UI**: `HAVE_PITCHCONTROL` is still defined because it gates real DSP code
+in `lib/rbcodec`, and `global_status.resume_pitch`/`resume_speed` still exist
+because `firmware/sound.c` and `lib/rbcodec/dsp/tdspeed.c` write to them. The
+`%Sp`/`%Ss` skin tokens keep their renderers for the same class of reason --
+the tags are defined in `lib/skin_parser`, so dropping the renderer would leave
+a tag that parses cleanly and draws nothing.
+
+`apps-ipod/plugins/` still exists but holds only support files. Live ones:
+`plugin.lds` (the codec link, via `lib/rbcodec/codecs/codecs.make`),
+`credits.pl` (`apps.make`), `bitmaps/` and `plugins.make` (`tools/root.make`).
+`viewers.config`, `rockbox-fonts.config` and `CATEGORIES` are vestigial --
+`tools/buildzip.pl` is byte-identical to upstream and reads its copies from
+`apps/plugins/`, never from here.
 
 ### Codec System
 
@@ -261,8 +282,9 @@ To build, tag, and publish a release on GitHub:
 ./build-hw.sh 5g       # 5G
 
 # 2. Commit, tag, and push
-git add <files>
-git commit -m "vX.Y: description"
+#    Explicit paths, never `git add` -- work is often left staged
+#    deliberately, and a bare commit sweeps it in.
+git commit <paths> -F -
 git tag vX.Y
 git push origin master
 git push origin vX.Y
@@ -276,9 +298,8 @@ gh release create vX.Y \
     -F release-notes.md
 # Add -p for prerelease/alpha/beta tags
 ```
-Releases belong to this fork (`origin`, currently
-`anthonyfletcher/podbox`). The `nuxcodes/` repositories are upstream and
-are not writable from here -- do not pass `--repo` pointing at them.
+Releases belong to this fork, which is what `origin` points at. Upstream
+remotes are not writable from here -- do not pass `--repo` pointing at one.
 
-Note the 6G zip ships without ever having run on hardware; see the testability
-note under Build Commands.
+Note the 6G zip ships without routine hardware testing -- see the reference
+target note under Build Commands.

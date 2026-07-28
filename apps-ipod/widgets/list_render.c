@@ -174,6 +174,7 @@ static bool draw_title(struct screen *display,
 
 void list_draw(struct screen *display, struct gui_synclist *list)
 {
+    const unsigned int t_render = USEC_TIMER;
     int start, end, item_offset, i;
     const int screen = display->screen_type;
     list_draw_item *callback_draw_item;
@@ -391,8 +392,10 @@ void list_draw(struct screen *display, struct gui_synclist *list)
     parent->fg_pattern = dc_saved_list_fg;
     parent->bg_pattern = dc_saved_list_bg;
     display->set_viewport(parent);
+    skin_note_render(USEC_TIMER - t_render);
     if (!gui_synclist_flush_inhibited())
     {
+        unsigned int t_flush = USEC_TIMER;
         if (list_need_full_update() | skin_is_dirty(display->screen_type))
         {
             display->set_viewport(NULL);
@@ -401,6 +404,7 @@ void list_draw(struct screen *display, struct gui_synclist *list)
         }
         else
             display->update_viewport();
+        skin_note_flush(USEC_TIMER - t_flush);
     }
     display->set_viewport(last_vp);
 }

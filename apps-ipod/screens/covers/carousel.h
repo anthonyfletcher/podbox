@@ -147,6 +147,11 @@ int  carousel_run(const struct carousel_model *m, const char *selected_file);
 void set_current_slide(int index);
 void set_scroll_line(const char *str, enum pf_scroll_line_type type);
 int  get_scroll_line_offset(enum pf_scroll_line_type type);
+/* Clip drawing to the inset caption box; offsets from get_scroll_line_offset()
+ * are relative to it. Enter before setting the font or colour, and pass the
+ * returned viewport back to carousel_text_end() when the caption is drawn. */
+struct viewport *carousel_text_begin(void);
+void carousel_text_end(struct viewport *saved);
 /* Build the album-artist list into the shared buffer (used by both the album
  * index build and the artist model). */
 int  build_artist_index(struct tagcache_search *tcs, void **buf, size_t *bufsz);

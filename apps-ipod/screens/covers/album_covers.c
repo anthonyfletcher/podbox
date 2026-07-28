@@ -1302,6 +1302,7 @@ static void draw_album_text(void)
     else
         snprintf(album_and_year, sizeof(album_and_year), "%s", albumtxt);
 
+    struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
 
     static int prev_albumtxt_index = -1;
@@ -1362,6 +1363,7 @@ static void draw_album_text(void)
         lcd_putsxy(albumtxt_x, albumtxt_y, album_and_year);
         lcd_setfont(screens[SCREEN_MAIN].getuifont());
     }
+    carousel_text_end(saved_vp);
 }
 
 /* Rebuild the album carousel in place (after a settings change or cache

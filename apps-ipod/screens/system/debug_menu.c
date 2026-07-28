@@ -297,6 +297,33 @@ static void dbg_audio_task(void)
     ticks++;
 }
 
+/* A reading of all the counters above at one instant. The tick task keeps
+ * running once started, so differencing the live counters against a snapshot
+ * gives the rates over any chosen window. The window that matters is the one
+ * between leaving this screen and returning to it, since that is the only way
+ * to measure a screen you cannot be sitting in while you read the numbers. */
+struct cpu_sample
+{
+    unsigned int ticks;
+    unsigned int boost_ticks;
+    unsigned int freq_sum;
+    unsigned int flushes;
+    unsigned int render_usec;
+    unsigned int flush_usec;
+};
+
+static struct cpu_sample sample_on_close;
+
+static void cpu_sample_take(struct cpu_sample *s)
+{
+    s->ticks = ticks;
+    s->boost_ticks = boost_ticks;
+    s->freq_sum = freq_sum;
+    s->flushes = skin_flush_count();
+    s->render_usec = skin_render_usec();
+    s->flush_usec = skin_flush_usec();
+}
+
 static bool dbg_buffering_thread(void)
 {
     int button;
@@ -307,14 +334,48 @@ static bool dbg_buffering_thread(void)
     int pcmbufdescs = pcmbuf_descs();
     struct buffering_debug d;
     size_t filebuflen = audio_get_filebuflen();
+    static bool task_running = false;
+    struct cpu_sample sample_on_open;
+    unsigned int away_ticks, away_frames = 0;
+    int away_boost = 0, away_clock = 0, away_flush = 0;
+    int away_render_ms = 0, away_flush_ms = 0;
     /* This is a size_t, but call it a long so it puts a - when it's bad. */
     #define STR_DATAREM "data_rem"
     const char * const fmt_used = "%s: %6ld/%ld";
 
-    boost_ticks = 0;
-    ticks = freq_sum = 0;
+    /* Added once and never removed: the counters have to keep running while
+     * this screen is closed, or there is nothing to report on return. */
+    if (!task_running)
+    {
+        tick_add_task(dbg_audio_task);
+        task_running = true;
+    }
 
-    tick_add_task(dbg_audio_task);
+    cpu_sample_take(&sample_on_open);
+
+    /* Fixed for the whole visit: what happened while the screen was shut. */
+    away_ticks = sample_on_open.ticks - sample_on_close.ticks;
+    if (away_ticks > 0)
+    {
+        away_boost = (sample_on_open.boost_ticks - sample_on_close.boost_ticks)
+                     * 1000 / away_ticks;                  /* in 0.1 % */
+        away_clock = (sample_on_open.freq_sum - sample_on_close.freq_sum)
+                     * 10 / away_ticks;                    /* in 100 kHz */
+        away_flush = (sample_on_open.flushes - sample_on_close.flushes)
+                     * 10 * HZ / away_ticks;               /* in 0.1 /s */
+    }
+
+    /* Averaged per frame rather than per second, so the split does not move
+     * just because the screen was busier: what matters is where the time in
+     * one redraw goes. Both in 0.1 ms. */
+    away_frames = sample_on_open.flushes - sample_on_close.flushes;
+    if (away_frames > 0)
+    {
+        away_render_ms = (sample_on_open.render_usec
+                          - sample_on_close.render_usec) / away_frames / 100;
+        away_flush_ms = (sample_on_open.flush_usec
+                         - sample_on_close.flush_usec) / away_frames / 100;
+    }
 
     FOR_NB_SCREENS(i)
         screens[i].setfont(FONT_SYSFIXED);
@@ -386,12 +447,30 @@ static bool dbg_buffering_thread(void)
             screens[i].putsf(0, line++, "cpu freq: %3dMHz",
                              (int)((FREQ + 500000) / 1000000));
 
-            if (ticks > 0)
+            unsigned int here_ticks = ticks - sample_on_open.ticks;
+            if (here_ticks > 0)
             {
-                int avgclock   = freq_sum * 10 / ticks;      /* in 100 kHz */
-                int boostquota = boost_ticks * 1000 / ticks; /* in 0.1 % */
+                /* in 100 kHz */
+                int avgclock   = (freq_sum - sample_on_open.freq_sum)
+                                 * 10 / here_ticks;
+                /* in 0.1 % */
+                int boostquota = (boost_ticks - sample_on_open.boost_ticks)
+                                 * 1000 / here_ticks;
                 screens[i].putsf(0, line++, "boost:%3d.%d%% (%d.%dMHz)",
                                  boostquota/10, boostquota%10, avgclock/10, avgclock%10);
+            }
+            if (away_ticks > 0)
+            {
+                screens[i].putsf(0, line++, "away:%3d.%d%% %d.%dMHz %d.%dfl/s",
+                                 away_boost/10, away_boost%10,
+                                 away_clock/10, away_clock%10,
+                                 away_flush/10, away_flush%10);
+            }
+            if (away_frames > 0)
+            {
+                screens[i].putsf(0, line++, "frame: rnd%d.%dms fls%d.%dms",
+                                 away_render_ms/10, away_render_ms%10,
+                                 away_flush_ms/10, away_flush_ms%10);
             }
 
             screens[i].putsf(0, line++, "pcmbufdesc: %2d/%2d",
@@ -403,7 +482,9 @@ static bool dbg_buffering_thread(void)
         }
     }
 
-    tick_remove_task(dbg_audio_task);
+    /* Mark the point of departure rather than stopping the counters, so the
+     * next visit can report on whatever screen was used in between. */
+    cpu_sample_take(&sample_on_close);
 
     FOR_NB_SCREENS(i)
         screens[i].setfont(FONT_UI);

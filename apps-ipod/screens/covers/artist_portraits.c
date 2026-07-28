@@ -152,6 +152,7 @@ static void artist_draw_text(void)
         return;
 
     name = artist_name(center_index);
+    struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
     lcd_setfont(pf_bold_font);
     if (center_index != prev_index)
@@ -179,6 +180,7 @@ static void artist_draw_text(void)
     txt_x = get_scroll_line_offset(PF_SCROLL_ALBUM);
     lcd_putsxy(txt_x, txt_y, name);
     lcd_setfont(screens[SCREEN_MAIN].getuifont());
+    carousel_text_end(saved_vp);
 }
 
 static void carousel_sort_noop(void)

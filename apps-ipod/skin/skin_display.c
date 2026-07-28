@@ -100,11 +100,40 @@ void skin_mark_dirty(enum screen_type screen)
  * draws outside the action loop and needs the result on screen now -- a
  * progress indicator advancing while its caller blocks, say. Everything else
  * should let GUI_EVENT_ACTIONUPDATE do it. */
+/* Cost of the UI redraw, accumulated since boot. A frame is a render -- walk
+ * the skin or list and paint into the framebuffer -- followed by a flush, the
+ * push of those pixels to the LCD. Splitting the two says whether a slow
+ * screen is slow because of what it draws or because of what it sends, which
+ * are fixed in completely different places. Never reset; the debug menu
+ * differences two readings to get a rate. */
+static unsigned int flush_count;
+static unsigned int render_usec;
+static unsigned int flush_usec;
+
+unsigned int skin_flush_count(void) { return flush_count; }
+unsigned int skin_render_usec(void) { return render_usec; }
+unsigned int skin_flush_usec(void)  { return flush_usec; }
+
+void skin_note_render(unsigned int usec)
+{
+    render_usec += usec;
+}
+
+void skin_note_flush(unsigned int usec)
+{
+    flush_usec += usec;
+    flush_count++;
+}
+
 void skin_flush_dirty(void)
 {
     FOR_NB_SCREENS(i)
         if (skin_is_dirty(i))
+        {
+            unsigned int t0 = USEC_TIMER;
             screens[i].update();
+            skin_note_flush(USEC_TIMER - t0);
+        }
 }
 
 void skin_update(enum skinnable_screens skin, enum screen_type screen,
@@ -118,8 +147,10 @@ void skin_update(enum skinnable_screens skin, enum screen_type screen,
     if (cuesheet_update)
         skin_request_full_update(skin);
 
+    unsigned int t0 = USEC_TIMER;
     skin_render(gwps, skin_do_full_update(skin, screen) ?
                         SKIN_REFRESH_ALL : update_type);
+    skin_note_render(USEC_TIMER - t0);
     skin_mark_dirty(screen);
 }
 

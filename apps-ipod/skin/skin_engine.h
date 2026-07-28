@@ -42,6 +42,14 @@ void skin_inhibit_flush(bool inhibit);
 bool skin_flush_inhibited(void);
 /* Flush now -- for drawing done outside the action loop */
 void skin_flush_dirty(void);
+/* Redraw cost since boot; difference two readings for a rate. Renderers and
+ * flushers outside skin_display.c report their own time through the note_
+ * calls so the totals cover every path that repaints the screen. */
+unsigned int skin_flush_count(void);
+unsigned int skin_render_usec(void);
+unsigned int skin_flush_usec(void);
+void skin_note_render(unsigned int usec);
+void skin_note_flush(unsigned int usec);
 
 bool skin_has_sbs(struct gui_wps *gwps);
 

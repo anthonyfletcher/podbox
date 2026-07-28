@@ -24,6 +24,14 @@ enum current_activity {
     ACTIVITY_DATABASEBROWSER,
     ACTIVITY_PLUGINBROWSER,
     ACTIVITY_QUICKSCREEN,
+    /* Reserved. Skins select their layout by comparing %cs against these
+       values numerically, so the positions are an interface a theme is
+       written against, not an internal detail: dropping an entry silently
+       renumbers every activity below it and repoints each %cs test at the
+       wrong screen. This slot held the pitch screen, which no longer exists;
+       it stays to keep the numbering that Themify_2 and any other skin
+       already encode. Add new activities at the end. */
+    ACTIVITY_RESERVED_11,
     ACTIVITY_OPTIONSELECT,
     ACTIVITY_PLAYLISTBROWSER,
     ACTIVITY_PLUGIN,

@@ -189,6 +189,13 @@ static void pf_update_dynamic_colors(void)
 #define MAXSLIDE_LEFT_R (PFREAL_HALF - DISPLAY_WIDTH * PFREAL_HALF)
 
 
+/* Caption lines are inset from the screen edges by this much. A caption long
+ * enough to scroll has to overhang its box to reveal its tail, so the inset
+ * is a clip region (see carousel_text_begin()) and not just a starting
+ * offset: without it a scrolling album name runs right into the bezel. */
+#define PF_TEXT_MARGIN 20
+#define PF_TEXT_WIDTH  (LCD_WIDTH - 2 * PF_TEXT_MARGIN)
+
 #define MAX_SLIDES_COUNT 10
 /* Number of side slides rendered per side (3 visible + 1 animation buffer).
  * Was a user-configurable field in the original plugin's config struct, but
@@ -793,10 +800,34 @@ void set_scroll_line(const char *str, enum pf_scroll_line_type type)
     s->step = 0;
     s->offset = 0;
     s->start_tick = current_tick + scroll_line_info.delay;
-    if (LCD_WIDTH - s->width < 0)
+    /* Offsets are relative to the inset caption box, so 0 is PF_TEXT_MARGIN
+     * in from the screen edge -- carousel_text_begin() supplies the origin. */
+    if (PF_TEXT_WIDTH - s->width < 0)
         s->step = scroll_line_info.step;
     else
-        s->offset = (LCD_WIDTH - s->width) / 2;
+        s->offset = (PF_TEXT_WIDTH - s->width) / 2;
+}
+
+/* Clip and shift drawing to the caption box for the duration of one caption.
+ * Callers restore with carousel_text_end(). Enter this before setting the
+ * font or colour: both are properties of the current viewport, so anything
+ * set beforehand is lost on the switch. */
+struct viewport *carousel_text_begin(void)
+{
+    static struct viewport text_vp;
+
+    text_vp = pf_vp;
+    if (pf_vp.width > 2 * PF_TEXT_MARGIN)
+    {
+        text_vp.x = pf_vp.x + PF_TEXT_MARGIN;
+        text_vp.width = pf_vp.width - 2 * PF_TEXT_MARGIN;
+    }
+    return lcd_set_viewport(&text_vp);
+}
+
+void carousel_text_end(struct viewport *saved)
+{
+    lcd_set_viewport(saved);
 }
 
 int get_scroll_line_offset(enum pf_scroll_line_type type)
@@ -826,9 +857,9 @@ static void update_scroll_lines(void)
                 s->step = scroll_line_info.step;
                 s->start_tick = current_tick + scroll_line_info.delay * 2;
             }
-            if (s->offset <= LCD_WIDTH - s->width) {
+            if (s->offset <= PF_TEXT_WIDTH - s->width) {
                 /* at end of line */
-                s->offset = LCD_WIDTH - s->width;
+                s->offset = PF_TEXT_WIDTH - s->width;
                 s->step = -scroll_line_info.step;
                 s->start_tick = current_tick + scroll_line_info.delay * 2;
             }
