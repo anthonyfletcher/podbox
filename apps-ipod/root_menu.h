@@ -75,6 +75,10 @@ enum {
 };
 extern struct menu_item_ex root_menu_;
 
+/* Open the file browser at this file the next time it is entered, rather
+   than where it was left. Cleared as soon as it is used. */
+void browser_reveal_on_next_load(const char *path);
+
 void root_menu_load_from_cfg(void* setting, char *value);
 char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len);
 void root_menu_set_default(void* setting, void* defaultval);

@@ -72,7 +72,6 @@
 #endif
 #include "quick_screen.h"
 #include "screens/shortcuts.h"
-#include "pitch_screen.h"
 #include "system/appevents.h"
 #include "draw/viewport.h"
 #include "audio/pcmbuf.h"
@@ -703,9 +702,10 @@ long gui_wps_show(void)
             case ACTION_WPS_HOTKEY:
             {
                 hotkey = true;
-                if (!global_settings.hotkey_wps)
+                int act = HK_CTX_GET(0, global_settings.context_wps);
+                if (act == HOTKEY_OFF)
                     break;
-                if (get_hotkey(global_settings.hotkey_wps)->flags & HOTKEY_FLAG_NOSBS)
+                if (get_hotkey(act)->flags & HOTKEY_FLAG_NOSBS)
                 {
                     /* leave WPS without re-enabling theme */
                     theme_enabled = false;
@@ -732,6 +732,8 @@ long gui_wps_show(void)
                 if (retval == ONPLAY_MAINMENU
                     || !audio_status())
                     return GO_TO_ROOT;
+                else if (retval == ONPLAY_REVEAL_FILE)
+                    return GO_TO_FILEBROWSER;
                 else if (retval == ONPLAY_PLAYLIST)
                     return GO_TO_PLAYLIST_VIEWER;
 
@@ -930,16 +932,6 @@ long gui_wps_show(void)
             break;
 
                 /* screen settings */
-
-                /* pitch screen */
-            case ACTION_WPS_PITCHSCREEN:
-            {
-                gwps_leave_wps(true);
-                if (1 == gui_syncpitchscreen_run())
-                    return GO_TO_ROOT;
-                restore = true;
-            }
-            break;
 
             /* reset A&B markers */
             case ACTION_WPS_ABRESET:

@@ -90,7 +90,9 @@ struct bookmark_list
     char* items[];
 };
 
-/* flags for optional bookmark tokens */
+/* Flags for optional bookmark tokens. Nothing writes these any more, but
+   bookmarks written before the pitch screen was dropped still carry them and
+   must still parse, so the read path below keeps consuming them. */
 #define BM_PITCH    0x01
 #define BM_SPEED    0x02
 
@@ -103,7 +105,7 @@ struct resume_info{
     long resume_elapsed;
     int  repeat_mode;
     bool shuffle;
-    /* optional values */
+    /* optional values -- only ever read, from pre-existing bookmarks */
     int  pitch;
     int  speed;
 };
@@ -464,18 +466,16 @@ static char* create_bookmark(char **name,
     size_t bmarksz= snprintf(buf, bufsz,
                              /* new optional bookmark token descriptors should
                                 be inserted just after ';"' in this line... */
-                             ">%d;%d;%ld;%d;%ld;%d;%d;%ld;%ld;",
+                             ">%d;%d;%ld;%d;%ld;%d;%d;",
                              /* ... their flags should go here ... */
-                             BM_PITCH | BM_SPEED,
+                             0,
                              resume_info->resume_index,
                              resume_info->id3->offset,
                              resume_info->resume_seed,
                              resume_info->id3->elapsed,
                              resume_info->repeat_mode,
-                             resume_info->shuffle,
+                             resume_info->shuffle
                              /* ...and their values should go here */
-                             (long)resume_info->pitch,
-                             (long)resume_info->speed
                     ); /*sprintf*/
 /* mandatory tokens */
     if (bmarksz >= bufsz) /* include NULL*/
@@ -533,8 +533,6 @@ static void get_track_resume_info(struct resume_info *resume_info)
     resume_info->id3 = audio_current_track();
     resume_info->repeat_mode = global_settings.repeat_mode;
     resume_info->shuffle = global_settings.playlist_shuffle;
-    resume_info->pitch = sound_get_pitch();
-    resume_info->speed = dsp_get_timestretch();
 }
 
 /* ----------------------------------------------------------------------- */
@@ -1106,16 +1104,11 @@ static bool play_bookmark(const char* bookmark)
 {
     char fnamebuf[MAX_PATH];
     struct resume_info resume_info;
-    /* preset pitch and speed to 100% in case bookmark doesn't have info */
-    resume_info.pitch = sound_get_pitch();
-    resume_info.speed = dsp_get_timestretch();
 
     if (parse_bookmark(fnamebuf, sizeof(fnamebuf), bookmark, &resume_info, true))
     {
         global_settings.repeat_mode = resume_info.repeat_mode;
         global_settings.playlist_shuffle = resume_info.shuffle;
-        sound_set_pitch(resume_info.pitch);
-        dsp_set_timestretch(resume_info.speed);
         if (!warn_on_pl_erase())
             return false;
         bool success = bookmark_play(global_temp_buffer, resume_info.resume_index,

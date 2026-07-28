@@ -455,6 +455,18 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
     { 16000, 7, 0 },
 };
 
+/* Item 0 is the hotkey button; 1..4 are the configurable rows at the bottom
+   of the WPS context menu. These defaults are the entries that used to be
+   fixed there, so the menu reads the same until the user changes it. */
+static const int wps_context_menu_default =
+    HK_CTX_SET(0, HOTKEY_VIEW_PLAYLIST) /* hotkey */
+  | HK_CTX_SET(1, HOTKEY_SHOW_TRACK_INFO)
+  | HK_CTX_SET(2, HOTKEY_DELETE)
+  | HK_CTX_SET(3, HOTKEY_SHOW_IN_FILES)
+  | HK_CTX_SET(4, HOTKEY_ALBUMART);
+
+static const int tree_hotkey_default = HOTKEY_OFF;
+
 static void eq_load_from_cfg(void *setting, char *value)
 {
     struct eq_band_setting *eq = setting;
@@ -597,24 +609,6 @@ static void qs_set_default(void* var, void* defaultval)
     *(const struct settings_list **)var = find_setting(defaultval);
 }
 
-static void hotkey_callback(int var)
-{
-    (void)var;
-}
-static const char* hotkey_formatter(char* buffer, size_t buffer_size, int value,
-                              const char* unit)
-{
-    (void)buffer;
-    (void)buffer_size;
-    (void)unit;
-    return str(get_hotkey(value)->lang_id);
-}
-static int32_t hotkey_getlang(int value, int unit)
-{
-    (void)unit;
-    return get_hotkey(value)->lang_id;
-}
-
 /* volume limiter */
 static void volume_limit_load_from_cfg(void* var, char*value)
 {
@@ -643,8 +637,6 @@ static void volume_limit_set_default(void* setting, void* defaultval)
 const struct settings_list settings[] = {
 /* system_status settings .resume.cfg */
     SYSTEM_STATUS_SOUND(F_NO_WRAP, volume, LANG_VOLUME, "volume", SOUND_VOLUME),
-    SYSTEM_STATUS(F_SOUNDSETTING, resume_pitch, PITCH_SPEED_100, "pitch"),
-    SYSTEM_STATUS(F_SOUNDSETTING, resume_speed, PITCH_SPEED_100, "speed"),
     SYSTEM_STATUS(0, resume_index,   -1,     "IDX"),
     SYSTEM_STATUS(0, resume_crc32,   -1,     "CRC"),
     SYSTEM_STATUS(0, resume_elapsed, -1,     "ELA"),
@@ -932,8 +924,8 @@ const struct settings_list settings[] = {
     OFFON_SETTING(0,play_selected,LANG_PLAY_SELECTED,true,"play selected",NULL),
     CHOICE_SETTING(0, single_mode, LANG_SINGLE_MODE, 0,
                   "single mode",
-                  "off,track,album,album artist,artist,composer,work,genre",
-                  NULL, 8,
+                  "off,track,album,album artist,artist,composer,work,genre,playlist",
+                  NULL, 9,
                   ID2P(LANG_OFF),
                   ID2P(LANG_TRACK),
                   ID2P(LANG_ID3_ALBUM),
@@ -941,7 +933,8 @@ const struct settings_list settings[] = {
                   ID2P(LANG_ID3_ARTIST),
                   ID2P(LANG_ID3_COMPOSER),
                   ID2P(LANG_ID3_GROUPING),
-                  ID2P(LANG_ID3_GENRE)),
+                  ID2P(LANG_ID3_GENRE),
+                  ID2P(LANG_PLAYLIST)),
     OFFON_SETTING(0,party_mode,LANG_PARTY_MODE,false,"party mode",NULL),
     OFFON_SETTING(0,fade_on_stop,LANG_FADE_ON_STOP,true,"volume fade",NULL),
     INT_SETTING(F_TIME_SETTING, ff_rewind_min_step, LANG_FFRW_STEP, 1,
@@ -1219,10 +1212,6 @@ const struct settings_list settings[] = {
                        LANG_EQUALIZER_PRECUT, -25,
                        "pbe precut", UNIT_DB, -45, 0,
                        1, db_format, NULL, dsp_pbe_precut),
-    /* timestretch */
-    OFFON_SETTING(F_SOUNDSETTING, timestretch_enabled, LANG_TIMESTRETCH, false,
-                  "timestretch enabled", dsp_timestretch_enable),
-
     /* compressor */
     INT_SETTING_NOWRAP(F_SOUNDSETTING, compressor_settings.threshold,
                        LANG_COMPRESSOR_THRESHOLD, 0,
@@ -1516,11 +1505,6 @@ const struct settings_list settings[] = {
                   false, "shortcuts instead of quickscreen", NULL),
     OFFON_SETTING(0, prevent_skip, LANG_PREVENT_SKIPPING, false, "prevent track skip", NULL),
     OFFON_SETTING(0, rewind_across_tracks, LANG_REWIND_ACROSS_TRACKS, false, "rewind across tracks", NULL),
-    OFFON_SETTING(0, pitch_mode_semitone, LANG_SEMITONE, false,
-                  "Semitone pitch change", NULL),
-    OFFON_SETTING(0, pitch_mode_timestretch, LANG_TIMESTRETCH, false,
-                  "Timestretch mode", NULL),
-
     OFFON_SETTING(0, usb_hid, LANG_USB_HID, true, "usb hid", usb_set_hid),
     CHOICE_SETTING(0, usb_keypad_mode, LANG_USB_KEYPAD_MODE, 0,
             "usb keypad mode", "multimedia,presentation,browser"
@@ -1542,20 +1526,16 @@ const struct settings_list settings[] = {
     /* Customizable list */
     VIEWPORT_SETTING(ui_vp_config, "ui viewport"),
 
-    TABLE_SETTING(F_CB_ON_SELECT_ONLY, hotkey_wps,
-        LANG_HOTKEY_WPS, HOTKEY_VIEW_PLAYLIST, "hotkey wps",
-        "off,view playlist,show track info,pitchscreen,open with,delete,bookmark,plugin,bookmark list"
-        ,UNIT_INT, hotkey_formatter, hotkey_getlang, hotkey_callback,9, HOTKEY_OFF,
-        HOTKEY_VIEW_PLAYLIST, HOTKEY_SHOW_TRACK_INFO, HOTKEY_PITCHSCREEN,
-        HOTKEY_OPEN_WITH, HOTKEY_DELETE, HOTKEY_BOOKMARK, HOTKEY_PLUGIN, HOTKEY_BOOKMARK_LIST),
-    TABLE_SETTING(0, hotkey_tree,
-        LANG_HOTKEY_FILE_BROWSER, HOTKEY_OFF, "hotkey tree",
-        "off,properties,pictureflow,open with,delete,insert,insert shuffled",
-        UNIT_INT, hotkey_formatter, hotkey_getlang, NULL,
-        7,
-        HOTKEY_OFF,HOTKEY_PROPERTIES,
-        HOTKEY_PICTUREFLOW,
-        HOTKEY_OPEN_WITH, HOTKEY_DELETE, HOTKEY_INSERT, HOTKEY_INSERT_SHUFFLED),
+    CUSTOM_SETTING(0, context_wps,
+                   LANG_HOTKEY_WPS, /* lang string here is never actually used */
+                   &wps_context_menu_default, "context_wps",
+                   wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
+                   wps_context_menu_is_changed, wps_context_menu_set_default),
+    CUSTOM_SETTING(0, hotkey_tree,
+                   LANG_HOTKEY_FILE_BROWSER, /* lang string here is never actually used */
+                   &tree_hotkey_default, "hotkey tree",
+                   wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
+                   wps_context_menu_is_changed, wps_context_menu_set_default),
 
     INT_SETTING(F_TIME_SETTING, resume_rewind, LANG_RESUME_REWIND, 0,
                 "resume rewind", UNIT_SEC, 0, 60, 5,

@@ -87,7 +87,6 @@ enum {
     CONTEXT_BOOKMARKSCREEN, /* uses ACTION_BMS_ defines */
     CONTEXT_ALARMSCREEN, /* uses ACTION_AS_ defines */
     CONTEXT_QUICKSCREEN, /* uses ACTION_QS_ defines below */
-    CONTEXT_PITCHSCREEN, /* uses ACTION_PS_ defines below */
 
     CONTEXT_YESNOSCREEN, /*NOTE: make sure your target has this and ACTION_YESNO_ACCEPT */
     CONTEXT_RECSCREEN,
@@ -139,7 +138,6 @@ enum {
     ACTION_WPS_STOP,
     ACTION_WPS_VOLDOWN,
     ACTION_WPS_VOLUP,
-    ACTION_WPS_PITCHSCREEN,/* optional */
     ACTION_WPS_ID3SCREEN,/* optional */
     ACTION_WPS_CONTEXT,
     ACTION_WPS_QUICKSCREEN,/* optional */
@@ -205,22 +203,6 @@ enum {
     ACTION_QS_TOP,
     ACTION_QS_VOLUP,
     ACTION_QS_VOLDOWN,
-
-    /* pitchscreen */
-    /* obviously ignore if you dont have thise screen */
-    ACTION_PS_INC_SMALL,
-    ACTION_PS_INC_BIG,
-    ACTION_PS_DEC_SMALL,
-    ACTION_PS_DEC_BIG,
-    ACTION_PS_NUDGE_LEFT,
-    ACTION_PS_NUDGE_RIGHT,
-    ACTION_PS_NUDGE_LEFTOFF,
-    ACTION_PS_NUDGE_RIGHTOFF,
-    ACTION_PS_TOGGLE_MODE,
-    ACTION_PS_RESET,
-    ACTION_PS_EXIT, /* _STD_* isnt going to work here */
-    ACTION_PS_SLOWER,
-    ACTION_PS_FASTER,
 
     /* yesno screen */
     ACTION_YESNO_ACCEPT,

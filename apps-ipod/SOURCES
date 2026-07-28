@@ -103,9 +103,6 @@ screens/system/alarm.c
 #ifdef ROCKBOX_HAS_LOGF
 screens/system/log_viewer.c
 #endif
-#ifdef HAVE_PITCHCONTROL
-screens/playback/pitch_screen.c
-#endif
 #ifdef HAVE_QUICKSCREEN
 screens/playback/quick_screen.c
 #endif

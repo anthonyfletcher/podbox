@@ -154,25 +154,6 @@ static const struct button_mapping button_context_quickscreen[]  = {
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
 }; /* button_context_quickscreen */
 
-static const struct button_mapping button_context_pitchscreen[]  = {
-    { ACTION_PS_INC_SMALL,      BUTTON_SCROLL_FWD,                BUTTON_NONE },
-    { ACTION_PS_INC_BIG,        BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },
-    { ACTION_PS_DEC_SMALL,      BUTTON_SCROLL_BACK,                BUTTON_NONE },
-    { ACTION_PS_DEC_BIG,        BUTTON_SCROLL_BACK|BUTTON_REPEAT,  BUTTON_NONE },
-    { ACTION_PS_NUDGE_LEFT,     BUTTON_LEFT,                BUTTON_NONE },
-    { ACTION_PS_NUDGE_LEFTOFF,  BUTTON_LEFT|BUTTON_REL,     BUTTON_NONE },
-    { ACTION_PS_NUDGE_RIGHT,    BUTTON_RIGHT,               BUTTON_NONE },
-    { ACTION_PS_NUDGE_RIGHTOFF, BUTTON_RIGHT|BUTTON_REL,    BUTTON_NONE },
-    { ACTION_PS_TOGGLE_MODE,    BUTTON_PLAY,                BUTTON_NONE },
-    { ACTION_PS_EXIT,           BUTTON_MENU,                BUTTON_NONE },
-    { ACTION_PS_EXIT,           BUTTON_SELECT|BUTTON_REL,   BUTTON_SELECT},
-    { ACTION_PS_RESET,          BUTTON_SELECT|BUTTON_REPEAT,BUTTON_SELECT},
-    { ACTION_PS_SLOWER,         BUTTON_LEFT|BUTTON_REPEAT,  BUTTON_NONE },
-    { ACTION_PS_FASTER,         BUTTON_RIGHT|BUTTON_REPEAT, BUTTON_NONE },
-
-    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
-}; /* button_context_pitchscreen */
-
 static const struct button_mapping button_context_keyboard[]  = {
     /* Click-wheel text editor: wheel cycles the character under the caret,
      * a Left/Right tap moves the caret, and holding Left/Right backspaces /
@@ -418,8 +399,6 @@ const struct button_mapping* get_context_mapping(int context)
             return button_context_bmark;
         case CONTEXT_QUICKSCREEN:
             return button_context_quickscreen;
-        case CONTEXT_PITCHSCREEN:
-            return button_context_pitchscreen;
         case CONTEXT_KEYBOARD:
         case CONTEXT_MORSE_INPUT:
             return button_context_keyboard;

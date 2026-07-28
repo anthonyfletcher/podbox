@@ -107,7 +107,36 @@ MENUITEM_SETTING(dirfilter, &global_settings.dirfilter, NULL);
 MENUITEM_SETTING(show_filename_ext, &global_settings.show_filename_ext, NULL);
 MENUITEM_SETTING(browse_current, &global_settings.browse_current, NULL);
 MENUITEM_SETTING(show_path_in_browser, &global_settings.show_path_in_browser, NULL);
-MENUITEM_SETTING(hotkey_tree_item, &global_settings.hotkey_tree, NULL);
+/* The file browser hotkey uses the same picker as the WPS items, but only
+   item 0 of its packed setting -- there is no configurable menu here. */
+static char *tree_hotkey_get_name(int selected_item, void *data,
+                                  char *buffer, size_t buffer_len)
+{
+    (void)selected_item; (void)data;
+    const struct hotkey_assignment *cur =
+        get_hotkey(HK_CTX_GET(0, global_settings.hotkey_tree));
+
+    snprintf(buffer, buffer_len, "%s [%s]",
+             str(LANG_HOTKEY_FILE_BROWSER), str(cur->lang_id));
+    return buffer;
+}
+
+static int tree_hotkey_speak_item(int selected_item, void *data)
+{
+    (void)selected_item; (void)data;
+    const struct hotkey_assignment *cur =
+        get_hotkey(HK_CTX_GET(0, global_settings.hotkey_tree));
+
+    talk_id(LANG_HOTKEY_FILE_BROWSER, false);
+    talk_id(cur->lang_id, true);
+    return 0;
+}
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_tree_item, 0,
+                                  tree_context_menu_do_setting, (void*)0,
+                                  tree_hotkey_get_name,
+                                  tree_hotkey_speak_item,
+                                  (void*)0, NULL, Icon_Menu_setting);
 static int clear_start_directory(void)
 {
     path_append(global_settings.start_directory, PATH_ROOTSTR,
@@ -488,11 +517,95 @@ MAKE_MENU(voice_settings_menu, ID2P(LANG_VOICE), 0, Icon_Voice,
 MENUITEM_SETTING(browser_default,
                  &global_settings.browser_default, NULL);
 
-MENUITEM_SETTING(hotkey_wps_item, &global_settings.hotkey_wps, NULL);
+/* Item 0 is the hotkey button, items 1..4 the configurable rows at the
+   bottom of the WPS context menu. Each row shows what it is currently
+   assigned to; selecting it opens the list of available actions. */
+static char *wps_context_menu_get_name(int selected_item, void *data,
+                                       char *buffer, size_t buffer_len)
+{
+    (void)selected_item;
+    int item = (intptr_t)data;
+    int act = HK_CTX_GET(item, global_settings.context_wps);
+    const struct hotkey_assignment *cur = get_hotkey(act);
+
+    if (item == 0)
+    {
+        snprintf(buffer, buffer_len, "%s [%s]",
+                 str(LANG_HOTKEY_WPS), str(cur->lang_id));
+    }
+    else
+    {
+        snprintf(buffer, buffer_len, "%s %d [%s]",
+                 str(LANG_SET_CONTEXT_ITEM), item, str(cur->lang_id));
+    }
+    return buffer;
+}
+
+static int wps_context_menu_speak_item(int selected_item, void *data)
+{
+    (void)selected_item;
+    int item = (intptr_t)data;
+    int act = HK_CTX_GET(item, global_settings.context_wps);
+    const struct hotkey_assignment *cur = get_hotkey(act);
+
+    if (item == 0)
+    {
+        talk_id(LANG_HOTKEY_WPS, false);
+    }
+    else
+    {
+        talk_id(LANG_SET_CONTEXT_ITEM, false);
+        talk_number(item, true);
+    }
+    talk_id(cur->lang_id, true);
+    return 0;
+}
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_wps_item, 0,
+                                  wps_context_menu_do_setting, (void*)0,
+                                  wps_context_menu_get_name,
+                                  wps_context_menu_speak_item,
+                                  (void*)0, NULL, Icon_Menu_setting);
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_1, 0,
+                                  wps_context_menu_do_setting, (void*)1,
+                                  wps_context_menu_get_name,
+                                  wps_context_menu_speak_item,
+                                  (void*)1, NULL, Icon_Menu_setting);
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_2, 0,
+                                  wps_context_menu_do_setting, (void*)2,
+                                  wps_context_menu_get_name,
+                                  wps_context_menu_speak_item,
+                                  (void*)2, NULL, Icon_Menu_setting);
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_3, 0,
+                                  wps_context_menu_do_setting, (void*)3,
+                                  wps_context_menu_get_name,
+                                  wps_context_menu_speak_item,
+                                  (void*)3, NULL, Icon_Menu_setting);
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_4, 0,
+                                  wps_context_menu_do_setting, (void*)4,
+                                  wps_context_menu_get_name,
+                                  wps_context_menu_speak_item,
+                                  (void*)4, NULL, Icon_Menu_setting);
+
+static void reset_wps_items(void)
+{
+    reset_setting(find_setting(&global_settings.context_wps), NULL);
+}
+MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET), reset_wps_items,
+                  NULL, Icon_Queued);
 
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&browser_default
-            ,&hotkey_wps_item
+            ,&hotkey_wps_item /* this is item 0 */
+            ,&wps_set_context_item_1
+            ,&wps_set_context_item_2
+            ,&wps_set_context_item_3
+            ,&wps_set_context_item_4
+            ,&reset_wps_item
             );
 
 

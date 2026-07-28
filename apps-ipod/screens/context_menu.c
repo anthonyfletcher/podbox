@@ -23,6 +23,10 @@
  *   - playlist operations: insert, queue, add to a named or new playlist
  *   - bookmark, playback and rating items with their visibility callbacks
  *   - file operations: cut, copy, paste, delete, rename, properties
+ *   - the configurable tail of the WPS menu, whose rows are assigned by the
+ *     user rather than declared here
+ *   - the hotkey action table, the picker built from it, and the config.cfg
+ *     handlers for the two packed settings that store the assignments
  *   - the menu declarations, and context_menu_show*() which run them
  ****************************************************************************/
 #include <errno.h>
@@ -66,15 +70,16 @@
 #include "screens/covers/album_covers.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
-#include "screens/playback/pitch_screen.h"
 #include "draw/viewport.h"
 #include "pathfuncs.h"
 #include "shortcuts.h"
+#include "root_menu.h"
+#include "speech/language.h"
 #include "system/activity.h"
+#include "system/strutil.h"
 #include "system/app_util.h"
 #include "system/shutdown.h"
 #include "storage.h"
-#include "sound.h"
 #include "string-extra.h"
 #include "dir.h"
 
@@ -707,60 +712,6 @@ static int browse_id3_wrapper(void)
     return GO_TO_PREVIOUS;
 }
 
-/* CONTEXT_WPS items */
-MENUITEM_FUNCTION(browse_id3_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_MENU_SHOW_ID3_INFO),
-                  browse_id3_wrapper, NULL, Icon_NOICON);
-
-MENUITEM_FUNCTION(pitch_screen_item, 0, ID2P(LANG_PITCH),
-                  gui_syncpitchscreen_run, NULL, Icon_Audio);
-MENUITEM_FUNCTION(pitch_reset_item, 0, ID2P(LANG_RESET_SETTING),
-                  reset_pitch, NULL, Icon_Submenu_Entered);
-
-static int pitch_callback(int action,
-                          const struct menu_item_ex *this_item,
-                          struct gui_synclist *this_list);
-
-/* need special handling so we can toggle the icon */
-#define MAKE_PITCHMENU( name, str, callback, icon, ... )           \
-    static const struct menu_item_ex *name##_[]  = {__VA_ARGS__};  \
-    struct menu_callback_with_desc name##__ = {callback,str,icon}; \
-    static const struct menu_item_ex name =                        \
-        {MT_MENU|MENU_HAS_DESC|MENU_EXITAFTERTHISMENU|             \
-         MENU_ITEM_COUNT(sizeof( name##_)/sizeof(*name##_)),       \
-            { (void*)name##_},{.callback_and_desc = & name##__}};
-
-MAKE_PITCHMENU(pitch_menu, ID2P(LANG_PITCH),
-                pitch_callback, Icon_Audio,
-                &pitch_screen_item,
-                &pitch_reset_item);
-
-static int pitch_callback(int action,
-                          const struct menu_item_ex *this_item,
-                          struct gui_synclist *this_list)
-{
-    if (action == ACTION_ENTER_MENUITEM || action == ACTION_REQUEST_MENUITEM)
-    {
-        pitch_menu__.icon_id = Icon_Submenu; /* if setting changed show + */
-        int32_t ts = dsp_get_timestretch();
-        if (sound_get_pitch() == PITCH_SPEED_100 && ts == PITCH_SPEED_100)
-        {
-            pitch_menu__.icon_id = Icon_Audio;
-            if (action == ACTION_ENTER_MENUITEM)
-            { /* if default then run pitch screen directly */
-                gui_syncpitchscreen_run();
-                action = ACTION_EXIT_MENUITEM;
-            }
-        }
-    }
-    return action;
-
-    (void)this_item;
-    (void)this_list;
-}
-
-MENUITEM_FUNCTION(view_album_art_item, 0, ID2P(LANG_VIEW_ALBUMART),
-                  view_album_art, NULL, Icon_NOICON);
-
 static int clipboard_delete_selected_fileobject(void)
 {
     int rc = delete_fileobject(selected_file.path);
@@ -824,6 +775,30 @@ MENUITEM_FUNCTION(delete_dir_item, 0, ID2P(LANG_DELETE_DIR),
                  clipboard_delete_selected_fileobject, clipboard_callback, Icon_NOICON);
 MENUITEM_FUNCTION(create_dir_item, 0, ID2P(LANG_CREATE_DIR),
                   clipboard_create_dir, clipboard_callback, Icon_NOICON);
+
+static bool prepare_database_sel(void *param);
+
+/* Leave for the file browser, opened on the selected file. From the database
+   the selection is resolved to a real path first; a table resolves to its
+   first entry. */
+static int reveal(void)
+{
+    if (!prepare_database_sel(NULL))
+        return 0;
+
+    if (!file_exists(selected_file.path))
+    {
+        splash(HZ*2, ID2P(LANG_FILE_NOT_FOUND));
+        return 0;
+    }
+
+    browser_reveal_on_next_load(selected_file.path);
+    context_menu_result = ONPLAY_REVEAL_FILE;
+    return 0;
+}
+
+MENUITEM_FUNCTION(reveal_item, 0, ID2P(LANG_SHOW_IN_FILES),
+                  reveal, clipboard_callback, Icon_file_view_menu);
 
 static bool prepare_database_sel(void *param)
 {
@@ -987,7 +962,8 @@ static int clipboard_callback(int action,
                 return ACTION_EXIT_MENUITEM;
             if (selected_file.context == CONTEXT_ID3DB)
             {
-                if (this_item == &track_info_item)
+                if (this_item == &track_info_item ||
+                    this_item == &reveal_item)
                     return action;
                 return ACTION_EXIT_MENUITEM;
             }
@@ -1054,6 +1030,99 @@ static int context_menu_callback(int action,
                                const struct menu_item_ex *this_item,
                                struct gui_synclist *this_list);
 
+/* The configurable tail of the WPS context menu.
+
+   global_settings.context_wps packs HK_CTX_ITEMS hotkey actions into one int.
+   Item 0 is the hotkey button itself and is not drawn as a row; items 1..4 are
+   the rows below, each showing whichever action the user assigned to it. A row
+   set to HOTKEY_OFF hides itself rather than showing as a dead entry. */
+
+static int execute_hotkey(int action);
+static int wps_context_item_cb(int, const struct menu_item_ex *,
+                               struct gui_synclist *);
+
+static char *wps_context_get_item_name(int selected_item, void *data,
+                                       char *buffer, size_t buffer_len)
+{
+    (void)selected_item; (void)buffer; (void)buffer_len;
+    int item = (intptr_t)data;
+    const struct hotkey_assignment *hkey =
+        get_hotkey(HK_CTX_GET(item, global_settings.context_wps));
+
+    return ID2P(hkey->lang_id);
+}
+
+static int wps_context_item_speak_item(int selected_item, void *data)
+{
+    (void)selected_item;
+    int item = (intptr_t)data;
+    const struct hotkey_assignment *hkey =
+        get_hotkey(HK_CTX_GET(item, global_settings.context_wps));
+
+    talk_id(hkey->lang_id, false);
+    return 0;
+}
+
+/* Like MENUITEM_RETURNVALUE_DYNTEXT, but the name-and-icon struct is writable
+   so each row can take the icon of whatever action is assigned to it. */
+#define WPSCTX_RETURNVALUE_DYNTEXT(name, val, cb, text_callback,            \
+                                     voice_callback, text_cb_data, icon)    \
+     struct menu_get_name_and_icon name##_                                  \
+         = {cb,text_callback,voice_callback,text_cb_data,icon};             \
+     static const struct menu_item_ex name   =                              \
+        { MT_RETURN_VALUE|MENU_DYNAMIC_DESC, { .value = val},               \
+        {.menu_get_name_and_icon = & name##_}};
+
+WPSCTX_RETURNVALUE_DYNTEXT(context_item_0, GO_TO_PREVIOUS, wps_context_item_cb,
+  wps_context_get_item_name, wps_context_item_speak_item, (void*)0, Icon_NOICON);
+
+WPSCTX_RETURNVALUE_DYNTEXT(context_item_1, GO_TO_PREVIOUS, wps_context_item_cb,
+  wps_context_get_item_name, wps_context_item_speak_item, (void*)1, Icon_NOICON);
+
+WPSCTX_RETURNVALUE_DYNTEXT(context_item_2, GO_TO_PREVIOUS, wps_context_item_cb,
+  wps_context_get_item_name, wps_context_item_speak_item, (void*)2, Icon_NOICON);
+
+WPSCTX_RETURNVALUE_DYNTEXT(context_item_3, GO_TO_PREVIOUS, wps_context_item_cb,
+  wps_context_get_item_name, wps_context_item_speak_item, (void*)3, Icon_NOICON);
+
+WPSCTX_RETURNVALUE_DYNTEXT(context_item_4, GO_TO_PREVIOUS, wps_context_item_cb,
+  wps_context_get_item_name, wps_context_item_speak_item, (void*)4, Icon_NOICON);
+
+/* map item number to menu_get_name_and_icon structs so we can change icons */
+static struct menu_get_name_and_icon * const ctx_item_map[HK_CTX_ITEMS]=
+  {&context_item_0_, &context_item_1_, &context_item_2_, &context_item_3_,
+   &context_item_4_};
+
+static int wps_context_item_cb(int action,
+                               const struct menu_item_ex *this_item,
+                               struct gui_synclist *this_list)
+{
+    (void)this_list;
+    int item = (intptr_t) this_item->menu_get_name_and_icon->list_get_name_data;
+    int act = HK_CTX_GET(item, global_settings.context_wps);
+
+    if (action == ACTION_ENTER_MENUITEM || action == ACTION_REQUEST_MENUITEM)
+    {
+        if (act == HOTKEY_OFF)
+            return ACTION_EXIT_MENUITEM;
+
+        ctx_item_map[item]->icon_id = get_hotkey(act)->icon;
+    }
+    else if (action == ACTION_EXIT_MENUITEM) /* selected */
+    {
+        if (act == HOTKEY_CONTEXT_MENU)
+        {
+            context_menu_result = hotkey_run_menu(HOTKEY_FLAG_WPS, true, 0);
+        }
+        else
+        {
+            context_menu_result = execute_hotkey(act);
+        }
+        return ACTION_EXIT_AFTER_THIS_MENUITEM;
+    }
+    return action;
+}
+
 /* used when context_menu_show() is called in the CONTEXT_WPS context */
 MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            context_menu_callback, Icon_Audio,
@@ -1061,10 +1130,11 @@ MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &sound_settings, &playback_settings,
            &rating_item,
            &bookmark_menu,
-           &browse_id3_item,
-           &delete_file_item, &view_cue_item,
-           &pitch_menu,
-           &view_album_art_item,
+           &view_cue_item,
+           &context_item_1,
+           &context_item_2,
+           &context_item_3,
+           &context_item_4,
          );
 
 int sort_playlists_callback(int action,
@@ -1095,6 +1165,7 @@ MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,
+           &reveal_item,
            &set_backdrop_item,
            &add_to_faves_item, &set_as_dir_menu, &file_menu, &sort_playlists,
          );
@@ -1193,6 +1264,16 @@ static int hotkey_album_covers(void *param)
 
 #define HOTKEY_FUNC(func, param) {{(void *)func}, param}
 
+/* HOTKEY_CONTEXT_MENU: rather than run one action, offer all of the ones
+   valid where we are. */
+static int hotkey_execute_menu(void)
+{
+    intptr_t flag = HOTKEY_FLAG_WPS;
+    if (selected_file.context != CONTEXT_WPS)
+        flag = HOTKEY_FLAG_TREE;
+    return hotkey_run_menu(flag, true, 0);
+}
+
 /* Any desired hotkey functions go here, in the enum in context_menu_show.h,
    and in the settings menu in settings_list.c.  The order here
    is not important. */
@@ -1201,57 +1282,80 @@ static const struct hotkey_assignment hotkey_items[] = {
       .lang_id = LANG_OFF,
       .func = HOTKEY_FUNC(NULL,NULL),
       .return_code = ONPLAY_RELOAD_DIR,
-      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_TREE,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_VIEW_PLAYLIST,
       .lang_id = LANG_VIEW_DYNAMIC_PLAYLIST,
       .func = HOTKEY_FUNC(NULL, NULL),
       .return_code = ONPLAY_PLAYLIST,
-      .flags = HOTKEY_FLAG_WPS },
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_Playlist },
     { .action = HOTKEY_SHOW_TRACK_INFO,
       .lang_id = LANG_MENU_SHOW_ID3_INFO,
       .func = HOTKEY_FUNC(browse_id3_wrapper, NULL),
       .return_code = ONPLAY_RELOAD_DIR,
-      .flags = HOTKEY_FLAG_WPS },
-    { .action = HOTKEY_PITCHSCREEN,
-      .lang_id = LANG_PITCH,
-      .func = HOTKEY_FUNC(gui_syncpitchscreen_run, NULL),
-      .return_code = ONPLAY_RELOAD_DIR,
-      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS },
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_DELETE,
       .lang_id = LANG_DELETE,
       .func = HOTKEY_FUNC(hotkey_delete_item, NULL),
       .return_code = ONPLAY_RELOAD_DIR,
-      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_TREE,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_INSERT,
       .lang_id = LANG_ADD,
       .func = HOTKEY_FUNC(add_to_playlist, (intptr_t*)&addtopl_insert),
       .return_code = ONPLAY_RELOAD_DIR,
-      .flags = HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_TREE,
+      .icon = Icon_Queued },
     { .action = HOTKEY_INSERT_SHUFFLED,
       .lang_id = LANG_ADD_SHUFFLED,
       .func = HOTKEY_FUNC(hotkey_tree_pl_insert_shuffled, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_TREE,
+      .icon = Icon_Queued },
     { .action = HOTKEY_BOOKMARK,
       .lang_id = LANG_BOOKMARK_MENU_CREATE,
       .func = HOTKEY_FUNC(bookmark_create_menu, NULL),
       .return_code = ONPLAY_OK,
-      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS },
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_Bookmark },
     { .action = HOTKEY_BOOKMARK_LIST,
       .lang_id = LANG_BOOKMARK_MENU_LIST,
       .func = HOTKEY_FUNC(bookmark_load_menu, NULL),
       .return_code = ONPLAY_START_PLAY,
-      .flags = HOTKEY_FLAG_WPS },
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_Bookmark },
     { .action = HOTKEY_PROPERTIES,
       .lang_id = LANG_PROPERTIES,
       .func = HOTKEY_FUNC(hotkey_properties, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_TREE,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_PICTUREFLOW,
       .lang_id = LANG_ONPLAY_PICTUREFLOW,
       .func = HOTKEY_FUNC(hotkey_album_covers, NULL),
       .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_TREE },
+      .flags = HOTKEY_FLAG_TREE,
+      .icon = Icon_Wps },
+    { .action = HOTKEY_ALBUMART,
+      .lang_id = LANG_VIEW_ALBUMART,
+      .func = HOTKEY_FUNC(view_album_art, NULL),
+      .return_code = ONPLAY_OK,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_NOICON },
+    { .action = HOTKEY_SHOW_IN_FILES,
+      .lang_id = LANG_SHOW_IN_FILES,
+      .func = HOTKEY_FUNC(reveal, NULL),
+      .return_code = ONPLAY_REVEAL_FILE,
+      .flags = HOTKEY_FLAG_WPS,
+      .icon = Icon_file_view_menu },
+    { .action = HOTKEY_CONTEXT_MENU,
+      .lang_id = LANG_ONPLAY_MENU_TITLE,
+      .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_TREE,
+      .icon = Icon_Submenu },
 };
 
 const struct hotkey_assignment *get_hotkey(int action)
@@ -1265,11 +1369,8 @@ const struct hotkey_assignment *get_hotkey(int action)
 }
 
 /* Execute the hotkey function, if listed */
-static int execute_hotkey(bool is_wps)
+static int execute_hotkey(int action)
 {
-    const int action = (is_wps ? global_settings.hotkey_wps :
-                                 global_settings.hotkey_tree);
-
     /* search assignment struct for a match for the hotkey setting */
     const struct hotkey_assignment *this_item = get_hotkey(action);
 
@@ -1289,6 +1390,183 @@ static int execute_hotkey(bool is_wps)
     if (return_code == ONPLAY_FUNC_RETURN)
         return func_return;  /* Use value returned by function */
     return return_code;      /* or return the associated value */
+}
+
+static const char *hotkey_get_name(int selected_item, void *data,
+                                   char *buffer, size_t buffer_len)
+{
+    (void)buffer; (void)buffer_len;
+    const struct hotkey_assignment **hk_menu =
+                (const struct hotkey_assignment**)data;
+    return ID2P(hk_menu[selected_item]->lang_id);
+}
+
+static int hotkey_get_talk(int selected_item, void *data)
+{
+    const struct hotkey_assignment **hk_menu =
+                (const struct hotkey_assignment**)data;
+    talk_id(hk_menu[selected_item]->lang_id, false);
+    return 0;
+}
+
+static enum themable_icons hotkey_get_icon(int selected_item, void *data)
+{
+    const struct hotkey_assignment **hk_menu =
+                (const struct hotkey_assignment**)data;
+    return hk_menu[selected_item]->icon;
+}
+
+int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
+{
+    const struct hotkey_assignment *hk_menu[ARRAYLEN(hotkey_items)];
+
+    char *title = str(LANG_ONPLAY_MENU_TITLE);
+    if (flag & HOTKEY_FLAG_TREE)
+        title = str(LANG_HOTKEY_FILE_BROWSER);
+
+    struct simplelist_info info;
+    int selected = 0;
+    int count = 0;
+    for (size_t i = 0; i < ARRAYLEN(hotkey_items); i++)
+    {
+        hk_menu[i] = NULL; /*clear all the hk_menu entries prior to setting them */
+        if (hotkey_items[i].action == HOTKEY_OFF && execute)
+            continue; /* Don't display HOTKEY_OFF item */
+        if ((hotkey_items[i].flags & flag) == flag)
+        {
+            /* the menu cannot offer itself as one of its own entries */
+            if (!execute || hotkey_items[i].action != HOTKEY_CONTEXT_MENU)
+            {
+                if (hotkey_items[i].action == current_action)
+                    selected = count;
+                hk_menu[count++] = &hotkey_items[i];
+            }
+        }
+    }
+
+    simplelist_info_init(&info, title, count, (void*)&hk_menu);
+    info.get_name = hotkey_get_name;
+    info.get_icon = hotkey_get_icon;
+    info.get_talk = hotkey_get_talk;
+    info.selection = selected;
+    simplelist_show_list(&info);
+
+    if (execute)
+    {
+        if (info.selection < 0) /* canceled */
+            return ONPLAY_RELOAD_DIR;
+        return execute_hotkey(hk_menu[info.selection]->action);
+    }
+    else
+    {
+        if (info.selection < 0) /* canceled */
+            return -1;
+        return hk_menu[info.selection]->action;
+    }
+}
+
+/* Assign one packed item from the settings screens. Assigning an action that
+   is already on another item clears the other one, so an action cannot appear
+   twice in the same menu. The hotkey (item 0) is exempt -- it is a button, not
+   a row, so it may duplicate one. */
+static int hotkey_menu_do_setting(void *param, int *setting, int flag)
+{
+    int current = *setting;
+    int item = (intptr_t)param;
+
+    int temp = HK_CTX_GET(item, current);
+    int sel = hotkey_run_menu(flag, false, temp);
+    if (sel >= 0)
+    {
+        current &= ~HK_CTX_SET(item, HK_CTX_MASK);/*clear*/
+        current |= HK_CTX_SET(item, sel);
+
+        /* check for duplicates */
+        if (item > 0)
+        {
+            for (int i = 1; i < HK_CTX_ITEMS; i++)
+            {
+                if (i != item && HK_CTX_GET(i, *setting) == sel)
+                    current &= ~HK_CTX_SET(i, HK_CTX_MASK);/*clear*/
+            }
+        }
+        *setting = current;
+    }
+    return sel;
+}
+
+int wps_context_menu_do_setting(void *param)
+{
+    return hotkey_menu_do_setting(param, &global_settings.context_wps,
+                                  HOTKEY_FLAG_WPS);
+}
+
+int tree_context_menu_do_setting(void *param)
+{
+    return hotkey_menu_do_setting(param, &global_settings.hotkey_tree,
+                                  HOTKEY_FLAG_TREE);
+}
+
+/* config.cfg stores each item by its english name -- see lang_id_to_english().
+   Storing the numeric action instead would break as soon as the enum moved,
+   and storing the translated name breaks on a language change. */
+void wps_context_menu_load_from_cfg(void *setting, char *value)
+{
+    int item = 0;
+    int var = 0;
+    char *st = value;
+    char *end = value;
+    while (*end != '\0' && item < HK_CTX_ITEMS)
+    {
+        end++;
+        if (*end == ',' || *end == '\0')
+        {
+            st = skip_whitespace(st);
+            if (end - st > 1)
+            {
+                for (size_t i = ARRAYLEN(hotkey_items) - 1;
+                     i < ARRAYLEN(hotkey_items); i--)
+                {
+                    const char *this = lang_id_to_english(hotkey_items[i].lang_id);
+                    if (strncasecmp(st, this, end - st) == 0)
+                    {
+                        var |= HK_CTX_SET(item, hotkey_items[i].action);
+                    }
+                }
+            }
+            st = end + 1;
+            item++;
+        }
+    }
+    *(int*)setting = var;
+}
+
+char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len)
+{
+    int var = *(int*)setting;
+    /* the file browser hotkey is a button, not a menu -- only item 0 is used */
+    int items = (setting == &global_settings.hotkey_tree) ? 1 : HK_CTX_ITEMS;
+
+    unsigned int written;
+    char *buffer = buf;
+    for (int i = 0; i < items && buf_len > 0; i++)
+    {
+        written = snprintf(buffer, buf_len, "%s, ",
+                    lang_id_to_english(get_hotkey(HK_CTX_GET(i, var))->lang_id));
+        buf_len -= written;
+        buffer += written;
+    }
+    return buf;
+}
+
+void wps_context_menu_set_default(void *setting, void *defaultval)
+{
+    *(int*)setting = *(int*)defaultval;
+}
+
+bool wps_context_menu_is_changed(void *setting, void *defaultval)
+{
+    return *(int*)setting != *(int*)defaultval;
 }
 
 int context_menu_show(char* file, int attr, int from_context, bool hotkey, int customaction)
@@ -1322,7 +1600,17 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
     int menu_selection;
 
     if (hotkey)
-        return execute_hotkey(from_context == CONTEXT_WPS);
+    {
+        if (from_context == CONTEXT_WPS)
+        {
+            /* item 0 of the packed setting is the WPS hotkey; run it through
+               the same callback the menu rows use so HOTKEY_CONTEXT_MENU
+               behaves identically either way */
+            wps_context_item_cb(ACTION_EXIT_MENUITEM, &context_item_0, NULL);
+            return context_menu_result;
+        }
+        return execute_hotkey(global_settings.hotkey_tree & HK_CTX_MASK);
+    }
     if (customaction == ONPLAY_CUSTOMACTION_SHUFFLE_SONGS)
     {
         int returnCode = add_to_playlist(&addtopl_replace_shuffled);

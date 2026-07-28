@@ -1048,7 +1048,7 @@ static int dirbrowse(void)
             }
 
             case ACTION_TREE_HOTKEY:
-                if (!global_settings.hotkey_tree)
+                if (HK_CTX_GET(0, global_settings.hotkey_tree) == HOTKEY_OFF)
                     break;
                 /* fall through */
             case ACTION_STD_CONTEXT:
@@ -1115,6 +1115,10 @@ static int dirbrowse(void)
                 {
                     case ONPLAY_MAINMENU:
                         return exit_to_new_screen(GO_TO_ROOT);
+                        break;
+
+                    case ONPLAY_REVEAL_FILE:
+                        return exit_to_new_screen(GO_TO_FILEBROWSER);
                         break;
 
                     case ONPLAY_OK:

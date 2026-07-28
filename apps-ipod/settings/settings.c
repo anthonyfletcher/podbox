@@ -974,7 +974,6 @@ void settings_apply(bool read_disk)
     dsp_afr_enable(global_settings.afr_enabled);
     dsp_pbe_precut(global_settings.pbe_precut);
     dsp_pbe_enable(global_settings.pbe);
-    dsp_timestretch_enable(global_settings.timestretch_enabled);
     dsp_set_compressor(&global_settings.compressor_settings);
 
 

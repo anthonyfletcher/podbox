@@ -111,7 +111,8 @@ enum {
     SINGLE_MODE_ARTIST,
     SINGLE_MODE_COMPOSER,
     SINGLE_MODE_GROUPING,
-    SINGLE_MODE_GENRE
+    SINGLE_MODE_GENRE,
+    SINGLE_MODE_PLAYLIST,
 };
 
 enum
@@ -316,6 +317,10 @@ struct system_status
     uint32_t resume_crc32; /* crc32 of the name of the file */
     uint32_t resume_elapsed; /* elapsed time in last file */
     uint32_t resume_offset; /* byte offset in mp3 file */
+    /* Write-only, and not persisted: firmware/sound.c and
+       lib/rbcodec/dsp/tdspeed.c store the value they applied here. Both mirror
+       upstream, so the fields have to stay even though this fork has no pitch
+       screen to set or restore them. */
     int32_t resume_pitch;
     int32_t resume_speed;
     int runtime;       /* current runtime since last charge */
@@ -370,7 +375,6 @@ struct user_settings
     int  keyclick;          /* keyclick volume */
     int  keyclick_repeats;  /* keyclick on repeats */
     bool dithering_enabled;
-    bool timestretch_enabled;
 
 
     /* misc options */
@@ -618,9 +622,6 @@ struct user_settings
     bool prevent_skip;
 
 
-    /* pitch screen settings */
-    bool pitch_mode_semitone;
-    bool pitch_mode_timestretch;
     /* If values are just added to the end, no need to bump plugin API
        version. */
     /* new stuff to be added at the end */
@@ -643,9 +644,11 @@ struct user_settings
     bool show_shutdown_message; /* toggle whether display lights up and displays message
                                 when shutting down */
 
-    /* hotkey assignments - acceptable values are in
-       hotkey_action enum in context_menu_show.h */
-    int hotkey_wps;
+    /* hotkey and WPS context menu assignments - several hotkey_action values
+       (see context_menu.h) packed into one int with the HK_CTX_* macros.
+       Item 0 is the hotkey button; for context_wps items 1..4 are the
+       configurable rows at the bottom of the WPS context menu. */
+    int context_wps;
     int hotkey_tree;
 
     /* When resuming playback (after a stop), rewind this number of seconds */

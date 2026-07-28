@@ -116,24 +116,6 @@ MENUITEM_SETTING(stereo_width, &global_settings.stereo_width,
               &crossfeed, &crossfeed_direct_gain, &crossfeed_cross_gain,
               &crossfeed_hf_attenuation, &crossfeed_hf_cutoff);
 
-static int timestretch_callback(int action,
-                                const struct menu_item_ex *this_item,
-                                struct gui_synclist *this_list)
-{
-    (void)this_list;
-    switch (action)
-    {
-        case ACTION_EXIT_MENUITEM: /* on exit */
-            if (global_settings.timestretch_enabled && !dsp_timestretch_available())
-                splash(HZ*2, ID2P(LANG_PLEASE_REBOOT));
-            break;
-    }
-    lowlatency_callback(action, this_item, NULL);
-    return action;
-}
-    MENUITEM_SETTING(timestretch_enabled,
-                     &global_settings.timestretch_enabled, timestretch_callback);
-
     MENUITEM_SETTING(dithering_enabled,
                      &global_settings.dithering_enabled, lowlatency_callback);
     MENUITEM_SETTING(afr_enabled,
@@ -194,6 +176,5 @@ MAKE_MENU(sound_settings, ID2P(LANG_SOUND_SETTINGS), NULL, Icon_Audio,
           ,&balance,&channel_config,&stereo_width
           ,&crossfeed_menu, &equalizer_menu, &dithering_enabled
           ,&surround_menu, &pbe_menu, &afr_enabled
-          ,&timestretch_enabled
           ,&compressor_menu
          );

@@ -81,6 +81,16 @@ static void rootmenu_track_changed_callback(unsigned short id, void* param)
     struct mp3entry *id3 = ((struct track_event *)param)->id3;
     strmemccpy(current_track_path, id3->path, MAX_PATH);
 }
+
+/* One file the browser opens on next entry instead of resuming where it was,
+ * armed by the context menu's "Show in Files". Consumed once: the browser
+ * goes back to its own position afterwards. */
+static char reveal_path[MAX_PATH];
+
+void browser_reveal_on_next_load(const char *path)
+{
+    strmemccpy(reveal_path, path, MAX_PATH);
+}
 /* Waits for the tagcache to become usable, showing build/init progress as
  * needed. Returns false if the user aborted (caller should bail out). */
 static bool wait_for_tagcache_ready(void)
@@ -163,7 +173,12 @@ static int browser(void* param)
     {
         case GO_TO_FILEBROWSER:
             filter = global_settings.dirfilter;
-            if (global_settings.browse_current &&
+            if (reveal_path[0])
+            {
+                strcpy(folder, reveal_path);
+                reveal_path[0] = '\0';
+            }
+            else if (global_settings.browse_current &&
                     last_screen == GO_TO_WPS &&
                     current_track_path[0])
             {
@@ -368,12 +383,6 @@ static int wpsscrn(void* param)
     int audstatus = audio_status();
     (void)param;
     push_current_activity(ACTIVITY_WPS);
-
-    if (!audstatus)
-    {
-        sound_set_pitch(global_status.resume_pitch);
-        dsp_set_timestretch(global_status.resume_speed);
-    }
 
     if (audstatus)
     {

@@ -17596,3 +17596,45 @@
     *: "Cancel"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SET_CONTEXT_ITEM
+  desc: WPS context item
+  user: core
+  <source>
+    *: "Set Context Item"
+  </source>
+  <dest>
+    *: "Set Context Item"
+  </dest>
+  <voice>
+    *: "Set Context Item"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_IN_FILES
+  desc: Reveal item in File Browser
+  user: core
+  <source>
+    *: "Show in Files"
+  </source>
+  <dest>
+    *: "Show in Files"
+  </dest>
+  <voice>
+    *: "Show in Files"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_NOT_FOUND
+  desc: When file does not exist
+  user: core
+  <source>
+    *: "File not found"
+  </source>
+  <dest>
+    *: "File not found"
+  </dest>
+  <voice>
+    *: "File not found"
+  </voice>
+</phrase>

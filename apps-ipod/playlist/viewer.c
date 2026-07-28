@@ -1071,7 +1071,8 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                                                             &viewer.buffer,
                                                             viewer.selected_track);
                 enum pv_context_result (*do_plugin)(const struct playlist_entry *) = NULL;
-                if (global_settings.hotkey_tree == HOTKEY_PICTUREFLOW)
+                int hk_act = HK_CTX_GET(0, global_settings.hotkey_tree);
+                if (hk_act == HOTKEY_PICTUREFLOW)
                     do_plugin = &open_pictureflow;
                 if (do_plugin != NULL)
                 {
@@ -1087,7 +1088,7 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                         goto exit;
                     }
                 }
-                else if (global_settings.hotkey_tree == HOTKEY_PROPERTIES)
+                else if (hk_act == HOTKEY_PROPERTIES)
                 {
                     if (show_track_info(current_track) == PV_CONTEXT_USB)
                     {
@@ -1096,7 +1097,7 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                     }
                     update_gui(&playlist_lists, false);
                 }
-                else if (global_settings.hotkey_tree == HOTKEY_DELETE)
+                else if (hk_act == HOTKEY_DELETE)
                 {
                     if (update_viewer(&playlist_lists,
                             delete_track(current_track->index,

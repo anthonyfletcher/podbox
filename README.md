@@ -4,10 +4,9 @@
 
 # PodBox
 
-**New firmware for the iPod Classic and iPod Video** with a focus on simplifying
+New firmware for the iPod Classic and iPod Video with a focus on simplifying
 RockBox whilst providing album and artist art everywhere with colour schemes that 
 follows the music.
----
 
 ## Does it run on my iPod?
 
@@ -33,10 +32,6 @@ application to help you populate your library with art.
 The interface recolours itself from the current album art, through the lists and
 the now-playing screen.
 
-**A keyboard you can actually use.**
-The pop-up grid keyboard is gone, replaced by a single-line editor driven
-entirely by the click wheel.
-
 **Themed throughout.**
 A reworked version of the **Themify 2** theme ships as the default. Dialogs,
 splashes and prompts have been standardised and im proved, and screens that used to 
@@ -50,6 +45,10 @@ views can be promoted onto the main menu.
 **Documents and pictures too.**
 A text viewer that handles txt, fb2, epub, docx, pdf, md, html and rtf and an
 image viewer that supports bmp, gif, jpeg and png.
+
+**A keyboard you can actually use.**
+The pop-up grid keyboard is gone, replaced by a single-line editor driven
+entirely by the click wheel.
 
 ## Installing
 
@@ -94,7 +93,8 @@ is a fetcher tool — see [`tools/art_fetch`](tools/art_fetch/README.md).
   have.
 - **No plugin system.** The plugin loader and `open_plugin` are gone. The
   handful of plugins worth keeping became ordinary core screens: the text and
-  image viewers, properties, playing time, credits.
+  image viewers, properties, playing time, credits.  If you miss Doom you need
+  help.
 
 **The application layer is a different tree.** `apps-ipod/` replaces Rockbox's
 `apps/`: reorganised by purpose to make development easier, and every file 
@@ -110,10 +110,6 @@ not render on stock Rockbox.
 merges keep applying. The exceptions — hardware fixes in `firmware/`, build
 scripts, and a handful of others — are catalogued with their reasons in
 [upstream divergence](docs/podbox/upstream-divergence.md).
-
-`tools/checkwps` and `tools/database` both build and work -- CheckWPS
-understands this fork's custom skin tags, so it can validate the shipped theme.
-The simulator does not build.
 
 ---
 
