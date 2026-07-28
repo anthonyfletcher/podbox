@@ -20,6 +20,11 @@ you want [Rockbox](https://www.rockbox.org) itself, which supports 80+ players.
 
 ## What you get
 
+<img src="docs/podbox/ss_album_covers.png" alt="Screenshot" width="200"/> 
+<img src="docs/podbox/ss_album_browser.png" alt="Screenshot" width="200"/>
+<img src="docs/podbox/ss_artist_profiles.png" alt="Screenshot" width="200"/> 
+<img src="docs/podbox/ss_artist_browser.png" alt="Screenshot" width="200"/>
+
 **Your artwork, everywhere.**
 Album covers sit beside the rows in the album browser, and artist photos beside
 artist rows. Two carousels — **Album Covers** and **Artist Portraits** — hang off
@@ -27,6 +32,9 @@ the main menu, and you can go straight from a cover into that album, or from an
 artist into their albums. A thumbnail cache builds quietly in the background
 while the database is idle, so browsing stays fast.  There's also an art fetcher
 application to help you populate your library with art.
+
+<img src="docs/podbox/ss_playing_now.png" alt="Screenshot" width="200"/> 
+<img src="docs/podbox/ss_themed_screen.png" alt="Screenshot" width="200"/>
 
 **Colours that follow the music.**
 The interface recolours itself from the current album art, through the lists and
@@ -41,6 +49,8 @@ the now-playing screen.
 **Your music library.**
 The tag database is always on, is called Music rather than Database, and its
 views can be promoted onto the main menu.
+
+<img src="docs/podbox/ss_epub_viewer.png" alt="Screenshot" width="200"/>
 
 **Documents and pictures too.**
 A text viewer that handles txt, fb2, epub, docx, pdf, md, html and rtf and an

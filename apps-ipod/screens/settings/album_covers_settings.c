@@ -41,10 +41,17 @@ static int art_cache_menu_rebuild(void)
 MENUITEM_FUNCTION(art_cache_rebuild_item, 0, ID2P(LANG_REBUILD_CACHE),
                   art_cache_menu_rebuild, NULL, Icon_NOICON);
 
+/* Update must poke the shared thumbnail cache as well as the carousel's own
+ * index. The cache thread idles once it has covered the current track count, so
+ * artwork added to already-indexed folders -- artist photos especially, which
+ * are dropped in long after the music -- is never picked up on its own. */
 static int art_cache_menu_update(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_UPDATE_CACHE)))
+    {
+        art_cache_rescan();
         album_covers_update_cache();
+    }
     return 0;
 }
 MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),

@@ -74,6 +74,14 @@ static volatile bool cache_busy;
  * thumbnail and regenerate from scratch. */
 static volatile bool aa_invalidate_requested;
 
+/* Set by art_cache_rescan(): run a pass again WITHOUT purging. The thread
+ * otherwise only works when the database's track count changes, so artwork
+ * added to folders that already have their tracks indexed is never noticed --
+ * adding a folder.jpg does not move that count. A pass costs little here
+ * because aa_cache_dir() returns immediately for any folder whose thumbnails
+ * all exist, so this fills in the gaps and leaves everything else alone. */
+static volatile bool aa_rescan_requested;
+
 /* Scratch id3 used only to feed search_albumart_files(); kept out of the
  * thread stack because struct mp3entry is large. */
 static struct mp3entry aa_id3;
@@ -113,6 +121,11 @@ bool art_cache_is_busy(void)
 void art_cache_invalidate(void)
 {
     aa_invalidate_requested = true;
+}
+
+void art_cache_rescan(void)
+{
+    aa_rescan_requested = true;
 }
 
 int art_cache_num_sizes(void)
@@ -1098,6 +1111,15 @@ static void aa_thread(void)
                     aa_invalidate_requested = false;
                     aa_ensure_dirs();
                     aa_purge_thumbs();
+                    done_total = -1;
+                    prev_total = -1;
+                }
+                /* A rescan forces the same fresh pass but keeps what is already
+                 * cached, so only folders missing a thumbnail cost anything. */
+                else if (aa_rescan_requested)
+                {
+                    aa_rescan_requested = false;
+                    aa_ensure_dirs();
                     done_total = -1;
                     prev_total = -1;
                 }

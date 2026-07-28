@@ -62,6 +62,11 @@ bool art_cache_is_busy(void);
 /* Purge every cached thumbnail and regenerate from scratch (background). */
 void art_cache_invalidate(void);
 
+/* Run a generation pass again without purging, so artwork added since the last
+ * pass is picked up. Needed because the cache thread otherwise idles until the
+ * database's track count changes, and adding a folder.jpg does not change it. */
+void art_cache_rescan(void);
+
 /* Resolve the cache-file path for a given album folder and size index.
  * Returns true and fills 'out' if a thumbnail is available, false otherwise.
  * 'dir' is the album's folder path (the directory containing the track), with no
