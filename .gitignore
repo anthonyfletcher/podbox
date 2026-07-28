@@ -343,6 +343,11 @@ __pycache__
 # Local working notes -- drafts and specs, never committed
 /.specifications/
 
+# Release zips fetched back from the build server by release.sh. Ignored so a
+# finished release doesn't dirty the tree and block the next one -- release.sh
+# refuses to run unless the tree is clean.
+/dist/
+
 # Editor and assistant tooling -- local to whoever checked the tree out
 /.idea/
 /.claude/
