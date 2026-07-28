@@ -274,32 +274,40 @@ Native assembler threads (ARM) with cooperative multitasking.
 
 ## Release Workflow
 
-To build, tag, and publish a release on GitHub:
+**Use `./release.sh`.** It does the whole cycle from a clean tree:
 
 ```bash
-# 1. Build hardware release zips
-./build-hw.sh          # 6G
-./build-hw.sh 5g       # 5G
-
-# 2. Commit, tag, and push
-#    Explicit paths, never `git add` -- work is often left staged
-#    deliberately, and a bare commit sweeps it in.
-git commit <paths> -F -
-git tag vX.Y
-git push origin master
-git push origin vX.Y
-
-# 3. Create GitHub release with both zips
-#    No --repo: gh infers it from origin, which is this fork.
-gh release create vX.Y \
-    build-hw-ipod6g/rockbox.zip#rockbox-ipod6g.zip \
-    build-hw-ipodvideo/rockbox.zip#rockbox-ipodvideo-5g.zip \
-    -t "vX.Y" \
-    -F release-notes.md
-# Add -p for prerelease/alpha/beta tags
+export PODBOX_BUILD_SERVER=user@host   # or pass --server; never committed
+./release.sh --dry-run vX.Y            # rehearse: builds + verifies, publishes nothing
+./release.sh vX.Y                      # for real
 ```
-Releases belong to this fork, which is what `origin` points at. Upstream
-remotes are not writable from here -- do not pass `--repo` pointing at one.
+
+It builds both targets on the build server from a `git archive` of HEAD, checks
+each zip really contains the theme, the EQ presets and the binary, and only then
+tags, pushes and creates the release -- so a failed build leaves no tag behind.
+A `-alpha`/`-beta`/`-rc` suffix marks it a prerelease automatically. Release
+notes come from the commits since the previous tag; `--since REF` overrides that
+and is needed only when the previous tag isn't reachable from HEAD.
+
+Three things about publishing that are easy to get wrong by hand, all handled
+inside the script:
+
+- **`gh`'s `file#text` sets a display LABEL, not the asset filename.** Both
+  targets build a file called `rockbox.zip`, so uploading them as
+  `build-hw-ipod6g/rockbox.zip#rockbox-ipod6g.zip` sends two assets both named
+  `rockbox.zip`; the second collides and `gh` then deletes the release it just
+  made, leaving a pushed tag and no release. Copy the zips to their published
+  names *before* upload instead.
+- **`gh` runs on the build server, so it needs `--repo`.** It infers the repo
+  from the origin of the checkout it runs in, and the server's origin is
+  upstream Rockbox, not this fork. Run from *this* machine, origin is the fork
+  and `--repo` is unnecessary -- which is why the flag looks droppable and is
+  not.
+- **Commit with explicit paths, never `git add`** -- work is often left staged
+  deliberately and a bare commit sweeps it in. `release.sh` does not commit; it
+  refuses to run unless the tree is already clean.
+
+Releases belong to this fork. Upstream remotes are not writable from here.
 
 Note the 6G zip ships without routine hardware testing -- see the reference
 target note under Build Commands.

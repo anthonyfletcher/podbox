@@ -263,13 +263,19 @@ say "Creating the GitHub release"
 # (CLAUDE.md's "no --repo" note describes running gh on the local machine,
 # where origin *is* the fork. It does not apply on the server.)
 scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
-ssh "$SERVER" "cd '$REMOTE_DIR' && gh release create '$VERSION' \
+# Both targets produce a file called rockbox.zip, so they must be renamed
+# BEFORE upload. gh's `file#text` syntax does not do this -- it sets a display
+# label and leaves the asset name as the filename, so uploading that way sends
+# two assets both named rockbox.zip and the second one collides.
+ssh "$SERVER" "cd '$REMOTE_DIR' && \
+    cp build-hw-ipod6g/rockbox.zip rockbox-ipod6g.zip && \
+    cp build-hw-ipodvideo/rockbox.zip rockbox-ipodvideo-5g.zip && \
+    gh release create '$VERSION' \
     --repo '$SLUG' \
     --title '$VERSION' \
     --notes-file release-notes.md \
     $PRERELEASE $DRAFT \
-    'build-hw-ipod6g/rockbox.zip#rockbox-ipod6g.zip' \
-    'build-hw-ipodvideo/rockbox.zip#rockbox-ipodvideo-5g.zip'"
+    rockbox-ipod6g.zip rockbox-ipodvideo-5g.zip"
 
 say "Released $VERSION"
 echo "  https://github.com/$SLUG/releases/tag/$VERSION"
