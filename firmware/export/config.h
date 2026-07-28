@@ -1391,7 +1391,22 @@ Lyre prototype 1 */
 #define USB_ENABLE_AUDIO
 #endif
 
-#if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) && USB_VENDOR_ID == 0x05ac
+/* USB iAP is upstream's (the vendored libiap under usbstack/iap), and its gate
+ * turns on automatically for both players this fork builds -- both are Apple
+ * vendor ID with interrupt and isochronous endpoints.
+ *
+ * It ships OFF here because there is no dock or accessory available to test it
+ * with, and shipping an untestable subsystem enabled invites bug reports nobody
+ * here can reproduce. This is not a judgement on the code.
+ *
+ * To re-enable: delete PODBOX_NO_USB_IAP below. Nothing else is needed --
+ * the driver, its SOURCES entries and the descriptors are all already present.
+ * Note it also brings HAVE_MULTIMEDIA_KEYS back, which nothing in apps-ipod
+ * currently consumes. */
+#define PODBOX_NO_USB_IAP
+
+#if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) \
+    && USB_VENDOR_ID == 0x05ac && !defined(PODBOX_NO_USB_IAP)
 #define USB_ENABLE_IAP
 #endif
 

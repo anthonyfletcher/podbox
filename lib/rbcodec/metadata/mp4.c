@@ -64,6 +64,7 @@
 #define MP4_moov FOURCC('m', 'o', 'o', 'v')
 #define MP4_mp4a FOURCC('m', 'p', '4', 'a')
 #define MP4_soun FOURCC('s', 'o', 'u', 'n')
+#define MP4_vide FOURCC('v', 'i', 'd', 'e')
 #define MP4_stbl FOURCC('s', 't', 'b', 'l')
 #define MP4_stsd FOURCC('s', 't', 's', 'd')
 #define MP4_stts FOURCC('s', 't', 't', 's')
@@ -676,6 +677,8 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             lseek(fd, 8, SEEK_CUR);
             read_uint32be(fd, &handler);
             size -= 12;
+            if (handler == MP4_vide)
+                id3->has_video = true;
             /* DEBUGF("    Handler '%c%c%c%c'\n", handler >> 24 & 0xff,
                 handler >> 16 & 0xff, handler >> 8 & 0xff,handler & 0xff); */
             break;

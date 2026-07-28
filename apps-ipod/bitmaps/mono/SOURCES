@@ -1,0 +1,6 @@
+/* Monochrome bitmaps compiled into the core build.
+ *
+ * The upstream osx_dummy.bmp entry was for hosted Apple builds, which this
+ * bare-metal-only fork cannot produce; it and its conditional are gone. */
+
+default_icons.bmp

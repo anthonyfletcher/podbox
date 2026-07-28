@@ -23,7 +23,7 @@
 #if !defined(BOOTLOADER)
 #include "settings.h"
 #include "action.h"
-#include "../apps/gui/skin_engine/skin_engine.h"
+#include "gui/skin_engine/skin_engine.h"
 #endif
 #include <stdlib.h>
 #include "cpu.h"
@@ -39,6 +39,7 @@
 #include "timer.h"
 #include "backlight.h"
 #include "lcd.h"
+#include "storage.h"
 #include "screendump.h"
 
 #ifdef HAVE_REMOTE_LCD
@@ -493,6 +494,10 @@ static inline void do_backlight_off(void)
     backlight_lcd_sleep_countdown(true);
 #endif
 #endif
+    /* Accelerate SSD sleep when backlight turns off — the deep sleep
+     * timer in the storage driver uses backlight state as a gate. */
+    if (storage_get_ssd_mode())
+        storage_sleep();
 }
 
 /* Update state of backlight according to timeout setting */
@@ -820,6 +825,11 @@ void backlight_on(void)
 {
     if(!ignore_backlight_on)
     {
+        /* Pre-wake SSD from ISR context so the storage thread
+         * starts power-up before the UI thread processes the
+         * button event that triggered this. */
+        if (storage_get_ssd_mode())
+            storage_post_event(Q_STORAGE_PRE_WAKE, 0);
         queue_remove_from_head(&backlight_queue, BACKLIGHT_ON);
         queue_post(&backlight_queue, BACKLIGHT_ON, 0);
     }
@@ -862,7 +872,7 @@ int backlight_get_current_timeout(void)
         /* always on or always off */
     else
 #if CONFIG_CHARGING
-        if (power_input_present())
+        if (charger_inserted())
             return backlight_timeout_plugged;
         else
 #endif
@@ -893,8 +903,8 @@ void backlight_hold_changed(bool hold_button)
     if (!hold_button || (backlight_on_button_hold > 0))
     {
         /* if unlocked or override in effect */
-
-        /*backlight_on(); REMOVED*/
+        if (storage_get_ssd_mode())
+            storage_post_event(Q_STORAGE_PRE_WAKE, 0);
         queue_remove_from_head(&backlight_queue, BACKLIGHT_ON);
         queue_post(&backlight_queue, BACKLIGHT_ON, 0);
     }

@@ -528,8 +528,8 @@ sub onevoiceentry {
 sub generaterawclips {
     our $verbose;
     my ($language, $target, $encoder, $encoder_opts, $tts_object, $tts_engine_opts, $existingids) = @_;
-    my $english = dirname($0) . '/../apps/lang/english.lang';
-    my $langfile = dirname($0) . '/../apps/lang/' . $language . '.lang';
+    my $english = dirname($0) . '/../apps-ipod/lang/english.lang';
+    my $langfile = dirname($0) . '/../apps-ipod/lang/' . $language . '.lang';
     my $correctionsfile = dirname($0) . '/voice-corrections.txt';
     my $idfile = "$language.vid";
     my $updfile = "$language-update.lang";
@@ -604,9 +604,9 @@ sub generatevstringclips {
     my $cmd;
     local $| = 1; # make progress indicator work reliably
 
-    unzip $binzip => $langfile, Name => "apps/lang/$langfile" or die "unzip failed: $UnzipError\n";
-    unzip $binzip => $correctionsfile, Name => "apps/lang/$correctionsfile" or die "unzip failed: $UnzipError\n";
-    unzip $binzip => $langenumfile, Name => "apps/lang/lang-enum.txt" or undef($langenumfile);
+    unzip $binzip => $langfile, Name => "apps-ipod/lang/$langfile" or die "unzip failed: $UnzipError\n";
+    unzip $binzip => $correctionsfile, Name => "apps-ipod/lang/$correctionsfile" or die "unzip failed: $UnzipError\n";
+    unzip $binzip => $langenumfile, Name => "apps-ipod/lang/lang-enum.txt" or undef($langenumfile);
 
     # load then add string corrections to tts_object.
     my @corrects = loadvoicecorrect($tts_object, $correctionsfile, $language);

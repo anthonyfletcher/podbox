@@ -1,0 +1,91 @@
+/***************************************************************************
+ * Original code from RockBox
+ * was: apps/recorder/peakmeter.h
+ * Copyright (C) 2002 by Philipp Pertermann
+ * GNU General Public License (version 2+)
+ *
+ * Interface to peakmeter.c.
+ ****************************************************************************/
+#ifndef __PEAK_METER_H__
+#define __PEAK_METER_H__
+
+#define PEAK_METER_FPS 10 /* bugfix FS#10686*/
+#define MAX_PEAK 0x8000
+
+/*#define PM_DEBUG */
+#ifdef PM_DEBUG 
+extern bool peak_meter_histogram(void);
+#endif
+
+extern int pm_get_clipcount(void);
+extern void pm_reset_clipcount(void);
+extern void pm_activate_clipcount(bool active);
+
+extern void peak_meter_enable(bool enable);
+/* sets *left and *right to the current *unscaled* values */
+extern void peak_meter_current_vals(int *left, int *right);
+
+extern void peak_meter_playback(bool playback);
+extern int  peak_meter_draw_get_btn(int action_context, int x[], int y[],
+                                    int height[], int nb_screens,
+                                    struct viewport vps[]);
+extern void peak_meter_set_clip_hold(int time);
+extern void peak_meter_peek(void);
+extern void peak_meter_init_range( bool dbfs, int range_min, int range_max);
+extern void peak_meter_init_times(int release, int hold_ms, int clip_hold_sec);
+extern int  peak_meter_get_min(void);
+extern int  peak_meter_get_max(void);
+extern void peak_meter_set_use_dbfs(bool use);
+extern bool peak_meter_get_use_dbfs(void);
+extern int  peak_meter_db2sample(int db);
+extern unsigned short peak_meter_scale_value(unsigned short val, int meterwidth);
+
+
+/* valid values for trigger_status */
+#define TRIG_OFF            0x00
+#define TRIG_READY          0x01
+#define TRIG_STEADY         0x02
+#define TRIG_GO             0x03
+#define TRIG_POSTREC        0x04
+#define TRIG_RETRIG         0x05
+#define TRIG_CONTINUE       0x06
+
+extern void peak_meter_define_trigger(
+    int start_threshold,
+    long start_duration,
+    long start_dropout,
+    int stop_threshold,
+    long stop_hold_time,
+    long restart_gap
+    );
+
+extern void peak_meter_trigger(bool on);
+extern int peak_meter_trigger_status(void);
+extern void peak_meter_set_trigger_listener(void (*listener)(int status));
+
+#define TRIG_HEIGHT 8
+
+extern void peak_meter_draw_trig(int x[], int y[], int trig_width[], 
+                                      int nb_screens);
+
+#define DB_SCALE_SRC_VALUES_SIZE 12
+struct meter_scales{
+    /* buffered peak values */
+    int pm_peak_left;
+    int pm_peak_right;
+    /* if db_scale_valid is false the content of
+       db_scale_lcd_coord needs recalculation */
+    bool db_scale_valid;
+    /* contains the lcd x coordinates of the magical
+       scale values in db_scale_src_values */
+    int db_scale_lcd_coord[DB_SCALE_SRC_VALUES_SIZE];
+    int last_left;
+    int last_right;
+    /* peak hold timeouts */
+    long pm_peak_timeout_l;
+    long pm_peak_timeout_r;
+};
+
+extern void peak_meter_screen(struct screen *display, int x, int y, int height);
+#endif /* __PEAK_METER_H__ */
+

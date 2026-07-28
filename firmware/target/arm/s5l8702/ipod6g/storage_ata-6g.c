@@ -33,6 +33,7 @@
 #include "panic.h"
 #include "fs_defines.h"
 #include "logf.h"
+#include "backlight.h"
 
 #ifndef ATA_RETRIES
 #define ATA_RETRIES 3
@@ -70,6 +71,9 @@ static struct semaphore ata_wakeup;
 static long ata_last_activity_value = -1;
 static long ata_sleep_timeout = 7 * HZ;
 static bool ata_powered;
+static bool ata_ssd_mode = false;
+static long ssd_sleep_tick;
+static bool ssd_deep_asleep;
 static struct semaphore mmc_wakeup;
 static struct semaphore mmc_comp_wakeup;
 #ifdef HAVE_ATA_DMA
@@ -652,6 +656,18 @@ static int ata_power_up(void)
     logf("ata POWERUP %ld", current_tick);
 
     ata_set_active();
+
+    if (ata_ssd_mode && !ceata) {
+        if (!ssd_deep_asleep) {
+            /* Fast path: clock was gated, AUTOLDO still on */
+            PWRCON(0) &= ~(1 << 5);
+            ata_powered = true;
+            return 0;
+        }
+        ssd_deep_asleep = false;
+        /* Fall through to full PATA init below */
+    }
+
     ide_power_enable(true);
     long spinup_start = current_tick;
     if (ceata) {
@@ -743,10 +759,13 @@ static int ata_power_up(void)
             PASS_RC(ata_set_feature(0x02, 0), 3, 5); /* Enable volatile write cache */
         if (identify_info[82] & BIT(6))
             PASS_RC(ata_set_feature(0xaa, 0), 3, 6); /* Enable read lookahead */
-        if (identify_info[83] & BIT(3))
-            PASS_RC(ata_set_feature(0x05, 0x80), 3, 7); /* Enable lowest power mode w/o standby */
-        if (identify_info[83] & BIT(9))
-            PASS_RC(ata_set_feature(0x42, 0x80), 3, 8); /* Enable lowest noise mode */
+        if (!ata_ssd_mode)
+        {
+            if (identify_info[83] & BIT(3))
+                PASS_RC(ata_set_feature(0x05, 0x80), 3, 7); /* Enable lowest power mode w/o standby */
+            if (identify_info[83] & BIT(9))
+                PASS_RC(ata_set_feature(0x42, 0x80), 3, 8); /* Enable lowest noise mode */
+        }
 
         PASS_RC(ata_identify(identify_info), 3, 9); /* Finally, re-read identify info */
     }
@@ -915,10 +934,13 @@ static int ata_transfer_sectors(uint64_t sector, int count, void* buffer, int wr
     if (sector + count > total_sectors)
         RET_ERR(0);
     ata_set_active();
-    if (ata_dma && write)
-        commit_dcache();
-    else if (ata_dma)
-        commit_discard_dcache();
+    if (ata_dma) {
+        int xfer_size = count * log_sector_size;
+        if (write)
+            commit_dcache_range(buffer, xfer_size);
+        else
+            commit_discard_dcache_range(buffer, xfer_size);
+    }
     if (!ceata)
         ATA_COMMAND = BIT(1);
 
@@ -1103,39 +1125,71 @@ void ata_sleepnow(void)
 
     ata_flush_cache();
 
-    if (ceata || ata_disk_can_sleep()) {
+    if (ceata) {
         logf("ata SLEEP %ld", current_tick);
-
-        if (ceata) {
-            memset(ceata_taskfile, 0, 16);
-            ceata_taskfile[0xf] = CMD_STANDBY_IMMEDIATE;
-            ceata_wait_idle();
-            ceata_write_multiple_register(0, ceata_taskfile, 16);
-            ceata_wait_idle();
-            sleep(HZ);
-            PWRCON(0) |= (1 << 9);
-        } else {
-            ata_wait_for_rdy(1000000);
-            ata_write_cbr(&ATA_PIO_DVR, 0);
-            ata_write_cbr(&ATA_PIO_CSD, CMD_STANDBY_IMMEDIATE);
-            ata_wait_for_rdy(1000000);
-            sleep(HZ / 30);
-            ATA_CONTROL = 0;
-            while (!(ATA_CONTROL & BIT(1)))
-                yield();
-            PWRCON(0) |= (1 << 5);
-        }
+        memset(ceata_taskfile, 0, 16);
+        ceata_taskfile[0xf] = CMD_STANDBY_IMMEDIATE;
+        ceata_wait_idle();
+        ceata_write_multiple_register(0, ceata_taskfile, 16);
+        ceata_wait_idle();
+        sleep(HZ);
+        PWRCON(0) |= (1 << 9);
+        ata_power_down();
+    } else if (ata_ssd_mode) {
+        /* SSD: gate ATA controller clock.  Flash stays powered,
+         * GPIOs stay configured, controller state preserved through
+         * clock gate.  Near-instant wake via fast-path in
+         * ata_power_up(). */
+        logf("ata SSD SLEEP %ld", current_tick);
+        PWRCON(0) |= (1 << 5);
+        ata_powered = false;
+        ssd_deep_asleep = false;
+        ssd_sleep_tick = current_tick;
+    } else if (ata_disk_can_sleep()) {
+        logf("ata SLEEP %ld", current_tick);
+        ata_wait_for_rdy(1000000);
+        ata_write_cbr(&ATA_PIO_DVR, 0);
+        ata_write_cbr(&ATA_PIO_CSD, CMD_STANDBY_IMMEDIATE);
+        ata_wait_for_rdy(1000000);
+        sleep(HZ / 30);
+        ATA_CONTROL = 0;
+        while (!(ATA_CONTROL & BIT(1)))
+            yield();
+        PWRCON(0) |= (1 << 5);
+        ata_power_down();
+    } else if (canflush) {
+        ata_power_down();
     }
-
-    if (ceata || ata_disk_can_sleep() || canflush)
-        ata_power_down(); // XXX add a powerdown delay similar to main ATA driver?
 
     mutex_unlock(&ata_mutex);
 }
 
 void ata_spin(void)
 {
+    if (ata_ssd_mode && !ata_powered)
+    {
+        mutex_lock(&ata_mutex);
+        if (!ata_powered)
+            ata_power_up();
+        mutex_unlock(&ata_mutex);
+    }
     ata_set_active();
+}
+
+void ata_set_storage_mode(int mode)
+{
+    /* 0=auto, 1=HDD, 2=SSD */
+    if (mode == 2)
+        ata_ssd_mode = true;
+    else if (mode == 1)
+        ata_ssd_mode = false;
+    else /* auto */
+        ata_ssd_mode = ata_disk_isssd();
+}
+
+bool ata_get_ssd_mode(void)
+{
+    return ata_ssd_mode;
 }
 
 long ata_last_disk_activity(void)
@@ -1151,6 +1205,8 @@ int ata_init(void)
     semaphore_init(&mmc_comp_wakeup, 1, 0);
     ceata = PDAT(11) & BIT(1);
     ata_powered = false;
+    ssd_deep_asleep = false;
+    ssd_sleep_tick = 0;
     total_sectors = 0;
 
     /* get identify_info */
@@ -1159,6 +1215,9 @@ int ata_init(void)
     mutex_unlock(&ata_mutex);
     if (IS_ERR(rc))
         return rc;
+
+    /* Auto-detect SSD before settings are loaded */
+    ata_ssd_mode = ata_disk_isssd();
 
     /* Logical sector size */
     if (ceata)
@@ -1286,6 +1345,26 @@ int ata_event(long id, intptr_t data)
         if (!ata_powered ||
             TIME_BEFORE(current_tick, ata_last_activity_value + ata_sleep_timeout))
         {
+            /* Phase 2: SSD deep sleep — cut AUTOLDO after 30s of
+             * clock-gate sleep when backlight is off */
+            if (ata_ssd_mode && !ata_powered && !ssd_deep_asleep
+                && !is_backlight_on(true)
+                && TIME_AFTER(current_tick, ssd_sleep_tick + 10 * HZ))
+            {
+                mutex_lock(&ata_mutex);
+                if (!ata_powered && !ssd_deep_asleep)
+                {
+                    logf("ata SSD DEEP %ld", current_tick);
+                    PCON(7) = 0;
+                    PCON(8) = 0;
+                    PCON(9) = 0;
+                    PCON(10) &= ~0xffff;
+                    PCON(11) &= ~0xf;
+                    ide_power_enable(false);
+                    ssd_deep_asleep = true;
+                }
+                mutex_unlock(&ata_mutex);
+            }
             STG_EVENT_ASSERT_ACTIVE(STORAGE_ATA);
         }
     }
@@ -1296,6 +1375,17 @@ int ata_event(long id, intptr_t data)
     else if (id == Q_STORAGE_SLEEP)
     {
         ata_last_activity_value = current_tick - ata_sleep_timeout + HZ / 5;
+    }
+    else if (id == Q_STORAGE_PRE_WAKE)
+    {
+        if (ata_ssd_mode && !ata_powered)
+        {
+            mutex_lock(&ata_mutex);
+            if (!ata_powered)
+                ata_power_up();
+            mutex_unlock(&ata_mutex);
+        }
+        ata_set_active();
     }
     else if (id == SYS_USB_CONNECTED)
     {

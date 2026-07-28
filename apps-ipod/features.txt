@@ -1,0 +1,268 @@
+/* This file controls which strings are included when rockbox is built and
+   when the .lng and .voice files are built. That means that a change in this
+   file will break compatibility with older .lng and .voice files and that those
+   version numbers should be updated. It also means that changing defines in
+   the various config*.h files could also break back compatibility */
+
+#if defined(HAVE_ACCESSORY_SUPPLY)
+accessory_supply
+#endif
+
+#if defined(HAVE_AGC)
+agc
+#endif
+
+#if defined(HAVE_RTC_ALARM)
+alarm
+#endif
+
+#if defined(HAVE_BACKLIGHT_BRIGHTNESS)
+backlight_brightness
+#endif
+
+#if defined(HAVE_GENERAL_PURPOSE_LED)
+general_purpose_led
+#endif
+
+#if defined(HAVE_BUTTON_LIGHT)
+button_light
+#endif
+
+#if defined(HAVE_BUTTONLIGHT_BRIGHTNESS)
+buttonlight_brightness
+#endif
+
+#if defined(HAVE_CROSSFADE)
+crossfade
+#endif
+
+#if defined(HAVE_DIRCACHE)
+dircache
+#endif
+
+#if defined(HAVE_FLASH_STORAGE)
+flash_storage
+#endif
+
+#if defined(HAVE_HEADPHONE_DETECTION)
+headphone_detection
+#endif
+
+#if defined(HAS_BUTTON_HOLD)
+hold_button
+#endif
+
+#if defined(HAVE_HOTKEY)
+hotkey
+#endif
+
+lcd_bitmap
+
+#if LCD_DEPTH > 1
+lcd_non-mono
+#endif
+
+#if defined(HAVE_LCD_COLOR)
+lcd_color
+#endif
+
+#if defined(HAVE_LCD_INVERT)
+lcd_invert
+#endif
+
+#if defined(HAVE_LCD_SLEEP)
+lcd_sleep
+#endif
+
+#if defined(HAVE_MORSE_INPUT)
+morse_input
+#endif
+
+#if defined(HAVE_PITCHCONTROL)
+pitchscreen
+#endif
+
+#if defined(HAVE_MULTIVOLUME)
+multivolume
+#endif
+
+#if defined(HAVE_QUICKSCREEN)
+quickscreen
+#endif
+
+
+#if defined(HAVE_HISTOGRAM)
+histogram
+#endif
+
+
+
+#if CONFIG_RTC
+rtc
+#endif
+
+#if defined(IPOD_ACCESSORY_PROTOCOL)
+serial_port
+#endif
+
+#if defined(HAVE_SPDIF_POWER)
+spdif_power
+#endif
+
+#if defined(HAVE_SPEAKER)
+speaker
+#endif
+
+swcodec
+
+#if defined(HAVE_TAGCACHE)
+tagcache
+#endif
+
+#if defined(HAVE_TC_RAMCACHE)
+tc_ramcache
+#endif
+
+#if CONFIG_CHARGING
+charging
+#if defined(HAVE_USB_CHARGING_ENABLE)
+usb_charging_enable
+#endif
+#endif
+
+#if defined(HAVE_WHEEL_ACCELERATION)
+wheel_acceleration
+#endif
+
+#if defined(HAVE_LINEOUT_POWEROFF)
+lineout_poweroff
+#endif
+
+
+#if defined(HAVE_TOUCHPAD_DEADZONE)
+touchpad_deadzone
+#endif
+
+#if defined(HAVE_IMX233_CODEC) || defined(HAVE_WM8750) || defined(HAVE_WM8978)
+depth_3d
+#endif
+
+/* This should be AUDIOHW_HAVE_FILTER_ROLL_OFF but that is only defined later */
+#if defined(DX50) || defined(HAVE_DF1704_CODEC) || defined(HAVE_PCM1792_CODEC) || defined(HAVE_CS4398) || defined(HAVE_WM8740) || defined(HAVE_ES9018)|| defined(HAVE_EROS_QN_CODEC) || defined(HAVE_XDUOO_LINUX_CODEC) || defined(HAVE_FIIO_LINUX_CODEC) || defined(HAVE_AK4376) || defined(HAVE_ES9218) || defined(HAVE_SURFANS_LINUX_CODEC) || defined(HAVE_HIBY_LINUX_CODEC)
+filter_roll_off
+#endif
+
+/* This should be AUDIOHW_HAVE_POWER_MODE but that is not defined yet */
+#if defined(HAVE_AK4376) || defined(HAVE_ES9218)
+dac_power_mode
+#endif
+
+#if defined(HAVE_ES9018) || defined(HAVE_EROS_QN_CODEC)
+es9018
+#endif
+
+#if defined(HAVE_ES9218)
+es9218
+#endif
+
+/* These features are only used by the manual so they won't break binary
+ * compatibility
+ */
+
+#if (PLUGIN_BUFFER_SIZE >= 0x80000)
+large_plugin_buffer
+#endif
+
+#if defined(AB_REPEAT_ENABLE) && !defined(ACTION_WPSAB_SINGLE)
+ab_repeat_buttons
+#endif
+
+#if defined(HAVE_ALBUMART)
+albumart
+#endif
+
+#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
+backlight_fade_int
+#endif
+
+#if defined(HAVE_DISK_STORAGE)
+disk_storage
+#endif
+
+#if (CONFIG_STORAGE & STORAGE_SD)
+sd_storage
+#endif
+
+
+#if defined(HAVE_LCD_FLIP)
+lcd_flip
+#endif
+
+#if defined(HAVE_LCD_CONTRAST)
+lcd_contrast
+#endif
+
+#if defined(HAVE_SCROLLWHEEL)
+scrollwheel
+#endif
+
+#if defined(HAVE_USB_POWER)
+usb_power
+#endif
+
+#if defined(HAVE_USBSTACK)
+usbstack
+#endif
+
+#if defined(USB_ENABLE_HID)
+usb_hid
+#if defined(HAVE_USB_HID_MOUSE)
+usb_hid_mouse
+#endif
+#endif
+
+#if defined(HAVE_SPDIF_IN)
+recording_digital
+#endif
+
+#if MEMORYSIZE <= 2
+lowmem
+#elif MEMORYSIZE > 8
+himem
+#endif
+
+#if defined(HAVE_HARDWARE_CLICK)
+hardware_click
+#endif
+
+#if defined(HAVE_PLAY_FREQ)
+play_frequency
+#endif
+
+#if defined(HAVE_MULTIBOOT)
+multi_boot
+#endif
+
+#if defined(HIBY_LINUX)
+hibylinux
+#endif
+
+#if (CONFIG_KEYPAD == IPOD_4G_PAD)
+clear_settings_on_hold
+#endif
+
+#if defined(HAVE_PERCEPTUAL_VOLUME)
+perceptual_volume
+#endif
+
+#if defined(CODEC_AAC_SBR_DEC)
+codec_aac_he
+#endif
+
+#if defined(USE_LTO)
+lto
+#endif
+
+#if defined(USB_ENABLE_AUDIO)
+usbdac
+#endif

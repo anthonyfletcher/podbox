@@ -21,8 +21,8 @@
 /* define this if the ATA controller and method of USB access support LBA48 */
 #define HAVE_LBA48
 
-/* define this if you have recording possibility */
-#define HAVE_RECORDING
+/* Recording support removed for this DAP-only fork. */
+//#define HAVE_RECORDING
 //#define HAVE_AGC
 //#define HAVE_HISTOGRAM
 
@@ -136,7 +136,7 @@
 #define HAVE_SW_POWEROFF
 
 /* Buffer for plugins and codecs. */
-#define PLUGIN_BUFFER_SIZE  0x200000 /* 2 MiB */
+#define PLUGIN_BUFFER_SIZE  0x300000 /* 3 MiB */
 #define CODEC_SIZE          0x100000 /* 1 MiB */
 
 /* 6g has a standard battery of 550mAh, except for the thick 6g (2007 160gb)
@@ -258,9 +258,11 @@
 #endif
 #else /* !BOOTLOADER */
 #define HAVE_SERIAL
+#define ROCKBOX_HAS_LOGF
 /* Disable iAP when LOGF_SERIAL is enabled to avoid conflicts */
 #ifndef LOGF_SERIAL
 #define IPOD_ACCESSORY_PROTOCOL
+#define TARGET_EXTRA_THREADS 1
 #endif
 #endif
 

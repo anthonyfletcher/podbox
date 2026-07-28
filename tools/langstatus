@@ -12,7 +12,7 @@ else
 fi
 
 UPDLANG=`dirname $0`/updatelang
-LANGDIR=`dirname $0`/../apps/lang
+LANGDIR=`dirname $0`/../apps-ipod/lang
 ENGLISH="$LANGDIR"/english.lang
 
 (for LANGFILE in $LANGDIR/*.lang; do

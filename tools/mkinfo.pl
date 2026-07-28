@@ -105,14 +105,21 @@ printf O ("Binary: %s\n", $ENV{'BINARY'});
 printf O ("Binary size: %s\n", filesize($ENV{'BINARY'}));
 printf O ("Voice format: %s\n", definescan("$ENV{APPSDIR}/talk.h", "VOICE_VERSION"));
 
-if ($ENV{'APPSDIR'} =~ /\/apps$/) {
+# A core build is one compiling the application layer, whatever directory that
+# lives in -- --appsdir can move it, so match COREAPPSDIR rather than "apps".
+# The features file sits under the matching directory in the build tree.
+my $coreapps = $ENV{'COREAPPSDIR'} || "";
+my ($coreappsname) = $coreapps =~ m{([^/]+)$};
+$coreappsname = "apps" unless $coreappsname;
+
+if ($coreapps ne "" && $ENV{'APPSDIR'} eq $coreapps) {
     if (-f "rockbox.bin") {
         printf O ("Actual size: %s\n", filesize("rockbox.bin"));
     } else {
         printf O ("Actual size: %s\n", filesize($ENV{'BINARY'}));
     }
   printf O ("RAM usage: %s\n", mapscan("rockbox.map"));
-  printf O ("Features: %s\n", features("apps/features"));
+  printf O ("Features: %s\n", features("$coreappsname/features"));
 } elsif ($ENV{'APPSDIR'} =~ /\/bootloader$/) {
     if (-f "bootloader.bin") {
         printf O ("Actual size: %s\n", filesize("bootloader.bin"));

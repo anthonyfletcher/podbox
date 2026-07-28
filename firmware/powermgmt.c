@@ -361,7 +361,7 @@ static int voltage_to_battery_level(int millivolts)
         return -1;
 
 #if CONFIG_CHARGING >= CHARGING_MONITOR
-    if (charging_state()) {
+    if (charge_state > DISCHARGING) {
         /* battery level is defined to be < 100% until charging is finished */
         level = voltage_to_percent(millivolts, percent_to_volt_charge);
         if (level > 99)
@@ -595,11 +595,8 @@ static inline void charging_algorithm_step(void)
     {
     case CHARGER_PLUGGED:
     case CHARGER:
-        if (charging_state()) {
-            charge_state = CHARGING;
-            break;
-        }
-    /* Fallthrough */
+        charge_state = CHARGING;
+        break;
     case CHARGER_UNPLUGGED:
     case NO_CHARGER:
         charge_state = DISCHARGING;

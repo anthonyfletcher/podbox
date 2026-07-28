@@ -1,0 +1,35 @@
+/* Bitmaps compiled into the core build for the native (colour) LCD.
+ *
+ * This fork targets the iPod Video 5G/5.5G and iPod Classic 6G/7G only, both
+ * 320x240 16-bit. The upstream variants for every other screen size, and the
+ * bootloader menu icons for the Sony/AGPTek/xDuoo/FiiO players, have been
+ * deleted -- they were never selected here. The size conditionals below are
+ * kept only where a real choice remains. */
+
+#ifndef BOOTLOADER  /* We don't need these for the bootloader */
+
+/* Boot logo, shown centered by show_logo_boot() in apps/main.c */
+podboxlogo.bmp
+
+/* Artwork panel down the left of the credits screen, drawn by
+ * cr_draw_backdrop() in apps/viewers/credits.c */
+podboxcredits.bmp
+
+/* Shared "no artwork found" placeholder for album and artist art -- scaled to
+ * each size by aa_ensure_fallback() in apps/metadata/art_cache.c */
+#ifdef HAVE_TAGCACHE
+podboxnoart.bmp
+#endif
+
+/* Full-screen custom USB (eject) screen for the 320x240 iPods */
+#if defined(HAVE_LCD_COLOR) && (LCD_WIDTH == 320) && (LCD_HEIGHT == 240)
+podboxusb.bmp
+#endif
+
+/* Full-screen wake image, shown by alarm_show_wake_image() in
+ * apps/screens/system/alarm.c on the boot an RTC alarm started */
+#ifdef HAVE_RTC_ALARM
+podboxalarm.bmp
+#endif
+
+#endif /* BOOTLOADER */

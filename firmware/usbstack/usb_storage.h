@@ -23,5 +23,10 @@
 #include "usb_class_driver.h"
 
 extern struct usb_class_driver usb_cdrv_storage;
+
+/* True if the host wrote to mass storage during the connect that just ended.
+ * False means the disk is byte-for-byte as we left it, so the post-USB
+ * database and dircache rebuild can be skipped entirely. */
+bool usb_storage_host_wrote(void);
 #endif
 

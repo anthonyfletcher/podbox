@@ -326,6 +326,9 @@ struct mp3entry {
 
     /* For ASF files with MP3 audio stream */
     bool is_asf_stream;
+
+    /* MP4 container has a video track */
+    bool has_video;
 };
 
 unsigned int probe_file_format(const char *filename); /* returns audio_fmt */

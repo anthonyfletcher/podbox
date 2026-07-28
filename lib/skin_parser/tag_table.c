@@ -318,11 +318,23 @@ int find_escape_character(char lookup)
  * Finds a tag by name and returns its parameter list, or an empty
  * string if the tag is not found in the table
  */
+/* Optional extension: a build may supply extra tags in its own table without
+ * touching this (upstream) one. Weak so the parser still links standalone
+ * (e.g. the theme editor), where it resolves to NULL and is skipped. */
+const struct tag_info* find_custom_tag(const char *name) __attribute__((weak));
+
 const struct tag_info* find_tag(const char *name)
 {
-    /* First we check three then two characters after the '%', then a single char */
     const struct tag_info *tag = NULL;
     int i = MAX_TAG_LENGTH;
+    /* Custom tags first: they do their own full-length match, so a custom name
+     * (e.g. "sel") wins over a shorter upstream tag that prefixes it ("s").
+     * The reverse order would let the upstream single-char search below shadow
+     * every custom tag whose name starts with an existing 1- or 2-char tag.
+     * Safe because custom names are verified not to clash with upstream ones. */
+    if (find_custom_tag)
+        tag = find_custom_tag(name);
+    /* Then upstream: three, then two characters after the '%', then a single char */
     while (!tag && i > 1)
     {
         tag = search_tag(name, i);

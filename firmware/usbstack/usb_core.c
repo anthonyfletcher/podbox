@@ -470,6 +470,18 @@ void usb_core_init(void)
     logf("usb_core_init() finished");
 }
 
+/* Exposed here because usb_storage.h is private to the stack; the app layer
+ * uses this to skip the post-USB database and dircache rebuild when the host
+ * only ever read from us. */
+bool usb_core_host_wrote_storage(void)
+{
+#ifdef USB_ENABLE_STORAGE
+    return usb_storage_host_wrote();
+#else
+    return false;
+#endif
+}
+
 void usb_core_exit(void)
 {
     usb_core_do_set_config(0);

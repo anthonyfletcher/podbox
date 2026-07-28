@@ -1420,8 +1420,9 @@ voiceconfig () {
 }
 
 picklang() {
-    # figure out which languages that are around
-    for file in $rootdir/apps/lang/*.lang; do
+    # figure out which languages that are around -- in the application layer
+    # being built, which --appsdir may have moved away from "apps"
+    for file in $rootdir/${coreapps:-apps}/lang/*.lang; do
         clean=`basename $file .lang`
         langs="$langs $clean"
     done
@@ -1537,6 +1538,8 @@ help() {
     --32-bit          Force a 32-bit simulator (use with --sdl-threads for duke3d)
     --prefix          Target installation directory
     --compiler-prefix Override compiler prefix (inherently dangerous)
+    --appsdir=DIR     Build the application layer from DIR (a name relative to
+                      the source root) instead of the default "apps"
     --help            Shows this message (must not be used with other options)
 
 EOF
@@ -1544,6 +1547,7 @@ EOF
   exit
 }
 
+ARG_APPSDIR=
 ARG_CCACHE=
 ARG_ENCOPTS=
 ARG_LANG=
@@ -1565,6 +1569,7 @@ ARG_PLUGINS=
 err=
 for arg in "$@"; do
 	case "$arg" in
+		--appsdir=*)  ARG_APPSDIR=`echo "$arg" | cut -d = -f 2`;;
 		--ccache)     ARG_CCACHE=1;;
 		--no-ccache)  ARG_CCACHE=0;;
 		--encopts=*)  ARG_ENCOPTS=`echo "$arg" | cut -d = -f 2`;;
@@ -1670,7 +1675,17 @@ if [ -z "$rootdir" ]; then
 fi
 
 apps="apps"
-appsdir='$(ROOTDIR)/apps'
+# The application layer lives in "apps" unless --appsdir names another
+# directory. coreappsdir always points at it; appsdir is what the build type
+# actually compiles, and the bootloader/checkwps/database types repoint that
+# below while still needing coreappsdir for the core bitmaps and lang files.
+coreapps="${ARG_APPSDIR:-apps}"
+if test ! -d "$rootdir/$coreapps"; then
+  echo "[ERROR] --appsdir: no such directory '$coreapps' in $rootdir"
+  exit 1
+fi
+coreappsdir='$(ROOTDIR)/'"$coreapps"
+appsdir="$coreappsdir"
 toolsdir='$(ROOTDIR)/tools'
 
 
@@ -4896,6 +4911,7 @@ export SELECTED_PLUGINS_SUBDIRS=${selected_subdirs}
 export ROOTDIR=${rootdir}
 export FIRMDIR=\$(ROOTDIR)/firmware
 export APPSDIR=${appsdir}
+export COREAPPSDIR=${coreappsdir}
 export TOOLSDIR=${toolsdir}
 export DOCSDIR=${rootdir}/docs
 export MANUALDIR=${rootdir}/manual

@@ -1,0 +1,5 @@
+# Intentionally empty: tools/buildzip.pl uses this file to move each listed
+# plugin's .rock into a category subfolder (rocks/viewers/, rocks/apps/,
+# etc.) when packaging the zip. With this file empty, no plugin gets moved,
+# so every .rock stays flat in rocks/ -- a single list rather than grouped
+# categories. Must still exist and be openable, or buildzip.pl dies.

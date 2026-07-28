@@ -319,6 +319,20 @@ static void send_and_read_next(void);
 static bool ejected[NUM_DRIVES];
 static bool locked[NUM_DRIVES];
 
+/* Did the host write to us during this connect? Cleared on each new connect.
+ *
+ * The app layer rebuilds the database and dircache on every USB disconnect,
+ * because the host may have changed the files. If it only ever read, none of
+ * that work is needed -- and Windows produces a spurious disconnect/reconnect
+ * on every single connect, which used to trigger the full rebuild and then
+ * leave the tagcache thread mid-scan when the reconnect arrived. */
+static bool host_wrote;
+
+bool usb_storage_host_wrote(void)
+{
+    return host_wrote;
+}
+
 static int usb_interface;
 
 static struct usb_class_driver_ep_allocation ep_allocs[2] = {
@@ -440,6 +454,7 @@ static int usb_storage_init_connection(void)
     logf("ums: set config");
     /* prime rx endpoint. We only need room for commands */
     state = WAITING_FOR_COMMAND;
+    host_wrote = false;
 
 #ifdef USB_STATIC_ALLOC
     static unsigned char _cbw_buffer[MAX_CBW_SIZE]
@@ -1242,6 +1257,7 @@ static void handle_scsi(struct command_block_wrapper* cbw)
 #endif
         case SCSI_WRITE_10:
             logf("scsi write10 %d",lun);
+            host_wrote = true;
             if(!lun_present) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_NOT_READY;
@@ -1277,6 +1293,7 @@ static void handle_scsi(struct command_block_wrapper* cbw)
 #ifdef STORAGE_64BIT_SECTOR
         case SCSI_WRITE_16:
             logf("scsi write16 %d",lun);
+            host_wrote = true;
             if(!lun_present) {
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_NOT_READY;

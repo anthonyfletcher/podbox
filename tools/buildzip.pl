@@ -18,6 +18,12 @@ use Getopt::Long qw(:config pass_through);    # pass_through so not confused by 
 
 my $ROOT="..";
 
+# The application layer is not necessarily "apps": tools/configure --appsdir
+# moves it, and this fork builds from apps-ipod/ while keeping upstream's apps/
+# in the tree unbuilt. Files shipped FROM the application layer must follow
+# APPSDIR, or they are silently taken from the wrong tree. make exports it.
+my $APPSDIR = $ENV{'APPSDIR'} || "$ROOT/apps";
+
 my $ziptool;
 my $output;
 my $verbose;
@@ -574,7 +580,7 @@ sub buildzip {
 
     glob_unlink("$temp_dir/rocks/*.lua"); # Clean up unwanted *.lua files (e.g. actions.lua, buttons.lua)
 
-    copy("$ROOT/apps/tagnavi.config", "$temp_dir/");
+    copy("$APPSDIR/tagnavi.config", "$temp_dir/");
     copy("$ROOT/apps/plugins/disktidy.config", "$temp_dir/rocks/apps/");
 
     if(-e "$temp_dir/rocks/viewers/open_plugins.rock") {
@@ -682,7 +688,7 @@ sub buildzip {
     glob_copy('apps/lang/*.lng', "$temp_dir/langs/");
     glob_copy('apps/lang/*.zip', "$temp_dir/langs/");
     # Copy over the Invalid Language fallback stuff
-    glob_copy("$ROOT/apps/lang/Invalid*.talk", "$temp_dir/langs/");
+    glob_copy("$APPSDIR/lang/Invalid*.talk", "$temp_dir/langs/");
 
     # Copy over any generated voice/talk clips
     glob_copy('Invalid*.talk', "$temp_dir/langs/");

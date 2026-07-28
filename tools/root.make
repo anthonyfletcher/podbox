@@ -57,6 +57,11 @@ endif
 
 all: $(DEPFILE) build
 
+# Where the application layer's build output lands. Objects mirror their source
+# path under $(BUILDDIR), so this has to track COREAPPSDIR (which --appsdir can
+# repoint) rather than hardcoding "apps".
+APPSBUILDDIR = $(subst $(ROOTDIR),$(BUILDDIR),$(COREAPPSDIR))
+
 # Subdir makefiles. their primary purpose is to populate SRC, OTHER_SRC,
 # ASMDEFS_SRC and CORE_LIBS. But they also define special dependencies and
 # compile rules
@@ -66,7 +71,7 @@ ifeq (,$(findstring checkwps,$(APP_TYPE)))
   ifeq (,$(findstring database,$(APP_TYPE)))
     ifeq (,$(findstring warble,$(APP_TYPE)))
       include $(FIRMDIR)/firmware.make
-      include $(ROOTDIR)/apps/bitmaps/bitmaps.make
+      include $(COREAPPSDIR)/bitmaps/bitmaps.make
       ifeq (arch_arm,$(ARCH))
           # some targets don't use the unwarminder because they have the glibc backtrace
           ifeq (,$(filter sonynwz,$(APP_TYPE)))
@@ -404,12 +409,12 @@ manual-7zip:
 
 ifdef TTS_ENGINE
 
-voice: voicetools $(BUILDDIR)/apps/genlang-features
+voice: voicetools $(APPSBUILDDIR)/genlang-features
 	$(SILENT)if [ -z "$$POOL" ] ; then \
 		export POOL="$(BUILDDIR)/voice-pool" ; \
 	fi;\
 	mkdir -p $${POOL} ;\
-	for lang in `echo $(VOICELANGUAGE) |sed "s/,/ /g"`; do $(TOOLSDIR)/voice.pl -V -l=$$lang -t=$(MODELNAME):`cat $(BUILDDIR)/apps/genlang-features` -i=$(TARGET_ID) -e="$(ENCODER)" -E="$(ENC_OPTS)" -s=$(TTS_ENGINE) -S="$(TTS_OPTS)"; done
+	for lang in `echo $(VOICELANGUAGE) |sed "s/,/ /g"`; do $(TOOLSDIR)/voice.pl -V -l=$$lang -t=$(MODELNAME):`cat $(APPSBUILDDIR)/genlang-features` -i=$(TARGET_ID) -e="$(ENCODER)" -E="$(ENC_OPTS)" -s=$(TTS_ENGINE) -S="$(TTS_OPTS)"; done
 
 talkclips: voicetools
 	$(SILENT)if [ -z '$(TALKDIR)' ] ; then \

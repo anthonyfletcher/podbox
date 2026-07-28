@@ -1,0 +1,674 @@
+#-----------------------------------------------#
+# ===== =    = ===== ==   == ===== ===== =   =
+#   =   ====== ===   = === =   =   ===   =====
+#   =   =    = ===== =  =  = ===== =       =
+#
+#Themify 2
+#Original code by Dook 2025
+#Creative Commons Attribution-ShareAlike 3.0
+#Unported (CC BY-SA 3.0)
+#-----------------------------------------------#
+#	Search Index
+#	----------------------
+#	$VD - Viewport Declarations
+#	$FL - Font-loading
+#	$SB - Status Bar Logic
+#	$ME - Menu Engine
+#	$SE - Scroll Engine
+#	$NP - Now Playing Panel
+#	$US - USB Screen Logic
+#	$SD - System Dialog Box
+#	$QS - Quickscreen Engine
+#	----------------------
+#
+#--- Viewport Declarations ---# $VD
+# these need to be here to prevent rendering issues.
+#
+# CC: $VD runs first on every screen. %cs = current screen id. This line
+# CC: pre-enables the viewports the quickscreen (cs=10) needs, plus the
+# CC: battery + loading/sleep icons, so they exist before anything draws.
+%?if(%cs, =, 10)<%Vd(Quickscreen)%VI(Default_Menu_Supression)%?or(%if(%Ql,=,0),%if(%Ql,=,%Sx(No)),%if(%Ql,=,%Sx(Off)),%if(%Ql,=,ERR))<%Vd(Quickitem_Left_Flush)|%Vd(Quickitem_Left)>%?or(%if(%Qt,=,0),%if(%Qt,=,%Sx(No)),%if(%Qt,=,%Sx(Off)),%if(%Qt,=,ERR))<%Vd(Quickitem_Top_Flush)|%Vd(Quickitem_Top)>%?or(%if(%Qb,=,0),%if(%Qb,=,%Sx(No)),%if(%Qb,=,%Sx(Off)),%if(%Qb,=,ERR))<%Vd(Quickitem_Bottom_Flush)|%Vd(Quickitem_Bottom)>%?or(%if(%Qr,=,0),%if(%Qr,=,%Sx(No)),%if(%Qr,=,%Sx(Off)),%if(%Qr,=,ERR))<%Vd(Quickitem_Right_Flush)|%Vd(Quickitem_Right)>>%?St(battery display)<%Vd(Battery_Graphical)|%Vd(Battery_Numeric)>%?lh<%Vd(Loading_Notification)|%?lb<%Vd(Loading_Notification)|%?lw<%Vd(Loading_Notification)|%?bs<%Vd(Sleep)|%Vd(Loading_Notification_Flush)>>>>
+#
+#- Home Menu Initialisation -#
+# CC: The home menu (cs=1) has two layouts, chosen by playback state:
+# CC:   %mp = 1 (stopped)      -> the menu uses the full screen width.
+# CC:   %mp > 1 (track loaded, -> the menu shrinks to the left and the
+# CC:            paused too)      now-playing panel ($NP) takes x=200..320.
+# CC: Note %mp counts from 1 here (stop=1, play=2, pause=3): inside %if() a
+# CC: tag is compared by its internal enum value, NOT by the number it would
+# CC: print. A bare %mp renders one less than these.
+# CC: Each branch then picks a viewport by font size + scrollbar setting and
+# CC: loads the matching row config via %Lb (icons/no-icons, scroll/no-scroll).
+# CC: The %mp test sits inside the same %and() as %cs rather than wrapping the
+# CC: line, so both layouts keep the nesting depth the single line had before:
+# CC: skin_render_line recurses once per level, so depth here is not free.
+%?and(%if(%cs,=,1),%if(%mp,=,1))<%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Home_Menu_Viewport_Full)|%Vd(Home_Corners)%?St(scrollbar)<%VI(Home_Menu_Viewport_Full)|%VI(Home_Menu_Viewport_Right)%?LB<%Vd(Scrollbar_Tall_Left)>|%VI(Home_Menu_Viewport_Left)%?LB<%Vd(Scrollbar_Tall_Right)>>%?St(scrollbar)<%?St(show icons)<%Lb(No_Scroll_Home_Menu_With_Icons,302,30)|%Lb(No_Scroll_Home_Menu_No_Icons,302,30)>|%?St(show icons)<%Lb(Home_Menu_With_Icons,302,30)|%Lb(Home_Menu_No_Icons,302,30)>>>>
+#
+# CC: Track loaded: enable the panel backdrop and frame, then the real
+# CC: cover (%C true) or the placeholder art, and use the narrow menu.
+%?and(%if(%cs,=,1),%if(%mp,>,1))<%Vd(Widgets_Backdrop)%Vd(Miniplayer_Widget)%?C<%Vd(Miniplayer_Album_Art)|%Vd(Miniplayer_Album_Fallback_Art)>%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Home_Menu_Viewport_Full_Panel)|%Vd(Home_Corners_Panel)%?St(scrollbar)<%VI(Home_Menu_Viewport_Full_Panel)|%VI(Home_Menu_Viewport_Right_Panel)%?LB<%Vd(Scrollbar_Tall_Left)>|%VI(Home_Menu_Viewport_Left_Panel)%?LB<%Vd(Scrollbar_Tall_Right_Panel)>>%?St(scrollbar)<%?St(show icons)<%Lb(No_Scroll_Home_Menu_With_Icons_Panel,182,30)|%Lb(No_Scroll_Home_Menu_No_Icons_Panel,182,30)>|%?St(show icons)<%Lb(Home_Menu_With_Icons_Panel,182,30)|%Lb(Home_Menu_No_Icons_Panel,182,30)>>>>
+#
+# CC: Panel title enable: the title viewport when the track is tagged, else the
+# CC: filename one. %wr sizes the wrap to the viewport, so the old character-
+# CC: count probe (Panel_Title_Single vs Space_3..9 vs Long) is gone.
+%?and(%if(%cs,=,1),%if(%mp,>,1))<%Vd(Panel_Title)%Vd(Panel_Artist)>
+# was: a 771-char %?if(%ss..)/%ft(space:) chain choosing one of nine viewports.
+#
+#- Sub Menu Initialisation -#
+# CC: Sub-menu init: for any list screen that isn't home/quickscreen/usb/
+# CC: etc., decide whether to show the icon header (by screen id or title),
+# CC: then pick the sub-menu viewport + scrollbar side.
+%?and(%if(%cs,!=,1),%if(%cs,!=,10),%if(%cs,!=,14),%if(%cs,!=,16),%if(%cs,!=,21),%if(%cs,!=,22))<%?or(%if(%cs,=,7),%if(%Li, =, 4),%if(%Li, =, 11),%if(%Li, =, 26),%if(%Li, =, 27),%if(%Li, =, 32),%and(%if(%cs, =, 15),%if(%Lt, !=, %Sx(Context Menu))),%if(%cs, =, 17),%if(%cs, =, 19),%if(%cs, =, 20),%if(%Lt,=,%Sx(Album Artist)),%if(%Lt,=,%Sx([All tracks])),%if(%Lt,=,%Sx([Untagged])),%if(%Lt,=,%Sx([By album])),%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Album)),%if(%Lt,=,%Sx(Genre)),%if(%Lt,=,%Sx(Year)),%if(%Lt,=,%Sx(Composer)),%if(%Lt,=,%Sx(Tracks by)),%if(%Lt,=,%Sx(Search by...)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Recently Added)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Settings)),%if(%Lt,=,%Sx(Sound Settings)),%if(%Lt,=,%Sx(Playback Settings)),%if(%Lt,=,%Sx(General Settings)),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Database)),%if(%Lt,=,%Sx(Theme Settings)),%if(%Lt,=,%Sx(Recording Settings)),%if(%Lt,=,%Sx(Manage Settings)),%if(%Lt,=,%Sx(Display)),%if(%Lt,=,%Sx(Language)),%if(%Lt,=,%Sx(Voice)),%if(%Lt,=,%Sx(Main Menu Settings)),%if(%Lt,=,%Sx(Brightness)))<%?St(show icons)<%Vd(Header_with_Icon)|%Vd(Header_without_Icon)>|%Vd(Header_without_Icon)>%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Sub_Menu_Viewport_Full)|%Vd(Sub_Menu_Corners)%?St(scrollbar)<%VI(Sub_Menu_Viewport_Full)|%VI(Sub_Menu_Viewport_Right)%?LB<%Vd(Scrollbar_Short_Left)>|%VI(Sub_Menu_Viewport_Left)%?LB<%Vd(Scrollbar_Short_Right)>>%?St(scrollbar)<%?if(%cs,=,7)<%?St(show icons)<%Lb(No_Scroll_File_Browser,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(No_Scroll_Folder_Select,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(No_Scroll_Menu_With_Icons,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%Lb(No_Scroll_Menu_No_Icons,182,30)>>>|%?if(%cs,=,7)<%?St(show icons)<%Lb(File_Browser,182,30)|%Lb(Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(Folder_Select,182,30)|%Lb(Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(Menu_With_Icons,182,30)|%Lb(Menu_No_Icons,182,30)>|%Lb(Menu_No_Icons,182,30)>>>>>>
+#
+#- USB Screen Logic -#
+# CC: USB screen (cs=21): hide the normal UI viewport. The screen itself is
+# CC: drawn by usb_screen.c, not by this skin.
+%?if(%cs, =, 21)<%VI(USB_Screen_Supression)>
+#
+#- System Menu -#
+# CC: System menu (cs=16): header + sub-menu viewport + the version dialog box.
+%?if(%cs, =, 16)<%?St(show icons)<%Vd(Header_with_Icon)|%Vd(Header_without_Icon)>%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Sub_Menu_Viewport_Full)|%Vd(Sub_Menu_Corners)%?St(scrollbar)<%VI(System_Menu_Viewport_Full)|%VI(System_Menu_Viewport_Right)%?LB<%Vd(Scrollbar_Short_Left)>|%VI(System_Menu_Viewport_Left)%?LB<%Vd(Scrollbar_Short_Right)>>%?St(scrollbar)<%Lb(No_Scroll_Menu_No_Icons,182,30)|%Lb(Menu_No_Icons,182,30)>>>
+#
+#--- END ---#
+#
+#
+# need to flush the background and foreground, or the previous screen's background remains.
+%V(0,0,-,-,-)%VB
+%V(0,0,-,-,-)
+#
+#--- Font Pre-loading ---# $FL
+#
+%Fl(3,22-LeagueSpartan-Bold.fnt) # used for time and large Text
+%Fl(4,18-LeagueSpartan-Medium.fnt) # subtext font
+%Fl(5,../wps/Themify_2/16-LeagueSpartan-SemiBold.fnt)# battery icon font
+%Fl(6,../wps/Themify_2/UI_Vectors.fnt) # ui drawing cectors
+%Fl(7,../wps/Themify_2/Blank_Font.fnt,5) # blank font for default quickscreen supression
+%Fl(8,../wps/Themify_2/14x13_Compacticons.fnt,120) # vector icons for menus, status bar etc.
+%Fl(9,../wps/Themify_2/Graphics_Font.fnt) # vector icons 
+#
+#--- END ---#
+#
+#
+#--- Status Bar Logic ---# $SB
+#
+#-- Status Bar Background Drawing --#
+# Drawn on background and foreground as there is a delay drawing the foreground layer, causing visual flashing of the UI.
+#
+# CC: Status bar background: fill the top 25px. Drawn on backdrop (%VB) and
+# CC: foreground to avoid a one-frame flash while the fg layer catches up.
+%V(0,0,-,25,-)%VB%dr(0,0,-,-)
+%V(0,0,-,25,-)%dr(0,0,-,-)
+#
+# CC: Round the status bar's bottom corners by subtracting them. Y (bottom-left)
+# CC: and Z (bottom-right) are corner wedges in 14x13_Compacticons (font 8),
+# CC: drawn with %Vs(invert) so they paint the BACKGROUND colour, cutting the
+# CC: light bar. This viewport spans the full width, so it must first refill its
+# CC: back with the FOREGROUND colour (%dr) -- otherwise declaring it re-clears
+# CC: the strip and leaves dark gaps between the status-bar elements (clock,
+# CC: loading, hold, battery). Corners themselves only on the home screen (cs=1,
+# CC: no title bar); y=7 lands the wedge (bottom of the 18px cell) on the bar's
+# CC: bottom edge. (%Vf must not be used here -- it leaks onto later viewports.)
+%V(0,7,-,18,8)%VB%dr(0,0,-,-)%?if(%cs,=,1)<%Vs(invert)Y%aRZ|>
+%V(0,7,-,18,8)%dr(0,0,-,-)%?if(%cs,=,1)<%Vs(invert)Y%aRZ|>
+#
+#Manually sets the number for %cl hour on 12-hour time. The %cl tag puts a space at the start and throws off the positioning of the time.
+# CC: Clock. %cf = 24h format; else %cl gives the 12h hour (1-12, the list
+# CC: avoids the leading space %cl would add). Refreshes hourly (%t(3600)).
+%V(13,5,75,17,3)%VB%t(0.1)%Vs(invert)%?cf<%cH:%cM|%?cl<1|2|3|4|5|6|7|8|9|10|11|12>:%cM%cp>;%t(3600)
+%V(13,5,75,17,3)%Vs(invert)%?cf<%cH:%cM|%?cl<1|2|3|4|5|6|7|8|9|10|11|12>:%cM%cp>
+#
+#-- Battery Indicators --#
+# Draw on the backdrop so it loads instantly prevently visual lag, but dont draw a copy on the foreground as this will make deeper aliasing and mess with the rounded corners
+#
+#- Numeric Battery -#
+# CC: Numeric battery: E/F/G are the pill-shaped container glyphs.
+%Vl(Battery_Numeric,282,6,30,14,8)%VB%Vs(invert)EFG
+%Vl(Battery_Numeric,282,6,30,14,7)
+#
+# battery level numbers
+# CC: Battery % number. %bc = charging (flash it); flash too when <=15%.
+%Vl(Battery_Numeric,284,8,24,9,5)%VB%?bc<%t(3)%ac%bl;%t(2)|%?if(%bl,<=,15)<%t(2)%ac%bl;%t(.5)|%ac%bl>>
+%Vl(Battery_Numeric,284,8,24,9,5)%?bc<%t(3)%ac%bl;%t(2)|%?if(%bl,<=,15)<%t(2)%ac%bl;%t(.5)|%ac%bl>>
+#
+# charging icon
+# CC: Charging bolt glyph K, shown only while charging.
+%Vl(Battery_Numeric,290,6,12,13,8)%?bc<%t(3);%t(2)%Vs(invert)K|>
+#
+#- Graphical Battery -#
+#%?bl<unknown|...|100%>
+# CC: Graphical battery: one glyph per ~5% level (%bl), a different glyph
+# CC: set while charging (%bc).
+%Vl(Battery_Graphical,282,6,30,14,8)%VB%Vs(invert)%?bc<%?bl<|îö|ïö|ðö|ñö|òö|óö|ôö|õö|õö|õö|õö|õö|õö|õö|õö|õö|õø|õù|õú|õû|õü|õý>G|%?bl<|Öâ|×â|Øâ|Ùâ|Úâ|Ûâ|Üâ|Ýâ|Þâ|ßâ|àâ|áã|áä|áå|áæ|áç|áè|áé|áê|áë|áì|áí>>G
+%Vl(Battery_Graphical,282,6,30,14,8)%Vs(invert)%?bc<%?bl<|îö|ïö|ðö|ñö|òö|óö|ôö|õö|õö|õö|õö|õö|õö|õö|õö|õö|õø|õù|õú|õû|õü|õý>G|%?bl<|Öâ|×â|Øâ|Ùâ|Úâ|Ûâ|Üâ|Ýâ|Þâ|ßâ|àâ|áã|áä|áå|áæ|áç|áè|áé|áê|áë|áì|áí>>G
+#
+#-- Hold Icon and backup Sleep Icon --#
+# CC: Hold (%lh) / sleep-timer (%bs) / hold-switch (%mh) status glyphs.
+%V(262,6,14,14,8)%VB%Vs(invert)%ac%?lh<%?bs<q|%?mh<o|%dr(0,0,-,-)>>|%?mh<o|%dr(0,0,-,-)>>
+%V(262,6,14,14,8)%Vs(invert)%ac%?lh<%?bs<q|%?mh<o|%dr(0,0,-,-)>>|%?mh<o|%dr(0,0,-,-)>>
+%V(243,6,14,14,8)%VB%Vs(invert)%ac%?lh<%?bs<%?mh<o|%dr(0,0,-,-)>|%dr(0,0,-,-)>|%dr(0,0,-,-)>
+%V(243,6,14,14,8)%Vs(invert)%ac%?lh<%?bs<%?mh<o|%dr(0,0,-,-)>|%dr(0,0,-,-)>|%dr(0,0,-,-)>
+#
+#-- Loading Notification --#
+#
+%Vl(Loading_Notification_Flush,110,2,94,21,7)%VB%dr(0,0,-,-)
+%Vl(Loading_Notification_Flush,110,2,94,21,7)
+#
+%Vl(Loading_Notification,110,2,94,21,7)%VB%dr(0,0,-,-)
+%Vl(Loading_Notification,110,2,94,21,7)
+# CC: Disk-activity spinner: animate frames unless the theme's 'animations'
+# CC: preference is off (then show a single static glyph t).
+%Vl(Loading_Notification,118,5,13,13,8)%VB%?if(%ft(themes/Themify_2.preferences,animations:),=,off)<%Vs(invert)t|%?la<Â|Ã|Ä|Å|Æ|Ç|È|É|Ê|Ë|Ì>>
+%Vl(Loading_Notification,118,5,13,13,8)
+%?if(%ft(themes/Themify_2.preferences,animations:),=,off)<%Vs(invert)t|%t(0.1)Á;%t(0.1)Á>
+#
+%Vl(Loading_Notification,135,5,69,15,4)%VB%Vs(invert)%?lw<Working..|%?lb<Building..|Loading..>>
+%Vl(Loading_Notification,135,5,69,15,4)%Vs(invert)%?lw<Working..|%?lb<Building..|Loading..>>
+#
+#
+#-- Sleep Notification --#
+# Single font, A and B are the ends.
+# CC: Sleep-timer popup (A..B are the rounded ends, %bs the remaining time).
+%Vl(Sleep,110,2,94,21,9)%VB%Vs(invert)%t(0.1)%acA%bsB;%t(655)
+%Vl(Sleep,110,2,94,21,9)%Vs(invert)%acA%bsB
+#
+#
+#-- Sub Menu Header --#
+#
+%Vl(Header_with_Icon,0,25,-,27,-)%VB%dr(0,0,-,-)
+%Vl(Header_with_Icon,0,25,-,27,-)
+# CC: Round the header's bottom corners -- with a title bar this is the bottom of
+# CC: the light region (not the status bar). Y/Z wedges via %Vs(invert), same
+# CC: subtraction as the status bar; y=34 lands them on the header's bottom edge.
+# CC: Re-uses the Header viewport, so it draws over the fill and clears to the
+# CC: light backdrop -- unlike the fresh full-width status-bar %V, no %dr needed.
+%Vl(Header_with_Icon,0,34,-,18,8)%VB%Vs(invert)Y%aRZ
+%Vl(Header_with_Icon,0,34,-,18,8)%Vs(invert)Y%aRZ
+#
+%Vl(Header_without_Icon,0,25,-,27,-)%VB%dr(0,0,-,-)
+%Vl(Header_without_Icon,0,25,-,27,-)
+%Vl(Header_without_Icon,0,34,-,18,8)%VB%Vs(invert)Y%aRZ
+%Vl(Header_without_Icon,0,34,-,18,8)%Vs(invert)Y%aRZ
+#
+#Background is drawn here for .1 of a second and then immediately removed. This is to prevent UI flashes, but it has to be removed as if it scrolls the device will crash.
+# CC: Sub-menu header title text. Renames a few internal titles ([All
+# CC: tracks] etc.); drawn once on the backdrop for 0.1s to avoid a flash.
+%Vl(Header_with_Icon,29,29,284,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%cs,=,3)<%Sx(Recording)|%?if(%Lt,=,%Sx([By album]))<By Album|%Lt>>>>;%t(3600)
+%Vl(Header_with_Icon,29,29,284,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
+#
+%Vl(Header_without_Icon,13,29,300,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)
+%Vl(Header_without_Icon,13,29,300,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
+#
+#- Icons for Sub menu Header -#
+# CC: Sub-menu header ICON. %sel picks the glyph paired with the first key
+# CC: equal to the header title (%Lt), each key a %Sx language string.
+# CC: Folder and playlist names are user data, so no language string can
+# CC: match them; the default is therefore a second %sel keyed on %Li, the
+# CC: Rockbox title-icon id (the enum in apps/draw/icon.h, offset by one).
+# CC: Ids 13-16, 19-21 never appear as a title icon and fall through to x.
+%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%sel(%Lt,%Sx(Same as currently played track),Ô,%Sx(Playback History),Ó,%Sx(Recently Added),Ò,%Sx(User Rating),Õ,%Sx(Tracks by),b,%Sx(By First Letter...),Ñ,%Sx(Year),Ð,%Sx(Genre),Ï,%Sx(Album),Î,%Sx(Album Artist),Í,%Sx(Search by...),y,themes,i,%Sx(Artist),s,%Sx(Composer),s,%Sx([All tracks]),b,%Sx([Untagged]),e,%Sx([By album]),Î,%Sx(Music),0,%Sx(Database),0,%Sx(Playlist Catalogue),2,%sel(%cs,3,7,%sel(%Li,1,3,2,8,3,1,4,2,5,5,6,i,7,7,8,8,9,5,10,4,11,5,12,%sel(%Lt,%Sx(Shortcuts),z,6),17,7,18,%sel(%Lt,%Sx(Brightness),l,f),22,%sel(%cs,17,c,4),23,7,24,f,25,4,26,k,27,3,28,h,29,5,30,9,31,1,32,g,x)))
+# was: the same mapping as 21 nested %?if conditionals; restore this line
+# was: in place of the %sel above to revert.
+#%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%?if(%Lt,=,%Sx(Same as currently played track))<Ô|%?if(%Lt,=,%Sx(Playback History))<Ó|%?if(%Lt,=,%Sx(Recently Added))<Ò|%?if(%Lt,=,%Sx(User Rating))<Õ|%?if(%Lt,=,%Sx(Tracks by))<b|%?if(%Lt,=,%Sx(By First Letter...))<Ñ|%?if(%Lt,=,%Sx(Year))<Ð|%?if(%Lt,=,%Sx(Genre))<Ï|%?if(%Lt,=,%Sx(Album))<Î|%?if(%Lt,=,%Sx(Album Artist))<Í|%?if(%Lt,=,%Sx(Search by...))<y|%?if(%Lt,=,themes)<i|%?or(%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Composer)))<s|%?if(%Lt,=,%Sx([All tracks]))<b|%?if(%Lt,=,%Sx([Untagged]))<e|%?if(%Lt,=,%Sx([By album]))<Î|%?if(%Lt,=,%Sx(Music))<0|%?if(%Lt,=,%Sx(Database))<0|%?if(%cs,=,3)<7|%?if(%Lt,=,%Sx(Playlist Catalogue))<2|%?Li<3|8|1|2|5|i|7|8|5|4|5|%?if(%Lt,=,%Sx(Shortcuts))<z|6>|13|14|15|16|17|%?if(%Lt,=,%Sx(Brightness))<l|f>|19|20|21|%?if(%cs, =, 17)<c|4>|7|f|4|k|3|h|29|9|1|g|x>>>>>>>>>>>>>>>>>>>>>
+%Vl(Header_with_Icon,10,30,14,14,8)
+#
+#
+#--- END ---#
+#
+#
+#--- Menu Engine ---# $ME
+#
+# CC: %Vi declares the list/menu content rectangles used below via %VI:
+# CC: full-width, left-scrollbar and right-scrollbar variants for the
+# CC: home / sub / system menus.
+%Vi(-,3,28,302,-,-)
+%Vi(Default_Menu_Supression,-100,0,30,30,7)
+%Vi(USB_Screen_Supression,-1,-1,1,1,7)
+# No Scrollbar
+%Vi(Sub_Menu_Viewport_Full,3,55,-3,-,-)
+# Full screen width, used while playback is stopped. The _Panel twins below
+# stop short of x=200 to leave room for the now-playing panel.
+%Vi(Home_Menu_Viewport_Full,3,28,-3,-,-)
+%Vi(System_Menu_Viewport_Full,3,55,-3,-,-)
+# Left Scrollbar
+%Vi(Sub_Menu_Viewport_Left,3,55,302,-,-)
+%Vi(Home_Menu_Viewport_Left,3,28,302,-,-)
+%Vi(System_Menu_Viewport_Left,3,55,302,-,-)
+# Right Scrollbar
+%Vi(Sub_Menu_Viewport_Right,15,55,302,-,-)
+%Vi(Home_Menu_Viewport_Right,15,28,302,-,-)
+# Narrow variants, used while the now-playing panel is on screen.
+%Vi(Home_Menu_Viewport_Full_Panel,3,28,194,-,-)
+%Vi(Home_Menu_Viewport_Left_Panel,3,28,182,-,-)
+%Vi(Home_Menu_Viewport_Right_Panel,15,28,182,-,-)
+%Vi(System_Menu_Viewport_Right,15,55,302,-,-)
+#
+#-- Menu Drawing with Scrollbar --#
+#- Menus with Icons -#
+#always place text last in these as it will not scroll otherwise
+# Menu With Scrollbar
+#
+# CC: A settings/database list row (with icons). This line = the selection
+# CC: bar (%Lc = line is selected: draw the inverse rounded bar A..B).
+%Vl(Menu_With_Icons,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
+# CC: Row icon, chosen by the item title (%LT) via %Sx -> glyph.
+%Vl(Menu_With_Icons,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Sound Settings))<8>%?if(%LT,=,%Sx(Playback Settings))<3>%?if(%LT,=,%Sx(General Settings))<4>%?if(%LT,=,%Sx(Theme Settings))<i>%?if(%LT,=,%Sx(Recording Settings))<7>%?if(%LT,=,%Sx(Time & Date Settings))<c>%?if(%LT,=,%Sx(Manage Settings))<h>%?if(%LT,=,%Sx(Album Cover Settings))<Î>%?if(%LT,=,%Sx(Last.fm Settings))<g>%?or(%if(%LT,=,%Sx(Main Menu Settings)),%if(%LT,=,%Sx(Custom menu)))<x>%?if(%LT,=,%Sx(Search))<y>%?if(%LT,=,%Sx(Album Artist))<Í>%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s>%?if(%LT,=,%Sx(Album))<Î>%?if(%LT,=,%Sx(Genre))<Ï>%?if(%LT,=,%Sx(Year))<Ð>%?if(%LT,=,%Sx(First Letter))<Ñ>%?if(%LT,=,%Sx(Tracks by))<b>%?if(%LT,=,%Sx(Shuffle Songs))<m>%?if(%LT,=,%Sx(User Rating))<w>%?if(%LT,=,%Sx(Recently Added))<Ò>%?if(%LT,=,%Sx(Playback History))<Ó>%?if(%LT,=,%Sx(Same as currently played track))<Ô>
+# CC: Row label text (%LT). Placed last so it scrolls; %s = scrolling.
+%Vl(Menu_With_Icons,29,4,265,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+# Home Menu with Scrollbar
+# 302 wide to match Menu_With_Icons, with an 8px right margin on the text
+# (302-29-8=265). Home_Menu_With_Icons_Panel is the 182-wide twin.
+%Vl(Home_Menu_With_Icons,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
+# icon display
+# CC: Home-menu row icon by title. Database categories first, then the
+# CC: root items (Now Playing/Music/Playlists/Files/Shortcuts/Settings/
+# CC: System) -- title-based, replacing the old by-index fallback.
+%Vl(Home_Menu_With_Icons,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Album Artist))<Í|%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s|%?if(%LT,=,%Sx(Album))<Î|%?if(%LT,=,%Sx(Genre))<Ï|%?if(%LT,=,%Sx(Year))<Ð|%?if(%LT,=,%Sx(First Letter))<Ñ|%?if(%LT,=,%Sx(Tracks by))<b|%?if(%LT,=,%Sx(Album Covers))<Î|%?if(%LT,=,%Sx(Recently Added))<Ò|%?if(%LT,=,%Sx(User Rating))<w|%?if(%LT,=,%Sx(Now Playing))<r|%?if(%LT,=,%Sx(Resume Playback))<r|%?if(%LT,=,%Sx(Music))<0|%?if(%LT,=,%Sx(Playlists))<2|%?if(%LT,=,%Sx(Files))<1|%?if(%LT,=,%Sx(Shortcuts))<z|%?if(%LT,=,%Sx(Settings))<4|%?if(%LT,=,%Sx(System))<k|%?if(%LT,=,%Sx(Artist Portraits))<s|0>>>>>>>>>>>>>>>>>>>
+#
+# CC: Home-menu row label; the Now Playing row also appends the track.
+%Vl(Home_Menu_With_Icons,29,4,265,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%?if(%LT,=,%Sx(Now Playing))<%Sx(Now Playing): %?it<%it|%fn>|%LT>
+#
+#
+#- Menus with no Icons -#
+#
+# Home Menu with no icons
+# 302 wide to match Menu_No_Icons, with a 10px right margin on the text
+# (302-9-10=283). Home_Menu_No_Icons_Panel is the 182-wide twin.
+%Vl(Home_Menu_No_Icons,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(Home_Menu_No_Icons,9,4,283,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+# Menu with no icons
+#is by album? is all tracks in no.1 slot or no.2? Is random around? Is untagged around? If not any of the above, go to default.
+%Vl(Menu_No_Icons,0,0,302,30,6)
+# CC: %?La<|...> blanks the ordinary-row background on album rows; every other
+# CC: row (special rows included) gets the plain selection bar. The old grouped
+# CC: multi-glyph frame for [All tracks]/[Random]/etc. was removed: its deep
+# CC: %?if nesting mis-rendered on the first frames after a list change and
+# CC: pushed skin_render_line's recursion near the stack limit.
+%?La<|%?Lc<%Vs(invert)A%aRB>>
+#
+%Vl(Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+#
+%Vl(Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+#
+%Vl(Menu_No_Icons,9,4,283,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+#
+# CC: Album-list layout (%?La true only). The skin renderer recurses once per
+# CC: nesting level (skin_render_line), so these stay shallow -- depth, not
+# CC: viewport count, is what overflows the stack. The baseline viewports above
+# CC: are left untouched so ordinary lists keep their exact (safe) depth.
+# CC: Cover on the left; %La self-blanks to the placeholder until the cache fills.
+%Vl(Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
+# CC: Special rows have no cover, so draw their glyph icon centred in the art slot.
+# CC: Font 8 (14x13_Compacticons) is the menu icon font -- the last %Vl param is
+# CC: the font id, not a radius; with the default font these render as letters.
+%Vl(Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+# CC: Rounded selection bar around the name only (right of the cover) when selected.
+%Vl(Menu_No_Icons,54,11,248,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
+# CC: Name shifted right of the cover, vertically centred. Friendly labels for the
+# CC: special rows; %LT (optionally scrolling) for real albums.
+%Vl(Menu_No_Icons,63,15,229,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+#
+#
+#-- Menu Drawing without Scrollbar --#
+#- Menus with Icons -#
+# No Scroll Menu
+#
+# CC: Same menu rows as above but 314px wide (no scrollbar reserved).
+%Vl(No_Scroll_Menu_With_Icons,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_Menu_With_Icons,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Sound Settings))<8>%?if(%LT,=,%Sx(Playback Settings))<3>%?if(%LT,=,%Sx(General Settings))<4>%?if(%LT,=,%Sx(Theme Settings))<i>%?if(%LT,=,%Sx(Recording Settings))<7>%?if(%LT,=,%Sx(Time & Date Settings))<c>%?if(%LT,=,%Sx(Manage Settings))<h>%?if(%LT,=,%Sx(Album Cover Settings))<Î>%?if(%LT,=,%Sx(Last.fm Settings))<g>%?or(%if(%LT,=,%Sx(Main Menu Settings)),%if(%LT,=,%Sx(Custom menu)))<x>%?if(%LT,=,%Sx(Search))<y>%?if(%LT,=,%Sx(Album Artist))<Í>%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s>%?if(%LT,=,%Sx(Album))<Î>%?if(%LT,=,%Sx(Genre))<Ï>%?if(%LT,=,%Sx(Year))<Ð>%?if(%LT,=,%Sx(First Letter))<Ñ>%?if(%LT,=,%Sx(Tracks by))<b>%?if(%LT,=,%Sx(Shuffle Songs))<m>%?if(%LT,=,%Sx(User Rating))<w>%?if(%LT,=,%Sx(Recently Added))<Ò>%?if(%LT,=,%Sx(Playback History))<Ó>%?if(%LT,=,%Sx(Same as currently played track))<Ô>
+%Vl(No_Scroll_Menu_With_Icons,27,4,277,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#
+#- File Browser -#
+# CC: The file browser (cs=7) draws a per-item icon chosen by %LI, the item's
+# CC: themable-icon id (the enum in apps/draw/icon.h). The ids that reach here:
+# CC: 1 = folder, 0 = audio, 33 = text (Icon_Last_Themeable+1), 34 = image (+2);
+# CC: any other id is an ordinary file. %sel maps them to font-8 glyphs: 1 the
+# CC: folder icon, S text, T image, U audio (MP3), V any other/unknown file.
+# CC: Geometry mirrors Menu_With_Icons / No_Scroll_Menu_With_Icons; only the icon
+# CC: source differs.
+%Vl(File_Browser,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,1,1,33,S,34,T,0,U,V)
+%Vl(File_Browser,29,4,265,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+%Vl(No_Scroll_File_Browser,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,1,1,33,S,34,T,0,U,V)
+%Vl(No_Scroll_File_Browser,27,4,277,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#
+#- Folder Picker (database "Directories to Scan" / autoresume) -#
+# CC: The tri-state folder picker (cs=25, ACTIVITY_FOLDERSELECT) draws two glyphs
+# CC: per row from %LI, the state id set by folder_get_icon: bit0 = included,
+# CC: bit1 = expanded, offset by Icon_Last_Themeable+8, so 40..43 span the four
+# CC: combinations. Arrow: B collapsed, C expanded. Box: W excluded, X included.
+# CC: The folder name (indented per depth) follows.
+%Vl(Folder_Select,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(Folder_Select,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,40,B,41,B,42,C,43,C,B)
+%Vl(Folder_Select,25,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,40,W,41,X,42,W,43,X,W)
+%Vl(Folder_Select,43,4,251,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+%Vl(No_Scroll_Folder_Select,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_Folder_Select,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,40,B,41,B,42,C,43,C,B)
+%Vl(No_Scroll_Folder_Select,25,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,40,W,41,X,42,W,43,X,W)
+%Vl(No_Scroll_Folder_Select,43,4,263,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#
+# No Scroll Home Menu
+# 314 wide to match No_Scroll_Menu_With_Icons, with a 7px right margin on the
+# text (314-30-7=277). No_Scroll_Home_Menu_With_Icons_Panel is the 194 twin.
+%Vl(No_Scroll_Home_Menu_With_Icons,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
+# icon display
+%Vl(No_Scroll_Home_Menu_With_Icons,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Album Artist))<Í|%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s|%?if(%LT,=,%Sx(Album))<Î|%?if(%LT,=,%Sx(Genre))<Ï|%?if(%LT,=,%Sx(Year))<Ð|%?if(%LT,=,%Sx(First Letter))<Ñ|%?if(%LT,=,%Sx(Tracks by))<b|%?if(%LT,=,%Sx(Album Covers))<Î|%?if(%LT,=,%Sx(Recently Added))<Ò|%?if(%LT,=,%Sx(User Rating))<w|%?if(%LT,=,%Sx(Now Playing))<r|%?if(%LT,=,%Sx(Resume Playback))<r|%?if(%LT,=,%Sx(Music))<0|%?if(%LT,=,%Sx(Playlists))<2|%?if(%LT,=,%Sx(Files))<1|%?if(%LT,=,%Sx(Shortcuts))<z|%?if(%LT,=,%Sx(Settings))<4|%?if(%LT,=,%Sx(System))<k|%?if(%LT,=,%Sx(Artist Portraits))<s|0>>>>>>>>>>>>>>>>>>>
+%Vl(No_Scroll_Home_Menu_With_Icons,30,4,277,22,-)%?Lc<%Vs(invert)%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#
+#- Menus with no Icons -#
+#
+# no scroll home menu
+# 314 wide to match No_Scroll_Menu_No_Icons, with a 10px right margin on the
+# text (314-9-10=295). No_Scroll_Home_Menu_No_Icons_Panel is the 194 twin.
+%Vl(No_Scroll_Home_Menu_No_Icons,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_Home_Menu_No_Icons,9,4,295,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#- Home Menu rows, narrow (now-playing panel on screen) -#
+# CC: Identical to the four home-menu row configs above, only narrower:
+# CC: row viewport widths are baked into %Vl, so the two layouts cannot
+# CC: share a name. Widths here are the pre-panel-removal ones.
+%Vl(Home_Menu_With_Icons_Panel,0,0,182,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(Home_Menu_With_Icons_Panel,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Album Artist))<Í|%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s|%?if(%LT,=,%Sx(Album))<Î|%?if(%LT,=,%Sx(Genre))<Ï|%?if(%LT,=,%Sx(Year))<Ð|%?if(%LT,=,%Sx(First Letter))<Ñ|%?if(%LT,=,%Sx(Tracks by))<b|%?if(%LT,=,%Sx(Album Covers))<Î|%?if(%LT,=,%Sx(Recently Added))<Ò|%?if(%LT,=,%Sx(User Rating))<w|%?if(%LT,=,%Sx(Now Playing))<r|%?if(%LT,=,%Sx(Resume Playback))<r|%?if(%LT,=,%Sx(Music))<0|%?if(%LT,=,%Sx(Playlists))<2|%?if(%LT,=,%Sx(Files))<1|%?if(%LT,=,%Sx(Shortcuts))<z|%?if(%LT,=,%Sx(Settings))<4|%?if(%LT,=,%Sx(System))<k|%?if(%LT,=,%Sx(Artist Portraits))<s|0>>>>>>>>>>>>>>>>>>>
+%Vl(Home_Menu_With_Icons_Panel,29,4,145,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%?if(%LT,=,%Sx(Now Playing))<%Sx(Now Playing): %?it<%it|%fn>|%LT>
+%Vl(Home_Menu_No_Icons_Panel,0,0,182,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(Home_Menu_No_Icons_Panel,9,4,163,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+%Vl(No_Scroll_Home_Menu_With_Icons_Panel,0,0,194,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_Home_Menu_With_Icons_Panel,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Album Artist))<Í|%?or(%if(%LT,=,%Sx(Artist)),%if(%LT,=,%Sx(Composer)))<s|%?if(%LT,=,%Sx(Album))<Î|%?if(%LT,=,%Sx(Genre))<Ï|%?if(%LT,=,%Sx(Year))<Ð|%?if(%LT,=,%Sx(First Letter))<Ñ|%?if(%LT,=,%Sx(Tracks by))<b|%?if(%LT,=,%Sx(Album Covers))<Î|%?if(%LT,=,%Sx(Recently Added))<Ò|%?if(%LT,=,%Sx(User Rating))<w|%?if(%LT,=,%Sx(Now Playing))<r|%?if(%LT,=,%Sx(Resume Playback))<r|%?if(%LT,=,%Sx(Music))<0|%?if(%LT,=,%Sx(Playlists))<2|%?if(%LT,=,%Sx(Files))<1|%?if(%LT,=,%Sx(Shortcuts))<z|%?if(%LT,=,%Sx(Settings))<4|%?if(%LT,=,%Sx(System))<k|%?if(%LT,=,%Sx(Artist Portraits))<s|0>>>>>>>>>>>>>>>>>>>
+%Vl(No_Scroll_Home_Menu_With_Icons_Panel,30,4,157,22,-)%?Lc<%Vs(invert)%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+%Vl(No_Scroll_Home_Menu_No_Icons_Panel,0,0,194,30,6)%?Lc<%Vs(invert)A%aRB>
+%Vl(No_Scroll_Home_Menu_No_Icons_Panel,9,4,175,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
+#
+#
+# no scroll menu
+# CC: plain selection bar for every non-album row (see Menu_No_Icons above --
+# CC: the grouped special-row frame was removed).
+%Vl(No_Scroll_Menu_No_Icons,0,0,314,30,6)%?La<|%?Lc<%Vs(invert)A%aRB>>
+#
+%Vl(No_Scroll_Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+#
+%Vl(No_Scroll_Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+#
+%Vl(No_Scroll_Menu_No_Icons,9,4,295,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+#
+# CC: Album-list layout (%?La true only) -- see Menu_No_Icons. Kept shallow so
+# CC: ordinary sub-menus (which render through THIS config when the scrollbar is
+# CC: on) keep their exact baseline nesting depth and cannot overflow.
+%Vl(No_Scroll_Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
+%Vl(No_Scroll_Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+%Vl(No_Scroll_Menu_No_Icons,54,11,260,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
+%Vl(No_Scroll_Menu_No_Icons,63,15,241,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+#
+#
+#-- Menu top fill (square corners) --#
+# CC: The list's top strip. This used to draw the rounded-corner glyphs (S/U/V/T
+# CC: in font 6); now it fills the strip flat, so the menu top corners are square.
+# CC: %Vf(031835) forces the theme BACKGROUND colour (the dynamic engine swaps it
+# CC: to the album dominant just like the list body) -- a bare %dr would paint the
+# CC: foreground colour and leave a light block above a dark menu. On the backdrop
+# CC: (%VB), which clear_viewport memcpys from for the first row; leaving it
+# CC: unpainted is what clipped the top row. Foreground line stays empty.
+%Vl(Home_Corners,0,25,-,12,6)%VB%Vf(031835)%dr(0,0,-,-)
+%Vl(Home_Corners,0,25,-,12,6)
+#
+# CC: Panel-narrow twin (stops at x=200 when the now-playing panel is on screen).
+%Vl(Home_Corners_Panel,0,25,200,12,6)%VB%Vf(031835)%dr(0,0,-,-)
+%Vl(Home_Corners_Panel,0,25,200,12,6)
+#
+%Vl(Sub_Menu_Corners,0,52,-,12,6)%VB%Vf(031835)%dr(0,0,-,-)
+%Vl(Sub_Menu_Corners,0,52,-,12,6)
+#
+#--- END ---#
+#
+#
+#--- Scrollbar Engine ---# $SE
+# Logic controlling the scrollbars.
+#- Image Preloads -#
+# CC: Scrollbar image: Thumb = the draggable bar.
+# CC: (the flush wipe image is gone -- the viewport is gated in $VD).
+%xl(Thumb,Scrollbar_Thumb.bmp)
+#
+# Use the %?LB in these viewports. If you do it while calling the viewport instead, it bugs drawing out for some reason.
+#
+#- Right side Tall Scrollbar -#
+# CC: Tall (home-menu) right scrollbar track, built from stacked glyphs
+# CC: (C top cap, D middle repeated, E bottom cap). Enabled in $VD only when a
+%Vl(Scrollbar_Tall_Right,310,30,5,205,9)%VB
+C
+D
+D
+D
+D
+D
+D
+D
+E
+# CC: scrollbar exists, so the track needs no guard and the thumb (%LB slider)
+# CC: draws nothing when there is none -- no wipe image needed.
+%Vl(Scrollbar_Tall_Right,310,30,5,205,-)%LB(0,0,5,205,invert,noborder,nobar,slider,Thumb)
+#
+#- Right side Tall Scrollbar, shifted left of the panel -#
+# CC: Same track and thumb as above, moved from x=310 to x=190 so it sits
+# CC: beside the narrow menu instead of underneath the panel.
+%Vl(Scrollbar_Tall_Right_Panel,190,30,5,205,9)%VB
+C
+D
+D
+D
+D
+D
+D
+D
+E
+%Vl(Scrollbar_Tall_Right_Panel,190,30,5,205,-)%LB(0,0,5,205,invert,noborder,nobar,slider,Thumb)
+#
+#- Left side Tall Scrollbar -#
+%Vl(Scrollbar_Tall_Left,5,30,5,205,9)%VB
+C
+D
+D
+D
+D
+D
+D
+D
+E
+#
+%Vl(Scrollbar_Tall_Left,5,30,5,205,-)%LB(0,0,5,205,invert,noborder,nobar,slider,Thumb)
+#
+#- Right side Short Scrollbar -#
+%Vl(Scrollbar_Short_Right,310,57,5,173,9)%VB
+C
+D
+D
+D
+D
+D
+D
+%Vl(Scrollbar_Short_Right,310,230,5,5,9)%VBE
+#
+%Vl(Scrollbar_Short_Right,310,57,5,178,-)%LB(0,0,5,178,invert,noborder,nobar,slider,Thumb)
+#
+#- Left side Short Scrollbar -#
+%Vl(Scrollbar_Short_Left,5,57,5,173,9)%VB
+C
+D
+D
+D
+D
+D
+D
+%Vl(Scrollbar_Short_Left,5,230,5,5,9)%VBE
+%Vl(Scrollbar_Short_Left,5,57,5,178,-)%LB(0,0,5,178,invert,noborder,nobar,slider,Thumb)
+#
+#--- END ---#
+#
+#
+#--- Now Playing Panel ---# $NP
+# CC: Enabled from $VD only while a track is loaded. Widgets_Backdrop fills
+# CC: the strip right of the menu; Miniplayer_Widget draws the rounded caps
+# CC: above and below the art. The art box is square (111x111 at the top of
+# CC: the strip) so covers are scaled whole rather than centre-cropped, with
+# CC: a glyph placeholder when no cover is found.
+#
+%Vl(Widgets_Backdrop,200,25,-,-,-)%VB%Vf(031835)%dr(0,0,-,-)
+%Vl(Widgets_Backdrop,200,25,-,-,-)
+#
+%Vl(Miniplayer_Album_Art,205,25,111,111,9)%VB%Cl(0,0,111,111,c,c)%Cdvvvvv
+vvvvv
+vvvvv
+vvvvv
+vvvvv
+%Vl(Miniplayer_Album_Art,205,25,111,111,-)
+#
+%Vl(Miniplayer_Album_Fallback_Art,205,25,111,111,-)%VB
+%Vl(Miniplayer_Album_Fallback_Art,205,25,111,111,9)%VB
+bcdeu
+ghiju
+lmnop
+uqrst
+uuuuu
+%Vl(Miniplayer_Album_Fallback_Art,205,25,111,111,-)
+%Vl(Miniplayer_Widget,205,25,111,10,6)%Vf(031835)
+W%aRX
+%Vl(Miniplayer_Widget,205,126,111,10,6)%Vf(031835)
+Y%aRZ
+#
+# CC: Now-playing panel: %wt title box (bottom-aligned) with the artist in the
+# CC: smaller font 4 below, matching the WPS. A 1-line title sits at the box
+# CC: bottom right above the artist; a 2-line title grows up. No single/dual
+# CC: decision, nothing desyncs. Box sits below the album art (which ends y=136).
+# CC: The panel is filled with the theme BACKGROUND (031835) and the text drawn
+# CC: in the theme FOREGROUND (fff2f9). Both are written as the theme's own
+# CC: configured colours so the dynamic engine maps them -- it matches on exact
+# CC: colour, sending fg to the accent and bg to the dominant album-art colour.
+%Vl(Panel_Title,209,140,103,40,3)%Vf(fff2f9)
+%wt(%it,bl,%fn)
+%Vl(Panel_Artist,209,182,103,18,4)%Vf(fff2f9)
+%?if(%St(scroll speed),=,1)<|%s>%aL%?ia<%ia|%d(1)>
+#--- END ---#
+#
+#
+#--- USB Screen ---# $US
+#
+# CC: Removed -- usb_screen.c draws the eject screen itself, full-screen from
+# CC: podboxusb.bmp with the caption over it, so a skinned version was never
+# CC: reached. Only the UI-viewport suppression below is still needed, to keep
+# CC: the menu list from drawing over it.
+#
+#--- END ---#
+#
+#
+#--- System Dialog Box ---# $SD
+#
+# CC: Removed -- the System menu shows only its list now, which fills the height
+# CC: the box used to take (see System_Menu_Viewport_*). The version string is
+# CC: still reachable via the 'Rockbox Info' entry in that menu.
+#
+#--- END ---#
+#
+#
+#--- Quickscreen ---# $QS
+#
+#-- Rounded Top corners --#
+%Vl(Quickscreen,0,25,24,24,6)%VBO
+%Vl(Quickscreen,0,25,24,24,7)
+%Vl(Quickscreen,-24,25,24,24,6)%VBP
+%Vl(Quickscreen,-24,25,24,24,7)
+#
+#-- Volume Slider --#
+# CC: Quickscreen volume slider track; %pv = current volume position.
+%Vl(Quickscreen,9,34,302,28,6)%VB%?pv<Ą|Ć|Ć|ą|ą|Ć|Ć|Ć|Ć>ĈĈĈĈĈĈĈĈĈĉ
+%Vl(Quickscreen,9,34,302,28,-)
+%Vl(Quickscreen,9,34,14,28,6)%?pv<|Ċ|Ċ|Ċ>
+%Vl(Quickscreen,23,34,8,8,6)%?pv<|ċċċ|ċċċ|ċċċ>
+%Vl(Quickscreen,23,54,8,8,6)%?pv<|ċċċ|ċċċ|ċċċ>
+#- Custom Slider -#
+# ċ = 3
+# č = 12
+# Ď = 24
+%Vl(Quickscreen,31,34,281,28,6)%?pv<|ċ|ċċ|ċċċ|č|čċċċ|Ď|Ďċċċ|Ďč|Ďčċ|Ďčċċ|Ďčċċċ|ĎĎ|ĎĎċ|ĎĎċċ|ĎĎċċċ|ĎĎč|ĎĎčċ|ĎĎčċċ|ĎĎčċċċ|ĎĎĎċ|ĎĎĎċċ|ĎĎĎċċċ|ĎĎĎč|ĎĎĎčċ|ĎĎĎčċċċ|ĎĎĎĎ|ĎĎĎĎċ|ĎĎĎĎċċ|ĎĎĎĎċċċ|ĎĎĎĎč|ĎĎĎĎčċ|ĎĎĎĎčċċ|ĎĎĎĎčċċċ|ĎĎĎĎĎ|ĎĎĎĎĎċ|ĎĎĎĎĎċċ|ĎĎĎĎĎċċċ|ĎĎĎĎĎč|ĎĎĎĎĎčċ|ĎĎĎĎĎčċċ|ĎĎĎĎĎčċċċ|ĎĎĎĎĎĎ|ĎĎĎĎĎĎċ|ĎĎĎĎĎĎċċ|ĎĎĎĎĎĎċċċ|ĎĎĎĎĎĎč|ĎĎĎĎĎĎčċ|ĎĎĎĎĎĎčċċ|ĎĎĎĎĎĎčċċċ|ĎĎĎĎĎĎĎ|ĎĎĎĎĎĎĎċ|ĎĎĎĎĎĎĎċċ|ĎĎĎĎĎĎĎċċċ|ĎĎĎĎĎĎĎč|ĎĎĎĎĎĎĎčċ|ĎĎĎĎĎĎĎčċċ|ĎĎĎĎĎĎĎčċċċ|ĎĎĎĎĎĎĎĎ|ĎĎĎĎĎĎĎĎċ|ĎĎĎĎĎĎĎĎċċ|ĎĎĎĎĎĎĎĎċċċ|ĎĎĎĎĎĎĎĎč|ĎĎĎĎĎĎĎĎčċ|ĎĎĎĎĎĎĎĎčċċ|ĎĎĎĎĎĎĎĎčċċċ|ĎĎĎĎĎĎĎĎĎ|ĎĎĎĎĎĎĎĎĎċ|ĎĎĎĎĎĎĎĎĎċċ|ĎĎĎĎĎĎĎĎĎċċċ|ĎĎĎĎĎĎĎĎĎč|ĎĎĎĎĎĎĎĎĎčċ|ĎĎĎĎĎĎĎĎĎčċċ|ĎĎĎĎĎĎĎĎĎčċċċ|ĎĎĎĎĎĎĎĎĎĎ|ĎĎĎĎĎĎĎĎĎĎċ|ĎĎĎĎĎĎĎĎĎĎċċ|ĎĎĎĎĎĎĎĎĎĎċċċ|ĎĎĎĎĎĎĎĎĎĎč|ĎĎĎĎĎĎĎĎĎĎčċ|ĎĎĎĎĎĎĎĎĎĎčċċ|ĎĎĎĎĎĎĎĎĎĎčċċċ|ĎĎĎĎĎĎĎĎĎĎĎ|ĎĎĎĎĎĎĎĎĎĎĎċ>%?pv<|Č|Č|Č>
+#
+%Vl(Quickscreen,17,42,14,12,8)%?pv<|%Vs(invert)|%Vs(invert)|%Vs(invert)>N%?pv<O|P|P|Q|Q|R|R|R|R>
+#
+#-- Brightness Slider --#
+%Vl(Quickscreen,9,70,302,28,6)%VBćĈĈĈĈĈĈĈĈĈĉ
+%Vl(Quickscreen,9,70,302,28,-)
+%Vl(Quickscreen,9,70,14,28,6)Ċ
+%Vl(Quickscreen,23,70,8,28,-)%dr(0,0,-,-)
+# default slider tech as using conditional with %St(brightness) does not automatically adjust values to use full bar width
+%xl(slider,Brightness_Slider_Front.bmp)
+# CC: Quickscreen brightness slider, driven directly by the brightness setting.
+%Vl(Quickscreen,31,70,280,28,6)%St(0,0,-,28,noborder,slider,slider,setting,brightness)
+# brightness icon
+%Vl(Quickscreen,17,78,14,13,8)%Vs(invert)M
+#
+#-- Left Button --#
+# CC: A quickscreen action button. %Ql/%Qt/%Qr/%Qb are the four assignable
+# CC: quick settings (left/top/right/bottom); Off/ERR states pick different
+# CC: button glyphs. Quickitem_* below draw each button's name + value.
+%Vl(Quickscreen,8,107,148,29,6)%VB%?or(%if(%Ql,=,0),%if(%Ql,=,%Sx(No)),%if(%Ql,=,%Sx(Off)))<ĒēĔĔĕĖ|%?if(%Ql,=,ERR)<ĦħĨĩĪī|ĜĔĔĔĕĖ>>
+%Vl(Quickscreen,8,136,148,29,6)%VB%?or(%if(%Ql,=,0),%if(%Ql,=,%Sx(No)),%if(%Ql,=,%Sx(Off)))<ėĘęęĚě|%?if(%Ql,=,ERR)<ĬĭĮįİı|ĝęęęĚě>>
+%Vl(Quickscreen,8,107,148,58,-)
+#
+%Vl(Quickitem_Left,10,109,144,14,6)ef%aRg
+%Vl(Quickitem_Left,10,147,144,14,6)hi%aRj
+5%Vl(Quickitem_Left,10,123,144,24,-)%dr(0,0,5,-)%dr(130,0,-,-)
+%Vl(Quickitem_Left,38,109,102,52,-)%dr(0,0,-,-)
+%Vl(Quickitem_Left_Flush,8,107,148,58,-)#
+%Vl(Quickscreen,19,121,14,13,8)%?if(%Ql,=,ERR)<|%t(0.1)D;%t(0.1)D>
+%Vl(Quickscreen,45,118,100,18,3)%?or(%if(%Ql,=,0),%if(%Ql,=,%Sx(No)),%if(%Ql,=,%Sx(Off)),%if(%Ql,=,ERR))<|%Vs(invert)>%?if(%QL,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%QL>
+%Vl(Quickscreen,46,139,100,15,4)%?or(%if(%Ql,=,0),%if(%Ql,=,%Sx(No)),%if(%Ql,=,%Sx(Off)),%if(%Ql,=,ERR))<|%Vs(invert)>%?if(%Ql,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%Ql>
+#
+#-- Top Button --#
+%Vl(Quickscreen,164,107,148,29,6)%VB%?or(%if(%Qt,=,0),%if(%Qt,=,%Sx(No)),%if(%Qt,=,%Sx(Off)))<ĒēĔĔĕĖ|%?if(%Qt,=,ERR)<ĦħĨĩĪī|ĜĔĔĔĕĖ>>
+%Vl(Quickscreen,164,136,148,29,6)%VB%?or(%if(%Qt,=,0),%if(%Qt,=,%Sx(No)),%if(%Qt,=,%Sx(Off)))<ėĘęęĚě|%?if(%Qt,=,ERR)<ĬĭĮįİı|ĝęęęĚě>>
+%Vl(Quickscreen,164,107,148,58,-)
+#
+%Vl(Quickitem_Top,166,109,144,14,6)ef%aRg
+%Vl(Quickitem_Top,166,147,144,14,6)hi%aRj
+%Vl(Quickitem_Top,166,123,144,24,-)%dr(0,0,5,-)%dr(130,0,-,-)
+%Vl(Quickitem_Top,194,109,102,52,-)%dr(0,0,-,-)
+%Vl(Quickitem_Top_Flush,164,107,148,58,-)
+%Vl(Quickscreen,175,121,14,13,8)%?if(%Qt,=,ERR)<|%t(0.1)A;%t(0.1)A>
+%Vl(Quickscreen,200,118,100,18,3)%?or(%if(%Qt,=,0),%if(%Qt,=,%Sx(No)),%if(%Qt,=,%Sx(Off)),%if(%Qt,=,ERR))<|%Vs(invert)>%?if(%QT,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%QT>
+%Vl(Quickscreen,201,139,100,15,4)%?or(%if(%Qt,=,0),%if(%Qt,=,%Sx(No)),%if(%Qt,=,%Sx(Off)),%if(%Qt,=,ERR))<|%Vs(invert)>%?if(%Qt,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%Qt>
+#
+#-- Right Button --#
+%Vl(Quickscreen,8,173,148,29,6)%VB%aR%?or(%if(%Qr,=,0),%if(%Qr,=,%Sx(No)),%if(%Qr,=,%Sx(Off)))<ĒēĔĔĕĖ|%?if(%Qr,=,ERR)<ĦħĨĩĪī|ĜĔĔĔĕĖ>>
+%Vl(Quickscreen,8,202,148,29,6)%VB%aR%?or(%if(%Qr,=,0),%if(%Qr,=,%Sx(No)),%if(%Qr,=,%Sx(Off)))<ėĘęęĚě|%?if(%Qr,=,ERR)<ĬĭĮįİı|ĝęęęĚě>>
+%Vl(Quickscreen,8,173,148,58,-)
+#
+%Vl(Quickitem_Right,10,175,144,14,6)ef%aRg
+%Vl(Quickitem_Right,10,213,144,14,6)hi%aRj
+%Vl(Quickitem_Right,10,189,144,24,-)%dr(0,0,5,-)%dr(130,0,-,-)
+%Vl(Quickitem_Right,38,175,102,52,-)%dr(0,0,-,-)
+%Vl(Quickitem_Right_Flush,8,173,148,58,-)
+%Vl(Quickscreen,19,187,14,13,8)%?if(%Qr,=,ERR)<|%t(0.1)B;%t(0.1)B>
+%Vl(Quickscreen,45,184,100,18,3)%?or(%if(%Qr,=,0),%if(%Qr,=,%Sx(No)),%if(%Qr,=,%Sx(Off)),%if(%Qr,=,ERR))<|%Vs(invert)>%?if(%QR,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%QR>
+%Vl(Quickscreen,46,205,100,15,4)%?or(%if(%Qr,=,0),%if(%Qr,=,%Sx(No)),%if(%Qr,=,%Sx(Off)),%if(%Qr,=,ERR))<|%Vs(invert)>%?if(%Qr,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%Qr>
+#
+#-- Bottom Button --#
+%Vl(Quickscreen,164,173,148,29,6)%VB%?or(%if(%Qb,=,0),%if(%Qb,=,%Sx(No)),%if(%Qb,=,%Sx(Off)))<ĒēĔĔĕĖ|%?if(%Qb,=,ERR)<ĦħĨĩĪī|ĜĔĔĔĕĖ>>
+%Vl(Quickscreen,164,202,148,29,6)%VB%?or(%if(%Qb,=,0),%if(%Qb,=,%Sx(No)),%if(%Qb,=,%Sx(Off)))<ėĘęęĚě|%?if(%Qb,=,ERR)<ĬĭĮįİı|ĝęęęĚě>>
+%Vl(Quickscreen,164,173,148,58,-)
+#
+%Vl(Quickitem_Bottom,166,175,144,14,6)ef%aRg
+%Vl(Quickitem_Bottom,166,213,144,14,6)hi%aRj
+%Vl(Quickitem_Bottom,166,189,144,24,-)%dr(0,0,5,-)%dr(130,0,-,-)
+%Vl(Quickitem_Bottom,194,175,102,52,-)%dr(0,0,-,-)
+%Vl(Quickitem_Bottom_Flush,164,173,148,58,-)
+%Vl(Quickscreen,175,187,14,13,8)%?if(%Qb,=,ERR)<|%t(0.1)C;%t(0.1)C>
+%Vl(Quickscreen,200,184,100,18,3)%?or(%if(%Qb,=,0),%if(%Qb,=,%Sx(No)),%if(%Qb,=,%Sx(Off)),%if(%Qb,=,ERR))<|%Vs(invert)>%?if(%QB,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%QB>
+%Vl(Quickscreen,201,205,100,15,4)%?or(%if(%Qb,=,0),%if(%Qb,=,%Sx(No)),%if(%Qb,=,%Sx(Off)),%if(%Qb,=,ERR))<|%Vs(invert)>%?if(%Qb,=,ERR)<|%?if(%St(scroll speed),=,1)<|%s>%Qb>
+#
+#--- END ---#
+#
+#
