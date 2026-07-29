@@ -36,6 +36,28 @@
 static struct listitem_viewport_cfg *listcfg[NB_SCREENS] = {NULL};
 static struct gui_synclist *current_list;
 
+/* Working copies of the selected row's viewports, one per %Vl in the layout.
+ *
+ * The selected row cannot draw straight from the skin buffer the way the other
+ * rows do: its scrolling lines outlive the draw, and the scroll engine keeps a
+ * *pointer* to the viewport rather than a snapshot of it. So each viewport that
+ * can hold a live line needs its own address -- sharing one made a later
+ * viewport's geometry capture an earlier viewport's scrolling line, which then
+ * animated at the wrong y.
+ *
+ * Static rather than per-cfg because only one list draws at a time per screen,
+ * and skinlist_set_cfg() retires the lines when that changes. A layout with
+ * more viewports than slots reuses the last one, which is the old behaviour for
+ * the overflow only. */
+#define SKINLIST_SEL_VPS 12
+static struct skin_viewport selected_vps[NB_SCREENS][SKINLIST_SEL_VPS];
+
+static void skinlist_stop_selected_scroll(enum screen_type screen)
+{
+    for (int i = 0; i < SKINLIST_SEL_VPS; i++)
+        screens[screen].scroll_stop_viewport(&selected_vps[screen][i].vp);
+}
+
 static int current_row;
 static int current_column;
 static bool needs_scrollbar[NB_SCREENS];
@@ -46,7 +68,7 @@ void skinlist_set_cfg(enum screen_type screen,
     if (listcfg[screen] != cfg)
     {
         if (listcfg[screen])
-            screens[screen].scroll_stop_viewport(&listcfg[screen]->selected_item_vp.vp);
+            skinlist_stop_selected_scroll(screen);
         listcfg[screen] = cfg;
         /* the old list's scrollbar must go with it */
         needs_scrollbar[screen] = false;
@@ -221,6 +243,14 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
     if (!skinlist_is_configured(screen, list))
         return false;
 
+    /* Re-assert the title, as the unskinned renderer does in list_render.c.
+     * toggle_theme() clears it whenever the theme is switched off, which is
+     * what any full-screen takeover does, and nothing restores it on the way
+     * back -- so without this the list returns with no title and the default
+     * icon until something calls gui_synclist_set_title() again. */
+    if (list->title)
+        sb_set_title_text(list->title, list->title_icon, screen);
+
     current_list = list;
     dynamic_colors_check_extraction(-1);
     wps.display = display;
@@ -261,6 +291,9 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
             break;
         current_drawing_line = list_start_item+cur_line;
         is_selected = list_start_item+cur_line == list->selected_item;
+        /* Nth matching %Vl takes the Nth slot, so a viewport keeps the same
+         * address from one draw to the next and its scrolling line with it. */
+        int sel_slot = 0;
 
         for (viewport = SKINOFFSETTOPTR(get_skin_buffer(wps.data), listcfg[screen]->data->tree);
              viewport;
@@ -277,8 +310,14 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
                 continue;
             if (is_selected)
             {
-                memcpy(&listcfg[screen]->selected_item_vp, skin_viewport, sizeof(struct skin_viewport));
-                skin_viewport = &listcfg[screen]->selected_item_vp;
+                struct skin_viewport *sel = &selected_vps[screen][sel_slot];
+                if (sel_slot < SKINLIST_SEL_VPS - 1)
+                    sel_slot++;
+                /* Retire last draw's line before reusing this slot, so it
+                 * cannot animate against the geometry we are about to write. */
+                display->scroll_stop_viewport(&sel->vp);
+                memcpy(sel, skin_viewport, sizeof(struct skin_viewport));
+                skin_viewport = sel;
             }
             original_x = skin_viewport->vp.x;
             original_y = skin_viewport->vp.y;

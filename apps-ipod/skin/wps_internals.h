@@ -289,7 +289,6 @@ struct listitem_viewport_cfg {
     int16_t     xmargin;
     int16_t     ymargin;
     bool    tile;
-    struct skin_viewport selected_item_vp;
 };
 
 
