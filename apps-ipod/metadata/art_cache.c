@@ -29,6 +29,7 @@
 #include "settings/settings.h"  /* global_settings.art_cache_fast_build */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
+#include "database/album_index.h"   /* album_index_is_busy */
 #include "lcd.h"
 #include "draw/bmp.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
@@ -1128,12 +1129,14 @@ static void aa_thread(void)
                  * re-confirm the count settled before scanning -- this keeps
                  * generation (and the %lc "Caching" indicator) off during the
                  * whole build instead of churning through partial states. */
-                if (!tagcache_is_usable() || tagcache_is_busy())
+                if (!tagcache_is_usable() || tagcache_is_busy()
+                    || album_index_is_busy())
                 {
                     if (prev_total != -1)
                         debug_log(DEBUG_LOG_ARTCACHE,
-                                  "waiting: db usable=%d busy=%d",
-                                  tagcache_is_usable(), tagcache_is_busy());
+                                  "waiting: db usable=%d busy=%d index=%d",
+                                  tagcache_is_usable(), tagcache_is_busy(),
+                                  album_index_is_busy());
                     prev_total = -1;
                     break;
                 }

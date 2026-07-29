@@ -593,6 +593,7 @@ void album_covers_rebuild_cache(void)
     pf_cfg.update_albumart = false;
     pf_cfg.cache_version = CACHE_REBUILD;
     remove(EMPTY_SLIDE);
+    album_index_invalidate();  /* so the background pass rebuilds too */
     pf_config_save();
 }
 
@@ -601,6 +602,7 @@ void album_covers_update_cache(void)
     pf_cfg.update_albumart = true;
     pf_cfg.cache_version = CACHE_REBUILD;
     remove(EMPTY_SLIDE);
+    album_index_invalidate();  /* so the background pass rebuilds too */
     pf_config_save();
 }
 

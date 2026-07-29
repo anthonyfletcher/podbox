@@ -56,6 +56,7 @@
 #include "dircache.h"
 #include "database/tagcache.h"
 #include "metadata/art_cache.h"
+#include "database/album_index.h"
 #include "screens/browse/browser_db.h"
 #include "lang.h"
 #include "string.h"
@@ -196,6 +197,7 @@ static void init_tagcache(void)
 {
     bool clear = false;
     tagcache_init();
+    album_index_init();
     art_cache_init();
 
     while (!tagcache_is_initialized())
