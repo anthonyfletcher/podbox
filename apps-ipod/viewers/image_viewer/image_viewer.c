@@ -672,6 +672,9 @@ reload_decoder:
     {
         /* a re-entry here after ZOOM_IN/OUT is a zoom re-decode -> show progress */
         iv_zooming = (status == ZOOM_IN || status == ZOOM_OUT);
+        /* Hold the progress dialog back for 250ms, so an image that decodes
+         * quickly never flashes one up. */
+        splash_progress_set_delay(HZ/4);
         status = imgdec->get_image(info, frame, ds); /* decode or fetch from cache */
         if (status == PLUGIN_ERROR)
         {

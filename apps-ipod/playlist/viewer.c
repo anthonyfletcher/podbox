@@ -118,6 +118,8 @@ struct playlist_viewer {
                                    viewer-relative index) of moving track    */
     struct playlist_buffer buffer;
     struct mp3entry *id3;
+    unsigned long loading_tick; /* when to next splash while entries load    */
+    bool is_open;               /* false until the viewer is on screen       */
 };
 
 struct playlist_search_data
@@ -207,6 +209,14 @@ static void playlist_buffer_load_entries(struct playlist_buffer *pb, int index,
 
     for (i = 0; i < num_entries; i++)
     {
+        /* Only before the viewer is on screen: a big playlist can take long
+         * enough to load that the player looks hung. */
+        if (!viewer.is_open && TIME_AFTER(current_tick, viewer.loading_tick))
+        {
+            viewer.loading_tick += HZ*10;
+            splash(0, ID2P(LANG_WAIT));
+        }
+
         int len = playlist_entry_load(&(pb->tracks[i]), index, p, remaining);
         if (len < 0)
         {
@@ -603,6 +613,7 @@ static void close_playlist_viewer(void)
      * buffer, so holding on would panic. */
     viewer.id3 = NULL;
     app_release_buffer("playlist viewer");
+    viewer.is_open = false;
 }
 
 static enum pv_context_result open_pictureflow(const struct playlist_entry *current_track)
@@ -867,9 +878,12 @@ static bool open_playlist_viewer(const char* filename,
                                   struct gui_synclist *playlist_lists,
                                   bool reload, int *most_recent_selection)
 {
+    viewer.loading_tick = current_tick + HZ/3;
     push_current_activity(ACTIVITY_PLAYLISTVIEWER);
 
-    if (!playlist_viewer_init(&viewer, filename, reload, most_recent_selection))
+    if (playlist_viewer_init(&viewer, filename, reload, most_recent_selection))
+        viewer.is_open = true;
+    else
         return false;
 
     update_gui(playlist_lists, true);
