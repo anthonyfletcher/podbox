@@ -1021,6 +1021,13 @@ bool simplelist_show_list(struct simplelist_info *info)
             info->selection = -1;
             break;
         }
+        else if (action == ACTION_TREE_WPS && info->wps_on_play)
+        {
+            /* -2, distinct from -1 for cancel, so the caller can return
+             * GO_TO_WPS rather than backing out to wherever it came from. */
+            info->selection = -2;
+            break;
+        }
         else if (action == ACTION_STD_OK)
         {
             info->selection = gui_synclist_get_sel_pos(&lists);
@@ -1068,6 +1075,7 @@ void simplelist_info_init(struct simplelist_info *info, char* title,
     info->scroll_all = false;
     info->hide_theme = false;
     info->speak_onshow = true;
+    info->wps_on_play = false;
     info->timeout = HZ/10;
     info->selection = 0;
     info->action_callback = NULL;

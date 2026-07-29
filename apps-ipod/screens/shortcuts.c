@@ -748,6 +748,7 @@ int do_shortcut_menu(void *ignored)
     list.get_name = shortcut_menu_get_name;
     list.action_callback = shortcut_menu_get_action;
     list.title_icon = Icon_Bookmark;
+    list.wps_on_play = true;   /* this screen can return GO_TO_WPS */
 
     if (shortcut_count == 0)
     {
@@ -772,6 +773,12 @@ int do_shortcut_menu(void *ignored)
 
         if (list.selection == -1)
             break;
+        else if (list.selection == -2)
+        {
+            /* PLAY: straight to the playing screen rather than back. */
+            done = GO_TO_WPS;
+            break;
+        }
         else
         {
             sc = get_shortcut(list.selection, NULL);

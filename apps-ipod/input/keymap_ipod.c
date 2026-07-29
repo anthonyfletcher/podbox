@@ -40,14 +40,29 @@ static const struct button_mapping button_context_standard[]  = {
     { ACTION_STD_MENU,          BUTTON_MENU|BUTTON_REL,             BUTTON_MENU },
     { ACTION_STD_QUICKSCREEN,   BUTTON_MENU|BUTTON_REPEAT,          BUTTON_MENU },
     { ACTION_STD_CONTEXT,       BUTTON_SELECT|BUTTON_REPEAT,        BUTTON_SELECT },
-    { ACTION_STD_CANCEL,        BUTTON_PLAY|BUTTON_REPEAT,          BUTTON_NONE },
+    /* A tap of PLAY goes to the playing screen, as it already does in the file
+     * browser and the WPS. Lists had it free -- "back" here is LEFT and MENU,
+     * not PLAY -- and a list that cannot act on it ignores it. */
+    { ACTION_TREE_WPS,          BUTTON_PLAY|BUTTON_REL,             BUTTON_PLAY },
+    /* Held PLAY does nothing, and must still be claimed here so it does not
+     * fall through as a cascade: it used to mean a second "back" (LEFT and MENU
+     * already do that), which dropped out of the list while the button was
+     * still down -- the next repeat then reached the browser as stop, and the
+     * release arrived as the jump above. Claiming it also moves last_button on,
+     * so the release no longer matches the tap entry. */
+    { ACTION_NONE,              BUTTON_PLAY|BUTTON_REPEAT,          BUTTON_NONE },
 
     LAST_ITEM_IN_LIST
 }; /* button_context_standard */
 
 static const struct button_mapping button_context_tree[]  = {
     { ACTION_TREE_WPS,          BUTTON_PLAY|BUTTON_REL,      BUTTON_PLAY },
-    { ACTION_TREE_STOP,         BUTTON_PLAY|BUTTON_REPEAT,   BUTTON_PLAY },
+    /* Held PLAY does nothing here either. This context serves the main menu as
+     * well as the file browser, so stopping playback from it was reachable by
+     * holding PLAY on almost any screen -- easy to do by accident, and it
+     * discards the playing track's colours with it. Stop remains where it is
+     * meant, held PLAY in the playing screen. */
+    { ACTION_NONE,              BUTTON_PLAY|BUTTON_REPEAT,   BUTTON_PLAY },
     { ACTION_TREE_HOTKEY,       BUTTON_SELECT|BUTTON_PLAY,   BUTTON_NONE },
 
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)

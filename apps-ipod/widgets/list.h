@@ -288,6 +288,10 @@ struct simplelist_info {
     bool scroll_all;
     bool hide_theme;
     bool speak_onshow; /* list speaks first item or 'empty list' */
+    bool wps_on_play;  /* PLAY exits with selection == -2, meaning "go to the
+                          playing screen". Only for callers that can act on it:
+                          the settings lists have no GO_TO_* to return, and
+                          there PLAY is ignored rather than meaning "back". */
     int  timeout;
     int  selection; /* the item to select when the list is first displayed */
                     /* when the list is exited, this will be set to the

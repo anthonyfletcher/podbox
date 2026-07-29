@@ -100,6 +100,20 @@ static void draw_progressbar(int step, int count, char *msg)
     }
 
     (void)step; (void)count; (void)msg;
+
+    /* Rate-limited, because this is not cheap: a status bar render plus an LCD
+     * flush is a few milliseconds either side of ten, and the callers reach
+     * here once per album. Unthrottled, most of a foreground build was spent
+     * redrawing rather than reading the database -- the background pass, which
+     * draws nothing, finishes the same work several times quicker. 8fps is
+     * more than enough for an indicator that only spins. */
+    static long next_draw_tick;
+    long now = current_tick;
+
+    if (!TIME_AFTER(now, next_draw_tick))
+        return;
+    next_draw_tick = now + HZ / 8;
+
     sb_skin_update(SCREEN_MAIN, true);
     skin_flush_dirty();
 }

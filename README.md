@@ -177,7 +177,9 @@ existing build directory.
 
 ## Credits
 
-I am not a C programmer; most of the larger changes here were made with Claude.
+I'm not a C programmer, so this project has been developed with extensive AI assistance. The code itself is often AI-generated, but the ideas, feature design, specifications, testing, and iteration are mine.
+
+This is a hobby project, built because I wanted a version of Rockbox that better suited how I use my iPod. I'm sharing it in the hope that others might find it useful too.
 
 Built on the work of the [Rockbox](https://www.rockbox.org/) project, the
 [RockPod](https://github.com/nuxcodes/rockpod) project, the [Themify 2](https://git.sr.ht/~dook/Themify) theme
