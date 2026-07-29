@@ -2,12 +2,6 @@
 
 Single-file, single-parser artwork generation for Rockbox-style music libraries.
 
-Current build:
-
-```text
-3.8-provider-candidate-cap-no-face-detection
-```
-
 This tool creates square JPEG artwork for a music library organised as artist folders containing album folders. It can create:
 
 - artist artwork at `Artist/folder.jpg`

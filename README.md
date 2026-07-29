@@ -20,7 +20,7 @@ you want [Rockbox](https://www.rockbox.org) itself, which supports 80+ players.
 
 ## What you get
 
-<img src="docs/podbox/ss_album_covers.png" alt="Screenshot" width="200"/> <img src="docs/podbox/ss_album_browser.png" alt="Screenshot" width="200"/> <img src="docs/podbox/ss_artist_profiles.png" alt="Screenshot" width="200"/> <img src="docs/podbox/ss_artist_browser.png" alt="Screenshot" width="200"/>
+<img src="docs/podbox/ss_grid_art_everywhere.png" alt="Screenshot"/>
 
 **Your artwork, everywhere.**
 Album covers sit beside the rows in the album browser, and artist photos beside
@@ -30,31 +30,35 @@ artist into their albums. A thumbnail cache builds quietly in the background
 while the database is idle, so browsing stays fast.  There's also an art fetcher
 application to help you populate your library with art.
 
-<img src="docs/podbox/ss_playing_now.png" alt="Screenshot" width="200"/> <img src="docs/podbox/ss_themed_screen.png" alt="Screenshot" width="200"/>
+<img src="docs/podbox/ss_grid_art_colours.png" alt="Screenshot"/>
 
 **Colours that follow the music.**
 The interface recolours itself from the current album art, through the lists and
 the now-playing screen.
 
+<img src="docs/podbox/ss_grid_theme_everywhere.png" alt="Screenshot"/>
+
 **Themed throughout.**
 A reworked version of the **Themify 2** theme ships as the default. Dialogs,
-splashes and prompts have been standardised and im proved, and screens that used to 
+splashes and prompts have been standardised and improved, and screens that used to 
 break out of the theme no longer do.  There's also a mini spectrum visualiser for 
 the now-playing screen.
+
+**A keyboard you can actually use.**
+The pop-up grid keyboard is gone, replaced by a single-line editor driven
+entirely by the click wheel.
+
+<img src="docs/podbox/ss_grid_menu_editing.png" alt="Screenshot"/>
 
 **Your music library.**
 The tag database is always on, is called Music rather than Database, and its
 views can be promoted onto the main menu.
 
-<img src="docs/podbox/ss_epub_viewer.png" alt="Screenshot" width="200"/>
+<img src="docs/podbox/ss_grid_text_viewer.png" alt="Screenshot"/>
 
 **Documents and pictures too.**
 A text viewer that handles txt, fb2, epub, docx, pdf, md, html and rtf and an
 image viewer that supports bmp, gif, jpeg and png.
-
-**A keyboard you can actually use.**
-The pop-up grid keyboard is gone, replaced by a single-line editor driven
-entirely by the click wheel.
 
 ## Installing
 

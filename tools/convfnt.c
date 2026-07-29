@@ -1,12 +1,4 @@
 /***************************************************************************
- *             __________               __   ___.
- *   Open      \______   \ ____   ____ |  | _\_ |__   _______  ___
- *   Source     |       _//  _ \_/ ___\|  |/ /| __ \ /  _ \  \/  /
- *   Jukebox    |    |   (  <_> )  \___|    < | \_\ (  <_> > <  <
- *   Firmware   |____|_  /\____/ \___  >__|_ \|___  /\____/__/\_ \
- *                     \/            \/     \/    \/            \/
- * $Id$
- *
  * A command-line tool to export a single glyph from a Rockbox .fnt font
  * to an 8-bit greyscale .bmp, and to import an edited .bmp back into the
  * font.  Intended for editing icon fonts, where the glyphs are artwork

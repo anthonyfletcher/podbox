@@ -119,7 +119,7 @@ thread mid-scan when the reconnect arrived.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `export/config.h` | New `PODBOX_NO_USB_IAP`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. There is no dock or accessory here to test iAP against, and shipping an untestable subsystem invites unreproducible bug reports. Deleting the one define re-enables it — driver, `SOURCES` entries and descriptors are all present. It also brings back `HAVE_MULTIMEDIA_KEYS`, which nothing in `apps-ipod/` uses. |
+| `export/config.h` | New `PODBOX_NO_USB_IAP`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. There is no dock or accessory here to test iAP against, and shipping an untestable subsystem invites unreproducible bug reports. **Settled 2026-07-29: this stays off permanently** — see below. It also suppresses `HAVE_MULTIMEDIA_KEYS`, which nothing in `apps-ipod/` uses. |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | DAP-only fork; no recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | There is no plugin system. The name survives for the core scratch buffer (`apps-ipod/system/app_buffer.c`) that core screens allocate from. |
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined | Serial logging on by default for this target, which has never been run on hardware. Pairs with the enlarged `MAX_LOGF_SIZE`. |
@@ -132,6 +132,33 @@ thread mid-scan when the reconnect arrived.
 > generic gate and ARC isochronous support both predate the fork, so dropping it
 > restores USB audio on the 5G rather than introducing it. DesignWare (6G) and
 > ARC (5G) both set `USB_HAS_ISOCHRONOUS`.
+
+### USB iAP stays off — decided, not deferred
+
+`PODBOX_NO_USB_IAP` is a policy decision, not a hardware limitation. Both
+targets satisfy upstream's gate, and RockPod shipped MFi digital audio on the
+6G, so the feature is genuinely applicable. It is off because:
+
+- **The application layer is not written for a second PCM sink.** Enabling it
+  defines `PCM_SINK_IAP`, taking `PCM_SINK_NUM` from 1 to 2. Nothing in
+  `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, and
+  `audio_guess_frequency()` (`apps-ipod/audio/playback.c`) is sink-unaware.
+  Upstream's fixes for that (`f343168051`, `1d5aa53321`) are declined in
+  `upstream-commit-log.md` *because* there is only one sink — so re-enabling
+  makes them prerequisites rather than dead rows.
+- **The payoff is narrow.** Digital audio out to an MFi dock or DAC. Ordinary
+  docks and car AUX take analogue off the line-out pins and need no protocol.
+- **It has never run on a 5G.** The prior art is 6G/DesignWare; the 5G is ARC.
+  `USB_ENABLE_AUDIO` is already on there and untested, so enabling this too
+  would stack two unproven USB features on one controller.
+
+The comment at `config.h:1402` says re-enabling needs "nothing else". True of
+the build — it compiles — but not of the behaviour, per the first point.
+
+**Serial iAP is unaffected and stays on.** It is a different transport
+(`IPOD_ACCESSORY_PROTOCOL`, UART pins on the dock connector), implemented in
+`apps-ipod/iap/` and so outside this document's scope — `upstream-commit-log.md`
+records that it carries no RockPod code and tracks upstream.
 
 ---
 
@@ -228,6 +255,6 @@ These look like omissions and are not:
 | --- | --- |
 | `apps/` | Untouched upstream mirror, kept so merges apply cleanly. `apps-ipod/` is ours; do not edit `apps/`. |
 | `usbstack/usb_audio.c` | Upstream's is sink-only (host → player) and reaches both targets. RockPod's added a source mode that only worked on the 6G. |
-| `usbstack/iap/` | Upstream's vendored libiap. RockPod's `usb_iap_hid.c` and its transport indirection served a USB MFi/dock-DAC feature this fork no longer carries. |
+| `usbstack/iap/` | Upstream's vendored libiap. RockPod's `usb_iap_hid.c` and its transport indirection served a USB MFi/dock-DAC feature this fork no longer carries. Compiled out entirely by `PODBOX_NO_USB_IAP`, which is now a settled decision — kept upstream-identical so it stays mergeable rather than because it builds. |
 | `target/arm/s5l8702/usb-designware.c` | RockPod's isochronous plumbing was written for the above and calls `usb_audio_source_streaming()`, which no longer exists. |
 | `target/arm/s5l8702/pcm-s5l8702.c` | RockPod's per-start/stop I2S clock gating is **deferred, not rejected**. Upstream's `pcm_sink` refactor removed the functions it patched and the replacements nest, so a naive port would gate the clock on every buffer. It is a 6G power optimisation and there is no 6G here to test it on. |
