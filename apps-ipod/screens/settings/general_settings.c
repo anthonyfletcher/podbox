@@ -90,11 +90,17 @@ MENUITEM_FUNCTION(tc_import, 0, ID2P(LANG_TAGCACHE_IMPORT),
 MENUITEM_FUNCTION(tc_paths, 0, ID2P(LANG_SELECT_DATABASE_DIRS),
                   dirs_to_scan, NULL, Icon_NOICON);
 
+/* Art beside the rows in the database browser. Both come from the shared
+ * thumbnail cache, so turning them off only stops them being drawn. */
+MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
+MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
+
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
                 &tagcache_scan_on_eject, &tagcache_scan_on_startup,
                 &tc_init, &tc_update, &runtimedb,
+                &db_albumart, &db_artistart,
                 &tc_export, &tc_import, &tc_paths, &debug_log_tagcache
                 );
 

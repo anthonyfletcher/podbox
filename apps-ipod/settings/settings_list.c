@@ -1453,10 +1453,10 @@ const struct settings_list settings[] = {
      * on. A theme whose list config doesn't draw the %La cover should set it off
      * in its .cfg, otherwise its album rows still grow to the tall height (just
      * with no cover in them). */
-    OFFON_SETTING(F_THEMESETTING, db_albumart, -1, true, "database album art",
-                  NULL),
-    OFFON_SETTING(F_THEMESETTING, db_artistart, -1, true, "database artist art",
-                  NULL),
+    OFFON_SETTING(F_THEMESETTING, db_albumart, LANG_DB_ALBUM_ART, true,
+                  "database album art", NULL),
+    OFFON_SETTING(F_THEMESETTING, db_artistart, LANG_DB_ARTIST_ART, true,
+                  "database artist art", NULL),
     {F_T_INT|F_THEMESETTING, &global_settings.db_art_row_height, -1,
         INT(52), "database art row height", UNUSED},
     OFFON_SETTING(0, art_cache_fast_build, LANG_ART_CACHE_FAST_BUILD, false,
@@ -1505,7 +1505,7 @@ const struct settings_list settings[] = {
                   false, "shortcuts instead of quickscreen", NULL),
     OFFON_SETTING(0, prevent_skip, LANG_PREVENT_SKIPPING, false, "prevent track skip", NULL),
     OFFON_SETTING(0, rewind_across_tracks, LANG_REWIND_ACROSS_TRACKS, false, "rewind across tracks", NULL),
-    OFFON_SETTING(0, usb_hid, LANG_USB_HID, true, "usb hid", usb_set_hid),
+    OFFON_SETTING(0, usb_hid, LANG_USB_HID, false, "usb hid", usb_set_hid),
     CHOICE_SETTING(0, usb_keypad_mode, LANG_USB_KEYPAD_MODE, 0,
             "usb keypad mode", "multimedia,presentation,browser"
             ",mouse"

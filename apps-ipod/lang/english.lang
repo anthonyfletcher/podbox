@@ -17638,3 +17638,59 @@
     *: "File not found"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_ALBUM_ART
+  desc: in Settings, database browser album art rows
+  user: core
+  <source>
+    *: "Album Art Rows"
+  </source>
+  <dest>
+    *: "Album Art Rows"
+  </dest>
+  <voice>
+    *: "Album Art Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_ART
+  desc: in Settings, database browser artist art rows
+  user: core
+  <source>
+    *: "Artist Art Rows"
+  </source>
+  <dest>
+    *: "Artist Art Rows"
+  </dest>
+  <voice>
+    *: "Artist Art Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_INDEX
+  desc: in Carousel settings, rebuild the album index
+  user: core
+  <source>
+    *: "Rebuild index"
+  </source>
+  <dest>
+    *: "Rebuild index"
+  </dest>
+  <voice>
+    *: "Rebuild index"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_INDEX
+  desc: in Carousel settings, update the album index
+  user: core
+  <source>
+    *: "Update index"
+  </source>
+  <dest>
+    *: "Update index"
+  </dest>
+  <voice>
+    *: "Update index"
+  </voice>
+</phrase>
