@@ -23,6 +23,7 @@
 #include "string-extra.h"    /* strlcpy */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
+#include "database/album_index.h" /* build_artist_index() */
 
 static char *artist_name(int index)
 {

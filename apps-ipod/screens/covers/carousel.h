@@ -152,9 +152,8 @@ int  get_scroll_line_offset(enum pf_scroll_line_type type);
  * returned viewport back to carousel_text_end() when the caption is drawn. */
 struct viewport *carousel_text_begin(void);
 void carousel_text_end(struct viewport *saved);
-/* Build the album-artist list into the shared buffer (used by both the album
- * index build and the artist model). */
-int  build_artist_index(struct tagcache_search *tcs, void **buf, size_t *bufsz);
+/* build_artist_index() belongs to the index builder -- see
+ * database/album_index.h. */
 /* Persist the engine's pf_cfg to its config file (album model calls this after
  * changing last_album / triggering a cache rebuild). */
 void pf_config_save(void);
