@@ -478,8 +478,13 @@ bool browse_id3_ex(struct mp3entry *id3, struct playlist_info *playlist,
      * robust; the old activity check treated any non-plugin caller as live,
      * which flashed-and-closed the core Properties -> Track Info view. */
     bool is_curr_track_info = (id3 != NULL && id3 == audio_current_track());
-    if (is_curr_track_info)
-        push_current_activity(ACTIVITY_ID3SCREEN);
+    /* Push unconditionally: the activity is what a skin branches on (%cs), so
+     * every caller has to set it, not just the live ones. Tied to the test
+     * above it left Track Info reporting whichever browser opened it -- 7 from
+     * Files, 8 from Music -- and those pick different header viewports, so the
+     * title drew at a different x depending on the route. Live mode keeps the
+     * id3-identity test; only the activity moves. */
+    push_current_activity(ACTIVITY_ID3SCREEN);
 refresh_info:
     info.count = 0;
     info.playlist_display_index = playlist_display_index;
@@ -555,8 +560,7 @@ refresh_info:
     FOR_NB_SCREENS(i)
         screens[i].scroll_stop(); /* when custom lists are used */
 
-    if (is_curr_track_info)
-        pop_current_activity();
+    pop_current_activity();
     return ret;
 }
 

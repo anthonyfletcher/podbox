@@ -326,12 +326,16 @@ struct system_status
     int runtime;       /* current runtime since last charge */
     int topruntime;    /* top known runtime */
     int dircache_size;      /* directory cache structure last size, 22 bits */
-    signed char last_screen;
+    /* int, not a narrower type: the SYSTEM_STATUS macro flags these F_T_INT,
+       so settings.c loads and saves them through an int pointer. A 1-byte
+       member leaves the other three to alignment padding, which is what
+       reaches .resume.cfg. */
+    int last_screen;
     int  viewer_icon_count;
     int last_volume_change; /* tick the last volume change happened. skins use this */
     int font_id[NB_SCREENS]; /* font id of the settings font for each screen */
 
-    bool resume_modified; /* playlist is modified (=> warn before erase) */
+    int resume_modified; /* playlist is modified (=> warn before erase) */
 };
 
 struct user_settings
