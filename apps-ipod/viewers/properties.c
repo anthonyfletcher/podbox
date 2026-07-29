@@ -370,6 +370,22 @@ int properties(const char *file)
         return GO_TO_PREVIOUS;
     }
 
+    /* Erase the background behind the progress bar. A theme that gives the
+     * context menu activity its own viewport leaves whatever it drew there
+     * showing through while the scan runs. Directories are exempt: they show
+     * no progress bar and draw their own screen, so clearing only flashes. */
+    if (props_type != PROPS_DIR)
+    {
+        /* Static because the scroll engine keeps the pointer, not a copy --
+         * see the list_text[] note in list_render.c. */
+        static struct viewport ui_vp;
+        struct screen *display = &screens[SCREEN_MAIN];
+        viewport_set_defaults(&ui_vp, SCREEN_MAIN);
+        struct viewport *last_vp = display->set_viewport(&ui_vp);
+        display->clear_viewport();
+        display->set_viewport(last_vp);
+    }
+
     if (props_type == PROPS_MUL_ID3)
         ret = assemble_track_info(NULL, NULL);
     else if (props_type == PROPS_DIR)

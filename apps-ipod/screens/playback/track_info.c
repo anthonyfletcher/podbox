@@ -504,6 +504,8 @@ refresh_info:
         {
             if (key == ACTION_STD_OK)
             {
+                /* A row mid-scroll keeps animating under the text view. */
+                gui_synclist_scroll_stop(&id3_lists);
                 int header_id = id3_headers[info.info_id[id3_lists.selected_item]];
                 char* title_and_text[2];
                 title_and_text[0] = str(header_id);
