@@ -64,11 +64,10 @@ First match wins.
 | `firmware/` core, `lib/`, `tools/` | **Adopt** — check `upstream-divergence.md` for a local patch in the same file first. |
 | `manual/`, `uisimulator/`, `android/`, `wps/`, other `themes/` | **N/A** — mirrored so merges apply; unbuilt, and not pruned deliberately. |
 
-Two habits that repeatedly paid off:
+Two rules, both earned:
 
 1. **Check for a later commit on the same function before porting.** Upstream
-   reverses itself. Two cancelling pairs and one four-week dead end were caught
-   this way — each would have cost real effort to port and then unport.
+   reverses itself; this file records two cancelling pairs and one dead end.
    `git log --oneline <base>..rockbox/master -- <file>`
 2. **Port the net, not the sequence,** wherever a cluster of commits converges
    on one design.
@@ -89,8 +88,8 @@ Two habits that repeatedly paid off:
 | 2026-02-19 | `3373ed6744` | playback: fix single mode with auto frequency switch | **Adopted** | With the above, as one net port. |
 | 2026-02-21 | `017dd72ff3` | plugins: convert all plugins to mixer API | **N/A** | No plugin system. |
 | 2026-02-23 | `c86fd2318d` | retain file browser directory on reboots | **Declined** | Not wanted. 116 lines across 8 files into browser code PodBox has reworked heavily. |
-| 2026-02-23 | `e15451815a` | tagcache: prevent infinite scan/commit loop | **Adopted** | Already fixed here independently, with a better comment. Left as is. |
-| 2026-02-24 | `17edcbd42a` | talk: improvements in voicing "years" | **Adopted** | Half-landed: `english.lang` documented `Y`/`y`, `talk.c` ignored the distinction, so "dAY" voiced 2020 as "two thousand twenty". |
+| 2026-02-23 | `e15451815a` | tagcache: prevent infinite scan/commit loop | **Adopted (independently)** | The same guard exists here, with a fuller comment. Nothing to take. |
+| 2026-02-24 | `17edcbd42a` | talk: improvements in voicing "years" | **Adopted** | Only the `talk.c` half was missing: `english.lang` documents a `Y`/`y` distinction that `talk.c` ignored, voicing 2020 as "two thousand twenty" for "dAY". |
 | 2026-03-02 | `eafcbd3fd6` | debug_menu: 2nd SD/MMC card only if NUM_DRIVES > 1 | **N/A** | Other targets. |
 | 2026-03-25 | `6928581bf9` | open_plugin_import fails to import full path | **N/A** | No plugin system. |
 | 2026-03-31 | `4b9c78e01b` | filetree: restrict keep_directory to Files menu | **N/A** | Follow-up to declined `c86fd2318d`. |
@@ -99,21 +98,21 @@ Two habits that repeatedly paid off:
 | 2026-04-02 | `c765addd24` | eliminate default browser setting | **Declined** | It does apply — `browser_default` / `LANG_DEFAULT_BROWSER` are still live in `settings_list.c` and `root_menu.c` — but it *removes* a setting in favour of resuming whichever browser was last used. A UX opinion with no defect behind it, and `root_menu.c` has diverged here. PodBox keeps the explicit setting. |
 | 2026-04-07 | `5ac105c837` | tagtree: add "Show in Files" | **Adopted** | Landed with the context-menu rework. |
 | 2026-04-07 | `e405858b9e` | wps: replace "Open With"/"Delete" with "Show in Files" | **Adopted** | Same. `HOTKEY_OPEN_WITH` removed — it served a plugin system that does not exist. |
-| 2026-04-09 | `27ebdfcb25` | settings: fix mismatched resume setting variable types | **Adopted** | All of it. `last_screen` and `resume_modified` widen to `int`, plus the `NUM_ITEMS` bounds guard in `root_menu_setup_screens()`. No migration: `.resume.cfg` is a **text** cfg written through `settings_write_config`, so a member's C type never reaches the disk format. The narrow types were the defect — `SYSTEM_STATUS` flags them `F_T_INT` and `settings.c` loads and saves through an `int` pointer, which stayed in bounds only on alignment padding. PodBox is less exposed than upstream on the `PLM` half: upstream has `browse_last_folder[]` straight after `resume_modified` and no padding, this fork dropped it. Deviation: the `(char)` cast at `root_menu.c:1086` is dropped, where upstream kept its two. Tested on 5G. |
+| 2026-04-09 | `27ebdfcb25` | settings: fix mismatched resume setting variable types | **Adopted** | `last_screen` and `resume_modified` are `int`, and `root_menu_setup_screens()` guards `new_screen >= NUM_ITEMS`. The narrow types were the defect: `SYSTEM_STATUS` flags both `F_T_INT` and `settings.c` loads and saves through an `int` pointer, which stays in bounds only on alignment padding. No migration is involved — `.resume.cfg` is a text cfg, so a member's C type never reaches the disk format. Deviation: the `(char)` cast at `root_menu.c:1086` is dropped, where upstream keeps its two. The Start Screen and resume paths are not separately exercised on hardware. |
 | 2026-04-13 | `719f0f1a3b` | settings: move USB settings to their own submenu | **Declined** | Pure reorganisation behind a new `HAVE_USB_MODE`. Nothing is hidden today: `usb_hid`, `usb_keypad_mode`, `usb_audio` and `usb_skip_first_drive` are all listed inline at `screens/settings/general_settings.c:297-303`, `usb_audio` under `#ifdef USB_ENABLE_AUDIO`. This fork's settings tree is its own design, and the commit's bulk is `manual/`, which is not built. Worth revisiting only inside a deliberate menu tidy. |
 | 2026-04-13 | `e85f120190` | playlist_viewer: character-based Now Playing indicator | **Adopted** | The playing track is bracketed `[like this]`, so it reads without colour or an icon. |
 | 2026-04-15 | `f4dc4d89dc` | imageviewer: hide info by default when loading | **Adopted (in part)** | Lands on `viewers/image_viewer/`, the core port, not on `screens/covers/` — only a 2-line `pictureflow.c` hunk touches the carousel. Taken: the 250ms grace before a progress dialog appears, as `splash_progress_set_delay(HZ/4)` at the decode call. Not taken: the `hide_info` **setting**, which this viewer does not need — `cb_progress()` already shows nothing during slideshows and only reports on a first decode or a zoom. |
-| 2026-04-16 | `a1ccb79727` | pitchscreen: adjust keymaps for ipod and fiiom3k | **Adopted**, since removed | An iPod-specific fix, taken — then the pitch screen was deleted entirely as unreachable. |
-| 2026-04-16 | `cc7418dd8b` | dsp: add option to swap left and right channels | **Adopted** | Half-landed: `lib/rbcodec` already implemented `SOUND_CHAN_SWAP`; only the setting was missing. |
+| 2026-04-16 | `a1ccb79727` | pitchscreen: adjust keymaps for ipod and fiiom3k | **N/A** | There is no pitch screen here: screen, keymap context, `ACTION_PS_*` codes and settings are all gone. |
+| 2026-04-16 | `cc7418dd8b` | dsp: add option to swap left and right channels | **Adopted** | Only the setting was missing; `lib/rbcodec` implements `SOUND_CHAN_SWAP` already. |
 | 2026-04-16 | `fd7ae09e7a` | FS#13864: last char of folder/filename not voiced | **Adopted** | |
 | 2026-04-21 | `9ac6edf750` | add panicf to plugin and codec API | **Adopted** | Compile-blocking — new trailing member, left silently NULL. |
 | 2026-04-24 | `2690418551` | imageviewer: use theme in all submenus | **Adopted (independently)** | `viewers/image_viewer/image_viewer.c:816-847` already has the shape upstream restructures towards: one `viewportmanager_theme_enable`/`_undo` bracket around `do_menu()` **and** all three submenus, with the backdrop reset after the undo rather than inside. Nothing to take. |
-| 2026-04-24 | `c145d19e85` | gui: align display updates, reduce UI glitches | **Declined** ⚠ | A dead end upstream deleted four weeks later in `c0a8303a9c`. Ironically credited to RockPod's own anti-flicker work — but neither RockPod nor PodBox ever had `skin_defer_rendering`, so there was nothing to unwind. |
+| 2026-04-24 | `c145d19e85` | gui: align display updates, reduce UI glitches | **Declined** ⚠ | A dead end, superseded by `c0a8303a9c`. `skin_defer_rendering` does not exist here, so nothing depends on it. |
 | 2026-04-26 | `5bbf1c8e5b` | tree: gui_synclist_scroll_stop on uninitialized list | **Adopted** | `update_dir()` could return -1 with the list uninitialised. Reachable with "remember last folder" pointing at a deleted directory. |
 | 2026-04-26 | `6cf705886d` | skin: custom scrollbar OBOE | **Adopted** | `last_shown` was the item count, not the last index. Visible — Themify_2 draws its own scrollbar. |
-| 2026-04-26 | `792a230c00` | FS#13877: use FONT_UI in the Equalizer sliders | **Adopted** | Sliders were a fixed 6px against a forced `FONT_SYSFIXED`; now sized off the font, minimum 6. |
+| 2026-04-26 | `792a230c00` | FS#13877: use FONT_UI in the Equalizer sliders | **Adopted** | Sliders size off the font with a 6px floor, rather than a fixed 6px against a forced `FONT_SYSFIXED`. |
 | 2026-04-26 | `bf0fa29a30` | WPS Context Menu configurable entry | **Adopted** | 740 lines. The bottom five rows are assignable from Settings > WPS, sharing one action list with the browser hotkey. |
-| 2026-04-28 | `7ab1a81806` | simple_viewer: use UI viewport and SBS title | **Adopted (in part)** | Only the `gui_synclist_scroll_stop()` from the `apps/screens.c` half, at `screens/playback/track_info.c:508` — without it a mid-scroll row keeps animating under the opened text view. The plugin API and `simple_viewer.c` halves are N/A. The theme enable/undo removal is **not** taken: this fork's `view_text()` owns the full screen with no themed SBS, a different design from upstream's. Tested on 5G. |
+| 2026-04-28 | `7ab1a81806` | simple_viewer: use UI viewport and SBS title | **Adopted (in part)** | The `gui_synclist_scroll_stop()` from the `apps/screens.c` half, at `screens/playback/track_info.c:508`; without it a mid-scroll row animates on under the opened text view. The plugin API and `simple_viewer.c` halves are N/A. The theme enable/undo removal is declined: `view_text()` owns the full screen with no themed SBS, which is this fork's intended design. |
 | 2026-04-29 | `121c65b32a` | FS#13857: keylock with USB (Fiio M3K) | **N/A** | Other target. |
 | 2026-04-29 | `c41beebcda` | gui: delay updating SBS when setting list title | **Declined** | Half of a cancelling pair with `160905b1b8`. PodBox's `set_title` already matches upstream's settled version. |
 | 2026-04-29 | `dbcee0deae` | gui: defer deadspace viewport update | **Adopted** | Part of the refresh campaign, taken as net state. |
@@ -131,7 +130,7 @@ Two habits that repeatedly paid off:
 | 2026-05-06 | `b4c308d698` | splash: rework word wrap, escape characters | **Declined** | Head of a 140-line rework that PodBox's dialog framing, physical-display centring and padding would have to be re-applied onto. Only two splash calls use escapes, both `\n`. |
 | 2026-05-07 | `05f1a6605d` | gui: skin_engine: fix dirty & force_waiting across screens | **Declined** | A fix *to* the `c145d19e85` dead end, and equally moot. |
 | 2026-05-07 | `ce403586e0` | playlist_viewer: loading splash after delay | **Adopted** | Completes the pair with `04e557898f`. `is_open`/`loading_tick` on the viewer struct; a large playlist that takes over ~330ms to load now says so rather than looking hung, repeating every 10s. Self-limiting — on a playlist that loads quickly the splash never appears. |
-| 2026-05-08 | `325a028af4` | properties: clear UI viewport at startup | **Adopted** | Taken as the *net* with `bc528c4079`, not as a pair — this one alone made the viewport flash. `viewers/properties.c:373`. |
+| 2026-05-08 | `325a028af4` | properties: clear UI viewport at startup | **Adopted** | The *net* with `bc528c4079` at `viewers/properties.c:373`. Alone it makes the viewport flash on directories, so the two only make sense together. |
 | 2026-05-08 | `ae871d25a9` | gui: skin_engine: reduce updates | **Declined** | Fix to the dead end. |
 | 2026-05-09 | `bc528c4079` | properties: don't clear UI viewport for dirs | **Adopted** | The net with `325a028af4`. `struct viewport` must be `static` here as upstream had it — the scroll engine keeps the pointer, not a copy. Tested on 5G. |
 | 2026-05-11 | `51abd937d5` | playlist viewer: retrieve track name id3 from db | **Adopted (independently)** | `playlist/viewer.c:274` already tries tagcache before falling back to a disk read. Upstream gates its version on `METADATA_EXCLUDE_ID3_PATH`; PodBox's is unconditional, which is the better choice on a spinning disk. Left as is. |
@@ -147,13 +146,13 @@ Two habits that repeatedly paid off:
 | 2026-05-19 | `bf8328fbe0` | rbcodec: fix build failure with DEBUG but no LOGF | **Adopted** | Compile-blocking. |
 | 2026-05-21 | `04e557898f` | playlist: delay loading splash when adding indices | **Adopted** | The splash appeared for playlists indexed too fast to need it. |
 | 2026-05-21 | `ae17d606be` | playlist_viewer: UI feedback when loading is delayed | **Declined** | Changes `playlist_viewer_init`'s signature and touches plugin-buffer sizing PodBox has changed. |
-| 2026-05-22 | `edecad823e` | gui: list-skinned: fix scrollbar lag | **Adopted** | Deferred once on a wrong assumption, then taken: `sb_skin_force_next_update()` only bypasses the status bar's rate limiter, it does not force a full refresh. |
+| 2026-05-22 | `edecad823e` | gui: list-skinned: fix scrollbar lag | **Adopted** | `sb_skin_force_next_update()` only bypasses the status bar's rate limiter; it does not force a full refresh. |
 | 2026-05-23 | `6a252576f5` | bookmark: stop scrolling for skinned context menu | **Adopted** | |
 | 2026-05-23 | `eb6746c1d6` | albumart: fix warning with GCC16 | **Adopted** | Compile-blocking. |
 | 2026-05-24 | `c0a8303a9c` | gui: simplify screen updates | **Adopted** ★ | The anchor of the refresh campaign and the largest single port. `skin_render()` no longer flushes; `skin_update()` marks dirty and one place flushes at end of action. See the deviations note below. |
 | 2026-05-25 | `21e9d3f449` | Hotkey Tree shares code with WPS Context | **Adopted** | With the context-menu rework. |
 | 2026-05-25 | `e471fe4115` | FixRed: Tree Hotkey without HAVE_HOTKEY | **Adopted** | With the above. |
-| 2026-05-26 | `239ba599fd` | FS#13908: hotkeys not saved when language changes | **Adopted** | Declined at first — it fixes a configurable context menu PodBox did not yet have — then taken once `bf0fa29a30` landed. Hotkeys are now stored in `config.cfg` by name. |
+| 2026-05-26 | `239ba599fd` | FS#13908: hotkeys not saved when language changes | **Adopted** | Depends on the configurable context menu from `bf0fa29a30`. Hotkeys are stored in `config.cfg` by name, so changing language does not lose them. |
 | 2026-05-26 | `2a29dedeb6` | gui: skin_display: draw album art first | **Adopted** | So mask images can be drawn over it. Themify_2 does exactly this. |
 | 2026-05-27 | `018994e8c7` | gui: skinned lists: fix off-screen selection | **Adopted** | Refresh campaign, net state. |
 | 2026-05-27 | `0c464c3d49` | gui: list-skinned: scrollbar not disappearing | **Adopted** | `needs_scrollbar` cleared with the cfg it belongs to. |
@@ -171,10 +170,10 @@ Two habits that repeatedly paid off:
 | 2026-06-03 | `85adf518ac` | shortcuts: go to WPS for ACTION_TREE_WPS | **Declined** | Only works paired with `e6b4ec81ff`. |
 | 2026-06-03 | `e6b4ec81ff` | simplelist: support ACTION_TREE_WPS | **Declined** ⚠ | Switches every simple list from `CONTEXT_LIST` to `CONTEXT_TREE`, which on this target rebinds PLAY from `ACTION_STD_CANCEL` to `ACTION_TREE_WPS` app-wide. A convenience feature, not a fix. |
 | 2026-06-04 | `0836ebbd45` | shortcuts: 'File' shortcuts fail when dir filter set | **Adopted** | A shortcut to a file hidden by the current filter failed with "Failed reading". |
-| 2026-06-05 | `1add6b0dd5` | shortcuts: eliminate unnecessary nesting | **Declined** | Cosmetic. |
+| 2026-06-05 | `1add6b0dd5` | shortcuts: eliminate unnecessary nesting | **Declined** | A 477-line refactor for GNU Complexity scores, with no behaviour change. `screens/shortcuts.c` is 885 lines and differs from upstream's throughout, so there is no cheap way to apply it. |
 | 2026-06-05 | `74905f4796` | skin_engine: remove get_skin_filename call | **Adopted** | It was called purely to fill a buffer nobody read. |
 | 2026-06-11 | `4d773a3329` | onplay wps context menu plugin item namebuf | **N/A** | `HOTKEY_PLUGIN` has no meaning here and has been removed. |
-| 2026-06-12 | `a824085057` | skin: add %pX tag for time-based playlist progress | **Adopted** | Half-landed — `lib/skin_parser` already advertised `%pX` while nothing rendered it. Taken from upstream's current file, not the commit. Track lengths cached (500 max), with a size-based estimate on ATA. Inert until a theme uses it. |
+| 2026-06-12 | `a824085057` | skin: add %pX tag for time-based playlist progress | **Adopted** | Only the renderer was missing; `lib/skin_parser` advertised `%pX` already. Ported from upstream's current file rather than the commit. Track lengths are cached (500 max), with a size-based estimate on ATA. Inert until a theme uses the tag. |
 | 2026-06-14 | `58ce77fbe2` | tagtree: letter menus voiced with talkmenu off | **Adopted** | |
 | 2026-06-17 | `d737cbb931` | Sansa As3525 debug menu scroll buttons | **N/A** | Other target. |
 | 2026-06-19 | `81962808a2` | use core_alloc for Radio Presets | **N/A** | No radio on these targets. |
@@ -182,7 +181,7 @@ Two habits that repeatedly paid off:
 | 2026-06-27 | `3cd286d8f8` | metadata: add audio_fmt to get_metadata_ex | **Adopted** | Compile-blocking, 4 files. |
 | 2026-06-27 | `3e08b86e4b` | FixRed for %pX: checkwps, ATA builds | **Adopted** | With `a824085057`. |
 | 2026-06-28 | `24b0254d96` | metadata.c small cleanup | **Adopted** | Compile-blocking. |
-| 2026-06-30 | `d87755c535` | FS#13944: FONT_UI loads last loaded font | **Adopted** | Half-landed — `firmware/font.c` already had `set_ui_font()` and nothing called it, so FONT_UI could pick up a theme's icon font instead of the configured UI font. |
+| 2026-06-30 | `d87755c535` | FS#13944: FONT_UI loads last loaded font | **Adopted** | Only the call was missing; `firmware/font.c` defines `set_ui_font()` already. Without it FONT_UI picks up a theme's icon font instead of the configured UI font. |
 | 2026-06-30 | `f4e9ba7f17` | FS#13943: single mode tracks under one second don't play | **N/A** | Reverted upstream two days later. Net effect is nothing. |
 | 2026-07-02 | `ce88de54b8` | hosted: fix USB mode not initialized | **N/A** | Hosted targets. |
 | 2026-07-02 | `ddc31e8ddc` | Revert FS#13943 | **N/A** | The revert of the above. |
@@ -191,15 +190,15 @@ Two habits that repeatedly paid off:
 | 2026-07-21 | `ea775fa501` | hibyr1: add USB DAC scaffolding | **N/A** | Other target. |
 | 2026-07-26 | `31dfd5da2e` | playback: add Playlist Single Mode option | **Adopted** | `settings.h:115`, `settings_list.c:927`, `playback.c:2806`. The enum value is appended last, so stored settings keep their meaning. |
 | 2026-07-26 | `4f6aac445f` | hiby: raise plugin buffer to 2MiB on 64MB targets | **N/A** | `hibylinux.h` only — not a PodBox target, and no plugin system. |
-| 2026-07-27 | `5f129ef299` | tools: mkinfo handles echor1 symbols | **Pending** | Merges clean; PodBox's local `mkinfo.pl` hunk is elsewhere. Affects `rockbox-info.txt` reporting only, not the binary. `_bssend` is inert here, but `_?loadaddress` now also matches the bare symbol both PodBox linker scripts define alongside `_loadaddress` — compare the reported RAM size on `ipod6g` either side. |
-| 2026-07-28 | `c54dddc2ac` | playback: fix Playlist Single Mode pause behavior | **Adopted** | Fixes the feature two rows above. Before it, Playlist mode paused after *every* track — see below. `playback.c:2806`. Tested on 5G: Playlist mode plays through and pauses only at the playlist boundary. |
+| 2026-07-27 | `5f129ef299` | tools: mkinfo handles echor1 symbols | **Pending** | Two regex broadenings in `mkinfo.pl`, affecting `rockbox-info.txt` only, never the binary. Both are inert on these targets and safe: no `_bssend` symbol exists, and although `ipod6g`'s map carries a bare `loadaddress = 0x8000000` beside `_loadaddress = .`, the pattern requires `= .` and matches only the latter. Reported RAM usage is unchanged. PodBox's own `mkinfo.pl` change is the `COREAPPSDIR` hunk elsewhere in the file, so there is no conflict. Awaiting the next `tools/` sync. |
+| 2026-07-28 | `c54dddc2ac` | playback: fix Playlist Single Mode pause behavior | **Adopted** | `playback.c:2806`. Makes the option added by `31dfd5da2e` usable — without it Playlist mode pauses after every track. See below for the mechanism. Verified on 5G. |
 
 # Noted exceptions
 
 ## USB iAP — off by policy, and staying off
 
-Four rows above turn on one define, so the reasoning lives here rather than
-being repeated.
+Several rows above turn on this one define, so the reasoning lives here rather
+than being repeated in each.
 
 **iAP is one protocol with two transports, and PodBox runs only one of them.**
 
@@ -211,8 +210,25 @@ being repeated.
 | Wire | UART pins on the dock connector | USB, HID-framed |
 | Carries | Commands only | Commands **and digital audio** |
 
-`USB_ENABLE_IAP` is **applicable to this hardware**, however, **It stays off.** The payoff is digital audio out to an MFi dock or DAC — a
-small, discontinued category of accessory. 
+`USB_ENABLE_IAP` applies to this hardware — both targets satisfy upstream's
+gate, and the driver, `SOURCES` entries and descriptors are all present.
+`config.h` defines `PODBOX_NO_USB_IAP` to suppress it, and deleting that one
+define is all it takes to turn it back on. It stays off for three reasons:
+
+- **The application layer is not written for a second PCM sink.** Enabling it
+  defines `PCM_SINK_IAP`, taking `PCM_SINK_NUM` from 1 to 2. Nothing in
+  `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, and
+  `audio_guess_frequency()` is sink-unaware. The rows declined above on the
+  grounds that there is only one sink become prerequisites if that changes.
+- **The payoff is narrow.** Digital audio out to an MFi dock or DAC, a small
+  and discontinued category. Ordinary docks and car AUX take analogue off the
+  line-out pins and need no protocol.
+- **It has never run on a 5G.** The prior art is 6G/DesignWare; the 5G is ARC.
+  `USB_ENABLE_AUDIO` is already on there and untested, so enabling this too
+  would stack two unproven USB features on one controller.
+
+Suppressing the define also suppresses `HAVE_MULTIMEDIA_KEYS`, which nothing in
+`apps-ipod/` uses.
 
 ## Two deviations from upstream in `c0a8303a9c`, both load-bearing
 
@@ -237,30 +253,24 @@ spinner, and the status bar after the playlist viewer pops its activity. **A new
 screen that renders without an action following it needs this too** — it is the
 one way to get a stale screen in this model.
 
-### `c54dddc2ac` — what it fixed
+### `c54dddc2ac` — the failure mode it removes
 
-Worth keeping because the bug was worse than upstream's commit message suggests,
-and the shape of it recurs: a `single_mode` value the tag comparison cannot
-describe.
+Recorded because the shape recurs: a `single_mode` value the tag comparison
+cannot describe.
 
-Before the fix, when the mode was `PLAYLIST` and the skip was *not* a new
-playlist, the function fell through to the tag comparison — and that code cannot
-handle this mode. `single_mode_get_id3_tag()` (`playback.c:2773`) has no
-`SINGLE_MODE_PLAYLIST` case, so it returned `NULL`, the `previous_tag == NULL`
-test short-circuited, and the function returned `true`. **Playlist mode paused
-after every track**, making it unusable.
-
-The fix answers for that mode in both directions rather than only the pausing
-one:
+`single_mode_get_id3_tag()` (`playback.c:2773`) has no `SINGLE_MODE_PLAYLIST`
+case and returns `NULL` for it. Any path that falls through to the tag
+comparison therefore short-circuits on `previous_tag == NULL` and answers
+`true` — a pause. Playlist mode must be answered before that point, in both
+directions:
 
 ```c
 if (global_settings.single_mode == SINGLE_MODE_PLAYLIST)
     return skip_pending == TRACK_SKIP_AUTO_NEW_PLAYLIST;
 ```
 
-**Untested on hardware.** To verify on `ipodvideo`: set Single Mode to Playlist,
-play a multi-track playlist through — it should run to the end without pausing
-between tracks, and pause when playback crosses into a new playlist.
+Any future `single_mode` value needs the same treatment, or it pauses after
+every track.
 
 ---
 
