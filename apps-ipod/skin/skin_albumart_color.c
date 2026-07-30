@@ -5,25 +5,22 @@
  * GNU General Public License (version 2+)
  *
  * Extracts a dominant colour palette from the current album art and
- * exposes it to skins as dynamic colours, with fading between tracks.
+ * exposes it to skins as dynamic colours.
  *
  * Extraction runs once per track, not per frame: the art is sampled into
  * coarse colour buckets, the most populous are picked as the palette, then
  * adjusted for contrast so text drawn in them stays readable against the
  * background. Skins read the result through the dynamic-colour tags.
  *
- * The fade between tracks is not animated by a timer. start_fade() records
- * the old and new palettes and a start tick; every colour lookup during the
- * fade interpolates between them by however far current_tick has got. So the
- * fade advances only as fast as the screen is repainted, and asking for a
- * colour is what makes it progress.
+ * The palette changes in one step, not over a fade -- see apply_colors() for
+ * why the fade that used to be here could not be made to look right.
  *
  * Parts, in order:
- *   - luminance, interpolation and fade progress helpers
+ *   - luminance, contrast and blending helpers
  *   - extract_colors(): sampling the bitmap and choosing the palette
  *   - track-change hook and theme colour save/restore
  *   - the accessors skins resolve their colour tags through, which also
- *     report whether a fade is still in flight and needs another repaint
+ *     report whether a change is recent enough to need another repaint
  ****************************************************************************/
 
 #include "config.h"
@@ -40,7 +37,11 @@
 #include "draw/color.h"              /* color_blend */
 #include "skin_albumart_color.h"
 
-#define AA_FADE_DURATION  (HZ / 4)   /* 250ms */
+/* How long after a colour change the screens are asked to keep repainting.
+ * Long enough for the slowest of them -- the status bar, on its own throttle --
+ * to come round once. Not a fade: every repaint in the window draws the final
+ * colour. */
+#define AA_SETTLE_TICKS   (HZ / 5)   /* 200ms */
 #define HISTOGRAM_BUCKETS 4096
 #define SAMPLE_STRIDE     4          /* sample every 4th pixel */
 #define MIN_RATIO         600        /* target contrast ratio x100 (6:1) */
@@ -55,24 +56,20 @@
 #endif
 
 struct dynamic_colors_cache {
-    unsigned int dominant;       /* target bg color */
-    unsigned int accent;         /* target fg color */
-    unsigned int prev_dominant;  /* fade-start bg */
-    unsigned int prev_accent;    /* fade-start fg */
+    unsigned int dominant;       /* bg color */
+    unsigned int accent;         /* fg color */
     unsigned int theme_fg;       /* saved original theme fg */
     unsigned int theme_bg;       /* saved original theme bg */
     unsigned int theme_lss;      /* saved selector start color */
     unsigned int theme_lse;      /* saved selector end color */
     unsigned int theme_lst;      /* saved selector text color */
     unsigned int theme_sep;      /* saved list separator color */
-    long fade_start_tick;
+    long change_tick;            /* when the colours last changed */
     long track_change_tick;      /* when TRACK_CHANGE fired */
     bool valid;                  /* have valid AA colors */
-    bool fading;                 /* fade in progress */
-    bool fading_out;             /* fading to defaults after disable/stop */
     bool was_enabled;            /* track setting state for toggle detection */
-    bool needs_full_update;      /* set when fade completes for full redraw */
-    bool needs_screen_clear;     /* set when fade completes to clear bg gaps */
+    bool needs_full_update;      /* set on a change, for a full redraw */
+    bool needs_screen_clear;     /* set on a change, to clear bg gaps */
 };
 
 static struct dynamic_colors_cache cache;
@@ -120,55 +117,33 @@ static unsigned int lerp_color(unsigned int c1, unsigned int c2, int t)
     return color_blend(c1, c2, t);
 }
 
-static int fade_progress(void)
+/* Change to a new pair of colours, or back to the theme's, in one step.
+ *
+ * These used to be interpolated over 250ms, and the transition looked wrong in
+ * a way that took a long time to pin down: specific elements -- the status
+ * boxes, the glyphs framing the spectrum -- appeared to fade differently from
+ * everything around them, though they always arrived correctly.
+ *
+ * The cause is that the screen is painted by several independent schedules:
+ * the skin's own refresh, the meters' animation cycles, the status bar's
+ * throttle. An interpolated colour is only coherent if every one of them
+ * samples it on the same tick, and they do not -- so elements drawn on
+ * different schedules showed different points along the fade at once. Holding
+ * a fade at a fixed midpoint made every element agree, which is what proved it
+ * was the motion rather than the colours.
+ *
+ * Changing in one step removes the intermediate values entirely. Whenever each
+ * schedule next paints, it paints the final colour; the worst case is an
+ * element being one frame late, which is not visible. */
+static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
+                         bool to_defaults)
 {
-    long elapsed = current_tick - cache.fade_start_tick;
-    if (elapsed <= 0)
-        return 0;
-    if (elapsed >= AA_FADE_DURATION)
-        return 256;
-    return (int)((elapsed * 256) / AA_FADE_DURATION);
-}
-
-static void start_fade(unsigned int new_accent, unsigned int new_dominant,
-                       bool to_defaults)
-{
-    /* Capture current effective colors as fade start */
-    if (cache.fading || cache.fading_out)
-    {
-        int p = fade_progress();
-        if (cache.fading_out)
-        {
-            cache.prev_accent = lerp_color(cache.prev_accent,
-                                           cache.theme_fg, p);
-            cache.prev_dominant = lerp_color(cache.prev_dominant,
-                                             cache.theme_bg, p);
-        }
-        else
-        {
-            cache.prev_accent = lerp_color(cache.prev_accent,
-                                           cache.accent, p);
-            cache.prev_dominant = lerp_color(cache.prev_dominant,
-                                             cache.dominant, p);
-        }
-    }
-    else if (cache.valid)
-    {
-        cache.prev_accent = cache.accent;
-        cache.prev_dominant = cache.dominant;
-    }
-    else
-    {
-        cache.prev_accent = cache.theme_fg;
-        cache.prev_dominant = cache.theme_bg;
-    }
-
     cache.accent = new_accent;
     cache.dominant = new_dominant;
-    cache.fade_start_tick = current_tick;
-    cache.fading = !to_defaults;
-    cache.fading_out = to_defaults;
-    cache.valid = true;
+    cache.valid = !to_defaults;
+    cache.change_tick = current_tick;
+    cache.needs_full_update = true;
+    cache.needs_screen_clear = true;
 }
 
 static void extract_colors(const struct bitmap *bmp)
@@ -380,7 +355,7 @@ static void extract_colors(const struct bitmap *bmp)
         accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
     }
 
-    start_fade(accent, dominant, false);
+    apply_colors(accent, dominant, false);
 }
 
 static void track_change_cb(unsigned short id, void *param)
@@ -423,8 +398,6 @@ void dynamic_colors_save_theme(void)
     save_all_theme_colors();
     /* Invalidate cached colors — they were for the old theme */
     cache.valid = false;
-    cache.fading = false;
-    cache.fading_out = false;
     cache.needs_screen_clear = false;
     needs_extraction = true;
 }
@@ -451,20 +424,20 @@ void dynamic_colors_check_extraction(int aa_slot)
      * cheap and false whenever anything is playing, which keeps
      * audio_current_track() -- a mutex and a metadata fetch -- off the render
      * path except while stopped. */
-    if (cache.valid && !cache.fading_out &&
+    if (cache.valid &&
         global_settings.dynamic_colors &&
         !(audio_status() & AUDIO_STATUS_PLAY) &&
         audio_current_track()->path[0] == '\0')
     {
-        start_fade(cache.theme_fg, cache.theme_bg, true);
+        apply_colors(cache.theme_fg, cache.theme_bg, true);
     }
 
     /* Detect setting toggle */
     bool enabled = global_settings.dynamic_colors;
-    if (!enabled && cache.was_enabled && cache.valid && !cache.fading_out)
+    if (!enabled && cache.was_enabled && cache.valid)
     {
         /* Setting just turned off — start fade to defaults */
-        start_fade(cache.theme_fg, cache.theme_bg, true);
+        apply_colors(cache.theme_fg, cache.theme_bg, true);
     }
     if (enabled && !cache.was_enabled)
     {
@@ -501,8 +474,8 @@ void dynamic_colors_check_extraction(int aa_slot)
         if (elapsed > NO_ART_TIMEOUT)
         {
             /* No art for this track — fade to defaults */
-            if (cache.valid && !cache.fading_out)
-                start_fade(cache.theme_fg, cache.theme_bg, true);
+            if (cache.valid)
+                apply_colors(cache.theme_fg, cache.theme_bg, true);
             needs_extraction = false;
         }
         /* else: keep trying on next render */
@@ -546,47 +519,21 @@ static unsigned int resolve_mapped(unsigned int original,
 
 unsigned int dynamic_colors_resolve(unsigned int original)
 {
-    /* Fade-out continues even after setting is toggled off */
-    if (cache.fading_out)
-    {
-        int p = fade_progress();
-        if (p >= 256)
-        {
-            cache.fading_out = false;
-            cache.valid = false;
-            cache.needs_full_update = true;
-            cache.needs_screen_clear = true;
-            return original;
-        }
-        return resolve_mapped(original,
-            lerp_color(cache.prev_accent, cache.theme_fg, p),
-            lerp_color(cache.prev_dominant, cache.theme_bg, p));
-    }
-
     if (!global_settings.dynamic_colors || !cache.valid)
         return original;
-
-    if (cache.fading)
-    {
-        int p = fade_progress();
-        if (p >= 256)
-        {
-            cache.fading = false;
-            cache.needs_full_update = true;
-            cache.needs_screen_clear = true;
-        }
-        else
-            return resolve_mapped(original,
-                lerp_color(cache.prev_accent, cache.accent, p),
-                lerp_color(cache.prev_dominant, cache.dominant, p));
-    }
 
     return resolve_mapped(original, cache.accent, cache.dominant);
 }
 
 bool dynamic_colors_fading(void)
 {
-    return cache.fading || cache.fading_out;
+    /* Nothing fades any more, but the screens that poll this still need to be
+     * told to repaint after a change -- otherwise whatever is on screen keeps
+     * the previous colours until the next keypress, and a dialog waiting on
+     * TIMEOUT_BLOCK keeps them indefinitely. The window only has to outlast one
+     * refresh of the slowest of them. Every repaint inside it draws the same
+     * final colour, so there is nothing left for them to disagree about. */
+    return TIME_BEFORE(current_tick, cache.change_tick + AA_SETTLE_TICKS);
 }
 
 bool dynamic_colors_needs_full_update(void)
