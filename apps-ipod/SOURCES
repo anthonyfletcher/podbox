@@ -90,6 +90,7 @@ screens/bookmark.c
 screens/browse/browser.c
 screens/browse/browser_disk.c
 screens/context_menu.c
+screens/system/bg_task_info.c
 screens/system/debug_menu.c
 files/file_ops.c
 files/filetypes.c
@@ -231,6 +232,7 @@ speech/talk.c
 system/activity.c
 system/app_buffer.c
 system/app_util.c
+system/bg_task.c
 system/debug_log.c
 draw/color.c
 audio/sound_feedback.c

@@ -41,7 +41,7 @@ MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year
 static int art_cache_menu_rebuild(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_CACHE)))
-        art_cache_invalidate();
+        bg_task_rebuild(&art_cache_task);
     return 0;
 }
 MENUITEM_FUNCTION(art_cache_rebuild_item, 0, ID2P(LANG_REBUILD_CACHE),
@@ -50,7 +50,7 @@ MENUITEM_FUNCTION(art_cache_rebuild_item, 0, ID2P(LANG_REBUILD_CACHE),
 static int art_cache_menu_update(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_UPDATE_CACHE)))
-        art_cache_rescan();
+        bg_task_update(&art_cache_task);
     return 0;
 }
 MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),
@@ -62,7 +62,7 @@ MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),
 static int carousel_menu_rebuild_index(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_INDEX)))
-        album_covers_rebuild_cache();
+        bg_task_rebuild(&album_covers_task);
     return 0;
 }
 MENUITEM_FUNCTION(carousel_rebuild_index_item, 0, ID2P(LANG_REBUILD_INDEX),
@@ -71,7 +71,7 @@ MENUITEM_FUNCTION(carousel_rebuild_index_item, 0, ID2P(LANG_REBUILD_INDEX),
 static int carousel_menu_update_index(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_UPDATE_INDEX)))
-        album_covers_update_cache();
+        bg_task_update(&album_covers_task);
     return 0;
 }
 MENUITEM_FUNCTION(carousel_update_index_item, 0, ID2P(LANG_UPDATE_INDEX),

@@ -29,7 +29,7 @@
 #include "settings/settings.h"  /* global_settings.art_cache_fast_build */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
-#include "database/album_index.h"   /* album_index_is_busy */
+#include "system/bg_task.h"         /* the caching pass runs as one */
 #include "lcd.h"
 #include "draw/bmp.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
@@ -71,17 +71,11 @@ static struct event_queue aa_queue;
 
 static volatile bool cache_busy;
 
-/* Set by art_cache_invalidate(), consumed by the cache thread: purge every
- * thumbnail and regenerate from scratch. */
-static volatile bool aa_invalidate_requested;
-
-/* Set by art_cache_rescan(): run a pass again WITHOUT purging. The thread
- * otherwise only works when the database's track count changes, so artwork
- * added to folders that already have their tracks indexed is never noticed --
- * adding a folder.jpg does not move that count. A pass costs little here
- * because aa_cache_dir() returns immediately for any folder whose thumbnails
- * all exist, so this fills in the gaps and leaves everything else alone. */
-static volatile bool aa_rescan_requested;
+/* What the current (or last completed) pass has covered, and the folder it is
+ * on. Every one of these is a count of a branch the pass already takes, so
+ * keeping them costs nothing beyond the increment; aa_dir is the scratch
+ * buffer the pass already keeps the current directory in. */
+static struct art_cache_counts aa_counts;
 
 /* Scratch id3 used only to feed search_albumart_files(); kept out of the
  * thread stack because struct mp3entry is large. */
@@ -119,14 +113,14 @@ bool art_cache_is_busy(void)
     return cache_busy;
 }
 
-void art_cache_invalidate(void)
+void art_cache_get_counts(struct art_cache_counts *out)
 {
-    aa_invalidate_requested = true;
+    *out = aa_counts;
 }
 
-void art_cache_rescan(void)
+const char *art_cache_activity(void)
 {
-    aa_rescan_requested = true;
+    return cache_busy ? aa_dir : "";
 }
 
 int art_cache_num_sizes(void)
@@ -191,22 +185,6 @@ static void aa_fallback_path(char *out, int out_len, int size_index)
 {
     snprintf(out, out_len, THUMBCACHE_DIR "/%s/_fallback.aat",
              art_sizes[size_index].name);
-}
-
-/* As aa_fallback_path, but the artist placeholder (a silhouette) -- a separate
- * file so artist rows never show the album "?" art. */
-static void aa_artist_fallback_path(char *out, int out_len, int size_index)
-{
-    snprintf(out, out_len, THUMBCACHE_DIR "/%s/_artist_fallback.aat",
-             art_sizes[size_index].name);
-}
-
-bool art_cache_artist_fallback(int size_index, char *out, int out_len)
-{
-    if (size_index < 0 || size_index >= ART_CACHE_NUM_SIZES)
-        return false;
-    aa_artist_fallback_path(out, out_len, size_index);
-    return file_exists(out);
 }
 
 /* Streaming area-average downscale of an open .aat into `bm` (fd is consumed).
@@ -323,8 +301,10 @@ static void aa_purge_thumbs(void)
     char dirpath[MAX_PATH];
     char filepath[MAX_PATH];
 
-    /* the thumbnails are going, so nothing is cached for any entry count */
-    remove(AA_DONE_FILE);
+    /* The thumbnails are going, so nothing is cached for any entry count.
+     * Said here rather than left to whoever asked, because the format-version
+     * check below purges from inside a pass that may then be interrupted. */
+    bg_task_forget(&art_cache_task);
 
     for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
     {
@@ -349,12 +329,8 @@ static void aa_purge_thumbs(void)
     }
 }
 
-/* The generator decides "already cached?" with a bare file_exists(), and the
- * reader rejects any file whose header version doesn't match. So on a format
- * bump the stale files would be skipped forever *and* refused at render time -
- * every cover would silently go blank. Stamp the format version alongside the
- * cache and purge the thumbnails whenever it moves. */
-static void aa_check_format_version(void)
+/* The format version stamped alongside the cache, or -1 if there is none. */
+static int aa_stamped_format(void)
 {
     char buf[16];
     int fd, n, ver = -1;
@@ -370,6 +346,22 @@ static void aa_check_format_version(void)
         }
         close(fd);
     }
+    return ver;
+}
+
+/* The generator decides "already cached?" with a bare file_exists(), and the
+ * reader rejects any file whose header version doesn't match. So on a format
+ * bump the stale files would be skipped forever *and* refused at render time -
+ * every cover would silently go blank. Stamp the format version alongside the
+ * cache and purge the thumbnails whenever it moves.
+ *
+ * Being inside the pass, this only ever runs once the pass has been allowed to
+ * start; art_cache_init() is what makes sure a bump allows it. */
+static void aa_check_format_version(void)
+{
+    char buf[16];
+    int fd, n;
+    int ver = aa_stamped_format();
 
     if (ver == ART_CACHE_FORMAT_VERSION)
         return;
@@ -382,39 +374,6 @@ static void aa_check_format_version(void)
     if (fd >= 0)
     {
         n = snprintf(buf, sizeof(buf), "%d\n", ART_CACHE_FORMAT_VERSION);
-        write(fd, buf, n);
-        close(fd);
-    }
-}
-
-/* The entry count of the last completed pass, or -1 if unknown. */
-static int aa_read_done_total(void)
-{
-    char buf[16];
-    int total = -1;
-    int fd = open(AA_DONE_FILE, O_RDONLY);
-
-    if (fd >= 0)
-    {
-        int n = read(fd, buf, sizeof(buf) - 1);
-        if (n > 0)
-        {
-            buf[n] = '\0';
-            total = atoi(buf);
-        }
-        close(fd);
-    }
-    return total;
-}
-
-static void aa_write_done_total(int total)
-{
-    char buf[16];
-    int fd = open(AA_DONE_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-
-    if (fd >= 0)
-    {
-        int n = snprintf(buf, sizeof(buf), "%d\n", total);
         write(fd, buf, n);
         close(fd);
     }
@@ -786,23 +745,34 @@ static void aa_render_placeholder(const fb_data *src, int sw, int sh,
 
 /* Render podboxnoart into both the album and artist placeholder .aat of every
  * size. One shared square source, so COVER is a plain downscale. */
+/* One placeholder, used for album and artist rows alike. There were two files
+ * and two bitmaps once; they have since become the same image, so the second
+ * file only cost a render and a copy of the same pixels. */
 static void aa_ensure_fallback(void *workbuf, size_t workbuf_sz)
 {
     (void)workbuf_sz;
     aa_render_placeholder((const fb_data *)podboxnoart,
                           BMPWIDTH_podboxnoart, BMPHEIGHT_podboxnoart,
                           aa_fallback_path, workbuf);
-    aa_render_placeholder((const fb_data *)podboxnoart,
-                          BMPWIDTH_podboxnoart, BMPHEIGHT_podboxnoart,
-                          aa_artist_fallback_path, workbuf);
 }
 
 /* True if the pass should stop right now: a USB connection or shutdown is
- * pending. Uses queue_peek so the event stays queued for the thread loop to
- * actually acknowledge -- we just need to stop touching the disk promptly. */
+ * pending, or a task that outranks this one is waiting to start. Uses
+ * queue_peek so the event stays queued for the thread loop to actually
+ * acknowledge -- we just need to stop touching the disk promptly.
+ *
+ * The rank check is what keeps the album index from queueing behind a full
+ * artwork pass. The index is short and the carousel can be waiting on it,
+ * while a pass here can run for minutes and has the memory the index needs
+ * pinned for the whole of it. Standing down costs nothing: the pass resumes
+ * from where the thumbnails on disk leave it. */
 static bool aa_check_abort(void)
 {
     struct queue_event ev;
+
+    if (bg_task_preempted(&art_cache_task))
+        return true;
+
     if (!queue_peek(&aa_queue, &ev))
         return false;
     switch (ev.id)
@@ -822,7 +792,7 @@ static bool aa_check_abort(void)
  * folder.jpg; `dh` is that folder's hash (the cache key). Sets *aborted if a
  * USB/shutdown/DB-busy stop was hit mid-decode. A cheap no-op once every size
  * already exists (dircache-served file_exists checks, no art re-resolution). */
-static void aa_cache_dir(const char *probe_path, unsigned int dh,
+static bool aa_cache_dir(const char *probe_path, unsigned int dh,
                          void *workbuf, size_t worksz, bool *aborted)
 {
     int s;
@@ -838,7 +808,7 @@ static void aa_cache_dir(const char *probe_path, unsigned int dh,
         }
     }
     if (all_exist)
-        return;
+        return true;
 
     /* Only now (a thumbnail is missing) resolve this folder's cover art.
      * album/albumartist left NULL: only folder-based art is searched
@@ -846,7 +816,7 @@ static void aa_cache_dir(const char *probe_path, unsigned int dh,
     memset(&aa_id3, 0, sizeof(aa_id3));
     strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
     if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath)))
-        return;
+        return false;   /* no cover art in this folder */
 
     struct aa_src src = { aa_artpath, -1, 0, 0 };  /* folder image on disk */
     int order[ART_CACHE_NUM_SIZES];
@@ -867,12 +837,13 @@ static void aa_cache_dir(const char *probe_path, unsigned int dh,
         if (aa_check_abort() || tagcache_is_busy())
         {
             *aborted = true;
-            return;
+            return false;
         }
         aa_cache_path(aa_out_path, sizeof(aa_out_path), s, dh);
         aa_generate_size(&src, s, dh, aa_out_path, workbuf, worksz);
         yield();
     }
+    return true;
 }
 
 /* One full generation pass: walk every track filename, dedup by directory,
@@ -924,6 +895,11 @@ static bool aa_run_pass(void)
         goto out;
     }
 
+    /* Counting starts over: these describe this pass, not every pass since
+     * boot. Zeroed here rather than at the top so an early return -- no
+     * memory, no search -- leaves the previous pass's figures readable. */
+    memset(&aa_counts, 0, sizeof(aa_counts));
+
     /* A pass is running -> lights the status-bar %lc ("Caching") token. */
     cache_busy = true;
     /* Speed up the (CPU-bound) image decoding, like Cover Flow's own
@@ -950,7 +926,11 @@ static bool aa_run_pass(void)
         aa_dirname(tcs.result, aa_dir, sizeof(aa_dir));
         dh = aa_hash(aa_dir);
         if (!aa_seen(seen, dh))
-            aa_cache_dir(tcs.result, dh, workbuf, worksz, &aborted);
+        {
+            aa_counts.albums++;
+            if (aa_cache_dir(tcs.result, dh, workbuf, worksz, &aborted))
+                aa_counts.album_art++;
+        }
         if (aborted)
             break;
 
@@ -965,7 +945,9 @@ static bool aa_run_pass(void)
             if (!aa_seen(seen, ah))
             {
                 snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
-                aa_cache_dir(aa_probe, ah, workbuf, worksz, &aborted);
+                aa_counts.artists++;
+                if (aa_cache_dir(aa_probe, ah, workbuf, worksz, &aborted))
+                    aa_counts.artist_art++;
             }
         }
         if (aborted)
@@ -1077,107 +1059,65 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     queue_post(&aa_queue, AA_EVENT_OFFER, 0);
 }
 
+/* bg_task.run: one pass, with the tracing the pass itself does not do. */
+static bool aa_task_run(void)
+{
+    bool done;
+
+    debug_log(DEBUG_LOG_ARTCACHE, "starting pass");
+    done = aa_run_pass();
+    debug_log(DEBUG_LOG_ARTCACHE,
+              done ? "pass complete, idle" : "pass interrupted");
+    return done;
+}
+
+/* bg_task.handle_event: everything on the queue that is ours rather than the
+ * tick's -- which is just the offer posted by the track-change hook. */
+static void aa_task_event(const struct queue_event *ev)
+{
+    if (ev->id == AA_EVENT_OFFER)
+        aa_handle_offer();
+}
+
+/* Ranked below the album index: a full pass here runs for minutes and pins the
+ * memory the index wants, so this is the one that stands down. The marker is
+ * read back at init rather than started at -1 -- starting at -1 meant the first
+ * settled count after a boot never matched, so a full pass ran on every startup,
+ * walking the whole database with cache_busy set, which is what held the
+ * "Building" indicator up with nothing actually to do. */
+struct bg_task art_cache_task =
+{
+    .done_file    = AA_DONE_FILE,
+    .rank         = BG_RANK_ART,
+    .run          = aa_task_run,
+    .purge        = aa_purge_thumbs,
+    .handle_event = aa_task_event,
+};
+
 static void aa_thread(void)
 {
-    struct queue_event ev;
-    /* Read back rather than starting at -1. Starting at -1 meant the first
-     * settled count after a boot never matched, so a full pass ran on every
-     * startup -- walking the whole database with cache_busy set, which is what
-     * held the "Building" indicator up with nothing actually to do. */
-    int done_total = aa_read_done_total();
-    int prev_total = -1;   /* entry count seen last tick (stability check) */
-
     while (1)
-    {
-        queue_wait_w_tmo(&aa_queue, &ev, HZ * 5);
-
-        switch (ev.id)
-        {
-            case SYS_USB_CONNECTED:
-                usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
-                usb_wait_for_disconnect(&aa_queue);
-                break;
-
-            case AA_EVENT_OFFER:
-                aa_handle_offer();
-                break;
-
-            case SYS_TIMEOUT:
-            {
-                int total;
-                /* A requested invalidation wipes every thumbnail and forces a
-                 * fresh pass; the placeholders are re-rendered by that pass. */
-                if (aa_invalidate_requested)
-                {
-                    aa_invalidate_requested = false;
-                    aa_ensure_dirs();
-                    aa_purge_thumbs();
-                    done_total = -1;
-                    prev_total = -1;
-                }
-                /* A rescan forces the same fresh pass but keeps what is already
-                 * cached, so only folders missing a thumbnail cost anything. */
-                else if (aa_rescan_requested)
-                {
-                    aa_rescan_requested = false;
-                    aa_ensure_dirs();
-                    done_total = -1;
-                    prev_total = -1;
-                }
-                /* Wait until the database is fully usable and NOT building.
-                 * Reset the stability tracker while it's busy so we always
-                 * re-confirm the count settled before scanning -- this keeps
-                 * generation (and the %lc "Caching" indicator) off during the
-                 * whole build instead of churning through partial states. */
-                if (!tagcache_is_usable() || tagcache_is_busy()
-                    || album_index_is_busy())
-                {
-                    if (prev_total != -1)
-                        debug_log(DEBUG_LOG_ARTCACHE,
-                                  "waiting: db usable=%d busy=%d index=%d",
-                                  tagcache_is_usable(), tagcache_is_busy(),
-                                  album_index_is_busy());
-                    prev_total = -1;
-                    break;
-                }
-                total = tagcache_get_stat()->total_entries;
-                /* Require the count to be stable across two consecutive checks
-                 * before doing anything, so a still-growing/rebuilding database
-                 * never triggers a pass mid-flight. */
-                if (total != prev_total)
-                {
-                    debug_log(DEBUG_LOG_ARTCACHE,
-                              "entry count %d -> %d, waiting for it to settle",
-                              prev_total, total);
-                    prev_total = total;
-                    break;
-                }
-                if (total == done_total)
-                    break; /* already fully cached for this database */
-                debug_log(DEBUG_LOG_ARTCACHE,
-                          "starting pass: %d entries (last completed %d)",
-                          total, done_total);
-                if (aa_run_pass())
-                {
-                    done_total = total; /* settled + done -> go idle */
-                    aa_write_done_total(total);
-                    debug_log(DEBUG_LOG_ARTCACHE, "pass complete, idle");
-                }
-                else
-                    debug_log(DEBUG_LOG_ARTCACHE, "pass interrupted");
-                break;
-            }
-
-            default:
-                break;
-        }
-    }
+        bg_task_tick(&art_cache_task, &aa_queue);
 }
 
 void art_cache_init(void)
 {
     cache_busy = false;
     queue_init(&aa_queue, true);
+
+    /* A format bump leaves every cached thumbnail unreadable, but it does not
+     * move the database's entry count -- so the marker still says this library
+     * is covered, and the pass that would purge and regenerate them would
+     * never be run to notice. Every cover goes blank and stays blank.
+     *
+     * So drop the marker here, before bg_task_init() reads it, which is enough
+     * to make the task stale; the purge itself stays inside the pass. Boot is
+     * the only place this needs checking, the version being a compile-time
+     * constant that can only move across a firmware update. */
+    if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
+        remove(AA_DONE_FILE);
+
+    bg_task_init(&art_cache_task);
     aa_thread_id = create_thread(aa_thread, aa_stack, sizeof(aa_stack), 0,
                                  aa_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
                                  IF_COP(, CPU));

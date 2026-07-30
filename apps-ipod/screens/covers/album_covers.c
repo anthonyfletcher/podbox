@@ -588,7 +588,7 @@ static void album_sort_prev(void)
                 % SORT_VALUES_SIZE, false);
 }
 
-void album_covers_rebuild_cache(void)
+static void album_covers_rebuild_cache(void)
 {
     pf_cfg.update_albumart = false;
     pf_cfg.cache_version = CACHE_REBUILD;
@@ -597,7 +597,7 @@ void album_covers_rebuild_cache(void)
     pf_config_save();
 }
 
-void album_covers_update_cache(void)
+static void album_covers_update_cache(void)
 {
     pf_cfg.update_albumart = true;
     pf_cfg.cache_version = CACHE_REBUILD;
@@ -605,6 +605,26 @@ void album_covers_update_cache(void)
     album_index_invalidate();  /* so the background pass rebuilds too */
     pf_config_save();
 }
+
+/* bg_task.request: the carousel drives itself, so this is a task only in the
+ * sense that the menu can reach it the same way as the others.
+ *
+ * It is not one background pass but two things going stale together: the
+ * carousel's own on-disk state above, which nothing else touches, and the
+ * album index, which really is a bg_task and is told separately. Pointing a
+ * menu at that index alone would leave the first half undone. */
+static void album_covers_request(bool rebuild)
+{
+    if (rebuild)
+        album_covers_rebuild_cache();
+    else
+        album_covers_update_cache();
+}
+
+struct bg_task album_covers_task =
+{
+    .request = album_covers_request,
+};
 
 /* Restored to (almost) exactly how the original plugin's draw_album_text()
  * worked: drawn directly inside pf_vp -- the same viewport the coverflow

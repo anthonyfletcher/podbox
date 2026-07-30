@@ -35,6 +35,8 @@
 #include "widgets/folder_select.h"
 #include "screens/context_menu.h"
 #include "system/activity.h"
+#include "system/bg_task.h"      /* tagcache_task, the standard triggers */
+#include "screens/system/bg_task_info.h"
 #include "system/format_time.h"
 #include "system/volume.h"
 #include "pathfuncs.h"
@@ -44,13 +46,13 @@
 
 static void tagcache_rebuild_with_splash(void)
 {
-    tagcache_rebuild();
+    bg_task_rebuild(&tagcache_task);
     splash(HZ*2, ID2P(LANG_TAGCACHE_FORCE_UPDATE_SPLASH));
 }
 
 static void tagcache_update_with_splash(void)
 {
-    tagcache_update();
+    bg_task_update(&tagcache_task);
     splash(HZ*2, ID2P(LANG_TAGCACHE_FORCE_UPDATE_SPLASH));
 }
 
@@ -286,6 +288,16 @@ MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
 
 MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
 
+/* The screen reports a USB attach the way simplelist does, as a bool; the menu
+ * wants it as MENU_ATTACHED_USB so it unwinds rather than redrawing. */
+static int bg_task_info_item(void)
+{
+    return bg_task_info_screen() ? MENU_ATTACHED_USB : 0;
+}
+
+MENUITEM_FUNCTION(bg_task_info, 0, ID2P(LANG_BG_TASK_INFO),
+                  bg_task_info_item, NULL, Icon_NOICON);
+
 
 MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
           0, Icon_System_menu,
@@ -308,6 +320,7 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
 
             &usb_mode,
             &wps_select_action,
+            &bg_task_info,
             &show_debug_menu,
          );
 

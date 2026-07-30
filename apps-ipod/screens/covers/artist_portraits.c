@@ -42,7 +42,7 @@ static int artist_build_index(void)
     int res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
-    res = build_artist_index(&tcs, &buf, &buf_size);
+    res = album_index_build_artists(&pf_idx, &tcs, &buf, &buf_size);
     if (res < SUCCESS)
         return res;
 

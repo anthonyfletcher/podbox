@@ -91,16 +91,30 @@ void browser_reveal_on_next_load(const char *path)
 {
     strmemccpy(reveal_path, path, MAX_PATH);
 }
+/* Can a database screen be opened right now?
+ *
+ * Deliberately stricter than tagcache_is_usable(), which only asks whether a
+ * database exists. Committing one that already exists leaves it saying yes,
+ * and every tagcache_search() made during a commit then blocks on the commit's
+ * read lock -- on this, the UI thread -- so the screen stops redrawing and
+ * stops taking buttons until the commit finishes, and the search fails at the
+ * end of it anyway. Waiting below instead is the same wait with a progress
+ * screen and a way out. */
+static bool tagcache_reachable(void)
+{
+    return tagcache_is_usable() && tagcache_get_commit_step() == 0;
+}
+
 /* Waits for the tagcache to become usable, showing build/init progress as
  * needed. Returns false if the user aborted (caller should bail out). */
 static bool wait_for_tagcache_ready(void)
 {
-    if (!tagcache_is_usable())
+    if (!tagcache_reachable())
     {
         bool reinit_attempted = false;
 
         /* Now display progress until it's ready or the user exits */
-        while(!tagcache_is_usable())
+        while(!tagcache_reachable())
         {
             struct tagcache_stat *stat = tagcache_get_stat();
 
@@ -155,7 +169,7 @@ static bool wait_for_tagcache_ready(void)
             }
         }
     }
-    return tagcache_is_usable();
+    return tagcache_reachable();
 }
 
 static int browser(void* param)

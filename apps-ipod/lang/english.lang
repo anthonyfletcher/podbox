@@ -17694,3 +17694,17 @@
     *: "Update index"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_BG_TASK_INFO
+  desc: in System settings, live status of the background tasks
+  user: core
+  <source>
+    *: "Background tasks"
+  </source>
+  <dest>
+    *: "Background tasks"
+  </dest>
+  <voice>
+    *: "Background tasks"
+  </voice>
+</phrase>

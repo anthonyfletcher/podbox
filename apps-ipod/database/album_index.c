@@ -20,6 +20,7 @@
  *   - the tagcache walks that populate it
  *   - the on-disk form
  *   - album_index_build(), which reuses the saved index or rebuilds it
+ *   - the background pass that keeps the saved index current
  ****************************************************************************/
 
 #include <stdio.h>
@@ -45,6 +46,7 @@
 #include "powermgmt.h"               /* reset_poweroff_timer */
 #include "system/shutdown.h"
 #include "system/activity.h"          /* ui_set_working */
+#include "system/bg_task.h"           /* the background pass runs as one */
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
@@ -83,10 +85,42 @@ static struct mutex build_mutex;
 static bool building_bg;
 static volatile bool idx_abort;
 
-/* Last progress the background pass reported; read by anything showing it. */
+/* Last progress the background pass reported; read by anything showing it.
+ * bg_step is the step name the builder was already passing to the progress
+ * bar and the background path was already throwing away -- keeping the
+ * pointer is the whole cost of reporting what the pass is doing. */
 static int bg_done, bg_total;
+static const char *bg_step;
 
 static void draw_progressbar(int step, int count, char *msg);
+
+/* Keep an idle poweroff from interrupting a build the user is watching.
+ *
+ * Deliberately not done for a background pass. reset_poweroff_timer() records
+ * a *user event*, and claiming one on behalf of a pass nobody asked for would
+ * hold poweroff off for the whole build and then restart the timer from the
+ * moment it ended -- on a device sitting idle with the screen off. Poweroff is
+ * already deferred while the pass runs, by the disk activity it genuinely
+ * causes (see handle_auto_poweroff()). */
+static void keep_awake_for_build(void)
+{
+    if (!building_bg)
+        reset_poweroff_timer();
+}
+
+/* The "working" indicator, likewise only for a build someone is watching.
+ *
+ * ui_set_working() repaints the status bar on the spot and flushes it -- it has
+ * to, because a foreground build then blocks without redrawing, and the
+ * indicator would otherwise appear only once the work was over. From the
+ * background thread that same repaint lands on whatever screen the user is
+ * actually on, which is the flicker seen as a background build finished. The
+ * background pass has no indicator to show and nothing to show it on. */
+static void set_working_for_build(bool working)
+{
+    if (!building_bg)
+        ui_set_working(working);
+}
 
 static void draw_progressbar(int step, int count, char *msg)
 {
@@ -96,6 +130,7 @@ static void draw_progressbar(int step, int count, char *msg)
          * thread -- whatever screen the user is on owns it. */
         bg_done = step;
         bg_total = count;
+        bg_step = msg;
         return;
     }
 
@@ -390,8 +425,11 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
     return ret;
 }
 
-/* Create an index of all artists from the database */
-int build_artist_index(struct tagcache_search *tcs,
+/* Create an index of all artists from the database, into whichever index pfi
+ * currently points at. Like everything else here it assumes build_mutex is
+ * held and pfi is set -- album_index_build_artists() is how an outside caller
+ * gets into that state. */
+static int build_artist_index(struct tagcache_search *tcs,
                                  void **buf, size_t *bufsz)
 {
     int i, res = SUCCESS;
@@ -439,8 +477,7 @@ static int assign_album_year(void)
     draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_YEAR);
     for (int album_idx = 0; album_idx < pfi->album_ct; album_idx++)
     {
-        /* Prevent idle poweroff */
-        reset_poweroff_timer();
+        keep_awake_for_build();
 
         if (progress_cancel(album_idx, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_YEAR))
             return ERROR_USER_ABORT;
@@ -529,8 +566,7 @@ static int create_album_index(void)
     draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUMS);
     for (j = 0; j < pfi->album_ct; j++)
     {
-        /* Prevent idle poweroff */
-        reset_poweroff_timer();
+        keep_awake_for_build();
 
         if (progress_cancel(j, pfi->album_ct, STR_STEP_ASSIGNING_ALBUMS))
             return ERROR_USER_ABORT;
@@ -586,8 +622,7 @@ retry_artist_lookup:
     /* mark duplicate albums for deletion */
     for (i = 0; i < pfi->album_ct - 1; i++) /* -1 don't check last entry */
     {
-        /* Prevent idle poweroff */
-        reset_poweroff_timer();
+        keep_awake_for_build();
 
         if (progress_cancel(i, pfi->album_ct, STR_STEP_REMOVING_DUPLICATES))
             return ERROR_USER_ABORT;
@@ -789,9 +824,9 @@ static int build_into(struct pf_index_t *target, void *buf, size_t buf_sz,
     /* Scan will trigger when no file is found or the option was activated */
     if ((pf_cfg.cache_version != CACHE_VERSION) || (load_album_index() < 0))
     {
-        ui_set_working(true);   /* show the "working" LED while (re)building */
+        set_working_for_build(true);   /* the "working" LED while (re)building */
         ret = create_album_index();
-        ui_set_working(false);
+        set_working_for_build(false);
 
         if (ret == 0)
         {
@@ -862,6 +897,33 @@ int album_index_build(void)
     return album_index_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
 }
 
+/* carousel_model.build_index for the artist model: the artist half only, with
+ * no album list, into the caller's index and the caller's memory.
+ *
+ * The locking is the point of this function existing. pfi is one shared slot
+ * and build_mutex is what makes pointing it somewhere safe -- so the artist
+ * model cannot reach build_artist_index() directly, however tempting, because
+ * a background pass holding pfi would resume after a yield writing through
+ * whatever the artist build had left there. Same wait, same lock, same
+ * clear-before-unlock as build_into(). */
+int album_index_build_artists(struct pf_index_t *target,
+                              struct tagcache_search *tcs,
+                              void **buf, size_t *bufsz)
+{
+    int ret = wait_for_background();
+
+    if (ret != SUCCESS)
+        return ret;
+
+    mutex_lock(&build_mutex);
+    pfi = target;
+    ret = build_artist_index(tcs, buf, bufsz);
+    pfi = NULL;
+    mutex_unlock(&build_mutex);
+
+    return ret;
+}
+
 /* ---------------------------------------------------------------------------
  * Building it in the background
  *
@@ -870,9 +932,16 @@ int album_index_build(void)
  * made to wait for it. The carousel is unchanged: it still asks for the index
  * the same way, and simply finds it already written most of the time.
  *
- * The pass runs on the same terms as the artwork cache thread it sits beside --
- * only while the database is usable and idle, and only once the entry count has
- * stopped moving, so a scan in progress is left alone.
+ * The pass runs on the same terms as the artwork cache thread it sits beside,
+ * and for the same reasons -- so both are expressed as a bg_task and the terms
+ * themselves live in system/bg_task.c: only while the database is usable and
+ * idle, and only once the entry count has stopped moving, so a scan in
+ * progress is left alone.
+ *
+ * This one outranks the artwork cache. It finishes in seconds where a full
+ * artwork pass takes minutes, the carousel can be sat waiting on it, and it
+ * needs a 384K allocation that an artwork pass in flight has effectively
+ * spoken for -- so the artwork pass is the one that gives way.
  * ------------------------------------------------------------------------ */
 
 #define IDX_STACK_SIZE (DEFAULT_STACK_SIZE + 0x2000)
@@ -893,6 +962,17 @@ bool album_index_is_busy(void)
     return building_bg;
 }
 
+const char *album_index_activity(void)
+{
+    return bg_step ? bg_step : "";
+}
+
+void album_index_progress(int *done, int *total)
+{
+    *done = bg_done;
+    *total = bg_total;
+}
+
 /* The database entry count the last background build covered.
  *
  * Deliberately not pf_cfg.cache_version: that means "the on-disk formats are
@@ -903,41 +983,11 @@ bool album_index_is_busy(void)
  * reason -- what was the library like when we last finished. */
 #define IDX_DONE_FILE CACHE_PREFIX "/index_done.txt"
 
-static int read_done_total(void)
+/* bg_task.artifact_ok: the marker matching the entry count is not on its own
+ * enough -- the index file it refers to has to still be there. Cheap: no
+ * allocation, and nothing is read out of it. */
+static bool saved_index_present(void)
 {
-    char buf[16];
-    int total = -1;
-    int fd = open(IDX_DONE_FILE, O_RDONLY);
-
-    if (fd >= 0)
-    {
-        int n = read(fd, buf, sizeof(buf) - 1);
-        if (n > 0)
-        {
-            buf[n] = '\0';
-            total = atoi(buf);
-        }
-        close(fd);
-    }
-    return total;
-}
-
-static void write_done_total(int total)
-{
-    int fd = open(IDX_DONE_FILE, O_WRONLY|O_CREAT|O_TRUNC, 0666);
-    if (fd >= 0)
-    {
-        fdprintf(fd, "%d", total);
-        close(fd);
-    }
-}
-
-/* Is the saved index usable as it stands? Cheap: no allocation, no read. */
-static bool saved_index_current(int total)
-{
-    if (read_done_total() != total)
-        return false;
-
     int fd = open(ALBUM_INDEX, O_RDONLY);
     if (fd < 0)
         return false;
@@ -945,10 +995,13 @@ static bool saved_index_current(int total)
     return true;
 }
 
-/* One background build, into memory of its own. The result is the file on
- * disk; the index it builds in RAM is thrown away, because the carousel will
- * read it back for itself when it needs it. */
-static void background_build(int total)
+/* bg_task.run: one background build, into memory of its own. The result is the
+ * file on disk; the index it builds in RAM is thrown away, because the
+ * carousel will read it back for itself when it needs it.
+ *
+ * Returns false if it could not finish, which leaves the marker alone so the
+ * next tick tries again. */
+static bool background_build(void)
 {
     struct pf_index_t local;
     size_t bufsz = IDX_BUILD_BUFSZ;
@@ -960,15 +1013,17 @@ static void background_build(int total)
     /* The carousel makes this directory when it starts up; a build that runs
      * before it ever has would otherwise have nowhere to write the index. */
     if (!dir_exists(CACHE_PREFIX) && mkdir(CACHE_PREFIX) < 0)
-        return;
+        return false;
 
     /* Ask outright rather than checking core_allocatable() first: that reports
      * space already free, and on a player with the audio buffer claimed there
      * is rarely any. core_alloc() shrinks what will shrink to make room, which
-     * is the only way this ever gets memory. Failure just means try later. */
+     * is the only way this ever gets memory. Failure just means try later --
+     * and by then the artwork pass, which is what usually has the memory, will
+     * have seen this task waiting and let go of it. */
     handle = core_alloc(bufsz);
     if (handle <= 0)
-        return;
+        return false;
 
     /* Pinned: a handle with no ops is movable, and the builder yields all the
      * way through -- to the database, and to be nice to playback. */
@@ -985,77 +1040,49 @@ static void background_build(int total)
     core_free(handle);
 
     /* Only on a clean finish: an aborted or failed pass must be retried, not
-     * recorded as covering this library. */
-    if (ret == SUCCESS)
-    {
-        /* Finish the handshake the carousel would otherwise complete for us.
-         *
-         * The builder leaves cache_version at CACHE_REBUILD, and it is the
-         * carousel's prepare callback that later marks it current -- so a
-         * background build that stopped here would leave the flag saying
-         * "stale" and the carousel would rebuild everything we just did.
-         *
-         * That flag also decides whether the placeholder slide is regenerated,
-         * which is not ours to skip: if it was out of date, drop the file so
-         * the carousel makes a new one from its absence instead. */
-        if (old_version != CACHE_VERSION)
-            remove(EMPTY_SLIDE);
+     * recorded as covering this library. Saying so is enough -- bg_task writes
+     * the marker itself once we return true. */
+    if (ret != SUCCESS)
+        return false;
 
-        pf_cfg.cache_version = CACHE_VERSION;
-        pf_config_save();
+    /* Finish the handshake the carousel would otherwise complete for us.
+     *
+     * The builder leaves cache_version at CACHE_REBUILD, and it is the
+     * carousel's prepare callback that later marks it current -- so a
+     * background build that stopped here would leave the flag saying "stale"
+     * and the carousel would rebuild everything we just did.
+     *
+     * That flag also decides whether the placeholder slide is regenerated,
+     * which is not ours to skip: if it was out of date, drop the file so the
+     * carousel makes a new one from its absence instead. */
+    if (old_version != CACHE_VERSION)
+        remove(EMPTY_SLIDE);
 
-        write_done_total(total);
-    }
+    pf_cfg.cache_version = CACHE_VERSION;
+    pf_config_save();
+
+    return true;
 }
+
+struct bg_task album_index_task =
+{
+    .done_file   = IDX_DONE_FILE,
+    .rank        = BG_RANK_INDEX,
+    .run         = background_build,
+    .artifact_ok = saved_index_present,
+};
 
 static void idx_thread(void)
 {
-    struct queue_event ev;
-    int prev_total = -1;    /* entry count seen last tick (stability check) */
-
     while (1)
-    {
-        queue_wait_w_tmo(&idx_queue, &ev, HZ * 5);
-
-        switch (ev.id)
-        {
-            case SYS_USB_CONNECTED:
-                usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
-                usb_wait_for_disconnect(&idx_queue);
-                prev_total = -1;   /* the library may have changed under us */
-                break;
-
-            case SYS_TIMEOUT:
-            {
-                if (!tagcache_is_usable() || tagcache_is_busy())
-                {
-                    prev_total = -1;
-                    break;
-                }
-
-                int total = tagcache_get_stat()->total_entries;
-                if (total != prev_total)
-                {
-                    /* Still moving -- wait for it to settle before spending
-                     * a scan of our own on a moving target. */
-                    prev_total = total;
-                    break;
-                }
-
-                if (saved_index_current(total))
-                    break;
-
-                background_build(total);
-                break;
-            }
-        }
-    }
+        bg_task_tick(&album_index_task, &idx_queue);
 }
 
 void album_index_init(void)
 {
     mutex_init(&build_mutex);
     queue_init(&idx_queue, true);
+    bg_task_init(&album_index_task);
     idx_thread_id = create_thread(idx_thread, idx_stack, sizeof(idx_stack), 0,
                                   idx_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
                                   IF_COP(, CPU));
@@ -1065,7 +1092,10 @@ void album_index_init(void)
 void album_index_invalidate(void)
 {
     /* Forget what the last pass covered, so the next tick rebuilds. Used by
-     * the menu's rebuild/update, which otherwise only reach the carousel's own
-     * build and would leave the background pass thinking it was up to date. */
-    remove(IDX_DONE_FILE);
+     * the carousel's rebuild/update, which otherwise only reach its own build
+     * and would leave the background pass thinking it was up to date.
+     *
+     * An update rather than a rebuild: there is nothing here to purge that the
+     * pass does not overwrite anyway, the index being a single file. */
+    bg_task_update(&album_index_task);
 }

@@ -6,6 +6,8 @@
 #ifndef _ALBUM_COVERS_H_
 #define _ALBUM_COVERS_H_
 
+#include "system/bg_task.h"
+
 /* Values for global_settings.album_covers_show_album_name */
 enum show_album_name_values {
     ALBUM_NAME_HIDE = 0,
@@ -50,11 +52,12 @@ int artist_portraits(const char *selected_file);
  * album and artist models care about different settings. */
 int carousel_settings_menu(void);
 
-/* Forces the on-disk album art cache to be rebuilt (or filled in, in the
- * "update" case) the next time Album covers opens. Used both by the
- * in-screen main menu's own Rebuild/Update Cache actions and by the
- * Settings > Album covers menu (apps/menus/album_covers_menu.c). */
-void album_covers_rebuild_cache(void);
-void album_covers_update_cache(void);
+/* The carousel's own cached state, for the standard triggers.
+ *
+ * bg_task_rebuild() forces it to be built again the next time Album covers
+ * opens; bg_task_update() fills in what is missing instead. Both also tell the
+ * album index to rebuild, which is the part that is a real background task --
+ * see album_covers_request(). */
+extern struct bg_task album_covers_task;
 
 #endif

@@ -303,7 +303,6 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
     /* One list is either an album list or an artist list; resolve the row to the
      * matching folder (album folder, or its parent artist folder). */
     bool artist = !browser_db_is_album_list(local_tc);
-    bool is_fallback = false;
     if (artist)
     {
         if (!browser_db_get_artist_dir(local_tc, selected_item, dir, sizeof(dir)))
@@ -312,20 +311,12 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
     else if (!browser_db_get_album_dir(local_tc, selected_item, dir, sizeof(dir)))
         return NULL;
 
-    /* Album rows want the placeholder returned transparently, so an album with
-     * no cover still fills its viewport. Artist rows must NOT show the album "?"
-     * placeholder (wrong art on a person): when there is no real artist photo,
-     * substitute the dedicated artist silhouette instead. */
-    if (artist)
-    {
-        if (!art_cache_lookup(dir, browser_aa_size_idx, aat, sizeof(aat),
-                                   &is_fallback) || is_fallback)
-        {
-            if (!art_cache_artist_fallback(browser_aa_size_idx, aat, sizeof(aat)))
-                return NULL;    /* silhouette not generated yet */
-        }
-    }
-    else if (!art_cache_lookup(dir, browser_aa_size_idx, aat, sizeof(aat), NULL))
+    /* Both kinds of row want the placeholder returned transparently, so a row
+     * with no art still fills its viewport. Artist rows once took a different
+     * path here, to avoid showing the album "?" on a person; the two
+     * placeholders have since become one image, so the distinction no longer
+     * draws anything different. */
+    if (!art_cache_lookup(dir, browser_aa_size_idx, aat, sizeof(aat), NULL))
         return NULL;    /* no art and no placeholder generated yet */
 
     slot = browser_aa_victim;

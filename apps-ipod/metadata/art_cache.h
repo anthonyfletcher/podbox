@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "system/bg_task.h"
 
 struct bitmap;
 
@@ -59,13 +60,30 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size);
 /* True while a generation pass is running. Drives the status-bar %lc token. */
 bool art_cache_is_busy(void);
 
-/* Purge every cached thumbnail and regenerate from scratch (background). */
-void art_cache_invalidate(void);
+/* What the current -- or, once it has finished, the last -- pass covered.
+ * "art" counts the folders that ended up with a thumbnail; the difference is
+ * the folders that simply have no cover image to find. */
+struct art_cache_counts
+{
+    int albums;
+    int album_art;
+    int artists;
+    int artist_art;
+};
+void art_cache_get_counts(struct art_cache_counts *out);
 
-/* Run a generation pass again without purging, so artwork added since the last
- * pass is picked up. Needed because the cache thread otherwise idles until the
- * database's track count changes, and adding a folder.jpg does not change it. */
-void art_cache_rescan(void);
+/* The folder a running pass is on, or "" when idle. */
+const char *art_cache_activity(void);
+
+/* The caching pass, for the standard triggers.
+ *
+ * bg_task_rebuild() purges every cached thumbnail and regenerates from
+ * scratch. bg_task_update() runs a pass without purging, so artwork added
+ * since the last one is picked up -- needed because the thread otherwise idles
+ * until the database's track count changes, and adding a folder.jpg does not
+ * change it. That pass is cheap, since a folder whose thumbnails all exist is
+ * skipped with an existence check. */
+extern struct bg_task art_cache_task;
 
 /* Resolve the cache-file path for a given album folder and size index.
  * Returns true and fills 'out' if a thumbnail is available, false otherwise.
@@ -78,12 +96,6 @@ void art_cache_rescan(void);
  * caller that wants to prefer another source (e.g. embedded ID3 art) still can. */
 bool art_cache_lookup(const char *dir, int size_index,
                            char *out, int out_len, bool *is_fallback);
-
-/* Path to the shared "no artist photo" placeholder (a silhouette) for a size.
- * True if it exists. Album rows get their placeholder folded into
- * art_cache_lookup(); artist rows need a distinct one, so it is requested
- * separately -- see the artist branch in tree.c's art callback. */
-bool art_cache_artist_fallback(int size_index, char *out, int out_len);
 
 /* Number of configured thumbnail sizes, and accessors for each. */
 int         art_cache_num_sizes(void);
