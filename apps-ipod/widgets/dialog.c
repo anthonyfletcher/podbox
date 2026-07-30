@@ -21,7 +21,7 @@
 #include "settings/settings.h"  /* theme fg/bg for the derived colours */
 #include "skin/statusbar_skinned.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
-#include "skin/skin_albumart_color.h" /* dynamic_colors_resolve/_fading */
+#include "skin/skin_albumart_color.h" /* dynamic_colors_resolve/_needs_repaint */
 #include "dialog.h"
 
 #define DIALOG_MARGIN 10   /* default content inset inside the box */
@@ -578,11 +578,11 @@ int dialog_run(struct dialog *d, int poll_ticks)
 
         /* A dialog left open across a track change would otherwise hold the
          * previous album's colours: the loop only comes round on input, and a
-         * caller waiting on TIMEOUT_BLOCK never does. Poll while the fade runs
-         * so the box travels with the rest of the UI, and go back to whatever
-         * the caller asked for once it has arrived. */
+         * caller waiting on TIMEOUT_BLOCK never does. Poll for as long as the
+         * palette is asking to be repainted, then go back to whatever the
+         * caller asked for. */
         int ticks = poll_ticks;
-        if (dynamic_colors_fading()
+        if (dynamic_colors_needs_repaint()
             && (ticks == TIMEOUT_BLOCK || ticks > HZ / 10))
             ticks = HZ / 10;
 

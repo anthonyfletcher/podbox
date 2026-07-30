@@ -19,8 +19,12 @@ void dynamic_colors_init(void);
  * Otherwise return the original color unchanged. */
 unsigned int dynamic_colors_resolve(unsigned int original);
 
-/* Returns true while a color fade is in progress (for fast refresh) */
-bool dynamic_colors_fading(void);
+/* True for a short window after the palette changes, during which whatever is
+ * on screen owes itself a repaint. The colours have already changed -- this is
+ * not a transition in progress -- but a screen that only redraws on input
+ * would otherwise keep the previous ones until the next keypress, and one
+ * blocked waiting for input would keep them indefinitely. */
+bool dynamic_colors_needs_repaint(void);
 
 /* Check if color extraction is needed and perform it (call from UI thread) */
 void dynamic_colors_check_extraction(int aa_slot);

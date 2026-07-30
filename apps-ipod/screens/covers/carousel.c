@@ -2514,7 +2514,7 @@ static int album_covers_loop(void)
         bool quiescent = pf_state != pf_scrolling
                       && !caption_scrolling
                       && aa_cache.inspected >= pf_idx.album_ct
-                      && !dynamic_colors_fading()
+                      && !dynamic_colors_needs_repaint()
                       && !(audio_status() & AUDIO_STATUS_PLAY);
         int timeout = (pf_state == pf_scrolling) ? 0
                     : (quiescent ? HZ/2 : HZ/16);

@@ -775,13 +775,13 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
            sb = true;
     }
 
-    bool fading = dynamic_colors_fading();
+    bool recolouring = dynamic_colors_needs_repaint();
     bool pending = dynamic_colors_pending();
 
-    if (pm || sb || fading || pending) {
+    if (pm || sb || recolouring || pending) {
         long next_pm_refresh = current_tick;
         long next_sb_refresh = current_tick;
-        long next_fade_refresh = current_tick;
+        long next_recolour_refresh = current_tick;
         long next_big_refresh = current_tick + timeout;
         button = BUTTON_NONE;
         while (TIME_BEFORE(current_tick, next_big_refresh)) {
@@ -811,12 +811,12 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
                 }
                 next_sb_refresh += HZ / SPECTRUM_FPS;
             }
-            if ((fading || pending) && TIME_AFTER(current_tick, next_fade_refresh)) {
+            if ((recolouring || pending) && TIME_AFTER(current_tick, next_recolour_refresh)) {
                 unsigned int refresh = SKIN_REFRESH_ALL;
                 FOR_NB_SCREENS(i)
                     skin_update(skin, i, refresh);
-                next_fade_refresh += HZ / 20;
-                fading = dynamic_colors_fading();
+                next_recolour_refresh += HZ / 20;
+                recolouring = dynamic_colors_needs_repaint();
                 pending = dynamic_colors_pending();
             }
         }
@@ -827,7 +827,7 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
         }
     }
 
-    /* No peak meter or fading
+    /* No peak meter or recolouring
        -> no additional screen updates needed */
     else
     {

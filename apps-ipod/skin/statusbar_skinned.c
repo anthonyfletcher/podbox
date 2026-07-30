@@ -170,17 +170,17 @@ void sb_skin_update(enum screen_type screen, bool force)
     if (!data->wps_loaded)
         return;
     {
-        static bool sb_was_fading[NB_SCREENS] = {false};
-        bool sb_fading = dynamic_colors_fading() || dynamic_colors_pending();
-        if (sb_fading)
+        static bool sb_was_recolouring[NB_SCREENS] = {false};
+        bool sb_recolouring = dynamic_colors_needs_repaint() || dynamic_colors_pending();
+        if (sb_recolouring)
         {
             force = true;
-            sb_was_fading[i] = true;
+            sb_was_recolouring[i] = true;
         }
-        else if (sb_was_fading[i])
+        else if (sb_was_recolouring[i])
         {
             force = true;
-            sb_was_fading[i] = false;
+            sb_was_recolouring[i] = false;
         }
     }
     if (TIME_AFTER(current_tick, next_update[i]) || force || force_waiting)

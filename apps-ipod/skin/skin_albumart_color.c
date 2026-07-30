@@ -525,14 +525,11 @@ unsigned int dynamic_colors_resolve(unsigned int original)
     return resolve_mapped(original, cache.accent, cache.dominant);
 }
 
-bool dynamic_colors_fading(void)
+bool dynamic_colors_needs_repaint(void)
 {
-    /* Nothing fades any more, but the screens that poll this still need to be
-     * told to repaint after a change -- otherwise whatever is on screen keeps
-     * the previous colours until the next keypress, and a dialog waiting on
-     * TIMEOUT_BLOCK keeps them indefinitely. The window only has to outlast one
-     * refresh of the slowest of them. Every repaint inside it draws the same
-     * final colour, so there is nothing left for them to disagree about. */
+    /* The window only has to outlast one refresh of the slowest screen that
+     * polls this. Every repaint inside it draws the same final colour, so
+     * there is nothing for those screens to disagree about. */
     return TIME_BEFORE(current_tick, cache.change_tick + AA_SETTLE_TICKS);
 }
 

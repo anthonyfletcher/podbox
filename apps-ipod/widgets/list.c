@@ -815,11 +815,11 @@ bool gui_synclist_do_button(struct gui_synclist * lists, int *actionptr)
         /* scheduled postponed item announcement is due */
         _gui_synclist_speak_item(lists);
     {
-        static bool was_fading = false;
-        bool dc_active = dynamic_colors_fading() || dynamic_colors_pending();
-        if (dc_active || was_fading)
+        static bool was_recolouring = false;
+        bool dc_active = dynamic_colors_needs_repaint() || dynamic_colors_pending();
+        if (dc_active || was_recolouring)
         {
-            was_fading = dc_active;
+            was_recolouring = dc_active;
             if (action == ACTION_NONE)
             {
                 gui_synclist_draw(lists);
@@ -834,18 +834,18 @@ int list_do_action_timeout(struct gui_synclist *lists, int timeout)
 /* Returns the lowest of timeout or the delay until a postponed
    scheduled announcement is due (if any). */
 {
-    if (dynamic_colors_fading() || dynamic_colors_pending())
+    if (dynamic_colors_needs_repaint() || dynamic_colors_pending())
     {
-        int fade_timeout = HZ / 20;
-        if (timeout > fade_timeout)
-            timeout = fade_timeout;
+        int recolour_timeout = HZ / 20;
+        if (timeout > recolour_timeout)
+            timeout = recolour_timeout;
     }
     /* While the themed status bar shows its animated "busy" spinner -- the
      * database/thumbnail "Building.." indicator (%lb) or the generic "Working.."
      * one (%lw) -- that animation only advances when the status bar is redrawn.
      * An idle list would otherwise block on input and freeze it, so mirror the
-     * colour-fade case above and cap the wait to the spinner's frame rate for as
-     * long as any such work is busy. */
+     * recolouring case above and cap the wait to the spinner's frame rate for
+     * as long as any such work is busy. */
     {
         bool ui_busy = ui_working();
         ui_busy = ui_busy || tagcache_is_busy();
