@@ -37,6 +37,7 @@
 #include "audio/playback.h"
 #include "audio/buffering.h"
 #include "system/appevents.h"
+#include "draw/color.h"              /* color_blend */
 #include "skin_albumart_color.h"
 
 #define AA_FADE_DURATION  (HZ / 4)   /* 250ms */
@@ -112,21 +113,11 @@ static int contrast_ratio(int32_t lum_a, int32_t lum_b)
     return (int)((hi * 100) / lo);
 }
 
+/* t: 0..256, 0 = fully c1, 256 = fully c2. The dialog chrome derives its own
+ * secondary colours the same way, so the arithmetic lives in draw/color.c. */
 static unsigned int lerp_color(unsigned int c1, unsigned int c2, int t)
 {
-    /* t: 0..256, 0 = fully c1, 256 = fully c2 */
-    int r1 = RGB_UNPACK_RED(c1);
-    int g1 = RGB_UNPACK_GREEN(c1);
-    int b1 = RGB_UNPACK_BLUE(c1);
-    int r2 = RGB_UNPACK_RED(c2);
-    int g2 = RGB_UNPACK_GREEN(c2);
-    int b2 = RGB_UNPACK_BLUE(c2);
-
-    int r = r1 + (((r2 - r1) * t) >> 8);
-    int g = g1 + (((g2 - g1) * t) >> 8);
-    int b = b1 + (((b2 - b1) * t) >> 8);
-
-    return LCD_RGBPACK(r, g, b);
+    return color_blend(c1, c2, t);
 }
 
 static int fade_progress(void)
@@ -448,10 +439,22 @@ void dynamic_colors_check_extraction(int aa_slot)
     else
         aa_slot = last_aa_slot;
 
-    /* Detect playback stop — initiate fade to defaults */
+    /* Fade back to the theme when there is no longer a track to take colours
+     * from -- which is not the same as playback having stopped. A stopped
+     * track is still the one on the playing screen, and its colours belong
+     * with it; only an empty path means there is nothing left to match.
+     *
+     * Pausing never reached here anyway: PLAY_PAUSED is
+     * AUDIO_STATUS_PLAY | AUDIO_STATUS_PAUSE, so the PLAY bit stays set.
+     *
+     * The status test is kept in front as a guard, not as the condition. It is
+     * cheap and false whenever anything is playing, which keeps
+     * audio_current_track() -- a mutex and a metadata fetch -- off the render
+     * path except while stopped. */
     if (cache.valid && !cache.fading_out &&
         global_settings.dynamic_colors &&
-        !(audio_status() & AUDIO_STATUS_PLAY))
+        !(audio_status() & AUDIO_STATUS_PLAY) &&
+        audio_current_track()->path[0] == '\0')
     {
         start_fade(cache.theme_fg, cache.theme_bg, true);
     }

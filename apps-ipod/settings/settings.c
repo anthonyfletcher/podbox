@@ -799,9 +799,12 @@ static int clamp_int(int v, int lo, int hi)
 }
 
 /* Push the theme's dialog chrome into the shared default dialog style. The
- * metrics always apply; the colours only when "dialog colours" is on, otherwise
- * every colour stays DIALOG_COLOR_INHERIT and the dialogs follow the theme's own
- * foreground/background exactly as they did before this setting existed.
+ * metrics always apply; the colours depend on "dialog colours".
+ *
+ * Note what is stored for "auto": sentinels, not colours. The album-derived
+ * colours change while the player runs and this function is called once, when
+ * settings are applied -- so anything resolved here would be frozen at whatever
+ * was playing then. dialog.c resolves the sentinels per draw instead.
  *
  * These values come straight out of a hand-edited .cfg (atoi, no range check in
  * the settings loader), so they are clamped here: a negative margin or an absurd
@@ -820,7 +823,7 @@ static void settings_apply_dialog_style(void)
     s.button_border_radius = clamp_int(global_settings.dialog_btn_border_radius,
                                        0, 64);
 
-    if (global_settings.dialog_colors)
+    if (global_settings.dialog_colors == DIALOG_COLORS_ON)
     {
         s.box_fg                       = global_settings.dialog_box_fg;
         s.box_bg                       = global_settings.dialog_box_bg;
@@ -831,6 +834,30 @@ static void settings_apply_dialog_style(void)
         s.button_fg_selected           = global_settings.dialog_btn_fg_sel;
         s.button_bg_selected           = global_settings.dialog_btn_bg_sel;
         s.button_border_color_selected = global_settings.dialog_btn_border_sel;
+    }
+    else if (global_settings.dialog_colors == DIALOG_COLORS_AUTO)
+    {
+        /* The box sits on the derived background so it lifts off the screen;
+         * the buttons sit on the plain one, so they read as raised out of the
+         * box rather than flush with it. An unselected button takes the
+         * background for its border too, so it has no visible outline at all
+         * and reads only as a slightly different fill -- quiet, which leaves
+         * the selected one as the only marked thing in the dialog.
+         *
+         * Selecting inverts it: the accent fills and the border takes the
+         * foreground, so the selection gains an outline at the same moment it
+         * gains its colour. The label is whichever of the two reads on the
+         * accent -- fixing it to either one leaves album colours that make it
+         * illegible. */
+        s.box_fg                       = DIALOG_COLOR_FG;
+        s.box_bg                       = DIALOG_COLOR_BG2;
+        s.box_border_color             = DIALOG_COLOR_FG;
+        s.button_fg                    = DIALOG_COLOR_FG;
+        s.button_bg                    = DIALOG_COLOR_BG;
+        s.button_border_color          = DIALOG_COLOR_BG;
+        s.button_fg_selected           = DIALOG_COLOR_ON_ACCENT;
+        s.button_bg_selected           = DIALOG_COLOR_ACCENT;
+        s.button_border_color_selected = DIALOG_COLOR_FG;
     }
 
     dialog_set_default_style(&s);

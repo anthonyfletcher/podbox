@@ -883,20 +883,24 @@ const struct settings_list settings[] = {
 
 
     /* Modal dialog chrome. Config-file only (no menu entries): lang_id -1, so
-     * these are edited in a theme .cfg. The defaults reproduce
-     * dialog_style_default() exactly, i.e. today's look. */
+     * these are edited in a theme .cfg. The metric defaults are the chrome a
+     * theme gets for saying nothing, so they are the shipped look rather than
+     * dialog_style_default()'s bare 1px square borders. */
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_box_border_width, -1,
-        INT(1), "dialog box border width", UNUSED},
+        INT(2), "dialog box border width", UNUSED},
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_box_margin, -1,
         INT(10), "dialog box margin", UNUSED},
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_width, -1,
-        INT(1), "dialog button border width", UNUSED},
+        INT(2), "dialog button border width", UNUSED},
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_radius, -1,
-        INT(0), "dialog button border radius", UNUSED},
-    /* off: every dialog colour is inherited from the theme (the default look).
-     * on: the nine colours below are used instead. */
-    OFFON_SETTING(F_THEMESETTING, dialog_colors, -1, false, "dialog colours",
-                  NULL),
+        INT(4), "dialog button border radius", UNUSED},
+    /* off:  every dialog colour is inherited from the theme, flat.
+     * on:   the nine colours below are used instead.
+     * auto: derived from the theme's foreground and background, or from the
+     *       album's while dynamic colours are running (the default). */
+    CHOICE_SETTING(F_THEMESETTING, dialog_colors, -1, DIALOG_COLORS_AUTO,
+                   "dialog colours", "off,on,auto", NULL, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUTO)),
     {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_box_fg, -1,
         INT(DEFAULT_THEME_FOREGROUND), "dialog box foreground", UNUSED},
     {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_box_bg, -1,

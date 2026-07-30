@@ -44,6 +44,32 @@ struct dialog;
  * (foreground for fg/border fields, background for bg fields). */
 #define DIALOG_COLOR_INHERIT ((unsigned)-1)
 
+/* Colours that resolve, also at draw time, to the theme's own foreground and
+ * background -- album-derived while dynamic colours are running, so a dialog
+ * follows the music the way the rest of the UI does.
+ *
+ * Not the same as INHERIT, which takes whatever the screen happens to carry:
+ * inside a button that is the *box's* fill, so INHERIT there would give the box
+ * background rather than the theme's. These five are absolute.
+ *
+ * BG2 is the background lifted toward the foreground, so a box reads as raised
+ * off the screen behind it.
+ *
+ * ACCENT is the selection colour, and is derived from the background's hue
+ * rather than mixed from the pair. Mixing spends contrast -- a muted foreground
+ * is by definition nearer the background than the foreground was -- while
+ * turning the hue keeps the distance and changes the colour instead.
+ *
+ * ON_ACCENT is whichever of the foreground and the background reads better on
+ * ACCENT, and means nothing apart from it. A single fixed choice cannot work:
+ * the accent's lightness is not tied to the pair it came from, so with a light
+ * album the background-coloured text it was designed for falls to 1.4:1. */
+#define DIALOG_COLOR_FG        ((unsigned)-2)
+#define DIALOG_COLOR_BG        ((unsigned)-3)
+#define DIALOG_COLOR_ACCENT    ((unsigned)-4)
+#define DIALOG_COLOR_BG2       ((unsigned)-5)
+#define DIALOG_COLOR_ON_ACCENT ((unsigned)-6)
+
 /* A font that resolves to the one the parent (theme) viewport already carries. */
 #define DIALOG_FONT_INHERIT  (-1)
 

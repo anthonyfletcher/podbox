@@ -55,6 +55,18 @@ enum {
     BOOKMARK_ONE_PER_TRACK = 3,
 };
 
+/* global_settings.dialog_colors -- what a modal dialog does about colour.
+ *
+ * OFF and ON are the two the setting has always had, in the order it wrote
+ * them, so an existing .cfg keeps its meaning. AUTO is the default, so a theme
+ * that says nothing about dialogs gets the derived scheme rather than the flat
+ * one. */
+enum {
+    DIALOG_COLORS_OFF = 0,   /* every colour inherited from the theme        */
+    DIALOG_COLORS_ON = 1,    /* the nine colours named in the .cfg           */
+    DIALOG_COLORS_AUTO = 2,  /* derived from the theme's, or the album's     */
+};
+
 enum
 {
     TRIG_MODE_OFF = 0,
@@ -481,14 +493,13 @@ struct user_settings
     bool dynamic_colors; /* auto-color from album art */
 
     /* Modal dialog chrome (apps/gui/dialog.h). Applied in settings_apply() via
-     * dialog_set_default_style(). The metrics always apply; the colours only
-     * when dialog_colors is on, otherwise every colour is inherited from the
-     * theme (DIALOG_COLOR_INHERIT), which is the default look. */
+     * dialog_set_default_style(). The metrics always apply; what the colours do
+     * depends on dialog_colors, one of DIALOG_COLORS_*. */
     int dialog_box_border_width;
     int dialog_box_margin;
     int dialog_btn_border_width;
     int dialog_btn_border_radius;
-    bool dialog_colors;         /* off == inherit every colour from the theme */
+    int dialog_colors;
     int dialog_box_fg;
     int dialog_box_bg;
     int dialog_box_border;

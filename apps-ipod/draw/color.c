@@ -45,6 +45,93 @@ int hex_to_rgb(const char* hex, int* color)
     return 0;
 }
 
+unsigned color_blend(unsigned c1, unsigned c2, int t)
+{
+    int r1 = RGB_UNPACK_RED(c1);
+    int g1 = RGB_UNPACK_GREEN(c1);
+    int b1 = RGB_UNPACK_BLUE(c1);
+    int r2 = RGB_UNPACK_RED(c2);
+    int g2 = RGB_UNPACK_GREEN(c2);
+    int b2 = RGB_UNPACK_BLUE(c2);
+
+    int r = r1 + (((r2 - r1) * t) >> 8);
+    int g = g1 + (((g2 - g1) * t) >> 8);
+    int b = b1 + (((b2 - b1) * t) >> 8);
+
+    return LCD_RGBPACK(r, g, b);
+}
+
+unsigned color_hue_rotate(unsigned base, int degrees, int sat, int val)
+{
+    int r = RGB_UNPACK_RED(base);
+    int g = RGB_UNPACK_GREEN(base);
+    int b = RGB_UNPACK_BLUE(base);
+    int max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    int min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    int delta = max - min;
+    int h, region, rem, p, q, t;
+
+    /* base's hue in degrees. A grey has no hue to turn, so it yields 0 (red):
+     * a predictable colour rather than another grey, which is the one answer
+     * that would be useless to a caller asking for an accent. */
+    if (delta == 0)
+        h = 0;
+    else if (max == r)
+        h = (60 * (g - b)) / delta;
+    else if (max == g)
+        h = 120 + (60 * (b - r)) / delta;
+    else
+        h = 240 + (60 * (r - g)) / delta;
+
+    h = (h + degrees) % 360;
+    if (h < 0)
+        h += 360;
+
+    /* Back to RGB at the caller's saturation and brightness rather than
+     * base's. A theme background is usually dark and unsaturated and has
+     * neither to spare -- keeping them would give a colour too close to the
+     * one we were asked to move away from. */
+    region = h / 60;
+    rem    = ((h - region * 60) * 255) / 60;
+    p = (val * (255 - sat)) / 255;
+    q = (val * (255 - (sat * rem) / 255)) / 255;
+    t = (val * (255 - (sat * (255 - rem)) / 255)) / 255;
+
+    switch (region)
+    {
+        case 0:  r = val; g = t;   b = p;   break;
+        case 1:  r = q;   g = val; b = p;   break;
+        case 2:  r = p;   g = val; b = t;   break;
+        case 3:  r = p;   g = q;   b = val; break;
+        case 4:  r = t;   g = p;   b = val; break;
+        default: r = val; g = p;   b = q;   break;
+    }
+
+    return LCD_RGBPACK(r, g, b);
+}
+
+/* WCAG relative luminance. sRGB is linearised with a gamma of 2.0 rather than
+ * the exact piecewise curve -- a multiply instead of a lookup table, and well
+ * inside the tolerance of a pass/fail threshold. */
+static int32_t rel_luminance(unsigned c)
+{
+    int32_t r = RGB_UNPACK_RED(c);
+    int32_t g = RGB_UNPACK_GREEN(c);
+    int32_t b = RGB_UNPACK_BLUE(c);
+
+    return (r * r * 2126 + g * g * 7152 + b * b * 722) / 10000;
+}
+
+int color_contrast(unsigned c1, unsigned c2)
+{
+    int32_t la = rel_luminance(c1);
+    int32_t lb = rel_luminance(c2);
+    int32_t hi = (la > lb ? la : lb) + 3251;   /* the 0.05 of the WCAG ratio */
+    int32_t lo = (la < lb ? la : lb) + 3251;
+
+    return (int)((hi * 100) / lo);
+}
+
 /* '0'-'3' are ASCII 0x30 to 0x33 */
 #define is0123(x) (((x) & 0xfc) == 0x30)
 bool parse_color(enum screen_type screen, char *text, int *value)

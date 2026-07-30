@@ -17,8 +17,11 @@
 #include "input/action.h"
 #include "backlight.h"
 #include "draw/icon.h"          /* Icon_NOICON */
+#include "draw/color.h"         /* color_blend */
+#include "settings/settings.h"  /* theme fg/bg for the derived colours */
 #include "skin/statusbar_skinned.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
+#include "skin/skin_albumart_color.h" /* dynamic_colors_resolve/_fading */
 #include "dialog.h"
 
 #define DIALOG_MARGIN 10   /* default content inset inside the box */
@@ -202,13 +205,142 @@ static void draw_box_border(struct screen *s, int w, int h, int bw)
     s->fillrect(w - bw, bw, bw, h - 2 * bw);         /* right  */
 }
 
+/* How far BG2 is mixed toward the foreground, out of 256.
+ *
+ * Every step raises the box off the screen behind it and lowers the contrast of
+ * the text on it, and the two cross over. Measured against Themify_2's pair:
+ * 32 gives 1.50:1 box-against-screen and 10.97:1 text; 48 gives 1.88:1 and
+ * 8.71:1; 64 gives 2.40:1 but drops text to 6.84:1, under WCAG's 7:1. So 48 --
+ * the box becomes a shape in its own right rather than an outline, and the
+ * text keeps a AAA margin. */
+#define DIALOG_BG2_MIX 48
+
+/* The accent, as a turn around the colour wheel from the background.
+ *
+ * 100 degrees rather than a true complement (180): on a navy background 180
+ * lands on amber, which is legible but reads as a different design. 100 lands
+ * on a pink-mauve -- which is, to within a couple of values, the accent this
+ * fork's theme already used by eye before any of it was computed.
+ *
+ * The saturation and brightness are fixed rather than taken from the
+ * background, which is typically too dark and too flat to yield anything
+ * usable. These give roughly 6.2:1 against the background it came from. */
+#define DIALOG_ACCENT_ROTATE 100
+#define DIALOG_ACCENT_SAT    107   /* 0.42 of full */
+
+/* Brightnesses to try for the accent, preferred one first.
+ *
+ * A fixed brightness cannot work, because it is not tied to the pair it was
+ * derived from: 204 against a dark background gives the pink above, but
+ * against a *light* album it lands on a light green with the text at 1.4:1 --
+ * the unreadable selection this list exists to avoid. The rest are fallbacks,
+ * reached only when the preferred one is not legible, so a theme whose accent
+ * already works never has it changed underneath it. */
+static const unsigned char dialog_accent_vals[] =
+    { 204, 240, 160, 128, 96, 64, 32 };
+
+/* Contrast the accent and its text must reach before the search stops: WCAG's
+ * 4.5:1 for body text, in hundredths. */
+#define DIALOG_ACCENT_TARGET 450
+
+/* The theme's live foreground and background, album-derived when dynamic
+ * colours are running. dynamic_colors_resolve() matches by value against the
+ * saved theme colours, which is exactly what these are. */
+static unsigned dialog_theme_fg(void)
+{
+    return dynamic_colors_resolve(global_settings.fg_color);
+}
+
+static unsigned dialog_theme_bg(void)
+{
+    return dynamic_colors_resolve(global_settings.bg_color);
+}
+
+/* Pick the accent and the colour that goes on it together -- they are chosen
+ * against each other, so neither can be resolved alone.
+ *
+ * Take the preferred brightness, ask which of the foreground and background
+ * reads better on the result, and stop there if that pairing is legible. Only
+ * when it is not does this go looking, which keeps a working accent from being
+ * quietly retuned. */
+static void resolve_accent(unsigned *accent_out, unsigned *text_out)
+{
+    unsigned fg = dialog_theme_fg();
+    unsigned bg = dialog_theme_bg();
+    unsigned best_accent = 0, best_text = 0;
+    int best_contrast = -1;
+    unsigned i;
+
+    for (i = 0; i < sizeof(dialog_accent_vals); i++)
+    {
+        unsigned accent = color_hue_rotate(bg, DIALOG_ACCENT_ROTATE,
+                                           DIALOG_ACCENT_SAT,
+                                           dialog_accent_vals[i]);
+        int on_bg = color_contrast(bg, accent);
+        int on_fg = color_contrast(fg, accent);
+        bool bg_wins = on_bg >= on_fg;
+        int contrast = bg_wins ? on_bg : on_fg;
+
+        if (contrast > best_contrast)
+        {
+            best_contrast = contrast;
+            best_accent   = accent;
+            best_text     = bg_wins ? bg : fg;
+        }
+
+        if (i == 0 && contrast >= DIALOG_ACCENT_TARGET)
+            break;
+    }
+
+    *accent_out = best_accent;
+    *text_out   = best_text;
+}
+
+/* The absolute sentinels. Returns false for anything else, including INHERIT,
+ * which is screen-relative and resolved by the callers below. */
+static bool resolve_derived(unsigned color, unsigned *out)
+{
+    unsigned accent, text;
+
+    switch (color)
+    {
+        case DIALOG_COLOR_FG:
+            *out = dialog_theme_fg();
+            return true;
+        case DIALOG_COLOR_BG:
+            *out = dialog_theme_bg();
+            return true;
+        case DIALOG_COLOR_ACCENT:
+            resolve_accent(&accent, &text);
+            *out = accent;
+            return true;
+        case DIALOG_COLOR_ON_ACCENT:
+            resolve_accent(&accent, &text);
+            *out = text;
+            return true;
+        case DIALOG_COLOR_BG2:
+            *out = color_blend(dialog_theme_bg(), dialog_theme_fg(),
+                               DIALOG_BG2_MIX);
+            return true;
+    }
+    return false;
+}
+
 static unsigned resolve_fg(struct screen *s, unsigned color)
 {
+    unsigned derived;
+
+    if (resolve_derived(color, &derived))
+        return derived;
     return color == DIALOG_COLOR_INHERIT ? s->get_foreground() : color;
 }
 
 static unsigned resolve_bg(struct screen *s, unsigned color)
 {
+    unsigned derived;
+
+    if (resolve_derived(color, &derived))
+        return derived;
     return color == DIALOG_COLOR_INHERIT ? s->get_background() : color;
 }
 
@@ -444,8 +576,18 @@ int dialog_run(struct dialog *d, int poll_ticks)
          * that merely woke the screen (matches the old yes/no behaviour) */
         d->backlight_on = is_backlight_on(false);
 
+        /* A dialog left open across a track change would otherwise hold the
+         * previous album's colours: the loop only comes round on input, and a
+         * caller waiting on TIMEOUT_BLOCK never does. Poll while the fade runs
+         * so the box travels with the rest of the UI, and go back to whatever
+         * the caller asked for once it has arrived. */
+        int ticks = poll_ticks;
+        if (dynamic_colors_fading()
+            && (ticks == TIMEOUT_BLOCK || ticks > HZ / 10))
+            ticks = HZ / 10;
+
         skin_inhibit_flush(true);
-        int action = get_action(d->context, poll_ticks);
+        int action = get_action(d->context, ticks);
         skin_inhibit_flush(false);
 
         disp = d->cb->on_action(d, action, d->data);
