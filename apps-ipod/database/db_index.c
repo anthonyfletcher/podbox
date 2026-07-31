@@ -38,6 +38,7 @@
 #include "lang.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
+#include "metadata/art_cache.h"      /* art_cache_dir_hash */
 #include "widgets/splash.h"
 #include "widgets/yesno.h"           /* gui_syncyesno_run, YESNO_YES */
 #include "draw/screen_access.h"
@@ -67,8 +68,13 @@
  * build.
  *   PFID -> PFIE: album_data gained playcount/lastplayed (the album charts).
  *   PFIE -> PFIF: artist_data gained the same (the artist charts), and the
- *                 file moved out of the carousel folder. */
-#define INDEX_HDR "PFIF"
+ *                 file moved out of the carousel folder.
+ *   PFIF -> PFIG: both gained art_hash (the carousel's slide loading).
+ *   PFIG -> PFIH: album_data gained artist_art_hash. PFIG indexes also have to
+ *                 go regardless: they were written by a build that resolved
+ *                 every art_hash to 0, so nothing in them would ever match a
+ *                 cached thumbnail. */
+#define INDEX_HDR "PFIH"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -260,6 +266,8 @@ static void write_album_index(int idx, int name_idx,
     pfi->album_index[idx].year = 0;
     pfi->album_index[idx].playcount = 0;
     pfi->album_index[idx].lastplayed = 0;
+    pfi->album_index[idx].art_hash = 0;
+    pfi->album_index[idx].artist_art_hash = 0;
 }
 
 static inline void write_album_entry(struct tagcache_search *tcs,
@@ -283,8 +291,62 @@ static void write_artist_entry(struct tagcache_search *tcs,
     pfi->artist_index[-pfi->artist_ct].seek = tcs->result_seek;
     pfi->artist_index[-pfi->artist_ct].playcount = 0;
     pfi->artist_index[-pfi->artist_ct].lastplayed = 0;
+    pfi->artist_index[-pfi->artist_ct].art_hash = 0;
     pfi->artist_len += len;
     pfi->artist_ct++;
+}
+
+/* The art_cache keys for the folders holding the artwork of the track the given
+ * search is currently sitting on: its own folder (the album's), and that
+ * folder's parent (the artist's, under the <artist>/<album>/<track> layout the
+ * artist list assumes). Either is set to 0 if the path is too shallow to strip
+ * that far. Both are resolved together because they come from one path.
+ *
+ * The caller must be on a *filtered or numeric* search. Those go through
+ * build_lookup_list(), which walks the master index and so records a real
+ * master-index id per result -- and tcs->idx_id is what makes the path one
+ * direct fetch away, with no search and no scan of our own. An unfiltered
+ * search on a unique tag (tag_album, tag_albumartist) is not usable here: those
+ * tag files are deduplicated and their entries carry idx_id -1, so there is no
+ * track to ask about. That is why this is called from the per-album and
+ * per-artist passes rather than from the walks that first enumerate them.
+ *
+ * Done during the build so that displaying a slide never has to go near the
+ * database. Either output pointer may be NULL for a caller that wants only the
+ * other one. */
+static void resolve_art_hashes(struct tagcache_search *tcs,
+                               unsigned int *album_hash,
+                               unsigned int *artist_hash)
+{
+    /* Static rather than automatic: this can run on the background build
+     * thread, whose stack is modest, and one build at a time is enforced by
+     * build_mutex. */
+    static char path[MAX_PATH];
+    char *sep;
+
+    if (album_hash)
+        *album_hash = 0;
+    if (artist_hash)
+        *artist_hash = 0;
+
+    if (tcs->idx_id < 0
+        || !tagcache_retrieve(tcs, tcs->idx_id, tag_filename,
+                              path, sizeof(path)))
+        return;
+
+    sep = strrchr(path, '/');
+    if (!sep || sep == path)
+        return;
+    *sep = '\0';                     /* track file -> album folder */
+    if (album_hash)
+        *album_hash = art_cache_dir_hash(path);
+
+    sep = strrchr(path, '/');
+    if (!sep || sep == path)
+        return;
+    *sep = '\0';                     /* album -> artist folder */
+    if (artist_hash)
+        *artist_hash = art_cache_dir_hash(path);
 }
 
 /* adds tagcache_search results into artist/album index */
@@ -393,7 +455,6 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
             *bufsz -= sizeof(struct album_data);
             write_album_index(-pfi->album_ct, pfi->album_untagged_idx,
                                pfi->album_untagged_seek, -1, tcs->result_seek);
-
             pfi->album_ct++;
         }
         tagcache_search_finish(tcs);
@@ -515,6 +576,8 @@ static int assign_album_stats(void)
         int album_year = 0;
         int album_playcount = 0;
         long album_lastplayed = 0;
+        unsigned int album_art = 0, artist_art = 0;
+        bool first_track = true;
 
         if (tagcache_search(&tcs, tag_year))
         {
@@ -527,6 +590,17 @@ static int assign_album_stats(void)
 
             while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz)) {
                 int track_year = tagcache_get_numeric(&tcs, tag_year);
+
+                /* Where this album's artwork is cached, from the first of its
+                 * tracks. Taken here because this is the only per-album pass
+                 * that walks tracks, so the folder costs nothing beyond one
+                 * fetch -- resolving it per slide instead is a filtered search
+                 * per slide, which is what the carousel used to do. */
+                if (first_track)
+                {
+                    first_track = false;
+                    resolve_art_hashes(&tcs, &album_art, &artist_art);
+                }
                 long track_playcount = tagcache_get_numeric(&tcs, tag_playcount);
 
                 if (track_year > album_year)
@@ -557,6 +631,8 @@ static int assign_album_stats(void)
         pfi->album_index[album_idx].year = album_year;
         pfi->album_index[album_idx].playcount = album_playcount;
         pfi->album_index[album_idx].lastplayed = album_lastplayed;
+        pfi->album_index[album_idx].art_hash = album_art;
+        pfi->album_index[album_idx].artist_art_hash = artist_art;
     }
     return SUCCESS;
 }
@@ -587,6 +663,7 @@ static void assign_artist_stats(void)
     {
         pfi->artist_index[a].playcount = 0;
         pfi->artist_index[a].lastplayed = 0;
+        pfi->artist_index[a].art_hash = 0;
     }
 
     for (j = 0; j < pfi->album_ct; j++)
@@ -606,6 +683,12 @@ static void assign_artist_stats(void)
                 pfi->artist_index[a].lastplayed)
                 pfi->artist_index[a].lastplayed =
                     pfi->album_index[j].lastplayed;
+            /* Its albums' folders share a parent, which is the artist's own --
+             * so the first album to resolve one answers for the artist, and no
+             * separate walk is needed to find it. */
+            if (pfi->artist_index[a].art_hash == 0)
+                pfi->artist_index[a].art_hash =
+                    pfi->album_index[j].artist_art_hash;
             break;
         }
     }
@@ -1046,8 +1129,19 @@ static int build_into(struct pf_index_t *target, void *buf, size_t buf_sz,
     pfi->buf = buf;
     pfi->buf_sz = buf_sz;
 
-    /* Scan will trigger when no file is found or the option was activated */
-    if ((pf_cfg.cache_version != CACHE_VERSION) || (load_album_index() < 0))
+    /* The background pass is the one that rebuilds. bg_task runs it only when
+     * the library has changed or a trigger fired, so when it does run there is
+     * nothing to reuse and it always builds. Every other caller reads the saved
+     * index, and builds only when there is none to read.
+     *
+     * This used to ask pf_cfg.cache_version instead, which is the carousel's
+     * own state: loaded from its config file by the carousel's init and by
+     * nothing else. A caller that had not opened the carousel this boot -- the
+     * album charts, Random album -- therefore read it as CACHE_REBUILD and
+     * walked the whole database on every invocation, with a perfectly good
+     * index sitting on disk unread. A stale *format* is caught by INDEX_HDR,
+     * which is what that magic is for. */
+    if (background || load_album_index() < 0)
     {
         set_working_for_build(true);   /* the "working" LED while (re)building */
         ret = create_album_index();
@@ -1141,7 +1235,17 @@ int db_index_build(void)
  * Only worth its cost when something is going to sort on it, hence the opt-in
  * at the call site. Artists are far fewer than albums, so even then it is a
  * fraction of what a full build does. */
-static void assign_artist_stats_from_db(struct tagcache_search *tcs)
+/* Fill in each artist's folder, and optionally their playback figures, by
+ * walking the database.
+ *
+ * The artist-only build has no album list to derive either from -- that is what
+ * assign_artist_stats() does on the full build -- so this is the one path that
+ * has to ask. The folder is always resolved: it is what the artist carousel
+ * shows a photo from, and skipping it here would leave every artist without one
+ * until a full build wrote an index. The figures are only summed when something
+ * is going to sort on them, since that is the part that reads every track. */
+static void assign_artist_art_and_stats(struct tagcache_search *tcs,
+                                        bool with_stats)
 {
     char tcs_buf[TAGCACHE_BUFSZ];
     const long tcs_bufsz = sizeof(tcs_buf);
@@ -1151,6 +1255,8 @@ static void assign_artist_stats_from_db(struct tagcache_search *tcs)
     {
         int playcount = 0;
         long lastplayed = 0;
+        unsigned int artist_art = 0;
+        bool first_track = true;
 
         keep_awake_for_build();
         if (progress_cancel(a, pfi->artist_ct, STR_STEP_ARTIST_STATS))
@@ -1163,6 +1269,15 @@ static void assign_artist_stats_from_db(struct tagcache_search *tcs)
 
             while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
             {
+                if (first_track)
+                {
+                    first_track = false;
+                    resolve_art_hashes(tcs, NULL, &artist_art);
+                    /* Nothing else here needs a second track. */
+                    if (!with_stats)
+                        break;
+                }
+
                 long n = tagcache_get_numeric(tcs, tag_playcount);
 
                 if (n > 0)
@@ -1176,8 +1291,12 @@ static void assign_artist_stats_from_db(struct tagcache_search *tcs)
         }
         tagcache_search_finish(tcs);
 
-        pfi->artist_index[a].playcount = playcount;
-        pfi->artist_index[a].lastplayed = lastplayed;
+        pfi->artist_index[a].art_hash = artist_art;
+        if (with_stats)
+        {
+            pfi->artist_index[a].playcount = playcount;
+            pfi->artist_index[a].lastplayed = lastplayed;
+        }
     }
 }
 
@@ -1193,8 +1312,8 @@ int db_index_build_artists(struct pf_index_t *target,
     mutex_lock(&build_mutex);
     pfi = target;
     ret = build_artist_index(tcs, buf, bufsz);
-    if (ret >= SUCCESS && with_stats)
-        assign_artist_stats_from_db(tcs);
+    if (ret >= SUCCESS)
+        assign_artist_art_and_stats(tcs, with_stats);
     pfi = NULL;
     mutex_unlock(&build_mutex);
 
@@ -1274,6 +1393,14 @@ int db_index_acquire(struct pf_index_t *target, int *handle)
     void *buf;
     int ret;
 
+    /* Same wait the carousel does, and for the same reason: build_into() takes
+     * build_mutex, so without this a caller arriving while the background pass
+     * is running blocks on it with a dead screen and no way out. Here it shows
+     * the pass's progress and can be left. */
+    ret = wait_for_background();
+    if (ret != SUCCESS)
+        return ret;
+
     *handle = core_alloc(IDX_BUILD_BUFSZ);
     if (*handle <= 0)
         return ERROR_BUFFER_FULL;
@@ -1299,15 +1426,26 @@ void db_index_release(int handle)
 }
 
 /* bg_task.artifact_ok: the marker matching the entry count is not on its own
- * enough -- the index file it refers to has to still be there. Cheap: no
- * allocation, and nothing is read out of it. */
+ * enough -- the index file it refers to has to still be there, and be in a
+ * format this build can read. The magic is checked because the library does not
+ * change when the firmware does: after an upgrade that bumped INDEX_HDR the
+ * marker still matches, so without this the background pass would leave a file
+ * it can no longer read in place and the next caller that wanted the index
+ * would rebuild it in the foreground, progress bar and all. Cheap: the header
+ * is four bytes and nothing else is read. */
 static bool saved_index_present(void)
 {
+    uint32_t header;
     int fd = open(DB_INDEX_FILE, O_RDONLY);
+    bool ok;
+
     if (fd < 0)
         return false;
+
+    ok = read(fd, &header, sizeof(header)) == sizeof(header)
+      && memcmp(&header, INDEX_HDR, sizeof(header)) == 0;
     close(fd);
-    return true;
+    return ok;
 }
 
 /* bg_task.run: one background build, into memory of its own. The result is the
@@ -1315,7 +1453,15 @@ static bool saved_index_present(void)
  * carousel will read it back for itself when it needs it.
  *
  * Returns false if it could not finish, which leaves the marker alone so the
- * next tick tries again. */
+ * next tick tries again.
+ *
+ * Nothing here touches pf_cfg. It used to mark the carousel's cache_version
+ * current, because build_into() consulted that flag and would otherwise have
+ * rebuilt what this pass had just written. build_into() no longer asks, and
+ * the flag is only about the carousel's slide cache -- which this pass does
+ * not build -- so asserting anything about it from here was both untrue and,
+ * on a boot where the carousel had never loaded its config, a save of zeroes
+ * over the resume position. The carousel's own prepare callback owns it. */
 static bool background_build(void)
 {
     struct pf_index_t local;
@@ -1323,7 +1469,6 @@ static bool background_build(void)
     int handle;
     void *buf;
     int ret;
-    const int old_version = pf_cfg.cache_version;
 
     /* The carousel makes this directory when it starts up; a build that runs
      * before it ever has would otherwise have nowhere to write the index. */
@@ -1357,26 +1502,7 @@ static bool background_build(void)
     /* Only on a clean finish: an aborted or failed pass must be retried, not
      * recorded as covering this library. Saying so is enough -- bg_task writes
      * the marker itself once we return true. */
-    if (ret != SUCCESS)
-        return false;
-
-    /* Finish the handshake the carousel would otherwise complete for us.
-     *
-     * The builder leaves cache_version at CACHE_REBUILD, and it is the
-     * carousel's prepare callback that later marks it current -- so a
-     * background build that stopped here would leave the flag saying "stale"
-     * and the carousel would rebuild everything we just did.
-     *
-     * That flag also decides whether the placeholder slide is regenerated,
-     * which is not ours to skip: if it was out of date, drop the file so the
-     * carousel makes a new one from its absence instead. */
-    if (old_version != CACHE_VERSION)
-        remove(EMPTY_SLIDE);
-
-    pf_cfg.cache_version = CACHE_VERSION;
-    pf_config_save();
-
-    return true;
+    return ret == SUCCESS;
 }
 
 struct bg_task db_index_task =

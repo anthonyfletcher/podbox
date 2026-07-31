@@ -256,9 +256,13 @@ static bool browser_aa_ready(void)
     return true;
 }
 
-/* Read a cached thumbnail into `slot`: a small header followed by row-major
- * native pixels (see art_cache.h). The read yields, so the store is pinned
- * across it rather than trusting a pointer taken beforehand. */
+/* Read a cached thumbnail into `slot`: a small header followed by native pixels
+ * (see art_cache.h). The read yields, so the store is pinned across it rather
+ * than trusting a pointer taken beforehand.
+ *
+ * Copied in whole, so it has to be stored the way it is drawn: rows. The list
+ * size is (art_sizes.h), but that is checked rather than assumed -- a size
+ * stored by columns would otherwise load without complaint and draw mirrored. */
 static bool browser_aa_load(const char *path, int slot)
 {
     struct art_cache_header hdr;
@@ -272,6 +276,7 @@ static bool browser_aa_load(const char *path, int slot)
     if (read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr) &&
         hdr.magic == ART_CACHE_MAGIC &&
         hdr.version == ART_CACHE_FORMAT_VERSION &&
+        hdr.layout == AA_ROWS &&
         hdr.width == browser_aa_dim && hdr.height == browser_aa_dim)
     {
         char *store = core_get_data_pinned(browser_aa_handle);

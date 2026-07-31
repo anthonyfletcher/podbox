@@ -80,6 +80,15 @@ struct album_data {
     long lastplayed;  /* the most recent of its tracks */
     long artist_seek; /* artist taglist position */
     long seek;        /* album taglist position */
+    /* art_cache key for the folder holding this album's tracks, resolved once
+     * during the build. A slide load is then a file open, where finding the
+     * folder from the seeks above would be a database search per slide. 0 if
+     * the build could not resolve it. */
+    unsigned int art_hash;
+    /* That folder's parent, which is the artist's own. Carried here because it
+     * comes from the same path for free, and the artist list is filled by
+     * rolling the album list up rather than by walking the database again. */
+    unsigned int artist_art_hash;
 };
 
 struct artist_data {
@@ -91,6 +100,10 @@ struct artist_data {
     int playcount;
     long lastplayed;
     long seek;    /* artist taglist position */
+    /* As struct album_data's field, for the artist's own folder -- the parent
+     * of its albums', under the <artist>/<album>/<track> layout this list
+     * assumes. */
+    unsigned int art_hash;
 };
 
 struct pf_index_t {
@@ -130,7 +143,7 @@ enum pf_scroll_line_type {
 struct carousel_model {
     int  (*build_index)(void);                         /* build the slide data; SUCCESS/ERROR_* */
     int  (*count)(void);                               /* number of slides */
-    bool (*slide_art)(int index, char *dir, int len);  /* folder for the art cache */
+    unsigned int (*art_key)(int index);                /* art_cache key, or 0 */
     bool (*legacy_art)(int index, char *path, int len);/* pre-cache fallback art, or false */
     int  (*enter)(int index);                          /* select: drill in; returns GO_TO_* */
     int  (*jump_prev)(void);                           /* jump to prev section (letter/year) */

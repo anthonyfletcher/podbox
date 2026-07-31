@@ -56,9 +56,9 @@
  * unchanged library does not re-walk the whole database. */
 #define AA_DONE_FILE    THUMBCACHE_DIR "/done.txt"
 
-/* On-disk thumbnail format (struct art_cache_header + row-major native
- * pixels) is declared in art_cache.h so consumers can read it. A
- * magic/version lets a future format change be detected per file rather than
+/* On-disk thumbnail format (struct art_cache_header + native pixels, in the
+ * order the header names) is declared in art_cache.h so consumers can read it.
+ * A magic/version lets a future format change be detected per file rather than
  * needing a global cache wipe. */
 
 /* Directory-dedup "seen" set: open-addressed table of directory-path hashes.
@@ -214,6 +214,13 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size)
         hdr.magic != ART_CACHE_MAGIC || hdr.version != ART_CACHE_FORMAT_VERSION)
         return -1;
 
+    /* This reads the file a band of rows at a time, so it can only make sense
+     * of a row-major one. Refused rather than transposed: no caller wants a
+     * column-major source, and silently reading one the wrong way round would
+     * produce a plausible-looking but mirrored thumbnail. */
+    if (hdr.layout != AA_ROWS)
+        return -1;
+
     sw = hdr.width;
     sh = hdr.height;
     if (sw <= 0 || sh <= 0 || sw > ART_CACHE_MAX_DIM ||
@@ -261,15 +268,40 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size)
     return dw * dh * FB_DATA_SZ;
 }
 
+unsigned int art_cache_dir_hash(const char *dir)
+{
+    return aa_hash(dir);
+}
+
+void art_cache_thumb_path(unsigned int dir_hash, int size_index,
+                          char *out, int out_len)
+{
+    aa_cache_path(out, out_len, size_index, dir_hash);
+}
+
 bool art_cache_lookup(const char *dir, int size_index,
+                           char *out, int out_len, bool *is_fallback)
+{
+    if (!dir)
+    {
+        if (is_fallback)
+            *is_fallback = false;
+        return false;
+    }
+
+    return art_cache_lookup_hash(aa_hash(dir), size_index, out, out_len,
+                                 is_fallback);
+}
+
+bool art_cache_lookup_hash(unsigned int dir_hash, int size_index,
                            char *out, int out_len, bool *is_fallback)
 {
     if (is_fallback)
         *is_fallback = false;
-    if (!dir || size_index < 0 || size_index >= ART_CACHE_NUM_SIZES)
+    if (size_index < 0 || size_index >= ART_CACHE_NUM_SIZES)
         return false;
 
-    aa_cache_path(out, out_len, size_index, aa_hash(dir));
+    aa_cache_path(out, out_len, size_index, dir_hash);
     if (file_exists(out))
         return true;
 
@@ -517,12 +549,37 @@ static void aa_crop_center(void *buf, int tw, int th, int dim)
 
 /* Write a native (row-major fb_data) bitmap to a .aat file: the shared header
  * followed by the pixels. Removes the file on a short write. */
-static bool aa_write_aat(const char *out_path, const struct bitmap *bm)
+static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index)
 {
     struct art_cache_header hdr;
     size_t bytes;
     bool ok;
-    int fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    enum art_layout layout = AA_ROWS;
+    int fd;
+
+    /* Transposed here, once, for a size that wants columns -- and only when the
+     * thumbnail is square, because that is an in-place swap where a rectangle
+     * would need a second full-size buffer. A COVER thumbnail is square unless
+     * its source was too elongated to crop, so the occasional rectangle is
+     * stored by rows and the header says which it is. */
+    if (art_sizes[size_index].layout == AA_COLUMNS
+        && bm->width == bm->height)
+    {
+        fb_data *px = (fb_data *)bm->data;
+        int n = bm->width, r, c;
+
+        for (r = 0; r < n; r++)
+            for (c = r + 1; c < n; c++)
+            {
+                fb_data t = px[r * n + c];
+                px[r * n + c] = px[c * n + r];
+                px[c * n + r] = t;
+            }
+
+        layout = AA_COLUMNS;
+    }
+
+    fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd < 0)
         return false;
 
@@ -530,6 +587,8 @@ static bool aa_write_aat(const char *out_path, const struct bitmap *bm)
     hdr.version = ART_CACHE_FORMAT_VERSION;
     hdr.width = bm->width;
     hdr.height = bm->height;
+    hdr.layout = layout;
+    hdr.pad = 0;
     bytes = (size_t)bm->width * bm->height * FB_DATA_SZ;
 
     ok = (write(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)) &&
@@ -595,7 +654,7 @@ static bool aa_generate_one(const struct aa_src *src, int size_index,
         bm.height = dim;
     }
 
-    return aa_write_aat(out_path, &bm);
+    return aa_write_aat(out_path, &bm, size_index);
 }
 
 /* art_sizes[] indices, largest dim first. Fast-build derives each thumbnail
@@ -651,6 +710,11 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
 
         if (art_sizes[s].dim <= dim)
             continue;
+        /* Chaining reads with art_cache_load_aat(), which is row-major only, so
+         * a size stored by columns cannot be a source. Nothing is lost: the
+         * loop simply carries on to the next size up. */
+        if (art_sizes[s].layout != AA_ROWS)
+            continue;
 
         aa_cache_path(aa_chain_path, sizeof(aa_chain_path), s, dh);
         fd = open(aa_chain_path, O_RDONLY);
@@ -676,7 +740,7 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
         close(fd);
 
         if (ret > 0)
-            return aa_write_aat(out_path, &bm);
+            return aa_write_aat(out_path, &bm, size_index);
     }
 
     return false;
@@ -749,7 +813,7 @@ static void aa_render_placeholder(const fb_data *src, int sw, int sh,
         bm.width = dim;
         bm.height = dim;
         bm.format = FORMAT_NATIVE;
-        aa_write_aat(path, &bm);
+        aa_write_aat(path, &bm, s);
         yield();
     }
 }

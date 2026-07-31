@@ -20,7 +20,6 @@
 #include "font.h"
 #include "screens/browse/browser_db.h"         /* browser_db_enter_artist_albums_on_next_load */
 #include "root_menu.h"       /* GO_TO_* screen codes, MENU_ATTACHED_USB */
-#include "string-extra.h"    /* strlcpy */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
 #include "database/db_index.h" /* build_artist_index() */
@@ -100,39 +99,11 @@ static int artist_count(void)
     return pf_idx.artist_ct;
 }
 
-/* The artist's folder, for the shared art cache: the first track filed under
- * this album-artist, with its filename and album folder stripped away (the
- * <artist>/<album>/<track> layout the whole artist-art feature assumes). */
-static bool artist_slide_dir(int index, char *dir, int dirlen)
+/* carousel_model.art_key for the artist model: the shared cache's key for this
+ * album-artist's own folder, resolved when the index was built. */
+static unsigned int artist_art_key(int index)
 {
-    struct tagcache_search tcs_l;
-    char tcs_buf[TAGCACHE_BUFSZ];
-    bool ret = false;
-
-    if (!tagcache_search(&tcs_l, tag_filename))
-        return false;
-
-    tagcache_search_add_filter(&tcs_l, tag_albumartist,
-                               pf_idx.artist_index[index].seek);
-
-    if (tagcache_get_next(&tcs_l, tcs_buf, sizeof(tcs_buf)))
-    {
-        char *sep;
-        strlcpy(dir, tcs_l.result, dirlen);
-        sep = strrchr(dir, '/');
-        if (sep && sep != dir)
-        {
-            *sep = '\0';                 /* strip track file -> album folder */
-            sep = strrchr(dir, '/');
-            if (sep && sep != dir)
-            {
-                *sep = '\0';             /* strip album -> artist folder */
-                ret = true;
-            }
-        }
-    }
-    tagcache_search_finish(&tcs_l);
-    return ret;
+    return pf_idx.artist_index[index].art_hash;
 }
 
 /* Artists have no per-screen pfraw cache; a missing photo just shows the empty
@@ -277,7 +248,7 @@ static void artist_set_initial(const char *selected_file)
 static const struct carousel_model artist_model = {
     .build_index = artist_build_index,
     .count       = artist_count,
-    .slide_art   = artist_slide_dir,
+    .art_key     = artist_art_key,
     .legacy_art  = no_legacy_art,
     .enter       = artist_enter,
     .jump_prev   = artist_jump_prev,

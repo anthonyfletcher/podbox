@@ -937,7 +937,27 @@ static void thread(void)
         }
 
         if(ev.id != SYS_TIMEOUT) {
-            while ( queue_empty(&thread_q) ) {
+            while (1) {
+                /* Drain the wakeups that piled up while we were loading, and
+                 * keep going, rather than abandoning the run to fetch them.
+                 *
+                 * A wakeup means the centre slide moved. It does not mean this
+                 * run is stale: load_new_slide() reads center_index afresh
+                 * every call, so the next load already aims at the new
+                 * neighbourhood -- going back through the queue to learn that
+                 * changes nothing except when the loading resumes. It used to
+                 * abandon the run on any pending event, which during a scroll
+                 * meant roughly one slide loaded per centre change, against the
+                 * 2 * ALBUM_COVERS_NUM_SLIDES + 1 a moving centre needs. The
+                 * loader lost ground for as long as the animation ran and only
+                 * caught up once it stopped, which is what "the art appears
+                 * after the animation settles" was. */
+                while (!queue_empty(&thread_q)) {
+                    queue_wait_w_tmo(&thread_q, &ev, 0);
+                    if (ev.id == EV_EXIT)
+                        return;
+                }
+
                 buf_ctx_lock();
                 bool slide_loaded = load_new_slide();
                 buf_ctx_unlock();
@@ -1248,18 +1268,21 @@ static int read_pfraw(char* filename, int prio)
     return hid;
 }
 
-/* Read a shared-cache thumbnail (.aat: struct art_cache_header followed by
- * row-major native pixels) into a buflib surface, transposing to the
- * column-major layout render_slide() expects. Returns a buflib handle,
- * empty_slide_hid on a missing/corrupt file, or -1 on allocation failure. */
-static int read_aat_transposed(const char *filename, int prio)
+/* Read a shared-cache thumbnail from an open fd (.aat: struct art_cache_header
+ * followed by native pixels) into a buflib surface in the column-major layout
+ * render_slide() expects. The fd stays the caller's to close.
+ *
+ * Takes an fd rather than a path because the caller has to open the file
+ * anyway, and asking the cache whether it exists first would be a second
+ * directory lookup for the same answer.
+ *
+ * Returns a buflib handle, empty_slide_hid on a corrupt file, or -1 on
+ * allocation failure. */
+static int read_aat(int fh, int prio)
 {
     struct art_cache_header hdr;
     pix_t rowbuf[DISPLAY_WIDTH];
     int row, col, w, h, size, hid;
-    int fh = open(filename, O_RDONLY);
-    if (fh < 0)
-        return empty_slide_hid;
 
     if (read(fh, &hdr, sizeof(hdr)) != sizeof(hdr) ||
         hdr.magic != ART_CACHE_MAGIC ||
@@ -1267,7 +1290,6 @@ static int read_aat_transposed(const char *filename, int prio)
         hdr.width == 0 || hdr.height == 0 ||
         hdr.width > DISPLAY_WIDTH || hdr.height > DISPLAY_HEIGHT)
     {
-        close(fh);
         return empty_slide_hid;
     }
 
@@ -1280,28 +1302,42 @@ static int read_aat_transposed(const char *filename, int prio)
     } while (hid < 0 && free_slide_prio(prio));
 
     if (hid < 0)
-    {
-        close(fh);
         return -1;
-    }
 
     struct dim *bm = buflib_get_data(&buf_ctx, hid);
     bm->width = w;
     bm->height = h;
     pix_t *dst = (pix_t*)(sizeof(struct dim) + (char *)bm);
 
-    for (row = 0; row < h; row++)
+    /* The "coverflow" size is stored column-major (art_sizes.h), which is the
+     * order rendering wants, so it reads straight in. The cache falls back to
+     * rows for a thumbnail it could not store transposed -- a non-square COVER
+     * fit -- and that one is transposed a row at a time on the way in. */
+    if (hdr.layout == AA_COLUMNS)
     {
-        if (read(fh, rowbuf, sizeof(pix_t) * w) != (ssize_t)(sizeof(pix_t) * w))
+        size_t bytes = sizeof(pix_t) * w * h;
+
+        if (read(fh, dst, bytes) != (ssize_t)bytes)
         {
-            close(fh);
             buflib_free(&buf_ctx, hid);
             return empty_slide_hid;
         }
-        for (col = 0; col < w; col++)
-            dst[col * h + row] = rowbuf[col];
     }
-    close(fh);
+    else
+    {
+        for (row = 0; row < h; row++)
+        {
+            if (read(fh, rowbuf, sizeof(pix_t) * w)
+                != (ssize_t)(sizeof(pix_t) * w))
+            {
+                buflib_free(&buf_ctx, hid);
+                return empty_slide_hid;
+            }
+            for (col = 0; col < w; col++)
+                dst[col * h + row] = rowbuf[col];
+        }
+    }
+
     return hid;
 }
 
@@ -1315,36 +1351,33 @@ static inline bool load_and_prepare_surface(const int slide_index,
     int hid = -1;
     bool got_shared = false;
 
-    /* Prefer the shared, database-driven thumbnail cache (folder-keyed). */
-    if (pf_cover_size_idx >= 0)
+    /* Prefer the shared, database-driven thumbnail cache. It is keyed by a hash
+     * of the folder the tracks live in, which the album index resolved once
+     * when it was built -- so this costs a file open, not a database search. */
+    unsigned int art_hash = model->art_key(slide_index);
+    if (pf_cover_size_idx >= 0 && art_hash != 0)
     {
-        char dir[MAX_PATH];
         char aat_file[MAX_PATH];
-        bool is_fallback = false;
-        if (model->slide_art(slide_index, dir, sizeof(dir)) &&
-            art_cache_lookup(dir, pf_cover_size_idx, aat_file,
-                                  sizeof(aat_file), &is_fallback))
+        int fh;
+
+        /* Opened rather than looked up: this runs while an animation is
+         * scrolling, and asking whether the file exists before opening it is
+         * two directory lookups where one will do. A folder the cache has no
+         * art for simply fails to open and falls through below, which is also
+         * what happens while a pass is still running and has not reached it --
+         * the pass finishing drops these slides and loads them again (see
+         * album_covers_loop), so real art replaces the empty slide when it
+         * lands. */
+        art_cache_thumb_path(art_hash, pf_cover_size_idx,
+                             aat_file, sizeof(aat_file));
+        fh = open(aat_file, O_RDONLY);
+        if (fh >= 0)
         {
-            if (is_fallback)
-            {
-                /* Only the placeholder exists so far. While the cache is still
-                 * building, this folder's real thumbnail may just not be
-                 * generated yet -- leave the slide unloaded (shows the empty
-                 * slide) and retry, so the real art replaces it when it lands
-                 * rather than the placeholder sticking. Once building is done, a
-                 * fallback is genuine "no art" and the empty slide stands. */
-                if (art_cache_is_busy())
-                    return false;
-                hid = empty_slide_hid;
-                got_shared = true;
-            }
-            else
-            {
-                hid = read_aat_transposed(aat_file, prio);
-                if (hid < 0)
-                    return false; /* allocation failure: retry later */
-                got_shared = (hid != empty_slide_hid);
-            }
+            hid = read_aat(fh, prio);
+            close(fh);
+            if (hid < 0)
+                return false; /* allocation failure: retry later */
+            got_shared = (hid != empty_slide_hid);
         }
     }
 
@@ -2487,8 +2520,26 @@ static int album_covers_loop(void)
 {
     int ret;
     int button;
+    bool art_was_building = art_cache_is_busy();
 
     while (true) {
+        /* An artwork pass finished while the carousel was open. Slides loaded
+         * while it ran may have got the placeholder because their thumbnail had
+         * not been generated yet, so drop the cached surfaces and let the
+         * loader thread fetch them again -- now they exist. Everything goes,
+         * the centre slide included: it is the one being looked at, and the
+         * loader reloads it first. */
+        bool art_building = art_cache_is_busy();
+        if (art_was_building && !art_building)
+        {
+            buf_ctx_lock();
+            free_all_slide_prio(-1);
+            buf_ctx_unlock();
+            queue_remove_from_head(&thread_q, EV_WAKEUP);
+            queue_post(&thread_q, EV_WAKEUP, 0);
+        }
+        art_was_building = art_building;
+
         /* Get input first. The SBS renders during get_custom_action() and
          * writes into the framebuffer (including decorative viewports that
          * overlap our area). Inhibit the SBS's lcd_update() so it doesn't

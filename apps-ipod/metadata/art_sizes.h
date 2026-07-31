@@ -27,11 +27,30 @@ enum albumart_fit
     AA_FIT_COVER,
 };
 
+/* Pixel order a size's thumbnails are stored in.
+ *
+ * Row-major is the default and what every general-purpose reader expects. A
+ * size whose only consumer wants columns can ask for them instead, and pay the
+ * transpose once here at generation rather than on every load: the carousel
+ * evicts and reloads slides constantly as it scrolls, so a per-load transpose
+ * is the same work done over and over.
+ *
+ * Only square thumbnails are stored transposed -- that is an in-place swap and
+ * needs no second buffer. AA_FIT_COVER is square except when the source is too
+ * elongated to crop and falls back to CONTAIN, so the writer records the layout
+ * it actually used in the file header and readers honour that, not this. */
+enum art_layout
+{
+    AA_ROWS = 0,   /* row-major: pixel (x,y) at y*width + x */
+    AA_COLUMNS     /* column-major: pixel (x,y) at x*height + y */
+};
+
 struct art_size
 {
     const char *name;       /* cache sub-folder name / stable identifier   */
     short       dim;        /* target square edge in pixels (NxN)          */
     enum albumart_fit fit;  /* how to fit the source into the square       */
+    enum art_layout layout; /* pixel order to store it in                  */
 };
 
 /* Thumbnail resolutions the cache generates. The order here does not matter:
@@ -41,9 +60,11 @@ struct art_size
  * pixels, so bump ART_CACHE_FORMAT_VERSION to force a regenerate. */
 static const struct art_size art_sizes[] =
 {
-    { "coverflow", 128, AA_FIT_COVER   },   /* carousel slides (DISPLAY_WIDTH) */
-    { "list",       44, AA_FIT_COVER   },   /* database album rows, in a 46px row */
-    { "wps",       300, AA_FIT_COVER   },   /* now-playing / miniplayer art */
+    /* Columns because the carousel renders slides column by column for the
+     * perspective transform, and it is this size's only reader. */
+    { "coverflow", 128, AA_FIT_COVER, AA_COLUMNS },/* carousel slides (DISPLAY_WIDTH) */
+    { "list",       44, AA_FIT_COVER, AA_ROWS    },/* database album rows, in a 46px row */
+    { "wps",       300, AA_FIT_COVER, AA_ROWS    },/* now-playing / miniplayer art */
 };
 
 #define ART_CACHE_NUM_SIZES \

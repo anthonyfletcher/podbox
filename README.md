@@ -4,6 +4,8 @@ New firmware for the iPod Classic and iPod Video with a focus on simplifying
 RockBox whilst providing album and artist art everywhere with colour schemes that 
 follows the music.
 
+> **Please note**: This project is still under development and current releases should be considered "beta".  Due to changes to the code, it may be that your art/index cache needs to be rebuilt - which takes time.  You can view progress in Settings > General Settings > System > Background Tasks.
+
 ## Does it run on my iPod?
 
 | iPod | Generation | Years |

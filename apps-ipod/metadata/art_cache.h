@@ -10,12 +10,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "system/bg_task.h"
+#include "art_sizes.h"       /* enum art_layout, named by the file header */
 
 struct bitmap;
 
 /* On-disk thumbnail file format: this header, followed by width*height native
- * (fb_data) pixels in ROW-MAJOR order. Exposed so consumers (e.g. Cover Flow)
- * can read a cached thumbnail directly. */
+ * (fb_data) pixels in the order the header's 'layout' names. Exposed so
+ * consumers (e.g. Cover Flow) can read a cached thumbnail directly. */
 #define ART_CACHE_MAGIC          0x5441u  /* 'AT' */
 /* Bump whenever the cached pixels' meaning changes (format, geometry, fit rule).
  * aa_check_format_version() purges the thumbnails when this moves, so a stale
@@ -27,8 +28,10 @@ struct bitmap;
  *   3 -> 4: coverflow 128 -> 140; single podboxnoart placeholder.
  *   4 -> 5: list 48 -> 46.
  *   5 -> 6: list 46 -> 44 (fits 4 rows of 46px).
- *   6 -> 7: coverflow back to 128 (140 tore the angled slides). */
-#define ART_CACHE_FORMAT_VERSION 7
+ *   6 -> 7: coverflow back to 128 (140 tore the angled slides).
+ *   7 -> 8: header gained 'layout'; coverflow thumbs are stored column-major so
+ *           the carousel can read one straight into a slide. */
+#define ART_CACHE_FORMAT_VERSION 8
 
 struct art_cache_header
 {
@@ -36,6 +39,8 @@ struct art_cache_header
     uint16_t version;
     uint16_t width;
     uint16_t height;
+    uint16_t layout;   /* enum art_layout, as stored */
+    uint16_t pad;      /* keeps the pixel data 4-byte aligned */
 };
 
 /* Background, database-driven album-art thumbnail cache.
@@ -96,6 +101,30 @@ extern struct bg_task art_cache_task;
  * caller that wants to prefer another source (e.g. embedded ID3 art) still can. */
 bool art_cache_lookup(const char *dir, int size_index,
                            char *out, int out_len, bool *is_fallback);
+
+/* The same lookup keyed by the folder's hash rather than its path.
+ *
+ * The hash is all the lookup ever uses, so a caller that resolves the same
+ * folder repeatedly can keep the hash instead of the path and skip both the
+ * path and the work of producing it. The carousel does exactly that: finding an
+ * album's folder means a database search, so it is done once when the album
+ * index is built and only the hash is carried per slide.
+ *
+ * art_cache_dir_hash() produces the key, and returns 0 for a NULL path. Callers
+ * use 0 as their "folder not resolved" marker; a real path can hash to 0 too,
+ * and the cost of that collision is one folder's art not being found. */
+unsigned int art_cache_dir_hash(const char *dir);
+bool art_cache_lookup_hash(unsigned int dir_hash, int size_index,
+                           char *out, int out_len, bool *is_fallback);
+
+/* Where a folder's thumbnail would be, said without going near the disk.
+ *
+ * For a caller that is about to open the file anyway: the lookups above answer
+ * "is it there?" by opening it and closing it again, so asking them first and
+ * then opening makes two of what should be one. Opening the path this hands
+ * back is itself the existence test. */
+void art_cache_thumb_path(unsigned int dir_hash, int size_index,
+                          char *out, int out_len);
 
 /* The folders the last completed pass found no art for, as a file of one path
  * per line. Written only when a pass finishes, so an interrupted one leaves

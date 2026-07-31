@@ -200,7 +200,7 @@ enum pf_states {
 /* struct carousel_model (the engine<->data seam) is declared in carousel.h. */
 
 static int  album_count(void);
-static bool get_slide_dir(const int slide_index, char *dir, int dirlen);
+static unsigned int album_art_key(int slide_index);
 static bool album_legacy_art(int index, char *path, int len);
 static int  album_enter(int index);
 static int  jmp_idx_prev(void);
@@ -215,7 +215,7 @@ static void album_prepare(void);
 static const struct carousel_model album_model = {
     .build_index = db_index_build,
     .count       = album_count,
-    .slide_art   = get_slide_dir,
+    .art_key     = album_art_key,
     .legacy_art  = album_legacy_art,
     .enter       = album_enter,
     .jump_prev   = jmp_idx_prev,
@@ -451,38 +451,11 @@ static unsigned int mfnv(char *str)
 }
 
 
-/* Resolve the album's folder (directory of its first track) for a slide, so
- * its thumbnail can be looked up in the folder-keyed shared cache. Runs on the
- * picture-load thread, so the tagcache search here doesn't stall rendering. */
-static bool get_slide_dir(const int slide_index, char *dir, int dirlen)
+/* carousel_model.art_key for the album model: the shared cache's key for the
+ * folder this album's tracks live in, resolved when the index was built. */
+static unsigned int album_art_key(int slide_index)
 {
-    struct tagcache_search tcs_l;
-    char tcs_buf[TAGCACHE_BUFSZ];
-    bool ret = false;
-
-    if (!tagcache_search(&tcs_l, tag_filename))
-        return false;
-
-    tagcache_search_add_filter(&tcs_l, tag_album,
-                               pf_idx.album_index[slide_index].seek);
-    tagcache_search_add_filter(&tcs_l, tag_albumartist,
-                               pf_idx.album_index[slide_index].artist_seek);
-
-    if (tagcache_get_next(&tcs_l, tcs_buf, sizeof(tcs_buf)))
-    {
-        const char *sep = strrchr(tcs_l.result, '/');
-        int len = sep ? (int)(sep - tcs_l.result) : 0;
-        if (len >= dirlen)
-            len = dirlen - 1;
-        if (len > 0)
-        {
-            memcpy(dir, tcs_l.result, len);
-            dir[len] = 0;
-            ret = true;
-        }
-    }
-    tagcache_search_finish(&tcs_l);
-    return ret;
+    return pf_idx.album_index[slide_index].art_hash;
 }
 
 /* carousel_model.count for the album model. */
