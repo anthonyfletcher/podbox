@@ -1255,7 +1255,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[सब tracks]"
@@ -1949,7 +1949,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "हाँ - सिर्फ अभी के"
@@ -1963,7 +1963,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "पूछँ - सिर्फ अभी के"

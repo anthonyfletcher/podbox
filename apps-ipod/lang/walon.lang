@@ -1719,7 +1719,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Crexhaedje po boket a l'astcheyance"
@@ -2319,7 +2319,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Tos les bokets]"
@@ -4408,7 +4408,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Oyi - Rén k' les dierins"
@@ -4422,7 +4422,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Dimander - Rén k' les dierins"
@@ -10459,7 +10459,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Foirt londjin"
@@ -10487,7 +10487,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Foirt roed"
@@ -10848,7 +10848,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Eterpreter les limeros po les rlére"
@@ -10862,7 +10862,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "Come des chifes"
@@ -10876,7 +10876,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Come des limeros tot etirs"

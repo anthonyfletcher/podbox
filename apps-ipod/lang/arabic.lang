@@ -1785,7 +1785,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "اسأل - الحديثة فقط"
@@ -2176,7 +2176,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "نعم - الحديثة فقط"
@@ -3616,7 +3616,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[كل الملفات]"
@@ -4027,7 +4027,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "انتبه للأرقام عند الترتيب"
@@ -6218,7 +6218,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "بطىء جدا"
@@ -6560,7 +6560,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "سريع جدا"

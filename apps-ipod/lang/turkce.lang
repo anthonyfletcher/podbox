@@ -3087,7 +3087,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Çok Yavaş"
@@ -3115,7 +3115,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Çok Çabuk"
@@ -3862,7 +3862,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
     *: "Taranacak dizinleri seçin"
@@ -4486,7 +4486,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Evet - Yalnızca son zamanlarda"
@@ -5431,7 +5431,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
     *: "Bir veya daha fazla dizin seçin"
@@ -6671,7 +6671,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Sor - Yalnızca son zamanlarda"
@@ -7220,7 +7220,7 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
     *: "Yalnızca özel dizinlerde"
@@ -8056,7 +8056,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
     *: "Önbelleğe Alınacak Glifler"
@@ -8286,7 +8286,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Karıştırılıyorsa Kazancı Takip Edin"
@@ -9336,7 +9336,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "İkilik olarak"
@@ -10056,7 +10056,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Tüm parçalar]"
@@ -10747,7 +10747,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Sıralama sırasında sayıları yorumlayın"
@@ -11110,7 +11110,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Tam Sayılar Olarak"
@@ -11197,7 +11197,7 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
     *: "Otomatik şarkı değiştirmeye devam et"
@@ -12383,7 +12383,7 @@
   desc: Save only one bookmark for a playlist in recent bookmarks
   user: core
   <source>
-    *: "One per playlist"
+    *: "One per Playlist"
   </source>
   <dest>
     *: "Oynatma listesi başına bir tane"
@@ -12397,7 +12397,7 @@
   desc: Save only one bookmark for a combination (playlist,track) in recent bookmarks
   user: core
   <source>
-    *: "One per track"
+    *: "One per Track"
   </source>
   <dest>
     *: "Parça başına bir tane"
@@ -12481,7 +12481,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </source>
   <dest>
     *: "Geçen parça:"
@@ -12509,7 +12509,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </source>
   <dest>
     *: "Kalan parça:"
@@ -12565,7 +12565,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </source>
   <dest>
     *: "Ortalama parça boyutu:"
@@ -12579,7 +12579,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </source>
   <dest>
     *: "Ortalama bit hızı:"
@@ -12607,7 +12607,7 @@
   desc: onplay menu
   user: core
   <source>
-    *: "Playing time"
+    *: "Playing Time"
   </source>
   <dest>
     *: "Çalma Süresi"
@@ -14241,7 +14241,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "Directory properties"
+    *: "Directory Properties"
   </source>
   <dest>
     *: "Dizin özellikleri"
@@ -14255,7 +14255,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "File properties"
+    *: "File Properties"
   </source>
   <dest>
     *: "Dosya özellikleri"
@@ -14430,7 +14430,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre margin"
+    *: "Centre Margin"
   </source>
   <dest>
     *: "Merkez kenar boşluğu"
@@ -14472,7 +14472,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Show album title"
+    *: "Show Album Title"
   </source>
   <dest>
     *: "Albüm başlığını göster"
@@ -14710,7 +14710,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Hide information"
+    *: "Hide Information"
   </source>
   <dest>
     *: "Bilgileri gizle"
@@ -14724,7 +14724,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </source>
   <dest>
     *: "Albümü altta göster"
@@ -14738,7 +14738,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </source>
   <dest>
     *: "Albümü en üstte göster"
@@ -14752,7 +14752,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </source>
   <dest>
     *: "Albümü ve sanatçıyı en üstte göster"
@@ -14766,7 +14766,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </source>
   <dest>
     *: "Albümü ve sanatçıyı altta göster"
@@ -15451,7 +15451,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </source>
   <dest>
     *: "Albümleri şuna göre sırala:"
@@ -15493,7 +15493,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </source>
   <dest>
     *: "Yıla göre sırala"
@@ -15507,7 +15507,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </source>
   <dest>
     *: "Albüm İsminde Yılı da Yaz"
@@ -16183,7 +16183,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </source>
   <dest>
     *: "ID3 etiketlerinden başlık & albüm"
@@ -16197,7 +16197,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </source>
   <dest>
     *: "ID3 etiketlerinden başlık"
@@ -16351,7 +16351,7 @@
   desc: Disable main menu scrolling
   user: core
   <source>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </source>
   <dest>
     *: "Ana menü kaydırmasını kapat"
@@ -16514,7 +16514,7 @@
   desc: Special character (japanese, accents, etc)
   user: core
   <source>
-    *: "Special character"
+    *: "Special Character"
   </source>
   <dest>
     *: "Özel karakter"

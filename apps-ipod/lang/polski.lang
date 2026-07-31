@@ -1537,7 +1537,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Wzm. utworu przy tasowaniu"
@@ -2120,7 +2120,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Wszystkie utwory]"
@@ -4046,7 +4046,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Tak - tylko w najnowszych"
@@ -4060,7 +4060,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Pytaj - tylko najnowsze"
@@ -9396,7 +9396,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Bardzo wolno"
@@ -9424,7 +9424,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Bardzo szybko"
@@ -9785,7 +9785,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Sortuj liczby"
@@ -9799,7 +9799,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "Po cyfrach"
@@ -9813,7 +9813,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Jako całą liczbę"
@@ -11127,7 +11127,7 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
     *: "Wznów przy automatcznej zmianie utworu"
@@ -11141,7 +11141,7 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
     *: "Tylko w wybranych katalogach"
@@ -11211,7 +11211,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
     *: "Rozmiar bufora znaków"
@@ -11464,7 +11464,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
     *: "Wybierz jeden lub wiele katalogów"
@@ -11478,7 +11478,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
     *: "Wybierz katalogi do przeskanowania"
@@ -12011,7 +12011,7 @@
   desc: Save only one bookmark for a combination (playlist,track) in recent bookmarks
   user: core
   <source>
-    *: "One per track"
+    *: "One per Track"
   </source>
   <dest>
     *: "Jedna na utwór"
@@ -12067,7 +12067,7 @@
   desc: Save only one bookmark for a playlist in recent bookmarks
   user: core
   <source>
-    *: "One per playlist"
+    *: "One per Playlist"
   </source>
   <dest>
     *: "Jedna na listę odtwarzania"
@@ -12561,7 +12561,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </source>
   <dest>
     *: "Czas utworu:"
@@ -12721,7 +12721,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </source>
   <dest>
     *: "Pozostały czas utworu:"
@@ -12898,7 +12898,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "File properties"
+    *: "File Properties"
   </source>
   <dest>
     *: "Właściwości pliku"
@@ -12926,7 +12926,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "Directory properties"
+    *: "Directory Properties"
   </source>
   <dest>
     *: "Właściwości katalogu"
@@ -13092,7 +13092,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Show album title"
+    *: "Show Album Title"
   </source>
   <dest>
     *: "Pokaż tytuł albumu"
@@ -13235,7 +13235,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre margin"
+    *: "Centre Margin"
   </source>
   <dest>
     *: "Margines środkowy"
@@ -13606,7 +13606,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </source>
   <dest>
     *: "Średni rozmiar utworu:"
@@ -13679,7 +13679,7 @@
   desc: onplay menu
   user: core
   <source>
-    *: "Playing time"
+    *: "Playing Time"
   </source>
   <dest>
     *: "Czas odtwarzania"
@@ -13943,7 +13943,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </source>
   <dest>
     *: "Średnia szybkość transmisji:"
@@ -14282,7 +14282,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </source>
   <dest>
     *: "Pokaż album na dole"
@@ -14310,7 +14310,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Hide information"
+    *: "Hide Information"
   </source>
   <dest>
     *: "Ukryj informacje"
@@ -14324,7 +14324,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </source>
   <dest>
     *: "Pokaż album i wykonawcę na górze"
@@ -14338,7 +14338,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </source>
   <dest>
     *: "Pokaż album na górze"
@@ -14352,7 +14352,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </source>
   <dest>
     *: "Pokaż album i wykonawcę na dole"
@@ -15347,7 +15347,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </source>
   <dest>
     *: "Sortuj albumy według"
@@ -15389,7 +15389,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </source>
   <dest>
     *: "Kolejność sortowania według roku"
@@ -15403,7 +15403,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </source>
   <dest>
     *: "Pokaż rok w tytule albumu"
@@ -16149,7 +16149,7 @@
   desc: Disable main menu scrolling
   user: core
   <source>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </source>
   <dest>
     *: "Wyłącz przewijanie menu głównego"
@@ -16177,7 +16177,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </source>
   <dest>
     *: "Tytuł i album ze znaczników ID3"
@@ -16191,7 +16191,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </source>
   <dest>
     *: "Tytuł ze znaczników ID3"
@@ -16368,7 +16368,7 @@
   desc: Special character (japanese, accents, etc)
   user: core
   <source>
-    *: "Special character"
+    *: "Special Character"
   </source>
   <dest>
     *: "Znak specjalny"

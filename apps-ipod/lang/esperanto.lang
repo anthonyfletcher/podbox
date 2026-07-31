@@ -2090,7 +2090,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Jes - Nur freŝa"
@@ -2104,7 +2104,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Demandi - Nur freŝa"
@@ -2696,7 +2696,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Kanto Gajno Kiam Miksanta"
@@ -7240,7 +7240,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Ĉiuj kantoj]"

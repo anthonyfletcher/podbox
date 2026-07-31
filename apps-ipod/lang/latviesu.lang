@@ -1530,7 +1530,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Dziesmu pastiprinājums secības jaukšanā"
@@ -2113,7 +2113,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Visas dziesmas]"
@@ -4053,7 +4053,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Jā - tikai pēdējo"
@@ -4067,7 +4067,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Jautāt - tikai pēdējo"
@@ -9403,7 +9403,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Ļoti lēns"
@@ -9431,7 +9431,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Ļoti ātrs"
@@ -9792,7 +9792,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Interpretēt numurus kārtošanas laikā"
@@ -9806,7 +9806,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "Kā ciparus"
@@ -9820,7 +9820,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Kā veselus skaitļus"
@@ -11117,7 +11117,7 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
     *: "Atsākt pie automātiskas dziesmas maiņas"
@@ -11131,7 +11131,7 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
     *: "Tikai norādītajās mapēs"
@@ -11235,7 +11235,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
     *: "Simboli kešatmiņā"
@@ -11499,7 +11499,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </source>
   <dest>
     *: "Nosaukums un albums no ID3 birkām"
@@ -11513,7 +11513,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </source>
   <dest>
     *: "Nosaukums no ID3 birkām"
@@ -11541,7 +11541,7 @@
   desc: Special character (japanese, accents, etc)
   user: core
   <source>
-    *: "Special character"
+    *: "Special Character"
   </source>
   <dest>
     *: "Citas rakstzīmes"
@@ -11670,7 +11670,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
     *: "Atlasīt vienu vai vairākas mapes"
@@ -11684,7 +11684,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
     *: "Atlasīt mapes datubāzei"
@@ -12425,7 +12425,7 @@
   desc: Save only one bookmark for a playlist in recent bookmarks
   user: core
   <source>
-    *: "One per playlist"
+    *: "One per Playlist"
   </source>
   <dest>
     *: "Vienu uz atskaņošanas sarakstu"
@@ -12439,7 +12439,7 @@
   desc: Save only one bookmark for a combination (playlist,track) in recent bookmarks
   user: core
   <source>
-    *: "One per track"
+    *: "One per Track"
   </source>
   <dest>
     *: "Vienu uz dziesmu"
@@ -12523,7 +12523,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </source>
   <dest>
     *: "Pagājušais dziesmas laiks:"
@@ -12537,7 +12537,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </source>
   <dest>
     *: "Atlikušais dziesmas laiks:"
@@ -12593,7 +12593,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </source>
   <dest>
     *: "Vidējais dziesmas izmērs:"
@@ -12607,7 +12607,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </source>
   <dest>
     *: "Vidējais bitu pārraides ātrums:"
@@ -12621,7 +12621,7 @@
   desc: onplay menu
   user: core
   <source>
-    *: "Playing time"
+    *: "Playing Time"
   </source>
   <dest>
     *: "Atskaņošanas laiks"
@@ -14255,7 +14255,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "Directory properties"
+    *: "Directory Properties"
   </source>
   <dest>
     *: "Mapes rekvizīti"
@@ -14269,7 +14269,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "File properties"
+    *: "File Properties"
   </source>
   <dest>
     *: "Mapes rekvizīti"
@@ -14444,7 +14444,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre margin"
+    *: "Centre Margin"
   </source>
   <dest>
     *: "Centrālā robeža"
@@ -14486,7 +14486,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Show album title"
+    *: "Show Album Title"
   </source>
   <dest>
     *: "Rādīt albuma nosaukumu"
@@ -14710,7 +14710,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Hide information"
+    *: "Hide Information"
   </source>
   <dest>
     *: "Paslēpt informāciju"
@@ -14724,7 +14724,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </source>
   <dest>
     *: "Rādīt albumu apakšā"
@@ -14738,7 +14738,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </source>
   <dest>
     *: "Rādīt albumu augšā"
@@ -14752,7 +14752,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </source>
   <dest>
     *: "Rādīt albumu un izpildītāju augšā"
@@ -14766,7 +14766,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </source>
   <dest>
     *: "Rādīt albumu un izpildītāju apakšā"
@@ -15452,7 +15452,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </source>
   <dest>
     *: "Kārtot albumus pēc"
@@ -15494,7 +15494,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </source>
   <dest>
     *: "Gadu kārtošanas secība"
@@ -15508,7 +15508,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </source>
   <dest>
     *: "Rādīt gadu albuma nosaukumā"
@@ -16240,7 +16240,7 @@
   desc: Disable main menu scrolling
   user: core
   <source>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </source>
   <dest>
     *: "Atspējot galvenās izvēlnes ritināšanu"

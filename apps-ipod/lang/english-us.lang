@@ -1541,13 +1541,13 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </dest>
   <voice>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </voice>
 </phrase>
 <phrase>
@@ -2124,13 +2124,13 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </dest>
   <voice>
-    *: "All tracks"
+    *: "All Tracks"
   </voice>
 </phrase>
 <phrase>
@@ -3407,15 +3407,15 @@
   user: core
   <source>
     *: none
-    rtc: "Time & Date"
+    rtc: "Time & Date Settings"
   </source>
   <dest>
     *: none
-    rtc: "Time & Date"
+    rtc: "Time & Date Settings"
   </dest>
   <voice>
     *: none
-    rtc: "Time and Date"
+    rtc: "Time and Date Settings"
   </voice>
 </phrase>
 <phrase>
@@ -4050,13 +4050,13 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </dest>
   <voice>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </voice>
 </phrase>
 <phrase>
@@ -4064,13 +4064,13 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </dest>
   <voice>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </voice>
 </phrase>
 <phrase>
@@ -9431,13 +9431,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
-    *: "Very slow"
+    *: "Very Slow"
   </dest>
   <voice>
-    *: "Very slow"
+    *: "Very Slow"
   </voice>
 </phrase>
 <phrase>
@@ -9459,13 +9459,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
-    *: "Very fast"
+    *: "Very Fast"
   </dest>
   <voice>
-    *: "Very fast"
+    *: "Very Fast"
   </voice>
 </phrase>
 <phrase>
@@ -9820,13 +9820,13 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </dest>
   <voice>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </voice>
 </phrase>
 <phrase>
@@ -9834,13 +9834,13 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
-    *: "As digits"
+    *: "As Digits"
   </dest>
   <voice>
-    *: "As digits"
+    *: "As Digits"
   </voice>
 </phrase>
 <phrase>
@@ -9848,13 +9848,13 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </dest>
   <voice>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </voice>
 </phrase>
 <phrase>
@@ -11176,13 +11176,13 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </dest>
   <voice>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </voice>
 </phrase>
 <phrase>
@@ -11190,13 +11190,13 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </dest>
   <voice>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </voice>
 </phrase>
 <phrase>
@@ -11412,13 +11412,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </dest>
   <voice>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </voice>
 </phrase>
 <phrase>
@@ -11541,13 +11541,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </dest>
   <voice>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </voice>
 </phrase>
 <phrase>
@@ -11555,13 +11555,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </dest>
   <voice>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </voice>
 </phrase>
 <phrase>
@@ -12296,13 +12296,13 @@
   desc: Save only one bookmark for a playlist in recent bookmarks
   user: core
   <source>
-    *: "One per playlist"
+    *: "One per Playlist"
   </source>
   <dest>
-    *: "One per playlist"
+    *: "One per Playlist"
   </dest>
   <voice>
-    *: "One per playlist"
+    *: "One per Playlist"
   </voice>
 </phrase>
 <phrase>
@@ -12310,13 +12310,13 @@
   desc: Save only one bookmark for a combination (playlist,track) in recent bookmarks
   user: core
   <source>
-    *: "One per track"
+    *: "One per Track"
   </source>
   <dest>
-    *: "One per track"
+    *: "One per Track"
   </dest>
   <voice>
-    *: "One per track"
+    *: "One per Track"
   </voice>
 </phrase>
 <phrase>
@@ -12408,13 +12408,13 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </source>
   <dest>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </dest>
   <voice>
-    *: "Track elapsed"
+    *: "Track Elapsed"
   </voice>
 </phrase>
 <phrase>
@@ -12422,13 +12422,13 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </source>
   <dest>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </dest>
   <voice>
-    *: "Track remaining"
+    *: "Track Remaining"
   </voice>
 </phrase>
 <phrase>
@@ -12478,13 +12478,13 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </source>
   <dest>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </dest>
   <voice>
-    *: "Average track size"
+    *: "Average Track Size"
   </voice>
 </phrase>
 <phrase>
@@ -12492,13 +12492,13 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </source>
   <dest>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </dest>
   <voice>
-    *: "Average bit rate"
+    *: "Average Bit Rate"
   </voice>
 </phrase>
 <phrase>
@@ -12506,13 +12506,13 @@
   desc: onplay menu
   user: core
   <source>
-    *: "Playing time"
+    *: "Playing Time"
   </source>
   <dest>
-    *: "Playing time"
+    *: "Playing Time"
   </dest>
   <voice>
-    *: "Playing time"
+    *: "Playing Time"
   </voice>
 </phrase>
 <phrase>
@@ -14042,10 +14042,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Path]"
+    *: "Path"
   </source>
   <dest>
-    *: "[Path]"
+    *: "Path"
   </dest>
   <voice>
     *: "Path"
@@ -14056,10 +14056,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Filename]"
+    *: "Filename"
   </source>
   <dest>
-    *: "[Filename]"
+    *: "Filename"
   </dest>
   <voice>
     *: "Filename"
@@ -14070,10 +14070,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Size]"
+    *: "Size"
   </source>
   <dest>
-    *: "[Size]"
+    *: "Size"
   </dest>
   <voice>
     *: "Size"
@@ -14084,10 +14084,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Date]"
+    *: "Date"
   </source>
   <dest>
-    *: "[Date]"
+    *: "Date"
   </dest>
   <voice>
     *: "Date"
@@ -14098,10 +14098,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Time]"
+    *: "Time"
   </source>
   <dest>
-    *: "[Time]"
+    *: "Time"
   </dest>
   <voice>
     *: "Time"
@@ -14112,10 +14112,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Subdirs]"
+    *: "Subdirs"
   </source>
   <dest>
-    *: "[Subdirs]"
+    *: "Subdirs"
   </dest>
   <voice>
     *: "Subdirs"
@@ -14126,10 +14126,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Files]"
+    *: "Files"
   </source>
   <dest>
-    *: "[Files]"
+    *: "Files"
   </dest>
   <voice>
     *: "Files"
@@ -14140,10 +14140,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "Directory properties"
+    *: "Directory Properties"
   </source>
   <dest>
-    *: "Directory properties"
+    *: "Directory Properties"
   </dest>
   <voice>
     *: ""
@@ -14154,10 +14154,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "File properties"
+    *: "File Properties"
   </source>
   <dest>
-    *: "File properties"
+    *: "File Properties"
   </dest>
   <voice>
     *: ""
@@ -14329,13 +14329,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre margin"
+    *: "Centre Margin"
   </source>
   <dest>
-    *: "Centre margin"
+    *: "Centre Margin"
   </dest>
   <voice>
-    *: "Centre margin"
+    *: "Centre Margin"
   </voice>
 </phrase>
 <phrase>
@@ -14371,13 +14371,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Show album title"
+    *: "Show Album Title"
   </source>
   <dest>
-    *: "Show album title"
+    *: "Show Album Title"
   </dest>
   <voice>
-    *: "Show album title"
+    *: "Show Album Title"
   </voice>
 </phrase>
 <phrase>
@@ -14595,13 +14595,13 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Hide information"
+    *: "Hide Information"
   </source>
   <dest>
-    *: "Hide information"
+    *: "Hide Information"
   </dest>
   <voice>
-    *: "Hide information"
+    *: "Hide Information"
   </voice>
 </phrase>
 <phrase>
@@ -14609,13 +14609,13 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </source>
   <dest>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </dest>
   <voice>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </voice>
 </phrase>
 <phrase>
@@ -14623,13 +14623,13 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </source>
   <dest>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </dest>
   <voice>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </voice>
 </phrase>
 <phrase>
@@ -14637,13 +14637,13 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </source>
   <dest>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </dest>
   <voice>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </voice>
 </phrase>
 <phrase>
@@ -14651,13 +14651,13 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </source>
   <dest>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </dest>
   <voice>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </voice>
 </phrase>
 <phrase>
@@ -15337,13 +15337,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </source>
   <dest>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </dest>
   <voice>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </voice>
 </phrase>
 <phrase>
@@ -15379,13 +15379,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </source>
   <dest>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </dest>
   <voice>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </voice>
 </phrase>
 <phrase>
@@ -15393,13 +15393,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </source>
   <dest>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </dest>
   <voice>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </voice>
 </phrase>
 <phrase>
@@ -16139,13 +16139,13 @@
   desc: Disable main menu scrolling
   user: core
   <source>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </source>
   <dest>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </dest>
   <voice>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </voice>
 </phrase>
 <phrase>
@@ -16167,13 +16167,13 @@
   desc: track display options
   user: core
   <source>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </source>
   <dest>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </dest>
   <voice>
-    *: "Title and Album from tags"
+    *: "Title and Album from Tags"
   </voice>
 </phrase>
 <phrase>
@@ -16181,13 +16181,13 @@
   desc: track display options
   user: core
   <source>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </source>
   <dest>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </dest>
   <voice>
-    *: "Title from tags"
+    *: "Title from Tags"
   </voice>
 </phrase>
 <phrase>
@@ -16358,13 +16358,13 @@
   desc: Special character (japanese, accents, etc)
   user: core
   <source>
-    *: "Special character"
+    *: "Special Character"
   </source>
   <dest>
-    *: "Special character"
+    *: "Special Character"
   </dest>
   <voice>
-    *: "Special character"
+    *: "Special Character"
   </voice>
 </phrase>
 <phrase>

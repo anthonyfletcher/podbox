@@ -1715,7 +1715,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Guany de pista en mode aleatori"
@@ -2301,7 +2301,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Totes les pistes]"
@@ -4385,7 +4385,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Sí - Només recents"
@@ -4399,7 +4399,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Pregunta - Només Recents"
@@ -10437,7 +10437,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Molt lent"
@@ -10465,7 +10465,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Molt ràpid"
@@ -10826,7 +10826,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Interpretar els nombres en ordenar"
@@ -10840,7 +10840,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "Com a dígits"
@@ -10854,7 +10854,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Com a nombres enters"
@@ -12148,7 +12148,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
     *: "Glyphs a la memòria cau"
@@ -12204,7 +12204,7 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
     *: "Reprendre la reproducció al canviar de pista"
@@ -12578,7 +12578,7 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
     *: "Només a les carpetes personalitzades"
@@ -12606,7 +12606,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
     *: "Seleccionar un o més directoris"
@@ -12620,7 +12620,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
     *: "Seleccionar directoris a escanejar"

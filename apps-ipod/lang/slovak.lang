@@ -1529,7 +1529,7 @@
   desc: use track gain if shuffle mode is on, album gain otherwise
   user: core
   <source>
-    *: "Track Gain if Shuffling"
+    *: "Track Gain If Shuffling"
   </source>
   <dest>
     *: "Zosilnenie stopy ak sa mieša"
@@ -2112,7 +2112,7 @@
   desc: "[All tracks]" entry in tag browser
   user: core
   <source>
-    *: "[All tracks]"
+    *: "[All Tracks]"
   </source>
   <dest>
     *: "[Všetky stopy]"
@@ -4038,7 +4038,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Yes - Recent only"
+    *: "Yes - Recent Only"
   </source>
   <dest>
     *: "Áno len najnovšie"
@@ -4052,7 +4052,7 @@
   desc: Save in recent bookmarks only
   user: core
   <source>
-    *: "Ask - Recent only"
+    *: "Ask - Recent Only"
   </source>
   <dest>
     *: "Opýtať sa len najnovšie"
@@ -9388,7 +9388,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very slow"
+    *: "Very Slow"
   </source>
   <dest>
     *: "Veľmi pomaly"
@@ -9416,7 +9416,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Very fast"
+    *: "Very Fast"
   </source>
   <dest>
     *: "Veľmi rýchlo"
@@ -9777,7 +9777,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "Interpret numbers when sorting"
+    *: "Interpret Numbers When Sorting"
   </source>
   <dest>
     *: "Interpretovať Čísla pri triedení"
@@ -9791,7 +9791,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As digits"
+    *: "As Digits"
   </source>
   <dest>
     *: "Ako Číslice"
@@ -9805,7 +9805,7 @@
   desc: in Settings -> File view
   user: core
   <source>
-    *: "As whole numbers"
+    *: "As Whole Numbers"
   </source>
   <dest>
     *: "Ako celé čísla"
@@ -11119,7 +11119,7 @@
   desc: resume on automatic track change
   user: core
   <source>
-    *: "Resume on automatic track change"
+    *: "Resume on Automatic Track Change"
   </source>
   <dest>
     *: "Obnoviť pri automatickej zmene stopy"
@@ -11133,7 +11133,7 @@
   desc: enable customization of resume on automatic track change
   user: core
   <source>
-    *: "In custom directories only"
+    *: "In Custom Directories Only"
   </source>
   <dest>
     *: "Len v zvolených priečinkoch"
@@ -11279,7 +11279,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Glyphs To Cache"
+    *: "Glyphs to Cache"
   </source>
   <dest>
     *: "Zapamätať Glyfy"
@@ -11456,7 +11456,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select one or more directories"
+    *: "Select One or More Directories"
   </source>
   <dest>
     *: "Vyberte jeden alebo viacero priečinkov"
@@ -11470,7 +11470,7 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "Select directories to scan"
+    *: "Select Directories to Scan"
   </source>
   <dest>
     *: "Vyberte priečinky pre prehľadávanie"
@@ -11779,7 +11779,7 @@
   desc: Save only one bookmark for a playlist in recent bookmarks
   user: core
   <source>
-    *: "One per playlist"
+    *: "One per Playlist"
   </source>
   <dest>
     *: "Jedna na playlist"
@@ -11891,7 +11891,7 @@
   desc: Save only one bookmark for a combination (playlist,track) in recent bookmarks
   user: core
   <source>
-    *: "One per track"
+    *: "One per Track"
   </source>
   <dest>
     *: "Jednu na stopu"
@@ -12432,7 +12432,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Show album title"
+    *: "Show Album Title"
   </source>
   <dest>
     *: "Zobraziť názov albumu"
@@ -12561,7 +12561,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "File properties"
+    *: "File Properties"
   </source>
   <dest>
     *: "Vlastnosti súboru"
@@ -12648,7 +12648,7 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre margin"
+    *: "Centre Margin"
   </source>
   <dest>
     *: "Centrovať okraj"
@@ -12982,7 +12982,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track elapsed:"
+    *: "Track Elapsed:"
   </source>
   <dest>
     *: "Stopa prehraté:"
@@ -13676,7 +13676,7 @@
   desc: onplay menu
   user: core
   <source>
-    *: "Playing time"
+    *: "Playing Time"
   </source>
   <dest>
     *: "čas prehrávania"
@@ -13766,7 +13766,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Track remaining:"
+    *: "Track Remaining:"
   </source>
   <dest>
     *: "Stopa zostáva:"
@@ -13780,7 +13780,7 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "Directory properties"
+    *: "Directory Properties"
   </source>
   <dest>
     *: "Vlastnosti priečinka"
@@ -13822,7 +13822,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average bitrate:"
+    *: "Average Bitrate:"
   </source>
   <dest>
     *: "Priemerný bitrate:"
@@ -13864,7 +13864,7 @@
   desc: playing time screen
   user: core
   <source>
-    *: "Average track size:"
+    *: "Average Track Size:"
   </source>
   <dest>
     *: "Priemerná dĺžka stopy:"
@@ -14274,7 +14274,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the top"
+    *: "Show Album at the Top"
   </source>
   <dest>
     *: "Zobraziť album navrchu"
@@ -14302,7 +14302,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the bottom"
+    *: "Show Album and Artist at the Bottom"
   </source>
   <dest>
     *: "Zobraziť album a umelca naspodku"
@@ -14316,7 +14316,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album at the bottom"
+    *: "Show Album at the Bottom"
   </source>
   <dest>
     *: "Zobraziť album naspodku"
@@ -14330,7 +14330,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Hide information"
+    *: "Hide Information"
   </source>
   <dest>
     *: "Skryť info"
@@ -14344,7 +14344,7 @@
   desc: in the pictureflow settings
   user: core
   <source>
-    *: "Show album and artist at the top"
+    *: "Show Album and Artist at the Top"
   </source>
   <dest>
     *: "Zobraziť album a umelca navrchu"
@@ -15341,7 +15341,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Sort albums by"
+    *: "Sort Albums By"
   </source>
   <dest>
     *: "Triediť albumy podľa"
@@ -15383,7 +15383,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Year sort order"
+    *: "Year Sort Order"
   </source>
   <dest>
     *: "Triediť podľa roku"
@@ -15397,7 +15397,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "Show year in album title"
+    *: "Show Year in Album Title"
   </source>
   <dest>
     *: "Ukázať rok v názve albumu"
@@ -15509,7 +15509,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title & Album from ID3 tags"
+    *: "Title & Album from ID3 Tags"
   </source>
   <dest>
     *: "Názov a album z ID3 tagov"
@@ -15523,7 +15523,7 @@
   desc: track display options
   user: core
   <source>
-    *: "Title from ID3 tags"
+    *: "Title from ID3 Tags"
   </source>
   <dest>
     *: "Názov z ID3 tagov"
@@ -15551,7 +15551,7 @@
   desc: Special character (japanese, accents, etc)
   user: core
   <source>
-    *: "Special character"
+    *: "Special Character"
   </source>
   <dest>
     *: "Špeciálny znak"
@@ -16241,7 +16241,7 @@
   desc: Disable main menu scrolling
   user: core
   <source>
-    *: "Disable main menu scrolling"
+    *: "Disable Main Menu Scrolling"
   </source>
   <dest>
     *: "Vypnúť rolovanie v hlavnej ponuke"
