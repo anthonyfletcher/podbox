@@ -47,6 +47,8 @@
 #include "browser_disk.h"
 #include "system/app_util.h"
 #include "system/activity.h"   /* ui_set_working -- the status-bar busy indicator */
+#include "skin/skin_engine.h"
+#include "skin/statusbar_skinned.h"
 #include "strnatcmp.h"
 #include "widgets/keyboard.h"
 
@@ -464,6 +466,24 @@ static void browser_disk_apply_skin_file(char *buf, char *file)
     settings_apply_skins();
 }
 
+/* Repaint everything after a "... loaded" splash that followed a theme change.
+ * The load redraws the screen and consumes the skins' full-update flag, then
+ * the splash covers the middle of the display.
+ *
+ * Clearing the framebuffer is the part that cannot be skipped. Asking the skins
+ * to redraw in full only repaints the viewports they define, and skin_render()
+ * clears the screen itself only for the WPS -- so on a list screen the box
+ * survives in whatever the theme's viewports do not cover, which for a skin
+ * that insets its UI viewport is most of the box. The list and the statusbar
+ * skin then draw over the cleared buffer before the next flush. */
+static void browser_disk_repaint_after_splash(void)
+{
+    FOR_NB_SCREENS(i)
+        screens[i].clear_display();
+    skin_request_full_update(CUSTOM_STATUSBAR);
+    sb_skin_force_next_update();
+}
+
 static const char *strip_slash(const char *path, const char *def)
 {
     if (path)
@@ -607,6 +627,7 @@ int browser_disk_enter(struct browser_context* c)
                 if (!settings_load_config(buf,true))
                     break;
                 splash(HZ, ID2P(LANG_SETTINGS_LOADED));
+                browser_disk_repaint_after_splash();
                 break;
 
             case FILE_ATTR_BMARK:
@@ -627,6 +648,7 @@ int browser_disk_enter(struct browser_context* c)
                 viewportmanager_theme_changed(THEME_LANGUAGE);
                 settings_apply_skins();
                 splash(HZ, ID2P(LANG_LANGUAGE_LOADED));
+                browser_disk_repaint_after_splash();
                 break;
 
             case FILE_ATTR_FONT:
