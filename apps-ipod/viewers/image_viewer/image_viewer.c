@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include "config.h"
 #include "system.h"          /* MIN, MAX */
+#include "dir.h"             /* the folder read when the browser cache is not it */
 #include "lcd.h"
 #include "file.h"            /* MAX_PATH */
 #include "fs_attr.h"         /* ATTR_DIRECTORY */
@@ -165,7 +166,53 @@ static void iv_usb_inserted(unsigned short id, void *event_data)
     iv_usb_dropped = true;
 }
 
-/* Read directory contents for scrolling. */
+/* Read 'dir' for the files to page through, when the browser's cache is not
+ * about this directory (see get_pic_list()).
+ *
+ * The names are copied into the working buffer. The cache path can point
+ * straight at the browser's own strings because the browser owns them for as
+ * long as the viewer is up; nothing owns a readdir() name past the next call,
+ * so these have to be kept. The pointer table grows from the front of the
+ * buffer and the names from the back, and they stop when they would meet --
+ * the buffer is also what the images decode into, so this takes what it needs
+ * and no more. */
+static void get_pic_list_from_dir(const char *dir, const char *pname)
+{
+    char *names = (char *)buf + buf_size;   /* names fill downwards */
+    DIR *d = opendir(dir);
+    struct dirent *entry;
+
+    if (!d)
+        return;
+
+    while ((entry = readdir(d)))
+    {
+        struct dirinfo info = dir_get_info(d, entry);
+        size_t len = strlen((char *)entry->d_name) + 1;
+
+        if (info.attribute & ATTR_DIRECTORY)
+            continue;
+
+        /* One more pointer at the front and one more name at the back. */
+        if (buf_size < sizeof(char **) + len)
+            break;
+
+        names -= len;
+        strcpy(names, (char *)entry->d_name);
+        buf_size -= len;
+
+        file_pt[entries] = names;
+        if (!strcmp(names, pname))
+            curfile = entries;
+        entries++;
+
+        buf = (char *)buf + sizeof(char **);
+        buf_size -= sizeof(char **);
+    }
+
+    closedir(d);
+}
+
 static void get_pic_list(bool single_file)
 {
     file_pt = (char **) buf;
@@ -184,26 +231,59 @@ static void get_pic_list(bool single_file)
     struct entry *dircache = browser_get_entries(tree);
     int i;
     char *pname;
+    char dir[MAX_PATH], cwd[MAX_PATH];
 
     /* Remove path and leave only the name.*/
     pname = strrchr(np_file,'/');
     pname++;
 
-    for (i = 0; i < tree->filesindir && buf_size > sizeof(char**); i++)
-    {
-        /* Add all files. Non-image files will be filtered out while loading. */
-        if (!(dircache[i].attr & ATTR_DIRECTORY))
-        {
-            file_pt[entries] = dircache[i].name;
-            /* Set Selected File. */
-            if (!strcmp(file_pt[entries], pname))
-                curfile = entries;
-            entries++;
+    /* The neighbours to page through come from the file browser's cached
+     * directory, which is only this file's directory when the browser is what
+     * opened it. The flat Images list (screens/browse/browser_flat.c) opens
+     * files from anywhere without moving the browser, and reading its cache
+     * then describes some unrelated folder -- usually empty, which is the
+     * "No supported files" this used to give, and worse when it is not empty,
+     * because paging would walk a folder the image is not in.
+     *
+     * So the cache is used only when it really is this file's directory, and
+     * the directory is read directly otherwise. Preferring the cache is not
+     * just economy: it is already sorted the way the browser shows it, and
+     * paging should follow the order the file was picked from. */
+    /* np_file's directory, without the trailing slash -- which getcwd() does
+     * not return either, except at the root where the slash is the whole
+     * name. */
+    size_t dlen = (size_t)(pname - np_file);
+    if (dlen > 1)
+        dlen--;
+    if (dlen >= sizeof(dir))
+        dlen = sizeof(dir) - 1;
+    memcpy(dir, np_file, dlen);
+    dir[dlen] = '\0';
 
-            buf += (sizeof(char**));
-            buf_size -= (sizeof(char**));
+    cwd[0] = '\0';
+    getcwd(cwd, sizeof(cwd));
+
+    if (cwd[0] && !strcmp(cwd, dir))
+    {
+        for (i = 0; i < tree->filesindir && buf_size > sizeof(char**); i++)
+        {
+            /* Add all files. Non-image files will be filtered out while loading. */
+            if (!(dircache[i].attr & ATTR_DIRECTORY))
+            {
+                file_pt[entries] = dircache[i].name;
+                /* Set Selected File. */
+                if (!strcmp(file_pt[entries], pname))
+                    curfile = entries;
+                entries++;
+
+                buf += (sizeof(char**));
+                buf_size -= (sizeof(char**));
+            }
         }
+        return;
     }
+
+    get_pic_list_from_dir(dir, pname);
 }
 
 static int change_filename(int direct)
