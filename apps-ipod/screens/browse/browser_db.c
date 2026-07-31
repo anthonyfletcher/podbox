@@ -2261,25 +2261,65 @@ void browser_db_enter_menu_on_next_load(const char *menu_id)
                sizeof(pending_root_shortcut_menu));
 }
 
-/* Which root row opens the submenu with this id, or -1. */
-static int find_root_entry_by_menu_id(const char *menu_id)
+/* Finding a row to select, among the rows actually on screen.
+ *
+ * c->selected_item is a *screen* position, and a row's position in
+ * tagnavi.config is not one: load_root() skips submenus that lead nowhere and
+ * inserts synthetic rows of its own (Random album, the album charts), so the
+ * two diverge from the first insertion onwards. Selecting by config position
+ * therefore picks a neighbour -- with Random album sitting under Album, every
+ * shortcut below it opened the row above the one asked for.
+ *
+ * These match against what load_root() just produced rather than repeating its
+ * skip and insert rules, so the two cannot drift apart when either changes.
+ * load_root() leaves the raw config index in a tag row's extraseek and the
+ * target menu in a submenu row's, which is what makes the identification
+ * exact. Synthetic rows carry neither table and are skipped.
+ *
+ * Note browser_db_find_root_entry_by_tag() below is a different question and
+ * still correct: it answers "which entry of menus[rootmenu]->items[]", which
+ * is a config position, and its callers index that array with it. */
+static int loaded_row_for_menu_id(struct browser_context *c, int rows,
+                                  const char *menu_id)
 {
-    struct menu_root *root;
     int i;
 
-    if (rootmenu < 0 || rootmenu >= menu_count)
-        return -1;
-    root = menus[rootmenu];
+    for (i = 0; i < rows; i++)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+        int link = e->extraseek;
+
+        if (e->newtable != TABLE_ROOT)
+            continue;
+        if (link >= 0 && link < menu_count && menus[link]
+            && !strcasecmp(menus[link]->id, menu_id))
+            return i;
+    }
+    return -1;
+}
+
+static int loaded_row_for_tag(struct browser_context *c, int rows, int tag)
+{
+    struct menu_root *root = (rootmenu >= 0 && rootmenu < menu_count)
+                           ? menus[rootmenu] : NULL;
+    int i;
+
     if (!root)
         return -1;
 
-    for (i = 0; i < root->itemcount; i++)
+    for (i = 0; i < rows; i++)
     {
-        if (root->items[i]->type == menu_load
-            && root->items[i]->link >= 0
-            && root->items[i]->link < menu_count
-            && menus[root->items[i]->link]
-            && !strcasecmp(menus[root->items[i]->link]->id, menu_id))
+        struct tagentry *e = browser_db_get_entry(c, i);
+        int raw = e->extraseek;
+
+        if (e->newtable != TABLE_NAVIBROWSE)
+            continue;
+        if (raw < 0 || raw >= root->itemcount)
+            continue;
+        /* Shuffle and by-first-letter rows share TABLE_NAVIBROWSE. */
+        if (root->items[raw]->type == menu_next
+            && root->items[raw]->si.tagorder_count > 0
+            && root->items[raw]->si.tagorder[0] == tag)
             return i;
     }
     return -1;
@@ -2580,14 +2620,14 @@ int browser_db_load(struct browser_context* c)
         && c->dirlevel == 0)
     {
         char target[MAX_MENU_ID_SIZE];
-        int idx;
+        int idx, rows;
 
         strmemccpy(target, pending_root_shortcut_menu, sizeof(target));
         pending_root_shortcut_menu[0] = '\0';
 
-        load_root(c);
+        rows = load_root(c);
 
-        idx = find_root_entry_by_menu_id(target);
+        idx = loaded_row_for_menu_id(c, rows, target);
         if (idx >= 0)
         {
             c->selected_item = idx;
@@ -2601,9 +2641,10 @@ int browser_db_load(struct browser_context* c)
     if (pending_root_shortcut_tag != -1 && table == TABLE_ROOT && c->dirlevel == 0)
     {
         int target_tag = pending_root_shortcut_tag;
+        int rows;
         pending_root_shortcut_tag = -1;
 
-        load_root(c);
+        rows = load_root(c);
 
         /* Album covers' jump (only ever paired with target_tag == tag_album)
          * bypasses the normal single-hop browser_db_enter() below entirely --
@@ -2637,7 +2678,7 @@ int browser_db_load(struct browser_context* c)
         }
         else
         {
-            int idx = browser_db_find_root_entry_by_tag(target_tag);
+            int idx = loaded_row_for_tag(c, rows, target_tag);
             if (idx >= 0)
             {
                 c->selected_item = idx;

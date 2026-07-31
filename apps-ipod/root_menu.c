@@ -857,6 +857,14 @@ static void root_menu_apply_canonical_order(void)
             }
 
     memcpy(root_menu__, reordered, out * sizeof(root_menu__[0]));
+
+    /* The count follows what was actually written. It cannot normally change
+     * -- every item lands in exactly one of the three groups -- but if it ever
+     * did, leaving the old count standing would draw whatever stale pointer
+     * was left in the tail as if it were a real row. */
+    if (out != count)
+        root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
+                            | MENU_ITEM_COUNT(out);
 }
 
 /* Display-only counterpart to root_menu__[] -- see
@@ -1064,10 +1072,27 @@ void root_menu_load_from_cfg(void* setting, char *value)
         {
             if (*start && !strcmp(start, menu_table[i].string))
             {
+                unsigned k;
+                matched = true;
+
+                /* Once only, however many times the key is listed. Nothing
+                 * downstream removes a repeat: it goes into root_menu__ twice,
+                 * root_menu_write_to_cfg() writes it out twice from there, and
+                 * the next load reads it back twice -- so a configuration that
+                 * ever gained a duplicate key kept it, showing the row twice in
+                 * Customize Main Menu and on the main menu itself. Skipping it
+                 * here also repairs such a configuration on its next save. */
+                for (k = 0; k < menu_item_count; k++)
+                {
+                    if (root_menu__[k] == menu_table[i].item)
+                        break;
+                }
+                if (k < menu_item_count)
+                    break;
+
                 root_menu__[menu_item_count++] = (struct menu_item_ex *)menu_table[i].item;
                 if (menu_table[i].item == &menu_)
                     main_menu_added = true;
-                matched = true;
                 break;
             }
         }

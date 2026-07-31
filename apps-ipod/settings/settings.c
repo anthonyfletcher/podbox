@@ -149,17 +149,54 @@ const char* setting_get_cfgvals(const struct settings_list *setting)
     return NULL;
 }
 
+/* Longest configuration line, and the longest value within one.
+ *
+ * Both the reader and the writer used fixed buffers that truncate rather than
+ * fail, and neither rejects a truncated line -- it simply parses as a shorter
+ * value, losing whatever fell off the end. "root menu order" is the line that
+ * outgrew them: every enabled main-menu entry contributes its key, so it grows
+ * with the menu. At the old 128-byte read buffer the last entries vanished from
+ * the menu while the configuration on disk still named them; at the writer's
+ * MAX_PATH they would have been dropped on the way out instead.
+ *
+ * Sized from the ceiling the writer already enforces rather than from what a
+ * menu happens to hold today. main_menu_config.c caps its own output at
+ * CFG_STR_SIZE -- MAX_ITEMS keys of at most 13 bytes, currently 572 -- so 589
+ * with the setting name is the most that line can be, however many entries are
+ * added later. A fully enabled menu as it stands (13 fixed entries and all 20
+ * tagnavi slots) is 338, so there is roughly double the headroom.
+ *
+ * Deliberately one constant for reading and writing. Sizing them differently is
+ * how a value gets written that cannot be read back, which is the more
+ * confusing half of this bug: the configuration on disk names entries that do
+ * not appear. */
+#define SETTINGS_MAX_LINE 640
+
+/* The write path's scratch line, static rather than on the stack.
+ *
+ * Saving happens from flush_config_block_callback(), a storage-idle callback,
+ * which runs on the storage thread -- and that thread has ATA_THREAD_STACK_SIZE,
+ * two kilobytes. A buffer this size is a third of it in a single frame, before
+ * the file I/O underneath gets its own. The reader keeps its buffer on the
+ * stack because it runs from the main thread at startup and from the UI thread
+ * for a theme, neither of which is short of room.
+ *
+ * Shared by the two functions below, which the callback calls one after the
+ * other rather than nested. Both write the same file, so anything calling them
+ * concurrently is already broken for a larger reason. */
+static char settings_line[SETTINGS_MAX_LINE];
+
 /* calculates and stores crc of settings, returns true if settings have changed */
 static bool settings_crc_changed(void)
 {
-    char value[MAX_PATH];
+    char *value = settings_line;
     uint32_t custom_crc = 0xFFFFFFFF;
     for(int i=0; i<nb_settings; i++)
     {
         const struct settings_list *setting = &settings[i];
         if (!(setting->flags & F_CUSTOM_SETTING))
             continue;
-        cfg_to_string(setting, value, sizeof(value));
+        cfg_to_string(setting, value, SETTINGS_MAX_LINE);
         custom_crc = crc_32(value, strlen(value), custom_crc);
     }
 
@@ -383,7 +420,7 @@ bool settings_load_config(const char* file, bool apply)
 {
     logf("%s()\r\n", __func__);
     int fd;
-    char line[128];
+    char line[SETTINGS_MAX_LINE];
     bool theme_changed = false;
 
     fd = open_utf8(file, O_RDONLY);
@@ -555,7 +592,7 @@ static bool settings_write_config(const char* filename, int options)
     logf("%s\r\n", __func__);
     int i;
     int fd;
-    char value[MAX_PATH];
+    char *value = settings_line;   /* not the stack -- see settings_line */
     fd = open(filename,O_CREAT|O_TRUNC|O_WRONLY, 0666);
     if (fd < 0)
         return false;
@@ -603,7 +640,7 @@ static bool settings_write_config(const char* filename, int options)
                 break;
             }
         }
-        cfg_to_string(setting, value, MAX_PATH);
+        cfg_to_string(setting, value, SETTINGS_MAX_LINE);
         logf("Written: '%s: %s'\r\n",setting->cfg_name, value);
 
         fdprintf(fd,"%s: %s\r\n",setting->cfg_name,value);
