@@ -59,7 +59,7 @@
 # CC: Sub-menu init: for any list screen that isn't home/quickscreen/usb/
 # CC: etc., decide whether to show the icon header (by screen id or title),
 # CC: then pick the sub-menu viewport + scrollbar side.
-%?and(%if(%cs,!=,1),%if(%cs,!=,10),%if(%cs,!=,14),%if(%cs,!=,16),%if(%cs,!=,21),%if(%cs,!=,22))<%?or(%if(%cs,=,7),%if(%Li, =, 4),%if(%Li, =, 11),%if(%Li, =, 26),%if(%Li, =, 27),%if(%Li, =, 32),%and(%if(%cs, =, 15),%if(%Lt, !=, %Sx(Context Menu))),%if(%cs, =, 17),%if(%cs, =, 19),%if(%cs, =, 20),%if(%Lt,=,%Sx(Album Artist)),%if(%Lt,=,%Sx([All tracks])),%if(%Lt,=,%Sx([Untagged])),%if(%Lt,=,%Sx([By album])),%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Album)),%if(%Lt,=,%Sx(Genre)),%if(%Lt,=,%Sx(Year)),%if(%Lt,=,%Sx(Composer)),%if(%Lt,=,%Sx(Tracks by)),%if(%Lt,=,%Sx(Search by...)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Recently Added)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Settings)),%if(%Lt,=,%Sx(Sound Settings)),%if(%Lt,=,%Sx(Playback Settings)),%if(%Lt,=,%Sx(General Settings)),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Database)),%if(%Lt,=,%Sx(Theme Settings)),%if(%Lt,=,%Sx(Recording Settings)),%if(%Lt,=,%Sx(Manage Settings)),%if(%Lt,=,%Sx(Display)),%if(%Lt,=,%Sx(Language)),%if(%Lt,=,%Sx(Voice)),%if(%Lt,=,%Sx(Main Menu Settings)),%if(%Lt,=,%Sx(Brightness)))<%?St(show icons)<%Vd(Header_with_Icon)|%Vd(Header_without_Icon)>|%Vd(Header_without_Icon)>%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Sub_Menu_Viewport_Full)|%Vd(Sub_Menu_Corners)%?St(scrollbar)<%VI(Sub_Menu_Viewport_Full)|%VI(Sub_Menu_Viewport_Right)%Vd(Scrollbar_Short_Left)%?LB<%Vd(Scrollbar_Short_Left_Thumb)>|%VI(Sub_Menu_Viewport_Left)%Vd(Scrollbar_Short_Right)%?LB<%Vd(Scrollbar_Short_Right_Thumb)>>%?St(scrollbar)<%?if(%cs,=,7)<%?St(show icons)<%Lb(No_Scroll_File_Browser,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(No_Scroll_Folder_Select,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(No_Scroll_Menu_With_Icons,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%Lb(No_Scroll_Menu_No_Icons,182,30)>>>|%?if(%cs,=,7)<%?St(show icons)<%Lb(File_Browser,182,30)|%Lb(Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(Folder_Select,182,30)|%Lb(Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(Menu_With_Icons,182,30)|%Lb(Menu_No_Icons,182,30)>|%Lb(Menu_No_Icons,182,30)>>>>>>
+%?and(%if(%cs,!=,1),%if(%cs,!=,10),%if(%cs,!=,14),%if(%cs,!=,16),%if(%cs,!=,21),%if(%cs,!=,22))<%?or(%if(%cs,=,7),%if(%Li, =, 4),%if(%Li, =, 11),%if(%Li, =, 26),%if(%Li, =, 27),%if(%Li, =, 32),%and(%if(%cs, =, 15),%if(%Lt, !=, %Sx(Context Menu))),%if(%cs, =, 17),%if(%cs, =, 19),%if(%cs, =, 20),%if(%Lt,=,%Sx(Album Artist)),%if(%Lt,=,%Sx([All Tracks])),%if(%Lt,=,%Sx([Untagged])),%if(%Lt,=,%Sx([By album])),%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Album)),%if(%Lt,=,%Sx(Genre)),%if(%Lt,=,%Sx(Year)),%if(%Lt,=,%Sx(Composer)),%if(%Lt,=,%Sx(Tracks by)),%if(%Lt,=,%Sx(Search by...)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Recently Added)),%if(%Lt,=,%Sx(User Rating)),%if(%Lt,=,%Sx(Settings)),%if(%Lt,=,%Sx(Sound Settings)),%if(%Lt,=,%Sx(Playback Settings)),%if(%Lt,=,%Sx(General Settings)),%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Database)),%if(%Lt,=,%Sx(Theme Settings)),%if(%Lt,=,%Sx(Recording Settings)),%if(%Lt,=,%Sx(Manage Settings)),%if(%Lt,=,%Sx(Display)),%if(%Lt,=,%Sx(Language)),%if(%Lt,=,%Sx(Voice)),%if(%Lt,=,%Sx(Main Menu Settings)),%if(%Lt,=,%Sx(Brightness)))<%?St(show icons)<%Vd(Header_with_Icon)|%Vd(Header_without_Icon)>|%Vd(Header_without_Icon)>%?and(%if(%ss(0,2,%St(font)),!=,22),%if(%ss(0,2,%St(font)),!=,24))<%VI(Sub_Menu_Viewport_Full)|%Vd(Sub_Menu_Corners)%?St(scrollbar)<%VI(Sub_Menu_Viewport_Full)|%VI(Sub_Menu_Viewport_Right)%Vd(Scrollbar_Short_Left)%?LB<%Vd(Scrollbar_Short_Left_Thumb)>|%VI(Sub_Menu_Viewport_Left)%Vd(Scrollbar_Short_Right)%?LB<%Vd(Scrollbar_Short_Right_Thumb)>>%?St(scrollbar)<%?if(%cs,=,7)<%?St(show icons)<%Lb(No_Scroll_File_Browser,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(No_Scroll_Folder_Select,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(No_Scroll_Menu_With_Icons,182,30)|%Lb(No_Scroll_Menu_No_Icons,182,30)>|%Lb(No_Scroll_Menu_No_Icons,182,30)>>>|%?if(%cs,=,7)<%?St(show icons)<%Lb(File_Browser,182,30)|%Lb(Menu_No_Icons,182,30)>|%?if(%cs,=,25)<%?St(show icons)<%Lb(Folder_Select,182,30)|%Lb(Menu_No_Icons,182,30)>|%?or(%and(%if(%Lt,=,%Sx(Music)),%if(%Li,=,3)),%if(%Lt,=,%Sx(Settings)))<%?St(show icons)<%Lb(Menu_With_Icons,182,30)|%Lb(Menu_No_Icons,182,30)>|%Lb(Menu_No_Icons,182,30)>>>>>>
 #
 #- USB Screen Logic -#
 # CC: USB screen (cs=21): hide the normal UI viewport. The screen itself is
@@ -193,11 +193,11 @@
 #Background is drawn here for .1 of a second and then immediately removed. This is to prevent UI flashes, but it has to be removed as if it scrolls the device will crash.
 # CC: Sub-menu header title text. Renames a few internal titles ([All
 # CC: tracks] etc.); drawn once on the backdrop for 0.1s to avoid a flash.
-%Vl(Header_with_Icon,29,29,284,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%cs,=,3)<%Sx(Recording)|%?if(%Lt,=,%Sx([By album]))<By Album|%Lt>>>>;%t(3600)
-%Vl(Header_with_Icon,29,29,284,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
+%Vl(Header_with_Icon,29,29,284,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%cs,=,3)<%Sx(Recording)|%?if(%Lt,=,%Sx([By album]))<By Album|%Lt>>>>;%t(3600)
+%Vl(Header_with_Icon,29,29,284,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
 #
-%Vl(Header_without_Icon,13,29,300,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)
-%Vl(Header_without_Icon,13,29,300,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
+%Vl(Header_without_Icon,13,29,300,18,3)%VB%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)
+%Vl(Header_without_Icon,13,29,300,18,3)%t(0.1)%Vs(invert)%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>;%t(3600)%Vs(invert)%?if(%St(scroll speed),=,1)<|%s>%?if(%Lt,=,%Sx([All Tracks]))<All Tracks|%?if(%Lt,=,%Sx([Untagged]))<Untagged|%?if(%Lt,=,%Sx([By album]))<By Album|%?if(%cs,=,3)<%Sx(Recording)|%Lt>>>>
 #
 #- Icons for Sub menu Header -#
 # CC: Sub-menu header ICON. %sel picks the glyph paired with the first key
@@ -206,10 +206,10 @@
 # CC: match them; the default is therefore a second %sel keyed on %Li, the
 # CC: Rockbox title-icon id (the enum in apps/draw/icon.h, offset by one).
 # CC: Ids 13-16, 19-21 never appear as a title icon and fall through to x.
-%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%sel(%Lt,%Sx(Same as currently played track),Ô,%Sx(Playback History),Ó,%Sx(Recently Added),Ò,%Sx(User Rating),Õ,%Sx(Tracks by),b,%Sx(By First Letter...),Ñ,%Sx(Year),Ð,%Sx(Genre),Ï,%Sx(Album),Î,%Sx(Album Artist),Í,%Sx(Search by...),y,themes,i,%Sx(Artist),s,%Sx(Composer),s,%Sx([All tracks]),b,%Sx([Untagged]),e,%Sx([By album]),Î,%Sx(Music),0,%Sx(Database),0,%Sx(Playlist Catalogue),2,%sel(%cs,3,7,%sel(%Li,1,3,2,8,3,1,4,2,5,5,6,i,7,7,8,8,9,5,10,4,11,5,12,%sel(%Lt,%Sx(Shortcuts),z,6),17,7,18,%sel(%Lt,%Sx(Brightness),l,f),22,%sel(%cs,17,c,4),23,7,24,f,25,4,26,k,27,3,28,h,29,5,30,9,31,1,32,g,x)))
+%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%sel(%Lt,%Sx(Same as currently played track),Ô,%Sx(Playback History),Ó,%Sx(Recently Added),Ò,%Sx(User Rating),Õ,%Sx(Tracks by),b,%Sx(By First Letter...),Ñ,%Sx(Year),Ð,%Sx(Genre),Ï,%Sx(Album),Î,%Sx(Album Artist),Í,%Sx(Search by...),y,themes,i,%Sx(Artist),s,%Sx(Composer),s,%Sx([All Tracks]),b,%Sx([Untagged]),e,%Sx([By album]),Î,%Sx(Music),0,%Sx(Database),0,%Sx(Playlist Catalogue),2,%sel(%cs,3,7,%sel(%Li,1,3,2,8,3,1,4,2,5,5,6,i,7,7,8,8,9,5,10,4,11,5,12,%sel(%Lt,%Sx(Shortcuts),z,6),17,7,18,%sel(%Lt,%Sx(Brightness),l,f),22,%sel(%cs,17,c,4),23,7,24,f,25,4,26,k,27,3,28,h,29,5,30,9,31,1,32,g,x)))
 # was: the same mapping as 21 nested %?if conditionals; restore this line
 # was: in place of the %sel above to revert.
-#%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%?if(%Lt,=,%Sx(Same as currently played track))<Ô|%?if(%Lt,=,%Sx(Playback History))<Ó|%?if(%Lt,=,%Sx(Recently Added))<Ò|%?if(%Lt,=,%Sx(User Rating))<Õ|%?if(%Lt,=,%Sx(Tracks by))<b|%?if(%Lt,=,%Sx(By First Letter...))<Ñ|%?if(%Lt,=,%Sx(Year))<Ð|%?if(%Lt,=,%Sx(Genre))<Ï|%?if(%Lt,=,%Sx(Album))<Î|%?if(%Lt,=,%Sx(Album Artist))<Í|%?if(%Lt,=,%Sx(Search by...))<y|%?if(%Lt,=,themes)<i|%?or(%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Composer)))<s|%?if(%Lt,=,%Sx([All tracks]))<b|%?if(%Lt,=,%Sx([Untagged]))<e|%?if(%Lt,=,%Sx([By album]))<Î|%?if(%Lt,=,%Sx(Music))<0|%?if(%Lt,=,%Sx(Database))<0|%?if(%cs,=,3)<7|%?if(%Lt,=,%Sx(Playlist Catalogue))<2|%?Li<3|8|1|2|5|i|7|8|5|4|5|%?if(%Lt,=,%Sx(Shortcuts))<z|6>|13|14|15|16|17|%?if(%Lt,=,%Sx(Brightness))<l|f>|19|20|21|%?if(%cs, =, 17)<c|4>|7|f|4|k|3|h|29|9|1|g|x>>>>>>>>>>>>>>>>>>>>>
+#%Vl(Header_with_Icon,10,30,14,14,8)%VB%Vs(invert)%?if(%Lt,=,%Sx(Same as currently played track))<Ô|%?if(%Lt,=,%Sx(Playback History))<Ó|%?if(%Lt,=,%Sx(Recently Added))<Ò|%?if(%Lt,=,%Sx(User Rating))<Õ|%?if(%Lt,=,%Sx(Tracks by))<b|%?if(%Lt,=,%Sx(By First Letter...))<Ñ|%?if(%Lt,=,%Sx(Year))<Ð|%?if(%Lt,=,%Sx(Genre))<Ï|%?if(%Lt,=,%Sx(Album))<Î|%?if(%Lt,=,%Sx(Album Artist))<Í|%?if(%Lt,=,%Sx(Search by...))<y|%?if(%Lt,=,themes)<i|%?or(%if(%Lt,=,%Sx(Artist)),%if(%Lt,=,%Sx(Composer)))<s|%?if(%Lt,=,%Sx([All Tracks]))<b|%?if(%Lt,=,%Sx([Untagged]))<e|%?if(%Lt,=,%Sx([By album]))<Î|%?if(%Lt,=,%Sx(Music))<0|%?if(%Lt,=,%Sx(Database))<0|%?if(%cs,=,3)<7|%?if(%Lt,=,%Sx(Playlist Catalogue))<2|%?Li<3|8|1|2|5|i|7|8|5|4|5|%?if(%Lt,=,%Sx(Shortcuts))<z|6>|13|14|15|16|17|%?if(%Lt,=,%Sx(Brightness))<l|f>|19|20|21|%?if(%cs, =, 17)<c|4>|7|f|4|k|3|h|29|9|1|g|x>>>>>>>>>>>>>>>>>>>>>
 %Vl(Header_with_Icon,10,30,14,14,8)
 #
 #
@@ -286,32 +286,32 @@
 %Vl(Menu_No_Icons,0,0,302,30,6)
 # CC: %?La<|...> blanks the ordinary-row background on album rows; every other
 # CC: row (special rows included) gets the plain selection bar. The old grouped
-# CC: multi-glyph frame for [All tracks]/[Random]/etc. was removed: its deep
+# CC: multi-glyph frame for [All Tracks]/[Random]/etc. was removed: its deep
 # CC: %?if nesting mis-rendered on the first frames after a list change and
 # CC: pushed skin_render_line's recursion near the stack limit.
 %?La<|%?Lc<%Vs(invert)A%aRB>>
 #
-%Vl(Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+%Vl(Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
 #
-%Vl(Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+%Vl(Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
 #
-%Vl(Menu_No_Icons,9,4,283,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+%Vl(Menu_No_Icons,9,4,283,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
 #
 # CC: Album-list layout (%?La true only). The skin renderer recurses once per
 # CC: nesting level (skin_render_line), so these stay shallow -- depth, not
 # CC: viewport count, is what overflows the stack. The baseline viewports above
 # CC: are left untouched so ordinary lists keep their exact (safe) depth.
 # CC: Cover on the left; %La self-blanks to the placeholder until the cache fills.
-%Vl(Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
+%Vl(Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
 # CC: Special rows have no cover, so draw their glyph icon centred in the art slot.
 # CC: Font 8 (14x13_Compacticons) is the menu icon font -- the last %Vl param is
 # CC: the font id, not a radius; with the default font these render as letters.
-%Vl(Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+%Vl(Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
 # CC: Rounded selection bar around the name only (right of the cover) when selected.
 %Vl(Menu_No_Icons,54,11,248,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
 # CC: Name shifted right of the cover, vertically centred. Friendly labels for the
 # CC: special rows; %LT (optionally scrolling) for real albums.
-%Vl(Menu_No_Icons,63,15,229,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+%Vl(Menu_No_Icons,63,15,229,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
 #
 #
 #-- Menu Drawing without Scrollbar --#
@@ -396,19 +396,19 @@
 # CC: the grouped special-row frame was removed).
 %Vl(No_Scroll_Menu_No_Icons,0,0,314,30,6)%?La<|%?Lc<%Vs(invert)A%aRB>>
 #
-%Vl(No_Scroll_Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+%Vl(No_Scroll_Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
 #
-%Vl(No_Scroll_Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+%Vl(No_Scroll_Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
 #
-%Vl(No_Scroll_Menu_No_Icons,9,4,295,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+%Vl(No_Scroll_Menu_No_Icons,9,4,295,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
 #
 # CC: Album-list layout (%?La true only) -- see Menu_No_Icons. Kept shallow so
 # CC: ordinary sub-menus (which render through THIS config when the scrollbar is
 # CC: on) keep their exact baseline nesting depth and cannot overflow.
-%Vl(No_Scroll_Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
-%Vl(No_Scroll_Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+%Vl(No_Scroll_Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>|>
+%Vl(No_Scroll_Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
 %Vl(No_Scroll_Menu_No_Icons,54,11,260,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
-%Vl(No_Scroll_Menu_No_Icons,63,15,241,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+%Vl(No_Scroll_Menu_No_Icons,63,15,241,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
 #
 #
 #-- Menu top fill (square corners) --#
