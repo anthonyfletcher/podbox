@@ -291,6 +291,26 @@ struct listitem_viewport_cfg {
     bool    tile;
 };
 
+/* Skin variables: a named integer a skin can set (%vs), read back (%vg) and
+ * test the age of (%vl), which is how a skin holds state of its own between
+ * refreshes. Upstream gates these on HAVE_SKIN_VARIABLES, which it only defines
+ * for touchscreen targets; here they are always available. */
+struct skin_var {
+    OFFSETTYPE(const char *) label;
+    int value;
+    long last_changed;
+};
+struct skin_var_lastchange {
+    OFFSETTYPE(struct skin_var *) var;
+    long timeout;
+};
+struct skin_var_changer {
+    OFFSETTYPE(struct skin_var *) var;
+    int newval;
+    bool direct; /* true to make val=newval, false for val += newval */
+    int max;
+};
+
 
 /* wps_data
    this struct holds all necessary data which describes the
@@ -301,6 +321,7 @@ struct wps_data
 
     OFFSETTYPE(struct skin_element *) tree;
     OFFSETTYPE(struct skin_token_list *) images;
+    OFFSETTYPE(struct skin_token_list *) skinvars;
     OFFSETTYPE(int16_t *) font_ids;
     int16_t font_count;
     int16_t backdrop_id;
@@ -365,6 +386,7 @@ enum skin_find_what {
     SKIN_FIND_VP = 0,
     SKIN_FIND_UIVP,
     SKIN_FIND_IMAGE,
+    SKIN_VARIABLE,
 };
 void *skin_find_item(const char *label, enum skin_find_what what,
                      struct wps_data *data);

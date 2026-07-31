@@ -1960,6 +1960,28 @@ const char *get_token_value(struct gui_wps *gwps,
         case SKIN_TOKEN_LANG_IS_RTL:
             return lang_is_rtl() ? "r" : NULL;
 
+        case SKIN_TOKEN_VAR_GETVAL:
+        {
+            struct skin_var *var =
+                SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (intval)
+                *intval = var->value;
+            itoa_buf(buf, buf_size, var->value);
+            return buf;
+        }
+        case SKIN_TOKEN_VAR_TIMEOUT:
+        {
+            struct skin_var_lastchange *lc =
+                SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            struct skin_var *var = SKINOFFSETTOPTR(get_skin_buffer(data), lc->var);
+
+            /* 0xffff is the "never set" marker find_or_add_var() writes */
+            if (var->last_changed != 0xffff &&
+                TIME_BEFORE(current_tick, lc->timeout + var->last_changed))
+                return "t";
+            return NULL;
+        }
+
         default:
         {
             /* if the token is an RTC one, update the time

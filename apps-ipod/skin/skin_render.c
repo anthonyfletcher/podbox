@@ -335,6 +335,28 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
         case SKIN_TOKEN_UIVIEWPORT_ENABLE:
             sb_set_info_vp(gwps->display->screen_type, token->value.data);
             break;
+        case SKIN_TOKEN_VAR_SET:
+            {
+                struct skin_var_changer *data = SKINOFFSETTOPTR(skin_buffer, token->value.data);
+                struct skin_var *var = SKINOFFSETTOPTR(skin_buffer, data->var);
+                if (data->direct)
+                    var->value = data->newval;
+                else
+                {
+                    var->value += data->newval;
+                    if (data->max)
+                    {
+                        if (var->value > data->max)
+                            var->value = 1;
+                        else if (var->value < 1)
+                            var->value = data->max;
+                    }
+                }
+                if (var->value < 1)
+                    var->value = 1;
+                var->last_changed = current_tick;
+            }
+            break;
         case SKIN_TOKEN_PEAKMETER:
             data->peak_meter_enabled = true;
             if (do_refresh)
