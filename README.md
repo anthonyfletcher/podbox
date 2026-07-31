@@ -1,7 +1,3 @@
-<p align="center">
-<img src="docs/podbox/podbox-logo.png" alt="PodBox" width="400"/>
-<p>
-
 # PodBox
 
 New firmware for the iPod Classic and iPod Video with a focus on simplifying
@@ -182,8 +178,8 @@ I'm not a C programmer, so this project has been developed with extensive AI ass
 This is a hobby project, built because I wanted a version of Rockbox that better suited how I use my iPod. I'm sharing it in the hope that others might find it useful too.
 
 Built on the work of the [Rockbox](https://www.rockbox.org/) project, the
-[RockPod](https://github.com/nuxcodes/rockpod) project, the [Themify 2](https://git.sr.ht/~dook/Themify) theme
-by [Dook](https://d00k.net/) and art by [Thomodoro](https://thomodoro.com/).
+[RockPod](https://github.com/nuxcodes/rockpod) project and the [Themify 2](https://git.sr.ht/~dook/Themify) theme
+by [Dook](https://d00k.net/).
 
 ## Licence
 

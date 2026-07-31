@@ -19,6 +19,7 @@
 #include <stdlib.h>          /* atoi */
 #include <stdio.h>           /* snprintf */
 #include <string.h>
+#include "string-extra.h"    /* strmemccpy */
 #include "config.h"
 #include "file.h"            /* off_t, open/close/rename/remove, fdprintf */
 #include "rbpaths.h"         /* ROCKBOX_DIR */
@@ -327,10 +328,24 @@ static off_t tv_page(off_t start, bool render)
  * margin border and any loading splash before the page is drawn inset. */
 static void tv_fullscreen_vp(struct viewport *vp)
 {
-    /* viewport_set_fullscreen() runs lcd_init_viewport() before it writes the
-     * struct, and that reads vp->buffer -- so it must be cleared first, exactly
-     * as viewport_set_defaults() does. Skipping it dereferences stack garbage. */
+    /* Both fields must be set before viewport_set_fullscreen(), which writes
+     * neither -- exactly as viewport_set_defaults() does it. Callers pass a
+     * bare stack struct, so anything left unset here is stack garbage.
+     *
+     * buffer, because viewport_set_fullscreen() runs lcd_init_viewport()
+     * first and that dereferences it.
+     *
+     * flags, because a stray VP_FLAG_OWNER_UPDATE (0x2000) makes
+     * lcd_update_viewport() return without transferring anything
+     * (lcd-bitmap-common.c). Drawing still lands in the framebuffer, so the
+     * page is simply never sent to the panel: the reader looks frozen on
+     * whatever was last displayed, while paging, input and redraws all carry
+     * on underneath. Waking the LCD hides it again -- lcd_awake() pushes the
+     * whole framebuffer directly, so the current page appears and the next
+     * keypress goes missing in the same way. set_default_align_flags() only
+     * rewrites the alignment bits, so it cannot clear this one. */
     vp->buffer = NULL;
+    vp->flags = VP_DEFAULT_FLAGS;
     viewport_set_fullscreen(vp, SCREEN_MAIN);
     vp->bg_pattern = tv.vp.bg_pattern;
 }
@@ -585,6 +600,39 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
 
     remove(TV_RESUME_FILE);
     rename(TV_RESUME_FILE ".tmp", TV_RESUME_FILE);
+}
+
+/* The document on the newest line, for the main menu's "Continue reading".
+ *
+ * The parse lives here rather than in the caller because the format is this
+ * file's: two space-delimited numbers, then the path as everything left. The
+ * path is last precisely so it may contain spaces, so it cannot be picked out
+ * by tokenising the line.
+ *
+ * Says nothing about whether the document still exists -- that is the
+ * caller's to check, since it is the caller who has to decide what to do
+ * about it. */
+bool text_viewer_last_document(char *buf, size_t bufsize)
+{
+    int fd = open(TV_RESUME_FILE, O_RDONLY);
+    char line[MAX_PATH + 32];
+    char *path;
+    bool found = false;
+
+    if (fd < 0)
+        return false;
+
+    if (read_line(fd, line, sizeof line) > 0
+        && (path = strchr(line, ' ')) != NULL
+        && (path = strchr(path + 1, ' ')) != NULL
+        && path[1] != '\0')
+    {
+        strmemccpy(buf, path + 1, bufsize);
+        found = true;
+    }
+
+    close(fd);
+    return found;
 }
 
 /* ---- lifecycle -------------------------------------------------------- */

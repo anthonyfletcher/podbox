@@ -1985,7 +1985,16 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
 /* Load the track's folder art from the pre-scaled cache (the 300px "wps"
  * thumbnail). Returns a handle, or an error when there is no real cached art --
  * the placeholder is rejected so an artless album falls through to the theme's
- * own no-art state rather than showing the cache's "?" thumbnail. */
+ * own no-art state rather than showing the cache's "?" thumbnail.
+ *
+ * Which picture that is depends on wps_art_source. The cache holds album and
+ * artist art alike, both keyed by a folder path, so choosing between them is
+ * only a matter of which folder to ask about: the track's own folder for the
+ * album, its parent for the artist. That mirrors how art_cache.c fills them
+ * (see the parent-folder pass in aa_run_pass()), and it is why artist art
+ * exists only for <artist>/<album>/<track> layouts -- a library with no
+ * distinct parent folder has nothing for the artist to be keyed on, and falls
+ * through to the no-art state above. */
 static int load_cached_albumart(struct mp3entry *track_id3,
                                 struct bufopen_bitmap_data *user_data,
                                 bool is_current_track, int i)
@@ -2009,6 +2018,16 @@ static int load_cached_albumart(struct mp3entry *track_id3,
         return ERR_UNSUPPORTED_TYPE;
     memcpy(dir, track_id3->path, dlen);
     dir[dlen] = '\0';
+
+    if (global_settings.wps_art_source == WPS_ART_ARTIST)
+    {
+        /* Up one level. A track sitting at the volume root has no parent to
+         * rise to, and truncating to "" would key on the whole volume. */
+        char *psep = strrchr(dir, '/');
+        if (!psep || psep == dir)
+            return ERR_UNSUPPORTED_TYPE;
+        *psep = '\0';
+    }
 
     if (!art_cache_lookup(dir, wps_size_idx, path, sizeof(path), &is_fallback)
         || is_fallback)
@@ -2037,8 +2056,23 @@ static int audio_load_albumart(struct track_info *infop,
         memset(&user_data, 0, sizeof(user_data));
         user_data.dim = &albumart_slots[i].dim;
 
+        /* Artist art has exactly one source: the artist folder's cached
+         * thumbnail. Every other source below is album art by definition --
+         * embedded tags and folder images both belong to the record, not the
+         * performer -- so an artist with no portrait must end with no
+         * artwork rather than quietly falling through to the album cover.
+         * Missing portraits are meant to be visible; that is what the art
+         * cache health screen reports on. */
+        bool artist_art = global_settings.wps_art_source == WPS_ART_ARTIST;
+
         char path[MAX_PATH];
-        if (global_settings.album_art == AA_PREFER_CACHE)
+        if (artist_art)
+        {
+            if (global_settings.album_art != AA_OFF)
+                hid = load_cached_albumart(track_id3, &user_data,
+                                           is_current_track, i);
+        }
+        else if (global_settings.album_art == AA_PREFER_CACHE)
         {
             /* cache first: the other sources below chain on hid < 0, so a hit
              * here skips them */
@@ -2056,7 +2090,7 @@ static int audio_load_albumart(struct track_info *infop,
         }
 
         /* We can only decode jpeg for embedded AA */
-        if (global_settings.album_art != AA_OFF &&
+        if (!artist_art && global_settings.album_art != AA_OFF &&
             hid < 0 && hid != ERR_BUFFER_FULL &&
             track_id3->has_embedded_albumart && (track_id3->albumart.type & AA_CLEAR_FLAGS_MASK) == AA_TYPE_JPG)
         {
@@ -2099,7 +2133,8 @@ static int audio_load_albumart(struct track_info *infop,
             }
         }
 
-        if (global_settings.album_art != AA_OFF && !checked_image_file &&
+        if (!artist_art && global_settings.album_art != AA_OFF &&
+            !checked_image_file &&
             hid < 0 && hid != ERR_BUFFER_FULL)
         {
             /* No embedded AA or it couldn't be loaded - try other sources */
@@ -2112,7 +2147,7 @@ static int audio_load_albumart(struct track_info *infop,
 
         /* Last resort for the non-cache-first settings: the pre-scaled cache
          * (cache-first already tried it above). */
-        if (global_settings.album_art != AA_OFF &&
+        if (!artist_art && global_settings.album_art != AA_OFF &&
             global_settings.album_art != AA_PREFER_CACHE &&
             hid < 0 && hid != ERR_BUFFER_FULL)
         {

@@ -55,12 +55,24 @@ struct album_data {
     int name_idx;     /* offset to the album name */
     int artist_idx;   /* offset to the artist name */
     int year;         /* album year */
+    /* Playback history, summarised over the album's tracks by
+     * assign_album_stats(). The album charts sort on these; nothing else
+     * reads them. Both are 0 for an album that has never been played, which
+     * is why the charts exclude 0 rather than showing it at one end. */
+    int playcount;    /* total plays across the album */
+    long lastplayed;  /* the most recent of its tracks */
     long artist_seek; /* artist taglist position */
     long seek;        /* album taglist position */
 };
 
 struct artist_data {
     int name_idx; /* offset to the artist name */
+    /* As struct album_data's pair, summarised over everything by this artist.
+     * "Artist" here is the album artist -- the tag this list is built from
+     * (see build_artist_index()) -- so a guest appearance counts towards the
+     * record's artist, not the guest. */
+    int playcount;
+    long lastplayed;
     long seek;    /* artist taglist position */
 };
 
@@ -153,7 +165,7 @@ int  get_scroll_line_offset(enum pf_scroll_line_type type);
 struct viewport *carousel_text_begin(void);
 void carousel_text_end(struct viewport *saved);
 /* build_artist_index() belongs to the index builder -- see
- * database/album_index.h. */
+ * database/db_index.h. */
 /* Persist the engine's pf_cfg to its config file (album model calls this after
  * changing last_album / triggering a cache rebuild). */
 void pf_config_save(void);

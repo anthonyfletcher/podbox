@@ -290,6 +290,7 @@ MENUITEM_FUNCTION_W_PARAM(browse_themes, 0, ID2P(LANG_CUSTOM_THEME),
 MENUITEM_SETTING(cursor_style, &global_settings.cursor_style, NULL);
 MENUITEM_SETTING(sep_menu, &global_settings.list_separator_height, NULL);
 MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
+MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
 
 MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             NULL, Icon_Wps,
@@ -304,4 +305,5 @@ MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             &sep_menu,
             &colors_settings,
             &dynamic_colors,
+            &wps_art_source,
 );

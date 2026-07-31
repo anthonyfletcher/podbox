@@ -82,7 +82,7 @@
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
 #include "carousel.h"     /* shared carousel engine interface (pf_idx, model, ...) */
-#include "database/album_index.h" /* the album/artist list this model shows */
+#include "database/db_index.h" /* the album/artist list this model shows */
 
 /** Globals **/
 
@@ -213,7 +213,7 @@ static int  album_on_menu(void);
 static void album_prepare(void);
 
 static const struct carousel_model album_model = {
-    .build_index = album_index_build,
+    .build_index = db_index_build,
     .count       = album_count,
     .slide_art   = get_slide_dir,
     .legacy_art  = album_legacy_art,
@@ -593,7 +593,7 @@ static void album_covers_rebuild_cache(void)
     pf_cfg.update_albumart = false;
     pf_cfg.cache_version = CACHE_REBUILD;
     remove(EMPTY_SLIDE);
-    album_index_invalidate();  /* so the background pass rebuilds too */
+    db_index_invalidate();  /* so the background pass rebuilds too */
     pf_config_save();
 }
 
@@ -602,7 +602,7 @@ static void album_covers_update_cache(void)
     pf_cfg.update_albumart = true;
     pf_cfg.cache_version = CACHE_REBUILD;
     remove(EMPTY_SLIDE);
-    album_index_invalidate();  /* so the background pass rebuilds too */
+    db_index_invalidate();  /* so the background pass rebuilds too */
     pf_config_save();
 }
 

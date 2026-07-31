@@ -52,6 +52,8 @@
 #include "widgets/splash.h"
 #include "draw/icon_bitmaps.h"
 #include "browser.h"
+#include "root_menu.h"   /* GO_TO_* codes the synthetic rows return */
+#include "album_charts.h"
 #include "input/action.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
@@ -122,6 +124,13 @@ enum table {
     TABLE_ALLSUBENTRIES,
     TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS,
     TABLE_PLAYTRACK,
+    /* Not tables at all: the markers on the synthetic rows load_root() adds,
+     * meaning "leave the browser and do this instead". The chart row carries
+     * which chart in its extraseek. Append only -- these values are stored in
+     * tagentry.newtable and compared back, so renumbering changes what an
+     * already-drawn row means. */
+    TABLE_ALBUM_CHARTS,
+    TABLE_RANDOM_ALBUM,
 };
 
 static const struct id3_to_search_mapping {
@@ -2001,10 +2010,108 @@ entry_skip_formatter:
 
 }
 
+/* Does this "==>" row lead anywhere?
+ *
+ * An "==>" naming a menu that was never defined does not fail to parse: the
+ * parser allocates an empty menu and links to it (see the menu_load case in
+ * parse_search()). The row then exists and opens a blank list. That is exactly
+ * what a "Custom menu" row does on a player with no tagnavi_custom.config --
+ * which is every player, until someone writes one.
+ *
+ * So a submenu row is shown only once its menu has something in it. Nothing
+ * here is specific to the custom menu; any "==>" pointing at an empty or
+ * missing menu is hidden, and appears by itself the moment a config gives it
+ * contents. The generated %byfirstletter menus are unaffected -- those are
+ * filled with 28 real rows at parse time. */
+static bool row_submenu_has_items(const struct menu_entry *item)
+{
+    return item->link >= 0 && item->link < menu_count
+        && menus[item->link] && menus[item->link]->itemcount > 0;
+}
+
+/* The tagnavi menu these rows attach to, by its config id rather than its
+ * position, so reordering tagnavi.config cannot move them somewhere else.
+ * -1 if the user's config has no such menu, in which case the rows simply do
+ * not appear. */
+static int menu_index_by_id(const char *id)
+{
+    int i;
+    for (i = 0; i < menu_count; i++)
+    {
+        if (!strcasecmp(menus[i]->id, id))
+            return i;
+    }
+    return -1;
+}
+
+/* Is this a tag-browse row on the given tag? Used to find the Music menu's
+ * "Album" row by what it does rather than by its name or position.
+ *
+ * Not unique: "Recently Added" also browses tag_album first, so the caller
+ * must take the first match rather than every one. */
+static bool row_browses_tag(const struct menu_entry *item, int tag)
+{
+    return item->type == menu_next && item->si.tagorder_count > 0
+        && item->si.tagorder[0] == tag;
+}
+
+/* Does this row carry the given label? The Playback History rows are anchored
+ * this way because, unlike the Album row, they are all `-> title` searches
+ * distinguished only by their clauses -- there is nothing structural to match
+ * on. Matching the shipped tagnavi.config's own English strings, so a user who
+ * replaces that menu simply loses the anchor and the row is appended instead
+ * (see load_root()). */
+static bool row_named(const struct menu_entry *item, const char *name)
+{
+    return strcmp((const char *)P2STR((unsigned char *)item->name), name) == 0;
+}
+
+/* One row that came from here rather than from tagnavi.config. 'param' is
+ * carried in extraseek for the marker to interpret. */
+static void add_synthetic_row(struct tagentry **dptr, int lang_id,
+                              int marker, int param)
+{
+    (*dptr)->name = (char*)ID2P(lang_id);
+    (*dptr)->newtable = marker;
+    (*dptr)->extraseek = param;
+    (*dptr)->customaction = ONPLAY_NO_CUSTOMACTION;
+    (*dptr)++;
+}
+
+/* The album charts, and where each one slots into Playback History. Kept as a
+ * table so the order shown is the order written here, next to the anchors that
+ * put it there: each chart follows the track-level row it is the album
+ * counterpart of. */
+static const struct {
+    int lang_id;
+    enum album_chart kind;
+    const char *after;      /* row to follow, or NULL to append */
+} album_chart_rows[] = {
+    /* Album then artist under each track-level row, so the menu reads
+     * tracks / albums / artists for each kind of history. Order within one
+     * anchor is the order written here. */
+    { LANG_MOST_PLAYED_ALBUMS,      ALBUM_CHART_MOST_PLAYED,
+      "Most played tracks" },
+    { LANG_MOST_PLAYED_ARTISTS,     ARTIST_CHART_MOST_PLAYED,
+      "Most played tracks" },
+    { LANG_RECENTLY_PLAYED_ALBUMS,  ALBUM_CHART_RECENTLY_PLAYED,
+      "Recently played tracks" },
+    { LANG_RECENTLY_PLAYED_ARTISTS, ARTIST_CHART_RECENTLY_PLAYED,
+      "Recently played tracks" },
+    { LANG_FORGOTTEN_ALBUMS,        ALBUM_CHART_FORGOTTEN,
+      "Never played tracks" },
+    { LANG_FORGOTTEN_ARTISTS,       ARTIST_CHART_FORGOTTEN,
+      "Never played tracks" },
+};
+#define ALBUM_CHART_ROWS ((int)ARRAYLEN(album_chart_rows))
+
 static int load_root(struct browser_context *c)
 {
     struct tagentry *dptr = core_get_data(c->cache.entries_handle);
-    int i;
+    bool chart_placed[ALBUM_CHART_ROWS] = { 0 };
+    bool random_placed = false;
+    bool is_runtime_menu;
+    int i, n, rows = 0;
 
     tc = c;
     c->currtable = TABLE_ROOT;
@@ -2020,11 +2127,23 @@ static int load_root(struct browser_context *c)
     if (menu == NULL)
         return 0;
 
-    if (menu->itemcount > c->cache.max_entries)
+    is_runtime_menu = (c->currextra == menu_index_by_id("runtime"));
+
+    /* Room for the synthetic rows added below -- three on Playback History,
+     * one on the Music root, never both. Counting them here is not optional:
+     * this panics rather than truncating. */
+    if (menu->itemcount + SYNTHETIC_ROWS_MAX > c->cache.max_entries)
             panicf("%s browser_cache too small", __func__);
 
     for (i = 0; i < menu->itemcount; i++)
     {
+        /* A submenu that leads nowhere is not drawn -- see
+         * row_submenu_has_items(). This is the row itself being skipped;
+         * root_row_is_shortcutable() keeps the same row out of the main-menu
+         * offer list, so the two stay consistent. */
+        if (menu->items[i]->type == menu_load
+            && !row_submenu_has_items(menu->items[i]))
+            continue;
 
         dptr->name = (char*)menu->items[i]->name;
 
@@ -2059,21 +2178,111 @@ static int load_root(struct browser_context *c)
         }
 
         dptr++;
+        rows++;
+
+        /* Random album, immediately beneath the Music menu's Album row --
+         * requested there rather than at the foot, since it is an album
+         * action. Anchored to the row that browses tag_album so it follows
+         * that row wherever tagnavi.config puts it, but only the first such
+         * row: "Recently Added" browses tag_album too, and matching every one
+         * put a second copy of this row halfway down the menu. */
+        if (c->currextra == rootmenu && !random_placed
+            && row_browses_tag(menu->items[i], tag_album))
+        {
+            add_synthetic_row(&dptr, LANG_RANDOM_ALBUM, TABLE_RANDOM_ALBUM, 0);
+            random_placed = true;
+            rows++;
+        }
+
+        /* Each album chart follows its track-level counterpart, so Playback
+         * History reads tracks-then-albums for each kind of history rather
+         * than listing all the album ones at the end. They cannot be config
+         * rows: a %format groups by the tag it displays and sorts on the
+         * formatted string, so "sum playcount across an album" is not
+         * expressible (see screens/browse/album_charts.c). Their labels come
+         * from the language file, so they are translated. */
+        if (is_runtime_menu)
+        {
+            for (n = 0; n < ALBUM_CHART_ROWS; n++)
+            {
+                if (chart_placed[n] || !album_chart_rows[n].after
+                    || !row_named(menu->items[i], album_chart_rows[n].after))
+                    continue;
+
+                /* No break: two rows share each anchor (the album chart and
+                 * the artist one), and both belong under it. */
+                add_synthetic_row(&dptr, album_chart_rows[n].lang_id,
+                                  TABLE_ALBUM_CHARTS, album_chart_rows[n].kind);
+                chart_placed[n] = true;
+                rows++;
+            }
+        }
+    }
+
+    /* Anything whose anchor was not found -- a replaced Playback History menu,
+     * or renamed rows -- goes at the end rather than disappearing. */
+    if (is_runtime_menu)
+    {
+        for (n = 0; n < ALBUM_CHART_ROWS; n++)
+        {
+            if (chart_placed[n])
+                continue;
+            add_synthetic_row(&dptr, album_chart_rows[n].lang_id,
+                              TABLE_ALBUM_CHARTS, album_chart_rows[n].kind);
+            rows++;
+        }
     }
 
     current_offset = 0;
-    current_entry_count = i;
+    current_entry_count = rows;
 
-    return i;
+    return rows;
 }
 
 /* Set by browser_db_enter_by_tag_on_next_load(); consumed the next time
  * browser_db_load() sees a fresh root load. -1 means none armed. */
 static int pending_root_shortcut_tag = -1;
+/* Its submenu counterpart; empty when none is armed. */
+static char pending_root_shortcut_menu[MAX_MENU_ID_SIZE];
 
 void browser_db_enter_by_tag_on_next_load(int tag)
 {
     pending_root_shortcut_tag = tag;
+    pending_root_shortcut_menu[0] = '\0';
+}
+
+/* The submenu counterpart, armed by id ("runtime" and so on) rather than by
+ * position for the same reason the tag version uses tag identity: a row that
+ * moves in tagnavi.config must still be found. */
+void browser_db_enter_menu_on_next_load(const char *menu_id)
+{
+    pending_root_shortcut_tag = -1;
+    strmemccpy(pending_root_shortcut_menu, menu_id,
+               sizeof(pending_root_shortcut_menu));
+}
+
+/* Which root row opens the submenu with this id, or -1. */
+static int find_root_entry_by_menu_id(const char *menu_id)
+{
+    struct menu_root *root;
+    int i;
+
+    if (rootmenu < 0 || rootmenu >= menu_count)
+        return -1;
+    root = menus[rootmenu];
+    if (!root)
+        return -1;
+
+    for (i = 0; i < root->itemcount; i++)
+    {
+        if (root->items[i]->type == menu_load
+            && root->items[i]->link >= 0
+            && root->items[i]->link < menu_count
+            && menus[root->items[i]->link]
+            && !strcasecmp(menus[root->items[i]->link]->id, menu_id))
+            return i;
+    }
+    return -1;
 }
 
 /* Set by browser_db_enter_album_tracks_on_next_load(); consumed on the next
@@ -2241,11 +2450,35 @@ static bool enter_artist_albums_directly(struct browser_context *c,
  * two look directly at menus[rootmenu] (populated by parse_menu() at boot)
  * rather than the file-scope 'menu' pointer load_root() sets, since
  * root_menu.c may query this before any browsing has actually happened. */
-bool browser_db_get_main_menu_tag_row(int index, int *out_tag,
-                                   const unsigned char **out_name)
+/* Can this root-menu row be offered as a main-menu shortcut?
+ *
+ * Both kinds qualify: a "->" row that browses a tag, and a "==>" row that
+ * opens a submenu. Only the first kind used to, which is why Playback History
+ * -- a submenu -- could not be put on the main menu however much it looked
+ * like it should be. What rules a row out is having no stable identity to arm
+ * a jump with: a tag browse with no tags, or a submenu whose link does not
+ * resolve. Everything else (shuffle, by-first-letter) is an action rather than
+ * a place, and there is nothing to return to. */
+static bool root_row_is_shortcutable(const struct menu_entry *item)
+{
+    if (item->type == menu_next)
+        return item->si.tagorder_count > 0;
+    if (item->type == menu_load)
+        return row_submenu_has_items(item);
+    return false;
+}
+
+bool browser_db_get_main_menu_row(int index, int *out_tag,
+                                  const char **out_menu_id,
+                                  const unsigned char **out_name)
 {
     struct menu_root *root;
     int i, count = 0;
+
+    if (out_tag)
+        *out_tag = -1;
+    if (out_menu_id)
+        *out_menu_id = NULL;
 
     if (rootmenu < 0 || rootmenu >= menu_count)
         return false;
@@ -2256,14 +2489,19 @@ bool browser_db_get_main_menu_tag_row(int index, int *out_tag,
 
     for (i = 0; i < root->itemcount; i++)
     {
-        if (root->items[i]->type != menu_next ||
-            root->items[i]->si.tagorder_count == 0)
+        if (!root_row_is_shortcutable(root->items[i]))
             continue;
 
         if (count == index)
         {
-            if (out_tag)
-                *out_tag = root->items[i]->si.tagorder[0];
+            if (root->items[i]->type == menu_next)
+            {
+                if (out_tag)
+                    *out_tag = root->items[i]->si.tagorder[0];
+            }
+            else if (out_menu_id)
+                *out_menu_id = menus[root->items[i]->link]->id;
+
             if (out_name)
                 *out_name = root->items[i]->name;
             return true;
@@ -2287,8 +2525,7 @@ int browser_db_get_main_menu_tag_row_count(void)
 
     for (i = 0; i < root->itemcount; i++)
     {
-        if (root->items[i]->type == menu_next &&
-            root->items[i]->si.tagorder_count > 0)
+        if (root_row_is_shortcutable(root->items[i]))
             count++;
     }
     return count;
@@ -2317,6 +2554,31 @@ int browser_db_load(struct browser_context* c)
      * rockbox_browse() is called -- rockbox_browse() unconditionally resets
      * dirlevel/selected_item to 0 for any ID3-DB entry (tree.c), which would
      * silently discard a dirlevel bump made any earlier. */
+    /* The submenu form of the same thing, for a root row that opens a nested
+     * menu ("Playback History ==> runtime") rather than browsing a tag. One
+     * plain hop: select the row and enter it, exactly as pressing it would. */
+    if (pending_root_shortcut_menu[0] && table == TABLE_ROOT
+        && c->dirlevel == 0)
+    {
+        char target[MAX_MENU_ID_SIZE];
+        int idx;
+
+        strmemccpy(target, pending_root_shortcut_menu, sizeof(target));
+        pending_root_shortcut_menu[0] = '\0';
+
+        load_root(c);
+
+        idx = find_root_entry_by_menu_id(target);
+        if (idx >= 0)
+        {
+            c->selected_item = idx;
+            browser_db_enter(c, false);
+            return browser_db_load(c);
+        }
+        /* Submenu gone (a customised tagnavi_user.config) -- fall through and
+         * show the root menu rather than a dead end, as the tag case does. */
+    }
+
     if (pending_root_shortcut_tag != -1 && table == TABLE_ROOT && c->dirlevel == 0)
     {
         int target_tag = pending_root_shortcut_tag;
@@ -2503,6 +2765,22 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             c->selected_item = random_item;
     }
     newextra = dptr->newtable;
+
+    /* The synthetic rows are actions, not browse levels. Leaving here --
+     * before any of the history/dirlevel bookkeeping below, and before the
+     * cache lock is taken -- is what makes returning from one land back on
+     * this menu exactly as it was. Descending first and unwinding afterwards
+     * would have to undo four separate pieces of state.
+     *
+     * Which chart is in the row's extraseek, already read into 'seek'; the
+     * armed value is picked up by root_menu.c's dispatch. */
+    if (newextra == TABLE_ALBUM_CHARTS)
+    {
+        album_charts_arm(seek);
+        return GO_TO_ALBUM_CHARTS;
+    }
+    if (newextra == TABLE_RANDOM_ALBUM)
+        return GO_TO_RANDOM_ALBUM;
 
     if (c->dirlevel >= MAX_DIR_LEVELS)
         return 0;

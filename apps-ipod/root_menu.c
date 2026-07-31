@@ -50,8 +50,11 @@
 #endif
 #include "database/tagcache.h"
 #include "screens/covers/album_covers.h"
+#include "screens/browse/album_charts.h"
+#include "screens/browse/browser_flat.h"
 #include "speech/language.h"
 #include "files/filetypes.h"
+#include "viewers/text_viewer/text_viewer.h"
 #include "disk.h"
 #include "sound.h"
 
@@ -228,10 +231,12 @@ static int browser(void* param)
         {
             int slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
             int target_tag;
+            const char *target_menu;
 
             if (!wait_for_tagcache_ready())
                 return GO_TO_PREVIOUS;
-            if (!browser_db_get_main_menu_tag_row(slot, &target_tag, NULL))
+            if (!browser_db_get_main_menu_row(slot, &target_tag, &target_menu,
+                                              NULL))
                 return GO_TO_PREVIOUS; /* slot not backed by a real row */
 
             filter = SHOW_ID3DB;
@@ -246,9 +251,16 @@ static int browser(void* param)
              * ID3-DB entry, but NOT currtable/currextra, so those must be
              * forced back to the root here or browser_db_load() will just keep
              * showing whatever table was last displayed and the armed
-             * shortcut below will never see a fresh root load to apply on. */
+             * shortcut below will never see a fresh root load to apply on.
+             *
+             * A row is one of two kinds: a tag browse, or a submenu such as
+             * Playback History. Whichever identity came back is the one to arm
+             * with -- see browser_db_get_main_menu_row(). */
             tc->currtable = 0;
-            browser_db_enter_by_tag_on_next_load(target_tag);
+            if (target_menu)
+                browser_db_enter_menu_on_next_load(target_menu);
+            else
+                browser_db_enter_by_tag_on_next_load(target_tag);
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         }
         break;
@@ -521,6 +533,57 @@ static int artist_portraits_scrn(void* param)
     return artist_portraits(NULL);
 }
 
+/* The text viewer restores the reading position itself, so this only has to
+ * find the document. lastdoc_available() has normally already hidden the row
+ * when there is nothing to open, but it is asked when the menu is drawn and
+ * the file can go away between then and the keypress -- hence the same
+ * question again here, with something to say when the answer has changed. */
+static int lastdoc_scrn(void* param)
+{
+    char path[MAX_PATH];
+    (void)param;
+
+    if (!text_viewer_last_document(path, sizeof(path)) || !file_exists(path))
+    {
+        splash(HZ*2, ID2P(LANG_FILE_NOT_FOUND));
+        return GO_TO_PREVIOUS;
+    }
+    return text_viewer(path);
+}
+
+/* Both read the album index, which is derived from the database -- so they
+ * need the same wait the database screens do, not merely a database that
+ * exists. */
+static int album_charts_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return album_charts_run();
+}
+
+static int random_album_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return album_random();
+}
+
+/* No database wait for these two: their list comes from the file index, which
+ * walks the disk itself and knows nothing about the tag database. */
+static int documents_scrn(void* param)
+{
+    (void)param;
+    return browser_flat(false);
+}
+
+static int images_scrn(void* param)
+{
+    (void)param;
+    return browser_flat(true);
+}
+
 /* These are all static const'd from apps/menus/ *.c
    so little hack so we can use them */
 extern struct menu_item_ex
@@ -548,6 +611,11 @@ static const struct root_items items[] = {
     [GO_TO_SHORTCUTMENU] = { do_shortcut_menu, NULL, NULL },
     [GO_TO_PICTUREFLOW] = { pictureflow_scrn, NULL, NULL },
     [GO_TO_ARTIST_PORTRAITS] = { artist_portraits_scrn, NULL, NULL },
+    [GO_TO_LASTDOC] = { lastdoc_scrn, NULL, &text_viewer_menu },
+    [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
+    [GO_TO_RANDOM_ALBUM] = { random_album_scrn, NULL, &tagcache_menu },
+    [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
+    [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
 /* One reserved slot per tagnavi.config root-menu tag-browse row (see
  * GO_TO_TAGNAVI_FIRST in root_menu.h); all share the same dispatch function
@@ -596,6 +664,14 @@ MENUITEM_RETURNVALUE(pictureflow_item, ID2P(LANG_ALBUM_COVERS), GO_TO_PICTUREFLO
                         NULL, Icon_Rockbox);
 MENUITEM_RETURNVALUE(artist_portraits_item, ID2P(LANG_ARTIST_PORTRAITS), GO_TO_ARTIST_PORTRAITS,
                         NULL, Icon_Rockbox);
+MENUITEM_RETURNVALUE(continue_reading, ID2P(LANG_CONTINUE_READING), GO_TO_LASTDOC,
+                        item_callback, Icon_Font);
+MENUITEM_RETURNVALUE(random_album_item, ID2P(LANG_RANDOM_ALBUM), GO_TO_RANDOM_ALBUM,
+                        NULL, Icon_Audio);
+MENUITEM_RETURNVALUE(documents_item, ID2P(LANG_DOCUMENTS), GO_TO_DOCUMENTS,
+                        NULL, Icon_Font);
+MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
+                        NULL, Icon_Font);
 
 /* Dynamic-text menu items for the reserved GO_TO_TAGNAVI_FIRST.. slots: the
  * displayed name/voice for slot N is fetched fresh from browser_db's parsed
@@ -611,7 +687,7 @@ static char *tagnavi_item_get_name(int selected_item, void *data,
     int index = (int)(intptr_t)data;
     const unsigned char *name;
 
-    if (!browser_db_get_main_menu_tag_row(index, NULL, &name))
+    if (!browser_db_get_main_menu_row(index, NULL, NULL, &name))
     {
         buffer[0] = '\0';
         return buffer;
@@ -626,7 +702,7 @@ static int tagnavi_item_speak(int selected_item, void *data)
     int index = (int)(intptr_t)data;
     const unsigned char *name;
 
-    if (browser_db_get_main_menu_tag_row(index, NULL, &name))
+    if (browser_db_get_main_menu_row(index, NULL, NULL, &name))
     {
         int id = P2ID(name);
         if (id != -1)
@@ -691,6 +767,10 @@ static struct menu_table menu_table[] = {
     { "database", &db_browser },
     { "files", &file_browser },
     { "wps", &wps_item },
+    { "reading", &continue_reading },
+    { "random", &random_album_item },
+    { "docs", &documents_item },
+    { "images", &images_item },
     { "playlists", &playlists },
     { "shortcuts", &shortcut_menu },
     { "settings", &menu_ },
@@ -734,11 +814,12 @@ static struct menu_item_ex *root_menu__[MAX_MENU_ITEMS];
 static void root_menu_apply_canonical_order(void)
 {
     static const struct menu_item_ex * const before_tagnavi[] = {
-        &wps_item,
+        &wps_item, &continue_reading,
         &db_browser, &pictureflow_item, &artist_portraits_item,
+        &random_album_item,
     };
     static const struct menu_item_ex * const after_tagnavi[] = {
-        &playlists, &file_browser, &shortcut_menu,
+        &playlists, &documents_item, &images_item, &file_browser, &shortcut_menu,
         &menu_, &system_menu_,
     };
     struct menu_item_ex *reordered[MAX_MENU_ITEMS];
@@ -1018,6 +1099,17 @@ void root_menu_set_default(void* setting, void* defaultval)
          * not included here. */
         if ((int)i >= tagnavi_start)
             continue;
+        /* Likewise off to begin with. Random album already has a home in the
+         * Music menu, just under Album, so leaving it out of the root menu
+         * costs nothing but a level of nesting -- and a root entry that plays
+         * something the moment it is chosen is not one to hand someone
+         * unasked. Documents and Images are off because most players hold
+         * neither; on a device with no documents on it they would be two rows
+         * that only ever say there is nothing to show. */
+        if (menu_table[i].item == &random_album_item
+            || menu_table[i].item == &documents_item
+            || menu_table[i].item == &images_item)
+            continue;
         root_menu__[out++] = (struct menu_item_ex *)menu_table[i].item;
     }
     root_menu_.flags |= MENU_ITEM_COUNT(out);
@@ -1057,6 +1149,19 @@ static int item_callback(int action,
                 if (!audio_status() &&
                     global_status.resume_index == -1 &&
                     !file_exists(PLAYLIST_CONTROL_FILE))
+                    return ACTION_EXIT_MENUITEM;
+            }
+            else if (this_item == &continue_reading)
+            {
+                /* Hide the row unless there is a document to reopen. Costs
+                 * the same two file lookups the row above already spends,
+                 * and on the same terms: this runs while the menu is being
+                 * drawn for someone who just pressed a button, not on a
+                 * timer, so it is not disk traffic that can hold off
+                 * spindown or idle poweroff. */
+                char path[MAX_PATH];
+                if (!text_viewer_last_document(path, sizeof(path)) ||
+                    !file_exists(path))
                     return ACTION_EXIT_MENUITEM;
             }
         break;

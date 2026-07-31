@@ -36,6 +36,8 @@
 #include "screens/context_menu.h"
 #include "system/activity.h"
 #include "system/bg_task.h"      /* tagcache_task, the standard triggers */
+#include "screens/covers/album_covers.h"  /* album_covers_task (the db index) */
+#include "files/file_index.h"
 #include "screens/system/bg_task_info.h"
 #include "system/format_time.h"
 #include "system/volume.h"
@@ -97,11 +99,35 @@ MENUITEM_FUNCTION(tc_paths, 0, ID2P(LANG_SELECT_DATABASE_DIRS),
 MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
 MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
 
+/* The album and artist list derived from the database -- what the carousels
+ * scroll and the charts rank. Rebuild discards it and reads the database
+ * again; update keeps what still applies. Here rather than with the carousel
+ * settings because it is derived from the database and goes stale when the
+ * database changes, not when the carousel does anything. */
+static int db_index_rebuild(void)
+{
+    if (yesno_pop_confirm(ID2P(LANG_REBUILD_INDEX)))
+        bg_task_rebuild(&album_covers_task);
+    return 0;
+}
+MENUITEM_FUNCTION(db_index_rebuild_item, 0, ID2P(LANG_REBUILD_INDEX),
+                  db_index_rebuild, NULL, Icon_NOICON);
+
+static int db_index_update(void)
+{
+    if (yesno_pop_confirm(ID2P(LANG_UPDATE_INDEX)))
+        bg_task_update(&album_covers_task);
+    return 0;
+}
+MENUITEM_FUNCTION(db_index_update_item, 0, ID2P(LANG_UPDATE_INDEX),
+                  db_index_update, NULL, Icon_NOICON);
+
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
                 &tagcache_scan_on_eject, &tagcache_scan_on_startup,
                 &tc_init, &tc_update, &runtimedb,
+                &db_index_rebuild_item, &db_index_update_item,
                 &db_albumart, &db_artistart,
                 &tc_export, &tc_import, &tc_paths, &debug_log_tagcache
                 );
@@ -153,6 +179,18 @@ static int clear_start_directory(void)
     splash(HZ, ID2P(LANG_RESET_DONE_CLEAR));
     return false;
 }
+/* The flat Documents and Images lists come from a background walk of the
+ * disk. It reruns itself after a USB session, which is when files normally
+ * change; this is for when they changed some other way. */
+static int file_index_rescan(void)
+{
+    bg_task_update(&file_index_task);
+    splash(HZ, ID2P(LANG_WAIT));
+    return 0;
+}
+MENUITEM_FUNCTION(file_index_rescan_item, 0, ID2P(LANG_REBUILD_FILE_INDEX),
+                  file_index_rescan, NULL, Icon_file_view_menu);
+
 MENUITEM_FUNCTION(clear_start_directory_item, 0, ID2P(LANG_RESET_START_DIR),
                   clear_start_directory, NULL, Icon_file_view_menu);
 
@@ -163,6 +201,7 @@ MAKE_MENU(file_menu, ID2P(LANG_FILE), filemenu_callback, Icon_file_view_menu,
                 &sort_case, &sort_dir, &sort_file, &interpret_numbers,
                 &dirfilter, &show_filename_ext, &browse_current,
                 &show_path_in_browser,
+                &file_index_rescan_item,
                 &clear_start_directory_item
                 ,&hotkey_tree_item
                 );

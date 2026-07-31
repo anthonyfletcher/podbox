@@ -13,6 +13,7 @@
 #include "database/tagcache.h"
 #include "browser.h"
 
+#define SYNTHETIC_ROWS_MAX 6  /* most rows load_root() adds beyond tagnavi.config */
 #define TAGNAVI_VERSION    "#! rockbox/tagbrowser/2.0"
 #define TAGMENU_MAX_ITEMS  64
 #define TAGMENU_MAX_MENUS  32
@@ -47,6 +48,10 @@ int browser_db_get_icon(struct browser_context* c);
  * position so it's robust to tagnavi.config reordering. Used by
  * root_menu.c's tagnavi-derived main-menu shortcuts. */
 void browser_db_enter_by_tag_on_next_load(int tag);
+/* The same for a root row that opens a nested menu rather than browsing a tag
+ * -- "Playback History ==> runtime" and its like. Armed by the submenu's
+ * config id, again identity rather than position. */
+void browser_db_enter_menu_on_next_load(const char *menu_id);
 /* Arms a direct jump: root -> straight into that specific album's own track
  * list, identified by its tagcache seek (not name/position), skipping the
  * intermediate "Album" grouping listing entirely. Used by
@@ -65,10 +70,13 @@ void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
  * shuffle) don't count. Used by root_menu.c to know how many of its reserved
  * GO_TO_TAGNAVI_FIRST..LAST slots are backed by a real row. */
 int browser_db_get_main_menu_tag_row_count(void);
-/* Returns the tag and raw (P2STR-resolvable) display name of the Nth (0-based)
- * such row. Returns false if index is out of range. */
-bool browser_db_get_main_menu_tag_row(int index, int *out_tag,
-                                   const unsigned char **out_name);
+/* The Nth (0-based) such row: its raw (P2STR-resolvable) display name, and
+ * whichever identity it has -- *out_tag for a tag-browse row, *out_menu_id for
+ * a submenu row, the other left as -1/NULL. Feed whichever came back to the
+ * matching enter_..._on_next_load() above. False if index is out of range. */
+bool browser_db_get_main_menu_row(int index, int *out_tag,
+                                  const char **out_menu_id,
+                                  const unsigned char **out_name);
 int browser_db_get_filename(struct browser_context* c, char *buf, int buflen);
 int browser_db_get_custom_action(struct browser_context* c);
 bool browser_db_get_subentry_filename(char *buf, size_t bufsize);

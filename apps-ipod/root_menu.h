@@ -72,6 +72,22 @@ enum {
      * reuses GO_TO_ALBUM_COVERS_TRACKS to open its album listing, and BACK
      * from there returns here via the normal previous-screen tracking. */
     GO_TO_ARTIST_PORTRAITS,
+    /* Reopen the most recently read document in the text viewer, which
+     * restores its own reading position (see text_viewer_last_document()).
+     * Append below here, never insert: these values are persisted in
+     * global_status.last_screen and global_settings.start_in_screen, so
+     * renumbering them changes what a saved config means. */
+    GO_TO_LASTDOC,
+    /* One album chart, chosen by album_charts_arm(). Reached only from the
+     * database browser's Playback History rows, so it has no root-menu entry
+     * of its own -- but it still needs a code, because that is how a browse
+     * level hands control back. */
+    GO_TO_ALBUM_CHARTS,
+    /* Play a random album (screens/browse/album_charts.c). */
+    GO_TO_RANDOM_ALBUM,
+    /* Documents and Images: the flat lists (screens/browse/browser_flat.c). */
+    GO_TO_DOCUMENTS,
+    GO_TO_IMAGES,
 };
 extern struct menu_item_ex root_menu_;
 

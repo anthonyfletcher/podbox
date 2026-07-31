@@ -11,9 +11,6 @@
 /* Boot logo, shown centered by show_logo_boot() in apps/main.c */
 podboxlogo.bmp
 
-/* Artwork panel down the left of the credits screen, drawn by
- * cr_draw_backdrop() in apps/viewers/credits.c */
-podboxcredits.bmp
 
 /* Shared "no artwork found" placeholder for album and artist art -- scaled to
  * each size by aa_ensure_fallback() in apps/metadata/art_cache.c */

@@ -97,6 +97,12 @@ extern struct bg_task art_cache_task;
 bool art_cache_lookup(const char *dir, int size_index,
                            char *out, int out_len, bool *is_fallback);
 
+/* The folders the last completed pass found no art for, as a file of one path
+ * per line. Written only when a pass finishes, so an interrupted one leaves
+ * the previous list rather than a partial one. Read by the health screen
+ * (screens/system/art_health.c); absent until a pass has completed. */
+const char *art_cache_noart_list(bool artists);
+
 /* Number of configured thumbnail sizes, and accessors for each. */
 int         art_cache_num_sizes(void);
 int         art_cache_size_dim(int size_index);

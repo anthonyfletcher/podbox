@@ -543,6 +543,14 @@ static void albumart_callback(int mode)
     set_albumart_mode(mode);
 }
 
+/* The buffered bitmap is chosen per track, so nothing changes on screen until
+ * the artwork is fetched again. */
+static void wps_art_source_callback(int mode)
+{
+    (void)mode;
+    playback_update_aa_dims();
+}
+
 /* perform shuffle/unshuffle of the current playlist based on the boolean provided */
 static void shuffle_playlist_callback(bool shuffle)
 {
@@ -1081,7 +1089,7 @@ const struct settings_list settings[] = {
     TEXT_SETTING(0, autoresume_paths, "autoresume next track paths",
                  "/podcast:/podcasts", NULL, NULL),
 
-    OFFON_SETTING(0, runtimedb, LANG_RUNTIMEDB_ACTIVE, false,
+    OFFON_SETTING(0, runtimedb, LANG_RUNTIMEDB_ACTIVE, true,
                   "gather runtime data", NULL),
     TEXT_SETTING(0, tagcache_scan_paths, "database scan paths",
                  DEFAULT_TAGCACHE_SCAN_PATHS, NULL, NULL),
@@ -1415,6 +1423,13 @@ const struct settings_list settings[] = {
                      THEME_DIR "/", ".colours"),
     OFFON_SETTING(0, dynamic_colors, LANG_DYNAMIC_COLORS, true,
                   "dynamic colors", NULL),
+    /* Re-buffers the artwork on change, so the now-playing screen switches
+     * picture without waiting for the next track. Dynamic colours need no
+     * part in this: they are extracted from whatever bitmap was buffered. */
+    CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, wps_art_source,
+                   LANG_WPS_ART_SOURCE, WPS_ART_ALBUM, "wps art source",
+                   "album,artist", wps_art_source_callback, 2,
+                   ID2P(LANG_WPS_ART_ALBUM), ID2P(LANG_WPS_ART_ARTIST)),
     INT_SETTING(0, album_covers_center_margin, LANG_CENTRE_MARGIN, 0,
                 "album covers center margin", UNIT_INT, 0, 80, 1,
                 NULL, NULL, NULL),
@@ -1448,6 +1463,9 @@ const struct settings_list settings[] = {
                   "artist+name,artist+year,year,name", NULL, 4,
                   ID2P(LANG_ARTIST_PLUS_NAME), ID2P(LANG_ARTIST_PLUS_YEAR),
                   ID2P(LANG_ID3_YEAR), ID2P(LANG_NAME)),
+    CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
+                  0, "album covers sort artists by", "name,most played", NULL, 2,
+                  ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
     CHOICE_SETTING(0, album_covers_year_sort_order, LANG_YEAR_SORT_ORDER,
                   0, "album covers year sort order", "ascending,descending",
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),

@@ -33,11 +33,14 @@ static int menu_item_count;
 
 #define MAX_ITEM_NAME 64
 /* Must scale with TAGNAVI_MAIN_MENU_SLOTS, never be a fixed number.
- * root_menu.c's menu_table[] holds ~9 fixed entries plus one slot per
+ * root_menu.c's menu_table[] holds its fixed entries plus one slot per
  * tagnavi.config root-menu row (see root_menu.h), and the tagnavi slots
  * alone can exceed any fixed guess -- which silently overflows menu_items[]
- * below rather than failing cleanly. */
-#define MAX_ITEMS (16 + TAGNAVI_MAIN_MENU_SLOTS)
+ * below rather than failing cleanly.
+ *
+ * The fixed part is 10 today and grows whenever a root entry is added, so the
+ * constant carries enough headroom that adding one is not silently fatal. */
+#define MAX_ITEMS (24 + TAGNAVI_MAIN_MENU_SLOTS)
 
 /* Sized per item, for the same reason as MAX_ITEMS above. This buffer holds
  * the "key, key, key, ..." config string; with keys up to 11 chars

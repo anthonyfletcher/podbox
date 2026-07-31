@@ -18,15 +18,12 @@
 #include "system/shutdown.h"
 #include "credits.h"
 
-/* Artwork panel down the left edge, names scrolling in the column to its
- * right over a solid fill. The panel is full screen height, so the column is
- * simply what the artwork leaves behind. */
+/* Names scrolling up the whole screen over a solid fill. There was artwork
+ * down the left edge and the names ran in the column beside it; the artwork is
+ * gone and the names have the width to themselves. */
 #include "bitmaps/native/podbox_colors.h"
-#include "bitmaps/podboxcredits.h"
 
-#define CR_ART_W BMPWIDTH_podboxcredits    /* artwork panel, at screen left  */
-#define CR_X   CR_ART_W                     /* names column: right of the art */
-#define CR_W   (LCD_WIDTH - CR_ART_W)       /*   width, text centred          */
+#define CR_W   LCD_WIDTH                   /* names column, text centred     */
 #define CR_FG  PODBOX_COLOR_FG             /* scrolling name text            */
 #define CR_BG  PODBOX_COLOR_BG             /* solid screen fill              */
 
@@ -134,24 +131,6 @@ static int cr_wrap_name(struct screen *d, const char *s, bool draw,
     return lines > 0 ? lines : 1;
 }
 
-/* Paints the static backdrop once: the solid fill over the whole screen, then
- * the artwork panel over the left of it. The scrolling region repaints the
- * names each frame over the fill, and is narrow enough that it never clears
- * any part of the panel. */
-static void cr_draw_backdrop(struct screen *d)
-{
-    struct viewport vp, *last;
-
-    vp.buffer = NULL;
-    viewport_set_fullscreen(&vp, SCREEN_MAIN);
-    vp.bg_pattern = CR_BG;
-    last = d->set_viewport(&vp);
-    d->clear_viewport();
-    d->bmp(&bm_podboxcredits, 0, 0);
-    d->update_viewport();
-    d->set_viewport(last);
-}
-
 int credits_screen(void)
 {
     struct screen *d = &screens[SCREEN_MAIN];
@@ -169,13 +148,17 @@ int credits_screen(void)
      * repaint over the reel between our own draws. */
     viewportmanager_theme_enable(SCREEN_MAIN, false, &saved);
 
-    cr_draw_backdrop(d);
-
-    /* The scrolling names column. Transparent glyphs (DRMODE_FG) over the fill,
-     * cleared and redrawn each frame. */
+    /* The scrolling names, now over the whole screen. Transparent glyphs
+     * (DRMODE_FG) over the fill, cleared and redrawn each frame.
+     *
+     * viewport_set_defaults() rather than viewport_set_fullscreen(): with the
+     * theme off the two give the same geometry, but only the former also sets
+     * buffer and flags. A stray VP_FLAG_OWNER_UPDATE left in an uninitialised
+     * flags field makes every update_viewport() silently transfer nothing --
+     * the reel would run with the screen frozen. */
     region.buffer = NULL;
     viewport_set_defaults(&region, SCREEN_MAIN);
-    region.x = CR_X;
+    region.x = 0;
     region.y = 0;
     region.width = CR_W;
     region.height = LCD_HEIGHT;
@@ -184,6 +167,12 @@ int credits_screen(void)
     region.fg_pattern = CR_FG;
     region.bg_pattern = CR_BG;
     last = d->set_viewport(&region);
+
+    /* Clear once up front. The loop below waits on get_action() before its
+     * first draw, and without this whatever was on screen shows through until
+     * that returns. */
+    d->clear_viewport();
+    d->update_viewport();
 
     d->getstringsize((const unsigned char *)"A", NULL, &line_h);
     pitch = line_h;

@@ -23,7 +23,7 @@
 #include "string-extra.h"    /* strlcpy */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
-#include "database/album_index.h" /* build_artist_index() */
+#include "database/db_index.h" /* build_artist_index() */
 
 static char *artist_name(int index)
 {
@@ -34,21 +34,64 @@ static char *artist_name(int index)
  * shared buffer (reuses build_artist_index, which album covers' own
  * create_album_index otherwise uses only as transient scaffolding). No on-disk
  * cache -- artists are few, so a rebuild each open is cheap. */
+/* Most played first. Ties keep the order the database gave, which is by name,
+ * so a library where nothing has been played looks exactly as it did before
+ * the option existed. */
+static int compare_artists_by_plays(const void *a_v, const void *b_v)
+{
+    const struct artist_data *a = a_v;
+    const struct artist_data *b = b_v;
+
+    return b->playcount - a->playcount;
+}
+
 static int artist_build_index(void)
 {
     struct tagcache_search tcs;   /* local; the engine's shared tcs stays private */
     void *buf = pf_idx.buf;
     size_t buf_size = pf_idx.buf_sz;
+    bool by_plays = global_settings.album_covers_sort_artists_by
+                        == SORT_ARTISTS_BY_PLAYS;
     int res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
-    res = album_index_build_artists(&pf_idx, &tcs, &buf, &buf_size);
+
+    /* Read the saved index first, and only walk the database when there is
+     * none to read.
+     *
+     * This used to rebuild on every open, on the reasoning that artists are
+     * few and a rebuild is cheap. Cheap is not free, and it stopped being
+     * either once sorting by plays was an option: the figures that sort needs
+     * cost a filtered search per artist on the build path, where the saved
+     * index simply has them. Reading is faster in both orders, and makes the
+     * sort cost nothing at all. */
+    res = db_index_load_artists(&pf_idx, &buf, &buf_size);
+
+    /* Only a missing or unusable index falls through to a build. ERROR_USER_ABORT
+     * means the user cancelled out of waiting for the background pass, and
+     * answering that by starting the very work they declined to wait for
+     * would be the opposite of what they asked -- see wait_for_background(). */
+    if (res == ERROR_NO_ARTISTS)
+    {
+        /* The background pass has not produced an index yet, or a rebuild is
+         * pending. Ask for the figures here only if the sort will use them. */
+        buf = pf_idx.buf;
+        buf_size = pf_idx.buf_sz;
+        ALIGN_BUFFER(buf, buf_size, sizeof(long));
+        res = db_index_build_artists(&pf_idx, &tcs, &buf, &buf_size, by_plays);
+    }
+
     if (res < SUCCESS)
         return res;
 
     pf_idx.buf = buf;
     pf_idx.buf_sz = buf_size;
     pf_idx.album_ct = 0;   /* artist model has no album list */
+
+    if (by_plays)
+        qsort(pf_idx.artist_index, pf_idx.artist_ct,
+              sizeof(struct artist_data), compare_artists_by_plays);
+
     return SUCCESS;
 }
 

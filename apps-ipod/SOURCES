@@ -30,8 +30,9 @@ audio/audio_path.c
 
 #ifdef HAVE_TAGCACHE
 database/tagcache.c
-database/album_index.c
+database/db_index.c
 screens/browse/browser_db.c
+screens/browse/album_charts.c
 #endif
 
 playlist/catalog.c
@@ -89,11 +90,15 @@ widgets/mask_select.c
 screens/bookmark.c
 screens/browse/browser.c
 screens/browse/browser_disk.c
+screens/browse/browser_flat.c
 screens/context_menu.c
+screens/system/art_health.c
 screens/system/bg_task_info.c
 screens/system/debug_menu.c
 files/file_ops.c
+files/file_index.c
 files/filetypes.c
+files/path_list.c
 screens/system/runtime_info.c
 screens/shortcuts.c
 screens/system/time_set.c

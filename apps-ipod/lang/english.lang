@@ -17708,3 +17708,325 @@
     *: "Background tasks"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CONTINUE_READING
+  desc: in the main menu, reopen the most recently read document
+  user: core
+  <source>
+    *: "Continue reading"
+  </source>
+  <dest>
+    *: "Continue reading"
+  </dest>
+  <voice>
+    *: "Continue reading"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_SOURCE
+  desc: in Theme settings, which picture the now-playing screen shows
+  user: core
+  <source>
+    *: "Now playing artwork"
+  </source>
+  <dest>
+    *: "Now playing artwork"
+  </dest>
+  <voice>
+    *: "Now playing artwork"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ALBUM
+  desc: in Theme settings, now-playing artwork option: the album cover
+  user: core
+  <source>
+    *: "Album art"
+  </source>
+  <dest>
+    *: "Album art"
+  </dest>
+  <voice>
+    *: "Album art"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ARTIST
+  desc: in Theme settings, now-playing artwork option: the artist portrait
+  user: core
+  <source>
+    *: "Artist art"
+  </source>
+  <dest>
+    *: "Artist art"
+  </dest>
+  <voice>
+    *: "Artist art"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_CHARTS
+  desc: the album charts screen, ranked by playback history
+  user: core
+  <source>
+    *: "Album Stats"
+  </source>
+  <dest>
+    *: "Album Stats"
+  </dest>
+  <voice>
+    *: "Album Stats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ALBUMS
+  desc: album chart: most played albums
+  user: core
+  <source>
+    *: "Most played albums"
+  </source>
+  <dest>
+    *: "Most played albums"
+  </dest>
+  <voice>
+    *: "Most played albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ALBUMS
+  desc: album chart: most recently played albums
+  user: core
+  <source>
+    *: "Recently played albums"
+  </source>
+  <dest>
+    *: "Recently played albums"
+  </dest>
+  <voice>
+    *: "Recently played albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ALBUMS
+  desc: album chart: played once but not for a long time
+  user: core
+  <source>
+    *: "Forgotten albums"
+  </source>
+  <dest>
+    *: "Forgotten albums"
+  </dest>
+  <voice>
+    *: "Forgotten albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_ALBUM
+  desc: in the album charts, play a random album
+  user: core
+  <source>
+    *: "Random album"
+  </source>
+  <dest>
+    *: "Random album"
+  </dest>
+  <voice>
+    *: "Random album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_ALBUM_HISTORY
+  desc: shown when no album has been played yet
+  user: core
+  <source>
+    *: "No listening history yet"
+  </source>
+  <dest>
+    *: "No listening history yet"
+  </dest>
+  <voice>
+    *: "No listening history yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OUT_OF_MEMORY
+  desc: shown when a screen could not claim the memory it needs
+  user: core
+  <source>
+    *: "Not enough memory"
+  </source>
+  <dest>
+    *: "Not enough memory"
+  </dest>
+  <voice>
+    *: "Not enough memory"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RUNTIMEDB_OFF_PROMPT
+  desc: album charts are empty because runtime data gathering is disabled
+  user: core
+  <source>
+    *: "Album stats need Gather Runtime Data. Turn it on?"
+  </source>
+  <dest>
+    *: "Album stats need Gather Runtime Data. Turn it on?"
+  </dest>
+  <voice>
+    *: "Album stats need Gather Runtime Data. Turn it on?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ALBUMS
+  desc: in Art cache settings, albums with no cover art found
+  user: core
+  <source>
+    *: "Missing album artwork"
+  </source>
+  <dest>
+    *: "Missing album artwork"
+  </dest>
+  <voice>
+    *: "Missing album artwork"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ARTISTS
+  desc: in Art cache settings, artists with no portrait found
+  user: core
+  <source>
+    *: "Missing artist portraits"
+  </source>
+  <dest>
+    *: "Missing artist portraits"
+  </dest>
+  <voice>
+    *: "Missing artist portraits"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_NONE
+  desc: no missing-artwork list to show yet
+  user: core
+  <source>
+    *: "Nothing missing, or no scan yet"
+  </source>
+  <dest>
+    *: "Nothing missing, or no scan yet"
+  </dest>
+  <voice>
+    *: "Nothing missing, or no scan yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ARTISTS
+  desc: chart: artists with the most plays
+  user: core
+  <source>
+    *: "Most played artists"
+  </source>
+  <dest>
+    *: "Most played artists"
+  </dest>
+  <voice>
+    *: "Most played artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ARTISTS
+  desc: chart: most recently played artists
+  user: core
+  <source>
+    *: "Recently played artists"
+  </source>
+  <dest>
+    *: "Recently played artists"
+  </dest>
+  <voice>
+    *: "Recently played artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ARTISTS
+  desc: chart: artists played least, never-played included
+  user: core
+  <source>
+    *: "Forgotten artists"
+  </source>
+  <dest>
+    *: "Forgotten artists"
+  </dest>
+  <voice>
+    *: "Forgotten artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY
+  desc: in Carousel settings, artist portraits ordering
+  user: core
+  <source>
+    *: "Sort Artists By"
+  </source>
+  <dest>
+    *: "Sort Artists By"
+  </dest>
+  <voice>
+    *: "Sort Artists By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DOCUMENTS
+  desc: main menu, every document on the player in one list
+  user: core
+  <source>
+    *: "Documents"
+  </source>
+  <dest>
+    *: "Documents"
+  </dest>
+  <voice>
+    *: "Documents"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGES
+  desc: main menu, every image on the player in one list
+  user: core
+  <source>
+    *: "Images"
+  </source>
+  <dest>
+    *: "Images"
+  </dest>
+  <voice>
+    *: "Images"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FLAT_LIST_EMPTY
+  desc: no documents or images have been found yet
+  user: core
+  <source>
+    *: "Nothing found, or no scan yet"
+  </source>
+  <dest>
+    *: "Nothing found, or no scan yet"
+  </dest>
+  <voice>
+    *: "Nothing found, or no scan yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_FILE_INDEX
+  desc: in File View settings, rescan for documents and images
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Rescan Documents & Images"
+  </dest>
+  <voice>
+    *: "Rescan Documents & Images"
+  </voice>
+</phrase>

@@ -149,6 +149,15 @@ enum
     AA_PREFER_CACHE
 };
 
+/* Which picture the now-playing screen shows. The artwork cache holds both,
+ * keyed by folder, so this only chooses which folder to ask it about -- see
+ * load_cached_albumart() in audio/playback.c. */
+enum
+{
+    WPS_ART_ALBUM = 0,
+    WPS_ART_ARTIST
+};
+
 enum
 {
     TAGCACHE_RAM_OFF = 0,
@@ -491,6 +500,7 @@ struct user_settings
     int lst_color; /* color of the text for the selector */
     unsigned char colors_file[MAX_FILENAME+1];
     bool dynamic_colors; /* auto-color from album art */
+    int wps_art_source;  /* WPS_ART_*: album cover or artist portrait */
 
     /* Modal dialog chrome (apps/gui/dialog.h). Applied in settings_apply() via
      * dialog_set_default_style(). The metrics always apply; what the colours do
@@ -522,6 +532,7 @@ struct user_settings
     int  album_covers_transition_speed;
     int  album_covers_show_album_name;
     int  album_covers_sort_albums_by;
+    int  album_covers_sort_artists_by; /* SORT_ARTISTS_*: portraits ordering */
     int  album_covers_year_sort_order;
     bool album_covers_show_year;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On

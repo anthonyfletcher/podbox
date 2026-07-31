@@ -22,7 +22,7 @@
 #include "widgets/list.h"
 #include "input/action.h"
 #include "database/tagcache.h"
-#include "database/album_index.h"
+#include "database/db_index.h"
 #include "metadata/art_cache.h"
 #include "system/bg_task.h"
 #include "bg_task_info.h"
@@ -60,23 +60,23 @@ static void add_tagcache_lines(void)
                            stat->progress);
 }
 
-static void add_album_index_lines(void)
+static void add_db_index_lines(void)
 {
-    const char *step = album_index_activity();
+    const char *step = db_index_activity();
     int done, total;
 
-    album_index_progress(&done, &total);
+    db_index_progress(&done, &total);
 
     simplelist_addline("Album index: %s",
-                       bg_task_state(&album_index_task));
-    simplelist_addline("  Covered: %d entries", album_index_task.done_total);
+                       bg_task_state(&db_index_task));
+    simplelist_addline("  Covered: %d entries", db_index_task.done_total);
 
     if (step[0])
     {
         /* Held over after a pass, so label it for what it is. */
         simplelist_addline("  %s: %s",
-                           album_index_is_busy() ? "Step" : "Last step", step);
-        if (album_index_is_busy() && total > 0)
+                           db_index_is_busy() ? "Step" : "Last step", step);
+        if (db_index_is_busy() && total > 0)
             simplelist_addline("  Progress: %d/%d", done, total);
     }
 }
@@ -111,7 +111,7 @@ static int bg_task_info_callback(int action, struct gui_synclist *lists)
 
     add_tagcache_lines();
     simplelist_addline(" ");
-    add_album_index_lines();
+    add_db_index_lines();
     simplelist_addline(" ");
     add_art_cache_lines();
 

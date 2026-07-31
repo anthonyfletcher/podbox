@@ -16,6 +16,7 @@
 #include "draw/icon_bitmaps.h"
 #include "screens/covers/album_covers.h"
 #include "metadata/art_cache.h"
+#include "screens/system/art_health.h"
 
 MENUITEM_SETTING(album_covers_center_margin, &global_settings.album_covers_center_margin, NULL);
 MENUITEM_SETTING(album_covers_slide_tuck, &global_settings.album_covers_slide_tuck, NULL);
@@ -24,6 +25,7 @@ MENUITEM_SETTING(album_covers_scroll_speed, &global_settings.album_covers_scroll
 MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, NULL);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
 MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, NULL);
+MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
 MENUITEM_SETTING(album_covers_year_sort_order, &global_settings.album_covers_year_sort_order, NULL);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
 
@@ -33,11 +35,11 @@ MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year
  * (artist photos especially, dropped in long after the music) is never picked
  * up on its own.
  *
- * These do not touch the carousel's album index. That is a list of albums and
+ * These do not touch the database index. That is a list of albums and
  * artists read out of the database, holding no artwork at all, so the two go
  * stale for entirely different reasons: artwork when files change on disk, the
  * index when the database does. Rebuilding one to fix the other only costs
- * time. The index actions live in the carousel menu below. */
+ * time. The index actions are in the Database menu (general_settings.c). */
 static int art_cache_menu_rebuild(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_CACHE)))
@@ -56,26 +58,10 @@ static int art_cache_menu_update(void)
 MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),
                   art_cache_menu_update, NULL, Icon_NOICON);
 
-/* Index only -- the album/artist list the carousel scrolls through. Rebuild
- * discards it and reads the database again; update keeps the existing covers
- * where they still apply. Either takes effect on the next carousel open. */
-static int carousel_menu_rebuild_index(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_REBUILD_INDEX)))
-        bg_task_rebuild(&album_covers_task);
-    return 0;
-}
-MENUITEM_FUNCTION(carousel_rebuild_index_item, 0, ID2P(LANG_REBUILD_INDEX),
-                  carousel_menu_rebuild_index, NULL, Icon_NOICON);
-
-static int carousel_menu_update_index(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_UPDATE_INDEX)))
-        bg_task_update(&album_covers_task);
-    return 0;
-}
-MENUITEM_FUNCTION(carousel_update_index_item, 0, ID2P(LANG_UPDATE_INDEX),
-                  carousel_menu_update_index, NULL, Icon_NOICON);
+/* The index rebuild/update actions used to live here. They are in the Database
+ * menu now (general_settings.c): the index stopped being the carousel's
+ * private list when the charts started reading it too, and it goes stale for
+ * the database's reasons rather than the carousel's. */
 
 /* Off decodes the source image once per thumbnail size; on decodes it once for
  * the largest and derives the rest from that. Only affects thumbnails generated
@@ -85,9 +71,29 @@ MENUITEM_SETTING(art_cache_fast_build, &global_settings.art_cache_fast_build,
 
 MENUITEM_SETTING(debug_log_artcache, &global_settings.debug_log_artcache, NULL);
 
+/* What the last completed pass could find no artwork for. The counts have
+ * always been in Background Tasks; these are the folders behind them. */
+static int art_health_albums(void)
+{
+    art_health_screen(false);
+    return 0;
+}
+MENUITEM_FUNCTION(art_health_albums_item, 0, ID2P(LANG_ART_HEALTH_ALBUMS),
+                  art_health_albums, NULL, Icon_NOICON);
+
+static int art_health_artists(void)
+{
+    art_health_screen(true);
+    return 0;
+}
+MENUITEM_FUNCTION(art_health_artists_item, 0, ID2P(LANG_ART_HEALTH_ARTISTS),
+                  art_health_artists, NULL, Icon_NOICON);
+
 MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_Audio,
             &art_cache_fast_build,
             &debug_log_artcache,
+            &art_health_albums_item,
+            &art_health_artists_item,
             &art_cache_rebuild_item,
             &art_cache_update_item);
 
@@ -96,10 +102,9 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Audio,
             &album_covers_show_year,
             &album_covers_year_sort_order,
             &album_covers_sort_albums_by,
+            &album_covers_sort_artists_by,
             &album_covers_center_margin,
             &album_covers_slide_tuck,
             &album_covers_parallel_slides,
             &album_covers_scroll_speed,
-            &album_covers_transition_speed,
-            &carousel_rebuild_index_item,
-            &carousel_update_index_item);
+            &album_covers_transition_speed);

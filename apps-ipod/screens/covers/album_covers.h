@@ -27,6 +27,15 @@ enum sort_albums_by_values {
     SORT_VALUES_SIZE
 };
 
+/* Values for global_settings.album_covers_sort_artists_by. Ordering by plays
+ * needs figures the artist list does not otherwise carry, so it costs a pass
+ * over the database when the carousel opens -- which is why it is opt-in
+ * rather than simply offered as another order. */
+enum sort_artists_by_values {
+    SORT_ARTISTS_BY_NAME = 0,
+    SORT_ARTISTS_BY_PLAYS,
+};
+
 /* Values for global_settings.album_covers_year_sort_order */
 enum year_sort_order_values {
     ASCENDING = 0,

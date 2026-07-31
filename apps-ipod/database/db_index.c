@@ -1,17 +1,18 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The album index: the flat album and artist list the carousel scrolls.
+ * The database index: the flat album and artist list derived from tagcache.
  *
  * Built by walking tagcache, held in the buffer carousel.h describes as
- * pf_idx, and persisted to carousel.idx so later opens read it back instead
- * of rescanning. It carries no artwork -- only names, years and the taglist
- * seeks needed to navigate into the database -- so it goes stale when the
- * database changes, not when files on disk do.
+ * pf_idx, and persisted to db_index.idx so later reads get it back instead of
+ * rescanning. It carries no artwork -- only names, years, playback figures and
+ * the taglist seeks needed to navigate into the database -- so it goes stale
+ * when the database changes, not when files on disk do.
  *
- * It lives here rather than in album_covers.c because building it is not the
- * carousel's job: both carousel models consume it, and the build is intended
- * to run while neither is on screen.
+ * It began as the carousel's own list and is no longer only that: the album
+ * and artist charts read the same index for their rankings, which is why it
+ * is named for the database rather than for any one screen. Building it is
+ * nobody's screen's job, and is intended to happen while none of them is up.
  *
  * Parts, in order:
  *   - progress reporting and cancellation
@@ -19,7 +20,7 @@
  *   - writing entries into the index buffer
  *   - the tagcache walks that populate it
  *   - the on-disk form
- *   - album_index_build(), which reuses the saved index or rebuilds it
+ *   - db_index_build(), which reuses the saved index or rebuilds it
  *   - the background pass that keeps the saved index current
  ****************************************************************************/
 
@@ -51,14 +52,23 @@
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
 #include "screens/covers/album_covers.h"   /* SORT_BY_*, ASCENDING (sort order) */
-#include "album_index.h"
+#include "db_index.h"
 
-/* The album index file, and the four-byte magic at its start. Holds the
- * artist name blob as well as the albums -- artist_portraits.c reads
- * pf_idx.artist_names/artist_index straight out of it -- so the name is
- * deliberately not album-specific. Regenerated if absent. */
-#define ALBUM_INDEX CACHE_PREFIX "/carousel.idx"
-#define INDEX_HDR "PFID"
+/* The index file, and the four-byte magic at its start. It holds albums and
+ * artists alike, and is read by more than the carousel now, so it lives beside
+ * the other state in ROCKBOX_DIR rather than in the carousel's own folder --
+ * which keeps only what is genuinely the carousel's, its slide cache and empty
+ * slide. Regenerated if absent. */
+#define DB_INDEX_FILE ROCKBOX_DIR "/db_index.idx"
+/* Bump the magic whenever struct album_data or struct artist_data, or the
+ * file's layout, changes. load_album_index() validates nothing finer -- it
+ * checks this and some coarse sizes -- so a struct that grew without a new
+ * magic is read back at the wrong stride from a file written by an older
+ * build.
+ *   PFID -> PFIE: album_data gained playcount/lastplayed (the album charts).
+ *   PFIE -> PFIF: artist_data gained the same (the artist charts), and the
+ *                 file moved out of the carousel folder. */
+#define INDEX_HDR "PFIF"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -93,6 +103,7 @@ static int bg_done, bg_total;
 static const char *bg_step;
 
 static void draw_progressbar(int step, int count, char *msg);
+static int wait_for_background(void);
 
 /* Keep an idle poweroff from interrupting a build the user is watching.
  *
@@ -247,6 +258,8 @@ static void write_album_index(int idx, int name_idx,
     pfi->album_index[idx].artist_idx = artist_idx;
     pfi->album_index[idx].artist_seek = artist_seek;
     pfi->album_index[idx].year = 0;
+    pfi->album_index[idx].playcount = 0;
+    pfi->album_index[idx].lastplayed = 0;
 }
 
 static inline void write_album_entry(struct tagcache_search *tcs,
@@ -268,6 +281,8 @@ static void write_artist_entry(struct tagcache_search *tcs,
 {
     pfi->artist_index[-pfi->artist_ct].name_idx = name_idx;
     pfi->artist_index[-pfi->artist_ct].seek = tcs->result_seek;
+    pfi->artist_index[-pfi->artist_ct].playcount = 0;
+    pfi->artist_index[-pfi->artist_ct].lastplayed = 0;
     pfi->artist_len += len;
     pfi->artist_ct++;
 }
@@ -333,8 +348,9 @@ static int get_tcs_search_res(int type, struct tagcache_search *tcs,
 
 #define STR_STEP_INDEXING_UNTAGGED "1/5 Find " UNTAGGED
 #define STR_STEP_ASSIGNING_ALBUMS "2/5 Find Albums"
-#define STR_STEP_ASSIGNING_ALBUM_YEAR "3/5 Check Album Year"
+#define STR_STEP_ASSIGNING_ALBUM_STATS "3/5 Check Album Info"
 #define STR_STEP_REMOVING_DUPLICATES "4/5 Remove Duplicates"
+#define STR_STEP_ARTIST_STATS "Check Artist Info"
 
 /*adds <untagged> albums/artist to existing album index */
 static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
@@ -427,7 +443,7 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
 
 /* Create an index of all artists from the database, into whichever index pfi
  * currently points at. Like everything else here it assumes build_mutex is
- * held and pfi is set -- album_index_build_artists() is how an outside caller
+ * held and pfi is set -- db_index_build_artists() is how an outside caller
  * gets into that state. */
 static int build_artist_index(struct tagcache_search *tcs,
                                  void **buf, size_t *bufsz)
@@ -469,20 +485,36 @@ static int build_artist_index(struct tagcache_search *tcs,
     return res;
 }
 
-static int assign_album_year(void)
+/* Summarise each album from its tracks: the year, and the playback history the
+ * album charts sort on.
+ *
+ * All three come from one walk because the walk is the expensive part -- a
+ * filtered tagcache search per album, which is why this is its own numbered
+ * build step. A search on a numeric tag iterates one result per track (see
+ * get_next() in tagcache.c, which sets idx_id per entry), so tagcache_get_numeric()
+ * can be asked for any numeric tag of the track currently under the cursor,
+ * not only the one being searched on.
+ *
+ * Year takes the maximum rather than the first because a compilation can carry
+ * several; playcount sums because an album's plays are its tracks' plays; and
+ * lastplayed takes the maximum because an album was last heard when its most
+ * recently played track was. */
+static int assign_album_stats(void)
 {
     char tcs_buf[TAGCACHE_BUFSZ];
     const long tcs_bufsz = sizeof(tcs_buf);
     splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_YEAR);
+    draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_STATS);
     for (int album_idx = 0; album_idx < pfi->album_ct; album_idx++)
     {
         keep_awake_for_build();
 
-        if (progress_cancel(album_idx, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_YEAR))
+        if (progress_cancel(album_idx, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_STATS))
             return ERROR_USER_ABORT;
 
         int album_year = 0;
+        int album_playcount = 0;
+        long album_lastplayed = 0;
 
         if (tagcache_search(&tcs, tag_year))
         {
@@ -495,15 +527,88 @@ static int assign_album_year(void)
 
             while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz)) {
                 int track_year = tagcache_get_numeric(&tcs, tag_year);
+                long track_playcount = tagcache_get_numeric(&tcs, tag_playcount);
+
                 if (track_year > album_year)
                     album_year = track_year;
+
+                /* Negative is tagcache's "could not read it", not a count.
+                 *
+                 * The lastplayed read is inside this test because every
+                 * tagcache_get_numeric() is a separate index lookup, and this
+                 * loop runs once per track in the library. A track that has
+                 * never been played cannot have a last-played time, so asking
+                 * for one would be a third lookup per track to learn nothing
+                 * -- and on most libraries the never-played tracks are the
+                 * majority. */
+                if (track_playcount > 0)
+                {
+                    long track_lastplayed =
+                        tagcache_get_numeric(&tcs, tag_lastplayed);
+
+                    album_playcount += track_playcount;
+                    if (track_lastplayed > album_lastplayed)
+                        album_lastplayed = track_lastplayed;
+                }
             }
         }
         tagcache_search_finish(&tcs);
 
         pfi->album_index[album_idx].year = album_year;
+        pfi->album_index[album_idx].playcount = album_playcount;
+        pfi->album_index[album_idx].lastplayed = album_lastplayed;
     }
     return SUCCESS;
+}
+
+/* Roll the album figures up to their artists.
+ *
+ * Derived from the album index rather than walked out of the database again,
+ * which makes it free: every album already carries its own playcount and
+ * lastplayed, and the artist it belongs to. A second tagcache pass -- one
+ * filtered search per artist, as assign_album_stats() does per album -- would
+ * produce the same numbers for real disk work, and the build is already the
+ * slowest thing here.
+ *
+ * album_data.artist_idx and artist_data.name_idx are both offsets into the
+ * same artist name blob, so that is the join. Albums whose artist never
+ * resolved carry a negative artist_idx and are simply not counted anywhere.
+ *
+ * Must run after assign_album_stats() and before the duplicate pass trims the
+ * album list, or the totals would miss whatever the trim removes. */
+static void assign_artist_stats(void)
+{
+    int a, j;
+
+    if (!pfi->artist_index)
+        return;
+
+    for (a = 0; a < pfi->artist_ct; a++)
+    {
+        pfi->artist_index[a].playcount = 0;
+        pfi->artist_index[a].lastplayed = 0;
+    }
+
+    for (j = 0; j < pfi->album_ct; j++)
+    {
+        int artist_idx = pfi->album_index[j].artist_idx;
+
+        if (artist_idx < 0)
+            continue;
+
+        for (a = 0; a < pfi->artist_ct; a++)
+        {
+            if (pfi->artist_index[a].name_idx != artist_idx)
+                continue;
+
+            pfi->artist_index[a].playcount += pfi->album_index[j].playcount;
+            if (pfi->album_index[j].lastplayed >
+                pfi->artist_index[a].lastplayed)
+                pfi->artist_index[a].lastplayed =
+                    pfi->album_index[j].lastplayed;
+            break;
+        }
+    }
 }
 
 /**
@@ -608,10 +713,12 @@ retry_artist_lookup:
         tagcache_search_finish(&tcs);
     }
 
-    res = assign_album_year();
+    res = assign_album_stats();
 
     if (res < SUCCESS)
         return res;
+
+    assign_artist_stats();
 
     /* sort list order to find duplicates */
     qsort(pfi->album_index, pfi->album_ct,
@@ -657,7 +764,12 @@ retry_artist_lookup:
 
     pfi->buf = buf;
     pfi->buf_sz = buf_size;
-    pfi->artist_index = 0;
+    /* artist_index is deliberately kept, where it used to be discarded here.
+     * The array itself was always intact -- build_artist_index() finalises it
+     * into the buffer ahead of the album data, which nothing above overwrites
+     * -- so only the pointer was being thrown away. It is needed now: the
+     * artist figures assign_artist_stats() just filled in are saved with the
+     * rest of the index and read back by the artist charts. */
 
     qsort(pfi->album_index, pfi->album_ct,
                           sizeof(struct album_data), compare_albums);
@@ -669,7 +781,7 @@ retry_artist_lookup:
  next time PictureFlow is launched*/
 
 static int save_album_index(void){
-    int fd = creat(ALBUM_INDEX,0666);
+    int fd = creat(DB_INDEX_FILE,0666);
 
     struct pf_index_t data;
     memcpy(&data, pfi, sizeof(struct pf_index_t));
@@ -684,6 +796,11 @@ static int save_album_index(void){
         write(fd, data.album_names, data.album_len);
 
         write(fd, data.album_index, data.album_ct * sizeof(struct album_data));
+        /* The artist array too, which earlier versions did not keep. Written
+         * last so the layout above is unchanged; the magic distinguishes the
+         * two anyway. */
+        write(fd, data.artist_index,
+              data.artist_ct * sizeof(struct artist_data));
 
         close(fd);
         return 0;
@@ -701,10 +818,107 @@ static inline int read2buf(int fildes, void *buf, size_t nbyte){
     return nread;
 }
 
+/* Read only the artist half of the saved index into the caller's buffer.
+ *
+ * The artist carousel wants the artist list and nothing else, and used to
+ * rebuild it from the database on every open. It does not have to: the same
+ * list, with its playback figures already summarised, is sitting in the index
+ * file. Reading it is a file read against a walk of every album-artist tag.
+ *
+ * Only the artist parts are kept. The file is written as
+ *
+ *     header, artist_names, album_names, album_index, artist_index
+ *
+ * with no padding between -- plain sequential writes -- so the album halves
+ * can be stepped over with one seek and never cost the caller any memory.
+ * (Alignment in load_album_index() is of the destination buffer, not of file
+ * offsets, so it does not enter into the arithmetic here.)
+ *
+ * SUCCESS, or an ERROR_* leaving the caller to build the list the slow way. */
+static int load_artist_index(struct pf_index_t *target,
+                             void **buf, size_t *bufsz)
+{
+    struct pf_index_t data;
+    void *b = *buf;
+    size_t bsz = *bufsz;
+    unsigned int artist_idx_sz;
+    int i, fr = open(DB_INDEX_FILE, O_RDONLY);
+
+    if (fr < 0)
+        return ERROR_NO_ARTISTS;
+
+    if ((unsigned long)filesize(fr) <= sizeof(data)
+        || read(fr, &data, sizeof(data)) != sizeof(data)
+        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || data.artist_ct == 0)
+        goto failure;
+
+    artist_idx_sz = data.artist_ct * sizeof(struct artist_data);
+    if (data.artist_len + artist_idx_sz > bsz)
+        goto failure;
+
+    if (read2buf(fr, b, data.artist_len) == 0)
+        goto failure;
+    target->artist_names = b;
+    b = (char *)b + data.artist_len;
+    bsz -= data.artist_len;
+
+    /* past the album halves, which this caller has no use for */
+    if (lseek(fr, data.album_len + data.album_ct * sizeof(struct album_data),
+              SEEK_CUR) < 0)
+        goto failure;
+
+    ALIGN_BUFFER(b, bsz, alignof(struct artist_data));
+    if (read2buf(fr, b, artist_idx_sz) == 0)
+        goto failure;
+    target->artist_index = b;
+    b = (char *)b + artist_idx_sz;
+    bsz -= artist_idx_sz;
+
+    close(fr);
+
+    /* Same sanity check load_album_index() makes: a name offset past the end
+     * of the blob means the file is not what it claims to be. */
+    for (i = 0; i < data.artist_ct; i++)
+    {
+        if (target->artist_index[i].name_idx >= (int)data.artist_len)
+            return ERROR_NO_ARTISTS;
+    }
+
+    target->artist_ct = data.artist_ct;
+    target->artist_len = data.artist_len;
+    target->album_ct = 0;        /* no album list on this path */
+    *buf = b;
+    *bufsz = bsz;
+    return SUCCESS;
+
+failure:
+    close(fr);
+    return ERROR_NO_ARTISTS;
+}
+
+int db_index_load_artists(struct pf_index_t *target,
+                          void **buf, size_t *bufsz)
+{
+    int ret = wait_for_background();
+
+    if (ret != SUCCESS)
+        return ret;
+
+    /* Held for the read: the background pass rewrites this file in place, so
+     * without it a pass finishing mid-read would be seen as a corrupt index
+     * and thrown away for a full rebuild. */
+    mutex_lock(&build_mutex);
+    ret = load_artist_index(target, buf, bufsz);
+    mutex_unlock(&build_mutex);
+
+    return ret;
+}
+
 /*Loads the album_index information stored in the hard drive*/
 static int load_album_index(void){
 
-    int i, fr = open(ALBUM_INDEX, O_RDONLY);
+    int i, fr = open(DB_INDEX_FILE, O_RDONLY);
     struct pf_index_t data;
 
     void *bufstart = pfi->buf;
@@ -713,7 +927,7 @@ static int load_album_index(void){
     void* buf = pfi->buf;
     size_t buf_size = pfi->buf_sz;
 
-    unsigned int name_sz, album_idx_sz;
+    unsigned int name_sz, album_idx_sz, artist_idx_sz;
     int album_idx, artist_idx;
 
     if (fr >= 0){
@@ -725,8 +939,9 @@ static int load_album_index(void){
             {
                 name_sz = data.artist_len + data.album_len;
                 album_idx_sz = data.album_ct * sizeof(struct album_data);
+                artist_idx_sz = data.artist_ct * sizeof(struct artist_data);
 
-                if (name_sz + album_idx_sz > bufstart_sz)
+                if (name_sz + album_idx_sz + artist_idx_sz > bufstart_sz)
                     goto failure;
 
                 /* lseek(fr, sizeof(data) + 1, SEEK_SET); */
@@ -754,6 +969,16 @@ static int load_album_index(void){
                 data.album_index = buf;
                 buf = (char *)buf + album_idx_sz;
                 buf_size -= album_idx_sz;
+
+                /* index of artists, with their playback figures */
+                ALIGN_BUFFER(buf, buf_size, alignof(struct artist_data));
+                if (artist_idx_sz > 0
+                    && read2buf(fr, buf, artist_idx_sz) == 0)
+                    goto failure;
+
+                data.artist_index = buf;
+                buf = (char *)buf + artist_idx_sz;
+                buf_size -= artist_idx_sz;
 
                 close(fr);
 
@@ -846,7 +1071,7 @@ static int build_into(struct pf_index_t *target, void *buf, size_t buf_sz,
     return ret;
 }
 
-int album_index_build_into(struct pf_index_t *target, void *buf, size_t buf_sz)
+int db_index_build_into(struct pf_index_t *target, void *buf, size_t buf_sz)
 {
     return build_into(target, buf, buf_sz, false);
 }
@@ -863,13 +1088,13 @@ int album_index_build_into(struct pf_index_t *target, void *buf, size_t buf_sz)
  * be left. */
 static int wait_for_background(void)
 {
-    if (!album_index_is_busy())
+    if (!db_index_is_busy())
         return SUCCESS;
 
     /* Nothing on screen at all if it finishes promptly. */
     splash_progress_set_delay(HZ / 2);
 
-    while (album_index_is_busy())
+    while (db_index_is_busy())
     {
         splash_progress(bg_done, bg_total > 0 ? bg_total : 1,
                         "%s", str(LANG_WAIT));
@@ -888,13 +1113,13 @@ static int wait_for_background(void)
 
 /* carousel_model.build_index: build into the engine's own index and the
  * buffer it has already claimed. */
-int album_index_build(void)
+int db_index_build(void)
 {
     int ret = wait_for_background();
     if (ret != SUCCESS)
         return ret;
 
-    return album_index_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
+    return db_index_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
 }
 
 /* carousel_model.build_index for the artist model: the artist half only, with
@@ -906,9 +1131,59 @@ int album_index_build(void)
  * a background pass holding pfi would resume after a yield writing through
  * whatever the artist build had left there. Same wait, same lock, same
  * clear-before-unlock as build_into(). */
-int album_index_build_artists(struct pf_index_t *target,
+/* Artist figures for a build that has no album list to roll up from.
+ *
+ * The full build derives them from the albums for free (assign_artist_stats());
+ * this cannot, so it goes to the database -- one filtered search per artist,
+ * the same shape assign_album_stats() uses per album. The two agree by
+ * construction: an artist's total is every track filed under them either way.
+ *
+ * Only worth its cost when something is going to sort on it, hence the opt-in
+ * at the call site. Artists are far fewer than albums, so even then it is a
+ * fraction of what a full build does. */
+static void assign_artist_stats_from_db(struct tagcache_search *tcs)
+{
+    char tcs_buf[TAGCACHE_BUFSZ];
+    const long tcs_bufsz = sizeof(tcs_buf);
+    int a;
+
+    for (a = 0; a < pfi->artist_ct; a++)
+    {
+        int playcount = 0;
+        long lastplayed = 0;
+
+        keep_awake_for_build();
+        if (progress_cancel(a, pfi->artist_ct, STR_STEP_ARTIST_STATS))
+            break;
+
+        if (tagcache_search(tcs, tag_playcount))
+        {
+            tagcache_search_add_filter(tcs, tag_albumartist,
+                                       pfi->artist_index[a].seek);
+
+            while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
+            {
+                long n = tagcache_get_numeric(tcs, tag_playcount);
+
+                if (n > 0)
+                {
+                    long when = tagcache_get_numeric(tcs, tag_lastplayed);
+                    playcount += n;
+                    if (when > lastplayed)
+                        lastplayed = when;
+                }
+            }
+        }
+        tagcache_search_finish(tcs);
+
+        pfi->artist_index[a].playcount = playcount;
+        pfi->artist_index[a].lastplayed = lastplayed;
+    }
+}
+
+int db_index_build_artists(struct pf_index_t *target,
                               struct tagcache_search *tcs,
-                              void **buf, size_t *bufsz)
+                              void **buf, size_t *bufsz, bool with_stats)
 {
     int ret = wait_for_background();
 
@@ -918,6 +1193,8 @@ int album_index_build_artists(struct pf_index_t *target,
     mutex_lock(&build_mutex);
     pfi = target;
     ret = build_artist_index(tcs, buf, bufsz);
+    if (ret >= SUCCESS && with_stats)
+        assign_artist_stats_from_db(tcs);
     pfi = NULL;
     mutex_unlock(&build_mutex);
 
@@ -957,17 +1234,17 @@ static struct event_queue idx_queue;
 #define IDX_BUILD_BUFSZ (384 * 1024)
 
 
-bool album_index_is_busy(void)
+bool db_index_is_busy(void)
 {
     return building_bg;
 }
 
-const char *album_index_activity(void)
+const char *db_index_activity(void)
 {
     return bg_step ? bg_step : "";
 }
 
-void album_index_progress(int *done, int *total)
+void db_index_progress(int *done, int *total)
 {
     *done = bg_done;
     *total = bg_total;
@@ -981,14 +1258,52 @@ void album_index_progress(int *done, int *total)
  * forever (nothing sets it on this path) and quietly change what the carousel
  * does with it. This is the same marker the artwork cache keeps for the same
  * reason -- what was the library like when we last finished. */
-#define IDX_DONE_FILE CACHE_PREFIX "/index_done.txt"
+#define IDX_DONE_FILE ROCKBOX_DIR "/db_index.log"
+
+/* Read the index without a buffer of your own; see album_index.h.
+ *
+ * Here rather than in the caller because IDX_BUILD_BUFSZ is here: how much a
+ * build needs is the builder's business, and a second copy of that number
+ * elsewhere would be one to keep in step. Same allocation shape as
+ * background_build() below, for the same reasons -- ask outright rather than
+ * checking core_allocatable() first, since core_alloc() shrinks what will
+ * shrink and that is usually the only way this gets memory, and pin it because
+ * a handle with no ops is movable while the builder yields throughout. */
+int db_index_acquire(struct pf_index_t *target, int *handle)
+{
+    void *buf;
+    int ret;
+
+    *handle = core_alloc(IDX_BUILD_BUFSZ);
+    if (*handle <= 0)
+        return ERROR_BUFFER_FULL;
+
+    buf = core_get_data_pinned(*handle);
+    memset(target, 0, sizeof(*target));
+
+    ret = db_index_build_into(target, buf, IDX_BUILD_BUFSZ);
+    if (ret < SUCCESS)
+    {
+        db_index_release(*handle);
+        *handle = 0;
+    }
+    return ret;
+}
+
+void db_index_release(int handle)
+{
+    if (handle <= 0)
+        return;
+    core_put_data_pinned(core_get_data(handle));
+    core_free(handle);
+}
 
 /* bg_task.artifact_ok: the marker matching the entry count is not on its own
  * enough -- the index file it refers to has to still be there. Cheap: no
  * allocation, and nothing is read out of it. */
 static bool saved_index_present(void)
 {
-    int fd = open(ALBUM_INDEX, O_RDONLY);
+    int fd = open(DB_INDEX_FILE, O_RDONLY);
     if (fd < 0)
         return false;
     close(fd);
@@ -1064,7 +1379,7 @@ static bool background_build(void)
     return true;
 }
 
-struct bg_task album_index_task =
+struct bg_task db_index_task =
 {
     .done_file   = IDX_DONE_FILE,
     .rank        = BG_RANK_INDEX,
@@ -1075,21 +1390,21 @@ struct bg_task album_index_task =
 static void idx_thread(void)
 {
     while (1)
-        bg_task_tick(&album_index_task, &idx_queue);
+        bg_task_tick(&db_index_task, &idx_queue);
 }
 
-void album_index_init(void)
+void db_index_init(void)
 {
     mutex_init(&build_mutex);
     queue_init(&idx_queue, true);
-    bg_task_init(&album_index_task);
+    bg_task_init(&db_index_task);
     idx_thread_id = create_thread(idx_thread, idx_stack, sizeof(idx_stack), 0,
                                   idx_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
                                   IF_COP(, CPU));
     (void)idx_thread_id;
 }
 
-void album_index_invalidate(void)
+void db_index_invalidate(void)
 {
     /* Forget what the last pass covered, so the next tick rebuilds. Used by
      * the carousel's rebuild/update, which otherwise only reach its own build
@@ -1097,5 +1412,5 @@ void album_index_invalidate(void)
      *
      * An update rather than a rebuild: there is nothing here to purge that the
      * pass does not overwrite anyway, the index being a single file. */
-    bg_task_update(&album_index_task);
+    bg_task_update(&db_index_task);
 }

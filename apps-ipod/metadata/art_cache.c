@@ -46,6 +46,12 @@
 
 #define THUMBCACHE_DIR ROCKBOX_DIR "/thumbcache"
 #define AA_VERSION_FILE THUMBCACHE_DIR "/format.txt"
+/* Folders a pass found no art for, one path per line, for the health screen
+ * (screens/system/art_health.c). Written to a .tmp and renamed only when a
+ * pass finishes, so an aborted pass leaves the previous -- complete -- list
+ * standing rather than a partial one that reads as "the rest are fine". */
+#define AA_NOART_ALBUMS  THUMBCACHE_DIR "/noart_albums.lst"
+#define AA_NOART_ARTISTS THUMBCACHE_DIR "/noart_artists.lst"
 /* Entry count the cache was last completed for, so a restart with an
  * unchanged library does not re-walk the whole database. */
 #define AA_DONE_FILE    THUMBCACHE_DIR "/done.txt"
@@ -305,6 +311,11 @@ static void aa_purge_thumbs(void)
      * Said here rather than left to whoever asked, because the format-version
      * check below purges from inside a pass that may then be interrupted. */
     bg_task_forget(&art_cache_task);
+
+    /* The miss lists describe thumbnails that are about to stop existing, so
+     * they go too rather than being left to describe a cache that is gone. */
+    remove(AA_NOART_ALBUMS);
+    remove(AA_NOART_ARTISTS);
 
     for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
     {
@@ -851,6 +862,54 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
  * (album) folder and its parent (artist) folder, for libraries laid out as
  * <artist>/<album>/<track>. Returns true if the pass ran to completion, false if
  * it was aborted (USB/DB busy/no memory) and should be retried later. */
+/* The two miss lists a pass is writing, or -1. One open file each for the
+ * whole pass rather than an open/append/close per folder, which on a library
+ * with a lot of coverless folders would be thousands of them. */
+static int noart_album_fd = -1;
+static int noart_artist_fd = -1;
+
+static void noart_open(void)
+{
+    noart_album_fd = open(AA_NOART_ALBUMS ".tmp",
+                          O_CREAT|O_WRONLY|O_TRUNC, 0666);
+    noart_artist_fd = open(AA_NOART_ARTISTS ".tmp",
+                           O_CREAT|O_WRONLY|O_TRUNC, 0666);
+}
+
+/* Publish on a complete pass, discard on an aborted one. */
+static void noart_close(bool completed)
+{
+    if (noart_album_fd >= 0)
+        close(noart_album_fd);
+    if (noart_artist_fd >= 0)
+        close(noart_artist_fd);
+    noart_album_fd = noart_artist_fd = -1;
+
+    if (completed)
+    {
+        remove(AA_NOART_ALBUMS);
+        rename(AA_NOART_ALBUMS ".tmp", AA_NOART_ALBUMS);
+        remove(AA_NOART_ARTISTS);
+        rename(AA_NOART_ARTISTS ".tmp", AA_NOART_ARTISTS);
+    }
+    else
+    {
+        remove(AA_NOART_ALBUMS ".tmp");
+        remove(AA_NOART_ARTISTS ".tmp");
+    }
+}
+
+static void noart_record(int fd, const char *dir)
+{
+    if (fd >= 0)
+        fdprintf(fd, "%s\n", dir);
+}
+
+const char *art_cache_noart_list(bool artists)
+{
+    return artists ? AA_NOART_ARTISTS : AA_NOART_ALBUMS;
+}
+
 static bool aa_run_pass(void)
 {
     struct tagcache_search tcs;
@@ -899,6 +958,7 @@ static bool aa_run_pass(void)
      * boot. Zeroed here rather than at the top so an early return -- no
      * memory, no search -- leaves the previous pass's figures readable. */
     memset(&aa_counts, 0, sizeof(aa_counts));
+    noart_open();
 
     /* A pass is running -> lights the status-bar %lc ("Caching") token. */
     cache_busy = true;
@@ -930,6 +990,8 @@ static bool aa_run_pass(void)
             aa_counts.albums++;
             if (aa_cache_dir(tcs.result, dh, workbuf, worksz, &aborted))
                 aa_counts.album_art++;
+            else if (!aborted)
+                noart_record(noart_album_fd, aa_dir);
         }
         if (aborted)
             break;
@@ -948,6 +1010,8 @@ static bool aa_run_pass(void)
                 aa_counts.artists++;
                 if (aa_cache_dir(aa_probe, ah, workbuf, worksz, &aborted))
                     aa_counts.artist_art++;
+                else if (!aborted)
+                    noart_record(noart_artist_fd, aa_artist_dir);
             }
         }
         if (aborted)
@@ -963,6 +1027,7 @@ static bool aa_run_pass(void)
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
+    noart_close(!aborted);
     core_unpin(wh);
     core_unpin(sh);
     core_free(sh);

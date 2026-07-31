@@ -958,6 +958,14 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_PLUGIN);
                     case GO_TO_WPS:
                         return exit_to_new_screen(GO_TO_WPS);
+                    /* The database browser's synthetic album-charts row (see
+                     * load_root() in browser_db.c). Codes not named here fall
+                     * to the default and are silently dropped, so a new one
+                     * has to be added in both places. */
+                    case GO_TO_ALBUM_CHARTS:
+                        return exit_to_new_screen(GO_TO_ALBUM_CHARTS);
+                    case GO_TO_RANDOM_ALBUM:
+                        return exit_to_new_screen(GO_TO_RANDOM_ALBUM);
                     case GO_TO_ROOT: exit_func = true; break;
                     default:
                         break;
