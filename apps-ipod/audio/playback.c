@@ -2308,13 +2308,14 @@ static int audio_load_track(void)
         if (!path)
             break;
 
-        /* Test for broken playlists by probing for the files */
-        if (file_exists(path))
-        {
-            fd = open(path, O_RDONLY);
-            if (fd >= 0)
-                break;
-        }
+        /* Test for broken playlists by probing for the files. Opening is the
+         * whole probe: it answers "is this a playable entry?" more strictly
+         * than an existence check, which matches directories too, and it costs
+         * one directory walk instead of two. */
+        fd = open(path, O_RDONLY);
+        if (fd >= 0)
+            break;
+
         logf("Open failed %s", path);
 
         /* only skip if failed track has a successor in playlist */
@@ -2351,9 +2352,13 @@ static int audio_load_track(void)
         return LOAD_TRACK_ERR_NO_MORE;
     }
 
-    /* Successfully opened the file - get track metadata */
+    /* Successfully opened the file - get track metadata. The descriptor goes
+     * with it: on success the handle adopts it and sets fd to -1, so the
+     * buffering thread reads the metadata through the descriptor opened above
+     * rather than opening the same path again. The failure paths below still
+     * hold it, and the close at the end of the function covers them. */
     if (filling == STATE_FULL ||
-        (info.id3_hid = bufopen(path, 0, TYPE_ID3, NULL)) < 0)
+        (info.id3_hid = bufopen(path, 0, TYPE_ID3, &fd)) < 0)
     {
         /* Buffer or track list is full */
         struct mp3entry *ub_id3;
@@ -2403,7 +2408,14 @@ static bool audio_auto_change_frequency(struct mp3entry *id3, bool play);
 /* Second part of the track loading: We now have the metadata available, so we
    can load the codec, the album art and finally the audio data.
    This is called on the audio thread after the buffering thread calls the
-   buffering_handle_finished_callback callback. */
+   buffering_handle_finished_callback callback.
+
+   The audio data is loaded last on purpose, and the order is load-bearing:
+   add_handle() will not allocate behind a handle without first reserving the
+   whole of that handle's file, so anything opened after the audio handle has
+   to fit after the entire track has been set aside. Small companion handles
+   -- cuesheet, album art, codec -- therefore have to be opened before it, not
+   after. */
 static int audio_finish_load_track(struct track_info *infop)
 {
     int trackstat = LOAD_TRACK_OK;
@@ -3310,10 +3322,21 @@ static void audio_stop_playback(void)
     /* Wait for fade-out */
     audio_wait_fade_complete();
 
-    /* Stop the codec and unload it */
+    /* Stop the codec, but leave it loaded.
+     *
+     * Codecs live in codecbuf, their own region past the end of the audio
+     * buffer, and they take their working memory from what is left of it -- so
+     * an idle codec occupies nothing that stopping could give back. Keeping it
+     * means starting the next track in the same format does not have to read
+     * the .codec file off disk again, which is 12KB for flac but 76KB for mp3
+     * and 145KB for opus.
+     *
+     * Nothing here needs the slot emptied: audio_init_codec() unloads whatever
+     * is resident as soon as a track wants a different format, and re-running a
+     * codec that is already loaded is the ordinary path between two tracks of
+     * one album, not a special case. */
     halt_decoding_track(true);
     pcmbuf_play_stop();
-    codec_unload();
 
     /* Save resume information  - "filling" might have been set to
        "STATE_ENDED" by caller in order to facilitate end of playlist */

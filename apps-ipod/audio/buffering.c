@@ -908,7 +908,10 @@ management functions for all the actual handle management work.
            offset bytes of the file aren't needed.
    type: one of the data types supported (audio, image, cuesheet, others
    user_data: user data passed possibly passed in subcalls specific to a
-              data_type (only used for image (albumart) buffering so far )
+              data_type. For TYPE_BITMAP it is a struct bufopen_bitmap_data;
+              for TYPE_ID3 it is an int* holding an already-open descriptor
+              for the file, which the new handle adopts (see below). NULL is
+              always accepted and means "nothing extra".
    return value: <0 if the file cannot be opened, or one file already
    queued to be opened, otherwise the handle for the file in the buffer
 */
@@ -922,7 +925,23 @@ int bufopen(const char *file, off_t offset, enum data_type type,
     /* No buffer refs until after the mutex_lock call! */
 
     if (type == TYPE_ID3) {
-        /* ID3 case: allocate space, init the handle and return. */
+        /* ID3 case: allocate space, init the handle and return.
+         *
+         * The caller may hand over a descriptor it already has open -- it has
+         * usually just opened the file to check the track is really there, and
+         * passing it on saves the buffering thread opening the same path a
+         * second time to read the metadata.
+         *
+         * Adoption is all-or-nothing and is reported back through the caller's
+         * own int: it is set to -1 once the handle owns the descriptor, so the
+         * caller's "close it if I still hold it" clean-up becomes a no-op. If
+         * no handle could be allocated, nothing is taken and the caller still
+         * owns it. Once adopted, the descriptor is released either by
+         * get_metadata_ex() when it finishes reading, or by close_handle() if
+         * the handle is closed before that -- the same arrangement a cuesheet
+         * handle uses. */
+        int *fd_p = user_data;
+
         mutex_lock(&llist_mutex);
 
         h = add_handle(H_ALLOCALL, sizeof(struct mp3entry), file, &data);
@@ -939,6 +958,11 @@ int bufopen(const char *file, off_t offset, enum data_type type,
             h->start    = 0;
             h->pos      = 0;
             h->end      = 0;
+
+            if (fd_p && *fd_p >= 0) {
+                h->fd = *fd_p;
+                *fd_p = -1;
+            }
 
             link_handle(h);
 
