@@ -25,6 +25,10 @@ void browser_db_init(void) INIT_ATTR;
 int browser_db_enter(struct browser_context* c, bool is_visible);
 void browser_db_exit(struct browser_context* c, bool is_visible);
 int browser_db_load(struct browser_context* c);
+/* True when BACK should leave the browser rather than pop a level: the
+ * current level is the one a main-menu shortcut entered at, and the menu it
+ * would pop to is the one the shortcut existed to skip. */
+bool browser_db_back_exits(const struct browser_context *c);
 /* The top row a freshly loaded level wants shown (it opens scrolled past its
  * <All tracks>/<Random> rows), or -1 for no preference. Clears the request, so
  * only the load that made it is affected -- call once, right after selecting. */

@@ -182,7 +182,7 @@ static void usb_screens_draw(struct usb_screen_vps_t *usb_screen_vps_ar)
             caption.fg_pattern = PODBOX_COLOR_FG;
             screen->set_viewport(&caption);
             screen->getstringsize(msg, &tw, &th);
-            screen->putsxy((screen->lcdwidth - tw) / 2, 195, msg);
+            screen->putsxy((screen->lcdwidth - tw) / 2, 175, msg);
         }
 
         screen->set_viewport(last_vp);

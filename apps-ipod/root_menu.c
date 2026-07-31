@@ -320,10 +320,28 @@ static int browser(void* param)
         TAGNAVI_CASE(12) TAGNAVI_CASE(13) TAGNAVI_CASE(14) TAGNAVI_CASE(15)
         TAGNAVI_CASE(16) TAGNAVI_CASE(17) TAGNAVI_CASE(18) TAGNAVI_CASE(19)
 #undef TAGNAVI_CASE
-            /* Deliberately not touching last_db_dirlevel/last_db_selection --
-             * these shortcuts stay independent of the plain Database entry's
-             * own resume position. */
+            /* Leave the database browser as a fresh Music entry would find it.
+             *
+             * A shortcut enters at dirlevel 0 so one BACK leaves, which means
+             * it never passes back through the Music menu -- and it was that
+             * pass that used to put currtable right, browser_db_exit()
+             * restoring it from table_history on the way up. Without it,
+             * currtable was left pointing at the shortcut's own listing, and
+             * the plain Music entry inherits whatever is there: choosing Music
+             * opened the album list, and every later database screen was
+             * confused in turn.
+             *
+             * Same repair, and the same reason, as GO_TO_ALBUM_COVERS_TRACKS
+             * below. Clearing the resume position with it is deliberate:
+             * dirlevel and currtable have to agree, so keeping a stored depth
+             * against a reset table is what caused this in the first place.
+             * These shortcuts used to leave the Music position alone; entering
+             * at level 0 is what costs that, and a shortcut that quietly
+             * breaks Music is the worse trade. */
             tc->dirlevel = last_ft_dirlevel;
+            tc->currtable = 0;
+            last_db_dirlevel = 0;
+            last_db_selection = 0;
         break;
 
         case GO_TO_ALBUM_COVERS_TRACKS:

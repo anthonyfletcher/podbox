@@ -41,6 +41,23 @@ typedef fb_data pix_t;
 /* Number of slide slots the engine keeps decoded at once. */
 #define SLIDE_CACHE_SIZE 100
 
+/* Caption geometry, in one place because three pieces of code have to agree on
+ * it: each model's draw_text() places the text, and the engine reserves a strip
+ * of the same size for it (see the text_margin switch in carousel.c). They were
+ * three copies of the same expression, and moving the text without moving the
+ * strip lets the slides run underneath it.
+ *
+ * PF_CAPTION_STRIP is the room a bottom caption needs -- two lines at 0.75
+ * spacing plus descenders. PF_CAPTION_LIFT holds it clear of the very bottom
+ * edge, which read as sitting too low.
+ *
+ * PF_CAPTION_ONE_LINE_Y offsets a caption that has only one line to write, so
+ * it sits where the middle of a two-line caption would rather than on the
+ * first line: half the 0.75 line spacing. */
+#define PF_CAPTION_STRIP(char_height)  ((char_height) * 9 / 4)
+#define PF_CAPTION_LIFT                10
+#define PF_CAPTION_ONE_LINE_Y(char_height) ((char_height) * 3 / 8)
+
 /* build_index / count return codes */
 #define SUCCESS              0
 #define ERROR_NO_ALBUMS     -1

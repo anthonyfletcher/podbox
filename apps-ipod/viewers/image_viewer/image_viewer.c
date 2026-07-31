@@ -238,17 +238,22 @@ static void get_pic_list(bool single_file)
     pname++;
 
     /* The neighbours to page through come from the file browser's cached
-     * directory, which is only this file's directory when the browser is what
+     * directory, which describes this file only when the browser is what
      * opened it. The flat Images list (screens/browse/browser_flat.c) opens
-     * files from anywhere without moving the browser, and reading its cache
-     * then describes some unrelated folder -- usually empty, which is the
-     * "No supported files" this used to give, and worse when it is not empty,
-     * because paging would walk a folder the image is not in.
+     * files from anywhere without moving the browser.
      *
-     * So the cache is used only when it really is this file's directory, and
-     * the directory is read directly otherwise. Preferring the cache is not
-     * just economy: it is already sorted the way the browser shows it, and
-     * paging should follow the order the file was picked from. */
+     * Two things have to hold, and comparing the paths alone is not enough --
+     * that was the first attempt at this and it still failed. getcwd() returns
+     * the browser's last directory whether or not it ever loaded it, so for a
+     * file at the volume root the paths matched, the empty cache was trusted,
+     * and the viewer reported "No supported files". The cache must also
+     * actually contain the file being opened.
+     *
+     * The cache is still preferred where it genuinely applies: it is ordered
+     * the way the browser displays it, and paging should follow the order the
+     * file was picked from. It is also shared with the database browser, so it
+     * may hold something else entirely -- another reason to check rather than
+     * assume. */
     /* np_file's directory, without the trailing slash -- which getcwd() does
      * not return either, except at the root where the slash is the whole
      * name. */
@@ -263,7 +268,21 @@ static void get_pic_list(bool single_file)
     cwd[0] = '\0';
     getcwd(cwd, sizeof(cwd));
 
+    bool cache_has_file = false;
     if (cwd[0] && !strcmp(cwd, dir))
+    {
+        for (i = 0; i < tree->filesindir; i++)
+        {
+            if (!(dircache[i].attr & ATTR_DIRECTORY)
+                && !strcmp(dircache[i].name, pname))
+            {
+                cache_has_file = true;
+                break;
+            }
+        }
+    }
+
+    if (cache_has_file)
     {
         for (i = 0; i < tree->filesindir && buf_size > sizeof(char**); i++)
         {

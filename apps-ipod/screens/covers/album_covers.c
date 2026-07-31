@@ -695,7 +695,8 @@ static void draw_album_text(void)
             break;
         case ALBUM_NAME_BOTTOM:
         case ALBUM_AND_ARTIST_BOTTOM:
-            albumtxt_y = pf_height - (char_height * 9 / 4);
+            albumtxt_y = pf_height - PF_CAPTION_STRIP(char_height)
+                                   - PF_CAPTION_LIFT;
             break;
         case ALBUM_NAME_TOP:
         default:

@@ -684,7 +684,13 @@ static int update_dir(void)
     if (*tc.dirfilter == SHOW_ID3DB)
     {
         int top_item = browser_db_take_pending_top_item();
-        if (top_item >= 0)
+        /* Only if the selection still fits on screen below it. The list
+         * re-chooses its top row when the selection moves, not on a plain
+         * draw, so a top row that pushed the cursor out of sight would simply
+         * stay that way until the user scrolled. */
+        if (top_item >= 0
+            && gui_synclist_get_sel_pos(list)
+                 < top_item + gui_synclist_get_nb_lines(list, SCREEN_MAIN))
             gui_synclist_set_top_item(list, top_item);
     }
     /* Draw twice to settle the top row: after a change between lists of
@@ -979,7 +985,11 @@ static int dirbrowse(void)
                     exit_func = true;
                     break;
                 }
-                if ((*tc.dirfilter == SHOW_ID3DB && tc.dirlevel == 0) ||
+                /* browser_db_back_exits(): a main-menu shortcut jumped
+                 * straight to this level, so popping would land on the menu it
+                 * was meant to skip. One press undoes one jump. */
+                if ((*tc.dirfilter == SHOW_ID3DB
+                     && (tc.dirlevel == 0 || browser_db_back_exits(&tc))) ||
                     ((*tc.dirfilter != SHOW_ID3DB && !strcmp(currdir,"/"))))
                 {
                     if (oldbutton == ACTION_TREE_PGLEFT)

@@ -465,6 +465,12 @@ void gui_synclist_select_item(struct gui_synclist * gui_list, int item_number)
 /* Force the row drawn at the top of the screen, overriding the scroll margin
  * gui_synclist_select_item() applies. Call it right after selecting; it holds
  * until the selection next moves. */
+int gui_synclist_get_nb_lines(struct gui_synclist * gui_list,
+                              enum screen_type screen)
+{
+    return list_get_nb_lines(gui_list, screen);
+}
+
 void gui_synclist_set_top_item(struct gui_synclist * gui_list, int item_number)
 {
     FOR_NB_SCREENS(i)

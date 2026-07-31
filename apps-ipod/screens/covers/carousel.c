@@ -2308,7 +2308,9 @@ static bool init(void)
             case ALBUM_NAME_BOTTOM:
             case ALBUM_AND_ARTIST_BOTTOM:
             default:
-                text_margin = char_height * 9 / 4;
+                /* The lift is part of the strip: the text moved up, so the
+                 * slides have to stop that much higher or they run under it. */
+                text_margin = PF_CAPTION_STRIP(char_height) + PF_CAPTION_LIFT;
                 text_at_top = false;
                 break;
         }

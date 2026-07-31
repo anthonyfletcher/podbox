@@ -205,15 +205,22 @@ static void artist_draw_text(void)
         prev_index = center_index;
     }
 
+    /* This caption is one line where the album carousel's is two, so it is
+     * placed where the middle of that pair would be rather than on the first
+     * line -- otherwise it sits high in a strip sized for two, which reads as
+     * misaligned against the same screen showing albums. The strip itself is
+     * unchanged: the engine reserves the same space either way. */
     char_height = screens[SCREEN_MAIN].getcharheight();
     switch (global_settings.album_covers_show_album_name)
     {
         case ALBUM_AND_ARTIST_TOP:
-            txt_y = 0;
+            txt_y = PF_CAPTION_ONE_LINE_Y(char_height);
             break;
         case ALBUM_NAME_BOTTOM:
         case ALBUM_AND_ARTIST_BOTTOM:
-            txt_y = pf_height - (char_height * 9 / 4);
+            txt_y = pf_height - PF_CAPTION_STRIP(char_height)
+                              - PF_CAPTION_LIFT
+                              + PF_CAPTION_ONE_LINE_Y(char_height);
             break;
         case ALBUM_NAME_TOP:
         default:

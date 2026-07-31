@@ -2279,6 +2279,38 @@ void browser_db_enter_menu_on_next_load(const char *menu_id)
  * Note browser_db_find_root_entry_by_tag() below is a different question and
  * still correct: it answers "which entry of menus[rootmenu]->items[]", which
  * is a config position, and its callers index that array with it. */
+/* The level a main-menu shortcut landed on, or -1. BACK here leaves the
+ * browser instead of popping, so the shortcut takes one press to undo rather
+ * than depositing the user in the Music menu it existed to skip. */
+static int shortcut_base_level = -1;
+
+/* Note the level a shortcut just entered, and open it the way a descent would.
+ *
+ * Faking dirlevel = 0 was the obvious way to make BACK leave, and it is wrong
+ * twice over. load_root() takes dirlevel 0 to mean the root menu and resets
+ * currextra to it, so a submenu shortcut lost which submenu it had chosen and
+ * showed the Music root. And exiting from a level the browser thinks is the
+ * top skips browser_db_exit(), which is what used to put currtable back --
+ * leaving it pointing at the shortcut's listing for the next Music entry to
+ * inherit. Recording the level instead keeps dirlevel, currtable and currextra
+ * agreeing with each other, which everything else here assumes.
+ *
+ * It also asks for the <All tracks>/<Random> rows to be scrolled past.
+ * browser_db_enter() arms that itself, but only on a visible descent, and a
+ * shortcut enters with is_visible false -- so this was the one way into a list
+ * that opened sitting on a special row. */
+static void enter_as_root_shortcut(struct browser_context *c)
+{
+    shortcut_base_level = c->dirlevel;
+    c->selected_item = 0;
+    position_past_specials = true;
+}
+
+bool browser_db_back_exits(const struct browser_context *c)
+{
+    return shortcut_base_level >= 0 && c->dirlevel == shortcut_base_level;
+}
+
 static int loaded_row_for_menu_id(struct browser_context *c, int rows,
                                   const char *menu_id)
 {
@@ -2605,6 +2637,8 @@ int browser_db_load(struct browser_context* c)
         table = TABLE_ROOT;
         c->currtable = table;
         c->currextra = rootmenu;
+        /* A session starting at the root is not one a shortcut opened. */
+        shortcut_base_level = -1;
     }
 
     /* A shortcut (e.g. root_menu.c's Artists/Albums/Genres entries) armed a
@@ -2632,6 +2666,7 @@ int browser_db_load(struct browser_context* c)
         {
             c->selected_item = idx;
             browser_db_enter(c, false);
+            enter_as_root_shortcut(c);
             return browser_db_load(c);
         }
         /* Submenu gone (a customised tagnavi_user.config) -- fall through and
@@ -2683,6 +2718,7 @@ int browser_db_load(struct browser_context* c)
             {
                 c->selected_item = idx;
                 browser_db_enter(c, false);
+                enter_as_root_shortcut(c);
                 return browser_db_load(c);
             }
             /* Tag not found (e.g. removed from tagnavi_user.config) -- fall
@@ -2764,6 +2800,18 @@ int browser_db_load(struct browser_context* c)
              * the first real row. Consumed once by the browser's list sync. */
             pending_top_item = c->special_entry_count;
         }
+    }
+    else if (c->special_entry_count > 0
+             && c->selected_item >= c->special_entry_count)
+    {
+        /* Coming back to a level, on a row past the special ones. Ask for the
+         * same top row: the list keeps one row above the cursor of its own
+         * accord, so returning to the first album or two put <All tracks> back
+         * on screen even though the descent had scrolled it away -- the list
+         * looked different depending on how it was arrived at. The browser
+         * drops this request if the selection is too far down for it, in which
+         * case the special rows are off the top anyway. */
+        pending_top_item = c->special_entry_count;
     }
 
     return count;

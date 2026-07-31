@@ -28,3 +28,4 @@ make -j"$JOBS"
 make zip
 ../bundle-theme.sh
 ../bundle-eqs.sh
+../bundle-licenses.sh

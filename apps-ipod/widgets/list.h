@@ -229,6 +229,12 @@ extern void gui_synclist_select_item(struct gui_synclist * lists,
  * until the selection next moves. */
 extern void gui_synclist_set_top_item(struct gui_synclist * lists,
                                       int item_number);
+/* How many rows fit on screen. Needed to tell whether a top row chosen by the
+ * caller would push the selection out of sight -- the list only re-adjusts
+ * itself when the selection moves, so an unreachable top row would simply
+ * stay wrong. */
+extern int gui_synclist_get_nb_lines(struct gui_synclist * lists,
+                                     enum screen_type screen);
 extern void gui_synclist_add_item(struct gui_synclist * lists);
 extern void gui_synclist_del_item(struct gui_synclist * lists);
 extern void gui_synclist_set_title(struct gui_synclist * lists, const char * title,
