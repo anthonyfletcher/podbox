@@ -427,6 +427,21 @@ bool settings_load_config(const char* file, bool apply)
     if (fd < 0)
         return false;
 
+    /* Only for a file the user chose to load, which is meant to describe a
+     * whole look and so must not leave the previous one's settings standing.
+     * The files read at startup are the opposite case -- config.cfg holds only
+     * what differs from the defaults, and the fixed settings file is a partial
+     * overlay on top of it, so resetting for those would discard the very
+     * values being restored. */
+    if (apply)
+    {
+        for (int i = 0; i < nb_settings; i++)
+        {
+            if (settings[i].flags & F_THEMERESET)
+                reset_setting(&settings[i], settings[i].setting);
+        }
+    }
+
     while (read_line(fd, line, sizeof line) > 0)
     {
         char *name, *value;

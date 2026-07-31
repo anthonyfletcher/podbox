@@ -1421,7 +1421,10 @@ const struct settings_list settings[] = {
                      ICON_DIR "/", ".bmp"),
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, colors_file, "filetype colours", "-",
                      THEME_DIR "/", ".colours"),
-    OFFON_SETTING(0, dynamic_colors, LANG_DYNAMIC_COLORS, true,
+    /* Off unless a theme asks for it: it repaints in colours taken from the
+     * album art, which a skin not written for it has no reason to expect.
+     * F_THEMERESET so loading such a skin turns it back off. */
+    OFFON_SETTING(F_THEMERESET, dynamic_colors, LANG_DYNAMIC_COLORS, false,
                   "dynamic colors", NULL),
     /* Re-buffers the artwork on change, so the now-playing screen switches
      * picture without waiting for the next track. Dynamic colours need no
@@ -1471,14 +1474,16 @@ const struct settings_list settings[] = {
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
     OFFON_SETTING(0, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
                   false, "album covers show year", NULL),
-    /* Config-file only (lang_id -1, no menu entry): a theme sets these. Defaults
-     * on. A theme whose list config doesn't draw the %La cover should set it off
-     * in its .cfg, otherwise its album rows still grow to the tall height (just
-     * with no cover in them). */
-    OFFON_SETTING(F_THEMESETTING, db_albumart, LANG_DB_ALBUM_ART, true,
-                  "database album art", NULL),
-    OFFON_SETTING(F_THEMESETTING, db_artistart, LANG_DB_ARTIST_ART, true,
-                  "database artist art", NULL),
+    /* Config-file only (lang_id -1, no menu entry): a theme sets these. Off
+     * unless asked for, because they make album rows grow to the tall height
+     * to fit a cover -- a theme whose list config doesn't draw the %La cover
+     * gets the tall rows with nothing in them. F_THEMERESET so a theme that
+     * says nothing gets them off rather than inheriting them from the last
+     * theme loaded. */
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_albumart, LANG_DB_ALBUM_ART,
+                  false, "database album art", NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_artistart, LANG_DB_ARTIST_ART,
+                  false, "database artist art", NULL),
     {F_T_INT|F_THEMESETTING, &global_settings.db_art_row_height, -1,
         INT(52), "database art row height", UNUSED},
     OFFON_SETTING(0, art_cache_fast_build, LANG_ART_CACHE_FAST_BUILD, false,
