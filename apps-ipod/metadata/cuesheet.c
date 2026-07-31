@@ -23,6 +23,7 @@
 #include "system/strutil.h"
 #include "widgets/list.h"
 #include "input/action.h"
+#include "system/shutdown.h"         /* default_event_handler */
 #include "lang.h"
 #include "debug.h"
 #include "settings/settings.h"
@@ -496,7 +497,15 @@ void browse_cuesheet(struct cuesheet *cue)
 
             case ACTION_STD_CANCEL:
                 done = true;
+                break;
             default:
+                /* This loop owns the button queue while the screen is up, so
+                 * a USB connect has to be handled here rather than dropped:
+                 * the storage handover waits for the acknowledgement
+                 * default_event_handler() sends, and leaves the host looking
+                 * at an empty drive until it arrives. */
+                if (default_event_handler(action) == SYS_USB_CONNECTED)
+                    done = true;
                 break;
         }
     }

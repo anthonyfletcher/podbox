@@ -17,6 +17,7 @@
 #include "kernel.h"          /* current_tick, yield, HZ, TIME_AFTER */
 #include "lang.h"            /* LANG_*, str */
 #include "input/action.h"          /* get_action */
+#include "system/shutdown.h" /* default_event_handler */
 #include "widgets/splash.h"          /* splashf, splash_progress */
 #include "dir.h"             /* opendir/readdir/closedir, dir_get_info */
 #include "files/filetypes.h"       /* filetype_get_attr, FILE_ATTR_* */
@@ -337,7 +338,13 @@ bool collect_dir_stats(struct dir_stats *stats, bool (*id3_cb)(const char*))
 
         if (TIME_AFTER(current_tick, cds_last_get_action + HZ/8))
         {
-            if(ACTION_STD_CANCEL == get_action(CONTEXT_STD,TIMEOUT_NOBLOCK))
+            int action = get_action(CONTEXT_STD,TIMEOUT_NOBLOCK);
+
+            /* USB has to be handled here rather than dropped: this poll owns
+             * the button queue while the scan runs, and the storage handover
+             * waits on the acknowledgement default_event_handler() sends. */
+            if (default_event_handler(action) == SYS_USB_CONNECTED ||
+                action == ACTION_STD_CANCEL)
             {
                 stats->canceled = true;
                 result = false;

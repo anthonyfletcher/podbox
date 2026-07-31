@@ -61,6 +61,7 @@
 #include "system/app_util.h"
 #include "system/shutdown.h"
 #include "system/strutil.h"
+#include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/context_menu.h"           /* context_menu_show_playlist_cat/menu */
 #include "metadata/albumart.h"         /* find_albumart / search_albumart_files */
 #include "metadata/art_cache.h"   /* shared database-driven thumbnail cache */
@@ -933,9 +934,29 @@ static void thread(void)
             case EV_WAKEUP:
                 /* we just woke up */
                 break;
+            case SYS_USB_CONNECTED:
+                /* This queue is in the broadcast list, so the storage handover
+                 * counts an acknowledgement from it and will not give the host
+                 * the disk until it arrives. Then park: loading a slide reads
+                 * a disk that is no longer ours to read.
+                 *
+                 * Parked by hand rather than with usb_wait_for_disconnect(),
+                 * which discards every event but the disconnect -- including
+                 * the EV_EXIT that end_pf_thread() posts before waiting on
+                 * this thread, which would then wait forever. */
+                usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
+                while (1) {
+                    queue_wait(&thread_q, &ev);
+                    if (ev.id == SYS_USB_DISCONNECTED)
+                        break;
+                    if (ev.id == EV_EXIT)
+                        return;
+                }
+                continue;
         }
 
         if(ev.id != SYS_TIMEOUT) {
+            bool usb_pending = false;
             while (1) {
                 /* Drain the wakeups that piled up while we were loading, and
                  * keep going, rather than abandoning the run to fetch them.
@@ -955,7 +976,16 @@ static void thread(void)
                     queue_wait_w_tmo(&thread_q, &ev, 0);
                     if (ev.id == EV_EXIT)
                         return;
+                    if (ev.id == SYS_USB_CONNECTED) {
+                        /* Put it back and stop the run: the acknowledgement
+                         * belongs in one place, and the outer loop is it. */
+                        queue_post(&thread_q, ev.id, ev.data);
+                        usb_pending = true;
+                        break;
+                    }
                 }
+                if (usb_pending)
+                    break;
 
                 buf_ctx_lock();
                 bool slide_loaded = load_new_slide();

@@ -142,6 +142,7 @@ static const char *bg_step;
 
 static void draw_progressbar(int step, int count, char *msg);
 static int wait_for_background(void);
+static bool bg_should_stop(void);
 
 /* Keep an idle poweroff from interrupting a build the user is watching.
  *
@@ -217,13 +218,25 @@ static bool progress_cancel(int step, int count, char *msg)
         yield();
         if (count)
             draw_progressbar(step, count, msg);
-        return idx_abort;
+        return idx_abort || bg_should_stop();
     }
 
     const struct text_message prompt = {
             (const char*[]) {"Quit?", "Progress will be lost"}, 2};
 
     int action = get_action(CONTEXT_STD,TIMEOUT_NOBLOCK);
+
+    /* While a foreground build runs, this get_action() is the only thing
+     * reading the button queue -- and a USB connect arrives on it as an
+     * action. That queue is in the broadcast list, so the storage handover
+     * counts an acknowledgement from it, and default_event_handler() is what
+     * sends it. Dropping the action here leaves the handover waiting and the
+     * host looking at a drive with no medium in it for the length of the
+     * build. Give up afterwards: the library this was reading may have changed
+     * while the host had the disk. */
+    if (default_event_handler(action) == SYS_USB_CONNECTED)
+        return true;
+
     if (action == ACTION_STD_CANCEL || action == ACTION_STD_MENU)
     {
         if (gui_syncyesno_run(&prompt, NULL, NULL) == YESNO_YES)
@@ -1254,7 +1267,14 @@ static int wait_for_background(void)
         splash_progress(bg_done, bg_total > 0 ? bg_total : 1,
                         "%s", str(LANG_WAIT));
 
-        if (get_action(CONTEXT_STD, HZ / 10) == ACTION_STD_CANCEL)
+        int action = get_action(CONTEXT_STD, HZ / 10);
+
+        /* USB counts as leaving, and has to be handled rather than dropped --
+         * this poll owns the button queue for as long as the wait lasts, and
+         * the acknowledgement the storage handover is waiting for is the one
+         * default_event_handler() sends. */
+        if (default_event_handler(action) == SYS_USB_CONNECTED ||
+            action == ACTION_STD_CANCEL)
         {
             /* Leaving, not switching to the slow path: tell it to stop so it
              * is not still running behind whatever comes next. */
@@ -1412,6 +1432,40 @@ static struct event_queue idx_queue;
  * fails with ERROR_BUFFER_FULL, which leaves the carousel to build inline as
  * it always has. */
 #define IDX_BUILD_BUFSZ (384 * 1024)
+
+/* Whether the background pass should give up where it stands.
+ *
+ * The event is peeked, never taken. This queue is in the broadcast list, so
+ * the storage handover counts an acknowledgement from it and hands the host
+ * the disk only once every count is in -- and bg_task_tick() is what sends
+ * this one. A pass that swallowed the event here would leave the handover
+ * waiting for an acknowledgement nobody can still send, and the player would
+ * report an empty drive for as long as it stayed plugged in. Returning true is
+ * the whole job: the pass unwinds to the tick, which reads the event properly.
+ *
+ * Without this the pass has no way to hear about USB at all, and a full
+ * library index takes long enough for the host to give up and reset the port
+ * while it runs. */
+static bool bg_should_stop(void)
+{
+    struct queue_event ev;
+
+    if (bg_task_preempted(&db_index_task))
+        return true;
+
+    if (!queue_peek(&idx_queue, &ev))
+        return false;
+
+    switch (ev.id)
+    {
+        case SYS_USB_CONNECTED:
+        case SYS_POWEROFF:
+        case SYS_REBOOT:
+            return true;
+    }
+
+    return false;
+}
 
 
 /* True from before the background pass reaches for the lock until after it has

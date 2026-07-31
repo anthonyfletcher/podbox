@@ -31,6 +31,7 @@
 #include "widgets/splash.h"
 #include "widgets/keyboard.h"
 #include "input/action.h"
+#include "system/shutdown.h"         /* default_event_handler */
 
 /* Used for directory move, copy and delete */
 struct file_op_params
@@ -107,7 +108,17 @@ static bool poll_cancel_action(int operation, struct file_op_params *param)
                             current_kib, unit_str);
         }
     }
-    return ACTION_STD_CANCEL == get_action(CONTEXT_STD, TIMEOUT_NOBLOCK);
+    int action = get_action(CONTEXT_STD, TIMEOUT_NOBLOCK);
+
+    /* A USB connect arrives here as an action, and this poll owns the button
+     * queue for the length of the operation. Dropping it would leave the
+     * storage handover waiting for an acknowledgement only
+     * default_event_handler() can send. Counts as a cancel either way -- the
+     * host is about to take the disk this is writing to. */
+    if (default_event_handler(action) == SYS_USB_CONNECTED)
+        return true;
+
+    return ACTION_STD_CANCEL == action;
 }
 
 static void init_file_op(struct file_op_params *param,
