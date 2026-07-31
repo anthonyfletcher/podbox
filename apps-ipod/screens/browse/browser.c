@@ -1474,6 +1474,16 @@ static int browser_play_filename(char *dir, char *file, int attr)
                      TALK_IDARRAY(LANG_VOICE_DIR_HOVER), false);
 }
 
+/* True while this cable session's dircache suspend is outstanding.
+ *
+ * dircache_suspend() nests, and browser_flush()/browser_restore() are called as
+ * a pair per USB screen -- which a mid-connect blip runs more than once for a
+ * single cable session. Tracking it here makes the suspend one per session
+ * instead: without that, either the count climbs by one per session and the
+ * cache never returns, or the blip releases it and rebuilds the tree while the
+ * host is about to take the disk back. */
+static bool dircache_suspended_for_usb = false;
+
 /* These two functions are called by the USB and shutdown handlers */
 void browser_flush(void)
 {
@@ -1484,18 +1494,19 @@ void browser_flush(void)
 
     int old_val = global_status.dircache_size;
 
-    if (global_settings.dircache)
+    if (!global_settings.dircache)
+    {
+        global_status.dircache_size = 0;
+    }
+    else if (!dircache_suspended_for_usb)
     {
         dircache_suspend();
+        dircache_suspended_for_usb = true;
 
         struct dircache_info info;
         dircache_get_info(&info);
 
         global_status.dircache_size = info.last_size;
-    }
-    else
-    {
-        global_status.dircache_size = 0;
     }
 
     if (old_val != global_status.dircache_size)
@@ -1518,9 +1529,6 @@ void browser_restore(void)
     if (usb_core_host_wrote_storage())
         rescan_pending = true;
 
-    if (!rescan_pending)
-        return;
-
     /* Not yet, if the cable is still in. Windows unconfigures and reconfigures
      * us mid-connect (SET_CONFIG(0) ~1.7s in, SET_CONFIG(1) 300ms later), and
      * that arrives here as a disconnect although the cable never moved.
@@ -1539,9 +1547,31 @@ void browser_restore(void)
     if (usb_inserted())
         return;
 
+    /* The cable really is out, so release this session's suspend. Always --
+     * leaving it standing is what kept the directory cache empty and every
+     * listing on the disk for the rest of the run. */
+    int dircache_rc = 0;
+    if (dircache_suspended_for_usb)
+    {
+        dircache_rc = dircache_resume();
+        dircache_suspended_for_usb = false;
+    }
+
+    if (!rescan_pending)
+    {
+        /* Nothing was written, so the database files are byte-for-byte what
+         * they were and the RAM copy of them is still correct. browser_flush()
+         * only cleared the flag, so handing the searches back is free -- and
+         * without it the rest of the session reads every album name off the
+         * disk, which is the difference between a tag browser that opens
+         * instantly and one that does not. */
+        tagcache_reload_ramcache();
+        return;
+    }
+
     rescan_pending = false;
 
-    if (global_settings.dircache && dircache_resume() > 0)
+    if (dircache_rc > 0)
     {
         /* Scanning the disk is background work, so it shows in the status bar
          * rather than over the screen. */

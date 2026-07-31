@@ -184,6 +184,7 @@ void tagcache_screensync_enable(bool state);
 bool tagcache_is_in_ram(void);
 bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
 void tagcache_unload_ramcache(void);
+void tagcache_reload_ramcache(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
 bool tagcache_is_initialized(void);

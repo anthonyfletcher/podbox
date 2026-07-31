@@ -4848,6 +4848,23 @@ void tagcache_unload_ramcache(void)
     /* remove_db_file(TAGCACHE_STATEFILE); */
 }
 
+/* Put the RAM copy back into use.
+ *
+ * The counterpart to tagcache_unload_ramcache(), which clears a flag and does
+ * nothing else -- the buffer stays allocated and stays populated. So this is
+ * only a flag again, and the caller owns the one condition that matters:
+ * nothing may have written to the database files in between. Whoever knows
+ * that (a USB session the host only read from, say) can hand the searches
+ * back to RAM instead of leaving them on the disk for the rest of the run. */
+void tagcache_reload_ramcache(void)
+{
+    if (tcramcache.hdr != NULL && tc_stat.ramcache_allocated > 0
+        && tc_stat.ready)
+    {
+        tc_stat.ramcache = true;
+    }
+}
+
 
 /*
  * db_file_exists is noinline to minimize stack usage
