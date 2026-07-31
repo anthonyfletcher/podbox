@@ -251,7 +251,11 @@ static const char graphic_numeric[] = "graphic,numeric";
 #define DEFAULT_THEME_SELECTOR_TEXT LCD_RGBPACK(0x00, 0x00, 0x00)
 #define DEFAULT_THEME_SEPARATOR  LCD_RGBPACK(0x80, 0x80, 0x80)
 
-#define DEFAULT_BACKDROP    BACKDROP_DIR "/cabbiev2.bmp"
+/* No backdrop, so that a theme which says nothing about one gets the plain
+ * background colour rather than whatever image the previous theme left behind.
+ * Upstream defaults to cabbiev2.bmp; that file is not in this build's zip, so
+ * naming it here would only ever resolve to a failed load anyway. */
+#define DEFAULT_BACKDROP    "-"
 
 
 #define DEFAULT_TAGCACHE_SCAN_PATHS "/"
@@ -1377,7 +1381,9 @@ const struct settings_list settings[] = {
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY,sbs_file, "sbs",
                      DEFAULT_SBSNAME, SBS_DIR "/", ".sbs"),
     TEXT_SETTING(0,lang_file,"lang","",LANG_DIR "/",".lng"),
-    TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY,backdrop_file,"backdrop",
+    /* F_THEMERESET: a theme that names no backdrop means it wants none, not
+     * the last theme's image showing through everything it draws. */
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET|F_NEEDAPPLY,backdrop_file,"backdrop",
                      DEFAULT_BACKDROP, NULL, NULL),
     TEXT_SETTING(0,kbd_file,"kbd","-",ROCKBOX_DIR "/",".kbd"),
     CHOICE_SETTING(0, usb_charging, LANG_USB_CHARGING, TARGET_USB_CHARGING_DEFAULT, "usb charging",

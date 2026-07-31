@@ -416,6 +416,27 @@ bool string_to_cfg(const char *name, char* value, bool *theme_changed)
     return true;
 }
 
+/* True if the open config file names any setting that describes the look, which
+ * is what separates a theme from the other .cfg files the user can load. Takes
+ * the caller's line buffer rather than another 640 bytes of stack, and leaves
+ * the read position at wherever it stopped; the caller rewinds. */
+static bool config_names_theme_setting(int fd, char *line, int line_size)
+{
+    while (read_line(fd, line, line_size) > 0)
+    {
+        char *name, *value;
+        const struct settings_list *setting;
+
+        if (!settings_parseline(line, &name, &value))
+            continue;
+
+        setting = find_setting_by_cfgname(name);
+        if (setting && (setting->flags & F_THEMESETTING))
+            return true;
+    }
+    return false;
+}
+
 bool settings_load_config(const char* file, bool apply)
 {
     logf("%s()\r\n", __func__);
@@ -432,13 +453,24 @@ bool settings_load_config(const char* file, bool apply)
      * The files read at startup are the opposite case -- config.cfg holds only
      * what differs from the defaults, and the fixed settings file is a partial
      * overlay on top of it, so resetting for those would discard the very
-     * values being restored. */
+     * values being restored.
+     *
+     * Restricted further to files that actually describe a look, which is not
+     * every .cfg the user can pick: an EQ preset is one too, and loading one
+     * must not quietly drop the current theme's backdrop and colours. A theme
+     * always names at least one theme setting (its wps, sbs or a colour), so
+     * scan for one first and rewind. */
     if (apply)
     {
-        for (int i = 0; i < nb_settings; i++)
+        bool is_theme = config_names_theme_setting(fd, line, sizeof line);
+        lseek(fd, 0, SEEK_SET); /* the scan consumed the file either way */
+        if (is_theme)
         {
-            if (settings[i].flags & F_THEMERESET)
-                reset_setting(&settings[i], settings[i].setting);
+            for (int i = 0; i < nb_settings; i++)
+            {
+                if (settings[i].flags & F_THEMERESET)
+                    reset_setting(&settings[i], settings[i].setting);
+            }
         }
     }
 
