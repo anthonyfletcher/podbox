@@ -74,7 +74,6 @@
 #include "draw/bmp.h"              /* read_bmp_file */
 #include "draw/jpeg_load.h"        /* read_jpeg_file */
 #include "power.h"
-#include "powermgmt.h"        /* reset_poweroff_timer */
 #include "backlight.h"        /* backlight_set_timeout(_plugged) */
 #include "cpu.h"
 #include "skin/skin_engine.h"  /* skin_inhibit_flush */
