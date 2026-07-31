@@ -2162,14 +2162,23 @@ static void update_scroll_animation(void)
         center_index = index;
         queue_post(&thread_q, EV_WAKEUP, 0);
         slide_frame = index << 16;
-        /* Recalculate pos/tick/ftick/fade for the snapped slide_frame.
-         * Without this, stale pre-snap values cause a one-frame alpha
-         * discontinuity (flash) at boundary crossings. */
-        pos = (step < 0) ? 65535 : 0;
-        neg = 65536 - pos;
-        tick = (step < 0) ? neg : pos;
-        ftick = (tick * PFREAL_ONE) >> 16;
-        fade = pos / 256;
+        /* Recalculate for the snapped slide_frame. Without this, the values
+         * describe the frame we just left: fade drives the whole alpha ramp
+         * and ftick the slide geometry, so carrying either across a crossing
+         * shows as a one-frame flash.
+         *
+         * slide_frame now sits exactly on the boundary, so progress through
+         * the gap is zero -- and that is true whichever way we are moving.
+         * Deriving the backward case from pos = 65535 instead put it at the
+         * far end of the gap it had just finished: fade came out 255 rather
+         * than 0, lifting the entire right-hand ramp a half-step so the
+         * outermost right slide appeared at alpha 63 when it should not have
+         * been drawn, and ftick came out a full gap rather than none. One
+         * frame of both, on every backward crossing. */
+        pos = 0;
+        tick = 0;
+        ftick = 0;
+        fade = 0;
         center_slide.slide_index = center_index;
         for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
             left_slides[i].slide_index = center_index - 1 - i;
