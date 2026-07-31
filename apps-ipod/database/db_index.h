@@ -15,8 +15,13 @@ struct pf_index_t;
 
 /* Fill the caller's index from the saved file, rebuilding it from tagcache
  * first if there is none or it predates the current cache version. SUCCESS or
- * an ERROR_* from carousel.h. Only one build may run at a time; a caller
- * arriving while another is running asks it to stop, then waits.
+ * an ERROR_* from carousel.h.
+ *
+ * Only one build may run at a time. A caller arriving while the background
+ * pass is running waits for it and then reads what it wrote, rather than
+ * stopping it and repeating the work -- waiting is the quicker of the two,
+ * since this path redraws for every album and that one does not. The pass is
+ * asked to stop only if the user abandons the wait.
  *
  * The buffer is the caller's: the carousel passes the app buffer it has
  * claimed, the background pass passes memory of its own. Nothing else differs

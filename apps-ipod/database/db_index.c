@@ -61,6 +61,9 @@
  * which keeps only what is genuinely the carousel's, its slide cache and empty
  * slide. Regenerated if absent. */
 #define DB_INDEX_FILE ROCKBOX_DIR "/db_index.idx"
+/* The index is always rewritten whole, so it is built here and renamed over
+ * the real file rather than written into it. See save_album_index(). */
+#define DB_INDEX_TMP  DB_INDEX_FILE ".tmp"
 /* Bump the magic whenever struct album_data or struct artist_data, or the
  * file's layout, changes. load_album_index() validates nothing finer -- it
  * checks this and some coarse sizes -- so a struct that grew without a new
@@ -100,6 +103,35 @@ static struct mutex build_mutex;
  * the builder must not do off the main thread: draw, and read the keypad. */
 static bool building_bg;
 static volatile bool idx_abort;
+
+/* Which side is about to want the builder.
+ *
+ * building_bg cannot answer that, because it is set inside build_mutex: between
+ * a foreground caller finding it clear and that caller reaching the lock, the
+ * background pass can take the lock, and the caller then blocks on it with a
+ * dead screen and no way out -- precisely what wait_for_background() exists to
+ * prevent. These two are set before either side reaches for the lock, so the
+ * question can be asked while the answer still means something.
+ *
+ * Each side announces itself and only then looks at the other, so a tie is
+ * resolved rather than missed: at least one of them sees the other's mark. The
+ * background pass is the side that gives way, because nothing is waiting on it
+ * and its next tick is a few seconds away. The reverse case costs nothing --
+ * a background thread blocking on the mutex is invisible; only the thread
+ * holding the screen must never do it. */
+static volatile bool bg_claimed;
+static long fg_wanted_tick;
+
+/* Long enough to cover a foreground caller getting from its announcement to
+ * the lock. It is refreshed while that caller waits, so it does not have to
+ * cover the waiting itself; and going stale only ever risks the background
+ * pass blocking on the mutex, which is harmless. */
+#define FG_CLAIM_TICKS (HZ / 2)
+
+static bool foreground_wants_builder(void)
+{
+    return TIME_BEFORE(current_tick, fg_wanted_tick + FG_CLAIM_TICKS);
+}
 
 /* Last progress the background pass reported; read by anything showing it.
  * bg_step is the step name the builder was already passing to the progress
@@ -863,32 +895,53 @@ retry_artist_lookup:
 /*Saves the album index into a binary file to be recovered the
  next time PictureFlow is launched*/
 
+/* write() that insists on the whole block. A half-written index is not a
+ * usable one, so a short write has to fail the save rather than be left to be
+ * discovered by whoever reads it back. */
+static bool write_block(int fd, const void *buf, size_t len)
+{
+    return len == 0 || write(fd, buf, len) == (ssize_t)len;
+}
+
 static int save_album_index(void){
-    int fd = creat(DB_INDEX_FILE,0666);
-
+    /* Written beside the real file and renamed over it, never into it.
+     *
+     * The index is rewritten whole, so writing in place destroys the previous
+     * one the instant it starts -- and anything that cuts the write short, a
+     * USB session or a flat battery, leaves a truncated file that the next
+     * load rejects, sending the carousel off to rebuild from the database.
+     * rename() creates the new directory entry before dropping the old one, so
+     * a reader arriving at any moment sees one complete index or the other. */
+    int fd = creat(DB_INDEX_TMP, 0666);
     struct pf_index_t data;
+    bool ok;
+
+    if (fd < 0)
+        return -1;
+
     memcpy(&data, pfi, sizeof(struct pf_index_t));
+    memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
 
-    if(fd >= 0)
+    /* The artist array is written last so the layout before it is unchanged
+     * from the versions that did not keep it; the magic tells the two apart
+     * anyway. */
+    ok = write_block(fd, &data, sizeof(struct pf_index_t))
+      && write_block(fd, data.artist_names, data.artist_len)
+      && write_block(fd, data.album_names, data.album_len)
+      && write_block(fd, data.album_index,
+                     (size_t)data.album_ct * sizeof(struct album_data))
+      && write_block(fd, data.artist_index,
+                     (size_t)data.artist_ct * sizeof(struct artist_data));
+
+    close(fd);
+
+    if (!ok || rename(DB_INDEX_TMP, DB_INDEX_FILE) < 0)
     {
-        memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
-
-        write(fd, &data, sizeof(struct pf_index_t));
-
-        write(fd, data.artist_names, data.artist_len);
-        write(fd, data.album_names, data.album_len);
-
-        write(fd, data.album_index, data.album_ct * sizeof(struct album_data));
-        /* The artist array too, which earlier versions did not keep. Written
-         * last so the layout above is unchanged; the magic distinguishes the
-         * two anyway. */
-        write(fd, data.artist_index,
-              data.artist_ct * sizeof(struct artist_data));
-
-        close(fd);
-        return 0;
+        remove(DB_INDEX_TMP);
+        return -1;
     }
-    return -1;
+
+    return 0;
 }
 
 /* reads data from save file to buffer */
@@ -1182,6 +1235,10 @@ int db_index_build_into(struct pf_index_t *target, void *buf, size_t buf_sz)
  * be left. */
 static int wait_for_background(void)
 {
+    /* Announce before asking, so a pass deciding whether to start sees this
+     * and stands down instead of taking the lock out from under us. */
+    fg_wanted_tick = current_tick;
+
     if (!db_index_is_busy())
         return SUCCESS;
 
@@ -1190,6 +1247,10 @@ static int wait_for_background(void)
 
     while (db_index_is_busy())
     {
+        /* Kept current for as long as we are here, so the claim never lapses
+         * while we are still waiting on a pass that is already running. */
+        fg_wanted_tick = current_tick;
+
         splash_progress(bg_done, bg_total > 0 ? bg_total : 1,
                         "%s", str(LANG_WAIT));
 
@@ -1353,9 +1414,11 @@ static struct event_queue idx_queue;
 #define IDX_BUILD_BUFSZ (384 * 1024)
 
 
+/* True from before the background pass reaches for the lock until after it has
+ * let go, not merely while it holds it -- see bg_claimed. */
 bool db_index_is_busy(void)
 {
-    return building_bg;
+    return bg_claimed || building_bg;
 }
 
 const char *db_index_activity(void)
@@ -1469,11 +1532,27 @@ static bool background_build(void)
     int handle;
     void *buf;
     int ret;
+    bool ok;
+
+    /* Claim the builder before doing anything that leads to the lock, then
+     * give way if a foreground caller has already announced itself. Returning
+     * false is not a failure: bg_task simply tries again on a later tick, by
+     * which time whoever wanted it has finished and written the index this
+     * pass would have built anyway. */
+    bg_claimed = true;
+    if (foreground_wants_builder())
+    {
+        bg_claimed = false;
+        return false;
+    }
 
     /* The carousel makes this directory when it starts up; a build that runs
      * before it ever has would otherwise have nowhere to write the index. */
     if (!dir_exists(CACHE_PREFIX) && mkdir(CACHE_PREFIX) < 0)
+    {
+        bg_claimed = false;
         return false;
+    }
 
     /* Ask outright rather than checking core_allocatable() first: that reports
      * space already free, and on a player with the audio buffer claimed there
@@ -1483,7 +1562,10 @@ static bool background_build(void)
      * have seen this task waiting and let go of it. */
     handle = core_alloc(bufsz);
     if (handle <= 0)
+    {
+        bg_claimed = false;
         return false;
+    }
 
     /* Pinned: a handle with no ops is movable, and the builder yields all the
      * way through -- to the database, and to be nice to playback. */
@@ -1499,10 +1581,16 @@ static bool background_build(void)
     core_put_data_pinned(buf);
     core_free(handle);
 
+    /* Released only now, after the lock has been let go inside build_into():
+     * anyone polling db_index_is_busy() is waiting to take that lock, so it
+     * has to stay set until there is nothing left for them to collide with. */
+    ok = (ret == SUCCESS);
+    bg_claimed = false;
+
     /* Only on a clean finish: an aborted or failed pass must be retried, not
      * recorded as covering this library. Saying so is enough -- bg_task writes
      * the marker itself once we return true. */
-    return ret == SUCCESS;
+    return ok;
 }
 
 struct bg_task db_index_task =

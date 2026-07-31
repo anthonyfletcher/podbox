@@ -69,6 +69,7 @@
 #include "tdspeed.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
+#include "database/db_index.h"      /* db_index_is_busy -- the %lb indicator */
 
 #include "wps_internals.h"
 #include "custom_tokens.h"
@@ -1810,9 +1811,15 @@ const char *get_token_value(struct gui_wps *gwps,
                 return NULL;
         case SKIN_TOKEN_VLED_BUILDING:
         {
-            /* database and/or thumbnail-cache background work in progress */
+            /* database, album-index and/or thumbnail-cache background work in
+             * progress. All three are passes the user did not ask for and
+             * cannot see, and any of them can be the reason a screen that
+             * needs the database is slow to open -- so they share one
+             * indicator rather than each having their own. */
             bool building = false;
             if (tagcache_is_busy())
+                building = true;
+            if (db_index_is_busy())
                 building = true;
             if (art_cache_is_busy())
                 building = true;
