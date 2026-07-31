@@ -2450,29 +2450,41 @@ static bool enter_artist_albums_directly(struct browser_context *c,
  * two look directly at menus[rootmenu] (populated by parse_menu() at boot)
  * rather than the file-scope 'menu' pointer load_root() sets, since
  * root_menu.c may query this before any browsing has actually happened. */
-/* Can this root-menu row be offered as a main-menu shortcut?
+/* Can this root-menu row be offered as a main-menu shortcut, on this pass?
  *
- * Both kinds qualify: a "->" row that browses a tag, and a "==>" row that
- * opens a submenu. Only the first kind used to, which is why Playback History
- * -- a submenu -- could not be put on the main menu however much it looked
+ * Both kinds qualify: a "->" row that browses a tag (pass 0), and a "==>" row
+ * that opens a submenu (pass 1). Only the first kind used to, which is why
+ * Playback History could not be put on the main menu however much it looked
  * like it should be. What rules a row out is having no stable identity to arm
- * a jump with: a tag browse with no tags, or a submenu whose link does not
- * resolve. Everything else (shuffle, by-first-letter) is an action rather than
- * a place, and there is nothing to return to. */
-static bool root_row_is_shortcutable(const struct menu_entry *item)
+ * a jump with: a tag browse with no tags, or a submenu that leads nowhere.
+ * Everything else (shuffle songs) is an action rather than a place.
+ *
+ * The two passes are the point, not a tidiness. A row's position in this
+ * enumeration is its *slot number*, and the slot number is what a saved
+ * main-menu configuration records -- root_menu.c writes "tagnavi6" and reads
+ * it back. Admitting submenu rows in menu order therefore renumbered every
+ * slot from the first submenu onwards, silently repointing saved
+ * configurations at different rows: a "tagnavi6" that meant User Rating came
+ * back as First Letter. Enumerating all the tag rows first and the submenus
+ * after leaves every previously saved slot meaning exactly what it did, and
+ * gives the submenus numbers that were never in use.
+ *
+ * So: only ever append a new kind of row as a later pass. */
+static bool root_row_eligible(const struct menu_entry *item, int pass)
 {
-    if (item->type == menu_next)
-        return item->si.tagorder_count > 0;
-    if (item->type == menu_load)
-        return row_submenu_has_items(item);
-    return false;
+    if (pass == 0)
+        return item->type == menu_next && item->si.tagorder_count > 0;
+    return item->type == menu_load && row_submenu_has_items(item);
 }
+
+#define ROOT_ROW_PASSES 2
 
 bool browser_db_get_main_menu_row(int index, int *out_tag,
                                   const char **out_menu_id,
                                   const unsigned char **out_name)
 {
     struct menu_root *root;
+    int pass;
     int i, count = 0;
 
     if (out_tag)
@@ -2487,26 +2499,29 @@ bool browser_db_get_main_menu_row(int index, int *out_tag,
     if (!root)
         return false;
 
-    for (i = 0; i < root->itemcount; i++)
+    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
     {
-        if (!root_row_is_shortcutable(root->items[i]))
-            continue;
-
-        if (count == index)
+        for (i = 0; i < root->itemcount; i++)
         {
-            if (root->items[i]->type == menu_next)
-            {
-                if (out_tag)
-                    *out_tag = root->items[i]->si.tagorder[0];
-            }
-            else if (out_menu_id)
-                *out_menu_id = menus[root->items[i]->link]->id;
+            if (!root_row_eligible(root->items[i], pass))
+                continue;
 
-            if (out_name)
-                *out_name = root->items[i]->name;
-            return true;
+            if (count == index)
+            {
+                if (root->items[i]->type == menu_next)
+                {
+                    if (out_tag)
+                        *out_tag = root->items[i]->si.tagorder[0];
+                }
+                else if (out_menu_id)
+                    *out_menu_id = menus[root->items[i]->link]->id;
+
+                if (out_name)
+                    *out_name = root->items[i]->name;
+                return true;
+            }
+            count++;
         }
-        count++;
     }
     return false;
 }
@@ -2515,6 +2530,7 @@ int browser_db_get_main_menu_tag_row_count(void)
 {
     int i, count = 0;
     struct menu_root *root;
+    int pass;
 
     if (rootmenu < 0 || rootmenu >= menu_count)
         return 0;
@@ -2523,10 +2539,13 @@ int browser_db_get_main_menu_tag_row_count(void)
     if (!root)
         return 0;
 
-    for (i = 0; i < root->itemcount; i++)
+    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
     {
-        if (root_row_is_shortcutable(root->items[i]))
-            count++;
+        for (i = 0; i < root->itemcount; i++)
+        {
+            if (root_row_eligible(root->items[i], pass))
+                count++;
+        }
     }
     return count;
 }

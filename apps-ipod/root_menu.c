@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <ctype.h>
 #include "string-extra.h"
 #include "config.h"
 #include "system/appevents.h"
@@ -952,6 +954,11 @@ static int root_menu_active_count(void)
  * init-order casualty to correct, it's the actual desired state. Only
  * matters once root_menu_customized is true, i.e. there's a real saved
  * preference this init-order race could have clipped. */
+/* Tagnavi slots the saved configuration named but that could not be matched
+ * when it was read. One bit per slot; TAGNAVI_MAIN_MENU_SLOTS is 20, so a
+ * uint32_t covers it with room to spare. */
+static uint32_t wanted_tagnavi_slots;
+
 static void root_menu_fixup_tagnavi_slots(void)
 {
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
@@ -972,6 +979,15 @@ static void root_menu_fixup_tagnavi_slots(void)
         unsigned i;
         bool present = false;
 
+        /* Only slots the saved configuration actually named. This used to add
+         * every slot backed by a real row, which is not the same thing at all
+         * -- it read as "turning one row on turned them all on", because the
+         * first customization sets root_menu_customized and the next boot then
+         * added the lot. The comment above always claimed it restored what the
+         * configuration wanted; nothing recorded what that was until now. */
+        if (!(wanted_tagnavi_slots & (1u << n)))
+            continue;
+
         for (i = 0; i < count; i++)
         {
             if (root_menu__[i] == item)
@@ -983,6 +999,9 @@ static void root_menu_fixup_tagnavi_slots(void)
         if (!present && count < MAX_MENU_ITEMS)
             root_menu__[count++] = item;
     }
+
+    /* Consumed: this runs once, and a later save writes the real list. */
+    wanted_tagnavi_slots = 0;
 
     if (count != MENU_GET_COUNT(root_menu_.flags))
         root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
@@ -996,6 +1015,21 @@ struct menu_table *root_menu_get_options(int *nb_options)
     *nb_options = root_menu_active_count();
 
     return menu_table;
+}
+
+/* Record "tagnaviN" from a config token that matched nothing. Anything else
+ * unmatched is a key from an older build, or a typo, and is simply dropped as
+ * it always was. */
+static void note_wanted_tagnavi_slot(const char *key)
+{
+    int slot;
+
+    if (strncmp(key, "tagnavi", 7) != 0 || !isdigit((unsigned char)key[7]))
+        return;
+
+    slot = atoi(key + 7);
+    if (slot >= 0 && slot < TAGNAVI_MAIN_MENU_SLOTS)
+        wanted_tagnavi_slots |= 1u << slot;
 }
 
 void root_menu_load_from_cfg(void* setting, char *value)
@@ -1025,6 +1059,7 @@ void root_menu_load_from_cfg(void* setting, char *value)
         start = skip_whitespace(start);
         if ((end = strchr(start, ' ')))
             *end = '\0';
+        bool matched = false;
         for (i=0; i<(unsigned)root_menu_active_count(); i++)
         {
             if (*start && !strcmp(start, menu_table[i].string))
@@ -1032,9 +1067,19 @@ void root_menu_load_from_cfg(void* setting, char *value)
                 root_menu__[menu_item_count++] = (struct menu_item_ex *)menu_table[i].item;
                 if (menu_table[i].item == &menu_)
                     main_menu_added = true;
+                matched = true;
                 break;
             }
         }
+
+        /* A tagnavi slot this configuration asked for that could not be
+         * matched, because the database browser has not parsed
+         * tagnavi.config yet and root_menu_active_count() therefore still
+         * hides every slot. Remember exactly which ones, so
+         * root_menu_fixup_tagnavi_slots() can restore those and only those
+         * once the real row count is known. */
+        if (!matched && *start)
+            note_wanted_tagnavi_slot(start);
     }
     if (!main_menu_added)
         root_menu__[menu_item_count++] = (struct menu_item_ex *)&menu_;
