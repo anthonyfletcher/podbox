@@ -848,6 +848,12 @@ static bool aa_check_abort(void)
     if (bg_task_preempted(&art_cache_task))
         return true;
 
+    /* Trap: the queue alone is too late for a host. Nothing arrives on it
+     * until SET_CONFIGURATION, by which point a pass holding the CPU has
+     * already cost the host SET_ADDRESS. */
+    if (usb_host_is_present())
+        return true;
+
     if (!queue_peek(&aa_queue, &ev))
         return false;
     switch (ev.id)
