@@ -280,8 +280,17 @@ static void fi_thread(void)
             case SYS_TIMEOUT:
                 /* Only while the database is leaving the disk alone: both
                  * walk it, and two at once makes each slower than the pair
-                 * run in turn. */
-                if (fi_wants_scan && !tagcache_is_busy())
+                 * run in turn.
+                 *
+                 * And never while the cable is in. A host unconfiguring us
+                 * mid-session wakes the wait above without the cable moving,
+                 * which arms the scan; starting it then means walking a disk
+                 * the host is about to take back, with the walk still running
+                 * when the reconnect asks to be acknowledged. Gating the run
+                 * rather than the arming is deliberate -- the request stays
+                 * pending, so a real extraction still gets its scan however
+                 * early usb_inserted() is asked. */
+                if (fi_wants_scan && !tagcache_is_busy() && !usb_inserted())
                 {
                     fi_wants_scan = false;
                     fi_run_scan();
