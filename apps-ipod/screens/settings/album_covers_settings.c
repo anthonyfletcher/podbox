@@ -28,6 +28,8 @@ MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort
 MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
 MENUITEM_SETTING(album_covers_year_sort_order, &global_settings.album_covers_year_sort_order, NULL);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
+MENUITEM_SETTING(album_covers_background, &global_settings.album_covers_background, NULL);
+MENUITEM_SETTING(album_covers_statusbar, &global_settings.album_covers_statusbar, NULL);
 
 /* Artwork only. Rebuild purges every cached thumbnail so they regenerate from
  * source; update fills in what is missing -- the cache thread idles once it has
@@ -100,6 +102,8 @@ MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_Audio,
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Audio,
             &album_covers_show_album_name,
             &album_covers_show_year,
+            &album_covers_background,
+            &album_covers_statusbar,
             &album_covers_year_sort_order,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,

@@ -1492,6 +1492,16 @@ const struct settings_list settings[] = {
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
     OFFON_SETTING(0, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
                   false, "album covers show year", NULL),
+    /* Defaults for a theme that says nothing, not the shipped look --
+     * Themify_2 asks for the opposite of both in its own .cfg. Few status bars
+     * span the full width, and one that does not sits over a screen that does
+     * as a gap rather than a bar. */
+    CHOICE_SETTING(0, album_covers_background, LANG_CAROUSEL_BACKGROUND,
+                  1, "album covers background",
+                  "foreground,background", NULL, 2,
+                  ID2P(LANG_FOREGROUND_COLOR), ID2P(LANG_BACKGROUND_COLOR)),
+    OFFON_SETTING(0, album_covers_statusbar, LANG_STATUS_BAR,
+                  false, "album covers statusbar", NULL),
     /* Config-file only (lang_id -1, no menu entry): a theme sets these. Off
      * unless asked for, because they make album rows grow to the tall height
      * to fit a cover -- a theme whose list config doesn't draw the %La cover

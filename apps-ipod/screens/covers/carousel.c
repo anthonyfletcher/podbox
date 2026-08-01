@@ -158,12 +158,15 @@ static unsigned int pf_bg_g;   /* pf_bg_color & 0x7e0 */
 
 static void pf_update_dynamic_colors(void)
 {
-    /* Swapped relative to the rest of the UI's bg/fg convention, requested
-     * explicitly: this screen's background should match the status bar's
-     * (fg_color), with text/foreground drawn in what's normally the
-     * background colour. */
-    pf_bg_color = (pix_t)dynamic_colors_resolve(global_settings.fg_color);
-    pf_fg_color = (pix_t)dynamic_colors_resolve(global_settings.bg_color);
+    /* The setting picks which of the theme's two colours fills the screen;
+     * the captions always take the other. */
+    bool bg_from_fg = global_settings.album_covers_background
+                        == CAROUSEL_BG_FOREGROUND;
+    int fill = bg_from_fg ? global_settings.fg_color : global_settings.bg_color;
+    int text = bg_from_fg ? global_settings.bg_color : global_settings.fg_color;
+
+    pf_bg_color = (pix_t)dynamic_colors_resolve(fill);
+    pf_fg_color = (pix_t)dynamic_colors_resolve(text);
     pf_lss_color = (pix_t)dynamic_colors_resolve(global_settings.lss_color);
     pf_lse_color = (pix_t)dynamic_colors_resolve(global_settings.lse_color);
     pf_lst_color = (pix_t)dynamic_colors_resolve(global_settings.lst_color);
@@ -319,6 +322,10 @@ int pf_bold_font;
 static int pf_vp_y;             /* viewport y-offset (status bar height) */
 static struct viewport pf_vp;   /* PF rendering viewport (below status bar) */
 static struct frame_buffer_t pf_framebuffer; /* bypass backdrop in clear_viewport */
+static bool pf_show_statusbar;  /* this session's album_covers_statusbar */
+/* Theme state left pushed for cleanup() to pop. cleanup() also runs after a
+ * failed init(), so it cannot assume there is one. */
+static bool pf_theme_pushed;
 
 static struct slide_data center_slide;
 static struct slide_data left_slides[MAX_SLIDES_COUNT];
@@ -2274,6 +2281,15 @@ static void cleanup(void)
     if (buf_ctx_locked)
         buf_ctx_unlock();
 
+    /* Give the theme back. Whatever comes next draws itself, so no forced
+     * redraw from here. */
+    if (pf_theme_pushed)
+    {
+        FOR_NB_SCREENS(i)
+            viewportmanager_theme_undo(i, false);
+        pf_theme_pushed = false;
+    }
+
     cpu_boost(false);
     end_pf_thread();
 
@@ -2324,17 +2340,34 @@ static bool init(void)
     config_set_defaults(&pf_cfg); /* must appear before pf_config_load */
     pf_config_load();
 
-    /* Layout is always below the theme's status bar -- the theme owns
-     * showing/hiding it now, unlike the old plugin's show_statusbar toggle. */
+    /* Hiding the status bar means disabling the theme for as long as this
+     * screen is up -- nothing less stops the SBS drawing into our area.
+     * cleanup() pops it. Showing it needs only a temporary push, so that
+     * viewport_set_defaults() reads the theme whatever the ambient state. */
+    pf_show_statusbar = global_settings.album_covers_statusbar;
+    pf_theme_pushed = true;
     FOR_NB_SCREENS(i)
-        viewportmanager_theme_enable(i, true, NULL);
+        viewportmanager_theme_enable(i, pf_show_statusbar, NULL);
     viewport_set_defaults(&pf_vp, SCREEN_MAIN);
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_undo(i, false);
+    if (pf_show_statusbar)
+    {
+        FOR_NB_SCREENS(i)
+            viewportmanager_theme_undo(i, false);
+        pf_theme_pushed = false;
+    }
 
     pf_vp.buffer = &pf_framebuffer;
     pf_vp.x = 0;
     pf_vp.width = LCD_WIDTH;
+    /* Down to the bottom edge, for the same reason x and width are overridden
+     * above: viewport_set_defaults() hands back the theme's %Vi, which is
+     * sized for a list, and this screen fills what it is given.
+     *
+     * Trap: %Vi is whichever %VI the SBS last selected, so a theme that picks
+     * none for this activity leaves the previous screen's in force and the
+     * height follows where you came from. LCD_HEIGHT - y is what the skin
+     * engine itself uses for a viewport with no height (parse_viewport()). */
+    pf_vp.height = LCD_HEIGHT - pf_vp.y;
 
     pf_vp_y = pf_vp.y;
     pf_height = pf_vp.height;

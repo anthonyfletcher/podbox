@@ -18030,3 +18030,19 @@
     *: "Rescan Documents & Images"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CAROUSEL_BACKGROUND
+  desc: in Carousel settings, which theme colour fills the screen behind the
+        covers -- the options are the existing Foreground/Background Colour
+        strings
+  user: core
+  <source>
+    *: "Background"
+  </source>
+  <dest>
+    *: "Background"
+  </dest>
+  <voice>
+    *: "Background"
+  </voice>
+</phrase>

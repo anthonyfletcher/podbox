@@ -42,6 +42,14 @@ enum year_sort_order_values {
     DESCENDING
 };
 
+/* Values for global_settings.album_covers_background: which of the theme's two
+ * colours fills the carousel, the other drawing the captions. Both resolve
+ * through dynamic colours. */
+enum carousel_background_values {
+    CAROUSEL_BG_FOREGROUND = 0,  /* the status bar's colour */
+    CAROUSEL_BG_BACKGROUND       /* the same background as every other screen */
+};
+
 /* selected_file: jump to this file's album on open (e.g. context_menu_show.c's "Album
  * covers" context-menu item on a specific track); NULL for the normal
  * entry paths (main menu, WPS shortcuts) -- falls back to the currently

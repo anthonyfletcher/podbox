@@ -539,6 +539,8 @@ struct user_settings
     int  album_covers_sort_artists_by; /* SORT_ARTISTS_*: portraits ordering */
     int  album_covers_year_sort_order;
     bool album_covers_show_year;
+    int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
+    bool album_covers_statusbar;  /* show it, or take the screen and cover it */
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

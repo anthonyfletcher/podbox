@@ -216,13 +216,16 @@ static void carousel_sort_noop(void)
 static int artist_on_menu(void)
 {
     int old_show_name = global_settings.album_covers_show_album_name;
+    bool old_statusbar = global_settings.album_covers_statusbar;
 
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
 
-    /* The caption layout decides the text margin, which is computed during
-     * init() -- so a change to it needs a full rebuild, not just a redraw. */
-    if (global_settings.album_covers_show_album_name != old_show_name)
+    /* The caption layout decides the text margin and the status bar decides
+     * the viewport, both computed during init() -- so a change to either needs
+     * a full rebuild, not just a redraw. */
+    if (global_settings.album_covers_show_album_name != old_show_name
+        || global_settings.album_covers_statusbar != old_statusbar)
     {
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;
