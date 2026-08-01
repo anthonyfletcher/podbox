@@ -8,7 +8,7 @@
 
 #ifndef BOOTLOADER  /* We don't need these for the bootloader */
 
-/* Boot logo, shown centered by show_logo_boot() in apps/main.c */
+/* Boot logo, shown centered by boot_paint() in apps/main.c */
 podboxlogo.bmp
 
 

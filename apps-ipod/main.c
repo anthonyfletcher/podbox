@@ -142,15 +142,20 @@ int main(void)
     root_menu();
 }
 
-/* The boot screen: the logo art, a caption in the space beneath it, and
- * optionally a progress bar under the caption. Every stage of boot that has
- * something to say redraws the whole thing rather than overlaying a splash,
- * so nothing has to be undone afterwards.
+/* The boot screen: the logo art, a caption in the space beneath it, and a
+ * progress bar under the caption. Every stage of boot that has something to
+ * say redraws the whole thing rather than overlaying a splash, so nothing has
+ * to be undone afterwards.
  *
- * `caption` may be NULL for the bare logo; the bar is drawn only when `total`
- * is positive. A caption asked for before the theme's font is loaded is
- * dropped rather than drawn in the built-in fixed font, which is the wrong
- * shape for this screen -- the earliest calls therefore show the art alone.
+ * The bar is the part that always works. A caption needs the theme's font,
+ * the font needs the disk, and the disk can be busy serving a USB host for
+ * the whole of boot -- so on a cabled boot the bar may be the only thing that
+ * moves. It is driven by boot_progress() below rather than by the captions.
+ *
+ * Captions are sticky: pass NULL to leave the current one up. One asked for
+ * before the theme's font is loaded is dropped rather than drawn in the
+ * built-in fixed font, which is the wrong shape for this screen -- the
+ * earliest paints therefore show the art alone.
  *
  * Boot only. INIT_ATTR memory is reclaimed once root_menu() starts, so calling
  * this after that point jumps into whatever was laid over it. Errors keep
@@ -160,9 +165,99 @@ int main(void)
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
 #define BOOT_BAR_GAP      8  /* between the caption's baseline and the bar */
+#define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
 
-static void show_logo_boot(const char *caption, int step, int total) INIT_ATTR;
-static void show_logo_boot(const char *caption, int step, int total)
+/* Stages in the order init() reaches them, each worth a share of the bar.
+ * boot_progress() paints the *start* of a stage, so the bar always shows work
+ * that is finished, never work still to come. A stage that turns out to have
+ * nothing to do is never painted and the next one credits its chunks, which
+ * is why the bar can jump. */
+enum boot_stage
+{
+    BOOT_STORAGE,       /* the logo is up; spinning the disk up */
+    BOOT_MOUNT,
+    BOOT_SETTINGS,
+    BOOT_THEME,         /* settings_apply(): fonts, backdrops, colours */
+    BOOT_DIRCACHE,
+    BOOT_TAGCACHE,
+    BOOT_AUDIO,
+    BOOT_SKINS,
+    BOOT_STAGE_COUNT
+};
+
+/* Chunks each stage is worth. Guesses at relative duration -- the bar only
+ * has to keep moving, and the two stages that can take minutes report from
+ * inside themselves anyway. BOOT_TAGCACHE is left out on purpose: see
+ * boot_stage_chunks(). */
+static const unsigned char boot_weight[BOOT_STAGE_COUNT] =
+{
+    [BOOT_STORAGE]  = 2,
+    [BOOT_MOUNT]    = 1,
+    [BOOT_SETTINGS] = 1,
+    [BOOT_THEME]    = 3,
+    [BOOT_DIRCACHE] = 2,
+    [BOOT_AUDIO]    = 2,
+    [BOOT_SKINS]    = 2,
+};
+
+static const char *boot_caption;  /* NULL until a stage sets one */
+static int boot_bar_y;            /* where the last full paint put the bar */
+
+/* A database commit is worth its own step count, so one commit step moves the
+ * bar exactly one chunk. */
+static int boot_stage_chunks(enum boot_stage stage) INIT_ATTR;
+static int boot_stage_chunks(enum boot_stage stage)
+{
+    return stage == BOOT_TAGCACHE ? tagcache_get_max_commit_step()
+                                  : boot_weight[stage];
+}
+
+/* Chunks done when `stage` starts; BOOT_STAGE_COUNT gives the whole bar. */
+static int boot_chunks_done(enum boot_stage stage) INIT_ATTR;
+static int boot_chunks_done(enum boot_stage stage)
+{
+    int chunks = 0;
+
+    for (int i = 0; i < stage; i++)
+        chunks += boot_stage_chunks(i);
+
+    return chunks;
+}
+
+/* num/den divides the stage's own chunks, for a stage that reports progress
+ * from inside itself; 0/0 for the whole of it. */
+static int boot_step(enum boot_stage stage, int num, int den) INIT_ATTR;
+static int boot_step(enum boot_stage stage, int num, int den)
+{
+    int step = boot_chunks_done(stage);
+
+    if (den > 0)
+        step += (boot_stage_chunks(stage) * MIN(num, den)) / den;
+
+    return step;
+}
+
+static void boot_viewport(struct viewport *vp) INIT_ATTR;
+static void boot_viewport(struct viewport *vp)
+{
+    /* Drawing goes through a viewport rather than the lcd_ calls, so the font
+     * and colour used here are not left behind for whatever draws next.
+     *
+     * buffer and flags first: viewport_set_fullscreen() sets neither, and a
+     * stack viewport carrying whatever was on the stack can silently swallow
+     * every transfer to the LCD. viewport_set_defaults() would do it, but it
+     * hands back the SBS area when a theme is enabled, and this wants the
+     * whole screen. */
+    vp->buffer = NULL;                  /* the default framebuffer */
+    vp->flags = VP_DEFAULT_FLAGS;
+    viewport_set_fullscreen(vp, SCREEN_MAIN);
+    vp->font = font_get_ui_bold();
+    vp->drawmode = DRMODE_FG;
+    vp->fg_pattern = PODBOX_COLOR_FG;
+}
+
+static void boot_paint(int step, int total) INIT_ATTR;
+static void boot_paint(int step, int total)
 {
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
@@ -177,46 +272,104 @@ static void show_logo_boot(const char *caption, int step, int total)
     lcd_bmp(&bm_podboxlogo, (LCD_WIDTH - BMPWIDTH_podboxlogo) / 2,
                              (LCD_HEIGHT - BMPHEIGHT_podboxlogo) / 2);
 
+    boot_viewport(&vp);
+    last_vp = screen->set_viewport(&vp);
+
     /* Loaded fonts start at FONT_FIRSTUSERFONT; below that is FONT_SYSFIXED,
      * which is all there is until settings_apply() has read one off the disk.
      * font_get_ui_bold() falls back that far too. */
-    if (font_get_ui_bold() < FONT_FIRSTUSERFONT)
-        caption = NULL;
-
-    /* Through a viewport rather than the lcd_ calls above, so the font and
-     * colour used here are not left behind for whatever draws next.
-     *
-     * buffer and flags first: viewport_set_fullscreen() sets neither, and a
-     * stack viewport carrying whatever was on the stack can silently swallow
-     * every transfer to the LCD. viewport_set_defaults() would do it, but it
-     * hands back the SBS area when a theme is enabled, and this wants the
-     * whole screen. */
-    vp.buffer = NULL;                   /* the default framebuffer */
-    vp.flags = VP_DEFAULT_FLAGS;
-    viewport_set_fullscreen(&vp, SCREEN_MAIN);
-    vp.font = font_get_ui_bold();
-    vp.drawmode = DRMODE_FG;
-    vp.fg_pattern = PODBOX_COLOR_FG;
-    last_vp = screen->set_viewport(&vp);
-
-    if (caption)
+    if (boot_caption && vp.font >= FONT_FIRSTUSERFONT)
     {
         int tw;
-        screen->getstringsize(caption, &tw, &th);
-        screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, caption);
+        screen->getstringsize(boot_caption, &tw, &th);
+        screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, boot_caption);
     }
 
-    if (total > 0)
-    {
-        vp.fg_pattern = PODBOX_COLOR_BAR;
-        progress_bar_draw(screen, (vp.width - BOOT_BAR_W) / 2,
-                          BOOT_CAPTION_Y + th + BOOT_BAR_GAP,
-                          BOOT_BAR_W, BOOT_BAR_H, step, total,
-                          global_settings.progress_bar_radius);
-    }
+    boot_bar_y = BOOT_CAPTION_Y + th + BOOT_BAR_GAP;
+    vp.fg_pattern = PODBOX_COLOR_BAR;
+    progress_bar_draw(screen, BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H,
+                      step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
     lcd_update();
+}
+
+/* The bar alone, over the logo the last full paint left on the LCD, because a
+ * repaint four times a second is otherwise a full-screen blit each time. The
+ * fill only ever grows, so drawing over the old one needs no clearing.
+ *
+ * Only valid while that paint is still on screen: anything that puts up a
+ * screen of its own -- the tagcache thread's commit prompt -- has to be
+ * followed by a full paint before this is used again. */
+static void boot_paint_bar(int step, int total) INIT_ATTR;
+static void boot_paint_bar(int step, int total)
+{
+    struct screen *screen = &screens[SCREEN_MAIN];
+    struct viewport vp;
+    struct viewport *last_vp;
+
+    boot_viewport(&vp);
+    vp.fg_pattern = PODBOX_COLOR_BAR;
+    last_vp = screen->set_viewport(&vp);
+
+    progress_bar_draw(screen, BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H,
+                      step, total, global_settings.progress_bar_radius);
+
+    screen->set_viewport(last_vp);
+    lcd_update_rect(BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H);
+}
+
+static void boot_progress(enum boot_stage stage, int num, int den,
+                          const char *caption) INIT_ATTR;
+static void boot_progress(enum boot_stage stage, int num, int den,
+                          const char *caption)
+{
+    if (caption)
+        boot_caption = caption;
+
+    boot_paint(boot_step(stage, num, den),
+               boot_chunks_done(BOOT_STAGE_COUNT));
+}
+
+static void boot_progress_bar(enum boot_stage stage, int num,
+                              int den) INIT_ATTR;
+static void boot_progress_bar(enum boot_stage stage, int num, int den)
+{
+    boot_paint_bar(boot_step(stage, num, den),
+                   boot_chunks_done(BOOT_STAGE_COUNT));
+}
+
+/* dircache_wait() blocks, which would leave the bar dead for the length of a
+ * scan. Poll instead and keep it moving: `size` grows as the cache is built,
+ * and the previous build's size is a fair guess at where it will stop. A
+ * first-ever build has no previous size and simply holds at the start of the
+ * stage. */
+static void dircache_boot_wait(void) INIT_ATTR;
+static void dircache_boot_wait(void)
+{
+    struct dircache_info info;
+    bool scanning = false;
+
+    while (1)
+    {
+        dircache_get_info(&info);
+
+        /* One sight of SCANNING first: the thread sets it a moment after
+         * dircache_enable() hands back, so an IDLE seen straight away means
+         * "not started yet", not "finished". */
+        if (info.status == DIRCACHE_SCANNING)
+            scanning = true;
+        else if (scanning || info.status == DIRCACHE_READY)
+            break;
+
+        if (info.last_size > 0)
+            boot_progress_bar(BOOT_DIRCACHE, (int)info.size,
+                              (int)info.last_size);
+
+        sleep(HZ/4);
+    }
+
+    dircache_wait();    /* it is done; reap the thread */
 }
 
 static int INIT_ATTR init_dircache(bool preinit)
@@ -236,10 +389,9 @@ static int INIT_ATTR init_dircache(bool preinit)
         {
             if (result > 0)
             {
-                show_logo_boot(str(LANG_SCANNING_DISK), 0, 0);
-                dircache_wait();
+                boot_progress(BOOT_DIRCACHE, 0, 0, str(LANG_SCANNING_DISK));
+                dircache_boot_wait();
                 backlight_on();
-                show_logo_boot(str(LANG_WAIT), 0, 0);
             }
 
             struct dircache_info info;
@@ -258,7 +410,13 @@ static void init_tagcache(void) INIT_ATTR;
  * the database commit is using the audio buffer anyway. */
 static void init_tagcache(void)
 {
-    bool clear = false;
+    bool committed = false;
+
+    /* Ahead of tagcache_init(), which starts the thread that may put up the
+     * "commit now?" prompt -- painting after that point is what the loop
+     * below has to avoid. */
+    boot_progress(BOOT_TAGCACHE, 0, 0, str(LANG_WAIT));
+
     tagcache_init();
     db_index_init();
     file_index_init();
@@ -270,22 +428,26 @@ static void init_tagcache(void)
 
         /* Nothing is drawn until the commit is actually running. That is what
          * keeps this off the screen while the tagcache thread's "commit now?"
-         * prompt is up -- see tagcache_thread(). */
+         * prompt is up -- see tagcache_thread(). The first paint has to be a
+         * full one for the same reason: the prompt may have owned the screen
+         * up to this point. */
         if (ret > 0)
         {
-            show_logo_boot(str(LANG_TAGCACHE_INIT), ret,
-                           tagcache_get_max_commit_step());
-            clear = true;
+            int max = tagcache_get_max_commit_step();
+
+            if (committed)
+                boot_progress_bar(BOOT_TAGCACHE, ret, max);
+            else
+                boot_progress(BOOT_TAGCACHE, ret, max,
+                              str(LANG_TAGCACHE_INIT));
+            committed = true;
         }
         sleep(HZ/4);
     }
     browser_db_init();
 
-    if (clear)
-    {
+    if (committed)
         backlight_on();
-        show_logo_boot(str(LANG_WAIT), 0, 0);
-    }
 }
 
 
@@ -332,7 +494,7 @@ static void init(void)
      * lang_init() below. The caption goes up once settings_apply() has loaded
      * the theme's font. */
     CHART(">show_logo");
-    show_logo_boot(NULL, 0, 0);
+    boot_progress(BOOT_STORAGE, 0, 0, NULL);
     CHART("<show_logo");
     lang_init(core_language_builtin, language_strings,
               LANG_LAST_INDEX_IN_ARRAY);
@@ -392,6 +554,7 @@ static void init(void)
 
     if (!mounted)
     {
+        boot_progress(BOOT_MOUNT, 0, 0, NULL);
         CHART(">disk_mount_all");
         rc = disk_mount_all();
         CHART("<disk_mount_all");
@@ -445,6 +608,7 @@ static void init(void)
     pcm_init();
     dsp_init();
 
+    boot_progress(BOOT_SETTINGS, 0, 0, NULL);
     CHART(">settings_load");
     settings_load();
     CHART("<settings_load");
@@ -471,9 +635,11 @@ static void init(void)
     if (rc < 0)
         tagcache_remove_statefile();
 
+    boot_progress(BOOT_THEME, 0, 0, NULL);
     CHART(">settings_apply(true)");
     settings_apply(true);
     CHART("<settings_apply(true)");
+    boot_progress(BOOT_DIRCACHE, 0, 0, NULL);
     CHART(">init_dircache(false)");
     init_dircache(false);
     CHART("<init_dircache(false)");
@@ -487,6 +653,7 @@ static void init(void)
 
     shortcuts_init();
 
+    boot_progress(BOOT_AUDIO, 0, 0, str(LANG_WAIT));
     CHART(">audio_init");
     audio_init();
     CHART("<audio_init");
@@ -500,6 +667,7 @@ static void init(void)
     iap_setup(global_settings.serial_bitrate);
     accessory_supply_set(global_settings.accessory_supply);
     lineout_set(global_settings.lineout_active);
+    boot_progress(BOOT_SKINS, 0, 0, NULL);
     CHART("<settings_apply_skins");
     settings_apply_skins();
     CHART(">settings_apply_skins");
