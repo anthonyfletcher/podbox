@@ -161,11 +161,15 @@ int main(void)
  * this after that point jumps into whatever was laid over it. Errors keep
  * using splash() -- they can happen at any time, and the fatal ones (no disk,
  * no partition) print diagnostics and never reach a normal screen anyway. */
-#define BOOT_CAPTION_Y  175  /* top edge, level with the USB screen's caption */
+/* The bar sits at a fixed height and the caption goes underneath it. Sizing
+ * the caption first and placing the bar below it moved the bar whenever the
+ * text appeared or changed, which is jarring on a screen where the bar is the
+ * only thing meant to be moving. */
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
-#define BOOT_BAR_GAP      8  /* between the caption's baseline and the bar */
 #define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
+#define BOOT_BAR_Y      (LCD_HEIGHT - 48 - BOOT_BAR_H)  /* 48px of clearance */
+#define BOOT_CAPTION_Y  (BOOT_BAR_Y + BOOT_BAR_H + 12)  /* top edge of the text */
 
 /* Stages in the order init() reaches them, each worth a share of the bar.
  * boot_progress() paints the *start* of a stage, so the bar always shows work
@@ -201,7 +205,6 @@ static const unsigned char boot_weight[BOOT_STAGE_COUNT] =
 };
 
 static const char *boot_caption;  /* NULL until a stage sets one */
-static int boot_bar_y;            /* where the last full paint put the bar */
 
 /* A database commit is worth its own step count, so one commit step moves the
  * bar exactly one chunk. */
@@ -262,7 +265,6 @@ static void boot_paint(int step, int total)
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
     struct viewport *last_vp;
-    int th = 0;
 
     /* Clear to the artwork's background so the flash before the full-screen
      * logo lands matches it rather than showing stray colour. */
@@ -280,14 +282,13 @@ static void boot_paint(int step, int total)
      * font_get_ui_bold() falls back that far too. */
     if (boot_caption && vp.font >= FONT_FIRSTUSERFONT)
     {
-        int tw;
+        int tw, th;
         screen->getstringsize(boot_caption, &tw, &th);
         screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, boot_caption);
     }
 
-    boot_bar_y = BOOT_CAPTION_Y + th + BOOT_BAR_GAP;
     vp.fg_pattern = PODBOX_COLOR_BAR;
-    progress_bar_draw(screen, BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H,
+    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
@@ -312,11 +313,11 @@ static void boot_paint_bar(int step, int total)
     vp.fg_pattern = PODBOX_COLOR_BAR;
     last_vp = screen->set_viewport(&vp);
 
-    progress_bar_draw(screen, BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H,
+    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
-    lcd_update_rect(BOOT_BAR_X, boot_bar_y, BOOT_BAR_W, BOOT_BAR_H);
+    lcd_update_rect(BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H);
 }
 
 static void boot_progress(enum boot_stage stage, int num, int den,
