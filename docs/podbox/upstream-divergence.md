@@ -58,13 +58,45 @@ fork's own.
 
 ## firmware/ — USB stack
 
+Two features, plus one accessor the app layer needs to keep out of the host's
+way.
+
+### `usb_host_is_present()`
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `usb.c` | New `usb_host_is_present()`, returning the existing static `usb_host_present`. A stub returning false joins the `USB_NONE` dummies | The app layer has to tell an enumerating host from a cable that only supplies power, and had no way to. |
+| `export/usb.h` | Declares it | — |
+
+Background work — a database scan or commit, an album index build, a file
+index walk — stands down while a host is enumerating. Otherwise the controller
+is starved of the CPU it needs to answer and enumeration fails outright, which
+Windows reports as a device that malfunctioned. That failure does not clear on
+a port reset: VBUS stays up, so the firmware never sees `USB_EXTRACTED` and
+never resets its own state. Only unplugging clears it.
+
+`usb_inserted()` is unsuitable as the signal. It covers `USB_POWERED` as well
+as `USB_INSERTED`, so a charger satisfies it too, and a player kept on charge
+would never finish indexing.
+
+`usb_host_present` carries the needed meaning. Both targets define
+`USB_DETECT_BY_REQUEST` (`config.h`, under `USBOTG_ARC` and under
+`CONFIG_CPU == S5L8702`), so it turns true on the first completed control
+transfer: after enumeration starts, before `SET_ADDRESS`, and never for a
+charger.
+
+`SYS_USB_CONNECTED` does not serve here. Nothing is broadcast until
+`SET_CONFIGURATION`, which is after `SET_ADDRESS`.
+
+### `host_wrote`
+
 All four files serve one feature: a `host_wrote` flag.
 
 The app layer rebuilds the tag database and dircache on every USB disconnect, on
 the assumption the host changed files. If the host only ever read, none of that
-work is needed — and Windows produces a spurious disconnect/reconnect on *every*
-connect, which used to trigger the full rebuild and then leave the tagcache
-thread mid-scan when the reconnect arrived.
+work is needed — and Windows produces a spurious disconnect/reconnect on
+*every* connect, which without the flag triggers the full rebuild and leaves
+the tagcache thread mid-scan when the reconnect arrives.
 
 | File | What changed | Why |
 | --- | --- | --- |
