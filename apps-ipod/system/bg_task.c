@@ -223,16 +223,13 @@ void bg_task_tick(struct bg_task *task, struct event_queue *queue)
         task->retry_at = 0;
     }
 
-    /* Never begin anything while the cable is in, and before the gates below
-     * touch the disk to answer.
+    /* Never begin anything while a host has hold of us, and ahead of the gates
+     * below, which reach the disk to answer.
      *
-     * Acknowledging the connect is not the end of it. A host that unconfigures
-     * us mid-session releases every thread again -- usb_core_do_set_config()
-     * broadcasts a disconnect before re-requesting the disk -- so the wait
-     * above returns while the cable is still there, and a pass started in that
-     * window is still running when the reconnect asks for its acknowledgement.
-     * usb_inserted() stays true across the whole of it. */
-    if (usb_inserted())
+     * Trap: acknowledging the connect is not the end of it. A host that
+     * unconfigures us mid-session broadcasts a disconnect before re-requesting
+     * the disk, so the wait above returns with the cable still in. */
+    if (usb_host_is_present())
         return;
 
     /* Only ever work against a database that is readable and holding still. */
