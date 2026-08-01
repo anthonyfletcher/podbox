@@ -266,8 +266,12 @@ struct listitem {
     int16_t offset;
 };
 
+/* %Sb(bars[,align[,radius]]): how many bars to split the band table into,
+ * whether they grow from the viewport floor or from its middle, and the
+ * corner radius of each bar (0 for square). */
 struct spectrum_bars {
     int16_t bars;
+    int16_t radius;
     bool center_aligned;
 };
 

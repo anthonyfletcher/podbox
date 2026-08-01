@@ -936,6 +936,12 @@ const struct settings_list settings[] = {
         INT(DEFAULT_THEME_FOREGROUND), "dialog button border colour selected",
         UNUSED},
 
+    /* Progress bar chrome, config-file only for the same reason as the dialog
+     * metrics above. The border rounds to this and the fill to one less, so a
+     * radius of 1 is the smallest that rounds anything. */
+    {F_T_INT|F_THEMESETTING, &global_settings.progress_bar_radius, -1,
+        INT(2), "progress bar radius", UNUSED},
+
     /* more playback */
     OFFON_SETTING(0,play_selected,LANG_PLAY_SELECTED,true,"play selected",NULL),
     CHOICE_SETTING(0, single_mode, LANG_SINGLE_MODE, 0,
@@ -1279,6 +1285,12 @@ const struct settings_list settings[] = {
      * USB is usually looking for changes that cannot have happened. */
     OFFON_SETTING(F_BANFROMQS, tagcache_scan_on_startup, LANG_SCAN_ON_STARTUP,
                   true, "tagcache_scan_on_startup", NULL),
+    /* A commit cut short (a flat battery, a USB session mid-scan) leaves work
+     * to finish at the next boot. On means finish it; off asks first, which is
+     * only worth having because the commit holds up the database for as long
+     * as it runs. */
+    OFFON_SETTING(F_BANFROMQS, tagcache_autocommit, LANG_AUTOCOMMIT_ON_STARTUP,
+                  true, "tagcache_autocommit", NULL),
     CHOICE_SETTING(F_TEMPVAR, default_codepage, LANG_DEFAULT_CODEPAGE, 14,
                    "default codepage",
                    /* The order must match with that in unicode.c */

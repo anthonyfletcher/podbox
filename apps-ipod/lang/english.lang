@@ -877,6 +877,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_AUTOCOMMIT_ON_STARTUP
+  desc: in database settings
+  user: core
+  <source>
+    *: "Autocommit on Startup"
+  </source>
+  <dest>
+    *: "Autocommit on Startup"
+  </dest>
+  <voice>
+    *: "Autocommit on Startup"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_DEBUG_LOG
   desc: in database and art cache settings
   user: core

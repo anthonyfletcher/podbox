@@ -78,6 +78,8 @@ MENUITEM_SETTING(tagcache_ram, &global_settings.tagcache_ram, NULL);
 MENUITEM_SETTING(tagcache_scan_on_eject, &global_settings.tagcache_scan_on_eject, NULL);
 MENUITEM_SETTING(tagcache_scan_on_startup,
                  &global_settings.tagcache_scan_on_startup, NULL);
+MENUITEM_SETTING(tagcache_autocommit,
+                 &global_settings.tagcache_autocommit, NULL);
 MENUITEM_FUNCTION(tc_init, 0, ID2P(LANG_TAGCACHE_FORCE_UPDATE),
                   (int(*)(void))tagcache_rebuild_with_splash, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(tc_update, 0, ID2P(LANG_TAGCACHE_UPDATE),
@@ -126,6 +128,7 @@ MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
                 &tagcache_scan_on_eject, &tagcache_scan_on_startup,
+                &tagcache_autocommit,
                 &tc_init, &tc_update, &runtimedb,
                 &db_index_rebuild_item, &db_index_update_item,
                 &db_albumart, &db_artistart,

@@ -41,6 +41,7 @@
 #include "system/strutil.h"
 #include "system/app_buffer.h"
 #include "draw/viewport.h"
+#include "audio/spectrum_meter.h"   /* SPECTRUM_MAX_BANDS */
 
 #include "skin_buffer.h"
 #include "skin_debug.h"
@@ -538,12 +539,20 @@ static int parse_spectrumbars(struct skin_element *element,
     sb->bars = get_param(element, 0)->data.number;
     if (sb->bars < 1)
         sb->bars = 1;
-    else if (sb->bars > 8) /* SPECTRUM_MAX_BANDS, apps/recorder/spectrum_meter.h */
-        sb->bars = 8;
+    else if (sb->bars > SPECTRUM_MAX_BANDS)
+        sb->bars = SPECTRUM_MAX_BANDS;
     if (element->params_count > 1)
         sb->center_aligned = strcasecmp(get_param_text(element, 1), "center") == 0;
     else
         sb->center_aligned = false;
+    /* Corner radius. No upper clamp: fill_round_rect() fits it to whatever
+     * bar it is drawing, and a short bar rounds less than a tall one. */
+    if (element->params_count > 2 && !isdefault(get_param(element, 2)))
+        sb->radius = get_param(element, 2)->data.number;
+    else
+        sb->radius = 0;
+    if (sb->radius < 0)
+        sb->radius = 0;
     return 0;
 }
 

@@ -4949,9 +4949,17 @@ static void tagcache_thread(void)
         static const char *lines[] = {ID2P(LANG_TAGCACHE_BUSY),
                                       ID2P(LANG_TAGCACHE_UPDATE)};
         static const struct text_message message = {lines, 2};
+        bool go = global_settings.tagcache_autocommit;
 
-        if (gui_syncyesno_run_w_tmo(HZ * 5, YESNO_YES, str(LANG_TAGCACHE),
-                                    &message, NULL, NULL) == YESNO_YES)
+        /* Asking runs on this thread, which owns no screen -- main.c's boot
+         * screen does. They do not collide only because the boot screen draws
+         * nothing until commit_step goes above zero, which cannot happen
+         * before this is answered. Keep that true if either side moves. */
+        if (!go)
+            go = gui_syncyesno_run_w_tmo(HZ * 5, YESNO_YES, str(LANG_TAGCACHE),
+                                         &message, NULL, NULL) == YESNO_YES;
+
+        if (go)
         {
             allocate_tempbuf();
             commit();

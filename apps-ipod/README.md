@@ -86,7 +86,7 @@ Ordered by how much they own, as above:
 
 | Directory | Rule |
 |---|---|
-| `draw/` | Stateless drawing. Knows pixels; knows nothing about features. viewport, line, scrollbar, icon, bmp, resize, jpeg decode, screen_access. |
+| `draw/` | Stateless drawing. Knows pixels; knows nothing about features. viewport, line, scrollbar, round_rect, progress_bar, icon, bmp, resize, jpeg decode, screen_access. |
 | `widgets/` | Reusable controls. Called by someone else, hand control back. list, dialog, yesno, splash, option_select, colour picker, folder select, keyboard, menu, text_box. |
 | `screens/` | Full screens. Navigated *to*; run their own loop until the user leaves. |
 | `viewers/` | File-format applications: their own model, view and input. `text_viewer/` (streaming document engine), `image_viewer/`, properties, playing_time, credits. |

@@ -281,7 +281,7 @@ uuuuuuu
 # CC: Play/pause/ff/rw indicator; while playing it shows the spectrum
 # CC: analyser (%Sb), declared last so nothing clears over it (see comment).
 %Vl(Player_Status_Short,260,160,46,46,4)%?mp<|%Vd(Player_Spectrum_Short)|1|æ|õ>
-%Vl(Player_Spectrum_Short,268,168,30,30,4)%?mv(1)<|%Sb(5,center)>
+%Vl(Player_Spectrum_Short,268,168,30,30,4)%?mv(1)<|%Sb(5,center,1)>
 # volume Slider, one character for the 91 positions of regular volume settings.
 # CC: Volume popup: one glyph per volume step (%pv).
 %Vl(Player_Volume_Short,260,160,46,46,4)%?pv<4|5|6|7|8|9|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|À|Á|Â|Ã|Ä|Å|Ç|È|É|Ê|Ë|Ì|Í|Î|Ï|Ð|Ñ|Ò|Ó|Ô|Õ|Ö|×|Ø|Ù|Ú|Û|Ü|Ý|Þ|ß|à|á|â|ã|ä|ä|å>
@@ -291,7 +291,7 @@ uuuuuuu
 # Status declared (and rendered) first, Spectrum last, and %Sb gated on
 # %mv(1) for the same reason (see the comment above).
 %Vl(Player_Status_Long,202,160,46,46,4)%?mp<|%Vd(Player_Spectrum_Long)|1|æ|õ>
-%Vl(Player_Spectrum_Long,210,168,30,30,4)%?mv(1)<|%Sb(5,center)>
+%Vl(Player_Spectrum_Long,210,168,30,30,4)%?mv(1)<|%Sb(5,center,1)>
 # volume Slider, one character for the 91 positions of regular volume settings.
 #
 %Vl(Player_Volume_Long,202,160,46,46,4)%?pv<4|5|6|7|8|9|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|À|Á|Â|Ã|Ä|Å|Ç|È|É|Ê|Ë|Ì|Í|Î|Ï|Ð|Ñ|Ò|Ó|Ô|Õ|Ö|×|Ø|Ù|Ú|Û|Ü|Ý|Þ|ß|à|á|â|ã|ä|ä|å>

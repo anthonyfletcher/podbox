@@ -50,6 +50,7 @@
 #include "tag_table.h"
 #include "skin_scan.h"
 #include "draw/viewport.h"
+#include "draw/round_rect.h"
 #include "metadata/cuesheet.h"
 #include "speech/language.h"
 #include "audio/playback.h"
@@ -531,7 +532,11 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                     else
                         y = vp_h - bar_h;
 
-                    gwps->display->fillrect(x, y, bar_w, bar_h);
+                    /* Both ends round. A quiet (one-pixel) bar squares off
+                     * on its own -- fill_round_rect() fits the radius to
+                     * the bar and falls back to a plain fillrect. */
+                    fill_round_rect(gwps->display, x, y, bar_w, bar_h,
+                                    sb->radius);
                 }
             }
             break;

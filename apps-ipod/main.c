@@ -65,6 +65,7 @@
 #include "eeprom_settings.h"
 #include "draw/icon.h"
 #include "draw/viewport.h"
+#include "draw/progress_bar.h"
 #include "skin/skin_engine.h"
 #include "skin/statusbar_skinned.h"
 #include "bootchart.h"
@@ -141,19 +142,81 @@ int main(void)
     root_menu();
 }
 
-/* The disk isn't ready at boot, rblogo is stored in bin and erased after boot */
-int show_logo_boot( void ) INIT_ATTR;
-int show_logo_boot( void )
+/* The boot screen: the logo art, a caption in the space beneath it, and
+ * optionally a progress bar under the caption. Every stage of boot that has
+ * something to say redraws the whole thing rather than overlaying a splash,
+ * so nothing has to be undone afterwards.
+ *
+ * `caption` may be NULL for the bare logo; the bar is drawn only when `total`
+ * is positive. A caption asked for before the theme's font is loaded is
+ * dropped rather than drawn in the built-in fixed font, which is the wrong
+ * shape for this screen -- the earliest calls therefore show the art alone.
+ *
+ * Boot only. INIT_ATTR memory is reclaimed once root_menu() starts, so calling
+ * this after that point jumps into whatever was laid over it. Errors keep
+ * using splash() -- they can happen at any time, and the fatal ones (no disk,
+ * no partition) print diagnostics and never reach a normal screen anyway. */
+#define BOOT_CAPTION_Y  175  /* top edge, level with the USB screen's caption */
+#define BOOT_BAR_W      160
+#define BOOT_BAR_H        7
+#define BOOT_BAR_GAP      8  /* between the caption's baseline and the bar */
+
+static void show_logo_boot(const char *caption, int step, int total) INIT_ATTR;
+static void show_logo_boot(const char *caption, int step, int total)
 {
-    /* Clear to the artwork's background (#000105) so the flash before the
-     * full-screen logo lands matches it rather than showing stray colour. */
+    struct screen *screen = &screens[SCREEN_MAIN];
+    struct viewport vp;
+    struct viewport *last_vp;
+    int th = 0;
+
+    /* Clear to the artwork's background so the flash before the full-screen
+     * logo lands matches it rather than showing stray colour. */
     lcd_set_background(PODBOX_COLOR_BG);
     lcd_set_foreground(PODBOX_COLOR_FG);
     lcd_clear_display();
     lcd_bmp(&bm_podboxlogo, (LCD_WIDTH - BMPWIDTH_podboxlogo) / 2,
                              (LCD_HEIGHT - BMPHEIGHT_podboxlogo) / 2);
+
+    /* Loaded fonts start at FONT_FIRSTUSERFONT; below that is FONT_SYSFIXED,
+     * which is all there is until settings_apply() has read one off the disk.
+     * font_get_ui_bold() falls back that far too. */
+    if (font_get_ui_bold() < FONT_FIRSTUSERFONT)
+        caption = NULL;
+
+    /* Through a viewport rather than the lcd_ calls above, so the font and
+     * colour used here are not left behind for whatever draws next.
+     *
+     * buffer and flags first: viewport_set_fullscreen() sets neither, and a
+     * stack viewport carrying whatever was on the stack can silently swallow
+     * every transfer to the LCD. viewport_set_defaults() would do it, but it
+     * hands back the SBS area when a theme is enabled, and this wants the
+     * whole screen. */
+    vp.buffer = NULL;                   /* the default framebuffer */
+    vp.flags = VP_DEFAULT_FLAGS;
+    viewport_set_fullscreen(&vp, SCREEN_MAIN);
+    vp.font = font_get_ui_bold();
+    vp.drawmode = DRMODE_FG;
+    vp.fg_pattern = PODBOX_COLOR_FG;
+    last_vp = screen->set_viewport(&vp);
+
+    if (caption)
+    {
+        int tw;
+        screen->getstringsize(caption, &tw, &th);
+        screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, caption);
+    }
+
+    if (total > 0)
+    {
+        vp.fg_pattern = PODBOX_COLOR_BAR;
+        progress_bar_draw(screen, (vp.width - BOOT_BAR_W) / 2,
+                          BOOT_CAPTION_Y + th + BOOT_BAR_GAP,
+                          BOOT_BAR_W, BOOT_BAR_H, step, total,
+                          global_settings.progress_bar_radius);
+    }
+
+    screen->set_viewport(last_vp);
     lcd_update();
-    return 0;
 }
 
 static int INIT_ATTR init_dircache(bool preinit)
@@ -173,11 +236,10 @@ static int INIT_ATTR init_dircache(bool preinit)
         {
             if (result > 0)
             {
-                /* Print "Scanning disk..." to the display. */
-                splash(0, str(LANG_SCANNING_DISK));
+                show_logo_boot(str(LANG_SCANNING_DISK), 0, 0);
                 dircache_wait();
                 backlight_on();
-                show_logo_boot();
+                show_logo_boot(str(LANG_WAIT), 0, 0);
             }
 
             struct dircache_info info;
@@ -206,20 +268,13 @@ static void init_tagcache(void)
     {
         int ret = tagcache_get_commit_step();
 
+        /* Nothing is drawn until the commit is actually running. That is what
+         * keeps this off the screen while the tagcache thread's "commit now?"
+         * prompt is up -- see tagcache_thread(). */
         if (ret > 0)
         {
-            if (lang_is_rtl())
-            {
-                splash_progress(ret, tagcache_get_max_commit_step(),
-                               "[%d/%d] %s", ret, tagcache_get_max_commit_step(),
-                               str(LANG_TAGCACHE_INIT));
-            }
-            else
-            {
-                splash_progress(ret, tagcache_get_max_commit_step(),
-                                "%s [%d/%d]", str(LANG_TAGCACHE_INIT), ret,
-                                tagcache_get_max_commit_step());
-            }
+            show_logo_boot(str(LANG_TAGCACHE_INIT), ret,
+                           tagcache_get_max_commit_step());
             clear = true;
         }
         sleep(HZ/4);
@@ -229,7 +284,7 @@ static void init_tagcache(void)
     if (clear)
     {
         backlight_on();
-        show_logo_boot();
+        show_logo_boot(str(LANG_WAIT), 0, 0);
     }
 }
 
@@ -271,8 +326,13 @@ static void init(void)
 
     settings_reset();
 
+    /* Bare, and as early as possible. Nothing can be written under the logo
+     * yet: the disk is not mounted, so the only font in existence is the
+     * built-in fixed one, and language_strings[] is not filled in until
+     * lang_init() below. The caption goes up once settings_apply() has loaded
+     * the theme's font. */
     CHART(">show_logo");
-    show_logo_boot();
+    show_logo_boot(NULL, 0, 0);
     CHART("<show_logo");
     lang_init(core_language_builtin, language_strings,
               LANG_LAST_INDEX_IN_ARRAY);

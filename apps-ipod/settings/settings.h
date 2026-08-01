@@ -483,6 +483,7 @@ struct user_settings
     int tagcache_ram;        /* load tagcache to ram: 1=on, 2=quick (ignore dircache) */
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */
     bool tagcache_scan_on_startup; /* also check for changes at boot? */
+    bool tagcache_autocommit;    /* finish an interrupted commit without asking */
     bool autoresume_enable;   /* enable auto-resume feature? */
     int autoresume_automatic; /* resume next track? 0=never, 1=always,
                                  2=custom */
@@ -519,6 +520,9 @@ struct user_settings
     int dialog_btn_fg_sel;      /* the selected button */
     int dialog_btn_bg_sel;
     int dialog_btn_border_sel;
+
+    /* Corner radius of the progress bar drawn by draw/progress_bar.c. */
+    int progress_bar_radius;
 
     /* apps/gui/album_covers.c settings -- see enum show_album_name_values /
      * sort_albums_by_values / year_sort_order_values in album_covers.h for

@@ -1156,10 +1156,9 @@ static int load_album_index(void){
     }
 
 failure:
-    /* Foreground only -- the background pass owns no screen, and a failed
-     * load there simply means it goes on to build one. */
-    if (!building_bg)
-        splash(HZ/2, "Failed to load index");
+    /* Silent: there being no readable index is a normal state -- first run,
+     * a bumped INDEX_HDR, a deleted file -- and the caller just builds one.
+     * Nothing here is the user's to act on. */
     if (fr >= 0)
         close(fr);
 

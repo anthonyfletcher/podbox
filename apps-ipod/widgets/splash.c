@@ -19,7 +19,7 @@
 #include "splash.h"
 #include "draw/viewport.h"
 #include "strptokspn_r.h"
-#include "draw/scrollbar.h"
+#include "draw/progress_bar.h"
 #include "font.h"
 #include "system/activity.h"
 #include "dialog.h"
@@ -194,7 +194,7 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
     dialog_frame_box(screen, vp, &style, &content);
 
     /* print the message into the content column, then restore the box
-     * viewport: splash_progress draws its scrollbar in box
+     * viewport: splash_progress draws its progress bar in box
      * coordinates and the caller flushes the box. */
     screen->set_viewport(&content);
     /* DRMODE_FG so glyphs draw over our solid fill without the theme backdrop
@@ -293,8 +293,8 @@ void splash_progress(int current, int total, const char *fmt, ...)
             int y = vp.height - size - RECT_SPACING;
             int w = vp.width - RECT_SPACING * 2;
             int h = size;
-            const int sb_flags = HORIZONTAL | FOREGROUND;
-            gui_scrollbar_draw(screen, x, y, w, h, total, 0, current, sb_flags);
+            progress_bar_draw(screen, x, y, w, h, current, total,
+                              global_settings.progress_bar_radius);
 
             screen->update_viewport();
         }

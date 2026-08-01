@@ -21,7 +21,7 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_VLED_BUILDING,      "lb", "",     SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_VLED_WORKING,       "lw", "",     SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LOADING_ANIM,       "la", "",     SKIN_REFRESH_DYNAMIC),
-    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|S",  SKIN_REFRESH_SPECTRUM),
+    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|Si", SKIN_REFRESH_SPECTRUM),
     TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|IS",  SKIN_REFRESH_DYNAMIC),
 
     /* %tw/%Vw/%Vh transform or report their arguments and are consumed by an

@@ -62,6 +62,13 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Documentation
+
+Comments, commit descriptions and documentation should NOT describe the journey - only the destination.  The purpose
+of the documentation is for programmers reading the output - they don't need to know how you got there.
+The only exception is if you think there's a trap they might themselves fall into - then you can include it. Be brief!
+Keep your documentation short and snappy.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
@@ -83,21 +90,17 @@ This tree is a custom build for **iPod Classic 6G/7G** and **iPod Video 5G/5.5G*
 - **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. Full feature set including MFi digital audio, SSD power management.
 - **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes). USB audio is **on** here: `config.h` uses upstream's generic `USB_HAS_ISOCHRONOUS` gate for `USB_ENABLE_AUDIO`, and the ARC controller declares it, so `rockbox-info.txt` lists `usbdac`. This is new since the Rockbox rebase — RockPod had narrowed the gate to `CONFIG_CPU == S5L8702`, which excluded this target — and it has **never been exercised on hardware**.
 
-  USB iAP is separately **off** on both targets: `config.h` defines `PODBOX_NO_USB_IAP`, which suppresses the otherwise-automatic `USB_ENABLE_IAP`. Delete that define to re-enable; nothing else is needed.
+USB iAP is separately **off** on both targets: `config.h` defines `PODBOX_NO_USB_IAP`, which suppresses the otherwise-automatic `USB_ENABLE_IAP`. Delete that define to re-enable; nothing else is needed.
 
 ## Build Commands
 
-Rockbox requires out-of-tree builds. Cross-compiler toolchains are built via `tools/rockboxdev.sh`.
+Rockbox requires out-of-tree builds. Cross-compiler toolchains are built via 
+`tools/rockboxdev.sh`.
 
 **Environment note:** the cross-compiler (`arm-elf-eabi-gcc`) may not be present
 on the machine this repo is checked out on. If it is missing, the build cannot
 run locally -- ask rather than installing a toolchain, and do not assume `sudo`
 is available.
-
-**`ipodvideo` is the reference target.** It is the one that gets exercised on
-hardware; `ipod6g` builds clean and ships, but is not routinely run. Treat 6G
-behaviour as unverified unless it has actually been tested, and when a change
-affects both targets say plainly which one was checked.
 
 **The application layer is `apps-ipod/`, so every configure invocation needs
 `--appsdir=apps-ipod`.** `build-hw.sh` passes it; a hand-rolled configure that
@@ -111,7 +114,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-eqs.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -308,6 +311,3 @@ inside the script:
   refuses to run unless the tree is already clean.
 
 Releases belong to this fork. Upstream remotes are not writable from here.
-
-Note the 6G zip ships without routine hardware testing -- see the reference
-target note under Build Commands.
