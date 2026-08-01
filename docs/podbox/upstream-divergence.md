@@ -58,22 +58,25 @@ fork's own.
 
 ## firmware/ — USB stack
 
-Two features, plus one accessor the app layer needs to keep out of the host's
-way.
+Two features: keeping other work out of an enumerating host's way, and the
+`host_wrote` flag.
 
 ### `usb_host_is_present()`
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usb.c` | New `usb_host_is_present()`, returning the existing static `usb_host_present`. A stub returning false joins the `USB_NONE` dummies | The app layer has to tell an enumerating host from a cable that only supplies power, and had no way to. |
+| `usb.c` | New `usb_host_is_present()`, returning the existing static `usb_host_present`. A stub returning false joins the `USB_NONE` dummies | The app layer distinguishes an enumerating host from a cable that only supplies power. |
 | `export/usb.h` | Declares it | — |
+| `usb.c` | `usb_set_host_present()` raises the USB thread to `PRIORITY_REALTIME`, and restores `PRIORITY_SYSTEM` when the host goes | Upstream raises it in `usb_core_do_set_config()`, leaving enumeration at `PRIORITY_SYSTEM` (18) — below the UI thread's 16. |
 
 Background work — a database scan or commit, an album index build, a file
-index walk — stands down while a host is enumerating. Otherwise the controller
-is starved of the CPU it needs to answer and enumeration fails outright, which
-Windows reports as a device that malfunctioned. That failure does not clear on
-a port reset: VBUS stays up, so the firmware never sees `USB_EXTRACTED` and
-never resets its own state. Only unplugging clears it.
+index walk — stands down while a host is enumerating, and the tagcache's
+boot-time pass defers rather than starting on top of one.
+
+This is contention, not correctness. It keeps a background pass from holding
+the disk, the bus and the locks a mounting host is waiting on. It is **not**
+established as the cause of the `SET_ADDRESS` enumeration failures seen on the
+iPod Video, which are open.
 
 `usb_inserted()` is unsuitable as the signal. It covers `USB_POWERED` as well
 as `USB_INSERTED`, so a charger satisfies it too, and a player kept on charge

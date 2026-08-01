@@ -380,6 +380,10 @@ static inline void usb_slave_mode(bool on)
 }
 #endif /* HAVE_USBSTACK */
 
+#if !defined(HAVE_PRIORITY_SCHEDULING)
+#define thread_set_priority(...)
+#endif
+
 static void usb_set_host_present(bool present)
 {
     if(usb_host_present == present)
@@ -390,8 +394,16 @@ static void usb_set_host_present(bool present)
     if(!usb_host_present)
     {
         usb_configure_drivers(USB_EXTRACTED);
+        thread_set_priority(thread_self(), PRIORITY_SYSTEM);
         return;
     }
+
+    /* usb_core_do_set_config() raises this too, but SET_CONFIGURATION is late:
+     * until then the thread sits at PRIORITY_SYSTEM (18), below the UI thread
+     * at PRIORITY_USER_INTERFACE (16), so UI-thread disk work can hold it off
+     * for the whole of enumeration. Raised only once a host has spoken, so a
+     * charger costs nothing. */
+    thread_set_priority(thread_self(), PRIORITY_REALTIME);
 
 #ifdef HAVE_USB_POWER
     if (usb_power_only)
