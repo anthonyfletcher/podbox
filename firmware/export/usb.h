@@ -200,6 +200,11 @@ int usb_wait_for_disconnect_w_tmo(struct event_queue *q, int ticks);
 /* check whether USB is plugged, note that this is the official value which has
  * been reported to the thread */
 bool usb_inserted(void);
+
+/* True only once a host has issued a request, where the target can tell --
+ * unlike usb_inserted(), which a charger also satisfies. Use this to decide
+ * whether to stand work down for an enumeration that is about to happen. */
+bool usb_host_is_present(void);
 /* check whether USB is plugged, note that this is the raw hardware value */
 int usb_detect(void);
 #ifdef USB_STATUS_BY_EVENT

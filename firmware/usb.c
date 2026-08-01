@@ -800,6 +800,18 @@ bool usb_inserted(void)
     return usb_state == USB_INSERTED || usb_state == USB_POWERED;
 }
 
+/* Whether a host has spoken to us, rather than a cable merely supplying 5V.
+ * usb_inserted() covers USB_POWERED too, so a charger satisfies it.
+ *
+ * Where USB_DETECT_BY_REQUEST is defined this turns true on the first
+ * completed control transfer -- before SET_ADDRESS, so callers have time to
+ * stand down and leave the controller the CPU it needs to answer. Elsewhere it
+ * follows cable detect. */
+bool usb_host_is_present(void)
+{
+    return usb_host_present;
+}
+
 #if defined(USB_FULL_INIT)
 bool usb_exclusive_storage(void)
 {
@@ -910,6 +922,11 @@ bool usb_powered_only(void)
 /* Dummy functions for USB_NONE  */
 
 bool usb_inserted(void)
+{
+    return false;
+}
+
+bool usb_host_is_present(void)
 {
     return false;
 }
