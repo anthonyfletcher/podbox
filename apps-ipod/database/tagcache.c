@@ -101,7 +101,16 @@
 
 #include "lang.h"
 #include "eeprom_settings.h"
-#define USR_CANCEL false
+/* Whether the commit in progress should give up where it stands. commit() and
+ * the two index builders it calls test it in seven loops and again before the
+ * master header is written.
+ *
+ * Cancelling is safe: the loops fall out, the master header and
+ * TAGCACHE_FILE_TEMP are left alone, commit_error releases the lock and the
+ * borrowed buffers, and rc stays false. The commit has not happened, and the
+ * next starts over from the temp file. */
+static bool usr_cancel(void);
+#define USR_CANCEL usr_cancel()
 /*
  * Define this to support non-native endian tagcache files.
  * Databases are always written in native endian so this is
@@ -382,6 +391,12 @@ static int processed_dir_count;
 /* Thread safe locking */
 static volatile int write_lock;
 static volatile int read_lock;
+
+/* Sticky for the length of one commit. Trap: USR_CANCEL is asked again at the
+ * guard around the master header update, long after the loops have fallen out.
+ * Answered live it could read false there and write the header over an
+ * incomplete index. */
+static bool commit_cancelled;
 
 static bool delete_entry(long idx_id);
 
@@ -3265,6 +3280,8 @@ static bool commit(void)
     bool ramcache_buffer_stolen = false;
     logf("committing tagcache");
 
+    commit_cancelled = false;
+
     while (write_lock)
         sleep(1);
 
@@ -4120,6 +4137,12 @@ static bool check_event_queue(void)
 {
     struct queue_event ev;
 
+    /* An enumerating host counts. Trap: the queue alone is too late for one --
+     * nothing arrives on it until SET_CONFIGURATION, by which point a scan
+     * holding the CPU has already cost the host SET_ADDRESS. */
+    if (usb_host_is_present())
+        return true;
+
     if(!queue_peek(&tagcache_queue, &ev))
         return false;
 
@@ -4135,6 +4158,42 @@ static bool check_event_queue(void)
     return false;
 }
 
+
+/* The queue alone, for load_tagcache(). It runs at startup, where a player
+ * booted on a charger is plugged in throughout; standing down would leave the
+ * database on the disk for the whole session. */
+static bool check_event_queue_no_usb(void)
+{
+    struct queue_event ev;
+
+    if(!queue_peek(&tagcache_queue, &ev))
+        return false;
+
+    switch (ev.id)
+    {
+        case Q_STOP_SCAN:
+        case SYS_POWEROFF:
+        case SYS_REBOOT:
+        case SYS_USB_CONNECTED:
+            return true;
+    }
+
+    return false;
+}
+
+/* USR_CANCEL. The host test is a flag read and runs every time round; the
+ * queue peek takes a corelock and these loops run once per database entry, so
+ * it rides do_timed_yield()'s HZ/25 limit. */
+static bool usr_cancel(void)
+{
+    if (commit_cancelled)
+        return true;
+
+    if (usb_host_is_present() || (do_timed_yield() && check_event_queue()))
+        commit_cancelled = true;
+
+    return commit_cancelled;
+}
 
 static void fix_ramcache(void* old_addr, void* new_addr)
 {
@@ -4296,7 +4355,7 @@ static bool load_tagcache(void)
              tcramcache.hdr->entry_count[tag]++)
         {
             /* Abort if we got a critical event in queue */
-            if (do_timed_yield() && check_event_queue())
+            if (do_timed_yield() && check_event_queue_no_usb())
                 goto failure;
 
             p = TC_ALIGN_PTR(p, struct tagfile_entry, &rc);
