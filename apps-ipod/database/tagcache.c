@@ -3316,12 +3316,32 @@ static bool commit(void)
         return false;
     }
 
-    if (tch.entry_count == 0)
-        logf("nothing to commit");
-
     /* Fully initialize existing headers (if any) before going further. */
     tc_stat.ready = check_all_headers();
 
+    if (tch.entry_count == 0 && tc_stat.ready)
+    {
+        /* Nothing was added, so there is nothing to merge -- and this is the
+         * ordinary outcome of a scan rather than an error: add_tagcache()
+         * skips every file whose mtime is unchanged, so a library that has
+         * not moved produces an empty temp file.
+         *
+         * Going on would rewrite all ten index files with the contents they
+         * already have, and would drop the RAM copy below without asking for
+         * it back -- only a commit that added entries starts the scan that
+         * reloads it. That is what left every search reading the disk, at a
+         * whole master-index scan each, for the rest of a session in which a
+         * host had written anything.
+         *
+         * tc_stat.ready is in the test because rewriting those files is also
+         * how a dirty database is repaired: check_all_headers() above reports
+         * a half-finished commit as not ready, and that one has to go the
+         * long way round even with nothing of its own to add. */
+        logf("nothing to commit");
+        close(tmpfd);
+        remove_db_file(TAGCACHE_FILE_TEMP);
+        return true;
+    }
 
     /* At first be sure to unload the ramcache! */
     tc_stat.ramcache = false;
@@ -3434,11 +3454,12 @@ static bool commit(void)
             tcrc_buffer_unlock();
         }
 
-        /* Reload tagcache -- only re-scan if we actually committed
-         * new entries. A 0-entry commit must not re-trigger a scan,
-         * otherwise the cycle load_ramcache -> build -> commit(0) ->
-         * start_scan -> load_ramcache -> ... repeats forever. */
-        if (tc_stat.ramcache_allocated > 0 && tch.entry_count > 0)
+        /* Ask for the RAM copy back: this rewrote the index files under it,
+         * and the scan is what reloads it -- see the tagcache thread's
+         * SYS_TIMEOUT arm. A commit with nothing in it cannot reach here, it
+         * returns above, which is what stops the cycle build -> commit(0) ->
+         * start_scan -> build -> ... from repeating forever. */
+        if (tc_stat.ramcache_allocated > 0)
             tagcache_start_scan();
 
         rc = true;
@@ -4878,7 +4899,14 @@ void tagcache_build(void)
 
 static void load_ramcache(void)
 {
-    if (!tcramcache.hdr)
+    /* Ask for the buffer again if an earlier attempt gave it back. Loading is
+     * all-or-nothing -- a load stopped part way is a failure like any other
+     * below, because a half-populated buffer must never be left where
+     * tagcache_reload_ramcache() would switch it back on -- and a USB connect
+     * arriving mid-load stops one. Without this, that single interruption cost
+     * the RAM copy for the rest of the session, whatever happened afterwards:
+     * the free below is permanent and every later call returned here. */
+    if (!tcramcache.hdr && !allocate_tagcache())
         return ;
 
     cpu_boost(true);
@@ -4895,6 +4923,10 @@ static void load_ramcache(void)
         int handle = tcramcache.handle;
         tcramcache.handle = 0;
         core_free(handle);
+        /* No buffer means nothing allocated. Leaving the size standing let
+         * commit() take the branch that carves its tempbuf out of the RAM
+         * copy, which with a freed one writes through (hdr + 1). */
+        tc_stat.ramcache_allocated = 0;
     }
 
     cpu_boost(false);
