@@ -5018,6 +5018,20 @@ static void tagcache_thread(void)
                 if (check_done)
                     break ;
 
+                /* Deferred, not abandoned, while a host has hold of us. This
+                 * arm reads the whole database into RAM and can rescan the
+                 * disk, which on a player booted with the cable in lands
+                 * squarely on top of enumeration. check_done stays clear, so
+                 * the next tick a second later picks it up.
+                 *
+                 * Deferring rather than aborting matters: load_ramcache()
+                 * treats a stopped load as failure and frees the buffer for
+                 * the rest of the session, which is why load_tagcache() uses
+                 * check_event_queue_no_usb() once it is under way. Not
+                 * starting costs nothing; stopping costs the RAM copy. */
+                if (usb_host_is_present())
+                    break ;
+
                 /* Two different questions, so two different settings.
                  * Something asked for a scan (a USB session wrote to us, or a
                  * commit added entries) -> Auto Update decides. Nobody asked
