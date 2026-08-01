@@ -1,0 +1,11 @@
+<svg width="320" height="320" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg">
+ <g class="layer">
+  <title>Layer 1</title>
+  <rect x="32" y="70" width="34" height="180" rx="17" fill="#fff2f9" id="svg_2"/>
+  <rect x="76" y="82" width="34" height="110" rx="17" fill="#feafdb" id="svg_3"/>
+  <rect x="120" y="106" width="34" height="70" rx="17" fill="#c78dbe" id="svg_4"/>
+  <rect x="170" y="70" width="34" height="180" rx="17" fill="#926d9d" id="svg_5"/>
+  <rect x="214" y="128" width="34" height="110" rx="17" fill="#c78dbe" id="svg_6"/>
+  <rect x="258" y="148" width="34" height="70" rx="17" fill="#feafdb" id="svg_7"/>
+ </g>
+</svg>

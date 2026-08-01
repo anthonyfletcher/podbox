@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/podbox/podbox-logo.png" width="100">
+</p>
+
 # PodBox
 
 New firmware for the iPod Classic and iPod Video with a focus on simplifying
