@@ -85,6 +85,7 @@ enum {
     GO_TO_ALBUM_CHARTS,
     /* Play a random album (screens/browse/album_charts.c). */
     GO_TO_RANDOM_ALBUM,
+    GO_TO_DB_SEARCH,
     /* Documents and Images: the flat lists (screens/browse/browser_flat.c). */
     GO_TO_DOCUMENTS,
     GO_TO_IMAGES,

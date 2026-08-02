@@ -131,6 +131,7 @@ enum table {
      * already-drawn row means. */
     TABLE_ALBUM_CHARTS,
     TABLE_RANDOM_ALBUM,
+    TABLE_DB_SEARCH,
 };
 
 static const struct id3_to_search_mapping {
@@ -2110,6 +2111,7 @@ static int load_root(struct browser_context *c)
     struct tagentry *dptr = core_get_data(c->cache.entries_handle);
     bool chart_placed[ALBUM_CHART_ROWS] = { 0 };
     bool random_placed = false;
+    bool search_placed = false;
     bool is_runtime_menu;
     int i, n, rows = 0;
 
@@ -2144,6 +2146,26 @@ static int load_root(struct browser_context *c)
         if (menu->items[i]->type == menu_load
             && !row_submenu_has_items(menu->items[i]))
             continue;
+
+        /* Search sits directly above "Search by...", the two ways of asking
+         * the same question in the order you would reach for them. Inserted
+         * before the row is copied rather than after, which is what every
+         * other synthetic row does -- this is the only one that goes above its
+         * anchor.
+         *
+         * Left out entirely while the database is not held in RAM: the scan
+         * reads the tag files, which from disk is a seek and a read per entry,
+         * and db_search_run() refuses to open in that case. Matches
+         * db_search_callback() in root_menu.c, which hides the root entry on
+         * the same test. */
+        if (c->currextra == rootmenu && !search_placed
+            && global_settings.tagcache_ram != TAGCACHE_RAM_OFF
+            && row_named(menu->items[i], "Search by..."))
+        {
+            add_synthetic_row(&dptr, LANG_DB_SEARCH, TABLE_DB_SEARCH, 0);
+            search_placed = true;
+            rows++;
+        }
 
         dptr->name = (char*)menu->items[i]->name;
 
@@ -2889,6 +2911,9 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     }
     if (newextra == TABLE_RANDOM_ALBUM)
         return GO_TO_RANDOM_ALBUM;
+
+    if (newextra == TABLE_DB_SEARCH)
+        return GO_TO_DB_SEARCH;
 
     if (c->dirlevel >= MAX_DIR_LEVELS)
         return 0;

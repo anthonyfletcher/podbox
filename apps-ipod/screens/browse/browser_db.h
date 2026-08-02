@@ -13,7 +13,7 @@
 #include "database/tagcache.h"
 #include "browser.h"
 
-#define SYNTHETIC_ROWS_MAX 6  /* most rows load_root() adds beyond tagnavi.config */
+#define SYNTHETIC_ROWS_MAX 7  /* most rows load_root() adds beyond tagnavi.config */
 #define TAGNAVI_VERSION    "#! rockbox/tagbrowser/2.0"
 #define TAGMENU_MAX_ITEMS  64
 #define TAGMENU_MAX_MENUS  32

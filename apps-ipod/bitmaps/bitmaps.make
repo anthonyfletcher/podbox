@@ -30,6 +30,9 @@ BMPOBJ = $(call full_path_subst,$(ROOTDIR)/%.bmp,$(BUILDDIR)/%.o,$(BMP))
 # native/SOURCES exactly: an entry with no bitmap can never be produced, and a
 # bitmap with no entry breaks any source that includes its header.
 BMPHFILES = $(BMPINCDIR)/default_icons.h \
+	$(BMPINCDIR)/podbox_icon_album.h \
+	$(BMPINCDIR)/podbox_icon_artist.h \
+	$(BMPINCDIR)/podbox_icon_track.h \
 	$(BMPINCDIR)/podboxalarm.h \
 	$(BMPINCDIR)/podboxcredits.h \
 	$(BMPINCDIR)/podboxlogo.h \

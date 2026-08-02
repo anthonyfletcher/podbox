@@ -4,3 +4,12 @@
  * bare-metal-only fork cannot produce; it and its conditional are gone. */
 
 default_icons.bmp
+
+/* Row icons for the database search. Kept out of enum themable_icons on
+ * purpose: icon.c slices an iconset with height / Icon_Last_Themeable, so a new
+ * entry there re-slices every theme's strip and shears all of its icons. These
+ * are drawn with mono_bitmap() in the current foreground instead, so they still
+ * take the theme's (or the dialog's) text colour. */
+podbox_icon_album.bmp
+podbox_icon_artist.bmp
+podbox_icon_track.bmp

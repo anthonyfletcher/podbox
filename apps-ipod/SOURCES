@@ -68,6 +68,7 @@ draw/jpeg_idct_arm.S
 #endif
 
 widgets/dialog.c
+widgets/edit_line.c
 widgets/keyboard.c
 widgets/list.c
 widgets/list_render.c
@@ -96,6 +97,7 @@ screens/browse/browser_flat.c
 screens/context_menu.c
 screens/system/art_health.c
 screens/system/bg_task_info.c
+screens/system/db_search.c
 screens/system/debug_menu.c
 files/file_ops.c
 files/file_index.c

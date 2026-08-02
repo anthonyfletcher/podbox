@@ -17835,6 +17835,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_DB_SEARCH
+  desc: in the Music menu, search the database for text
+  user: core
+  <source>
+    *: "Search"
+  </source>
+  <dest>
+    *: "Search"
+  </dest>
+  <voice>
+    *: "Search"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_NO_ALBUM_HISTORY
   desc: shown when no album has been played yet
   user: core

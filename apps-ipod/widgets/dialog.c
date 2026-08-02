@@ -291,45 +291,135 @@ void dialog_frame_box(struct screen *screen, struct viewport *box,
     content_out->height -= in.top + in.bottom;
 }
 
-void dialog_draw_button(struct screen *screen,
-                        const struct dialog_style *style,
-                        int x, int y, int w, int h,
-                        const char *label, bool selected)
+#define BTN_PAD_X    4   /* gap from the border to the icon or label */
+#define BTN_ICON_GAP 4   /* gap between the icon and the label */
+
+/* Draw the icon and label inside a button already filled and bordered.
+ *
+ * The label goes into a sub-viewport covering only the button's interior, so
+ * it is clipped rather than drawn over the border -- a bare putsxy() of a label
+ * wider than the button spills out of it in both directions, which is what a
+ * list row does all the time and a Cancel/OK pair never does.
+ *
+ * `pad_left` already includes the icon, so the sub-viewport starts past it. */
+static void draw_button_content(struct screen *screen, int x, int y,
+                                int w, int h, int lw, int lh,
+                                const char *label,
+                                enum dialog_button_align align,
+                                const struct bitmap *icon,
+                                int scroll_px, int *overflow_out,
+                                bool selected, bool colour,
+                                unsigned fill, unsigned text)
+{
+    struct viewport *cur = *screen->current_viewport;
+    struct viewport tvp;
+    struct viewport *prev;
+    int icon_w = icon ? icon->width + BTN_ICON_GAP : 0;
+    int overflow, tx = 0;
+
+    if (overflow_out)
+        *overflow_out = 0;
+
+    if (icon)
+    {
+        /* mono_bitmap paints set bits in the current foreground, so the icon
+         * takes the label's colour and needs no palette of its own. */
+        screen->set_drawmode(selected && !colour ? DRMODE_SOLID | DRMODE_INVERSEVID
+                                                 : DRMODE_FG);
+        if (colour)
+            screen->set_foreground(text);
+        screen->mono_bitmap(icon->data, x + BTN_PAD_X,
+                            y + (h - icon->height) / 2,
+                            icon->width, icon->height);
+        screen->set_drawmode(DRMODE_SOLID);
+    }
+
+    /* A sub-viewport covering just the label's space, so putsxy() below is
+     * clipped to it however wide the label is. */
+    tvp = *cur;                        /* flags and buffer come with it */
+    tvp.x = cur->x + x + BTN_PAD_X + icon_w;
+    tvp.y = cur->y + y + (h - lh) / 2;
+    tvp.width = w - 2 * BTN_PAD_X - icon_w;
+    tvp.height = lh;
+    if (tvp.width < 1 || tvp.height < 1)
+        return;
+
+    if (colour)
+    {
+        tvp.fg_pattern = text;
+        tvp.bg_pattern = fill;
+    }
+
+    overflow = lw - tvp.width;
+    if (overflow < 0)
+        overflow = 0;
+    if (overflow_out)
+        *overflow_out = overflow;
+
+    if (scroll_px > overflow)
+        scroll_px = overflow;
+    if (scroll_px < 0)
+        scroll_px = 0;
+
+    prev = screen->set_viewport(&tvp);
+
+    if (overflow == 0 && align == DIALOG_BTN_CENTRE)
+        tx = (tvp.width - lw) / 2;
+    else
+        tx = -scroll_px;
+
+    screen->set_drawmode(selected && !colour ? DRMODE_SOLID | DRMODE_INVERSEVID
+                                             : DRMODE_FG);
+    screen->putsxy(tx, 0, (const unsigned char *)label);
+
+    screen->set_drawmode(DRMODE_SOLID);
+    screen->set_viewport(prev);
+}
+
+void dialog_draw_button_ex(struct screen *screen,
+                           const struct dialog_style *style,
+                           int x, int y, int w, int h,
+                           const char *label, bool selected,
+                           enum dialog_button_align align,
+                           const struct bitmap *icon,
+                           int scroll_px, int *overflow_out)
 {
     int r  = style->button_border_radius;
     int bw = style->button_border_width;
     int old_font = (*screen->current_viewport)->font;
+    bool colour = screen->depth > 1;
+    unsigned fill = 0, text = 0;
     int lw, lh;
 
     if (style->button_font != DIALOG_FONT_INHERIT)
         screen->setfont(style->button_font);
 
     screen->getstringsize((const unsigned char *)label, &lw, &lh);
-    int tx = x + (w - lw) / 2;
-    int ty = y + (h - lh) / 2;
 
-    if (screen->depth > 1)
+    if (colour)
     {
         /* Inheriting reproduces the old inverse-video selector exactly: the
          * selected button takes the box's foreground as its fill and its
          * background as its text, and the unselected one fills with the box's
          * own background, so it reads as the plain outline drawn before. */
         unsigned box_fg = screen->get_foreground();
-        unsigned fill   = selected ? resolve_fg(screen, style->button_bg_selected)
-                                   : resolve_bg(screen, style->button_bg);
-        unsigned text   = selected ? resolve_bg(screen, style->button_fg_selected)
-                                   : resolve_fg(screen, style->button_fg);
-        unsigned border = selected
-                        ? resolve_fg(screen, style->button_border_color_selected)
-                        : resolve_fg(screen, style->button_border_color);
+        unsigned border;
+
+        fill   = selected ? resolve_fg(screen, style->button_bg_selected)
+                          : resolve_bg(screen, style->button_bg);
+        text   = selected ? resolve_bg(screen, style->button_fg_selected)
+                          : resolve_fg(screen, style->button_fg);
+        border = selected ? resolve_fg(screen, style->button_border_color_selected)
+                          : resolve_fg(screen, style->button_border_color);
 
         screen->set_drawmode(DRMODE_FG);
         screen->set_foreground(fill);
         fill_round_rect(screen, x, y, w, h, r);
         screen->set_foreground(border);
         draw_round_rect(screen, x, y, w, h, r, bw);
-        screen->set_foreground(text);
-        screen->putsxy(tx, ty, (const unsigned char *)label);
+
+        draw_button_content(screen, x, y, w, h, lw, lh, label, align, icon,
+                            scroll_px, overflow_out, selected, colour, fill, text);
 
         screen->set_foreground(box_fg);      /* restore for the rest of the box */
         screen->set_drawmode(DRMODE_SOLID);
@@ -340,21 +430,30 @@ void dialog_draw_button(struct screen *screen,
         {
             screen->set_drawmode(DRMODE_FG);
             fill_round_rect(screen, x, y, w, h, r);
-            screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
-            screen->putsxy(tx, ty, (const unsigned char *)label);
         }
         else
         {
             screen->set_drawmode(DRMODE_SOLID);
             draw_round_rect(screen, x, y, w, h, r, bw);
-            screen->set_drawmode(DRMODE_FG);
-            screen->putsxy(tx, ty, (const unsigned char *)label);
         }
+
+        draw_button_content(screen, x, y, w, h, lw, lh, label, align, icon,
+                            scroll_px, overflow_out, selected, colour, fill, text);
+
         screen->set_drawmode(DRMODE_SOLID);
     }
 
     if (style->button_font != DIALOG_FONT_INHERIT)
         screen->setfont(old_font);
+}
+
+void dialog_draw_button(struct screen *screen,
+                        const struct dialog_style *style,
+                        int x, int y, int w, int h,
+                        const char *label, bool selected)
+{
+    dialog_draw_button_ex(screen, style, x, y, w, h, label, selected,
+                          DIALOG_BTN_CENTRE, NULL, 0, NULL);
 }
 
 int dialog_wrap_text(const char *text, int max_width, int font,
@@ -448,6 +547,8 @@ int dialog_run(struct dialog *d, int poll_ticks)
 {
     int disp = DIALOG_CONTINUE;
 
+    d->poll_ticks = poll_ticks;
+
     FOR_NB_SCREENS(i)
     {
         screens[i].scroll_stop();
@@ -476,7 +577,7 @@ int dialog_run(struct dialog *d, int poll_ticks)
          * caller waiting on TIMEOUT_BLOCK never does. Poll for as long as the
          * palette is asking to be repainted, then go back to whatever the
          * caller asked for. */
-        int ticks = poll_ticks;
+        int ticks = d->poll_ticks;
         if (dynamic_colors_needs_repaint()
             && (ticks == TIMEOUT_BLOCK || ticks > HZ / 10))
             ticks = HZ / 10;

@@ -143,6 +143,42 @@ void dialog_draw_button(struct screen *screen,
                         int x, int y, int w, int h,
                         const char *label, bool selected);
 
+/* Where the label sits. Centred is right for a Cancel/OK pair; left is right
+ * for a button that is really a row of a list. */
+enum dialog_button_align {
+    DIALOG_BTN_CENTRE = 0,
+    DIALOG_BTN_LEFT,
+};
+
+/* As above, with the three things a list row needs that a Cancel/OK pair does
+ * not:
+ *
+ *   `align`  - see above.
+ *   `icon`   - optional 1bpp bitmap drawn at the label's left, in the label's
+ *              colour, with the text indented past it. NULL for none.
+ *   `scroll_px` - how far the label is scrolled left, in pixels. Clamped to
+ *              what actually overflows, so 0 is always "start of the text".
+ *   `overflow_out` - if non-NULL, receives how many pixels the label overflows
+ *              the space available to it (0 when it fits). That is the range
+ *              scroll_px is clamped to, so a caller animating the text has the
+ *              one number it needs.
+ *
+ * Scrolling is the caller's to drive, deliberately: the shared scroll engine
+ * redraws asynchronously using whatever colours are current when its thread
+ * runs, which on a selected row is the wrong background and text in the
+ * background's colour. A dialog repaints on every pass anyway, so stepping an
+ * offset there costs nothing and is the same every frame.
+ *
+ * The label is always clipped to the button's interior, so it can never spill
+ * over the border the way a bare putsxy() does. */
+void dialog_draw_button_ex(struct screen *screen,
+                           const struct dialog_style *style,
+                           int x, int y, int w, int h,
+                           const char *label, bool selected,
+                           enum dialog_button_align align,
+                           const struct bitmap *icon,
+                           int scroll_px, int *overflow_out);
+
 /* A wrapped display line: a (non-terminated) slice of the source text. */
 struct dialog_text_line
 {
@@ -210,6 +246,14 @@ struct dialog
     /* --- maintained by dialog_run(), readable by callbacks --- */
     struct viewport parent[NB_SCREENS]; /* theme-enabled parent per screen  */
     bool  backlight_on;         /* backlight state sampled before get_action */
+
+    /* The get_action timeout for the NEXT pass, seeded from dialog_run()'s
+     * argument. A callback may write it to change how often it is woken with
+     * ACTION_NONE -- a dialog that animates something can ask for a fast tick
+     * only while the animation is running, and go back to idling after. Every
+     * pass costs a full repaint of the box (see dialog_run), so this is the
+     * difference between animating and burning CPU. */
+    int   poll_ticks;
 };
 
 /* Initialise a dialog. `title` and `style` may be NULL (NULL style == the

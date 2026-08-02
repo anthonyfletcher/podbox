@@ -52,6 +52,7 @@
 #endif
 #include "database/tagcache.h"
 #include "screens/covers/album_covers.h"
+#include "screens/system/db_search.h"
 #include "screens/browse/album_charts.h"
 #include "screens/browse/browser_flat.h"
 #include "speech/language.h"
@@ -547,6 +548,12 @@ static int pictureflow_scrn(void* param)
     return album_covers(NULL);
 }
 
+static int db_search_scrn(void* param)
+{
+    (void)param;
+    return db_search_run();
+}
+
 static int artist_portraits_scrn(void* param)
 {
     (void)param;
@@ -634,6 +641,7 @@ static const struct root_items items[] = {
     [GO_TO_LASTDOC] = { lastdoc_scrn, NULL, &text_viewer_menu },
     [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
     [GO_TO_RANDOM_ALBUM] = { random_album_scrn, NULL, &tagcache_menu },
+    [GO_TO_DB_SEARCH] = { db_search_scrn, NULL, &tagcache_menu },
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
@@ -673,6 +681,25 @@ static int shortcut_menu_callback(int action,
     return action;
 }
 
+/* Hidden entirely while the database is not held in RAM. Searching off the
+ * ramcache means a seek and a read per tag entry, which on a disk is not slow
+ * but unusable -- db_search_run() refuses in that case, so without this the
+ * row exists only to say no. Same mechanism as the Shortcuts row above.
+ *
+ * The setting rather than tagcache_is_in_ram(): the row's presence should not
+ * flicker with whether the cache happens to be loaded yet at this moment. */
+static int db_search_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.tagcache_ram == TAGCACHE_RAM_OFF)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_RETURNVALUE(shortcut_menu, ID2P(LANG_SHORTCUTS), GO_TO_SHORTCUTMENU,
                         shortcut_menu_callback, Icon_Bookmark);
 
@@ -688,6 +715,8 @@ MENUITEM_RETURNVALUE(continue_reading, ID2P(LANG_CONTINUE_READING), GO_TO_LASTDO
                         item_callback, Icon_Font);
 MENUITEM_RETURNVALUE(random_album_item, ID2P(LANG_RANDOM_ALBUM), GO_TO_RANDOM_ALBUM,
                         NULL, Icon_Audio);
+MENUITEM_RETURNVALUE(db_search_item, ID2P(LANG_DB_SEARCH), GO_TO_DB_SEARCH,
+                        db_search_callback, Icon_Audio);
 MENUITEM_RETURNVALUE(documents_item, ID2P(LANG_DOCUMENTS), GO_TO_DOCUMENTS,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
@@ -789,6 +818,7 @@ static struct menu_table menu_table[] = {
     { "wps", &wps_item },
     { "reading", &continue_reading },
     { "random", &random_album_item },
+    { "search", &db_search_item },
     { "docs", &documents_item },
     { "images", &images_item },
     { "playlists", &playlists },
@@ -1195,6 +1225,7 @@ void root_menu_set_default(void* setting, void* defaultval)
          * neither; on a device with no documents on it they would be two rows
          * that only ever say there is nothing to show. */
         if (menu_table[i].item == &random_album_item
+            || menu_table[i].item == &db_search_item
             || menu_table[i].item == &documents_item
             || menu_table[i].item == &images_item)
             continue;
