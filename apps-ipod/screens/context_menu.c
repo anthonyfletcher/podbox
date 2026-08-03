@@ -55,6 +55,7 @@
 #include "context_menu.h"
 #include "files/filetypes.h"
 #include "viewers/image_viewer/image_viewer_pub.h"
+#include "viewers/lyric_viewer/lyric_viewer.h"
 #include "viewers/properties.h"
 #include "viewers/playing_time.h"
 #include "files/file_ops.h"
@@ -232,6 +233,15 @@ static void playing_time(void)
 static void view_album_art(void)
 {
     image_viewer(NULL);
+}
+
+/* Returns its own result rather than a fixed one, so that leaving the lyrics
+ * because USB was plugged in lands at the root and not back in the WPS. */
+static int view_lyrics(void)
+{
+    if (lyric_viewer() == GO_TO_ROOT)
+        return ONPLAY_MAINMENU;
+    return ONPLAY_OK;
 }
 
 MENUITEM_FUNCTION(wps_view_cur_playlist_item, 0, ID2P(LANG_VIEW_DYNAMIC_PLAYLIST),
@@ -1350,6 +1360,12 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_REVEAL_FILE,
       .flags = HOTKEY_FLAG_WPS,
       .icon = Icon_file_view_menu },
+    { .action = HOTKEY_LYRICS,
+      .lang_id = LANG_LYRICS,
+      .func = HOTKEY_FUNC(view_lyrics, NULL),
+      .return_code = ONPLAY_FUNC_RETURN,
+      .flags = HOTKEY_FLAG_WPS | HOTKEY_FLAG_NOSBS,
+      .icon = Icon_NOICON },
     { .action = HOTKEY_CONTEXT_MENU,
       .lang_id = LANG_ONPLAY_MENU_TITLE,
       .func = HOTKEY_FUNC(hotkey_execute_menu, NULL),

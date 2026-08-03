@@ -18060,3 +18060,214 @@
     *: "Background"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_LYRICS
+  desc: WPS context menu and hotkey, opens the synchronised lyrics screen
+  user: core
+  <source>
+    *: "Lyrics"
+  </source>
+  <dest>
+    *: "Lyrics"
+  </dest>
+  <voice>
+    *: "Lyrics"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NONE
+  desc: lyric viewer, no lyrics file or SYLT tag was found for the track
+  user: core
+  <source>
+    *: "No lyrics"
+  </source>
+  <dest>
+    *: "No lyrics"
+  </dest>
+  <voice>
+    *: "No lyrics"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_WAITING
+  desc: lyric viewer, shown while nothing is playing or the track's metadata
+        has not arrived yet
+  user: core
+  <source>
+    *: "Waiting for track..."
+  </source>
+  <dest>
+    *: "Waiting for track..."
+  </dest>
+  <voice>
+    *: "Waiting for track"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_MENU
+  desc: lyric viewer settings menu title
+  user: core
+  <source>
+    *: "Lyrics Viewer"
+  </source>
+  <dest>
+    *: "Lyrics Viewer"
+  </dest>
+  <voice>
+    *: "Lyrics Viewer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_CENTRE
+  desc: lyric viewer alignment, centred
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "Centre"
+  </dest>
+  <voice>
+    *: "Centre"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ALIGN
+  desc: lyric viewer, horizontal alignment of the lines
+  user: core
+  <source>
+    *: "Alignment"
+  </source>
+  <dest>
+    *: "Alignment"
+  </dest>
+  <voice>
+    *: "Alignment"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_PREV_OPACITY
+  desc: lyric viewer, how visible the line above is
+  user: core
+  <source>
+    *: "Previous Line"
+  </source>
+  <dest>
+    *: "Previous Line"
+  </dest>
+  <voice>
+    *: "Previous Line"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NEXT_OPACITY
+  desc: lyric viewer, how visible the line below is
+  user: core
+  <source>
+    *: "Next Line"
+  </source>
+  <dest>
+    *: "Next Line"
+  </dest>
+  <voice>
+    *: "Next Line"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM
+  desc: lyric viewer, speed of the slide between lines
+  user: core
+  <source>
+    *: "Animation"
+  </source>
+  <dest>
+    *: "Animation"
+  </dest>
+  <voice>
+    *: "Animation"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_FAST
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Fast"
+  </dest>
+  <voice>
+    *: "Fast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_NORMAL
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Normal"
+  </source>
+  <dest>
+    *: "Normal"
+  </dest>
+  <voice>
+    *: "Normal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_SLOW
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Slow"
+  </dest>
+  <voice>
+    *: "Slow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_HIGHLIGHT
+  desc: lyric viewer, light words as they are sung
+  user: core
+  <source>
+    *: "Highlight Sung Words"
+  </source>
+  <dest>
+    *: "Highlight Sung Words"
+  </dest>
+  <voice>
+    *: "Highlight Sung Words"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_BACKLIGHT
+  desc: lyric viewer, keep the screen lit while open
+  user: core
+  <source>
+    *: "Keep Backlight On"
+  </source>
+  <dest>
+    *: "Keep Backlight On"
+  </dest>
+  <voice>
+    *: "Keep Backlight On"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_FONT_DEFAULT
+  desc: lyric viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "Use UI Font"
+  </dest>
+  <voice>
+    *: "Use UI Font"
+  </voice>
+</phrase>

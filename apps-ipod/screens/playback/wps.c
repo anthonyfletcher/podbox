@@ -66,6 +66,7 @@
 #include "ata_idle_notify.h"
 #include "root_menu.h"
 #include "screens/covers/album_covers.h"
+#include "viewers/lyric_viewer/lyric_viewer.h"
 #include "skin/backdrop.h"
 #ifdef HAVE_RTC_ALARM
 #include "screens/system/alarm.h"
@@ -771,6 +772,20 @@ long gui_wps_show(void)
                 {
                     gwps_leave_wps(true);
                     return GO_TO_FILEBROWSER;
+                }
+                else if (sel_action == 4) /* lyrics */
+                {
+                    /* Leave without re-enabling the theme: the lyrics screen
+                     * owns the display and turns it off again itself. Same
+                     * shape as a HOTKEY_FLAG_NOSBS hotkey. */
+                    theme_enabled = false;
+                    gwps_leave_wps(theme_enabled);
+                    if (lyric_viewer() == GO_TO_ROOT)
+                    {
+                        gwps_leave_wps(true);   /* returning to the SBS */
+                        return GO_TO_ROOT;
+                    }
+                    restore = true;
                 }
                 else /* default — previous browser */
                 {

@@ -49,7 +49,8 @@ enum current_activity {
     ACTIVITY_ALBUMCHARTS,
     ACTIVITY_DOCUMENTBROWSER,
     ACTIVITY_IMAGEBROWSER,
-    ACTIVITY_DB_SEARCH
+    ACTIVITY_DB_SEARCH,
+    ACTIVITY_LYRICS
 };
 
 /* custom string representation of activity */

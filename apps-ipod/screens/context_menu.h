@@ -45,6 +45,10 @@ enum hotkey_action {
     HOTKEY_BOOKMARK_LIST,
     HOTKEY_ALBUMART,
     HOTKEY_SHOW_IN_FILES,
+    HOTKEY_LYRICS,
+    /* Append here, never insert: these values are packed HK_CTX_BITS at a
+       time into the saved context_wps/hotkey_tree integers, so renumbering
+       one repoints every hotkey the user has already configured. */
     HOTKEY_CONTEXT_MENU = 0x3E, /* shows the actions above as a menu */
     /* Note no more than 62 items -- see HK_CTX_BITS */
 };

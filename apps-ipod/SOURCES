@@ -140,6 +140,7 @@ screens/settings/playlist_settings.c
 screens/settings/general_settings.c
 screens/settings/sound_settings.c
 screens/settings/text_viewer_settings.c
+screens/settings/lyric_viewer_settings.c
 screens/settings/theme_settings.c
 #ifdef HAVE_TAGCACHE
 screens/settings/album_covers_settings.c
@@ -151,6 +152,12 @@ screens/settings/time_settings.c
 viewers/credits.c
 viewers/playing_time.c
 viewers/properties.c
+
+/* Synchronised lyrics for the playing track. lyrics.c finds, loads and indexes
+ * .lrc/.lrc8/.snc files and ID3 SYLT frames (ported from the lrcplayer
+ * plugin); lyric_viewer.c is the screen that draws them. */
+viewers/lyric_viewer/lyrics.c
+viewers/lyric_viewer/lyric_viewer.c
 
 /* Streaming text-extraction engine behind the core-linked text viewer. Turns
  * plain/markdown/html/rtf/fb2/epub/docx/pdf into a stream of UTF-8. Platform

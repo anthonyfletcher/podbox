@@ -625,6 +625,16 @@ struct user_settings
     int text_viewer_line_spacing; /* extra pixels between lines */
     unsigned char text_viewer_font_file[MAX_FILENAME+1]; /* "" = UI font */
     bool text_viewer_page_number; /* show the page number at the foot */
+    /* Synchronised lyrics viewer (apps-ipod/viewers/lyric_viewer). */
+    int lyric_colour_mode;        /* as text_viewer_colour_mode */
+    unsigned char lyric_font_file[MAX_FILENAME+1]; /* "" = UI font */
+    int lyric_line_spacing;       /* extra pixels between rows */
+    int lyric_align;              /* 0 left, 1 centre, 2 right */
+    int lyric_prev_opacity;       /* per cent, the line above */
+    int lyric_next_opacity;       /* per cent, the line below */
+    int lyric_anim;               /* 0 off, else the slide in ms */
+    bool lyric_highlight;         /* light words as they are sung */
+    bool lyric_backlight;         /* hold the backlight on */
     unsigned char kbd_file[MAX_FILENAME+1];  /* last keyboard */
     int  backlight_timeout;  /* backlight off timeout:  -1=never,
                                 0=always, or time in seconds */
