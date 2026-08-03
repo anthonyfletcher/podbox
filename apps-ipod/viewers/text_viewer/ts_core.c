@@ -48,7 +48,7 @@ const char *ts_format_name(ts_format f)
      * members, so it is an unsigned type and the upper bound is the only
      * check needed. */
     static const char *n[] = { "unknown", "text", "markdown", "html", "rtf",
-                               "fb2", "epub", "docx", "pdf" };
+                               "fb2", "epub", "docx", "pdf", "lyrics" };
     return ((size_t)f < sizeof n / sizeof *n) ? n[f] : "unknown";
 }
 
@@ -226,6 +226,10 @@ static ts_format probe_ext(const char *name)
     if (!ts_ascii_casecmp(e, "epub"))                     return TS_FMT_EPUB;
     if (!ts_ascii_casecmp(e, "docx"))                     return TS_FMT_DOCX;
     if (!ts_ascii_casecmp(e, "pdf"))                      return TS_FMT_PDF;
+    /* By extension only. A lyrics file is plain text with tags in it, so a
+     * content sniff would claim .txt files that merely start with a bracket. */
+    if (!ts_ascii_casecmp(e, "lrc") || !ts_ascii_casecmp(e, "lrc8") ||
+        !ts_ascii_casecmp(e, "snc"))                      return TS_FMT_LYRICS;
     if (!ts_ascii_casecmp(e, "txt") || !ts_ascii_casecmp(e, "text") ||
         !ts_ascii_casecmp(e, "nfo") || !ts_ascii_casecmp(e, "log"))
         return TS_FMT_PLAIN;
@@ -338,6 +342,7 @@ int ts_open(ts_source **out, const ts_io *io, const char *name,
     case TS_FMT_HTML:   rc = ts_open_html(&ctx, &s->pipe);         break;
     case TS_FMT_FB2:    rc = ts_open_fb2(&ctx, &s->pipe);          break;
     case TS_FMT_PDF:    rc = ts_open_pdf(&ctx, &s->pipe);          break;
+    case TS_FMT_LYRICS: rc = ts_open_lyrics(&ctx, &s->pipe);       break;
     case TS_FMT_EPUB:
     case TS_FMT_DOCX:   rc = ts_open_epub(&ctx, &s->pipe);         break;
     default:            rc = TS_ERR_UNSUP;                         break;

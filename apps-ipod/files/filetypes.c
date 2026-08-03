@@ -85,6 +85,11 @@ static const struct filetype_inbuilt inbuilt_filetypes[] = {
     { "epub", FILE_ATTR_TXT },
     { "docx", FILE_ATTR_TXT },
     { "pdf",  FILE_ATTR_TXT },
+    /* Lyrics read as words here, with the timing stripped (ts_lyrics.c). The
+     * synchronised viewer is reached from the WPS, not from the browser. */
+    { "lrc",  FILE_ATTR_TXT },
+    { "lrc8", FILE_ATTR_TXT },
+    { "snc",  FILE_ATTR_TXT },
     { "bmp",  FILE_ATTR_IMG },
     { "jpg",  FILE_ATTR_IMG },
     { "jpe",  FILE_ATTR_IMG },

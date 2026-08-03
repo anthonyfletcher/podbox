@@ -39,7 +39,8 @@ typedef enum {
     TS_FMT_FB2,
     TS_FMT_EPUB,
     TS_FMT_DOCX,
-    TS_FMT_PDF
+    TS_FMT_PDF,
+    TS_FMT_LYRICS        /* .lrc / .lrc8 / .snc, read without the timing */
 } ts_format;
 
 const char *ts_format_name(ts_format f);

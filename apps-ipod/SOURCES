@@ -161,6 +161,7 @@ viewers/text_viewer/ts_charset.c
 viewers/text_viewer/ts_core.c
 viewers/text_viewer/ts_inflate.c
 viewers/text_viewer/ts_io_core.c
+viewers/text_viewer/ts_lyrics.c
 viewers/text_viewer/ts_markup.c
 viewers/text_viewer/ts_pdf.c
 viewers/text_viewer/ts_pdffont.c

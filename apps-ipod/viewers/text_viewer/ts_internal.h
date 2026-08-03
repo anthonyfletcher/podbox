@@ -142,6 +142,7 @@ int ts_open_fb2  (ts_ctx *c, ts_stream **out);
 int ts_open_epub (ts_ctx *c, ts_stream **out);
 int ts_open_docx (ts_ctx *c, ts_stream **out);
 int ts_open_pdf  (ts_ctx *c, ts_stream **out);
+int ts_open_lyrics(ts_ctx *c, ts_stream **out);
 
 /* ---- small helpers --------------------------------------------------- */
 
