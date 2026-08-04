@@ -203,8 +203,25 @@ void list_draw(struct screen *display, struct gui_synclist *list)
     dynamic_colors_check_extraction(-1);
     unsigned int dc_saved_list_fg = parent->fg_pattern;
     unsigned int dc_saved_list_bg = parent->bg_pattern;
-    parent->fg_pattern = dynamic_colors_resolve(global_settings.fg_color);
-    parent->bg_pattern = dynamic_colors_resolve(global_settings.bg_color);
+
+    /* Under a theme the list keeps the colours it was handed. `parent` is a
+     * copy of the skin's UI viewport, so a skin that sets %Vf on it is stating
+     * what colour its rows should be, and substituting the global foreground
+     * here would silently discard that -- which is what used to happen, and is
+     * why a theme drawing grey rows against a white selection got white rows.
+     *
+     * They are not resolved again either: skin_render() has already resolved
+     * that viewport in place, and putting an album-derived colour back through
+     * the mapping would transform it a second time.
+     *
+     * With no theme there is no skin viewport to inherit from -- the parent was
+     * filled from the global settings by viewport_set_fullscreen() -- so the
+     * dynamic colours are applied here instead. */
+    if (!viewportmanager_theme_enabled(screen))
+    {
+        parent->fg_pattern = dynamic_colors_resolve(global_settings.fg_color);
+        parent->bg_pattern = dynamic_colors_resolve(global_settings.bg_color);
+    }
     if (parent->fg_pattern != dc_saved_list_fg ||
         parent->bg_pattern != dc_saved_list_bg)
     {

@@ -61,53 +61,72 @@ unsigned color_blend(unsigned c1, unsigned c2, int t)
     return LCD_RGBPACK(r, g, b);
 }
 
-unsigned color_hue_rotate(unsigned base, int degrees, int sat, int val)
+void color_get_hsv(unsigned c, int *h, int *s, int *v)
 {
-    int r = RGB_UNPACK_RED(base);
-    int g = RGB_UNPACK_GREEN(base);
-    int b = RGB_UNPACK_BLUE(base);
+    int r = RGB_UNPACK_RED(c);
+    int g = RGB_UNPACK_GREEN(c);
+    int b = RGB_UNPACK_BLUE(c);
     int max = r > g ? (r > b ? r : b) : (g > b ? g : b);
     int min = r < g ? (r < b ? r : b) : (g < b ? g : b);
     int delta = max - min;
-    int h, region, rem, p, q, t;
 
-    /* base's hue in degrees. A grey has no hue to turn, so it yields 0 (red):
-     * a predictable colour rather than another grey, which is the one answer
-     * that would be useless to a caller asking for an accent. */
+    /* A grey has no hue, so it yields 0 (red): a predictable answer rather
+     * than another grey, which is the one result that would be useless to a
+     * caller asking where to turn to. */
     if (delta == 0)
-        h = 0;
+        *h = 0;
     else if (max == r)
-        h = (60 * (g - b)) / delta;
+        *h = (60 * (g - b)) / delta;
     else if (max == g)
-        h = 120 + (60 * (b - r)) / delta;
+        *h = 120 + (60 * (b - r)) / delta;
     else
-        h = 240 + (60 * (r - g)) / delta;
+        *h = 240 + (60 * (r - g)) / delta;
 
-    h = (h + degrees) % 360;
+    if (*h < 0)
+        *h += 360;
+
+    *s = max ? (delta * 255) / max : 0;
+    *v = max;
+}
+
+unsigned color_from_hsv(int h, int s, int v)
+{
+    int region, rem, p, q, t, r, g, b;
+
+    h %= 360;
     if (h < 0)
         h += 360;
+
+    region = h / 60;
+    rem    = ((h - region * 60) * 255) / 60;
+    p = (v * (255 - s)) / 255;
+    q = (v * (255 - (s * rem) / 255)) / 255;
+    t = (v * (255 - (s * (255 - rem)) / 255)) / 255;
+
+    switch (region)
+    {
+        case 0:  r = v; g = t; b = p; break;
+        case 1:  r = q; g = v; b = p; break;
+        case 2:  r = p; g = v; b = t; break;
+        case 3:  r = p; g = q; b = v; break;
+        case 4:  r = t; g = p; b = v; break;
+        default: r = v; g = p; b = q; break;
+    }
+
+    return LCD_RGBPACK(r, g, b);
+}
+
+unsigned color_hue_rotate(unsigned base, int degrees, int sat, int val)
+{
+    int h, s, v;
+
+    color_get_hsv(base, &h, &s, &v);
 
     /* Back to RGB at the caller's saturation and brightness rather than
      * base's. A theme background is usually dark and unsaturated and has
      * neither to spare -- keeping them would give a colour too close to the
      * one we were asked to move away from. */
-    region = h / 60;
-    rem    = ((h - region * 60) * 255) / 60;
-    p = (val * (255 - sat)) / 255;
-    q = (val * (255 - (sat * rem) / 255)) / 255;
-    t = (val * (255 - (sat * (255 - rem)) / 255)) / 255;
-
-    switch (region)
-    {
-        case 0:  r = val; g = t;   b = p;   break;
-        case 1:  r = q;   g = val; b = p;   break;
-        case 2:  r = p;   g = val; b = t;   break;
-        case 3:  r = p;   g = q;   b = val; break;
-        case 4:  r = t;   g = p;   b = val; break;
-        default: r = val; g = p;   b = q;   break;
-    }
-
-    return LCD_RGBPACK(r, g, b);
+    return color_from_hsv(h + degrees, sat, val);
 }
 
 /* WCAG relative luminance. sRGB is linearised with a gamma of 2.0 rather than
@@ -130,6 +149,66 @@ int color_contrast(unsigned c1, unsigned c2)
     int32_t lo = (la < lb ? la : lb) + 3251;
 
     return (int)((hi * 100) / lo);
+}
+
+/* Steps of brightness taken while searching, and the most that will be tried
+ * before giving up on the hue and going to plain black or white. 16 steps of
+ * 16 reaches either end of the 0..255 range from anywhere in it. */
+#define FIT_STEP  16
+#define FIT_TRIES 16
+
+unsigned color_fit_contrast(unsigned c, unsigned against, int target)
+{
+    unsigned white = LCD_RGBPACK(255, 255, 255);
+    unsigned black = LCD_RGBPACK(0, 0, 0);
+    bool lighten;
+    int h, s, v, step, i;
+
+    if (color_contrast(c, against) >= target)
+        return c;
+
+    color_get_hsv(c, &h, &s, &v);
+
+    /* Only brightness moves: the hue is the caller's design and the saturation
+     * is what makes it read as a colour rather than a tint.
+     *
+     * Both ways are tried at each distance, nearest first, so the answer is the
+     * one that changes the colour least. Searching one way only -- toward
+     * whichever extreme has more contrast in it -- takes a vivid colour all the
+     * way to near-black when a step or two the other way would have done, and a
+     * near-black accent is not an accent. */
+    for (step = FIT_STEP; step <= FIT_STEP * FIT_TRIES; step += FIT_STEP)
+    {
+        for (i = 0; i < 2; i++)
+        {
+            int cv = i ? v - step : v + step;
+            unsigned cand;
+
+            /* clamped rather than skipped, so the ends of the range are
+             * themselves tried: a colour that only works at full brightness
+             * would otherwise be stepped straight past and lose its hue to the
+             * fallback below */
+            if (cv < 0)
+                cv = 0;
+            if (cv > 255)
+                cv = 255;
+
+            cand = color_from_hsv(h, s, cv);
+            if (color_contrast(cand, against) >= target)
+                return cand;
+        }
+    }
+
+    lighten = color_contrast(white, against) > color_contrast(black, against);
+
+    /* The hue cannot reach the target at any brightness -- a saturated one on
+     * a mid-luminance field is the usual case, since it runs out of range
+     * before it runs out of contrast. Legibility wins over hue.
+     *
+     * A mid-luminance background may leave even this short of the target: no
+     * colour whatever reaches 4.5:1 against some of them. This is then the
+     * most readable answer that exists, not a passing one. */
+    return lighten ? white : black;
 }
 
 /* '0'-'3' are ASCII 0x30 to 0x33 */

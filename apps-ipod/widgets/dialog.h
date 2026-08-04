@@ -50,10 +50,7 @@ struct dialog;
  *
  * Not the same as INHERIT, which takes whatever the screen happens to carry:
  * inside a button that is the *box's* fill, so INHERIT there would give the box
- * background rather than the theme's. These five are absolute.
- *
- * BG2 is the background lifted toward the foreground, so a box reads as raised
- * off the screen behind it.
+ * background rather than the theme's. These four are absolute.
  *
  * ACCENT is the selection colour, and is derived from the background's hue
  * rather than mixed from the pair. Mixing spends contrast -- a muted foreground
@@ -67,7 +64,6 @@ struct dialog;
 #define DIALOG_COLOR_FG        ((unsigned)-2)
 #define DIALOG_COLOR_BG        ((unsigned)-3)
 #define DIALOG_COLOR_ACCENT    ((unsigned)-4)
-#define DIALOG_COLOR_BG2       ((unsigned)-5)
 #define DIALOG_COLOR_ON_ACCENT ((unsigned)-6)
 
 /* A font that resolves to the one the parent (theme) viewport already carries. */

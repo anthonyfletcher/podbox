@@ -921,24 +921,26 @@ static void settings_apply_dialog_style(void)
     }
     else if (global_settings.dialog_colors == DIALOG_COLORS_AUTO)
     {
-        /* The box sits on the derived background so it lifts off the screen;
-         * the buttons sit on the plain one, so they read as raised out of the
-         * box rather than flush with it. An unselected button takes the
-         * background for its border too, so it has no visible outline at all
-         * and reads only as a slightly different fill -- quiet, which leaves
-         * the selected one as the only marked thing in the dialog.
+        /* Three colours and no mixes: the theme's pair, plus the accent on the
+         * selected button. Everything is drawn on the plain background and
+         * outlined in the plain foreground, so the box and its buttons are
+         * shapes rather than fills, and the one filled thing in the dialog is
+         * the selection.
          *
-         * Selecting inverts it: the accent fills and the border takes the
-         * foreground, so the selection gains an outline at the same moment it
-         * gains its colour. The label is whichever of the two reads on the
-         * accent -- fixing it to either one leaves album colours that make it
+         * Blending a fourth value out of the pair -- a box background lifted
+         * toward the foreground -- reads as washed out rather than as depth,
+         * because every step toward the foreground is a step of contrast taken
+         * off the text sitting on it.
+         *
+         * The selected label is whichever of the two reads on the accent --
+         * fixing it to either one leaves album colours that make it
          * illegible. */
         s.box_fg                       = DIALOG_COLOR_FG;
-        s.box_bg                       = DIALOG_COLOR_BG2;
+        s.box_bg                       = DIALOG_COLOR_BG;
         s.box_border_color             = DIALOG_COLOR_FG;
         s.button_fg                    = DIALOG_COLOR_FG;
         s.button_bg                    = DIALOG_COLOR_BG;
-        s.button_border_color          = DIALOG_COLOR_BG;
+        s.button_border_color          = DIALOG_COLOR_FG;
         s.button_fg_selected           = DIALOG_COLOR_ON_ACCENT;
         s.button_bg_selected           = DIALOG_COLOR_ACCENT;
         s.button_border_color_selected = DIALOG_COLOR_FG;

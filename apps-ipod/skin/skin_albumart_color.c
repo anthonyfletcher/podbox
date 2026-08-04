@@ -12,6 +12,12 @@
  * adjusted for contrast so text drawn in them stays readable against the
  * background. Skins read the result through the dynamic-colour tags.
  *
+ * The six colours a theme names are matched by value and mapped by role. Every
+ * other colour a skin spells out is carried over instead: measured against the
+ * theme's own pair, and rebuilt in the same relationship to the album's. So a
+ * skin needs no syntax to take part -- a plain hex accent moves with the music
+ * like the foreground and background do.
+ *
  * The palette changes in one step, not over a fade -- see apply_colors() for
  * why the fade that used to be here could not be made to look right.
  *
@@ -19,6 +25,7 @@
  *   - luminance, contrast and blending helpers
  *   - extract_colors(): sampling the bitmap and choosing the palette
  *   - track-change hook and theme colour save/restore
+ *   - carrying a skin's own colours over to the new palette
  *   - the accessors skins resolve their colour tags through, which also
  *     report whether a change is recent enough to need another repaint
  ****************************************************************************/
@@ -34,7 +41,7 @@
 #include "audio/playback.h"
 #include "audio/buffering.h"
 #include "system/appevents.h"
-#include "draw/color.h"              /* color_blend */
+#include "draw/color.h"              /* blending, HSV and contrast helpers */
 #include "skin_albumart_color.h"
 
 /* How long after a colour change the screens are asked to keep repainting.
@@ -48,6 +55,28 @@
 #define SATURATION_BASE   8          /* base score for unsaturated colors */
 #define NO_ART_TIMEOUT    HZ         /* 1s timeout before concluding no art */
 
+/* How far off the theme's own background-to-foreground line a colour has to
+ * sit, as a per-channel distance, before it is treated as an accent in its own
+ * right rather than as a tint mixed from the pair. */
+#define AXIS_TOLERANCE    24
+
+/* Saturation below which a theme background counts as having no hue at all. */
+#define CHROMA_MIN        32
+
+/* Contrast a carried-over accent aims for against the new background, in
+ * hundredths: WCAG's 3:1 for interface components rather than the 4.5:1 it
+ * asks of body text.
+ *
+ * An accent has to be told apart from its background, which is what 3:1 is the
+ * threshold for. Demanding 4.5:1 is what a mid-luminance album cannot give: no
+ * vivid colour reaches it there, only something near black or near white, so
+ * the stricter bar reliably destroys the colour it was meant to protect. */
+#define ACCENT_MIN_RATIO  300
+
+/* Transformed colours remembered between palette changes. A skin uses a
+ * handful -- Themify_2 uses two, and every stock theme together uses three. */
+#define XFORM_CACHE_SIZE  16
+
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
@@ -60,9 +89,6 @@ struct dynamic_colors_cache {
     unsigned int accent;         /* fg color */
     unsigned int theme_fg;       /* saved original theme fg */
     unsigned int theme_bg;       /* saved original theme bg */
-    unsigned int theme_lss;      /* saved selector start color */
-    unsigned int theme_lse;      /* saved selector end color */
-    unsigned int theme_lst;      /* saved selector text color */
     unsigned int theme_sep;      /* saved list separator color */
     long change_tick;            /* when the colours last changed */
     long track_change_tick;      /* when TRACK_CHANGE fired */
@@ -75,6 +101,25 @@ struct dynamic_colors_cache {
 static struct dynamic_colors_cache cache;
 static volatile bool needs_extraction;
 static uint16_t histogram[HISTOGRAM_BUCKETS];
+
+/* Colours the theme named that are neither its foreground nor its background,
+ * and what they became under the current palette. */
+static struct
+{
+    unsigned int in;
+    unsigned int out;
+} xform_cache[XFORM_CACHE_SIZE];
+static int xform_entries;
+static int xform_rotation;
+static bool xform_rotation_valid;
+
+/* Every transformed colour is derived from the palette and the theme, so both
+ * changing invalidates the lot. */
+static void forget_transforms(void)
+{
+    xform_entries = 0;
+    xform_rotation_valid = false;
+}
 
 static int compute_luminance(int r8, int g8, int b8)
 {
@@ -144,6 +189,7 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
     cache.change_tick = current_tick;
     cache.needs_full_update = true;
     cache.needs_screen_clear = true;
+    forget_transforms();
 }
 
 static void extract_colors(const struct bitmap *bmp)
@@ -370,9 +416,6 @@ static void save_all_theme_colors(void)
 {
     cache.theme_fg  = global_settings.fg_color;
     cache.theme_bg  = global_settings.bg_color;
-    cache.theme_lss = global_settings.lss_color;
-    cache.theme_lse = global_settings.lse_color;
-    cache.theme_lst = global_settings.lst_color;
     cache.theme_sep = global_settings.list_separator_color;
 }
 
@@ -400,6 +443,7 @@ void dynamic_colors_save_theme(void)
     cache.valid = false;
     cache.needs_screen_clear = false;
     needs_extraction = true;
+    forget_transforms();
 }
 
 void dynamic_colors_check_extraction(int aa_slot)
@@ -482,8 +526,141 @@ void dynamic_colors_check_extraction(int aa_slot)
     }
 }
 
+static int color_luminance(unsigned int c)
+{
+    return compute_luminance(RGB_UNPACK_RED(c), RGB_UNPACK_GREEN(c),
+                             RGB_UNPACK_BLUE(c));
+}
+
+/* Where c sits along the theme's background-to-foreground line, 0..256, and
+ * how far off that line it lies.
+ *
+ * Position is taken from luminance alone, which is what the line is ordered by;
+ * the distance is then measured against the colour that position would give, so
+ * a tint of the pair comes back near zero however dark or light it is, and
+ * anything carrying a hue of its own does not. */
+static int axis_position(unsigned int c, int *distance)
+{
+    int lum_bg = color_luminance(cache.theme_bg);
+    int lum_fg = color_luminance(cache.theme_fg);
+    int lum_c  = color_luminance(c);
+    unsigned int on_axis;
+    int t, dr, dg, db;
+
+    if (lum_fg == lum_bg)
+        t = 0;
+    else
+    {
+        t = ((lum_c - lum_bg) * 256) / (lum_fg - lum_bg);
+        t = MIN(MAX(t, 0), 256);
+    }
+
+    on_axis = color_blend(cache.theme_bg, cache.theme_fg, t);
+
+    dr = RGB_UNPACK_RED(c)   - RGB_UNPACK_RED(on_axis);
+    dg = RGB_UNPACK_GREEN(c) - RGB_UNPACK_GREEN(on_axis);
+    db = RGB_UNPACK_BLUE(c)  - RGB_UNPACK_BLUE(on_axis);
+
+    *distance = MAX(MAX(MAX(dr, -dr), MAX(dg, -dg)), MAX(db, -db));
+    return t;
+}
+
+/* One turn of the colour wheel, applied to every accent the theme uses.
+ *
+ * The whole palette turns rigidly rather than each colour being placed on its
+ * own, so a skin using several accents keeps their relationships to each other
+ * as well as to the background. What a theme author picked was a relationship
+ * to their background, not a wavelength: an orange chosen against navy is
+ * "170 degrees round from the background", and reproducing the angle against a
+ * green album gives a magenta that works there, where reproducing the orange
+ * gives orange on green. */
+static int transform_rotation(void)
+{
+    int dom_h, dom_s, dom_v;
+    int bg_h, bg_s, bg_v;
+
+    if (xform_rotation_valid)
+        return xform_rotation;
+
+    color_get_hsv(cache.dominant, &dom_h, &dom_s, &dom_v);
+    color_get_hsv(cache.theme_bg, &bg_h, &bg_s, &bg_v);
+
+    /* A theme with no hue in its background -- white on black, and most themes
+     * that are not built round a colour -- has no orientation to carry over.
+     * Anchor it to red, which is what an achromatic colour reports, and aim at
+     * where a derived accent would sit against the album instead. Its accents
+     * then land somewhere that works against the art, and still hold their
+     * angles to one another. */
+    if (bg_s < CHROMA_MIN)
+    {
+        bg_h = 0;
+        dom_h += COLOR_ACCENT_ROTATE;
+    }
+
+    xform_rotation = dom_h - bg_h;
+    xform_rotation_valid = true;
+    return xform_rotation;
+}
+
+/* Carry a colour the theme named, but which is neither its foreground nor its
+ * background, onto the album's palette. */
+static unsigned int transform_literal(unsigned int c)
+{
+    int t, distance, h, s, v;
+    unsigned int out;
+
+    t = axis_position(c, &distance);
+
+    /* A tint of the theme's own pair is not a colour in its own right, so it
+     * is remade at the same place along the new pair. This is what carries the
+     * greys, the muted panel fills and the half-tone separators. */
+    if (distance <= AXIS_TOLERANCE)
+        return color_blend(cache.dominant, cache.accent, t);
+
+    color_get_hsv(c, &h, &s, &v);
+    out = color_from_hsv(h + transform_rotation(), s, v);
+
+    /* Ask for legibility, or for what it already had if that was less -- a
+     * deliberately quiet colour stays quiet.
+     *
+     * Not for the contrast it had against the theme's background, which is the
+     * obvious reading and is unreachable: a dark theme background allows ratios
+     * no colour can reach against a mid-luminance album, so the target would
+     * always fail and fall back to plain black or white, throwing away the hue
+     * this exists to keep. */
+    return color_fit_contrast(out, cache.dominant,
+                              MIN(color_contrast(c, cache.theme_bg),
+                                  ACCENT_MIN_RATIO));
+}
+
+static unsigned int transform_cached(unsigned int c)
+{
+    unsigned int out;
+    int i;
+
+    for (i = 0; i < xform_entries; i++)
+        if (xform_cache[i].in == c)
+            return xform_cache[i].out;
+
+    out = transform_literal(c);
+
+    /* A skin with more distinct colours than the table holds simply stops
+     * caching. The transform is a few dozen integer operations on a miss, which
+     * is not a reason to grow it. */
+    if (xform_entries < XFORM_CACHE_SIZE)
+    {
+        xform_cache[xform_entries].in  = c;
+        xform_cache[xform_entries].out = out;
+        xform_entries++;
+    }
+
+    return out;
+}
+
 /* Map a color to its dynamic equivalent using pre-computed effective colors.
- * Matches against all 6 saved theme colors with role-based fallbacks. */
+ * The six colours the theme names are matched by value and mapped by role;
+ * anything else is a colour a skin chose, and is carried over by
+ * transform_cached(). */
 static unsigned int resolve_mapped(unsigned int original,
                                    unsigned int eff_accent,
                                    unsigned int eff_dominant)
@@ -494,27 +671,23 @@ static unsigned int resolve_mapped(unsigned int original,
     if (original == cache.theme_bg)
         return eff_dominant;
 
-    /* Selector bar: default to accent (eye-catching highlight) */
-    if (original == cache.theme_lss)
-        return (cache.theme_lss == cache.theme_fg) ? eff_accent :
-               (cache.theme_lss == cache.theme_bg) ? eff_dominant : eff_accent;
-
-    /* Selector text: should contrast with bar, default to dominant */
-    if (original == cache.theme_lst)
-        return (cache.theme_lst == cache.theme_bg) ? eff_dominant :
-               (cache.theme_lst == cache.theme_fg) ? eff_accent : eff_dominant;
-
-    /* Selector gradient end: blend accent toward dominant */
-    if (original == cache.theme_lse)
-        return (cache.theme_lse == cache.theme_fg) ? eff_accent :
-               (cache.theme_lse == cache.theme_bg) ? eff_dominant :
-               lerp_color(eff_accent, eff_dominant, 64);
-
-    /* List separator: subtle line, blend dominant toward accent */
+    /* List separator: a hairline meant to be barely there rather than a colour
+     * in its own right, so it is placed next to the background instead of
+     * being carried over on its own merits. */
     if (original == cache.theme_sep)
         return lerp_color(eff_dominant, eff_accent, 64);
 
-    return original;
+    /* Everything else: the selector colours when the theme gave them values of
+     * their own, and every colour a skin spells out. Carried over.
+     *
+     * The selector colours need no cases here. Written as the theme's own
+     * foreground or background they arrive as those values and are answered
+     * above; given a third colour they meant it, and it is carried over like
+     * any other. The bar used to be forced to the accent instead, which
+     * collided whenever the selector text was the theme foreground -- the
+     * common way to write a theme, and the foreground maps to the accent too,
+     * so bar and text landed on one colour and the selected row went blank. */
+    return transform_cached(original);
 }
 
 unsigned int dynamic_colors_resolve(unsigned int original)

@@ -263,8 +263,22 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
     display->set_viewport(parent);
     unsigned int dc_saved_fg = parent->fg_pattern;
     unsigned int dc_saved_bg = parent->bg_pattern;
-    parent->fg_pattern = dynamic_colors_resolve(dc_saved_fg);
-    parent->bg_pattern = dynamic_colors_resolve(dc_saved_bg);
+
+    /* The parent's colours are already resolved: it is a copy of the skin's UI
+     * viewport, which skin_render() resolves in place from its own stored
+     * originals. Resolving them again here maps an album-derived colour as
+     * though it were a colour the theme had named -- the background comes back
+     * turned a second time, and the area no row covers ends up a different
+     * colour from the rows themselves.
+     *
+     * Only where there is no theme is there anything to resolve, because the
+     * viewport was then filled from the global settings and nothing else has
+     * touched it. Same rule as list_render.c. */
+    if (!viewportmanager_theme_enabled(screen))
+    {
+        parent->fg_pattern = dynamic_colors_resolve(dc_saved_fg);
+        parent->bg_pattern = dynamic_colors_resolve(dc_saved_bg);
+    }
     display->set_foreground(parent->fg_pattern);
     display->set_background(parent->bg_pattern);
     display->clear_viewport();

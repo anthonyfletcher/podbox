@@ -289,7 +289,19 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 linedes->line_end_color = lec;
             }
             else
+            {
                 *linedes = *data;
+                /* Resolved from the parsed original every frame, like the
+                 * viewport colours are, so it follows the album. Only under
+                 * STYLE_COLORED, because that is the only style the field
+                 * means anything in -- resolving it unconditionally would put
+                 * an unused zero through the mapping, and a theme whose
+                 * foreground happens to be black would see it come back as
+                 * something else. */
+                if (data->style & STYLE_COLORED)
+                    linedes->text_color =
+                        dynamic_colors_resolve(data->text_color);
+            }
         }
         break;
         case SKIN_TOKEN_VIEWPORT_GRADIENT_SETUP:

@@ -47,6 +47,11 @@ void viewportmanager_theme_enable(enum screen_type screen, bool enable,
  * Should almost always be set to false except coming out of fully skinned screens */
 void viewportmanager_theme_undo(enum screen_type screen, bool force_redraw);
 
+/* True while the theme owns the screen, which is also what decides where a
+ * default viewport's colours came from: the skin's UI viewport when set, the
+ * global settings when not. */
+bool viewportmanager_theme_enabled(enum screen_type screen);
+
 /* call this when a theme changed */
 void viewportmanager_theme_changed(const int);
 

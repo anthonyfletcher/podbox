@@ -103,8 +103,17 @@ int main(void)
     CHART(">init");
     init();
     CHART("<init");
+    /* Hand the screen over to the UI in the theme's colours.
+     *
+     * The boot screen paints in the logo's own colours and leaves them set --
+     * settings_apply() establishes the theme's during init(), but boot stages
+     * run after it and each repaint puts the logo's back. clear_display()
+     * fills with whatever background is current, so without this the logo's
+     * blue is what shows through wherever the theme does not paint. */
     FOR_NB_SCREENS(i)
     {
+        screens[i].set_foreground(global_settings.fg_color);
+        screens[i].set_background(global_settings.bg_color);
         screens[i].clear_display();
         screens[i].update();
     }

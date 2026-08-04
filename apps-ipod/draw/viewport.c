@@ -46,8 +46,6 @@ static void viewportmanager_redraw(unsigned short id, void* data);
 
 static int theme_stack_top[NB_SCREENS]; /* the last item added */
 static struct viewport_stack_item theme_stack[NB_SCREENS][VPSTACK_DEPTH];
-static bool is_theme_enabled(enum screen_type screen);
-
 static void evt_toggle(bool enable, unsigned short id,
                          void (*handler)(unsigned short id, void *data))
 {
@@ -83,7 +81,7 @@ static void toggle_theme(enum screen_type screen, bool force)
 
     FOR_NB_SCREENS(i)
     {
-        enable_event = enable_event || is_theme_enabled(i);
+        enable_event = enable_event || viewportmanager_theme_enabled(i);
         if (!sb_get_persistent_title(i))
             sb_set_title_text(NULL, Icon_NOICON, i);
     }
@@ -94,7 +92,7 @@ static void toggle_theme(enum screen_type screen, bool force)
     skinlist_set_cfg(screen, NULL);
     toggle_events(enable_event);
 
-    if (is_theme_enabled(screen))
+    if (viewportmanager_theme_enabled(screen))
     {
         last_vp = screens[screen].set_viewport(NULL);
         bool first_boot = theme_stack_top[screen] == 0;
@@ -143,7 +141,7 @@ static void toggle_theme(enum screen_type screen, bool force)
     /* let list initialize viewport in case viewport dimensions is changed. */
     send_event(GUI_EVENT_THEME_CHANGED, NULL);
     FOR_NB_SCREENS(i)
-        was_enabled[i] = is_theme_enabled(i);
+        was_enabled[i] = viewportmanager_theme_enabled(i);
     after_boot[screen] = true;
 }
 
@@ -173,7 +171,7 @@ void viewportmanager_theme_undo(enum screen_type screen, bool force_redraw)
 }
 
 
-static bool is_theme_enabled(enum screen_type screen)
+bool viewportmanager_theme_enabled(enum screen_type screen)
 {
     int top = theme_stack_top[screen];
     return theme_stack[screen][top].enabled;
@@ -189,7 +187,7 @@ static void viewportmanager_redraw(unsigned short id, void* data)
     (void)id;
     FOR_NB_SCREENS(i)
     {
-        if (is_theme_enabled(i))
+        if (viewportmanager_theme_enabled(i))
             sb_skin_update(i, NULL != data);
     }
 }
@@ -282,7 +280,7 @@ void viewport_set_defaults(struct viewport *vp,
     vp->buffer = NULL; /* use default frame_buffer */
     vp->flags = VP_DEFAULT_FLAGS;
     struct viewport *sbs_area = NULL;
-    if (!is_theme_enabled(screen))
+    if (!viewportmanager_theme_enabled(screen))
     {
         viewport_set_fullscreen(vp, screen);
         return;

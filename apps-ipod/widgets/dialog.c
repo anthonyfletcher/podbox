@@ -17,7 +17,7 @@
 #include "input/action.h"
 #include "backlight.h"
 #include "draw/icon.h"          /* Icon_NOICON */
-#include "draw/color.h"         /* color_blend */
+#include "draw/color.h"         /* color_hue_rotate, color_contrast */
 #include "draw/round_rect.h"    /* fill_round_rect/draw_round_rect */
 #include "settings/settings.h"  /* theme fg/bg for the derived colours */
 #include "skin/statusbar_skinned.h"
@@ -100,27 +100,10 @@ static void draw_box_border(struct screen *s, int w, int h, int bw)
     s->fillrect(w - bw, bw, bw, h - 2 * bw);         /* right  */
 }
 
-/* How far BG2 is mixed toward the foreground, out of 256.
- *
- * Every step raises the box off the screen behind it and lowers the contrast of
- * the text on it, and the two cross over. Measured against Themify_2's pair:
- * 32 gives 1.50:1 box-against-screen and 10.97:1 text; 48 gives 1.88:1 and
- * 8.71:1; 64 gives 2.40:1 but drops text to 6.84:1, under WCAG's 7:1. So 48 --
- * the box becomes a shape in its own right rather than an outline, and the
- * text keeps a AAA margin. */
-#define DIALOG_BG2_MIX 48
-
-/* The accent, as a turn around the colour wheel from the background.
- *
- * 100 degrees rather than a true complement (180): on a navy background 180
- * lands on amber, which is legible but reads as a different design. 100 lands
- * on a pink-mauve -- which is, to within a couple of values, the accent this
- * fork's theme already used by eye before any of it was computed.
- *
- * The saturation and brightness are fixed rather than taken from the
- * background, which is typically too dark and too flat to yield anything
- * usable. These give roughly 6.2:1 against the background it came from. */
-#define DIALOG_ACCENT_ROTATE 100
+/* The accent's saturation, fixed rather than taken from the background, which
+ * is typically too dark and too flat to yield anything usable. With
+ * COLOR_ACCENT_ROTATE this gives roughly 6.2:1 against the background it came
+ * from. */
 #define DIALOG_ACCENT_SAT    107   /* 0.42 of full */
 
 /* Brightnesses to try for the accent, preferred one first.
@@ -168,7 +151,7 @@ static void resolve_accent(unsigned *accent_out, unsigned *text_out)
 
     for (i = 0; i < sizeof(dialog_accent_vals); i++)
     {
-        unsigned accent = color_hue_rotate(bg, DIALOG_ACCENT_ROTATE,
+        unsigned accent = color_hue_rotate(bg, COLOR_ACCENT_ROTATE,
                                            DIALOG_ACCENT_SAT,
                                            dialog_accent_vals[i]);
         int on_bg = color_contrast(bg, accent);
@@ -212,10 +195,6 @@ static bool resolve_derived(unsigned color, unsigned *out)
         case DIALOG_COLOR_ON_ACCENT:
             resolve_accent(&accent, &text);
             *out = text;
-            return true;
-        case DIALOG_COLOR_BG2:
-            *out = color_blend(dialog_theme_bg(), dialog_theme_fg(),
-                               DIALOG_BG2_MIX);
             return true;
     }
     return false;
