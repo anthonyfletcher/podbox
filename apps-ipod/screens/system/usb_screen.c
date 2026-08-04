@@ -4,8 +4,9 @@
  * Copyright (C) 2002 Björn Stenberg
  * GNU General Public License (version 2+)
  *
- * The USB connection screen shown while the device is mounted, including
- * the logo or skinned variant and HID keypad handling.
+ * The USB connection screen shown while the device is mounted: the theme's own
+ * screen where it has one, the eject message otherwise, plus HID keypad
+ * handling.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -22,22 +23,24 @@
 #include "system/appevents.h"
 #include "usb_screen.h"
 #include "skin/skin_engine.h"
+#include "skin/statusbar_skinned.h"   /* sb_skin_update */
 #include "playlist/playlist.h"
 #include "system/activity.h"
 #include "system/shutdown.h"
-#include "draw/icon_bitmaps.h"
+#include "widgets/splash.h"
 
-/* The USB (eject) screen is a full-screen bitmap plus caption, drawn directly
- * rather than through the skin engine. The skin engine must not run during the
- * USB screen on PP502x -- it breaks enumeration (see the guard in
- * usb_screen_fix_viewports()). */
-#define HAVE_ROCKPOD_USB_SCREEN
-#include "bitmaps/podboxusb.h"
-#include "bitmaps/native/podbox_colors.h"
-
+/* Below this, in either direction, the theme's UI viewport is taken as a
+ * suppression rather than a place to draw: the convention for "this theme draws
+ * its own USB screen" is a 1x1 %Vi, and nothing smaller than a line of text
+ * could hold the message anyway. */
+#define USB_UIVP_MIN 16
 
 int usb_keypad_mode;
 static bool usb_hid;
+
+/* Whether the theme rendered its own USB screen and suppressed the UI viewport,
+ * i.e. the built-in message must not be drawn over it. */
+static bool usb_screen_skinned;
 
 
 static int handle_usb_events(void)
@@ -106,18 +109,21 @@ static void usb_screen_fix_viewports(struct screen *screen,
     logo_width  = 176;   /* dimensions of the logo bitmap this replaced */
     logo_height = 48;
 
-    /* Draw the USB screen WITHOUT the theme (full screen, no SBS/backdrop).
+    /* Tear the theme down for the rest of the USB session: full screen, no SBS,
+     * no backdrop, and above all no skin update running once the handover has
+     * happened. A repaint through the skin engine reaches for backdrops, covers
+     * and fonts, and after the handover those live on a volume the app no
+     * longer owns.
      *
-     * This MUST stay disabled. On the PP502x (iPod Video) target, running the
-     * theme/skin engine during the USB screen -- even a single render done
-     * before the mass-storage handoff -- destabilises the connection: the
-     * device flaps between the menu and the eject screen and never enumerates
-     * on the host (you end up in disk mode). Empirically: theme enabled == USB
-     * broken, theme disabled == USB solid. So the USB screen is deliberately
-     * kept theme-free. The cost is a plain USB logo instead of a theme's custom
-     * USB screen -- that is the price of a reliable connection, and intentional.
-     * The theme's Eject graphic is rendered by the skin engine (custom font
-     * glyphs), so it cannot be shown here without re-enabling the theme. */
+     * A theme that draws its own USB screen has already been rendered once by
+     * the caller, before this point, while the app still owns storage.
+     *
+     * This screen is delicate on PP502x and the failure is expensive -- the
+     * host wedges and only a physical unplug clears it -- so treat any work
+     * added between here and usb_acknowledge() as USB-critical. An earlier
+     * revision read the same symptom as "the theme cannot be drawn at all";
+     * the cause was threads that owed a SYS_USB_CONNECTED ack and did not send
+     * it, which delays the handover the same way. */
     viewportmanager_theme_enable(screen->screen_type, false, parent);
 
     if (logo_width  > parent->width)
@@ -154,40 +160,39 @@ static void usb_screen_fix_viewports(struct screen *screen,
     }
 }
 
-static void usb_screens_draw(struct usb_screen_vps_t *usb_screen_vps_ar)
+/* The built-in "eject before disconnecting" message: a centred box, the same
+ * one every other modal in the UI uses.
+ *
+ * With a theme up it goes straight over whatever the SBS rendered, so the
+ * theme's chrome survives underneath -- and a theme that draws the whole screen
+ * itself has suppressed the UI viewport, so nothing is drawn at all. Without a
+ * theme there is nothing underneath worth keeping (early USB still shows the
+ * boot logo), so the screen is blanked to the background first.
+ *
+ * Plain fill and text drawing, never the skin engine, so this is safe to repeat
+ * after the storage handover. */
+static void usb_screens_draw(struct usb_screen_vps_t *usb_screen_vps_ar,
+                             bool themed)
 {
-    struct viewport *last_vp;
+    if (usb_screen_skinned)
+        return;
+
     FOR_NB_SCREENS(i)
     {
         struct screen *screen = &screens[i];
-        struct viewport *parent = &usb_screen_vps_ar[i].parent;
 
-        last_vp = screen->set_viewport(parent);
-        screen->clear_viewport();
         screen->backlight_on();
+        if (themed)
+            continue;
 
-        if (i == SCREEN_MAIN)
-        {
-            struct viewport caption = *parent;
-            const unsigned char *msg = str(LANG_USB_EJECT_BEFORE_DISCONNECT);
-            int tw, th;
-
-            /* full-screen background art */
-            screen->bmp(&bm_podboxusb, 0, 0);
-
-            /* caption (#f9f9f9) centred horizontally, top edge at y = 195,
-             * drawn transparently over the art in the theme's bold UI font */
-            caption.font = font_get_ui_bold();
-            caption.drawmode = DRMODE_FG;
-            caption.fg_pattern = PODBOX_COLOR_FG;
-            screen->set_viewport(&caption);
-            screen->getstringsize(msg, &tw, &th);
-            screen->putsxy((screen->lcdwidth - tw) / 2, 175, msg);
-        }
-
-        screen->set_viewport(last_vp);
+        struct viewport *last_vp =
+            screen->set_viewport(&usb_screen_vps_ar[i].parent);
+        screen->clear_viewport();
         screen->update_viewport();
+        screen->set_viewport(last_vp);
     }
+
+    splash(0, ID2P(LANG_USB_EJECT_BEFORE_DISCONNECT));
 }
 
 void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
@@ -199,6 +204,49 @@ void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
 
     usb_hid = global_settings.usb_hid;
     usb_keypad_mode = global_settings.usb_keypad_mode;
+
+    /* Render the theme once, so a %cs 21 branch gets its screen.
+     *
+     * Here and only here: the app still owns storage and the fonts are still
+     * open, which is what the skin engine needs, and the theme is torn down
+     * immediately afterwards so nothing repaints through it for the rest of the
+     * session. A skin update running after the handover would reach for a
+     * backdrop, a cover or a font on a volume the app no longer owns.
+     *
+     * Unconditional, because that is the contract themes were written against:
+     * the core draws its message afterwards, and a theme drawing its own screen
+     * says so by shrinking the UI viewport (%VI to a 1x1 %Vi). Gating this on a
+     * setting instead would silently drop the USB screen of every theme that
+     * never heard of the setting. */
+    bool themed = false;
+
+    usb_screen_skinned = false;
+    FOR_NB_SCREENS(i)
+    {
+        if (early_usb || !viewportmanager_theme_enabled(i))
+            continue;
+        themed = true;
+
+        /* Backlight first: skin_update() is gated on lcd_active(), so a device
+         * plugged in with the screen off would draw nothing at all.
+         *
+         * And flush explicitly. sb_skin_update() only draws -- the transfer to
+         * the LCD is viewportmanager_update()'s job, and that runs off the event
+         * loop this screen is about to leave. Without this the screen appears
+         * the next time anything else flushes, which on a device left plugged in
+         * means when it is woken. */
+        screens[i].backlight_on();
+        sb_skin_update(i, true);
+        screens[i].update();
+
+        /* Only now: the UI viewport a conditional %VI selects is set as a side
+         * effect of rendering, so asking before this would read the previous
+         * screen's answer. */
+        struct viewport ui;
+        viewport_set_defaults(&ui, i);
+        if (ui.width < USB_UIVP_MIN || ui.height < USB_UIVP_MIN)
+            usb_screen_skinned = true;
+    }
 
     FOR_NB_SCREENS(i)
     {
@@ -212,11 +260,10 @@ void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
         usb_screen_fix_viewports(screen, &usb_screen_vps_ar[i]);
     }
 
-    /* Draw the USB screen once here -- before the fonts are closed and before
-     * the mass-storage handoff -- so the caption renders (and its glyphs get
-     * cached) while the fonts are still open and the app still owns storage.
-     * This is plain bitmap + text drawing, no skin engine, so it is USB-safe. */
-    usb_screens_draw(usb_screen_vps_ar);
+    /* Draw the message once here -- before the fonts are closed and before the
+     * mass-storage handoff -- so its glyphs get cached while the fonts are
+     * still open and the app still owns storage. */
+    usb_screens_draw(usb_screen_vps_ar, themed);
 
     if(!early_usb)
     {
@@ -230,9 +277,9 @@ void gui_usb_screen_run(bool early_usb, intptr_t seqnum)
     {
         if (handle_usb_events())
             break;
-        /* Reached only on a USB-HID keypad mode switch; repaint (the caption's
+        /* Reached only on a USB-HID keypad mode switch; repaint (the message's
          * glyphs are already cached from the pre-handoff draw above). */
-        usb_screens_draw(usb_screen_vps_ar);
+        usb_screens_draw(usb_screen_vps_ar, themed);
     }
 
     FOR_NB_SCREENS(i)

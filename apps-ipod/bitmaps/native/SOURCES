@@ -18,11 +18,6 @@ podboxlogo.bmp
 podboxnoart.bmp
 #endif
 
-/* Full-screen custom USB (eject) screen for the 320x240 iPods */
-#if defined(HAVE_LCD_COLOR) && (LCD_WIDTH == 320) && (LCD_HEIGHT == 240)
-podboxusb.bmp
-#endif
-
 /* Full-screen wake image, shown by alarm_show_wake_image() in
  * apps/screens/system/alarm.c on the boot an RTC alarm started */
 #ifdef HAVE_RTC_ALARM

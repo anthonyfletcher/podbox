@@ -904,8 +904,11 @@ const struct settings_list settings[] = {
         INT(10), "dialog box margin", UNUSED},
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_width, -1,
         INT(2), "dialog button border width", UNUSED},
+    /* Square by default: a radius is a look, and a theme that says nothing
+     * should get the plain shape rather than this fork's. Themify_2 asks for
+     * the rounded one in its own .cfg. */
     {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_radius, -1,
-        INT(4), "dialog button border radius", UNUSED},
+        INT(0), "dialog button border radius", UNUSED},
     /* off:  every dialog colour is inherited from the theme, flat.
      * on:   the nine colours below are used instead.
      * auto: derived from the theme's foreground and background, or from the
@@ -1529,12 +1532,19 @@ const struct settings_list settings[] = {
     /* Defaults for a theme that says nothing, not the shipped look --
      * Themify_2 asks for the opposite of both in its own .cfg. Few status bars
      * span the full width, and one that does not sits over a screen that does
-     * as a gap rather than a bar. */
-    CHOICE_SETTING(0, album_covers_background, LANG_CAROUSEL_BACKGROUND,
+     * as a gap rather than a bar.
+     *
+     * F_THEMERESET is what makes that true. Without it these keep the last
+     * theme's answer, so a theme saying nothing inherits a reserved status bar
+     * strip it never draws into, and the carousel runs with a gap along the
+     * top. */
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_background,
+                  LANG_CAROUSEL_BACKGROUND,
                   1, "album covers background",
                   "foreground,background", NULL, 2,
                   ID2P(LANG_FOREGROUND_COLOR), ID2P(LANG_BACKGROUND_COLOR)),
-    OFFON_SETTING(0, album_covers_statusbar, LANG_STATUS_BAR,
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_statusbar,
+                  LANG_STATUS_BAR,
                   false, "album covers statusbar", NULL),
     /* Config-file only (lang_id -1, no menu entry): a theme sets these. Off
      * unless asked for, because they make album rows grow to the tall height
