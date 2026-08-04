@@ -71,6 +71,12 @@ typedef fb_data pix_t;
 struct album_data {
     int name_idx;     /* offset to the album name */
     int artist_idx;   /* offset to the artist name */
+    /* Identity that survives a database commit, hashed from the two names
+     * above. The seeks below do not survive one: any commit that adds a track
+     * re-sorts the whole album tagfile and moves every seek in it. So this is
+     * what an entry is matched by when figures are carried from one build of
+     * the index to the next. */
+    uint32_t key;
     int year;         /* album year */
     /* Playback history, summarised over the album's tracks by
      * assign_album_stats(). The album charts sort on these; nothing else
@@ -93,6 +99,7 @@ struct album_data {
 
 struct artist_data {
     int name_idx; /* offset to the artist name */
+    uint32_t key; /* as struct album_data's, from the name alone */
     /* As struct album_data's pair, summarised over everything by this artist.
      * "Artist" here is the album artist -- the tag this list is built from
      * (see build_artist_index()) -- so a guest appearance counts towards the
@@ -110,6 +117,12 @@ struct pf_index_t {
     uint32_t            header; /*INDEX_HDR*/
     uint16_t            artist_ct;
     uint16_t            album_ct;
+    /* What the database looked like when this index was built. Both come from
+     * tagcache_get_marks(): commitid moves when tracks are added, serial once
+     * per logged play. They say what has happened since, so a later build can
+     * tell which entries still need their figures recomputed. */
+    int32_t             commitid;
+    int32_t             serial;
 
     char               *artist_names;
     struct artist_data *artist_index;

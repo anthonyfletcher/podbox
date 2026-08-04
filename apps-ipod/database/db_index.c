@@ -76,8 +76,10 @@
  *   PFIG -> PFIH: album_data gained artist_art_hash. PFIG indexes also have to
  *                 go regardless: they were written by a build that resolved
  *                 every art_hash to 0, so nothing in them would ever match a
- *                 cached thumbnail. */
-#define INDEX_HDR "PFIH"
+ *                 cached thumbnail.
+ *   PFIH -> PFII: both gained key, and the header gained the commitid/serial
+ *                 watermarks. */
+#define INDEX_HDR "PFII"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -301,10 +303,56 @@ static int compare_album_artists (const void *a_v, const void *b_v)
     return (int)(a - b);
 }
 
+/* FNV-1a over one name, or two joined by a NUL so that ("ab", "c") and
+ * ("a", "bc") do not land on the same value. Pass NULL for 'b' to key on a
+ * single name.
+ *
+ * 32 bits: a collision merges two entries' playback figures, which is wrong
+ * but not corrupt, and the next full rebuild reads the real numbers back out
+ * of tagcache anyway. */
+static uint32_t name_key(const char *a, const char *b)
+{
+    uint32_t h = 2166136261u;
+
+    for (; a && *a; a++)
+        h = (h ^ (unsigned char)*a) * 16777619u;
+
+    h *= 16777619u;   /* the joining NUL */
+
+    for (; b && *b; b++)
+        h = (h ^ (unsigned char)*b) * 16777619u;
+
+    return h;
+}
+
+/* Fill in every entry's key, once the album list is final. Left to the end
+ * rather than done as entries are written because an album's artist is not
+ * known until the artist pass has resolved it.
+ *
+ * A nameless album keys to 0, meaning "do not match this against anything".
+ * The list really does hold a few -- four on the library this was written
+ * against, sorted to the front with no name, no artist and no year -- and
+ * they would otherwise all share one key and be handed each other's figures. */
+static void assign_keys(void)
+{
+    int i;
+
+    for (i = 0; i < pfi->album_ct; i++)
+    {
+        struct album_data *a = &pfi->album_index[i];
+        const char *name = pfi->album_names + a->name_idx;
+        const char *artist = a->artist_idx >= 0
+                           ? pfi->artist_names + a->artist_idx : NULL;
+
+        a->key = *name ? name_key(name, artist) : 0;
+    }
+}
+
 static void write_album_index(int idx, int name_idx,
                               long album_seek, int artist_idx, long artist_seek)
 {
     pfi->album_index[idx].name_idx = name_idx;
+    pfi->album_index[idx].key = 0;
     pfi->album_index[idx].seek = album_seek;
     pfi->album_index[idx].artist_idx = artist_idx;
     pfi->album_index[idx].artist_seek = artist_seek;
@@ -333,6 +381,7 @@ static void write_artist_entry(struct tagcache_search *tcs,
                                int name_idx, unsigned int len)
 {
     pfi->artist_index[-pfi->artist_ct].name_idx = name_idx;
+    pfi->artist_index[-pfi->artist_ct].key = 0;
     pfi->artist_index[-pfi->artist_ct].seek = tcs->result_seek;
     pfi->artist_index[-pfi->artist_ct].playcount = 0;
     pfi->artist_index[-pfi->artist_ct].lastplayed = 0;
@@ -580,6 +629,15 @@ static int build_artist_index(struct tagcache_search *tcs,
     /* move buf ptr to end of artist_index */
     *buf = pfi->artist_index + pfi->artist_ct;
 
+    /* Here rather than with the albums' keys, so the artist-only build gets
+     * them too -- that path never reaches create_album_index(). */
+    for (i = 0; i < pfi->artist_ct; i++)
+    {
+        const char *name = pfi->artist_names + pfi->artist_index[i].name_idx;
+
+        pfi->artist_index[i].key = *name ? name_key(name, NULL) : 0;
+    }
+
     if (res == SUCCESS)
     {
         if (pfi->artist_ct > 0)
@@ -751,6 +809,7 @@ static int create_album_index(void)
     size_t buf_size = pfi->buf_sz;
 
     struct album_data* tmp_album;
+    struct tagcache_marks marks;
 
     int i, j, last, final, retry, res;
 
@@ -899,6 +958,17 @@ retry_artist_lookup:
      * artist figures assign_artist_stats() just filled in are saved with the
      * rest of the index and read back by the artist charts. */
 
+    assign_keys();
+
+    /* Stamped after the figures have been read, not before. A play landing
+     * mid-build is then simply not replayed later; stamping first would
+     * replay one that assign_album_stats() had already counted. Both correct
+     * themselves at the next full build, which re-reads tagcache -- this is
+     * the quieter of the two while they stand. */
+    tagcache_get_marks(&marks);
+    pfi->commitid = marks.commitid;
+    pfi->serial = marks.serial;
+
     qsort(pfi->album_index, pfi->album_ct,
                           sizeof(struct album_data), compare_albums);
 
@@ -1037,6 +1107,8 @@ static int load_artist_index(struct pf_index_t *target,
     target->artist_ct = data.artist_ct;
     target->artist_len = data.artist_len;
     target->album_ct = 0;        /* no album list on this path */
+    target->commitid = data.commitid;
+    target->serial = data.serial;
     *buf = b;
     *bufsz = bsz;
     return SUCCESS;
