@@ -192,6 +192,12 @@ static enum themable_icons  menu_get_icon(int selected_item, void * data)
     else if (menu->flags&MENU_DYNAMIC_DESC)
         menu_icon = menu->menu_get_name_and_icon->icon_id;
 
+    /* An item that named no icon of its own gets the generic one for its type.
+     * Every MT_* has to appear here: a type missing from the chain keeps
+     * Icon_NOICON and draws a blank where its neighbours draw an icon, whatever
+     * iconset the theme supplies. MT_FUNCTION_CALL_W_PARAM was the missing one
+     * -- it left the six colour setters, Manage Settings' four entries, Browse
+     * EQ Presets, Save Current Playlist, Properties and Track Info iconless. */
     if (menu_icon == Icon_NOICON)
     {
         unsigned int flags = (menu->flags&MENU_TYPE_MASK);
@@ -199,7 +205,9 @@ static enum themable_icons  menu_get_icon(int selected_item, void * data)
             menu_icon = Icon_Submenu;
         else if (flags == MT_SETTING || flags == MT_SETTING_W_TEXT)
              menu_icon = Icon_Menu_setting;
-        else if (flags == MT_FUNCTION_CALL || flags == MT_RETURN_VALUE)
+        else if (flags == MT_FUNCTION_CALL
+              || flags == MT_FUNCTION_CALL_W_PARAM
+              || flags == MT_RETURN_VALUE)
              menu_icon = Icon_Menu_functioncall;
     }
     return menu_icon;

@@ -617,7 +617,7 @@ static void draw_album_text(void)
     char album_and_year[MAX_PATH];
     char *albumtxt, *artisttxt;
     int album_idx = 0;
-    int char_height;
+    int char_height, artist_height;
     int albumtxt_x, albumtxt_y, artisttxt_x;
     bool show_artist;
 
@@ -659,7 +659,11 @@ static void draw_album_text(void)
         prev_show_year = global_settings.album_covers_show_year;
     }
 
+    /* The bold font is current, so this is the album line's height; the artist
+     * line below is drawn in the plain UI font and is measured separately. Both
+     * are needed: the strip has to be the one the engine reserved. */
     char_height = screens[SCREEN_MAIN].getcharheight();
+    artist_height = font_get(screens[SCREEN_MAIN].getuifont())->height;
     switch (global_settings.album_covers_show_album_name)
     {
         case ALBUM_AND_ARTIST_TOP:
@@ -667,7 +671,8 @@ static void draw_album_text(void)
             break;
         case ALBUM_NAME_BOTTOM:
         case ALBUM_AND_ARTIST_BOTTOM:
-            albumtxt_y = pf_height - PF_CAPTION_STRIP(char_height)
+            albumtxt_y = pf_height - PF_CAPTION_STRIP(char_height,
+                                                      artist_height)
                                    - PF_CAPTION_LIFT;
             break;
         case ALBUM_NAME_TOP:
@@ -692,7 +697,8 @@ static void draw_album_text(void)
         if (album_changed)
             set_scroll_line(artisttxt, PF_SCROLL_ARTIST);
         artisttxt_x = get_scroll_line_offset(PF_SCROLL_ARTIST);
-        lcd_putsxy(artisttxt_x, albumtxt_y + char_height * 3 / 4, artisttxt);
+        lcd_putsxy(artisttxt_x, albumtxt_y + PF_CAPTION_LINE2_Y(char_height),
+                   artisttxt);
     }
     else
     {

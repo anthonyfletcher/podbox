@@ -2372,6 +2372,16 @@ static bool init(void)
     pf_vp_y = pf_vp.y;
     pf_height = pf_vp.height;
 
+    /* Album-name font: the shared bold UI font. settings.c loads it once and
+     * owns its lifecycle (so we must not unload it), and it already falls back
+     * to the real configured UI font when the theme has no bold font -- so this
+     * can be used unconditionally. Using the shared id (not the FONT_UI
+     * constant) also sidesteps FONT_UI's fallback slot-search, which could
+     * otherwise resolve to some other theme font in a higher slot.
+     *
+     * Set before the caption strip below, which measures it. */
+    pf_bold_font = font_get_ui_bold();
+
     /* Reserve real, empty vertical space for draw_album_text()'s overlay,
      * rather than just biasing where the up/down split falls: since
      * pf_lower_half is *defined* as pf_height - pf_half_height, upper and
@@ -2385,15 +2395,14 @@ static bool init(void)
      * caption -- also shifting the render origin down so the reserved
      * strip is skipped rather than just repositioning within it.
      *
-     * Margin sizes mirror draw_album_text()'s own Y math exactly:
-     * TOP captions span up to 1.75 * char_height (name+artist) or
-     * 1.5 * char_height (name only) from the top; BOTTOM captions start
-     * at (pf_height - 2.25 * char_height) regardless of whether the artist
-     * line is also shown (it's added below the album line, within the same
-     * reserved strip, not beyond it). 2 * char_height / 2.25 * char_height
-     * cover both variants of each with a little safety margin. */
+     * Margin sizes mirror draw_album_text()'s own Y math exactly, which means
+     * measuring the same two fonts it draws in -- the bold one for the album
+     * line, the plain one for the artist line. Measuring only the UI font here
+     * was the bug: a theme whose bold font is a different size got a strip that
+     * did not match where the caption actually landed. */
     {
-        int char_height = font_get(screens[SCREEN_MAIN].getuifont())->height;
+        int album_h  = font_get(pf_bold_font)->height;
+        int artist_h = font_get(screens[SCREEN_MAIN].getuifont())->height;
         int text_margin;
         bool text_at_top;
         int draw_height;
@@ -2406,7 +2415,7 @@ static bool init(void)
                 break;
             case ALBUM_NAME_TOP:
             case ALBUM_AND_ARTIST_TOP:
-                text_margin = char_height * 2;
+                text_margin = PF_CAPTION_TOP_MARGIN(album_h, artist_h);
                 text_at_top = true;
                 break;
             case ALBUM_NAME_BOTTOM:
@@ -2414,7 +2423,8 @@ static bool init(void)
             default:
                 /* The lift is part of the strip: the text moved up, so the
                  * slides have to stop that much higher or they run under it. */
-                text_margin = PF_CAPTION_STRIP(char_height) + PF_CAPTION_LIFT;
+                text_margin = PF_CAPTION_STRIP(album_h, artist_h)
+                            + PF_CAPTION_LIFT;
                 text_at_top = false;
                 break;
         }
@@ -2461,14 +2471,6 @@ static bool init(void)
     pf_idx.buf_sz = buf_size;
 
     lcd_setfont(screens[SCREEN_MAIN].getuifont());
-
-    /* Album-name font: the shared bold UI font. settings.c loads it once and
-     * owns its lifecycle (so we must not unload it), and it already falls back
-     * to the real configured UI font when the theme has no bold font -- so this
-     * can be used unconditionally. Using the shared id (not the FONT_UI
-     * constant) also sidesteps FONT_UI's fallback slot-search, which could
-     * otherwise resolve to some other theme font in a higher slot. */
-    pf_bold_font = font_get_ui_bold();
 
     if (!dir_exists(CACHE_PREFIX))
     {

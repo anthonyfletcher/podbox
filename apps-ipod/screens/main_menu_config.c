@@ -94,8 +94,14 @@ static const char * menu_get_name(int selected_item, void * data,
 static enum themable_icons menu_get_icon(int selected_item, void * data)
 {
     (void)data;
+    (void)selected_item;
 
-    return menu_items[selected_item].enabled ? Icon_Config : Icon_NOICON;
+    /* Every row, enabled or not. Icon_NOICON for the disabled ones left a
+     * blank cell wherever an entry was not in the root menu -- which is all of
+     * the tagnavi rows until one is added -- and that reads as a missing icon
+     * rather than as "off". The state is in the row text either way:
+     * menu_get_name() appends ": On" / ": Off". */
+    return Icon_Config;
 }
 
 /* 'dest' is the menu_items[] slot this name is being resolved for -- needed

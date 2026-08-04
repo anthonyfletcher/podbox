@@ -160,7 +160,7 @@ static int artist_jump_prev(void)
 static void artist_draw_text(void)
 {
     static int prev_index = -1;
-    int char_height, txt_x, txt_y;
+    int char_height, artist_height, txt_x, txt_y;
     char *name;
 
     if (global_settings.album_covers_show_album_name == ALBUM_NAME_HIDE)
@@ -182,6 +182,7 @@ static void artist_draw_text(void)
      * misaligned against the same screen showing albums. The strip itself is
      * unchanged: the engine reserves the same space either way. */
     char_height = screens[SCREEN_MAIN].getcharheight();
+    artist_height = font_get(screens[SCREEN_MAIN].getuifont())->height;
     switch (global_settings.album_covers_show_album_name)
     {
         case ALBUM_AND_ARTIST_TOP:
@@ -189,7 +190,7 @@ static void artist_draw_text(void)
             break;
         case ALBUM_NAME_BOTTOM:
         case ALBUM_AND_ARTIST_BOTTOM:
-            txt_y = pf_height - PF_CAPTION_STRIP(char_height)
+            txt_y = pf_height - PF_CAPTION_STRIP(char_height, artist_height)
                               - PF_CAPTION_LIFT
                               + PF_CAPTION_ONE_LINE_Y(char_height);
             break;

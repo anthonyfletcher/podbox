@@ -897,53 +897,67 @@ const struct settings_list settings[] = {
     /* Modal dialog chrome. Config-file only (no menu entries): lang_id -1, so
      * these are edited in a theme .cfg. The metric defaults are the chrome a
      * theme gets for saying nothing, so they are the shipped look rather than
-     * dialog_style_default()'s bare 1px square borders. */
-    {F_T_INT|F_THEMESETTING, &global_settings.dialog_box_border_width, -1,
+     * dialog_style_default()'s bare 1px square borders.
+     *
+     * F_THEMERESET throughout is what makes "for saying nothing" true. Without
+     * it every value below is inherited, so a theme is handed the last theme's
+     * dialog chrome -- rounded buttons on a theme that never asked for them. */
+    {F_T_INT|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_box_border_width, -1,
         INT(2), "dialog box border width", UNUSED},
-    {F_T_INT|F_THEMESETTING, &global_settings.dialog_box_margin, -1,
-        INT(10), "dialog box margin", UNUSED},
-    {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_width, -1,
+    {F_T_INT|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_box_margin,
+        -1, INT(10), "dialog box margin", UNUSED},
+    {F_T_INT|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_border_width, -1,
         INT(2), "dialog button border width", UNUSED},
     /* Square by default: a radius is a look, and a theme that says nothing
      * should get the plain shape rather than this fork's. Themify_2 asks for
      * the rounded one in its own .cfg. */
-    {F_T_INT|F_THEMESETTING, &global_settings.dialog_btn_border_radius, -1,
+    {F_T_INT|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_border_radius, -1,
         INT(0), "dialog button border radius", UNUSED},
     /* off:  every dialog colour is inherited from the theme, flat.
      * on:   the nine colours below are used instead.
      * auto: derived from the theme's foreground and background, or from the
      *       album's while dynamic colours are running (the default). */
-    CHOICE_SETTING(F_THEMESETTING, dialog_colors, -1, DIALOG_COLORS_AUTO,
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, dialog_colors, -1,
+                   DIALOG_COLORS_AUTO,
                    "dialog colours", "off,on,auto", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUTO)),
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_box_fg, -1,
-        INT(DEFAULT_THEME_FOREGROUND), "dialog box foreground", UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_box_bg, -1,
-        INT(DEFAULT_THEME_BACKGROUND), "dialog box background", UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_box_border, -1,
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_box_fg,
+        -1, INT(DEFAULT_THEME_FOREGROUND), "dialog box foreground", UNUSED},
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_box_bg,
+        -1, INT(DEFAULT_THEME_BACKGROUND), "dialog box background", UNUSED},
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_box_border, -1,
         INT(DEFAULT_THEME_FOREGROUND), "dialog box border colour", UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_fg, -1,
-        INT(DEFAULT_THEME_FOREGROUND), "dialog button foreground", UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_bg, -1,
-        INT(DEFAULT_THEME_BACKGROUND), "dialog button background", UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_border, -1,
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_btn_fg,
+        -1, INT(DEFAULT_THEME_FOREGROUND), "dialog button foreground", UNUSED},
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_btn_bg,
+        -1, INT(DEFAULT_THEME_BACKGROUND), "dialog button background", UNUSED},
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_border, -1,
         INT(DEFAULT_THEME_FOREGROUND), "dialog button border colour", UNUSED},
     /* the selected button defaults to the inverse-video look of the plain box */
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_fg_sel, -1,
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_fg_sel, -1,
         INT(DEFAULT_THEME_BACKGROUND), "dialog button foreground selected",
         UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_bg_sel, -1,
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_bg_sel, -1,
         INT(DEFAULT_THEME_FOREGROUND), "dialog button background selected",
         UNUSED},
-    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.dialog_btn_border_sel, -1,
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_btn_border_sel, -1,
         INT(DEFAULT_THEME_FOREGROUND), "dialog button border colour selected",
         UNUSED},
 
     /* Progress bar chrome, config-file only for the same reason as the dialog
-     * metrics above. The border rounds to this and the fill to one less, so a
-     * radius of 1 is the smallest that rounds anything. */
-    {F_T_INT|F_THEMESETTING, &global_settings.progress_bar_radius, -1,
-        INT(2), "progress bar radius", UNUSED},
+     * metrics above, F_THEMERESET included. The border rounds to this and the
+     * fill to one less, so a radius of 1 is the smallest that rounds
+     * anything. */
+    {F_T_INT|F_THEMESETTING|F_THEMERESET, &global_settings.progress_bar_radius,
+        -1, INT(2), "progress bar radius", UNUSED},
 
     /* more playback */
     OFFON_SETTING(0,play_selected,LANG_PLAY_SELECTED,true,"play selected",NULL),
@@ -1369,8 +1383,12 @@ const struct settings_list settings[] = {
                 formatter_time_unit_0_is_off, getlang_time_unit_0_is_off, NULL),
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY, font_file, "font",
                      DEFAULT_FONTNAME, FONT_DIR "/", ".fnt"),
-    TEXT_SETTING(F_THEMESETTING, bold_font_file, "font bold",
-                     "22-LeagueSpartan-Bold", FONT_DIR "/", ".fnt"),
+    /* No font of its own: unset means the regular UI font, so a theme naming
+     * only "font" gets a bold that matches it rather than the last theme's.
+     * F_THEMERESET is what makes that true -- without it the setting keeps the
+     * previous value and the fallback in font_get_ui_bold() never runs. */
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET, bold_font_file, "font bold",
+                     "-", FONT_DIR "/", ".fnt"),
     INT_SETTING(0, glyphs_to_cache, LANG_GLYPHS, DEFAULT_GLYPHS,
                 "glyphs", UNIT_INT, MIN_GLYPHS, MAX_GLYPHS, 10,
                 NULL, NULL, NULL),
