@@ -49,6 +49,7 @@
 #include "system/shutdown.h"
 #include "system/activity.h"          /* ui_set_working */
 #include "system/bg_task.h"           /* the background pass runs as one */
+#include "system/debug_log.h"         /* what the carry-over managed to skip */
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
@@ -78,8 +79,9 @@
  *                 every art_hash to 0, so nothing in them would ever match a
  *                 cached thumbnail.
  *   PFIH -> PFII: both gained key, and the header gained the commitid/serial
- *                 watermarks. */
-#define INDEX_HDR "PFII"
+ *                 watermarks.
+ *   PFII -> PFIJ: the header gained the deleted count. */
+#define INDEX_HDR "PFIJ"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -649,6 +651,230 @@ static int build_artist_index(struct tagcache_search *tcs,
     return res;
 }
 
+/* ---------------------------------------------------------------------------
+ * Carrying figures across a rebuild
+ *
+ * Summarising an album costs a filtered tagcache search, and the build does
+ * one per album whatever changed. An album whose tracks are the same as when
+ * the last index was written already has its answer in that file.
+ *
+ * The seeks in it are worthless by then -- a commit that adds a track re-sorts
+ * the whole album tagfile and moves every one -- so entries are matched by the
+ * name key instead, and only the figures are taken.
+ * ------------------------------------------------------------------------ */
+
+/* Room for the albums that gained tracks, and for the search's unique list.
+ * Past the first, so much has changed that summarising the lot is no worse
+ * than working out what to skip. */
+#define CARRY_DIRTY_MAX 512
+#define CARRY_UNIQ_MAX  2048
+
+struct carried
+{
+    uint32_t key;
+    int year;
+    int playcount;
+    long lastplayed;
+    unsigned int art_hash;
+    unsigned int artist_art_hash;
+};
+
+static struct carried *carried_tab;
+static int carried_ct;
+/* Album-name hashes with a track newer than the saved index. The name alone,
+ * without the artist: a search on tag_album yields names, and matching more
+ * albums than strictly necessary only costs the search we would have done. */
+static uint32_t *dirty_tab;
+static int dirty_ct;
+/* What was taken off the buffer for the two tables, so the caller can have it
+ * back once they are finished with. */
+static size_t carry_reserved;
+
+static int compare_carried(const void *a, const void *b)
+{
+    uint32_t ka = ((const struct carried *)a)->key;
+    uint32_t kb = ((const struct carried *)b)->key;
+    return ka < kb ? -1 : (ka > kb);
+}
+
+static int compare_u32(const void *a, const void *b)
+{
+    uint32_t ka = *(const uint32_t *)a, kb = *(const uint32_t *)b;
+    return ka < kb ? -1 : (ka > kb);
+}
+
+static const struct carried *carried_find(uint32_t key)
+{
+    int lo = 0, hi = carried_ct - 1;
+
+    if (key == 0)   /* nameless: matches nothing, by assign_keys()'s rule */
+        return NULL;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (carried_tab[mid].key == key)
+            return &carried_tab[mid];
+        if (carried_tab[mid].key < key)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return NULL;
+}
+
+static bool album_is_dirty(uint32_t namehash)
+{
+    int lo = 0, hi = dirty_ct - 1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (dirty_tab[mid] == namehash)
+            return true;
+        if (dirty_tab[mid] < namehash)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return false;
+}
+
+/* Albums holding a track committed after the saved index was written. One
+ * pass over the master index, no per-album work. */
+static void load_dirty(int32_t since, uint32_t *uniq)
+{
+    struct tagcache_search dtcs;
+    struct tagcache_search_clause clause;
+    char buf[TAGCACHE_BUFSZ];
+
+    memset(&clause, 0, sizeof(clause));
+    clause.tag = tag_commitid;
+    clause.type = clause_gt;
+    clause.numeric = true;
+    clause.numeric_data = since;
+
+    if (!tagcache_search(&dtcs, tag_album))
+        return;
+
+    /* Without this the search reports one result per track rather than per
+     * album, and a single album would fill the table on its own. */
+    tagcache_search_set_uniqbuf(&dtcs, uniq, CARRY_UNIQ_MAX * sizeof(*uniq));
+    tagcache_search_add_clause(&dtcs, &clause);
+
+    while (tagcache_get_next(&dtcs, buf, sizeof(buf)))
+    {
+        if (dirty_ct >= CARRY_DIRTY_MAX)
+        {
+            dirty_ct = -1;   /* too many: summarise everything */
+            break;
+        }
+        dirty_tab[dirty_ct++] = name_key(buf, NULL);
+    }
+
+    tagcache_search_finish(&dtcs);
+
+    if (dirty_ct > 0)
+        qsort(dirty_tab, dirty_ct, sizeof(*dirty_tab), compare_u32);
+}
+
+/* Read the previous index's album figures, and work out which albums cannot
+ * use them. Both tables are optional: on any doubt they are left empty and
+ * every album is summarised from the database exactly as before.
+ *
+ * The buffer shrinks rather than this being allocated separately. The arrays
+ * below are built from both ends of it, so the only safe place to stand is
+ * outside what the build can reach. */
+static void carry_over_prepare(void **buf, size_t *bufsz)
+{
+    struct pf_index_t old;
+    struct tagcache_marks marks;
+    struct album_data *raw;
+    size_t need;
+    int i, fd;
+
+    carried_tab = NULL;
+    carried_ct = 0;
+    dirty_tab = NULL;
+    dirty_ct = 0;
+    carry_reserved = 0;
+
+    fd = open(DB_INDEX_FILE, O_RDONLY);
+    if (fd < 0)
+        return;
+
+    if (read(fd, &old, sizeof(old)) != sizeof(old)
+        || memcmp(&old.header, INDEX_HDR, sizeof(old.header)) != 0
+        || old.album_ct == 0)
+    {
+        close(fd);
+        return;
+    }
+
+    /* A deletion moves figures this cannot account for -- a removed track's
+     * plays should stop counting, and nothing here says which album lost one.
+     * Deletions are rare, so give the whole carry-over up rather than carry
+     * something wrong. */
+    tagcache_get_marks(&marks);
+    if (marks.deleted_ct != old.deleted)
+    {
+        close(fd);
+        return;
+    }
+
+    need = (size_t)old.album_ct * sizeof(struct album_data)
+         + (CARRY_DIRTY_MAX + CARRY_UNIQ_MAX) * sizeof(uint32_t);
+
+    /* Never at the build's expense: it has to fit what it is building. */
+    if (need > *bufsz / 3)
+    {
+        close(fd);
+        return;
+    }
+
+    *bufsz -= need;
+    carry_reserved = need;
+    raw = (struct album_data *)((char *)*buf + *bufsz);
+    dirty_tab = (uint32_t *)(raw + old.album_ct);
+
+    /* Past the header and both name blobs; the album array follows them. */
+    if (lseek(fd, sizeof(old) + old.artist_len + old.album_len, SEEK_SET) < 0
+        || read(fd, raw, old.album_ct * sizeof(struct album_data))
+           != (ssize_t)(old.album_ct * sizeof(struct album_data)))
+    {
+        close(fd);
+        *bufsz += need;
+        carry_reserved = 0;
+        dirty_tab = NULL;
+        return;
+    }
+    close(fd);
+
+    /* Compacted in place, forward: struct carried is the smaller of the two,
+     * so entry i is always written below where entry i was read from. */
+    carried_tab = (struct carried *)raw;
+    for (i = 0; i < old.album_ct; i++)
+    {
+        struct album_data a = raw[i];
+
+        carried_tab[i].key = a.key;
+        carried_tab[i].year = a.year;
+        carried_tab[i].playcount = a.playcount;
+        carried_tab[i].lastplayed = a.lastplayed;
+        carried_tab[i].art_hash = a.art_hash;
+        carried_tab[i].artist_art_hash = a.artist_art_hash;
+    }
+    carried_ct = old.album_ct;
+    qsort(carried_tab, carried_ct, sizeof(*carried_tab), compare_carried);
+
+    load_dirty(old.commitid, dirty_tab + CARRY_DIRTY_MAX);
+
+    if (dirty_ct < 0)       /* too much changed to be worth matching */
+        carried_ct = 0;
+}
+
 /* Summarise each album from its tracks: the year, and the playback history the
  * album charts sort on.
  *
@@ -667,6 +893,7 @@ static int assign_album_stats(void)
 {
     char tcs_buf[TAGCACHE_BUFSZ];
     const long tcs_bufsz = sizeof(tcs_buf);
+    int carried_over = 0;
     splash_progress_set_delay(HZ / 2);
     draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_STATS);
     for (int album_idx = 0; album_idx < pfi->album_ct; album_idx++)
@@ -681,6 +908,24 @@ static int assign_album_stats(void)
         long album_lastplayed = 0;
         unsigned int album_art = 0, artist_art = 0;
         bool first_track = true;
+
+        /* Already answered, by a previous index, for an album whose tracks
+         * have not changed since. This is the whole point of the step: the
+         * search below is the expensive part of the build. */
+        struct album_data *ent = &pfi->album_index[album_idx];
+        const struct carried *c;
+
+        if (!album_is_dirty(name_key(pfi->album_names + ent->name_idx, NULL))
+            && (c = carried_find(ent->key)) != NULL)
+        {
+            ent->year = c->year;
+            ent->playcount = c->playcount;
+            ent->lastplayed = c->lastplayed;
+            ent->art_hash = c->art_hash;
+            ent->artist_art_hash = c->artist_art_hash;
+            carried_over++;
+            continue;
+        }
 
         if (tagcache_search(&tcs, tag_year))
         {
@@ -737,6 +982,9 @@ static int assign_album_stats(void)
         pfi->album_index[album_idx].art_hash = album_art;
         pfi->album_index[album_idx].artist_art_hash = artist_art;
     }
+
+    debug_log(DEBUG_LOG_TAGCACHE, "index: %d albums, %d carried, %d searched",
+              pfi->album_ct, carried_over, pfi->album_ct - carried_over);
     return SUCCESS;
 }
 
@@ -814,6 +1062,10 @@ static int create_album_index(void)
     int i, j, last, final, retry, res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
+
+    /* Before anything claims the buffer: this takes its share off the top,
+     * where neither of the arrays built from the ends can reach it. */
+    carry_over_prepare(&buf, &buf_size);
 
     /* Artists */
     res = build_artist_index(&tcs, &buf, &buf_size);
@@ -900,6 +1152,9 @@ retry_artist_lookup:
         tagcache_search_finish(&tcs);
     }
 
+    /* Before the stats, not after: they are what the carry-over matches on. */
+    assign_keys();
+
     res = assign_album_stats();
 
     if (res < SUCCESS)
@@ -949,16 +1204,22 @@ retry_artist_lookup:
     pfi->album_index += pfi->album_untagged_idx + 1;
     pfi->album_ct -= pfi->album_untagged_idx + 1;
 
+    /* The duplicate pass above rewrites artist_idx, so the keys assigned
+     * before the stats no longer describe every entry. Cheap to redo, and
+     * these are the ones that get saved. */
+    assign_keys();
+
     pfi->buf = buf;
-    pfi->buf_sz = buf_size;
+    /* The carry-over tables are finished with, so hand their space back
+     * rather than leaving the caller short of it for this build. */
+    pfi->buf_sz = buf_size + carry_reserved;
+    carry_reserved = 0;
     /* artist_index is deliberately kept, where it used to be discarded here.
      * The array itself was always intact -- build_artist_index() finalises it
      * into the buffer ahead of the album data, which nothing above overwrites
      * -- so only the pointer was being thrown away. It is needed now: the
      * artist figures assign_artist_stats() just filled in are saved with the
      * rest of the index and read back by the artist charts. */
-
-    assign_keys();
 
     /* Stamped after the figures have been read, not before. A play landing
      * mid-build is then simply not replayed later; stamping first would
@@ -968,6 +1229,7 @@ retry_artist_lookup:
     tagcache_get_marks(&marks);
     pfi->commitid = marks.commitid;
     pfi->serial = marks.serial;
+    pfi->deleted = marks.deleted_ct;
 
     qsort(pfi->album_index, pfi->album_ct,
                           sizeof(struct album_data), compare_albums);

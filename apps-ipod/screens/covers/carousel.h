@@ -123,6 +123,10 @@ struct pf_index_t {
      * tell which entries still need their figures recomputed. */
     int32_t             commitid;
     int32_t             serial;
+    /* Entries tagcache had flagged deleted. A deletion moves figures that
+     * cannot be matched back to an album, so a build that finds this changed
+     * summarises everything rather than carrying anything across. */
+    int32_t             deleted;
 
     char               *artist_names;
     struct artist_data *artist_index;
