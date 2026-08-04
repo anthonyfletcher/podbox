@@ -65,6 +65,27 @@
 /* The index is always rewritten whole, so it is built here and renamed over
  * the real file rather than written into it. See save_album_index(). */
 #define DB_SUMMARY_TMP  DB_SUMMARY_FILE ".tmp"
+/* Plays since the summary was written. */
+#define DB_PLAYS_FILE ROCKBOX_DIR "/db_summary.plays"
+
+/* One finished track. The serial is tagcache's, which is what the index's own
+ * watermark is compared against, and doubles as the lastplayed value.
+ *
+ * Trap: tagcache_increase_serial() returns the value *before* the increment,
+ * while the watermark is the counter as it stands -- the next value to be
+ * handed out. So a record is already counted in an index only when its serial
+ * is strictly below that watermark. Testing <= instead discards the first
+ * play after every build, and no other. */
+struct play_rec
+{
+    int32_t  serial;
+    uint32_t album_key;
+    uint32_t artist_key;
+};
+
+/* Past this the log stops being cheaper to replay than to fold in, so the
+ * background pass is asked for. */
+#define PLAY_LOG_MAX 512
 /* Bump the magic whenever struct album_data or struct artist_data, or the
  * file's layout, changes. load_album_index() validates nothing finer -- it
  * checks this and some coarse sizes -- so a struct that grew without a new
@@ -652,6 +673,106 @@ static int build_artist_index(struct tagcache_search *tcs,
 }
 
 /* ---------------------------------------------------------------------------
+ * The play log
+ *
+ * A play changes an album's figures and nothing else about it, so rebuilding
+ * the index for one is absurd -- and rebuilding is the only thing that ever
+ * updated them. Instead each finished track appends twelve bytes here, and a
+ * reader applies whatever arrived after the index was written.
+ *
+ * Both keys come from the track's own tags, so a play costs no database work
+ * at all: an append, at a moment when tagcache is already writing runtime
+ * data to the same disk.
+ * ------------------------------------------------------------------------ */
+
+void db_summary_log_play(const char *album, const char *albumartist,
+                       long serial)
+{
+    struct play_rec rec;
+    int fd;
+
+    /* Nothing to attribute it to. assign_keys() gives a nameless album a key
+     * of 0 and matches nothing against it, so a record like this could never
+     * be applied to anything. */
+    if (!album || !*album)
+        return;
+
+    rec.serial = serial;
+    rec.album_key = name_key(album, albumartist);
+    rec.artist_key = albumartist && *albumartist
+                   ? name_key(albumartist, NULL) : 0;
+
+    fd = open(DB_PLAYS_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (fd < 0)
+        return;
+
+    write(fd, &rec, sizeof(rec));
+
+    /* Ask for a pass once it has grown enough that folding it into the index
+     * beats replaying it on every read. Cheap to say so: a build that finds
+     * only plays changed carries every album's figures across bar the ones
+     * named here. */
+    if (filesize(fd) > (long)(PLAY_LOG_MAX * sizeof(rec)))
+        bg_task_update(&db_summary_task);
+
+    close(fd);
+}
+
+/* Apply the log to an index just read from disk. Records at or below its
+ * watermark are already counted in the figures it was saved with.
+ *
+ * Linear over the arrays rather than sorted-and-searched: a few hundred
+ * records against a few hundred albums is nothing, and the arrays are in
+ * display order by the time anyone wants them. */
+static void replay_plays(struct db_summary_t *idx)
+{
+    struct play_rec batch[32];
+    int fd = open(DB_PLAYS_FILE, O_RDONLY);
+    ssize_t got;
+
+    if (fd < 0)
+        return;
+
+    while ((got = read(fd, batch, sizeof(batch))) >= (ssize_t)sizeof(batch[0]))
+    {
+        int n = got / sizeof(batch[0]);
+        int i, j;
+
+        for (i = 0; i < n; i++)
+        {
+            if (batch[i].serial < idx->serial)
+                continue;
+
+            for (j = 0; j < idx->album_ct; j++)
+            {
+                struct album_data *a = &idx->album_index[j];
+
+                if (a->key != batch[i].album_key || a->key == 0)
+                    continue;
+                a->playcount++;
+                if (batch[i].serial > a->lastplayed)
+                    a->lastplayed = batch[i].serial;
+                break;
+            }
+
+            for (j = 0; j < idx->artist_ct; j++)
+            {
+                struct artist_data *r = &idx->artist_index[j];
+
+                if (r->key != batch[i].artist_key || r->key == 0)
+                    continue;
+                r->playcount++;
+                if (batch[i].serial > r->lastplayed)
+                    r->lastplayed = batch[i].serial;
+                break;
+            }
+        }
+    }
+
+    close(fd);
+}
+
+/* ---------------------------------------------------------------------------
  * Carrying figures across a rebuild
  *
  * Summarising an album costs a filtered tagcache search, and the build does
@@ -686,6 +807,11 @@ static int carried_ct;
  * albums than strictly necessary only costs the search we would have done. */
 static uint32_t *dirty_tab;
 static int dirty_ct;
+/* Full album keys named in the play log. Their figures must come from
+ * tagcache, which already holds the real counts -- carrying the old ones and
+ * then replaying the log on top of them would count those plays twice. */
+static uint32_t *played_tab;
+static int played_ct;
 /* What was taken off the buffer for the two tables, so the caller can have it
  * back once they are finished with. */
 static size_t carry_reserved;
@@ -724,22 +850,60 @@ static const struct carried *carried_find(uint32_t key)
     return NULL;
 }
 
-static bool album_is_dirty(uint32_t namehash)
+static bool in_u32_table(const uint32_t *tab, int ct, uint32_t v)
 {
-    int lo = 0, hi = dirty_ct - 1;
+    int lo = 0, hi = ct - 1;
 
     while (lo <= hi)
     {
         int mid = (lo + hi) / 2;
 
-        if (dirty_tab[mid] == namehash)
+        if (tab[mid] == v)
             return true;
-        if (dirty_tab[mid] < namehash)
+        if (tab[mid] < v)
             lo = mid + 1;
         else
             hi = mid - 1;
     }
     return false;
+}
+
+/* Albums that cannot take the previous index's figures: one that gained
+ * tracks (matched on the name, which is all the commitid search reports) or
+ * one that was played (matched on the full key, which the log carries). */
+static bool album_is_dirty(uint32_t namehash, uint32_t key)
+{
+    return in_u32_table(dirty_tab, dirty_ct, namehash)
+        || in_u32_table(played_tab, played_ct, key);
+}
+
+/* The albums named in the log since the saved index was written. */
+static void load_played(int32_t since)
+{
+    struct play_rec batch[32];
+    int fd = open(DB_PLAYS_FILE, O_RDONLY);
+    ssize_t got;
+
+    if (fd < 0)
+        return;
+
+    while ((got = read(fd, batch, sizeof(batch))) >= (ssize_t)sizeof(batch[0]))
+    {
+        int n = got / sizeof(batch[0]);
+        int i;
+
+        for (i = 0; i < n; i++)
+        {
+            if (batch[i].serial < since || played_ct >= PLAY_LOG_MAX)
+                continue;
+            played_tab[played_ct++] = batch[i].album_key;
+        }
+    }
+
+    close(fd);
+
+    if (played_ct > 0)
+        qsort(played_tab, played_ct, sizeof(*played_tab), compare_u32);
 }
 
 /* Albums holding a track committed after the saved index was written. One
@@ -799,6 +963,8 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
     carried_ct = 0;
     dirty_tab = NULL;
     dirty_ct = 0;
+    played_tab = NULL;
+    played_ct = 0;
     carry_reserved = 0;
 
     fd = open(DB_SUMMARY_FILE, O_RDONLY);
@@ -825,7 +991,7 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
     }
 
     need = (size_t)old.album_ct * sizeof(struct album_data)
-         + (CARRY_DIRTY_MAX + CARRY_UNIQ_MAX) * sizeof(uint32_t);
+         + (CARRY_DIRTY_MAX + CARRY_UNIQ_MAX + PLAY_LOG_MAX) * sizeof(uint32_t);
 
     /* Never at the build's expense: it has to fit what it is building. */
     if (need > *bufsz / 3)
@@ -869,7 +1035,10 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
     carried_ct = old.album_ct;
     qsort(carried_tab, carried_ct, sizeof(*carried_tab), compare_carried);
 
+    played_tab = dirty_tab + CARRY_DIRTY_MAX + CARRY_UNIQ_MAX;
+
     load_dirty(old.commitid, dirty_tab + CARRY_DIRTY_MAX);
+    load_played(old.serial);
 
     if (dirty_ct < 0)       /* too much changed to be worth matching */
         carried_ct = 0;
@@ -915,7 +1084,8 @@ static int assign_album_stats(void)
         struct album_data *ent = &pfi->album_index[album_idx];
         const struct carried *c;
 
-        if (!album_is_dirty(name_key(pfi->album_names + ent->name_idx, NULL))
+        if (!album_is_dirty(name_key(pfi->album_names + ent->name_idx, NULL),
+                            ent->key)
             && (c = carried_find(ent->key)) != NULL)
         {
             ent->year = c->year;
@@ -1231,6 +1401,11 @@ retry_artist_lookup:
     pfi->serial = marks.serial;
     pfi->deleted = marks.deleted_ct;
 
+    /* Everything in the log is now either counted in an album summarised from
+     * tagcache, or predates the watermark just stamped. Keeping it would
+     * replay those plays on top of figures that already hold them. */
+    remove(DB_PLAYS_FILE);
+
     qsort(pfi->album_index, pfi->album_ct,
                           sizeof(struct album_data), compare_albums);
 
@@ -1371,6 +1546,8 @@ static int load_artist_index(struct db_summary_t *target,
     target->album_ct = 0;        /* no album list on this path */
     target->commitid = data.commitid;
     target->serial = data.serial;
+    /* Artists only on this path, but the log carries their keys too. */
+    replay_plays(target);
     *buf = b;
     *bufsz = bsz;
     return SUCCESS;
@@ -1480,6 +1657,10 @@ static int load_album_index(void){
                 memcpy(pfi, &data, sizeof(struct db_summary_t));
                 pfi->buf = buf;
                 pfi->buf_sz = buf_size;
+
+                /* The figures in the file are correct as of its watermark;
+                 * anything played since is sitting in the log. */
+                replay_plays(pfi);
 
                 qsort(pfi->album_index, pfi->album_ct,
                           sizeof(struct album_data), compare_albums);

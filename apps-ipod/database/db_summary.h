@@ -69,6 +69,16 @@ int db_summary_build_artists(struct db_summary_t *target,
                               struct tagcache_search *tcs,
                               void **buf, size_t *bufsz, bool with_stats);
 
+/* Record that a track finished, so the album and artist figures move without
+ * the index being rebuilt for it. 'serial' is the value tagcache_increase_
+ * serial() just returned, which is also what it stores as lastplayed.
+ *
+ * Both names come from the track's own tags, so this costs no database work:
+ * it appends twelve bytes and returns. A reader applies whatever arrived
+ * after the index it just loaded was written. */
+void db_summary_log_play(const char *album, const char *albumartist,
+                       long serial);
+
 /* qsort comparator over struct album_data, in the carousel's display order.
  * Public because the sort order can be changed from the carousel itself. */
 int compare_albums(const void *a_v, const void *b_v);
