@@ -38,7 +38,6 @@
 #include "system/bg_task.h"      /* tagcache_task, the standard triggers */
 #include "screens/covers/album_covers.h"  /* album_covers_task (the db index) */
 #include "files/file_index.h"
-#include "screens/system/bg_task_info.h"
 #include "system/format_time.h"
 #include "system/volume.h"
 #include "pathfuncs.h"
@@ -330,17 +329,6 @@ MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
 
 MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
 
-/* The screen reports a USB attach the way simplelist does, as a bool; the menu
- * wants it as MENU_ATTACHED_USB so it unwinds rather than redrawing. */
-static int bg_task_info_item(void)
-{
-    return bg_task_info_screen() ? MENU_ATTACHED_USB : 0;
-}
-
-MENUITEM_FUNCTION(bg_task_info, 0, ID2P(LANG_BG_TASK_INFO),
-                  bg_task_info_item, NULL, Icon_NOICON);
-
-
 MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
           0, Icon_System_menu,
             &battery_menu,
@@ -362,7 +350,6 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
 
             &usb_mode,
             &wps_select_action,
-            &bg_task_info,
             &show_debug_menu,
          );
 

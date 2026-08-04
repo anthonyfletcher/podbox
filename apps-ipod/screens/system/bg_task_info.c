@@ -54,10 +54,18 @@ static void add_tagcache_lines(void)
 
     simplelist_addline("  Tracks found: %d", stat->total_entries);
 
-    /* Only meaningful mid-scan; processed_entries is left over otherwise. */
+    /* Whether searches are answered from memory or the disk. It falls back
+     * silently and everything merely gets slow, which is a bad way to find
+     * out -- the database is under a megabyte for a normal library, so on
+     * this player anything but "in RAM" means something is wrong. */
+    simplelist_addline("  Storage: %s",
+                       tagcache_is_in_ram() ? "in RAM" : "on disk");
+
+    /* Only meaningful mid-scan; processed_entries is left over otherwise. No
+     * percentage: it is a count of every file and directory walked, against a
+     * total that is the track count, so the two do not divide into anything. */
     if (tagcache_is_busy())
-        simplelist_addline("  Processed: %d (%d%%)", stat->processed_entries,
-                           stat->progress);
+        simplelist_addline("  Processed: %d", stat->processed_entries);
 }
 
 static void add_db_summary_lines(void)
@@ -67,16 +75,16 @@ static void add_db_summary_lines(void)
 
     db_summary_progress(&done, &total);
 
-    simplelist_addline("Album index: %s",
+    simplelist_addline("Summary Index: %s",
                        bg_task_state(&db_summary_task));
     simplelist_addline("  Covered: %d entries", db_summary_task.done_marks.entries);
 
-    if (step[0])
+    /* Only while it is running. The step is held over after a pass, and one
+     * that finished reporting "4/5 Remove Duplicates" reads as stuck on it. */
+    if (db_summary_is_busy() && step[0])
     {
-        /* Held over after a pass, so label it for what it is. */
-        simplelist_addline("  %s: %s",
-                           db_summary_is_busy() ? "Step" : "Last step", step);
-        if (db_summary_is_busy() && total > 0)
+        simplelist_addline("  Step: %s", step);
+        if (total > 0)
             simplelist_addline("  Progress: %d/%d", done, total);
     }
 }
@@ -110,9 +118,7 @@ static int bg_task_info_callback(int action, struct gui_synclist *lists)
     simplelist_reset_lines();
 
     add_tagcache_lines();
-    simplelist_addline(" ");
     add_db_summary_lines();
-    simplelist_addline(" ");
     add_art_cache_lines();
 
     if (action == ACTION_NONE)

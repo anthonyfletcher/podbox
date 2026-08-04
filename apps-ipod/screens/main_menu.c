@@ -32,6 +32,7 @@
 #include "speech/talk.h"
 #include "widgets/splash.h"
 #include "screens/system/debug_menu.h"
+#include "screens/system/bg_task_info.h"
 #include "version.h"
 #include "time.h"
 #include "screens/playback/wps.h"
@@ -402,9 +403,19 @@ MENUITEM_FUNCTION(show_third_party_licenses_item, 0,
                   ID2P(LANG_THIRD_PARTY_LICENSES),
                   show_third_party_licenses, NULL, Icon_NOICON);
 
+/* The screen reports a USB attach the way simplelist does, as a bool; the menu
+ * wants it as MENU_ATTACHED_USB so it unwinds rather than redrawing. */
+static int bg_task_info_item(void)
+{
+    return bg_task_info_screen() ? MENU_ATTACHED_USB : 0;
+}
+
+MENUITEM_FUNCTION(bg_task_info, 0, ID2P(LANG_BG_TASK_INFO),
+                  bg_task_info_item, NULL, Icon_NOICON);
+
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_info_item, &show_credits_item,
-          &show_runtime_item, &show_license_item,
+          &show_runtime_item, &bg_task_info, &show_license_item,
           &show_third_party_licenses_item, &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
