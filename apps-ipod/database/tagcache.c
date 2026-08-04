@@ -3963,12 +3963,22 @@ static bool delete_entry(long idx_id)
 
     logf("delete_entry(): %ld", idx_id);
 
-    /* At first mark the entry removed from ram cache. */
+    debug_log(DEBUG_LOG_TAGCACHE, "del %ld: enter", idx_id);
+
+    /* At first mark the entry removed from ram cache.
+     *
+     * Note what this costs if anything below fails: RAM says deleted, the
+     * master index on disk does not, and the two disagree until something
+     * reloads the RAM copy -- at which point the entry is back. */
     if (tc_stat.ramcache)
         tcramcache.hdr->indices[idx_id].flag |= FLAG_DELETED;
 
     if ( (masterfd = open_master_fd(&myhdr, true) ) < 0)
+    {
+        debug_log(DEBUG_LOG_TAGCACHE,
+                  "del %ld: master open failed, RAM only", idx_id);
         return false;
+    }
 
     lseek(masterfd, idx_id * sizeof(struct index_entry), SEEK_CUR);
     if (read_index_entries(masterfd, &myidx, 1) != sizeof(struct index_entry))
@@ -4139,6 +4149,7 @@ static bool delete_entry(long idx_id)
 
     close(masterfd);
 
+    debug_log(DEBUG_LOG_TAGCACHE, "del %ld: written to disk", idx_id);
     return true;
 
     cleanup:
@@ -4147,6 +4158,10 @@ static bool delete_entry(long idx_id)
     if (masterfd >= 0)
         close(masterfd);
 
+    /* After the closes, not before: debug_log() opens the log to append and
+     * gives up silently if it cannot, so a line written while this function
+     * still holds handles is a line that may never appear. */
+    debug_log(DEBUG_LOG_TAGCACHE, "del %ld: bailed, RAM only", idx_id);
     return false;
 }
 
@@ -4260,19 +4275,41 @@ static bool allocate_tagcache(void)
 
     /* Ensure enough memory remains for the audio buffer after allocation.
      * Without this check, a large database can consume so much RAM that
-     * audio_reset_buffer() panics on OOM when playback starts. */
+     * audio_reset_buffer() panics on OOM when playback starts.
+     *
+     * Only when the allocation would come out of free space, though. Once the
+     * audio buffer holds the pool -- which it does the moment playback has run
+     * -- core_available() is near zero however much headroom there really is,
+     * because the memory this needs comes from shrinking that buffer. Applying
+     * the test then refused the RAM copy to every path that runs with the UI
+     * up, so a rebuild or update from the menu left the database on the disk
+     * for the rest of the session: slow browsing, and the deleted-file check
+     * giving up on its first line for want of a buffer.
+     *
+     * Nothing is lost by standing aside: shrinking is negotiated, and
+     * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE. */
     size_t available = core_available();
-    if (alloc_size + TAGCACHE_MIN_AUDIO_RESERVE > available)
+    if (alloc_size <= available
+        && alloc_size + TAGCACHE_MIN_AUDIO_RESERVE > available)
     {
         logf("tagcache: ramcache %luKB exceeds budget (%luKB avail)",
              (unsigned long)(alloc_size / 1024),
              (unsigned long)(available / 1024));
+        debug_log(DEBUG_LOG_TAGCACHE,
+                  "ramcache: %luKB wanted, %luKB free, reserving %luKB",
+                  (unsigned long)(alloc_size / 1024),
+                  (unsigned long)(available / 1024),
+                  (unsigned long)(TAGCACHE_MIN_AUDIO_RESERVE / 1024));
         return false;
     }
 
     int handle = core_alloc_ex(alloc_size, &ops);
     if (handle <= 0)
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "ramcache: alloc of %luKB refused",
+                  (unsigned long)(alloc_size / 1024));
         return false;
+    }
 
     tcramcache.handle = handle;
     tcramcache.hdr = core_get_data(handle);
@@ -4294,6 +4331,11 @@ static bool load_tagcache(void)
     bool ok = false;
     ssize_t bytesleft = tc_stat.ramcache_allocated - sizeof(struct ramcache_header);
     int fd;
+    /* Which tag this got to before giving up, for the log at `failure:`. Every
+     * exit below reports the same way through logf(), which is compiled out on
+     * a release build -- so a load that fails on a device says nothing at all,
+     * and the database is silently left on the disk for the session. */
+    int failtag = -1;
 
     /* Wait for any in-progress dircache build to complete */
     dircache_wait();
@@ -4350,6 +4392,8 @@ static bool load_tagcache(void)
 
         if (TAGCACHE_IS_NUMERIC(tag))
             continue;
+
+        failtag = tag;
 
         p = TC_ALIGN_PTR(p, struct tagcache_header, &rc);
         bytesleft -= rc;
@@ -4409,7 +4453,16 @@ static bool load_tagcache(void)
                     goto failure;
                 }
 
-                if (idx->tag_seek[tag] != pos)
+                /* Not for a deleted entry: delete_entry() deliberately
+                 * replaces tag_seek with a CRC of the tag text, so that
+                 * runtime statistics survive a file coming back. Comparing
+                 * that against a file position is meaningless, and treating
+                 * the mismatch as corruption abandoned the whole load -- so
+                 * one deleted track left the database unable to enter RAM on
+                 * every boot thereafter, until something rebuilt it. Searches
+                 * skip deleted entries anyway, so the hash is never read as a
+                 * seek by anything downstream. */
+                if (!(idx->flag & FLAG_DELETED) && idx->tag_seek[tag] != pos)
                 {
                     logf("corrupt data structures!:");
                     logf("  tag_seek[%d]=%" PRId32 ":pos=%ld", tag,
@@ -4501,6 +4554,19 @@ static bool load_tagcache(void)
     ok = true;
 
 failure:
+    if (!ok)
+    {
+        /* bytesleft says which kind of failure this was without needing a
+         * message per exit: near zero means the buffer ran out, healthy means
+         * the file did not read back as expected. failtag says where. */
+        debug_log(DEBUG_LOG_TAGCACHE,
+                  "load: failed on tag %d (%s), %ld bytes left of %d",
+                  failtag,
+                  failtag >= 0 && failtag < (int)ARRAYLEN(tags_str)
+                      ? tags_str[failtag] : "master index",
+                  (long)bytesleft, tc_stat.ramcache_allocated);
+    }
+
     if (fd >= 0)
         close(fd);
 
@@ -4950,6 +5016,9 @@ static void load_ramcache(void)
     tc_stat.ramcache = load_tagcache();
 
     if (!tc_stat.ramcache)
+        debug_log(DEBUG_LOG_TAGCACHE, "ramcache: buffer taken but load failed");
+
+    if (!tc_stat.ramcache)
     {
         /* RAM loading failed. Free the allocation and fall back to
          * disk-based access. Do not set tc_stat.ready = false here;
@@ -5069,6 +5138,20 @@ static void tagcache_thread(void)
                 remove_files();
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
+                /* commit() unloads the RAM copy before it starts and nothing
+                 * here used to put it back, so a rebuild from the menu left
+                 * the database on the disk for the rest of the session: every
+                 * search a seek, the album index half a second an album, the
+                 * browser slow, and get_progress() unable to report a total
+                 * because it has no entry count to divide by. It came back
+                 * only on the next USB session or reboot, which is what made
+                 * it look like a USB problem. Q_UPDATE below always did this;
+                 * the omission here was not deliberate.
+                 *
+                 * No check_deleted_files() to go with it: a rebuild has just
+                 * regenerated the whole database from what is on the disk, so
+                 * there is nothing stale left for it to find. */
+                load_ramcache();
                 break;
 
             case Q_UPDATE:
@@ -5246,7 +5329,10 @@ void tagcache_get_marks(struct tagcache_marks *m)
     /* Deletions are only ever marked in the index -- delete_entry() sets the
      * flag and leaves entry_count alone -- so counting the flags is the only
      * way to notice one at all. */
-    if (!tc_stat.ready || !tc_stat.ramcache || tcramcache.hdr == NULL)
+    /* The handle, not just the header: a failed load frees the buffer and
+     * clears both, and pinning a handle of 0 below is not something to find
+     * out about later. check_file_refs() guards the same way. */
+    if (!tc_stat.ready || !tc_stat.ramcache || tcramcache.handle <= 0)
         return;
 
     /* Pinned and run straight through, as build_lookup_list() does: the

@@ -62,15 +62,24 @@ static bool bg_marks_equal(const struct bg_marks *a, const struct bg_marks *b)
         && a->deleted == b->deleted;
 }
 
-/* What the library looks like right now. */
-static void bg_marks_now(struct bg_marks *m)
+/* What the library looks like right now, as this task last understood it. */
+static void bg_marks_now(const struct bg_task *task, struct bg_marks *m)
 {
     struct tagcache_marks tm;
 
     tagcache_get_marks(&tm);
     m->entries = tagcache_get_stat()->total_entries;
     m->commitid = tm.commitid;
-    m->deleted = tm.deleted_ct;
+
+    /* -1 is "could not count", not a count, and the two must not be compared
+     * as if they were. The database is only countable while it is held in
+     * RAM, and a USB session drops it until something reloads it -- so a tick
+     * landing in that window reads -1, which against a stored count reads as
+     * a change and runs a pass; the next tick, with the cache back, reads the
+     * real number and runs another. Carry the last real answer forward
+     * instead. Never having had one (the cache is switched off) leaves this
+     * -1 throughout, and deletions go unnoticed, which is the truth. */
+    m->deleted = tm.deleted_ct < 0 ? task->done_marks.deleted : tm.deleted_ct;
 }
 
 /* The marks of the last completed pass, or none if there wasn't one.
@@ -275,7 +284,7 @@ void bg_task_tick(struct bg_task *task, struct event_queue *queue)
 
     /* Require the marks to be stable across two consecutive ticks, so a scan
      * still in flight is never mistaken for a settled library. */
-    bg_marks_now(&now);
+    bg_marks_now(task, &now);
     if (!bg_marks_equal(&now, &task->prev_marks))
     {
         task->prev_marks = now;
