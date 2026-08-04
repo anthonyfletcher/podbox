@@ -69,7 +69,7 @@ static void add_db_index_lines(void)
 
     simplelist_addline("Album index: %s",
                        bg_task_state(&db_index_task));
-    simplelist_addline("  Covered: %d entries", db_index_task.done_total);
+    simplelist_addline("  Covered: %d entries", db_index_task.done_marks.entries);
 
     if (step[0])
     {
@@ -89,7 +89,7 @@ static void add_art_cache_lines(void)
     art_cache_get_counts(&c);
 
     simplelist_addline("Art cache: %s", bg_task_state(&art_cache_task));
-    simplelist_addline("  Covered: %d entries", art_cache_task.done_total);
+    simplelist_addline("  Covered: %d entries", art_cache_task.done_marks.entries);
 
     if (dir[0])
         simplelist_addline("  Now: %s", dir);

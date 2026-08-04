@@ -90,6 +90,20 @@ struct tagcache_stat {
     /* const char *uimessage;   Pending error message. Implement soon. */
 };
 
+/* The counters that say what has changed in the database since a caller last
+ * looked. Read together because anything watching one wants the others, and
+ * because the deleted count wants the ramcache pinned once.
+ *
+ * commitid and serial live in the master header and cost nothing to read.
+ * deleted_ct is counted over the master index, so it needs the database in
+ * RAM; off the ramcache it is -1 and a caller watching it simply never sees a
+ * deletion. */
+struct tagcache_marks {
+    int32_t commitid;   /* commits so far; tag_commitid stamps each entry */
+    int32_t serial;     /* one per logged play, and the lastplayed value */
+    int32_t deleted_ct; /* entries flagged deleted, or -1 if not countable */
+};
+
 enum source_type {source_constant, 
                   source_runtime, 
                   source_current_path /* dont add items after this.
@@ -170,6 +184,9 @@ bool tagcache_create_changelog(struct tagcache_search *tcs);
 void tagcache_update_numeric(int idx_id, int tag, long data);
 
 struct tagcache_stat* tagcache_get_stat(void);
+/* Fill in the change counters above. Cheap enough to ask on a timer; the
+ * deleted count is the only part that walks anything, and it walks RAM. */
+void tagcache_get_marks(struct tagcache_marks *m);
 /* True while a database build/update scan or commit is in progress. Used to
  * drive the status-bar activity indicator (%ld) instead of a modal splash. */
 bool tagcache_is_busy(void);

@@ -4517,12 +4517,17 @@ static bool check_file_refs(bool auto_update)
     struct tagfile_entry tfe;
     struct tagcache_header hdr;
 
+    int deleted_ct = 0;
+
     logf("reverse scan...");
 
     if (tcramcache.handle > 0)
         tcrc_buffer_lock();
     else
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "refs: no ramcache buffer, giving up");
         return false;
+    }
     /* Wait for any in-progress dircache build to complete */
     dircache_wait();
 
@@ -4531,8 +4536,12 @@ static bool check_file_refs(bool auto_update)
     if (fd < 0)
     {
         logf(TAGCACHE_FILE_INDEX " open fail", tag_filename);
+        debug_log(DEBUG_LOG_TAGCACHE, "refs: filename tagfile open failed");
         return false;
     }
+
+    debug_log(DEBUG_LOG_TAGCACHE, "refs: start, auto_update=%d entries=%d",
+              auto_update, (int)hdr.entry_count);
 
     processed_dir_count = 0;
 
@@ -4586,17 +4595,43 @@ static bool check_file_refs(bool auto_update)
         }
         else if (rc_cache == 0)     /* not in cache but okay */
         {;}
-        else if (auto_update && rc_cache == ENOENT)
+        /* A negative return means the lookup did not succeed; it does not say
+         * why in any form worth trusting. Upstream read absence out of the
+         * return value (`rc_cache == ENOENT`), which compares it against 2 --
+         * a *success* code the branch above has already taken -- so nothing
+         * deleted from the player was ever dropped from the database.
+         *
+         * errno is no better. dircache_search()'s "absent for sure" branch
+         * reports ENOENT only when its inner call returns exactly 0; a missing
+         * file here comes back rc=-15 with errno untouched at 0, so an errno
+         * test misses it just as completely.
+         *
+         * So ask the filesystem instead of decoding the failure. It costs a
+         * stat, but only for entries that already failed to resolve -- 43 on
+         * the library this was found on, against 3502 scanned -- and deleting
+         * an entry is destructive enough to be worth confirming directly. */
+        else if (auto_update && !file_exists(buf))
         {
             logf("Entry no longer valid.");
             logf("-> %s / %" PRId32, buf, tfe.tag_length);
+            debug_log(DEBUG_LOG_TAGCACHE, "refs: gone %s", buf);
             delete_entry(idx_id);
+            deleted_ct++;
+        }
+        else if (rc_cache < 0)
+        {
+            /* Did not resolve, but the file is there. Left alone. */
+            debug_log(DEBUG_LOG_TAGCACHE, "refs: rc=%d errno=%d %s",
+                      rc_cache, errno, buf);
         }
 
         do_timed_yield();
     }
 
 wend_finished:
+    debug_log(DEBUG_LOG_TAGCACHE, "refs: done, scanned=%d deleted=%d",
+              processed_dir_count, deleted_ct);
+
 
     if (tcramcache.handle > 0)
         tcrc_buffer_unlock();
@@ -5079,6 +5114,11 @@ static void tagcache_thread(void)
                  * user open the database browser and confirm a prompt to
                  * create one, build it here in the background automatically
                  * -- there's no situation where you wouldn't want one. */
+                debug_log(DEBUG_LOG_TAGCACHE,
+                          "scan: asked=%d update=%d ready=%d ram=%d(set %d)",
+                          asked_to_scan, do_update, tc_stat.ready,
+                          tc_stat.ramcache, global_settings.tagcache_ram);
+
                 if (!tc_stat.ready)
                 {
                     tagcache_build();
@@ -5092,7 +5132,22 @@ static void tagcache_thread(void)
                 if (!tc_stat.ramcache && global_settings.tagcache_ram)
                 {
                     load_ramcache();
-                    if (global_settings.tagcache_ram == TAGCACHE_RAM_ON)
+                    /* Two jobs share this call, picked by its argument, and
+                     * only one of them is what Quick opts out of.
+                     *
+                     * check_file_refs(false) populates dircache filerefs --
+                     * the optimisation Quick trades away for a faster load.
+                     * check_file_refs(true) checks storage and drops entries
+                     * whose files have gone, which needs no dircache and is
+                     * the only thing that ever notices a deletion.
+                     *
+                     * Gating both on Quick left a database that never forgets:
+                     * delete an album over USB and it stays in the browser and
+                     * the carousel for the life of the install. The other arm
+                     * below always ran the check, so the asymmetry was not
+                     * deliberate. Ask for it whenever a scan was asked for. */
+                    if (global_settings.tagcache_ram == TAGCACHE_RAM_ON
+                        || do_update)
                         check_file_refs(do_update);
                     if (tc_stat.ramcache && do_update)
                         tagcache_build();
@@ -5178,6 +5233,36 @@ static int get_progress(void)
         return 100;
     else
         return processed_dir_count * 100 / total_count;
+}
+
+void tagcache_get_marks(struct tagcache_marks *m)
+{
+    int i, n = 0;
+
+    m->commitid = current_tcmh.commitid;
+    m->serial = current_tcmh.serial;
+    m->deleted_ct = -1;
+
+    /* Deletions are only ever marked in the index -- delete_entry() sets the
+     * flag and leaves entry_count alone -- so counting the flags is the only
+     * way to notice one at all. */
+    if (!tc_stat.ready || !tc_stat.ramcache || tcramcache.hdr == NULL)
+        return;
+
+    /* Pinned and run straight through, as build_lookup_list() does: the
+     * indices are movable, so yielding mid-walk would invalidate the pointer.
+     * One flag read per entry is cheap enough not to want the yield. A race
+     * with delete_entry() only undercounts, and the caller looks again. */
+    tcrc_buffer_lock();
+
+    for (i = 0; i < current_tcmh.tch.entry_count; i++)
+    {
+        if (tcramcache.hdr->indices[i].flag & FLAG_DELETED)
+            n++;
+    }
+
+    tcrc_buffer_unlock();
+    m->deleted_ct = n;
 }
 
 struct tagcache_stat* tagcache_get_stat(void)

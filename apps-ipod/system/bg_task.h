@@ -7,9 +7,9 @@
  * Three things rebuild themselves after the library changes -- the tag
  * database, the carousel's album index and the artwork thumbnail cache -- and
  * the last two are identical in everything but the pass itself: wake on a
- * timer, acknowledge USB, wait for the database to settle, compare an entry
- * count against a marker file, run, record. That shape lives here, so each
- * task supplies only its pass.
+ * timer, acknowledge USB, wait for the database to settle, compare the
+ * library's marks against a marker file, run, record. That shape lives here,
+ * so each task supplies only its pass.
  *
  * This owns no thread and is not a scheduler. Every task keeps its own
  * thread, stack and queue -- the stacks differ by a lot, and a thread holding
@@ -32,12 +32,30 @@
 #define BG_RANK_INDEX   0
 #define BG_RANK_ART     1
 
+/* What "the library" looked like at some moment. A task is stale when the
+ * marks move, so between them these are the whole definition of "something
+ * changed that the derived artifacts care about".
+ *
+ * Three rather than one because the entry count alone misses deletions:
+ * tagcache marks a removed entry and leaves the count where it was, so a
+ * library that only ever loses tracks looks untouched forever.
+ *
+ * The play counter (tagcache's serial) is deliberately absent. Playing a
+ * track changes nothing either pass produces -- the album index carries
+ * playback figures, but it keeps them current by its own means. */
+struct bg_marks
+{
+    int entries;   /* tagcache entry count */
+    int commitid;  /* commits so far -- moves when tracks are added */
+    int deleted;   /* entries flagged deleted, -1 when not countable */
+};
+
 struct bg_task
 {
     /* ---- supplied by the task ---- */
 
-    /* Where the entry count of the last completed pass is kept. On disk
-     * rather than in RAM so an unchanged library costs nothing at startup. */
+    /* Where the marks of the last completed pass are kept. On disk rather
+     * than in RAM so an unchanged library costs nothing at startup. */
     const char *done_file;
     int rank;
 
@@ -75,8 +93,8 @@ struct bg_task
     volatile bool rebuild_req;
     volatile bool update_req;
     bool verified;      /* artifact_ok() has answered yes; don't ask again */
-    int  done_total;    /* entry count the last completed pass covered */
-    int  prev_total;    /* entry count seen last tick (stability check) */
+    struct bg_marks done_marks;  /* what the last completed pass covered */
+    struct bg_marks prev_marks;  /* what last tick saw (stability check) */
     int  fails;         /* consecutive unfinished passes */
     long retry_at;      /* tick before which not to try again, 0 = now */
 };

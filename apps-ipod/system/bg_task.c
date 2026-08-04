@@ -13,7 +13,6 @@
  ****************************************************************************/
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include "config.h"
 #include "kernel.h"
@@ -48,12 +47,44 @@ static int bg_tasks_count;
  * The marker file
  * ------------------------------------------------------------------------ */
 
-/* The entry count of the last completed pass, or -1 if there wasn't one. */
-static int bg_read_done(const struct bg_task *task)
+/* Marks that match nothing, so a task holding them is stale. */
+static void bg_marks_none(struct bg_marks *m)
 {
-    char buf[16];
-    int total = -1;
+    m->entries = -1;
+    m->commitid = -1;
+    m->deleted = -1;
+}
+
+static bool bg_marks_equal(const struct bg_marks *a, const struct bg_marks *b)
+{
+    return a->entries == b->entries
+        && a->commitid == b->commitid
+        && a->deleted == b->deleted;
+}
+
+/* What the library looks like right now. */
+static void bg_marks_now(struct bg_marks *m)
+{
+    struct tagcache_marks tm;
+
+    tagcache_get_marks(&tm);
+    m->entries = tagcache_get_stat()->total_entries;
+    m->commitid = tm.commitid;
+    m->deleted = tm.deleted_ct;
+}
+
+/* The marks of the last completed pass, or none if there wasn't one.
+ *
+ * A file written before the marks existed holds a single number, so the parse
+ * falls short and the task reads as never having run -- one pass each after
+ * the firmware update, which is the right answer anyway since nothing before
+ * this could see a deletion. */
+static void bg_read_done(const struct bg_task *task, struct bg_marks *m)
+{
+    char buf[48];
     int fd = open(task->done_file, O_RDONLY);
+
+    bg_marks_none(m);
 
     if (fd >= 0)
     {
@@ -61,21 +92,24 @@ static int bg_read_done(const struct bg_task *task)
         if (n > 0)
         {
             buf[n] = '\0';
-            total = atoi(buf);
+            if (sscanf(buf, "%d %d %d",
+                       &m->entries, &m->commitid, &m->deleted) != 3)
+                bg_marks_none(m);
         }
         close(fd);
     }
-    return total;
 }
 
-static void bg_write_done(const struct bg_task *task, int total)
+static void bg_write_done(const struct bg_task *task,
+                          const struct bg_marks *m)
 {
-    char buf[16];
+    char buf[48];
     int fd = open(task->done_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
     if (fd >= 0)
     {
-        int n = snprintf(buf, sizeof(buf), "%d\n", total);
+        int n = snprintf(buf, sizeof(buf), "%d %d %d\n",
+                         m->entries, m->commitid, m->deleted);
         write(fd, buf, n);
         close(fd);
     }
@@ -89,8 +123,8 @@ static void bg_write_done(const struct bg_task *task, int total)
 void bg_task_forget(struct bg_task *task)
 {
     remove(task->done_file);
-    task->done_total = -1;
-    task->prev_total = -1;
+    bg_marks_none(&task->done_marks);
+    bg_marks_none(&task->prev_marks);
     task->retry_at = 0;
     task->fails = 0;
     task->verified = false;
@@ -102,8 +136,8 @@ void bg_task_forget(struct bg_task *task)
 
 void bg_task_init(struct bg_task *task)
 {
-    task->done_total = bg_read_done(task);
-    task->prev_total = -1;
+    bg_read_done(task, &task->done_marks);
+    bg_marks_none(&task->prev_marks);
 
     if (bg_tasks_count < BG_MAX_TASKS)
         bg_tasks[bg_tasks_count++] = task;
@@ -173,7 +207,7 @@ void bg_task_update(struct bg_task *task)
 void bg_task_tick(struct bg_task *task, struct event_queue *queue)
 {
     struct queue_event ev;
-    int total;
+    struct bg_marks now;
     bool finished;
 
     queue_wait_w_tmo(queue, &ev, BG_TICK_PERIOD);
@@ -186,7 +220,7 @@ void bg_task_tick(struct bg_task *task, struct event_queue *queue)
             /* The library may have changed while we were a disk, and so may
              * the artifacts -- this is the one way they go missing without a
              * trigger, so it is also the one place worth re-checking. */
-            task->prev_total = -1;
+            bg_marks_none(&task->prev_marks);
             task->verified = false;
             return;
 
@@ -235,20 +269,20 @@ void bg_task_tick(struct bg_task *task, struct event_queue *queue)
     /* Only ever work against a database that is readable and holding still. */
     if (!tagcache_is_usable() || tagcache_is_busy())
     {
-        task->prev_total = -1;
+        bg_marks_none(&task->prev_marks);
         return;
     }
 
-    /* Require the count to be stable across two consecutive ticks, so a scan
+    /* Require the marks to be stable across two consecutive ticks, so a scan
      * still in flight is never mistaken for a settled library. */
-    total = tagcache_get_stat()->total_entries;
-    if (total != task->prev_total)
+    bg_marks_now(&now);
+    if (!bg_marks_equal(&now, &task->prev_marks))
     {
-        task->prev_total = total;
+        task->prev_marks = now;
         return;
     }
 
-    if (total == task->done_total)
+    if (bg_marks_equal(&now, &task->done_marks))
     {
         /* Already answered once, and only a USB session or a trigger can have
          * changed the answer -- both of which clear `verified`. Re-asking every
@@ -280,11 +314,11 @@ void bg_task_tick(struct bg_task *task, struct event_queue *queue)
 
     if (finished)
     {
-        task->done_total = total;
-        task->prev_total = total;
+        task->done_marks = now;
+        task->prev_marks = now;
         task->wants_run = false;
         task->fails = 0;
-        bg_write_done(task, total);
+        bg_write_done(task, &now);
         return;
     }
 
