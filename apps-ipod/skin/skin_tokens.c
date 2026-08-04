@@ -69,7 +69,7 @@
 #include "tdspeed.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
-#include "database/db_index.h"      /* db_index_is_busy -- the %lb indicator */
+#include "database/db_summary.h"      /* db_summary_is_busy -- the %lb indicator */
 
 #include "wps_internals.h"
 #include "custom_tokens.h"
@@ -1819,7 +1819,7 @@ const char *get_token_value(struct gui_wps *gwps,
             bool building = false;
             if (tagcache_is_busy())
                 building = true;
-            if (db_index_is_busy())
+            if (db_summary_is_busy())
                 building = true;
             if (art_cache_is_busy())
                 building = true;

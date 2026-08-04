@@ -30,7 +30,7 @@ audio/audio_path.c
 
 #ifdef HAVE_TAGCACHE
 database/tagcache.c
-database/db_index.c
+database/db_summary.c
 screens/browse/browser_db.c
 screens/browse/album_charts.c
 #endif

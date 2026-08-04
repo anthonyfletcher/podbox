@@ -9,7 +9,7 @@
  * express "sum playcount across an album" -- which is why the database's own
  * Playback History menu is otherwise entirely track-level. They are computed
  * here instead, from figures the database index summarises per album and per
- * artist while it is built (see database/db_index.c).
+ * artist while it is built (see database/db_summary.c).
  *
  * Albums and artists rank identically -- most played, most recently played,
  * fewest plays -- and differ only in which array of the index they read, so
@@ -48,7 +48,7 @@
 #include "input/action.h"
 #include "system/activity.h"
 #include "database/tagcache.h"
-#include "database/db_index.h"
+#include "database/db_summary.h"
 #include "screens/covers/carousel.h"      /* struct album_data, SUCCESS/ERROR_* */
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
@@ -67,7 +67,7 @@ enum chart_rank {
 };
 
 /* The index, live only for the duration of one action. */
-static struct pf_index_t idx;
+static struct db_summary_t idx;
 static int idx_handle;
 
 /* The current chart: indices into whichever array it ranks, best first, with
@@ -297,7 +297,7 @@ static void report_empty(void)
 /* Claim the index. SUCCESS, or an ERROR_* having already said why. */
 static int acquire(void)
 {
-    int res = db_index_acquire(&idx, &idx_handle);
+    int res = db_summary_acquire(&idx, &idx_handle);
 
     if (res < SUCCESS)
     {
@@ -313,7 +313,7 @@ static int acquire(void)
 
 static void release(void)
 {
-    db_index_release(idx_handle);
+    db_summary_release(idx_handle);
     idx_handle = 0;
 }
 

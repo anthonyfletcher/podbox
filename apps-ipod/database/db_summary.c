@@ -4,7 +4,7 @@
  * The database index: the flat album and artist list derived from tagcache.
  *
  * Built by walking tagcache, held in the buffer carousel.h describes as
- * pf_idx, and persisted to db_index.idx so later reads get it back instead of
+ * pf_idx, and persisted to db_summary.dat so later reads get it back instead of
  * rescanning. It carries no artwork -- only names, years, playback figures and
  * the taglist seeks needed to navigate into the database -- so it goes stale
  * when the database changes, not when files on disk do.
@@ -20,7 +20,7 @@
  *   - writing entries into the index buffer
  *   - the tagcache walks that populate it
  *   - the on-disk form
- *   - db_index_build(), which reuses the saved index or rebuilds it
+ *   - db_summary_build(), which reuses the saved index or rebuilds it
  *   - the background pass that keeps the saved index current
  ****************************************************************************/
 
@@ -54,17 +54,17 @@
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
 #include "screens/covers/album_covers.h"   /* SORT_BY_*, ASCENDING (sort order) */
-#include "db_index.h"
+#include "db_summary.h"
 
 /* The index file, and the four-byte magic at its start. It holds albums and
  * artists alike, and is read by more than the carousel now, so it lives beside
  * the other state in ROCKBOX_DIR rather than in the carousel's own folder --
  * which keeps only what is genuinely the carousel's, its slide cache and empty
  * slide. Regenerated if absent. */
-#define DB_INDEX_FILE ROCKBOX_DIR "/db_index.idx"
+#define DB_SUMMARY_FILE ROCKBOX_DIR "/db_summary.dat"
 /* The index is always rewritten whole, so it is built here and renamed over
  * the real file rather than written into it. See save_album_index(). */
-#define DB_INDEX_TMP  DB_INDEX_FILE ".tmp"
+#define DB_SUMMARY_TMP  DB_SUMMARY_FILE ".tmp"
 /* Bump the magic whenever struct album_data or struct artist_data, or the
  * file's layout, changes. load_album_index() validates nothing finer -- it
  * checks this and some coarse sizes -- so a struct that grew without a new
@@ -95,7 +95,7 @@ static struct tagcache_search tcs;
  * whoever asked for it. That lets the same code serve the carousel building
  * into the app buffer it has claimed, and a background build into memory of
  * its own -- the allocation differs, the builder does not. */
-static struct pf_index_t *pfi;
+static struct db_summary_t *pfi;
 
 /* Serialises the two callers of the builder. The carousel blocks here rather
  * than starting a second build; because it has usually just asked for one, it
@@ -600,7 +600,7 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
 
 /* Create an index of all artists from the database, into whichever index pfi
  * currently points at. Like everything else here it assumes build_mutex is
- * held and pfi is set -- db_index_build_artists() is how an outside caller
+ * held and pfi is set -- db_summary_build_artists() is how an outside caller
  * gets into that state. */
 static int build_artist_index(struct tagcache_search *tcs,
                                  void **buf, size_t *bufsz)
@@ -789,7 +789,7 @@ static void load_dirty(int32_t since, uint32_t *uniq)
  * outside what the build can reach. */
 static void carry_over_prepare(void **buf, size_t *bufsz)
 {
-    struct pf_index_t old;
+    struct db_summary_t old;
     struct tagcache_marks marks;
     struct album_data *raw;
     size_t need;
@@ -801,7 +801,7 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
     dirty_ct = 0;
     carry_reserved = 0;
 
-    fd = open(DB_INDEX_FILE, O_RDONLY);
+    fd = open(DB_SUMMARY_FILE, O_RDONLY);
     if (fd < 0)
         return;
 
@@ -1257,20 +1257,20 @@ static int save_album_index(void){
      * load rejects, sending the carousel off to rebuild from the database.
      * rename() creates the new directory entry before dropping the old one, so
      * a reader arriving at any moment sees one complete index or the other. */
-    int fd = creat(DB_INDEX_TMP, 0666);
-    struct pf_index_t data;
+    int fd = creat(DB_SUMMARY_TMP, 0666);
+    struct db_summary_t data;
     bool ok;
 
     if (fd < 0)
         return -1;
 
-    memcpy(&data, pfi, sizeof(struct pf_index_t));
+    memcpy(&data, pfi, sizeof(struct db_summary_t));
     memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
 
     /* The artist array is written last so the layout before it is unchanged
      * from the versions that did not keep it; the magic tells the two apart
      * anyway. */
-    ok = write_block(fd, &data, sizeof(struct pf_index_t))
+    ok = write_block(fd, &data, sizeof(struct db_summary_t))
       && write_block(fd, data.artist_names, data.artist_len)
       && write_block(fd, data.album_names, data.album_len)
       && write_block(fd, data.album_index,
@@ -1280,9 +1280,9 @@ static int save_album_index(void){
 
     close(fd);
 
-    if (!ok || rename(DB_INDEX_TMP, DB_INDEX_FILE) < 0)
+    if (!ok || rename(DB_SUMMARY_TMP, DB_SUMMARY_FILE) < 0)
     {
-        remove(DB_INDEX_TMP);
+        remove(DB_SUMMARY_TMP);
         return -1;
     }
 
@@ -1316,14 +1316,14 @@ static inline int read2buf(int fildes, void *buf, size_t nbyte){
  * offsets, so it does not enter into the arithmetic here.)
  *
  * SUCCESS, or an ERROR_* leaving the caller to build the list the slow way. */
-static int load_artist_index(struct pf_index_t *target,
+static int load_artist_index(struct db_summary_t *target,
                              void **buf, size_t *bufsz)
 {
-    struct pf_index_t data;
+    struct db_summary_t data;
     void *b = *buf;
     size_t bsz = *bufsz;
     unsigned int artist_idx_sz;
-    int i, fr = open(DB_INDEX_FILE, O_RDONLY);
+    int i, fr = open(DB_SUMMARY_FILE, O_RDONLY);
 
     if (fr < 0)
         return ERROR_NO_ARTISTS;
@@ -1380,7 +1380,7 @@ failure:
     return ERROR_NO_ARTISTS;
 }
 
-int db_index_load_artists(struct pf_index_t *target,
+int db_summary_load_artists(struct db_summary_t *target,
                           void **buf, size_t *bufsz)
 {
     int ret = wait_for_background();
@@ -1401,8 +1401,8 @@ int db_index_load_artists(struct pf_index_t *target,
 /*Loads the album_index information stored in the hard drive*/
 static int load_album_index(void){
 
-    int i, fr = open(DB_INDEX_FILE, O_RDONLY);
-    struct pf_index_t data;
+    int i, fr = open(DB_SUMMARY_FILE, O_RDONLY);
+    struct db_summary_t data;
 
     void *bufstart = pfi->buf;
     unsigned int bufstart_sz = pfi->buf_sz;
@@ -1477,7 +1477,7 @@ static int load_album_index(void){
                     }
                 }
 
-                memcpy(pfi, &data, sizeof(struct pf_index_t));
+                memcpy(pfi, &data, sizeof(struct db_summary_t));
                 pfi->buf = buf;
                 pfi->buf_sz = buf_size;
 
@@ -1510,7 +1510,7 @@ failure:
 /* Reuse the saved index, or build one and persist it, into the caller's
  * struct and the caller's memory. Which memory is the only thing that varies
  * between a build the carousel asks for and one a background pass does. */
-static int build_into(struct pf_index_t *target, void *buf, size_t buf_sz,
+static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
                       bool background)
 {
     int ret = SUCCESS;
@@ -1564,7 +1564,7 @@ static int build_into(struct pf_index_t *target, void *buf, size_t buf_sz,
     return ret;
 }
 
-int db_index_build_into(struct pf_index_t *target, void *buf, size_t buf_sz)
+int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz)
 {
     return build_into(target, buf, buf_sz, false);
 }
@@ -1585,13 +1585,13 @@ static int wait_for_background(void)
      * and stands down instead of taking the lock out from under us. */
     fg_wanted_tick = current_tick;
 
-    if (!db_index_is_busy())
+    if (!db_summary_is_busy())
         return SUCCESS;
 
     /* Nothing on screen at all if it finishes promptly. */
     splash_progress_set_delay(HZ / 2);
 
-    while (db_index_is_busy())
+    while (db_summary_is_busy())
     {
         /* Kept current for as long as we are here, so the claim never lapses
          * while we are still waiting on a pass that is already running. */
@@ -1621,13 +1621,13 @@ static int wait_for_background(void)
 
 /* carousel_model.build_index: build into the engine's own index and the
  * buffer it has already claimed. */
-int db_index_build(void)
+int db_summary_build(void)
 {
     int ret = wait_for_background();
     if (ret != SUCCESS)
         return ret;
 
-    return db_index_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
+    return db_summary_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
 }
 
 /* carousel_model.build_index for the artist model: the artist half only, with
@@ -1714,7 +1714,7 @@ static void assign_artist_art_and_stats(struct tagcache_search *tcs,
     }
 }
 
-int db_index_build_artists(struct pf_index_t *target,
+int db_summary_build_artists(struct db_summary_t *target,
                               struct tagcache_search *tcs,
                               void **buf, size_t *bufsz, bool with_stats)
 {
@@ -1783,7 +1783,7 @@ static bool bg_should_stop(void)
 {
     struct queue_event ev;
 
-    if (bg_task_preempted(&db_index_task))
+    if (bg_task_preempted(&db_summary_task))
         return true;
 
     /* Trap: the queue alone is too late for a host. Nothing arrives on it
@@ -1809,17 +1809,17 @@ static bool bg_should_stop(void)
 
 /* True from before the background pass reaches for the lock until after it has
  * let go, not merely while it holds it -- see bg_claimed. */
-bool db_index_is_busy(void)
+bool db_summary_is_busy(void)
 {
     return bg_claimed || building_bg;
 }
 
-const char *db_index_activity(void)
+const char *db_summary_activity(void)
 {
     return bg_step ? bg_step : "";
 }
 
-void db_index_progress(int *done, int *total)
+void db_summary_progress(int *done, int *total)
 {
     *done = bg_done;
     *total = bg_total;
@@ -1833,7 +1833,7 @@ void db_index_progress(int *done, int *total)
  * forever (nothing sets it on this path) and quietly change what the carousel
  * does with it. This is the same marker the artwork cache keeps for the same
  * reason -- what was the library like when we last finished. */
-#define IDX_DONE_FILE ROCKBOX_DIR "/db_index.log"
+#define DB_SUMMARY_DONE ROCKBOX_DIR "/db_summary.done"
 
 /* Read the index without a buffer of your own; see album_index.h.
  *
@@ -1844,7 +1844,7 @@ void db_index_progress(int *done, int *total)
  * checking core_allocatable() first, since core_alloc() shrinks what will
  * shrink and that is usually the only way this gets memory, and pin it because
  * a handle with no ops is movable while the builder yields throughout. */
-int db_index_acquire(struct pf_index_t *target, int *handle)
+int db_summary_acquire(struct db_summary_t *target, int *handle)
 {
     void *buf;
     int ret;
@@ -1864,16 +1864,16 @@ int db_index_acquire(struct pf_index_t *target, int *handle)
     buf = core_get_data_pinned(*handle);
     memset(target, 0, sizeof(*target));
 
-    ret = db_index_build_into(target, buf, IDX_BUILD_BUFSZ);
+    ret = db_summary_build_into(target, buf, IDX_BUILD_BUFSZ);
     if (ret < SUCCESS)
     {
-        db_index_release(*handle);
+        db_summary_release(*handle);
         *handle = 0;
     }
     return ret;
 }
 
-void db_index_release(int handle)
+void db_summary_release(int handle)
 {
     if (handle <= 0)
         return;
@@ -1892,7 +1892,7 @@ void db_index_release(int handle)
 static bool saved_index_present(void)
 {
     uint32_t header;
-    int fd = open(DB_INDEX_FILE, O_RDONLY);
+    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
     bool ok;
 
     if (fd < 0)
@@ -1920,7 +1920,7 @@ static bool saved_index_present(void)
  * over the resume position. The carousel's own prepare callback owns it. */
 static bool background_build(void)
 {
-    struct pf_index_t local;
+    struct db_summary_t local;
     size_t bufsz = IDX_BUILD_BUFSZ;
     int handle;
     void *buf;
@@ -1975,7 +1975,7 @@ static bool background_build(void)
     core_free(handle);
 
     /* Released only now, after the lock has been let go inside build_into():
-     * anyone polling db_index_is_busy() is waiting to take that lock, so it
+     * anyone polling db_summary_is_busy() is waiting to take that lock, so it
      * has to stay set until there is nothing left for them to collide with. */
     ok = (ret == SUCCESS);
     bg_claimed = false;
@@ -1986,9 +1986,9 @@ static bool background_build(void)
     return ok;
 }
 
-struct bg_task db_index_task =
+struct bg_task db_summary_task =
 {
-    .done_file   = IDX_DONE_FILE,
+    .done_file   = DB_SUMMARY_DONE,
     .rank        = BG_RANK_INDEX,
     .run         = background_build,
     .artifact_ok = saved_index_present,
@@ -1997,21 +1997,21 @@ struct bg_task db_index_task =
 static void idx_thread(void)
 {
     while (1)
-        bg_task_tick(&db_index_task, &idx_queue);
+        bg_task_tick(&db_summary_task, &idx_queue);
 }
 
-void db_index_init(void)
+void db_summary_init(void)
 {
     mutex_init(&build_mutex);
     queue_init(&idx_queue, true);
-    bg_task_init(&db_index_task);
+    bg_task_init(&db_summary_task);
     idx_thread_id = create_thread(idx_thread, idx_stack, sizeof(idx_stack), 0,
                                   idx_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
                                   IF_COP(, CPU));
     (void)idx_thread_id;
 }
 
-void db_index_invalidate(void)
+void db_summary_invalidate(void)
 {
     /* Forget what the last pass covered, so the next tick rebuilds. Used by
      * the carousel's rebuild/update, which otherwise only reach its own build
@@ -2019,5 +2019,5 @@ void db_index_invalidate(void)
      *
      * An update rather than a rebuild: there is nothing here to purge that the
      * pass does not overwrite anyway, the index being a single file. */
-    bg_task_update(&db_index_task);
+    bg_task_update(&db_summary_task);
 }

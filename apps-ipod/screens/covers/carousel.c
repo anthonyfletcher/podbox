@@ -362,7 +362,7 @@ struct event_queue thread_q;
 
 static struct buflib_context buf_ctx;
 
-struct pf_index_t pf_idx;
+struct db_summary_t pf_idx;
 
 static bool thread_is_running;
 static bool wants_to_quit;

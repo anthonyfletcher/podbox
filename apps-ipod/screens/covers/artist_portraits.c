@@ -22,7 +22,7 @@
 #include "root_menu.h"       /* GO_TO_* screen codes, MENU_ATTACHED_USB */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
-#include "database/db_index.h" /* build_artist_index() */
+#include "database/db_summary.h" /* build_artist_index() */
 
 static char *artist_name(int index)
 {
@@ -64,7 +64,7 @@ static int artist_build_index(void)
      * cost a filtered search per artist on the build path, where the saved
      * index simply has them. Reading is faster in both orders, and makes the
      * sort cost nothing at all. */
-    res = db_index_load_artists(&pf_idx, &buf, &buf_size);
+    res = db_summary_load_artists(&pf_idx, &buf, &buf_size);
 
     /* Only a missing or unusable index falls through to a build. ERROR_USER_ABORT
      * means the user cancelled out of waiting for the background pass, and
@@ -77,7 +77,7 @@ static int artist_build_index(void)
         buf = pf_idx.buf;
         buf_size = pf_idx.buf_sz;
         ALIGN_BUFFER(buf, buf_size, sizeof(long));
-        res = db_index_build_artists(&pf_idx, &tcs, &buf, &buf_size, by_plays);
+        res = db_summary_build_artists(&pf_idx, &tcs, &buf, &buf_size, by_plays);
     }
 
     if (res < SUCCESS)

@@ -113,7 +113,7 @@ struct artist_data {
     unsigned int art_hash;
 };
 
-struct pf_index_t {
+struct db_summary_t {
     uint32_t            header; /*INDEX_HDR*/
     uint16_t            artist_ct;
     uint16_t            album_ct;
@@ -189,7 +189,7 @@ struct pf_config_t
 
 /* --- Shared engine state the models read/write (owned by the engine) -------- */
 extern struct pf_config_t pf_cfg;  /* engine's persistent cache/resume config */
-extern struct pf_index_t pf_idx;   /* the current carousel's index buffer */
+extern struct db_summary_t pf_idx;   /* the current carousel's index buffer */
 extern int   center_index;         /* engine's current slide */
 extern int   pf_bold_font;         /* caption bold font (draw_text) */
 extern int   pf_height;            /* drawable viewport height (draw_text) */
@@ -212,7 +212,7 @@ int  get_scroll_line_offset(enum pf_scroll_line_type type);
 struct viewport *carousel_text_begin(void);
 void carousel_text_end(struct viewport *saved);
 /* build_artist_index() belongs to the index builder -- see
- * database/db_index.h. */
+ * database/db_summary.h. */
 /* Persist the engine's pf_cfg to its config file (album model calls this after
  * changing last_album / triggering a cache rebuild). */
 void pf_config_save(void);

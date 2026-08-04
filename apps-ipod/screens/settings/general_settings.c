@@ -106,23 +106,23 @@ MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
  * again; update keeps what still applies. Here rather than with the carousel
  * settings because it is derived from the database and goes stale when the
  * database changes, not when the carousel does anything. */
-static int db_index_rebuild(void)
+static int db_summary_rebuild(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_INDEX)))
         bg_task_rebuild(&album_covers_task);
     return 0;
 }
-MENUITEM_FUNCTION(db_index_rebuild_item, 0, ID2P(LANG_REBUILD_INDEX),
-                  db_index_rebuild, NULL, Icon_NOICON);
+MENUITEM_FUNCTION(db_summary_rebuild_item, 0, ID2P(LANG_REBUILD_INDEX),
+                  db_summary_rebuild, NULL, Icon_NOICON);
 
-static int db_index_update(void)
+static int db_summary_update(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_UPDATE_INDEX)))
         bg_task_update(&album_covers_task);
     return 0;
 }
-MENUITEM_FUNCTION(db_index_update_item, 0, ID2P(LANG_UPDATE_INDEX),
-                  db_index_update, NULL, Icon_NOICON);
+MENUITEM_FUNCTION(db_summary_update_item, 0, ID2P(LANG_UPDATE_INDEX),
+                  db_summary_update, NULL, Icon_NOICON);
 
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
@@ -130,7 +130,7 @@ MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_scan_on_eject, &tagcache_scan_on_startup,
                 &tagcache_autocommit,
                 &tc_init, &tc_update, &runtimedb,
-                &db_index_rebuild_item, &db_index_update_item,
+                &db_summary_rebuild_item, &db_summary_update_item,
                 &db_albumart, &db_artistart,
                 &tc_export, &tc_import, &tc_paths, &debug_log_tagcache
                 );
