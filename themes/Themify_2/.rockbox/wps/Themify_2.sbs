@@ -64,7 +64,7 @@
 #- USB Screen Logic -#
 # CC: USB screen (cs=21): hide the normal UI viewport. The screen itself is
 # CC: drawn by usb_screen.c, not by this skin.
-%?if(%cs, =, 21)<%VI(USB_Screen_Supression)>
+%?if(%cs, =, 21)<%VI(USB_Screen_Supression)%Vd(USB_Screen)>
 #
 #- System Menu -#
 # CC: System menu (cs=16): header + sub-menu viewport + the version dialog box.
@@ -720,3 +720,31 @@ u
 #--- END ---#
 #
 #
+#
+#--- USB Screen ---#
+# Rendered once by gui_usb_screen_run(), before the storage handover. The eject
+# graphic is font 9 glyphs, so it needs the skin engine and cannot be drawn any
+# other way.
+#
+# %VI(USB_Screen_Supression) on the %cs 21 line shrinks the UI viewport to 1x1,
+# which is how the core is told this screen draws its own message and should not
+# get the built-in one on top.
+#
+# The fill covers the full height, status bar included. This screen is drawn
+# once and never refreshed, so a visible status bar would freeze -- clock,
+# battery and any loading indicator stuck at whatever they read on plug-in.
+#
+%Vl(USB_Screen,0,0,-,-,-)%dr(0,0,-,-)
+%Vl(USB_Screen,30,177,260,29,6)%VB%Vs(invert)ĞğğğğğğğğĤĠ
+%Vl(USB_Screen,30,206,260,11,6)%VB%Vs(invert)ġĢĢĢĢĢĢĢĢĥģ
+%Vl(USB_Screen,30,177,260,40,-)
+#
+%Vl(USB_Screen,41,182,238,22,-)%VB%acEject before Disconnecting
+%Vl(USB_Screen,41,182,238,22,-)
+#
+%Vl(USB_Screen,85,27,150,150,9)%Vs(invert)%alÀÁÂÃ
+ÄÅÆÇÈÉ
+ÊËÌÍÎÏ
+ÐÑÒÓÔÕ
+Ö×ØÙÚÛ
+  ÜÝÞß
