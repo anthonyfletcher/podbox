@@ -310,10 +310,11 @@ struct pf_config_t pf_cfg;
 /** below we allocate the memory we want to use **/
 
 static pix_t *buffer; /* for now it always points to the lcd framebuffer */
-int pf_height;           /* viewport height (LCD_HEIGHT minus status bar) */
+static int pf_height;    /* viewport height (LCD_HEIGHT minus status bar) */
 static int pf_half_height;      /* rows of drawable (post text-margin) height above center */
 static int pf_lower_half;       /* rows of drawable (post text-margin) height below center */
 static int pf_draw_y_shift;     /* rows skipped below pf_vp_y for a TOP text caption's margin */
+static int pf_caption_band;     /* rows the covers give up to the caption */
 /* Album name font: global_settings.bold_font_file loaded via font_load(),
  * or the real UI font if none is configured. Provided by font_get_ui_bold()
  * (settings.c), which owns the font's lifecycle -- this screen must not unload
@@ -334,6 +335,11 @@ static int slide_frame;
 static int step;
 static int target;
 static int fade;
+/* Wall clock for the flip, see update_scroll_animation(). The scroll and
+ * transition speed settings are calibrated as a per-frame step at this rate. */
+#define CAROUSEL_NOMINAL_FPS 30
+static long anim_last_tick;
+static int anim_frac;
 /* Always 0: nothing sets it any more, but render_all_slides()'s fade
  * arithmetic still reads it, so it stays as a no-op term. */
 static int extra_fade;
@@ -1739,6 +1745,75 @@ static void recalc_offsets(void)
     }
 }
 
+/* Nominal cover height. Covers are scaled into DISPLAY_WIDTH x DISPLAY_HEIGHT
+ * keeping their aspect, so a square one -- nearly all of them -- comes out
+ * width-limited at this height. The caption is placed against this rather than
+ * against the cover currently on screen, so it stays put when a cover of some
+ * other shape scrolls past. */
+#define PF_NOMINAL_ART_H  MIN(DISPLAY_WIDTH, DISPLAY_HEIGHT)
+
+/* Least clear air above and below the caption. It only bounds how tight the
+ * band may get -- the block is centred in whatever space the band actually
+ * opens up, which is more than this. */
+#define PF_CAPTION_PAD    6
+
+/* Second line's offset from the first line's box top: clear air of half the
+ * album font's ascent, measured from that line's baseline.
+ *
+ * Both halves of that are load-bearing. Measured from the baseline rather than
+ * the box bottom, because a box carries a descent running anywhere from a
+ * fifth to nearly a third of its height depending on the font, and spacing off
+ * the bottom hands that variation straight to the gap.
+ *
+ * Keyed to the *album* font, not the artist font or the larger of the two,
+ * because the gap reads as belonging to the line above it. Keying it to the
+ * larger font was tried and is wrong on real themes: Themify_2 sets an 18px
+ * bold album line under a 25px regular artist line, and sizing the gap by the
+ * 25px font made it visibly too wide, while BONES -- 17px for both lines --
+ * looked right. Half the album ascent gives 6px and 7px respectively, which
+ * matches how they actually look.
+ *
+ * Half an ascent also reliably exceeds a descent (ascent runs ~70% of the box,
+ * descent ~28%), so a descending album name still clears the line below. */
+static int caption_line2(void)
+{
+    return font_get(pf_bold_font)->ascent * 3 / 2;
+}
+
+static int caption_block(bool two_lines)
+{
+    if (!two_lines)
+        return (int)font_get(pf_bold_font)->height;
+    return caption_line2()
+         + (int)font_get(screens[SCREEN_MAIN].getuifont())->height;
+}
+
+void carousel_caption_layout(bool two_lines, struct pf_caption *out)
+{
+    int block = caption_block(two_lines);
+    int art_top = (pf_height - pf_caption_band - PF_NOMINAL_ART_H) / 2;
+    int space, top;
+
+    if (art_top < 0)        /* cover taller than the drawable area: it is
+                             * clipped to that area, so it starts at the top */
+        art_top = 0;
+    art_top += pf_draw_y_shift;
+
+    if (pf_draw_y_shift)    /* caption above the covers */
+    {
+        top = 0;
+        space = art_top;
+    }
+    else
+    {
+        top = art_top + PF_NOMINAL_ART_H;
+        space = pf_height - top;
+    }
+
+    out->y1 = (space > block) ? top + (space - block) / 2 : top;
+    out->y2 = out->y1 + caption_line2();
+}
+
 /* Re-apply the geometry settings (zoom / centre margin / slide tuck / tilt) to
  * the slide layout without rebuilding the index -- used after the in-screen
  * settings menu changes a purely visual setting. Preserves the current slide. */
@@ -1862,6 +1937,12 @@ static void render_slide(struct slide_data *slide, const int alpha)
     const int p_start_upper = (half_height - 1 - vertical_offset) * PFREAL_ONE;
     const int p_start_lower = (half_height - vertical_offset) * PFREAL_ONE;
     for (x = xi; x < w; x++) {
+        /* Rounding in the reverse projection above can leave xs a fraction
+         * below the slide's left edge. The cast is unsigned, so that would
+         * wrap to a huge column and break out of the loop, truncating the
+         * slide mid-render rather than drawing its first column. */
+        if (xs < slide_left)
+            xs = slide_left;
         int column = (unsigned)(xs - slide_left) >> PFREAL_SHIFT;
         if (column >= sw)
             break;
@@ -2008,6 +2089,8 @@ static void start_animation(void)
 {
     step = (target < center_slide.slide_index) ? -1 : 1;
     pf_state = pf_scrolling;
+    anim_last_tick = current_tick;
+    anim_frac = 0;
 }
 
 static void update_scroll_animation(void);
@@ -2163,65 +2246,81 @@ static void update_scroll_animation(void)
     speed = 512 * global_settings.album_covers_transition_speed / 100
           + accel * global_settings.album_covers_scroll_speed / 100;
 
-    /* This advances slide_frame by a fixed amount per loop iteration,
-     * not per unit of wall-clock time (the original plugin's own
-     * update_scroll_animation() worked exactly the same way, so this
-     * isn't a regression) -- meaning the same logical animation plays
-     * out in fewer, larger jumps whenever the loop itself runs slower,
-     * which is exactly what happens now that playback stays active
-     * and competes with this screen for CPU time (see
-     * app_claim_buffer()'s comment in init()). A true fix would make
-     * this frame-rate independent (scale by measured elapsed ticks
-     * rather than a flat per-iteration constant); this is the cheaper,
-     * targeted version of that: a flat multiplier specifically while
-     * something is actually competing for the CPU, rather than always.
-     * The 3/2 factor is a guess, not a measurement -- there's no way
-     * to test actual frame timing from here, so treat this as a
-     * starting point to tune against how it actually feels on
-     * hardware, not a calibrated value. */
-    if (audio_status() & AUDIO_STATUS_PLAY)
-        speed = speed * 3 / 2;
+    /* Advance by elapsed time, not per call. speed is calibrated as a
+     * per-frame step at CAROUSEL_NOMINAL_FPS; a slower frame then takes a
+     * bigger step instead of making the flip take longer. Frame cost varies
+     * with the settings, and playback competes for the CPU (see
+     * app_claim_buffer()'s comment in init()), so a per-call advance cost
+     * twice over: fewer frames per second, and a flip that stretched in
+     * proportion because it still needed the same number of frames.
+     *
+     * The remainder is carried because HZ is 100 -- a ~30ms frame is about
+     * three ticks, and truncating each one would jitter the step size by a
+     * third. */
+    long now = current_tick;
+    int dt = now - anim_last_tick;
+    anim_last_tick = now;
+    if (dt < 0)
+        dt = 0;
+    else if (dt > HZ / 5)
+        dt = HZ / 5;        /* a stall must not teleport the flip */
 
-    slide_frame += speed * step;
+    int num = speed * dt * CAROUSEL_NOMINAL_FPS + anim_frac;
+    int adv = num / HZ;
+    anim_frac = num - adv * HZ;
 
-    int index = slide_frame >> 16;
-    int pos = slide_frame & 0xffff;
-    int neg = 65536 - pos;
-    int tick = (step < 0) ? neg : pos;
-    PFreal ftick = (tick * PFREAL_ONE) >> 16;
+    /* Clamping dt bounds the time step, not the distance. speed reaches
+     * 133120 and target is never more than two slides away, so one long
+     * frame could sail past it: the direction test at the end of this
+     * function would throw the flip into reverse, and center_index would
+     * meanwhile leave 0..number_of_slides-1, which album_covers.c's
+     * draw_album_text() uses to index pf_idx.album_index[] without a range
+     * check. Land on the target exactly instead. */
+    int remain = (step < 0) ? slide_frame - (target << 16)
+                            : (target << 16) - slide_frame;
+    if (remain < 0)
+        remain = 0;
+    if (adv > remain)
+        adv = remain;
 
-    /* the leftmost and rightmost slide must fade away */
-    fade = pos / 256;
+    slide_frame += adv * step;
 
-    if (step < 0)
-        index++;
+    /* Which slide is in the centre, and how far this flip has got towards
+     * the next one. A boundary is shared by two gaps, so the answer depends
+     * on the direction: moving right, C<<16 starts the gap above C; moving
+     * left it ends the gap below C, and the centre is still C. Rounding
+     * away from the direction of travel resolves both, and matters because
+     * a frame can land exactly on a boundary -- the advance above is zero
+     * for two frames inside the same 10ms tick, and is clamped to land on
+     * the target.
+     *
+     * tick is progress through the gap, 0 at the start, and neg is what
+     * remains; both are measured along the direction of travel, so the
+     * geometry below reads the same either way. */
+    int index = (step < 0) ? ((slide_frame + 0xffff) >> 16)
+                           : (slide_frame >> 16);
+
     if (center_index != index) {
         center_index = index;
         queue_post(&thread_q, EV_WAKEUP, 0);
         slide_frame = index << 16;
-        /* Recalculate for the snapped slide_frame. Without this, the values
-         * describe the frame we just left: fade drives the whole alpha ramp
-         * and ftick the slide geometry, so carrying either across a crossing
-         * shows as a one-frame flash.
-         *
-         * slide_frame now sits exactly on the boundary, so progress through
-         * the gap is zero -- and that is true whichever way we are moving.
-         * Deriving the backward case from pos = 65535 instead put it at the
-         * far end of the gap it had just finished: fade came out 255 rather
-         * than 0, lifting the entire right-hand ramp a half-step so the
-         * outermost right slide appeared at alpha 63 when it should not have
-         * been drawn, and ftick came out a full gap rather than none. One
-         * frame of both, on every backward crossing. */
-        pos = 0;
-        tick = 0;
-        ftick = 0;
-        fade = 0;
         center_slide.slide_index = center_index;
         for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
             left_slides[i].slide_index = center_index - 1 - i;
         for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
             right_slides[i].slide_index = center_index + 1 + i;
     }
+
+    /* Derived after the snap, so nothing can describe the gap we just left:
+     * fade drives the whole alpha ramp and ftick the slide geometry, and
+     * carrying either across a crossing shows as a one-frame flash. */
+    int tick = (step < 0) ? ((-slide_frame) & 0xffff)
+                          : (slide_frame & 0xffff);
+    int neg = 65536 - tick;
+    PFreal ftick = (tick * PFREAL_ONE) >> 16;
+
+    /* the leftmost and rightmost slide must fade away */
+    fade = ((step < 0) ? neg : tick) / 256;
 
     center_slide.angle = (step * tick * itilt) >> 16;
     center_slide.cx = -step * fmul(offsetX, ftick);
@@ -2260,8 +2359,8 @@ static void update_scroll_animation(void)
         right_slides[0].cx = fmul(offsetX, ftick);
         right_slides[0].cy = fmul(offsetY, ftick);
     } else {
-        PFreal ftick = (pos * PFREAL_ONE) >> 16;
-        left_slides[0].angle = (pos * itilt) >> 16;
+        PFreal ftick = (neg * PFREAL_ONE) >> 16;
+        left_slides[0].angle = (neg * itilt) >> 16;
         left_slides[0].cx = -fmul(offsetX, ftick);
         left_slides[0].cy = fmul(offsetY, ftick);
     }
@@ -2395,47 +2494,40 @@ static bool init(void)
      * caption -- also shifting the render origin down so the reserved
      * strip is skipped rather than just repositioning within it.
      *
-     * Margin sizes mirror draw_album_text()'s own Y math exactly, which means
-     * measuring the same two fonts it draws in -- the bold one for the album
-     * line, the plain one for the artist line. Measuring only the UI font here
-     * was the bug: a theme whose bold font is a different size got a strip that
-     * did not match where the caption actually landed. */
+     * The band is always sized for a two-line caption, whichever mode is set,
+     * so the covers do not change size between the album and artist screens --
+     * carousel_caption_layout() centres whatever it is actually given in the
+     * space this opens up. */
     {
-        int album_h  = font_get(pf_bold_font)->height;
-        int artist_h = font_get(screens[SCREEN_MAIN].getuifont())->height;
-        int text_margin;
         bool text_at_top;
         int draw_height;
 
         switch (global_settings.album_covers_show_album_name)
         {
             case ALBUM_NAME_HIDE:
-                text_margin = 0;
+                pf_caption_band = 0;
                 text_at_top = false;
                 break;
             case ALBUM_NAME_TOP:
             case ALBUM_AND_ARTIST_TOP:
-                text_margin = PF_CAPTION_TOP_MARGIN(album_h, artist_h);
+                pf_caption_band = caption_block(true) + 2 * PF_CAPTION_PAD;
                 text_at_top = true;
                 break;
             case ALBUM_NAME_BOTTOM:
             case ALBUM_AND_ARTIST_BOTTOM:
             default:
-                /* The lift is part of the strip: the text moved up, so the
-                 * slides have to stop that much higher or they run under it. */
-                text_margin = PF_CAPTION_STRIP(album_h, artist_h)
-                            + PF_CAPTION_LIFT;
+                pf_caption_band = caption_block(true) + 2 * PF_CAPTION_PAD;
                 text_at_top = false;
                 break;
         }
 
-        draw_height = pf_height - text_margin;
+        draw_height = pf_height - pf_caption_band;
         if (draw_height < 0)
             draw_height = 0;
 
         pf_half_height = draw_height / 2;
         pf_lower_half = draw_height - pf_half_height;
-        pf_draw_y_shift = text_at_top ? text_margin : 0;
+        pf_draw_y_shift = text_at_top ? pf_caption_band : 0;
     }
 
     pf_update_dynamic_colors();
@@ -2815,7 +2907,11 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
 
     cleanup();
 
-    if (ret == GO_TO_WPS || ret == GO_TO_PREVIOUS_MUSIC || ret == GO_TO_PLUGIN)
+    /* CAROUSEL_PLAY_ALBUM belongs with these: album_covers() turns it into
+     * GO_TO_WPS, so the screen underneath is about to be replaced either way
+     * and a refresh on the way past would only flash it. */
+    if (ret == GO_TO_WPS || ret == GO_TO_PREVIOUS_MUSIC || ret == GO_TO_PLUGIN
+        || ret == CAROUSEL_PLAY_ALBUM)
         pop_current_activity_without_refresh();
     else
         pop_current_activity();

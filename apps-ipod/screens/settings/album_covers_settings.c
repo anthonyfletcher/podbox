@@ -24,6 +24,7 @@ MENUITEM_SETTING(album_covers_parallel_slides, &global_settings.album_covers_par
 MENUITEM_SETTING(album_covers_scroll_speed, &global_settings.album_covers_scroll_speed, NULL);
 MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, NULL);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
+MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
 MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, NULL);
 MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
 MENUITEM_SETTING(album_covers_year_sort_order, &global_settings.album_covers_year_sort_order, NULL);
@@ -100,6 +101,7 @@ MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_Menu_setting,
             &debug_log_artcache);
 
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Menu_setting,
+            &album_covers_on_select,
             &album_covers_show_album_name,
             &album_covers_show_year,
             &album_covers_background,

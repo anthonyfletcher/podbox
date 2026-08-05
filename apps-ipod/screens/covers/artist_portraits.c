@@ -160,7 +160,8 @@ static int artist_jump_prev(void)
 static void artist_draw_text(void)
 {
     static int prev_index = -1;
-    int char_height, artist_height, txt_x, txt_y;
+    struct pf_caption cap;
+    int txt_x, txt_y;
     char *name;
 
     if (global_settings.album_covers_show_album_name == ALBUM_NAME_HIDE)
@@ -176,29 +177,13 @@ static void artist_draw_text(void)
         prev_index = center_index;
     }
 
-    /* This caption is one line where the album carousel's is two, so it is
-     * placed where the middle of that pair would be rather than on the first
-     * line -- otherwise it sits high in a strip sized for two, which reads as
-     * misaligned against the same screen showing albums. The strip itself is
-     * unchanged: the engine reserves the same space either way. */
-    char_height = screens[SCREEN_MAIN].getcharheight();
-    artist_height = font_get(screens[SCREEN_MAIN].getuifont())->height;
-    switch (global_settings.album_covers_show_album_name)
-    {
-        case ALBUM_AND_ARTIST_TOP:
-            txt_y = PF_CAPTION_ONE_LINE_Y(char_height);
-            break;
-        case ALBUM_NAME_BOTTOM:
-        case ALBUM_AND_ARTIST_BOTTOM:
-            txt_y = pf_height - PF_CAPTION_STRIP(char_height, artist_height)
-                              - PF_CAPTION_LIFT
-                              + PF_CAPTION_ONE_LINE_Y(char_height);
-            break;
-        case ALBUM_NAME_TOP:
-        default:
-            txt_y = char_height / 2;
-            break;
-    }
+    /* One line where the album carousel draws two. The engine reserves the
+     * same band either way and centres whatever it is given in it, so this
+     * lands in the middle of that band rather than sitting high in space
+     * sized for a pair -- which is what made it read as misaligned against
+     * the same screen showing albums. */
+    carousel_caption_layout(false, &cap);
+    txt_y = cap.y1;
 
     txt_x = get_scroll_line_offset(PF_SCROLL_ALBUM);
     lcd_putsxy(txt_x, txt_y, name);

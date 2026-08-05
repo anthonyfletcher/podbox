@@ -385,23 +385,13 @@ int album_charts_show(enum album_chart kind)
  * needs no playback history, so unlike the charts it works with runtime data
  * gathering switched off.
  *
- * The tracks are gathered straight from the database rather than through
- * browser_db_subentries_do_action(), which looks like the obvious helper and
- * is not usable here -- it acts on the *browser's* currently selected item
- * (tc->dirlevel/selected_item, goto_allsubentries()), and this action has not
- * put the browser anywhere. The filter pair is the same one
- * assign_album_stats() enumerates an album with, searching tag_filename so
- * each result is a path.
- *
- * cpu_boost around the walk, matching insert_all_playlist(): this is a
- * database scan plus a playlist write, and the user is waiting on it. */
+ * db_summary_play_album() does the gathering. The index is released before it
+ * runs, since nothing below reads it again and playback is about to want the
+ * memory -- hence the copy of the entry, which points into what that frees. */
 int album_random(void)
 {
-    struct tagcache_search tcs;
-    struct playlist_insert_context context;
-    char buf[MAX_PATH];
-    int pick, added = 0;
-    int ret = GO_TO_PREVIOUS;
+    struct album_data album;
+    int pick;
 
     if (acquire() < SUCCESS)
         return GO_TO_PREVIOUS;
@@ -415,54 +405,8 @@ int album_random(void)
 
     srand(current_tick);
     pick = rand() % idx.album_ct;
-
-    if (playlist_create(NULL, NULL) < 0)
-    {
-        release();
-        return GO_TO_PREVIOUS;
-    }
-
-    cpu_boost(true);
-
-    if (!tagcache_search(&tcs, tag_filename))
-    {
-        cpu_boost(false);
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        release();
-        return GO_TO_PREVIOUS;
-    }
-
-    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
-                                       false, false) < 0)
-    {
-        tagcache_search_finish(&tcs);
-        cpu_boost(false);
-        release();
-        return GO_TO_PREVIOUS;
-    }
-
-    tagcache_search_add_filter(&tcs, tag_album, idx.album_index[pick].seek);
-    if (idx.album_index[pick].artist_idx >= 0)
-        tagcache_search_add_filter(&tcs, tag_albumartist,
-                                   idx.album_index[pick].artist_seek);
-
-    while (tagcache_get_next(&tcs, buf, sizeof(buf)))
-    {
-        if (playlist_insert_context_add(&context, buf) < 0)
-            break;
-        added++;
-    }
-
-    playlist_insert_context_release(&context);
-    tagcache_search_finish(&tcs);
-    cpu_boost(false);
-
-    if (added > 0)
-    {
-        playlist_start(0, 0, 0);
-        ret = GO_TO_WPS;
-    }
-
+    album = idx.album_index[pick];
     release();
-    return ret;
+
+    return db_summary_play_album(&album) > 0 ? GO_TO_WPS : GO_TO_PREVIOUS;
 }

@@ -107,4 +107,17 @@ void db_summary_progress(int *done, int *total);
  * again on its next tick. */
 void db_summary_invalidate(void);
 
+/* Build the current playlist from one album's tracks and start it, in the same
+ * disc/track order the browser's track list shows them in. Returns the number
+ * of tracks queued, or a negative value if nothing could be played.
+ *
+ * Scratch memory comes from the app buffer, which panics if a screen still
+ * holds a claim on it -- so this cannot be called from inside the carousel.
+ * db_summary_play_album_on_exit() exists for that: it records the album, and
+ * root_menu.c calls db_summary_play_pending() once the screen has gone. */
+struct album_data;
+int  db_summary_play_album(const struct album_data *album);
+void db_summary_play_album_on_exit(const struct album_data *album);
+int  db_summary_play_pending(void);
+
 #endif /* _DB_SUMMARY_H */

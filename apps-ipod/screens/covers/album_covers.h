@@ -17,6 +17,12 @@ enum show_album_name_values {
     ALBUM_AND_ARTIST_BOTTOM
 };
 
+/* Values for global_settings.album_covers_on_select */
+enum on_album_select_values {
+    ON_SELECT_SHOW_TRACKS = 0,
+    ON_SELECT_PLAY_ALBUM
+};
+
 /* Values for global_settings.album_covers_sort_albums_by */
 enum sort_albums_by_values {
     SORT_BY_ARTIST_AND_NAME = 0,

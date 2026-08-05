@@ -50,6 +50,9 @@
 #include "system/activity.h"          /* ui_set_working */
 #include "system/bg_task.h"           /* the background pass runs as one */
 #include "system/debug_log.h"         /* what the carry-over managed to skip */
+#include "system/app_buffer.h"        /* scratch for ordering an album */
+#include "system/app_util.h"          /* warn_on_pl_erase */
+#include "playlist/playlist.h"
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
 #include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
@@ -2201,4 +2204,154 @@ void db_summary_invalidate(void)
      * An update rather than a rebuild: there is nothing here to purge that the
      * pass does not overwrite anyway, the index being a single file. */
     bg_task_update(&db_summary_task);
+}
+
+/* ---- playing an album -------------------------------------------------- */
+
+/* One track, while the album is being put in order. Only the index id is kept,
+ * not the path: a path is MAX_PATH and there is no reason to hold every one of
+ * them when tagcache_retrieve() can fetch each again in the order wanted. */
+struct album_track {
+    int32_t idx_id;
+    int32_t key;
+};
+
+static int compare_album_tracks(const void *a_v, const void *b_v)
+{
+    const struct album_track *a = a_v;
+    const struct album_track *b = b_v;
+    return a->key - b->key;
+}
+
+int db_summary_play_album(const struct album_data *album)
+{
+    struct tagcache_search tcs;
+    struct playlist_insert_context context;
+    char buf[MAX_PATH];
+    struct album_track *list;
+    size_t list_sz = 0;
+    int cap, found = 0, added = 0;
+    bool sorted;
+
+    if (!warn_on_pl_erase())
+        return -1;
+    if (playlist_create(NULL, NULL) < 0)
+        return -1;
+
+    cpu_boost(true);
+    if (!tagcache_search(&tcs, tag_filename))
+    {
+        cpu_boost(false);
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return -1;
+    }
+    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
+                                       false, false) < 0)
+    {
+        tagcache_search_finish(&tcs);
+        cpu_boost(false);
+        return -1;
+    }
+
+    /* The same filter pair assign_album_stats() enumerates an album with. */
+    tagcache_search_add_filter(&tcs, tag_album, album->seek);
+    if (album->artist_idx >= 0)
+        tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);
+
+    /* A search returns entries in master-index order -- the order the files
+     * were scanned, which is close to track order for most rips and wrong for
+     * the rest. The browser's track list is sorted by tagnavi's
+     * "%02d%04d%s" discnum/tracknum format, and playing an album has to come
+     * out in the order that list shows, so collect the album first and sort it
+     * before any of it reaches the playlist. */
+    list = app_get_buffer(&list_sz, "album play");
+    cap = list ? (int)(list_sz / sizeof(*list)) : 0;
+    sorted = (cap > 0);
+
+    while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+    {
+        int disc, track;
+
+        if (found >= cap)
+        {
+            /* Nowhere to put the rest of the album, so it cannot be ordered
+             * as a whole. Play it in search order rather than not at all. */
+            sorted = false;
+            break;
+        }
+        disc  = tagcache_get_numeric(&tcs, tag_discnumber);
+        track = tagcache_get_numeric(&tcs, tag_tracknumber);
+        if (disc < 0)
+            disc = 0;
+        if (track < 0)
+            track = 0;
+        list[found].idx_id = tcs.idx_id;
+        /* Disc above track, so disc 2's track 1 follows disc 1's last. An
+         * untagged disc or track sorts as 0, which puts it first -- the same
+         * place the browser's format string puts it. Both are masked: these
+         * come from file tags, so a nonsense value must not shift into the
+         * sign bit and sort the track to the front. */
+        list[found].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
+        found++;
+    }
+
+    if (sorted)
+    {
+        qsort(list, found, sizeof(*list), compare_album_tracks);
+        for (int i = 0; i < found; i++)
+        {
+            if (!tagcache_retrieve(&tcs, list[i].idx_id, tag_filename,
+                                   buf, sizeof(buf)))
+                continue;
+            if (playlist_insert_context_add(&context, buf) < 0)
+                break;
+            added++;
+        }
+    }
+    else
+    {
+        /* Restart: the walk above consumed part or all of the search. */
+        tagcache_search_finish(&tcs);
+        if (tagcache_search(&tcs, tag_filename))
+        {
+            tagcache_search_add_filter(&tcs, tag_album, album->seek);
+            if (album->artist_idx >= 0)
+                tagcache_search_add_filter(&tcs, tag_albumartist,
+                                           album->artist_seek);
+            while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+            {
+                if (playlist_insert_context_add(&context, buf) < 0)
+                    break;
+                added++;
+            }
+        }
+    }
+
+    playlist_insert_context_release(&context);
+    tagcache_search_finish(&tcs);
+    cpu_boost(false);
+
+    if (added <= 0)
+        return -1;
+
+    playlist_start(0, 0, 0);
+    return added;
+}
+
+/* The album the carousel asked for, held across its teardown. */
+static struct album_data pending_play;
+static bool pending_play_armed;
+
+void db_summary_play_album_on_exit(const struct album_data *album)
+{
+    pending_play = *album;
+    pending_play_armed = true;
+}
+
+int db_summary_play_pending(void)
+{
+    if (!pending_play_armed)
+        return -1;
+    pending_play_armed = false;
+    return db_summary_play_album(&pending_play);
 }

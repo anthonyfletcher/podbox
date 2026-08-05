@@ -544,6 +544,7 @@ struct user_settings
     int  album_covers_scroll_speed;
     int  album_covers_transition_speed;
     int  album_covers_show_album_name;
+    int  album_covers_on_select;  /* ON_SELECT_*: browse the album, or play it */
     int  album_covers_sort_albums_by;
     int  album_covers_sort_artists_by; /* SORT_ARTISTS_*: portraits ordering */
     int  album_covers_year_sort_order;

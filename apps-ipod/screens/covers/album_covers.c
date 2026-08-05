@@ -44,6 +44,7 @@
 #include "kernel.h"           /* threads, mutex, queue, current_tick */
 #include "core_alloc.h"       /* buflib types for buf_ctx (see init()) */
 #include "database/tagcache.h"
+#include "database/db_summary.h"   /* db_summary_play_album_on_exit/_pending */
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
@@ -617,7 +618,7 @@ static void draw_album_text(void)
     char album_and_year[MAX_PATH];
     char *albumtxt, *artisttxt;
     int album_idx = 0;
-    int char_height, artist_height;
+    struct pf_caption cap;
     int albumtxt_x, albumtxt_y, artisttxt_x;
     bool show_artist;
 
@@ -659,27 +660,10 @@ static void draw_album_text(void)
         prev_show_year = global_settings.album_covers_show_year;
     }
 
-    /* The bold font is current, so this is the album line's height; the artist
-     * line below is drawn in the plain UI font and is measured separately. Both
-     * are needed: the strip has to be the one the engine reserved. */
-    char_height = screens[SCREEN_MAIN].getcharheight();
-    artist_height = font_get(screens[SCREEN_MAIN].getuifont())->height;
-    switch (global_settings.album_covers_show_album_name)
-    {
-        case ALBUM_AND_ARTIST_TOP:
-            albumtxt_y = 0;
-            break;
-        case ALBUM_NAME_BOTTOM:
-        case ALBUM_AND_ARTIST_BOTTOM:
-            albumtxt_y = pf_height - PF_CAPTION_STRIP(char_height,
-                                                      artist_height)
-                                   - PF_CAPTION_LIFT;
-            break;
-        case ALBUM_NAME_TOP:
-        default:
-            albumtxt_y = char_height / 2;
-            break;
-    }
+    /* The engine measures both fonts and centres the block for us, so top and
+     * bottom captions need no separate arithmetic here. */
+    carousel_caption_layout(show_artist, &cap);
+    albumtxt_y = cap.y1;
 
     albumtxt_x = get_scroll_line_offset(PF_SCROLL_ALBUM);
 
@@ -697,8 +681,7 @@ static void draw_album_text(void)
         if (album_changed)
             set_scroll_line(artisttxt, PF_SCROLL_ARTIST);
         artisttxt_x = get_scroll_line_offset(PF_SCROLL_ARTIST);
-        lcd_putsxy(artisttxt_x, albumtxt_y + PF_CAPTION_LINE2_Y(char_height),
-                   artisttxt);
+        lcd_putsxy(artisttxt_x, cap.y2, artisttxt);
     }
     else
     {
@@ -728,10 +711,15 @@ static bool reinit(void)
     return false;
 }
 
-/* carousel_model.enter for the album model: drill into the selected album's
- * track list. Identifies the album by its own tagcache seek, not by name --
- * browser_db.c filters directly on this, so there's no name/sort matching involved
- * (the earlier, much more fragile design that this replaced). */
+/* carousel_model.enter for the album model: either drill into the selected
+ * album's track list or play it, per "On album select". Identifies the album by
+ * its own tagcache seek, not by name -- browser_db.c and db_summary.c both
+ * filter directly on this, so there's no name/sort matching involved (the
+ * earlier, much more fragile design that this replaced).
+ *
+ * Playing does not happen here. It needs the app buffer to put the album in
+ * order, and this screen is still holding a claim on it -- so the album is
+ * recorded and root_menu.c plays it once the carousel has torn down. */
 static int album_enter(int index)
 {
     int album_idx = 0;
@@ -741,6 +729,13 @@ static int album_enter(int index)
     pf_cfg.last_album = index;
     pf_resume_album_index = index;
     pf_resume_last_album = true;
+
+    if (global_settings.album_covers_on_select == ON_SELECT_PLAY_ALBUM)
+    {
+        db_summary_play_album_on_exit(&pf_idx.album_index[index]);
+        return CAROUSEL_PLAY_ALBUM;
+    }
+
     browser_db_enter_album_tracks_on_next_load(album_seek, album);
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
@@ -828,5 +823,16 @@ static void album_prepare(void)
 
 int album_covers(const char *selected_file)
 {
-    return carousel_run(&album_model, selected_file);
+    int ret = carousel_run(&album_model, selected_file);
+
+    /* "On album select" = Play album. Deliberately here and not in
+     * album_enter(): carousel_run()'s cleanup() has released the app buffer by
+     * now, and putting the album in track order needs it. Doing it here rather
+     * than in root_menu.c also means every way into this screen gets it -- the
+     * WPS select action and the playlist viewer call this directly, and would
+     * not know what to do with a sentinel escaping to them. */
+    if (ret == CAROUSEL_PLAY_ALBUM)
+        ret = db_summary_play_pending() > 0 ? GO_TO_WPS : GO_TO_PREVIOUS;
+
+    return ret;
 }

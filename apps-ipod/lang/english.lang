@@ -18551,3 +18551,45 @@
     *: "Shortcuts instead"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ON_ALBUM_SELECT
+  desc: Carousel option: what selecting an album does
+  user: core
+  <source>
+    *: "On Album Select"
+  </source>
+  <dest>
+    *: "On Album Select"
+  </dest>
+  <voice>
+    *: "On Album Select"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_TRACKS
+  desc: Carousel "On Album Select" option: open the album's track list
+  user: core
+  <source>
+    *: "Show tracks"
+  </source>
+  <dest>
+    *: "Show tracks"
+  </dest>
+  <voice>
+    *: "Show tracks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_ALBUM
+  desc: Carousel "On Album Select" option: play the album straight away
+  user: core
+  <source>
+    *: "Play album"
+  </source>
+  <dest>
+    *: "Play album"
+  </dest>
+  <voice>
+    *: "Play album"
+  </voice>
+</phrase>

@@ -41,50 +41,25 @@ typedef fb_data pix_t;
 /* Number of slide slots the engine keeps decoded at once. */
 #define SLIDE_CACHE_SIZE 100
 
-/* Caption geometry, in one place because three pieces of code have to agree on
- * it: each model's draw_text() places the text, and the engine reserves a strip
- * of the same size for it (see the text_margin switch in carousel.c). They were
- * three copies of the same expression, and moving the text without moving the
- * strip lets the slides run underneath it.
+/* Caption geometry, owned by the engine because three things have to agree on
+ * it: each model's draw_text() places the text, and init() reserves a band of
+ * clear height beside the covers for it. They were separate copies of the same
+ * arithmetic, which is how the text and the band drifted apart.
  *
- * The two lines are drawn in different fonts -- the album name in the bold UI
- * font, the artist name in the plain one -- so both heights are parameters.
- * Taking one height and using it for both is what these used to do, and it
- * silently mis-registers the strip against the text whenever a theme's bold
- * font is not the same size as its regular one (Themify_2: 18px against 25px).
- * Passing the same value twice reproduces the old geometry exactly.
+ * Band and text are sized separately, on purpose:
  *
- * PF_CAPTION_LINE2_Y is where the second line starts: a full first line, plus
- * PF_CAPTION_LINE_GAP of clear air. The gap is the tuning knob if the two lines
- * want more or less room between them. It cannot be dropped: album_h already
- * includes the first line's descender space, so a smaller offset puts the
- * artist name where a descending album name still has ink. The old 0.75
- * spacing did exactly that once the two fonts differed -- 0.75 of Themify_2's
- * 18px bold font is 13px, its exact ascent, so the lines touched.
+ *   The band fixes where the covers stop, and nothing else. It is always sized
+ *   for a two-line caption, so the covers come out the same size on the album
+ *   and artist screens.
  *
- * PF_CAPTION_STRIP is the room a bottom caption needs: that, plus the second
- * line and its descenders. PF_CAPTION_TOP_MARGIN is the same for a top caption,
- * which needs no descender clearance at the screen edge.
- *
- * PF_CAPTION_LIFT is how far a bottom caption sits off the bottom edge, and so
- * the knob for moving both of its lines up or down together: the engine adds it
- * to the reserved strip and each model subtracts it from the text's y, so one
- * value moves the text and the slides' stopping point in step. It is small
- * because the strip's own descender allowance already leaves clear air below
- * the second line -- 14px on Themify_2 -- and a larger lift on top of that read
- * as the caption floating too high.
- *
- * PF_CAPTION_ONE_LINE_Y offsets a caption that has only one line to write, so
- * it sits where the middle of a two-line caption would rather than on the
- * first line: half the line-2 offset. */
-#define PF_CAPTION_LINE_GAP(album_h)  ((album_h) / 4)
-#define PF_CAPTION_LINE2_Y(album_h)   ((album_h) + PF_CAPTION_LINE_GAP(album_h))
-#define PF_CAPTION_STRIP(album_h, artist_h) \
-                    (PF_CAPTION_LINE2_Y(album_h) + (artist_h) * 3 / 2)
-#define PF_CAPTION_TOP_MARGIN(album_h, artist_h) \
-                    (PF_CAPTION_LINE2_Y(album_h) + (artist_h) * 5 / 4)
-#define PF_CAPTION_LIFT               2
-#define PF_CAPTION_ONE_LINE_Y(album_h) (PF_CAPTION_LINE2_Y(album_h) / 2)
+ *   The text is then centred in the clear space the band opens up, so a
+ *   one-line caption lands in the middle of it rather than sitting high in
+ *   room meant for two, and neither has to be kept numerically in step with
+ *   the other. */
+struct pf_caption {
+    int y1;   /* top of the first line, drawn in pf_bold_font */
+    int y2;   /* top of the second line, drawn in the UI font */
+};
 
 /* build_index / count return codes */
 #define SUCCESS              0
@@ -184,6 +159,14 @@ enum pf_scroll_line_type {
 #define CAROUSEL_MENU_STAY     (-1)  /* menu closed; just resume drawing */
 #define CAROUSEL_MENU_RELOADED (-2)  /* index was rebuilt; engine resets its display */
 
+/* enter() may return this instead of a GO_TO_* to mean "exit, and play the
+ * album I recorded with db_summary_play_album_on_exit()". The play cannot
+ * happen inside the carousel: ordering the album needs the app buffer, and
+ * this screen holds a claim on it until cleanup() runs. album_covers() does it
+ * on the way out, once carousel_run() has returned. Negative, so it never
+ * collides with a GO_TO_* value. */
+#define CAROUSEL_PLAY_ALBUM    (-3)
+
 /* The seam between the generic coverflow engine and the data it shows. */
 struct carousel_model {
     int  (*build_index)(void);                         /* build the slide data; SUCCESS/ERROR_* */
@@ -220,7 +203,6 @@ extern struct pf_config_t pf_cfg;  /* engine's persistent cache/resume config */
 extern struct db_summary_t pf_idx;   /* the current carousel's index buffer */
 extern int   center_index;         /* engine's current slide */
 extern int   pf_bold_font;         /* caption bold font (draw_text) */
-extern int   pf_height;            /* drawable viewport height (draw_text) */
 extern pix_t pf_fg_color;          /* caption colour (draw_text) */
 /* Transient "resume to this slide on next open" signal, set by a model's
  * enter() and consumed by its set_initial(). */
@@ -239,6 +221,9 @@ int  get_scroll_line_offset(enum pf_scroll_line_type type);
  * returned viewport back to carousel_text_end() when the caption is drawn. */
 struct viewport *carousel_text_begin(void);
 void carousel_text_end(struct viewport *saved);
+/* Where the caption's lines go, centred in the space the band opens up. y2 is
+ * meaningful only when two_lines is set. */
+void carousel_caption_layout(bool two_lines, struct pf_caption *out);
 /* build_artist_index() belongs to the index builder -- see
  * database/db_summary.h. */
 /* Persist the engine's pf_cfg to its config file (album model calls this after
