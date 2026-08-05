@@ -97,7 +97,10 @@ MENUITEM_FUNCTION_W_PARAM(save_sound_item, 0, ID2P(LANG_SAVE_SOUND),
 MENUITEM_FUNCTION(reset_settings_item, 0, ID2P(LANG_RESET),
                   reset_settings, NULL, Icon_NOICON);
 
+MENUITEM_SETTING(settings_mode_item, &global_settings.settings_mode, NULL);
+
 MAKE_MENU(manage_settings, ID2P(LANG_MANAGE_MENU), NULL, Icon_Config,
+          &settings_mode_item,
           &browse_configs, &reset_settings_item,
           &save_settings_item, &save_sound_item, &save_theme_item);
 

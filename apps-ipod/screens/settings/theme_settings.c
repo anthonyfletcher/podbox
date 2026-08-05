@@ -57,6 +57,17 @@ enum Colors {
     COLOR_LSE,
     COLOR_LST,
     COLOR_SEP,
+    /* The nine modal-dialog colours. Only used when Dialog Colours is On --
+       Auto derives them and ignores what is set here. */
+    COLOR_DLG_BOX_FG,
+    COLOR_DLG_BOX_BG,
+    COLOR_DLG_BOX_BORDER,
+    COLOR_DLG_BTN_FG,
+    COLOR_DLG_BTN_BG,
+    COLOR_DLG_BTN_BORDER,
+    COLOR_DLG_BTN_FG_SEL,
+    COLOR_DLG_BTN_BG_SEL,
+    COLOR_DLG_BTN_BORDER_SEL,
     COLOR_COUNT
 };
 static struct colour_info
@@ -70,6 +81,20 @@ static struct colour_info
     [COLOR_LSE] = {&global_settings.lse_color, LANG_SELECTOR_END_COLOR},
     [COLOR_LST] = {&global_settings.lst_color, LANG_SELECTOR_TEXT_COLOR},
     [COLOR_SEP] = {&global_settings.list_separator_color, LANG_LIST_SEPARATOR_COLOR},
+    [COLOR_DLG_BOX_FG] = {&global_settings.dialog_box_fg, LANG_DIALOG_BOX_FG},
+    [COLOR_DLG_BOX_BG] = {&global_settings.dialog_box_bg, LANG_DIALOG_BOX_BG},
+    [COLOR_DLG_BOX_BORDER] = {&global_settings.dialog_box_border,
+                              LANG_DIALOG_BOX_BORDER},
+    [COLOR_DLG_BTN_FG] = {&global_settings.dialog_btn_fg, LANG_DIALOG_BTN_FG},
+    [COLOR_DLG_BTN_BG] = {&global_settings.dialog_btn_bg, LANG_DIALOG_BTN_BG},
+    [COLOR_DLG_BTN_BORDER] = {&global_settings.dialog_btn_border,
+                              LANG_DIALOG_BTN_BORDER},
+    [COLOR_DLG_BTN_FG_SEL] = {&global_settings.dialog_btn_fg_sel,
+                              LANG_DIALOG_BTN_FG_SEL},
+    [COLOR_DLG_BTN_BG_SEL] = {&global_settings.dialog_btn_bg_sel,
+                              LANG_DIALOG_BTN_BG_SEL},
+    [COLOR_DLG_BTN_BORDER_SEL] = {&global_settings.dialog_btn_border_sel,
+                                  LANG_DIALOG_BTN_BORDER_SEL},
 };
 
 /**
@@ -139,6 +164,61 @@ MAKE_MENU(colors_settings, ID2P(LANG_COLORS_MENU),
             &lss_settings,  &set_sep_col,
             &set_bg_col, &set_fg_col, &reset_colors
          );
+
+/* Modal dialog chrome. Every setting here is F_THEMERESET: loading a theme
+   returns all of them to the shipped defaults, so a theme that says nothing
+   about dialogs cannot inherit the last theme's. That applies to changes made
+   here too -- they last until the next theme is loaded. */
+MENUITEM_FUNCTION_W_PARAM(set_dlg_box_fg, 0, ID2P(LANG_DIALOG_BOX_FG),
+                          set_color_func, (void*)COLOR_DLG_BOX_FG,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_box_bg, 0, ID2P(LANG_DIALOG_BOX_BG),
+                          set_color_func, (void*)COLOR_DLG_BOX_BG,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_box_border, 0, ID2P(LANG_DIALOG_BOX_BORDER),
+                          set_color_func, (void*)COLOR_DLG_BOX_BORDER,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_fg, 0, ID2P(LANG_DIALOG_BTN_FG),
+                          set_color_func, (void*)COLOR_DLG_BTN_FG,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_bg, 0, ID2P(LANG_DIALOG_BTN_BG),
+                          set_color_func, (void*)COLOR_DLG_BTN_BG,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_border, 0, ID2P(LANG_DIALOG_BTN_BORDER),
+                          set_color_func, (void*)COLOR_DLG_BTN_BORDER,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_fg_sel, 0, ID2P(LANG_DIALOG_BTN_FG_SEL),
+                          set_color_func, (void*)COLOR_DLG_BTN_FG_SEL,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_bg_sel, 0, ID2P(LANG_DIALOG_BTN_BG_SEL),
+                          set_color_func, (void*)COLOR_DLG_BTN_BG_SEL,
+                          NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_border_sel, 0,
+                          ID2P(LANG_DIALOG_BTN_BORDER_SEL),
+                          set_color_func, (void*)COLOR_DLG_BTN_BORDER_SEL,
+                          NULL, Icon_NOICON);
+
+MAKE_MENU(dialog_colors_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
+            &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
+            &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
+            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel);
+
+MENUITEM_SETTING(dialog_colors, &global_settings.dialog_colors, NULL);
+MENUITEM_SETTING(dialog_box_border_width,
+                 &global_settings.dialog_box_border_width, NULL);
+MENUITEM_SETTING(dialog_box_margin, &global_settings.dialog_box_margin, NULL);
+MENUITEM_SETTING(dialog_btn_border_width,
+                 &global_settings.dialog_btn_border_width, NULL);
+MENUITEM_SETTING(dialog_btn_border_radius,
+                 &global_settings.dialog_btn_border_radius, NULL);
+
+MAKE_MENU(dialog_settings, ID2P(LANG_DIALOGS_MENU), NULL, Icon_Display_menu,
+            &dialog_box_border_width,
+            &dialog_box_margin,
+            &dialog_btn_border_width,
+            &dialog_btn_border_radius,
+            &dialog_colors,
+            &dialog_colors_menu);
 
 
 
@@ -292,10 +372,19 @@ MENUITEM_SETTING(sep_menu, &global_settings.list_separator_height, NULL);
 MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
 MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
 
-MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
-            NULL, Icon_Wps,
-            &browse_themes,
-            &browse_fonts,
+/* Art beside the rows in the database browser. Both come from the shared
+ * thumbnail cache, so turning them off only stops them being drawn. They are
+ * a property of the look rather than of the database, and a theme that wants
+ * them says so in its .cfg. */
+MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
+MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
+
+MENUITEM_SETTING(shortcuts_replaces_quickscreen,
+                 &global_settings.shortcuts_replaces_qs, NULL);
+
+/* The pieces a theme is built from. Loading a theme sets all of them at once,
+   so these are for adjusting one afterwards. */
+MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
             &browse_wps,
             &browse_sbs,
             &show_icons,
@@ -304,6 +393,16 @@ MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             &cursor_style,
             &sep_menu,
             &colors_settings,
+            &dialog_settings,
+            &db_albumart,
+            &db_artistart);
+
+MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
+            NULL, Icon_Wps,
+            &browse_themes,
+            &browse_fonts,
+            &theme_settings_menu,
             &dynamic_colors,
             &wps_art_source,
+            &shortcuts_replaces_quickscreen,
 );

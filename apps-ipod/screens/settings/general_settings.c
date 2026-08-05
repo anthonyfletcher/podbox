@@ -95,11 +95,6 @@ MENUITEM_FUNCTION(tc_import, 0, ID2P(LANG_TAGCACHE_IMPORT),
 MENUITEM_FUNCTION(tc_paths, 0, ID2P(LANG_SELECT_DATABASE_DIRS),
                   dirs_to_scan, NULL, Icon_NOICON);
 
-/* Art beside the rows in the database browser. Both come from the shared
- * thumbnail cache, so turning them off only stops them being drawn. */
-MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
-MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
-
 /* The album and artist list derived from the database -- what the carousels
  * scroll and the charts rank. Rebuild discards it and reads the database
  * again; update keeps what still applies. Here rather than with the carousel
@@ -126,12 +121,12 @@ MENUITEM_FUNCTION(db_summary_update_item, 0, ID2P(LANG_UPDATE_INDEX),
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
-                &tagcache_scan_on_eject, &tagcache_scan_on_startup,
+                &tagcache_scan_on_startup, &tagcache_scan_on_eject,
                 &tagcache_autocommit,
-                &tc_init, &tc_update, &runtimedb,
+                &runtimedb, &tc_paths,
+                &tc_init, &tc_update,
                 &db_summary_rebuild_item, &db_summary_update_item,
-                &db_albumart, &db_artistart,
-                &tc_export, &tc_import, &tc_paths, &debug_log_tagcache
+                &tc_export, &tc_import, &debug_log_tagcache
                 );
 
 /** File view menu **/
@@ -203,9 +198,9 @@ MAKE_MENU(file_menu, ID2P(LANG_FILE), filemenu_callback, Icon_file_view_menu,
                 &sort_case, &sort_dir, &sort_file, &interpret_numbers,
                 &dirfilter, &show_filename_ext, &browse_current,
                 &show_path_in_browser,
-                &file_index_rescan_item,
                 &clear_start_directory_item
                 ,&hotkey_tree_item
+                ,&file_index_rescan_item
                 );
 static int filemenu_callback(int action,
                              const struct menu_item_ex *this_item,
@@ -322,11 +317,6 @@ MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, NULL);
 #endif
 
 
-MENUITEM_SETTING(shortcuts_replaces_quickscreen, &global_settings.shortcuts_replaces_qs, NULL);
-
-
-MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
-
 MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
 
 MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
@@ -336,7 +326,6 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
             &limits_menu,
             &volume_adjust_mode,
             &volume_adjust_norm_steps,
-            &shortcuts_replaces_quickscreen,
             &car_adapter_mode_menu,
             &serial_bitrate,
             &accessory_supply,
@@ -349,7 +338,6 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
 #endif
 
             &usb_mode,
-            &wps_select_action,
             &show_debug_menu,
          );
 
@@ -565,6 +553,9 @@ MAKE_MENU(voice_settings_menu, ID2P(LANG_VOICE), 0, Icon_Voice,
 MENUITEM_SETTING(browser_default,
                  &global_settings.browser_default, NULL);
 
+/* Where Select from the now-playing screen goes. */
+MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
+
 /* Item 0 is the hotkey button, items 1..4 the configurable rows at the
    bottom of the WPS context menu. Each row shows what it is currently
    assigned to; selecting it opens the list of available actions. */
@@ -648,6 +639,7 @@ MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET), reset_wps_items,
 
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&browser_default
+            ,&wps_select_action
             ,&hotkey_wps_item /* this is item 0 */
             ,&wps_set_context_item_1
             ,&wps_set_context_item_2

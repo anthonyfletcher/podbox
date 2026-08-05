@@ -39,4 +39,9 @@ const char* eq_precut_format(char* buffer, size_t buffer_size, int value,
 /* callbacks for settings_list.c */
 void eq_enabled_option_callback(bool enabled);
 
+/* Applies the curve on leaving the item. Any menu carrying an EQ setting needs
+   this, including the copy of Enable EQ on the basic settings page. */
+int eq_setting_callback(int action, const struct menu_item_ex *this_item,
+                        struct gui_synclist *this_list);
+
 #endif

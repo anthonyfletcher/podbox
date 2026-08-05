@@ -25,7 +25,8 @@ extern const struct menu_item_ex
         , album_covers_menu         /* album_covers_menu.c */
         , art_cache_menu            /* album_covers_menu.c */
         , text_viewer_menu         /* text_viewer_menu.c */
-        , lyric_viewer_menu;        /* lyric_viewer_settings.c */
+        , lyric_viewer_menu         /* lyric_viewer_settings.c */
+        , basic_settings_menu;      /* basic_settings.c */
 
 struct browse_folder_info {
     const char* dir;

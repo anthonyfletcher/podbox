@@ -460,10 +460,9 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
 };
 
 /* Item 0 is the hotkey button; 1..4 are the configurable rows at the bottom
-   of the WPS context menu. These defaults are the entries that used to be
-   fixed there, so the menu reads the same until the user changes it. */
+   of the WPS context menu. */
 static const int wps_context_menu_default =
-    HK_CTX_SET(0, HOTKEY_VIEW_PLAYLIST) /* hotkey */
+    HK_CTX_SET(0, HOTKEY_LYRICS) /* hotkey */
   | HK_CTX_SET(1, HOTKEY_SHOW_TRACK_INFO)
   | HK_CTX_SET(2, HOTKEY_DELETE)
   | HK_CTX_SET(3, HOTKEY_SHOW_IN_FILES)
@@ -758,6 +757,13 @@ const struct settings_list settings[] = {
     OFFON_SETTING(0,show_icons, LANG_SHOW_ICONS ,true,"show icons", NULL),
     OFFON_SETTING(0,show_debug_menu, LANG_SHOW_DEBUG_MENU, false,
                   "show debug menu", NULL),
+    /* Which tree the root Settings entry opens. F_BANFROMQS because the
+       quickscreen would be a strange place to change the shape of the settings
+       menu from. */
+    CHOICE_SETTING(F_BANFROMQS, settings_mode, LANG_SETTINGS_MODE,
+                   SETTINGS_MODE_BASIC, "settings mode", "basic,advanced",
+                   NULL, 2, ID2P(LANG_SETTINGS_MODE_BASIC),
+                   ID2P(LANG_SETTINGS_MODE_ADVANCED)),
     /* system */
     INT_SETTING(F_TIME_SETTING, poweroff, LANG_POWEROFF_IDLE, 10,
                 "idle poweroff", UNIT_MIN, 0,60,1,
@@ -894,34 +900,37 @@ const struct settings_list settings[] = {
         INT(DEFAULT_THEME_SELECTOR_TEXT),"line selector text color",UNUSED},
 
 
-    /* Modal dialog chrome. Config-file only (no menu entries): lang_id -1, so
-     * these are edited in a theme .cfg. The metric defaults are the chrome a
-     * theme gets for saying nothing, so they are the shipped look rather than
+    /* Modal dialog chrome, edited under UI Settings -> Edit Theme -> Dialogs
+     * or in a theme .cfg. The metric defaults are the chrome a theme gets for
+     * saying nothing, so they are the shipped look rather than
      * dialog_style_default()'s bare 1px square borders.
      *
      * F_THEMERESET throughout is what makes "for saying nothing" true. Without
      * it every value below is inherited, so a theme is handed the last theme's
-     * dialog chrome -- rounded buttons on a theme that never asked for them. */
-    {F_T_INT|F_THEMESETTING|F_THEMERESET,
-        &global_settings.dialog_box_border_width, -1,
-        INT(2), "dialog box border width", UNUSED},
-    {F_T_INT|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_box_margin,
-        -1, INT(10), "dialog box margin", UNUSED},
-    {F_T_INT|F_THEMESETTING|F_THEMERESET,
-        &global_settings.dialog_btn_border_width, -1,
-        INT(2), "dialog button border width", UNUSED},
+     * dialog chrome -- rounded buttons on a theme that never asked for them.
+     * It applies equally to a value set from the menu: the next theme load
+     * returns it to the default below. */
+    INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_box_border_width,
+        LANG_DIALOG_BOX_BORDER_WIDTH, 2, "dialog box border width",
+        UNIT_PIXEL, 0, 10, 1, NULL, NULL, NULL),
+    INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_box_margin,
+        LANG_DIALOG_BOX_MARGIN, 10, "dialog box margin",
+        UNIT_PIXEL, 0, 40, 1, NULL, NULL, NULL),
+    INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_btn_border_width,
+        LANG_DIALOG_BTN_BORDER_WIDTH, 2, "dialog button border width",
+        UNIT_PIXEL, 0, 10, 1, NULL, NULL, NULL),
     /* Square by default: a radius is a look, and a theme that says nothing
      * should get the plain shape rather than this fork's. Themify_2 asks for
      * the rounded one in its own .cfg. */
-    {F_T_INT|F_THEMESETTING|F_THEMERESET,
-        &global_settings.dialog_btn_border_radius, -1,
-        INT(0), "dialog button border radius", UNUSED},
+    INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_btn_border_radius,
+        LANG_DIALOG_BTN_BORDER_RADIUS, 0, "dialog button border radius",
+        UNIT_PIXEL, 0, 20, 1, NULL, NULL, NULL),
     /* off:  every dialog colour is inherited from the theme, flat.
      * on:   the nine colours below are used instead.
      * auto: derived from the theme's foreground and background, or from the
      *       album's while dynamic colours are running (the default). */
-    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, dialog_colors, -1,
-                   DIALOG_COLORS_AUTO,
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, dialog_colors,
+                   LANG_DIALOG_COLORS, DIALOG_COLORS_AUTO,
                    "dialog colours", "off,on,auto", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUTO)),
     {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET, &global_settings.dialog_box_fg,
@@ -1618,8 +1627,12 @@ const struct settings_list settings[] = {
                   NULL, "qs bottom",
                   qs_load_from_cfg, qs_write_to_cfg,
                   qs_is_changed, qs_set_default),
-   OFFON_SETTING(0, shortcuts_replaces_qs, LANG_USE_SHORTCUTS_INSTEAD_OF_QS,
-                  false, "shortcuts instead of quickscreen", NULL),
+   /* What the long press opens. Named for the thing being chosen rather than
+      the override, so the two options read as alternatives; the cfg name and
+      its off/on values are unchanged. */
+   BOOL_SETTING(0, shortcuts_replaces_qs, LANG_USE_SHORTCUTS_INSTEAD_OF_QS,
+                  false, "shortcuts instead of quickscreen", off_on,
+                  LANG_SHORTCUTS_INSTEAD, LANG_ON, NULL),
     OFFON_SETTING(0, prevent_skip, LANG_PREVENT_SKIPPING, false, "prevent track skip", NULL),
     OFFON_SETTING(0, rewind_across_tracks, LANG_REWIND_ACROSS_TRACKS, false, "rewind across tracks", NULL),
     OFFON_SETTING(0, usb_hid, LANG_USB_HID, false, "usb hid", usb_set_hid),

@@ -92,9 +92,9 @@ static void eq_apply(void)
     }
 }
 
-static int eq_setting_callback(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
+int eq_setting_callback(int action,
+                        const struct menu_item_ex *this_item,
+                        struct gui_synclist *this_list)
 {
     (void)this_list;
     switch (action)
@@ -810,5 +810,5 @@ MENUITEM_FUNCTION_W_PARAM(eq_browse, 0, ID2P(LANG_EQUALIZER_BROWSE),
                           lowlatency_callback, Icon_NOICON);
 
 MAKE_MENU(equalizer_menu, ID2P(LANG_EQUALIZER), NULL, Icon_EQ,
-        &eq_enable, &eq_graphical, &eq_precut, &gain_menu,
-        &advanced_menu, &eq_save, &eq_browse, &eq_reset);
+        &eq_browse, &eq_enable, &eq_graphical, &gain_menu,
+        &advanced_menu, &eq_precut, &eq_save, &eq_reset);

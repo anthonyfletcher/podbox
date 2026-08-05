@@ -853,13 +853,13 @@
   desc: in tag cache settings; rescan after a USB session that wrote to us
   user: core
   <source>
-    *: "Update on USB Eject"
+    *: "Scan on Eject"
   </source>
   <dest>
-    *: "Update on USB Eject"
+    *: "Scan on Eject"
   </dest>
   <voice>
-    *: "Update on USB Eject"
+    *: "Scan on Eject"
   </voice>
 </phrase>
 <phrase>
@@ -1077,10 +1077,10 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </source>
   <dest>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </dest>
   <voice>
     *: "Simple equalizer settings"
@@ -1091,10 +1091,10 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </source>
   <dest>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </dest>
   <voice>
     *: "Advanced equalizer settings"
@@ -1119,10 +1119,10 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Browse EQ Presets"
+    *: "Load EQ Preset"
   </source>
   <dest>
-    *: "Browse EQ Presets"
+    *: "Load EQ Preset"
   </dest>
   <voice>
     *: "Browse equalizer presets"
@@ -1906,13 +1906,13 @@
   desc: in settings_menu()
   user: core
   <source>
-    *: "File View"
+    *: "File Browser"
   </source>
   <dest>
-    *: "File View"
+    *: "File Browser"
   </dest>
   <voice>
-    *: "File View"
+    *: "File Browser"
   </voice>
 </phrase>
 <phrase>
@@ -2211,13 +2211,13 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </source>
   <dest>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </dest>
   <voice>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </voice>
 </phrase>
 <phrase>
@@ -2225,13 +2225,13 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Update Now"
+    *: "Update Database"
   </source>
   <dest>
-    *: "Update Now"
+    *: "Update Database"
   </dest>
   <voice>
-    *: "Update Now"
+    *: "Update Database"
   </voice>
 </phrase>
 <phrase>
@@ -4599,13 +4599,13 @@
   desc: in the main menu
   user: core
   <source>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </source>
   <dest>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </dest>
   <voice>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </voice>
 </phrase>
 <phrase>
@@ -9218,13 +9218,13 @@
   desc: in the settings menu
   user: core
   <source>
-    *: "Theme Settings"
+    *: "UI Settings"
   </source>
   <dest>
-    *: "Theme Settings"
+    *: "UI Settings"
   </dest>
   <voice>
-    *: "Theme Settings"
+    *: "UI Settings"
   </voice>
 </phrase>
 <phrase>
@@ -11065,15 +11065,15 @@
   user: core
   <source>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </dest>
   <voice>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </voice>
 </phrase>
 <phrase>
@@ -11082,15 +11082,15 @@
   user: core
   <source>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </dest>
   <voice>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </voice>
 </phrase>
 <phrase>
@@ -11806,15 +11806,15 @@
   user: core
   <source>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </source>
   <dest>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </dest>
   <voice>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </voice>
 </phrase>
 <phrase>
@@ -12322,13 +12322,13 @@
   desc: in sound settings
   user: core
   <source>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </source>
   <dest>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </dest>
   <voice>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </voice>
 </phrase>
 <phrase>
@@ -17225,13 +17225,13 @@
   desc: in settings_menu
   user: core
   <source>
-    *: "WPS Select Action"
+    *: "Select Action"
   </source>
   <dest>
-    *: "WPS Select Action"
+    *: "Select Action"
   </dest>
   <voice>
-    *: "WPS Select Action"
+    *: "Select Action"
   </voice>
 </phrase>
 <phrase>
@@ -18269,5 +18269,285 @@
   </dest>
   <voice>
     *: "Use UI Font"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE
+  desc: in Manage Settings, chooses the basic or the full settings tree
+  user: core
+  <source>
+    *: "Settings Mode"
+  </source>
+  <dest>
+    *: "Settings Mode"
+  </dest>
+  <voice>
+    *: "Settings Mode"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_BASIC
+  desc: Settings Mode option: the short settings page
+  user: core
+  <source>
+    *: "Basic"
+  </source>
+  <dest>
+    *: "Basic"
+  </dest>
+  <voice>
+    *: "Basic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_ADVANCED
+  desc: Settings Mode option, and the entry that opens the full settings tree
+  user: core
+  <source>
+    *: "Advanced"
+  </source>
+  <dest>
+    *: "Advanced"
+  </dest>
+  <voice>
+    *: "Advanced"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_SETTINGS_MENU
+  desc: in UI Settings, the group holding the parts a theme is built from
+  user: core
+  <source>
+    *: "Theme Settings"
+  </source>
+  <dest>
+    *: "Theme Settings"
+  </dest>
+  <voice>
+    *: "Theme Settings"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOGS_MENU
+  desc: in Edit Theme, the modal dialog chrome group
+  user: core
+  <source>
+    *: "Dialogs"
+  </source>
+  <dest>
+    *: "Dialogs"
+  </dest>
+  <voice>
+    *: "Dialogs"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_COLORS
+  desc: dialog settings, whether the nine colours below are used
+  user: core
+  <source>
+    *: "Dialog Colours"
+  </source>
+  <dest>
+    *: "Dialog Colours"
+  </dest>
+  <voice>
+    *: "Dialog Colours"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER_WIDTH
+  desc: dialog settings, width of the box border
+  user: core
+  <source>
+    *: "Box Border Width"
+  </source>
+  <dest>
+    *: "Box Border Width"
+  </dest>
+  <voice>
+    *: "Box Border Width"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_MARGIN
+  desc: dialog settings, inset of the box from the screen edge
+  user: core
+  <source>
+    *: "Box Margin"
+  </source>
+  <dest>
+    *: "Box Margin"
+  </dest>
+  <voice>
+    *: "Box Margin"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_WIDTH
+  desc: dialog settings, width of a button border
+  user: core
+  <source>
+    *: "Button Border Width"
+  </source>
+  <dest>
+    *: "Button Border Width"
+  </dest>
+  <voice>
+    *: "Button Border Width"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_RADIUS
+  desc: dialog settings, corner radius of a button
+  user: core
+  <source>
+    *: "Button Corner Radius"
+  </source>
+  <dest>
+    *: "Button Corner Radius"
+  </dest>
+  <voice>
+    *: "Button Corner Radius"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_FG
+  desc: dialog colour, box text
+  user: core
+  <source>
+    *: "Box Text"
+  </source>
+  <dest>
+    *: "Box Text"
+  </dest>
+  <voice>
+    *: "Box Text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BG
+  desc: dialog colour, box background
+  user: core
+  <source>
+    *: "Box Background"
+  </source>
+  <dest>
+    *: "Box Background"
+  </dest>
+  <voice>
+    *: "Box Background"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER
+  desc: dialog colour, box border
+  user: core
+  <source>
+    *: "Box Border"
+  </source>
+  <dest>
+    *: "Box Border"
+  </dest>
+  <voice>
+    *: "Box Border"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG
+  desc: dialog colour, button text
+  user: core
+  <source>
+    *: "Button Text"
+  </source>
+  <dest>
+    *: "Button Text"
+  </dest>
+  <voice>
+    *: "Button Text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG
+  desc: dialog colour, button background
+  user: core
+  <source>
+    *: "Button Background"
+  </source>
+  <dest>
+    *: "Button Background"
+  </dest>
+  <voice>
+    *: "Button Background"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER
+  desc: dialog colour, button border
+  user: core
+  <source>
+    *: "Button Border"
+  </source>
+  <dest>
+    *: "Button Border"
+  </dest>
+  <voice>
+    *: "Button Border"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG_SEL
+  desc: dialog colour, selected button text
+  user: core
+  <source>
+    *: "Selected Button Text"
+  </source>
+  <dest>
+    *: "Selected Button Text"
+  </dest>
+  <voice>
+    *: "Selected Button Text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG_SEL
+  desc: dialog colour, selected button background
+  user: core
+  <source>
+    *: "Selected Button Background"
+  </source>
+  <dest>
+    *: "Selected Button Background"
+  </dest>
+  <voice>
+    *: "Selected Button Background"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_SEL
+  desc: dialog colour, selected button border
+  user: core
+  <source>
+    *: "Selected Button Border"
+  </source>
+  <dest>
+    *: "Selected Button Border"
+  </dest>
+  <voice>
+    *: "Selected Button Border"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHORTCUTS_INSTEAD
+  desc: Quick Screen option: the long press opens the shortcuts menu instead
+  user: core
+  <source>
+    *: "Shortcuts instead"
+  </source>
+  <dest>
+    *: "Shortcuts instead"
+  </dest>
+  <voice>
+    *: "Shortcuts instead"
   </voice>
 </phrase>

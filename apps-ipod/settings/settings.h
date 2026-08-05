@@ -67,6 +67,14 @@ enum {
     DIALOG_COLORS_AUTO = 2,  /* derived from the theme's, or the album's     */
 };
 
+/* global_settings.settings_mode -- which tree the root Settings entry opens.
+ * BASIC is a short flat page of the settings most people want; its last entry
+ * opens the full tree, so nothing is unreachable either way. */
+enum {
+    SETTINGS_MODE_BASIC = 0,
+    SETTINGS_MODE_ADVANCED = 1,
+};
+
 enum
 {
     TRIG_MODE_OFF = 0,
@@ -454,6 +462,7 @@ struct user_settings
     int battery_display; /* how battery is displayed: 0=graphic, 1=percent */
     bool show_icons;   /* 0=hide 1=show */
     bool show_debug_menu; /* show the Debug entry in the System menu */
+    int settings_mode; /* SETTINGS_MODE_* enum values */
     int statusbar;    /* STATUSBAR_* enum values */
 
     int scrollbar;    /* SCROLLBAR_* enum values */

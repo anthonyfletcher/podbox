@@ -621,12 +621,22 @@ extern struct menu_item_ex
         playlist_options,
         info_menu,
         system_menu;
+
+/* The Settings entry opens whichever tree Settings Mode names. The basic page
+ * carries its own way into the full one, so neither is a dead end. */
+static int settings_scrn(void * param)
+{
+    (void)param;
+    return miscscrn(global_settings.settings_mode == SETTINGS_MODE_BASIC
+                    ? (void *)&basic_settings_menu
+                    : (void *)&main_menu_);
+}
+
 static const struct root_items items[] = {
     [GO_TO_FILEBROWSER] =   { browser, (void*)GO_TO_FILEBROWSER, &file_menu},
     [GO_TO_DBBROWSER] =     { browser, (void*)GO_TO_DBBROWSER, &tagcache_menu },
     [GO_TO_WPS] =           { wpsscrn, NULL, &playback_settings },
-    [GO_TO_MAINMENU] =      { miscscrn, (struct menu_item_ex*)&main_menu_,
-                                                            &manage_settings },
+    [GO_TO_MAINMENU] =      { settings_scrn, NULL, &manage_settings },
 
 
     [GO_TO_RECENTBMARKS] =  { load_bmarks, NULL, &bookmark_settings_menu },
