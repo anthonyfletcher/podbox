@@ -22,11 +22,26 @@ fi
 
 # themes/Themify_2/.rockbox is already laid out with the on-device directory
 # structure, so it drops straight in.
+#
+# default-config.cfg sits beside the theme rather than inside it: it is the
+# build's first-boot config, not part of Themify_2, and it names settings that
+# have nothing to do with the theme. Keeping it in themes/Themify_2 made it
+# look like one of that theme's files and meant it moved whenever the theme did.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox"
 cp -R "$ROOT/themes/Themify_2/.rockbox/." "$STAGE/.rockbox/"
-cp "$ROOT/themes/Themify_2/default-config.cfg" "$STAGE/.rockbox/config.cfg"
+cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/config.cfg"
+
+# The default iconset. buildzip.pl creates icons/ but copies nothing into it,
+# so DEFAULT_ICONSET ("tango_icons.16x16", settings_list.c) pointed at a file
+# that was never on the device. load_icons() fails silently and every icon
+# falls back to the compiled-in bm_default_icons, which is 6x8 -- a blob at
+# 320x240. The viewers set goes with it for the same reason.
+mkdir -p "$STAGE/.rockbox/icons"
+cp "$ROOT/icons/tango_icons.16x16.bmp" "$STAGE/.rockbox/icons/"
+cp "$ROOT/icons/tango_icons_viewers.16x16.bmp" "$STAGE/.rockbox/icons/"
+
 (cd "$STAGE" && zip -qr "$ZIP" .rockbox)
 
 # Upstream buildzip.pl copies the classic_statusbar theme straight out of
