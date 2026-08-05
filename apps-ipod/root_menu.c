@@ -708,13 +708,13 @@ MENUITEM_RETURNVALUE(file_browser, ID2P(LANG_DIR_BROWSER), GO_TO_FILEBROWSER,
 MENUITEM_RETURNVALUE(db_browser, ID2P(LANG_MUSIC_BROWSER), GO_TO_DBBROWSER,
                         NULL, Icon_Audio);
 MENUITEM_RETURNVALUE(pictureflow_item, ID2P(LANG_ALBUM_COVERS), GO_TO_PICTUREFLOW,
-                        NULL, Icon_Rockbox);
+                        NULL, Icon_Folder);
 MENUITEM_RETURNVALUE(artist_portraits_item, ID2P(LANG_ARTIST_PORTRAITS), GO_TO_ARTIST_PORTRAITS,
-                        NULL, Icon_Rockbox);
+                        NULL, Icon_Folder);
 MENUITEM_RETURNVALUE(continue_reading, ID2P(LANG_CONTINUE_READING), GO_TO_LASTDOC,
                         item_callback, Icon_Font);
 MENUITEM_RETURNVALUE(random_album_item, ID2P(LANG_RANDOM_ALBUM), GO_TO_RANDOM_ALBUM,
-                        NULL, Icon_Audio);
+                        NULL, Icon_Playlist);
 MENUITEM_RETURNVALUE(db_search_item, ID2P(LANG_DB_SEARCH), GO_TO_DB_SEARCH,
                         db_search_callback, Icon_Audio);
 MENUITEM_RETURNVALUE(documents_item, ID2P(LANG_DOCUMENTS), GO_TO_DOCUMENTS,

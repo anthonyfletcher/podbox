@@ -1831,15 +1831,26 @@ const char *get_token_value(struct gui_wps *gwps,
             return ui_working() ? "w" : NULL;
         case SKIN_TOKEN_LOADING_ANIM:
             /* Time-cycling frame index for an animated "busy" spinner. A theme
-             * conditional (%?la<f0|f1|...|fN>) maps it to N glyphs; the value
-             * changes ~10x/s so the spinner advances via ordinary value-change
-             * refreshes, with no reliance on skin sub-image timers. The frame
-             * count follows however many options the theme provides. Only ever
-             * drawn while the busy notification viewport is visible. */
+             * conditional (%?la<f0|f1|...|fN>) maps it to N glyphs; the frame
+             * count follows however many options the theme provides, and the
+             * spinner advances via ordinary value-change refreshes with no
+             * reliance on skin sub-image timers.
+             *
+             * A frame has to outlast the interval between repaints, because
+             * this is a function of the clock rather than a counter: whoever
+             * draws it samples it, and a frame shorter than their sampling
+             * period is stepped straight over. The status bar is the slowest
+             * of them at DEFAULT_UPDATE_DELAY, so the frame is half again as
+             * long, which leaves every frame certain to be caught at least
+             * once. It used to be a flat HZ/10 -- faster than the status bar
+             * could sample -- and a four-glyph spinner came out as two
+             * characters alternating instead of turning. */
             if (intval)
             {
                 int frames = (limit >= 2) ? limit : 2;
-                *intval = (int)((current_tick / (HZ / 10)) % frames) + 1;
+                int frame_ticks = DEFAULT_UPDATE_DELAY
+                                + DEFAULT_UPDATE_DELAY / 2;
+                *intval = (int)((current_tick / frame_ticks) % frames) + 1;
             }
             return "a";
         case SKIN_TOKEN_BUTTON_VOLUME:

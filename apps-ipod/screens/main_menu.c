@@ -419,7 +419,7 @@ MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_third_party_licenses_item, &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
-                  main_menu_config, NULL, Icon_Rockbox);
+                  main_menu_config, NULL, Icon_Menu_setting);
 
 /** Main menu **/
 

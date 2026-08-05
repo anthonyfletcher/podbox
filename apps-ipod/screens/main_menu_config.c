@@ -283,7 +283,7 @@ int main_menu_config(void)
         gui_synclist_set_voice_callback(&list, menu_speak_item);
     gui_synclist_set_icon_callback(&list, menu_get_icon);
     gui_synclist_set_nb_items(&list, menu_item_count);
-    gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Rockbox);
+    gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
     /* Draw twice to settle the top row: entering from a list of a different
      * row height (e.g. a tall album-art list) leaves the shared %?La album
      * conditional transiently true on the first row, flashing its album-layout
@@ -359,7 +359,7 @@ int main_menu_config(void)
                     default:
                         gui_synclist_speak_item(&list);
                 }
-                gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Rockbox);
+                gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
                 break;
             }
             case ACTION_STD_CANCEL:
