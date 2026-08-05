@@ -4,6 +4,7 @@
 /build-sim/
 /sim*
 /output
+/iconsources/
 *.elf
 *.exe
 *.so
