@@ -1836,20 +1836,26 @@ const char *get_token_value(struct gui_wps *gwps,
              * spinner advances via ordinary value-change refreshes with no
              * reliance on skin sub-image timers.
              *
-             * A frame has to outlast the interval between repaints, because
-             * this is a function of the clock rather than a counter: whoever
+             * One revolution a second whatever the frame count, so the
+             * interval is a second divided by however many frames the theme
+             * gave us. That is what lets one tag serve both kinds of spinner.
+             *
+             * This is a function of the clock rather than a counter: whoever
              * draws it samples it, and a frame shorter than their sampling
-             * period is stepped straight over. The status bar is the slowest
-             * of them at DEFAULT_UPDATE_DELAY, so the frame is half again as
-             * long, which leaves every frame certain to be caught at least
-             * once. It used to be a flat HZ/10 -- faster than the status bar
-             * could sample -- and a four-glyph spinner came out as two
-             * characters alternating instead of turning. */
+             * period is stepped straight over. The slowest sampler is the
+             * status bar at DEFAULT_UPDATE_DELAY. A handful of frames divides
+             * into intervals longer than that, so a four-glyph ASCII spinner
+             * -- where every frame is distinct and a dropped one shows --
+             * loses none. Twenty frames divides below it and does drop some,
+             * which is invisible when consecutive frames differ only
+             * slightly. A single fixed interval cannot do both: long enough
+             * for four glyphs makes twenty take four seconds a turn. */
             if (intval)
             {
                 int frames = (limit >= 2) ? limit : 2;
-                int frame_ticks = DEFAULT_UPDATE_DELAY
-                                + DEFAULT_UPDATE_DELAY / 2;
+                int frame_ticks = HZ / frames;
+                if (frame_ticks < 1)
+                    frame_ticks = 1;
                 *intval = (int)((current_tick / frame_ticks) % frames) + 1;
             }
             return "a";
