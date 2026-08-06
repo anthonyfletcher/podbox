@@ -161,10 +161,10 @@ int main(void)
  * the whole of boot -- so on a cabled boot the bar may be the only thing that
  * moves. It is driven by boot_progress() below rather than by the captions.
  *
- * Captions are sticky: pass NULL to leave the current one up. One asked for
- * before the theme's font is loaded is dropped rather than drawn in the
- * built-in fixed font, which is the wrong shape for this screen -- the
- * earliest paints therefore show the art alone.
+ * Captions are sticky: pass NULL to leave the current one up. They draw in the
+ * built-in fixed font, so they need neither the disk nor the theme and are
+ * available from the first paint; the earliest stages simply have nothing to
+ * say yet and pass NULL.
  *
  * Boot only. INIT_ATTR memory is reclaimed once root_menu() starts, so calling
  * this after that point jumps into whatever was laid over it. Errors keep
@@ -177,8 +177,10 @@ int main(void)
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
 #define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
-#define BOOT_BAR_Y      (LCD_HEIGHT - 62 - BOOT_BAR_H)  /* bar bottom, 62px up */
-#define BOOT_CAPTION_Y  (LCD_HEIGHT - 40)               /* top edge of the text */
+#define BOOT_BAR_BOTTOM (LCD_HEIGHT - 76)               /* bar bottom, 76px up */
+#define BOOT_BAR_Y      (BOOT_BAR_BOTTOM - BOOT_BAR_H)
+#define BOOT_CAPTION_PAD 10                             /* bar to caption gap */
+#define BOOT_CAPTION_Y  (BOOT_BAR_BOTTOM + BOOT_CAPTION_PAD)
 
 /* Stages in the order init() reaches them, each worth a share of the bar.
  * boot_progress() paints the *start* of a stage, so the bar always shows work
@@ -263,7 +265,11 @@ static void boot_viewport(struct viewport *vp)
     vp->buffer = NULL;                  /* the default framebuffer */
     vp->flags = VP_DEFAULT_FLAGS;
     viewport_set_fullscreen(vp, SCREEN_MAIN);
-    vp->font = font_get_ui_bold();
+    /* The built-in fixed-pitch font, not the theme's: it is compiled in, so it
+     * needs neither the disk nor settings_apply() and is there from the first
+     * paint. It is also small, which is what this caption wants -- it labels
+     * the bar rather than competing with the logo. */
+    vp->font = FONT_SYSFIXED;
     vp->drawmode = DRMODE_FG;
     vp->fg_pattern = PODBOX_COLOR_FG;
 }
@@ -286,10 +292,7 @@ static void boot_paint(int step, int total)
     boot_viewport(&vp);
     last_vp = screen->set_viewport(&vp);
 
-    /* Loaded fonts start at FONT_FIRSTUSERFONT; below that is FONT_SYSFIXED,
-     * which is all there is until settings_apply() has read one off the disk.
-     * font_get_ui_bold() falls back that far too. */
-    if (boot_caption && vp.font >= FONT_FIRSTUSERFONT)
+    if (boot_caption)
     {
         int tw, th;
         screen->getstringsize(boot_caption, &tw, &th);
@@ -499,10 +502,9 @@ static void init(void)
     settings_reset();
 
     /* Bare, and as early as possible. Nothing can be written under the logo
-     * yet: the disk is not mounted, so the only font in existence is the
-     * built-in fixed one, and language_strings[] is not filled in until
-     * lang_init() below. The caption goes up once settings_apply() has loaded
-     * the theme's font. */
+     * yet -- not for want of a font, since the caption uses the built-in one,
+     * but because language_strings[] is not filled in until lang_init() below.
+     * The first caption goes up at the stage after that. */
     CHART(">show_logo");
     boot_progress(BOOT_STORAGE, 0, 0, NULL);
     CHART("<show_logo");
