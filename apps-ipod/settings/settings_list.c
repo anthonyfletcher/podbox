@@ -1317,6 +1317,33 @@ const struct settings_list settings[] = {
      * as it runs. */
     OFFON_SETTING(F_BANFROMQS, tagcache_autocommit, LANG_AUTOCOMMIT_ON_STARTUP,
                   true, "tagcache_autocommit", NULL),
+    /* Database search. The row and letter counts are choices rather than int
+     * settings so the steps are fixed and the config file holds the figure as
+     * written. Both store the index; db_search.c turns it back into a count. */
+    STRINGCHOICE_SETTING(F_BANFROMQS, db_search_max_rows, LANG_DB_SEARCH_MAX_ROWS,
+                         1, "search max rows", "25,50,75,100,125,150,175,200",
+                         NULL, 8,
+                         TALK_ID(25, UNIT_INT), TALK_ID(50, UNIT_INT),
+                         TALK_ID(75, UNIT_INT), TALK_ID(100, UNIT_INT),
+                         TALK_ID(125, UNIT_INT), TALK_ID(150, UNIT_INT),
+                         TALK_ID(175, UNIT_INT), TALK_ID(200, UNIT_INT)),
+    STRINGCHOICE_SETTING(F_BANFROMQS, db_search_min_letters,
+                         LANG_DB_SEARCH_MIN_LETTERS, 0, "search min letters",
+                         "1,2,3", NULL, 3,
+                         TALK_ID(1, UNIT_INT), TALK_ID(2, UNIT_INT),
+                         TALK_ID(3, UNIT_INT)),
+    CHOICE_SETTING(F_BANFROMQS, db_search_order, LANG_DB_SEARCH_ORDER,
+                   DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST, "search order",
+                   "track album artist,track artist album,"
+                   "album track artist,album artist track,"
+                   "artist album track,artist track album",
+                   NULL, DB_SEARCH_ORDER_COUNT,
+                   ID2P(LANG_DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST),
+                   ID2P(LANG_DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM),
+                   ID2P(LANG_DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST),
+                   ID2P(LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK),
+                   ID2P(LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK),
+                   ID2P(LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM)),
     CHOICE_SETTING(F_TEMPVAR, default_codepage, LANG_DEFAULT_CODEPAGE, 14,
                    "default codepage",
                    /* The order must match with that in unicode.c */

@@ -661,6 +661,16 @@ MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &database_sort_albums_by, &music_menu_config_item
           );
 
+/* The text search over the database (screens/system/db_search.c). Its own
+ * submenu rather than rows under Music, because all three shape one screen. */
+MENUITEM_SETTING(db_search_max_rows, &global_settings.db_search_max_rows, NULL);
+MENUITEM_SETTING(db_search_min_letters,
+                 &global_settings.db_search_min_letters, NULL);
+MENUITEM_SETTING(db_search_order, &global_settings.db_search_order, NULL);
+MAKE_MENU(search_menu, ID2P(LANG_DB_SEARCH), 0, Icon_NOICON,
+          &db_search_max_rows, &db_search_min_letters, &db_search_order
+          );
+
 /** Settings menu **/
 
 static struct browse_folder_info langs = { LANG_DIR, SHOW_LNG };
@@ -673,6 +683,7 @@ MAKE_MENU(settings_menu_item, ID2P(LANG_GENERAL_SETTINGS), 0,
           &wps_settings,
           &playlist_settings, &file_menu,
           &music_menu,
+          &search_menu,
           &tagcache_menu,
           &album_covers_menu,
           &art_cache_menu,

@@ -18635,3 +18635,129 @@
     *: "Music Menu Settings"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MAX_ROWS
+  desc: General Settings > Search: how many results the search keeps
+  user: core
+  <source>
+    *: "Maximum Results"
+  </source>
+  <dest>
+    *: "Maximum Results"
+  </dest>
+  <voice>
+    *: "Maximum Results"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MIN_LETTERS
+  desc: General Settings > Search: how many letters must be typed before searching
+  user: core
+  <source>
+    *: "Minimum Letters"
+  </source>
+  <dest>
+    *: "Minimum Letters"
+  </dest>
+  <voice>
+    *: "Minimum Letters"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER
+  desc: General Settings > Search: which kind of result is listed first
+  user: core
+  <source>
+    *: "Result Order"
+  </source>
+  <dest>
+    *: "Result Order"
+  </dest>
+  <voice>
+    *: "Result Order"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Albums, Artists"
+  </source>
+  <dest>
+    *: "Tracks, Albums, Artists"
+  </dest>
+  <voice>
+    *: "Tracks, Albums, Artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Artists, Albums"
+  </source>
+  <dest>
+    *: "Tracks, Artists, Albums"
+  </dest>
+  <voice>
+    *: "Tracks, Artists, Albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Tracks, Artists"
+  </source>
+  <dest>
+    *: "Albums, Tracks, Artists"
+  </dest>
+  <voice>
+    *: "Albums, Tracks, Artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Artists, Tracks"
+  </source>
+  <dest>
+    *: "Albums, Artists, Tracks"
+  </dest>
+  <voice>
+    *: "Albums, Artists, Tracks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Albums, Tracks"
+  </source>
+  <dest>
+    *: "Artists, Albums, Tracks"
+  </dest>
+  <voice>
+    *: "Artists, Albums, Tracks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Tracks, Albums"
+  </source>
+  <dest>
+    *: "Artists, Tracks, Albums"
+  </dest>
+  <voice>
+    *: "Artists, Tracks, Albums"
+  </voice>
+</phrase>

@@ -17,6 +17,10 @@
  *
  * Selecting a result returns a GO_TO_* code for root_menu.c to dispatch.
  *
+ * Three settings shape it, under General Settings > Search: how many results
+ * are kept, how many letters must be typed before a scan runs, and which of
+ * the three tags leads.
+ *
  * Parts, in order:
  *   - the matches
  *   - the scan
@@ -83,17 +87,37 @@
 #define NAME_ARENA   (8 * 1024)
 #define ROW_PAD_Y    3
 
-/* Which tags are searched, in the order results are grouped. Title is per
- * track and dominates the cost; the other two are unique-valued tags whose
- * blobs hold one entry per distinct value, so they are nearly free.
+/* Which tags are searched, one row per value of the order setting. Results are
+ * appended in scan order and never sorted, so the row read is also the order
+ * they appear in. Title is per track and dominates the cost; the other two are
+ * unique-valued tags whose blobs hold one entry per distinct value, so they are
+ * nearly free.
  *
  * tag_artist is deliberately absent. It is the per-track artist, so on any
  * compilation it produces a row per guest that leads to the same albums the
  * album artist already does -- duplicates that push real results off a list
  * this short. What a search means by "artist" is the album artist. */
-static const int search_tags[] = {
-    tag_title, tag_album, tag_albumartist
+static const int search_tags[DB_SEARCH_ORDER_COUNT][3] = {
+    { tag_title,       tag_album,       tag_albumartist },
+    { tag_title,       tag_albumartist, tag_album       },
+    { tag_album,       tag_title,       tag_albumartist },
+    { tag_album,       tag_albumartist, tag_title       },
+    { tag_albumartist, tag_album,       tag_title       },
+    { tag_albumartist, tag_title,       tag_album       },
 };
+
+/* Both count settings are indices into evenly spaced choice lists, so the
+ * value is arithmetic rather than a second table to hold in step with
+ * settings_list.c. */
+static int setting_max_rows(void)
+{
+    return 25 * (global_settings.db_search_max_rows + 1);
+}
+
+static int setting_min_letters(void)
+{
+    return global_settings.db_search_min_letters + 1;
+}
 
 /* The query the screen last closed on, so reopening resumes rather than
  * starting blank. Deliberately not a setting: it is a convenience within a
@@ -112,21 +136,14 @@ static struct match {
 static int  match_count;
 static char name_arena[NAME_ARENA];
 static int  arena_used;
-static bool overflowed;         /* the library had more than we kept */
-
-/* What the last scan cost. */
-static int          scanned;
-static unsigned int search_usec;
+static int  row_limit;          /* the max-rows setting, taken once per scan */
 
 static bool add_match(int tag, const char *name, int32_t seek, int32_t idx_id)
 {
     int len = strlen(name) + 1;
 
-    if (match_count >= MAX_MATCHES || arena_used + len > NAME_ARENA)
-    {
-        overflowed = true;
+    if (match_count >= row_limit || arena_used + len > NAME_ARENA)
         return false;
-    }
 
     matches[match_count].name_off = arena_used;
     matches[match_count].tag = tag;
@@ -143,10 +160,9 @@ static bool add_match(int tag, const char *name, int32_t seek, int32_t idx_id)
 
 /* Re-run the whole search for `query`.
  *
- * No yield() in the loop, which is not what a shipping version would do. It is
- * what makes the figure on screen mean something: a yield hands the codec and
- * the tagcache thread time that would otherwise be counted here. The settle
- * delay is what keeps this off the critical path, not chunking.
+ * The loop does not yield. What keeps this off the critical path is the settle
+ * delay in front of it, not chunking: a scan only starts once the query has
+ * stood still, and on a library this size it is over in a fraction of that.
  *
  * The clause machinery is deliberately unused. A clause makes tagcache walk
  * the master index -- one 96-byte index_entry per track, plus a scattered read
@@ -157,37 +173,37 @@ static void run_search(const char *query)
 {
     char buf[TAGCACHE_BUFSZ];
     struct tagcache_search tcs;
-    unsigned int t0 = USEC_TIMER;
+    const int *tags = search_tags[global_settings.db_search_order];
     unsigned int i;
 
     match_count = 0;
     arena_used = 0;
-    overflowed = false;
-    scanned = 0;
 
-    if (query[0] == '\0')
-    {
-        search_usec = 0;
+    /* The setting is a second, lower ceiling; MAX_MATCHES and NAME_ARENA stay
+     * the hard array bounds, so no setting can overrun them. */
+    row_limit = MIN(setting_max_rows(), MAX_MATCHES);
+
+    /* Too short to bother with -- and, since the threshold is at least one
+     * letter, this is also the empty-query case. Everything above is already
+     * cleared, so a query backspaced below the threshold empties the results
+     * rather than leaving the last scan's on screen. */
+    if ((int)strlen(query) < setting_min_letters())
         return;
-    }
 
-    for (i = 0; i < ARRAYLEN(search_tags); i++)
+    for (i = 0; i < ARRAYLEN(search_tags[0]); i++)
     {
-        if (!tagcache_search(&tcs, search_tags[i]))
+        if (!tagcache_search(&tcs, tags[i]))
             continue;
 
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
         {
-            scanned++;
             if (strcasestr(buf, query)
-                && !add_match(search_tags[i], buf, tcs.result_seek, tcs.idx_id))
+                && !add_match(tags[i], buf, tcs.result_seek, tcs.idx_id))
                 break;
         }
 
         tagcache_search_finish(&tcs);
     }
-
-    search_usec = USEC_TIMER - t0;
 }
 
 /* ---- the dialog --------------------------------------------------------- */
@@ -563,9 +579,6 @@ int db_search_run(void)
 
     match_count = 0;
     arena_used = 0;
-    overflowed = false;
-    scanned = 0;
-    search_usec = 0;
 
     /* Rows are buttons, but a list of forty outlined boxes reads as clutter.
      * An unselected row is therefore borderless and takes the box's own fill,

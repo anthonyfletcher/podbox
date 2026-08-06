@@ -173,6 +173,20 @@ enum
     TAGCACHE_RAM_QUICK = 2
 };
 
+/* Database search: which of the three tags is scanned first, and so which
+ * results appear first -- the scan appends and never sorts. Indexes the table
+ * in screens/system/db_search.c, so the two must stay in step. */
+enum
+{
+    DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST = 0,
+    DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM,
+    DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST,
+    DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK,
+    DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK,
+    DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM,
+    DB_SEARCH_ORDER_COUNT
+};
+
 /* dir filter options */
 /* Note: Any new filter modes need to be added before NUM_FILTER_MODES.
  *       Any new rockbox browse filter modes (accessible through the menu)
@@ -493,6 +507,11 @@ struct user_settings
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */
     bool tagcache_scan_on_startup; /* also check for changes at boot? */
     bool tagcache_autocommit;    /* finish an interrupted commit without asking */
+    /* Database search. The two counts are indices into evenly spaced choice
+     * lists, not the values themselves. */
+    int db_search_max_rows;      /* 0..7 -> 25..200 results, in steps of 25 */
+    int db_search_min_letters;   /* 0..2 -> 1..3 letters before a scan runs */
+    int db_search_order;         /* DB_SEARCH_ORDER_* */
     bool autoresume_enable;   /* enable auto-resume feature? */
     int autoresume_automatic; /* resume next track? 0=never, 1=always,
                                  2=custom */
