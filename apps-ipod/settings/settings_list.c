@@ -1429,7 +1429,9 @@ const struct settings_list settings[] = {
                 "glyphs", UNIT_INT, MIN_GLYPHS, MAX_GLYPHS, 10,
                 NULL, NULL, NULL),
     /* Core text viewer (apps/text_viewer) */
-    CHOICE_SETTING(0, text_viewer_colour_mode, LANG_TEXT_VIEWER_COLOUR, 0,
+    /* Defaults to white on black: long-form reading wants a fixed, high
+       contrast page, not the theme's (or the album's) colours. */
+    CHOICE_SETTING(0, text_viewer_colour_mode, LANG_TEXT_VIEWER_COLOUR, 3,
                    "text viewer colour mode",
                    "theme,inverted,black on white,white on black", NULL, 4,
                    ID2P(LANG_TEXT_VIEWER_COLOUR_THEME),
