@@ -17797,13 +17797,13 @@
   desc: album chart: most played albums
   user: core
   <source>
-    *: "Most Played Albums"
+    *: "Most played albums"
   </source>
   <dest>
-    *: "Most Played Albums"
+    *: "Most played albums"
   </dest>
   <voice>
-    *: "Most Played Albums"
+    *: "Most played albums"
   </voice>
 </phrase>
 <phrase>
@@ -17811,13 +17811,13 @@
   desc: album chart: most recently played albums
   user: core
   <source>
-    *: "Recently Played Albums"
+    *: "Recently played albums"
   </source>
   <dest>
-    *: "Recently Played Albums"
+    *: "Recently played albums"
   </dest>
   <voice>
-    *: "Recently Played Albums"
+    *: "Recently played albums"
   </voice>
 </phrase>
 <phrase>
@@ -17825,13 +17825,13 @@
   desc: album chart: played once but not for a long time
   user: core
   <source>
-    *: "Forgotten Albums"
+    *: "Forgotten albums"
   </source>
   <dest>
-    *: "Forgotten Albums"
+    *: "Forgotten albums"
   </dest>
   <voice>
-    *: "Forgotten Albums"
+    *: "Forgotten albums"
   </voice>
 </phrase>
 <phrase>
@@ -17951,13 +17951,13 @@
   desc: chart: artists with the most plays
   user: core
   <source>
-    *: "Most Played Artists"
+    *: "Most played artists"
   </source>
   <dest>
-    *: "Most Played Artists"
+    *: "Most played artists"
   </dest>
   <voice>
-    *: "Most Played Artists"
+    *: "Most played artists"
   </voice>
 </phrase>
 <phrase>
@@ -17965,13 +17965,13 @@
   desc: chart: most recently played artists
   user: core
   <source>
-    *: "Recently Played Artists"
+    *: "Recently played artists"
   </source>
   <dest>
-    *: "Recently Played Artists"
+    *: "Recently played artists"
   </dest>
   <voice>
-    *: "Recently Played Artists"
+    *: "Recently played artists"
   </voice>
 </phrase>
 <phrase>
@@ -17979,13 +17979,13 @@
   desc: chart: artists played least, never-played included
   user: core
   <source>
-    *: "Forgotten Artists"
+    *: "Forgotten artists"
   </source>
   <dest>
-    *: "Forgotten Artists"
+    *: "Forgotten artists"
   </dest>
   <voice>
-    *: "Forgotten Artists"
+    *: "Forgotten artists"
   </voice>
 </phrase>
 <phrase>
