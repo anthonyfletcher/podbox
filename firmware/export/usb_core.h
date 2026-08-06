@@ -78,4 +78,13 @@ void usb_core_notify_set_config(uint8_t config);
 void usb_core_hotswap_event(int volume,bool inserted);
 #endif
 
+#if defined(USB_ENABLE_STORAGE) && !defined(BOOTLOADER)
+/* Claim the mass-storage transfer buffers. Call once at boot, from usb_init(),
+ * *before* audio_init() takes the rest of the RAM -- see the definition in
+ * usbstack/usb_storage.c for why it must not happen any later. Idempotent, and
+ * a no-op where the buffers are static BSS. Declared here rather than in
+ * usbstack/usb_storage.h so usb.c can reach it. */
+void usb_storage_alloc_buffers(void);
+#endif
+
 #endif

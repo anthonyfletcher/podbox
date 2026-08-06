@@ -58,8 +58,9 @@ fork's own.
 
 ## firmware/ — USB stack
 
-Two features: keeping other work out of an enumerating host's way, and the
-`host_wrote` flag.
+Four features: keeping other work out of an enumerating host's way, the
+`host_wrote` flag, when the mass-storage buffers are claimed, and an insertion
+diagnostic.
 
 ### `usb_host_is_present()`
 
@@ -75,8 +76,9 @@ boot-time pass defers rather than starting on top of one.
 
 This is contention, not correctness. It keeps a background pass from holding
 the disk, the bus and the locks a mounting host is waiting on. It is **not**
-established as the cause of the `SET_ADDRESS` enumeration failures seen on the
-iPod Video, which are open.
+the cause of the `SET_ADDRESS` enumeration failures on the iPod Video, which
+remain open — see *Insertion diagnostic* below for the signature and how to
+read it.
 
 `usb_inserted()` is unsuitable as the signal. It covers `USB_POWERED` as well
 as `USB_INSERTED`, so a charger satisfies it too, and a player kept on charge
@@ -93,8 +95,6 @@ charger.
 
 ### `host_wrote`
 
-All four files serve one feature: a `host_wrote` flag.
-
 The app layer rebuilds the tag database and dircache on every USB disconnect, on
 the assumption the host changed files. If the host only ever read, none of that
 work is needed — and Windows produces a spurious disconnect/reconnect on
@@ -107,6 +107,35 @@ the tagcache thread mid-scan when the reconnect arrives.
 | `usbstack/usb_storage.h` | Declares the accessor | — |
 | `usbstack/usb_core.c` | `usb_core_host_wrote_storage()`, forwarding when `USB_ENABLE_STORAGE` is set and returning false otherwise | `usb_storage.h` is private to the USB stack, so the app layer cannot include it. |
 | `export/usb_core.h` | Declares it | The app layer's entry point. |
+
+### When the mass-storage buffers are claimed
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `usbstack/usb_storage.c` | The ~128K transfer-buffer allocation moves out of `usb_storage_init_connection()` into a new idempotent `usb_storage_alloc_buffers()`; `usb_storage_disconnect()` no longer frees it | Upstream allocates it inside the host's `SET_CONFIGURATION`. It is immovable buflib, so after `audio_init()` it can only be met by shrinking the audio buffer — whose callback stops playback with a synchronous `queue_send`, blocking the USB thread mid-control-transfer. Freeing on disconnect would make the next connection pay again. |
+| `export/usb_core.h` | Declares it | `usbstack/` is not on `usb.c`'s include path. |
+| `usb.c` | `usb_init()` calls it | Before `audio_init()`, so there is nothing to shrink. Costs ~128K of audio buffer for the life of the firmware. |
+
+**Do not move this to `usb_storage_init()`.** `usb_core_init()` runs
+`usb_drv_init()` — which sets `USBCMD_RUN` and attaches the device — *before*
+the class drivers' `init()`, so a stall there lands before `SET_ADDRESS` and
+stops enumeration outright. Boot is the only point where nothing can be waiting.
+
+Targets defining `USB_STATIC_ALLOC` use BSS and never had this. PP502x is
+excluded from that list because `USB_DEVBSS_ATTR` is `IBSS_ATTR` there and 128K
+does not fit in IRAM.
+
+### Insertion diagnostic
+
+Scaffolding for the open `SET_ADDRESS` failures, reachable at
+**Debug → View USB info**. Plain counters, no allocation and no disk, none of
+it in the timing-critical path.
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `export/usb.h` | `struct usb_insert_record`, `enum usb_waypoint`, `usb_get_insert_record()`, `usb_record_waypoint()` | What the last insertion decided and how far enumeration got. |
+| `usb.c` | Static record, zeroed per insertion; captures `button_status()`, the ignore mask, `usb_mode`, `usb_power_only`, and the ack bookkeeping | A connect that does nothing is either charging-only or a stuck handover, and nothing on screen tells them apart. |
+| `usbstack/usb_core.c` | Waypoints in `usb_core_bus_reset()`, `usb_core_setup_received()`, `usb_core_do_set_addr()`, `usb_core_do_set_config()`, and the driver loop | Placed at the handlers, not at `usb_core_handle_notify()`: the ARC driver calls `usb_core_bus_reset()` straight from its ISR and posts no notifications, so counters on the notify path read zero even on a healthy connection. |
 
 ## firmware/ — iPod Classic 6G (S5L8702)
 

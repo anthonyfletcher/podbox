@@ -876,6 +876,11 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
 
 static void usb_core_do_set_addr(uint8_t address)
 {
+#ifndef BOOTLOADER
+    /* Counted here, not at the notify: controllers that handle SET_ADDRESS in
+     * their own interrupt path (the ARC driver does) never post one. */
+    usb_record_waypoint(USB_WP_SET_ADDR, address, 0);
+#endif
     logf("usb_core: SET_ADR %d", address);
     usb_address = address;
     usb_state = ADDRESS;
@@ -888,6 +893,9 @@ static void usb_core_do_set_addr(uint8_t address)
 
 static int usb_core_do_set_config(uint8_t new_config)
 {
+#ifndef BOOTLOADER
+    usb_record_waypoint(USB_WP_SET_CONFIG, new_config, 0);
+#endif
     logf("usb_core: SET_CONFIG %d to %d", usb_config, new_config);
 
     if(new_config > NUM_CONFIGS) {
@@ -916,6 +924,9 @@ static int usb_core_do_set_config(uint8_t new_config)
 
     bool require_exclusive = false;
     bool require_cpu_boost = false;
+#ifndef BOOTLOADER
+    int dbg_active = 0, dbg_error = 0;
+#endif
 
     /* activate new config */
     if(usb_config != 0) {
@@ -924,14 +935,25 @@ static int usb_core_do_set_config(uint8_t new_config)
             if(!is_active(drivers[i])) {
                 continue;
             }
+#ifndef BOOTLOADER
+            dbg_active |= 1 << i;
+#endif
             if(drivers[i]->init_connection != NULL && drivers[i]->init_connection() < 0) {
                 drivers[i]->error = true;
+#ifndef BOOTLOADER
+                dbg_error |= 1 << i;
+#endif
                 continue;
             }
             require_exclusive |= drivers[i]->needs_exclusive_storage;
             require_cpu_boost |= drivers[i]->needs_cpu_boost;
         }
     }
+
+#ifndef BOOTLOADER
+    usb_record_waypoint(USB_WP_DRIVERS, dbg_active, dbg_error);
+    usb_record_waypoint(USB_WP_EXCLUSIVE, require_exclusive, 0);
+#endif
 
     if(require_exclusive) {
         if(!usb_exclusive_storage()) {
@@ -1186,6 +1208,12 @@ static void do_bus_reset(void) {
 /* called by usb_drv_int() */
 void usb_core_bus_reset(void)
 {
+#ifndef BOOTLOADER
+    /* Counted here, not at the notify below: that one is only posted once a
+     * configuration is set, so before then resets are handled inline and never
+     * reach usb_core_handle_notify() at all. */
+    usb_record_waypoint(USB_WP_BUS_RESET, 0, 0);
+#endif
     logf("usb_core: bus reset");
     if(bus_reset_pending) {
         return;
@@ -1313,6 +1341,7 @@ void usb_core_handle_notify(long id, intptr_t data)
             usb_core_do_set_config(data);
             break;
         case USB_NOTIFY_BUS_RESET:
+            /* counted in usb_core_bus_reset(), which posted this */
             usb_core_do_set_config(0);
             do_bus_reset();
 #ifdef HAVE_USB_CHARGING_ENABLE
@@ -1339,6 +1368,11 @@ void usb_core_handle_notify(long id, intptr_t data)
 }
 
 void usb_core_setup_received(struct usb_ctrlrequest* req) {
+#ifndef BOOTLOADER
+    /* Every control request the host makes lands here first, so this answers
+     * "did the host talk to us at all" independently of what we did next. */
+    usb_record_waypoint(USB_WP_SETUP, req->bRequest, 0);
+#endif
     if(bus_reset_pending) {
         logf("usb_core: bus resetting tick=%lu", current_tick);
         return;

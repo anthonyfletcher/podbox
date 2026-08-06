@@ -207,6 +207,60 @@ bool usb_inserted(void);
 bool usb_host_is_present(void);
 /* check whether USB is plugged, note that this is the raw hardware value */
 int usb_detect(void);
+
+#ifndef BOOTLOADER
+/* What the last cable insertion decided, and how far the handover got.
+ *
+ * Diagnostic only. A connect that appears to do nothing is either charging-only
+ * (no broadcast, the UI stays live) or a handover waiting on a thread that has
+ * not acknowledged -- and nothing on screen tells those apart. Read by the
+ * debug menu's "View USB info". */
+struct usb_insert_record
+{
+    long tick;               /* current_tick at insertion */
+    long broadcast_tick;     /* ...and when SYS_USB_CONNECTED went out */
+    int  btn_status;         /* button_status() at insertion */
+    int  btn_ignore;         /* the mask it is tested against; nonzero AND
+                              * inverts the mass-storage/charge decision */
+    int  usb_mode;           /* USB_MODE_* the settings asked for */
+    bool power_only;         /* charging only: no broadcast, no mass storage */
+    int  acks_expected;      /* threads owing an ack at broadcast, -1 = none sent */
+    int  acks_remaining;     /* still owed -- nonzero here is a stuck handover */
+    bool storage_handed_over;/* disk_unmount_all() ran; the host has the disk */
+
+    /* Enumeration waypoints, counted since insertion. Which of these stops
+     * moving says where the connection died:
+     *   set_addr 0            -> never enumerated at all
+     *   set_config 0          -> descriptors rejected; never configured
+     *   drv_active no storage -> the driver was not enabled or not in this
+     *                            config
+     *   drv_error has storage -> its init_connection() failed
+     *   exclusive_required 0  -> nothing asked for the disk, hence no broadcast
+     *   bus_resets climbing   -> the host keeps giving up and retrying */
+    int  bus_resets;
+    int  setups;             /* control requests received from the host */
+    int  last_setup;         /* bRequest of the last one */
+    int  set_addr;           /* SET_ADDRESS handled */
+    int  set_config;         /* SET_CONFIGURATION handled */
+    int  last_config;        /* value of the last one (0 = deconfigured) */
+    int  drv_active;         /* bitmask by USB_DRIVER_*, at last set_config */
+    int  drv_error;          /* ...those whose init_connection() failed */
+    bool exclusive_required; /* a driver asked for the disk */
+};
+
+enum usb_waypoint
+{
+    USB_WP_BUS_RESET,
+    USB_WP_SETUP,        /* a = bRequest */
+    USB_WP_SET_ADDR,
+    USB_WP_SET_CONFIG,   /* a = config value */
+    USB_WP_DRIVERS,      /* a = active mask, b = errored mask */
+    USB_WP_EXCLUSIVE,    /* a = require_exclusive */
+};
+
+void usb_record_waypoint(enum usb_waypoint w, int a, int b);
+const struct usb_insert_record *usb_get_insert_record(void);
+#endif /* !BOOTLOADER */
 #ifdef USB_STATUS_BY_EVENT
 /* Notify USB insertion state (USB_INSERTED or USB_EXTRACTED) */
 void usb_status_event(int current_status);

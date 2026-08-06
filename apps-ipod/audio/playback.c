@@ -415,7 +415,7 @@ enum audio_start_playback_flags
 
 static void audio_start_playback(const struct audio_resume_info *resume_info,
                                  unsigned int flags);
-static void audio_stop_playback(void);
+static void audio_stop_playback(bool allow_fade);
 static void buffer_event_buffer_low_callback(unsigned short id, void *data, void *user_data);
 static void buffer_event_rebuffer_callback(unsigned short id, void *data);
 static void buffer_event_finished_callback(unsigned short id, void *data);
@@ -1074,7 +1074,7 @@ static int shrink_callback(int handle, unsigned hints, void* start, size_t old_s
     if (thread_self() == audio_thread_id)
     {   /* inline case Q_AUDIO_STOP (audio_hard_stop() response
          * if we're in the audio thread */
-        audio_stop_playback();
+        audio_stop_playback(false);   /* buflib is waiting: no fade */
         queue_clear(&audio_queue);
     }
     else
@@ -2903,7 +2903,7 @@ static void audio_finalise_track_change(void)
     case TRACK_SKIP_AUTO_END_PLAYLIST:
     default:            /* Invalid */
         filling = STATE_ENDED;
-        audio_stop_playback();
+        audio_stop_playback(true);
         return;
     }
 
@@ -3308,14 +3308,20 @@ static void audio_start_playback(const struct audio_resume_info *resume_info,
 
 /* Stop playback and enter an idle state
    (usually Q_AUDIO_STOP) */
-static void audio_stop_playback(void)
+static void audio_stop_playback(bool allow_fade)
 {
     logf("%s()", __func__);
 
     if (play_status == PLAY_STOPPED)
         return;
 
-    bool do_fade = global_settings.fade_on_stop && filling != STATE_ENDED;
+    /* allow_fade is false when a USB host is waiting on us. The fade takes a
+     * third of a second and audio_wait_fade_complete() below sits in it, which
+     * puts it squarely in front of the SYS_USB_CONNECTED acknowledgement this
+     * call has to finish before -- long enough, on its own, to cost the
+     * handover. Nothing is lost but the fade; the music stops either way. */
+    bool do_fade = allow_fade && global_settings.fade_on_stop
+                   && filling != STATE_ENDED;
 
     pcmbuf_fade(do_fade, false);
 
@@ -3451,7 +3457,7 @@ static void audio_on_skip(void)
         {
             /* Some variety of fatal error while updating playlist */
             filling = STATE_ENDED;
-            audio_stop_playback();
+            audio_stop_playback(true);
             return;
         }
 
@@ -3467,7 +3473,7 @@ static void audio_on_skip(void)
                 /* Had to move the opposite direction to correct, which is
                    wrong - this is the end */
                 filling = STATE_ENDED;
-                audio_stop_playback();
+                audio_stop_playback(true);
                 return;
             }
 
@@ -3772,7 +3778,10 @@ void audio_playback_handler(struct queue_event *ev)
         case SYS_USB_CONNECTED:
         case Q_AUDIO_STOP:
             LOGFQUEUE("playback < Q_AUDIO_STOP");
-            audio_stop_playback();
+            /* No fade for USB, nor for a forced stop -- data != 0 marks the
+             * ones nobody asked for (audio_hard_stop(), the buflib shrink
+             * callback), where a caller is blocked waiting on us. */
+            audio_stop_playback(ev->id != SYS_USB_CONNECTED && ev->data == 0);
             if (ev->data != 0)
                 queue_clear(&audio_queue);
             return; /* no more playback */

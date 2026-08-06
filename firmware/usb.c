@@ -123,6 +123,49 @@ static int usb_audio = 0;
 static bool usb_host_present = false;
 static int usb_num_acks_to_expect = 0;
 static uint32_t usb_broadcast_seqnum = 0x80000000;
+
+#ifndef BOOTLOADER
+/* Diagnostic only: what happened at the last cable insertion. A connect that
+ * appears to do nothing is either charging-only or a handover that never
+ * completed, and nothing on screen distinguishes them. Shown by the debug
+ * menu's "View USB info". Written outside the timing-critical path -- plain
+ * stores, no allocation, no disk. */
+static struct usb_insert_record usb_record = { .acks_expected = -1 };
+
+/* Waypoints, called from usb_core.c as enumeration proceeds. Plain counters. */
+void usb_record_waypoint(enum usb_waypoint w, int a, int b)
+{
+    switch(w)
+    {
+        case USB_WP_BUS_RESET:  usb_record.bus_resets++;  break;
+        case USB_WP_SETUP:
+            usb_record.setups++;
+            usb_record.last_setup = a;
+            break;
+        case USB_WP_SET_ADDR:   usb_record.set_addr++;    break;
+        case USB_WP_SET_CONFIG:
+            usb_record.set_config++;
+            usb_record.last_config = a;
+            break;
+        case USB_WP_DRIVERS:
+            usb_record.drv_active = a;
+            usb_record.drv_error = b;
+            break;
+        case USB_WP_EXCLUSIVE:
+            usb_record.exclusive_required = (a != 0);
+            break;
+    }
+}
+
+const struct usb_insert_record *usb_get_insert_record(void)
+{
+    /* The live half, read at display time rather than recorded: a handover
+     * still waiting on a thread shows a non-zero count here. */
+    usb_record.acks_remaining = usb_num_acks_to_expect;
+    usb_record.storage_handed_over = exclusive_storage_enabled;
+    return &usb_record;
+}
+#endif /* !BOOTLOADER */
 #if defined(USB_FIREWIRE_HANDLING)
 static void try_reboot(void)
 {
@@ -482,6 +525,22 @@ static void NORETURN_ATTR usb_thread(void)
             }
 #endif
 
+#ifndef BOOTLOADER
+            /* Zero the counters first: a reading has to describe this
+             * insertion, not every one since boot. */
+            memset(&usb_record, 0, sizeof(usb_record));
+            usb_record.tick = current_tick;
+            usb_record.btn_status = button_status();
+            usb_record.btn_ignore = ~USBPOWER_BTN_IGNORE;
+            usb_record.usb_mode = usb_mode;
+#ifdef HAVE_USB_POWER
+            usb_record.power_only = usb_power_only;
+#else
+            usb_record.power_only = false;
+#endif
+            usb_record.acks_expected = -1;   /* no broadcast yet this session */
+#endif
+
 #ifndef USB_DETECT_BY_REQUEST
             usb_state = USB_INSERTED;
             usb_set_host_present(true);
@@ -749,6 +808,14 @@ void usb_init(void)
     tick_add_task(usb_tick);
 #endif
 #endif /* USB_FULL_INIT */
+
+#if defined(USB_ENABLE_STORAGE) && !defined(BOOTLOADER)
+    /* Here and nowhere later: this runs before audio_init() claims the rest of
+     * the RAM, so the mass-storage transfer buffers cost nothing to obtain.
+     * Asked for once a host is talking to us, the same allocation stalls the
+     * USB thread long enough to lose the connection -- see the function. */
+    usb_storage_alloc_buffers();
+#endif
 }
 
 void usb_wait_for_disconnect(struct event_queue *q)
@@ -881,6 +948,10 @@ void usb_request_exclusive_storage(void)
     usb_broadcast_seqnum += 1;
     usb_num_acks_to_expect = queue_broadcast(SYS_USB_CONNECTED, usb_broadcast_seqnum) - 1;
     DEBUGF("usb: waiting for %d acks...\n", usb_num_acks_to_expect);
+#ifndef BOOTLOADER
+    usb_record.acks_expected = usb_num_acks_to_expect;
+    usb_record.broadcast_tick = current_tick;
+#endif
 }
 
 void usb_release_exclusive_storage(void)

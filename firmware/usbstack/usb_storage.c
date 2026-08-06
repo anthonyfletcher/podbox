@@ -413,12 +413,6 @@ void usb_set_skip_first_drive(bool skip)
 }
 #endif
 
-/* called by usb_core_init() */
-static void usb_storage_init(void)
-{
-    logf("usb_storage_init done");
-}
-
 static int usb_storage_set_first_interface(int interface)
 {
     usb_interface = interface;
@@ -449,6 +443,69 @@ static int usb_storage_get_config_descriptor(unsigned char *dest,int max_packet_
 #else
 static int usb_handle = 0;
 #endif
+
+/* Claim the transfer buffers. Idempotent, and deliberately never released.
+ *
+ * PODBOX: must be called from usb_init(), at boot, and from nowhere else that
+ * matters. The allocation is ~128K of *immovable* buflib, so once audio_init()
+ * has taken the rest of the RAM it can only be satisfied by shrinking the audio
+ * buffer -- and that callback stops playback with a synchronous queue_send,
+ * blocking the calling thread for a fade, a codec halt and several disk writes.
+ * Called at boot it lands before audio_init(), so there is nothing to shrink
+ * and nothing to wait for.
+ *
+ * Both later moments are fatal, in different ways, and both were tried:
+ *
+ *  - usb_storage_init_connection() (upstream's placement) runs inside the
+ *    host's SET_CONFIGURATION. The USB thread stalls mid-control-transfer, the
+ *    host gives up, and usb_request_exclusive_storage() -- which sits *after*
+ *    the driver loop in usb_core_do_set_config() -- is never reached, so no
+ *    thread is ever asked to release storage.
+ *  - usb_storage_init(), i.e. usb_core_init(), is worse: usb_core_init() calls
+ *    usb_drv_init() first, which sets USBCMD_RUN and attaches the device. A
+ *    stall there is before SET_ADDRESS, so enumeration never starts at all --
+ *    the host just bus-resets until it gives up.
+ *
+ * Not freed on disconnect either, or the next connection would pay for it.
+ *
+ * Targets with USB_STATIC_ALLOC never had the problem: their buffers are BSS.
+ * PP502x is excluded from that because USB_DEVBSS_ATTR is IBSS_ATTR there and
+ * 128K does not fit in IRAM. */
+void usb_storage_alloc_buffers(void)
+{
+#ifndef USB_STATIC_ALLOC
+    unsigned char *buffer;
+
+    if (usb_handle > 0)
+        return;
+
+    // Add 31 to handle worst-case misalignment
+    usb_handle = core_alloc_ex(ALLOCATE_BUFFER_SIZE + MAX_CBW_SIZE + 31,
+                               &buflib_ops_locked);
+    if (usb_handle < 0)
+        panicf("%s(): OOM", __func__);
+
+    buffer = core_get_data(usb_handle);
+#if defined(UNCACHED_ADDR) && CONFIG_CPU != AS3525
+    cbw_buffer = (void *)UNCACHED_ADDR((unsigned int)(buffer+31) & 0xffffffe0);
+#else
+    cbw_buffer = (void *)((unsigned int)(buffer+31) & 0xffffffe0);
+#endif
+    tb.transfer_buffer = cbw_buffer + MAX_CBW_SIZE;
+    commit_discard_dcache();
+#ifdef USB_USE_RAMDISK
+    ramdisk_buffer = tb.transfer_buffer + ALLOCATE_BUFFER_SIZE;
+#endif
+#endif /* !USB_STATIC_ALLOC */
+}
+
+/* called by usb_core_init() -- which has already attached the device, so
+ * nothing expensive belongs here. See usb_storage_alloc_buffers(). */
+static void usb_storage_init(void)
+{
+    logf("usb_storage_init done");
+}
+
 static int usb_storage_init_connection(void)
 {
     logf("ums: set config");
@@ -469,25 +526,9 @@ static int usb_storage_init_connection(void)
     ramdisk_buffer = _ramdisk_buffer;
 #endif
 #else
-    unsigned char * buffer;
-
-    // Add 31 to handle worst-case misalignment
-    usb_handle = core_alloc_ex(ALLOCATE_BUFFER_SIZE + MAX_CBW_SIZE + 31,
-                               &buflib_ops_locked);
-    if (usb_handle < 0)
-        panicf("%s(): OOM", __func__);
-
-    buffer = core_get_data(usb_handle);
-#if defined(UNCACHED_ADDR) && CONFIG_CPU != AS3525
-    cbw_buffer = (void *)UNCACHED_ADDR((unsigned int)(buffer+31) & 0xffffffe0);
-#else
-    cbw_buffer = (void *)((unsigned int)(buffer+31) & 0xffffffe0);
-#endif
-    tb.transfer_buffer = cbw_buffer + MAX_CBW_SIZE;
-    commit_discard_dcache();
-#ifdef USB_USE_RAMDISK
-    ramdisk_buffer = tb.transfer_buffer + ALLOCATE_BUFFER_SIZE;
-#endif
+    /* Already done at init; a no-op unless something skipped that. Must not
+     * be the first allocation -- see usb_storage_alloc_buffers(). */
+    usb_storage_alloc_buffers();
 #endif
     usb_drv_recv_nonblocking(EP_OUT, cbw_buffer, MAX_CBW_SIZE);
 
@@ -502,9 +543,9 @@ static int usb_storage_init_connection(void)
 
 void usb_storage_disconnect(void)
 {
-#ifndef USB_STATIC_ALLOC
-    usb_handle = core_free(usb_handle);
-#endif
+    /* The transfer buffers stay claimed for the life of the firmware --
+     * releasing them here means re-allocating on the next connection, which is
+     * the cost usb_storage_alloc_buffers() exists to move out of the way. */
 }
 
 /* called by usb_core_transfer_complete() */

@@ -1378,6 +1378,77 @@ static int database_callback(int btn, struct gui_synclist *lists)
     }
     return btn;
 }
+/* What the last cable insertion did. Reads the record firmware/usb.c keeps;
+ * see struct usb_insert_record for why each field is here. */
+static int usb_info_callback(int btn, struct gui_synclist *lists)
+{
+    (void)lists;
+    const struct usb_insert_record *r = usb_get_insert_record();
+
+    simplelist_reset_lines();
+
+    simplelist_addline("Last insert: %ld tick", r->tick);
+    simplelist_addline("Mode wanted: %s",
+                       r->usb_mode == USB_MODE_MASS_STORAGE ? "Mass storage"
+                                                            : "Charge");
+    simplelist_addline("Buttons: %08x (mask %08x)",
+                       (unsigned)r->btn_status, (unsigned)r->btn_ignore);
+    simplelist_addline("  -> inverted: %s",
+                       (r->btn_status & r->btn_ignore) ? "YES" : "no");
+    simplelist_addline("Charge only: %s", r->power_only ? "YES" : "no");
+    simplelist_addline("Host present: %s", usb_host_is_present() ? "Yes" : "No");
+
+    simplelist_setline("Enumeration:");
+    simplelist_addline("  bus resets: %d", r->bus_resets);
+    simplelist_addline("  setups: %d (last req %02x)",
+                       r->setups, (unsigned)r->last_setup);
+    simplelist_addline("  set addr: %d", r->set_addr);
+    simplelist_addline("  set config: %d (cfg %d)",
+                       r->set_config, r->last_config);
+    simplelist_addline("  drivers active: %02x err %02x",
+                       (unsigned)r->drv_active, (unsigned)r->drv_error);
+    simplelist_addline("   (storage=%02x hid=%02x audio=%02x)",
+                       1 << USB_DRIVER_MASS_STORAGE,
+#ifdef USB_ENABLE_HID
+                       1 << USB_DRIVER_HID,
+#else
+                       0,
+#endif
+#ifdef USB_ENABLE_AUDIO
+                       1 << USB_DRIVER_AUDIO
+#else
+                       0
+#endif
+                       );
+    simplelist_addline("  wants disk: %s",
+                       r->exclusive_required ? "Yes" : "No");
+
+    simplelist_setline("Handover:");
+    if (r->acks_expected < 0)
+        simplelist_addline("  no broadcast sent");
+    else
+    {
+        simplelist_addline("  acks expected: %d", r->acks_expected);
+        simplelist_addline("  acks left: %d", r->acks_remaining);
+        simplelist_addline("  broadcast at: %ld tick", r->broadcast_tick);
+    }
+    simplelist_addline("Storage given up: %s",
+                       r->storage_handed_over ? "Yes" : "No");
+    simplelist_addline("Now: %ld tick", current_tick);
+
+    return btn;
+}
+
+static bool dbg_usb_info(void)
+{
+    struct simplelist_info info;
+    simplelist_info_init(&info, "USB Info", 0, NULL);
+    info.action_callback = usb_info_callback;
+    info.scroll_all = true;
+    info.timeout = HZ/2;
+    return simplelist_show_list(&info);
+}
+
 static bool dbg_tagcache_info(void)
 {
     struct simplelist_info info;
@@ -1771,6 +1842,7 @@ static const struct {
         { "Metadata log", dbg_metadatalog },
         { "View dircache info", dbg_dircache_info },
         { "View database info", dbg_tagcache_info },
+        { "View USB info", dbg_usb_info },
         { "View buffering thread", dbg_buffering_thread },
 #ifdef PM_DEBUG
         { "pm histogram", peak_meter_histogram},
