@@ -68,9 +68,6 @@
 #include "screens/covers/album_covers.h"
 #include "viewers/lyric_viewer/lyric_viewer.h"
 #include "skin/backdrop.h"
-#ifdef HAVE_RTC_ALARM
-#include "screens/system/alarm.h"
-#endif
 #include "quick_screen.h"
 #include "screens/shortcuts.h"
 #include "system/appevents.h"
@@ -614,11 +611,6 @@ long gui_wps_show(void)
     {
         splash(HZ*2, ID2P(LANG_USB_DAC_ACTIVE));
     }
-#endif
-#ifdef HAVE_RTC_ALARM
-    /* Before anything renders: this blocks on a button while the wake image
-     * is up, and entering the WPS below would repaint over it. */
-    alarm_show_wake_image();
 #endif
     long button = 0;
     bool restore = true;

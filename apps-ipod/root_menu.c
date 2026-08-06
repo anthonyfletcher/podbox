@@ -46,10 +46,6 @@
 #include "playlist/viewer.h"
 #include "playlist/catalog.h"
 #include "screens/settings/exported_settings.h"
-#ifdef HAVE_RTC_ALARM
-#include "rtc.h"
-#include "screens/system/alarm.h"
-#endif
 #include "database/tagcache.h"
 #include "screens/covers/album_covers.h"
 #include "screens/system/db_search.h"
@@ -464,13 +460,6 @@ static int wpsscrn(void* param)
         playlist_start(0, 0, 0);
         ret_val = gui_wps_show();
     }
-
-#ifdef HAVE_RTC_ALARM
-    /* gui_wps_show() consumes this, but the "nothing to resume" branches above
-     * never get there. Drop it either way so a wake image can't surface on
-     * some unrelated WPS entry later in the session. */
-    alarm_woke_us = false;
-#endif
 
     if (ret_val == GO_TO_PLAYLIST_VIEWER
         || ret_val == GO_TO_PLUGIN
@@ -1454,25 +1443,6 @@ static int root_menu_setup_screens(void)
         if (headphones_inserted())
             new_screen = GO_TO_WPS;
     }
-
-#ifdef HAVE_RTC_ALARM
-    /* Deliberately after unplug_autoresume, so an alarm wake overrides it:
-     * the alarm's whole job is to start playing at the set time, headphones
-     * plugged in or not. Keep this block last. */
-    int alarm_wake_up_screen = 0;
-    if ( rtc_check_alarm_started(true) )
-    {
-        rtc_enable_alarm(false);
-        alarm_woke_us = true;
-
-        switch (alarm_wake_up_screen)
-        {
-            default:
-                new_screen = GO_TO_WPS;
-                break;
-        } /* switch() */
-    }
-#endif /* HAVE_RTC_ALARM */
 
     return new_screen;
 }

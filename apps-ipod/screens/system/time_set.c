@@ -4,8 +4,8 @@
  * Copyright (C) 2002 Björn Stenberg
  * GNU General Public License (version 2+)
  *
- * The interactive date and time picker, with voiced feedback. Shared by
- * the time menu and the alarm screen.
+ * The interactive date and time picker, with voiced feedback. Driven from
+ * the time menu.
  ****************************************************************************/
 
 #include <stdbool.h>

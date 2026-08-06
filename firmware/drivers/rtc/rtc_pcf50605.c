@@ -25,14 +25,18 @@
 #include "pcf50605.h"
 #include "timefuncs.h"
 
+#ifdef HAVE_RTC_ALARM
 /* Values which each disable one alarm time register */
 static const char alarm_disable[] = {
     0x7f, 0x7f, 0x3f, 0x07, 0x3f, 0x1f, 0xff
 };
+#endif
 
 void rtc_init(void)
 {
+#ifdef HAVE_RTC_ALARM
     rtc_check_alarm_started(false);
+#endif
 }
 
 int rtc_read_datetime(struct tm *tm)
@@ -79,6 +83,7 @@ int rtc_write_datetime(const struct tm *tm)
     return 1;
 }
 
+#ifdef HAVE_RTC_ALARM
 /**
  * Checks the PCF interrupt 1 register bit 7 to see if an alarm interrupt has
  * triggered since last we checked.
@@ -164,3 +169,4 @@ void rtc_get_alarm(int *h, int *m)
     *m = BCD2DEC(buf[0]);
     *h = BCD2DEC(buf[1]);
 }
+#endif /* HAVE_RTC_ALARM */

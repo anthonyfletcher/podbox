@@ -85,7 +85,6 @@ enum {
         and (possibly) ACTION_SETTINGS_[INC|DEC]
        Also add any extra actions they need                        */
     CONTEXT_BOOKMARKSCREEN, /* uses ACTION_BMS_ defines */
-    CONTEXT_ALARMSCREEN, /* uses ACTION_AS_ defines */
     CONTEXT_QUICKSCREEN, /* uses ACTION_QS_ defines below */
 
     CONTEXT_YESNOSCREEN, /*NOTE: make sure your target has this and ACTION_YESNO_ACCEPT */

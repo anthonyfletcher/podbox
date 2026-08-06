@@ -76,8 +76,12 @@
 /* define this if you have a real-time clock */
 #define CONFIG_RTC RTC_PCF50605
 
-/* Define if the device can wake from an RTC alarm */
-#define HAVE_RTC_ALARM
+/* RTC wake-up alarm -- disabled for this fork (matches ipod6g.h). The PCF
+ * cannot report that it was the alarm that started us, because the Apple
+ * bootloader clears its interrupt registers first; rtc_check_alarm_started()
+ * falls back to matching the clock against the alarm registers within ten
+ * seconds, which a 5G booting off a spinning disk rarely manages. */
+//#define HAVE_RTC_ALARM
 
 /* Define this if you can switch on/off the accessory power supply */
 #define HAVE_ACCESSORY_SUPPLY
@@ -172,7 +176,7 @@
 /* Apple remote tuner accessory support -- disabled for this fork (matches
  * ipod6g.h): not something this build targets, and leaving it enabled left
  * a full FM radio UI surface (Radio Screen theme option, Radio Settings
- * menu, main-menu FM item, alarm-wake-to-FM) reachable but pointless. */
+ * menu, main-menu FM item) reachable but pointless. */
 //#define CONFIG_TUNER IPOD_REMOTE_TUNER
 //#define HAVE_RDS_CAP
 //#define CONFIG_RDS RDS_CFG_PUSH

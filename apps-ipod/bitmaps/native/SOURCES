@@ -18,10 +18,4 @@ podboxlogo.bmp
 podboxnoart.bmp
 #endif
 
-/* Full-screen wake image, shown by alarm_show_wake_image() in
- * apps/screens/system/alarm.c on the boot an RTC alarm started */
-#ifdef HAVE_RTC_ALARM
-podboxalarm.bmp
-#endif
-
 #endif /* BOOTLOADER */

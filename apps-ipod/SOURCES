@@ -108,9 +108,6 @@ screens/shortcuts.c
 screens/system/time_set.c
 screens/playback/track_info.c
 screens/playback/wps.c
-#ifdef HAVE_RTC_ALARM
-screens/system/alarm.c
-#endif
 #ifdef ROCKBOX_HAS_LOGF
 screens/system/log_viewer.c
 #endif

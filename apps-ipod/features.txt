@@ -12,10 +12,6 @@ accessory_supply
 agc
 #endif
 
-#if defined(HAVE_RTC_ALARM)
-alarm
-#endif
-
 #if defined(HAVE_BACKLIGHT_BRIGHTNESS)
 backlight_brightness
 #endif

@@ -219,13 +219,6 @@ enum { SCROLLBAR_OFF = 0, SCROLLBAR_LEFT, SCROLLBAR_RIGHT };
 enum { AUTORESUME_NEXTTRACK_NEVER = 0, AUTORESUME_NEXTTRACK_ALWAYS,
        AUTORESUME_NEXTTRACK_CUSTOM};
 
-/* Alarm settings */
-#ifdef HAVE_RTC_ALARM
-enum {  ALARM_START_WPS = 0,
-        ALARM_START_COUNT
-    };
-#endif /* HAVE_RTC_ALARM */
-
 /* Keyclick stuff */
 
  /* Not really a setting but several files should stay synced */

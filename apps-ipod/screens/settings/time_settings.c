@@ -4,7 +4,7 @@
  * Copyright (C) 2007 Jonathan Gordon
  * GNU General Public License (version 2+)
  *
- * Time and date menu: sets the clock and, where fitted, the alarm.
+ * Time and date menu: sets the clock and the display format.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -26,7 +26,6 @@
 #include "time.h"
 #include "draw/viewport.h"
 #include "widgets/list.h"
-#include "screens/system/alarm.h"
 #include "screens/system/time_set.h"
 #include "font.h"
 #include "system.h"
@@ -69,10 +68,6 @@ static int timedate_set(void)
 MENUITEM_FUNCTION(time_set, 0, ID2P(LANG_SET_TIME),
                   timedate_set, NULL, Icon_NOICON);
 MENUITEM_SETTING(timeformat, &global_settings.timeformat, NULL);
-#ifdef HAVE_RTC_ALARM
-MENUITEM_FUNCTION(alarm_screen_call, 0, ID2P(LANG_ALARM_MOD_ALARM_MENU),
-                  alarm_screen, NULL, Icon_NOICON);
-#endif /* HAVE_RTC_ALARM */
 
 static void draw_timedate(struct viewport *vp, struct screen *display)
 {
@@ -165,9 +160,6 @@ static int time_menu_callback(int action,
 
 MAKE_MENU(time_menu, ID2P(LANG_TIME_MENU), time_menu_callback, Icon_NOICON,
           &time_set,
-#ifdef HAVE_RTC_ALARM
-          &alarm_screen_call,
-#endif
           &timeformat);
 
 int time_screen(void* ignored)
