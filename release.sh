@@ -1,5 +1,10 @@
 #!/bin/sh
-# Build a tagged release on the build server and publish it to GitHub.
+# Build the current commit on the build server and publish it as the rolling
+# `latest` release.
+#
+# There are no version tags. Every run replaces the `latest` release and moves
+# its tag to the commit that was built, so the release page always shows the
+# current build and nothing else.
 #
 # The build server is not recorded here -- see PODBOX_BUILD_SERVER below.
 #
@@ -17,18 +22,16 @@
 # to precede a 0x0A.
 #
 # Nothing reaches GitHub until both targets have built and both zips have been
-# checked, so a failed build leaves no tag and no release behind.
+# checked, so a failed build leaves the previous release standing.
 #
-# Usage: ./release.sh [options] vX.Y[-beta.N]
+# Usage: ./release.sh [options]
 #
 #   --server U@H  build server. Defaults to $PODBOX_BUILD_SERVER; required.
 #   --root PATH   build directory on the server, relative to its home
 #                 directory. Defaults to $PODBOX_BUILD_ROOT or podbox-release.
-#   --since REF   where the release notes start. Only needed while the fork's
-#                 own tags are unreachable from HEAD; see the note by the notes.
 #   -y            don't ask for confirmation before publishing
 #   --draft       create the release as a draft
-#   --dry-run     build and verify, then stop -- no tag, no push, no release
+#   --dry-run     build and verify, then stop -- the existing release stands
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
 # installed and authenticated THERE -- see the --repo note further down.
@@ -47,6 +50,13 @@ REMOTE_ROOT=${PODBOX_BUILD_ROOT:-podbox-release}
 
 TARGETS="ipod6g ipodvideo"
 
+# The one release, reused forever. Its tag is moved to each commit built.
+RELEASE=latest
+
+# How many commit subjects the release notes list. The old "everything since the
+# previous tag" range does not exist any more -- there is no previous tag.
+NOTES_COMMITS=20
+
 cd "$(dirname "$0")"
 
 die() { echo "release: $*" >&2; exit 1; }
@@ -55,16 +65,12 @@ say() { echo; echo "==> $*"; }
 ASSUME_YES=
 DRAFT=
 DRY_RUN=
-SINCE=
-VERSION=
 
 while [ $# -gt 0 ]; do
     case "$1" in
         -y|--yes)   ASSUME_YES=1 ;;
         --draft)    DRAFT=--draft ;;
         --dry-run)  DRY_RUN=1 ;;
-        --since)    [ $# -ge 2 ] || die "--since needs a tag or commit"
-                    SINCE=$2; shift ;;
         --server)   [ $# -ge 2 ] || die "--server needs user@host"
                     SERVER=$2; shift ;;
         --root)     [ $# -ge 2 ] || die "--root needs a path"
@@ -74,26 +80,16 @@ while [ $# -gt 0 ]; do
         -h|--help)  awk 'NR>1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$0"
                     exit 0 ;;
         -*)         die "unknown option '$1'" ;;
-        *)          [ -z "$VERSION" ] || die "give exactly one version"
-                    VERSION=$1 ;;
+        *)          die "unexpected argument '$1' -- this script takes no
+       version; it always publishes the current commit as '$RELEASE'" ;;
     esac
     shift
 done
-
-[ -n "$VERSION" ] || die "no version given (try: $0 v6.0)"
 
 [ -n "$SERVER" ] || die "no build server. Either
          export PODBOX_BUILD_SERVER=user@host
        in your shell profile, or pass --server user@host. It is not stored in
        the repo on purpose."
-
-# A tag with a suffix (-alpha.0, -beta.1, -rc.0) is a prerelease. This mirrors
-# the existing tag history; plain vX.Y and vX.Y.Z are full releases.
-case "$VERSION" in
-    v[0-9]*-*) PRERELEASE=--prerelease ;;
-    v[0-9]*)   PRERELEASE= ;;
-    *)         die "version should look like v6.1, v6.1.2 or v6.1-beta.0" ;;
-esac
 
 # ---------------------------------------------------------------- preflight --
 
@@ -101,12 +97,6 @@ say "Checking the tree"
 
 [ -z "$(git status --porcelain)" ] ||
     die "working tree is not clean -- commit or stash first, so the zips match the tag"
-
-! git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null 2>&1 ||
-    die "tag $VERSION already exists locally"
-
-! git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1 ||
-    die "tag $VERSION already exists on origin"
 
 UPSTREAM=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null) ||
     die "this branch has no upstream; push it before releasing"
@@ -139,51 +129,34 @@ ssh -o BatchMode=yes "$SERVER" 'gh auth status >/dev/null 2>&1' ||
     die "gh on $SERVER is not authenticated (run: ssh $SERVER gh auth login)"
 
 # ------------------------------------------------------------------- notes --
-
-# Working out "the last release" is not as simple as it looks here. This tree
-# mirrors upstream Rockbox, so upstream's own tags (v3.x, v4.0-final) ARE
-# ancestors of HEAD, while the fork's history was squashed at one point and its
-# older release tags are NOT. `git describe` therefore walks past the fork's
-# releases into upstream's and would produce a thousand lines of somebody
-# else's changelog. Rather than guess, take the nearest reachable tag and
-# refuse if the range is obviously not one release worth of work.
-if [ -n "$SINCE" ]; then
-    PREV=$SINCE
-    git rev-parse -q --verify "$PREV^{commit}" >/dev/null 2>&1 ||
-        die "--since: no such commit or tag '$PREV'"
-else
-    PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
-fi
+# A fixed count of recent commits, not a range. There is no previous release to
+# measure from -- and working one out here used to be genuinely hard, because
+# this tree mirrors upstream Rockbox: upstream's tags (v3.x, v4.0-final) ARE
+# ancestors of HEAD while the fork's own were orphaned by a history squash, so
+# `git describe` walked straight past them into somebody else's changelog.
 
 NOTES=$(mktemp)
 trap 'rm -f "$NOTES"' EXIT
 
-if [ -n "$PREV" ]; then
-    COUNT=$(git log --no-merges --oneline "$PREV..HEAD" | wc -l | tr -d ' ')
-    if [ -z "$SINCE" ] && [ "$COUNT" -gt 100 ]; then
-        die "nearest tag reachable from HEAD is $PREV, which is $COUNT commits
-       back -- almost certainly an upstream Rockbox tag rather than one of
-       this fork's releases (the fork's own tags were orphaned by a history
-       squash). Pass --since <tag-or-commit> to say where this release starts.
-       Once this script has cut one release, its tag will be reachable and
-       this resolves itself."
-    fi
-    printf 'Changes since %s:\n\n' "$PREV" > "$NOTES"
-    git log --no-merges --pretty='- %s' "$PREV..HEAD" >> "$NOTES"
-else
-    printf 'Changes:\n\n' > "$NOTES"
-    git log --no-merges --pretty='- %s' >> "$NOTES"
-fi
+{
+    printf 'Built from `%s` on `%s`.\n\n' "$(git rev-parse HEAD)" "$BRANCH"
+    printf '| file | player |\n| --- | --- |\n'
+    printf '| `rockbox-ipod6g.zip` | iPod Classic 6G/7G |\n'
+    printf '| `rockbox-ipodvideo-5g.zip` | iPod Video 5G/5.5G |\n\n'
+    printf 'Unzip onto the root of the player.\n\n'
+    printf '### Recent changes\n\n'
+    git log --no-merges -"$NOTES_COMMITS" --pretty='- %s'
+} > "$NOTES"
 
 # ------------------------------------------------------------------- plan ---
 
 cat <<PLAN
 
-  version    $VERSION${PRERELEASE:+  (prerelease)}${DRAFT:+  (draft)}
+  release    $RELEASE${DRAFT:+  (draft)}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS
-  build in   $SERVER:$REMOTE_ROOT/$VERSION
+  build in   $SERVER:$REMOTE_ROOT/$RELEASE
 
 release notes
 -------------
@@ -194,7 +167,7 @@ echo
 if [ -n "$DRY_RUN" ]; then
     echo "(--dry-run: will build and verify, then stop before publishing)"
 elif [ -z "$ASSUME_YES" ]; then
-    printf 'Build and publish this release? [y/N] '
+    printf 'Build this and replace the %s release? [y/N] ' "$RELEASE"
     read -r reply
     case "$reply" in
         y|Y|yes|YES) ;;
@@ -204,7 +177,7 @@ fi
 
 # ------------------------------------------------------------------ build ---
 
-REMOTE_DIR=$REMOTE_ROOT/$VERSION
+REMOTE_DIR=$REMOTE_ROOT/$RELEASE
 
 say "Shipping the tree to $SERVER"
 ssh "$SERVER" "rm -rf '$REMOTE_DIR' && mkdir -p '$REMOTE_DIR'"
@@ -236,47 +209,58 @@ for target in $TARGETS; do
     "
 done
 
-say "Fetching copies to dist/$VERSION"
-mkdir -p "dist/$VERSION"
+say "Fetching copies to dist/"
+mkdir -p dist
 scp "$SERVER:$REMOTE_DIR/build-hw-ipod6g/rockbox.zip" \
-    "dist/$VERSION/rockbox-ipod6g.zip"
+    "dist/rockbox-ipod6g.zip"
 scp "$SERVER:$REMOTE_DIR/build-hw-ipodvideo/rockbox.zip" \
-    "dist/$VERSION/rockbox-ipodvideo-5g.zip"
+    "dist/rockbox-ipodvideo-5g.zip"
 
 if [ -n "$DRY_RUN" ]; then
     say "Dry run: built and verified, nothing published"
-    echo "  zips in dist/$VERSION/"
+    echo "  zips in dist/"
     exit 0
 fi
 
 # ---------------------------------------------------------------- publish ---
 # Everything below this line is visible outside, and is deliberately last.
 
-say "Tagging $VERSION"
-git tag -a "$VERSION" -m "$VERSION"
-git push origin "$VERSION"
+SHA=$(git rev-parse HEAD)
 
-say "Creating the GitHub release"
-# --repo is REQUIRED here and must not be dropped. gh infers the repo from the
-# origin of the checkout it runs in, and the server's origin is upstream
-# Rockbox, not this fork -- so an inferred release would target the wrong repo.
-# (CLAUDE.md's "no --repo" note describes running gh on the local machine,
-# where origin *is* the fork. It does not apply on the server.)
+say "Replacing the $RELEASE release"
+# --repo is REQUIRED on every gh call here and must not be dropped. gh infers
+# the repo from the origin of the checkout it runs in, and the server's origin
+# is upstream Rockbox, not this fork -- so an inferred release would target the
+# wrong repo. (CLAUDE.md's "no --repo" note describes running gh on the local
+# machine, where origin *is* the fork. It does not apply on the server.)
+#
+# The old release and its tag go first. `gh release create` reuses an existing
+# tag rather than moving it, so a leftover tag would publish these zips against
+# an older commit. The second line covers a tag left behind by a run that died
+# between the two.
+ssh "$SERVER" "gh release delete '$RELEASE' --repo '$SLUG' --yes --cleanup-tag \
+    || true"
+git push origin --delete "$RELEASE" 2>/dev/null || true
+
 scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
 # Both targets produce a file called rockbox.zip, so they must be renamed
 # BEFORE upload. gh's `file#text` syntax does not do this -- it sets a display
 # label and leaves the asset name as the filename, so uploading that way sends
 # two assets both named rockbox.zip and the second one collides.
+#
+# --target names the commit the new tag is created at, on GitHub. Nothing tags
+# locally: a rolling tag left in the dev checkout only goes stale.
 ssh "$SERVER" "cd '$REMOTE_DIR' && \
     cp build-hw-ipod6g/rockbox.zip rockbox-ipod6g.zip && \
     cp build-hw-ipodvideo/rockbox.zip rockbox-ipodvideo-5g.zip && \
-    gh release create '$VERSION' \
+    gh release create '$RELEASE' \
     --repo '$SLUG' \
-    --title '$VERSION' \
+    --target '$SHA' \
+    --title 'Latest build' \
     --notes-file release-notes.md \
-    $PRERELEASE $DRAFT \
+    $DRAFT \
     rockbox-ipod6g.zip rockbox-ipodvideo-5g.zip"
 
-say "Released $VERSION"
-echo "  https://github.com/$SLUG/releases/tag/$VERSION"
-echo "  local copies in dist/$VERSION/"
+say "Published $COMMIT as $RELEASE"
+echo "  https://github.com/$SLUG/releases/tag/$RELEASE"
+echo "  local copies in dist/"

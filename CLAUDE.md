@@ -277,22 +277,25 @@ Native assembler threads (ARM) with cooperative multitasking.
 
 ## Release Workflow
 
+**There are no version tags.** Every release is the same rolling one, `latest`,
+whose tag moves to the commit that was built. The release page always shows the
+current build and nothing else.
+
 **Use `./release.sh`.** It does the whole cycle from a clean tree:
 
 ```bash
 export PODBOX_BUILD_SERVER=user@host   # or pass --server; never committed
-./release.sh --dry-run vX.Y            # rehearse: builds + verifies, publishes nothing
-./release.sh vX.Y                      # for real
+./release.sh --dry-run                 # rehearse: builds + verifies, publishes nothing
+./release.sh                           # for real
 ```
 
 It builds both targets on the build server from a `git archive` of HEAD, checks
 each zip really contains the theme, the EQ presets and the binary, and only then
-tags, pushes and creates the release -- so a failed build leaves no tag behind.
-A `-alpha`/`-beta`/`-rc` suffix marks it a prerelease automatically. Release
-notes come from the commits since the previous tag; `--since REF` overrides that
-and is needed only when the previous tag isn't reachable from HEAD.
+replaces the release -- so a failed build leaves the previous one standing.
+Release notes are the last 20 commit subjects; nothing is tagged locally, since
+a rolling tag in the dev checkout only goes stale.
 
-Three things about publishing that are easy to get wrong by hand, all handled
+Four things about publishing that are easy to get wrong by hand, all handled
 inside the script:
 
 - **`gh`'s `file#text` sets a display LABEL, not the asset filename.** Both
@@ -306,8 +309,17 @@ inside the script:
   upstream Rockbox, not this fork. Run from *this* machine, origin is the fork
   and `--repo` is unnecessary -- which is why the flag looks droppable and is
   not.
+- **Delete the old tag before creating the release.** `gh release create` reuses
+  an existing tag rather than moving it, so a leftover `latest` would publish the
+  new zips against an old commit. `gh release delete --cleanup-tag` handles the
+  normal case; a `git push --delete` covers a tag orphaned by a failed run.
 - **Commit with explicit paths, never `git add`** -- work is often left staged
   deliberately and a bare commit sweeps it in. `release.sh` does not commit; it
   refuses to run unless the tree is already clean.
 
 Releases belong to this fork. Upstream remotes are not writable from here.
+
+That workflow invokes `rockboxdev.sh` as `bash ./tools/rockboxdev.sh`, not
+`./tools/rockboxdev.sh`. The script says `#!/bin/sh` but uses `BASH_SOURCE` to
+locate its own `toolchain-patches/`, so under a `sh` that isn't bash it looks in
+the wrong directory and quietly builds an *unpatched* gcc.
