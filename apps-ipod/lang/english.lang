@@ -17401,8 +17401,22 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_USB_CONNECTED
+  desc: first line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "USB Connected"
+  </source>
+  <dest>
+    *: "USB Connected"
+  </dest>
+  <voice>
+    *: "USB Connected"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_USB_EJECT_BEFORE_DISCONNECT
-  desc: caption shown on the USB (mass storage) connection screen
+  desc: second line of the USB (mass storage) connection screen
   user: core
   <source>
     *: "Eject before disconnecting"
