@@ -283,8 +283,15 @@ static void search_measure(struct dialog *d, struct screen *display,
     dialog_get_insets(&d->style, &in);
     chrome = in.top + in.bottom + head_height(display);
 
+    /* One row short of what actually fits: taking every row the margins allow
+     * left the box near enough full-screen that it stopped reading as a dialog
+     * over the browser and started reading as a screen of its own. Only when
+     * there is a row to spare, so at a large font the row goes to showing
+     * results rather than to whitespace. */
     limit = display->lcdheight - 2 * BOX_MARGIN_Y;
     rows = (limit - chrome + ROW_GAP) / (row_h + ROW_GAP);
+    if (rows > MIN_ROWS)
+        rows--;
     if (rows < MIN_ROWS)
         rows = MIN_ROWS;
 
