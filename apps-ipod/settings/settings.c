@@ -919,6 +919,12 @@ static void settings_apply_dialog_style(void)
                                        0, 16);
     s.button_border_radius = clamp_int(global_settings.dialog_btn_border_radius,
                                        0, 64);
+    /* Shadow with the metrics, not with the palette below: it applies whatever
+     * dialog_colors says, so a theme need not turn the other nine on to set
+     * it. */
+    s.box_shadow_offset    = clamp_int(global_settings.dialog_box_shadow,
+                                       0, 32);
+    s.box_shadow_color     = global_settings.dialog_box_shadow_color;
 
     if (global_settings.dialog_colors == DIALOG_COLORS_ON)
     {

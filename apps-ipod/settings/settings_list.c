@@ -916,6 +916,16 @@ const struct settings_list settings[] = {
     INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_box_margin,
         LANG_DIALOG_BOX_MARGIN, 10, "dialog box margin",
         UNIT_PIXEL, 0, 40, 1, NULL, NULL, NULL),
+    INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_box_shadow,
+        LANG_DIALOG_BOX_SHADOW, 4, "dialog box shadow",
+        UNIT_PIXEL, 0, 16, 1, NULL, NULL, NULL),
+    /* Black rather than a theme colour: the shadow's job is to sit the box off
+       whatever is behind it, and a colour derived from the theme's own pair is
+       the one thing guaranteed not to contrast with the box. Unlike the nine
+       below, it is not gated on dialog_colors. */
+    {F_T_INT|F_RGB|F_THEMESETTING|F_THEMERESET,
+        &global_settings.dialog_box_shadow_color, LANG_DIALOG_BOX_SHADOW_COLOR,
+        INT(LCD_BLACK), "dialog box shadow colour", UNUSED},
     INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_btn_border_width,
         LANG_DIALOG_BTN_BORDER_WIDTH, 2, "dialog button border width",
         UNIT_PIXEL, 0, 10, 1, NULL, NULL, NULL),

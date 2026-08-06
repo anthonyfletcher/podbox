@@ -529,6 +529,11 @@ struct user_settings
      * depends on dialog_colors, one of DIALOG_COLORS_*. */
     int dialog_box_border_width;
     int dialog_box_margin;
+    /* The drop shadow is chrome, not part of the dialog_colors palette: both
+     * of these apply whatever dialog_colors is set to, so a theme can style
+     * the shadow without having to take over all nine colours as well. */
+    int dialog_box_shadow;          /* offset in px; 0 == no shadow */
+    int dialog_box_shadow_color;
     int dialog_btn_border_width;
     int dialog_btn_border_radius;
     int dialog_colors;

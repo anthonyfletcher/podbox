@@ -68,6 +68,8 @@ enum Colors {
     COLOR_DLG_BTN_FG_SEL,
     COLOR_DLG_BTN_BG_SEL,
     COLOR_DLG_BTN_BORDER_SEL,
+    /* Not one of the nine: the shadow applies whatever Dialog Colours says. */
+    COLOR_DLG_BOX_SHADOW,
     COLOR_COUNT
 };
 static struct colour_info
@@ -95,6 +97,8 @@ static struct colour_info
                               LANG_DIALOG_BTN_BG_SEL},
     [COLOR_DLG_BTN_BORDER_SEL] = {&global_settings.dialog_btn_border_sel,
                                   LANG_DIALOG_BTN_BORDER_SEL},
+    [COLOR_DLG_BOX_SHADOW] = {&global_settings.dialog_box_shadow_color,
+                              LANG_DIALOG_BOX_SHADOW_COLOR},
 };
 
 /**
@@ -207,6 +211,11 @@ MENUITEM_SETTING(dialog_colors, &global_settings.dialog_colors, NULL);
 MENUITEM_SETTING(dialog_box_border_width,
                  &global_settings.dialog_box_border_width, NULL);
 MENUITEM_SETTING(dialog_box_margin, &global_settings.dialog_box_margin, NULL);
+MENUITEM_SETTING(dialog_box_shadow, &global_settings.dialog_box_shadow, NULL);
+MENUITEM_FUNCTION_W_PARAM(set_dlg_box_shadow_col, 0,
+                          ID2P(LANG_DIALOG_BOX_SHADOW_COLOR),
+                          set_color_func, (void*)COLOR_DLG_BOX_SHADOW,
+                          NULL, Icon_NOICON);
 MENUITEM_SETTING(dialog_btn_border_width,
                  &global_settings.dialog_btn_border_width, NULL);
 MENUITEM_SETTING(dialog_btn_border_radius,
@@ -215,6 +224,8 @@ MENUITEM_SETTING(dialog_btn_border_radius,
 MAKE_MENU(dialog_settings, ID2P(LANG_DIALOGS_MENU), NULL, Icon_Display_menu,
             &dialog_box_border_width,
             &dialog_box_margin,
+            &dialog_box_shadow,
+            &set_dlg_box_shadow_col,
             &dialog_btn_border_width,
             &dialog_btn_border_radius,
             &dialog_colors,

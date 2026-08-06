@@ -18398,6 +18398,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_DIALOG_BOX_SHADOW
+  desc: dialog settings, how far the drop shadow is offset
+  user: core
+  <source>
+    *: "Box Shadow"
+  </source>
+  <dest>
+    *: "Box Shadow"
+  </dest>
+  <voice>
+    *: "Box Shadow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW_COLOR
+  desc: dialog settings, colour of the drop shadow
+  user: core
+  <source>
+    *: "Box Shadow Colour"
+  </source>
+  <dest>
+    *: "Box Shadow Colour"
+  </dest>
+  <voice>
+    *: "Box Shadow Colour"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_DIALOG_BTN_BORDER_WIDTH
   desc: dialog settings, width of a button border
   user: core

@@ -26,6 +26,7 @@
 #include "dialog.h"
 
 #define DIALOG_MARGIN 10   /* default content inset inside the box */
+#define DIALOG_SHADOW  4   /* default solid drop-shadow offset */
 
 /* ---------------------------------------------------------------------- *
  * Style                                                                  *
@@ -39,6 +40,8 @@ void dialog_style_default(struct dialog_style *s)
     s->box_border_width  = 1;
     s->box_margin        = DIALOG_MARGIN;
     s->box_font          = DIALOG_FONT_INHERIT;
+    s->box_shadow_color  = LCD_BLACK;
+    s->box_shadow_offset = DIALOG_SHADOW;
 
     s->button_fg                     = DIALOG_COLOR_INHERIT;
     s->button_bg                     = DIALOG_COLOR_INHERIT;
@@ -218,6 +221,41 @@ static unsigned resolve_bg(struct screen *s, unsigned color)
     return color == DIALOG_COLOR_INHERIT ? s->get_background() : color;
 }
 
+/* Flushes the part of the drop shadow that falls outside `box`: the strip down
+ * its right edge and the one along its bottom. The caller flushes `box` and
+ * nothing else, so without this the shadow would sit in the framebuffer and
+ * never reach the display. The part *under* the box is deliberately not sent --
+ * it is about to be overdrawn, and flushing it here would put a half-drawn box
+ * on screen for a frame.
+ *
+ * lcd_update_rect() does not clip (it walks the framebuffer straight from
+ * FBADDR(x, y)), so a box against the right or bottom edge would run off the
+ * end. The strips are clamped here rather than trusting the driver.
+ *
+ * Call this only once the box itself has been drawn -- the same routine rounds
+ * x down and width up to even, so a strip can overlap the box by a column, and
+ * sending that column before it is drawn is what makes the edge flicker. */
+static void update_shadow_strips(struct screen *screen,
+                                 const struct viewport *box, int off)
+{
+    int sx = box->x + off;               /* shadow rect origin */
+    int sy = box->y + off;
+    int rx = box->x + box->width;        /* right strip starts here */
+    int by = box->y + box->height;       /* bottom strip starts here */
+    int x2 = sx + box->width;            /* shadow rect far edge */
+    int y2 = sy + box->height;
+
+    if (x2 > screen->lcdwidth)
+        x2 = screen->lcdwidth;
+    if (y2 > screen->lcdheight)
+        y2 = screen->lcdheight;
+
+    if (x2 > rx && y2 > sy)
+        screen->update_rect(rx, sy, x2 - rx, y2 - sy);
+    if (y2 > by && x2 > sx)
+        screen->update_rect(sx, by, x2 - sx, y2 - by);
+}
+
 void dialog_frame_box(struct screen *screen, struct viewport *box,
                       const struct dialog_style *style,
                       struct viewport *content_out)
@@ -239,6 +277,35 @@ void dialog_frame_box(struct screen *screen, struct viewport *box,
         unsigned fg = resolve_fg(screen, style->box_fg);
         unsigned bg = resolve_bg(screen, style->box_bg);
         unsigned bc = resolve_fg(screen, style->box_border_color);
+        unsigned sc = resolve_fg(screen, style->box_shadow_color);
+
+        /* The shadow falls outside `box`, so it needs a viewport that reaches
+         * the rest of the screen. Every colour above is resolved BEFORE that
+         * switch: resolve_*() read the screen's current fg/bg, and for the
+         * popup those screen colours are the broken-theme override that
+         * DIALOG_COLOR_INHERIT is there to pick up -- set_viewport() reloads
+         * them from the viewport's own patterns and would lose it. */
+        if (style->box_shadow_offset > 0)
+        {
+            struct viewport full, *prev;
+            int off = style->box_shadow_offset;
+
+            /* Both fields before the call, not after: viewport_set_fullscreen()
+             * hands straight to lcd_init_viewport(), which reads
+             * vp->buffer->elems -- on an uninitialised stack viewport that is a
+             * garbage pointer and a data abort. Same order as
+             * viewport_set_defaults(). */
+            full.buffer = NULL;               /* use the default framebuffer */
+            full.flags  = VP_DEFAULT_FLAGS;
+            viewport_set_fullscreen(&full, screen->screen_type);
+            prev = screen->set_viewport(&full);
+            screen->set_drawmode(DRMODE_FG);
+            screen->set_foreground(sc);
+            screen->fillrect(box->x + off, box->y + off,
+                             box->width, box->height);
+            screen->set_drawmode(DRMODE_SOLID);
+            screen->set_viewport(prev);
+        }
 
         screen->set_drawmode(DRMODE_FG);
         screen->set_foreground(bg);          /* fill with the background colour */
@@ -247,6 +314,16 @@ void dialog_frame_box(struct screen *screen, struct viewport *box,
         draw_box_border(screen, box->width, box->height, bw);
         screen->set_foreground(fg);          /* interior draws in the box fg */
         screen->set_drawmode(DRMODE_SOLID);
+
+        /* Flushed here, after the box, and not next to the shadow fill above:
+         * lcd_update_rect() rounds x down and width up to even, so the right
+         * strip reaches up to a column into the box. Sent before the box was
+         * drawn, that column carried whatever the status-bar skin had left in
+         * the framebuffer during get_action, and the box's own flush then put
+         * the border back -- two different values pushed every pass, which
+         * reads as a flickering right edge. */
+        if (style->box_shadow_offset > 0)
+            update_shadow_strips(screen, box, style->box_shadow_offset);
 
         /* so set_viewport(content) reloads the style's colours, not the theme's */
         box->fg_pattern = fg;

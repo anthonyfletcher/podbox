@@ -79,6 +79,13 @@ struct dialog_style
     int      box_margin;            /* content inset inside the box         */
     int      box_font;
 
+    /* Solid drop shadow: an opaque copy of the box's rectangle offset down
+     * and right, drawn behind it, so what shows is an L along the right and
+     * bottom edges. No blur and no transparency -- the box is opaque, so only
+     * the offset part is ever visible. */
+    unsigned box_shadow_color;
+    int      box_shadow_offset;     /* px right and down; 0 == no shadow    */
+
     /* the button row (the yes/no and text-input dialogs share one renderer) */
     unsigned button_fg;
     unsigned button_bg;
@@ -91,8 +98,9 @@ struct dialog_style
     int      button_font;
 };
 
-/* Every colour DIALOG_COLOR_INHERIT, every font DIALOG_FONT_INHERIT, 1px square
- * borders, 10px margin: the Stage 1-3 look, driven entirely by the theme. */
+/* Every colour DIALOG_COLOR_INHERIT (bar the shadow, which is DIALOG_COLOR_FG),
+ * every font DIALOG_FONT_INHERIT, 1px square borders, 10px margin and a 4px
+ * solid drop shadow: driven entirely by the theme. */
 void dialog_style_default(struct dialog_style *s);
 
 /* The style used by dialogs that pass NULL to dialog_init() and by the popup -
