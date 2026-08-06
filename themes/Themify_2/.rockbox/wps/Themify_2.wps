@@ -84,7 +84,7 @@
 %Vd(Album_Widget)%?C<%Vd(Album_Art)|%Vd(Album_Fallback_Art)>
 # CC: Load the album art into a 160x160 area (%Cl position, %Cd draw); the
 # CC: 'v' rows shade the backdrop behind it.
-%Vl(Album_Art,0,22,160,160,9)%VB%Cl(0,0,160,160)%Cdvvvvvvv
+%Vl(Album_Art,0,22,160,160,9)%VB%Cl(0,0,160,160)%Cd
 vvvvvvv
 vvvvvvv
 vvvvvvv
