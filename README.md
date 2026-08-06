@@ -4,20 +4,20 @@
 
 # PodBox
 
-PodBox is a modified version of RockBox for the iPod Classic and iPod Video with a focus on simplifying
-RockBox whilst providing album and artist art everywhere with colour schemes that 
-follows the music.
+PodBox is a modified version of Rockbox for the iPod Classic and iPod Video with a focus on simplifying
+Rockbox whilst providing album and artist art everywhere with colour schemes that
+follow the music.
 
-> Please note that PodBox is still work in progress and receiving regular updates until stable.
+> Please note that PodBox is still a work in progress and receiving regular updates until stable.
 
 ## Art everywhere
 
 <img src="docs/podbox/images/ss_grid_art_everywhere.png" alt="Screenshot"/>
 
 Album covers sit beside the rows in the album browser, and artist photos beside
-artist rows. Two carousels are available from the main menu — **Album Covers** 
-and **Artist Portraits** — and you can go straight from a cover into that album, 
-or from an artist into their albums. 
+artist rows. Two carousels are available from the main menu — **Album Covers**
+and **Artist Portraits** — and you can go straight from a cover into that album,
+or from an artist into their albums.
 
 ## Colours that follow the music
 
@@ -30,17 +30,17 @@ interface.  There's also a mini spectrum visualiser for the now-playing screen.
 
 <img src="docs/podbox/images/ss_grid_fast_search.png" alt="Screenshot"/>
 
-You can now search across tracks, albums and artists with instant results.  Additionally, 
-the grid keyboard is gone, replaced by a single-line editor driven entirely by the click 
+You can now search across tracks, albums and artists with instant results.  Additionally,
+the grid keyboard is gone, replaced by a single-line editor driven entirely by the click
 wheel.
 
-## Theamed throughout
+## Themed throughout
 
 <img src="docs/podbox/images/ss_grid_theme_everywhere.png" alt="Screenshot"/>
 
 A modified version of the **Themify 2** theme ships as the default. Dialogs,
-splashes and prompts have been standardised and improved, and screens that used to 
-break out of the theme no longer do.  
+splashes and prompts have been standardised and improved, and screens that used to
+break out of the theme no longer do.
 
 ## Your music library
 
@@ -54,8 +54,8 @@ album and artist chart information (frequently played, recently played, forgotte
 
 <img src="docs/podbox/images/ss_grid_apps.png" alt="Screenshot"/>
 
-While the plugins have gone, the image viewer has been ported to the core system and 
-there's an improved text viewer that handles more file formats (including txt, lrc, 
+While the plugins have gone, the image viewer has been ported to the core system and
+there's an improved text viewer that handles more file formats (including txt, lrc,
 fb2, epub, docx, pdf, md, html and rtf).  There's also a new lyric viewer that can
 be accessed from the "what's playing" screen by pressing select+play.
 
@@ -75,9 +75,10 @@ you want [Rockbox](https://www.rockbox.org) itself, which supports 80+ players.
 
 ## Installing PodBox
 
-Grab `rockbox.zip` for your player and unzip it into the root of the iPod's
-disk, so that the `.rockbox` folder sits alongside your music. That is the whole
-update.
+Grab the zip for your player — `rockbox-ipod6g.zip` for the Classic,
+`rockbox-ipodvideo-5g.zip` for the Video — and unzip it into the root of the
+iPod's disk, so that the `.rockbox` folder sits alongside your music. That is
+the whole update.
 
 > **First time on this iPod?** A fresh player also needs the Rockbox bootloader
 > installed once, which is a separate step and is not covered here — follow the
@@ -87,19 +88,18 @@ update.
 
 # Setting up your music library
 
-For best result, your music library should be set up in the following structure:
+For best results, your music library should be set up in the following structure:
 
 ```text
 Artist One
 ├── Album One
 │   ├── 01 Track.flac
+│   ├── 01 Track.lrc
 │   ├── 02 Track.flac
-│   └── ...
-│   └── 01 Track.lrc
-│   └── ...
+│   ├── ...
 │   └── folder.jpg
 ├── Album Two
-│    └── ...
+│   └── ...
 └── folder.jpg
 Artist Two
 └── Album One
@@ -111,12 +111,12 @@ Artist Three
 
 ## Album and artist art
 
-To support the carousel and artwork in lists, your album art should be stored with the album 
+To support the carousel and artwork in lists, your album art should be stored with the album
 tracks as either folder.jpg or cover.jpg e.g. `Artist/Album/folder.jpg`.
 
 Without these files, the art cache will only build from embedded images as tracks are played.
 
-Your artist art should be stored with the album folders as either folder.jpg or cover.jpg 
+Your artist art should be stored with the album folders as either folder.jpg or cover.jpg
 e.g. `Artist/folder.jpg`.
 
 All artwork should be:
@@ -142,24 +142,24 @@ with a different extension e.g. `Artist/Album/01 Track.lrc`
 
 # Installing themes
 
-To get the most out of PodBox you should use the modified [Themify 2](themes/Themify_2/README.md) theme 
-included as it supports all the new features built into PodBox and has received the most testing. 
+To get the most out of PodBox you should use the modified [Themify 2](themes/Themify_2/README.md) theme
+included as it supports all the new features built into PodBox and has received the most testing.
 
-PodBox will support all RockBox themes, however without modification they will **not** support dynamic
-colours or art in lists.  
+PodBox will support all Rockbox themes, however without modification they will **not** support dynamic
+colours or art in lists.
 
 > A selection of additional themes for PodBox are available [here](https://github.com/anthonyfletcher/podbox-themes/)
 
 # User guides
 
-- For guidance on using the new text input see [`text-input-guide.md`](docs/podbox/technically-curious.md)
+- For guidance on using the new text input see [`text-input-guide.md`](docs/podbox/text-input-guide.md)
 - For guidance on navigating the settings menu see [`settings-guide.md`](docs/podbox/settings-guide.md)
 
 ---
 
 # Technical details
 
-See [`technically-curious.md`](docs/podbox/technically-curious.md) for the history of PodBox and how to build 
+See [`technically-curious.md`](docs/podbox/technically-curious.md) for the history of PodBox and how to build
 your own version.
 
 Theme builders: See [`theme-guide.md`](docs/podbox/theme-guide.md) for guidance on creating
@@ -178,4 +178,4 @@ Built on the work of the [Rockbox](https://www.rockbox.org/) project, the
 
 [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 
-See [`docs/LICENSES`](docs/LICENSES) and  [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
+See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).

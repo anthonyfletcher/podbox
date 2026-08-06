@@ -3,7 +3,7 @@
 This guide is provided to help you navigate the settings available in PodBox.
 
 The settings come in two shapes — a short **Basic** page, which is what a fresh
-install shows, and the full **Advanced** tree. The Basic page's last entry opens 
+install shows, and the full **Advanced** tree. The Basic page's last entry opens
 the full tree.
 
 Defaults below are what a **Reset Settings** produces. They are not always what

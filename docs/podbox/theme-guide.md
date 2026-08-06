@@ -213,7 +213,7 @@ shadow without having to take over the whole palette to do it.
 Black is the default rather than a colour taken from your theme, because the
 shadow's job is to lift the box off whatever sits behind it, and a colour drawn
 from your own foreground/background pair is the one value guaranteed not to
-contrast with the box. 
+contrast with the box.
 
 ### Colours
 
@@ -391,10 +391,10 @@ followed it.
 ### Why
 
 The window between the cable going in and the firmware handing storage to the
-host is timing-critical on these targets (particularly the iPod 5). Scheduling 
-is cooperative, so any long stretch of drawing starves the USB thread while the 
-host has `SET_ADDRESS` outstanding; when the host gives up, the port wedges and 
-only a physical unplug clears it. This presents as a "device malfunction" in 
+host is timing-critical on these targets (particularly the iPod 5). Scheduling
+is cooperative, so any long stretch of drawing starves the USB thread while the
+host has `SET_ADDRESS` outstanding; when the host gives up, the port wedges and
+only a physical unplug clears it. This presents as a "device malfunction" in
 Windows.  Rendering a skin in a way that doesn't cause this issue has been tried
 and reverted a number of times.  Increased reliability was picked over pretty display.
 
