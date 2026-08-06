@@ -70,6 +70,7 @@
 #include "draw/viewport.h"
 #include "database/tagcache.h"
 #include "database/db_summary.h"      /* db_summary_is_busy -- the %lb indicator */
+#include "files/file_index.h"         /* file_index_is_busy -- likewise */
 
 #include "wps_internals.h"
 #include "custom_tokens.h"
@@ -1811,17 +1812,24 @@ const char *get_token_value(struct gui_wps *gwps,
                 return NULL;
         case SKIN_TOKEN_VLED_BUILDING:
         {
-            /* database, album-index and/or thumbnail-cache background work in
-             * progress. All three are passes the user did not ask for and
-             * cannot see, and any of them can be the reason a screen that
-             * needs the database is slow to open -- so they share one
-             * indicator rather than each having their own. */
+            /* database, album-index, thumbnail-cache and document/image-index
+             * background work in progress. All four are passes the user did not
+             * ask for and cannot see, and any of them can be the reason a
+             * screen is slow to open -- so they share one indicator rather than
+             * each having their own.
+             *
+             * The file index earns its place the hard way: left out, its
+             * whole-disk walk reported as plain disk activity (%lh), which
+             * reads as ordinary loading and hid a walk running right through a
+             * USB handshake. */
             bool building = false;
             if (tagcache_is_busy())
                 building = true;
             if (db_summary_is_busy())
                 building = true;
             if (art_cache_is_busy())
+                building = true;
+            if (file_index_is_busy())
                 building = true;
             return building ? "b" : NULL;
         }

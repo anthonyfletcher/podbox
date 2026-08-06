@@ -97,6 +97,20 @@ static bool fi_check_abort(void)
     if (fi_abort)
         return true;
 
+    /* Trap: the queue alone is too late for a host. With the USB stack the
+     * broadcast comes from the mass-storage driver at SET_CONFIGURATION, so
+     * nothing arrives here until enumeration is nearly done -- by which point a
+     * walk still hammering the disk has already cost the host SET_ADDRESS.
+     * usb_host_is_present() is true from the moment the cable goes in.
+     *
+     * The same test already gates the *start* of a scan in fi_thread(); this is
+     * the one that stops a walk already under way. */
+    if (usb_host_is_present())
+    {
+        fi_abort = true;
+        return true;
+    }
+
     queue_wait_w_tmo(&fi_queue, &ev, 0);
     switch (ev.id)
     {
