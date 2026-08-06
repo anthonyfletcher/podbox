@@ -127,7 +127,8 @@ static int *field_limits(struct tm *tm, int field, unsigned *min, unsigned *max)
     return NULL;
 }
 
-/* Renders field `i` into `buf`. */
+/* Renders one field and returns it. Use the return value, not `buf`: the
+ * month is a language string returned directly and never touches `buf`. */
 static const unsigned char *field_text(const struct tm *tm, int field,
                                        unsigned char *buf, size_t bufsz)
 {
@@ -184,8 +185,9 @@ static void draw_field_row(struct screen *d, struct ts_edit *s,
 
     for (i = 0; i < count; i++)
     {
-        field_text(s->tm, first + i, buf, sizeof(buf));
-        widths[i] = d->getstringsize(buf, NULL, NULL);
+        const unsigned char *text = field_text(s->tm, first + i,
+                                               buf, sizeof(buf));
+        widths[i] = d->getstringsize(text, NULL, NULL);
         total += widths[i] + (i ? sep_w : 0);
     }
 
@@ -203,6 +205,8 @@ static void draw_field_row(struct screen *d, struct ts_edit *s,
 
     for (i = 0; i < count; i++)
     {
+        const unsigned char *text;
+
         if (i || lead)
         {
             d->set_drawmode(DRMODE_FG);
@@ -210,8 +214,8 @@ static void draw_field_row(struct screen *d, struct ts_edit *s,
             d->set_drawmode(DRMODE_SOLID);
             x += sep_w;
         }
-        field_text(s->tm, first + i, buf, sizeof(buf));
-        draw_field(d, x, y, widths[i], h, buf, s->sel == first + i);
+        text = field_text(s->tm, first + i, buf, sizeof(buf));
+        draw_field(d, x, y, widths[i], h, text, s->sel == first + i);
         x += widths[i];
     }
 }
