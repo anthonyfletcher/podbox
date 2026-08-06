@@ -292,8 +292,11 @@ export PODBOX_BUILD_SERVER=user@host   # or pass --server; never committed
 It builds both targets on the build server from a `git archive` of HEAD, checks
 each zip really contains the theme, the EQ presets and the binary, and only then
 replaces the release -- so a failed build leaves the previous one standing.
-Release notes are the last 20 commit subjects; nothing is tagged locally, since
-a rolling tag in the dev checkout only goes stale.
+Release notes list every commit since the last release, using the `latest` tag
+itself as the start point -- read from origin, since nothing is tagged locally
+(a rolling tag in the dev checkout only goes stale). That tag always names a
+commit this script published, which is why no `--since` escape hatch is needed
+any more.
 
 Four things about publishing that are easy to get wrong by hand, all handled
 inside the script:

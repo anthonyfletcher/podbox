@@ -53,10 +53,6 @@ TARGETS="ipod6g ipodvideo"
 # The one release, reused forever. Its tag is moved to each commit built.
 RELEASE=latest
 
-# How many commit subjects the release notes list. The old "everything since the
-# previous tag" range does not exist any more -- there is no previous tag.
-NOTES_COMMITS=20
-
 cd "$(dirname "$0")"
 
 die() { echo "release: $*" >&2; exit 1; }
@@ -129,11 +125,48 @@ ssh -o BatchMode=yes "$SERVER" 'gh auth status >/dev/null 2>&1' ||
     die "gh on $SERVER is not authenticated (run: ssh $SERVER gh auth login)"
 
 # ------------------------------------------------------------------- notes --
-# A fixed count of recent commits, not a range. There is no previous release to
-# measure from -- and working one out here used to be genuinely hard, because
-# this tree mirrors upstream Rockbox: upstream's tags (v3.x, v4.0-final) ARE
-# ancestors of HEAD while the fork's own were orphaned by a history squash, so
-# `git describe` walked straight past them into somebody else's changelog.
+# Everything since the last release, which is wherever the `$RELEASE` tag
+# currently points. That tag is asked of origin rather than looked up locally:
+# nothing here creates it, gh does, on the server.
+#
+# It is also the only tag worth asking about. This tree mirrors upstream
+# Rockbox, so upstream's tags (v3.x, v4.0-final) ARE ancestors of HEAD while the
+# fork's own were orphaned by a history squash -- which is why `git describe`
+# used to walk straight past ours into somebody else's changelog, and why the
+# old script needed a --since escape hatch. `$RELEASE` always names a commit
+# this script itself published, so it needs none.
+
+say "Working out what has changed"
+
+REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/$RELEASE" 2>/dev/null || true)
+
+# An annotated tag lists two lines, the tag object and a `...^{}` line naming
+# the commit. Prefer the dereferenced one; a lightweight tag has only the first.
+PREV=$(printf '%s\n' "$REMOTE_TAG" | sed -n 's/^\([0-9a-f]\{7,\}\).*\^{}$/\1/p')
+[ -n "$PREV" ] ||
+    PREV=$(printf '%s\n' "$REMOTE_TAG" | sed -n 's/^\([0-9a-f]\{7,\}\).*/\1/p')
+
+# A release published from some other checkout can name a commit this one has
+# never seen. Listing the whole history beats dying at the last step.
+if [ -n "$PREV" ] && ! git cat-file -e "$PREV^{commit}" 2>/dev/null; then
+    echo "  the $RELEASE release names $PREV, which isn't in this checkout --"
+    echo "  listing the full history instead"
+    PREV=
+fi
+
+if [ -n "$PREV" ]; then
+    HEADING="Changes since the last release"
+    CHANGES=$(git log --no-merges --pretty='- %s' "$PREV..HEAD")
+else
+    HEADING="Changes"
+    CHANGES=$(git log --no-merges --pretty='- %s')
+fi
+
+# Empty means HEAD is already what the release names -- a rebuild, not a
+# mistake, so say so rather than publishing an empty heading.
+[ -n "$CHANGES" ] || CHANGES="- Rebuilt from the same commit."
+
+echo "  $(printf '%s\n' "$CHANGES" | wc -l | tr -d ' ') commits to list"
 
 NOTES=$(mktemp)
 trap 'rm -f "$NOTES"' EXIT
@@ -144,8 +177,8 @@ trap 'rm -f "$NOTES"' EXIT
     printf '| `rockbox-ipod6g.zip` | iPod Classic 6G/7G |\n'
     printf '| `rockbox-ipodvideo-5g.zip` | iPod Video 5G/5.5G |\n\n'
     printf 'Unzip onto the root of the player.\n\n'
-    printf '### Recent changes\n\n'
-    git log --no-merges -"$NOTES_COMMITS" --pretty='- %s'
+    printf '### %s\n\n' "$HEADING"
+    printf '%s\n' "$CHANGES"
 } > "$NOTES"
 
 # ------------------------------------------------------------------- plan ---
