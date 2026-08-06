@@ -37,7 +37,6 @@
 #include "lcd.h"
 #include "settings/settings.h"
 #include "kernel.h"
-#include "audio.h"
 #include "audio/playback.h"
 #include "audio/buffering.h"
 #include "system/appevents.h"
@@ -456,25 +455,15 @@ void dynamic_colors_check_extraction(int aa_slot)
     else
         aa_slot = last_aa_slot;
 
-    /* Fade back to the theme when there is no longer a track to take colours
-     * from -- which is not the same as playback having stopped. A stopped
-     * track is still the one on the playing screen, and its colours belong
-     * with it; only an empty path means there is nothing left to match.
+    /* Stopping playback deliberately does not put the theme's colours back.
+     * The palette outlives the track it came from, and is replaced only by
+     * another one: a new track's art, a track that has none (the timeout
+     * below), the setting going off, or a theme change.
      *
-     * Pausing never reached here anyway: PLAY_PAUSED is
-     * AUDIO_STATUS_PLAY | AUDIO_STATUS_PAUSE, so the PLAY bit stays set.
-     *
-     * The status test is kept in front as a guard, not as the condition. It is
-     * cheap and false whenever anything is playing, which keeps
-     * audio_current_track() -- a mutex and a metadata fetch -- off the render
-     * path except while stopped. */
-    if (cache.valid &&
-        global_settings.dynamic_colors &&
-        !(audio_status() & AUDIO_STATUS_PLAY) &&
-        audio_current_track()->path[0] == '\0')
-    {
-        apply_colors(cache.theme_fg, cache.theme_bg, true);
-    }
+     * Do not add a revert here. A stop frees the buffered art, and
+     * playback_current_aa_hid() reports none once stopped, so cache.accent
+     * and cache.dominant are the last copy of the palette anywhere -- a
+     * revert would discard it with no way to derive it again. */
 
     /* Detect setting toggle */
     bool enabled = global_settings.dynamic_colors;

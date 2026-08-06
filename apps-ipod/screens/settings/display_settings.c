@@ -352,7 +352,6 @@ MENUITEM_SETTING(codepage_setting, &global_settings.default_codepage, codepage_c
 MAKE_MENU(display_menu, ID2P(LANG_DISPLAY),
             NULL, Icon_Display_menu,
             &lcd_settings,
-            &scroll_settings_menu,
             &peak_meter_menu,
             &codepage_setting,
             );

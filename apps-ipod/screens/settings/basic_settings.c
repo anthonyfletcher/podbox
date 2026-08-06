@@ -41,7 +41,6 @@ MENUITEM_SETTING(basic_shuffle, &global_settings.playlist_shuffle, NULL);
 MENUITEM_SETTING(basic_repeat, &global_settings.repeat_mode, NULL);
 MENUITEM_SETTING(basic_backlight, &global_settings.backlight_timeout, NULL);
 MENUITEM_SETTING(basic_brightness, &global_settings.brightness, NULL);
-MENUITEM_SETTING(basic_start_screen, &global_settings.start_in_screen, NULL);
 MENUITEM_SETTING(basic_poweroff, &global_settings.poweroff, NULL);
 
 /* The escape hatch: everything not on this page is one entry away. Backing out
@@ -62,15 +61,14 @@ MAKE_MENU(basic_settings_menu, ID2P(LANG_SETTINGS), NULL,
           &basic_volume,
           &basic_bass,
           &basic_treble,
-          &basic_eq_enable,
-          &eq_browse,
           &basic_shuffle,
           &basic_repeat,
-          &basic_backlight,
           &basic_brightness,
-          &basic_start_screen,
-          &basic_poweroff,
+          &basic_backlight,
+          &eq_browse,
+          &basic_eq_enable,
           &browse_themes,
           &browse_fonts,
+          &basic_poweroff,
           &main_menu_config_item,
           &basic_advanced_item);

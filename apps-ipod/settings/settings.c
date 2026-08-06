@@ -488,6 +488,19 @@ bool settings_load_config(const char* file, bool apply)
     close(fd);
     if (apply)
     {
+        /* Stop before the loading, not after it. settings_apply_skins() stops
+         * playback too, but by then the fonts, the language, the iconset and
+         * the colour file have all been read, and each of those allocations
+         * makes buflib shrink the audio buffer -- which stops playback and
+         * queues a resume (see shrink_callback() in audio/playback.c). The
+         * theme change then costs a stop-and-rebuffer per allocation, every
+         * one of them competing with the theme's own reads for the disk.
+         *
+         * Stopping first leaves those allocations nothing to interrupt. The
+         * music stops either way; this only decides how long it takes. */
+        if (theme_changed)
+            audio_stop();
+
         settings_save();
         settings_apply(true);
         if (theme_changed)

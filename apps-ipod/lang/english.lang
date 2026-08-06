@@ -1119,10 +1119,10 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Load EQ Preset"
+    *: "Load EQ"
   </source>
   <dest>
-    *: "Load EQ Preset"
+    *: "Load EQ"
   </dest>
   <voice>
     *: "Browse equalizer presets"
@@ -18773,5 +18773,19 @@
   </dest>
   <voice>
     *: "Artists, Tracks, Albums"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPLYING_THEME
+  desc: boot screen caption while the theme's skins are being loaded
+  user: core
+  <source>
+    *: "Applying theme..."
+  </source>
+  <dest>
+    *: "Applying theme..."
+  </dest>
+  <voice>
+    *: ""
   </voice>
 </phrase>

@@ -47,7 +47,6 @@
 #include "audio/playback.h"
 #include "database/tagcache.h"
 #include "root_menu.h"
-#include "screens/covers/album_covers.h"
 #include "string-extra.h"
 
 /* Maximum number of tracks we can have loaded at one time                   */
@@ -77,10 +76,7 @@ enum direction
 
 /* Describes possible outcomes from context (menu or hotkey) action          */
 enum pv_context_result {
-    PV_CONTEXT_CLOSED,          /* Playlist Viewer has been closed           */
     PV_CONTEXT_USB,             /* USB-connection initiated                  */
-    PV_CONTEXT_USB_CLOSED,      /* USB-connection initiated (+viewer closed) */
-    PV_CONTEXT_WPS_CLOSED,      /* WPS requested (+viewer closed)            */
     PV_CONTEXT_MODIFIED,        /* Playlist was modified in some way         */
     PV_CONTEXT_UNCHANGED,       /* No change to playlist, as far as we know  */
     PV_CONTEXT_PL_UPDATE,       /* Playlist buffer requires reloading        */
@@ -609,28 +605,11 @@ static void close_playlist_viewer(void)
 
     /* viewer.id3 and the track name buffer both point into the shared app
      * buffer, claimed for this screen's lifetime. Hand it back here: the
-     * album covers screen is reachable from this one and claims the same
-     * buffer, so holding on would panic. */
+     * buffer has one owner at a time and the next screen to want it -- album
+     * covers, album charts -- panics rather than waiting. */
     viewer.id3 = NULL;
     app_release_buffer("playlist viewer");
     viewer.is_open = false;
-}
-
-static enum pv_context_result open_pictureflow(const struct playlist_entry *current_track)
-{
-    char selected_track[MAX_PATH];
-    close_playlist_viewer(); /* don't pop activity yet */
-
-    strmemccpy(selected_track, current_track->name, sizeof(selected_track));
-
-    int ret = album_covers(selected_track);
-    pop_current_activity_without_refresh();
-
-    if (ret == GO_TO_ROOT)
-        return PV_CONTEXT_USB_CLOSED;
-    if (ret == GO_TO_WPS)
-        return PV_CONTEXT_WPS_CLOSED;
-    return PV_CONTEXT_CLOSED;
 }
 
 static enum pv_context_result delete_track(int current_track_index,
@@ -671,7 +650,6 @@ static enum pv_context_result context_menu(int index)
                         ID2P(LANG_MENU_SHOW_ID3_INFO),
                         ID2P(LANG_SHUFFLE), ID2P(LANG_SAVE),
                         ID2P(LANG_PLAYLISTVIEWER_SETTINGS)
-                        ,ID2P(LANG_ONPLAY_PICTUREFLOW)
                         );
     int sel = do_menu(&menu_items, NULL, NULL, false);
     if (sel == MENU_ATTACHED_USB)
@@ -723,8 +701,6 @@ static enum pv_context_result context_menu(int index)
                     return (sel == global_settings.playlist_viewer_track_display) ?
                            PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
             }
-            case 8:
-                return open_pictureflow(current_track);
         }
     }
     return PV_CONTEXT_UNCHANGED;
@@ -1041,19 +1017,6 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                     ret = PLAYLIST_VIEWER_USB;
                     goto exit;
                 }
-                else if (pv_context_result == PV_CONTEXT_USB_CLOSED)
-                    return PLAYLIST_VIEWER_USB;
-                else if (pv_context_result == PV_CONTEXT_WPS_CLOSED)
-                    return PLAYLIST_VIEWER_OK;
-                else if (pv_context_result == PV_CONTEXT_CLOSED)
-                {
-                    if (!open_playlist_viewer(filename, &playlist_lists, true, NULL))
-                    {
-                        ret = PLAYLIST_VIEWER_CANCEL;
-                        goto exit;
-                    }
-                    break;
-                }
                 if (update_viewer(&playlist_lists, pv_context_result))
                 {
                     exit = true;
@@ -1084,25 +1047,8 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                 struct playlist_entry *current_track = playlist_buffer_get_track(
                                                             &viewer.buffer,
                                                             viewer.selected_track);
-                enum pv_context_result (*do_plugin)(const struct playlist_entry *) = NULL;
                 int hk_act = HK_CTX_GET(0, global_settings.hotkey_tree);
-                if (hk_act == HOTKEY_PICTUREFLOW)
-                    do_plugin = &open_pictureflow;
-                if (do_plugin != NULL)
-                {
-                    int plugin_result = do_plugin(current_track);
-
-                    if (plugin_result == PV_CONTEXT_USB_CLOSED)
-                        return PLAYLIST_VIEWER_USB;
-                    else if (plugin_result == PV_CONTEXT_WPS_CLOSED)
-                        return PLAYLIST_VIEWER_OK;
-                    else if (!open_playlist_viewer(filename, &playlist_lists, true, NULL))
-                    {
-                        ret = PLAYLIST_VIEWER_CANCEL;
-                        goto exit;
-                    }
-                }
-                else if (hk_act == HOTKEY_PROPERTIES)
+                if (hk_act == HOTKEY_PROPERTIES)
                 {
                     if (show_track_info(current_track) == PV_CONTEXT_USB)
                     {

@@ -26,7 +26,10 @@ extern const struct menu_item_ex
         , art_cache_menu            /* album_covers_menu.c */
         , text_viewer_menu         /* text_viewer_menu.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
-        , basic_settings_menu;      /* basic_settings.c */
+        , basic_settings_menu       /* basic_settings.c */
+        , scroll_settings_menu;     /* display_settings.c -- shown under UI
+                                       Settings, defined beside the other
+                                       LCD scroll settings it configures */
 
 struct browse_folder_info {
     const char* dir;

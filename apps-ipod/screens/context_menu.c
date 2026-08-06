@@ -68,7 +68,6 @@
 #include "playlist/save_screen.h"
 #include "playlist/catalog.h"
 #include "screens/browse/browser_db.h"
-#include "screens/covers/album_covers.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
 #include "draw/viewport.h"
@@ -1244,9 +1243,8 @@ static int hotkey_tree_pl_insert_shuffled(void)
     return ONPLAY_RELOAD_DIR;
 }
 
-/* Properties equivalent of hotkey_album_covers() below -- see
- * context_menu_properties()'s comment for why this can't share a generic
- * plugin-loading helper. */
+/* See context_menu_properties()'s comment for why this can't share a generic
+ * screen-launching helper. */
 static int hotkey_properties(void *param)
 {
     (void)param;
@@ -1254,20 +1252,6 @@ static int hotkey_properties(void *param)
         return ONPLAY_RELOAD_DIR;
     if (properties(selected_file.path) == GO_TO_ROOT)
         return ONPLAY_MAINMENU;
-
-    return ONPLAY_RELOAD_DIR;
-}
-
-/* Album covers equivalent of hotkey_properties() above -- see
- * context_menu_properties()'s comment for why this can't share a generic
- * plugin-loading helper. */
-static int hotkey_album_covers(void *param)
-{
-    (void)param;
-    if (!prepare_database_sel(NULL))
-        return ONPLAY_RELOAD_DIR;
-    if (album_covers(selected_file.path) == GO_TO_WPS)
-        return ONPLAY_START_PLAY;
 
     return ONPLAY_RELOAD_DIR;
 }
@@ -1342,12 +1326,6 @@ static const struct hotkey_assignment hotkey_items[] = {
       .return_code = ONPLAY_FUNC_RETURN,
       .flags = HOTKEY_FLAG_TREE,
       .icon = Icon_NOICON },
-    { .action = HOTKEY_PICTUREFLOW,
-      .lang_id = LANG_ONPLAY_PICTUREFLOW,
-      .func = HOTKEY_FUNC(hotkey_album_covers, NULL),
-      .return_code = ONPLAY_FUNC_RETURN,
-      .flags = HOTKEY_FLAG_TREE,
-      .icon = Icon_Wps },
     { .action = HOTKEY_ALBUMART,
       .lang_id = LANG_VIEW_ALBUMART,
       .func = HOTKEY_FUNC(view_album_art, NULL),

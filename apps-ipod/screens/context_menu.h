@@ -36,7 +36,10 @@ enum hotkey_action {
     HOTKEY_OFF = 0,
     HOTKEY_VIEW_PLAYLIST,
     HOTKEY_PROPERTIES,
-    HOTKEY_PICTUREFLOW,
+    HOTKEY_PICTUREFLOW, /* retired -- no longer offered; kept to hold the
+                           number, see the note below. get_hotkey() answers
+                           HOTKEY_OFF for it, which is what an old saved
+                           setting now does. */
     HOTKEY_SHOW_TRACK_INFO,
     HOTKEY_DELETE,
     HOTKEY_BOOKMARK,

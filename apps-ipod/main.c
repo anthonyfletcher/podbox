@@ -177,8 +177,8 @@ int main(void)
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
 #define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
-#define BOOT_BAR_Y      (LCD_HEIGHT - 48 - BOOT_BAR_H)  /* 48px of clearance */
-#define BOOT_CAPTION_Y  (BOOT_BAR_Y + BOOT_BAR_H + 12)  /* top edge of the text */
+#define BOOT_BAR_Y      (LCD_HEIGHT - 62 - BOOT_BAR_H)  /* bar bottom, 62px up */
+#define BOOT_CAPTION_Y  (LCD_HEIGHT - 40)               /* top edge of the text */
 
 /* Stages in the order init() reaches them, each worth a share of the bar.
  * boot_progress() paints the *start* of a stage, so the bar always shows work
@@ -677,7 +677,11 @@ static void init(void)
     iap_setup(global_settings.serial_bitrate);
     accessory_supply_set(global_settings.accessory_supply);
     lineout_set(global_settings.lineout_active);
-    boot_progress(BOOT_SKINS, 0, 0, NULL);
+    /* The last stage, and a slow one -- parsing the WPS and SBS, then loading
+     * their backdrops, bitmaps and fonts. It gets its own caption because the
+     * bar sits nearly full for the whole of it, and LANG_WAIT left over from
+     * audio_init() does not explain the pause. */
+    boot_progress(BOOT_SKINS, 0, 0, str(LANG_APPLYING_THEME));
     CHART("<settings_apply_skins");
     settings_apply_skins();
     CHART(">settings_apply_skins");

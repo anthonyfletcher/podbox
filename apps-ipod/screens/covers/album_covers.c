@@ -719,7 +719,7 @@ static bool reinit(void)
  *
  * Playing does not happen here. It needs the app buffer to put the album in
  * order, and this screen is still holding a claim on it -- so the album is
- * recorded and root_menu.c plays it once the carousel has torn down. */
+ * recorded and album_covers() plays it once carousel_run() has returned. */
 static int album_enter(int index)
 {
     int album_idx = 0;
