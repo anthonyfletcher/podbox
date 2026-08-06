@@ -21,6 +21,7 @@
  *   - the tagcache walks that populate it
  *   - the on-disk form
  *   - db_summary_build(), which reuses the saved index or rebuilds it
+ *   - reading single records out of the saved file, without holding it
  *   - the background pass that keeps the saved index current
  ****************************************************************************/
 
@@ -1750,6 +1751,17 @@ static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
 
 int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz)
 {
+    /* build_into() takes build_mutex, which the background pass holds for its
+     * whole run -- so a caller arriving mid-pass blocks on it with a dead
+     * screen and no way out. Waiting here instead is the same wait with the
+     * pass's progress on it and a way to leave, and doing it inside means no
+     * caller can forget. A caller with its own reason to wait earlier still
+     * may; arriving here with nothing running costs nothing. */
+    int ret = wait_for_background();
+
+    if (ret != SUCCESS)
+        return ret;
+
     return build_into(target, buf, buf_sz, false);
 }
 
@@ -1807,10 +1819,6 @@ static int wait_for_background(void)
  * buffer it has already claimed. */
 int db_summary_build(void)
 {
-    int ret = wait_for_background();
-    if (ret != SUCCESS)
-        return ret;
-
     return db_summary_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
 }
 
@@ -2063,6 +2071,184 @@ void db_summary_release(int handle)
         return;
     core_put_data_pinned(core_get_data(handle));
     core_free(handle);
+}
+
+/* ---------------------------------------------------------------------------
+ * Reading records without holding the index
+ *
+ * What save_album_index() writes is a header, the two name blobs and then the
+ * two arrays, all contiguous and in that order, and struct album_data is
+ * fixed-size. So album n is one seek away, and a caller that wants one record
+ * need not have the whole index in memory to reach it -- see the reader notes
+ * in db_summary.h for why that matters.
+ *
+ * Only albums so far. The charts want the same treatment and will want artists
+ * with it; nothing else does.
+ * ------------------------------------------------------------------------ */
+
+/* Open the file and work out where the album array starts, or leave nothing
+ * open. Separate from db_summary_reader_open() because that tries it twice,
+ * once either side of building an index. */
+static int reader_start(struct db_summary_reader *r)
+{
+    struct db_summary_t data;
+    off_t fsize;
+    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
+
+    if (fd < 0)
+        return ERROR_NO_ALBUMS;
+
+    fsize = filesize(fd);
+    if (fsize <= (off_t)sizeof(data)
+        || read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
+        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || data.album_ct == 0)
+        goto failure;
+
+    r->album_ct = data.album_ct;
+    r->album_off = (long)(sizeof(data) + data.artist_len + data.album_len);
+
+    /* The array has to be inside the file that claims to hold it. The magic is
+     * the first four bytes, so a truncated index passes the check above --
+     * without this one a seek would land past the end and the read would leave
+     * the caller's record as whatever was on its stack. */
+    if (r->album_off + (long)r->album_ct * (long)sizeof(struct album_data)
+        > (long)fsize)
+        goto failure;
+
+    r->fd = fd;
+    return SUCCESS;
+
+failure:
+    close(fd);
+    return ERROR_NO_ALBUMS;
+}
+
+int db_summary_reader_open(struct db_summary_reader *r)
+{
+    struct db_summary_t built;
+    int handle;
+    int ret;
+
+    r->fd = -1;
+
+    /* The same wait db_summary_acquire() makes, and for the same reason: the
+     * lock below is the one a background pass holds for its whole run. */
+    ret = wait_for_background();
+    if (ret != SUCCESS)
+        return ret;
+
+    /* Held until the reader closes. A pass finishing mid-read renames a new
+     * index over this file, which would leave the reader seeking to offsets
+     * that no longer describe what it is reading. */
+    mutex_lock(&build_mutex);
+    if (reader_start(r) == SUCCESS)
+        return SUCCESS;
+    mutex_unlock(&build_mutex);
+
+    /* Nothing readable there. Build one for the file it writes, not for the
+     * copy it returns -- which is thrown away here exactly as
+     * background_build() throws its own away. This is the one path that still
+     * costs the 384K, and it runs on a player that has never built an index. */
+    ret = db_summary_acquire(&built, &handle);
+    if (ret < SUCCESS)
+        return ret;
+    db_summary_release(handle);
+
+    mutex_lock(&build_mutex);
+    if (reader_start(r) == SUCCESS)
+        return SUCCESS;
+    mutex_unlock(&build_mutex);
+
+    return ERROR_NO_ALBUMS;
+}
+
+void db_summary_reader_close(struct db_summary_reader *r)
+{
+    if (r->fd < 0)
+        return;
+
+    close(r->fd);
+    r->fd = -1;
+    mutex_unlock(&build_mutex);
+}
+
+bool db_summary_read_album(struct db_summary_reader *r, int n,
+                           struct album_data *out)
+{
+    off_t at;
+
+    if (r->fd < 0 || n < 0 || n >= r->album_ct)
+        return false;
+
+    at = r->album_off + (long)n * (long)sizeof(*out);
+    return lseek(r->fd, at, SEEK_SET) == at
+        && read(r->fd, out, sizeof(*out)) == (ssize_t)sizeof(*out);
+}
+
+static int compare_year_seek(const void *a_v, const void *b_v)
+{
+    const struct db_summary_year *a = a_v;
+    const struct db_summary_year *b = b_v;
+
+    return (a->seek > b->seek) - (a->seek < b->seek);
+}
+
+int db_summary_read_year_table(struct db_summary_year *out, int max)
+{
+    struct db_summary_t data;
+    struct tagcache_marks marks;
+    struct album_data rec;
+    off_t at;
+    int fd;
+    int ret;
+    int n;
+
+    ret = wait_for_background();
+    if (ret != SUCCESS)
+        return ret;
+
+    mutex_lock(&build_mutex);
+
+    fd = open(DB_SUMMARY_FILE, O_RDONLY);
+    if (fd < 0)
+    {
+        ret = ERROR_NO_ALBUMS;
+        goto done;
+    }
+
+    ret = ERROR_NO_ALBUMS;
+    if (read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
+        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || data.album_ct == 0 || data.album_ct > max)
+        goto done;
+
+    /* The seeks below are only seeks for the commit they were written against;
+     * see the note in db_summary.h. */
+    tagcache_get_marks(&marks);
+    if (marks.commitid != data.commitid)
+        goto done;
+
+    at = (off_t)(sizeof(data) + data.artist_len + data.album_len);
+    if (lseek(fd, at, SEEK_SET) != at)
+        goto done;
+
+    for (n = 0; n < data.album_ct; n++)
+    {
+        if (read(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
+            goto done;
+        out[n].seek = rec.seek;
+        out[n].year = rec.year;
+    }
+
+    qsort(out, n, sizeof(*out), compare_year_seek);
+    ret = n;
+
+done:
+    if (fd >= 0)
+        close(fd);
+    mutex_unlock(&build_mutex);
+    return ret;
 }
 
 /* bg_task.artifact_ok: the marker matching the entry count is not on its own

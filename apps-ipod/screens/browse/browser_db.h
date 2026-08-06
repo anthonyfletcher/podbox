@@ -13,11 +13,17 @@
 #include "database/tagcache.h"
 #include "browser.h"
 
-#define SYNTHETIC_ROWS_MAX 7  /* most rows load_root() adds beyond tagnavi.config */
 #define TAGNAVI_VERSION    "#! rockbox/tagbrowser/2.0"
 #define TAGMENU_MAX_ITEMS  64
 #define TAGMENU_MAX_MENUS  32
 #define TAGMENU_MAX_FMTS   32
+
+/* global_settings.database_sort_albums_by: how an album list is ordered. */
+enum database_sort_albums {
+    DB_SORT_ALBUMS_NAME = 0,
+    DB_SORT_ALBUMS_YEAR,
+    DB_SORT_ALBUMS_YEAR_DESC,
+};
 
 int browser_db_export(void);
 int browser_db_import(void);
@@ -52,6 +58,12 @@ int browser_db_get_icon(struct browser_context* c);
  * position so it's robust to tagnavi.config reordering. Used by
  * root_menu.c's tagnavi-derived main-menu shortcuts. */
 void browser_db_enter_by_tag_on_next_load(int tag);
+/* The same for a caller that means one specific row rather than one kind of
+ * browse. A first tag does not identify a row -- the shipped menu's "Album"
+ * and "Recently Added" both start on tag_album -- so anything picking a row
+ * off a list arms with this. The label lives in RAM only, so nothing about how
+ * the choice is stored changes. */
+void browser_db_enter_by_label_on_next_load(const unsigned char *label);
 /* The same for a root row that opens a nested menu rather than browsing a tag
  * -- "Playback History ==> runtime" and its like. Armed by the submenu's
  * config id, again identity rather than position. */
@@ -81,6 +93,21 @@ int browser_db_get_main_menu_tag_row_count(void);
 bool browser_db_get_main_menu_row(int index, int *out_tag,
                                   const char **out_menu_id,
                                   const unsigned char **out_name);
+/* The Music menu's rows, for the screen that turns them on and off
+ * (screens/music_menu_config.c). Only rows the menu would actually draw are
+ * enumerated, so one already hidden for another reason -- an empty submenu, or
+ * Search while the database is not in RAM -- is not offered as a choice.
+ *
+ * 'index' is the row's position in tagnavi.config's root menu, which is what
+ * global_settings.music_menu_hidden is keyed on. That mask only means anything
+ * for the row set it was chosen against, so it is stored alongside
+ * browser_db_root_row_signature() and discarded when the two disagree. */
+int browser_db_root_row_count(void);
+bool browser_db_get_root_row(int n, int *out_index,
+                             const unsigned char **out_name);
+int browser_db_root_row_signature(void);
+bool browser_db_root_row_is_hidden(int index);
+
 int browser_db_get_filename(struct browser_context* c, char *buf, int buflen);
 int browser_db_get_custom_action(struct browser_context* c);
 bool browser_db_get_subentry_filename(char *buf, size_t bufsize);

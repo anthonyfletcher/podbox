@@ -13,6 +13,7 @@
 #include "system/bg_task.h"
 
 struct db_summary_t;
+struct album_data;
 
 /* Fill the caller's index from the saved file, rebuilding it from tagcache
  * first if there is none or it predates the current cache version. SUCCESS or
@@ -42,6 +43,57 @@ int db_summary_build(void);
  * so nothing it holds outlives the release. */
 int db_summary_acquire(struct db_summary_t *target, int *handle);
 void db_summary_release(int handle);
+
+/* Read single records out of the saved index without holding it.
+ *
+ * db_summary_acquire() above needs 384K of core memory, and the audio buffer
+ * is what gives it up -- which stops playback and rebuffers the current track
+ * (see shrink_callback() in playback.c). That is a fair price for the whole
+ * list. It is a poor one for a caller that wants one fixed-size record, so
+ * those seek to it in the file instead.
+ *
+ * A reader holds the build lock for its whole lifetime, so the background pass
+ * cannot swap the file out underneath it. Open one, take what you need, close
+ * it; do not put a screen up while one is open.
+ *
+ * The struct is here rather than opaque so the caller can keep one on its own
+ * stack. Its fields are private. */
+struct db_summary_reader {
+    int fd;
+    int album_ct;      /* albums the file holds */
+    long album_off;    /* where the first of them starts */
+};
+
+/* Open the saved index, building one first if there is none to read. SUCCESS,
+ * or an ERROR_* from carousel.h. On success, and only then, the caller must
+ * match this with db_summary_reader_close(). */
+int db_summary_reader_open(struct db_summary_reader *r);
+void db_summary_reader_close(struct db_summary_reader *r);
+
+/* Album n of r->album_ct into *out. False if it could not be read. */
+bool db_summary_read_album(struct db_summary_reader *r, int n,
+                           struct album_data *out);
+
+/* One album's release year, against the taglist position the database browser
+ * knows it by. */
+struct db_summary_year {
+    long seek;
+    int  year;
+};
+
+/* Fill 'out' with every album's pair, sorted by seek so the caller can binary
+ * search it. Returns how many were written, or a negative ERROR_*.
+ *
+ * For sorting album lists by year. The browser cannot read the year from the
+ * database itself -- a unique tag's rows carry no index entry for a numeric
+ * tag to be read from -- and the year here is the better one anyway: the
+ * maximum across the album's tracks, which is what Album covers sorts on.
+ *
+ * Refuses when the saved index predates the current database commit. A commit
+ * that adds a track re-sorts the album tagfile and moves every seek in it, so a
+ * stale table would join cleanly against the wrong albums and produce a
+ * plausible, wrong order. Name order is the right answer in that case. */
+int db_summary_read_year_table(struct db_summary_year *out, int max);
 
 /* Build only the artist half into 'target', from *buf, advancing it. The
  * artist carousel uses this on its own, without an album list. Serialises
@@ -114,8 +166,8 @@ void db_summary_invalidate(void);
  * Scratch memory comes from the app buffer, which panics if a screen still
  * holds a claim on it -- so this cannot be called from inside the carousel.
  * db_summary_play_album_on_exit() exists for that: it records the album, and
- * root_menu.c calls db_summary_play_pending() once the screen has gone. */
-struct album_data;
+ * album_covers() calls db_summary_play_pending() once carousel_run() has
+ * returned and released the claim. */
 int  db_summary_play_album(const struct album_data *album);
 void db_summary_play_album_on_exit(const struct album_data *album);
 int  db_summary_play_pending(void);

@@ -47,6 +47,7 @@
 #include "settings/settings.h"
 #include "input/action.h"
 #include "system/activity.h"
+#include "system/app_buffer.h"        /* where the index is read into */
 #include "database/tagcache.h"
 #include "database/db_summary.h"
 #include "screens/covers/carousel.h"      /* struct album_data, SUCCESS/ERROR_* */
@@ -68,7 +69,6 @@ enum chart_rank {
 
 /* The index, live only for the duration of one action. */
 static struct db_summary_t idx;
-static int idx_handle;
 
 /* The current chart: indices into whichever array it ranks, best first, with
  * the random tiebreak each entry was admitted on (see rank_before()). */
@@ -294,27 +294,52 @@ static void report_empty(void)
     splash(HZ * 2, ID2P(LANG_NO_ALBUM_HISTORY));
 }
 
-/* Claim the index. SUCCESS, or an ERROR_* having already said why. */
+/* Say why the index could not be read. */
+static void report_index_error(int res)
+{
+    /* Chosen before ID2P rather than inside it: the macro does arithmetic on
+     * its argument, so a conditional there is not the string id it looks
+     * like. */
+    int msg = (res == ERROR_BUFFER_FULL) ? LANG_OUT_OF_MEMORY
+                                         : LANG_NO_ALBUM_HISTORY;
+    splash(HZ * 2, ID2P(msg));
+}
+
+/* Read the index into the app buffer. SUCCESS, or an ERROR_* having already
+ * said why.
+ *
+ * Not core_alloc(): the audio buffer holds the whole of core, so a request
+ * from here shrinks it, and shrinking it stops playback and rebuffers the
+ * current track. The app buffer is linker-reserved RAM that sits idle unless
+ * a screen has borrowed it, so it costs nothing dynamic and playback never
+ * notices -- and it is larger than the core_alloc this used to make, so the
+ * index has more room than before, not less. The carousel reads the same
+ * index into the same buffer.
+ *
+ * Claimed rather than borrowed because it is held while the chart is on
+ * screen, which means nothing reachable from that list may want it. Nothing
+ * does: the list passes no action callback, so it has no context menu, and the
+ * handoff into the browser happens after release(). */
 static int acquire(void)
 {
-    int res = db_summary_acquire(&idx, &idx_handle);
+    size_t bufsz;
+    void *buf = app_claim_buffer(&bufsz, "album charts");
+    int res;
+
+    memset(&idx, 0, sizeof(idx));
+    res = db_summary_build_into(&idx, buf, bufsz);
 
     if (res < SUCCESS)
     {
-        /* Chosen before ID2P rather than inside it: the macro does arithmetic
-         * on its argument, so a conditional there is not the string id it
-         * looks like. */
-        int msg = (res == ERROR_BUFFER_FULL) ? LANG_OUT_OF_MEMORY
-                                             : LANG_NO_ALBUM_HISTORY;
-        splash(HZ * 2, ID2P(msg));
+        app_release_buffer("album charts");
+        report_index_error(res);
     }
     return res;
 }
 
 static void release(void)
 {
-    db_summary_release(idx_handle);
-    idx_handle = 0;
+    app_release_buffer("album charts");
 }
 
 /* See album_charts.h: the browser can only return a bare screen code, so which
@@ -385,28 +410,42 @@ int album_charts_show(enum album_chart kind)
  * needs no playback history, so unlike the charts it works with runtime data
  * gathering switched off.
  *
- * db_summary_play_album() does the gathering. The index is released before it
- * runs, since nothing below reads it again and playback is about to want the
- * memory -- hence the copy of the entry, which points into what that frees. */
+ * One record is all this needs. The names in the index are for display and
+ * nothing here displays anything, so it reads that record straight out of the
+ * saved file rather than acquiring the whole index -- which would cost the
+ * audio buffer 384K and the current track a rebuffer, moments before playback
+ * is told to go somewhere else entirely. The charts still acquire; they read
+ * every entry.
+ *
+ * The reader holds the build lock, so it is closed before anything slow
+ * happens: db_summary_play_album() searches the database and starts playback,
+ * neither of which should be waiting on this. */
 int album_random(void)
 {
+    struct db_summary_reader r;
     struct album_data album;
-    int pick;
+    bool got;
+    int res, pick;
 
-    if (acquire() < SUCCESS)
-        return GO_TO_PREVIOUS;
-
-    if (idx.album_ct <= 0)
+    res = db_summary_reader_open(&r);
+    if (res < SUCCESS)
     {
-        splash(HZ * 2, ID2P(LANG_NO_ALBUM_HISTORY));
-        release();
+        report_index_error(res);
         return GO_TO_PREVIOUS;
     }
 
+    /* An index with no albums in it is not opened at all, so there is always
+     * something to pick from here. */
     srand(current_tick);
-    pick = rand() % idx.album_ct;
-    album = idx.album_index[pick];
-    release();
+    pick = rand() % r.album_ct;
+    got = db_summary_read_album(&r, pick, &album);
+    db_summary_reader_close(&r);
+
+    if (!got)
+    {
+        report_index_error(ERROR_NO_ALBUMS);
+        return GO_TO_PREVIOUS;
+    }
 
     return db_summary_play_album(&album) > 0 ? GO_TO_WPS : GO_TO_PREVIOUS;
 }

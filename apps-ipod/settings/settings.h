@@ -551,6 +551,15 @@ struct user_settings
     bool album_covers_show_year;
     int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
     bool album_covers_statusbar;  /* show it, or take the screen and cover it */
+    /* Music menu rows the user has turned off: one bit per row of
+     * tagnavi.config's root menu, by position, valid only against the row set
+     * whose signature is stored beside it. See browser_db.h. */
+    int  music_menu_hidden;
+    int  music_menu_sig;
+    /* DB_SORT_ALBUMS_*: how the database browser orders its album lists. The
+     * year comes from the summary index, not the database, so this is separate
+     * from the carousel's own sort -- see .specifications/ALBUM_YEAR_SORT.md. */
+    int  database_sort_albums_by;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

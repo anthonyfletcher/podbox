@@ -24,6 +24,7 @@
 #include "exported_settings.h"
 #include "screens/browse/browser.h"
 #include "screens/browse/browser_db.h"
+#include "screens/music_menu_config.h"
 #include "usb.h"
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
@@ -650,6 +651,16 @@ MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
 
 
 
+/* How the Music browser presents what the database holds -- as against the
+ * Database menu above, which is about building and maintaining it. */
+MENUITEM_SETTING(database_sort_albums_by,
+                 &global_settings.database_sort_albums_by, NULL);
+MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
+                  music_menu_config, NULL, Icon_Menu_setting);
+MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
+          &database_sort_albums_by, &music_menu_config_item
+          );
+
 /** Settings menu **/
 
 static struct browse_folder_info langs = { LANG_DIR, SHOW_LNG };
@@ -661,6 +672,7 @@ MAKE_MENU(settings_menu_item, ID2P(LANG_GENERAL_SETTINGS), 0,
           Icon_General_settings_menu,
           &wps_settings,
           &playlist_settings, &file_menu,
+          &music_menu,
           &tagcache_menu,
           &album_covers_menu,
           &art_cache_menu,

@@ -235,11 +235,12 @@ static int browser(void* param)
             int slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
             int target_tag;
             const char *target_menu;
+            const unsigned char *target_name;
 
             if (!wait_for_tagcache_ready())
                 return GO_TO_PREVIOUS;
             if (!browser_db_get_main_menu_row(slot, &target_tag, &target_menu,
-                                              NULL))
+                                              &target_name))
                 return GO_TO_PREVIOUS; /* slot not backed by a real row */
 
             filter = SHOW_ID3DB;
@@ -257,11 +258,15 @@ static int browser(void* param)
              * shortcut below will never see a fresh root load to apply on.
              *
              * A row is one of two kinds: a tag browse, or a submenu such as
-             * Playback History. Whichever identity came back is the one to arm
-             * with -- see browser_db_get_main_menu_row(). */
+             * Playback History. A submenu has a unique id to arm with; a tag
+             * browse is armed by its label, because the tag alone does not
+             * identify it -- "Album" and "Recently Added" both browse
+             * tag_album first, and arming by tag sent both to the former. */
             tc->currtable = 0;
             if (target_menu)
                 browser_db_enter_menu_on_next_load(target_menu);
+            else if (target_name)
+                browser_db_enter_by_label_on_next_load(target_name);
             else
                 browser_db_enter_by_tag_on_next_load(target_tag);
             push_current_activity(ACTIVITY_DATABASEBROWSER);
@@ -1227,13 +1232,19 @@ void root_menu_set_default(void* setting, void* defaultval)
          * not included here. */
         if ((int)i >= tagnavi_start)
             continue;
-        /* Likewise off to begin with. Random album already has a home in the
-         * Music menu, just under Album, so leaving it out of the root menu
-         * costs nothing but a level of nesting -- and a root entry that plays
-         * something the moment it is chosen is not one to hand someone
-         * unasked. Documents and Images are off because most players hold
-         * neither; on a device with no documents on it they would be two rows
-         * that only ever say there is nothing to show. */
+        /* Likewise off to begin with. Random album and Search have homes in
+         * the Music menu, so leaving them out of the root menu costs nothing
+         * but a level of nesting -- and a root entry that plays something the
+         * moment it is chosen is not one to hand someone unasked. Documents
+         * and Images are off because most players hold neither; on a device
+         * with no documents on it they would be two rows that only ever say
+         * there is nothing to show.
+         *
+         * That home is a setting now: General Settings > Music > Music Menu
+         * Settings turns any Music row off, and nothing here knows. Turn off
+         * Random album there without adding it here and the feature has
+         * nowhere left to be reached from -- the user's to make, but not one
+         * either screen warns about. */
         if (menu_table[i].item == &random_album_item
             || menu_table[i].item == &db_search_item
             || menu_table[i].item == &documents_item

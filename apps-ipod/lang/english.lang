@@ -18593,3 +18593,45 @@
     *: "Play album"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_ASC
+  desc: database browser "Sort Albums By" option: release year, oldest first
+  user: core
+  <source>
+    *: "Year (oldest first)"
+  </source>
+  <dest>
+    *: "Year (oldest first)"
+  </dest>
+  <voice>
+    *: "Year, oldest first"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_DESC
+  desc: database browser "Sort Albums By" option: release year, newest first
+  user: core
+  <source>
+    *: "Year (newest first)"
+  </source>
+  <dest>
+    *: "Year (newest first)"
+  </dest>
+  <voice>
+    *: "Year, newest first"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_MENU_SETTINGS
+  desc: General Settings > Music: opens the screen that turns Music menu rows on and off
+  user: core
+  <source>
+    *: "Music Menu Settings"
+  </source>
+  <dest>
+    *: "Music Menu Settings"
+  </dest>
+  <voice>
+    *: "Music Menu Settings"
+  </voice>
+</phrase>

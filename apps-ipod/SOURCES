@@ -134,6 +134,7 @@ screens/settings/display_settings.c
 screens/settings/eq_settings.c
 screens/main_menu.c
 screens/main_menu_config.c
+screens/music_menu_config.c
 screens/settings/basic_settings.c
 screens/settings/common_settings.c
 screens/settings/playback_settings.c

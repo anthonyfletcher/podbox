@@ -1552,6 +1552,24 @@ const struct settings_list settings[] = {
                   "artist+name,artist+year,year,name", NULL, 4,
                   ID2P(LANG_ARTIST_PLUS_NAME), ID2P(LANG_ARTIST_PLUS_YEAR),
                   ID2P(LANG_ID3_YEAR), ID2P(LANG_NAME)),
+    /* Which Music menu rows are turned off, and the row set that was chosen
+     * against. Never shown as settings themselves -- the screen in
+     * screens/music_menu_config.c is the UI -- so the lang ids here are only
+     * there because the table wants one. */
+    INT_SETTING(F_BANFROMQS, music_menu_hidden, LANG_MUSIC_BROWSER, 0,
+                "music menu hidden", UNIT_INT, 0, 0x7fffffff, 1,
+                NULL, NULL, NULL),
+    INT_SETTING(F_BANFROMQS, music_menu_sig, LANG_MUSIC_BROWSER, 0,
+                "music menu signature", UNIT_INT, 0, 0x7fffffff, 1,
+                NULL, NULL, NULL),
+    /* The database browser's own album ordering. Separate from the carousel's
+     * above: that one groups by artist as well, which a browser list has
+     * already done by navigation. */
+    CHOICE_SETTING(0, database_sort_albums_by, LANG_SORT_ALBUMS_BY,
+                  0, "database sort albums by",
+                  "name,year,year descending", NULL, 3,
+                  ID2P(LANG_NAME), ID2P(LANG_SORT_BY_YEAR_ASC),
+                  ID2P(LANG_SORT_BY_YEAR_DESC)),
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),

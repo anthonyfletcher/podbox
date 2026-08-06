@@ -161,7 +161,57 @@ enum variables {
     menu_load,
     menu_reload,
     menu_shuffle_songs,
+    /* Not a token: "==>" parses as menu_load and becomes this when the id it
+     * names turns out to be a built-in row rather than a menu. */
+    menu_builtin,
 };
+
+/* Rows this file supplies rather than tagnavi.config expressing them as
+ * queries. An album chart sums playcount across an album, which a %format
+ * cannot express -- it groups by the tag it displays (see album_charts.c) --
+ * and Random album and Search are actions, not browse levels.
+ *
+ * tagnavi.config still says whether each one appears and where, by naming its
+ * id with "==>". These ids are reserved: they are matched before menu ids, so
+ * a menu cannot shadow one. The label written beside the id there is
+ * documentation -- the row draws the language string named here, so it stays
+ * translated whatever the config says.
+ *
+ * 'available' gates a row that cannot always do its job; NULL means always. */
+static bool db_search_available(void);
+
+static const struct builtin_row {
+    const char *id;
+    int lang_id;
+    int table;              /* TABLE_* the row enters */
+    int param;              /* carried in extraseek */
+    bool (*available)(void);
+} builtin_rows[] = {
+    { "random_album", LANG_RANDOM_ALBUM, TABLE_RANDOM_ALBUM, 0, NULL },
+    { "db_search",    LANG_DB_SEARCH,    TABLE_DB_SEARCH,    0,
+      db_search_available },
+    { "chart_albums_most_played",  LANG_MOST_PLAYED_ALBUMS,
+      TABLE_ALBUM_CHARTS, ALBUM_CHART_MOST_PLAYED,      NULL },
+    { "chart_artists_most_played", LANG_MOST_PLAYED_ARTISTS,
+      TABLE_ALBUM_CHARTS, ARTIST_CHART_MOST_PLAYED,     NULL },
+    { "chart_albums_recent",       LANG_RECENTLY_PLAYED_ALBUMS,
+      TABLE_ALBUM_CHARTS, ALBUM_CHART_RECENTLY_PLAYED,  NULL },
+    { "chart_artists_recent",      LANG_RECENTLY_PLAYED_ARTISTS,
+      TABLE_ALBUM_CHARTS, ARTIST_CHART_RECENTLY_PLAYED, NULL },
+    { "chart_albums_forgotten",    LANG_FORGOTTEN_ALBUMS,
+      TABLE_ALBUM_CHARTS, ALBUM_CHART_FORGOTTEN,        NULL },
+    { "chart_artists_forgotten",   LANG_FORGOTTEN_ARTISTS,
+      TABLE_ALBUM_CHARTS, ARTIST_CHART_FORGOTTEN,       NULL },
+};
+
+/* The search screen scans the tag files, which off disk is a seek and a read
+ * per entry -- db_search_run() refuses to open in that case, so the row is not
+ * offered either. Matches db_search_callback() in root_menu.c, which hides the
+ * main-menu entry on the same test. */
+static bool db_search_available(void)
+{
+    return global_settings.tagcache_ram != TAGCACHE_RAM_OFF;
+}
 
 /* Capacity 10 000 entries (for example 10k different artists) */
 #define UNIQBUF_SIZE (64*1024)
@@ -898,6 +948,20 @@ static bool parse_search(struct menu_entry *entry, const char *str)
         if (get_token_str(buf, sizeof buf) < 0)
             return false;
 
+        /* Reserved ids first. Checked ahead of the menus so a stray
+         * %menu_start cannot shadow a built-in row, and so an id that names
+         * one never reaches the "create an empty menu" path below -- which
+         * would leave the row parsing cleanly and never drawing. */
+        for (i = 0; i < (int)ARRAYLEN(builtin_rows); i++)
+        {
+            if (!strcasecmp(builtin_rows[i].id, buf))
+            {
+                entry->type = menu_builtin;
+                entry->link = i;
+                return true;
+            }
+        }
+
         /* Find the matching root menu or "create" it */
         for (i = 0; i < menu_count; i++)
         {
@@ -1624,6 +1688,65 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
     return 0;
 }
 
+/* Ordering an album list by year
+ *
+ * The sort compares the row's display name, so the year has to be *in* that
+ * name: four zero-padded digits ahead of it, stripped again after the sort by
+ * the same pass that strips a %format's own sort prefix. That is how every
+ * ordered list here works -- qsort swaps whole entries, so a year held
+ * alongside would have to be swapped in step with them.
+ *
+ * The year cannot come from the database on this path. tagcache_get_numeric()
+ * reads the row's index entry, and a unique tag's rows have none -- their
+ * tagfile entries carry idx_id = -1. It comes from the summary index instead,
+ * which also holds the better figure: the maximum across the album's tracks.
+ * See .specifications/ALBUM_YEAR_SORT.md.
+ */
+/* Four digits and a space. The space is load-bearing: the sort reads a run of
+ * digits as one number, so without a non-digit between them an album named "21"
+ * would extend its year into "200421" and sort after every album whose name
+ * starts with a letter. Broken by the space, names order within a year exactly
+ * as they do in the plain album list. */
+#define YEAR_PREFIX_LEN 5
+/* Albums the summary has no year for -- one added since the last background
+ * pass, or one whose tracks are untagged. Parked at the end together, and a
+ * value that reads as "unknown" rather than one that hides among real years if
+ * it is ever seen on screen. */
+#define YEAR_UNKNOWN    9999
+
+static void write_year_prefix(char *dst, const struct db_summary_year *tab,
+                              int count, long seek)
+{
+    int lo = 0, hi = count - 1;
+    int year = YEAR_UNKNOWN;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (tab[mid].seek == seek)
+        {
+            year = tab[mid].year;
+            break;
+        }
+        if (tab[mid].seek < seek)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+
+    if (year <= 0 || year > 9999)
+        year = YEAR_UNKNOWN;
+
+    /* Written a digit at a time rather than with snprintf, which would put a
+     * terminator on the fifth byte -- where the album name goes. */
+    dst[0] = '0' + (year / 1000) % 10;
+    dst[1] = '0' + (year / 100) % 10;
+    dst[2] = '0' + (year / 10) % 10;
+    dst[3] = '0' + year % 10;
+    dst[4] = ' ';
+}
+
 static struct tagentry* get_entries(struct browser_context *tc)
 {
     return core_get_data(tc->cache.entries_handle);
@@ -1660,6 +1783,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     bool is_basename = false;
     int sort_limit;
     int strip;
+    struct db_summary_year *year_tab = NULL;
+    int year_count = 0;
+    int year_prefix = 0;   /* characters this level prepends for the sort */
 
     if (c->currtable == TABLE_ALLSUBENTRIES || c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
     {
@@ -1750,6 +1876,30 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         sort_inverse = false;
         sort_limit = 0;
         strip = 0;
+    }
+
+    /* Album lists ordered by year rather than name; see write_year_prefix().
+     * The table is refused outright when the saved index predates the current
+     * database commit, because its seeks would then match the wrong albums --
+     * so a stale index leaves the list in name order rather than a wrong one. */
+    if (tag == tag_album
+        && global_settings.database_sort_albums_by != DB_SORT_ALBUMS_NAME)
+    {
+        size_t ytab_sz;
+
+        year_tab = app_get_buffer(&ytab_sz, "album year sort");
+        year_count = db_summary_read_year_table(year_tab,
+                                                ytab_sz / sizeof(*year_tab));
+        if (year_count > 0)
+        {
+            year_prefix = YEAR_PREFIX_LEN;
+            strip = YEAR_PREFIX_LEN;
+            sort = true;
+            sort_inverse = (global_settings.database_sort_albums_by
+                            == DB_SORT_ALBUMS_YEAR_DESC);
+        }
+        else
+            year_tab = NULL;
     }
 
     /* lock buflib out due to possible yields */
@@ -1870,11 +2020,16 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             }
 
             tcs.result = str(LANG_TAGNAVI_UNTAGGED);
-            tcs.result_len = strlen(tcs.result);
+            /* Every other result_len counts the terminator, and the copy below
+             * writes one -- without it the next name starts on this row's. */
+            tcs.result_len = strlen(tcs.result) + 1;
             tcs.ramresult = true;
         }
 
-        if (!tcs.ramresult || fmt)
+        /* year_prefix forces the copy: the branch below that skips it points
+         * dptr->name straight at shared memory, which has no room for a prefix
+         * and which the strip pass would then walk four characters into. */
+        if (!tcs.ramresult || fmt || year_prefix)
         {
 
             dptr->name = core_get_data(c->cache.name_buffer_handle)+namebufused;
@@ -1915,7 +2070,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             else
             {
                 tcs_get_basename(&tcs, is_basename);
-                namebufused += tcs.result_len;
+                namebufused += tcs.result_len + year_prefix;
                 bool buffer_full = (namebufused >= c->cache.name_buffer_size);
                 if (!buffer_full)
                 {
@@ -1925,7 +2080,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                         namebufused += strlen(dptr->album_name)+1;
                     else
                         dptr->album_name = NULL;
-                    strcpy(dptr->name, tcs.result);
+                    if (year_prefix)
+                        write_year_prefix(dptr->name, year_tab, year_count,
+                                          tcs.result_seek);
+                    strcpy(dptr->name + year_prefix, tcs.result);
                 }
                 else
                 {
@@ -2003,7 +2161,11 @@ entry_skip_formatter:
 
     if (strip)
     {
-        dptr = get_entries(c);
+        /* Past the special rows, as the sort above is. They carry no formatted
+         * name to strip, and dptr->name on one is an ID2P() virtual pointer
+         * rather than a string -- measuring it reads a stray address, and
+         * advancing it names a different phrase entirely. */
+        dptr = &get_entries(c)[c->special_entry_count];
         for (i = c->special_entry_count; i < current_entry_count; i++, dptr++)
         {
             int len = strlen(dptr->name);
@@ -2038,90 +2200,161 @@ static bool row_submenu_has_items(const struct menu_entry *item)
         && menus[item->link] && menus[item->link]->itemcount > 0;
 }
 
-/* The tagnavi menu these rows attach to, by its config id rather than its
- * position, so reordering tagnavi.config cannot move them somewhere else.
- * -1 if the user's config has no such menu, in which case the rows simply do
- * not appear. */
-static int menu_index_by_id(const char *id)
+/* Set while the root is being built to find one row in it rather than to show
+ * it. Rows turned off in the Music settings are still built then, so a
+ * main-menu shortcut to one keeps working: that screen hides rows from the
+ * Music menu and says nothing about the main menu, and the two are separate
+ * choices the user made on separate screens. The unfiltered root is never
+ * drawn -- the row is entered straight away, and BACK leaves the browser (see
+ * enter_as_root_shortcut()). */
+static bool loading_for_shortcut;
+
+static int load_root(struct browser_context *c);
+
+static int load_root_for_shortcut(struct browser_context *c)
 {
-    int i;
-    for (i = 0; i < menu_count; i++)
-    {
-        if (!strcasecmp(menus[i]->id, id))
-            return i;
-    }
-    return -1;
+    int rows;
+
+    loading_for_shortcut = true;
+    rows = load_root(c);
+    loading_for_shortcut = false;
+
+    return rows;
 }
 
-/* Is this a tag-browse row on the given tag? Used to find the Music menu's
- * "Album" row by what it does rather than by its name or position.
+/* Rows the Music menu turns on and off
  *
- * Not unique: "Recently Added" also browses tag_album first, so the caller
- * must take the first match rather than every one. */
-static bool row_browses_tag(const struct menu_entry *item, int tag)
+ * The mask is one bit per row of tagnavi.config's root menu, by position --
+ * which only means anything for the row set it was chosen against. So it is
+ * stored with a signature of that set, and a config that has changed at all
+ * discards it rather than hiding whatever now sits at those positions.
+ *
+ * Positions past the bit count simply cannot be hidden. The shipped root menu
+ * has sixteen rows; this leaves plenty of room and fails by offering too much
+ * rather than by hiding the wrong thing. */
+#define ROW_HIDE_BITS 31
+
+static uint32_t row_hide_bit(int index)
 {
-    return item->type == menu_next && item->si.tagorder_count > 0
-        && item->si.tagorder[0] == tag;
+    return index >= 0 && index < ROW_HIDE_BITS ? (1u << index) : 0;
 }
 
-/* Does this row carry the given label? The Playback History rows are anchored
- * this way because, unlike the Album row, they are all `-> title` searches
- * distinguished only by their clauses -- there is nothing structural to match
- * on. Matching the shipped tagnavi.config's own English strings, so a user who
- * replaces that menu simply loses the anchor and the row is appended instead
- * (see load_root()). */
-static bool row_named(const struct menu_entry *item, const char *name)
+/* Does the menu draw this row at all, leaving aside whether it is turned off?
+ * A submenu that leads nowhere is not drawn (see row_submenu_has_items()), and
+ * neither is a built-in row that cannot presently do its job. */
+static bool root_row_drawable(const struct menu_entry *item)
 {
-    return strcmp((const char *)P2STR((unsigned char *)item->name), name) == 0;
+    if (item->type == menu_load)
+        return row_submenu_has_items(item);
+
+    if (item->type == menu_builtin)
+    {
+        const struct builtin_row *b = &builtin_rows[item->link];
+
+        return !b->available || b->available();
+    }
+
+    return true;
 }
 
-/* One row that came from here rather than from tagnavi.config. 'param' is
- * carried in extraseek for the marker to interpret. */
-static void add_synthetic_row(struct tagentry **dptr, int lang_id,
-                              int marker, int param)
+int browser_db_root_row_signature(void)
 {
-    (*dptr)->name = (char*)ID2P(lang_id);
-    (*dptr)->newtable = marker;
-    (*dptr)->extraseek = param;
-    (*dptr)->customaction = ONPLAY_NO_CUSTOMACTION;
-    (*dptr)++;
+    struct menu_root *root;
+    uint32_t h = 2166136261u;
+    int i;
+
+    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+        return 0;
+
+    root = menus[rootmenu];
+
+    /* Every row, not just the drawable ones: whether Search can open right now
+     * depends on a setting rather than on the config, and that must not read
+     * as the menu having been rewritten. */
+    for (i = 0; i < root->itemcount; i++)
+    {
+        const char *s =
+            (const char *)P2STR((unsigned char *)root->items[i]->name);
+
+        for (; *s; s++)
+            h = (h ^ (unsigned char)*s) * 16777619u;
+        h = (h ^ (unsigned char)root->items[i]->type) * 16777619u;
+    }
+
+    /* Positive, so it never collides with the 0 a menu-less parse returns. */
+    return (int)(h & 0x7fffffff);
 }
 
-/* The album charts, and where each one slots into Playback History. Kept as a
- * table so the order shown is the order written here, next to the anchors that
- * put it there: each chart follows the track-level row it is the album
- * counterpart of. */
-static const struct {
-    int lang_id;
-    enum album_chart kind;
-    const char *after;      /* row to follow, or NULL to append */
-} album_chart_rows[] = {
-    /* Album then artist under each track-level row, so the menu reads
-     * tracks / albums / artists for each kind of history. Order within one
-     * anchor is the order written here. */
-    { LANG_MOST_PLAYED_ALBUMS,      ALBUM_CHART_MOST_PLAYED,
-      "Most played tracks" },
-    { LANG_MOST_PLAYED_ARTISTS,     ARTIST_CHART_MOST_PLAYED,
-      "Most played tracks" },
-    { LANG_RECENTLY_PLAYED_ALBUMS,  ALBUM_CHART_RECENTLY_PLAYED,
-      "Recently played tracks" },
-    { LANG_RECENTLY_PLAYED_ARTISTS, ARTIST_CHART_RECENTLY_PLAYED,
-      "Recently played tracks" },
-    { LANG_FORGOTTEN_ALBUMS,        ALBUM_CHART_FORGOTTEN,
-      "Never played tracks" },
-    { LANG_FORGOTTEN_ARTISTS,       ARTIST_CHART_FORGOTTEN,
-      "Never played tracks" },
-};
-#define ALBUM_CHART_ROWS ((int)ARRAYLEN(album_chart_rows))
+/* The hidden mask, or 0 if it does not describe the menu as it stands. */
+static uint32_t root_hide_mask(void)
+{
+    if (global_settings.music_menu_sig != browser_db_root_row_signature())
+        return 0;
+    return (uint32_t)global_settings.music_menu_hidden;
+}
+
+int browser_db_root_row_count(void)
+{
+    struct menu_root *root;
+    int i, count = 0;
+
+    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+        return 0;
+
+    root = menus[rootmenu];
+    for (i = 0; i < root->itemcount; i++)
+    {
+        if (root_row_drawable(root->items[i]))
+            count++;
+    }
+    return count;
+}
+
+bool browser_db_get_root_row(int n, int *out_index,
+                             const unsigned char **out_name)
+{
+    struct menu_root *root;
+    int i, count = 0;
+
+    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+        return false;
+
+    root = menus[rootmenu];
+    for (i = 0; i < root->itemcount; i++)
+    {
+        if (!root_row_drawable(root->items[i]))
+            continue;
+        if (count++ != n)
+            continue;
+
+        if (out_index)
+            *out_index = i;
+        if (out_name)
+        {
+            /* A built-in row draws its own translated name, not the label
+             * beside its id in the config -- so the screen must show the same
+             * one, or the row you turn off is not the row you read. */
+            *out_name = root->items[i]->type == menu_builtin
+                      ? ID2P(builtin_rows[root->items[i]->link].lang_id)
+                      : root->items[i]->name;
+        }
+        return true;
+    }
+    return false;
+}
+
+bool browser_db_root_row_is_hidden(int index)
+{
+    uint32_t mask = root_hide_mask();
+
+    return mask != 0 && (mask & row_hide_bit(index)) != 0;
+}
 
 static int load_root(struct browser_context *c)
 {
     struct tagentry *dptr = core_get_data(c->cache.entries_handle);
-    bool chart_placed[ALBUM_CHART_ROWS] = { 0 };
-    bool random_placed = false;
-    bool search_placed = false;
-    bool is_runtime_menu;
-    int i, n, rows = 0;
+    uint32_t hide_mask = 0;
+    int i, rows = 0;
 
     tc = c;
     c->currtable = TABLE_ROOT;
@@ -2137,43 +2370,27 @@ static int load_root(struct browser_context *c)
     if (menu == NULL)
         return 0;
 
-    is_runtime_menu = (c->currextra == menu_index_by_id("runtime"));
-
-    /* Room for the synthetic rows added below -- three on Playback History,
-     * one on the Music root, never both. Counting them here is not optional:
-     * this panics rather than truncating. */
-    if (menu->itemcount + SYNTHETIC_ROWS_MAX > c->cache.max_entries)
+    /* Every row is one of the menu's own now, so this is the whole count.
+     * Still checked: it panics rather than truncating. */
+    if (menu->itemcount > c->cache.max_entries)
             panicf("%s browser_cache too small", __func__);
+
+    /* Only the root menu is offered in the Music settings, so only it can
+     * have rows turned off; a submenu's positions are not what the mask
+     * describes. Not applied while a shortcut is being resolved -- see
+     * loading_for_shortcut. */
+    if (c->currextra == rootmenu && !loading_for_shortcut)
+        hide_mask = root_hide_mask();
 
     for (i = 0; i < menu->itemcount; i++)
     {
-        /* A submenu that leads nowhere is not drawn -- see
-         * row_submenu_has_items(). This is the row itself being skipped;
-         * root_row_is_shortcutable() keeps the same row out of the main-menu
-         * offer list, so the two stay consistent. */
-        if (menu->items[i]->type == menu_load
-            && !row_submenu_has_items(menu->items[i]))
+        if (!root_row_drawable(menu->items[i]))
             continue;
 
-        /* Search sits directly above "Search by...", the two ways of asking
-         * the same question in the order you would reach for them. Inserted
-         * before the row is copied rather than after, which is what every
-         * other synthetic row does -- this is the only one that goes above its
-         * anchor.
-         *
-         * Left out entirely while the database is not held in RAM: the scan
-         * reads the tag files, which from disk is a seek and a read per entry,
-         * and db_search_run() refuses to open in that case. Matches
-         * db_search_callback() in root_menu.c, which hides the root entry on
-         * the same test. */
-        if (c->currextra == rootmenu && !search_placed
-            && global_settings.tagcache_ram != TAGCACHE_RAM_OFF
-            && row_named(menu->items[i], "Search by..."))
-        {
-            add_synthetic_row(&dptr, LANG_DB_SEARCH, TABLE_DB_SEARCH, 0);
-            search_placed = true;
-            rows++;
-        }
+        /* Turned off in the Music settings. Only the root menu is offered
+         * there, and only while the mask still describes this row set. */
+        if (hide_mask && (hide_mask & row_hide_bit(i)))
+            continue;
 
         dptr->name = (char*)menu->items[i]->name;
 
@@ -2205,62 +2422,24 @@ static int load_root(struct browser_context *c)
                 dptr->extraseek = i;
                 dptr->customaction = ONPLAY_CUSTOMACTION_FIRSTLETTER;
                 break;
+
+            case menu_builtin:
+            {
+                const struct builtin_row *b =
+                    &builtin_rows[menu->items[i]->link];
+
+                /* The config's label is documentation; this one is
+                 * translated. */
+                dptr->name = (char*)ID2P(b->lang_id);
+                dptr->newtable = b->table;
+                dptr->extraseek = b->param;
+                dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+                break;
+            }
         }
 
         dptr++;
         rows++;
-
-        /* Random album, immediately beneath the Music menu's Album row --
-         * requested there rather than at the foot, since it is an album
-         * action. Anchored to the row that browses tag_album so it follows
-         * that row wherever tagnavi.config puts it, but only the first such
-         * row: "Recently Added" browses tag_album too, and matching every one
-         * put a second copy of this row halfway down the menu. */
-        if (c->currextra == rootmenu && !random_placed
-            && row_browses_tag(menu->items[i], tag_album))
-        {
-            add_synthetic_row(&dptr, LANG_RANDOM_ALBUM, TABLE_RANDOM_ALBUM, 0);
-            random_placed = true;
-            rows++;
-        }
-
-        /* Each album chart follows its track-level counterpart, so Playback
-         * History reads tracks-then-albums for each kind of history rather
-         * than listing all the album ones at the end. They cannot be config
-         * rows: a %format groups by the tag it displays and sorts on the
-         * formatted string, so "sum playcount across an album" is not
-         * expressible (see screens/browse/album_charts.c). Their labels come
-         * from the language file, so they are translated. */
-        if (is_runtime_menu)
-        {
-            for (n = 0; n < ALBUM_CHART_ROWS; n++)
-            {
-                if (chart_placed[n] || !album_chart_rows[n].after
-                    || !row_named(menu->items[i], album_chart_rows[n].after))
-                    continue;
-
-                /* No break: two rows share each anchor (the album chart and
-                 * the artist one), and both belong under it. */
-                add_synthetic_row(&dptr, album_chart_rows[n].lang_id,
-                                  TABLE_ALBUM_CHARTS, album_chart_rows[n].kind);
-                chart_placed[n] = true;
-                rows++;
-            }
-        }
-    }
-
-    /* Anything whose anchor was not found -- a replaced Playback History menu,
-     * or renamed rows -- goes at the end rather than disappearing. */
-    if (is_runtime_menu)
-    {
-        for (n = 0; n < ALBUM_CHART_ROWS; n++)
-        {
-            if (chart_placed[n])
-                continue;
-            add_synthetic_row(&dptr, album_chart_rows[n].lang_id,
-                              TABLE_ALBUM_CHARTS, album_chart_rows[n].kind);
-            rows++;
-        }
     }
 
     current_offset = 0;
@@ -2274,11 +2453,35 @@ static int load_root(struct browser_context *c)
 static int pending_root_shortcut_tag = -1;
 /* Its submenu counterpart; empty when none is armed. */
 static char pending_root_shortcut_menu[MAX_MENU_ID_SIZE];
+/* Its label counterpart, for a caller that knows which row it means rather
+ * than only what that row browses. Empty when none is armed. */
+static char pending_root_shortcut_label[MENUENTRY_MAX_NAME];
 
 void browser_db_enter_by_tag_on_next_load(int tag)
 {
     pending_root_shortcut_tag = tag;
     pending_root_shortcut_menu[0] = '\0';
+    pending_root_shortcut_label[0] = '\0';
+}
+
+/* Arm by the row's own label.
+ *
+ * The tag version above cannot tell two rows apart that browse the same thing
+ * first -- the shipped menu's "Album" and "Recently Added" both start on
+ * tag_album, so a shortcut to either opened the first. Callers that picked a
+ * specific row, rather than a specific kind of browse, arm with this instead.
+ *
+ * The label is only ever held in RAM, from the moment a row is chosen to the
+ * moment the browser opens it, so nothing about how the choice is *stored*
+ * changes -- which matters, because a settings line is capped at
+ * SETTINGS_MAX_LINE and labels are far longer than the keys it holds today. */
+void browser_db_enter_by_label_on_next_load(const unsigned char *label)
+{
+    pending_root_shortcut_tag = -1;
+    pending_root_shortcut_menu[0] = '\0';
+    strmemccpy(pending_root_shortcut_label,
+               (const char *)P2STR((unsigned char *)label),
+               sizeof(pending_root_shortcut_label));
 }
 
 /* The submenu counterpart, armed by id ("runtime" and so on) rather than by
@@ -2287,6 +2490,7 @@ void browser_db_enter_by_tag_on_next_load(int tag)
 void browser_db_enter_menu_on_next_load(const char *menu_id)
 {
     pending_root_shortcut_tag = -1;
+    pending_root_shortcut_label[0] = '\0';
     strmemccpy(pending_root_shortcut_menu, menu_id,
                sizeof(pending_root_shortcut_menu));
 }
@@ -2382,6 +2586,31 @@ static int loaded_row_for_tag(struct browser_context *c, int rows, int tag)
         if (root->items[raw]->type == menu_next
             && root->items[raw]->si.tagorder_count > 0
             && root->items[raw]->si.tagorder[0] == tag)
+            return i;
+    }
+    return -1;
+}
+
+/* The same by the row's label rather than by what it browses.
+ *
+ * A first tag does not identify a row: the shipped menu has two that start on
+ * tag_album ("Album" and "Recently Added"), so matching on it lands both of
+ * them on whichever comes first. The label is what tagnavi.config names the
+ * row and what the user picked off the main menu, so it is the identity that
+ * matches what they asked for. */
+static int loaded_row_for_label(struct browser_context *c, int rows,
+                                const char *label)
+{
+    int i;
+
+    if (!label || !*label)
+        return -1;
+
+    for (i = 0; i < rows; i++)
+    {
+        struct tagentry *e = browser_db_get_entry(c, i);
+
+        if (strcmp((const char *)P2STR((unsigned char *)e->name), label) == 0)
             return i;
     }
     return -1;
@@ -2689,7 +2918,7 @@ int browser_db_load(struct browser_context* c)
         strmemccpy(target, pending_root_shortcut_menu, sizeof(target));
         pending_root_shortcut_menu[0] = '\0';
 
-        rows = load_root(c);
+        rows = load_root_for_shortcut(c);
 
         idx = loaded_row_for_menu_id(c, rows, target);
         if (idx >= 0)
@@ -2703,13 +2932,38 @@ int browser_db_load(struct browser_context* c)
          * show the root menu rather than a dead end, as the tag case does. */
     }
 
+    /* The label form: a caller that means one specific row. Tried before the
+     * tag form because it is the more exact of the two. */
+    if (pending_root_shortcut_label[0] && table == TABLE_ROOT
+        && c->dirlevel == 0)
+    {
+        char target[MENUENTRY_MAX_NAME];
+        int idx, rows;
+
+        strmemccpy(target, pending_root_shortcut_label, sizeof(target));
+        pending_root_shortcut_label[0] = '\0';
+
+        rows = load_root_for_shortcut(c);
+
+        idx = loaded_row_for_label(c, rows, target);
+        if (idx >= 0)
+        {
+            c->selected_item = idx;
+            browser_db_enter(c, false);
+            enter_as_root_shortcut(c);
+            return browser_db_load(c);
+        }
+        /* Row renamed, removed, or turned off in the Music settings -- show
+         * the root menu rather than a dead end, as the other two forms do. */
+    }
+
     if (pending_root_shortcut_tag != -1 && table == TABLE_ROOT && c->dirlevel == 0)
     {
         int target_tag = pending_root_shortcut_tag;
         int rows;
         pending_root_shortcut_tag = -1;
 
-        rows = load_root(c);
+        rows = load_root_for_shortcut(c);
 
         /* Album covers' jump (only ever paired with target_tag == tag_album)
          * bypasses the normal single-hop browser_db_enter() below entirely --
