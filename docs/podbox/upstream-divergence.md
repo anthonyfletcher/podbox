@@ -55,6 +55,7 @@ fork's own.
 | `export/storage.h`, `storage.c` | New `Q_STORAGE_PRE_WAKE` event, stub functions and macro dispatch for the two calls above | Plumbing so the app and backlight layers can reach SSD mode through the generic `storage_*` interface. |
 | `powermgmt.c` | Two call sites stop consulting `charging_state()` — the battery-level test uses `charge_state > DISCHARGING`, and the charger case sets `CHARGING` unconditionally instead of falling through | On the 6G the charge-status line oscillates against weak USB sources, so `charging_state()` reads false while charging is genuinely happening. Upstream's fallthrough flips the reported state back and forth. |
 | `export/logf.h` | `MAX_LOGF_SIZE` 16 KiB → 256 KiB | Costs nothing unless `ROCKBOX_HAS_LOGF` is defined — which it now is on the 6G, so it is live there. |
+| `drivers/rtc/rtc_pcf50605.c` | Alarm functions, the `alarm_disable` table and the `rtc_init()` call to `rtc_check_alarm_started()` wrapped in `#ifdef HAVE_RTC_ALARM` | The prototypes in `export/rtc.h` are already guarded, but this driver referenced them unconditionally — it was the only RTC driver without the guard, because every upstream target using the PCF50605 defines `HAVE_RTC_ALARM`. Undefining it for the 5G broke the build. Now matches the shape of `rtc_ds1339_ds3231.c`, `rtc_e8564.c` and the rest, so this is upstream's own convention rather than a fork invention. |
 
 ## firmware/ — USB stack
 
@@ -189,7 +190,8 @@ it in the timing-critical path.
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined | Serial logging on by default for this target, which has never been run on hardware. Pairs with the enlarged `MAX_LOGF_SIZE`. |
 | `export/config/ipod6g.h` | `TARGET_EXTRA_THREADS 1` | Raises `MAXTHREADS`. Sits inside the block that enables `IPOD_ACCESSORY_PROTOCOL`, which needs a thread. |
 | `export/config/ipodvideo.h` | `HAVE_RECORDING` commented out | As above. |
-| `export/config/ipodvideo.h` | `CONFIG_TUNER`, `HAVE_RDS_CAP`, `CONFIG_RDS` commented out | The Apple remote tuner accessory is not a target of this build. Leaving them defined left a whole FM surface reachable and pointless: Radio Screen theme option, Radio Settings menu, main-menu FM entry, alarm-wake-to-FM. Now matches `ipod6g.h`, which never defined them. |
+| `export/config/ipodvideo.h` | `CONFIG_TUNER`, `HAVE_RDS_CAP`, `CONFIG_RDS` commented out | The Apple remote tuner accessory is not a target of this build. Leaving them defined left a whole FM surface reachable and pointless: Radio Screen theme option, Radio Settings menu, main-menu FM entry. Now matches `ipod6g.h`, which never defined them. |
+| `export/config/ipodvideo.h` | `HAVE_RTC_ALARM` commented out | The wake-up alarm could never be made to work, and the 5G was the only target that built it — `ipod6g.h` already had it commented out. The Apple bootloader clears the PCF interrupt registers before Rockbox runs, so `rtc_check_alarm_started()` guesses instead: it calls it a wake if the clock matches the alarm registers to within ten seconds, comparing seconds as raw BCD so the real window is 0–9. A 5G booting off a spinning disk usually misses it, and misses silently. The whole apps-side alarm — screen, wake image, menu entry, `CONTEXT_ALARMSCREEN` — is removed rather than left compiled out. |
 
 > **USB audio is on for both targets.** RockPod restricted `USB_ENABLE_AUDIO` to
 > the S5L8702; that restriction was deliberately not carried forward. The

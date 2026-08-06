@@ -2,7 +2,8 @@
 
 ## Details
 - Original theme: https://themify.d00k.net
-- Created by: Evan Kenny
+- Source code: https://git.sr.ht/~dook/Themify
+- Created by: Evan Kenny aka [Dook](https://d00k.net/)
 - License: CC BY-SA 3.0
 
 Modified to support dynamic colours and album/artist art in PodBox.

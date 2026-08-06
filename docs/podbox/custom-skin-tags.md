@@ -211,26 +211,6 @@ inside a list viewport (`%Vi`).
 %La(0)          # album art of the current list row
 ```
 
-### Not ours: `%pP` and `%pX` — playlist progress
-
-Both are **standard Rockbox tags**, listed here only because they are easy to
-mistake for fork additions and easy to mistake for each other. Neither is in
-`custom_tags.c`.
-
-- `%pP` — progress by **track position**: how far through the playlist by count.
-- `%pX` — progress by **time**: how far through the playlist's total duration.
-
-Each behaves like the other bar tags (`%pb`, `%bl`) — bare it yields a 0–100
-value, with bar parameters it draws a bar.
-
-```
-%pP                          # value, 0..100
-%pX(10,0,100,4,invert)       # drawn as a bar
-```
-
-`%pX` needs the whole playlist measured, so the first use of it scans the
-tracks; over 500 tracks it falls back to an equal-weight estimate. `%pP` costs
-nothing.
 
 ### `%lb` — database / cache building
 
@@ -253,15 +233,28 @@ internal `ui_set_working()`.
 
 ### `%la` — animated spinner frame
 
-A frame index that advances about ten times a second. Combine it with a
-conditional that lists the frames; `%la` cycles through however many you provide,
-so the spinner animates through ordinary refreshes:
+A frame index. Combine it with a conditional that lists the frames; `%la` cycles
+through however many you provide, so the spinner animates through ordinary
+refreshes:
 
 ```
 %?la<Ð|Ñ|Ò|Ó>        # a 4-frame spinner
 ```
 
 Best placed in a viewport that is only shown while something is loading.
+
+**The frame count sets the speed: a full turn takes about a second whatever
+number of frames you give it.** So a four-frame spinner changes four times a
+second and a twenty-frame one twenty times, and you do not have to tune
+anything. A few frames each last long enough that nothing drawing the tag can
+miss one; many frames run faster than the status bar repaints and some are
+skipped, which does not show when consecutive frames differ only slightly.
+
+If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
+
+```
+%?la<%||/|-|\>       # an ASCII spinner: | / - \
+```
 
 ---
 
@@ -280,21 +273,6 @@ If you previously relied on `%ft` returning a value's leading space verbatim
 compute spacing in the skin instead.
 
 ---
-
-## Completeness and source of truth
-
-The tags in the first sections (`%tw`, `%Vw`, `%Vh`, `%sel`, `%wr`, `%ma`, `%sl`,
-`%sf`, `%pd`, `%Sb`, `%La`, `%lb`, `%lw`, `%la`) are the fork's dedicated custom
-tags, registered together in `apps-ipod/skin/custom_tags.c`. **That file is the
-authoritative list** — every fork tag is in it and nothing else is. The fork
-adds no tags to `lib/skin_parser/tag_table.c`; that file tracks upstream and
-differs only by the weak `find_custom_tag()` hook the custom table registers
-through.
-
-Two upstream tags appear above for other reasons. `%ft` carries fork
-enhancements (file-line and prefix-search forms) on top of standard behaviour.
-`%pP` and `%pX` are wholly standard and are described only because they are
-easy to confuse with each other.
 
 Consult the Rockbox skin manual for the standard tags and treat this document as
 the delta on top.
