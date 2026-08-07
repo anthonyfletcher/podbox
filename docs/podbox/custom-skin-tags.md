@@ -188,15 +188,20 @@ zero yield 0). `a` and `b` may be numbers or tags.
 
 ## Widgets and indicators
 
-### `%Sb(bars[, center])` — spectrum analyser
+### `%Sb(bars[, center[, radius]])` — spectrum analyser
 
 Draws an audio spectrum analyser filling the current viewport. `bars` is the
 number of bands, 1–8 (values outside that range are clamped). Pass `center` as a
 second argument to grow the bars from the middle rather than up from the bottom.
 
+`radius` rounds the corners of each bar; 0, the default, leaves them square.
+There is no upper limit — the radius is fitted to the bar being drawn, so a
+short bar rounds less than a tall one.
+
 ```
 %V(20,40,120,60,-)%Sb(7)
 %V(20,40,120,60,-)%Sb(5, center)
+%V(20,40,120,60,-)%Sb(5, center, 2)
 ```
 
 ### `%La(offset[, nowrap])` — list-item album art
@@ -212,20 +217,26 @@ inside a list viewport (`%Vi`).
 ```
 
 
-### `%lb` — database / cache building
+### `%lb` — background index building
 
-Non-empty (`"b"`) while the music database or the album-art cache is being built
-in the background, otherwise empty. Use as a conditional to show a "busy" glyph:
+Non-empty (`"b"`) while any of four background passes is running — the music
+database, the album index behind the carousels and charts, the album-art
+thumbnail cache, or the document/image index — otherwise empty. All four are
+work the user did not ask for and cannot see, and any of them can be why the
+player feels slow, so they share one indicator. Use it as a conditional to show
+a "busy" glyph:
 
 ```
 %?lb<...building indicator...>
 ```
 
-### `%lw` — generic working flag
+### `%lw` — foreground work in progress
 
-Non-empty (`"w"`) while a generic "working" flag is set in the firmware. Nothing
-in normal playback sets it, so it's mainly for custom builds that call the
-internal `ui_set_working()`.
+Non-empty (`"w"`) while the UI is busy with something the user did ask for and
+is waiting on: the file browser waiting for a directory-cache scan, the database
+browser exporting or importing modifications, the album index being brought up
+to date. Where `%lb` means "something is happening behind your back", `%lw`
+means "the thing you just asked for is still going".
 
 ```
 %?lw<...busy...>

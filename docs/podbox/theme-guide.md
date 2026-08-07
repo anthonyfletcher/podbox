@@ -409,8 +409,8 @@ conditionals. See [`custom-skin-tags.md`](custom-skin-tags.md) for details.
 | Tag | Set while |
 |---|---|
 | `%lh` | the disk is active (standard Rockbox) |
-| `%lb` | the database or album-art cache is being built in the background |
-| `%lw` | a generic long-operation flag is raised |
+| `%lb` | the database, album index, art cache or document/image index is building in the background |
+| `%lw` | the UI is waiting on something the user asked for |
 
 They usually mean the same thing to someone looking at the screen, so one
 indicator covering all three is generally what you want:

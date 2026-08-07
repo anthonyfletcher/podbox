@@ -30,8 +30,10 @@ rebased onto, not the original fork point. To regenerate the list:
 git diff --name-status $(git merge-base HEAD rockbox/master)..HEAD -- . ':(exclude)apps-ipod'
 ```
 
-51 tracked files differ. 42 are code, build-system or build-script files (7 of
-them new); the rest are docs, EQ presets and the logo.
+Most of what that lists is code, build-system or build-script files; the rest is
+documentation, the Themify_2 theme, the EQ presets and the logo. Run it rather
+than trusting a count written down here — this document is a guide to *why* the
+files differ, and the set moves every time one is added.
 
 **`apps/` is byte-identical to upstream, and stays that way.** It is kept so
 `git merge rockbox/master` applies without delete/modify conflicts. The same
@@ -286,15 +288,18 @@ equally broken and equally unbuilt.
 ## Repo root
 
 `make zip` alone produces an **incomplete** zip: no theme, no first-boot config,
-no EQ presets, and a pile of files this fork cannot use. That is because
-`buildzip.pl` is kept upstream-shaped. The two bundle scripts make up the
-difference, and `build-hw.sh` runs both.
+no EQ presets, upstream's licence file rather than this fork's, and a pile of
+files this fork cannot use. That is because `buildzip.pl` is kept
+upstream-shaped. The three bundle scripts make up the difference, and
+`build-hw.sh` runs all three.
 
 | File | What it is | Why it exists |
 | --- | --- | --- |
 | `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs both bundle scripts after `make zip`. The supported way to produce a shippable build. |
 | `bundle-theme.sh` | Injects Themify_2 and a pre-populated `config.cfg` into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays byte-identical to upstream. The `config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback. |
 | `bundle-eqs.sh` | Injects `eqs/*.cfg` into `.rockbox/eqs/` | The presets live at the repo root, not the `lib/rbcodec/dsp/eqs/` that `buildzip.pl` copies from — that directory is empty here. |
+| `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other two: `buildzip.pl` copies upstream's file and is kept byte-identical. |
+| `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies each zip, then replaces the rolling `latest` release | Publishing by hand gets three things wrong — asset names colliding, `gh` needing `--repo` on the server, and a leftover tag being reused rather than moved. |
 | `.gitignore` | `/build*` narrowed to `/build-hw-*/`, `/build-hw/`, `/build-sim/`; adds `/notes/`, `/.specifications/` | Local working drafts. |
 | `wps/WPSLIST` | `cabbiev2` theme block removed (180 lines); explanatory comment added | `wpsbuild.pl` builds from this file, so delisting is what stops cabbiev2 shipping. The files stay in `wps/` because the tree mirrors upstream. `rockbox_failsafe` is kept — it is the skin engine's emergency fallback if a configured skin fails to parse. |
 
