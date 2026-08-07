@@ -130,9 +130,11 @@ make clean / make veryclean
 
 **Theme bundling — `make zip` is not enough.** `tools/buildzip.pl` is kept as
 close to upstream as possible and knows nothing about this fork's theme, so a
-zip straight from `make zip` has **no Themify_2, no first-boot `config.cfg` and
-no EQ presets**. Follow it with `../bundle-theme.sh` and `../bundle-eqs.sh`.
-`./build-hw.sh` runs both; a bare `make zip` does not.
+zip straight from `make zip` has **no Themify_2, no first-boot `config.cfg`, no
+EQ presets and upstream's licence file rather than this fork's**. Follow it with
+all three bundle scripts -- `../bundle-theme.sh`, `../bundle-eqs.sh`,
+`../bundle-licenses.sh`. `./build-hw.sh` runs all three; a bare `make zip` runs
+none.
 
 `bundle-theme.sh` also deletes the `classic_statusbar` theme, which
 `buildzip.pl` copies straight out of `wps/` without consulting `WPSLIST`. It
@@ -220,8 +222,8 @@ a tag that parses cleanly and draws nothing.
 `plugin.lds` (the codec link, via `lib/rbcodec/codecs/codecs.make`),
 `credits.pl` (`apps.make`), `bitmaps/` and `plugins.make` (`tools/root.make`).
 `viewers.config`, `rockbox-fonts.config` and `CATEGORIES` are vestigial --
-`tools/buildzip.pl` is byte-identical to upstream and reads its copies from
-`apps/plugins/`, never from here.
+`tools/buildzip.pl` reads its copies from a hardcoded `apps/plugins/`, never
+from here.
 
 ### Codec System
 
@@ -267,7 +269,10 @@ Native assembler threads (ARM) with cooperative multitasking.
 - `tools/bmp2rb` — bitmap converter for Rockbox
 - `tools/convbdf` — BDF font converter
 - `tools/scramble` / `tools/descramble` — firmware file format tools
-- `tools/buildzip.pl` — creates deployment ZIP (kept byte-identical to upstream)
+- `tools/buildzip.pl` — creates deployment ZIP. Kept as close to upstream as
+  possible: its only local change is an `$APPSDIR` for the two files genuinely
+  shipped *from* the application layer. Fork packaging goes in the
+  `bundle-*.sh` scripts instead
 - `tools/convfnt` — this fork's 4bpp icon-font tool. Theme icon fonts are 4bpp
   and `convbdf`/BDF cannot round-trip them, so use this instead
 - `tools/art_fetch/art_fetch.py` — fetches album and artist artwork

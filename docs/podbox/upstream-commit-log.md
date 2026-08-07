@@ -8,7 +8,7 @@ about each one — adopted it, declined it, or judged it inapplicable.
 Its companion, [`upstream-divergence.md`](upstream-divergence.md), answers the
 by-path question instead: which files differ from upstream, and why.
 
-## Two baselines
+## Two baselines, two parents
 
 The tree has two histories. Conflating them is the main way to misread this
 file.
@@ -17,6 +17,15 @@ file.
 | --- | --- | --- |
 | **`apps-ipod/`** — the application layer | **`dd21a1d1d9`** — 2026-02-10 | The rebase did **not** update this tree. It came from [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind upstream. |
 | `firmware/`, `lib/`, `tools/`, `apps/`, and everything else | **`24c3779146`** — 2026-07-24 | The rebase point. PodBox `master` descends from it, so all 39,454 upstream commits at or before it are **inherited**. No action, ever. |
+
+**`apps-ipod/` therefore has two parents, not one.** Rockbox is upstream of
+everything, but RockPod is upstream of this directory specifically, and it has
+gone on developing since `dd21a1d1d9`. A defect fixed there is usually cheaper
+to take than the same defect fixed in Rockbox, because the files are closer —
+often identical apart from include paths. It is also easier to miss, because
+nothing about a Rockbox merge will ever mention it.
+
+The two are tracked in separate tables below.
 
 ### Why `apps-ipod/` and not `apps/`
 
@@ -47,6 +56,7 @@ plugins became core screens here.
 | **Adopted (in part)** | Some of the commit is here and some deliberately is not. The row says which half, so a plain **Adopted** is not read as more than happened. |
 | **Adopted (independently)** | The behaviour exists here, reached separately rather than ported. Nothing to take. |
 | **Declined** | Deliberately not taken. The reason is recorded so it is not re-litigated. |
+| **Superseded** | Both parents fixed the same thing and PodBox took the other one. The row says which, so the unused fix is not later mistaken for a gap. |
 | **N/A** | Touches a target, or a subsystem, that PodBox does not build. |
 | **Open** | Applies, discretionary, not yet decided. |
 | **Pending** | Applies, wanted, not yet done. Actionable. |
@@ -74,15 +84,15 @@ Two rules, both earned:
 
 ---
 
-# Commit log
+# Rockbox commit log
 
 | Date | Upstream | Summary | Status | Note |
 | --- | --- | --- | --- | --- |
-| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`. Permanently inert — see *USB iAP* below — but harmless, and the count is then right by construction. |
-| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Declined** | USB iAP is off by policy and staying off — see *USB iAP* below. Every `iap_on_*` is an empty inline stub, so this is ~36 lines across 5 files compiling to nothing. |
+| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`. Permanently inert — see *USB iAP and serial iAP* below — but harmless, and the count is then right by construction. |
+| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Declined** | USB iAP is off by policy and staying off — see *USB iAP and serial iAP* below. Every `iap_on_*` is an empty inline stub, so this is ~36 lines across 5 files compiling to nothing. |
 | 2026-02-05 | `7eeb4e4302` | firmware: refactor CACHEALIGN_BITS/SIZE | **Adopted** | Compile-blocking after the rebase. |
-| 2026-02-12 | `76d63246c5` | playback: don't hardcode pcm sink in audio_set_playback_frequency | **Adopted (in part)** | Only the compile-blocking parts were taken. Nothing in `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, which is correct for a single-sink build — see *USB iAP* below. |
-| 2026-02-13 | `f343168051` | settings_list: apply playback freq changes only when sink is builtin | **Declined** | Guards against a non-builtin PCM sink. There is only ever one sink here — see *USB iAP* below — so the guard can never change a decision. |
+| 2026-02-12 | `76d63246c5` | playback: don't hardcode pcm sink in audio_set_playback_frequency | **Adopted (in part)** | Only the compile-blocking parts were taken. Nothing in `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, which is correct for a single-sink build — see *USB iAP and serial iAP* below. |
+| 2026-02-13 | `f343168051` | settings_list: apply playback freq changes only when sink is builtin | **Declined** | Guards against a non-builtin PCM sink. There is only ever one sink here — see *USB iAP and serial iAP* below — so the guard can never change a decision. |
 | 2026-02-13 | `f87ff3a9b2` | playback: support non-builtin sinks in audio_guess_frequency | **Adopted (in part)** | Compile-blocking parts only. `audio_guess_frequency()` (`playback.c:4368`) is still the sink-unaware switch on 44100/48000, which is all a single-sink build needs. |
 | 2026-02-18 | `c199d9a369` | playback: fix single mode leaking next track before pausing | **Adopted** | Taken as upstream's *net* state, not this commit — upstream amended it since. The decision now happens when the change is scheduled. |
 | 2026-02-19 | `3373ed6744` | playback: fix single mode with auto frequency switch | **Adopted** | With the above, as one net port. |
@@ -190,15 +200,165 @@ Two rules, both earned:
 | 2026-07-21 | `ea775fa501` | hibyr1: add USB DAC scaffolding | **N/A** | Other target. |
 | 2026-07-26 | `31dfd5da2e` | playback: add Playlist Single Mode option | **Adopted** | `settings.h:115`, `settings_list.c:927`, `playback.c:2806`. The enum value is appended last, so stored settings keep their meaning. |
 | 2026-07-26 | `4f6aac445f` | hiby: raise plugin buffer to 2MiB on 64MB targets | **N/A** | `hibylinux.h` only — not a PodBox target, and no plugin system. |
-| 2026-07-27 | `5f129ef299` | tools: mkinfo handles echor1 symbols | **Pending** | Two regex broadenings in `mkinfo.pl`, affecting `rockbox-info.txt` only, never the binary. Both are inert on these targets and safe: no `_bssend` symbol exists, and although `ipod6g`'s map carries a bare `loadaddress = 0x8000000` beside `_loadaddress = .`, the pattern requires `= .` and matches only the latter. Reported RAM usage is unchanged. PodBox's own `mkinfo.pl` change is the `COREAPPSDIR` hunk elsewhere in the file, so there is no conflict. Awaiting the next `tools/` sync. |
+| 2026-07-27 | `5f129ef299` | tools: mkinfo handles echor1 symbols | **Adopted** | Two regex broadenings in `mkinfo.pl`, affecting `rockbox-info.txt` only, never the binary. Both are inert on these targets and safe: no `_bssend` symbol exists, and although `ipod6g`'s map carries a bare `loadaddress = 0x8000000` beside `_loadaddress = .`, the pattern requires `= .` and matches only the latter. Reported RAM usage is unchanged. PodBox's own `mkinfo.pl` change is the `COREAPPSDIR` hunk elsewhere in the file, so there is no conflict. Awaiting the next `tools/` sync. |
 | 2026-07-28 | `c54dddc2ac` | playback: fix Playlist Single Mode pause behavior | **Adopted** | `playback.c:2806`. Makes the option added by `31dfd5da2e` usable — without it Playlist mode pauses after every track. See below for the mechanism. Verified on 5G. |
+| 2026-07-29 | `3af4e20792` | skin_engine: fix div by 0 for `%pP` tag | **Adopted (in part)** | Two independent divide-by-zeros; PodBox had one of them. Taken: the `skin_tokens.c:1570` half, where `playlist_amount()` divides into `current_pos`. The playback thread creates a playlist before adding any indices to it, so a skin update landing in that window — reachable with *Auto-Change Directory* on — divides by zero. The `draw_progressbar()` half is *Adopted (independently)*: `skin_display.c:318` already clamps a zero range, added here for a list scrollbar on a fully-visible list. One deliberate difference — PodBox clamps to a **full** bar, upstream to an empty one, which is right for the scrollbar the clamp exists for. The fork's own `%pX` was already safe; `wps_playlist_percent_prepare()` and `wps_get_playlist_percent()` both guard `amount <= 0`. |
+| 2026-07-29 | `58d4d2b221` | desktop: drop the 'version' fields | **N/A** | `utils/`. |
+| 2026-07-29 | `d42dcdcba2` | rbutilqt: Apple code signing ID from the environment | **N/A** | `utils/`. |
+| 2026-07-30 | `db87622e7d` | fix yellow in 3af4e20 | **N/A** | Touches only the `skin_display.c` half, which PodBox reached independently. |
+| 2026-07-30 | `1007216fc4` | FS#13961 add audio status, file_attr constants to lua | **N/A** | No plugin system, no lua. |
+| 2026-07-30 | `e764656ab7` | allow customizing EQ filter types | **Open** | Each of the five bands picks its filter type instead of the hardcoded shelf-peak-peak-peak-shelf. The `lib/rbcodec/dsp/eq.{c,h}` half is byte-identical to upstream and would merge clean, +27 lines; the `apps/menus/eq_menu.c` → `screens/settings/eq_settings.c` half is ~270 lines by hand. This fork ships its own EQ presets, so it has a stake in the format — settle first whether an `eqs/*.cfg` written before the change still loads to the same filters, because if not every bundled preset needs re-checking. |
+| 2026-07-30 | `b5d512c409` | iriver H300: fix remote-hold boot entry | **N/A** | Other target, bootloader. |
+| 2026-07-31 | `511d4dd90b` | FS#13876 strcasestr doesn't finds utf8 characters | **Adopted** | The size-optimised branch compared through `char`, so any byte ≥ 0x80 sign-extended and UTF-8 never matched. `-Os` defines `__OPTIMIZE_SIZE__`, so that is the branch this fork builds; the other one already used `unsigned char`, which is why upstream only fixed one. The fork's database text search is the caller that makes it visible — a search for an accented artist name found nothing. |
+| 2026-07-31 | `94ce143e06` | translation updates (english-us, polski, slovak) | **N/A** | See *Why the translation commits are N/A* below. |
+| 2026-08-01 | `00bf7f97ba` | rbutil: support building with QT 6.6 | **N/A** | `utils/`. |
+| 2026-08-01 | `2d2b03d314` | build: bundle the main .map files into the zip | **Declined** | ~4MB of text into a zip that is `/MIR`-synced onto the device, so it costs that much of the user's disk on every sync, permanently. It also buys nothing here: resolving a panic address goes through `nm` on the crashing build's `rockbox.elf`, which the release does not ship either. Expect it back on the next `tools/` sync; it should go again. |
+| 2026-08-02 | `104f57252b` | iap: increase the IAP thread's stack from 6K to 8K | **Superseded** | RockPod `99b21cd` raises the same stack to 12K from measurement, and that is the one taken. 8K is 1.23× the measured worst case; every other thread in the image runs at 1.8× or better. |
+| 2026-08-02 | `aa99dc51c1` | translation updates (chinese-simp, moldoveneste, romaneste) | **N/A** | See below. |
+| 2026-08-02 | `ab863dc40c` | iap: clean up use of logf.h | **N/A** | Removes an `#include` and two macros from `iap-core.h` that this copy does not have. |
+| 2026-08-04 | `b4db6ffbff` | FS#13971 updated Italian translation | **N/A** | See below. |
+| 2026-08-04 | `1b6767a7d7` | FS#13972 fix crash creating voice files under Windows | **N/A** | `utils/rbutilqt/`. |
+| 2026-08-04 | `a467bfc55f` | FS#13972 improve rbutil SAPI5 stability | **Adopted (in part)** | The `tools/sapi_voice.vbs` half, which this fork has never modified. The `utils/rbutilqt/` half is N/A. Voice builds are unverified here either way, so tracking upstream is the cheaper default. |
+| 2026-08-05 | `20c763ff89` | FS#13970 lcd_drawline() different depending on drawing direction | **Adopted** | With `dcdb539ca5`, as one net port. A line rasterised differently depending on which end it was given, so drawing it right-to-left did not land on the same pixels as left-to-right. |
+| 2026-08-05 | `dcdb539ca5` | FS#13970 lcd_drawline() … try#2 | **Adopted** | A rewrite of `20c763ff89`, not an addition — take the pair or neither. `lcd-bitmap-common.c` is `#include`d rather than compiled, and on this target only by `lcd-16bit.c`. |
+| 2026-08-05 | `b217a55059` | ipod6g: add inline earphone remote support | **Open** | Decodes the three-button remote on Apple's earphones via the jack "Mikey" controller (I2C bus 0, 0x72): a 342-line `mikey-6g.c` plus `mikey-target.h`, wired through `button-clickwheel.c`, `button.h`, `config/ipod6g.h`, `debug-s5l8702.c`, `audio-6g.c` and `firmware/SOURCES`. It applies to `ipod6g` and nothing prevents taking it. Deferred as of 2026-08-07 on maturity: upstream's commit message records the protocol as reverse engineered on-device, and its debug hunk exists because the remote-ID behaviour *varies between units*, which is a thin base for a driver running a polling thread on one of two shipped targets. Worth revisiting once it settles upstream. Scoped already — see *What the Mikey remote would need* below. |
+| 2026-08-05 | `290b06c869` | plugins/fft: do not starve other threads | **N/A** | No plugin system. |
+| 2026-08-05 | `20f4f9539a` | hiby: usb dac: fix crackling from sample rate mismatch | **N/A** | Other target, hosted. |
+
+Complete through `2d2b03d314` (2026-08-05).
+
+## What the Mikey remote would need (`b217a55059`)
+
+The port is larger than its diff, and none of the extra work is visible from the
+commit. Recorded so the scoping is not repeated.
+
+**Taken as written it would compile, be reachable from the debug menu, and do
+nothing.** The driver reports the remote as multimedia key codes, and
+`HAVE_MULTIMEDIA_KEYS` is defined *only* by `USB_ENABLE_IAP` (`config.h:1413`),
+which `PODBOX_NO_USB_IAP` suppresses. PodBox then dropped the handler block from
+`apps-ipod/system/shutdown.c` as dead code, the define never having been on.
+Four things are therefore needed beyond upstream's diff:
+
+1. **Decouple `HAVE_MULTIMEDIA_KEYS` from USB iAP.** It means "this target can
+   produce multimedia key codes"; the remote is a second producer independent of
+   iAP. `#if defined(USB_ENABLE_IAP) || defined(HAVE_MIKEY_REMOTE)`.
+2. **Restore the handler block** in `shutdown.c` — PLAYPAUSE/NEXT/PREV/STOP,
+   about 30 lines, *plus* the 8 upstream adds for volume. Not the 8-line diff it
+   appears to be.
+3. **`TARGET_EXTRA_THREADS` 1 → 2.** That define is this fork's, for the iAP
+   thread; upstream's `ipod6g.h` has none, and the commit adds a polling thread
+   without bumping any count. `BASETHREADS` is 17 here (`HAVE_HARDWARE_CLICK`).
+4. **Recording is off in this fork**, so `audio_enable_mic()` and with it
+   `mikey_set_mic_capture()` compile out. Harmless — there is no capture path to
+   hand over to — but that half of the driver would ship untested.
+
+Two things that look like obstacles and are not: `audio-6g.c` is **not** locally
+patched, and nothing outside it references `mikey_*`, so moving the three
+register helpers into `mikey-6g.c` is clean. Of the files the commit touches,
+only `config/ipod6g.h` and `docs/CREDITS` carry local changes.
+
+`button.h` and `button-clickwheel.c` are shared with `ipodvideo`. Every hook is
+`HAVE_MIKEY_REMOTE`-gated, but `button.h` widens `BUTTON_MULTIMEDIA_ALL`
+unconditionally, so the `ipodvideo` binary wants proving unchanged with the
+byte-identity gate rather than assuming.
+
+### Why this cannot work on `ipodvideo`
+
+**The 5G has no microphone input on the headphone jack**, and an Apple inline
+remote is a set of resistances switched onto the mic line — with no mic pin
+there is nothing to sense.
+
+| | `INPUT_SRC_CAPS` |
+| --- | --- |
+| `ipod6g.h:31` | `SRC_CAP_MIC \| SRC_CAP_LINEIN` |
+| `ipodvideo.h:23` | `SRC_CAP_LINEIN \| SRC_CAP_FMRADIO` |
+
+The 5G's line-in and radio sources are both dock-connector accessories; its jack
+is audio-out only. Mikey is an Apple part on the 6G's I2C bus and the 5G is a
+PP5022 with a WM8758, which has no such device.
+
+The 5G is not without a remote: it defines `IPOD_ACCESSORY_PROTOCOL`
+(`ipodvideo.h:246`) and `button-clickwheel.c:478` already ORs in
+`remote_control_rx()`, so dock-connector remotes work there over serial iAP.
+
+## Why the translation commits are N/A
+
+Four commits above are N/A, and the reason is not the obvious one.
+
+`apps-ipod/lang/english.lang` is the fork's own string set and has diverged far
+enough from upstream's that a translation update written against `apps/lang/`
+does not correspond to it. Untranslated strings fall back to English per string,
+so a partial translation degrades rather than breaks, but taking upstream's
+`.lang` edits wholesale would not improve any of the 48 languages this fork
+ships.
+
+All 48 are shipped, as of 2026-08-07. Until then they were compiled and then
+silently dropped from the zip by `tools/buildzip.pl` — see the `buildzip.pl`
+rows under *The `--appsdir` wiring* in
+[`upstream-divergence.md`](upstream-divergence.md), which is where the
+build-system side of that belongs.
+
+---
+
+# RockPod commit log
+
+The other parent. Same status vocabulary; the triage rules differ, because
+RockPod's `apps/` **is** this fork's `apps-ipod/` rather than a directory
+nothing builds.
+
+| RockPod path | Default |
+| --- | --- |
+| `apps/` | **Port by hand** into `apps-ipod/`. No `was:` map is needed — the correspondence is the filename. Files usually differ only in include paths and comments, so the hunks apply nearly as written. |
+| `apps/plugins/pictureflow/` | **Check first.** It is `screens/covers/carousel.c` here, but heavily reworked: the track list is gone, so anything touching it is N/A. |
+| `themes/Themify_2/` | **N/A by default.** This fork's copy is a rewrite in its own skin language. |
+| `firmware/`, `lib/`, `tools/` | **N/A.** RockPod is pre-rebase there; take from Rockbox instead. |
+
+RockPod is not a remote of this repo, and should not be — a fork that takes
+selectively does not want a merge available. Diff the two checkouts instead.
+
+| Date | RockPod | Summary | Status | Note |
+| --- | --- | --- | --- | --- |
+| 2026-07-13 | `9e30268` | fix empty list on LCD wake | **Declined as written** ⚠ | Removes the `current_lists = NULL` at `widgets/list.c:730`. **Ported 2026-08-07 and reverted the same day: it crashes.** `_lists_uiviewport_update_callback()` calls `gui_synclist_draw(current_lists)`, which dereferences the get_name/get_icon/get_talk function pointers out of the struct. A `struct gui_synclist` normally belongs to the screen that owns it and dies with it, so the `NULL` is not defensive tidiness — it is the only thing bounding that pointer's lifetime. Without it, a full status bar refresh arriving after the owning screen has exited calls through whatever now occupies that stack. The panic reads *"Undefined instruction at e3a01ff2, pc: e3a01ff3"*: a PC equal to an ARM instruction word rather than any address in the image, which is the signature of a call through reused stack rather than a decode fault. The same stale pointer repaints the previous list underneath a dialog, unthemed, on USB insertion. The bug it fixes is real and still open; a fix must not leave a raw pointer outliving its owner. |
+| 2026-07-30 | `3b6fd8d` | iap: adopt upstream's remote fixes and tighten spec conformance | **N/A** | Introduces IDPS transaction-ID handling. There is no IDPS state in this copy of `iap/` at all, so this and the six commits that build on it have nothing to land on. |
+| 2026-07-30 | `4d80394` | fix PictureFlow track list highlight using wrong text color | **N/A** | No track list — see below. |
+| 2026-07-30 | `3e29bfa` | revert PictureFlow track list to the selector text colour | **N/A** | Same. |
+| 2026-07-30 | `82d6fa2` | PictureFlow: full line of spacing on the album/artist lines | **Adopted** | As part of `320c006b4f`, which sizes a caption band and centres the text in it rather than tuning padding. |
+| 2026-07-30 | `5696534` | PictureFlow: widen the bottom offset only for two-line mode | **Adopted** | With the above, as one net port. |
+| 2026-07-30 | `8dcef26` | revert PictureFlow layout tweaks and the Themify 2 font swap | **Adopted** | The revert is part of the same net. |
+| 2026-07-30 | `e844e56` | update Themify 2 to the latest upstream release | **Declined** | This fork's Themify_2 is a rewrite in its own skin language; re-importing the release would discard it. The `.fnt` → `.fnticons` rename is RockPod's own convention — icon fonts live in `wps/Themify_2/` here, with editable sources in `iconsources/`. One piece is still **Open**: the release's `Themify_Font_Licenses.txt`, which `bundle-licenses.sh` exists to carry. Check `docs/podbox/LICENSES` covers League Spartan and Literata. |
+| 2026-07-30 | `b8bd8d6` / `2f9e202` / `e1d9acc` | Themify 2 fonts and menu centring | **Declined** | With `e844e56`. |
+| 2026-07-31 | `a64efb6` | iap: fix a 4GB memmove and a buffer-full check that inverted | **Adopted (in part)** | Taken: the `(iap_rxlen-2)` underflow at `iap-core.c:681` and `:702`, which wraps to ~4G once the buffer fills to within one byte and then admits every frame past the end of the region. Live here because this copy carries the `iap_rxlen` decrement (`:724`) — it is inert in a tree that only increments. Not taken: the negative-`memmove` fix, reachable only when `iap_reset_buffers()` runs from the USB thread, which `PODBOX_NO_USB_IAP` compiles out; and the corrupt-length guard, already `RX_BUFLEN+2` here. |
+| 2026-07-31 | `77fe839` | iap: fix a panic on long track tags and an unbounded database loop | **Adopted** | `strlcpy()` returns `strlen(src)`, not what it copied, and that went to `iap_send_pkt()` as a length — a stack over-read past 66 characters and `panicf()` beyond ~124. `RetrieveCategorizedDatabaseRecords` bounded `start_index + read_count`, which wraps on the spec's own count of -1, and only for two of seven categories. Deviation: the rewrite bounds the start and clamps the count rather than adding them, since PodBox's guards were shaped differently from RockPod's pre-fix ones. |
+| 2026-07-31 | `53bdc10` | iap: stop an accessory locking the device up via audio_skip() | **Adopted** | `audio_skip()` walks an out-of-range offset back one track at a time under `id3_mutex` without yielding. Also taken from this commit: the volume clamp and the `GetNumPlayingTracks` fall-through. Extended beyond it — the Simple Remote track index command (`iap-lingo3.c:725`) has the same unchecked `audio_skip()` and is fixed here too, and RockPod has not fixed it. |
+| 2026-07-31 | `99b21cd` | iap: enlarge the thread stack | **Adopted** ★ | 6KB against a ~6.5KB measured worst case, abutting the RX buffer with no gap, and only `stack[0]` is canary-checked — so the overflow corrupts packets silently rather than panicking. Now `DEFAULT_STACK_SIZE*12`, `0x3000` in the linked image. |
+| 2026-07-31 | `be4fb2f` `b09947a` `ebd26f4` `e605740` `9815533` `feb1924` | iap: IDPS session state, transaction IDs, lingo version | **N/A** | All build on `3b6fd8d`. |
+| 2026-07-31 | `8655fb3` | Themify 2: match the PictureFlow selector to the menu highlight | **N/A** | Configures a track list this fork does not have. |
+| 2026-07-31 | `af38f7e` | PictureFlow: honour "selector type" instead of assuming one style | **N/A** | See below. |
+| 2026-07-31 | `2b3dbc1` `42e80a7` `82f13a0` | PictureFlow selector draw mode and mode classification | **N/A** | Follow-ups to `af38f7e`. |
+| 2026-07-31 | `7fa092c` | PictureFlow: advance the flip by elapsed time, not frame count | **Adopted** | `320c006b4f`. |
+| 2026-07-31 | `bf6a974` | PictureFlow: don't snap the centre slide when no time has passed | **Adopted** | With the above. |
+| 2026-07-31 | `0a3446e` | PictureFlow: fix the centre-slide flash properly, and bound the advance | **Adopted** | `320c006b4f` for the bound, `bdb8a73e8d` for the flash — reached separately here, from the alpha ramp rather than the centre derivation. |
+| 2026-08-02 | — | *(upstream `104f57252b`, iap stack 6K → 8K)* | **Superseded** | Rockbox raised the same stack to 8KB. RockPod's 12KB comes from measurement and is the one taken; 8KB is 1.23× the measured worst case, where every other thread in the image runs at 1.8× or better. |
+
+## Why the PictureFlow selector commits are N/A
+
+Seven of them, and the reason is one fact worth stating once: **this fork's
+carousel has no track list.** `enum pf_states` is `{ pf_idle, pf_scrolling }`
+(`screens/covers/carousel.c:397`), there is no `draw_gradient()` or
+`draw_track_selector()`, and selecting an album either opens the browser or
+plays it. Everything RockPod did to make that list agree with the core list's
+"selector type" setting has nothing here to act on.
+
+One leftover: `pf_lse_color` (`carousel.c:171`) is still resolved every frame
+and never drawn with. It served the track list. Dead, and recorded rather than
+removed.
 
 # Noted exceptions
 
-## USB iAP — off by policy, and staying off
+## USB iAP and serial iAP are different things
 
-Several rows above turn on this one define, so the reasoning lives here rather
-than being repeated in each.
+Many rows above hinge on this, and commits titled `iap:` land on either side of
+it.
 
 **iAP is one protocol with two transports, and PodBox runs only one of them.**
 
@@ -210,25 +370,18 @@ than being repeated in each.
 | Wire | UART pins on the dock connector | USB, HID-framed |
 | Carries | Commands only | Commands **and digital audio** |
 
-`USB_ENABLE_IAP` applies to this hardware — both targets satisfy upstream's
-gate, and the driver, `SOURCES` entries and descriptors are all present.
-`config.h` defines `PODBOX_NO_USB_IAP` to suppress it, and deleting that one
-define is all it takes to turn it back on. It stays off for three reasons:
+So an upstream `iap:` commit is triaged by which column it touches. Serial iAP
+is live and built, and its commits are ported by hand like any other
+`apps-ipod/` work. USB iAP is compiled out by `PODBOX_NO_USB_IAP`, so commits
+touching only it are Declined — including the several above declined on the
+grounds that there is only ever one PCM sink, which is a consequence of that
+switch rather than a separate judgement.
 
-- **The application layer is not written for a second PCM sink.** Enabling it
-  defines `PCM_SINK_IAP`, taking `PCM_SINK_NUM` from 1 to 2. Nothing in
-  `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, and
-  `audio_guess_frequency()` is sink-unaware. The rows declined above on the
-  grounds that there is only one sink become prerequisites if that changes.
-- **The payoff is narrow.** Digital audio out to an MFi dock or DAC, a small
-  and discontinued category. Ordinary docks and car AUX take analogue off the
-  line-out pins and need no protocol.
-- **It has never run on a 5G.** The prior art is 6G/DesignWare; the 5G is ARC.
-  `USB_ENABLE_AUDIO` is already on there and untested, so enabling this too
-  would stack two unproven USB features on one controller.
-
-Suppressing the define also suppresses `HAVE_MULTIMEDIA_KEYS`, which nothing in
-`apps-ipod/` uses.
+**Why USB iAP is off, and what re-enabling would require, is a property of the
+tree rather than of any commit: see *USB iAP stays off* in
+[`upstream-divergence.md`](upstream-divergence.md).** Suppressing the define
+also suppresses `HAVE_MULTIMEDIA_KEYS`, which is why `b217a55059` above needs
+more than its diff.
 
 ## Two deviations from upstream in `c0a8303a9c`, both load-bearing
 
@@ -276,12 +429,15 @@ every track.
 
 ## Keeping this current
 
-All read-only.
+All read-only. **Both parents need checking** — a Rockbox sync says nothing
+about the other one.
+
+### Rockbox
 
 ```bash
 git fetch rockbox
 
-# New commits since the last row in section 2
+# New commits since the last row in the Rockbox table
 git log --reverse --format='%h | %ad | %s' --date=short <last-listed>..rockbox/master
 
 # What a commit touches -- this picks the triage rule
@@ -304,3 +460,30 @@ find apps-ipod \( -name '*.c' -o -name '*.h' \) -print0 | xargs -0 awk '
   if (l ~ /^apps\//) { print l "\t" FILENAME; done[FILENAME]=1 }
 }'
 ```
+
+### RockPod
+
+It is a separate checkout, not a remote, so compare content across the two
+trees rather than asking git.
+
+```bash
+RP=../rockpod                      # wherever the RockPod checkout lives
+git -C "$RP" fetch origin && git -C "$RP" log --oneline <last-listed>..origin/master
+
+# What a commit touches, and whether this fork has the file at all
+git -C "$RP" show --stat --format='' <commit>
+
+# Divergence in one file: PodBox's copy against RockPod's
+diff -u "$RP/apps/<path>" "apps-ipod/<path>"
+```
+
+Two things that mislead here:
+
+1. **Most of the diff is not divergence.** `apps-ipod/` rewrote include paths
+   (`playlist.h` → `playlist/playlist.h`) and its comments throughout, so
+   `iap/` alone shows ~1650 diff lines with almost no behavioural difference.
+   Judge a commit by whether its *own* hunks apply, not by the file's diff size.
+2. **Check the feature still exists** before triaging a fix to it.
+   Seven PictureFlow commits above are N/A for one reason: the screen they fix
+   was removed. `grep` for the identifier the commit touches — if it returns
+   nothing in `apps-ipod/`, that is the answer.

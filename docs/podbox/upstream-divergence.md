@@ -44,6 +44,23 @@ Most `firmware/` changes are hardware work inherited from the RockPod fork
 (GPLv2), which upstream has no equivalent of. The `tools/` changes are this
 fork's own.
 
+### Not everything the command lists is divergence
+
+The base is a fixed commit, so a file taken from a *later* upstream commit also
+shows as modified — identical to current `rockbox/master`, different from the
+rebase point, and not a fork patch at all. Distinguish them:
+
+```bash
+git diff --stat HEAD rockbox/master -- <file>   # empty output: upstream-identical
+```
+
+Current forward-ports, held here so they are not mistaken for local work:
+`firmware/common/strcasestr.c`, `firmware/drivers/lcd-bitmap-common.c`,
+`lib/rbcodec/dsp/eq.c`, `lib/rbcodec/dsp/eq.h`. Each is recorded in
+[`upstream-commit-log.md`](upstream-commit-log.md), which is the per-commit
+companion to this file: it answers *what was done about a given upstream
+commit*, where this one answers *why a given file differs*.
+
 ---
 
 ## firmware/ — core
@@ -263,7 +280,8 @@ instead** — it will succeed, and produce the wrong firmware.
 | `configure` | `picklang()` scans `${coreapps}/lang/*.lang` | Was hardcoded to `apps`. |
 | `root.make` | New `APPSBUILDDIR`; bitmaps include and the `voice` target use it | Objects mirror their source path under `$(BUILDDIR)`, so the output path has to track `COREAPPSDIR` too. |
 | `mkinfo.pl` | Detects a core build by comparing `APPSDIR` against `COREAPPSDIR`, not by matching `/\/apps$/` | Otherwise `rockbox-info.txt` silently loses its `Actual size`, `RAM usage` and `Features` lines. |
-| `buildzip.pl` | New `$APPSDIR` from the environment, used for `tagnavi.config` and `lang/Invalid*.talk` only | This file is kept as close to upstream as possible, so it gets the smallest change that works — just the two files genuinely shipped *from* the application layer. Everything else, including its `apps/plugins` paths, is untouched. |
+| `buildzip.pl` | New `$APPSDIR` from the environment, for `tagnavi.config` and `lang/Invalid*.talk` | This file is kept as close to upstream as possible, so it gets the smallest change that works — just the files genuinely shipped *from* the application layer. Everything else, including its `apps/plugins` paths, is untouched. |
+| `buildzip.pl` | New `$APPSBUILDDIR`, the basename of `COREAPPSDIR`, for `lang/*.lng` and `lang/*.zip` | **Two different questions, two different variables.** `$APPSDIR` is a *source* path; the `.lng` files are *build products*, named relative to the build directory buildzip runs in. Upstream's hardcoded `apps/lang/*.lng` exists in the source tree and is empty in the build tree, so every one of the 48 compiled languages was silently dropped from the zip and Settings > Language browsed an empty directory. `COREAPPSDIR` rather than `APPSDIR` because a bootloader build points the latter at `bootloader/`, which has no lang directory at all. |
 | `voice.pl`, `langstatus` | Hardcoded to `apps-ipod/lang/` | Standalone scripts with no access to `COREAPPSDIR`. Voice builds are unverified here regardless — `VOICE_VERSION` no longer resolves because `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`. |
 
 ### New tools
@@ -296,10 +314,12 @@ upstream-shaped. The three bundle scripts make up the difference, and
 | File | What it is | Why it exists |
 | --- | --- | --- |
 | `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs both bundle scripts after `make zip`. The supported way to produce a shippable build. |
-| `bundle-theme.sh` | Injects Themify_2 and a pre-populated `config.cfg` into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays byte-identical to upstream. The `config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback. |
+| `bundle-theme.sh` | Injects Themify_2 and a pre-populated `config.cfg` into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. The `config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback. |
 | `bundle-eqs.sh` | Injects `eqs/*.cfg` into `.rockbox/eqs/` | The presets live at the repo root, not the `lib/rbcodec/dsp/eqs/` that `buildzip.pl` copies from — that directory is empty here. |
-| `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other two: `buildzip.pl` copies upstream's file and is kept byte-identical. |
+| `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other two: `buildzip.pl` copies upstream's file and is kept upstream-shaped. |
+| `docs/podbox/LICENSES` | The fork's own licence notices — Literata, League Spartan, Themify 2 — with the SIL Open Font License 1.1 reproduced in full | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
 | `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies each zip, then replaces the rolling `latest` release | Publishing by hand gets three things wrong — asset names colliding, `gh` needing `--repo` on the server, and a leftover tag being reused rather than moved. |
+| `docs/CREDITS` | Three attribution blocks prepended: Themify, RockPod, and a "For RockBox:" heading before upstream's list | This fork ships a theme and inherits a large body of hardware work from another fork, both GPLv2 with named authors. Upstream's list is left untouched below the heading, so a merge from Rockbox applies to it cleanly. |
 | `.gitignore` | `/build*` narrowed to `/build-hw-*/`, `/build-hw/`, `/build-sim/`; adds `/notes/`, `/.specifications/` | Local working drafts. |
 | `wps/WPSLIST` | `cabbiev2` theme block removed (180 lines); explanatory comment added | `wpsbuild.pl` builds from this file, so delisting is what stops cabbiev2 shipping. The files stay in `wps/` because the tree mirrors upstream. `rockbox_failsafe` is kept — it is the skin engine's emergency fallback if a configured skin fails to parse. |
 
@@ -328,4 +348,4 @@ These look like omissions and are not:
 | `usbstack/usb_audio.c` | Upstream's is sink-only (host → player) and reaches both targets. RockPod's added a source mode that only worked on the 6G. |
 | `usbstack/iap/` | Upstream's vendored libiap. RockPod's `usb_iap_hid.c` and its transport indirection served a USB MFi/dock-DAC feature this fork no longer carries. Compiled out entirely by `PODBOX_NO_USB_IAP`, which is now a settled decision — kept upstream-identical so it stays mergeable rather than because it builds. |
 | `target/arm/s5l8702/usb-designware.c` | RockPod's isochronous plumbing was written for the above and calls `usb_audio_source_streaming()`, which no longer exists. |
-| `target/arm/s5l8702/pcm-s5l8702.c` | RockPod's per-start/stop I2S clock gating is **deferred, not rejected**. Upstream's `pcm_sink` refactor removed the functions it patched and the replacements nest, so a naive port would gate the clock on every buffer. It is a 6G power optimisation and there is no 6G here to test it on. |
+| `target/arm/s5l8702/pcm-s5l8702.c` | RockPod's per-start/stop I2S clock gating is **deferred, not rejected**. Upstream's `pcm_sink` refactor removed the functions it patched and the replacements nest, so a naive port would gate the clock on every buffer. That nesting is the whole difficulty; a 6G is available to measure the result on. |

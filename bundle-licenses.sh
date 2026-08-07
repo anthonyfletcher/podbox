@@ -9,9 +9,9 @@
 # Licenses opens (see main_menu.c).
 #
 # Done here rather than in tools/buildzip.pl, which copies docs/LICENSES itself
-# and is kept byte-identical to upstream -- the same reason the theme and the EQ
-# presets are injected by their own scripts. `make zip` alone ships upstream's
-# file unchanged.
+# and is kept as close to upstream as possible -- the same reason the theme and
+# the EQ presets are injected by their own scripts. `make zip` alone ships
+# upstream's file unchanged.
 #
 # Usage: run from inside a build dir, or pass the build dir as an argument.
 set -e

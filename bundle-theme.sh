@@ -4,8 +4,8 @@
 # pre-populated config.cfg (applied before any compiled DEFAULT_WPSNAME /
 # DEFAULT_SBSNAME fallback takes effect).
 #
-# This lives here rather than in tools/buildzip.pl so that file stays
-# byte-identical to upstream. `make zip` alone produces a themeless zip;
+# This lives here rather than in tools/buildzip.pl so that file stays as close
+# to upstream as possible. `make zip` alone produces a themeless zip;
 # every path that ships a build must run this afterwards.
 #
 # Usage: run from inside a build dir, or pass the build dir as an argument.

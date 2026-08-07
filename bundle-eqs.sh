@@ -5,7 +5,7 @@
 # The presets live at the repo root (eqs/), not lib/rbcodec/dsp/eqs/ that
 # upstream buildzip.pl copies from -- that directory is empty in this fork --
 # so, like the theme, they are injected here rather than by buildzip.pl (kept
-# byte-identical to upstream). `make zip` alone ships no presets.
+# as close to upstream as possible). `make zip` alone ships no presets.
 #
 # Usage: run from inside a build dir, or pass the build dir as an argument.
 set -e
