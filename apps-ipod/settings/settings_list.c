@@ -48,6 +48,7 @@
 #include "powermgmt.h"
 #include "kernel.h"
 #include "system/volume.h"
+#include "system/strutil.h"     /* skip_whitespace() */
 #include "audio/playback.h"
 #include "widgets/list.h"
 #include "rbunicode.h"
@@ -447,16 +448,16 @@ static int32_t get_precut_talkid(int value, int unit)
 }
 
 struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
-    { 32, 7, 0 },
-    { 64, 10, 0 },
-    { 125, 10, 0 },
-    { 250, 10, 0 },
-    { 500, 10, 0 },
-    { 1000, 10, 0 },
-    { 2000, 10, 0 },
-    { 4000, 10, 0 },
-    { 8000, 10, 0 },
-    { 16000, 7, 0 },
+    { EQ_FILTER_LOW_SHELF, 32, 7, 0 },
+    { EQ_FILTER_PEAK, 64, 10, 0 },
+    { EQ_FILTER_PEAK, 125, 10, 0 },
+    { EQ_FILTER_PEAK, 250, 10, 0 },
+    { EQ_FILTER_PEAK, 500, 10, 0 },
+    { EQ_FILTER_PEAK, 1000, 10, 0 },
+    { EQ_FILTER_PEAK, 2000, 10, 0 },
+    { EQ_FILTER_PEAK, 4000, 10, 0 },
+    { EQ_FILTER_PEAK, 8000, 10, 0 },
+    { EQ_FILTER_HIGH_SHELF, 16000, 7, 0 },
 };
 
 /* Item 0 is the hotkey button; 1..4 are the configurable rows at the bottom
@@ -470,7 +471,11 @@ static const int wps_context_menu_default =
 
 static const int tree_hotkey_default = HOTKEY_OFF;
 
-static void eq_load_from_cfg(void *setting, char *value)
+/* "cutoff, q, gain" in the old format, "cutoff, q, gain, TYPE" in the new one.
+ * A band's filter type used to be fixed by which setting it was, so a config
+ * written before the type existed carries no fourth field and its type comes
+ * from the setting name instead -- see the EQ_BAND_OLD entries below. */
+static void eq_load_from_cfg(void *setting, char *value, bool has_type)
 {
     struct eq_band_setting *eq = setting;
     char *val_end, *end;
@@ -494,14 +499,70 @@ static void eq_load_from_cfg(void *setting, char *value)
     /* gain */
     value = end + 1;
     if (value > val_end) return;
+    if (has_type)
+    {
+        end = strchr(value, ',');
+        if (!end) return;
+    }
     eq->gain = atoi(value);
+
+    if (!has_type) return;
+
+    /* type */
+    value = end + 1;
+    if (value > val_end) return;
+    value = skip_whitespace(value);
+    if (strcasecmp(value, "LOW_SHELF") == 0)
+        eq->type = EQ_FILTER_LOW_SHELF;
+    else if (strcasecmp(value, "PEAK") == 0)
+        eq->type = EQ_FILTER_PEAK;
+    else if (strcasecmp(value, "HIGH_SHELF") == 0)
+        eq->type = EQ_FILTER_HIGH_SHELF;
+}
+
+static void eq_load_from_cfg_old_low_shelf(void *setting, char *value)
+{
+    eq_load_from_cfg(setting, value, false);
+    ((struct eq_band_setting *)setting)->type = EQ_FILTER_LOW_SHELF;
+}
+
+static void eq_load_from_cfg_old_peak(void *setting, char *value)
+{
+    eq_load_from_cfg(setting, value, false);
+    ((struct eq_band_setting *)setting)->type = EQ_FILTER_PEAK;
+}
+
+static void eq_load_from_cfg_old_high_shelf(void *setting, char *value)
+{
+    eq_load_from_cfg(setting, value, false);
+    ((struct eq_band_setting *)setting)->type = EQ_FILTER_HIGH_SHELF;
+}
+
+static void eq_load_from_cfg_new(void *setting, char *value)
+{
+    eq_load_from_cfg(setting, value, true);
 }
 
 static char* eq_write_to_cfg(void *setting, char *buf, int buf_len)
 {
     struct eq_band_setting *eq = setting;
+    const char *type;
 
-    snprintf(buf, buf_len, "%d, %d, %d", eq->cutoff, eq->q, eq->gain);
+    switch (eq->type)
+    {
+    case EQ_FILTER_LOW_SHELF:
+        type = "LOW_SHELF";
+        break;
+    case EQ_FILTER_HIGH_SHELF:
+        type = "HIGH_SHELF";
+        break;
+    case EQ_FILTER_PEAK:
+    default:
+        type = "PEAK";
+        break;
+    }
+
+    snprintf(buf, buf_len, "%d, %d, %d, %s", eq->cutoff, eq->q, eq->gain, type);
     return buf;
 }
 
@@ -1211,21 +1272,41 @@ const struct settings_list settings[] = {
                        "eq precut", UNIT_DB, 0, 240, 1, eq_precut_format,
                        get_precut_talkid, dsp_set_eq_precut),
 
+/* The pre-type setting names, kept so an existing config or EQ preset still
+   loads. F_DEPRECATED reads them but never writes them back, so a config saved
+   after this point uses the "eq filter N" names below. */
+#define EQ_BAND_OLD(id, string, type) \
+        CUSTOM_SETTING(F_EQSETTING|F_DEPRECATED, eq_band_settings[id], -1, \
+                  &eq_defaults[id], string,                     \
+                  eq_load_from_cfg_old_##type, eq_write_to_cfg, \
+                  eq_is_changed, eq_set_default)
+    EQ_BAND_OLD(0, "eq low shelf filter", low_shelf),
+    EQ_BAND_OLD(1, "eq peak filter 1", peak),
+    EQ_BAND_OLD(2, "eq peak filter 2", peak),
+    EQ_BAND_OLD(3, "eq peak filter 3", peak),
+    EQ_BAND_OLD(4, "eq peak filter 4", peak),
+    EQ_BAND_OLD(5, "eq peak filter 5", peak),
+    EQ_BAND_OLD(6, "eq peak filter 6", peak),
+    EQ_BAND_OLD(7, "eq peak filter 7", peak),
+    EQ_BAND_OLD(8, "eq peak filter 8", peak),
+    EQ_BAND_OLD(9, "eq high shelf filter", high_shelf),
+#undef EQ_BAND_OLD
+
 #define EQ_BAND(id, string) \
         CUSTOM_SETTING(F_EQSETTING, eq_band_settings[id], -1,   \
                   &eq_defaults[id], string,                     \
-                  eq_load_from_cfg, eq_write_to_cfg,            \
+                  eq_load_from_cfg_new, eq_write_to_cfg,        \
                   eq_is_changed, eq_set_default)
-    EQ_BAND(0, "eq low shelf filter"),
-    EQ_BAND(1, "eq peak filter 1"),
-    EQ_BAND(2, "eq peak filter 2"),
-    EQ_BAND(3, "eq peak filter 3"),
-    EQ_BAND(4, "eq peak filter 4"),
-    EQ_BAND(5, "eq peak filter 5"),
-    EQ_BAND(6, "eq peak filter 6"),
-    EQ_BAND(7, "eq peak filter 7"),
-    EQ_BAND(8, "eq peak filter 8"),
-    EQ_BAND(9, "eq high shelf filter"),
+    EQ_BAND(0, "eq filter 0"),
+    EQ_BAND(1, "eq filter 1"),
+    EQ_BAND(2, "eq filter 2"),
+    EQ_BAND(3, "eq filter 3"),
+    EQ_BAND(4, "eq filter 4"),
+    EQ_BAND(5, "eq filter 5"),
+    EQ_BAND(6, "eq filter 6"),
+    EQ_BAND(7, "eq filter 7"),
+    EQ_BAND(8, "eq filter 8"),
+    EQ_BAND(9, "eq filter 9"),
 #undef EQ_BAND
 
     /* dithering */
