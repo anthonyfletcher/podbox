@@ -1570,6 +1570,12 @@ const char *get_token_value(struct gui_wps *gwps,
         case SKIN_TOKEN_PLAYLIST_PERCENT:
         {
             int playlist_amt = playlist_amount();
+            /* The playback thread creates a playlist before it adds any
+             * indices to it, so a skin update landing in that window sees
+             * an empty one -- draw nothing rather than divide by zero. */
+            if (playlist_amt <= 0)
+                return NULL;
+
             int current_pos = playlist_get_display_index() + offset;
             int percentage = current_pos * 100 / playlist_amt;
 
