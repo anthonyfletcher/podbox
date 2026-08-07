@@ -24,6 +24,14 @@ my $ROOT="..";
 # APPSDIR, or they are silently taken from the wrong tree. make exports it.
 my $APPSDIR = $ENV{'APPSDIR'} || "$ROOT/apps";
 
+# Build products of the application layer need the matching directory in the
+# BUILD tree, which is a bare name relative to the build dir this runs in --
+# not $APPSDIR, which is a source path. COREAPPSDIR rather than APPSDIR
+# because a bootloader build points the latter at bootloader/.
+my $COREAPPSDIR = $ENV{'COREAPPSDIR'} || "$ROOT/apps";
+my ($APPSBUILDDIR) = $COREAPPSDIR =~ m{([^/]+)$};
+$APPSBUILDDIR = "apps" unless $APPSBUILDDIR;
+
 my $ziptool;
 my $output;
 my $verbose;
@@ -685,8 +693,8 @@ sub buildzip {
     copy("rockbox-info.txt", "$temp_dir/rockbox-info.txt");
 
     # copy the already built lng files
-    glob_copy('apps/lang/*.lng', "$temp_dir/langs/");
-    glob_copy('apps/lang/*.zip', "$temp_dir/langs/");
+    glob_copy("$APPSBUILDDIR/lang/*.lng", "$temp_dir/langs/");
+    glob_copy("$APPSBUILDDIR/lang/*.zip", "$temp_dir/langs/");
     # Copy over the Invalid Language fallback stuff
     glob_copy("$APPSDIR/lang/Invalid*.talk", "$temp_dir/langs/");
 
