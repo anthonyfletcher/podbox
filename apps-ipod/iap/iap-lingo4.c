@@ -1216,7 +1216,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t trackcount;
             index = get_u32(&cur_dbrecord[1]);
             trackcount = playlist_amount();
-            if ((cur_dbrecord[0] == 5) && (index > trackcount))
+            /* Every record type from 0x02 to 0x06 reaches audio_skip()
+             * below, not just 0x05, and audio_skip() locks the device up
+             * on an out-of-range offset rather than rejecting it. The
+             * bound is >=, not >: a valid index is 0..count-1. */
+            if ((cur_dbrecord[0] >= 2) && (cur_dbrecord[0] <= 6) &&
+                (index >= trackcount))
             {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
@@ -1424,14 +1429,40 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             uint32_t trackcount;
             trackcount = playlist_amount();
 
-            if ((buf[3] == 0x05) && ((start_index + read_count ) > trackcount))
+            /* The spec's way of asking for every record is a read count of
+             * -1 (Table 5-30), and testing start_index + read_count wraps
+             * on that, so the bound passes and the loop below runs 4.3
+             * billion times, wedging the iAP thread for the rest of the
+             * session. Bound the start first, then clamp the count against
+             * what is left rather than adding the two.
+             */
+            if (buf[3] == 0x01) /* Playlists */
             {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
+                if (start_index > number_of_playlists)
+                {
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    break;
+                }
+                if (read_count > (number_of_playlists + 1) - start_index)
+                    read_count = (number_of_playlists + 1) - start_index;
             }
-            if ((buf[3] == 0x01) && ((start_index + read_count) > (number_of_playlists + 1)))
+            else if (buf[3] >= 0x02 && buf[3] <= 0x06) /* Tracks, artists */
             {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                if (start_index >= trackcount)
+                {
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    break;
+                }
+                if (read_count > trackcount - start_index)
+                    read_count = trackcount - start_index;
+            }
+            else
+            {
+                /* Categories the switch below has no case for. Left
+                 * unbounded they spin it re-sending an unchanged buffer,
+                 * and the spec defines a status for exactly this
+                 * (Table 5-2, 0x01). */
+                cmd_ack(cmd, IAP_ACK_UNKNOWN_DB);
                 break;
             }
             for (counter=0;counter<read_count;counter++)
@@ -1800,16 +1831,33 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             /* Return the requested track data */
             switch(cmd)
             {
+                /* strlcpy() returns strlen(src), not the number of bytes
+                 * it copied, so a tag longer than the 64-byte limit sends
+                 * more than was ever written: past the end of data[70]
+                 * beyond 66 characters, and past TX_BUFLEN into
+                 * panicf("IAP: TX buffer overflow") beyond about 124.
+                 * Clamp to what can actually have landed. An absent tag
+                 * is NULL, which strlcpy() would dereference.
+                 */
                 case 0x20:
-                    len = strlcpy((char *)&data[3], id3.title, 64);
+                    len = strlcpy((char *)&data[3],
+                                  id3.title ? id3.title : "", 64);
+                    if (len > 63)
+                        len = 63;
                     iap_send_pkt(data, 4+len);
                     break;
                 case 0x22:
-                    len = strlcpy((char *)&data[3], id3.artist, 64);
+                    len = strlcpy((char *)&data[3],
+                                  id3.artist ? id3.artist : "", 64);
+                    if (len > 63)
+                        len = 63;
                     iap_send_pkt(data, 4+len);
                     break;
                 case 0x24:
-                    len = strlcpy((char *)&data[3], id3.album, 64);
+                    len = strlcpy((char *)&data[3],
+                                  id3.album ? id3.album : "", 64);
+                    if (len > 63)
+                        len = 63;
                     iap_send_pkt(data, 4+len);
                     break;
             }
@@ -2811,6 +2859,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
             long tracknum = get_u32(&buf[3]);
+
+            /* Unvalidated, this is the worst of the audio_skip() paths:
+             * the offset is backed out one track at a time under
+             * id3_mutex, so an index of 0x40000000 is on the order of
+             * 1e17 iterations with the UI blocked behind the mutex. */
+            if (tracknum < 0 || tracknum >= (long)playlist_amount())
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
 
             audio_pause();
             audio_skip(tracknum - playlist_next(0));

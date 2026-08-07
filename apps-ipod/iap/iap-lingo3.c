@@ -27,6 +27,7 @@
 #include "iap-lingo.h"
 #include "system.h"
 #include "audio.h"
+#include "sound.h"
 #include "powermgmt.h"
 #include "settings.h"
 #include "metadata.h"
@@ -66,6 +67,23 @@ static void cmd_ack(const unsigned char cmd, const unsigned char status)
 }
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
+
+/* An accessory sends volume as a byte covering -90..+6 dB, a wider range
+ * than the codec accepts. The value goes straight into global_status and is
+ * re-applied on every cold start, so one below the minimum is a silent mute
+ * that survives a reboot -- clamp it as the rest of the app layer does.
+ */
+static void set_accessory_volume(const unsigned char level)
+{
+    int vol = (int)(level/2.65625) - 90;
+
+    if (vol < sound_min(SOUND_VOLUME))
+        vol = sound_min(SOUND_VOLUME);
+    else if (vol > sound_max(SOUND_VOLUME))
+        vol = sound_max(SOUND_VOLUME);
+
+    global_status.volume = vol;
+}
 
 void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 {
@@ -700,6 +718,15 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                     CHECKLEN(7);
                     index = get_u32(&buf[0x03]);
+                    /* audio_skip() walks an out-of-range offset back one
+                     * track at a time holding id3_mutex, never yielding,
+                     * so a wild index locks the device up instead of
+                     * being rejected. Bound it first. */
+                    if (index >= (uint32_t)playlist_amount())
+                    {
+                        cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                        break;
+                    }
                     audio_skip(index-iap_get_trackindex());
 
                     cmd_ok(cmd);
@@ -759,7 +786,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     CHECKLEN(5);
                     if (buf[0x03]==0x00){
                         /* Not Muted */
-                        global_status.volume = (int) (buf[0x04]/2.65625)-90;
+                        set_accessory_volume(buf[0x04]);
                         device.mute = false;
                     }
                     else {
@@ -933,7 +960,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     CHECKLEN(7);
                     if (buf[0x03]==0x00){
                         /* Not Muted */
-                        global_status.volume = (int) (buf[0x04]/2.65625)-90;
+                        set_accessory_volume(buf[0x04]);
                         device.mute = false;
                     }
                     else {
@@ -1275,6 +1302,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             IAP_TX_PUT_U32(playlist_amount());
 
             iap_send_tx();
+            break;
         }
 
         /* RetNumPlayingTracks (0x15)

@@ -112,7 +112,14 @@ int iap_repeatbtn = 0;
 unsigned int iap_timeoutbtn = 0;
 bool iap_btnrepeat = false, iap_btnshuffle = false;
 
-static long thread_stack[(DEFAULT_STACK_SIZE*6)/sizeof(long)];
+/* The lingo 3 and 4 handlers each place a struct mp3entry (2760 bytes) on
+ * the stack unconditionally, even for the commands that never look at
+ * metadata, and a track title query on a WAV file adds a parse on top of
+ * that -- around 6.5KB in the worst case. Only stack[0] is canary-checked,
+ * and only at a thread switch, so an overflow that misses word 0 corrupts
+ * the RX buffer sitting below rather than panicking with "Stkov iap".
+ */
+static long thread_stack[(DEFAULT_STACK_SIZE*12)/sizeof(long)];
 static struct event_queue iap_queue;
 
 /* These are pointer used to manage a dynamically allocated buffer which
@@ -666,8 +673,12 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             /* large packet */
             s->state = ST_LENH;
         } else {
-            /* small packet */
-            if (x > (iap_rxlen-2))
+            /* small packet.
+             * Compare by addition: iap_rxlen is unsigned, so (iap_rxlen-2)
+             * wraps to ~4G once the buffer fills to within one byte, and
+             * every packet after that is accepted past the end of it.
+             */
+            if ((uint32_t)x + 2 > iap_rxlen)
             {
                 /* Packet too long for buffer */
                 s->state = ST_SYNC;
@@ -687,7 +698,8 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
     case ST_LENL:
         s->check += x;
         s->len += x;
-        if ((s->len == 0) || (s->len > (iap_rxlen-2))) {
+        /* Same underflow as the small-packet check above. */
+        if ((s->len == 0) || ((uint32_t)s->len + 2 > iap_rxlen)) {
             /* invalid length */
             s->state = ST_SYNC;
             break;
