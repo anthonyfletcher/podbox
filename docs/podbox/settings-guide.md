@@ -12,7 +12,7 @@ a bug:
 
 - The shipped `config.cfg` sets some values at first boot, so the device starts
   from that rather than from the compiled defaults.
-- Loading a theme resets number of settings — see [§9](#9-settings-a-theme-resets).
+- Loading a theme resets a number of settings — see [§9](#9-settings-a-theme-resets).
 
 Where the two players differ, the entry says so: **(5G)** is the iPod Video,
 **(6G)** the iPod Classic.
@@ -178,7 +178,7 @@ copy — change Bass here and Sound Settings shows the new value. Entries marked
 
 | Setting | What it does                                                                                                                                                         | Default |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|
-| Sort Albums By | Name, or release year with the oldest or the newest first. Applies to every album list in the Music menu, not just the top one.  Follows the same logic as Carousel. | Name |
+| Sort Albums By | Name, or release year with the oldest or the newest first. Applies to every album list in the Music menu, not just the top one. Follows the same logic as Carousel. | Name |
 | Music Menu Settings | Opens a list of the Music menu's rows, each toggling on or off.                                                                                                      | *(action)* |
 
 ### 4.5 Search
@@ -212,6 +212,7 @@ Settings for the Album Covers and Artist Profiles screens.
 
 | Setting | What it does                                                                                                  | Default                             |
 |---|---------------------------------------------------------------------------------------------------------------|-------------------------------------|
+| On Album Select | What Select on a cover does: open the album's track list, or start playing it. Album Covers only. | Show Tracks |
 | Show Album Title | Only applies to Album Covers. Hide / album at bottom / album at top / album+artist top / album+artist bottom. | Show Album and Artist at the Bottom |
 | Show Year in Album Title | Only applies to Album Covers. Appends the year to the caption.                                                                              | No                                  |
 | Background | Which theme colour fills the screen behind the covers.                                                        | Background Colour                   |
@@ -219,7 +220,7 @@ Settings for the Album Covers and Artist Profiles screens.
 | Year Sort Order | Only applies to Album Covers. Ascending or descending, when sorting by year.                                                                | Ascending                           |
 | Sort Albums By | Artist+name / artist+year / year / name.                                                                      | Artist + Name                       |
 | Sort Artists By | Name or most played.                                                                                          | Name                                |
-| Centre Margin | Gap between the front cover and its neighbours.                                                               | 0 ("20" via shipped config          |
+| Centre Margin | Gap between the front cover and its neighbours.                                                               | 0 ("20" via shipped config)         |
 | Slide Tuck | How far back covers stack behind the front one.                                                               | 32                                  |
 | Parallel Slides | Flat side covers instead of angled.                                                                           | On                                  |
 | Scroll Speed | Flick speed.                                                                                                  | 200% ("175%" via shipped config)    |
@@ -378,7 +379,7 @@ Voice builds are unverified in this fork.
 | **Theme Settings** ▸ | The pieces a theme is built from — for adjusting one after loading a theme. |                                         |
 | ├ While Playing Screen | Pick the `.wps` skin. | Themify_2                               |
 | ├ Base Skin | Pick the `.sbs` — the frame drawn behind lists and menus. | Themify_2                               |
-| ├ Show Icons | Draw list icons. | On ("Off" in  shipped config)           |
+| ├ Show Icons | Draw list icons. | On ("Off" in shipped config)           |
 | ├ Clear Backdrop | Drop the background image. | *(action)*                              |
 | ├ **Status-/Scrollbar** ▸ Scroll Bar / Scroll Bar Width | Off / left / right, and its width. | Left ("Right" in shipped config) / 6 px |
 | ├ **Status-/Scrollbar** ▸ Status Bar | Off / top / bottom. | Top                                     |
@@ -388,7 +389,7 @@ Voice builds are unverified in this fork.
 | ├ **Colours** ▸ | List, selector and separator colours, and Reset Colours. | Themify_2 palette                       |
 | ├ **Dialogs** ▸ | Modal dialog chrome — see below. |                                         |
 | ├ Album Art Rows | Draw album thumbnails beside database rows. | Off ("On" in shipped config)            |
-| └ Artist Art Rows | The same for artist portraits. | Off  ("On" in shipped config)                                    |
+| └ Artist Art Rows | The same for artist portraits. | Off ("On" in shipped config)                                    |
 | **Scrolling** ▸ | How text and lists move — see below. |                                         |
 | Dynamic Colors | Recolour the UI from the current album's artwork. A skin not written for it will look wrong. | Off ("On" in shipped config)                                     |
 | Artwork | Whether the now-playing screen shows Album Art or Artist Art. Re-buffers immediately. | Album Art                               |
