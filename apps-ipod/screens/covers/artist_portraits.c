@@ -11,10 +11,13 @@
  * selecting an artist opens that album-artist's own album listing. */
 
 #include <string.h>
+#include "string-extra.h"    /* strcasecmp */
 #include "config.h"
 #include "system.h"          /* ALIGN_BUFFER */
 #include "settings/settings.h"        /* global_settings */
-#include "database/tagcache.h"
+#include "database/tagcache.h"   /* UNTAGGED */
+#include "metadata.h"        /* struct mp3entry */
+#include "audio.h"           /* audio_status, audio_current_track */
 #include "draw/screen_access.h"   /* screens[], SCREEN_MAIN */
 #include "lcd.h"
 #include "font.h"
@@ -24,9 +27,43 @@
 #include "carousel.h"
 #include "database/db_summary.h" /* build_artist_index() */
 
+/* "Resume to this slide on next open", set by artist_enter() and consumed by
+ * artist_set_initial(). The album model's pf_resume_* pair is deliberately not
+ * reused: the two indices address different arrays (albums here, artists
+ * there), nothing in the shared pair records which model wrote it, and either
+ * model's set_initial() consumes whatever is pending -- so an album index left
+ * behind by Album Covers used to open this screen on an unrelated artist. */
+static int  artist_resume_index;
+static bool artist_resume_valid = false;
+
 static char *artist_name(int index)
 {
     return pf_idx.artist_names + pf_idx.artist_index[index].name_idx;
+}
+
+/* The slide for the album-artist of `id3`, or -1 if this list has no such
+ * artist. Matched by name rather than by any position carried in the database:
+ * artist_build_index() re-sorts the list when "Sort Artists By" is set to
+ * plays, so index order is not stable between opens. */
+static int artist_find_index(const struct mp3entry *id3)
+{
+    const char *current = UNTAGGED;
+
+    if (!id3)
+        return -1;
+
+    /* This list is built from the album-artist tag, so prefer that; a file
+     * carrying only a track artist is filed under that instead. */
+    if (id3->albumartist)
+        current = id3->albumartist;
+    else if (id3->artist)
+        current = id3->artist;
+
+    for (int i = 0; i < pf_idx.artist_ct; i++)
+        if (!strcasecmp(artist_name(i), current))
+            return i;
+
+    return -1;
 }
 
 /* carousel_model.build_index: build the persistent album-artist list into the
@@ -116,12 +153,12 @@ static bool no_legacy_art(int index, char *path, int len)
 
 /* Select an artist: open that album-artist's own album listing in the database
  * browser (armed for the next load; BACK returns here). Records the slide to
- * resume to (shared pf_resume_* state), so backing out lands on the artist just
- * visited rather than the first one. */
+ * resume to, so backing out lands on the artist just visited rather than on
+ * the first one. */
 static int artist_enter(int index)
 {
-    pf_resume_album_index = index;
-    pf_resume_last_album = true;
+    artist_resume_index = index;
+    artist_resume_valid = true;
     browser_db_enter_artist_albums_on_next_load(pf_idx.artist_index[index].seek,
                                              artist_name(index));
     return GO_TO_ALBUM_COVERS_TRACKS;
@@ -222,16 +259,24 @@ static int artist_on_menu(void)
     return CAROUSEL_MENU_RELOADED;
 }
 
+/* Where to open: the artist just visited, else whoever is playing, else the
+ * top of the list. The same order the album model uses, minus its
+ * selected_file case -- nothing enters this screen with a file in hand. */
 static void artist_set_initial(const char *selected_file)
 {
+    int index;
+
     (void)selected_file;
-    if (pf_resume_last_album)
+
+    if (artist_resume_valid)
     {
-        pf_resume_last_album = false;
-        set_current_slide(pf_resume_album_index);
+        artist_resume_valid = false;
+        set_current_slide(artist_resume_index);
+        return;
     }
-    else
-        set_current_slide(0);
+
+    index = audio_status() ? artist_find_index(audio_current_track()) : -1;
+    set_current_slide(index >= 0 ? index : 0);
 }
 
 static const struct carousel_model artist_model = {

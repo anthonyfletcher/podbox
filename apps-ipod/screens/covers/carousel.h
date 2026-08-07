@@ -204,8 +204,9 @@ extern struct db_summary_t pf_idx;   /* the current carousel's index buffer */
 extern int   center_index;         /* engine's current slide */
 extern int   pf_bold_font;         /* caption bold font (draw_text) */
 extern pix_t pf_fg_color;          /* caption colour (draw_text) */
-/* Transient "resume to this slide on next open" signal, set by a model's
- * enter() and consumed by its set_initial(). */
+/* Transient "resume to this slide on next open" signal, set by the album
+ * model's enter() and consumed by its set_initial(). Album indices only --
+ * artist_portraits.c keeps its own, since the two index different arrays. */
 extern int   pf_resume_album_index;
 extern bool  pf_resume_last_album;
 
