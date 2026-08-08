@@ -1675,6 +1675,9 @@ target/arm/s5l8702/ipod6g/serial-6g.c
 #ifndef BOOTLOADER
 target/arm/s5l8702/ipod6g/audio-6g.c
 target/arm/s5l8702/ipod6g/cscodec-6g.c
+#ifdef HAVE_MIKEY_REMOTE
+target/arm/s5l8702/ipod6g/mikey-6g.c
+#endif
 #endif /* BOOTLOADER */
 #endif /* IPOD_6G */
 

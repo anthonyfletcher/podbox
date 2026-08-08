@@ -706,6 +706,13 @@ sub buildzip {
     # copy the .lua files
     glob_mkdir("$temp_dir/rocks/viewers/lua/");
     glob_copy('apps/plugins/lua/*.lua', "$temp_dir/rocks/viewers/lua/");
+
+    # Upstream bundles the .map files into debug/ here. Not wanted: rockbox.map
+    # is ~4MB of text, the zip is /MIR-synced onto the player, so it costs that
+    # much of the user's disk on every sync -- and resolving a panic address
+    # here goes through nm on the crashing build's rockbox.elf, which the
+    # release does not ship either. Re-deleted after each merge; see
+    # docs/podbox/upstream-divergence.md.
 }
 
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) =
