@@ -15,8 +15,12 @@
  * and the reason a bitmap background would be a rewrite rather than a swap:
  * every routine below takes a theme and asks it what is underneath.
  *
- * This knows nothing about cards, statistics or input. It is handed
- * coordinates and colours and puts pixels down.
+ * The drawing knows nothing about cards or statistics: it is handed
+ * coordinates and colours and puts pixels down. The animation section at the
+ * end is the exception, and owns the wheel -- how much movement turns a card,
+ * and when that is worth abandoning an animation for. It lives with the
+ * animations because they are what reads the keypad between frames, and the
+ * count has to be the same one the deck loop navigates by.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -676,17 +680,98 @@ bool pv_exporting(void)
     return exporting;
 }
 
-bool pv_nav_button(int b)
+/* Buttons that act the moment they arrive, whatever the wheel is doing. */
+static bool immediate_button(int b)
 {
     if (b == SYS_USB_CONNECTED)
         return true;
 
-    /* BUTTON_REPEAT is masked off: continuous wheel rotation posts
-     * repeat-flagged scroll events, and those are navigation too. */
     b &= ~BUTTON_REPEAT;
-    return b == BUTTON_SCROLL_FWD || b == BUTTON_SCROLL_BACK
-        || b == BUTTON_LEFT || b == BUTTON_RIGHT
+    return b == BUTTON_LEFT || b == BUTTON_RIGHT
         || b == BUTTON_MENU || b == BUTTON_SELECT;
+}
+
+/* Which way a wheel event points, or 0 if it is not one.
+ *
+ * BUTTON_REPEAT is masked off: continuous wheel rotation posts
+ * repeat-flagged scroll events, and those are navigation too. */
+static int wheel_dir(int b)
+{
+    b &= ~BUTTON_REPEAT;
+    if (b == BUTTON_SCROLL_FWD)
+        return +1;
+    if (b == BUTTON_SCROLL_BACK)
+        return -1;
+    return 0;
+}
+
+/* Wheel events needed to turn one card.
+ *
+ * The clickwheel reports a great many small movements, and a card is a whole
+ * screenful rather than a list row -- at one card per event the smallest
+ * touch skids through several. The pad's own left and right are exact and are
+ * not damped. */
+#define PV_WHEEL_PER_CARD 4
+
+/* Movement asked for since the last card turned. Shared by the deck loop and
+ * by the animations, so a wheel event is counted once wherever it is read. */
+static int wheel;
+
+/* A reversal starts again from this event rather than unwinding the count, so
+ * turning back is as responsive as starting. */
+static int wheel_plus(int dir)
+{
+    return (((wheel > 0) != (dir > 0)) ? 0 : wheel) + dir;
+}
+
+static bool wheel_at_card(int w)
+{
+    return w <= -PV_WHEEL_PER_CARD || w >= PV_WHEEL_PER_CARD;
+}
+
+int pv_nav_step(int button)
+{
+    int b = button & ~BUTTON_REPEAT;
+    int dir;
+
+    if (b == BUTTON_RIGHT)
+        return +1;
+    if (b == BUTTON_LEFT)
+        return -1;
+
+    dir = wheel_dir(button);
+    if (dir == 0)
+    {
+        wheel = 0;
+        return 0;
+    }
+
+    wheel = wheel_plus(dir);
+    if (wheel_at_card(wheel))
+    {
+        wheel = 0;
+        return dir;
+    }
+    return 0;
+}
+
+bool pv_nav_interrupt(int button)
+{
+    int dir = wheel_dir(button);
+
+    if (dir == 0)
+        return immediate_button(button);
+
+    /* A wheel event abandons an animation only when it is the one that will
+     * turn the card, and is then left for pv_nav_step() to count. The others
+     * are counted here and dropped, since the deck loop never sees them --
+     * they used to abandon the animation too, which is why three wheel events
+     * in four killed a card's animation and then navigated nowhere. */
+    if (wheel_at_card(wheel_plus(dir)))
+        return true;
+
+    wheel = wheel_plus(dir);
+    return false;
 }
 
 long pv_ease(long target, int fr, int frames)
@@ -713,7 +798,7 @@ int pv_animate_count(const struct pv_theme *th, int cx, int oy,
         lcd_update_rect(0, band_y, PV_W, band_h);
 
         btn = button_get_w_tmo(HZ / 50);
-        if (pv_nav_button(btn))
+        if (pv_nav_interrupt(btn))
         {
             pv_commafmt(target, b, sizeof(b));
             pv_band(th, band_y, band_h);
@@ -747,7 +832,7 @@ int pv_animate_percent(const struct pv_theme *th, int oy, int pct)
         lcd_update_rect(0, oy - 2, PV_W, ch + sw + 6);
 
         btn = button_get_w_tmo(HZ / 50);
-        if (pv_nav_button(btn))
+        if (pv_nav_interrupt(btn))
         {
             snprintf(b, sizeof(b), "%d", pct);
             pv_band(th, oy - 2, ch + sw + 6);

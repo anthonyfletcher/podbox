@@ -59,6 +59,14 @@ there's an improved text viewer that handles more file formats (including txt, l
 fb2, epub, docx, pdf, md, html and rtf).  There's also a new lyric viewer that can
 be accessed from the "what's playing" screen by pressing select+play.
 
+## Spun embedded
+
+<img src="docs/podbox/images/ss_grid_spun.png" alt="Screenshot"/>
+
+A modified version of Spun is embedded which reads your playback log (whether it's the
+default logging or last.fm logging) and presents a summary of your year in music.  Hold
+Menu to save the cards to your iPod.  See [here](https://github.com/majorsiebe/Stats_for_iPod) for more information.
+
 ---
 
 # Installation
@@ -171,8 +179,11 @@ I'm not a C programmer, so this project has been developed with extensive AI ass
 
 This is a hobby project, built because I wanted a version of Rockbox that better suited how I use my iPod. I'm sharing it in the hope that others might find it useful too.
 
-Built on the work of the [Rockbox](https://www.rockbox.org/) project, the
-[RockPod](https://github.com/nuxcodes/rockpod) project and the [Themify 2](themes/Themify_2/README.md) theme.
+Built on the work of:
+- the [Rockbox](https://www.rockbox.org/) project
+- the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes))
+- the [Spun](https://github.com/majorsiebe/Stats_for_iPod) project (Siebe Majoor: aka [@majorsiebe](https://github.com/majorsiebe))
+- the [Themify 2](themes/Themify_2/README.md) project (Evan Kenny: aka [Dook](https://d00k.net/))
 
 ## Licence
 

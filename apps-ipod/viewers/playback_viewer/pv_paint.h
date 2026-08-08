@@ -93,8 +93,20 @@ bool pv_exporting(void);
 /* Ease-out-quad: most of the distance early, settling gently. */
 long pv_ease(long target, int fr, int frames);
 
-/* Buttons worth abandoning an animation for -- navigation, or USB. */
-bool pv_nav_button(int b);
+/* Whether a button means "the card after this one" or "the one before".
+ * Both wheel directions and both sides of the pad, because either is a
+ * reasonable thing to try. Consumes the event: wheel movement accumulates
+ * here, and only turns a card once it has been asked for clearly enough. */
+int pv_nav_step(int button);
+
+/* Whether a button is worth abandoning an animation for.
+ *
+ * True for USB and for the buttons that act at once. A wheel event is worth it
+ * only when it is the one that will turn the card -- so it shares pv_nav_step()'s
+ * count, absorbing the events that will not, and leaving the one that will for
+ * pv_nav_step() to consume. Interrupt on every wheel event instead and most of
+ * them stop the animation without navigating anywhere. */
+bool pv_nav_interrupt(int button);
 
 /* Count a figure up into place, in the band at (band_y, band_h).
  *

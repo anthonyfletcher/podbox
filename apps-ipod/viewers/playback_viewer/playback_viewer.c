@@ -46,56 +46,6 @@
 #include "pv_year.h"
 #include "playback_viewer.h"
 
-/* Wheel events needed to turn one card.
- *
- * The clickwheel reports a great many small movements, and a card is a whole
- * screenful rather than a list row -- at one card per event the smallest
- * touch skids through several. The pad's own left and right are exact and are
- * not damped. */
-#define PV_WHEEL_PER_CARD 4
-
-/* Whether a button means "the card after this one" or "the one before".
- * Both wheel directions and both sides of the pad, because either is a
- * reasonable thing to try.
- *
- * Wheel movement accumulates and only turns a card once it has been asked for
- * clearly enough; anything else resets the count, so a flick that was heading
- * one way does not carry over into a later one the other way. */
-static int nav_step(int button)
-{
-    static int wheel;
-    int b = button & ~BUTTON_REPEAT;
-    int dir = 0;
-
-    if (b == BUTTON_RIGHT)
-        return +1;
-    if (b == BUTTON_LEFT)
-        return -1;
-
-    if (b == BUTTON_SCROLL_FWD)
-        dir = +1;
-    else if (b == BUTTON_SCROLL_BACK)
-        dir = -1;
-    else
-    {
-        wheel = 0;
-        return 0;
-    }
-
-    /* A reversal starts again from this event rather than unwinding the
-     * count, so turning back is as responsive as starting. */
-    if ((wheel > 0) != (dir > 0))
-        wheel = 0;
-
-    wheel += dir;
-    if (wheel <= -PV_WHEEL_PER_CARD || wheel >= PV_WHEEL_PER_CARD)
-    {
-        wheel = 0;
-        return dir;
-    }
-    return 0;
-}
-
 /* Hold-Menu menu, the same gesture the text and image viewers use.
  *
  * Saving lives here rather than on a button because every button on this
@@ -208,7 +158,7 @@ int playback_viewer_screen(void)
             break;
         }
 
-        step = nav_step(btn);
+        step = pv_nav_step(btn);
         if (step > 0 && card < PV_CARD_COUNT - 1)
         {
             card++;

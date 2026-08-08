@@ -229,7 +229,7 @@ static int draw_top_list(const struct pv_theme *th, enum pv_table table,
         lcd_update_rect(0, y0 - 2, PV_W, n * rh + 4);
 
         btn = button_get_w_tmo(HZ / 60);
-        if (pv_nav_button(btn))
+        if (pv_nav_interrupt(btn))
         {
             pv_band(th, y0 - 2, n * rh + 4);
             for (int i = 0; i < n; i++)
@@ -422,7 +422,7 @@ static int card_clock(const struct pv_theme *th, const struct pv_totals *t,
             break;
 
         btn = button_get_w_tmo(HZ / 60);
-        if (pv_nav_button(btn))
+        if (pv_nav_interrupt(btn))
         {
             /* Keep the button, but take one more pass at full height on the
              * way past rather than leaving from here. */
@@ -632,7 +632,11 @@ static int card_type(const struct pv_theme *th, const struct pv_totals *t,
     pv_kicker(176, code, th->accent);
     pv_text_centre(200, type_name[tt], PV_TEXT_LIGHT);
 
-    for (int fr = (pv_exporting() ? F : 0); fr <= F; fr++)
+    /* Runs to fr == F and draws that frame before testing the queue, so the
+     * markers are always on the poles the verdict above claims when the card
+     * is left. Every marker starts centred, so leaving from an early frame
+     * would contradict it. The chart and the shared counters do the same. */
+    for (int fr = (pv_exporting() ? F : 0); ; fr++)
     {
         int btn;
 
@@ -677,11 +681,17 @@ static int card_type(const struct pv_theme *th, const struct pv_totals *t,
         }
 
         lcd_update_rect(0, ROWY - 10, PV_W, 4 * ROWH);
-        btn = button_get_w_tmo(HZ / 50);
-        if (pv_nav_button(btn))
-        {
-            ret = btn;
+
+        if (ret || fr >= F)
             break;
+
+        btn = button_get_w_tmo(HZ / 50);
+        if (pv_nav_interrupt(btn))
+        {
+            /* Keep the button, but take one more pass with the markers where
+             * they belong rather than leaving from here. */
+            ret = btn;
+            fr = F - 1;
         }
     }
 
