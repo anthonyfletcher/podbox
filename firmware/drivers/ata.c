@@ -98,6 +98,24 @@ static bool ata_led_on = false;
 
 static long sleep_timeout = 5*HZ;
 
+/* Whether the storage behind this interface is solid-state, from the
+ * "storage mode" setting (auto/hdd/ssd). Auto asks the drive itself --
+ * ata_disk_isssd() reads the IDENTIFY rotation-rate and form-factor fields.
+ *
+ * It decides one thing: whether the interface is ever powered OFF, as opposed
+ * to merely put in standby. Cutting power saves a spinning disk its motor;
+ * flash idles at almost nothing, so the saving is negligible while the cost
+ * is not. Waking from off runs ata_power_on(), which spends a fixed HZ/4
+ * letting the supply settle and then re-runs a hard reset, two IDENTIFYs,
+ * set_features and set_multiple_mode -- measured at ~780 ms on an iPod Video
+ * with an SD adapter, paid by the first file access after seven idle seconds.
+ * From standby it is a soft reset instead.
+ *
+ * Set false rather than auto-detected at init: the drive has not been
+ * identified yet when this file's statics are initialised, and settings_apply
+ * calls ata_set_storage_mode() as soon as the settings are loaded. */
+static bool ata_ssd_mode = false;
+
 static long last_disk_activity = -1;
 #ifdef HAVE_ATA_POWER_OFF
 static long power_off_tick = 0;
@@ -667,12 +685,18 @@ void ata_spindown(int seconds)
 
 void ata_set_storage_mode(int mode)
 {
-    (void)mode;
+    /* 0=auto, 1=HDD, 2=SSD */
+    if (mode == 2)
+        ata_ssd_mode = true;
+    else if (mode == 1)
+        ata_ssd_mode = false;
+    else
+        ata_ssd_mode = ata_disk_isssd();
 }
 
 bool ata_get_ssd_mode(void)
 {
-    return false;
+    return ata_ssd_mode;
 }
 
 bool ata_disk_is_active(void)
@@ -689,7 +713,9 @@ void ata_sleepnow(void)
             if (!ata_perform_flush_cache() && !ata_perform_sleep()) {
                 ata_state = ATA_SLEEPING;
 #ifdef HAVE_ATA_POWER_OFF
-                if (ata_disk_can_sleep() || canflush) {
+                /* Solid-state storage stays in standby rather than going all
+                 * the way off: see ata_ssd_mode. */
+                if (!ata_ssd_mode && (ata_disk_can_sleep() || canflush)) {
                     power_off_tick = current_tick + ATA_POWER_OFF_TIMEOUT;
                 }
 #endif
