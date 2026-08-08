@@ -54,6 +54,7 @@
 #include "speech/language.h"
 #include "files/filetypes.h"
 #include "viewers/text_viewer/text_viewer.h"
+#include "viewers/playback_viewer/playback_viewer.h"
 #include "disk.h"
 #include "sound.h"
 
@@ -605,6 +606,12 @@ static int images_scrn(void* param)
     return browser_flat(true);
 }
 
+static int playback_viewer_scrn(void* param)
+{
+    (void)param;
+    return playback_viewer_screen();
+}
+
 /* These are all static const'd from apps/menus/ *.c
    so little hack so we can use them */
 extern struct menu_item_ex
@@ -648,6 +655,7 @@ static const struct root_items items[] = {
     [GO_TO_DB_SEARCH] = { db_search_scrn, NULL, &tagcache_menu },
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
+    [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
 /* One reserved slot per tagnavi.config root-menu tag-browse row (see
  * GO_TO_TAGNAVI_FIRST in root_menu.h); all share the same dispatch function
@@ -725,6 +733,8 @@ MENUITEM_RETURNVALUE(documents_item, ID2P(LANG_DOCUMENTS), GO_TO_DOCUMENTS,
                         NULL, Icon_Font);
 MENUITEM_RETURNVALUE(images_item, ID2P(LANG_IMAGES), GO_TO_IMAGES,
                         NULL, Icon_Font);
+MENUITEM_RETURNVALUE(spun_item, ID2P(LANG_SPUN), GO_TO_SPUN,
+                        NULL, Icon_Audio);
 
 /* Dynamic-text menu items for the reserved GO_TO_TAGNAVI_FIRST.. slots: the
  * displayed name/voice for slot N is fetched fresh from browser_db's parsed
@@ -825,6 +835,7 @@ static struct menu_table menu_table[] = {
     { "search", &db_search_item },
     { "docs", &documents_item },
     { "images", &images_item },
+    { "spun", &spun_item },
     { "playlists", &playlists },
     { "shortcuts", &shortcut_menu },
     { "settings", &menu_ },
@@ -873,7 +884,8 @@ static void root_menu_apply_canonical_order(void)
         &random_album_item,
     };
     static const struct menu_item_ex * const after_tagnavi[] = {
-        &playlists, &documents_item, &images_item, &file_browser, &shortcut_menu,
+        &playlists, &documents_item, &images_item, &spun_item,
+        &file_browser, &shortcut_menu,
         &menu_, &system_menu_,
     };
     struct menu_item_ex *reordered[MAX_MENU_ITEMS];

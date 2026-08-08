@@ -89,6 +89,8 @@ enum {
     /* Documents and Images: the flat lists (screens/browse/browser_flat.c). */
     GO_TO_DOCUMENTS,
     GO_TO_IMAGES,
+    /* Spun: the playback-log statistics deck (viewers/playback_viewer/). */
+    GO_TO_SPUN,
 };
 extern struct menu_item_ex root_menu_;
 

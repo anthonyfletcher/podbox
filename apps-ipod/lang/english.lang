@@ -18845,3 +18845,73 @@
     *: "Filter Type"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SPUN
+  desc: root menu item for the playback-log statistics deck
+  user: core
+  <source>
+    *: "Spun"
+  </source>
+  <dest>
+    *: "Spun"
+  </dest>
+  <voice>
+    *: "Spun"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_LOG
+  desc: Spun found no playback log to read
+  user: core
+  <source>
+    *: "No listening history yet. Turn on Settings > Playback > Logging."
+  </source>
+  <dest>
+    *: "No listening history yet. Turn on Settings > Playback > Logging."
+  </dest>
+  <voice>
+    *: "No listening history yet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_MEMORY
+  desc: Spun could not get enough working memory to crunch the log
+  user: core
+  <source>
+    *: "Not enough memory to read the log"
+  </source>
+  <dest>
+    *: "Not enough memory to read the log"
+  </dest>
+  <voice>
+    *: "Not enough memory"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_CARD
+  desc: Spun menu item, saves a picture of the card on screen
+  user: core
+  <source>
+    *: "Save Current Card"
+  </source>
+  <dest>
+    *: "Save Current Card"
+  </dest>
+  <voice>
+    *: "Save current card"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_ALL
+  desc: Spun menu item, saves a picture of every card in the deck
+  user: core
+  <source>
+    *: "Save All Cards"
+  </source>
+  <dest>
+    *: "Save All Cards"
+  </dest>
+  <voice>
+    *: "Save all cards"
+  </voice>
+</phrase>

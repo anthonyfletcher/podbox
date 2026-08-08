@@ -56,6 +56,9 @@
 #include "dircache.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
+#include "system/app_buffer.h"
+#include "viewers/playback_viewer/pv_log.h"
+#include "viewers/playback_viewer/pv_stats.h"
 #include "crc32.h"
 #include "logf.h"
 #include "disk.h"
@@ -1449,6 +1452,100 @@ static bool dbg_usb_info(void)
     return simplelist_show_list(&info);
 }
 
+/* Spun's log crunch, with no cards in front of it.
+ *
+ * The figures here are meant to be read beside the expected-totals file that
+ * tools/spun_testlog.pl writes next to its synthetic log, which is what makes
+ * the parser verifiable rather than merely plausible.
+ *
+ * "from db" is the one to look at first. Zero of it on a device with a
+ * database means the logged paths and the database's disagree in form -- and
+ * since the artwork cache keys off the same strings, artwork is missing
+ * everything too, silently. */
+static bool dbg_pv_stats(void)
+{
+    struct simplelist_info info;
+    struct pv_totals t;
+    enum pv_build_result r;
+    unsigned long bytes;
+    long tick;
+    void *buf;
+    size_t bufsz;
+
+    buf = app_get_buffer(&bufsz, "spun debug");
+
+    splash(0, "Crunching the log...");
+    /* Timed because the spec's whole case for an on-disk index rests on how
+     * long this actually takes, and nobody has measured it. A first run
+     * includes the database sweep; a second does not. */
+    tick = current_tick;
+    r = pv_stats_build(buf, bufsz, &t);
+    tick = current_tick - tick;
+    bytes = pv_log_size(t.source);
+
+    if (r == PV_BUILD_NO_LOG)
+    {
+        splash(HZ * 3, "No playback log. Settings > Playback > Logging.");
+        return false;
+    }
+    if (r == PV_BUILD_NO_MEMORY)
+    {
+        splash(HZ * 2, "Spun: out of memory");
+        return false;
+    }
+
+    /* info_init resets the line count, so it has to come before the lines
+     * rather than after them. */
+    simplelist_info_init(&info, "Spun stats", 0, NULL);
+    info.scroll_all = true;
+    simplelist_reset_lines();
+
+    /* SIMPLELIST_MAX_LINES is 32, and going over it does not truncate: the
+     * line count wraps to zero and the screen comes up EMPTY. So this pairs
+     * figures onto shared lines and keeps a wide margin, rather than adding
+     * one line per number as it grew to during the optimisation work. */
+    simplelist_addline("%s, %lu bytes, %s",
+                       pv_log_source_name(t.source), bytes,
+                       t.from_index ? "INDEX" : "full rebuild");
+    simplelist_addline("Crunch %ld ms (names %ld%s, log %ld)",
+                       tick * 1000 / HZ, t.ms_names,
+                       t.names_swept ? " SWEPT" : "", t.ms_read);
+    simplelist_addline("  pick %ld  alloc %ld  post %ld",
+                       t.ms_pick, t.ms_alloc, t.ms_post);
+
+    simplelist_addline("Badges %d / %d", t.badges_unlocked, t.badges_total);
+
+    simplelist_addline("Log:");
+    simplelist_addline("  lines %ld   plays %ld", t.lines, t.plays);
+    simplelist_addline("  skips %ld   taps %ld", t.skips, t.taps);
+    simplelist_addline("  secs %ld  (%ld min)", t.seconds, t.seconds / 60);
+    simplelist_addline("  night %ld   unset clock %ld", t.night, t.unset_clock);
+    simplelist_addline("  ts %lu .. %lu", t.ts_min, t.ts_max);
+
+    simplelist_addline("Library:");
+    simplelist_addline("  artists %d/%d  albums %d/%d",
+                       t.artists, t.cap_artists, t.albums, t.cap_albums);
+    simplelist_addline("  titles %d/%d", t.titles, t.cap_titles);
+    simplelist_addline("  days %d   streak %d", t.days, t.streak);
+    simplelist_addline("  best week %ld min (day %ld)",
+                       t.best_week_secs / 60, t.best_week_day);
+    if (t.overflowed)
+        simplelist_addline("  TABLE FULL -- figures undercount");
+
+    simplelist_addline("Names:");
+    simplelist_addline("  db %d mapped %d", t.db_entries, t.db_mapped);
+    simplelist_addline("  from db %ld  path %ld  log %ld",
+                       t.from_db, t.from_path, t.from_log);
+    for (int i = 0; i < t.samples; i++)
+        simplelist_addline("  eg %s", t.sample[i]);
+    if (t.db_entries > 0 && t.from_db == 0)
+        simplelist_addline("  NO DB HITS -- path forms disagree");
+    if (t.source == PV_SRC_SCROBBLER)
+        simplelist_addline("  (scrobbler: mins are track lengths)");
+
+    return simplelist_show_list(&info);
+}
+
 static bool dbg_tagcache_info(void)
 {
     struct simplelist_info info;
@@ -1842,6 +1939,7 @@ static const struct {
         { "Metadata log", dbg_metadatalog },
         { "View dircache info", dbg_dircache_info },
         { "View database info", dbg_tagcache_info },
+        { "Spun stats", dbg_pv_stats },
         { "View USB info", dbg_usb_info },
         { "View buffering thread", dbg_buffering_thread },
 #ifdef PM_DEBUG

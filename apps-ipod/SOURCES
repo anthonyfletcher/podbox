@@ -108,6 +108,7 @@ screens/shortcuts.c
 screens/system/time_set.c
 screens/playback/track_info.c
 screens/playback/wps.c
+
 #ifdef ROCKBOX_HAS_LOGF
 screens/system/log_viewer.c
 #endif
@@ -175,6 +176,23 @@ viewers/text_viewer/ts_tags.c
 viewers/text_viewer/ts_text.c
 viewers/text_viewer/ts_zip.c
 viewers/text_viewer/ts_zipdoc.c
+
+/* Playback-log viewer -- listening statistics, presented in the UI as "Spun".
+ * pv_log.c reads the rotated log family the core writes, pv_names.c turns
+ * each logged path into an artist, album and title, and pv_stats.c folds the
+ * result into the aggregates the cards are drawn from. */
+viewers/playback_viewer/playback_viewer.c
+viewers/playback_viewer/pv_art.c
+viewers/playback_viewer/pv_badges.c
+viewers/playback_viewer/pv_badges_ui.c
+viewers/playback_viewer/pv_cards.c
+viewers/playback_viewer/pv_export.c
+viewers/playback_viewer/pv_index.c
+viewers/playback_viewer/pv_log.c
+viewers/playback_viewer/pv_names.c
+viewers/playback_viewer/pv_paint.c
+viewers/playback_viewer/pv_stats.c
+viewers/playback_viewer/pv_year.c
 
 /* Core-linked image viewer, ported from the imageviewer plugin. Colour
  * targets only -- the greylib paths of the original are gone. Reuses the core

@@ -50,7 +50,11 @@ enum current_activity {
     ACTIVITY_DOCUMENTBROWSER,
     ACTIVITY_IMAGEBROWSER,
     ACTIVITY_DB_SEARCH,
-    ACTIVITY_LYRICS
+    ACTIVITY_LYRICS,
+    /* Appended, never inserted: this enum is a skin ABI -- the %cs token
+     * compares against these numbers, so renumbering blanks conditionals in
+     * every theme that uses it. */
+    ACTIVITY_PLAYBACKVIEWER
 };
 
 /* custom string representation of activity */
