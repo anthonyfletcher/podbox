@@ -201,8 +201,21 @@ it in the timing-critical path.
 
 ## firmware/ — config headers
 
+**A decline has to be expressed here, not in a document.** `git merge
+rockbox/master` only stops to ask about files this fork also edits; it takes
+upstream's copy of everything else silently. So an upstream feature whose wiring
+lives in files this fork has never touched arrives *enabled*, whatever
+`upstream-commit-log.md` says about it. The two rows below are how that is
+prevented — undefine or gate the feature here, let the code land wherever the
+merge puts it, and it compiles to nothing.
+
+Everything else this fork declines happens to sit in a file it already edits, so
+those conflict on merge and surface on their own. Audited 2026-08-08; if a
+future decline is not in that position, it needs a row here.
+
 | File | What changed | Why |
 | --- | --- | --- |
+| `export/config.h` | `#undef HAVE_MIKEY_REMOTE`, after the target configs are included | Holds out the iPod Classic inline earphone remote (upstream `b217a55059`), whose wiring is in `firmware/SOURCES`, `export/button.h` and `target/arm/ipod/button-clickwheel.c` — none of which this fork edits, so a merge would take all three and build the driver. Every hook is `#ifdef`'d on this and `mikey-6g.c` is only reached through them. Deferred on maturity, not applicability: see the commit log, which also lists what taking it would need beyond the upstream diff. |
 | `export/config.h` | New `PODBOX_NO_USB_IAP`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. There is no dock or accessory here to test iAP against, and shipping an untestable subsystem invites unreproducible bug reports. **Settled 2026-07-29: this stays off permanently** — see below. It also suppresses `HAVE_MULTIMEDIA_KEYS`, which nothing in `apps-ipod/` uses. |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | DAP-only fork; no recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | There is no plugin system. The name survives for the core scratch buffer (`apps-ipod/system/app_buffer.c`) that core screens allocate from. |
