@@ -17793,6 +17793,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_WPS_ART_AUTO
+  desc: in Theme settings, now-playing artwork option: chosen by how the playlist was started
+  user: core
+  <source>
+    *: "Auto"
+  </source>
+  <dest>
+    *: "Auto"
+  </dest>
+  <voice>
+    *: "Auto"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_MOST_PLAYED_ALBUMS
   desc: album chart: most played albums
   user: core

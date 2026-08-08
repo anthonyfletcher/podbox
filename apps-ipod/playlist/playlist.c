@@ -2050,6 +2050,21 @@ struct playlist_info* playlist_load(const char* dir, const char* file,
     return playlist;
 }
 
+/* See playlist_set_from_artist(). A plain static rather than a playlist_info
+ * member: only the current playlist can be played from, and the flag says
+ * something about the browse that built it rather than about its contents. */
+static bool current_playlist_from_artist = false;
+
+void playlist_set_from_artist(bool from_artist)
+{
+    current_playlist_from_artist = from_artist;
+}
+
+bool playlist_is_from_artist(void)
+{
+    return current_playlist_from_artist;
+}
+
 /*
  * Create new (current) playlist
  */
@@ -2057,6 +2072,8 @@ int playlist_create(const char *dir, const char *file)
 {
     struct playlist_info* playlist = &current_playlist;
     int status = 0;
+
+    current_playlist_from_artist = false;
 
     dc_thread_stop(playlist);
     playlist_write_lock(playlist);

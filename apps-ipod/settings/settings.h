@@ -159,11 +159,17 @@ enum
 
 /* Which picture the now-playing screen shows. The artwork cache holds both,
  * keyed by folder, so this only chooses which folder to ask it about -- see
- * load_cached_albumart() in audio/playback.c. */
+ * load_cached_albumart() in audio/playback.c.
+ *
+ * WPS_ART_AUTO takes the choice from where the playlist was built: an artist
+ * portrait when it came from one of the artist menus (or Artist Portraits),
+ * the album cover otherwise, and the album cover again when the artist has no
+ * portrait. */
 enum
 {
     WPS_ART_ALBUM = 0,
-    WPS_ART_ARTIST
+    WPS_ART_ARTIST,
+    WPS_ART_AUTO
 };
 
 enum

@@ -1987,7 +1987,7 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
  * the placeholder is rejected so an artless album falls through to the theme's
  * own no-art state rather than showing the cache's "?" thumbnail.
  *
- * Which picture that is depends on wps_art_source. The cache holds album and
+ * Which picture that is, 'artist' says. The cache holds album and
  * artist art alike, both keyed by a folder path, so choosing between them is
  * only a matter of which folder to ask about: the track's own folder for the
  * album, its parent for the artist. That mirrors how art_cache.c fills them
@@ -1997,7 +1997,7 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
  * through to the no-art state above. */
 static int load_cached_albumart(struct mp3entry *track_id3,
                                 struct bufopen_bitmap_data *user_data,
-                                bool is_current_track, int i)
+                                bool is_current_track, int i, bool artist)
 {
     static int wps_size_idx = -2;   /* -2 until first looked up */
     char dir[MAX_PATH], path[MAX_PATH];
@@ -2019,7 +2019,7 @@ static int load_cached_albumart(struct mp3entry *track_id3,
     memcpy(dir, track_id3->path, dlen);
     dir[dlen] = '\0';
 
-    if (global_settings.wps_art_source == WPS_ART_ARTIST)
+    if (artist)
     {
         /* Up one level. A track sitting at the volume root has no parent to
          * rise to, and truncating to "" would key on the whole volume. */
@@ -2059,27 +2059,38 @@ static int audio_load_albumart(struct track_info *infop,
         /* Artist art has exactly one source: the artist folder's cached
          * thumbnail. Every other source below is album art by definition --
          * embedded tags and folder images both belong to the record, not the
-         * performer -- so an artist with no portrait must end with no
-         * artwork rather than quietly falling through to the album cover.
-         * Missing portraits are meant to be visible; that is what the art
-         * cache health screen reports on. */
-        bool artist_art = global_settings.wps_art_source == WPS_ART_ARTIST;
+         * performer -- so under the explicit Artist setting an artist with no
+         * portrait ends with no artwork rather than quietly falling through to
+         * the album cover. Missing portraits are meant to be visible; that is
+         * what the art cache health screen reports on.
+         *
+         * "Auto" is the exception, and asks for artist art only for a playlist
+         * built from an artist browse. It is a convenience rather than a
+         * statement about the library, so it does fall back. */
+        bool auto_art = global_settings.wps_art_source == WPS_ART_AUTO &&
+                        playlist_is_from_artist();
+        bool artist_art = global_settings.wps_art_source == WPS_ART_ARTIST ||
+                          auto_art;
 
         char path[MAX_PATH];
-        if (artist_art)
+        if (artist_art && global_settings.album_art != AA_OFF)
         {
-            if (global_settings.album_art != AA_OFF)
-                hid = load_cached_albumart(track_id3, &user_data,
-                                           is_current_track, i);
+            hid = load_cached_albumart(track_id3, &user_data,
+                                       is_current_track, i, true);
+
+            if (auto_art && hid < 0 && hid != ERR_BUFFER_FULL)
+                artist_art = false;   /* no portrait: take the album cover */
         }
-        else if (global_settings.album_art == AA_PREFER_CACHE)
+
+        if (!artist_art && global_settings.album_art == AA_PREFER_CACHE)
         {
             /* cache first: the other sources below chain on hid < 0, so a hit
              * here skips them */
             hid = load_cached_albumart(track_id3, &user_data,
-                                       is_current_track, i);
+                                       is_current_track, i, false);
         }
-        else if(global_settings.album_art == AA_PREFER_IMAGE_FILE)
+        else if(!artist_art &&
+                global_settings.album_art == AA_PREFER_IMAGE_FILE)
         {
             if (find_albumart(track_id3, path, sizeof(path),
                           &albumart_slots[i].dim))
@@ -2152,7 +2163,7 @@ static int audio_load_albumart(struct track_info *infop,
             hid < 0 && hid != ERR_BUFFER_FULL)
         {
             hid = load_cached_albumart(track_id3, &user_data,
-                                       is_current_track, i);
+                                       is_current_track, i, false);
         }
 
         if (hid == ERR_BUFFER_FULL)

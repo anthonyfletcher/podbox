@@ -91,6 +91,7 @@
 #define TAGNAVI_USER_CONFIG     ROCKBOX_DIR "/tagnavi_user.config"
 
 static int browser_db_play_folder(struct browser_context* c);
+static bool under_artist_level(struct browser_context* c);
 
 /* reuse of browser_db data after browser_db_play_folder() */
 static uint32_t loaded_entries_crc = 0;
@@ -3794,6 +3795,10 @@ static int browser_db_play_folder(struct browser_context* c)
         return -1;
     }
 
+    /* Which artwork the "auto" WPS art source picks. Set after the create
+     * above, which clears it. */
+    playlist_set_from_artist(under_artist_level(c));
+
     if (!insert_all_playlist(c, NULL, false, PLAYLIST_INSERT_LAST, false))
         return -2;
 
@@ -3913,6 +3918,37 @@ bool browser_db_is_artist_list(struct browser_context* c)
     return tag == tag_virt_canonicalartist ||
            tag == tag_albumartist ||
            tag == tag_artist;
+}
+
+/* True when the browse path down to the current level passes through an artist
+ * level -- i.e. these rows were reached via one of the artist menus, or via
+ * Artist Portraits, which enters under the "Album Artist" row's chain. Every
+ * level up to and including the current one counts, so an artist row itself and
+ * the albums and tracks below it all answer true, while the Album menu's
+ * album -> title chain does not.
+ *
+ * Recorded on the playlist when one is built from here, for the "auto" WPS art
+ * source. */
+static bool under_artist_level(struct browser_context* c)
+{
+    if (c->currtable == TABLE_ROOT || !csi)
+        return false;
+
+    for (int i = 0; i <= c->currextra && i < csi->tagorder_count; i++)
+    {
+        int tag = csi->tagorder[i];
+        if (tag == tag_virt_canonicalartist ||
+            tag == tag_albumartist ||
+            tag == tag_artist)
+            return true;
+    }
+
+    return false;
+}
+
+bool browser_db_current_under_artist_level(void)
+{
+    return tc && under_artist_level(tc);
 }
 
 /* Resolve browse row `item` to a folder on disk: ask the tagcache for the first

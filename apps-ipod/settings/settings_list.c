@@ -1633,8 +1633,9 @@ const struct settings_list settings[] = {
      * part in this: they are extracted from whatever bitmap was buffered. */
     CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, wps_art_source,
                    LANG_WPS_ART_SOURCE, WPS_ART_ALBUM, "wps art source",
-                   "album,artist", wps_art_source_callback, 2,
-                   ID2P(LANG_WPS_ART_ALBUM), ID2P(LANG_WPS_ART_ARTIST)),
+                   "album,artist,auto", wps_art_source_callback, 3,
+                   ID2P(LANG_WPS_ART_ALBUM), ID2P(LANG_WPS_ART_ARTIST),
+                   ID2P(LANG_WPS_ART_AUTO)),
     INT_SETTING(0, album_covers_center_margin, LANG_CENTRE_MARGIN, 0,
                 "album covers center margin", UNIT_INT, 0, 80, 1,
                 NULL, NULL, NULL),

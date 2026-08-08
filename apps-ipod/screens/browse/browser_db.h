@@ -47,6 +47,10 @@ char *browser_db_get_title(struct browser_context* c);
 int browser_db_get_attr(struct browser_context* c);
 bool browser_db_is_album_list(struct browser_context* c);
 bool browser_db_is_artist_list(struct browser_context* c);
+/* True when the path down to the browser's current level came through an artist
+ * level. Recorded on a playlist built from here, for the "auto" WPS art
+ * source. */
+bool browser_db_current_under_artist_level(void);
 bool browser_db_get_album_dir(struct browser_context* c, int item,
                            char *buf, int buflen);
 bool browser_db_get_artist_dir(struct browser_context* c, int item,

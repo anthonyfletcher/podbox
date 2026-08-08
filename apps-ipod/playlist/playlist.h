@@ -129,6 +129,15 @@ void playlist_set_last_shuffled_start(void);
 struct playlist_info *playlist_get_current(void);
 bool playlist_dynamic_only(void);
 
+/* Was the current playlist built from a browse path that came through an
+ * artist level (an artist menu, or Artist Portraits)? Set by whoever builds
+ * the playlist and read by the artwork loader for the "auto" WPS art source.
+ * Cleared by playlist_create(), so a playlist built any other way -- file
+ * browser, saved .m3u, dir play -- reads false. Not saved, so a playlist
+ * resumed after a reboot reads false too. */
+void playlist_set_from_artist(bool from_artist);
+bool playlist_is_from_artist(void);
+
 /* Exported functions for all playlists.  Pass NULL for playlist_info
    structure to work with current playlist. */
 size_t playlist_get_index_bufsz(size_t max_sz);
