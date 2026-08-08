@@ -138,17 +138,7 @@ copy — change Bass here and Sound Settings shows the new value. Entries marked
 
 ## 4. General Settings
 
-### 4.1 What's Playing Screen
-
-| Setting | What it does | Default |
-|---|---|---|
-| Default Browser | Which browser the now-playing screen and root default to. | Music |
-| Select Action | Where Select from the now-playing screen goes. | Previous Screen |
-| Hotkey | Action bound to the hotkey button in the now-playing screen. | Lyrics |
-| Set Context Item 1–4 | The four configurable rows at the bottom of the now-playing context menu. | Track Info, Delete, Show in Files, Album Art |
-| Reset Settings | Restore the hotkey and the four rows to defaults. | *(action)* |
-
-### 4.2 Playlists
+### 4.1 Playlists
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -158,7 +148,7 @@ copy — change Bass here and Sound Settings shows the new value. Entries marked
 | **Current Playlist** ▸ Warn When Erasing / Keep Current Track When Replacing / Show Shuffled Adding Options | Confirmations and which add-to-playlist options appear. | On / On / On |
 | **Current Playlist** ▸ Show Queue Options | Whether queue entries appear in context menus. | No |
 
-### 4.3 File Browser
+### 4.2 Files
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -174,41 +164,19 @@ copy — change Bass here and Sound Settings shows the new value. Entries marked
 | Hotkey | Action bound to the hotkey button in the browser. | Off |
 | Rescan Documents & Images | One-shot rebuild of the flat Documents and Images lists. Normally reruns itself after USB. | *(action)* |
 
-### 4.4 Music
+### 4.3 Music
 
 | Setting | What it does                                                                                                                                                         | Default |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|
 | Sort Albums By | Name, or release year with the oldest or the newest first. Applies to every album list in the Music menu, not just the top one. Follows the same logic as Carousel. | Name |
 | Music Menu Settings | Opens a list of the Music menu's rows, each toggling on or off.                                                                                                      | *(action)* |
+| **Search** ▸ Maximum Results | Total results kept, 25–200 in steps of 25.                                                                                                                           | 50 |
+| **Search** ▸ Minimum Letters | How many letters must be typed before a search runs, 1–3. Raise it if one-letter searches return more than they are worth.                                            | 1 |
+| **Search** ▸ Result Order | Which of tracks, albums and artists is listed first, second and third. Six permutations.                                                                              | Tracks, Albums, Artists |
 
-### 4.5 Search
+### 4.4 Carousel
 
-| Setting | What it does | Default |
-|---|---|---|
-| Maximum Results | Total results kept, 25–200 in steps of 25. | 50 |
-| Minimum Letters | How many letters must be typed before a search runs, 1–3. Raise it if one-letter searches return more than they are worth. | 1 |
-| Result Order | Which of tracks, albums and artists is listed first, second and third. Six permutations. | Tracks, Albums, Artists |
-
-### 4.6 Database
-
-| Setting | What it does                                                                                                  | Default                          |
-|---|---------------------------------------------------------------------------------------------------------------|----------------------------------|
-| Load to RAM | Keep the database in memory: off / on / quick (ignore dircache). Faster browsing, more RAM.                   | Off ("quick" via shipped config) |
-| Scan on Startup | Rescan at every boot. Usually redundant if Scan on Eject is on.                                               | On  ("off" via shipped config)   |
-| Scan on Eject | Rescan after a USB session — the moment the library can actually have changed.                                | On                               |
-| Autocommit on Startup | Finish a commit cut short by a flat battery or a mid-scan USB session. Off asks first.                        | On                               |
-| Gather Runtime Data | Record play counts and ratings.                                                                               | On                               |
-| Select Directories to Scan | Restrict the scan to chosen folders. Offers a rebuild afterwards without which you may see duplicate entries. | `/`                              |
-| Rebuild Database | Full rebuild from scratch. Slow.                                                                              | *(action)*                       |
-| Update Database | Incremental rescan. The fix for "my new album isn't showing up".                                              | *(action)*                       |
-| Rebuild Index | Discard and re-derive the album/artist list the carousels and charts read.                                    | *(action)*                       |
-| Update Index | The same, keeping what still applies.                                                                         | *(action)*                       |
-| Export / Import Modifications | Move runtime data and edits in and out of a file.                                                             | *(action)*                       |
-| Write Debug Log | Append scan progress to `.rockbox/tagcache.log`.                                                              | Off                              |
-
-### 4.7 Carousel
-
-Settings for the Album Covers and Artist Profiles screens.
+Settings for the Album Covers and Artist Portraits screens.
 
 | Setting | What it does                                                                                                  | Default                             |
 |---|---------------------------------------------------------------------------------------------------------------|-------------------------------------|
@@ -226,17 +194,7 @@ Settings for the Album Covers and Artist Profiles screens.
 | Scroll Speed | Flick speed.                                                                                                  | 200% ("175%" via shipped config)    |
 | Transition Speed | Settle animation speed.                                                                                       | 400% ("325%" via shipped config)    |
 
-### 4.8 Art Cache
-
-| Setting | What it does | Default |
-|---|---|---|
-| Fast Build | Decode each source image once for the largest thumbnail and derive the rest. Applies to new thumbnails only. | Off |
-| Missing Album Artwork / Missing Artist Portraits | The folders the last pass could find no art for. | *(screens)* |
-| Rebuild Cache | Purge every thumbnail and regenerate. | *(action)* |
-| Update Cache | Fill in what is missing — the fix for art added to already-indexed folders. | *(action)* |
-| Write Debug Log | Append to `.rockbox/artcache.log`. | Off |
-
-### 4.9 Text Viewer
+### 4.5 Text Viewer
 
 | Setting | What it does | Default                       |
 |---|---|-------------------------------|
@@ -247,7 +205,7 @@ Settings for the Album Covers and Artist Profiles screens.
 | Font | Pick a `.fnt` for the viewer only. | *(none — uses the UI font)*  ("22-Literata" via shipped config) |
 | Use UI Font | Drop back to the theme's font. | *(action)*                    |
 
-### 4.10 Lyrics Viewer
+### 4.6 Lyrics Viewer
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -261,7 +219,34 @@ Settings for the Album Covers and Artist Profiles screens.
 | Keep Backlight On | Hold the backlight up while lyrics are showing. | On |
 | Font / Use UI Font | A `.fnt` for the viewer only, and the way back. | *(none)* |
 
-### 4.11 Display
+### 4.7 Database
+
+| Setting | What it does                                                                                                  | Default                          |
+|---|---------------------------------------------------------------------------------------------------------------|----------------------------------|
+| Load to RAM | Keep the database in memory: off / on / quick (ignore dircache). Faster browsing, more RAM.                   | Off ("quick" via shipped config) |
+| Scan on Startup | Rescan at every boot. Usually redundant if Scan on Eject is on.                                               | On  ("off" via shipped config)   |
+| Scan on Eject | Rescan after a USB session — the moment the library can actually have changed.                                | On                               |
+| Autocommit on Startup | Finish a commit cut short by a flat battery or a mid-scan USB session. Off asks first.                        | On                               |
+| Gather Runtime Data | Record play counts and ratings.                                                                               | On                               |
+| Select Directories to Scan | Restrict the scan to chosen folders. Offers a rebuild afterwards without which you may see duplicate entries. | `/`                              |
+| Rebuild Database | Full rebuild from scratch. Slow.                                                                              | *(action)*                       |
+| Update Database | Incremental rescan. The fix for "my new album isn't showing up".                                              | *(action)*                       |
+| Rebuild Index | Discard and re-derive the album/artist list the carousels and charts read.                                    | *(action)*                       |
+| Update Index | The same, keeping what still applies.                                                                         | *(action)*                       |
+| Export / Import Modifications | Move runtime data and edits in and out of a file.                                                             | *(action)*                       |
+| Write Debug Log | Append scan progress to `.rockbox/tagcache.log`.                                                              | Off                              |
+
+### 4.8 Art Cache
+
+| Setting | What it does | Default |
+|---|---|---|
+| Fast Build | Decode each source image once for the largest thumbnail and derive the rest. Applies to new thumbnails only. | Off |
+| Missing Album Artwork / Missing Artist Portraits | The folders the last pass could find no art for. | *(screens)* |
+| Rebuild Cache | Purge every thumbnail and regenerate. | *(action)* |
+| Update Cache | Fill in what is missing — the fix for art added to already-indexed folders. | *(action)* |
+| Write Debug Log | Append to `.rockbox/artcache.log`. | Off |
+
+### 4.9 Display
 
 #### LCD Settings
 
@@ -295,7 +280,7 @@ The level meter some themes draw.
 |---|---|---|
 | Default Codepage | Character set assumed for non-Unicode tags. | Unicode (UTF-8) |
 
-### 4.12 System
+### 4.10 System
 
 | Setting | What it does | Default                                 |
 |---|---|-----------------------------------------|
@@ -320,7 +305,7 @@ The level meter some themes draw.
 | USB Mode | Mass Storage or Charge Only when a host connects. | Mass Storage                            |
 | Show Debug Menu | Reveals the Debug entry under root → System. | Off                                     |
 
-### 4.13 Startup/Shutdown
+### 4.11 Startup/Shutdown
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -333,7 +318,7 @@ The level meter some themes draw.
 | Restart Sleep Timer on Keypress | Any button resets the countdown. | No |
 | Clear settings when reset button is held during startup | Recovery escape hatch for a bad config. | No |
 
-### 4.14 Bookmarking
+### 4.12 Bookmarking
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -342,20 +327,20 @@ The level meter some themes draw.
 | Load Last Bookmark | No / Yes / Ask, on entering a bookmarked folder. | No |
 | Maintain a List of Recent Bookmarks? | Feeds the root menu's Recent Bookmarks. | No |
 
-### 4.15 Automatic Resume
+### 4.13 Automatic Resume
 
 | Setting | What it does | Default |
 |---|---|---|
 | Automatic Resume | Remember a per-track position and return to it. Needs a usable database, and offers to build one. | No |
 | Resume on Automatic Track Change | Never / always / in custom directories only. | Never |
 
-### 4.16 Language
+### 4.14 Language
 
 | Setting | What it does | Default |
 |---|---|---|
 | Language | Browse and load a `.lng` file. | English |
 
-### 4.17 Voice
+### 4.15 Voice
 
 | Setting | What it does | Default |
 |---|---|---|
@@ -372,32 +357,34 @@ Voice builds are unverified in this fork.
 
 ## 5. UI Settings
 
-| Setting | What it does | Default                                 |
-|---|---|-----------------------------------------|
-| Load Theme ● | Load a whole theme `.cfg` — skins, font, colours, backdrop at once. | Themify_2                               |
-| Font ● | UI font. | 22-LeagueSpartan-Regular                |
-| **Theme Settings** ▸ | The pieces a theme is built from — for adjusting one after loading a theme. |                                         |
-| ├ While Playing Screen | Pick the `.wps` skin. | Themify_2                               |
-| ├ Base Skin | Pick the `.sbs` — the frame drawn behind lists and menus. | Themify_2                               |
-| ├ Show Icons | Draw list icons. | On ("Off" in shipped config)           |
-| ├ Clear Backdrop | Drop the background image. | *(action)*                              |
-| ├ **Status-/Scrollbar** ▸ Scroll Bar / Scroll Bar Width | Off / left / right, and its width. | Left ("Right" in shipped config) / 6 px |
-| ├ **Status-/Scrollbar** ▸ Status Bar | Off / top / bottom. | Top                                     |
-| ├ **Status-/Scrollbar** ▸ Volume Display / Battery Display | Graphic or numeric in the status bar. | Graphic / Graphic                       |
-| ├ Line Selector Type | Pointer / inverse bar / solid colour bar / gradient bar. | Bar (Gradient Colour)                   |
-| ├ Line Separator | Height of the rule between list rows. Auto / off / 1–30 px. | Off                                     |
-| ├ **Colours** ▸ | List, selector and separator colours, and Reset Colours. | Themify_2 palette                       |
-| ├ **Dialogs** ▸ | Modal dialog chrome — see below. |                                         |
-| ├ Album Art Rows | Draw album thumbnails beside database rows. | Off ("On" in shipped config)            |
-| └ Artist Art Rows | The same for artist portraits. | Off ("On" in shipped config)                                    |
-| **Scrolling** ▸ | How text and lists move — see below. |                                         |
-| Dynamic Colors | Recolour the UI from the current album's artwork. A skin not written for it will look wrong. | Off ("On" in shipped config)                                     |
-| Artwork | Whether the now-playing screen shows Album Art or Artist Art. Re-buffers immediately. | Album Art                               |
-| Quick Screen | What the long press opens: the quick screen (**On**) or the shortcuts menu. | On                                      |
-
-Art rows force taller list rows, so a theme whose list layout does not draw the
-cover gets tall rows with nothing in them. Turn them on only for a theme that
-asks for them.
+| Setting | What it does                                                                                                                                                                                              | Default                                 |
+|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| Load Theme ● | Load a whole theme `.cfg` — skins, font, colours, backdrop at once.                                                                                                                                       | Themify_2                               |
+| Font ● | UI font.                                                                                                                                                                                                  | 22-LeagueSpartan-Regular                |
+| **Theme Settings** ▸ | The pieces a theme is built from — for adjusting one after loading a theme.                                                                                                                               |                                         |
+| ├ While Playing Screen | Pick the `.wps` skin.                                                                                                                                                                                     | Themify_2                               |
+| ├ Base Skin | Pick the `.sbs` — the frame drawn behind lists and menus.                                                                                                                                                 | Themify_2                               |
+| ├ Show Icons | Draw list icons.                                                                                                                                                                                          | On ("Off" in shipped config)           |
+| ├ Clear Backdrop | Drop the background image.                                                                                                                                                                                | *(action)*                              |
+| ├ **Status-/Scrollbar** ▸ Scroll Bar / Scroll Bar Width | Off / left / right, and its width.                                                                                                                                                                        | Left ("Right" in shipped config) / 6 px |
+| ├ **Status-/Scrollbar** ▸ Status Bar | Off / top / bottom.                                                                                                                                                                                       | Top                                     |
+| ├ **Status-/Scrollbar** ▸ Volume Display / Battery Display | Graphic or numeric in the status bar.                                                                                                                                                                     | Graphic / Graphic                       |
+| ├ Line Selector Type | Pointer / inverse bar / solid colour bar / gradient bar.                                                                                                                                                  | Bar (Gradient Colour)                   |
+| ├ Line Separator | Height of the rule between list rows. Auto / off / 1–30 px.                                                                                                                                               | Off                                     |
+| ├ **Colours** ▸ | List, selector and separator colours, and Reset Colours.                                                                                                                                                  | Themify_2 palette                       |
+| ├ **Dialogs** ▸ | Modal dialog chrome — see below.                                                                                                                                                                          |                                         |
+| ├ Album Art Rows | Draw album thumbnails beside database rows.  Requires a theme that supports drawing artwork in lists.                                                                                                     | Off ("On" in shipped config)            |
+| └ Artist Art Rows | The same for artist portraits.    Requires a theme that supports drawing artwork in lists.                                                                                                                | Off ("On" in shipped config)                                    |
+| **Scrolling** ▸ | How text and lists move — see below.                                                                                                                                                                      |                                         |
+| Dynamic Colors | Recolour the UI from the current album's artwork. A skin not written for it will look wrong.                                                                                                              | Off ("On" in shipped config)                                     |
+| **What's Playing Screen** ▸ | The now-playing screen's own settings.                                                                                                                                                                    |                                         |
+| ├ Artwork | Which art the screen shows. When set to auto, if the playlist was started via the Artist menu or from Artist Portraits, it will attempt to show the Artist art - otherwise the Album art will be shown. | Album Art                               |
+| ├ Default Browser | Which browser the now-playing screen and root default to.                                                                                                                                                 | Music |
+| ├ Select Action | Where Select from the now-playing screen goes.                                                                                                                                                            | Previous Screen |
+| ├ Hotkey | Action bound to the hotkey button in the now-playing screen.                                                                                                                                              | Lyrics |
+| ├ Set Context Item 1–4 | The four configurable rows at the bottom of the now-playing context menu.                                                                                                                                 | Track Info, Delete, Show in Files, Album Art |
+| └ Reset Settings | Restore the hotkey and the four rows to defaults.                                                                                                                                                         | *(action)* |
+| Quick Screen | What the long press opens: the quick screen (**On**) or the shortcuts menu.                                                                                                                               | On                                      |
 
 ### Dialogs
 

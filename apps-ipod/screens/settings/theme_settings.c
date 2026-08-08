@@ -381,7 +381,6 @@ MENUITEM_FUNCTION_W_PARAM(browse_themes, 0, ID2P(LANG_CUSTOM_THEME),
 MENUITEM_SETTING(cursor_style, &global_settings.cursor_style, NULL);
 MENUITEM_SETTING(sep_menu, &global_settings.list_separator_height, NULL);
 MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
-MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
 
 /* Art beside the rows in the database browser. Both come from the shared
  * thumbnail cache, so turning them off only stops them being drawn. They are
@@ -415,6 +414,6 @@ MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             &theme_settings_menu,
             &scroll_settings_menu,
             &dynamic_colors,
-            &wps_art_source,
+            &wps_settings,
             &shortcuts_replaces_quickscreen,
 );

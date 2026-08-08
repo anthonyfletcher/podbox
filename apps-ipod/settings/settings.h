@@ -528,7 +528,8 @@ struct user_settings
     int lst_color; /* color of the text for the selector */
     unsigned char colors_file[MAX_FILENAME+1];
     bool dynamic_colors; /* auto-color from album art */
-    int wps_art_source;  /* WPS_ART_*: album cover or artist portrait */
+    int wps_art_source;  /* WPS_ART_*: album cover, artist portrait, or by
+                            where the playlist came from */
 
     /* Modal dialog chrome (apps/gui/dialog.h). Applied in settings_apply() via
      * dialog_set_default_style(). The metrics always apply; what the colours do

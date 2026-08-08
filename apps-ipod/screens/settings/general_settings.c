@@ -195,7 +195,8 @@ MENUITEM_FUNCTION(clear_start_directory_item, 0, ID2P(LANG_RESET_START_DIR),
 static int filemenu_callback(int action,
                              const struct menu_item_ex *this_item,
                              struct gui_synclist *this_list);
-MAKE_MENU(file_menu, ID2P(LANG_FILE), filemenu_callback, Icon_file_view_menu,
+MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
+                Icon_file_view_menu,
                 &sort_case, &sort_dir, &sort_file, &interpret_numbers,
                 &dirfilter, &show_filename_ext, &browse_current,
                 &show_path_in_browser,
@@ -638,7 +639,12 @@ static void reset_wps_items(void)
 MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET), reset_wps_items,
                   NULL, Icon_Queued);
 
+/* Which picture the screen shows. A property of this screen rather than of the
+ * theme: no skin sets it, and a theme that wanted to could not. */
+MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
+
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
+            ,&wps_art_source
             ,&browser_default
             ,&wps_select_action
             ,&hotkey_wps_item /* this is item 0 */
@@ -651,24 +657,25 @@ MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
 
 
 
-/* How the Music browser presents what the database holds -- as against the
- * Database menu above, which is about building and maintaining it. */
-MENUITEM_SETTING(database_sort_albums_by,
-                 &global_settings.database_sort_albums_by, NULL);
-MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
-                  music_menu_config, NULL, Icon_Menu_setting);
-MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &database_sort_albums_by, &music_menu_config_item
-          );
-
 /* The text search over the database (screens/system/db_search.c). Its own
- * submenu rather than rows under Music, because all three shape one screen. */
+ * submenu rather than rows under Music, because all three shape one screen --
+ * and nested under Music, since searching is one of the ways in to it. */
 MENUITEM_SETTING(db_search_max_rows, &global_settings.db_search_max_rows, NULL);
 MENUITEM_SETTING(db_search_min_letters,
                  &global_settings.db_search_min_letters, NULL);
 MENUITEM_SETTING(db_search_order, &global_settings.db_search_order, NULL);
 MAKE_MENU(search_menu, ID2P(LANG_DB_SEARCH), 0, Icon_NOICON,
           &db_search_max_rows, &db_search_min_letters, &db_search_order
+          );
+
+/* How the Music browser presents what the database holds -- as against the
+ * Database menu below, which is about building and maintaining it. */
+MENUITEM_SETTING(database_sort_albums_by,
+                 &global_settings.database_sort_albums_by, NULL);
+MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
+                  music_menu_config, NULL, Icon_Menu_setting);
+MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
+          &database_sort_albums_by, &music_menu_config_item, &search_menu
           );
 
 /** Settings menu **/
@@ -678,17 +685,17 @@ static struct browse_folder_info langs = { LANG_DIR, SHOW_LNG };
 MENUITEM_FUNCTION_W_PARAM(browse_langs, 0, ID2P(LANG_LANGUAGE),
                           browse_folder, (void*)&langs, NULL, Icon_Language);
 
+/* What's Playing Screen is not here: it sits under UI Settings, with the rest
+ * of what the screens look like. */
 MAKE_MENU(settings_menu_item, ID2P(LANG_GENERAL_SETTINGS), 0,
           Icon_General_settings_menu,
-          &wps_settings,
           &playlist_settings, &file_menu,
           &music_menu,
-          &search_menu,
-          &tagcache_menu,
           &album_covers_menu,
-          &art_cache_menu,
           &text_viewer_menu,
           &lyric_viewer_menu,
+          &tagcache_menu,
+          &art_cache_menu,
           &display_menu, &system_menu,
           &startup_shutdown_menu,
           &bookmark_settings_menu,

@@ -27,6 +27,10 @@ extern const struct menu_item_ex
         , text_viewer_menu         /* text_viewer_menu.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
         , basic_settings_menu       /* basic_settings.c */
+        , wps_settings              /* general_settings.c -- shown under UI
+                                       Settings, defined beside the browser and
+                                       hotkey settings it shares a screen
+                                       with */
         , scroll_settings_menu;     /* display_settings.c -- shown under UI
                                        Settings, defined beside the other
                                        LCD scroll settings it configures */
