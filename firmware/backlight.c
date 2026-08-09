@@ -481,6 +481,23 @@ static void backlight_setup_fade_down(void)
 }
 #endif /* CONFIG_BACKLIGHT_FADING */
 
+/* Set when the backlight goes off in SSD mode, cleared by the first wake that
+ * acts on it, so exactly one Q_STORAGE_PRE_WAKE is posted per off->on cycle.
+ *
+ * backlight_on() runs from the button tick for *every* button event, repeats
+ * included, so posting there unconditionally put one event on the storage
+ * queue per press. That queue holds 16, queue_post() wraps silently when it is
+ * full, and KERNEL_ASSERT is compiled out of a release build -- so a burst had
+ * no way to announce itself and could quietly overwrite an unread event.
+ * SYS_USB_CONNECTED arrives on that same queue.
+ *
+ * Posting on the transition is also what the event means: pre-waking storage
+ * while the backlight is already on asks for something that was asked for when
+ * it came on. Read and written from both the backlight thread and the tick, so
+ * volatile; the worst a race can do is one extra post, which the handler
+ * already treats as idempotent. */
+static volatile bool ssd_wants_prewake;
+
 static inline void do_backlight_off(void)
 {
     backlight_timer = 0;
@@ -497,7 +514,10 @@ static inline void do_backlight_off(void)
     /* Accelerate SSD sleep when backlight turns off — the deep sleep
      * timer in the storage driver uses backlight state as a gate. */
     if (storage_get_ssd_mode())
+    {
         storage_sleep();
+        ssd_wants_prewake = true;
+    }
 }
 
 /* Update state of backlight according to timeout setting */
@@ -825,11 +845,14 @@ void backlight_on(void)
 {
     if(!ignore_backlight_on)
     {
-        /* Pre-wake SSD from ISR context so the storage thread
-         * starts power-up before the UI thread processes the
-         * button event that triggered this. */
-        if (storage_get_ssd_mode())
+        /* Pre-wake SSD from ISR context so the storage thread starts powering
+         * up before the UI thread processes the button event that triggered
+         * this. Once per off->on cycle -- see ssd_wants_prewake. */
+        if (ssd_wants_prewake)
+        {
+            ssd_wants_prewake = false;
             storage_post_event(Q_STORAGE_PRE_WAKE, 0);
+        }
         queue_remove_from_head(&backlight_queue, BACKLIGHT_ON);
         queue_post(&backlight_queue, BACKLIGHT_ON, 0);
     }
@@ -903,8 +926,11 @@ void backlight_hold_changed(bool hold_button)
     if (!hold_button || (backlight_on_button_hold > 0))
     {
         /* if unlocked or override in effect */
-        if (storage_get_ssd_mode())
+        if (ssd_wants_prewake)
+        {
+            ssd_wants_prewake = false;
             storage_post_event(Q_STORAGE_PRE_WAKE, 0);
+        }
         queue_remove_from_head(&backlight_queue, BACKLIGHT_ON);
         queue_post(&backlight_queue, BACKLIGHT_ON, 0);
     }
