@@ -384,6 +384,12 @@ static bool buf_ctx_locked;
 static struct pf_scroll_line_info scroll_line_info;
 static struct pf_scroll_line scroll_lines[PF_MAX_SCROLL_LINES];
 
+/* What the caption currently on screen was built for. Forgotten alongside the
+ * scroll lines in init_scroll_lines() -- see carousel_caption_changed(). */
+static int  caption_index;
+static int  caption_variant;
+static bool caption_valid;
+
 enum ePFS{ePFS_ARTIST = 0, ePFS_ALBUM};
 
 /*
@@ -804,6 +810,24 @@ static void init_scroll_lines(void)
     scroll_line_info.next_scroll = current_tick;
     for (i = 0; i < PF_MAX_SCROLL_LINES; i++)
         scroll_lines[i].step = 0;
+
+    /* The captions go with them. Everything above has just been forgotten, so
+     * a model still believing its caption is current would skip the
+     * set_scroll_line() that rebuilds it. */
+    caption_valid = false;
+}
+
+/* See carousel.h. Records what it was asked about, so a model calls it once
+ * per draw and uses the answer for every line of its caption. */
+bool carousel_caption_changed(int index, int variant)
+{
+    if (caption_valid && caption_index == index && caption_variant == variant)
+        return false;
+
+    caption_index = index;
+    caption_variant = variant;
+    caption_valid = true;
+    return true;
 }
 
 void set_scroll_line(const char *str, enum pf_scroll_line_type type)

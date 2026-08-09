@@ -1,14 +1,11 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Cover-flow artist browser. A second carousel.c model, showing artist
- * photos instead of album art.
+ * Artist Portraits: the coverflow carousel (screens/covers/carousel.c) over
+ * the album-artist list, showing artist photos from <artist>/folder.jpg. A
+ * second carousel_model beside album_covers.c, whose data is the album-artist
+ * index; selecting an artist opens that album-artist's own album listing.
  ****************************************************************************/
-
-/* Artist Portraits: the coverflow carousel (apps/gui/carousel via
- * album_covers.c) over the album-artist list, showing artist photos from
- * <artist>/folder.jpg. A carousel_model whose data is the album-artist index;
- * selecting an artist opens that album-artist's own album listing. */
 
 #include <string.h>
 #include "string-extra.h"    /* strcasecmp */
@@ -196,7 +193,6 @@ static int artist_jump_prev(void)
  * (album covers' second, artist/year line has no artist-mode equivalent). */
 static void artist_draw_text(void)
 {
-    static int prev_index = -1;
     struct pf_caption cap;
     int txt_x, txt_y;
     char *name;
@@ -208,11 +204,9 @@ static void artist_draw_text(void)
     struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
     lcd_setfont(pf_bold_font);
-    if (center_index != prev_index)
-    {
+    /* Nothing but the slide decides this caption, hence the 0 variant. */
+    if (carousel_caption_changed(center_index, 0))
         set_scroll_line(name, PF_SCROLL_ALBUM);
-        prev_index = center_index;
-    }
 
     /* One line where the album carousel draws two. The engine reserves the
      * same band either way and centres whatever it is given in it, so this

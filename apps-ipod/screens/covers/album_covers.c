@@ -641,10 +641,10 @@ static void draw_album_text(void)
     struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
 
-    static int prev_albumtxt_index = -1;
-    static bool prev_show_year = false;
-    bool album_changed = (center_index != prev_albumtxt_index
-                         || global_settings.album_covers_show_year != prev_show_year);
+    /* The year is the caption's other input: turning it on or off changes the
+     * string without moving the selection. */
+    bool album_changed = carousel_caption_changed(
+                             center_index, global_settings.album_covers_show_year);
 
     /* Switched to pf_bold_font (plain FONT_UI, a no-op, if no bold font is
      * configured -- see its declaration) *before* set_scroll_line() below:
@@ -654,11 +654,7 @@ static void draw_album_text(void)
      * different average glyph width would end up mis-centered. */
     lcd_setfont(pf_bold_font);
     if (album_changed)
-    {
         set_scroll_line(album_and_year, PF_SCROLL_ALBUM);
-        prev_albumtxt_index = center_index;
-        prev_show_year = global_settings.album_covers_show_year;
-    }
 
     /* The engine measures both fonts and centres the block for us, so top and
      * bottom captions need no separate arithmetic here. */

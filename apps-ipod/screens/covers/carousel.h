@@ -217,6 +217,18 @@ int  carousel_run(const struct carousel_model *m, const char *selected_file);
 void set_current_slide(int index);
 void set_scroll_line(const char *str, enum pf_scroll_line_type type);
 int  get_scroll_line_offset(enum pf_scroll_line_type type);
+/* True when the caption needs building again -- a different slide, or a
+ * different `variant` (whatever else the model's caption text depends on;
+ * pass 0 if nothing does). A model calls this once per draw and re-runs
+ * set_scroll_line() when it says yes.
+ *
+ * The engine keeps this rather than each model, because it has to be forgotten
+ * at exactly the moment the scroll lines are, and that moment belongs to
+ * init(). A model holding it in a function-local static instead kept it across
+ * screens: reopening onto the slide you left answered "unchanged", so
+ * set_scroll_line() never ran, and a caption too long for the box sat still at
+ * the previous session's offset. */
+bool carousel_caption_changed(int index, int variant);
 /* Clip drawing to the inset caption box; offsets from get_scroll_line_offset()
  * are relative to it. Enter before setting the font or colour, and pass the
  * returned viewport back to carousel_text_end() when the caption is drawn. */
