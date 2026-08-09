@@ -524,12 +524,30 @@ sub onevoiceentry {
     return $enc;
 }
 
+# Where the application layer lives -- not necessarily "apps", since
+# tools/configure --appsdir moves it and this fork builds from apps-ipod/.
+# COREAPPSDIR is what make exports; the fallbacks keep a hand-run working.
+sub appsdir {
+    return $ENV{'COREAPPSDIR'} if $ENV{'COREAPPSDIR'};
+    my $root = dirname($0) . '/..';
+    return "$root/apps-ipod" if -d "$root/apps-ipod/lang";
+    return "$root/apps";
+}
+
+# The same directory as it appears inside the build's binary zip, which stores
+# build-tree paths -- so the bare name, not the full path.
+sub appsname {
+    my $d = appsdir();
+    my ($name) = $d =~ m{([^/]+)$};
+    return $name || "apps";
+}
+
 # Run genlang and create voice clips for each string
 sub generaterawclips {
     our $verbose;
     my ($language, $target, $encoder, $encoder_opts, $tts_object, $tts_engine_opts, $existingids) = @_;
-    my $english = dirname($0) . '/../apps-ipod/lang/english.lang';
-    my $langfile = dirname($0) . '/../apps-ipod/lang/' . $language . '.lang';
+    my $english = appsdir() . '/lang/english.lang';
+    my $langfile = appsdir() . '/lang/' . $language . '.lang';
     my $correctionsfile = dirname($0) . '/voice-corrections.txt';
     my $idfile = "$language.vid";
     my $updfile = "$language-update.lang";
@@ -604,9 +622,10 @@ sub generatevstringclips {
     my $cmd;
     local $| = 1; # make progress indicator work reliably
 
-    unzip $binzip => $langfile, Name => "apps-ipod/lang/$langfile" or die "unzip failed: $UnzipError\n";
-    unzip $binzip => $correctionsfile, Name => "apps-ipod/lang/$correctionsfile" or die "unzip failed: $UnzipError\n";
-    unzip $binzip => $langenumfile, Name => "apps-ipod/lang/lang-enum.txt" or undef($langenumfile);
+    my $ad = appsname();
+    unzip $binzip => $langfile, Name => "$ad/lang/$langfile" or die "unzip failed: $UnzipError\n";
+    unzip $binzip => $correctionsfile, Name => "$ad/lang/$correctionsfile" or die "unzip failed: $UnzipError\n";
+    unzip $binzip => $langenumfile, Name => "$ad/lang/lang-enum.txt" or undef($langenumfile);
 
     # load then add string corrections to tts_object.
     my @corrects = loadvoicecorrect($tts_object, $correctionsfile, $language);

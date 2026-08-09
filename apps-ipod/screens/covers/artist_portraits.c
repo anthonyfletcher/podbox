@@ -171,19 +171,20 @@ static int artist_jump_next(void)
     return pf_idx.artist_ct - 1;
 }
 
+/* Step back to the first artist of a letter run. Same walk as the album
+ * model's jmp_idx_prev() -- see its comment for why the two cases collapse
+ * into these three lines, and for where the shape came from. */
 static int artist_jump_prev(void)
 {
     char *current = artist_name(center_index);
-    for (int i = center_index - 1; i > 0; i--)
+    int i = center_index - 1;
+
+    if (i > 0)
     {
         if (strncmp(artist_name(i), current, 1))
             current = artist_name(i);
-        while (i > 0)
-        {
-            if (strncmp(artist_name(i - 1), current, 1))
-                break;
+        while (i > 0 && strncmp(artist_name(i - 1), current, 1) == 0)
             i--;
-        }
         return i;
     }
     return 0;

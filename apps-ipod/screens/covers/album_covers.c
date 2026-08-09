@@ -306,20 +306,28 @@ static int jmp_idx_prev(void)
         return center_index;
     }
 
+    /* Step back to the first slide of a run.
+     *
+     * Two cases, and the same three lines cover both. Standing part-way into a
+     * run, the slide before us shares our key, so we keep it and walk to that
+     * run's start. Standing on a run's first slide, the one before belongs to
+     * the previous run, so we adopt *its* key and walk to that run's start
+     * instead. Either way the answer is the first slide holding `current`.
+     *
+     * Upstream (pictureflow) writes this as a `for` loop whose body always
+     * returns, i.e. a disguised `if`. Unwound here, and in artist_jump_prev(),
+     * which is the same walk over the artist list. */
     if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
     {
         int current_year = pf_idx.album_index[center_index].year;
+        int i = center_index - 1;
 
-        for (int i = center_index - 1; i > 0; i-- )
+        if (i > 0)
         {
-            if(pf_idx.album_index[i].year != current_year)
+            if (pf_idx.album_index[i].year != current_year)
                 current_year = pf_idx.album_index[i].year;
-            while (i > 0)
-            {
-                if (pf_idx.album_index[i-1].year != current_year)
-                    break;
+            while (i > 0 && pf_idx.album_index[i - 1].year == current_year)
                 i--;
-            }
             return i;
         }
     }
@@ -327,17 +335,15 @@ static int jmp_idx_prev(void)
     {
         bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
         char *current_selection = get_slide_name(center_index, by_artist);
+        int i = center_index - 1;
 
-        for (int i = center_index - 1; i > 0; i-- )
+        if (i > 0)
         {
-            if(strncmp(get_slide_name(i, by_artist), current_selection, 1))
+            if (strncmp(get_slide_name(i, by_artist), current_selection, 1))
                 current_selection = get_slide_name(i, by_artist);
-            while (i > 0)
-            {
-                if (strncmp(get_slide_name(i-1, by_artist), current_selection, 1))
-                    break;
+            while (i > 0 && strncmp(get_slide_name(i - 1, by_artist),
+                                    current_selection, 1) == 0)
                 i--;
-            }
             return i;
         }
     }

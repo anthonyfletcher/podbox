@@ -386,12 +386,13 @@ static int search_on_action(struct dialog *d, int action, void *data)
 
     /* The wheel means the query while the query has focus, and the results
      * once it does not -- the same handover the text-input dialog makes to its
-     * button row. */
-    /* The wheel and the caret taps never cross between the query and the
-     * results: inside the query they are the only way to change, advance or
-     * delete a character, so giving any of them a second meaning would cost an
-     * edit. Moving between the two is PLAY (down) and MENU (up), which are the
-     * physical buttons either side of the wheel and do nothing else here. */
+     * button row.
+     *
+     * The wheel and the caret taps never cross between the two: inside the
+     * query they are the only way to change, advance or delete a character, so
+     * giving any of them a second meaning would cost an edit. Moving between
+     * the two is PLAY (down) and MENU (up), the physical buttons either side
+     * of the wheel, which do nothing else here. */
     if (edit_line_owns_action(action))
     {
         if (s->selected < 0)

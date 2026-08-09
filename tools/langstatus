@@ -12,7 +12,19 @@ else
 fi
 
 UPDLANG=`dirname $0`/updatelang
-LANGDIR=`dirname $0`/../apps-ipod/lang
+
+# The application layer is not necessarily "apps": tools/configure --appsdir
+# moves it, and this fork builds from apps-ipod/. Honour COREAPPSDIR when make
+# exports it; otherwise pick whichever directory is actually there, so running
+# this by hand -- which is the only way it is ever run -- still works.
+ROOT=`dirname $0`/..
+if [ -n "$COREAPPSDIR" ]; then
+    LANGDIR="$COREAPPSDIR"/lang
+elif [ -d "$ROOT"/apps-ipod/lang ]; then
+    LANGDIR="$ROOT"/apps-ipod/lang
+else
+    LANGDIR="$ROOT"/apps/lang
+fi
 ENGLISH="$LANGDIR"/english.lang
 
 (for LANGFILE in $LANGDIR/*.lang; do

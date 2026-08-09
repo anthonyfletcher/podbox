@@ -822,6 +822,13 @@ static const char* NOINLINE get_pad_value(struct gui_wps *gwps,
     int n, len, bytes;
 
     if (!element || !element->params) return NULL;
+
+    /* buf_size is signed, and the clamps below take buf_size - 1: at zero that
+     * is -1, which reaches memcpy() as SIZE_MAX and writes buf[-1]. No caller
+     * can do that today -- every entry point passes sizeof a fixed array and
+     * the recursion hands buf_size on unchanged -- but that is a proof spanning
+     * four functions, and this one comparison means nobody has to redo it. */
+    if (buf_size <= 0) return NULL;
     struct skin_tag_parameter *params =
             SKINOFFSETTOPTR(skinbuffer, element->params);
 
