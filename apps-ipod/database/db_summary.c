@@ -16,13 +16,16 @@
  *
  * Parts, in order:
  *   - progress reporting and cancellation
- *   - sort comparators
- *   - writing entries into the index buffer
+ *   - name keys, and writing entries into the index buffer
  *   - the tagcache walks that populate it
- *   - the on-disk form
+ *   - the play log
+ *   - carrying figures across a rebuild, and create_album_index() driving it
+ *   - the on-disk form: saving, and the album and artist loaders
  *   - db_summary_build(), which reuses the saved index or rebuilds it
+ *   - the background pass: its progress reporting and the acquire/release pair
  *   - reading single records out of the saved file, without holding it
- *   - the background pass that keeps the saved index current
+ *   - the background pass again: its staleness gate, its run and its thread
+ *   - playing an album
  ****************************************************************************/
 
 #include <stdio.h>
@@ -2111,7 +2114,7 @@ void db_summary_progress(int *done, int *total)
  * reason -- what was the library like when we last finished. */
 #define DB_SUMMARY_DONE ROCKBOX_DIR "/db_summary.done"
 
-/* Read the index without a buffer of your own; see album_index.h.
+/* Read the index without a buffer of your own; see db_summary.h.
  *
  * Here rather than in the caller because IDX_BUILD_BUFSZ is here: how much a
  * build needs is the builder's business, and a second copy of that number

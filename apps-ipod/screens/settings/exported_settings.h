@@ -22,9 +22,9 @@ extern const struct menu_item_ex
         viewer_settings_menu,       /* playlist_menu.c  */
         equalizer_menu,             /* eq_menu.c        */
         theme_menu                  /* theme_menu.c     */
-        , album_covers_menu         /* album_covers_menu.c */
-        , art_cache_menu            /* album_covers_menu.c */
-        , text_viewer_menu         /* text_viewer_menu.c */
+        , album_covers_menu         /* album_covers_settings.c */
+        , art_cache_menu            /* album_covers_settings.c */
+        , text_viewer_menu          /* text_viewer_settings.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
         , basic_settings_menu       /* basic_settings.c */
         , wps_settings              /* general_settings.c -- shown under UI

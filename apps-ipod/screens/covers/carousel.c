@@ -430,15 +430,13 @@ static inline void buf_ctx_unlock(void)
     buf_ctx_locked = false;
 }
 
-/* Minimal stand-in for the plugin-only apps/plugins/lib/configfile.c (which
- * can't be reused as-is -- it derives its file path via
- * plugin_get_current_filename(), a genuinely plugin-lifecycle-only call).
- * This is deliberately bare-bones (a single fixed path, no version-gated
- * migration) since it's a transitional bridge -- real settings persistence
- * moves to global_settings/settings_list.c shortly after this lands. Reuses
- * the exact same line-parsing core functions (read_line/settings_parseline,
- * apps/misc.h) the plugin-lib version itself wraps via the plugin API's
- * function-pointer indirection. */
+/* The carousel's own settings file, kept apart from global_settings because
+ * they are the engine's state rather than anything the settings menus present.
+ *
+ * Deliberately bare-bones: one fixed path and no version-gated migration, so
+ * an unreadable or outdated file falls back to config_set_defaults() rather
+ * than being converted. The line parsing is the core's own
+ * (read_line/settings_parseline). */
 #define TYPE_INT  1
 #define TYPE_ENUM 2
 #define TYPE_BOOL 4
@@ -2941,7 +2939,7 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
      * re-sets it on the way back from the in-screen menu. */
     sb_set_persistent_title(model->title, Icon_NOICON, SCREEN_MAIN);
 
-    /* Jump to selected_file's album if one was passed (e.g. context_menu_show.c's
+    /* Jump to selected_file's album if one was passed (e.g. context_menu.c's
      * "Album covers" context-menu item on a specific track), otherwise the
      * currently-playing track's album, otherwise wherever was last viewed --
      * matching the old plugin's plugin_start() behavior exactly. */

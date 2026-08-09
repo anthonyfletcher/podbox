@@ -75,14 +75,15 @@ void browser_db_enter_menu_on_next_load(const char *menu_id);
 /* Arms a direct jump: root -> straight into that specific album's own track
  * list, identified by its tagcache seek (not name/position), skipping the
  * intermediate "Album" grouping listing entirely. Used by
- * apps/gui/album_covers.c so selecting a cover lands directly on that
+ * screens/covers/album_covers.c so selecting a cover lands directly on that
  * album's tracks in the core database browser, with a single BACK press
  * exiting straight back out (no intermediate level to unwind through). */
 void browser_db_enter_album_tracks_on_next_load(long album_seek,
                                              const char *album_title);
 /* As above, but jumps straight to a specific album-artist's album listing
- * (identified by seek), for Artist portraits (apps/gui/album_covers.c). A single
- * BACK returns to the carousel; selecting an album descends into its tracks. */
+ * (identified by seek), for Artist portraits
+ * (screens/covers/artist_portraits.c). A single BACK returns to the carousel;
+ * selecting an album descends into its tracks. */
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title);
 /* Number of direct tag-browse ("->") rows in the root ("main") menu -- rows

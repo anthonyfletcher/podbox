@@ -230,31 +230,6 @@ static const struct carousel_model album_model = {
     .title       = "Album Covers",
 };
 
-/* Minimal stand-in for the plugin-only apps/plugins/lib/configfile.c (which
- * can't be reused as-is -- it derives its file path via
- * plugin_get_current_filename(), a genuinely plugin-lifecycle-only call).
- * This is deliberately bare-bones (a single fixed path, no version-gated
- * migration) since it's a transitional bridge -- real settings persistence
- * moves to global_settings/settings_list.c shortly after this lands. Reuses
- * the exact same line-parsing core functions (read_line/settings_parseline,
- * apps/misc.h) the plugin-lib version itself wraps via the plugin API's
- * function-pointer indirection. */
-
-struct configdata
-{
-    int type;
-    int min;
-    int max;    /* enum: number of values */
-    union {
-        int *int_p;
-        bool *bool_p;
-    };
-    const char *name;
-    const char * const *values; /* enum only */
-};
-
-
-
 /**
  Return a pointer to the album name of the given slide_index
  */

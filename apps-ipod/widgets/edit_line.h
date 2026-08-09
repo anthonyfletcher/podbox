@@ -19,8 +19,7 @@
  *
  * The two caret shapes state what the wheel will do: a bar means "I will
  * insert a new character here", the inverse-video block means "I will keep
- * changing this one". See the iPod click-wheel text input specification and
- * docs/design/keyboard-gap-caret.md.
+ * changing this one".
  *
  * What accepts, cancels or otherwise surrounds the line is the caller's:
  * keyboard.c wraps it in a dialog with a Cancel/OK row, and the database

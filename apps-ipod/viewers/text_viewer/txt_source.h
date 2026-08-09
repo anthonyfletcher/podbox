@@ -63,8 +63,8 @@ typedef enum {
 
 /* ---- I/O vtable ------------------------------------------------------ */
 
-/* Rockbox: wrap rb->read / rb->lseek / rb->close.
- * Host: use ts_io_stdio() from ts_io_stdio.c. */
+/* How the engine reaches a file. ts_io_core() (ts_io_core.c) is the only
+ * implementation here; a port supplies its own. */
 typedef struct ts_io {
     long      (*read )(void *ctx, void *buf, size_t n);      /* <0 on error  */
     ts_off_t  (*seek )(void *ctx, ts_off_t off, int whence); /* SEEK_* codes */

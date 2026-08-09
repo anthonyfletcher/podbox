@@ -1701,7 +1701,6 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
  * reads the row's index entry, and a unique tag's rows have none -- their
  * tagfile entries carry idx_id = -1. It comes from the summary index instead,
  * which also holds the better figure: the maximum across the album's tracks.
- * See .specifications/ALBUM_YEAR_SORT.md.
  */
 /* Four digits and a space. The space is load-bearing: the sort reads a run of
  * digits as one number, so without a non-digit between them an album named "21"
@@ -1915,7 +1914,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * below, and selecting the top track already plays on through the rest.
      *
      * <Random> works at every level, including the track list: the handler in
-     * browser_db_enter_entry() picks a random NON-special row and adopts that
+     * browser_db_enter() picks a random NON-special row and adopts that
      * row's own newtable/extraseek, so on a track list it lands on
      * TABLE_PLAYTRACK and plays a random track from the album.
      *
@@ -2625,7 +2624,7 @@ static char pending_album_title[MENUENTRY_MAX_NAME];
 /* Arms a direct jump straight from the root into a specific album's own
  * track list -- skipping the intermediate "Album" grouping listing (all
  * albums) entirely, unlike a normal Album-browse session. Used by Album
- * covers (apps/gui/album_covers.c): it already knows exactly which album
+ * covers (screens/covers/album_covers.c): it already knows exactly which album
  * by tagcache seek (pf_idx.album_index[].seek), the same identifier
  * tagcache_search_add_filter() takes elsewhere in this file, so there's no
  * need to search for the album by name/position at all -- that was the
@@ -2681,7 +2680,7 @@ static int browser_db_find_root_entry_by_tag(int tag)
      * the file-scope 'menu', which only holds the root while a fresh root is
      * loaded. The direct-entry callers below reach this at dirlevel 0, where the
      * two coincide -- but keying off the boot-time root can never go stale from
-     * a mid-tree browse state, matching browser_db_get_main_menu_tag_row(). */
+     * a mid-tree browse state, matching browser_db_get_main_menu_row(). */
     if (rootmenu < 0 || rootmenu >= menu_count)
         return -1;
     root = menus[rootmenu];

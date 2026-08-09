@@ -7,7 +7,7 @@
 
 /* Modal box primitive shared by the popup / yes-no / text-input dialogs.
  *
- * Two entry points, deliberately separate (see docs/design/dialog-widget.md):
+ * Two entry points, deliberately separate:
  *
  *   dialog_frame_box() - pure drawing: fill + border a centred box and return
  *                        its content viewport. No theme, no input loop. Used by

@@ -458,7 +458,7 @@ static bool aa_seen(unsigned int *seen, unsigned int h)
 
 /* Where an album-art image comes from: a file on disk (folder art), or a JPEG
  * blob embedded in an audio file (emb_pos >= 0, reusing metadata already parsed
- * by playback -- see art_cache_offer_current()). */
+ * by playback -- see aa_track_change_cb()). */
 struct aa_src
 {
     const char   *path;      /* file to read: the folder image, or the track */

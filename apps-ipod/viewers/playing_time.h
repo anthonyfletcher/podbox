@@ -1,6 +1,6 @@
 /***************************************************************************
  * Public entry point for the core-linked Playing Time screen
- * (apps/viweers/playing_time.c), ported from the playing_time plugin.
+ * (viewers/playing_time.c), ported from the playing_time plugin.
  * GNU General Public License (version 2+)
  *
  * Interface to playing_time.c.

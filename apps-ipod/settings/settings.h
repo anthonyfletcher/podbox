@@ -531,7 +531,7 @@ struct user_settings
     int wps_art_source;  /* WPS_ART_*: album cover, artist portrait, or by
                             where the playlist came from */
 
-    /* Modal dialog chrome (apps/gui/dialog.h). Applied in settings_apply() via
+    /* Modal dialog chrome (widgets/dialog.h). Applied in settings_apply() via
      * dialog_set_default_style(). The metrics always apply; what the colours do
      * depends on dialog_colors, one of DIALOG_COLORS_*. */
     int dialog_box_border_width;
@@ -557,9 +557,9 @@ struct user_settings
     /* Corner radius of the progress bar drawn by draw/progress_bar.c. */
     int progress_bar_radius;
 
-    /* apps/gui/album_covers.c settings -- see enum show_album_name_values /
-     * sort_albums_by_values / year_sort_order_values in album_covers.h for
-     * what the choice settings' integer values mean. */
+    /* screens/covers/album_covers.c settings. What the choice settings'
+     * integer values mean is in album_covers.h: enum show_album_name_values,
+     * sort_albums_by_values and year_sort_order_values. */
     bool debug_log_tagcache;   /* append tag-database progress to a file */
     bool debug_log_artcache;   /* append art-cache progress to a file */
     int  album_covers_center_margin;
@@ -582,7 +582,7 @@ struct user_settings
     int  music_menu_sig;
     /* DB_SORT_ALBUMS_*: how the database browser orders its album lists. The
      * year comes from the summary index, not the database, so this is separate
-     * from the carousel's own sort -- see .specifications/ALBUM_YEAR_SORT.md. */
+     * from the carousel's own sort. */
     int  database_sort_albums_by;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
@@ -657,11 +657,11 @@ struct user_settings
     /* Optional bold companion to font_file -- empty ("") means none is
      * configured, in which case anything that wants a bold look just
      * falls back to FONT_UI (font_file) unchanged. Currently only read by
-     * apps/gui/album_covers.c, for the album name; not a general theme
+     * screens/covers/album_covers.c, for the album name; not a general theme
      * concept like font_file, just a per-feature opt-in. */
     unsigned char bold_font_file[MAX_FILENAME+1];
     int glyphs_to_cache; /* default font allocation size in glyphs */
-    /* Core text viewer (apps/text_viewer). */
+    /* Core text viewer (viewers/text_viewer). */
     int text_viewer_colour_mode;  /* 0 theme, 1 inverted, 2 black-on-white,
                                      3 white-on-black */
     bool text_viewer_margin;      /* inset the page by a small border */

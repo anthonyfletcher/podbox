@@ -161,8 +161,7 @@ viewers/lyric_viewer/lyric_viewer.c
 
 /* Streaming text-extraction engine behind the core-linked text viewer. Turns
  * plain/markdown/html/rtf/fb2/epub/docx/pdf into a stream of UTF-8. Platform
- * coupling is confined to ts_io_core.c; ts_io_rockbox.c (plugin API) and
- * ts_io_stdio.c (host test harness) are deliberately not built here. */
+ * coupling is confined to ts_io_core.c; the rest of the engine is portable. */
 viewers/text_viewer/text_viewer.c
 viewers/text_viewer/ts_charset.c
 viewers/text_viewer/ts_core.c

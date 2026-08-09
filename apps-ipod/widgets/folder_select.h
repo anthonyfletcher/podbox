@@ -1,7 +1,7 @@
 /***************************************************************************
  * Original code from RockBox
  * was: apps/gui/folder_select.h
- * Public entry point for the core folder-tree picker (apps/folder_select.c),
+ * Public entry point for the core folder-tree picker (widgets/folder_select.c),
  * ported from the db_folder_select plugin.
  * GNU General Public License (version 2+)
  *

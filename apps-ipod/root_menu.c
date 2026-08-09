@@ -557,10 +557,11 @@ static int artist_portraits_scrn(void* param)
 }
 
 /* The text viewer restores the reading position itself, so this only has to
- * find the document. lastdoc_available() has normally already hidden the row
- * when there is nothing to open, but it is asked when the menu is drawn and
- * the file can go away between then and the keypress -- hence the same
- * question again here, with something to say when the answer has changed. */
+ * find the document. text_viewer_last_document() has normally already hidden
+ * the row when there is nothing to open, but it is asked when the menu is
+ * drawn and the file can go away between then and the keypress -- hence the
+ * same question again here, with something to say when the answer has
+ * changed. */
 static int lastdoc_scrn(void* param)
 {
     char path[MAX_PATH];
@@ -1358,7 +1359,7 @@ static inline int load_screen(int screen)
      * WPS select-action and the custom STOP-opens-coverflow behavior),
      * bypassing this dispatcher entirely, so it pushes/pops
      * ACTIVITY_ALBUMCOVERS itself to cover both entry paths. See
-     * apps/gui/album_covers.c's album_covers(). */
+     * screens/covers/album_covers.c's album_covers(). */
 
     if (activity != ACTIVITY_UNKNOWN)
         push_current_activity(activity);

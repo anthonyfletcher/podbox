@@ -4,7 +4,7 @@
  * Copyright (C) 2023 Christian Soffke
  *
  * Ported from apps/plugins/lib/mul_id3.c to the core; used only by the
- * core Properties screen (apps/properties.c).
+ * core Properties screen (viewers/properties.c).
  * GNU General Public License (version 2+)
  *
  * Aggregates tags across many files: walks a directory collecting counts,

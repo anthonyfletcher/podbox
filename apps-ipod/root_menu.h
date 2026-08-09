@@ -54,7 +54,7 @@ enum {
     GO_TO_PICTUREFLOW,
     /* Reserved block of main-menu shortcuts, one per direct tag-browse row of
      * tagnavi.config's root ("main") menu (Album/Artist/Genre/etc), looked up
-     * by browser_db_get_main_menu_tag_row() rather than hardcoded per-tag cases
+     * by browser_db_get_main_menu_row() rather than hardcoded per-tag cases
      * so they survive tagnavi.config edits/reordering. TAGNAVI_MAIN_MENU_SLOTS
      * covers today's 8 such rows with headroom for a customized
      * tagnavi_user.config; browser_db_get_main_menu_tag_row_count() is used to
@@ -69,9 +69,9 @@ enum {
      * Album covers instead of the generic root menu. */
     GO_TO_ALBUM_COVERS_TRACKS,
     /* Artist portraits: the coverflow carousel over the album-artist list
-     * (apps/gui/album_covers.c's artist_portraits()). Selecting an artist
-     * reuses GO_TO_ALBUM_COVERS_TRACKS to open its album listing, and BACK
-     * from there returns here via the normal previous-screen tracking. */
+     * (screens/covers/artist_portraits.c). Selecting an artist reuses
+     * GO_TO_ALBUM_COVERS_TRACKS to open its album listing, and BACK from
+     * there returns here via the normal previous-screen tracking. */
     GO_TO_ARTIST_PORTRAITS,
     /* Reopen the most recently read document in the text viewer, which
      * restores its own reading position (see text_viewer_last_document()).

@@ -101,7 +101,7 @@ void list_init(void)
  * reaches us through list_init_viewports(), but the row config (%Lb) is
  * DYNAMIC and takes effect immediately -- so the skin can widen its rows while
  * our parent is still narrow. The rows then draw outside the parent, and since
- * list_skinned_draw() clears only the parent, whatever lands beyond it is never
+ * skinlist_draw() clears only the parent, whatever lands beyond it is never
  * erased and accumulates as the selection moves.
  *
  * This is checked on the draw path rather than driven by an event, because the

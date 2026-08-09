@@ -5,9 +5,10 @@
  * between the engine and its two screens.
  ****************************************************************************/
 
-/* Coverflow "carousel" engine shared by Album Covers (apps/gui/album_covers.c)
- * and Artist Portraits (apps/gui/artist_portraits.c). The engine (rendering,
- * slide cache, scroll, input loop, thread) is generic; each screen supplies a
+/* Coverflow "carousel" engine shared by Album Covers
+ * (screens/covers/album_covers.c) and Artist Portraits
+ * (screens/covers/artist_portraits.c). The engine (rendering, slide cache,
+ * scroll, input loop, thread) is generic; each screen supplies a
  * carousel_model describing what the slides are. This header is the interface
  * between the two: the model vtable, the shared index/rendering state the
  * models read, and the engine helpers they call. */
@@ -120,7 +121,7 @@ struct db_summary_t {
     uint32_t            header; /*INDEX_HDR*/
     /* Signed, not unsigned, and that is load-bearing. The builder writes the
      * "untagged" entries backwards from the start of each array, indexing with
-     * -artist_ct / -album_ct (db_summary.c, write_artist_index()). As uint16_t
+     * -artist_ct / -album_ct (db_summary.c, write_artist_entry()). As uint16_t
      * these promoted to int and negated correctly; as an unsigned 32-bit type
      * the negation would wrap to about 4 billion and index off the end of the
      * buffer. int32_t raises the ceiling from 65535 to 2^31 and leaves every

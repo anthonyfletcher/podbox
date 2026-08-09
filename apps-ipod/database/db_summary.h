@@ -140,7 +140,7 @@ int compare_albums(const void *a_v, const void *b_v);
 void db_summary_init(void);
 
 /* That pass, for the standard bg_task_rebuild()/bg_task_update() triggers.
- * It outranks the artwork cache -- see the ranking note in album_index.c. */
+ * It outranks the artwork cache -- see the ranking note in db_summary.c. */
 extern struct bg_task db_summary_task;
 
 /* True while that pass is building -- for anything that should stay off the

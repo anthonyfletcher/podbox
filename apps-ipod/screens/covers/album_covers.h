@@ -56,8 +56,8 @@ enum carousel_background_values {
     CAROUSEL_BG_BACKGROUND       /* the same background as every other screen */
 };
 
-/* selected_file: jump to this file's album on open (e.g. context_menu_show.c's "Album
- * covers" context-menu item on a specific track); NULL for the normal
+/* selected_file: jump to this file's album on open (e.g. context_menu.c's
+ * "Album covers" context-menu item on a specific track); NULL for the normal
  * entry paths (main menu, WPS shortcuts) -- falls back to the currently
  * playing track's album, or wherever was last viewed. */
 int album_covers(const char *selected_file);

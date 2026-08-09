@@ -27,9 +27,9 @@
  * Input is read in CONTEXT_WPS, so the transport keys are the ones already in
  * the fingers from the WPS: left/right skip, Play pauses, the wheel is volume.
  *
- * All of .specifications/LYRIC_VIEWER.md except the track-info and elapsed
- * headers: the screen, wrapping, the slide, word highlighting and the
- * settings. Settings are read live through the LV_* macros below rather than
+ * The screen, wrapping, the slide, word highlighting and the settings; no
+ * track-info or elapsed header, which the WPS behind it already shows.
+ * Settings are read live through the LV_* macros below rather than
  * cached, so holding Menu and changing one takes effect on the next draw;
  * only the few that move the layout need lv_apply_settings().
  *

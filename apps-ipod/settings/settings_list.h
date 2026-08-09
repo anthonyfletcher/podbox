@@ -36,7 +36,7 @@ union storage_type {
 #define F_T_MASK     0x7
 
 struct sound_setting {
-    int setting; /* from the enum in firmware/sound.h */
+    int setting; /* from the enum in firmware/export/sound.h */
 };
 #define F_T_SOUND    0x8 /* this variable uses the set_sound stuff,         \
                             | with one of the above types (usually F_T_INT) \

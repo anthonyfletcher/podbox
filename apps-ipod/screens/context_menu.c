@@ -1277,7 +1277,7 @@ static int hotkey_execute_menu(void)
     return hotkey_run_menu(flag, true, 0);
 }
 
-/* Any desired hotkey functions go here, in the enum in context_menu_show.h,
+/* Any desired hotkey functions go here, in the enum in context_menu.h,
    and in the settings menu in settings_list.c.  The order here
    is not important. */
 static const struct hotkey_assignment hotkey_items[] = {
