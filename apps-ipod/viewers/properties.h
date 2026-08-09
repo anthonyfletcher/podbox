@@ -1,6 +1,6 @@
 /***************************************************************************
  * Public entry point for the core-linked Properties screen
- * (apps/viewers/properties.c), ported from the properties plugin.
+ * (viewers/properties.c), ported from the properties plugin.
  * GNU General Public License (version 2+)
  *
  * Interface to properties.c.

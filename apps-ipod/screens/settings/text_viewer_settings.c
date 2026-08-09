@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Settings menu for the core text viewer (apps/viewers/text_viewer). The same
+ * Settings menu for the core text viewer (viewers/text_viewer). The same
  * menu is reached from Settings and, in the viewer, by holding Menu.
  ****************************************************************************/
 
