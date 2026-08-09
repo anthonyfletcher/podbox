@@ -5138,15 +5138,13 @@ static void tagcache_thread(void)
                 remove_files();
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
-                /* commit() unloads the RAM copy before it starts and nothing
-                 * here used to put it back, so a rebuild from the menu left
-                 * the database on the disk for the rest of the session: every
-                 * search a seek, the album index half a second an album, the
-                 * browser slow, and get_progress() unable to report a total
-                 * because it has no entry count to divide by. It came back
-                 * only on the next USB session or reboot, which is what made
-                 * it look like a USB problem. Q_UPDATE below always did this;
-                 * the omission here was not deliberate.
+                /* Load it back, as Q_UPDATE below does. commit() unloads the
+                 * RAM copy before it starts, so without this a rebuild from
+                 * the menu leaves the database on the disk for the rest of the
+                 * session: every search a seek, the album index half a second
+                 * an album, the browser slow, and get_progress() with no entry
+                 * count to divide by. It returns only on the next USB session
+                 * or reboot, which is what makes it look like a USB fault.
                  *
                  * No check_deleted_files() to go with it: a rebuild has just
                  * regenerated the whole database from what is on the disk, so

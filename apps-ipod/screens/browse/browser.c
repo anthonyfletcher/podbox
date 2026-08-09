@@ -317,10 +317,9 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
         return NULL;
 
     /* Both kinds of row want the placeholder returned transparently, so a row
-     * with no art still fills its viewport. Artist rows once took a different
-     * path here, to avoid showing the album "?" on a person; the two
-     * placeholders have since become one image, so the distinction no longer
-     * draws anything different. */
+     * with no art still fills its viewport. Album and artist rows share one
+     * placeholder image, so there is nothing to distinguish between here --
+     * only the folder lookup above differs. */
     if (!art_cache_lookup(dir, browser_aa_size_idx, aat, sizeof(aat), NULL))
         return NULL;    /* no art and no placeholder generated yet */
 

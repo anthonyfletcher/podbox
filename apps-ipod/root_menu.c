@@ -381,12 +381,12 @@ static int browser(void* param)
              * track list should return straight to Album covers, not the
              * main menu.
              *
-             * GO_TO_PREVIOUS, not GO_TO_PICTUREFLOW directly: this case's
+             * GO_TO_PREVIOUS, not GO_TO_ALBUM_COVERS directly: this case's
              * items[] entry is invoked through load_screen(), which already
              * tracks "the screen active before this one" itself (its local
              * old_previous, restored into the global last_screen exactly
              * when a callee returns GO_TO_PREVIOUS). Returning
-             * GO_TO_PICTUREFLOW directly bypassed that and left last_screen
+             * GO_TO_ALBUM_COVERS directly bypassed that and left last_screen
              * pointing at GO_TO_ALBUM_COVERS_TRACKS itself (the screen that
              * "ran" from load_screen()'s point of view) -- a value that
              * only makes sense as a one-shot dispatch armed by Album
@@ -398,7 +398,7 @@ static int browser(void* param)
              * Album covers and the bare Music menu that never reached the
              * real main menu. GO_TO_PREVIOUS here instead lets
              * load_screen()'s own bookkeeping do this correctly: it was
-             * called with old_previous already equal to GO_TO_PICTUREFLOW
+             * called with old_previous already equal to GO_TO_ALBUM_COVERS
              * (Album covers is the only caller of this entry point), so
              * returning GO_TO_PREVIOUS resolves back to exactly that. */
             if (ret_val == GO_TO_ROOT)
@@ -538,7 +538,7 @@ static int load_bmarks(void* param)
     return GO_TO_PREVIOUS;
 }
 
-static int pictureflow_scrn(void* param)
+static int album_covers_scrn(void* param)
 {
     (void)param;
     return album_covers(NULL);
@@ -649,7 +649,7 @@ static const struct root_items items[] = {
     [GO_TO_PLAYLIST_VIEWER] = { playlist_view, NULL, &playlist_options },
     [GO_TO_SYSTEM_SCREEN] = { miscscrn, &info_menu, &system_menu },
     [GO_TO_SHORTCUTMENU] = { do_shortcut_menu, NULL, NULL },
-    [GO_TO_PICTUREFLOW] = { pictureflow_scrn, NULL, NULL },
+    [GO_TO_ALBUM_COVERS] = { album_covers_scrn, NULL, NULL },
     [GO_TO_ARTIST_PORTRAITS] = { artist_portraits_scrn, NULL, NULL },
     [GO_TO_LASTDOC] = { lastdoc_scrn, NULL, &text_viewer_menu },
     [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
@@ -721,7 +721,8 @@ MENUITEM_RETURNVALUE(file_browser, ID2P(LANG_DIR_BROWSER), GO_TO_FILEBROWSER,
                         NULL, Icon_file_view_menu);
 MENUITEM_RETURNVALUE(db_browser, ID2P(LANG_MUSIC_BROWSER), GO_TO_DBBROWSER,
                         NULL, Icon_Audio);
-MENUITEM_RETURNVALUE(pictureflow_item, ID2P(LANG_ALBUM_COVERS), GO_TO_PICTUREFLOW,
+MENUITEM_RETURNVALUE(album_covers_item, ID2P(LANG_ALBUM_COVERS),
+                     GO_TO_ALBUM_COVERS,
                         NULL, Icon_Folder);
 MENUITEM_RETURNVALUE(artist_portraits_item, ID2P(LANG_ARTIST_PORTRAITS), GO_TO_ARTIST_PORTRAITS,
                         NULL, Icon_Folder);
@@ -826,8 +827,12 @@ struct menu_item_ex root_menu_;
 static struct menu_callback_with_desc root_menu_desc = {
         item_callback, ID2P(LANG_ROCKBOX_TITLE), Icon_Rockbox };
 
+/* These strings are the tokens written into the saved main-menu order, so they
+ * are an on-disk format and not free to rename with the code. "pictureflow" is
+ * the screen now called Album covers; changing it would drop the row from
+ * every config.cfg already out there. */
 static struct menu_table menu_table[] = {
-    { "pictureflow", &pictureflow_item },
+    { "pictureflow", &album_covers_item },
     { "artistportraits", &artist_portraits_item },
     { "database", &db_browser },
     { "files", &file_browser },
@@ -882,7 +887,7 @@ static void root_menu_apply_canonical_order(void)
 {
     static const struct menu_item_ex * const before_tagnavi[] = {
         &wps_item, &continue_reading,
-        &db_browser, &pictureflow_item, &artist_portraits_item,
+        &db_browser, &album_covers_item, &artist_portraits_item,
         &random_album_item,
     };
     static const struct menu_item_ex * const after_tagnavi[] = {
@@ -1053,12 +1058,11 @@ static void root_menu_fixup_tagnavi_slots(void)
         unsigned i;
         bool present = false;
 
-        /* Only slots the saved configuration actually named. This used to add
-         * every slot backed by a real row, which is not the same thing at all
-         * -- it read as "turning one row on turned them all on", because the
-         * first customization sets root_menu_customized and the next boot then
-         * added the lot. The comment above always claimed it restored what the
-         * configuration wanted; nothing recorded what that was until now. */
+        /* Only slots the saved configuration actually named -- which is not
+         * the same as every slot backed by a real row. Adding those instead
+         * reads to the user as "turning one row on turned them all on": the
+         * first customization sets root_menu_customized, and the next boot
+         * adds the lot. wanted_tagnavi_slots is what records the difference. */
         if (!(wanted_tagnavi_slots & (1u << n)))
             continue;
 
@@ -1354,7 +1358,7 @@ static inline int load_screen(int screen)
         activity = ACTIVITY_SETTINGS;
     else if (screen == GO_TO_SYSTEM_SCREEN)
         activity =  ACTIVITY_SYSTEMSCREEN;
-    /* Deliberately NOT handling GO_TO_PICTUREFLOW here: album_covers()
+    /* Deliberately NOT handling GO_TO_ALBUM_COVERS here: album_covers()
      * itself is also reachable directly from apps/gui/wps.c (the "coverflow"
      * WPS select-action and the custom STOP-opens-coverflow behavior),
      * bypassing this dispatcher entirely, so it pushes/pops

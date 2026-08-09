@@ -120,8 +120,8 @@ screens/system/usb_screen.c
 #endif
 
 /* Core-linked "Album covers" screen, ported from the pictureflow plugin.
- * Gated on HAVE_TAGCACHE like the rest of the tag-database UI whose entry
- * point it replaced -- see root_menu.c's GO_TO_PICTUREFLOW. */
+ * Gated on HAVE_TAGCACHE like the rest of the tag-database UI -- it browses
+ * the database index; see root_menu.c's GO_TO_ALBUM_COVERS. */
 #ifdef HAVE_TAGCACHE
 screens/covers/album_covers.c
 screens/covers/artist_portraits.c

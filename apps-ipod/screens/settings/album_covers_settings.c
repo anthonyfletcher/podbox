@@ -61,10 +61,9 @@ static int art_cache_menu_update(void)
 MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),
                   art_cache_menu_update, NULL, Icon_NOICON);
 
-/* The index rebuild/update actions used to live here. They are in the Database
- * menu now (general_settings.c): the index stopped being the carousel's
- * private list when the charts started reading it too, and it goes stale for
- * the database's reasons rather than the carousel's. */
+/* The index rebuild/update actions belong to the Database menu
+ * (general_settings.c), not here: the charts read the same index, and it goes
+ * stale for the database's reasons rather than the carousel's. */
 
 /* Off decodes the source image once per thumbnail size; on decodes it once for
  * the largest and derives the rest from that. Only affects thumbnails generated

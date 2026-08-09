@@ -2625,7 +2625,7 @@ static char pending_album_title[MENUENTRY_MAX_NAME];
  * track list -- skipping the intermediate "Album" grouping listing (all
  * albums) entirely, unlike a normal Album-browse session. Used by Album
  * covers (screens/covers/album_covers.c): it already knows exactly which album
- * by tagcache seek (pf_idx.album_index[].seek), the same identifier
+ * by tagcache seek (carousel_idx.album_index[].seek), the same identifier
  * tagcache_search_add_filter() takes elsewhere in this file, so there's no
  * need to search for the album by name/position at all -- that was the
  * root cause of an earlier, much more fragile version of this landing on

@@ -49,8 +49,7 @@
 #include "system/activity.h"
 #include "system/app_buffer.h"        /* where the index is read into */
 #include "database/tagcache.h"
-#include "database/db_summary.h"
-#include "screens/covers/carousel.h"      /* struct album_data, SUCCESS/ERROR_* */
+#include "database/db_summary.h"   /* the index, and SUCCESS/ERROR_* */
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
 #include "root_menu.h"

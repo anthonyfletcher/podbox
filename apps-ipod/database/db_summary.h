@@ -9,15 +9,107 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include "database/tagcache.h"
 #include "system/bg_task.h"
 
-struct db_summary_t;
-struct album_data;
+/* What a build or a load returns. Negative is failure. The carousel's
+ * build_index() hands these straight back, so they reach the engine too. */
+#define SUCCESS              0
+#define ERROR_NO_ALBUMS     -1
+#define ERROR_BUFFER_FULL   -2
+#define ERROR_NO_ARTISTS    -3
+#define ERROR_USER_ABORT    -4
+
+/* One album. Filled by db_summary_build*(), read by whoever asked for the
+ * index -- Album covers, the album charts, the browser's year sort. */
+struct album_data {
+    int name_idx;     /* offset to the album name */
+    int artist_idx;   /* offset to the artist name */
+    /* Identity that survives a database commit, hashed from the two names
+     * above. The seeks below do not survive one: any commit that adds a track
+     * re-sorts the whole album tagfile and moves every seek in it. So this is
+     * what an entry is matched by when figures are carried from one build of
+     * the index to the next. */
+    uint32_t key;
+    int year;         /* album year */
+    /* Playback history, summarised over the album's tracks by
+     * assign_album_stats(). The album charts sort on these; nothing else
+     * reads them. Both are 0 for an album that has never been played, which
+     * is why the charts exclude 0 rather than showing it at one end. */
+    int playcount;    /* total plays across the album */
+    long lastplayed;  /* the most recent of its tracks */
+    long artist_seek; /* artist taglist position */
+    long seek;        /* album taglist position */
+    /* art_cache key for the folder holding this album's tracks, resolved once
+     * during the build. A slide load is then a file open, where finding the
+     * folder from the seeks above would be a database search per slide. 0 if
+     * the build could not resolve it. */
+    unsigned int art_hash;
+    /* That folder's parent, which is the artist's own. Carried here because it
+     * comes from the same path for free, and the artist list is filled by
+     * rolling the album list up rather than by walking the database again. */
+    unsigned int artist_art_hash;
+};
+
+struct artist_data {
+    int name_idx; /* offset to the artist name */
+    uint32_t key; /* as struct album_data's, from the name alone */
+    /* As struct album_data's pair, summarised over everything by this artist.
+     * "Artist" here is the album artist -- the tag this list is built from
+     * (see build_artist_index()) -- so a guest appearance counts towards the
+     * record's artist, not the guest. */
+    int playcount;
+    long lastplayed;
+    long seek;    /* artist taglist position */
+    /* As struct album_data's field, for the artist's own folder -- the parent
+     * of its albums', under the <artist>/<album>/<track> layout this list
+     * assumes. */
+    unsigned int art_hash;
+};
+
+/* The whole index: the two arrays, the name blobs they index into, and what
+ * the database looked like when it was built. Written to disk verbatim, so
+ * see save_album_index() before adding a field. */
+struct db_summary_t {
+    uint32_t            header; /*INDEX_HDR*/
+    /* Signed, not unsigned, and that is load-bearing. The builder writes the
+     * "untagged" entries backwards from the start of each array, indexing with
+     * -artist_ct / -album_ct (db_summary.c, write_artist_entry()). As uint16_t
+     * these promoted to int and negated correctly; as an unsigned 32-bit type
+     * the negation would wrap to about 4 billion and index off the end of the
+     * buffer. int32_t raises the ceiling from 65535 to 2^31 and leaves every
+     * existing expression meaning what it meant. */
+    int32_t             artist_ct;
+    int32_t             album_ct;
+    /* What the database looked like when this index was built. Both come from
+     * tagcache_get_marks(): commitid moves when tracks are added, serial once
+     * per logged play. They say what has happened since, so a later build can
+     * tell which entries still need their figures recomputed. */
+    int32_t             commitid;
+    int32_t             serial;
+    /* Entries tagcache had flagged deleted. A deletion moves figures that
+     * cannot be matched back to an album, so a build that finds this changed
+     * summarises everything rather than carrying anything across. */
+    int32_t             deleted;
+
+    char               *artist_names;
+    struct artist_data *artist_index;
+    size_t              artist_len;
+
+    unsigned int        album_untagged_idx;
+    char               *album_names;
+    struct album_data  *album_index;
+    size_t              album_len;
+    long                album_untagged_seek;
+
+    void * buf;
+    size_t buf_sz;
+};
 
 /* Fill the caller's index from the saved file, rebuilding it from tagcache
  * first if there is none or it predates the current cache version. SUCCESS or
- * an ERROR_* from carousel.h.
+ * an ERROR_*.
  *
  * Only one build may run at a time. A caller arriving while the background
  * pass is running waits for it and then reads what it wrote, rather than
@@ -30,13 +122,14 @@ struct album_data;
  * between the two, which is the point. */
 int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz);
 
-/* The above against the carousel's own pf_idx; carousel_model.build_index. */
+/* The above against the carousel's own carousel_idx;
+ * carousel_model.build_index. */
 int db_summary_build(void);
 
 /* Claim memory and fill 'target' from the saved index, building it first if
  * there is none. For a caller that just wants to read the album list and has
  * no buffer of its own -- unlike the carousel, which has already claimed the
- * app buffer for its slides. SUCCESS, or an ERROR_* from carousel.h.
+ * app buffer for its slides. SUCCESS, or an ERROR_*.
  *
  * On success '*handle' is the claim, and db_summary_release() must be given
  * it once the caller has finished reading: 'target' points into that memory,
@@ -65,7 +158,7 @@ struct db_summary_reader {
 };
 
 /* Open the saved index, building one first if there is none to read. SUCCESS,
- * or an ERROR_* from carousel.h. On success, and only then, the caller must
+ * or an ERROR_*. On success, and only then, the caller must
  * match this with db_summary_reader_close(). */
 int db_summary_reader_open(struct db_summary_reader *r);
 void db_summary_reader_close(struct db_summary_reader *r);

@@ -35,7 +35,8 @@ static bool artist_resume_valid = false;
 
 static char *artist_name(int index)
 {
-    return pf_idx.artist_names + pf_idx.artist_index[index].name_idx;
+    return carousel_idx.artist_names
+         + carousel_idx.artist_index[index].name_idx;
 }
 
 /* The slide for the album-artist of `id3`, or -1 if this list has no such
@@ -56,7 +57,7 @@ static int artist_find_index(const struct mp3entry *id3)
     else if (id3->artist)
         current = id3->artist;
 
-    for (int i = 0; i < pf_idx.artist_ct; i++)
+    for (int i = 0; i < carousel_idx.artist_ct; i++)
         if (!strcasecmp(artist_name(i), current))
             return i;
 
@@ -81,8 +82,8 @@ static int compare_artists_by_plays(const void *a_v, const void *b_v)
 static int artist_build_index(void)
 {
     struct tagcache_search tcs;   /* local; the engine's shared tcs stays private */
-    void *buf = pf_idx.buf;
-    size_t buf_size = pf_idx.buf_sz;
+    void *buf = carousel_idx.buf;
+    size_t buf_size = carousel_idx.buf_sz;
     bool by_plays = global_settings.album_covers_sort_artists_by
                         == SORT_ARTISTS_BY_PLAYS;
     int res;
@@ -92,13 +93,11 @@ static int artist_build_index(void)
     /* Read the saved index first, and only walk the database when there is
      * none to read.
      *
-     * This used to rebuild on every open, on the reasoning that artists are
-     * few and a rebuild is cheap. Cheap is not free, and it stopped being
-     * either once sorting by plays was an option: the figures that sort needs
-     * cost a filtered search per artist on the build path, where the saved
-     * index simply has them. Reading is faster in both orders, and makes the
-     * sort cost nothing at all. */
-    res = db_summary_load_artists(&pf_idx, &buf, &buf_size);
+     * Rebuilding here instead looks cheap -- artists are few -- and is not.
+     * Sorting by plays needs each artist's figures, which cost a filtered
+     * search per artist on the build path and come free with the saved index.
+     * Reading wins in both sort orders, and makes the by-plays one free. */
+    res = db_summary_load_artists(&carousel_idx, &buf, &buf_size);
 
     /* Only a missing or unusable index falls through to a build. ERROR_USER_ABORT
      * means the user cancelled out of waiting for the background pass, and
@@ -108,21 +107,22 @@ static int artist_build_index(void)
     {
         /* The background pass has not produced an index yet, or a rebuild is
          * pending. Ask for the figures here only if the sort will use them. */
-        buf = pf_idx.buf;
-        buf_size = pf_idx.buf_sz;
+        buf = carousel_idx.buf;
+        buf_size = carousel_idx.buf_sz;
         ALIGN_BUFFER(buf, buf_size, sizeof(long));
-        res = db_summary_build_artists(&pf_idx, &tcs, &buf, &buf_size, by_plays);
+        res = db_summary_build_artists(&carousel_idx, &tcs, &buf, &buf_size,
+                                       by_plays);
     }
 
     if (res < SUCCESS)
         return res;
 
-    pf_idx.buf = buf;
-    pf_idx.buf_sz = buf_size;
-    pf_idx.album_ct = 0;   /* artist model has no album list */
+    carousel_idx.buf = buf;
+    carousel_idx.buf_sz = buf_size;
+    carousel_idx.album_ct = 0;   /* artist model has no album list */
 
     if (by_plays)
-        qsort(pf_idx.artist_index, pf_idx.artist_ct,
+        qsort(carousel_idx.artist_index, carousel_idx.artist_ct,
               sizeof(struct artist_data), compare_artists_by_plays);
 
     return SUCCESS;
@@ -130,14 +130,14 @@ static int artist_build_index(void)
 
 static int artist_count(void)
 {
-    return pf_idx.artist_ct;
+    return carousel_idx.artist_ct;
 }
 
 /* carousel_model.art_key for the artist model: the shared cache's key for this
  * album-artist's own folder, resolved when the index was built. */
 static unsigned int artist_art_key(int index)
 {
-    return pf_idx.artist_index[index].art_hash;
+    return carousel_idx.artist_index[index].art_hash;
 }
 
 /* Artists have no per-screen pfraw cache; a missing photo just shows the empty
@@ -156,8 +156,9 @@ static int artist_enter(int index)
 {
     artist_resume_index = index;
     artist_resume_valid = true;
-    browser_db_enter_artist_albums_on_next_load(pf_idx.artist_index[index].seek,
-                                             artist_name(index));
+    browser_db_enter_artist_albums_on_next_load(
+                                carousel_idx.artist_index[index].seek,
+                                artist_name(index));
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
 
@@ -165,10 +166,10 @@ static int artist_enter(int index)
 static int artist_jump_next(void)
 {
     char *current = artist_name(center_index);
-    for (int i = center_index + 1; i < pf_idx.artist_ct; i++)
+    for (int i = center_index + 1; i < carousel_idx.artist_ct; i++)
         if (strncmp(artist_name(i), current, 1))
             return i;
-    return pf_idx.artist_ct - 1;
+    return carousel_idx.artist_ct - 1;
 }
 
 /* Step back to the first artist of a letter run. Same walk as the album

@@ -51,7 +51,7 @@ enum {
     GO_TO_PLAYLIST_VIEWER,
     GO_TO_SYSTEM_SCREEN,
     GO_TO_SHORTCUTMENU,
-    GO_TO_PICTUREFLOW,
+    GO_TO_ALBUM_COVERS,
     /* Reserved block of main-menu shortcuts, one per direct tag-browse row of
      * tagnavi.config's root ("main") menu (Album/Artist/Genre/etc), looked up
      * by browser_db_get_main_menu_row() rather than hardcoded per-tag cases

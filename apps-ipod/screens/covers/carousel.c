@@ -87,7 +87,7 @@
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
-#include "carousel.h"     /* shared carousel engine interface (pf_idx, model, ...) */
+#include "carousel.h"     /* the shared engine: carousel_idx, the model */
 
 /******************************* Globals ***********************************/
 static fb_data *lcd_fb;
@@ -368,7 +368,7 @@ struct event_queue thread_q;
 
 static struct buflib_context buf_ctx;
 
-struct db_summary_t pf_idx;
+struct db_summary_t carousel_idx;
 
 static bool thread_is_running;
 static bool wants_to_quit;
@@ -2098,7 +2098,7 @@ int pf_resume_album_index;
  * splashes on this rather than reaching into aa_cache directly. */
 bool carousel_cache_ready(void)
 {
-    return aa_cache.inspected >= pf_idx.album_ct;
+    return aa_cache.inspected >= carousel_idx.album_ct;
 }
 
 /* carousel_settle: settle an in-progress scroll animation to idle. */
@@ -2116,11 +2116,11 @@ void carousel_reload(int (*compare)(const void *, const void *))
     end_pf_thread(); /* stop loading of covers */
 
     if (compare)
-        qsort(pf_idx.album_index, pf_idx.album_ct,
+        qsort(carousel_idx.album_index, carousel_idx.album_ct,
               sizeof(struct album_data), compare);
 
     /* Empty cache and restart cover loading thread */
-    buflib_init(&buf_ctx, (void *)pf_idx.buf, pf_idx.buf_sz);
+    buflib_init(&buf_ctx, (void *)carousel_idx.buf, carousel_idx.buf_sz);
     empty_slide_hid = read_pfraw(EMPTY_SLIDE, 0);
     initialize_slide_cache();
     create_pf_thread();
@@ -2318,7 +2318,8 @@ static void update_scroll_animation(void)
      * frame could sail past it: the direction test at the end of this
      * function would throw the flip into reverse, and center_index would
      * meanwhile leave 0..number_of_slides-1, which album_covers.c's
-     * draw_album_text() uses to index pf_idx.album_index[] without a range
+     * draw_album_text() uses to index carousel_idx.album_index[] without a
+     * range
      * check. Land on the target exactly instead. */
     int remain = (step < 0) ? slide_frame - (target << 16)
                             : (target << 16) - slide_frame;
@@ -2442,7 +2443,7 @@ static void cleanup(void)
     backlight_set_timeout(global_settings.backlight_timeout);
     backlight_set_timeout_plugged(global_settings.backlight_timeout_plugged);
 
-    /* Nothing to free: pf_idx.buf points into the shared app buffer (see
+    /* Nothing to free: carousel_idx.buf points into the shared app buffer (see
      * init()), not a buflib handle. But that buffer was claimed for this
      * screen's lifetime, so hand it back -- otherwise the next screen to want
      * it panics. The bold album-name font is the shared font_get_ui_bold() --
@@ -2601,8 +2602,8 @@ static bool init(void)
      * returns it or panics because someone else is holding it. */
 
     /* store buffer pointers and sizes */
-    pf_idx.buf = buf;
-    pf_idx.buf_sz = buf_size;
+    carousel_idx.buf = buf;
+    carousel_idx.buf_sz = buf_size;
 
     lcd_setfont(screens[SCREEN_MAIN].getuifont());
 
@@ -2636,18 +2637,18 @@ static bool init(void)
 
     number_of_slides = model->count();
 
-    /* Phase 3 v2: Cover Flow no longer generates its own thumbnails -- the
-     * background album-art cache (art_cache.c) does. Mark inspection
-     * complete so the idle-loop generator never runs and the navigation
-     * "wait for cache" splashes don't appear; slides come from the shared
-     * .aat cache (with the old pfraw / empty slide as fallback). */
+    /* Thumbnails come from the background album-art cache (art_cache.c), not
+     * from here. Marking inspection complete up front keeps the idle-loop
+     * generator from running and the navigation "wait for cache" splashes
+     * from appearing; slides are read from the shared .aat cache, falling
+     * back to a pfraw or the empty slide. */
     aa_cache.inspected = model->count();
 
     /* Reserve the album-art scratch buffer. Both models need it: create_empty_slide()
      * builds the placeholder into aa_cache.buf, and (album only) the pfraw
      * generator caches thumbnails there. */
     size_t aa_min = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(pix_t);
-    size_t aa_bufsz = ALIGN_DOWN(MAX(aa_min * 3, pf_idx.buf_sz / 8),
+    size_t aa_bufsz = ALIGN_DOWN(MAX(aa_min * 3, carousel_idx.buf_sz / 8),
                                  sizeof(long));
     if (aa_bufsz < aa_min)
     {
@@ -2655,16 +2656,16 @@ static bool init(void)
         return false;
     }
 
-    ALIGN_BUFFER(pf_idx.buf, pf_idx.buf_sz, sizeof(long));
-    aa_cache.buf = (char*) pf_idx.buf;
+    ALIGN_BUFFER(carousel_idx.buf, carousel_idx.buf_sz, sizeof(long));
+    aa_cache.buf = (char*) carousel_idx.buf;
     aa_cache.buf_sz = aa_bufsz;
 
-    pf_idx.buf += aa_bufsz;
-    pf_idx.buf_sz -= aa_bufsz;
+    carousel_idx.buf += aa_bufsz;
+    carousel_idx.buf_sz -= aa_bufsz;
 
     pf_cover_size_idx = art_cache_size_index("coverflow");
 
-    buflib_init(&buf_ctx, (void *)pf_idx.buf, pf_idx.buf_sz);
+    buflib_init(&buf_ctx, (void *)carousel_idx.buf, carousel_idx.buf_sz);
     initialize_slide_cache();
 
     if (!create_empty_slide(model->has_pfraw_cache &&
@@ -2773,7 +2774,7 @@ static int album_covers_loop(void)
                               || scroll_lines[PF_SCROLL_ARTIST].step;
         bool quiescent = pf_state != pf_scrolling
                       && !caption_scrolling
-                      && aa_cache.inspected >= pf_idx.album_ct
+                      && aa_cache.inspected >= carousel_idx.album_ct
                       && !dynamic_colors_needs_repaint()
                       && !(audio_status() & AUDIO_STATUS_PLAY);
         int timeout = (pf_state == pf_scrolling) ? 0
@@ -2811,11 +2812,9 @@ static int album_covers_loop(void)
         case PF_WPS:
             return GO_TO_WPS;
         case PF_BACK:
-            /* Album covers is a first-class main-menu screen now, not just
-             * a WPS browsing mode (the old plugin's assumption, which is
-             * why this unconditionally went to the WPS) -- BACK should
-             * return to whichever screen it was actually opened from, same
-             * as everywhere else in the firmware. */
+            /* Whichever screen this was opened from, as anywhere else in the
+             * firmware. Not the WPS: this is a main-menu screen in its own
+             * right, reachable without anything playing. */
             return GO_TO_PREVIOUS;
         case PF_MENU:
             /* The in-screen menu is model-specific: both models open the shared
@@ -2941,8 +2940,7 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
 
     /* Jump to selected_file's album if one was passed (e.g. context_menu.c's
      * "Album covers" context-menu item on a specific track), otherwise the
-     * currently-playing track's album, otherwise wherever was last viewed --
-     * matching the old plugin's plugin_start() behavior exactly. */
+     * currently-playing track's album, otherwise wherever was last viewed. */
     model->set_initial(selected_file);
 
     ret = album_covers_loop();

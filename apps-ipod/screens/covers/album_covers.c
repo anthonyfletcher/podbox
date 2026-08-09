@@ -44,7 +44,7 @@
 #include "kernel.h"           /* threads, mutex, queue, current_tick */
 #include "core_alloc.h"       /* buflib types for buf_ctx (see init()) */
 #include "database/tagcache.h"
-#include "database/db_summary.h"   /* db_summary_play_album_on_exit/_pending */
+#include "database/db_summary.h"   /* the album/artist index, and playing one */
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
@@ -81,8 +81,7 @@
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
-#include "carousel.h"     /* shared carousel engine interface (pf_idx, model, ...) */
-#include "database/db_summary.h" /* the album/artist list this model shows */
+#include "carousel.h"     /* the shared engine: carousel_idx, the model */
 
 /** Globals **/
 
@@ -104,8 +103,8 @@
  * the per-frame raw redraw first. */
 /* The album index file, and the four-byte magic at its start. */
 /* Holds the artist name blob as well as the albums -- artist_portraits.c
- * reads pf_idx.artist_names/artist_index straight out of it -- so the name
- * is deliberately not album-specific. Regenerated if absent. */
+ * reads carousel_idx.artist_names/artist_index straight out of it -- so the
+ * name is deliberately not album-specific. Regenerated if absent. */
 
 /** structs we use */
 struct albumart_t {
@@ -188,9 +187,8 @@ enum ePFS{ePFS_ARTIST = 0, ePFS_ALBUM};
  * States: pf_idle <-> pf_scrolling (browsing covers); SELECT on a cover
  * jumps straight into the core database's track list for that album (see
  * browser_db_enter_album_tracks_on_next_load(), called from
- * album_covers_loop()) instead of an in-house zoom animation and track-list
- * screen -- there are no separate cover-zoom/track-list browsing states
- * anymore, unlike the original plugin.
+ * album_covers_loop()). There is no in-house cover-zoom or track-list
+ * browsing state; the database browser is the track list.
  */
 enum pf_states {
     pf_idle = 0,
@@ -235,7 +233,8 @@ static const struct carousel_model album_model = {
  */
 static char* get_album_name(const int slide_index)
 {
-    char *name = pf_idx.album_names + pf_idx.album_index[slide_index].name_idx;
+    char *name = carousel_idx.album_names
+               + carousel_idx.album_index[slide_index].name_idx;
     return name;
 }
 
@@ -244,8 +243,9 @@ static char* get_album_name(const int slide_index)
  */
 static char* get_album_name_idx(const int slide_index, int *idx)
 {
-    *idx = pf_idx.album_index[slide_index].name_idx;
-    char *name = pf_idx.album_names + pf_idx.album_index[slide_index].name_idx;
+    *idx = carousel_idx.album_index[slide_index].name_idx;
+    char *name = carousel_idx.album_names
+               + carousel_idx.album_index[slide_index].name_idx;
     return name;
 }
 
@@ -254,10 +254,10 @@ static char* get_album_name_idx(const int slide_index, int *idx)
  */
 static char* get_album_artist(const int slide_index)
 {
-    if (slide_index < pf_idx.album_ct && slide_index >= 0){
-        int idx = pf_idx.album_index[slide_index].artist_idx;
-        if (idx >= 0 && idx < (int) pf_idx.artist_len) {
-            char *name = pf_idx.artist_names + idx;
+    if (slide_index < carousel_idx.album_ct && slide_index >= 0){
+        int idx = carousel_idx.album_index[slide_index].artist_idx;
+        if (idx >= 0 && idx < (int) carousel_idx.artist_len) {
+            char *name = carousel_idx.artist_names + idx;
             return name;
         }
     }
@@ -294,14 +294,15 @@ static int jmp_idx_prev(void)
      * which is the same walk over the artist list. */
     if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
     {
-        int current_year = pf_idx.album_index[center_index].year;
+        int current_year = carousel_idx.album_index[center_index].year;
         int i = center_index - 1;
 
         if (i > 0)
         {
-            if (pf_idx.album_index[i].year != current_year)
-                current_year = pf_idx.album_index[i].year;
-            while (i > 0 && pf_idx.album_index[i - 1].year == current_year)
+            if (carousel_idx.album_index[i].year != current_year)
+                current_year = carousel_idx.album_index[i].year;
+            while (i > 0
+                   && carousel_idx.album_index[i - 1].year == current_year)
                 i--;
             return i;
         }
@@ -336,20 +337,20 @@ static int jmp_idx_next(void)
 
     if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
     {
-        int current_year = pf_idx.album_index[center_index].year;
-        for (int i = center_index + 1; i < pf_idx.album_ct; i++ )
-            if(pf_idx.album_index[i].year != current_year)
+        int current_year = carousel_idx.album_index[center_index].year;
+        for (int i = center_index + 1; i < carousel_idx.album_ct; i++ )
+            if(carousel_idx.album_index[i].year != current_year)
                 return i;
     }
     else
     {
         bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
         char *current_selection = get_slide_name(center_index, by_artist);
-        for (int i = center_index + 1; i < pf_idx.album_ct; i++ )
+        for (int i = center_index + 1; i < carousel_idx.album_ct; i++ )
             if(strncmp(get_slide_name(i, by_artist), current_selection, 1))
                 return i;
     }
-    return pf_idx.album_ct - 1;
+    return carousel_idx.album_ct - 1;
 }
 
 static int id3_get_index(struct mp3entry *id3)
@@ -373,13 +374,14 @@ static int id3_get_index(struct mp3entry *id3)
         int i;
         int album_idx, artist_idx;
 
-        for (i = 0; i < pf_idx.album_ct; i++ )
+        for (i = 0; i < carousel_idx.album_ct; i++ )
         {
-            album_idx = pf_idx.album_index[i].name_idx;
-            artist_idx = pf_idx.album_index[i].artist_idx;
+            album_idx = carousel_idx.album_index[i].name_idx;
+            artist_idx = carousel_idx.album_index[i].artist_idx;
 
-            if(!strcmp(pf_idx.album_names + album_idx, current_album) &&
-                !strcasecmp(pf_idx.artist_names + artist_idx, current_artist))
+            if(!strcmp(carousel_idx.album_names + album_idx, current_album) &&
+                !strcasecmp(carousel_idx.artist_names + artist_idx,
+                            current_artist))
                 return i;
         }
 
@@ -436,13 +438,13 @@ static unsigned int mfnv(char *str)
  * folder this album's tracks live in, resolved when the index was built. */
 static unsigned int album_art_key(int slide_index)
 {
-    return pf_idx.album_index[slide_index].art_hash;
+    return carousel_idx.album_index[slide_index].art_hash;
 }
 
 /* carousel_model.count for the album model. */
 static int album_count(void)
 {
-    return pf_idx.album_ct;
+    return carousel_idx.album_ct;
 }
 
 /* carousel_model.legacy_art for the album model: this screen's own per-album
@@ -477,13 +479,13 @@ static void set_initial_slide(const char* selected_file)
 static void reselect(unsigned int hash_album, unsigned int hash_artist)
 {
     int i, album_idx, artist_idx;
-    for (i = 0; i < pf_idx.album_ct; i++ )
+    for (i = 0; i < carousel_idx.album_ct; i++ )
     {
-        album_idx = pf_idx.album_index[i].name_idx;
-        artist_idx = pf_idx.album_index[i].artist_idx;
+        album_idx = carousel_idx.album_index[i].name_idx;
+        artist_idx = carousel_idx.album_index[i].artist_idx;
 
-        if(hash_album == mfnv(pf_idx.album_names + album_idx) &&
-           hash_artist == mfnv(pf_idx.artist_names + artist_idx))
+        if(hash_album == mfnv(carousel_idx.album_names + album_idx) &&
+           hash_artist == mfnv(carousel_idx.artist_names + artist_idx))
         {
             set_current_slide(i);
             pf_cfg.last_album = i;
@@ -611,10 +613,10 @@ static void draw_album_text(void)
 
     albumtxt = get_album_name_idx(center_index, &album_idx);
     if (global_settings.album_covers_show_year
-        && pf_idx.album_index[center_index].year > 0)
+        && carousel_idx.album_index[center_index].year > 0)
     {
         snprintf(album_and_year, sizeof(album_and_year), "%s \xe2\x80\x93 %d",
-                  albumtxt, pf_idx.album_index[center_index].year);
+                  albumtxt, carousel_idx.album_index[center_index].year);
     }
     else
         snprintf(album_and_year, sizeof(album_and_year), "%s", albumtxt);
@@ -646,7 +648,8 @@ static void draw_album_text(void)
 
     if (show_artist)
     {
-        if (pf_idx.album_index[center_index].seek != pf_idx.album_untagged_seek)
+        if (carousel_idx.album_index[center_index].seek
+            != carousel_idx.album_untagged_seek)
             lcd_putsxy(albumtxt_x, albumtxt_y, album_and_year);
         /* Restored before the artist line: render_all_slides()/the FPS
          * overlay/etc all assume pf_vp's font is the real UI font, and the
@@ -701,7 +704,7 @@ static int album_enter(int index)
 {
     int album_idx = 0;
     char *album = get_album_name_idx(index, &album_idx);
-    long album_seek = pf_idx.album_index[index].seek;
+    long album_seek = carousel_idx.album_index[index].seek;
 
     pf_cfg.last_album = index;
     pf_resume_album_index = index;
@@ -709,7 +712,7 @@ static int album_enter(int index)
 
     if (global_settings.album_covers_on_select == ON_SELECT_PLAY_ALBUM)
     {
-        db_summary_play_album_on_exit(&pf_idx.album_index[index]);
+        db_summary_play_album_on_exit(&carousel_idx.album_index[index]);
         return CAROUSEL_PLAY_ALBUM;
     }
 

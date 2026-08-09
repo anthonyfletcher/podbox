@@ -23,6 +23,10 @@
 #include "lcd.h"        /* fb_data */
 #include "rbpaths.h"    /* ROCKBOX_DIR, for CACHE_PREFIX */
 #include "database/tagcache.h"   /* struct tagcache_search */
+/* The slide data itself belongs to the index builder, not to this engine:
+ * struct db_summary_t, struct album_data, struct artist_data and the
+ * SUCCESS/ERROR_* codes a build returns. */
+#include "database/db_summary.h"
 
 typedef fb_data pix_t;
 
@@ -60,97 +64,6 @@ typedef fb_data pix_t;
 struct pf_caption {
     int y1;   /* top of the first line, drawn in pf_bold_font */
     int y2;   /* top of the second line, drawn in the UI font */
-};
-
-/* build_index / count return codes */
-#define SUCCESS              0
-#define ERROR_NO_ALBUMS     -1
-#define ERROR_BUFFER_FULL   -2
-#define ERROR_NO_ARTISTS    -3
-#define ERROR_USER_ABORT    -4
-
-/* Index data built into the shared buffer by a model's build_index(). Album
- * covers fills album_index[]/album_names; artist portraits fills
- * artist_index[]/artist_names via build_artist_index(). */
-struct album_data {
-    int name_idx;     /* offset to the album name */
-    int artist_idx;   /* offset to the artist name */
-    /* Identity that survives a database commit, hashed from the two names
-     * above. The seeks below do not survive one: any commit that adds a track
-     * re-sorts the whole album tagfile and moves every seek in it. So this is
-     * what an entry is matched by when figures are carried from one build of
-     * the index to the next. */
-    uint32_t key;
-    int year;         /* album year */
-    /* Playback history, summarised over the album's tracks by
-     * assign_album_stats(). The album charts sort on these; nothing else
-     * reads them. Both are 0 for an album that has never been played, which
-     * is why the charts exclude 0 rather than showing it at one end. */
-    int playcount;    /* total plays across the album */
-    long lastplayed;  /* the most recent of its tracks */
-    long artist_seek; /* artist taglist position */
-    long seek;        /* album taglist position */
-    /* art_cache key for the folder holding this album's tracks, resolved once
-     * during the build. A slide load is then a file open, where finding the
-     * folder from the seeks above would be a database search per slide. 0 if
-     * the build could not resolve it. */
-    unsigned int art_hash;
-    /* That folder's parent, which is the artist's own. Carried here because it
-     * comes from the same path for free, and the artist list is filled by
-     * rolling the album list up rather than by walking the database again. */
-    unsigned int artist_art_hash;
-};
-
-struct artist_data {
-    int name_idx; /* offset to the artist name */
-    uint32_t key; /* as struct album_data's, from the name alone */
-    /* As struct album_data's pair, summarised over everything by this artist.
-     * "Artist" here is the album artist -- the tag this list is built from
-     * (see build_artist_index()) -- so a guest appearance counts towards the
-     * record's artist, not the guest. */
-    int playcount;
-    long lastplayed;
-    long seek;    /* artist taglist position */
-    /* As struct album_data's field, for the artist's own folder -- the parent
-     * of its albums', under the <artist>/<album>/<track> layout this list
-     * assumes. */
-    unsigned int art_hash;
-};
-
-struct db_summary_t {
-    uint32_t            header; /*INDEX_HDR*/
-    /* Signed, not unsigned, and that is load-bearing. The builder writes the
-     * "untagged" entries backwards from the start of each array, indexing with
-     * -artist_ct / -album_ct (db_summary.c, write_artist_entry()). As uint16_t
-     * these promoted to int and negated correctly; as an unsigned 32-bit type
-     * the negation would wrap to about 4 billion and index off the end of the
-     * buffer. int32_t raises the ceiling from 65535 to 2^31 and leaves every
-     * existing expression meaning what it meant. */
-    int32_t             artist_ct;
-    int32_t             album_ct;
-    /* What the database looked like when this index was built. Both come from
-     * tagcache_get_marks(): commitid moves when tracks are added, serial once
-     * per logged play. They say what has happened since, so a later build can
-     * tell which entries still need their figures recomputed. */
-    int32_t             commitid;
-    int32_t             serial;
-    /* Entries tagcache had flagged deleted. A deletion moves figures that
-     * cannot be matched back to an album, so a build that finds this changed
-     * summarises everything rather than carrying anything across. */
-    int32_t             deleted;
-
-    char               *artist_names;
-    struct artist_data *artist_index;
-    size_t              artist_len;
-
-    unsigned int        album_untagged_idx;
-    char               *album_names;
-    struct album_data  *album_index;
-    size_t              album_len;
-    long                album_untagged_seek;
-
-    void * buf;
-    size_t buf_sz;
 };
 
 enum pf_scroll_line_type {
@@ -208,7 +121,7 @@ struct pf_config_t
 
 /* --- Shared engine state the models read/write (owned by the engine) -------- */
 extern struct pf_config_t pf_cfg;  /* engine's persistent cache/resume config */
-extern struct db_summary_t pf_idx;   /* the current carousel's index buffer */
+extern struct db_summary_t carousel_idx;  /* this carousel's index buffer */
 extern int   center_index;         /* engine's current slide */
 extern int   pf_bold_font;         /* caption bold font (draw_text) */
 extern pix_t pf_fg_color;          /* caption colour (draw_text) */

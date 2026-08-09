@@ -4,7 +4,8 @@
  * The database index: the flat album and artist list derived from tagcache.
  *
  * Built by walking tagcache, held in the buffer carousel.h describes as
- * pf_idx, and persisted to db_summary.dat so later reads get it back instead of
+ * carousel_idx, and persisted to db_summary.dat so later reads get it back
+ * instead of
  * rescanning. It carries no artwork -- only names, years, playback figures and
  * the taglist seeks needed to navigate into the database -- so it goes stale
  * when the database changes, not when files on disk do.
@@ -59,7 +60,7 @@
 #include "playlist/playlist.h"
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
-#include "screens/covers/carousel.h"      /* pf_idx, CACHE_PREFIX, SUCCESS/ERROR_* */
+#include "screens/covers/carousel.h"   /* carousel_idx, CACHE_PREFIX */
 #include "screens/covers/album_covers.h"   /* SORT_BY_*, ASCENDING (sort order) */
 #include "db_summary.h"
 
@@ -1444,12 +1445,12 @@ retry_artist_lookup:
      * rather than leaving the caller short of it for this build. */
     pfi->buf_sz = buf_size + carry_reserved;
     carry_reserved = 0;
-    /* artist_index is deliberately kept, where it used to be discarded here.
-     * The array itself was always intact -- build_artist_index() finalises it
-     * into the buffer ahead of the album data, which nothing above overwrites
-     * -- so only the pointer was being thrown away. It is needed now: the
-     * artist figures assign_artist_stats() just filled in are saved with the
-     * rest of the index and read back by the artist charts. */
+    /* artist_index must survive this. The figures assign_artist_stats() has
+     * just filled in are saved with the rest of the index and read back by the
+     * artist charts, and the array itself is intact -- build_artist_index()
+     * finalises it into the buffer ahead of the album data, which nothing
+     * above overwrites. Clearing the pointer here would lose all of it and
+     * look free, because the memory is still there. */
 
     /* Stamped after the figures have been read, not before. A play landing
      * mid-build is then simply not replayed later; stamping first would
@@ -1472,8 +1473,8 @@ retry_artist_lookup:
     return (pfi->album_ct > 0) ? 0 : ERROR_NO_ALBUMS;
 }
 
-/*Saves the album index into a binary file to be recovered the
- next time PictureFlow is launched*/
+/* Saves the album index into a binary file, so the next screen that wants it
+   reads it back instead of walking the database again. */
 
 /* write() that insists on the whole block. A half-written index is not a
  * usable one, so a short write has to fail the save rather than be left to be
@@ -1553,10 +1554,10 @@ static inline int read2buf(int fildes, void *buf, size_t nbyte){
 
 /* Read only the artist half of the saved index into the caller's buffer.
  *
- * The artist carousel wants the artist list and nothing else, and used to
- * rebuild it from the database on every open. It does not have to: the same
- * list, with its playback figures already summarised, is sitting in the index
- * file. Reading it is a file read against a walk of every album-artist tag.
+ * The artist carousel wants the artist list and nothing else, and does not
+ * have to rebuild it: the same list, with its playback figures already
+ * summarised, is sitting in the index file. Reading it is a file read against
+ * a walk of every album-artist tag.
  *
  * Only the artist parts are kept. The file is written as
  *
@@ -1627,11 +1628,10 @@ static int load_artist_index(struct db_summary_t *target,
     target->artist_len = data.artist_len;
     target->commitid = data.commitid;
 
-    /* No album list on this path, and said three ways rather than one. The
-     * count alone used to be the whole guard, which meant any walk that
-     * forgot to check it read through whatever pointers the struct happened
-     * to be carrying -- from the previous load, or from the file. NULL faults
-     * instead. */
+    /* No album list on this path, and said three ways rather than one. A zero
+     * count alone is not enough of a guard: a walk that forgets to check it
+     * would read through whatever pointers the struct happens to be carrying,
+     * from the previous load or from the file. NULL faults instead. */
     target->album_ct = 0;
     target->album_len = 0;
     target->album_names = NULL;
@@ -1906,7 +1906,8 @@ static int wait_for_background(void)
  * buffer it has already claimed. */
 int db_summary_build(void)
 {
-    return db_summary_build_into(&pf_idx, pf_idx.buf, pf_idx.buf_sz);
+    return db_summary_build_into(&carousel_idx, carousel_idx.buf,
+                                carousel_idx.buf_sz);
 }
 
 /* carousel_model.build_index for the artist model: the artist half only, with

@@ -850,12 +850,11 @@ static bool prepare_database_sel(void *param)
     return true;
 }
 
-/* Properties is core-linked, not a loadable plugin, so it can't go through
- * filetype_load_plugin() like its siblings. Instead: prepare_database_sel() to
- * resolve selected_file.path in a database browse context, and the
- * context_menu_result side-channel to report properties()'s GO_TO_* result,
- * since do_menu() ignores this function's own return value without
- * MENU_FUNC_CHECK_RETVAL. */
+/* Two indirections, both forced by the menu machinery. prepare_database_sel()
+ * resolves selected_file.path, which is not otherwise set in a database browse
+ * context; and properties()'s GO_TO_* comes back through the
+ * context_menu_result side-channel, because do_menu() discards this function's
+ * own return value unless the item carries MENU_FUNC_CHECK_RETVAL. */
 static bool context_menu_properties(void *param)
 {
     (void)param;
