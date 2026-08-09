@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "config.h"
+#include "string-extra.h"        /* strlcpy */
+#include "file.h"                /* MAX_PATH */
 #include "kernel.h"
 #include "lang.h"
 #include "settings/settings.h"   /* ID2P */
@@ -79,9 +81,13 @@ int browser_flat(bool images)
             break;                       /* backed out */
 
         {
-            const char *path = path_list_get(&list, info.selection);
-            int attr = filetype_get_attr(path);
-            int rc;
+            /* Copied out, not pointed at: the list is handed back below and
+             * the path has to outlive it. */
+            char path[MAX_PATH];
+            int attr, rc;
+
+            strlcpy(path, path_list_get(&list, info.selection), sizeof(path));
+            attr = filetype_get_attr(path);
 
             /* The list is only as fresh as the last walk, so a file named in
              * it may be gone. */
@@ -90,6 +96,14 @@ int browser_flat(bool images)
                 splash(HZ * 2, ID2P(LANG_FILE_NOT_FOUND));
                 continue;
             }
+
+            /* Give the scratch buffer up before the viewer starts. Holding it
+             * across the call would panic the moment the viewer wanted it, and
+             * letting go also leaves the viewer a whole free buflib pool --
+             * the image viewer takes the largest contiguous block it can find,
+             * so this is the difference between opening a big picture from
+             * here and from the file browser. */
+            path_list_free(&list);
 
             if (filetype_open_core_viewer(attr, path, &rc))
             {
@@ -101,6 +115,16 @@ int browser_flat(bool images)
                     break;
                 }
             }
+
+            /* Read again rather than remembering: the background walk may have
+             * run while the viewer was up, so this is the current list, not
+             * the one we let go of. It can also have become empty. */
+            if (!path_list_load(&list, file_index_list(images), PATH_LIST_MAX))
+                break;
+
+            snprintf(title, sizeof(title), "%s (%d%s)",
+                     str(images ? LANG_IMAGES : LANG_DOCUMENTS),
+                     list.count, list.truncated ? "+" : "");
         }
     }
 

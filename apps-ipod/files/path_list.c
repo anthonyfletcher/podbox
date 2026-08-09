@@ -18,15 +18,22 @@
 #include <string.h>
 #include "config.h"
 #include "file.h"
-#include "core_alloc.h"
+#include "system/app_buffer.h"
 #include "path_list.h"
+
+/* One name for the claim, because only one list is ever loaded at a time --
+ * the documents/images browser and the artwork health screen cannot both be
+ * up. app_buffer compares owners by string, so the same literal must be used
+ * to claim and to release. */
+#define PATH_LIST_OWNER "path list"
 
 bool path_list_load(struct path_list *pl, const char *file, int max_entries)
 {
+    size_t cap;
     off_t size;
     int fd, i;
 
-    pl->handle = 0;
+    pl->held = false;
     pl->text = NULL;
     pl->count = 0;
     pl->truncated = false;
@@ -45,18 +52,20 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
         return false;
     }
 
-    /* One spare byte so the last line is terminated even with no trailing
-     * newline. */
-    pl->handle = core_alloc(size + 1);
-    if (pl->handle <= 0)
+    pl->text = app_claim_buffer(&cap, PATH_LIST_OWNER);
+    pl->held = true;
+
+    /* One byte kept back so the last line is terminated even with no trailing
+     * newline. A file bigger than that is read as far as it fits -- the reader
+     * only ever shows PATH_LIST_MAX lines anyway, and the alternative was
+     * allocating the whole of a file that may have been written before the
+     * writer started capping its own output. */
+    if ((size_t)size > cap - 1)
     {
-        close(fd);
-        pl->handle = 0;
-        return false;
+        size = (off_t)(cap - 1);
+        pl->truncated = true;
     }
 
-    /* Pinned: read() yields, and a handle with no ops is movable. */
-    pl->text = core_get_data_pinned(pl->handle);
     if (read(fd, pl->text, size) != (ssize_t)size)
     {
         close(fd);
@@ -65,6 +74,15 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
     }
     close(fd);
     pl->text[size] = '\0';
+
+    /* Cutting the read short lands mid-path. Drop that fragment rather than
+     * offering a half a filename the caller would fail to open. */
+    if (pl->truncated)
+    {
+        while (size > 0 && pl->text[size - 1] != '\n')
+            size--;
+        pl->text[size] = '\0';
+    }
 
     /* Split in place. A line is recorded by where it starts; its newline
      * becomes the terminator of the one before. */
@@ -97,12 +115,10 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
 
 void path_list_free(struct path_list *pl)
 {
-    if (pl->handle > 0)
-    {
-        core_put_data_pinned(pl->text);
-        core_free(pl->handle);
-    }
-    pl->handle = 0;
+    if (pl->held)
+        app_release_buffer(PATH_LIST_OWNER);
+
+    pl->held = false;
     pl->text = NULL;
     pl->count = 0;
     pl->truncated = false;

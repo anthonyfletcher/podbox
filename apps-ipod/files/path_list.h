@@ -14,18 +14,38 @@
 #define PATH_LIST_MAX 500
 
 struct path_list {
-    int   handle;                  /* the claim; 0 when nothing is held */
+    bool  held;                    /* the scratch buffer is ours */
     char *text;                    /* the file, newlines turned into NULs */
     int   line[PATH_LIST_MAX];     /* offset of each path into text */
     int   count;
-    bool  truncated;               /* more lines than were kept */
+    bool  truncated;               /* more lines, or more bytes, than were kept */
 };
 
 /* Read 'file' and index its lines. False when there is nothing to show -- no
- * such file, empty, or no memory -- having claimed nothing. On success the
- * caller must path_list_free() when done: every pointer handed out points
- * into that memory. */
+ * such file, or empty -- having claimed nothing. On success the caller must
+ * path_list_free() when done: every pointer handed out points into that
+ * memory.
+ *
+ * The lines live in the linker-reserved scratch buffer (system/app_buffer.h),
+ * not in a core_alloc(). Three reasons, and the first is the one users notice:
+ *
+ *  - core_alloc() from a screen makes the audio buffer shrink and the current
+ *    track rebuffer, so opening a list interrupted playback;
+ *  - the handle had to be pinned for as long as the list was on screen, and a
+ *    pinned block is one buflib cannot compact across -- so a viewer opened
+ *    from the list got a smaller contiguous pool than the same viewer opened
+ *    from anywhere else;
+ *  - the scratch buffer has a fixed size, which bounds the read. The old code
+ *    allocated the whole file however large it was, and kept only the first
+ *    PATH_LIST_MAX lines of it.
+ *
+ * Only one list exists at a time, and holding this buffer means nothing else
+ * may ask for it -- so a caller that opens another screen (browser_flat opens
+ * a viewer) must path_list_free() first and load again afterwards. */
 bool path_list_load(struct path_list *pl, const char *file, int max_entries);
+
+/* Hands the scratch buffer back. Safe to call on a list that never loaded, and
+ * safe to call twice. */
 void path_list_free(struct path_list *pl);
 
 /* The whole path, and just its last component. Both return "" out of range,
