@@ -1,5 +1,6 @@
 /***************************************************************************
  * Original code from RockBox
+ * was: apps/main.c
  * Copyright (C) 2002 Björn Stenberg
  * GNU General Public License (version 2+)
  *

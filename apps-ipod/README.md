@@ -45,6 +45,14 @@ grep -rn "was: apps/" --include=*.c --include=*.h .
 Files with no `was:` line were written for this fork, or came from RockPod;
 upstream changes cannot reach them by definition.
 
+**The two header lines go together.** A banner saying `Original code from
+RockBox` must carry a `was:` line as well, even where the path is unchanged
+from `apps/`. Eleven files once said the first without the second — `main.c`,
+`root_menu.{c,h}` and all of `iap/` — which left holes in the map at exactly
+the files an upstream fix is most likely to touch, and made absence-of-`was:`
+useless as a test of who wrote a file. Anything reading these headers to tell
+fork code from upstream code is entitled to assume the pair.
+
 ## The organising idea
 
 One distinction does most of the work — **how much of the screen and the input

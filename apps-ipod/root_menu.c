@@ -1,5 +1,6 @@
 /***************************************************************************
  * Original code from RockBox
+ * was: apps/root_menu.c
  * Copyright (C) 2007 Jonathan Gordon
  * Portions Copyright (C) 2026 RockPod contributors
  * GNU General Public License (version 2+)

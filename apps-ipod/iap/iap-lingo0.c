@@ -1,5 +1,6 @@
 /***************************************************************************
  * Original code from RockBox
+ * was: apps/iap/iap-lingo0.c
  * Copyright (C) 2002 by Alan Korr & Nick Robinson
  *
  * All files in this archive are subject to the GNU General Public License.

@@ -1,5 +1,6 @@
 /***************************************************************************
  * Original code from RockBox
+ * was: apps/root_menu.h
  * Copyright (C) 2007 Jonathan Gordon
  * GNU General Public License (version 2+)
  *
