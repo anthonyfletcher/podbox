@@ -105,8 +105,11 @@ struct play_rec
  *                 cached thumbnail.
  *   PFIH -> PFII: both gained key, and the header gained the commitid/serial
  *                 watermarks.
- *   PFII -> PFIJ: the header gained the deleted count. */
-#define INDEX_HDR "PFIJ"
+ *   PFII -> PFIJ: the header gained the deleted count.
+ *   PFIJ -> PFIK: artist_ct/album_ct widened from uint16_t to int32_t, which
+ *                 moves every field after them. A library past 65535 albums
+ *                 used to wrap silently. */
+#define INDEX_HDR "PFIK"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -1204,8 +1207,11 @@ static int assign_album_stats(void)
         pfi->album_index[album_idx].artist_art_hash = artist_art;
     }
 
+    /* Cast, because album_ct is int32_t and that is `long` on this toolchain,
+     * so %d would not match it. */
     debug_log(DEBUG_LOG_TAGCACHE, "index: %d albums, %d carried, %d searched",
-              pfi->album_ct, carried_over, pfi->album_ct - carried_over);
+              (int)pfi->album_ct, carried_over,
+              (int)pfi->album_ct - carried_over);
     return SUCCESS;
 }
 
@@ -1493,15 +1499,32 @@ static int save_album_index(void){
     memcpy(&data, pfi, sizeof(struct db_summary_t));
     memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
 
-    /* The artist array is written last so the layout before it is unchanged
+    /* The struct is written whole, pointers and all, and a pointer means
+     * nothing to whoever reads it back -- it is this boot's address for memory
+     * that will be somewhere else, or gone, next time. Zero them on the way
+     * out so the file cannot carry a plausible-looking address, and so a
+     * loader that forgets to rebind one gets a NULL fault here rather than a
+     * silent read of a stale location. The lengths and counts beside them are
+     * the real content. */
+    data.artist_names = NULL;
+    data.artist_index = NULL;
+    data.album_names  = NULL;
+    data.album_index  = NULL;
+    data.buf          = NULL;
+    data.buf_sz       = 0;
+
+    /* Header from the nulled copy, bodies from pfi -- `data`'s pointers have
+     * just been cleared, so they are no longer where the arrays live.
+     *
+     * The artist array is written last so the layout before it is unchanged
      * from the versions that did not keep it; the magic tells the two apart
      * anyway. */
     ok = write_block(fd, &data, sizeof(struct db_summary_t))
-      && write_block(fd, data.artist_names, data.artist_len)
-      && write_block(fd, data.album_names, data.album_len)
-      && write_block(fd, data.album_index,
+      && write_block(fd, pfi->artist_names, data.artist_len)
+      && write_block(fd, pfi->album_names, data.album_len)
+      && write_block(fd, pfi->album_index,
                      (size_t)data.album_ct * sizeof(struct album_data))
-      && write_block(fd, data.artist_index,
+      && write_block(fd, pfi->artist_index,
                      (size_t)data.artist_ct * sizeof(struct artist_data));
 
     close(fd);
@@ -1599,8 +1622,17 @@ static int load_artist_index(struct db_summary_t *target,
 
     target->artist_ct = data.artist_ct;
     target->artist_len = data.artist_len;
-    target->album_ct = 0;        /* no album list on this path */
     target->commitid = data.commitid;
+
+    /* No album list on this path, and said three ways rather than one. The
+     * count alone used to be the whole guard, which meant any walk that
+     * forgot to check it read through whatever pointers the struct happened
+     * to be carrying -- from the previous load, or from the file. NULL faults
+     * instead. */
+    target->album_ct = 0;
+    target->album_len = 0;
+    target->album_names = NULL;
+    target->album_index = NULL;
     target->serial = data.serial;
     /* Artists only on this path, but the log carries their keys too. */
     replay_plays(target);

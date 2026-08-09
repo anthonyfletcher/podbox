@@ -118,8 +118,15 @@ struct artist_data {
 
 struct db_summary_t {
     uint32_t            header; /*INDEX_HDR*/
-    uint16_t            artist_ct;
-    uint16_t            album_ct;
+    /* Signed, not unsigned, and that is load-bearing. The builder writes the
+     * "untagged" entries backwards from the start of each array, indexing with
+     * -artist_ct / -album_ct (db_summary.c, write_artist_index()). As uint16_t
+     * these promoted to int and negated correctly; as an unsigned 32-bit type
+     * the negation would wrap to about 4 billion and index off the end of the
+     * buffer. int32_t raises the ceiling from 65535 to 2^31 and leaves every
+     * existing expression meaning what it meant. */
+    int32_t             artist_ct;
+    int32_t             album_ct;
     /* What the database looked like when this index was built. Both come from
      * tagcache_get_marks(): commitid moves when tracks are added, serial once
      * per logged play. They say what has happened since, so a later build can
