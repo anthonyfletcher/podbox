@@ -65,11 +65,10 @@ static volatile bool fi_wants_scan;
 static volatile bool fi_abort;
 static volatile bool fi_busy;
 
-/* The walk's open output files, and how many lines each has taken. */
-static int fi_docs_fd = -1;
-static int fi_images_fd = -1;
-static int fi_docs_count;
-static int fi_images_count;
+/* The walk's two output lists. path_list owns the .tmp-and-rename publishing,
+ * and the line accounting with it. */
+static struct path_list_writer fi_docs;
+static struct path_list_writer fi_images;
 
 /* One path buffer, reused down the recursion rather than one per level:
  * MAX_PATH per frame times the depth limit is far more stack than the thread
@@ -115,11 +114,17 @@ static bool fi_check_abort(void)
     switch (ev.id)
     {
         case SYS_USB_CONNECTED:
+            /* Put it back: fi_thread() is what acknowledges the connect and
+             * waits out the session, and this only needs the walk to stop. */
+            queue_post(&fi_queue, ev.id, ev.data);
+            fi_abort = true;
+            return true;
+
         case SYS_POWEROFF:
         case SYS_REBOOT:
-            /* Put it back for the thread loop to deal with properly; this only
-             * needs to know that the walk must stop. */
-            queue_post(&fi_queue, ev.id, ev.data);
+            /* Not re-posted. Nothing here handles either -- the walk stopping
+             * is the whole of what this thread owes a shutdown, and putting
+             * them back would only leave them in a queue nobody reads. */
             fi_abort = true;
             return true;
     }
@@ -155,19 +160,11 @@ static bool fi_is_cover_art(const char *name)
     return false;
 }
 
-static void fi_record(int fd, int *count, const char *path)
-{
-    if (fd < 0 || *count >= PATH_LIST_MAX)
-        return;
-    fdprintf(fd, "%s\n", path);
-    (*count)++;
-}
-
 /* Both lists full: nothing more can be recorded, so stop walking. */
 static bool fi_lists_full(void)
 {
-    return fi_docs_count >= PATH_LIST_MAX
-        && fi_images_count >= PATH_LIST_MAX;
+    return path_list_write_full(&fi_docs)
+        && path_list_write_full(&fi_images);
 }
 
 /* Walk 'fi_path' (a directory) and everything under it. */
@@ -214,11 +211,11 @@ static void fi_walk(int depth)
             switch (filetype_get_attr(fi_path) & FILE_ATTR_MASK)
             {
                 case FILE_ATTR_TXT:
-                    fi_record(fi_docs_fd, &fi_docs_count, fi_path);
+                    path_list_write_record(&fi_docs, fi_path);
                     break;
                 case FILE_ATTR_IMG:
                     if (!fi_is_cover_art((char *)entry->d_name))
-                        fi_record(fi_images_fd, &fi_images_count, fi_path);
+                        path_list_write_record(&fi_images, fi_path);
                     break;
             }
         }
@@ -238,34 +235,26 @@ static void fi_run_scan(void)
 
     fi_abort = false;
     fi_busy = true;
-    fi_docs_count = fi_images_count = 0;
 
-    fi_docs_fd = open(FILE_INDEX_DOCS ".tmp", O_CREAT|O_WRONLY|O_TRUNC, 0666);
-    fi_images_fd = open(FILE_INDEX_IMAGES ".tmp",
-                        O_CREAT|O_WRONLY|O_TRUNC, 0666);
+    /* Both or neither. One walk fills both lists, so a pass that could only
+     * open one of them has nothing worth publishing -- and publishing half a
+     * pass would leave the two lists describing different walks. */
+    if (!path_list_write_open(&fi_docs, FILE_INDEX_DOCS)
+        || !path_list_write_open(&fi_images, FILE_INDEX_IMAGES))
+    {
+        path_list_write_close(&fi_docs, false);
+        path_list_write_close(&fi_images, false);
+        fi_busy = false;
+        fi_wants_scan = true;     /* no room to write now; try again later */
+        return;
+    }
 
     strcpy(fi_path, "/");
     fi_walk(0);
 
-    if (fi_docs_fd >= 0)
-        close(fi_docs_fd);
-    if (fi_images_fd >= 0)
-        close(fi_images_fd);
-    fi_docs_fd = fi_images_fd = -1;
-
     completed = !fi_abort;
-    if (completed)
-    {
-        remove(FILE_INDEX_DOCS);
-        rename(FILE_INDEX_DOCS ".tmp", FILE_INDEX_DOCS);
-        remove(FILE_INDEX_IMAGES);
-        rename(FILE_INDEX_IMAGES ".tmp", FILE_INDEX_IMAGES);
-    }
-    else
-    {
-        remove(FILE_INDEX_DOCS ".tmp");
-        remove(FILE_INDEX_IMAGES ".tmp");
-    }
+    path_list_write_close(&fi_docs, completed);
+    path_list_write_close(&fi_images, completed);
 
     fi_busy = false;
     fi_wants_scan = !completed;   /* interrupted: try again later */

@@ -887,14 +887,26 @@ static void update_scroll_lines(void)
 static bool save_pfraw(char* filename, struct bitmap *bm)
 {
     struct pfraw_header bmph;
+    size_t pixbytes = sizeof( pix_t ) * bm->width * bm->height;
+    bool ok;
     bmph.width = bm->width;
     bmph.height = bm->height;
     int fh = open(filename, O_WRONLY|O_CREAT|O_TRUNC, 0666);
     if( fh < 0 ) return false;
-    write( fh, &bmph, sizeof( struct pfraw_header ) );
-    write( fh, bm->data , sizeof( pix_t ) * bm->width *  bm->height );
+
+    /* Both writes checked, and the file removed if either falls short. A
+     * truncated cache file keeps its valid header, so read_pfraw() accepts it
+     * and renders whatever the short body left behind -- and being in the
+     * cache, it is re-read on every open until something deletes it. */
+    ok = (write(fh, &bmph, sizeof(struct pfraw_header))
+              == (ssize_t)sizeof(struct pfraw_header))
+      && (write(fh, bm->data, pixbytes) == (ssize_t)pixbytes);
     close( fh );
-    return true;
+
+    if (!ok)
+        remove(filename);
+
+    return ok;
 }
 
 /* Placeholder slide fill: a plain box, a touch off the dark theme background,
@@ -1304,8 +1316,18 @@ static int read_pfraw(char* filename, int prio)
     bm->width = bmph.width;
     bm->height = bmph.height;
     pix_t *data = (pix_t*)(sizeof(struct dim) + (char *)bm);
+    size_t pixbytes = sizeof( pix_t ) * bm->width * bm->height;
 
-    read( fh, data , sizeof( pix_t ) * bm->width * bm->height );
+    /* The header was checked above for exactly this reason; the body needs the
+     * same. A short read here leaves the tail of a freshly allocated slide
+     * holding whatever the buffer last contained, which renders as garbage. */
+    if (read(fh, data, pixbytes) != (ssize_t)pixbytes)
+    {
+        close( fh );
+        buflib_free(&buf_ctx, hid);
+        return empty_slide_hid;
+    }
+
     close( fh );
     return hid;
 }
@@ -2552,11 +2574,9 @@ static bool init(void)
      * Album covers is simply borrowing it back the same way the original
      * plugin did. Not a buflib handle, so nothing to free in cleanup(). */
     buf = app_claim_buffer(&buf_size, "album covers");
-    if (!buf)
-    {
-        error_wait("Not enough memory");
-        return false;
-    }
+
+    /* No failure to check for: the region is a static array, so the call either
+     * returns it or panics because someone else is holding it. */
 
     /* store buffer pointers and sizes */
     pf_idx.buf = buf;

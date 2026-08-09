@@ -18,6 +18,7 @@
 #include "kernel.h"
 #include "file.h"
 #include "usb.h"
+#include "panic.h"
 #include "database/tagcache.h"
 #include "bg_task.h"
 
@@ -37,8 +38,10 @@
  * for it, ever -- would starve everything below it for the whole session. */
 #define BG_MAX_PREEMPT_FAILS 3
 
-/* Registered tasks, kept only so ranks can be compared. Two today; this needs
- * to be no bigger than the number of callers of bg_task_init(). */
+/* Registered tasks, kept only so ranks can be compared. This must be no
+ * *smaller* than the number of ticked tasks, which is what bg_task_init()
+ * panics about: a task that did not fit is invisible to bg_task_preempted(),
+ * so ranking silently stops working for everything below it. */
 #define BG_MAX_TASKS 4
 static struct bg_task *bg_tasks[BG_MAX_TASKS];
 static int bg_tasks_count;
@@ -145,11 +148,21 @@ void bg_task_forget(struct bg_task *task)
 
 void bg_task_init(struct bg_task *task)
 {
+    /* A .request-only task keeps none of this. It is never ticked, so it has
+     * no marker to read and no pass to be preempted for -- registering it
+     * would only put an entry in the rank table whose `running`/`wants_run`
+     * can never become true. It also has no done_file, and reading one would
+     * mean handing open() a NULL path. */
+    if (task->request)
+        return;
+
     bg_read_done(task, &task->done_marks);
     bg_marks_none(&task->prev_marks);
 
-    if (bg_tasks_count < BG_MAX_TASKS)
-        bg_tasks[bg_tasks_count++] = task;
+    if (bg_tasks_count >= BG_MAX_TASKS)
+        panicf("bg_task: more than %d tasks", BG_MAX_TASKS);
+
+    bg_tasks[bg_tasks_count++] = task;
 }
 
 bool bg_task_preempted(const struct bg_task *task)

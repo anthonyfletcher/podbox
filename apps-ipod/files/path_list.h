@@ -33,4 +33,33 @@ void path_list_free(struct path_list *pl);
 const char *path_list_get(const struct path_list *pl, int index);
 const char *path_list_leaf(const struct path_list *pl, int index);
 
+/* Writing a list.
+ *
+ * Both producers -- the file index and the artwork cache's "found nothing"
+ * lists -- publish the same way: lines go to a ".tmp" beside the real file,
+ * which replaces it only when the pass that wrote it finished. An interrupted
+ * pass leaves the previous list standing.
+ *
+ * Trap, and the reason this lives here rather than in each producer: renaming
+ * a ".tmp" that was never created still removes the published file first, so a
+ * writer that skips the open() check destroys the previous list and puts
+ * nothing in its place. Both producers had that bug independently. _open()
+ * reports failure and _close() re-checks, so neither can have it again.
+ *
+ * A producer writing a pair of lists should open both before recording
+ * anything and publish neither unless both opened -- see fi_run_scan(). */
+struct path_list_writer {
+    int   fd;          /* < 0 when the open failed; nothing is published */
+    const char *path;  /* the published name; ".tmp" is derived from it */
+    int   count;
+};
+
+bool path_list_write_open(struct path_list_writer *w, const char *file);
+void path_list_write_record(struct path_list_writer *w, const char *line);
+void path_list_write_close(struct path_list_writer *w, bool completed);
+
+/* True once the writer has taken all the lines a reader could show, so a walk
+ * feeding it can stop early. */
+bool path_list_write_full(const struct path_list_writer *w);
+
 #endif /* _PATH_LIST_H */

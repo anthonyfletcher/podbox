@@ -99,7 +99,11 @@ struct bg_task
     long retry_at;      /* tick before which not to try again, 0 = now */
 };
 
-/* Register the task and read its marker back. Call before its thread starts. */
+/* Register the task and read its marker back. Call before its thread starts.
+ *
+ * A .request-only task may be passed and is deliberately ignored -- it is
+ * never ticked, so it has nothing to register and no marker to read. Calling
+ * this for one is harmless, so a caller need not know which kind it holds. */
 void bg_task_init(struct bg_task *task);
 
 /* One turn of a task's thread loop: wait on the queue with a timeout, then do

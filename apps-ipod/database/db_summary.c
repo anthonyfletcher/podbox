@@ -693,6 +693,7 @@ void db_summary_log_play(const char *album, const char *albumartist,
                        long serial)
 {
     struct play_rec rec;
+    off_t before;
     int fd;
 
     /* Nothing to attribute it to. assign_keys() gives a nameless album a key
@@ -710,7 +711,23 @@ void db_summary_log_play(const char *album, const char *albumartist,
     if (fd < 0)
         return;
 
-    write(fd, &rec, sizeof(rec));
+    /* A short write here is the one thing that can wreck the whole log. The
+     * file has no record markers -- readers step through it at a fixed stride
+     * from offset 0 -- so a partial record leaves every record appended after
+     * it at the wrong offset, and there is nothing to resynchronise from. The
+     * figures would then be credited to whichever album the misaligned bytes
+     * happen to name, silently and for good.
+     *
+     * So put the file back the way it was and drop this play instead. Losing
+     * one play is not worth noticing; losing the alignment is permanent. */
+    before = filesize(fd);
+    if (write(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
+    {
+        if (before >= 0)
+            ftruncate(fd, before);
+        close(fd);
+        return;
+    }
 
     /* Ask for a pass once it has grown enough that folding it into the index
      * beats replaying it on every read. Cheap to say so: a build that finds
@@ -722,6 +739,36 @@ void db_summary_log_play(const char *album, const char *albumartist,
     close(fd);
 }
 
+/* The play log, opened for reading, or -1.
+ *
+ * A log whose length is not a whole number of records has had a write cut
+ * short at some point, and everything after that point is misaligned (see
+ * db_summary_log_play()). Reading it anyway credits plays to the wrong albums,
+ * so it is discarded instead: the figures already folded into the saved index
+ * are untouched, and only the plays not yet folded in are lost.
+ *
+ * Belt and braces -- the writer above is what stops this arising -- but it is
+ * the difference between losing a few plays and quietly corrupting every
+ * album's figures, and both readers get it by calling this. */
+static int open_play_log(void)
+{
+    int fd = open(DB_PLAYS_FILE, O_RDONLY);
+    off_t size;
+
+    if (fd < 0)
+        return -1;
+
+    size = filesize(fd);
+    if (size < 0 || (size % (off_t)sizeof(struct play_rec)) != 0)
+    {
+        close(fd);
+        remove(DB_PLAYS_FILE);
+        return -1;
+    }
+
+    return fd;
+}
+
 /* Apply the log to an index just read from disk. Records at or below its
  * watermark are already counted in the figures it was saved with.
  *
@@ -731,7 +778,7 @@ void db_summary_log_play(const char *album, const char *albumartist,
 static void replay_plays(struct db_summary_t *idx)
 {
     struct play_rec batch[32];
-    int fd = open(DB_PLAYS_FILE, O_RDONLY);
+    int fd = open_play_log();
     ssize_t got;
 
     if (fd < 0)
@@ -885,7 +932,7 @@ static bool album_is_dirty(uint32_t namehash, uint32_t key)
 static void load_played(int32_t since)
 {
     struct play_rec batch[32];
-    int fd = open(DB_PLAYS_FILE, O_RDONLY);
+    int fd = open_play_log();
     ssize_t got;
 
     if (fd < 0)
@@ -1513,8 +1560,13 @@ static int load_artist_index(struct db_summary_t *target,
         || data.artist_ct == 0)
         goto failure;
 
+    /* Each length checked against the space left, never their sum against the
+     * total: artist_len comes straight out of the file, so on a corrupt header
+     * the addition wraps and a bounds check written that way passes. It is
+     * caught further down only because read2buf() then comes up short, which
+     * is the read defending the check rather than the other way round. */
     artist_idx_sz = data.artist_ct * sizeof(struct artist_data);
-    if (data.artist_len + artist_idx_sz > bsz)
+    if (data.artist_len > bsz || artist_idx_sz > bsz - data.artist_len)
         goto failure;
 
     if (read2buf(fr, b, data.artist_len) == 0)

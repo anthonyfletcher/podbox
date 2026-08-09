@@ -1,4 +1,9 @@
 /***************************************************************************
+ * GNU General Public License (version 2+)
+ *
+ * Hands out the linker-reserved scratch buffer to whichever screen needs a
+ * large temporary allocation, guarding against two owners at once.
+ *
  * The plugin system has been removed from this fork. All that remains of it in
  * the core is the RAM region a plugin used to run in (pluginbuf, from the
  * linker script), which a handful of core screens borrow as scratch space --
@@ -25,11 +30,8 @@
  * mean threading ownership through four unrelated call sites for no gain --
  * and a missed release would panic during ordinary use, which is a worse
  * failure than the one being prevented.
- * GNU General Public License (version 2+)
- *
- * Hands out the linker-reserved scratch buffer to whichever screen needs a
- * large temporary allocation, guarding against two owners at once.
  ****************************************************************************/
+#include <string.h>
 #include "config.h"
 #include "panic.h"
 #include "app_buffer.h"
@@ -66,9 +68,15 @@ void* app_claim_buffer(size_t *buffer_size, const char *owner)
  * on its init-failure path too), and panicking there would break ordinary use
  * to report a non-problem. Releasing a buffer someone *else* holds is a real
  * bug and still panics. */
+/* By name, not by pointer. Every claim/release pair today uses the same string
+ * literal inside one translation unit, so the compiler pools them and the two
+ * pointers happen to match -- but nothing enforces that, and a release whose
+ * literal lived in another object file would panic here for no reason at all,
+ * in the guard whose whole purpose is to prevent a crash. Twice per screen, so
+ * the comparison costs nothing worth measuring. */
 void app_release_buffer(const char *owner)
 {
-    if (buffer_owner && buffer_owner != owner)
+    if (buffer_owner && strcmp(buffer_owner, owner) != 0)
         panicf("app_buffer: %s released it, %s holds it", owner, buffer_owner);
 
     buffer_owner = NULL;

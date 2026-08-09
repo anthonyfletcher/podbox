@@ -47,7 +47,7 @@ struct art_cache_header
  *
  * A dedicated low-priority thread walks the tagcache once the database is
  * ready and idle, resolves each album folder's cover art, and renders it to
- * a set of square thumbnails (see apps/art_sizes.h) under
+ * a set of square thumbnails (see metadata/art_sizes.h) under
  * ROCKBOX_DIR/thumbcache/<sizename>/<hash>.aat. Thumbnails are keyed by a hash
  * of the album's folder path, so once a folder is done later passes skip it
  * with a cheap existence check (no art re-resolution), and keys stay valid

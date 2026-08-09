@@ -16,9 +16,14 @@
 #include "settings/settings.h"
 #include "debug_log.h"
 
-static const char * const log_path[DEBUG_LOG_COUNT] = {
-    [DEBUG_LOG_TAGCACHE] = ROCKBOX_DIR "/tagcache.log",
-    [DEBUG_LOG_ARTCACHE] = ROCKBOX_DIR "/artcache.log",
+/* Path and display name together, so adding a log means adding one row rather
+ * than remembering to extend a second list somewhere else. */
+static const struct {
+    const char *path;
+    const char *name;
+} log_info[DEBUG_LOG_COUNT] = {
+    [DEBUG_LOG_TAGCACHE] = { ROCKBOX_DIR "/tagcache.log", "tagcache"  },
+    [DEBUG_LOG_ARTCACHE] = { ROCKBOX_DIR "/artcache.log", "art cache" },
 };
 
 bool debug_log_enabled(enum debug_log_id id)
@@ -36,7 +41,7 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     if (id >= DEBUG_LOG_COUNT || !debug_log_enabled(id))
         return;
 
-    int fd = open(log_path[id], O_WRONLY | O_CREAT | O_APPEND, 0666);
+    int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (fd < 0)
         return;
 
@@ -66,10 +71,9 @@ void debug_log_restart(enum debug_log_id id)
     if (id >= DEBUG_LOG_COUNT || !debug_log_enabled(id))
         return;
 
-    int fd = open(log_path[id], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd >= 0)
         close(fd);
 
-    debug_log(id, "--- log started, %s ---",
-              id == DEBUG_LOG_TAGCACHE ? "tagcache" : "art cache");
+    debug_log(id, "--- log started, %s ---", log_info[id].name);
 }

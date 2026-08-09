@@ -30,6 +30,7 @@
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "system/bg_task.h"         /* the caching pass runs as one */
+#include "files/path_list.h"        /* the "found nothing" lists */
 #include "lcd.h"
 #include "draw/bmp.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
@@ -932,47 +933,31 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
  * (album) folder and its parent (artist) folder, for libraries laid out as
  * <artist>/<album>/<track>. Returns true if the pass ran to completion, false if
  * it was aborted (USB/DB busy/no memory) and should be retried later. */
-/* The two miss lists a pass is writing, or -1. One open file each for the
- * whole pass rather than an open/append/close per folder, which on a library
- * with a lot of coverless folders would be thousands of them. */
-static int noart_album_fd = -1;
-static int noart_artist_fd = -1;
+/* The two miss lists a pass is writing. One open file each for the whole pass
+ * rather than an open/append/close per folder, which on a library with a lot
+ * of coverless folders would be thousands of them. */
+static struct path_list_writer noart_albums;
+static struct path_list_writer noart_artists;
 
+/* Both or neither: one pass fills both lists, so publishing only the one that
+ * opened would leave the two describing different passes. A pass whose lists
+ * could not be opened still runs -- the thumbnails are the point, these are
+ * diagnostics -- it simply publishes nothing, leaving the previous pair. */
 static void noart_open(void)
 {
-    noart_album_fd = open(AA_NOART_ALBUMS ".tmp",
-                          O_CREAT|O_WRONLY|O_TRUNC, 0666);
-    noart_artist_fd = open(AA_NOART_ARTISTS ".tmp",
-                           O_CREAT|O_WRONLY|O_TRUNC, 0666);
+    if (path_list_write_open(&noart_albums, AA_NOART_ALBUMS)
+        && path_list_write_open(&noart_artists, AA_NOART_ARTISTS))
+        return;
+
+    path_list_write_close(&noart_albums, false);
+    path_list_write_close(&noart_artists, false);
 }
 
 /* Publish on a complete pass, discard on an aborted one. */
 static void noart_close(bool completed)
 {
-    if (noart_album_fd >= 0)
-        close(noart_album_fd);
-    if (noart_artist_fd >= 0)
-        close(noart_artist_fd);
-    noart_album_fd = noart_artist_fd = -1;
-
-    if (completed)
-    {
-        remove(AA_NOART_ALBUMS);
-        rename(AA_NOART_ALBUMS ".tmp", AA_NOART_ALBUMS);
-        remove(AA_NOART_ARTISTS);
-        rename(AA_NOART_ARTISTS ".tmp", AA_NOART_ARTISTS);
-    }
-    else
-    {
-        remove(AA_NOART_ALBUMS ".tmp");
-        remove(AA_NOART_ARTISTS ".tmp");
-    }
-}
-
-static void noart_record(int fd, const char *dir)
-{
-    if (fd >= 0)
-        fdprintf(fd, "%s\n", dir);
+    path_list_write_close(&noart_albums, completed);
+    path_list_write_close(&noart_artists, completed);
 }
 
 const char *art_cache_noart_list(bool artists)
@@ -1061,7 +1046,7 @@ static bool aa_run_pass(void)
             if (aa_cache_dir(tcs.result, dh, workbuf, worksz, &aborted))
                 aa_counts.album_art++;
             else if (!aborted)
-                noart_record(noart_album_fd, aa_dir);
+                path_list_write_record(&noart_albums, aa_dir);
         }
         if (aborted)
             break;
@@ -1081,7 +1066,7 @@ static bool aa_run_pass(void)
                 if (aa_cache_dir(aa_probe, ah, workbuf, worksz, &aborted))
                     aa_counts.artist_art++;
                 else if (!aborted)
-                    noart_record(noart_artist_fd, aa_artist_dir);
+                    path_list_write_record(&noart_artists, aa_artist_dir);
             }
         }
         if (aborted)

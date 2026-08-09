@@ -105,6 +105,7 @@ void path_list_free(struct path_list *pl)
     pl->handle = 0;
     pl->text = NULL;
     pl->count = 0;
+    pl->truncated = false;
 }
 
 const char *path_list_get(const struct path_list *pl, int index)
@@ -122,4 +123,78 @@ const char *path_list_leaf(const struct path_list *pl, int index)
     /* Something at the volume root has nothing after the slash; show the path
      * rather than an empty row. */
     return (slash && slash[1]) ? slash + 1 : path;
+}
+
+/* ---- writing a list ---------------------------------------------------- */
+
+static void tmp_name(const char *file, char *out, size_t out_sz)
+{
+    snprintf(out, out_sz, "%s.tmp", file);
+}
+
+/* 'path' is the open/closed flag, not just the name.
+ *
+ * Trap: writers are file-scope statics, so an untouched one is all zeroes --
+ * and a zeroed 'fd' is 0, a perfectly good descriptor, not -1. Testing fd
+ * alone would make _close() on a writer that was never opened close someone
+ * else's file and then rename a ".tmp" built from a NULL name. Only _open()
+ * ever sets 'path', so testing that is what makes a zeroed writer safe. The
+ * artwork cache reaches _close() without _open() on its no-memory path. */
+static bool writer_is_open(const struct path_list_writer *w)
+{
+    return w->path != NULL;
+}
+
+bool path_list_write_open(struct path_list_writer *w, const char *file)
+{
+    char tmp[MAX_PATH];
+
+    w->count = 0;
+    tmp_name(file, tmp, sizeof(tmp));
+    w->fd = open(tmp, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+    w->path = (w->fd >= 0) ? file : NULL;
+
+    return w->fd >= 0;
+}
+
+/* Lines past what a reader would keep are dropped rather than written: the
+ * reader stops at PATH_LIST_MAX and flags the list truncated, so the rest
+ * would only ever be disk. */
+void path_list_write_record(struct path_list_writer *w, const char *line)
+{
+    if (!writer_is_open(w) || w->count >= PATH_LIST_MAX)
+        return;
+
+    fdprintf(w->fd, "%s\n", line);
+    w->count++;
+}
+
+bool path_list_write_full(const struct path_list_writer *w)
+{
+    return w->count >= PATH_LIST_MAX;
+}
+
+void path_list_write_close(struct path_list_writer *w, bool completed)
+{
+    char tmp[MAX_PATH];
+
+    /* Never opened, or closed already: there is no .tmp to publish or clean
+     * up, and -- the point of the check -- nothing that would justify removing
+     * the published list. */
+    if (!writer_is_open(w))
+        return;
+
+    close(w->fd);
+    tmp_name(w->path, tmp, sizeof(tmp));
+
+    if (completed)
+    {
+        remove(w->path);
+        rename(tmp, w->path);
+    }
+    else
+        remove(tmp);
+
+    w->fd = -1;
+    w->path = NULL;
 }
