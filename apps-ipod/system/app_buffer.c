@@ -6,9 +6,9 @@
  *
  * The plugin system has been removed from this fork. All that remains of it in
  * the core is the RAM region a plugin used to run in (pluginbuf, from the
- * linker script), which a handful of core screens borrow as scratch space --
- * the bookmark list, cuesheet display, file copy/move, skin parsing, the
- * playlist viewer and the album art carousel.
+ * linker script), which core screens borrow as scratch space instead. For the
+ * current list of borrowers, grep for the two entry points below rather than
+ * trusting a list here -- it grows.
  *
  * The rb-> API struct, the .rock loader and the rest of the plugin machinery
  * are all gone. The linker symbol and PLUGIN_BUFFER_SIZE keep their old names
@@ -16,18 +16,18 @@
  *
  * One buffer, one user. While the plugin system existed that held by
  * construction -- only one plugin ran at a time. It no longer does: several
- * core screens can be reached from one another, and two of them (the carousel
- * and the playlist viewer) hold the buffer for as long as their screen is up.
- * Nothing copies out of it, so an overlap silently aliases memory.
+ * core screens can be reached from one another, and some of them hold the
+ * buffer for as long as their screen is up. Nothing copies out of it, so an
+ * overlap silently aliases memory.
  *
  * Ownership is therefore tracked, but only for the holders that actually need
- * it. The long-lived pair claim and release around their screen's lifetime;
+ * it. Long-lived holders claim and release around their screen's lifetime;
  * transient callers, which finish before returning to the UI loop, only assert
  * that nobody is holding it. That asymmetry is deliberate: a transient caller
  * cannot reliably release, because at least one of them (the bookmark list)
  * hands a pointer into this buffer back to *its* caller, so the region stays
  * live past the function that acquired it. Requiring a release there would
- * mean threading ownership through four unrelated call sites for no gain --
+ * mean threading ownership through every transient call site for no gain --
  * and a missed release would panic during ordinary use, which is a worse
  * failure than the one being prevented.
  ****************************************************************************/

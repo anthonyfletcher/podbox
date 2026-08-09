@@ -24,7 +24,7 @@
 #include "string-extra.h"    /* strlcpy, strlcat */
 #include "kernel.h"   /* HZ */
 #include "system.h"          /* ALIGN_UP */
-#include "core_alloc.h"
+#include "system/app_buffer.h"  /* the tree is built in the scratch buffer */
 #include "crc32.h"
 #include "dir.h"
 #include "file.h"            /* MAX_PATH */
@@ -589,19 +589,20 @@ bool folder_select(char * header_text, char* setting, int setting_len)
     size_t buf_size;
     bool changed = false;
 
-    int buf_handle = core_alloc_maximum(&buf_size, NULL);
-    if (buf_handle <= 0)
-    {
-        splash(HZ, "Out of memory");
-        return false;
-    }
-    /* PIN IT -- same reason as image_viewer.c. NULL ops means buflib may move
-     * this block freely, and we not only cache buffer_front/buffer_end but
-     * build the whole folder tree inside it, with every node pointing at other
-     * nodes by address. The list loop below yields, so a compaction while the
-     * picker is open would dangle all of them at once. */
-    core_pin(buf_handle);
-    buffer_front = core_get_data(buf_handle);
+    /* Upstream took the plugin buffer here; this is the same region under the
+     * name it has since the plugin system went (system/app_buffer.h).
+     *
+     * Not core_alloc_maximum(): the audio buffer holds the whole of core, so a
+     * request from a screen shrinks it, and shrinking it stops playback and
+     * rebuffers the current track -- and this is the largest request there is.
+     * The block would also have to be pinned, since the tree built inside it
+     * points at itself by address and the list loop below yields; a pinned
+     * block is one buflib cannot compact across.
+     *
+     * Claimed rather than borrowed because it is held while the picker is on
+     * screen. Nothing reachable from here wants it: the action callback only
+     * expands, collapses and toggles rows, and opens no screen at all. */
+    buffer_front = app_claim_buffer(&buf_size, "folder select");
     buffer_end = buffer_front + buf_size;
     logf("folder_select %d bytes free", (int)(buffer_end - buffer_front));
     root = load_root();
@@ -636,7 +637,6 @@ bool folder_select(char * header_text, char* setting, int setting_len)
         }
     }
 
-    core_unpin(buf_handle);
-    core_free(buf_handle);
+    app_release_buffer("folder select");
     return changed;
 }
