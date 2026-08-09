@@ -487,9 +487,19 @@ static void progress_load(void)
     close(fd);
 }
 
+/* All three writes checked, and the file removed if any falls short.
+ *
+ * progress_load() treats a short read as no progress at all rather than
+ * partial progress, which is the right call -- but it means a truncated save
+ * leaves a valid header over a short body, the next load zeroes every badge,
+ * and the save after that writes the zeroes back. A careful reader and a
+ * careless writer between them turn one full disk into progress lost for good.
+ * Removing the file instead leaves the next load with nothing to open, which
+ * it already handles. */
 void pv_badges_save(void)
 {
     unsigned long hdr[2];
+    bool ok;
     int fd = open(PV_BADGES_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
     if (fd < 0)
@@ -497,10 +507,14 @@ void pv_badges_save(void)
 
     hdr[0] = PV_BADGES_MAGIC;
     hdr[1] = (unsigned long)PV_N_BADGES;
-    write(fd, hdr, sizeof(hdr));
-    write(fd, seen, sizeof(seen));
-    write(fd, when, sizeof(when));
+
+    ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
+      && write(fd, seen, sizeof(seen)) == (ssize_t)sizeof(seen)
+      && write(fd, when, sizeof(when)) == (ssize_t)sizeof(when);
     close(fd);
+
+    if (!ok)
+        remove(PV_BADGES_PATH);
 }
 
 int pv_badges_classify(void)
