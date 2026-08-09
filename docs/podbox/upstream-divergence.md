@@ -72,8 +72,9 @@ commit*, where this one answers *why a given file differs*.
 | `backlight.c` | `power_input_present()` → `charger_inserted()` in `backlight_get_current_timeout()` | The 6G now distinguishes a plain USB port from a real charger. `power_input_present()` is true for both, so a data-only connection would wrongly get the plugged-in backlight timeout. |
 | `drivers/ata.c`, `export/ata.h` | New `ata_set_storage_mode(int)` / `ata_get_ssd_mode()`, backed by a file-scope `ata_ssd_mode`. In SSD mode `ata_sleepnow()` no longer arms `power_off_tick`. | Declares the SSD-mode interface for all ATA targets, and implements the one part of it that is not 6G-specific. Modes: 0 auto (asks `ata_disk_isssd()`), 1 HDD, 2 SSD; the 6G's richer handling is in `storage_ata-6g.c`. The generic driver is what the 5G runs, and it was powering the interface off after seven idle seconds (`sleep_timeout` then `ATA_POWER_OFF_TIMEOUT`) regardless of the setting. Waking from off runs `ata_power_on()` — a fixed `HZ/4` supply settle, hard reset, two IDENTIFYs — measured at ~780 ms on a 5G with an SD adapter, paid by the next file access. Flash saves almost nothing by being powered off rather than merely in standby. |
 | `export/storage.h`, `storage.c` | New `Q_STORAGE_PRE_WAKE` event, stub functions and macro dispatch for the two calls above | Plumbing so the app and backlight layers can reach SSD mode through the generic `storage_*` interface. |
-| `powermgmt.c` | Two call sites stop consulting `charging_state()` — the battery-level test uses `charge_state > DISCHARGING`, and the charger case sets `CHARGING` unconditionally instead of falling through | On the 6G the charge-status line oscillates against weak USB sources, so `charging_state()` reads false while charging is genuinely happening. Upstream's fallthrough flips the reported state back and forth. |
-| `export/logf.h` | `MAX_LOGF_SIZE` 16 KiB → 256 KiB | Costs nothing unless `ROCKBOX_HAS_LOGF` is defined — which it now is on the 6G, so it is live there. |
+| `powermgmt.c` | The charger case sets `CHARGING` unconditionally instead of falling through, and the battery-level test keys off `charge_state > DISCHARGING` | On the 6G the charge-status line oscillates against weak USB sources, so `charging_state()` reads false while charging is genuinely happening. Upstream's fallthrough flips the reported state back and forth, and with it the voltage-to-percentage curve, which moves the reading several points. |
+| `powermgmt.c` | New `charge_finished`, debounced 8 samples off `charging_state()` and held until unplug; the 99 % cap now needs it as well as `charge_state` | The change above answered two questions with one variable and got the second wrong. Curve selection wants debounced charger *presence*; the "< 100 % until charging is finished" cap wants "is charge still going in?", which `charge_state` cannot say — it reads `CHARGING` from plug-in to unplug, so **a full battery never showed 100 %**. Splitting them keeps the oscillation fix and releases the cap. Other targets never set the flag, so they keep upstream's behaviour exactly. |
+| `export/logf.h`, `export/config/ipod6g.h` | `MAX_LOGF_SIZE` 16 KiB → 256 KiB, **and** `ROCKBOX_HAS_LOGF` defined for non-bootloader 6G builds (upstream defines it only for the disabled bootloader block) | ⚠ **This is not free on the 6G.** Together they put a 256 KiB always-resident `logfbuffer` in `.bss` — jointly the largest object in `rockbox.elf`, level with `cache_buffer` — and turn every `logf()` in a file that arms `LOGF_ENABLE` into a real `vsnprintf`. `apps/playback.c` and `apps/codecs.c` arm it *upstream*, so on the 6G the audio path now logs on every buffering and codec event. Harmless on the 5G, which leaves `ROCKBOX_HAS_LOGF` undefined and pays nothing. See finding F-35. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm functions, the `alarm_disable` table and the `rtc_init()` call to `rtc_check_alarm_started()` wrapped in `#ifdef HAVE_RTC_ALARM` | The prototypes in `export/rtc.h` are already guarded, but this driver referenced them unconditionally — it was the only RTC driver without the guard, because every upstream target using the PCF50605 defines `HAVE_RTC_ALARM`. Undefining it for the 5G broke the build. Now matches the shape of `rtc_ds1339_ds3231.c`, `rtc_e8564.c` and the rest, so this is upstream's own convention rather than a fork invention. |
 
 ## firmware/ — USB stack
@@ -185,6 +186,22 @@ it in the timing-critical path.
 - **Auto-detection** runs in `ata_init()` via `ata_disk_isssd()`, so the mode is
   right before settings are even loaded.
 
+**One setting, two policies — worth knowing before changing either driver.**
+"Storage mode = SSD" does not mean the same thing on the two targets, and
+neither driver can see the other:
+
+| | `drivers/ata.c` (5G) | `storage_ata-6g.c` (6G) |
+| --- | --- | --- |
+| Powers the interface off? | **No** — SSD mode is what stops it | **Yes**, in the two stages above |
+| Wake cost hidden how? | Nothing to hide | `Q_STORAGE_PRE_WAKE` |
+
+`backlight.c` posts `Q_STORAGE_PRE_WAKE` on **both** targets under
+`storage_get_ssd_mode()`, and only the 6G handles it. That is harmless exactly
+while the 5G never powers off in SSD mode — there is nothing there to pre-wake.
+Make the 5G power off and the pre-wake will silently not fire, bringing back the
+~780 ms wake measured on that target. The divergence is recorded at both
+`ata_ssd_mode` declarations for the same reason.
+
 ### Charger classification, in detail
 
 - Charging is disabled over GPIO C1 when the USB current commitment is under
@@ -295,7 +312,7 @@ instead** — it will succeed, and produce the wrong firmware.
 | `mkinfo.pl` | Detects a core build by comparing `APPSDIR` against `COREAPPSDIR`, not by matching `/\/apps$/` | Otherwise `rockbox-info.txt` silently loses its `Actual size`, `RAM usage` and `Features` lines. |
 | `buildzip.pl` | New `$APPSDIR` from the environment, for `tagnavi.config` and `lang/Invalid*.talk` | This file is kept as close to upstream as possible, so it gets the smallest change that works — just the files genuinely shipped *from* the application layer. Everything else, including its `apps/plugins` paths, is untouched. |
 | `buildzip.pl` | New `$APPSBUILDDIR`, the basename of `COREAPPSDIR`, for `lang/*.lng` and `lang/*.zip` | **Two different questions, two different variables.** `$APPSDIR` is a *source* path; the `.lng` files are *build products*, named relative to the build directory buildzip runs in. Upstream's hardcoded `apps/lang/*.lng` exists in the source tree and is empty in the build tree, so every one of the 48 compiled languages was silently dropped from the zip and Settings > Language browsed an empty directory. `COREAPPSDIR` rather than `APPSDIR` because a bootloader build points the latter at `bootloader/`, which has no lang directory at all. |
-| `voice.pl`, `langstatus` | Hardcoded to `apps-ipod/lang/` | Standalone scripts with no access to `COREAPPSDIR`. Voice builds are unverified here regardless — `VOICE_VERSION` no longer resolves because `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`. |
+| `voice.pl`, `langstatus` | Derive the application directory from `COREAPPSDIR`, falling back to whichever of `apps-ipod/` or `apps/` exists | Both were hardcoded to `apps-ipod/lang/`, which solved the same problem two ways in one tree and would break silently on the next `--appsdir` change. `voice.pl` does get `COREAPPSDIR` when make invokes it; the fallback is for a hand-run, which is the only way `langstatus` is ever used. Voice builds are unverified here regardless — `VOICE_VERSION` no longer resolves because `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`. |
 
 ### New tools
 

@@ -19,18 +19,9 @@
 #include "playlist/playlist.h"
 #include "iap.h"
 
-/* On, where upstream has it off, and deliberately -- this header reaches every
- * iap/ file, so it turns logging on for the whole subsystem.
- *
- * iAP is the one thing here that talks a protocol to hardware nobody can single
- * step: every bug fixed in these files (a length underflow, two wild-index
- * lockups, a volume that muted across a reboot) was found by watching packets.
- * Leaving it armed costs nothing shipped -- ROCKBOX_HAS_LOGF is undefined in a
- * normal build, so logf falls back to DEBUGF, which is do{}while(0) -- and
- * means a logf-enabled build traces accessories without editing a header first.
- *
- * Comment it out to silence iap/ alone. */
-#define LOGF_ENABLE
+/* Upstream's line verbatim, so a merge never touches it. Uncommenting arms
+ * logf for every iap/ file, this header reaching all of them. */
+//#define LOGF_ENABLE
 #include "logf.h"
 
 /* The Model ID of the iPod we emulate. Currently a 160GB classic */
