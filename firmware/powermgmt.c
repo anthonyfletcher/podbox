@@ -101,6 +101,29 @@ unsigned int power_thread_inputs;
 #if CONFIG_CHARGING >= CHARGING_MONITOR
 /* Charging state (mode) as seen by the power thread */
 enum charge_state_type charge_state = DISCHARGING;
+
+/* Charging has finished, with the charger still plugged in.
+ *
+ * Deliberately separate from charge_state, because the two answer different
+ * questions and one variable cannot do both. charge_state follows the
+ * *debounced charger presence*: it selects the voltage-to-percentage curve,
+ * and driving that from the raw !CHRG pin made the reading jump between the
+ * charge and discharge curves every time the pin oscillated -- which it does
+ * on weak USB supplies near a full battery.
+ *
+ * The 99% cap below needs the other question, "is charge still going in?".
+ * Answering it from charge_state too is what left a full battery showing 99%
+ * for as long as it stayed on the charger, since charge_state says CHARGING
+ * from the moment the cable goes in until it comes out again.
+ *
+ * Debounced over the same number of samples as the charger detection, then
+ * held until the charger is removed -- so a flickering pin cannot flicker the
+ * last percent with it. A pause part way up (a hot battery, say) can set this
+ * early, and costs nothing: the charge curve still governs the number, and it
+ * only reaches 100 when the voltage is genuinely at the top. */
+#define CHARGE_DONE_SAMPLES 8   /* x POWER_THREAD_STEP_TICKS = ~4s */
+static bool charge_finished;
+static int  charge_done_count;
 #endif
 #endif /* CONFIG_CHARGING */
 
@@ -362,9 +385,11 @@ static int voltage_to_battery_level(int millivolts)
 
 #if CONFIG_CHARGING >= CHARGING_MONITOR
     if (charge_state > DISCHARGING) {
-        /* battery level is defined to be < 100% until charging is finished */
+        /* battery level is defined to be < 100% until charging is finished --
+         * but only until then. Capping for as long as the charger is present
+         * is what stopped a full battery ever reading 100%. */
         level = voltage_to_percent(millivolts, percent_to_volt_charge);
-        if (level > 99)
+        if (level > 99 && !charge_finished)
             level = 99;
     }
     else
@@ -596,10 +621,21 @@ static inline void charging_algorithm_step(void)
     case CHARGER_PLUGGED:
     case CHARGER:
         charge_state = CHARGING;
+        /* Follow the charger's own "still charging" pin only for the 99% cap,
+         * never for charge_state -- see charge_finished. */
+        if (!charge_finished)
+        {
+            if (charging_state())
+                charge_done_count = 0;
+            else if (++charge_done_count >= CHARGE_DONE_SAMPLES)
+                charge_finished = true;
+        }
         break;
     case CHARGER_UNPLUGGED:
     case NO_CHARGER:
         charge_state = DISCHARGING;
+        charge_finished = false;
+        charge_done_count = 0;
         break;
     }
 }
