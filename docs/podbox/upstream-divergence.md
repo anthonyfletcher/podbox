@@ -74,7 +74,7 @@ commit*, where this one answers *why a given file differs*.
 | `export/storage.h`, `storage.c` | New `Q_STORAGE_PRE_WAKE` event, stub functions and macro dispatch for the two calls above | Plumbing so the app and backlight layers can reach SSD mode through the generic `storage_*` interface. |
 | `powermgmt.c` | The charger case sets `CHARGING` unconditionally instead of falling through, and the battery-level test keys off `charge_state > DISCHARGING` | On the 6G the charge-status line oscillates against weak USB sources, so `charging_state()` reads false while charging is genuinely happening. Upstream's fallthrough flips the reported state back and forth, and with it the voltage-to-percentage curve, which moves the reading several points. |
 | `powermgmt.c` | New `charge_finished`, debounced 8 samples off `charging_state()` and held until unplug; the 99 % cap now needs it as well as `charge_state` | The change above answered two questions with one variable and got the second wrong. Curve selection wants debounced charger *presence*; the "< 100 % until charging is finished" cap wants "is charge still going in?", which `charge_state` cannot say — it reads `CHARGING` from plug-in to unplug, so **a full battery never showed 100 %**. Splitting them keeps the oscillation fix and releases the cap. Other targets never set the flag, so they keep upstream's behaviour exactly. |
-| `export/logf.h`, `export/config/ipod6g.h` | `MAX_LOGF_SIZE` 16 KiB → 256 KiB, **and** `ROCKBOX_HAS_LOGF` defined for non-bootloader 6G builds (upstream defines it only for the disabled bootloader block) | ⚠ **This is not free on the 6G.** Together they put a 256 KiB always-resident `logfbuffer` in `.bss` — jointly the largest object in `rockbox.elf`, level with `cache_buffer` — and turn every `logf()` in a file that arms `LOGF_ENABLE` into a real `vsnprintf`. `apps/playback.c` and `apps/codecs.c` arm it *upstream*, so on the 6G the audio path now logs on every buffering and codec event. Harmless on the 5G, which leaves `ROCKBOX_HAS_LOGF` undefined and pays nothing. See finding F-35. |
+| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined for non-bootloader 6G builds (upstream defines it only inside the disabled bootloader block) | The 6G keeps a serial log. **`export/logf.h` is no longer touched:** `MAX_LOGF_SIZE` had been raised 16 KiB → 256 KiB, which on this target is a 256 KiB always-resident `logfbuffer` in `.bss` — jointly the largest object in `rockbox.elf`. Restored to upstream's 16 KiB, so that header is byte-identical again and the buffer costs what upstream intends. Note `logf()` here is a real `vsnprintf`, not `do {} while(0)`, and `apps/playback.c` and `apps/codecs.c` arm `LOGF_ENABLE` *upstream* — so the 6G's audio path does log on every buffering and codec event. Nothing of this reaches the 5G, which leaves `ROCKBOX_HAS_LOGF` undefined. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm functions, the `alarm_disable` table and the `rtc_init()` call to `rtc_check_alarm_started()` wrapped in `#ifdef HAVE_RTC_ALARM` | The prototypes in `export/rtc.h` are already guarded, but this driver referenced them unconditionally — it was the only RTC driver without the guard, because every upstream target using the PCF50605 defines `HAVE_RTC_ALARM`. Undefining it for the 5G broke the build. Now matches the shape of `rtc_ds1339_ds3231.c`, `rtc_e8564.c` and the rest, so this is upstream's own convention rather than a fork invention. |
 
 ## firmware/ — USB stack
@@ -186,21 +186,22 @@ it in the timing-critical path.
 - **Auto-detection** runs in `ata_init()` via `ata_disk_isssd()`, so the mode is
   right before settings are even loaded.
 
-**One setting, two policies — worth knowing before changing either driver.**
-"Storage mode = SSD" does not mean the same thing on the two targets, and
-neither driver can see the other:
+**One setting, two mechanisms — worth knowing before changing either driver.**
+Both are after the same thing, idling flash more cheaply than a disk. They get
+there differently, and neither driver can see the other:
 
 | | `drivers/ata.c` (5G) | `storage_ata-6g.c` (6G) |
 | --- | --- | --- |
-| Powers the interface off? | **No** — SSD mode is what stops it | **Yes**, in the two stages above |
+| What SSD mode changes | Stops the interface being powered off at all | Makes the first sleep stage cheaper — clock-gate instead of `STANDBY IMMEDIATE` |
+| Does power-off still happen? | No | Yes, as a second stage: ten more seconds with the backlight off |
 | Wake cost hidden how? | Nothing to hide | `Q_STORAGE_PRE_WAKE` |
 
-`backlight.c` posts `Q_STORAGE_PRE_WAKE` on **both** targets under
-`storage_get_ssd_mode()`, and only the 6G handles it. That is harmless exactly
-while the 5G never powers off in SSD mode — there is nothing there to pre-wake.
-Make the 5G power off and the pre-wake will silently not fire, bringing back the
-~780 ms wake measured on that target. The divergence is recorded at both
-`ata_ssd_mode` declarations for the same reason.
+That last row follows from the one above it. `backlight.c` posts
+`Q_STORAGE_PRE_WAKE` on **both** targets under `storage_get_ssd_mode()`, and
+only the 6G handles it — because only the 6G has a power-off to hide. Give the
+generic driver a power-off path and the pre-wake will not fire for it, bringing
+back the ~780 ms wake measured on the 5G, unhidden. Noted at both
+`ata_ssd_mode` declarations for that reason.
 
 ### Charger classification, in detail
 

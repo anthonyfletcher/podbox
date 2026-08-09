@@ -115,14 +115,18 @@ static long sleep_timeout = 5*HZ;
  * identified yet when this file's statics are initialised, and settings_apply
  * calls ata_set_storage_mode() as soon as the settings are loaded.
  *
- * Trap: one setting, two policies. This driver takes SSD mode to mean the
- * interface never powers off at all. The iPod Classic's own driver
- * (target/arm/s5l8702/ipod6g/storage_ata-6g.c) still powers off in SSD mode
- * and hides the wake behind Q_STORAGE_PRE_WAKE, which backlight.c posts on
- * both targets but only that driver handles. Harmless while this one never
- * powers off -- there is nothing here to pre-wake -- and the moment that
- * changes, the pre-wake will silently not fire and the ~780 ms measured above
- * comes back with nothing hiding it. */
+ * One setting, two mechanisms. Both drivers are after the same thing -- idling
+ * flash more cheaply than a disk -- and go about it differently. Here, SSD mode
+ * simply stops the interface being powered off. The iPod Classic's own driver
+ * (target/arm/s5l8702/ipod6g/storage_ata-6g.c) instead makes the first sleep
+ * stage cheaper (clock-gating rather than STANDBY IMMEDIATE) and still powers
+ * off afterwards, once ten further seconds have passed with the backlight off.
+ *
+ * That difference is why Q_STORAGE_PRE_WAKE exists and why only that driver
+ * handles it: it has a power-off to hide, and this one does not. backlight.c
+ * posts the event on both targets, so if this driver is ever given a power-off
+ * path, the pre-wake will not fire for it and the ~780 ms above returns
+ * unhidden. */
 static bool ata_ssd_mode = false;
 
 static long last_disk_activity = -1;

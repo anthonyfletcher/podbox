@@ -71,14 +71,17 @@ static struct semaphore ata_wakeup;
 static long ata_last_activity_value = -1;
 static long ata_sleep_timeout = 7 * HZ;
 static bool ata_powered;
-/* "Storage mode = SSD", which means something different here than it does in
- * the generic driver. drivers/ata.c takes it to mean the interface never
- * powers off. This one still powers off -- in two stages, clock-gate then
- * AUTOLDO, see ssd_deep_asleep -- and hides the wake instead: backlight.c
- * posts Q_STORAGE_PRE_WAKE when the backlight comes on, and the handler at the
- * bottom of this file powers the interface back up before the user has
- * navigated anywhere. One user-facing setting, two policies; neither driver
- * can see the other, so the divergence is recorded at both declarations. */
+/* "Storage mode = SSD", pursued differently here than in the generic driver.
+ * Both are after cheaper idling for flash; drivers/ata.c gets it by never
+ * powering the interface off, while this one keeps the power-off and makes the
+ * step before it cheaper -- clock-gate first, AUTOLDO cut only after ten more
+ * seconds with the backlight off (see ssd_deep_asleep).
+ *
+ * Because a power-off survives here, this driver is the one that needs
+ * Q_STORAGE_PRE_WAKE: backlight.c posts it on both targets when the backlight
+ * comes on, and the handler at the bottom of this file powers the interface
+ * back up before the user has navigated anywhere. Neither driver can see the
+ * other, so the difference is noted at both declarations. */
 static bool ata_ssd_mode = false;
 static long ssd_sleep_tick;
 static bool ssd_deep_asleep;
