@@ -184,9 +184,18 @@ static const struct map_entry *map_get(const char *path)
 
 /* ------------------------------------------------------------ persistence */
 
+/* All three writes checked, and the file removed if any falls short.
+ *
+ * Less costly to get wrong than the badge file, because map_load() rejecting a
+ * short file makes map_sweep() rebuild the map rather than losing anything --
+ * but that sweep is a pass over every file the database knows, which the
+ * comment on it calls seeky on a spinning disk. Leaving a half-written map on
+ * disk buys one of those on the next open for nothing. */
 static void map_save(void)
 {
     unsigned long hdr[4];
+    size_t map_bytes;
+    bool ok;
     int fd = open(PV_MAP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
     if (fd < 0)
@@ -196,10 +205,15 @@ static void map_save(void)
     hdr[1] = (unsigned long)map_db_entries;
     hdr[2] = (unsigned long)map_n;
     hdr[3] = map_pool_used;
-    write(fd, hdr, sizeof(hdr));
-    write(fd, map, (size_t)map_n * sizeof(struct map_entry));
-    write(fd, map_pool, map_pool_used);
+    map_bytes = (size_t)map_n * sizeof(struct map_entry);
+
+    ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
+      && write(fd, map, map_bytes) == (ssize_t)map_bytes
+      && write(fd, map_pool, map_pool_used) == (ssize_t)map_pool_used;
     close(fd);
+
+    if (!ok)
+        remove(PV_MAP_PATH);
 }
 
 /* True if the saved map matches the database as it stands and was read whole. */
