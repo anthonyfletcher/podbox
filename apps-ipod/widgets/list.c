@@ -716,7 +716,18 @@ static void _lists_uiviewport_update_callback(unsigned short id,
     (void)userdata;
 
     if (current_lists)
+    {
         gui_synclist_draw(current_lists);
+        /* Nothing else will put this on screen. GUI_EVENT_ACTIONUPDATE is sent
+         * from the top of get_action(), so this runs with list_do_action()'s
+         * flush inhibition already set and the thread about to block for input:
+         * viewportmanager_update() returns without flushing, and the next
+         * update is the next get_action(), which inhibits again. Waking from a
+         * dimmed backlight is the case that shows it -- the status bar does a
+         * full refresh, the list repaints correctly into the framebuffer, and
+         * none of it reaches the LCD until a second keypress. */
+        skin_flush_dirty();
+    }
 }
 
 bool gui_synclist_do_button(struct gui_synclist * lists, int *actionptr)
