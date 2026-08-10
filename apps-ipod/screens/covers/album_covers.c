@@ -32,6 +32,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>            /* qsort */
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -442,14 +443,73 @@ static unsigned int album_art_key(int slide_index)
     return carousel_idx.album_index[slide_index].art_hash;
 }
 
+/* The order the slides appear in, from this screen's two sort settings.
+ *
+ * Here rather than in the index builder because it is a display order and
+ * nothing else: it reads settings this screen owns, and no other reader of the
+ * index wants it. The charts rank the same albums their own way, and Random
+ * album picks by number. */
+static int compare_albums(const void *a_v, const void *b_v)
+{
+    uint32_t artist_a = ((struct album_data *)a_v)->artist_idx;
+    uint32_t artist_b = ((struct album_data *)b_v)->artist_idx;
+
+    uint32_t album_a = ((struct album_data *)a_v)->name_idx;
+    uint32_t album_b = ((struct album_data *)b_v)->name_idx;
+
+    int year_a = ((struct album_data *)a_v)->year;
+    int year_b = ((struct album_data *)b_v)->year;
+
+    switch (global_settings.album_covers_sort_albums_by)
+    {
+        case SORT_BY_ARTIST_AND_NAME:
+            if (artist_a - artist_b == 0)
+                return (int)(album_a - album_b);
+            break;
+        case SORT_BY_ARTIST_AND_YEAR:
+            if (artist_a - artist_b == 0)
+            {
+                if (global_settings.album_covers_year_sort_order == ASCENDING)
+                    return year_a - year_b;
+                else
+                    return year_b - year_a;
+            }
+            break;
+        case SORT_BY_YEAR:
+            if (year_a - year_b != 0)
+            {
+                if (global_settings.album_covers_year_sort_order == ASCENDING)
+                    return year_a - year_b;
+                else
+                    return year_b - year_a;
+            }
+            break;
+        case SORT_BY_NAME:
+            if (album_a - album_b != 0)
+                return (int)(album_a - album_b);
+            break;
+    }
+
+    return (int)(artist_a - artist_b);
+}
+
 /* carousel_model.build_index for the album model: the whole index, into the
- * engine's own struct and the buffer it has already claimed. The database
- * module builds into whichever index it is handed; choosing that it is this
- * one is the model's business, which is why the call is here and not there. */
+ * engine's own struct and the buffer it has already claimed, then into this
+ * screen's display order.
+ *
+ * The database module builds into whichever index it is handed and leaves it
+ * in its own order; choosing that it is this one, and how the slides are
+ * arranged, is the model's business. */
 static int album_build_index(void)
 {
-    return db_summary_build_into(&carousel_idx, carousel_idx.buf,
-                                 carousel_idx.buf_sz);
+    int res = db_summary_build_into(&carousel_idx, carousel_idx.buf,
+                                    carousel_idx.buf_sz);
+
+    if (res >= SUCCESS)
+        qsort(carousel_idx.album_index, carousel_idx.album_ct,
+              sizeof(struct album_data), compare_albums);
+
+    return res;
 }
 
 /* carousel_model.count for the album model. */

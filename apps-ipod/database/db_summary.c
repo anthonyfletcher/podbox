@@ -42,7 +42,6 @@
 #include "kernel.h"
 #include "file.h"
 #include "lang.h"
-#include "settings/settings.h"
 #include "database/tagcache.h"
 #include "metadata/art_cache.h"      /* art_cache_dir_hash */
 #include "widgets/splash.h"
@@ -61,7 +60,6 @@
 #include "playlist/playlist.h"
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
-#include "screens/covers/album_covers.h"   /* SORT_BY_*, ASCENDING (sort order) */
 #include "db_summary.h"
 
 /* The index file, and the four-byte magic at its start. It holds albums and
@@ -286,55 +284,29 @@ static bool progress_cancel(int step, int count, char *msg)
     return false;
 }
 
-int compare_albums (const void *a_v, const void *b_v)
-{
-    uint32_t artist_a = ((struct album_data *)a_v)->artist_idx;
-    uint32_t artist_b = ((struct album_data *)b_v)->artist_idx;
-
-    uint32_t album_a = ((struct album_data *)a_v)->name_idx;
-    uint32_t album_b = ((struct album_data *)b_v)->name_idx;
-
-    int year_a = ((struct album_data *)a_v)->year;
-    int year_b = ((struct album_data *)b_v)->year;
-
-    switch (global_settings.album_covers_sort_albums_by)
-    {
-        case SORT_BY_ARTIST_AND_NAME:
-            if (artist_a - artist_b == 0)
-                return (int)(album_a - album_b);
-            break;
-        case SORT_BY_ARTIST_AND_YEAR:
-            if (artist_a - artist_b == 0)
-            {
-                if (global_settings.album_covers_year_sort_order == ASCENDING)
-                    return year_a - year_b;
-                else
-                    return year_b - year_a;
-            }
-            break;
-        case SORT_BY_YEAR:
-            if (year_a - year_b != 0)
-            {
-                if (global_settings.album_covers_year_sort_order == ASCENDING)
-                    return year_a - year_b;
-                else
-                    return year_b - year_a;
-            }
-            break;
-        case SORT_BY_NAME:
-            if (album_a - album_b != 0)
-                return (int)(album_a - album_b);
-            break;
-    }
-
-    return (int)(artist_a - artist_b);
-}
-
 static int compare_album_artists (const void *a_v, const void *b_v)
 {
     uint32_t a = ((struct album_data *)a_v)->artist_idx;
     uint32_t b = ((struct album_data *)b_v)->artist_idx;
     return (int)(a - b);
+}
+
+/* The order the index is left in, and therefore the order it is saved in.
+ *
+ * Artist, then album name -- both offsets into name blobs that were written in
+ * the order tagcache walked them, so this is a total order over the entries
+ * and reading no setting. That matters twice: the file is reproducible from
+ * the same library, and the charts, which keep array order between entries
+ * whose figures tie, show the same tied albums after a rebuild as before it.
+ * qsort is not stable, so leaving the ties to it would give neither. */
+static int compare_index_order(const void *a_v, const void *b_v)
+{
+    const struct album_data *a = a_v;
+    const struct album_data *b = b_v;
+
+    if (a->artist_idx != b->artist_idx)
+        return (int)((uint32_t)a->artist_idx - (uint32_t)b->artist_idx);
+    return (int)((uint32_t)a->name_idx - (uint32_t)b->name_idx);
 }
 
 /* FNV-1a over one name, or two joined by a NUL so that ("ab", "c") and
@@ -1467,8 +1439,12 @@ retry_artist_lookup:
      * replay those plays on top of figures that already hold them. */
     remove(DB_PLAYS_FILE);
 
+    /* Artist then album name, and that is all a reader is promised. A screen
+     * that wants its albums arranged any particular way sorts them itself once
+     * it has them -- which is where the setting deciding the arrangement lives
+     * anyway, and why no order here can be the right one for everybody. */
     qsort(pfi->album_index, pfi->album_ct,
-                          sizeof(struct album_data), compare_albums);
+          sizeof(struct album_data), compare_index_order);
 
     return (pfi->album_ct > 0) ? 0 : ERROR_NO_ALBUMS;
 }
@@ -1752,9 +1728,6 @@ static int load_album_index(void){
                 /* The figures in the file are correct as of its watermark;
                  * anything played since is sitting in the log. */
                 replay_plays(pfi);
-
-                qsort(pfi->album_index, pfi->album_ct,
-                          sizeof(struct album_data), compare_albums);
 
                 return 0;
             }

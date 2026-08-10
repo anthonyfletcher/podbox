@@ -22,7 +22,12 @@
 #define ERROR_USER_ABORT    -4
 
 /* One album. Filled by a db_summary_build*(), read by whoever asked for the
- * index -- Album covers, the album charts, the browser's year sort. */
+ * index -- Album covers, the album charts, the browser's year sort.
+ *
+ * album_index[] comes back ordered by artist and then album name. That is the
+ * index's own order and deliberately nobody's display order: a screen that
+ * wants some other arrangement qsort()s the array itself, since the setting
+ * that decides it belongs to that screen. */
 struct album_data {
     int name_idx;     /* offset to the album name */
     int artist_idx;   /* offset to the artist name */
@@ -219,10 +224,6 @@ int db_summary_build_artists(struct db_summary_t *target,
  * after the index it just loaded was written. */
 void db_summary_log_play(const char *album, const char *albumartist,
                        long serial);
-
-/* qsort comparator over struct album_data, in the carousel's display order.
- * Public because the sort order can be changed from the carousel itself. */
-int compare_albums(const void *a_v, const void *b_v);
 
 /* Start the background pass that keeps the saved index current. Called once
  * at startup; it builds only while the database is idle and settled. */
