@@ -21,7 +21,7 @@
 #define ERROR_NO_ARTISTS    -3
 #define ERROR_USER_ABORT    -4
 
-/* One album. Filled by db_summary_build*(), read by whoever asked for the
+/* One album. Filled by a db_summary_build*(), read by whoever asked for the
  * index -- Album covers, the album charts, the browser's year sort. */
 struct album_data {
     int name_idx;     /* offset to the album name */
@@ -122,10 +122,6 @@ struct db_summary_t {
  * between the two, which is the point. */
 int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz);
 
-/* The above against the carousel's own carousel_idx;
- * carousel_model.build_index. */
-int db_summary_build(void);
-
 /* Claim memory and fill 'target' from the saved index, building it first if
  * there is none. For a caller that just wants to read the album list and has
  * no buffer of its own -- unlike the carousel, which has already claimed the
@@ -190,8 +186,8 @@ int db_summary_read_year_table(struct db_summary_year *out, int max);
 
 /* Build only the artist half into 'target', from *buf, advancing it. The
  * artist carousel uses this on its own, without an album list. Serialises
- * against the background pass exactly as db_summary_build() does -- the index
- * being built is a single shared slot, so there is no unlocked way in. */
+ * against the background pass exactly as db_summary_build_into() does -- the
+ * index being built is a single shared slot, so there is no unlocked way in. */
 /* Read just the artist half of the saved index into *buf, advancing it. The
  * quick way to get an artist list: no database walk, and the playback figures
  * come with it already summarised. The album halves of the file are skipped,

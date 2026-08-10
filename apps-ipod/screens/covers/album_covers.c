@@ -209,9 +209,10 @@ static void album_sort_prev(void);
 static void set_initial_slide(const char *selected_file);
 static int  album_on_menu(void);
 static void album_prepare(void);
+static int  album_build_index(void);
 
 static const struct carousel_model album_model = {
-    .build_index = db_summary_build,
+    .build_index = album_build_index,
     .count       = album_count,
     .art_key     = album_art_key,
     .legacy_art  = album_legacy_art,
@@ -439,6 +440,16 @@ static unsigned int mfnv(char *str)
 static unsigned int album_art_key(int slide_index)
 {
     return carousel_idx.album_index[slide_index].art_hash;
+}
+
+/* carousel_model.build_index for the album model: the whole index, into the
+ * engine's own struct and the buffer it has already claimed. The database
+ * module builds into whichever index it is handed; choosing that it is this
+ * one is the model's business, which is why the call is here and not there. */
+static int album_build_index(void)
+{
+    return db_summary_build_into(&carousel_idx, carousel_idx.buf,
+                                 carousel_idx.buf_sz);
 }
 
 /* carousel_model.count for the album model. */

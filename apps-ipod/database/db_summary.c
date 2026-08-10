@@ -3,12 +3,14 @@
  *
  * The database index: the flat album and artist list derived from tagcache.
  *
- * Built by walking tagcache, held in the buffer carousel.h describes as
- * carousel_idx, and persisted to db_summary.dat so later reads get it back
- * instead of
- * rescanning. It carries no artwork -- only names, years, playback figures and
- * the taglist seeks needed to navigate into the database -- so it goes stale
- * when the database changes, not when files on disk do.
+ * Built by walking tagcache into a caller-supplied struct db_summary_t and a
+ * caller-supplied buffer, and persisted to db_summary.dat so later reads get
+ * it back instead of rescanning. It carries no artwork -- only names, years,
+ * playback figures and the taglist seeks needed to navigate into the database
+ * -- so it goes stale when the database changes, not when files on disk do.
+ *
+ * Nothing here knows about the screens that read it. Whose index is being
+ * built, and what that screen does afterwards, is the caller's business.
  *
  * It began as the carousel's own list and is no longer only that: the album
  * and artist charts read the same index for their rankings, which is why it
@@ -22,7 +24,7 @@
  *   - the play log
  *   - carrying figures across a rebuild, and create_album_index() driving it
  *   - the on-disk form: saving, and the album and artist loaders
- *   - db_summary_build(), which reuses the saved index or rebuilds it
+ *   - db_summary_build_into(), which reuses the saved index or rebuilds it
  *   - the background pass: its progress reporting and the acquire/release pair
  *   - reading single records out of the saved file, without holding it
  *   - the background pass again: its staleness gate, its run and its thread
@@ -39,7 +41,6 @@
 #include "rbpaths.h"
 #include "kernel.h"
 #include "file.h"
-#include "dir.h"                     /* dir_exists, mkdir */
 #include "lang.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
@@ -60,7 +61,6 @@
 #include "playlist/playlist.h"
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
-#include "screens/covers/carousel.h"   /* carousel_idx, CACHE_PREFIX */
 #include "screens/covers/album_covers.h"   /* SORT_BY_*, ASCENDING (sort order) */
 #include "db_summary.h"
 
@@ -1776,9 +1776,6 @@ failure:
 
 }
 
-/* carousel_model.build_index for the album model: reuse the on-disk index when
- * it matches the current cache version, otherwise rebuild it (and persist it).
- * Returns SUCCESS or one of the ERROR_* codes. */
 /* Reuse the saved index, or build one and persist it, into the caller's
  * struct and the caller's memory. Which memory is the only thing that varies
  * between a build the carousel asks for and one a background pass does. */
@@ -1805,23 +1802,27 @@ static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
      * nothing to reuse and it always builds. Every other caller reads the saved
      * index, and builds only when there is none to read.
      *
-     * This used to ask pf_cfg.cache_version instead, which is the carousel's
-     * own state: loaded from its config file by the carousel's init and by
-     * nothing else. A caller that had not opened the carousel this boot -- the
-     * album charts, Random album -- therefore read it as CACHE_REBUILD and
-     * walked the whole database on every invocation, with a perfectly good
-     * index sitting on disk unread. A stale *format* is caught by INDEX_HDR,
-     * which is what that magic is for. */
+     * Whether to rebuild is decided here, from the file, and must not be taken
+     * from any screen's state: a caller that has not opened that screen this
+     * boot would read its defaults and walk the whole database with a perfectly
+     * good index sitting on disk unread. The album charts and Random album are
+     * both such callers. A stale *format* is caught by INDEX_HDR, which is what
+     * that magic is for. */
     if (background || load_album_index() < 0)
     {
         set_working_for_build(true);   /* the "working" LED while (re)building */
         ret = create_album_index();
         set_working_for_build(false);
 
+        /* Writing the index is the whole of what a rebuild does. In
+         * particular it does not invalidate the carousel's slide cache: those
+         * files are keyed by a hash of the album and artist names
+         * (album_legacy_art()), not by list position, so the same album still
+         * resolves to the same file however the list is reordered. Nothing in
+         * this file may touch the carousel's config -- see background_build()
+         * for what goes wrong when it does. */
         if (ret == 0)
         {
-            pf_cfg.cache_version = CACHE_REBUILD;
-            pf_config_save();
             /* Only the foreground caller may report this: the background pass
              * owns no screen, and there is nothing the user could do anyway --
              * the carousel will simply build it again when asked. */
@@ -1902,16 +1903,8 @@ static int wait_for_background(void)
     return SUCCESS;
 }
 
-/* carousel_model.build_index: build into the engine's own index and the
- * buffer it has already claimed. */
-int db_summary_build(void)
-{
-    return db_summary_build_into(&carousel_idx, carousel_idx.buf,
-                                carousel_idx.buf_sz);
-}
-
-/* carousel_model.build_index for the artist model: the artist half only, with
- * no album list, into the caller's index and the caller's memory.
+/* The artist half only, with no album list, into the caller's index and the
+ * caller's memory.
  *
  * The locking is the point of this function existing. pfi is one shared slot
  * and build_mutex is what makes pointing it somewhere safe -- so the artist
@@ -2105,14 +2098,12 @@ void db_summary_progress(int *done, int *total)
     *total = bg_total;
 }
 
-/* The database entry count the last background build covered.
- *
- * Deliberately not pf_cfg.cache_version: that means "the on-disk formats are
- * current", is set by the carousel's prepare callback, and also gates the
- * slide placeholder's regeneration. Borrowing it here would both rebuild
- * forever (nothing sets it on this path) and quietly change what the carousel
- * does with it. This is the same marker the artwork cache keeps for the same
- * reason -- what was the library like when we last finished. */
+/* The database entry count the last background build covered. Its own marker,
+ * not a screen's cache-version flag: those say whether a screen's on-disk
+ * formats are current, are written by that screen and by nothing on this path,
+ * and would therefore read as "rebuild" forever. This is the same marker the
+ * artwork cache keeps for the same reason -- what was the library like when we
+ * last finished. */
 #define DB_SUMMARY_DONE ROCKBOX_DIR "/db_summary.done"
 
 /* Read the index without a buffer of your own; see db_summary.h.
@@ -2369,13 +2360,12 @@ static bool saved_index_present(void)
  * Returns false if it could not finish, which leaves the marker alone so the
  * next tick tries again.
  *
- * Nothing here touches pf_cfg. It used to mark the carousel's cache_version
- * current, because build_into() consulted that flag and would otherwise have
- * rebuilt what this pass had just written. build_into() no longer asks, and
- * the flag is only about the carousel's slide cache -- which this pass does
- * not build -- so asserting anything about it from here was both untrue and,
- * on a boot where the carousel had never loaded its config, a save of zeroes
- * over the resume position. The carousel's own prepare callback owns it. */
+ * Nothing in this file touches the carousel's config, and nothing may. It is
+ * a file-scope struct the carousel's own init() fills; a pass running on a
+ * boot where nobody opened the carousel would be saving zeroes over the
+ * resume position and the artwork-cache mark. Its cache_version is about the
+ * slide placeholder's format, which this pass does not build, so there was
+ * never anything true for this file to say about it either. */
 static bool background_build(void)
 {
     struct db_summary_t local;
@@ -2392,14 +2382,6 @@ static bool background_build(void)
      * pass would have built anyway. */
     bg_claimed = true;
     if (foreground_wants_builder())
-    {
-        bg_claimed = false;
-        return false;
-    }
-
-    /* The carousel makes this directory when it starts up; a build that runs
-     * before it ever has would otherwise have nowhere to write the index. */
-    if (!dir_exists(CACHE_PREFIX) && mkdir(CACHE_PREFIX) < 0)
     {
         bg_claimed = false;
         return false;
