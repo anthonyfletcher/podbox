@@ -17,6 +17,14 @@ enum show_album_name_values {
     ALBUM_AND_ARTIST_BOTTOM
 };
 
+/* Values for global_settings.album_covers_view_mode: how the carousel lays its
+ * covers out. 3D is the tilted cover flow; flat lays them face-on in two piles
+ * against the screen edges, the current one on top in the middle. */
+enum carousel_view_mode_values {
+    CAROUSEL_VIEW_3D = 0,
+    CAROUSEL_VIEW_FLAT
+};
+
 /* Values for global_settings.album_covers_on_select */
 enum on_album_select_values {
     ON_SELECT_SHOW_TRACKS = 0,

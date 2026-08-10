@@ -18,11 +18,47 @@
 #include "metadata/art_cache.h"
 #include "screens/system/art_health.h"
 
-MENUITEM_SETTING(album_covers_center_margin, &global_settings.album_covers_center_margin, NULL);
-MENUITEM_SETTING(album_covers_slide_tuck, &global_settings.album_covers_slide_tuck, NULL);
-MENUITEM_SETTING(album_covers_parallel_slides, &global_settings.album_covers_parallel_slides, NULL);
+/* The settings each view mode owns are named for it and grouped together under
+ * View Mode, and each is hidden while the other mode is selected -- a row that
+ * does nothing is worse than a missing one, and the prefix says which mode a
+ * row belongs to without having to switch back to find out.
+ *
+ * Transition speed is in the 3D group and not the shared one: the flat view
+ * replaces the whole speed expression it feeds (see update_scroll_animation()),
+ * timing itself off the wheel instead. Scroll speed is genuinely shared -- flat
+ * scales its own durations by it in flat_ticks(). */
+static int tilt_only_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.album_covers_view_mode == CAROUSEL_VIEW_FLAT)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+static int flat_only_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.album_covers_view_mode != CAROUSEL_VIEW_FLAT)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_SETTING(album_covers_view_mode, &global_settings.album_covers_view_mode, NULL);
+MENUITEM_SETTING(album_covers_pile_fade, &global_settings.album_covers_pile_fade, flat_only_callback);
+MENUITEM_SETTING(album_covers_pile_offset, &global_settings.album_covers_pile_offset, flat_only_callback);
+MENUITEM_SETTING(album_covers_center_margin, &global_settings.album_covers_center_margin, tilt_only_callback);
+MENUITEM_SETTING(album_covers_slide_tuck, &global_settings.album_covers_slide_tuck, tilt_only_callback);
+MENUITEM_SETTING(album_covers_parallel_slides, &global_settings.album_covers_parallel_slides, tilt_only_callback);
 MENUITEM_SETTING(album_covers_scroll_speed, &global_settings.album_covers_scroll_speed, NULL);
-MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, NULL);
+MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, tilt_only_callback);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
 MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
 MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, NULL);
@@ -108,8 +144,13 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Menu_setti
             &album_covers_year_sort_order,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,
+            &album_covers_view_mode,
+            /* Whichever mode is selected, its own settings follow it. */
             &album_covers_center_margin,
             &album_covers_slide_tuck,
             &album_covers_parallel_slides,
-            &album_covers_scroll_speed,
-            &album_covers_transition_speed);
+            &album_covers_transition_speed,
+            &album_covers_pile_fade,
+            &album_covers_pile_offset,
+            /* Shared, so last. */
+            &album_covers_scroll_speed);

@@ -562,6 +562,15 @@ struct user_settings
      * sort_albums_by_values and year_sort_order_values. */
     bool debug_log_tagcache;   /* append tag-database progress to a file */
     bool debug_log_artcache;   /* append art-cache progress to a file */
+    int  album_covers_view_mode;  /* CAROUSEL_VIEW_*: tilted, or flat piles */
+    /* Flat view only: how far the two piles are blended toward the background,
+     * so the cover in the middle stands out. Per cent; 0 leaves them solid. */
+    int  album_covers_pile_fade;
+    /* Flat view only: how far below the middle cover the piles sit, in pixels.
+     * A cover eases down to it on its way out and back up on its way in. */
+    int  album_covers_pile_offset;
+    /* The three below shape the tilted view only; flat mode ignores them and
+     * the menu hides them. */
     int  album_covers_center_margin;
     int  album_covers_slide_tuck;
     bool album_covers_parallel_slides;

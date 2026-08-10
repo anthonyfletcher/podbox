@@ -206,6 +206,55 @@ static void pf_update_dynamic_colors(void)
  * constant. */
 #define ALBUM_COVERS_NUM_SLIDES 4
 
+/* --- The flat view ---------------------------------------------------------
+ * Covers lie face-on, all the same size and all on the same line: two piles
+ * squared off against the screen edges, and the current cover on top in the
+ * middle. The piles are flat -- every card in one sits exactly on the one
+ * below, so only the top of each is ever visible, and there is no stack to see.
+ *
+ * A card at cx = 0 occupies the middle DISPLAY_WIDTH columns, so a pile at
+ * -PF_PILE_CX runs off the left edge with its inner strip underneath the centre
+ * card. That overlap is what makes the centre card read as lying *on* the pile;
+ * with the two exactly abutting, the boundary is ambiguous.
+ *
+ * Timing is the flat view's own (see flat_pace()). The 3D view's ease curve
+ * spends most of a flip crawling through its last tenth, which reads as a
+ * rotation settling and as a stall for a card being dealt; and a fixed duration
+ * is wrong in the other direction, since it caps how fast the user can get
+ * through the covers. The flat view runs at a constant rate per cover, set from
+ * how fast the user is actually scrolling: PF_FLAT_FLIP_MS when they are taking
+ * their time, down to PF_FLAT_MIN_MS, below which there is no animation left to
+ * see and the covers just change in the middle. Both scale with the scroll
+ * speed setting. */
+#define PF_PILE_OVERLAP 16
+#define PF_PILE_CX      ((DISPLAY_WIDTH - PF_PILE_OVERLAP) * PFREAL_ONE)
+#define PF_FLAT_FLIP_MS 250
+/* A frame costs 11-15 ms here, so this is about four of them -- the fewest a
+ * card can be caught at and still read as travelling rather than jumping. */
+#define PF_FLAT_MIN_MS  60
+
+/* The deal: the cover on top slides off to its pile, and the top of the other
+ * pile slides into the middle behind it, PF_DEAL_LEAD of a flip later.
+ *
+ * That lead is the whole of it, and it is a narrow window. A cover at rest lies
+ * on top of both piles, overlapping each by PF_PILE_OVERLAP, so the two moving
+ * covers start out overlapping by that much -- and the lead is what pulls them
+ * apart. Too much and the background shows between them, which is glaring, and
+ * on the 5G makes the tearing far worse (a large area changing colour rather
+ * than shifting). Too little and they travel locked together, which reads as
+ * the whole row sliding rather than one card being dealt.
+ *
+ * At 0.11 the pair stays about two pixels overlapped for the middle of the
+ * flip: no background, and the moment they swap over in the stacking order --
+ * which they must, since the arriving cover ends up on top of the one it
+ * started underneath -- has almost nothing to swap, so it cannot be seen. */
+#define PF_DEAL_LEAD (PFREAL_ONE * 11 / 100)
+#define PF_DEAL_SPAN (PFREAL_ONE - PF_DEAL_LEAD)
+
+/* How far a flip may stretch as the user stops, as a multiple of the pace they
+ * were scrolling at -- see flat_pace(). */
+#define PF_FLAT_SETTLE 3
+
 /* Not theme-controlled: layout is fixed/proportional (see init()) and
  * colours come from the theme's normal fg/bg + the dynamic (album-art
  * derived) colour scheme, same as everywhere else.
@@ -251,8 +300,9 @@ struct slide_data {
     int slide_index;
     int angle;
     PFreal cx;
-    PFreal cy;
+    PFreal cy;      /* downward shift; the flat view's pile offset, 0 in 3D */
     PFreal distance;
+    int alpha;      /* flat view only -- the 3D view derives its own per frame */
     int cached_slot; /* last cache slot this slide resolved to (see surface()) */
 };
 
@@ -347,8 +397,18 @@ int center_index = 0; /* index of the slide that is in the center */
 static int itilt;
 static PFreal offsetX;
 static PFreal auto_slide_spacing;
-static PFreal offsetY;
 static int number_of_slides;
+/* Flat view pacing: when the user last asked for a cover and how far apart they
+ * have been asking, plus the two per-flip decisions those feed -- whether this
+ * cover is going past too quickly to be worth dealing, and whether any card is
+ * currently off its resting place. See flat_pace(). */
+static long pf_flat_last_input;
+static int  pf_flat_interval;
+static bool pf_flat_snap;
+static bool pf_flat_moving;
+/* Whether the arriving cover has taken the top of the stack from the one it is
+ * replacing. See flat_animate(). */
+static bool pf_flat_handover;
 
 static struct pf_slide_cache pf_sldcache;
 
@@ -1697,10 +1757,105 @@ static inline struct dim *surface(struct slide_data *slide)
     return get_slide(empty_slide_hid);
 }
 
-/**
- adjust slides so that they are in "steady state" position
- */
-static void reset_slides(void)
+static bool flat_view(void)
+{
+    return global_settings.album_covers_view_mode == CAROUSEL_VIEW_FLAT;
+}
+
+/* The alpha a cover sitting on a pile is drawn at, the setting being how far
+ * toward the background it is taken. Note this is a dimming, not a
+ * transparency: render_slide() blends toward the background colour, so a pile
+ * cover drawn over another one still hides it, exactly as an undimmed one
+ * would. Which is what the piles want -- covers, further back. */
+static int pile_alpha(void)
+{
+    return 256 - 256 * global_settings.album_covers_pile_fade / 100;
+}
+
+/* How far below the middle cover a pile sits. */
+static PFreal pile_offset(void)
+{
+    return global_settings.album_covers_pile_offset * PFREAL_ONE;
+}
+
+/* Ease in and out: 3u^2 - 2u^3, for `u` in 0..PFREAL_ONE.
+ *
+ * Used for the drop onto a pile and the lift back off it, while the sideways
+ * travel stays linear. A card crossing at a steady rate while its height eases
+ * away and back is how one behaves being dealt; easing both would read as the
+ * whole move slowing down in the middle, which is the 3D view's ease curve and
+ * the thing the flat view was given a constant rate to get away from. */
+static PFreal smoothstep(PFreal u)
+{
+    PFreal uu;
+
+    if (u <= 0)
+        return 0;
+    if (u >= PFREAL_ONE)
+        return PFREAL_ONE;
+
+    uu = (u * u) >> PFREAL_SHIFT;
+    return (uu * (3 * PFREAL_ONE - 2 * u)) >> PFREAL_SHIFT;
+}
+
+/* A duration in ticks, scaled by the scroll speed setting (200% is the
+ * default, and what the PF_FLAT_*_MS figures are quoted at). */
+static int flat_ticks(int ms)
+{
+    int t = ms * HZ / 1000 * 200 / global_settings.album_covers_scroll_speed;
+    return MAX(t, 1);
+}
+
+/* Ticks this cover should take, so the deal keeps up with the user rather than
+ * lagging behind them: how far apart their scroll actions have been coming,
+ * stretched as the input dries up so the last cover of a gesture settles rather
+ * than merely stopping.
+ *
+ * The stretch is a multiple of their own pace, not a fixed duration. A fixed one
+ * is what makes a fast flick end in a full-length deal -- covers going by at
+ * 30ms apiece and then one taking 250ms, which reads as a stumble rather than a
+ * stop. Everything the flat view does is timed off the wheel; this is the part
+ * that is easiest to get wrong, because a settle that is too quick to see is
+ * the obvious failure and a settle that is out of proportion is not. */
+static int flat_pace(void)
+{
+    int base = MAX(pf_flat_interval, 1);
+    int since = current_tick - pf_flat_last_input;
+    int pace = MAX(base, MIN(since, base * PF_FLAT_SETTLE));
+
+    return MIN(pace, flat_ticks(PF_FLAT_FLIP_MS));
+}
+
+/* Ticks the flip in progress should take. Covers being snapped rather than
+ * dealt keep to the gesture's own rate and ignore the settling term above: they
+ * have no animation to land, so stretching one only holds a still picture on
+ * the screen, and an even cadence is the whole of what a snapped scroll has to
+ * look at. Handing them back to the 3D view's ease curve, which was the first
+ * try, gives the opposite -- each cover decelerating almost to a halt and then
+ * changing without warning. */
+static int flat_rate(void)
+{
+    if (pf_flat_snap)
+        return MAX(pf_flat_interval, 1);
+    return MAX(flat_pace(), flat_ticks(PF_FLAT_MIN_MS));
+}
+
+/* Every scroll action, whether or not it is one the engine can act on yet --
+ * the ones it discards past its two-cover lookahead still say how fast the
+ * user is going. */
+static void flat_note_scroll(void)
+{
+    int full = flat_ticks(PF_FLAT_FLIP_MS);
+    int gap = current_tick - pf_flat_last_input;
+
+    pf_flat_last_input = current_tick;
+    if (gap >= full)
+        pf_flat_interval = full;    /* a fresh gesture: forget the old pace */
+    else
+        pf_flat_interval = (pf_flat_interval + gap) / 2;
+}
+
+static void coverflow_idle(void)
 {
     center_slide.angle = 0;
     center_slide.cx = 0;
@@ -1713,7 +1868,7 @@ static void reset_slides(void)
         struct slide_data *si = &left_slides[i];
         si->angle = itilt;
         si->cx = -(offsetX + auto_slide_spacing * i);
-        si->cy = offsetY;
+        si->cy = 0;
         si->slide_index = center_index - 1 - i;
         si->distance = 0;
     }
@@ -1722,10 +1877,53 @@ static void reset_slides(void)
         struct slide_data *si = &right_slides[i];
         si->angle = -itilt;
         si->cx = offsetX + auto_slide_spacing * i;
-        si->cy = offsetY;
+        si->cy = 0;
         si->slide_index = center_index + 1 + i;
         si->distance = 0;
     }
+}
+
+/* Every card on its resting place: one cover in the middle, and the rest
+ * squared up in the two piles, each exactly on top of the one below it. */
+static void flat_idle(void)
+{
+    int pile = pile_alpha();
+    PFreal drop = pile_offset();
+
+    center_slide.angle = 0;
+    center_slide.cx = 0;
+    center_slide.cy = 0;
+    center_slide.distance = 0;
+    center_slide.alpha = 256;
+    center_slide.slide_index = center_index;
+
+    int i;
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
+        struct slide_data *l = &left_slides[i];
+        struct slide_data *r = &right_slides[i];
+
+        l->angle = r->angle = 0;
+        l->distance = r->distance = 0;
+        l->alpha = r->alpha = pile;
+        l->cy = r->cy = drop;
+        l->cx = -PF_PILE_CX;
+        r->cx = PF_PILE_CX;
+        l->slide_index = center_index - 1 - i;
+        r->slide_index = center_index + 1 + i;
+    }
+
+    pf_flat_moving = false;
+}
+
+/**
+ adjust slides so that they are in "steady state" position
+ */
+static void reset_slides(void)
+{
+    if (flat_view())
+        flat_idle();
+    else
+        coverflow_idle();
 }
 
 
@@ -1757,7 +1955,6 @@ static void recalc_offsets(void)
     offsetX = xp - fmul(xs, cosr) + fmuln(xp,
         zo + fmuln(xs, sinr, PFREAL_SHIFT - 2, 0), PFREAL_SHIFT - 2, 0)
         / CAM_DIST;
-    offsetY = DISPLAY_WIDTH / 2 * (fsin(itilt) + PFREAL_ONE / 2);
 
     /* auto-compute side slide spacing for 3 visible slides per side.
      * We distribute 3 visible slides across 2 intervals from offsetX
@@ -1977,7 +2174,17 @@ static void render_slide(struct slide_data *slide, const int alpha)
      * the original plugin's fixed full-screen numbers by coincidence (see
      * the removed pf_display_offs) -- any other sh left the image sitting
      * top-anchored, with a blank gap only at the bottom. */
-    const int vertical_offset = ((half_height + lower_half) - sh) / 2;
+    /* cy shifts the image down within that centred position -- the flat view's
+     * pile offset, and zero in the 3D view. Clamped, because the lower loop
+     * reads its source row unsigned: a start below row 0 would wrap to a huge
+     * index and read far outside the bitmap rather than clipping. The upper
+     * loop needs no clamp; a negative start simply fails its first test. */
+    int voff = ((half_height + lower_half) - sh) / 2;
+    if (slide->cy > 0)
+        voff += slide->cy >> PFREAL_SHIFT;
+    if (voff > half_height)
+        voff = half_height;
+    const int vertical_offset = voff;
     const int p_start_upper = (half_height - 1 - vertical_offset) * PFREAL_ONE;
     const int p_start_lower = (half_height - vertical_offset) * PFREAL_ONE;
     for (x = xi; x < w; x++) {
@@ -2135,12 +2342,14 @@ static void start_animation(void)
     pf_state = pf_scrolling;
     anim_last_tick = current_tick;
     anim_frac = 0;
+    pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
 }
 
 static void update_scroll_animation(void);
 
 static void show_previous_slide(void)
 {
+    flat_note_scroll();
     if (step == 0) {
         if (center_index > 0) {
             target = center_index - 1;
@@ -2158,6 +2367,7 @@ static void show_previous_slide(void)
 
 static void show_next_slide(void)
 {
+    flat_note_scroll();
     if (step == 0) {
         if (center_index < number_of_slides - 1) {
             target = center_index + 1;
@@ -2173,12 +2383,47 @@ static void show_next_slide(void)
     }
 }
 
-static void render_all_slides(void)
+/* A flat pile hides everything but its top card, so only four covers are ever
+ * worth drawing, and the order they go in is fixed rather than sorted. Both
+ * moving covers sit above both piles throughout -- a cover at rest lies on the
+ * piles it overlaps, and neither of these is at rest -- so the only question is
+ * which of the two is above the other, and that is the handover. */
+/* Piles taken all the way to the background have nothing left to draw, and
+ * drawing them anyway would paint background over what is behind them. */
+static void flat_draw(struct slide_data *slide)
 {
-    lcd_set_background(pf_bg_color);
-    /* TODO: Optimizes this by e.g. invalidating rects */
-    pf_clear_display();
+    if (slide->alpha > 0)
+        render_slide(slide, slide->alpha);
+}
 
+static void flat_render(void)
+{
+    struct slide_data *pile_near, *pile_next, *arriving;
+
+    if (!pf_flat_moving) {
+        flat_draw(&left_slides[0]);
+        flat_draw(&right_slides[0]);
+        flat_draw(&center_slide);   /* overlaps both, so it goes last */
+        return;
+    }
+
+    pile_near = (step > 0) ? &left_slides[0]  : &right_slides[0];
+    pile_next = (step > 0) ? &right_slides[1] : &left_slides[1];
+    arriving  = (step > 0) ? &right_slides[0] : &left_slides[0];
+
+    flat_draw(pile_near);
+    flat_draw(pile_next);
+    if (pf_flat_handover) {
+        flat_draw(&center_slide);
+        flat_draw(arriving);
+    } else {
+        flat_draw(arriving);
+        flat_draw(&center_slide);
+    }
+}
+
+static void coverflow_render(void)
+{
     int nleft = ALBUM_COVERS_NUM_SLIDES;
     int nright = ALBUM_COVERS_NUM_SLIDES;
 
@@ -2268,6 +2513,118 @@ static void render_all_slides(void)
     }
 }
 
+static void render_all_slides(void)
+{
+    lcd_set_background(pf_bg_color);
+    /* TODO: Optimizes this by e.g. invalidating rects */
+    pf_clear_display();
+
+    if (flat_view())
+        flat_render();
+    else
+        coverflow_render();
+}
+
+/* The two layouts, mid-flip. `s` is the direction (the scroll's step), and
+ * ftick how far through the gap between two covers this frame has got: 0 at the
+ * start, PFREAL_ONE at the end. Everything above the call -- the timing, the
+ * boundary snap that reassigns slide_index, the loader wake-ups -- is layout
+ * independent, and stays in one copy in update_scroll_animation(). */
+static void coverflow_animate(int s, int tick, int neg, PFreal ftick)
+{
+    int i;
+
+    center_slide.angle = (s * tick * itilt) >> 16;
+    center_slide.cx = -s * fmul(offsetX, ftick);
+    center_slide.cy = 0;
+
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
+        struct slide_data *si = &left_slides[i];
+        si->angle = itilt;
+        si->cx =
+            -(offsetX + auto_slide_spacing * i + s
+                        * fmul(auto_slide_spacing, ftick));
+        si->cy = 0;
+    }
+
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
+        struct slide_data *si = &right_slides[i];
+        si->angle = -itilt;
+        si->cx =
+            offsetX + auto_slide_spacing * i - s
+                      * fmul(auto_slide_spacing, ftick);
+        si->cy = 0;
+    }
+
+    PFreal fneg = (neg * PFREAL_ONE) >> 16;
+    if (s > 0) {
+        right_slides[0].angle = -(neg * itilt) >> 16;
+        right_slides[0].cx = fmul(offsetX, fneg);
+    } else {
+        left_slides[0].angle = (neg * itilt) >> 16;
+        left_slides[0].cx = -fmul(offsetX, fneg);
+    }
+}
+
+static void flat_animate(int s, PFreal ftick)
+{
+    struct slide_data *arriving;
+    PFreal off, in;
+
+    /* Going past too quickly to be worth animating: a card would get two or
+     * three frames to cross the screen and be sampled at arbitrary points along
+     * the way. The 3D view blurs that into motion with its tilt and its fade;
+     * flat covers have neither, so it strobes instead. Leave the piles at rest
+     * and let the covers simply change in the middle, which is what you want
+     * when hunting for one anyway.
+     *
+     * The scroll then stops dead rather than settling, and that is deliberate.
+     * Replaying the missed move afterwards was tried: it has to bring back the
+     * cover that was on top, which a snapped scroll had already taken out of
+     * the middle, so it flickers. Holding a cover back so the last one could be
+     * dealt for real does not work either -- the engine only ever aims two
+     * ahead, so holding one back leaves a single gap and every cover ends up
+     * dealt. Stopping dead is the honest end to a gesture that was never
+     * showing an animation in the first place. */
+    if (pf_flat_snap) {
+        flat_idle();
+        return;
+    }
+
+    /* Everything squared up, then move the two cards that are not. */
+    flat_idle();
+
+    off = MIN(ftick * PFREAL_ONE / PF_DEAL_SPAN, PFREAL_ONE);
+    in = (ftick <= PF_DEAL_LEAD)
+       ? 0 : MIN((ftick - PF_DEAL_LEAD) * PFREAL_ONE / PF_DEAL_SPAN, PFREAL_ONE);
+
+    arriving = (s > 0) ? &right_slides[0] : &left_slides[0];
+
+    center_slide.cx = -s * fmul(PF_PILE_CX, off);
+    arriving->cx = s * fmul(PF_PILE_CX, PFREAL_ONE - in);
+
+    /* Each takes the dimming and the height of where it is going, over the move
+     * that takes it there: the one leaving sinks into its pile, the one
+     * arriving comes up to full and rises to the middle as it lands. */
+    {
+        int pile = pile_alpha();
+        int span = 256 - pile;
+        PFreal drop = pile_offset();
+
+        center_slide.alpha = 256 - ((span * off) >> PFREAL_SHIFT);
+        arriving->alpha = pile + ((span * in) >> PFREAL_SHIFT);
+
+        center_slide.cy = fmul(drop, smoothstep(off));
+        arriving->cy = drop - fmul(drop, smoothstep(in));
+    }
+
+    /* They start out overlapped with the cover on top over the pile, and end
+     * overlapped the other way round, so the swap goes in the middle where they
+     * are barely touching. */
+    pf_flat_handover = ftick >= PFREAL_HALF;
+    pf_flat_moving = true;
+}
+
 static void update_scroll_animation(void)
 {
     if (step == 0)
@@ -2289,6 +2646,14 @@ static void update_scroll_animation(void)
     int accel = 16384 * (PFREAL_ONE + fsin(ia)) / PFREAL_ONE;
     speed = 512 * global_settings.album_covers_transition_speed / 100
           + accel * global_settings.album_covers_scroll_speed / 100;
+
+    /* The flat view deals two covers per flip, one after the other, so it needs
+     * long enough for both moves to read -- and the ease curve above spends
+     * most of a flip crawling through its last tenth, which is a rotation
+     * settling in the 3D view and a stall in this one. Constant rate instead,
+     * at the pace the user is scrolling: see flat_rate(). */
+    if (flat_view())
+        speed = 65536 * HZ / (CAROUSEL_NOMINAL_FPS * flat_rate());
 
     /* Advance by elapsed time, not per call. speed is calibrated as a
      * per-frame step at CAROUSEL_NOMINAL_FPS; a slower frame then takes a
@@ -2347,6 +2712,9 @@ static void update_scroll_animation(void)
 
     if (center_index != index) {
         center_index = index;
+        /* Decided per cover, at the crossing, where every card is on its
+         * resting place and the choice costs nothing to make. */
+        pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
         queue_post(&thread_q, EV_WAKEUP, 0);
         slide_frame = index << 16;
         center_slide.slide_index = center_index;
@@ -2367,10 +2735,6 @@ static void update_scroll_animation(void)
     /* the leftmost and rightmost slide must fade away */
     fade = ((step < 0) ? neg : tick) / 256;
 
-    center_slide.angle = (step * tick * itilt) >> 16;
-    center_slide.cx = -step * fmul(offsetX, ftick);
-    center_slide.cy = fmul(offsetY, ftick);
-
     if (center_index == target) {
         reset_slides();
         pf_state = pf_idle;
@@ -2380,35 +2744,10 @@ static void update_scroll_animation(void)
         return;
     }
 
-    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
-        struct slide_data *si = &left_slides[i];
-        si->angle = itilt;
-        si->cx =
-            -(offsetX + auto_slide_spacing * i + step
-                        * fmul(auto_slide_spacing, ftick));
-        si->cy = offsetY;
-    }
-
-    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
-        struct slide_data *si = &right_slides[i];
-        si->angle = -itilt;
-        si->cx =
-            offsetX + auto_slide_spacing * i - step
-                      * fmul(auto_slide_spacing, ftick);
-        si->cy = offsetY;
-    }
-
-    if (step > 0) {
-        PFreal ftick = (neg * PFREAL_ONE) >> 16;
-        right_slides[0].angle = -(neg * itilt) >> 16;
-        right_slides[0].cx = fmul(offsetX, ftick);
-        right_slides[0].cy = fmul(offsetY, ftick);
-    } else {
-        PFreal ftick = (neg * PFREAL_ONE) >> 16;
-        left_slides[0].angle = (neg * itilt) >> 16;
-        left_slides[0].cx = -fmul(offsetX, ftick);
-        left_slides[0].cy = fmul(offsetY, ftick);
-    }
+    if (flat_view())
+        flat_animate(step, ftick);
+    else
+        coverflow_animate(step, tick, neg, ftick);
 
     /* must change direction ? */
     if (target < index)

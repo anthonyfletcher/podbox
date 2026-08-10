@@ -14652,13 +14652,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Parallel Slides"
+    *: "3D Parallel Slides"
   </source>
   <dest>
-    *: "Parallel Slides"
+    *: "3D Parallel Slides"
   </dest>
   <voice>
-    *: "Parallel Slides"
+    *: "3D Parallel Slides"
   </voice>
 </phrase>
 <phrase>
@@ -14666,13 +14666,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </source>
   <dest>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </dest>
   <voice>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </voice>
 </phrase>
 <phrase>
@@ -14680,13 +14680,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Slide Tuck"
+    *: "3D Slide Tuck"
   </source>
   <dest>
-    *: "Slide Tuck"
+    *: "3D Slide Tuck"
   </dest>
   <voice>
-    *: "Slide Tuck"
+    *: "3D Slide Tuck"
   </voice>
 </phrase>
 <phrase>
@@ -17329,13 +17329,85 @@
   desc: in apps/menus/album_covers_menu.c
   user: core
   <source>
-    *: "Transition Speed"
+    *: "3D Transition Speed"
   </source>
   <dest>
-    *: "Transition Speed"
+    *: "3D Transition Speed"
   </dest>
   <voice>
     *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_MODE
+  desc: in the Carousel settings menu -- how the covers are laid out
+  user: core
+  <source>
+    *: "View Mode"
+  </source>
+  <dest>
+    *: "View Mode"
+  </dest>
+  <voice>
+    *: "View Mode"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_OFFSET
+  desc: in the Carousel settings menu -- how far below the middle cover the
+        flat view's piles sit
+  user: core
+  <source>
+    *: "Flat Pile Offset"
+  </source>
+  <dest>
+    *: "Flat Pile Offset"
+  </dest>
+  <voice>
+    *: "Flat Pile Offset"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_FADE
+  desc: in the Carousel settings menu -- how far the flat view's piles are
+        blended toward the background
+  user: core
+  <source>
+    *: "Flat Pile Fade"
+  </source>
+  <dest>
+    *: "Flat Pile Fade"
+  </dest>
+  <voice>
+    *: "Flat Pile Fade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_3D
+  desc: "view mode" choice option -- the tilted cover flow
+  user: core
+  <source>
+    *: "3D"
+  </source>
+  <dest>
+    *: "3D"
+  </dest>
+  <voice>
+    *: "3D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_FLAT
+  desc: "view mode" choice option -- covers face-on, in two piles
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "Flat"
+  </dest>
+  <voice>
+    *: "Flat"
   </voice>
 </phrase>
 <phrase>

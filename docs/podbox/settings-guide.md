@@ -178,6 +178,12 @@ copy — change Bass here and Sound Settings shows the new value. Entries marked
 
 Settings for the Album Covers and Artist Portraits screens.
 
+**View Mode** picks the layout, and most of the settings under it belong to one
+mode or the other. Those are named for the mode they shape and are shown only
+while it is selected, so the list changes as you switch — a row that would do
+nothing is not offered. Everything above View Mode, and Scroll Speed below it,
+applies to both.
+
 | Setting | What it does                                                                                                  | Default                             |
 |---|---------------------------------------------------------------------------------------------------------------|-------------------------------------|
 | On Album Select | What Select on a cover does: open the album's track list, or start playing it. Album Covers only. | Show Tracks |
@@ -188,11 +194,14 @@ Settings for the Album Covers and Artist Portraits screens.
 | Year Sort Order | Only applies to Album Covers. Ascending or descending, when sorting by year.                                                                | Ascending                           |
 | Sort Albums By | Artist+name / artist+year / year / name.                                                                      | Artist + Name                       |
 | Sort Artists By | Name or most played.                                                                                          | Name                                |
-| Centre Margin | Gap between the front cover and its neighbours.                                                               | 0 ("20" via shipped config)         |
-| Slide Tuck | How far back covers stack behind the front one.                                                               | 32                                  |
-| Parallel Slides | Flat side covers instead of angled.                                                                           | On                                  |
-| Scroll Speed | Flick speed.                                                                                                  | 200% ("175%" via shipped config)    |
-| Transition Speed | Settle animation speed.                                                                                       | 400% ("325%" via shipped config)    |
+| View Mode | **3D** is the tilted cover flow, covers angled away on both sides. **Flat** lays them face-on and all the same size, in two piles squared off against the screen edges with the current one on top in the middle; scrolling deals one cover from a pile to the middle and the last one onto the other pile. | 3D |
+| 3D Centre Margin | Gap between the front cover and its neighbours.                                                               | 0 ("20" via shipped config)         |
+| 3D Slide Tuck | How far back covers stack behind the front one.                                                               | 32                                  |
+| 3D Parallel Slides | Flat side covers instead of angled.                                                                           | On                                  |
+| 3D Transition Speed | Settle animation speed. No effect in Flat, which times itself off the wheel instead. | 400% ("325%" via shipped config)    |
+| Flat Pile Fade | How far the two piles are blended toward the background, so the cover in the middle stands out. 0 leaves them solid. | 0%                            |
+| Flat Pile Offset | How far below the middle cover the piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. 0 keeps them level. | 0px                        |
+| Scroll Speed | Flick speed. Applies to both modes — in Flat it scales how long a cover takes to be dealt. | 200% ("175%" via shipped config)    |
 
 ### 4.5 Text Viewer
 
