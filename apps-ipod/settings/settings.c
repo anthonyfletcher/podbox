@@ -97,6 +97,8 @@ static long lasttime = 0;
 
 #include "dsp_proc_settings.h"
 #include "audio/playback.h"
+#include "metadata/art_cache.h"        /* art_filter_set */
+#include "screens/browse/browser.h"    /* browser_albumart_invalidate */
 #include "pcm_sampr.h"
 
 #ifdef LOGF_ENABLE
@@ -968,6 +970,63 @@ static void settings_apply_dialog_style(void)
     dialog_set_default_style(&s);
 }
 
+/* The nth entry of ARTWORK_FILTER_CFG_VALS, or NULL past the end. The list is
+ * scanned rather than kept twice, so what the config file names and what the
+ * filter engine is handed cannot drift apart. */
+static const char *artwork_filter_entry(int idx, size_t *len)
+{
+    const char *p = ARTWORK_FILTER_CFG_VALS;
+
+    while (idx-- > 0)
+    {
+        p = strchr(p, ',');
+        if (!p)
+            return NULL;
+        p++;
+    }
+    *len = strcspn(p, ",");
+    return p;
+}
+
+void artwork_filter_apply(void)
+{
+    char spec[ARTWORK_FILTER_MAX];
+    const char *err = NULL;
+    bool changed = false;
+    size_t used = 0;
+
+    spec[0] = '\0';
+    for (int s = 0; s < ARTWORK_FILTER_SLOTS; s++)
+    {
+        const int idx = global_settings.artwork_filter[s];
+        size_t len;
+        const char *entry;
+
+        if (idx <= 0)                            /* entry 0 is "off" */
+            continue;
+        entry = artwork_filter_entry(idx, &len);
+        if (!entry || used + len + 2 > sizeof(spec))
+            continue;
+        if (used)
+            spec[used++] = '+';
+        memcpy(spec + used, entry, len);
+        used += len;
+        spec[used] = '\0';
+    }
+
+    /* Refused rather than quietly ignored: a chain the readers cannot run
+     * would otherwise look like it had worked. Nothing in the list can be
+     * refused today -- `blur` is not offered -- but the tier rule lives in
+     * the engine, not in this list, and that is the right way round. */
+    if (!art_filter_set(spec, &err, &changed))
+    {
+        splashf(HZ * 2, "artwork filter: %s", err);
+        art_filter_set("", NULL, &changed);
+    }
+    if (changed)
+        browser_albumart_invalidate();
+}
+
 void settings_apply(bool read_disk)
 {
     logf("%s", __func__);
@@ -1124,6 +1183,8 @@ void settings_apply(bool read_disk)
 
 
     usb_set_mode(global_settings.usb_mode);
+
+    artwork_filter_apply();
 
     /* already called with THEME_STATUSBAR in settings_apply_skins() */
     CHART(">viewportmanager_theme_changed");

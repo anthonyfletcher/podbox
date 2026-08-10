@@ -868,8 +868,14 @@ static int load_image(int fd, const char *path,
                        FORMAT_RESIZE | FORMAT_KEEP_ASPECT;
     size_t plen = strlen(path);
     if (aa == NULL && plen >= 4 && !strcmp(path + plen - 4, ".aat")) {
-        /* a pre-scaled thumbnail from the art cache: just downscale, no decode */
-        rc = art_cache_load_aat(fd, bmp, (int)max_size);
+        /* a pre-scaled thumbnail from the art cache: just downscale, no decode
+         *
+         * Unfiltered, deliberately. This bitmap is what skin_albumart_color.c
+         * derives the palette from, and the palette has to describe the album
+         * rather than the theme's treatment of it -- a bw chain here would
+         * turn every derived colour grey. Skin art has its own filter, on the
+         * %Cl that loads it. */
+        rc = art_cache_load_aat(fd, bmp, (int)max_size, false);
     }
     else if (aa != NULL) {
         lseek(fd, aa->pos, SEEK_SET);

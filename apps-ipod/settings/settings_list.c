@@ -607,6 +607,12 @@ static void albumart_callback(int mode)
     set_albumart_mode(mode);
 }
 
+static void artwork_filter_callback(int value)
+{
+    (void)value;
+    artwork_filter_apply();
+}
+
 /* The buffered bitmap is chosen per track, so nothing changes on screen until
  * the artwork is fetched again. */
 static void wps_art_source_callback(int mode)
@@ -1628,6 +1634,30 @@ const struct settings_list settings[] = {
      * F_THEMERESET so loading such a skin turns it back off. */
     OFFON_SETTING(F_THEMERESET, dynamic_colors, LANG_DYNAMIC_COLORS, false,
                   "dynamic colors", NULL),
+    /* The artwork filter, a slot at a time. F_THEMERESET for the same reason
+     * as dynamic colours: a theme that says nothing about them gets none,
+     * rather than inheriting the last theme's. */
+#define ARTWORK_FILTER_CHOICES                                          \
+                   ID2P(LANG_OFF),               ID2P(LANG_FILTER_BW),  \
+                   ID2P(LANG_FILTER_INVERT),     ID2P(LANG_FILTER_BRIGHTER), \
+                   ID2P(LANG_FILTER_DARKER),     ID2P(LANG_FILTER_CONTRAST_UP), \
+                   ID2P(LANG_FILTER_CONTRAST_DOWN), ID2P(LANG_FILTER_COLOUR_UP), \
+                   ID2P(LANG_FILTER_COLOUR_DOWN), ID2P(LANG_FILTER_HUE), \
+                   ID2P(LANG_FILTER_POSTERISE),  ID2P(LANG_DITHERING),   \
+                   ID2P(LANG_FILTER_PIXELLATE)
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, artwork_filter[0],
+                   LANG_ARTWORK_FILTER_1, 0, "artwork filter 1",
+                   ARTWORK_FILTER_CFG_VALS, artwork_filter_callback,
+                   ARTWORK_FILTER_COUNT, ARTWORK_FILTER_CHOICES),
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, artwork_filter[1],
+                   LANG_ARTWORK_FILTER_2, 0, "artwork filter 2",
+                   ARTWORK_FILTER_CFG_VALS, artwork_filter_callback,
+                   ARTWORK_FILTER_COUNT, ARTWORK_FILTER_CHOICES),
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, artwork_filter[2],
+                   LANG_ARTWORK_FILTER_3, 0, "artwork filter 3",
+                   ARTWORK_FILTER_CFG_VALS, artwork_filter_callback,
+                   ARTWORK_FILTER_COUNT, ARTWORK_FILTER_CHOICES),
+#undef ARTWORK_FILTER_CHOICES
     /* Re-buffers the artwork on change, so the now-playing screen switches
      * picture without waiting for the next track. Dynamic colours need no
      * part in this: they are extracted from whatever bitmap was buffered. */

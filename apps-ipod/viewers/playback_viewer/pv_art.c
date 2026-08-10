@@ -99,7 +99,8 @@ const struct bitmap *pv_art_get(unsigned int hash, int slot)
      * the way in. Area-averaging 1,936 pixels down to 900 is arithmetic, not
      * decoding -- the expensive part was done by the cache long ago. */
     rc = art_cache_load_aat(fd, &bm[slot],
-                            PV_ART_PX * PV_ART_PX * (int)sizeof(fb_data));
+                            PV_ART_PX * PV_ART_PX * (int)sizeof(fb_data),
+                            true);
     close(fd);
 
     if (rc <= 0)

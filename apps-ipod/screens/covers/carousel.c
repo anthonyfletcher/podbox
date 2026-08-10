@@ -1484,6 +1484,12 @@ static int read_aat(int fh, int prio)
         }
     }
 
+    /* Height and width that way round: the slide is stored column-major, so a
+     * "row" of this buffer is a column of the picture. Only the dither cares
+     * -- it is the one filter that reads a pixel's position -- and a Bayer
+     * grid turned on its side is still a Bayer grid. */
+    art_filter_apply(dst, h, w);
+
     return hid;
 }
 

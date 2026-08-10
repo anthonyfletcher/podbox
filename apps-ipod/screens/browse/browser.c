@@ -230,6 +230,11 @@ static void browser_aa_reset(void)
     browser_aa_victim = 0;
 }
 
+void browser_albumart_invalidate(void)
+{
+    browser_aa_reset();
+}
+
 static size_t browser_aa_slot_bytes(void)
 {
     return (size_t)browser_aa_dim * browser_aa_dim * FB_DATA_SZ;
@@ -281,6 +286,9 @@ static bool browser_aa_load(const char *path, int slot)
     {
         char *store = core_get_data_pinned(browser_aa_handle);
         ok = read(fd, store + (size_t)slot * bytes, bytes) == (ssize_t)bytes;
+        if (ok)
+            art_filter_apply(store + (size_t)slot * bytes,
+                             browser_aa_dim, browser_aa_dim);
         core_put_data_pinned(store);
     }
 

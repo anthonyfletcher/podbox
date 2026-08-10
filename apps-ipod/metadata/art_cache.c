@@ -33,6 +33,7 @@
 #include "files/path_list.h"        /* the "found nothing" lists */
 #include "lcd.h"
 #include "draw/bmp.h"
+#include "draw/img_filter.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
 #include "draw/jpeg_load.h"
 #include "usb.h"
@@ -204,7 +205,76 @@ static void aa_fallback_path(char *out, int out_len, int size_index)
 #define AAT_BAND_MAX 8    /* source rows resident per output row */
 static fb_data aat_band[AAT_BAND_MAX * ART_CACHE_MAX_DIM];
 
-int art_cache_load_aat(int fd, struct bitmap *bm, int max_size)
+/* ---------------------------------------------------------------------- *
+ * The cached-art filter                                                   *
+ * ---------------------------------------------------------------------- */
+
+static struct img_filter art_filter;
+static char art_filter_spec[ARTWORK_FILTER_MAX];
+
+bool art_filter_set(const char *spec, const char **err, bool *changed)
+{
+    struct img_filter next;
+
+    if (!spec)
+        spec = "";
+    if (changed)
+        *changed = false;
+
+    /* IMG_CLASSES_INPLACE is the tier rule: cached art takes anything that
+     * rewrites the pixels it was handed, at the size it was handed. That is
+     * everything but `blur`, and it is structural rather than a cost cutoff
+     * -- each of these readers ends with a finished picture sitting in a
+     * destination somebody else sized. */
+    if (!img_filter_compile(spec, IMG_CLASSES_INPLACE, &next))
+    {
+        if (err)
+            *err = next.error;
+        return false;
+    }
+
+    if (!strcmp(spec, art_filter_spec))
+        return true;
+
+    art_filter = next;
+    strmemccpy(art_filter_spec, spec, sizeof(art_filter_spec));
+    if (changed)
+        *changed = true;
+    return true;
+}
+
+/* Enough pixels per band to keep the per-band overhead irrelevant, few enough
+ * that no band holds the CPU for long. A browser thumbnail is one band and
+ * never yields; a 300px frame is twenty-odd. */
+#define ART_FILTER_BAND_PIXELS 4096
+
+void art_filter_apply(void *px, int w, int h)
+{
+    fb_data *p = (fb_data *)px;
+    int rows;
+
+    if (!art_filter.stages || w <= 0 || h <= 0)
+        return;
+
+    rows = ART_FILTER_BAND_PIXELS / w;
+    if (rows < 1)
+        rows = 1;
+
+    for (int y = 0; y < h; y += rows)
+    {
+        int band = MIN(rows, h - y);
+
+        img_filter_apply(p + (size_t)y * w, w, band, &art_filter);
+        if (y + band < h)
+            yield();
+    }
+}
+
+/* ---------------------------------------------------------------------- *
+ * Reading a cached thumbnail                                              *
+ * ---------------------------------------------------------------------- */
+
+int art_cache_load_aat(int fd, struct bitmap *bm, int max_size, bool filter)
 {
     struct art_cache_header hdr;
     int dw = bm->width, dh = bm->height;
@@ -265,6 +335,9 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size)
             out[dx] = n ? LCD_RGBPACK(r / n, g / n, b / n) : 0;
         }
     }
+
+    if (filter)
+        art_filter_apply(bm->data, dw, dh);
 
     return dw * dh * FB_DATA_SZ;
 }
@@ -737,7 +810,10 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
         bm.height = dim;
         bm.format = FORMAT_NATIVE;
 
-        ret = art_cache_load_aat(fd, &bm, (int)workbuf_sz);
+        /* Unfiltered: this is the generator chaining one cached size into a
+         * smaller one, and what it writes back to disk has to stay the
+         * theme's raw material. Filtering happens on the way out, per read. */
+        ret = art_cache_load_aat(fd, &bm, (int)workbuf_sz, false);
         close(fd);
 
         if (ret > 0)

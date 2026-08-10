@@ -389,6 +389,18 @@ MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
 MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
 MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
 
+/* The filters cached artwork is read through, one slot at a time, run in the
+ * order they are listed. A slot each rather than one typed chain: the chains
+ * worth having are short, and entering one on a click wheel is not. */
+MENUITEM_SETTING(artwork_filter_1, &global_settings.artwork_filter[0], NULL);
+MENUITEM_SETTING(artwork_filter_2, &global_settings.artwork_filter[1], NULL);
+MENUITEM_SETTING(artwork_filter_3, &global_settings.artwork_filter[2], NULL);
+
+MAKE_MENU(artwork_filter_menu, ID2P(LANG_ARTWORK_FILTER), NULL, Icon_NOICON,
+            &artwork_filter_1,
+            &artwork_filter_2,
+            &artwork_filter_3);
+
 MENUITEM_SETTING(shortcuts_replaces_quickscreen,
                  &global_settings.shortcuts_replaces_qs, NULL);
 
@@ -405,7 +417,8 @@ MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
             &colors_settings,
             &dialog_settings,
             &db_albumart,
-            &db_artistart);
+            &db_artistart,
+            &artwork_filter_menu);
 
 MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             NULL, Icon_Wps,
