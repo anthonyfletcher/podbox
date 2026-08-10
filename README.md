@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="docs/podbox/images/podbox-logo.png" width="100">
-</p>
-
 # PodBox
 
 PodBox is a modified version of Rockbox for the iPod Classic and iPod Video with a focus on simplifying

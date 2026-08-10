@@ -5,8 +5,8 @@
  * GNU General Public License (version 2+)
  *
  * Boot: brings up the hardware, filesystem, settings, playback and voice
- * in order, shows the logo, then hands control to the root menu and never
- * returns.
+ * in order, shows the boot screen, then hands control to the root menu and
+ * never returns.
  ****************************************************************************/
 #include "config.h"
 #include "system.h"
@@ -44,8 +44,6 @@
 #include "screens/system/debug_menu.h"
 #include "font.h"
 #include "speech/language.h"
-#include "bitmaps/podboxlogo.h"
-#include "bitmaps/native/podbox_colors.h"
 #include "screens/playback/wps.h"
 #include "playlist/playlist.h"
 #include "core_alloc.h"
@@ -106,11 +104,11 @@ int main(void)
     CHART("<init");
     /* Hand the screen over to the UI in the theme's colours.
      *
-     * The boot screen paints in the logo's own colours and leaves them set --
+     * The boot screen paints in its own palette and leaves it set --
      * settings_apply() establishes the theme's during init(), but boot stages
-     * run after it and each repaint puts the logo's back. clear_display()
-     * fills with whatever background is current, so without this the logo's
-     * blue is what shows through wherever the theme does not paint. */
+     * run after it and each repaint puts the palette's back. clear_display()
+     * fills with whatever background is current, so without this the boot
+     * background is what shows through wherever the theme does not paint. */
     FOR_NB_SCREENS(i)
     {
         screens[i].set_foreground(global_settings.fg_color);
@@ -152,10 +150,10 @@ int main(void)
     root_menu();
 }
 
-/* The boot screen: the logo art, a caption in the space beneath it, and a
- * progress bar under the caption. Every stage of boot that has something to
- * say redraws the whole thing rather than overlaying a splash, so nothing has
- * to be undone afterwards.
+/* The boot screen: a progress bar with a caption underneath, on a flat
+ * background. Every stage of boot that has something to say redraws the whole
+ * thing rather than overlaying a splash, so nothing has to be undone
+ * afterwards.
  *
  * The bar is the part that always works. A caption needs the theme's font,
  * the font needs the disk, and the disk can be busy serving a USB host for
@@ -171,17 +169,82 @@ int main(void)
  * this after that point jumps into whatever was laid over it. Errors keep
  * using splash() -- they can happen at any time, and the fatal ones (no disk,
  * no partition) print diagnostics and never reach a normal screen anyway. */
-/* The bar sits at a fixed height and the caption goes underneath it. Sizing
- * the caption first and placing the bar below it moved the bar whenever the
- * text appeared or changed, which is jarring on a screen where the bar is the
- * only thing meant to be moving. */
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
 #define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
-#define BOOT_BAR_BOTTOM (LCD_HEIGHT - 76)               /* bar bottom, 76px up */
-#define BOOT_BAR_Y      (BOOT_BAR_BOTTOM - BOOT_BAR_H)
 #define BOOT_CAPTION_PAD 10                             /* bar to caption gap */
-#define BOOT_CAPTION_Y  (BOOT_BAR_BOTTOM + BOOT_CAPTION_PAD)
+
+/* A colour set. The background fills the screen, the caption draws in `fg` and
+ * the progress bar in `accent`. Nothing else is on screen, so a set has to
+ * carry the whole look on its own -- both `fg` and `accent` need to read
+ * against `bg`, and `accent` has to survive being only seven pixels tall.
+ *
+ * All the backgrounds are dark on purpose: boot often happens in the dark,
+ * and a screen that lights up white is unpleasant to be handed. */
+struct boot_palette
+{
+    unsigned bg;
+    unsigned fg;
+    unsigned accent;
+};
+
+/* 0xrrggbb literals, packed to whatever the LCD wants. */
+#define BOOT_RGB(c)  LCD_RGBPACK(((c) >> 16) & 0xff, ((c) >> 8) & 0xff, \
+                                 (c) & 0xff)
+#define BOOT_PAL(bg, fg, accent) \
+    { BOOT_RGB(bg), BOOT_RGB(fg), BOOT_RGB(accent) }
+
+static const struct boot_palette boot_palettes[] =
+{
+    BOOT_PAL(0x031835, 0xfff2f9, 0xc78dbe),     /* podbox blue     */
+    BOOT_PAL(0x1e0d0a, 0xffe9df, 0xff7a45),     /* ember           */
+    BOOT_PAL(0x0a1a12, 0xe7f5ec, 0x5fbf8a),     /* moss            */
+    BOOT_PAL(0x10151c, 0xe6edf3, 0x7aa2f7),     /* slate           */
+    BOOT_PAL(0x1a0d20, 0xf7eaf8, 0xb98cf5),     /* plum            */
+    BOOT_PAL(0x0d0d0f, 0xf5f5f2, 0xe8b44a),     /* ink and gold    */
+    BOOT_PAL(0x05202a, 0xe2f4f8, 0x35c0cf),     /* teal            */
+    BOOT_PAL(0x1d0a11, 0xffe6ec, 0xff5d7e),     /* rose            */
+    BOOT_PAL(0x121504, 0xf2f6e2, 0xb5d334),     /* lime            */
+    BOOT_PAL(0x0b0f2a, 0xe8e9ff, 0x6c7bff),     /* indigo          */
+    BOOT_PAL(0x16060f, 0xffe9f6, 0xff5fc8),     /* magenta         */
+    BOOT_PAL(0x101014, 0xe9ecf1, 0x9aa8b8),     /* steel           */
+};
+
+/* Picked once, on the first paint, and held for the whole of boot. The clock
+ * is the only thing that differs between two boots this early: storage is not
+ * up, so there is nowhere to have remembered the last choice. A player whose
+ * clock does not tick gets the same set every time, which is dull rather than
+ * broken. */
+static const struct boot_palette *boot_pal;   /* NULL until the first paint */
+
+static const struct boot_palette *boot_palette(void) INIT_ATTR;
+static const struct boot_palette *boot_palette(void)
+{
+    if (!boot_pal)
+    {
+        struct tm t;
+        unsigned n = 0;
+
+        if (rtc_read_datetime(&t) >= 0)
+            n = t.tm_sec + t.tm_min * 7 + t.tm_hour * 13 + t.tm_yday * 31;
+
+        boot_pal = &boot_palettes[n % ARRAYLEN(boot_palettes)];
+    }
+
+    return boot_pal;
+}
+
+/* Bar and caption are centred as a pair. The caption's height counts whether
+ * or not there is a caption yet, so the bar does not move the moment text
+ * appears -- jarring on a screen where the bar is the only thing meant to be
+ * moving. */
+static int boot_bar_y(void) INIT_ATTR;
+static int boot_bar_y(void)
+{
+    int h = BOOT_BAR_H + BOOT_CAPTION_PAD + font_get(FONT_SYSFIXED)->height;
+
+    return (LCD_HEIGHT - h) / 2;
+}
 
 /* Stages in the order init() reaches them, each worth a share of the bar.
  * boot_progress() paints the *start* of a stage, so the bar always shows work
@@ -190,7 +253,7 @@ int main(void)
  * is why the bar can jump. */
 enum boot_stage
 {
-    BOOT_STORAGE,       /* the logo is up; spinning the disk up */
+    BOOT_STORAGE,       /* the screen is up; spinning the disk up */
     BOOT_MOUNT,
     BOOT_SETTINGS,
     BOOT_THEME,         /* settings_apply(): fonts, backdrops, colours */
@@ -269,26 +332,24 @@ static void boot_viewport(struct viewport *vp)
     /* The built-in fixed-pitch font, not the theme's: it is compiled in, so it
      * needs neither the disk nor settings_apply() and is there from the first
      * paint. It is also small, which is what this caption wants -- it labels
-     * the bar rather than competing with the logo. */
+     * the bar rather than competing with it. */
     vp->font = FONT_SYSFIXED;
     vp->drawmode = DRMODE_FG;
-    vp->fg_pattern = PODBOX_COLOR_FG;
+    vp->fg_pattern = boot_palette()->fg;
 }
 
 static void boot_paint(int step, int total) INIT_ATTR;
 static void boot_paint(int step, int total)
 {
+    const struct boot_palette *pal = boot_palette();
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
     struct viewport *last_vp;
+    int bar_y = boot_bar_y();
 
-    /* Clear to the artwork's background so the flash before the full-screen
-     * logo lands matches it rather than showing stray colour. */
-    lcd_set_background(PODBOX_COLOR_BG);
-    lcd_set_foreground(PODBOX_COLOR_FG);
+    lcd_set_background(pal->bg);
+    lcd_set_foreground(pal->fg);
     lcd_clear_display();
-    lcd_bmp(&bm_podboxlogo, (LCD_WIDTH - BMPWIDTH_podboxlogo) / 2,
-                             (LCD_HEIGHT - BMPHEIGHT_podboxlogo) / 2);
 
     boot_viewport(&vp);
     last_vp = screen->set_viewport(&vp);
@@ -297,18 +358,19 @@ static void boot_paint(int step, int total)
     {
         int tw, th;
         screen->getstringsize(boot_caption, &tw, &th);
-        screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, boot_caption);
+        screen->putsxy((vp.width - tw) / 2,
+                       bar_y + BOOT_BAR_H + BOOT_CAPTION_PAD, boot_caption);
     }
 
-    vp.fg_pattern = PODBOX_COLOR_BAR;
-    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
+    vp.fg_pattern = pal->accent;
+    progress_bar_draw(screen, BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
     lcd_update();
 }
 
-/* The bar alone, over the logo the last full paint left on the LCD, because a
+/* The bar alone, over what the last full paint left on the LCD, because a
  * repaint four times a second is otherwise a full-screen blit each time. The
  * fill only ever grows, so drawing over the old one needs no clearing.
  *
@@ -321,16 +383,17 @@ static void boot_paint_bar(int step, int total)
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
     struct viewport *last_vp;
+    int bar_y = boot_bar_y();
 
     boot_viewport(&vp);
-    vp.fg_pattern = PODBOX_COLOR_BAR;
+    vp.fg_pattern = boot_palette()->accent;
     last_vp = screen->set_viewport(&vp);
 
-    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
+    progress_bar_draw(screen, BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
-    lcd_update_rect(BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H);
+    lcd_update_rect(BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H);
 }
 
 static void boot_progress(enum boot_stage stage, int num, int den,
@@ -502,13 +565,16 @@ static void init(void)
 
     settings_reset();
 
-    /* Bare, and as early as possible. Nothing can be written under the logo
+    /* Before the first paint: the boot palette is chosen from the clock. */
+    rtc_init();
+
+    /* Bare, and as early as possible. Nothing can be written under the bar
      * yet -- not for want of a font, since the caption uses the built-in one,
      * but because language_strings[] is not filled in until lang_init() below.
      * The first caption goes up at the stage after that. */
-    CHART(">show_logo");
+    CHART(">show_boot_screen");
     boot_progress(BOOT_STORAGE, 0, 0, NULL);
-    CHART("<show_logo");
+    CHART("<show_boot_screen");
     lang_init(core_language_builtin, language_strings,
               LANG_LAST_INDEX_IN_ARRAY);
 
@@ -517,8 +583,6 @@ static void init(void)
 #else
     serial_setup();
 #endif
-
-    rtc_init();
 
     adc_init();
 

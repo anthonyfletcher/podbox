@@ -8,10 +8,6 @@
 
 #ifndef BOOTLOADER  /* We don't need these for the bootloader */
 
-/* Boot logo, shown centered by boot_paint() in apps/main.c */
-podboxlogo.bmp
-
-
 /* Shared "no artwork found" placeholder for album and artist art -- scaled to
  * each size by aa_ensure_fallback() in apps/metadata/art_cache.c */
 #ifdef HAVE_TAGCACHE
