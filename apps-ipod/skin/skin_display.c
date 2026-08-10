@@ -713,19 +713,40 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
     if (!aa)
         return;
 
+    /* A blurring chain has already rendered this track's art into the skin's
+     * own buffer, at its own size; everything else drew, or will draw, from
+     * the buffered bitmap. Only the source differs -- the cropping and
+     * alignment below are the same either way. */
+    const bool blurred = aa->filter_handle > 0
+                      && aa->filtered_art == handle_id;
+    const fb_data *pixels;
     struct bitmap *bmp;
-    if (bufgetdata(handle_id, 0, (void *)&bmp) <= 0)
-        return;
+    short src_w, src_h;
+
+    if (blurred)
+    {
+        pixels = core_get_data(aa->filter_handle);
+        src_w = aa->filtered_width;
+        src_h = aa->filtered_height;
+    }
+    else
+    {
+        if (bufgetdata(handle_id, 0, (void *)&bmp) <= 0)
+            return;
+        pixels = (const fb_data *)bmp->data;
+        src_w = bmp->width;
+        src_h = bmp->height;
+    }
 
     short x = aa->x;
     short y = aa->y;
-    short width = bmp->width;
-    short height = bmp->height;
+    short width = src_w;
+    short height = src_h;
 
     if (aa->width > 0)
     {
         /* Crop if the bitmap is too wide */
-        width = MIN(bmp->width, aa->width);
+        width = MIN(src_w, aa->width);
 
         /* Align */
         if (aa->xalign & WPS_ALBUMART_ALIGN_RIGHT)
@@ -737,7 +758,7 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
     if (aa->height > 0)
     {
         /* Crop if the bitmap is too high */
-        height = MIN(bmp->height, aa->height);
+        height = MIN(src_h, aa->height);
 
         /* Align */
         if (aa->yalign & WPS_ALBUMART_ALIGN_BOTTOM)
@@ -749,9 +770,9 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
     if (!clear)
     {
         /* Draw the bitmap */
-        gwps->display->bitmap_part((fb_data*)bmp->data, 0, 0,
+        gwps->display->bitmap_part(pixels, 0, 0,
                                     STRIDE(gwps->display->screen_type,
-                                        bmp->width, bmp->height),
+                                        src_w, src_h),
                                    x, y, width, height);
     }
     else

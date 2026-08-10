@@ -24,6 +24,18 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|Si", SKIN_REFRESH_SPECTRUM),
     TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|IS",  SKIN_REFRESH_DYNAMIC),
 
+    /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with one
+     * more optional string, the filter chain (draw/img_filter.h). The token
+     * id is unchanged, so parse_albumart_load() still handles it and only
+     * grows a clause.
+     *
+     * The one name here that deliberately collides with an upstream tag.
+     * find_tag() consults this table first, which is what makes overriding a
+     * tag possible at all rather than only adding to the set. The cost is
+     * that a theme using the seventh parameter parses here and is rejected by
+     * upstream Rockbox -- true of every tag in this file, and not new. */
+    TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sss", 0|NOBREAK),
+
     /* %tw/%Vw/%Vh transform or report their arguments and are consumed by an
      * enclosing %if/%sel, whose conditional render path drives the redraw, so
      * flag 0 (inherit) is right: the line's refresh follows its arguments.

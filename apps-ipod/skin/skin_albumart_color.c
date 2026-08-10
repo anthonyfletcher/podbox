@@ -21,10 +21,19 @@
  * The palette changes in one step, not over a fade -- see apply_colors() for
  * why the fade that used to be here could not be made to look right.
  *
+ * The module also owns the other once-per-art-change job, running a skin's
+ * %Cl filter chain over the art -- not because filtering has anything to do
+ * with colour, but because both need the same answer to "has the art changed,
+ * and has it finished buffering yet?", and two state machines answering that
+ * separately would drift apart. Extraction always goes first: the palette
+ * describes the album, not the theme's treatment of it.
+ *
  * Parts, in order:
  *   - luminance, contrast and blending helpers
  *   - extract_colors(): sampling the bitmap and choosing the palette
- *   - track-change hook and theme colour save/restore
+ *   - the %Cl filter chain, applied in place once per art change
+ *   - track-change hook, theme colour save/restore, and the once-per-render
+ *     check that drives both jobs
  *   - carrying a skin's own colours over to the new palette
  *   - the accessors skins resolve their colour tags through, which also
  *     report whether a change is recent enough to need another repaint
@@ -40,7 +49,15 @@
 #include "audio/playback.h"
 #include "audio/buffering.h"
 #include "system/appevents.h"
+#include "core_alloc.h"
+#include "file.h"
+#include "string-extra.h"
+#include "metadata/art_cache.h"      /* the palette's own source */
+#include "draw/bmp.h"                /* struct bitmap, FORMAT_NATIVE */
 #include "draw/color.h"              /* blending, HSV and contrast helpers */
+#include "draw/img_filter.h"
+#include "skin_engine.h"             /* SKINNABLE_SCREENS_COUNT */
+#include "wps_internals.h"           /* struct skin_albumart */
 #include "skin_albumart_color.h"
 
 /* How long after a colour change the screens are asked to keep repainting.
@@ -403,10 +420,285 @@ static void extract_colors(const struct bitmap *bmp)
     apply_colors(accent, dominant, false);
 }
 
+/* ---------------------------------------------------------------------- *
+ * The palette's own source                                                *
+ * ---------------------------------------------------------------------- */
+
+/* Where the palette comes from, in order of preference: the art cache's own
+ * thumbnail for the playing album, and failing that whatever bitmap a skin
+ * happened to buffer into its album-art slot.
+ *
+ * Reading the cache is much the better answer, and not only because it needs
+ * no slot:
+ *
+ *   - it works on a theme with no %Cl at all. Borrowing a skin's slot means
+ *     dynamic colours silently do nothing on such a theme, which is a trap
+ *     theme authors have had to know about and work around.
+ *   - it is the same picture whatever theme is loaded, so an album gets the
+ *     same colours from one theme to the next. Borrowing gives a palette
+ *     taken from whatever size that theme's %Cl asked for.
+ *   - it cannot be a filtered picture. A skin's slot can be: %Cl filters
+ *     rewrite it in place, and a bw chain would turn every derived colour
+ *     grey.
+ *
+ * The 128px "coverflow" thumbnail, not the 44px "list" one, and that is
+ * measured rather than assumed. Downscaling averages small saturated regions
+ * away, and the dominant colour is chosen with a bias toward saturation --
+ * so a heavily reduced thumbnail leaves that bias nothing to work with.
+ * Against the 300px thumbnail over 120 albums, the mean per-channel
+ * difference in the colour chosen is 14 from the 128px and 25 from the 44px,
+ * and the albums whose palette comes out markedly duller run 4% against 5%.
+ *
+ * The whole picture has to be resident because the extractor makes three
+ * passes over it, so this is 32 KB that stays allocated. Reading it in bands
+ * would need three reads of the file instead of one; area-averaging it down
+ * on the way in was measured too, and gives back exactly the accuracy the
+ * 128px was chosen for. */
+#define PALETTE_MAX_DIM 128
+
+static fb_data palette_px[PALETTE_MAX_DIM * PALETTE_MAX_DIM];
+static int palette_size_idx = -2;      /* -2 not looked up, -1 no such size */
+
+/* The folder last found to have no cached thumbnail. Without this, a track
+ * whose album is not in the cache reopens a file that is not there on every
+ * render pass while the timeout below runs down; with it, once per track. */
+static unsigned int palette_miss;
+
+/* The album folder of a track path, hashed the way the cache keys on it: no
+ * normalisation and no trailing slash. Anything else silently misses. */
+static unsigned int track_folder_hash(const char *path)
+{
+    const char *slash;
+
+    if (!path || !path[0])
+        return 0;
+    slash = strrchr(path, '/');
+    if (!slash || slash == path)
+        return 0;
+
+    {
+        char dir[MAX_PATH];
+        size_t n = (size_t)(slash - path);
+
+        if (n == 0 || n >= sizeof(dir))
+            return 0;
+        memcpy(dir, path, n);
+        dir[n] = '\0';
+        return art_cache_dir_hash(dir);
+    }
+}
+
+/* Extract from the cached thumbnail. False means there is none to read --
+ * no database yet, a folder the caching pass has not reached, or one with no
+ * art at all -- and the caller falls back to the skin's slot. */
+static bool palette_from_cache(void)
+{
+    struct art_cache_header hdr;
+    struct bitmap bmp;
+    char aat[MAX_PATH];
+    char path[MAX_PATH];
+    struct mp3entry *id3;
+    unsigned int hash;
+    size_t bytes;
+    int fd, dim;
+
+    /* A theme showing artist portraits should not have colours taken from the
+     * album cover, so leave it to the slot, which holds whatever it chose. */
+    if (global_settings.wps_art_source != WPS_ART_ALBUM)
+        return false;
+
+    if (palette_size_idx == -2)
+        palette_size_idx = art_cache_size_index("coverflow");
+    if (palette_size_idx < 0)
+        return false;
+
+    dim = art_cache_size_dim(palette_size_idx);
+    if (dim <= 0 || dim > PALETTE_MAX_DIM)
+        return false;
+
+    /* audio_current_track() hands back the engine's live entry, not a copy,
+     * so take what is needed out of it before doing anything else. */
+    id3 = audio_current_track();
+    if (!id3 || !id3->path[0])
+        return false;
+    strmemccpy(path, id3->path, sizeof(path));
+
+    hash = track_folder_hash(path);
+    if (hash == 0 || hash == palette_miss)
+        return false;
+
+    /* Ask where the thumbnail would be and open it, rather than asking
+     * whether it exists first -- the open is the existence test. A folder
+     * with no art has no file here, which is what keeps the shared "no art"
+     * placeholder from becoming somebody's palette. */
+    art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
+    fd = open(aat, O_RDONLY);
+    if (fd < 0)
+    {
+        palette_miss = hash;
+        return false;
+    }
+
+    bytes = (size_t)dim * dim * sizeof(fb_data);
+    if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
+        hdr.magic != ART_CACHE_MAGIC ||
+        hdr.version != ART_CACHE_FORMAT_VERSION ||
+        hdr.width != dim || hdr.height != dim ||
+        read(fd, palette_px, bytes) != (ssize_t)bytes)
+    {
+        close(fd);
+        palette_miss = hash;
+        return false;
+    }
+    close(fd);
+
+    /* Pixel order is not checked because a histogram does not care: this
+     * size is stored column-major for the carousel, and every pixel is
+     * counted whichever way round they sit. */
+    bmp.width = dim;
+    bmp.height = dim;
+    bmp.format = FORMAT_NATIVE;
+    bmp.data = (unsigned char *)palette_px;
+    extract_colors(&bmp);
+    return true;
+}
+
+/* ---------------------------------------------------------------------- *
+ * The %Cl filter chain                                                    *
+ * ---------------------------------------------------------------------- */
+
+/* The chain rewrites the album art slot's own copy of the bitmap, so it has
+ * to run exactly once per handle -- twice would darken a cover twice, or
+ * invert it back.
+ *
+ * Keyed by slot rather than by skin because slots dedupe by dimension: a
+ * status bar and a WPS asking for the same size share one bitmap, and a
+ * per-skin guard would filter it once each. The sharing has a second
+ * consequence this cannot fix, and it is worth knowing: two skins on one slot
+ * both show whichever chain ran first. Declaring different sizes separates
+ * them.
+ *
+ * Filtering in place cannot be undone, which shows up in one place: change
+ * theme mid-track and the art keeps the outgoing theme's treatment until the
+ * next track. Re-running the guard would be worse -- the new chain would
+ * compose on top of the old one's output rather than replace it.
+ *
+ * One above SKINNABLE_SCREENS_COUNT because that is the largest playback.c's
+ * MAX_MULTIPLE_AA can be (it grows by one for USB iAP). The bounds test is
+ * what actually keeps this safe, not the size. */
+#define AA_FILTER_SLOTS (SKINNABLE_SCREENS_COUNT + 1)
+
+static volatile int filtered_handle[AA_FILTER_SLOTS];
+
+static void forget_filtered(void)
+{
+    for (int i = 0; i < AA_FILTER_SLOTS; i++)
+        filtered_handle[i] = -1;
+}
+
+static bool slot_filtered(int aa_slot, int handle)
+{
+    return aa_slot >= 0 && aa_slot < AA_FILTER_SLOTS
+        && filtered_handle[aa_slot] == handle;
+}
+
+/* Fit a source of sw x sh inside a bw x bh box, keeping its aspect -- the
+ * same shape FORMAT_KEEP_ASPECT gives the unblurred path, so the blurred
+ * image lands where the crisp one would have. */
+static void fit_inside(int sw, int sh, int bw, int bh, int *dw, int *dh)
+{
+    *dw = bw;
+    *dh = sh * bw / sw;
+    if (*dh > bh)
+    {
+        *dh = bh;
+        *dw = sw * bh / sh;
+    }
+    if (*dw < 1) *dw = 1;
+    if (*dh < 1) *dh = 1;
+}
+
+/* A blurring chain cannot work in place, so it renders into the skin's own
+ * buffer instead, and leaves the buffered art alone. That is why this one
+ * keeps its guard on the skin rather than on the slot: rendering the same
+ * art twice into two different destinations is harmless, and two skins
+ * sharing a slot each need their own copy. It is also why the colour
+ * extractor is not locked out here -- the art it reads is untouched. */
+static void render_filtered(struct skin_albumart *aa, int handle,
+                            struct bitmap *bmp)
+{
+    fb_data *dst;
+    int dw, dh;
+
+    if (aa->filter_handle <= 0)
+        return;
+
+    fit_inside(bmp->width, bmp->height, aa->width, aa->height, &dw, &dh);
+
+    /* Pinned across the render: this one does have to hold still, because
+     * unlike the in-place pass it writes for as long as it reads. */
+    core_pin(aa->filter_handle);
+    dst = core_get_data(aa->filter_handle);
+    img_filter_render(dst, dw, dh, (const fb_data *)bmp->data,
+                      bmp->width, bmp->height, &aa->filter);
+    core_unpin(aa->filter_handle);
+
+    aa->filtered_width = (short)dw;
+    aa->filtered_height = (short)dh;
+    aa->filtered_art = handle;
+}
+
+void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
+{
+    const struct img_filter *filter = aa ? &aa->filter : NULL;
+    const bool resizes = filter && (filter->stages & IMG_CLASS_RESIZE);
+    struct bitmap *bmp;
+    int handle;
+
+    if (!filter || !filter->stages)
+        return;
+    if (aa_slot < 0 || aa_slot >= AA_FILTER_SLOTS)
+        return;
+
+    handle = playback_current_aa_hid(aa_slot);
+    if (handle < 0)
+        return;                                  /* not buffered yet */
+    if (resizes ? (aa->filtered_art == handle)
+                : (filtered_handle[aa_slot] == handle))
+        return;                                  /* already done */
+
+    /* The bitmap lives in the audio buffer and is movable, and this reads it
+     * unpinned -- the same bargain extract_colors() makes. Nothing between
+     * bufgetdata() and the last read may yield, allocate or touch the disk.
+     * Neither of the two calls below does any of the three.
+     *
+     * Width and height rather than the drawing stride: a levels filter is
+     * per-pixel and cares only that it covers the whole buffer. A positional
+     * one (dither) would need the real row length. */
+    if (bufgetdata(handle, 0, (void *)&bmp) <= 0)
+        return;
+
+    if (resizes)
+    {
+        render_filtered(aa, handle, bmp);
+    }
+    else
+    {
+        img_filter_apply((fb_data *)bmp->data, bmp->width, bmp->height,
+                         filter);
+        filtered_handle[aa_slot] = handle;
+    }
+}
+
 static void track_change_cb(unsigned short id, void *param)
 {
     (void)param;
     needs_extraction = true;
+    /* New art means the filter owes it a pass. Handle ids are the test for
+     * that and a new one nearly always differs -- this covers the case where
+     * buflib hands the same id back for different art. */
+    forget_filtered();
+    palette_miss = 0;
     if (id == PLAYBACK_EVENT_TRACK_CHANGE)
         cache.track_change_tick = current_tick;
 }
@@ -486,23 +778,32 @@ void dynamic_colors_check_extraction(int aa_slot)
         needs_extraction = false;
         return;
     }
-    if (aa_slot < 0)
+    /* The cache first. It needs no album-art slot, so this works on a theme
+     * that declares no %Cl -- which is why there is no "give up without a
+     * slot" test here any more. */
+    if (palette_from_cache())
     {
-        /* No known AA slot yet — can't extract */
+        needs_extraction = false;
         return;
     }
 
-    int handle = playback_current_aa_hid(aa_slot);
+    int handle = aa_slot >= 0 ? playback_current_aa_hid(aa_slot) : -1;
     if (handle >= 0)
     {
         struct bitmap *bmp;
-        if (bufgetdata(handle, 0, (void *)&bmp) > 0)
+        /* Never derive a palette from art a filter has already rewritten: it
+         * describes the album, not the theme's treatment of it, and a bw
+         * chain would otherwise turn every derived colour grey. Keeping the
+         * palette we have is the better of the two wrong answers. */
+        if (!slot_filtered(aa_slot, handle) &&
+            bufgetdata(handle, 0, (void *)&bmp) > 0)
             extract_colors(bmp);
         needs_extraction = false;
     }
     else
     {
-        /* Art not available yet — check timeout */
+        /* Neither a cached thumbnail nor a buffered bitmap. Art may still be
+         * on its way, so keep trying until the timeout. */
         long elapsed = current_tick - cache.track_change_tick;
         if (elapsed > NO_ART_TIMEOUT)
         {

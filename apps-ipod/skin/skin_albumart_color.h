@@ -29,6 +29,20 @@ bool dynamic_colors_needs_repaint(void);
 /* Check if color extraction is needed and perform it (call from UI thread) */
 void dynamic_colors_check_extraction(int aa_slot);
 
+/* Run a skin's %Cl filter chain over the art in the given slot, at most once
+ * per buffered image. Cheap to call every render pass, and does nothing for
+ * a chain with no stages.
+ *
+ * A chain that only rewrites pixels does so in the slot's own copy; one that
+ * blurs renders into the skin's filter buffer instead and leaves the art
+ * alone. Either way draw_album_art() picks up the result.
+ *
+ * Call it after dynamic_colors_check_extraction(), never before: the palette
+ * must be derived from the unfiltered art. UI thread only, for the same
+ * reason extraction is -- the source bitmap is movable and read unpinned. */
+struct skin_albumart;
+void skin_albumart_filter(int aa_slot, struct skin_albumart *aa);
+
 /* Re-save theme default colors (call after theme .cfg is applied) */
 void dynamic_colors_save_theme(void);
 

@@ -65,6 +65,7 @@
 #include "rbpaths.h"
 #include "pathfuncs.h"
 #include "draw/bmp.h"
+#include "draw/img_filter.h"
 
 #include "audio/playback.h"
 
@@ -1427,10 +1428,34 @@ static int parse_albumart_load(struct skin_element* element,
         aa->x = (curr_vp->vp.width - aa->width - aa->x);
 
     aa->state = WPS_ALBUMART_LOAD;
+    aa->filter_handle = -1;
+    aa->filtered_art = -1;
     wps_data->albumart = PTRTOSKINOFFSET(skin_buffer, aa);
 
-    dimensions.width = aa->width;
-    dimensions.height = aa->height;
+    /* The filter chain has to be compiled before the slot is claimed: a
+     * blurred chain wants a much smaller source than it draws, and the size
+     * asked for here is what every buffered track will carry. Compiled here
+     * rather than at draw time, so a misspelt filter fails the skin at load
+     * instead of quietly drawing nothing. A skin that named no chain
+     * compiles the empty one, which has no stages. */
+    const char *chain = NULL;
+    if (element->params_count > 6 && !isdefault(get_param(element, 6)))
+        chain = get_param_text(element, 6);
+
+    if (!img_filter_compile(chain, IMG_CLASSES_ALL, &aa->filter))
+    {
+        DEBUGF("%%Cl: %s\n", aa->filter.error);
+        return WPS_ERROR_INVALID_PARAM;
+    }
+
+    /* Slots dedupe by dimension, so a blurred %Cl no longer shares one with
+     * a same-sized unblurred one. That is right -- they want different
+     * pixels -- and it is what keeps the saving: audio_load_albumart() runs
+     * per buffered track, so a full-screen slot costs ~115 KiB per track
+     * where the decimated one costs about two. */
+    int div = img_filter_source_divisor(&aa->filter, aa->width, aa->height);
+    dimensions.width = (aa->width + div - 1) / div;
+    dimensions.height = (aa->height + div - 1) / div;
 
     albumart_slot = playback_claim_aa_slot(&dimensions);
 
@@ -1473,6 +1498,7 @@ static int parse_albumart_load(struct skin_element* element,
                 break;
         }
     }
+
     return 0;
 }
 
@@ -1623,6 +1649,16 @@ void skin_data_free_buflib_allocs(struct wps_data *wps_data)
     {
         while (wps_data->font_count > 0)
             font_unload(font_ids[--wps_data->font_count]);
+    }
+
+    /* Freed here rather than in skin_data_reset(), which clears the offset to
+     * the album art struct the handle is kept in before it could be read. */
+    {
+        struct skin_albumart *aa =
+                SKINOFFSETTOPTR(skin_buffer, wps_data->albumart);
+
+        if (aa && aa->filter_handle > 0)
+            aa->filter_handle = core_free(aa->filter_handle);
     }
 
 abort:
@@ -2335,6 +2371,32 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
                 skin_buffer_usage());
         stats->buflib_handles++;
         stats->browser_size = skin_buffer_usage();
+
+        /* A blurring %Cl draws from a buffer of its own rather than from the
+         * buffered art, so give it one -- now, at skin load, and not at the
+         * track change that first needs it. A core_alloc from a screen
+         * shrinks the audio buffer and forces a rebuffer; doing that on every
+         * track would stutter playback. Backdrops allocate here for the same
+         * reason.
+         *
+         * The bounding box is an upper bound: the art is fitted inside it
+         * keeping its aspect, so square art in a full-screen box uses 240x240
+         * of the 320x240 asked for. */
+        char *live_buffer = get_skin_buffer(wps_data);
+        struct skin_albumart *live =
+                SKINOFFSETTOPTR(live_buffer, wps_data->albumart);
+
+        if (live && (live->filter.stages & IMG_CLASS_RESIZE))
+        {
+            size_t bytes = (size_t)live->width * live->height
+                         * sizeof(fb_data);
+
+            live->filter_handle = core_alloc(bytes);
+            if (live->filter_handle <= 0)
+                DEBUGF("%%Cl: no room for a %zu byte filter buffer\n", bytes);
+            else
+                stats->buflib_handles++;
+        }
     }
 
 

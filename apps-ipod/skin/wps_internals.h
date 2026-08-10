@@ -19,6 +19,7 @@
 #include "skin_parser.h"
 #include "core_alloc.h"
 #include "kernel.h"
+#include "draw/img_filter.h"
 
 struct wps_data;
 
@@ -223,6 +224,25 @@ struct skin_albumart {
     unsigned char state; /* WPS_ALBUMART_NONE, _CHECK, _LOAD */
 
     int draw_handle;
+
+    /* The chain %Cl's seventh parameter named, compiled at skin load. No
+     * stages means the skin asked for no filtering. */
+    struct img_filter filter;
+
+    /* A chain that blurs cannot work in place, so it gets a destination of
+     * its own: one buflib block the size of the bounding box, allocated at
+     * skin load rather than at track change, since a core_alloc from a
+     * screen shrinks the audio buffer and forces a rebuffer. -1 when the
+     * chain does not need one, which is every chain but a blurring one.
+     *
+     * `filtered_art` is the art handle already rendered into it. Per skin
+     * rather than per slot -- unlike the in-place case there is no danger in
+     * two skins rendering the same art, and they each have their own
+     * destination to render it into. */
+    int filter_handle;
+    int filtered_art;
+    short filtered_width;      /* what is really in it: the source fitted */
+    short filtered_height;     /* inside the box, so smaller than it      */
 };
 
 

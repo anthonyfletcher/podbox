@@ -1115,7 +1115,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         !strcmp(label,VP_DEFAULT_LABEL_STRING))
         refresh_mode = 0;
 
-    bool dc_extraction_done = false;
+    bool art_checks_done = false;
 
     for (viewport = SKINOFFSETTOPTR(skin_buffer, data->tree);
          viewport;
@@ -1126,11 +1126,19 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         skin_viewport = SKINOFFSETTOPTR(skin_buffer, viewport->data);
         if (!skin_viewport) continue;
 
-        /* Check for pending color extraction once per render pass */
-        if (!dc_extraction_done)
+        /* The two once-per-art-change jobs, run once per render pass. The
+         * filter goes second and must stay there: it rewrites the art in
+         * place, and the palette has to come from the unfiltered image. */
+        if (!art_checks_done)
         {
             dynamic_colors_check_extraction(data->playback_aa_slot);
-            dc_extraction_done = true;
+
+            struct skin_albumart *aa =
+                    SKINOFFSETTOPTR(skin_buffer, data->albumart);
+            if (aa)
+                skin_albumart_filter(data->playback_aa_slot, aa);
+
+            art_checks_done = true;
         }
 
         unsigned vp_refresh_mode = refresh_mode;
