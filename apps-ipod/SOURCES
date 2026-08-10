@@ -51,6 +51,7 @@ metadata/art_cache.c
 draw/bmp.c
 draw/icon.c
 draw/icon_bitmaps.c
+draw/img_filter.c
 draw/line.c
 draw/progress_bar.c
 draw/round_rect.c
