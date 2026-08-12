@@ -989,6 +989,8 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
     struct align_pos * align = &info.align;
     bool needs_update, update_all = false;
     skin_buffer = get_skin_buffer(gwps->data);
+    if (!skin_buffer)       /* unloaded skin -- see skin_render() */
+        return;
     /* Set images to not to be displayed */
     struct skin_token_list *imglist = SKINOFFSETTOPTR(skin_buffer, gwps->data->images);
     while (imglist)
@@ -1081,6 +1083,15 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
 
     int old_refresh_mode = refresh_mode;
     skin_buffer = get_skin_buffer(gwps->data);
+    /* No buffer means the skin is unloaded -- settings_apply_skins() frees
+     * every skin before reloading, and `tree` still holds its offset until
+     * gui_skin_reset() runs in the next loop. Without this the offsets below
+     * resolve against a NULL base, which SKINOFFSETTOPTR turns into the raw
+     * offset rather than NULL, so the `if (!viewport)` guards pass and the
+     * dereference lands near address zero. That traps on the simulator and,
+     * on the player, quietly reads mapped memory instead. */
+    if (!skin_buffer)
+        return;
 
     /* Framebuffer is likely dirty */
     if ((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL)

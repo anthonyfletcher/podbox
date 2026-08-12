@@ -121,6 +121,14 @@ void gui_sync_skin_init(void)
 
 static void skin_reset_buffers(int item, int screen)
 {
+    /* Drop the skinned list's cached %Lb config before the buffer it points
+     * into is freed. Only an SBS render re-sets it (skin_render.c), so a list
+     * drawn after the reload otherwise reaches skinlist_draw() with listcfg
+     * still pointing into freed memory and renders through a garbage buffer.
+     * The same guard is applied at every other hand-off -- menu.c, activity.c,
+     * list.c, viewport.c -- but not here, where the memory actually goes. */
+    skinlist_set_cfg(screen, NULL);
+
     skin_data_free_buflib_allocs(&skins[item][screen].data);
     if (skins[item][screen].data.playback_aa_slot >= 0)
         playback_release_aa_slot(skins[item][screen].data.playback_aa_slot);
@@ -142,6 +150,14 @@ void settings_apply_skins(void)
     
     if (!first_run)
     {
+        /* Retire every scrolling line first. The scroll engine keeps a
+         * *pointer* to the viewport it animates, not a copy, and a skin's
+         * viewports live in the buffer about to be freed -- so a line still
+         * scrolling when the reload starts goes on drawing from released
+         * memory until something else happens to stop it. */
+        FOR_NB_SCREENS(s)
+            screens[s].scroll_stop();
+
         /* Make sure all skins unloaded */
         for (i=0; i<SKINNABLE_SCREENS_COUNT; i++)
         {

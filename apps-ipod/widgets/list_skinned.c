@@ -388,10 +388,20 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
                     img->display = -1;
                 imglist = SKINOFFSETTOPTR(get_skin_buffer(wps.data), imglist->next);
             }
-            struct skin_element** children = SKINOFFSETTOPTR(get_skin_buffer(wps.data), viewport->children);
-            if (children && *children)
-                skin_render_viewport(SKINOFFSETTOPTR(get_skin_buffer(wps.data), (intptr_t)children[0]),
-                                     &wps, skin_viewport, SKIN_REFRESH_ALL);
+            /* The child list holds skinoffset_t, not pointers. Reading it as
+             * struct skin_element** takes a pointer's worth of bytes per entry,
+             * which on a 64-bit host is twice the stride: the offset comes back
+             * with the next entry's bytes stuck on its top half, and rendering
+             * it lands far outside the buffer. Same declaration get_child()
+             * uses in skin_render.c. On the player the two widths coincide, so
+             * the fault only ever showed up in the simulator. */
+            OFFSETTYPE(struct skin_element*) *children =
+                SKINOFFSETTOPTR(get_skin_buffer(wps.data), viewport->children);
+            struct skin_element *first = children ?
+                SKINOFFSETTOPTR(get_skin_buffer(wps.data), children[0]) : NULL;
+            if (first)
+                skin_render_viewport(first, &wps, skin_viewport,
+                                     SKIN_REFRESH_ALL);
             wps_display_images(&wps, &skin_viewport->vp);
             /* force disableing scroll because it breaks later */
             if (!is_selected)
