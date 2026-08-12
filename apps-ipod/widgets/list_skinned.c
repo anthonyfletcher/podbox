@@ -183,6 +183,12 @@ int skinlist_get_line_count(enum screen_type screen, struct gui_synclist *list)
     struct viewport *parent = (list->parent[screen]);
     if (!skinlist_is_configured(screen, list))
         return -1;
+    /* Zero is a real answer, and must stay one: a %Vi UI viewport smaller than a
+     * single %Lb row fits no rows, and skinlist_draw() hands the list back to
+     * the core renderer rather than drawing an empty box (see there). Do not
+     * floor this at one to "always draw something" -- that makes the skinned
+     * renderer lay out a row against a config that has no room for it, and it
+     * faults inside skin_render_viewport(). */
     if (listcfg[screen]->tile == true)
     {
         int rows = (parent->height / listcfg[screen]->height);
@@ -256,6 +262,13 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
     wps.display = display;
     wps.data = listcfg[screen]->data;
     display_lines = skinlist_get_line_count(screen, list);
+    /* No room for even one row -- a %Vi shorter than the skin's %Lb pitch. Give
+     * the list back to the core renderer (gui_synclist_draw falls through to
+     * list_draw when this returns false), which clips a row instead. Drawing an
+     * empty box was the old outcome and is no better than the fault that comes
+     * of forcing a row through a config with no room for it. */
+    if (display_lines < 1)
+        return false;
     label = (char *)SKINOFFSETTOPTR(get_skin_buffer(wps.data), listcfg[screen]->label);
     if (!label)
         return false;
