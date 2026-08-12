@@ -172,24 +172,9 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
     max_width[screen->screen_type] = width;
 
     vp->flags |=  VP_FLAG_ALIGN_CENTER;
-    if (screen->depth > 1)
-    {
-        unsigned fg = screen->get_foreground();
-        unsigned bg = screen->get_background();
-        bool broken = (fg == bg) ||
-                      (bg == 63422 && fg == 65535); /* iPod reFresh '22 themes */
 
-        /* dialog_frame_box() fills with the background and borders (and the
-         * text below is drawn with) the foreground. For broken themes swap in
-         * a gray box with a black border/text so the message stays legible. */
-        if (broken)
-        {
-            screen->set_background(SCREEN_COLOR_TO_NATIVE(screen, LCD_LIGHTGRAY));
-            screen->set_foreground(SCREEN_COLOR_TO_NATIVE(screen, LCD_BLACK));
-        }
-    }
-
-    /* opaque box + border via the shared dialog frame */
+    /* opaque box + border via the shared dialog frame, which substitutes a
+     * legible pair of its own when the theme's is unusable */
     struct viewport content;
     dialog_frame_box(screen, vp, &style, &content);
 

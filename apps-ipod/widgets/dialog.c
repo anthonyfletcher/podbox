@@ -124,17 +124,42 @@ static const unsigned char dialog_accent_vals[] =
  * 4.5:1 for body text, in hundredths. */
 #define DIALOG_ACCENT_TARGET 450
 
+/* An unusable theme pair. A dialog fills with the background, borders and
+ * draws its text in the foreground, so a pair with no contrast between them
+ * renders the whole box invisible rather than merely ugly.
+ *
+ * Tested where the pair is resolved rather than where it is drawn, so the
+ * accent -- derived from both -- comes off the substitute too, and every
+ * dialog inherits the guard instead of each one carrying its own.
+ * Idempotent: the substitute below is not itself broken. */
+static bool theme_pair_broken(unsigned fg, unsigned bg)
+{
+    return (fg == bg) ||
+           (bg == 63422 && fg == 65535); /* iPod reFresh '22 themes */
+}
+
+/* The legible pair swapped in when the theme's is not: a gray box with a
+ * black border and black text. */
+#define DIALOG_FALLBACK_FG  LCD_BLACK
+#define DIALOG_FALLBACK_BG  LCD_LIGHTGRAY
+
 /* The theme's live foreground and background, album-derived when dynamic
  * colours are running. dynamic_colors_resolve() matches by value against the
  * saved theme colours, which is exactly what these are. */
 static unsigned dialog_theme_fg(void)
 {
-    return dynamic_colors_resolve(global_settings.fg_color);
+    unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
+    unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
+
+    return theme_pair_broken(fg, bg) ? DIALOG_FALLBACK_FG : fg;
 }
 
 static unsigned dialog_theme_bg(void)
 {
-    return dynamic_colors_resolve(global_settings.bg_color);
+    unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
+    unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
+
+    return theme_pair_broken(fg, bg) ? DIALOG_FALLBACK_BG : bg;
 }
 
 /* Pick the accent and the colour that goes on it together -- they are chosen
@@ -203,13 +228,20 @@ static bool resolve_derived(unsigned color, unsigned *out)
     return false;
 }
 
+/* INHERIT takes the screen's own pair, which is the theme's whenever the box
+ * has not already been framed -- so it needs the same guard as the derived
+ * colours above. Inside a framed box the screen carries the resolved pair,
+ * which the test then passes through unchanged. */
 static unsigned resolve_fg(struct screen *s, unsigned color)
 {
     unsigned derived;
 
     if (resolve_derived(color, &derived))
         return derived;
-    return color == DIALOG_COLOR_INHERIT ? s->get_foreground() : color;
+    if (color != DIALOG_COLOR_INHERIT)
+        return color;
+    return theme_pair_broken(s->get_foreground(), s->get_background())
+           ? DIALOG_FALLBACK_FG : s->get_foreground();
 }
 
 static unsigned resolve_bg(struct screen *s, unsigned color)
@@ -218,7 +250,10 @@ static unsigned resolve_bg(struct screen *s, unsigned color)
 
     if (resolve_derived(color, &derived))
         return derived;
-    return color == DIALOG_COLOR_INHERIT ? s->get_background() : color;
+    if (color != DIALOG_COLOR_INHERIT)
+        return color;
+    return theme_pair_broken(s->get_foreground(), s->get_background())
+           ? DIALOG_FALLBACK_BG : s->get_background();
 }
 
 /* Flushes the part of the drop shadow that falls outside `box`: the strip down
