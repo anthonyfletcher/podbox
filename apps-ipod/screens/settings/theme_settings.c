@@ -114,10 +114,14 @@ static int set_color_func(void* color)
         banned_color = *colors[COLOR_BG].setting;
 
     old_color = *colors[c].setting;
-    res = (int)set_color(&screens[SCREEN_MAIN],str(colors[c].lang_id),
+    res = (int)set_color(str(colors[c].lang_id),
                          colors[c].setting, banned_color);
     if (old_color != *colors[c].setting)
     {
+        /* settings_apply_skins() re-parses every skin, which is long enough to
+         * read as a hang -- the picker has closed and nothing else is on screen
+         * yet. splash(0, ...) draws and returns; the reload overdraws it. */
+        splash(0, ID2P(LANG_WAIT));
         settings_save();
         settings_apply(false);
         settings_apply_skins();

@@ -116,11 +116,16 @@ static const struct button_mapping button_context_settings[]  = {
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
 }; /* button_context_settings */
 
-/* The time/date screen is a grid, so it needs four directions plus a value
- * control. The wheel keeps the value; left/right step through the fields of a
- * row; MENU and PLAY -- the top and bottom of the wheel -- move between rows.
- * That leaves MENU held as the only cancel, alongside the Cancel button. */
-static const struct button_mapping button_context_settings_time[]  = {
+/* The grid editors -- the time/date screen and the colour picker -- need four
+ * directions plus a value control. The wheel keeps the value; left/right step
+ * through the cells of a row; MENU and PLAY -- the top and bottom of the wheel
+ * -- move between rows. That leaves MENU held as the only cancel, alongside the
+ * Cancel button.
+ *
+ * One table for both: they are the same shape, and CONTEXT_SETTINGS (which the
+ * colour picker used to fall through to) has no up/down at all, because the
+ * screen it replaced only ever had one row to move along. */
+static const struct button_mapping button_context_settings_grid[]  = {
     { ACTION_SETTINGS_INC,          BUTTON_SCROLL_FWD,                BUTTON_NONE },
     { ACTION_SETTINGS_INCREPEAT,    BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },
     { ACTION_SETTINGS_DEC,          BUTTON_SCROLL_BACK,               BUTTON_NONE },
@@ -133,7 +138,7 @@ static const struct button_mapping button_context_settings_time[]  = {
     { ACTION_STD_OK,                BUTTON_SELECT|BUTTON_REL,         BUTTON_NONE },
 
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
-}; /* button_context_settings_time */
+}; /* button_context_settings_grid */
 
 static const struct button_mapping button_context_yesno[]  = {
     { ACTION_YESNO_ACCEPT,          BUTTON_SELECT,                  BUTTON_NONE },
@@ -401,10 +406,10 @@ const struct button_mapping* get_context_mapping(int context)
             return button_context_standard;
 
         case CONTEXT_SETTINGS_TIME:
-            return button_context_settings_time;
+        case CONTEXT_SETTINGS_COLOURCHOOSER:
+            return button_context_settings_grid;
 
         case CONTEXT_SETTINGS_EQ:
-        case CONTEXT_SETTINGS_COLOURCHOOSER:
         case CONTEXT_SETTINGS:
         case CONTEXT_SETTINGS_RECTRIGGER:
             return button_context_settings;
