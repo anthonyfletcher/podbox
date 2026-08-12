@@ -69,6 +69,13 @@ struct items
 
 static struct items menu_items[MAX_ITEMS];
 
+/* Move mode, modelled on the playlist viewer's: an item is picked up from the
+ * context menu, carried by scrolling, and dropped with OK or put back with
+ * CANCEL. moving_item is the row the carried item currently occupies,
+ * moving_from where it was picked up; both -1 when no move is in progress. */
+static int moving_item = -1;
+static int moving_from = -1;
+
 
 static const char * menu_get_name(int selected_item, void * data,
                                    char * buffer, size_t buffer_len)
@@ -84,7 +91,11 @@ static const char * menu_get_name(int selected_item, void * data,
      * types have to agree, so settle on const char * for both. */
     const char *label = (id != -1) ? (const char *)str(id) : (const char *)p;
 
-    snprintf(buffer, buffer_len, "%s: %s", label,
+    /* The carried item is marked in the row text as well as by its icon: a
+     * theme need never map Icon_Moving, and a move you cannot see is a move
+     * you cannot finish. Same reasoning as the playlist viewer's '>'. */
+    snprintf(buffer, buffer_len, "%s%s: %s",
+             selected_item == moving_item ? ">" : "", label,
              menu_items[selected_item].enabled ?
              str(LANG_ON) : str(LANG_OFF));
 
@@ -94,7 +105,9 @@ static const char * menu_get_name(int selected_item, void * data,
 static enum themable_icons menu_get_icon(int selected_item, void * data)
 {
     (void)data;
-    (void)selected_item;
+
+    if (selected_item == moving_item)
+        return Icon_Moving;
 
     /* Every row, enabled or not. Icon_NOICON for the disabled ones left a
      * blank cell wherever an entry was not in the root menu -- which is all of
@@ -221,6 +234,25 @@ static void swap_items(int a, int b)
     menu_items[b].enabled = enabled;
 }
 
+/* Built out of swap_items() rather than a memmove of the structs: a dynamic
+ * name (MENU_DYNAMIC_DESC) points into its own slot's dyn_name buffer, so
+ * relocating the struct would leave 'name' pointing at the wrong slot.
+ * Swapping only the three carried fields leaves those buffers where they are
+ * and the pointers still valid. */
+static void move_item(int from, int to)
+{
+    while (from < to)
+    {
+        swap_items(from, from + 1);
+        from++;
+    }
+    while (from > to)
+    {
+        swap_items(from, from - 1);
+        from--;
+    }
+}
+
 /* Settings and Resume Playback/Now Playing are breaking changes to turn
  * off by accident: disabling Settings leaves no easy way back into the
  * menu that could re-enable it, and disabling the WPS item while
@@ -254,6 +286,9 @@ static int menu_speak_item(int selected_item, void *data)
         talk_id(menu_items[selected_item].enabled ? LANG_ON : LANG_OFF, true);
     }
 
+    if (selected_item == moving_item)
+        talk_ids(true, VOICE_PAUSE, LANG_MOVE);
+
     return 0;
 }
 
@@ -269,12 +304,13 @@ int main_menu_config(void)
 
     menu_table = root_menu_get_options(&menu_item_count);
     load_from_cfg();
+    moving_item = moving_from = -1;
 
     /* This screen builds its own gui_synclist directly instead of going
-     * through do_menu() (it needs custom OK-to-toggle and a move-up/down
-     * context menu, which don't fit do_menu()'s model), so it has to enable
-     * theme rendering itself -- otherwise it draws with the bare, unthemed
-     * list style instead of the theme's menu skin. */
+     * through do_menu() (it needs custom OK-to-toggle and a move mode, which
+     * don't fit do_menu()'s model), so it has to enable theme rendering
+     * itself -- otherwise it draws with the bare, unthemed list style instead
+     * of the theme's menu skin. */
     FOR_NB_SCREENS(i)
         viewportmanager_theme_enable(i, true, NULL);
 
@@ -307,11 +343,36 @@ int main_menu_config(void)
          * which barely draws, doesn't trigger it). HZ so the status bar still
          * redraws while idle, matching option_select.c's settings lists. */
         if (list_do_action(CONTEXT_LIST, HZ, &list, &action))
+        {
+            /* The list has already drawn itself with the new selection, and
+             * the carried item is drawn from moving_item -- so it has to
+             * catch up here and force a second draw, exactly as the playlist
+             * viewer does. */
+            if (moving_item >= 0)
+            {
+                int sel = gui_synclist_get_sel_pos(&list);
+                if (sel != moving_item)
+                {
+                    move_item(moving_item, sel);
+                    moving_item = sel;
+                    gui_synclist_draw(&list);
+                }
+            }
             continue;
+        }
 
         switch (action)
         {
             case ACTION_STD_OK:
+                if (moving_item >= 0)
+                {
+                    /* Drop it here */
+                    if (moving_item != moving_from)
+                        changed = true;
+                    moving_item = moving_from = -1;
+                    gui_synclist_speak_item(&list);
+                    break;
+                }
                 if (item_is_locked(cur_sel))
                 {
                     splash(HZ, ID2P(LANG_FAILED));
@@ -323,33 +384,19 @@ int main_menu_config(void)
                 break;
             case ACTION_STD_CONTEXT:
             {
+                if (moving_item >= 0) /* OK drops, CANCEL puts back */
+                    break;
+
                 MENUITEM_STRINGLIST(menu, ID2P(LANG_MAIN_MENU_SETTINGS), NULL,
-                                    ID2P(LANG_MOVE_ITEM_UP),
-                                    ID2P(LANG_MOVE_ITEM_DOWN),
+                                    ID2P(LANG_MOVE),
                                     ID2P(LANG_LOAD_DEFAULT_CONFIGURATION));
                 switch (do_menu(&menu, NULL, NULL, false))
                 {
                     case 0:
-                        if (cur_sel == 0)
-                        {
-                            splash(HZ, ID2P(LANG_FAILED));
-                            break;
-                        }
-                        swap_items(cur_sel, cur_sel - 1);
-                        gui_synclist_select_item(&list, cur_sel - 1); /* speaks */
-                        changed = true;
+                        moving_item = moving_from = cur_sel;
+                        gui_synclist_speak_item(&list);
                         break;
                     case 1:
-                        if (cur_sel + 1 == menu_item_count)
-                        {
-                            splash(HZ, ID2P(LANG_FAILED));
-                            break;
-                        }
-                        swap_items(cur_sel, cur_sel + 1);
-                        gui_synclist_select_item(&list, cur_sel + 1); /* speaks */
-                        changed = true;
-                        break;
-                    case 2:
                         if (yesno_pop_confirm(ID2P(LANG_LOAD_DEFAULT_CONFIGURATION)))
                         {
                             root_menu_set_default(&global_settings.root_menu_customized, NULL);
@@ -364,6 +411,16 @@ int main_menu_config(void)
             }
             case ACTION_STD_CANCEL:
             case ACTION_STD_MENU:
+                if (moving_item >= 0)
+                {
+                    /* Put it back where it was picked up, and stay here */
+                    move_item(moving_item, moving_from);
+                    moving_item = -1;
+                    gui_synclist_select_item(&list, moving_from);
+                    moving_from = -1;
+                    gui_synclist_speak_item(&list);
+                    break;
+                }
                 done = true;
                 break;
             default:
