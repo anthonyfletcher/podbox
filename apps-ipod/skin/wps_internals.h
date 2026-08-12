@@ -295,6 +295,7 @@ struct listitem {
 struct spectrum_bars {
     int16_t bars;
     int16_t radius;
+    int16_t gap;        /* pixels between bars; 1 unless the skin said otherwise */
     bool center_aligned;
 };
 

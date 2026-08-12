@@ -354,3 +354,7 @@ __pycache__
 # Editor and assistant tooling -- local to whoever checked the tree out
 /.idea/
 /.claude/
+
+# Themes under development -- bundled into the zip when present, absent from
+# a clean checkout (see bundle-theme.sh)
+/.theme-dev/

@@ -188,7 +188,7 @@ zero yield 0). `a` and `b` may be numbers or tags.
 
 ## Widgets and indicators
 
-### `%Sb(bars[, center[, radius]])` — spectrum analyser
+### `%Sb(bars[, center[, radius[, gap]]])` — spectrum analyser
 
 Draws an audio spectrum analyser filling the current viewport. `bars` is the
 number of bands, 1–8 (values outside that range are clamped). Pass `center` as a
@@ -198,10 +198,19 @@ second argument to grow the bars from the middle rather than up from the bottom.
 There is no upper limit — the radius is fitted to the bar being drawn, so a
 short bar rounds less than a tall one.
 
+`gap` is the spacing between bars in pixels. It defaults to 1, which is what
+every `%Sb` written before the argument existed gets; `0` butts the bars
+together into a solid block. The bars share out whatever width is left after the
+gaps, so a wider gap means narrower bars rather than a narrower meter.
+
+Arguments are positional, so reaching a later one means writing the earlier
+ones. Give them as `-` to keep the default:
+
 ```
 %V(20,40,120,60,-)%Sb(7)
 %V(20,40,120,60,-)%Sb(5, center)
 %V(20,40,120,60,-)%Sb(5, center, 2)
+%V(20,40,120,60,-)%Sb(8, -, -, 0)     # no gaps, square corners, from the bottom
 ```
 
 ### `%La(offset[, nowrap])` — list-item album art
@@ -254,18 +263,98 @@ refreshes:
 
 Best placed in a viewport that is only shown while something is loading.
 
-**The frame count sets the speed: a full turn takes about a second whatever
-number of frames you give it.** So a four-frame spinner changes four times a
-second and a twenty-frame one twenty times, and you do not have to tune
-anything. A few frames each last long enough that nothing drawing the tag can
-miss one; many frames run faster than the status bar repaints and some are
-skipped, which does not show when consecutive frames differ only slightly.
+**One revolution a second, whatever the frame count.** The gap between frames is
+a second divided by however many you provide, so a four-frame spinner steps four
+times a second and a twenty-frame one twenty times — both come back round in a
+second, and there is nothing to tune. The frame count changes how finely the
+turn is divided, not how fast it turns.
+
+**It is a reading of the clock, not a counter**, and that is why frames can be
+missed rather than queued. Whoever draws the tag samples it, so a frame shorter
+than that drawer's repaint interval is stepped straight over. The slowest
+sampler is the status bar. A handful of frames each last longer than that and
+none is lost — which is what a four-glyph ASCII spinner needs, since every frame
+is distinct there and a dropped one shows. Twenty frames step faster than the
+repaint and some are skipped, which is invisible when consecutive frames differ
+only slightly. No single fixed interval could serve both.
 
 If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 
 ```
 %?la<%||/|-|\>       # an ASCII spinner: | / - \
 ```
+
+---
+
+## Changed behaviour: `%Cl` album art filters
+
+```
+%Cl(x, y, maxwidth, maxheight [, xalign] [, yalign] [, filters])
+```
+
+A seventh argument filters the artwork before `%Cd` draws it. Leave it out and
+`%Cl` behaves exactly as it always has.
+
+`filters` is one or more names joined by `+`, each optionally carrying an amount
+written straight after the name. **No spaces anywhere in the chain.** An
+unrecognised name is a parse error, so a typo fails when the theme loads rather
+than quietly drawing nothing.
+
+```
+%Cl(0,0,320,240,c,c,blur)
+%Cl(0,0,320,240,c,c,blur12+darker)
+%Cl(0,0,320,240,c,c,blur8+bw+darker30)
+%Cl(10,10,100,100,c,c,hue180+saturate40)
+%Cl(10,10,100,100,c,c,bw+reduce3+dither)
+```
+
+| Name | Amount | Default | Effect |
+|---|---|---|---|
+| `invert` | — | — | Complement every channel |
+| `brightness` | −100…100 | required | Toward white or black |
+| `lighter` / `darker` | 0…100 | adaptive | Brightness, but see below |
+| `contrast` | −100…100 | required | Away from or toward mid-grey |
+| `reduce` | 2…256 | `4` | Posterise to n levels per channel |
+| `bw` | 0…100 | `100` | Toward greyscale |
+| `saturate` | −100…100 | required | `saturate-100` is `bw` |
+| `hue` | 0…359 | required | Rotate hue, in degrees |
+| `dither` | — | — | Ordered 8×8 Bayer |
+| `pixellate` | 2…64 | `8` | Block average, block edge in pixels |
+| `blur` | 1…64 | `4` | Radius in output pixels |
+
+Eight filters per chain.
+
+**`darker` with no amount adapts to the artwork**, targeting a fixed mean
+brightness rather than removing a fixed amount. That matters more than it
+sounds: a fixed darken is simultaneously too weak on a white cover — where white
+text over it is genuinely unreadable — and destructive on an already-dark one.
+`lighter` is the mirror, for a theme drawing dark text. Give either an explicit
+amount and you get that amount instead.
+
+**Order in the chain does not decide order of execution.** Stages always run
+spatial → colour → levels → dither, whatever order you wrote them in; within a
+stage, declaration order is honoured. So `bw+invert` and `invert+bw` differ, but
+`blur+bw` and `bw+blur` do not.
+
+**Cost is per stage used, not per filter named.** All the levels filters fold
+into one lookup table and all the colour ones into one matrix, so
+`invert+brightness20+reduce4` costs what `invert` alone costs. `blur` is the
+cheapest chain that touches every pixel, not the dearest, because it works on a
+decimated copy and the later stages fold into its upscale.
+
+Three things worth knowing before building a theme around it:
+
+- **The work happens once per track**, not per frame, so a blurred backdrop is
+  free to draw. It runs when the art changes and is cached until it changes
+  again.
+- **One `%Cl` per skin.** A blurred backdrop *and* a crisp cover in front of it
+  is the obvious thing to want and it does not work yet.
+- **Dynamic colours read the unfiltered art**, deliberately — the palette
+  describes the album, not your treatment of it. `bw` would otherwise turn every
+  derived colour grey.
+
+There is also an `artwork filter:` theme setting that applies to the browser and
+carousel thumbnails. It takes the same names, minus `blur`.
 
 ---
 
@@ -279,54 +368,61 @@ A seventh argument tints the rectangle instead of filling it: `opacity` runs
 from `0` (invisible) to `15` (opaque), and leaving it out means opaque, so every
 `%dr` you have already written behaves exactly as before.
 
-Optional arguments are positional, so reaching the seventh means writing the two
-colours. Give them as `-` to keep the viewport's own foreground — which is what
-you want when the dynamic-colour palette is driving that colour.
+Arguments are positional, so reaching the seventh means writing the two colours.
+**Write the colour out; do not pass `-`.** A `-` means "the viewport foreground
+as it stood when the parser reached this line", and `%Vf` only feeds into that on
+the viewport's own declaration line — so a `-` anywhere below quietly takes the
+*theme* foreground. On a light-on-dark theme that turns a scrim into a white
+wash, which looks exactly like the blending being broken when it is working
+perfectly. (It also crashes CheckWPS, which is built against stock Rockbox's
+`%dr` and reads past the end of the argument list.)
 
-**Two placement rules, and a tint is invisible or wrong if you break either.**
+### Where a tint has to go
 
-**1. It goes in a `%VB` viewport.** Drawn into the normal foreground layer a
-tint survives right up until the first line of text crosses it, because every
-text line repaints its own strip of background first. In the backdrop layer the
-opposite happens: that repaint *restores* the tint, and text drawn over it
-blends into it.
+A tint is invisible or wrong unless both of these hold.
 
-**2. It goes in the same viewport as whatever it darkens.** A `%VB` viewport
-wipes its own rectangle before it draws anything, so a tint given a viewport of
-its own has nothing left underneath and comes out as a solid block of colour.
-Put it after the `%Cd` that draws the art, in that viewport — tints are held
-back until the art has been drawn, so the order you write them in is the order
-you see.
+**1. In a `%VB` viewport.** Drawn into the ordinary foreground layer, a tint
+survives only until the first line of text crosses it, because every text line
+repaints its own strip of background first. In the backdrop layer that same
+repaint *restores* it, and text then blends into it.
 
-So the shape is two viewports, not three — the art and its tints, then the
+**2. In the same viewport as whatever it darkens.** A `%VB` viewport wipes its
+own rectangle before drawing, so a tint given a viewport to itself has nothing
+left underneath and comes out a solid block. Write it after the `%Cd` that draws
+the art, in that viewport: tints are held back until the art has been drawn, so
+the order you write is the order you see.
+
+That makes the shape two viewports, not three — the art and its tints, then the
 reveal, then the text:
 
 ```
-%V(0,0,240,240,-)%VB%Vf(000000)%Cl(0,0,240,240,c,c)%Cd   # art into the backdrop
-%dr(20,120,200,50,-,-,8)                                 # 50% black over it
-%V(0,0,-,-,-)                                            # reveal the backdrop
+%V(0,0,240,240,-)%VB%Cl(0,0,240,240,c,c)%Cd   # art into the backdrop
+%dr(20,120,200,50,000000,-,8)                 # ~50% black scrim over it
+%V(0,0,-,-,-)                                 # reveal the backdrop
 %V(20,135,200,22,2)
 Text that blends into the tint
 ```
 
-Order matters: the reveal has to come after everything painted into the
-backdrop, and the text after the reveal. `%Vf(000000)` is there because `%dr`
-paints the *foreground* — without it the tint is a white wash, not a scrim.
+The reveal has to come after everything painted into the backdrop, and the text
+after the reveal.
 
-Eight tints per viewport; past that the extras are dropped.
+### Limits and traps
 
-Two things to know before leaning on it:
-
-- **Use an antialiased font for text over a tint**, or the point is lost — the
+- **Only *tinted* rectangles are held back until after the art.** An opaque
+  `%dr` beside a `%Cd` draws where you wrote it and the cover lands on top,
+  so it vanishes. Give an opaque one its own `%VB` viewport declared after the
+  art's — that viewport clears its rectangle first, but if the rectangle fills
+  it, nothing is lost.
+- **Use an antialiased font for text over a tint**, or the point is lost: the
   blending happens at the glyph edges. Every font shipped with Themify_2 is
-  antialiased; a font you convert yourself with `convbdf` is not.
-- **A tint is much dearer per pixel than a plain fill**, because it has to read
-  the screen as well as write it. In the backdrop layer this costs nothing per
-  frame — `%dr` is only redrawn on a full repaint — but a full-screen tint is
-  still noticeable when the screen does repaint.
-
-Gradients and opacity do not combine: if you give both an `end_colour` and an
-opacity, the tint uses the start colour.
+  antialiased; one you convert yourself with `convbdf` is not.
+- **Eight tints per viewport**; beyond that the extras are dropped.
+- **Gradients and opacity do not combine.** Give both an `end_colour` and an
+  opacity and the tint uses the start colour.
+- **A tint costs far more per pixel than a plain fill**, because it reads the
+  screen as well as writing it. In the backdrop layer that is once per repaint
+  rather than once per frame, but a full-screen tint is still noticeable when
+  the screen does repaint.
 
 ---
 

@@ -21,7 +21,11 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_VLED_BUILDING,      "lb", "",     SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_VLED_WORKING,       "lw", "",     SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LOADING_ANIM,       "la", "",     SKIN_REFRESH_DYNAMIC),
-    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|Si", SKIN_REFRESH_SPECTRUM),
+    /* The alignment argument is lowercase 's', not 'S', so it accepts '-'.
+     * Arguments are positional and the parser rejects '-' on an uppercase type
+     * outright, so an uppercase one here would make `gap` unreachable without
+     * also writing an alignment. */
+    TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|sii",SKIN_REFRESH_SPECTRUM),
     TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|IS",  SKIN_REFRESH_DYNAMIC),
 
     /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with one

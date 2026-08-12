@@ -542,7 +542,7 @@ static int parse_spectrumbars(struct skin_element *element,
         sb->bars = 1;
     else if (sb->bars > SPECTRUM_MAX_BANDS)
         sb->bars = SPECTRUM_MAX_BANDS;
-    if (element->params_count > 1)
+    if (element->params_count > 1 && !isdefault(get_param(element, 1)))
         sb->center_aligned = strcasecmp(get_param_text(element, 1), "center") == 0;
     else
         sb->center_aligned = false;
@@ -554,6 +554,14 @@ static int parse_spectrumbars(struct skin_element *element,
         sb->radius = 0;
     if (sb->radius < 0)
         sb->radius = 0;
+    /* Gap between bars. Absent keeps what every %Sb written before this got:
+     * one pixel, or none when there is only one bar to separate. */
+    if (element->params_count > 3 && !isdefault(get_param(element, 3)))
+        sb->gap = get_param(element, 3)->data.number;
+    else
+        sb->gap = (sb->bars > 1) ? 1 : 0;
+    if (sb->gap < 0)
+        sb->gap = 0;
     return 0;
 }
 

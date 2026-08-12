@@ -535,7 +535,7 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
 
                 int vp_w = skin_vp->vp.width;
                 int vp_h = skin_vp->vp.height;
-                int gap = (sb->bars > 1) ? 1 : 0;
+                int gap = sb->gap;
                 int bar_w = (vp_w - gap * (sb->bars - 1)) / sb->bars;
                 int i;
 
