@@ -107,6 +107,11 @@ is available.
 omits it will silently build against whatever is in `apps/` instead.
 
 ```bash
+# Simulator builds (clean) — output in build-sim-<target>[-win32]/
+./build-sim.sh               # iPod Classic 6G (default), for this machine
+./build-sim.sh 5g            # iPod Video 5G
+./build-sim.sh 5g win        # cross-compile a 64-bit Windows .exe
+
 # Hardware builds (clean) — output in build-hw-<target>/
 ./build-hw.sh                # iPod Classic 6G (default)
 ./build-hw.sh 5g             # iPod Video 5G
@@ -133,16 +138,23 @@ close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Themify_2, no first-boot `config.cfg`, no
 EQ presets and upstream's licence file rather than this fork's**. Follow it with
 all three bundle scripts -- `../bundle-theme.sh`, `../bundle-eqs.sh`,
-`../bundle-licenses.sh`. `./build-hw.sh` runs all three; a bare `make zip` runs
-none.
+`../bundle-licenses.sh`. `./build-hw.sh` and `./build-sim.sh` both run all
+three; a bare `make zip` runs none.
 
 `bundle-theme.sh` also deletes the `classic_statusbar` theme, which
 `buildzip.pl` copies straight out of `wps/` without consulting `WPSLIST`. It
 removes the directory *and* the two loose `classic_statusbar.{sbs,rsbs}` files
 written beside it -- a `wps/classic_statusbar/*` pattern does not match those.
 
-**Configure build types:** (N)ormal, (B)ootloader, (C)heckWPS and (D)atabase
-all work. (S)imulator and (W)arble are offered by `tools/configure` and do not.
+**Configure build types:** (N)ormal, (B)ootloader, (C)heckWPS, (D)atabase and
+(S)imulator all work. (W)arble is offered by `tools/configure` and does not.
+
+**The simulator builds and runs** -- SDL2 and a host compiler, output
+`rockboxui`, storage in `simdisk/` beside it. A Windows `.exe` cross-compiles
+with `--type=as6` (that is **(A)dvanced** plus `s` and `6`; plain `--type=s6`
+silently gives a *normal* build). Follow either with `make zip` and the three
+`bundle-*.sh` scripts, then unzip into `simdisk/`, or it starts themeless.
+Read `apps-ipod/sim/README.md` before touching any of it.
 
 ```bash
 mkdir /tmp/cwps && cd /tmp/cwps
@@ -237,16 +249,27 @@ Audio codecs live in `lib/rbcodec/` and are loaded as `.codec` files with their 
 
 ### Platform Types
 
-This fork builds bare-metal native firmware only (`PLATFORM_NATIVE`), and
-`apps-ipod/` no longer carries `SIMULATOR` or `PLATFORM_HOSTED` conditionals.
-`tools/configure` still offers `--type=s`, but the simulator will not build.
+The **firmware** is bare-metal native only (`PLATFORM_NATIVE`). The
+**simulator** is `PLATFORM_HOSTED|PLATFORM_SDL` and does build.
+
+`apps-ipod/` still carries almost no `SIMULATOR` conditionals: the sim is made
+to fit it, not the other way round, by a shim directory (`apps-ipod/sim/`) that
+supplies the symbols a hosted build lacks. The exceptions -- places where the
+code itself would not compile, mostly ARM inline assembly whose `CPU_ARM` guard
+had been flattened -- are tabulated in `apps-ipod/sim/README.md`. **Read that
+file before adding a `#ifdef SIMULATOR` anywhere**; the rule is that a shim
+must fail the way the caller already handles, and a guard is the escalation.
 
 **The repository mirrors upstream; only `apps-ipod/` is ours.** `manual/`,
-`uisimulator/`, `android/`, `backdrops/`, `screenshots/`, the stock `wps/`
-themes and every `themes/` entry but Themify_2 are all still present and all
-unbuilt. They are kept deliberately so `git merge rockbox/master` applies
-without delete/modify conflicts. Do not prune them to tidy the tree -- being
-unused is not a reason to remove something here.
+`android/`, `backdrops/`, `screenshots/`, the stock `wps/` themes and every
+`themes/` entry but Themify_2 are all still present and all unbuilt. They are
+kept deliberately so `git merge rockbox/master` applies without delete/modify
+conflicts. Do not prune them to tidy the tree -- being unused is not a reason
+to remove something here.
+
+`uisimulator/` is upstream-identical as well, but it is **built** -- the
+simulator uses it as-is, along with `firmware/target/hosted/sdl/`. Neither
+needed a fork change.
 
 ### Threading
 

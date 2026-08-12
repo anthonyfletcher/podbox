@@ -90,8 +90,14 @@
 
 
 
+/* Both headers describe the USB stack, which only exists where it is built --
+ * usb_drv.h declares an array sized by USB_NUM_ENDPOINTS, and a simulator has
+ * no endpoints to count. (Nothing in this file names a usb_drv_* symbol; the
+ * include looks vestigial.) */
+#ifdef HAVE_USBSTACK
 #include "usb_core.h"
 #include "usb_drv.h"
+#endif
 #ifdef USB_ENABLE_AUDIO
 #include "../usbstack/usb_audio.h"
 #endif
@@ -99,7 +105,9 @@
 #include "speech/talk.h"
 
 
-#if defined(IPOD_6G)
+/* The SysCfg and bootflash screens below, and this header, reach the 6G's NOR
+ * flash through the S5L crypto block. None of it exists in a simulator. */
+#if defined(IPOD_6G) && !defined(SIMULATOR)
 #include "norboot-target.h"
 #endif
 
@@ -539,6 +547,8 @@ static bool dbg_buflib_allocs(void)
 }
 #endif /* BUFLIB_DEBUG_PRINT */
 
+/* Reads the partition table, which a simulator does not have. */
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
 static const char* dbg_partitions_getname(int selected_item, void *data,
                                           char *buffer, size_t buffer_len)
 {
@@ -572,9 +582,10 @@ static bool dbg_partitions(void)
     info.get_name = dbg_partitions_getname;
     return simplelist_show_list(&info);
 }
+#endif /* CONFIG_PLATFORM & PLATFORM_NATIVE */
 
 
-#if CONFIG_RTC == RTC_PCF50605
+#if (CONFIG_RTC == RTC_PCF50605) && (CONFIG_PLATFORM & PLATFORM_NATIVE)
 static bool dbg_pcf(void)
 {
     int line;
@@ -612,6 +623,10 @@ static bool dbg_pcf(void)
 }
 #endif
 
+/* Nothing to show without a boost counter: get_cpu_boost_counter() and
+ * set_cpu_frequency() are empty macros when the CPU's clock is not
+ * adjustable, so the calls below would not even parse. */
+#ifdef HAVE_ADJUSTABLE_CPU_FREQ
 static bool dbg_cpufreq(void)
 {
     int line;
@@ -661,8 +676,11 @@ static bool dbg_cpufreq(void)
     lcd_setfont(FONT_UI);
     return false;
 }
+#endif /* HAVE_ADJUSTABLE_CPU_FREQ */
 
-#if (CONFIG_BATTERY_MEASURE != 0)
+/* Not in a simulator: the per-target half of this screen reads the PP GPIO
+ * registers and probed_ramsize directly, and there is no battery to graph. */
+#if (CONFIG_BATTERY_MEASURE != 0) && !defined(SIMULATOR)
 /*
  * view_battery() shows a automatically scaled graph of the battery voltage
  * over time. Usable for estimating battery life / charging rate.
@@ -849,7 +867,12 @@ static bool view_battery(void)
     return false;
 }
 
-#endif /* (CONFIG_BATTERY_MEASURE != 0)  */
+#endif /* (CONFIG_BATTERY_MEASURE != 0) && !SIMULATOR */
+
+/* The disk screens, from here to dbg_disk_info(): every one of them reads the
+ * ATA driver, the partition table or S.M.A.R.T. directly. A simulator's
+ * storage is the host filesystem and has none of that. */
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
 
 static int disk_callback(int btn, struct gui_synclist *lists)
 {
@@ -1260,6 +1283,8 @@ static bool dbg_disk_info(void)
     return simplelist_show_list(&info);
 }
 
+#endif /* CONFIG_PLATFORM & PLATFORM_NATIVE -- the disk screens */
+
 static int dircache_callback(int btn, struct gui_synclist *lists)
 {
     (void)lists;
@@ -1382,7 +1407,11 @@ static int database_callback(int btn, struct gui_synclist *lists)
     return btn;
 }
 /* What the last cable insertion did. Reads the record firmware/usb.c keeps;
- * see struct usb_insert_record for why each field is here. */
+ * see struct usb_insert_record for why each field is here.
+ *
+ * The driver-mask line names the stack's own driver ids, so this screen goes
+ * where the stack goes -- a simulator has neither. */
+#ifdef HAVE_USBSTACK
 static int usb_info_callback(int btn, struct gui_synclist *lists)
 {
     (void)lists;
@@ -1451,6 +1480,7 @@ static bool dbg_usb_info(void)
     info.timeout = HZ/2;
     return simplelist_show_list(&info);
 }
+#endif /* HAVE_USBSTACK */
 
 /* Spun's log crunch, with no cards in front of it.
  *
@@ -1680,6 +1710,9 @@ static bool cpu_boost_log_dump(void)
 }
 #endif
 
+/* The click wheel's own driver state. A simulator sends button events from a
+ * keyboard and has no wheel to instrument. */
+#ifndef SIMULATOR
 extern bool wheel_is_touched;
 extern int old_wheel_value;
 extern int new_wheel_value;
@@ -1715,6 +1748,7 @@ static bool dbg_scrollwheel(void)
     lcd_setfont(FONT_UI);
     return false;
 }
+#endif /* !SIMULATOR -- the scroll wheel */
 
 static bool dbg_talk(void)
 {
@@ -1801,7 +1835,7 @@ static bool dbg_usb_audio(void)
 
 
 
-#if defined(IPOD_6G)
+#if defined(IPOD_6G) && !defined(SIMULATOR)
 static bool dbg_syscfg(void) {
     struct simplelist_info info;
     struct SysCfg syscfg;
@@ -1918,29 +1952,42 @@ static const struct {
 #if defined(CPU_PP) || defined(CPU_S5L87XX)
         { "View I/O ports", dbg_ports },
 #endif
-#if CONFIG_RTC == RTC_PCF50605
+#if (CONFIG_RTC == RTC_PCF50605) && (CONFIG_PLATFORM & PLATFORM_NATIVE)
         { "View PCF registers", dbg_pcf },
 #endif
+#ifdef HAVE_ADJUSTABLE_CPU_FREQ
         { "CPU frequency", dbg_cpufreq },
+#endif
         { "View OS stacks", dbg_os },
 #ifdef __linux__
         { "View CPU stats", dbg_cpuinfo },
 #endif
-#if (CONFIG_BATTERY_MEASURE != 0)
+#if (CONFIG_BATTERY_MEASURE != 0) && !defined(SIMULATOR)
         { "View battery", view_battery },
 #endif
         { "Screendump", dbg_screendump },
         { "Skin Engine RAM usage", dbg_skin_engine },
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
         { "View HW info", dbg_hw_info },
+#endif
+/* Every one of these reads the ATA driver or the partition table. Guarding
+ * the entries is enough -- the screens themselves are static and the compiler
+ * drops them once nothing names them. */
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
         { "View partitions", dbg_partitions },
         { "View disk info", dbg_disk_info },
+#if (CONFIG_STORAGE & STORAGE_ATA)
         { "Dump ATA identify info", dbg_identify_info},
         { "View/Dump S.M.A.R.T. data", dbg_ata_smart},
+#endif
+#endif
         { "Metadata log", dbg_metadatalog },
         { "View dircache info", dbg_dircache_info },
         { "View database info", dbg_tagcache_info },
         { "Spun stats", dbg_pv_stats },
+#ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },
+#endif
         { "View buffering thread", dbg_buffering_thread },
 #ifdef PM_DEBUG
         { "pm histogram", peak_meter_histogram},
@@ -1959,11 +2006,15 @@ static const struct {
         {"Show cpu_boost log",cpu_boost_log},
         {"Dump cpu_boost log",cpu_boost_log_dump},
 #endif
-        {"Debug scrollwheel", dbg_scrollwheel },
+#ifndef SIMULATOR
+        {"Debug scrollwheel", dbg_scrollwheel },   /* reads the wheel driver */
+#endif
+#ifdef IPOD_ACCESSORY_PROTOCOL
         {"Debug IAP", dbg_iap },
+#endif
         {"Talk engine stats", dbg_talk },
 
-#if defined(IPOD_6G)
+#if defined(IPOD_6G) && !defined(SIMULATOR)
         {"View SysCfg", dbg_syscfg },
         {"Dump bootflash to file", dbg_bootflash_dump },
 #endif

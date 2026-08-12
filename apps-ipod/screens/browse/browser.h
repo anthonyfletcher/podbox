@@ -108,7 +108,12 @@ void resume_directory(const char *dir);
 void browser_lock_cache(struct browser_context *t);
 void browser_unlock_cache(struct browser_context *t);
 
+#ifdef WIN32
+/* it takes an int there, and mingw's own declaration must not be contradicted */
+#define getcwd_size_t int
+#else
 #define getcwd_size_t size_t
+#endif
 char *getcwd(char *buf, getcwd_size_t size);
 void reload_directory(void);
 bool check_rockboxdir(void);

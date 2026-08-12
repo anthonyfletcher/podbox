@@ -11,6 +11,14 @@
  * powermgmt.c at system/strutil.h, delete the misc.h includes in
  * scroll_engine.c and usb.c, then delete this file.
  ****************************************************************************/
+#ifdef SIMULATOR
+/* firmware/target/hosted/sdl/window-sdl.c includes "misc.h" and then uses
+ * `background`, which lives in system-sdl.h. Upstream's apps/misc.h handed it
+ * over transitively through screen_access.h; this umbrella does not, and that
+ * file cannot be edited. Sim-only, so no hardware object moves. */
+#include "system-sdl.h"
+#endif
+
 #include "../system/strutil.h"
 #include "../system/format_time.h"
 #include "../system/shutdown.h"

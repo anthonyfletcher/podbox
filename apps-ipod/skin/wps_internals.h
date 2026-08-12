@@ -415,5 +415,14 @@ enum skin_find_what {
 void *skin_find_item(const char *label, enum skin_find_what what,
                      struct wps_data *data);
 
+/* Skin parse tracing. The three call sites in skin_parser.c report which file
+ * each viewport and image came from, and which lang phrase every %Sx()
+ * resolved to. debug_wps itself is defined by the SDL backend and set from
+ * the simulator's --debugwps; CheckWPS turns the same output on unconditionally.
+ * Neither is a hardware build, so nothing here reaches one. */
+#if defined(SIMULATOR) || defined(CHECKWPS)
+#define DEBUG_SKIN_ENGINE
+extern bool debug_wps;
+#endif
 
 #endif

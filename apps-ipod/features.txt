@@ -32,7 +32,8 @@ buttonlight_brightness
 crossfade
 #endif
 
-#if defined(HAVE_DIRCACHE)
+/* SIMULATOR as well -- see the note on usb_hid below. */
+#if defined(HAVE_DIRCACHE) || defined(SIMULATOR)
 dircache
 #endif
 
@@ -94,7 +95,8 @@ histogram
 rtc
 #endif
 
-#if defined(IPOD_ACCESSORY_PROTOCOL)
+/* SIMULATOR as well -- see the note on usb_hid below. */
+#if defined(IPOD_ACCESSORY_PROTOCOL) || defined(SIMULATOR)
 serial_port
 #endif
 
@@ -207,7 +209,13 @@ usb_power
 usbstack
 #endif
 
-#if defined(USB_ENABLE_HID)
+/* SIMULATOR is added to three gates here -- this one, dircache and
+ * serial_port. apps-ipod/ registers all three settings unconditionally, so
+ * settings_list.c and the USB screen name phrases that these gates would
+ * otherwise leave ungenerated in a sim, and the build fails on the phrase
+ * rather than on the feature. Both hardware targets satisfy all three
+ * conditions already, so none of their lang output changes. */
+#if defined(USB_ENABLE_HID) || defined(SIMULATOR)
 usb_hid
 #if defined(HAVE_USB_HID_MOUSE)
 usb_hid_mouse

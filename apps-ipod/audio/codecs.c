@@ -87,7 +87,9 @@ struct codec_api ci = {
     NULL, /* strip_filesize */
 
     /* kernel/ system */
+#if defined(ARM_NEED_DIV0)
     __div0,
+#endif
     sleep,
     yield,
 
@@ -114,7 +116,9 @@ struct codec_api ci = {
     memmove,
     memcmp,
     memchr,
-#if defined(DEBUG)
+/* Must match the struct in lib/rbcodec/codecs/codecs.h, which keys this entry
+ * on SIMULATOR as well -- omit it and every later member is off by one. */
+#if defined(DEBUG) || defined(SIMULATOR)
     debugf,
 #endif
 #ifdef ROCKBOX_HAS_LOGF
@@ -155,7 +159,9 @@ void *codec_get_buffer_callback(size_t *size)
         return NULL;
 
     *size = s;
-    ALIGN_BUFFER(buf, *size, CACHEALIGN_SIZE);
+    /* MEM_ALIGN_SIZE, not CACHEALIGN_SIZE: the latter exists only on targets
+     * with a CPU cache, and cpu.h refuses to let anything else define it. */
+    ALIGN_BUFFER(buf, *size, MEM_ALIGN_SIZE);
 
     return buf;
 }
@@ -175,8 +181,14 @@ static int codec_load_ram(struct codec_api *api)
         || (hdr->magic != CODEC_MAGIC
             )
         || hdr->target_id != TARGET_ID
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
+        /* Where the codec landed only means anything when it was loaded into
+         * codecbuf. A simulator gets a host shared object at an address of the
+         * loader's choosing, and checking it here rejects every codec -- which
+         * looks like every track finishing the instant it starts. */
         || hdr->load_addr != codecbuf
         || hdr->end_addr > codecbuf + CODEC_SIZE
+#endif
         )
     {
         logf("codec header error");
@@ -194,7 +206,11 @@ static int codec_load_ram(struct codec_api *api)
         return CODEC_ERROR;
     }
 
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
     codec_size = hdr->end_addr - codecbuf;
+#else
+    codec_size = 0;
+#endif
 
     /* This is the link step. A codec is compiled against a `struct codec_api *`
      * of its own and exports its address in the header; writing the core's api
@@ -206,6 +222,11 @@ static int codec_load_ram(struct codec_api *api)
     return c_hdr->entry_point(CODEC_LOAD);
 }
 
+/* Loading a codec straight out of a buffer needs lc_open_from_mem(), which
+ * only exists for BINFMT_ROCK -- config.h ties HAVE_CODEC_BUFFERING to that.
+ * A simulator loads codecs as host shared objects, so it has no such call and
+ * takes codec_load_file() below instead. */
+#if defined(HAVE_CODEC_BUFFERING)
 int codec_load_buf(int hid, struct codec_api *api)
 {
     int rc = bufread(hid, CODEC_SIZE, codecbuf);
@@ -224,6 +245,7 @@ int codec_load_buf(int hid, struct codec_api *api)
 
     return codec_load_ram(api);
 }
+#endif /* HAVE_CODEC_BUFFERING */
 
 int codec_load_file(const char *plugin, struct codec_api *api)
 {

@@ -261,7 +261,13 @@ static const char graphic_numeric[] = "graphic,numeric";
 
 #define DEFAULT_TAGCACHE_SCAN_PATHS "/"
 
+#ifdef SIMULATOR
+/* Never, in a sim. There is no battery to save and a blanked window looks
+ * exactly like a crash -- which costs an afternoon the first time. */
+#define DEFAULT_BACKLIGHT_TIMEOUT 0
+#else
 #define DEFAULT_BACKLIGHT_TIMEOUT 15
+#endif
 
 # if !defined(TARGET_USB_CHARGING_DEFAULT)
 #  define TARGET_USB_CHARGING_DEFAULT USB_CHARGING_ENABLE

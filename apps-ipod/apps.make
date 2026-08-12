@@ -20,6 +20,26 @@
 # the build exercises those stubs, so a broken one fails here rather than in a
 # later refactor. See api/README.md.
 INCLUDES += -I$(APPSDIR)/api -I$(APPSDIR)
+
+# apps/sim holds the simulator shims. apps-ipod/ carries no SIMULATOR
+# conditionals, so the declarations a sim build is missing have to arrive
+# without editing any include line: sim/include holds shadows of the two
+# headers that stop declaring things, and they have to be found FIRST.
+#
+# Hence the prepend rather than the usual +=. firmware.make is included before
+# this file in tools/root.make, so -I$(FIRMDIR)/include and the target include
+# path have already claimed both names. Only uisimulator.make is read after
+# this, and it appends, so nothing here is lost.
+#
+# A forced include (-include) would be simpler and is wrong: INCLUDES also
+# reaches PPCFLAGS, which preprocesses every SOURCES file, and the header's
+# declarations would be emitted into those file lists as bogus source names.
+#
+# Gated on APP_TYPE so a hardware build sees no new flag at all.
+ifeq ($(APP_TYPE),sdl-sim)
+INCLUDES := -I$(APPSDIR)/sim/include $(INCLUDES)
+endif
+
 SRC += $(call preprocess, $(APPSDIR)/SOURCES)
 
 # apps/features.txt is a file that (is preprocessed and) lists named features

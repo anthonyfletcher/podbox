@@ -30,6 +30,7 @@
 
 INLINE unsigned range_limit(int value)
 {
+#if defined(CPU_ARM)
     asm (  /* Note: Uses knowledge that only the low byte of the result is used */
         "add     %[v], %[v], #128    \n"  /* value += 128 */
         "cmp     %[v], #255          \n"  /* out of range 0..255? */
@@ -38,6 +39,19 @@ INLINE unsigned range_limit(int value)
         [v]"+r"(value)
     );
     return value;
+#else
+    /* Both hardware targets are ARM. A simulator is not: config.h ties
+     * CPU_ARM to ARCH, which a sim build leaves unset. */
+    value += 128;
+
+    if ((unsigned)value <= 255)
+        return value;
+
+    if (value < 0)
+        return 0;
+
+    return 255;
+#endif
 }
 
 /* IDCT implementation */

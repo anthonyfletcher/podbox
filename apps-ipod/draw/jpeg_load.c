@@ -37,6 +37,7 @@
  * Baseline JPEG decoder used for album art: Huffman decode, IDCT and
  * YUV-to-native conversion straight into a rockbox bitmap.
  ****************************************************************************/
+#include <string.h>
 #include "metadata_common.h"
 #include "debug.h"
 #include "jpeg_load.h"
@@ -127,6 +128,7 @@ struct jpeg
 
 INLINE unsigned range_limit(int value)
 {
+#if defined(CPU_ARM)
     /* Note: Uses knowledge that only the low byte of the result is used */
     asm (
         "cmp     %[v], #255          \n"  /* out of range 0..255? */
@@ -135,6 +137,17 @@ INLINE unsigned range_limit(int value)
         [v]"+r"(value)
     );
     return value;
+#else
+    /* Both hardware targets are ARM. A simulator is not: config.h ties
+     * CPU_ARM to ARCH, which a sim build leaves unset. */
+    if ((unsigned)value <= 255)
+        return value;
+
+    if (value < 0)
+        return 0;
+
+    return 255;
+#endif
 }
 
 INLINE unsigned scale_output(int value)
@@ -236,6 +249,334 @@ INLINE unsigned scale_output(int value)
 #define BUFAC           227
 #define COMPONENT_SHIFT  15
 
+/* The 1-, 2-, 4- and 8-point IDCT passes. Both hardware targets take the
+ * hand-written ARM versions from jpeg_idct_arm.S, which SOURCES builds under
+ * CPU_ARM; a simulator is not ARM and needs these. Verbatim from upstream
+ * apps/recorder/jpeg_load.c -- the 16-point pass below never had an assembler
+ * version and is shared. */
+#ifndef CPU_ARM
+/* horizontal-pass 1-point IDCT */
+static void jpeg_idct1h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep)
+{
+    for (; ws < end; ws += 8)
+    {
+        *out = range_limit(128 + (int) DESCALE(*ws, 3 + PASS1_BITS));
+        out += rowstep;
+    }
+}
+
+/* vertical-pass 2-point IDCT */
+static void jpeg_idct2v(int16_t *ws, int16_t *end)
+{
+    for (; ws < end; ws++)
+    {
+        int tmp1 = ws[0*8];
+        int tmp2 = ws[1*8];
+        ws[0*8] = tmp1 + tmp2;
+        ws[1*8] = tmp1 - tmp2;
+    }
+}
+
+/* horizontal-pass 2-point IDCT */
+static void jpeg_idct2h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep)
+{
+    for (; ws < end; ws += 8, out += rowstep)
+    {
+        int tmp1 = ws[0] + (ONE << (PASS1_BITS + 2))
+                   + (128 << (PASS1_BITS + 3));
+        int tmp2 = ws[1];
+        out[JPEG_PIX_SZ*0] = range_limit((int) RIGHT_SHIFT(tmp1 + tmp2,
+            PASS1_BITS + 3));
+        out[JPEG_PIX_SZ*1] = range_limit((int) RIGHT_SHIFT(tmp1 - tmp2,
+            PASS1_BITS + 3));
+    }
+}
+
+/* vertical-pass 4-point IDCT */
+static void jpeg_idct4v(int16_t *ws, int16_t *end)
+{
+    for (; ws < end; ws++)
+    {
+        int tmp0, tmp2, tmp10, tmp12;
+        int z1, z2, z3;
+        /* Even part */
+
+        tmp0 = ws[8*0];
+        tmp2 = ws[8*2];
+
+        tmp10 = (tmp0 + tmp2) << PASS1_BITS;
+        tmp12 = (tmp0 - tmp2) << PASS1_BITS;
+
+        /* Odd part */
+        /* Same rotation as in the even part of the 8x8 LL&M IDCT */
+
+        z2 = ws[8*1];
+        z3 = ws[8*3];
+
+        z1 = MULTIPLY16(z2 + z3, FIX_0_541196100) +
+            (ONE << (CONST_BITS - PASS1_BITS - 1));
+        tmp0 = RIGHT_SHIFT(z1 + MULTIPLY16(z3, - FIX_1_847759065),
+            CONST_BITS-PASS1_BITS);
+        tmp2 = RIGHT_SHIFT(z1 + MULTIPLY16(z2, FIX_0_765366865),
+            CONST_BITS-PASS1_BITS);
+
+        /* Final output stage */
+        ws[8*0] = (int) (tmp10 + tmp2);
+        ws[8*3] = (int) (tmp10 - tmp2);
+        ws[8*1] = (int) (tmp12 + tmp0);
+        ws[8*2] = (int) (tmp12 - tmp0);
+    }
+}
+
+/* horizontal-pass 4-point IDCT */
+static void jpeg_idct4h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep)
+{
+    for (; ws < end; out += rowstep, ws += 8)
+    {
+        int tmp0, tmp2, tmp10, tmp12;
+        int z1, z2, z3;
+        /* Even part */
+
+        tmp0 = (int) ws[0] + (ONE << (PASS1_BITS + 2))
+               + (128 << (PASS1_BITS + 3));
+        tmp2 = (int) ws[2];
+
+        tmp10 = (tmp0 + tmp2) << CONST_BITS;
+        tmp12 = (tmp0 - tmp2) << CONST_BITS;
+
+        /* Odd part */
+        /* Same rotation as in the even part of the 8x8 LL&M IDCT */
+
+        z2 = (int) ws[1];
+        z3 = (int) ws[3];
+
+        z1 = MULTIPLY16(z2 + z3, FIX_0_541196100);
+        tmp0 = z1 - MULTIPLY16(z3, FIX_1_847759065);
+        tmp2 = z1 + MULTIPLY16(z2, FIX_0_765366865);
+
+        /* Final output stage */
+
+        out[JPEG_PIX_SZ*0] = range_limit((int) RIGHT_SHIFT(tmp10 + tmp2,
+            DS_OUT));
+        out[JPEG_PIX_SZ*3] = range_limit((int) RIGHT_SHIFT(tmp10 - tmp2,
+            DS_OUT));
+        out[JPEG_PIX_SZ*1] = range_limit((int) RIGHT_SHIFT(tmp12 + tmp0,
+            DS_OUT));
+        out[JPEG_PIX_SZ*2] = range_limit((int) RIGHT_SHIFT(tmp12 - tmp0,
+            DS_OUT));
+    }
+}
+
+/* vertical-pass 8-point IDCT */
+static void jpeg_idct8v(int16_t *ws, int16_t *end)
+{
+    long tmp0, tmp1, tmp2, tmp3;
+    long tmp10, tmp11, tmp12, tmp13;
+    long z1, z2, z3, z4, z5;
+#ifdef JPEG_IDCT_TRANSPOSE
+    int16_t *ws2 = ws + 64;
+    for (; ws < end; ws += 8, ws2++)
+    {
+#else
+    for (; ws < end; ws++)
+    {
+#endif
+    /* Due to quantization, we will usually find that many of the input
+    * coefficients are zero, especially the AC terms.  We can exploit this
+    * by short-circuiting the IDCT calculation for any column in which all
+    * the AC terms are zero.  In that case each output is equal to the
+    * DC coefficient (with scale factor as needed).
+    * With typical images and quantization tables, half or more of the
+    * column DCT calculations can be simplified this way.
+    */
+        if ((ws[V_IN_ST*1] | ws[V_IN_ST*2] | ws[V_IN_ST*3]
+           | ws[V_IN_ST*4] | ws[V_IN_ST*5] | ws[V_IN_ST*6] | ws[V_IN_ST*7]) == 0)
+        {
+            /* AC terms all zero */
+            int dcval = ws[V_IN_ST*0] << PASS1_BITS;
+
+            V_OUT(0) = V_OUT(1) = V_OUT(2) = V_OUT(3) = V_OUT(4) = V_OUT(5) =
+                       V_OUT(6) = V_OUT(7) = dcval;
+            continue;
+        }
+
+        /* Even part: reverse the even part of the forward DCT. */
+        /* The rotator is sqrt(2)*c(-6). */
+
+        z2 = ws[V_IN_ST*2];
+        z3 = ws[V_IN_ST*6];
+
+        z1 = MULTIPLY16(z2 + z3, FIX_0_541196100);
+        tmp2 = z1 + MULTIPLY16(z3, - FIX_1_847759065);
+        tmp3 = z1 + MULTIPLY16(z2, FIX_0_765366865);
+
+        z2 = ws[V_IN_ST*0] << CONST_BITS;
+        z2 += ONE << (CONST_BITS - PASS1_BITS - 1);
+        z3 = ws[V_IN_ST*4] << CONST_BITS;
+
+        tmp0 = (z2 + z3);
+        tmp1 = (z2 - z3);
+
+        tmp10 = tmp0 + tmp3;
+        tmp13 = tmp0 - tmp3;
+        tmp11 = tmp1 + tmp2;
+        tmp12 = tmp1 - tmp2;
+
+        /* Odd part per figure 8; the matrix is unitary and hence its
+           transpose is its inverse.  i0..i3 are y7,y5,y3,y1 respectively. */
+
+        tmp0 = ws[V_IN_ST*7];
+        tmp1 = ws[V_IN_ST*5];
+        tmp2 = ws[V_IN_ST*3];
+        tmp3 = ws[V_IN_ST*1];
+
+        z1 = tmp0 + tmp3;
+        z2 = tmp1 + tmp2;
+        z3 = tmp0 + tmp2;
+        z4 = tmp1 + tmp3;
+        z5 = MULTIPLY16(z3 + z4, FIX_1_175875602); /* sqrt(2) * c3 */
+
+        tmp0 = MULTIPLY16(tmp0, FIX_0_298631336); /* sqrt(2) * (-c1+c3+c5-c7) */
+        tmp1 = MULTIPLY16(tmp1, FIX_2_053119869); /* sqrt(2) * ( c1+c3-c5+c7) */
+        tmp2 = MULTIPLY16(tmp2, FIX_3_072711026); /* sqrt(2) * ( c1+c3+c5-c7) */
+        tmp3 = MULTIPLY16(tmp3, FIX_1_501321110); /* sqrt(2) * ( c1+c3-c5-c7) */
+        z1 = MULTIPLY16(z1, - FIX_0_899976223); /* sqrt(2) * (c7-c3) */
+        z2 = MULTIPLY16(z2, - FIX_2_562915447); /* sqrt(2) * (-c1-c3) */
+        z3 = MULTIPLY16(z3, - FIX_1_961570560); /* sqrt(2) * (-c3-c5) */
+        z4 = MULTIPLY16(z4, - FIX_0_390180644); /* sqrt(2) * (c5-c3) */
+
+        z3 += z5;
+        z4 += z5;
+
+        tmp0 += z1 + z3;
+        tmp1 += z2 + z4;
+        tmp2 += z2 + z3;
+        tmp3 += z1 + z4;
+
+        /* Final output stage: inputs are tmp10..tmp13, tmp0..tmp3 */
+
+        V_OUT(0) = (int) RIGHT_SHIFT(tmp10 + tmp3, CONST_BITS-PASS1_BITS);
+        V_OUT(7) = (int) RIGHT_SHIFT(tmp10 - tmp3, CONST_BITS-PASS1_BITS);
+        V_OUT(1) = (int) RIGHT_SHIFT(tmp11 + tmp2, CONST_BITS-PASS1_BITS);
+        V_OUT(6) = (int) RIGHT_SHIFT(tmp11 - tmp2, CONST_BITS-PASS1_BITS);
+        V_OUT(2) = (int) RIGHT_SHIFT(tmp12 + tmp1, CONST_BITS-PASS1_BITS);
+        V_OUT(5) = (int) RIGHT_SHIFT(tmp12 - tmp1, CONST_BITS-PASS1_BITS);
+        V_OUT(3) = (int) RIGHT_SHIFT(tmp13 + tmp0, CONST_BITS-PASS1_BITS);
+        V_OUT(4) = (int) RIGHT_SHIFT(tmp13 - tmp0, CONST_BITS-PASS1_BITS);
+    }
+}
+
+/* horizontal-pass 8-point IDCT */
+static void jpeg_idct8h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep)
+{
+    long tmp0, tmp1, tmp2, tmp3;
+    long tmp10, tmp11, tmp12, tmp13;
+    long z1, z2, z3, z4, z5;
+    for (; ws < end; out += rowstep, ws += 8)
+    {
+        /* Rows of zeroes can be exploited in the same way as we did with
+         * columns. However, the column calculation has created many nonzero AC
+         * terms, so the simplification applies less often (typically 5% to 10%
+         * of the time). On machines with very fast multiplication, it's
+         * possible that the test takes more time than it's worth.  In that
+         * case this section may be commented out.
+        */
+
+#ifndef NO_ZERO_ROW_TEST
+        if ((ws[1] | ws[2] | ws[3]
+           | ws[4] | ws[5] | ws[6] | ws[7]) == 0)
+        {
+            /* AC terms all zero */
+            unsigned char dcval = range_limit(128 + (int) DESCALE((long) ws[0],
+                PASS1_BITS+3));
+
+            out[JPEG_PIX_SZ*0] = dcval;
+            out[JPEG_PIX_SZ*1] = dcval;
+            out[JPEG_PIX_SZ*2] = dcval;
+            out[JPEG_PIX_SZ*3] = dcval;
+            out[JPEG_PIX_SZ*4] = dcval;
+            out[JPEG_PIX_SZ*5] = dcval;
+            out[JPEG_PIX_SZ*6] = dcval;
+            out[JPEG_PIX_SZ*7] = dcval;
+            continue;
+        }
+#endif
+
+        /* Even part: reverse the even part of the forward DCT. */
+        /* The rotator is sqrt(2)*c(-6). */
+
+        z2 = (long) ws[2];
+        z3 = (long) ws[6];
+
+        z1 = MULTIPLY16(z2 + z3, FIX_0_541196100);
+        tmp2 = z1 + MULTIPLY16(z3, - FIX_1_847759065);
+        tmp3 = z1 + MULTIPLY16(z2, FIX_0_765366865);
+
+        z4 = (long) ws[0] + (ONE << (PASS1_BITS + 2))
+             + (128 << (PASS1_BITS + 3));
+        z4 <<= CONST_BITS;
+        z5 = (long) ws[4] << CONST_BITS;
+        tmp0 = z4 + z5;
+        tmp1 = z4 - z5;
+
+        tmp10 = tmp0 + tmp3;
+        tmp13 = tmp0 - tmp3;
+        tmp11 = tmp1 + tmp2;
+        tmp12 = tmp1 - tmp2;
+
+        /* Odd part per figure 8; the matrix is unitary and hence its
+        * transpose is its inverse. i0..i3 are y7,y5,y3,y1 respectively. */
+
+        tmp0 = (long) ws[7];
+        tmp1 = (long) ws[5];
+        tmp2 = (long) ws[3];
+        tmp3 = (long) ws[1];
+
+        z1 = tmp0 + tmp3;
+        z2 = tmp1 + tmp2;
+        z3 = tmp0 + tmp2;
+        z4 = tmp1 + tmp3;
+        z5 = MULTIPLY16(z3 + z4, FIX_1_175875602); /* sqrt(2) * c3 */
+
+        tmp0 = MULTIPLY16(tmp0, FIX_0_298631336); /* sqrt(2) * (-c1+c3+c5-c7) */
+        tmp1 = MULTIPLY16(tmp1, FIX_2_053119869); /* sqrt(2) * ( c1+c3-c5+c7) */
+        tmp2 = MULTIPLY16(tmp2, FIX_3_072711026); /* sqrt(2) * ( c1+c3+c5-c7) */
+        tmp3 = MULTIPLY16(tmp3, FIX_1_501321110); /* sqrt(2) * ( c1+c3-c5-c7) */
+        z1 = MULTIPLY16(z1, - FIX_0_899976223); /* sqrt(2) * (c7-c3) */
+        z2 = MULTIPLY16(z2, - FIX_2_562915447); /* sqrt(2) * (-c1-c3) */
+        z3 = MULTIPLY16(z3, - FIX_1_961570560); /* sqrt(2) * (-c3-c5) */
+        z4 = MULTIPLY16(z4, - FIX_0_390180644); /* sqrt(2) * (c5-c3) */
+
+        z3 += z5;
+        z4 += z5;
+
+        tmp0 += z1 + z3;
+        tmp1 += z2 + z4;
+        tmp2 += z2 + z3;
+        tmp3 += z1 + z4;
+
+        /* Final output stage: inputs are tmp10..tmp13, tmp0..tmp3 */
+
+        out[JPEG_PIX_SZ*0] = range_limit((int) RIGHT_SHIFT(tmp10 + tmp3,
+            DS_OUT));
+        out[JPEG_PIX_SZ*7] = range_limit((int) RIGHT_SHIFT(tmp10 - tmp3,
+            DS_OUT));
+        out[JPEG_PIX_SZ*1] = range_limit((int) RIGHT_SHIFT(tmp11 + tmp2,
+            DS_OUT));
+        out[JPEG_PIX_SZ*6] = range_limit((int) RIGHT_SHIFT(tmp11 - tmp2,
+            DS_OUT));
+        out[JPEG_PIX_SZ*2] = range_limit((int) RIGHT_SHIFT(tmp12 + tmp1,
+            DS_OUT));
+        out[JPEG_PIX_SZ*5] = range_limit((int) RIGHT_SHIFT(tmp12 - tmp1,
+            DS_OUT));
+        out[JPEG_PIX_SZ*3] = range_limit((int) RIGHT_SHIFT(tmp13 + tmp0,
+            DS_OUT));
+        out[JPEG_PIX_SZ*4] = range_limit((int) RIGHT_SHIFT(tmp13 - tmp0,
+            DS_OUT));
+    }
+}
+
+#else
 extern void jpeg_idct1h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep);
 extern void jpeg_idct2v(int16_t *ws, int16_t *end);
 extern void jpeg_idct2h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep);
@@ -243,6 +584,7 @@ extern void jpeg_idct4v(int16_t *ws, int16_t *end);
 extern void jpeg_idct4h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep);
 extern void jpeg_idct8v(int16_t *ws, int16_t *end);
 extern void jpeg_idct8h(int16_t *ws, unsigned char *out, int16_t *end, int rowstep);
+#endif
 
 /* vertical-pass 16-point IDCT */
 static void jpeg_idct16v(int16_t *ws, int16_t *end)

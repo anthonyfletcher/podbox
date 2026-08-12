@@ -87,7 +87,18 @@
 
 #define MAIN_NORETURN_ATTR NORETURN_ATTR
 
-
+#if (CONFIG_PLATFORM & PLATFORM_SDL)
+/* The simulator takes a command line -- --debugwps traces skin parsing,
+ * --nobackground drops the player bezel, and there are a few more in
+ * sys_handle_argv(). Without argv they are all silently unavailable. */
+#include "sim_tasks.h"
+#include "system-sdl.h"
+#define HAVE_ARGV_MAIN
+/* Don't use SDL_main on Windows -> no more stdio redirection */
+#if defined(WIN32)
+#undef main
+#endif
+#endif /* PLATFORM_SDL */
 
 /*#define AUTOROCK*/ /* define this to check for "autostart.rock" on boot */
 
@@ -96,9 +107,16 @@ static void init(void);
  * be INIT_ATTR. These functions must not be called after the final call
  * to root_menu() at the end of main()
  * see definition of INIT_ATTR in config.h */
+#ifdef HAVE_ARGV_MAIN
+int main(int argc, char *argv[]) INIT_ATTR MAIN_NORETURN_ATTR;
+int main(int argc, char *argv[])
+{
+    sys_handle_argv(argc, argv);
+#else
 int main(void) INIT_ATTR MAIN_NORETURN_ATTR;
 int main(void)
 {
+#endif
     CHART(">init");
     init();
     CHART("<init");
@@ -558,6 +576,11 @@ static void init(void)
     CHART("ticking");
 
     unicode_init();
+#ifdef SIMULATOR
+    /* The sim's own background thread: F5 screendumps, and the headphone and
+     * hotswap triggers from its menu. */
+    sim_tasks_init();
+#endif
     lcd_init();
     FOR_NB_SCREENS(i)
         global_status.font_id[i] = FONT_SYSFIXED;

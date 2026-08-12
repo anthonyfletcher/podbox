@@ -37,8 +37,11 @@ files differ, and the set moves every time one is added.
 
 **`apps/` is byte-identical to upstream, and stays that way.** It is kept so
 `git merge rockbox/master` applies without delete/modify conflicts. The same
-goes for `manual/`, `uisimulator/`, `android/`, `backdrops/`, `screenshots/` and
-every `themes/` entry but Themify_2. Being unused is not a reason to prune them.
+goes for `manual/`, `android/`, `backdrops/`, `screenshots/` and every `themes/`
+entry but Themify_2. Being unused is not a reason to prune them.
+
+**`uisimulator/` is upstream-identical too, but it is no longer unused** — the
+simulator builds and runs. See "The simulator needs nothing here" below.
 
 Most `firmware/` changes are hardware work inherited from the RockPod fork
 (GPLv2), which upstream has no equivalent of. The `tools/` changes are this
@@ -329,8 +332,38 @@ instead** — it will succeed, and produce the wrong firmware.
 | `checkwps/README` | New "DOES NOT BUILD IN THIS FORK" section | `configure` still offers `--type=C`, so someone will try. Its `SOURCES` and `.make` name core files at `apps/` paths that no longer exist. It would also need `lib/skin_parser` built with this fork's custom tags, or it rejects valid themes. |
 | `database/README` | New "DOES NOT BUILD IN THIS FORK" section | Same for `--type=D`, plus it needs a replacement for the deleted uisimulator filesystem backend. |
 
-Neither affects a normal firmware build. `(S)imulator` and `(W)arble` are
-equally broken and equally unbuilt.
+Neither affects a normal firmware build. `(W)arble` is equally broken and
+equally unbuilt. **`(S)imulator` is not** — it works; see below.
+
+### The simulator needs nothing here
+
+The simulator was brought up without changing a single file outside
+`apps-ipod/`. That is worth stating in a document about divergence, because the
+obvious assumption is the opposite: `uisimulator/`, `firmware/target/hosted/sdl/`
+and `tools/root.make`'s `sdl-sim` path are all upstream's, unmodified, and all
+of them work.
+
+What had to change was `apps-ipod/` believing it was on hardware — a shim
+directory plus a handful of restored upstream `#ifdef`s, documented in
+[`apps-ipod/sim/README.md`](../../apps-ipod/sim/README.md).
+
+Two things a merge should know:
+
+- **`uisimulator/common/stubs.c` includes `"screens.h"`** and uses nothing from
+  it. That resolves through `apps-ipod/api/screens.h`, an empty boundary stub.
+  If upstream ever makes that include meaningful, the stub has to forward to
+  whichever `apps-ipod/screens/` header owns the symbol.
+- **`firmware/target/hosted/sdl/window-sdl.c` includes `"misc.h"`** and then
+  uses `background` from `system-sdl.h`, which upstream's `apps/misc.h` supplied
+  transitively via `screen_access.h`. `apps-ipod/api/misc.h` now includes
+  `system-sdl.h` under `#ifdef SIMULATOR` to keep that contract.
+
+Both are the `api/` boundary doing its job: an upstream file includes an
+application header by bare name, and the stub absorbs the fork's reorganisation.
+
+A **Windows** simulator cross-compiles from the same tree with
+`--type=as6`; that needs `mingw-w64` and an SDL2 mingw development package on
+the build machine, but no repository change.
 
 ---
 
@@ -345,13 +378,14 @@ upstream-shaped. The three bundle scripts make up the difference, and
 | File | What it is | Why it exists |
 | --- | --- | --- |
 | `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs both bundle scripts after `make zip`. The supported way to produce a shippable build. |
+| `build-sim.sh` | The same for the simulator, into `build-sim-<target>[-win32]/`; takes a second argument `native` or `win` | Adds the steps a simulator needs and a device does not: unpacking the finished zip into `simdisk/`, and carrying an existing `simdisk/` across the clean so a rebuild does not destroy the test music and database. `win` selects `--type=as6` — **(A)dvanced** plus `s` and `6`, because `configure` matches the build type one character at a time and plain `--type=s6` silently produces a *normal* build. |
 | `bundle-theme.sh` | Injects Themify_2 and a pre-populated `config.cfg` into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. The `config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback. |
 | `bundle-eqs.sh` | Injects `eqs/*.cfg` into `.rockbox/eqs/` | The presets live at the repo root, not the `lib/rbcodec/dsp/eqs/` that `buildzip.pl` copies from — that directory is empty here. |
 | `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other two: `buildzip.pl` copies upstream's file and is kept upstream-shaped. |
 | `docs/podbox/LICENSES` | The fork's own licence notices — Literata, League Spartan, Themify 2 — with the SIL Open Font License 1.1 reproduced in full | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
 | `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies each zip, then replaces the rolling `latest` release | Publishing by hand gets three things wrong — asset names colliding, `gh` needing `--repo` on the server, and a leftover tag being reused rather than moved. |
 | `docs/CREDITS` | Three attribution blocks prepended: Themify, RockPod, and a "For RockBox:" heading before upstream's list | This fork ships a theme and inherits a large body of hardware work from another fork, both GPLv2 with named authors. Upstream's list is left untouched below the heading, so a merge from Rockbox applies to it cleanly. |
-| `.gitignore` | `/build*` narrowed to `/build-hw-*/`, `/build-hw/`, `/build-sim/`; adds `/notes/`, `/.specifications/` | Local working drafts. |
+| `.gitignore` | `/build*` narrowed to `/build-hw-*/`, `/build-hw/`, `/build-sim-*/`, `/build-sim/`; adds `/notes/`, `/.specifications/` | Local working drafts. The `build-sim-*` glob covers the per-target simulator directories (`build-sim-ipodvideo`, `build-sim-win32`); upstream's bare `/build-sim/` matches none of them. |
 | `wps/WPSLIST` | `cabbiev2` theme block removed (180 lines); explanatory comment added | `wpsbuild.pl` builds from this file, so delisting is what stops cabbiev2 shipping. The files stay in `wps/` because the tree mirrors upstream. `rockbox_failsafe` is kept — it is the skin engine's emergency fallback if a configured skin fails to parse. |
 
 **What `bundle-theme.sh` deletes, and why the deletions live there:**
