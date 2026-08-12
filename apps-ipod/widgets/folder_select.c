@@ -9,14 +9,23 @@
  * reworked: expansion and inclusion are independent. Scroll to move, Select to
  * expand/collapse a folder, hold Select to include/exclude it. Including a
  * folder includes all its subdirectories unless a subdirectory is individually
- * excluded. Included folders are shown bracketed, e.g. [Music]. Used by the
- * database "Directories to Scan" setting and the custom autoresume folder list
- * (both in apps/menus/settings_menu.c), which call folder_select() directly.
+ * excluded. Each row carries a checkbox saying which it is, and a chevron if
+ * there is anything under it to open.
  * GNU General Public License (version 2+)
  *
- * Tri-state folder picker used by the database scan list and autoresume.
- * Walks the filesystem into a collapsible tree and serialises the minimal
- * include/exclude path set back into a setting string.
+ * Tri-state folder picker used by the database "Directories to Scan" setting
+ * and the custom autoresume folder list (both in screens/settings/
+ * general_settings.c). Walks the filesystem into a collapsible tree and
+ * serialises the minimal include/exclude path set back into a setting string.
+ *
+ * A dialog rather than a themed list, and for the reason the state glyphs are
+ * this file's own bitmaps: a skinned list draws an icon only if the theme maps
+ * it, and `show icons` off draws none at all -- either of which left the only
+ * copy of "is this folder included?" undrawn.
+ *
+ * Parts, in order:
+ *   - the tree: allocation, loading, inheritance, path serialisation
+ *   - the dialog: measure, draw, actions
  ****************************************************************************/
 #include <stdlib.h>
 #include <stdio.h>
@@ -32,12 +41,24 @@
 #include "settings/settings.h"
 #include "splash.h"
 #include "yesno.h"
-#include "list.h"
-#include "draw/icon.h"        /* enum themable_icons, Icon_Last_Themeable */
+#include "dialog.h"
+#include "input/action.h"
+#include "draw/screen_access.h"
 #include "system/activity.h"  /* push/pop the folder-picker activity (%cs) */
+#include "system/shutdown.h"  /* default_event_handler */
 /*#define LOGF_ENABLE*/
 #include "logf.h"
 #include "folder_select.h"
+
+/* The "bitmaps/" prefix is required, not cosmetic: dependencies are generated
+ * with -MG, so a header that does not exist yet is recorded at the path as
+ * written. Only this spelling matches the rule bitmaps.make gives it. */
+#include "bitmaps/podbox_folder_closed_off.h"
+#include "bitmaps/podbox_folder_closed_on.h"
+#include "bitmaps/podbox_folder_open_off.h"
+#include "bitmaps/podbox_folder_open_on.h"
+#include "bitmaps/podbox_folder_leaf_off.h"
+#include "bitmaps/podbox_folder_leaf_on.h"
 
 /* Inclusion is a tri-state: a folder inherits from its nearest explicitly
  * included/excluded ancestor (default: excluded). Selecting a folder to include
@@ -54,6 +75,8 @@ struct child {
     enum sel_state sel;
     bool expanded;           /* children shown in the list */
     bool eaccess;            /* could not be opened */
+    bool probed;             /* has_subfolder() has answered for this one */
+    bool has_children;       /* what it answered */
 };
 
 struct folder {
@@ -216,6 +239,8 @@ static struct folder* load_folder(struct folder* parent, char *folder)
         child->sel = SEL_INHERIT;
         child->expanded = false;
         child->eaccess = false;
+        child->probed = false;
+        child->has_children = false;
         while(*first_child++ != '\0'){};/* move to next name entry */
         child_count--;
     }
@@ -235,6 +260,8 @@ static struct folder* load_root(void)
     root_child.sel = SEL_INHERIT;
     root_child.expanded = false;
     root_child.eaccess = false;
+    root_child.probed = false;
+    root_child.has_children = false;
 
     static struct folder root = {
         .name = "",
@@ -245,6 +272,58 @@ static struct folder* load_root(void)
     };
 
     return &root;
+}
+
+/* Whether `this` holds at least one subdirectory. Answered once and cached.
+ *
+ * A row has to show whether it can be expanded before it ever has been, and
+ * child_load() cannot be asked: it allocates the whole level, so calling it for
+ * every visible row would build subtrees nobody opened, and -- because it
+ * reports a full buffer the same way it reports an unreadable directory --
+ * would start marking perfectly good folders (?) once the buffer filled.
+ *
+ * This allocates nothing and stops at the first subdirectory it sees. Called
+ * from the draw path, so it costs one opendir per row the first time that row
+ * appears and nothing on any later pass. */
+static bool has_subfolder(struct child *this, struct folder *parent)
+{
+    char fullpath[MAX_PATH];
+    DIR *dir;
+    struct dirent *entry;
+    size_t len;
+
+    if (this->folder)          /* loaded: it counted them, so ask it */
+        return this->folder->children_count > 0;
+    if (this->probed)
+        return this->has_children;
+
+    this->probed = true;
+    this->has_children = false;
+
+    if (this->eaccess)         /* could not be opened, so nothing to expand */
+        return false;
+
+    len = get_full_path(parent, fullpath, sizeof(fullpath));
+    if (len >= sizeof(fullpath))
+        return false;
+    strlcpy(&fullpath[len], this->name, sizeof(fullpath) - len);
+
+    dir = opendir(fullpath);
+    if (dir == NULL)
+        return false;
+
+    while ((entry = readdir(dir)))
+    {
+        char *dn = entry->d_name;
+        if ((dir_get_info(dir, entry).attribute & ATTR_DIRECTORY) == 0)
+            continue;
+        if ((dn[0] == '.') && (dn[1] == '\0' || (dn[1] == '.' && dn[2] == '\0')))
+            continue;
+        this->has_children = true;
+        break;
+    }
+    closedir(dir);
+    return this->has_children;
 }
 
 /* Load a child's sub-folder if not already loaded. Returns the folder or NULL
@@ -329,93 +408,6 @@ static struct child* find_index(struct folder *start, int index, struct folder *
         }
     }
     return NULL;
-}
-
-static const char * folder_get_name(int selected_item, void * data,
-                                   char * buffer, size_t buffer_len)
-{
-    struct folder *root = (struct folder*)data;
-    struct folder *parent;
-    struct child *this = find_index(root, selected_item , &parent);
-
-    if (this == NULL)
-    {
-        buffer[0] = '\0';
-        return buffer;
-    }
-
-    /* two spaces of indent per tree level */
-    size_t pos = 0;
-    for (int i = 0; i < parent->depth && pos + 2 < buffer_len; i++)
-    {
-        buffer[pos++] = ' ';
-        buffer[pos++] = ' ';
-    }
-    buffer[pos] = '\0';
-
-    /* Inclusion is shown by the checkbox glyph (folder_get_icon), so the name
-     * is drawn plain -- the [brackets] that used to mark an included folder
-     * would now just duplicate it. */
-    strlcpy(&buffer[pos], this->name, buffer_len - pos);
-
-    if (this->eaccess)
-        strlcat(buffer, " (?)", buffer_len);
-
-    return buffer;
-}
-
-/* Per-row state handed to the theme through %LI: bit0 = included, bit1 =
- * expanded, so 0..3 cover the four expand/select combinations. Offset past the
- * themable-icon range (and clear of the file-type ids at +1/+2) so a theme
- * without a Folder_Select list config can't mistake it for a real iconset
- * entry. The Themify SBS maps these to its expand-arrow + checkbox glyphs. */
-#define FOLDER_ICON_BASE (Icon_Last_Themeable + 8)
-
-static enum themable_icons folder_get_icon(int selected_item, void * data)
-{
-    struct folder *root = (struct folder*)data;
-    struct folder *parent;
-    struct child *this = find_index(root, selected_item, &parent);
-
-    if (this == NULL)
-        return Icon_NOICON;
-
-    int state = (this->expanded ? 2 : 0)
-              | (effective_included(this, parent) ? 1 : 0);
-    return (enum themable_icons)(FOLDER_ICON_BASE + state);
-}
-
-static int folder_action_callback(int action, struct gui_synclist *list)
-{
-    struct folder *root = (struct folder*)list->data;
-    struct folder *parent;
-    struct child *this = find_index(root, list->selected_item, &parent);
-
-    if (this == NULL)
-        return action;
-
-    if (action == ACTION_STD_OK) /* expand / collapse */
-    {
-        if (!this->eaccess && child_load(this, parent) != NULL
-            && this->folder->children_count > 0)
-        {
-            this->expanded = !this->expanded;
-        }
-        /* Always consume Select: a folder with no subfolders (or one that
-         * couldn't be opened) has nothing to expand, but Select must never fall
-         * through -- an unhandled ACTION_STD_OK closes the picker. Only Back
-         * (ACTION_STD_CANCEL) exits; hold-Select (below) includes/excludes. */
-        action = ACTION_REDRAW;
-    }
-    else if (action == ACTION_STD_CONTEXT) /* include / exclude */
-    {
-        this->sel = effective_included(this, parent) ? SEL_EXCLUDE : SEL_INCLUDE;
-        action = ACTION_REDRAW;
-    }
-
-    if (action == ACTION_REDRAW)
-        list->nb_items = count_items(root);
-    return action;
 }
 
 static struct child* find_from_filename(const char* filename, struct folder *root)
@@ -582,12 +574,282 @@ static uint32_t save_folders(struct folder *root, char* dst, size_t maxlen)
     return hashed.val;
 }
 
+/* ---- the dialog --------------------------------------------------------- */
+
+struct folder_dlg {
+    struct folder *root;
+    int  selected;          /* index into the flattened tree */
+    int  top_row;           /* first visible row */
+    int  visible_rows;      /* set by measure(), read by draw() and on_action() */
+
+    /* Marquee for the selected row, driven from the poll tick rather than the
+     * shared scroll engine -- see dialog_draw_button_ex(). */
+    int  scroll_px;
+    int  scroll_max;        /* what the last draw said overflows */
+    int  scroll_dir;        /* +1 running left, -1 coming back */
+    int  scroll_wait;       /* polls to hold still at each end */
+    int  scroll_row;        /* the row the marquee belongs to */
+};
+
+/* How often the dialog loop wakes with ACTION_NONE. Fast while the marquee
+ * runs, idle otherwise: every wake repaints the whole box. */
+#define POLL_ANIM     (HZ/20)
+#define POLL_IDLE     (HZ/5)
+#define SCROLL_STEP   3                 /* pixels per poll */
+#define SCROLL_PAUSE  (HZ / POLL_ANIM)  /* about a second at each end */
+
+#define BOX_W_PCT     92   /* box width, as a percentage of the display */
+#define BOX_MARGIN_Y  10   /* clearance from the top and bottom */
+#define BOX_PAD        6   /* inside the border, all round */
+#define MIN_ROWS       3   /* however large the font, show at least this many */
+#define ROW_PAD_Y      3
+#define ROW_GAP        2   /* so adjacent rows read as separate */
+#define INDENT_PX      8   /* per tree level */
+
+static int row_height(struct screen *display)
+{
+    return display->getcharheight() + 2 * ROW_PAD_Y;
+}
+
+/* The row's state, as a bitmap this file owns rather than an iconset entry.
+ *
+ * That is the whole point of the dialog: with the state in a themable icon, a
+ * theme that does not map it -- or `show icons` turned off, which draws no icon
+ * at all -- left the picker a folder tree with nothing saying what was in it.
+ * These are drawn by dialog_draw_button_ex() in the label's colour, so they
+ * still follow the theme without depending on it.
+ *
+ * A folder with nothing under it gets no chevron -- only the checkbox, in the
+ * same column, so the rows still line up. Without that every leaf advertises an
+ * expansion that does nothing when you press Select.
+ *
+ * Indexed by expanded<<1 | included, with the leaf pair past the end, so the
+ * array order is load-bearing. */
+static const struct bitmap *row_icon(struct child *this, struct folder *parent)
+{
+    static const struct bitmap * const icons[6] = {
+        &bm_podbox_folder_closed_off, &bm_podbox_folder_closed_on,
+        &bm_podbox_folder_open_off,   &bm_podbox_folder_open_on,
+        &bm_podbox_folder_leaf_off,   &bm_podbox_folder_leaf_on,
+    };
+    int state = has_subfolder(this, parent) ? (this->expanded ? 2 : 0) : 4;
+
+    return icons[state | (effective_included(this, parent) ? 1 : 0)];
+}
+
+/* The name, plus the marker for a folder that could not be opened. The tree
+ * depth is not spelled here: the row is drawn indented instead, which survives
+ * a proportional font where leading spaces do not. */
+static void row_text(struct child *this, char *buf, size_t buf_len)
+{
+    strlcpy(buf, this->name, buf_len);
+    if (this->eaccess)
+        strlcat(buf, " (?)", buf_len);
+}
+
+/* Size the box to a whole number of rows rather than a percentage, so the
+ * bottom of the box is the bottom of a row at every font size. */
+static void folder_measure(struct dialog *d, struct screen *display,
+                           struct viewport *box, void *data)
+{
+    struct folder_dlg *s = data;
+    struct dialog_insets in;
+    int row_h = row_height(display);
+    int chrome, limit, rows, box_h;
+
+    dialog_get_insets(&d->style, &in);
+    chrome = in.top + in.bottom;
+
+    /* One row short of what fits, so the box reads as something over the
+     * settings menu rather than as a screen of its own. */
+    limit = display->lcdheight - 2 * BOX_MARGIN_Y;
+    rows = (limit - chrome + ROW_GAP) / (row_h + ROW_GAP);
+    if (rows > MIN_ROWS)
+        rows--;
+    if (rows < MIN_ROWS)
+        rows = MIN_ROWS;
+
+    box_h = chrome + rows * (row_h + ROW_GAP) - ROW_GAP;
+    if (box_h > display->lcdheight)
+        box_h = display->lcdheight;
+
+    /* draw() reads this rather than re-deriving it, so a rounding difference
+     * cannot leave half a row visible. */
+    s->visible_rows = rows;
+
+    box->width = display->lcdwidth * BOX_W_PCT / 100;
+    box->height = box_h;
+    box->x = (display->lcdwidth - box->width) / 2;
+    box->y = (display->lcdheight - box_h) / 2;
+}
+
+static void folder_draw(struct dialog *d, struct screen *display,
+                        struct viewport *content, void *data)
+{
+    struct folder_dlg *s = data;
+    int row_h = row_height(display);
+    int nb_items = count_items(s->root);
+    char buf[MAX_PATH];
+
+    /* No title inside the box: it cost a row and a rule to repeat what the
+     * menu row just said. dialog_init() is still given one, so a theme that
+     * draws a header has something to draw. */
+    if (s->selected < s->top_row)
+        s->top_row = s->selected;
+    else if (s->selected >= s->top_row + s->visible_rows)
+        s->top_row = s->selected - s->visible_rows + 1;
+    if (s->top_row > nb_items - s->visible_rows)
+        s->top_row = nb_items - s->visible_rows;
+    if (s->top_row < 0)
+        s->top_row = 0;
+
+    /* The marquee belongs to one row; moving the selection starts it over.
+     * Done here rather than at every place the selection changes, so no path
+     * can leave the new row mid-scroll. */
+    if (s->scroll_row != s->selected)
+    {
+        s->scroll_row = s->selected;
+        s->scroll_px = 0;
+        s->scroll_max = 0;
+        s->scroll_dir = 1;
+        s->scroll_wait = SCROLL_PAUSE;
+    }
+
+    for (int r = 0; r < s->visible_rows; r++)
+    {
+        int item = s->top_row + r;
+        struct folder *parent;
+        struct child *this;
+        bool sel;
+        int indent;
+
+        if (item >= nb_items)
+            break;
+        this = find_index(s->root, item, &parent);
+        if (this == NULL)
+            break;
+
+        /* Capped so a deeply nested tree cannot indent a row off the right
+         * edge and leave it with no width to draw in. */
+        indent = parent->depth * INDENT_PX;
+        if (indent > content->width / 2)
+            indent = content->width / 2;
+
+        sel = (item == s->selected);
+        row_text(this, buf, sizeof(buf));
+
+        dialog_draw_button_ex(display, &d->style, indent,
+                              r * (row_h + ROW_GAP),
+                              content->width - indent, row_h, buf, sel,
+                              DIALOG_BTN_LEFT, row_icon(this, parent),
+                              sel ? s->scroll_px : 0,
+                              sel ? &s->scroll_max : NULL);
+    }
+
+    display->set_drawmode(DRMODE_SOLID);
+}
+
+static int folder_on_action(struct dialog *d, int action, void *data)
+{
+    struct folder_dlg *s = data;
+    struct folder *parent;
+    struct child *this;
+
+    switch (action)
+    {
+        case ACTION_STD_PREV:
+        case ACTION_STD_PREVREPEAT:
+            if (s->selected > 0)
+                s->selected--;
+            break;
+
+        case ACTION_STD_NEXT:
+        case ACTION_STD_NEXTREPEAT:
+            if (s->selected + 1 < count_items(s->root))
+                s->selected++;
+            break;
+
+        case ACTION_STD_OK:            /* expand / collapse */
+            this = find_index(s->root, s->selected, &parent);
+            if (this && !this->eaccess && child_load(this, parent) != NULL
+                && this->folder->children_count > 0)
+            {
+                this->expanded = !this->expanded;
+            }
+            /* Always consumed. A folder with no subfolders (or one that could
+             * not be opened) has nothing to expand, but Select must never fall
+             * through -- as a list action that closed the picker, and the trap
+             * is the same here. Only Back exits; hold-Select toggles. */
+            break;
+
+        case ACTION_STD_CONTEXT:       /* include / exclude */
+            this = find_index(s->root, s->selected, &parent);
+            if (this)
+                this->sel = effective_included(this, parent) ? SEL_EXCLUDE
+                                                             : SEL_INCLUDE;
+            break;
+
+        case ACTION_STD_CANCEL:
+            return DIALOG_CANCEL;
+
+        case ACTION_STD_MENU:
+        case ACTION_STD_QUICKSCREEN:
+        case ACTION_TREE_WPS:
+            /* Swallowed: these all arrive from CONTEXT_LIST, and leaving for
+             * the menu or the playing screen mid-edit discards the tree. */
+            break;
+
+        case ACTION_NONE:
+            /* Only tick fast while the marquee is actually moving. Every pass
+             * is a full repaint of the box -- the status bar renders into the
+             * framebuffer under it on each get_action -- so at rest that is
+             * pure waste. */
+            d->poll_ticks = (s->scroll_max > 0) ? POLL_ANIM : POLL_IDLE;
+
+            if (s->scroll_max > 0)
+            {
+                if (s->scroll_wait > 0)
+                    s->scroll_wait--;
+                else
+                {
+                    s->scroll_px += s->scroll_dir * SCROLL_STEP;
+                    if (s->scroll_px >= s->scroll_max)
+                    {
+                        s->scroll_px = s->scroll_max;
+                        s->scroll_dir = -1;
+                        s->scroll_wait = SCROLL_PAUSE;
+                    }
+                    else if (s->scroll_px <= 0)
+                    {
+                        s->scroll_px = 0;
+                        s->scroll_dir = 1;
+                        s->scroll_wait = SCROLL_PAUSE;
+                    }
+                }
+            }
+            break;
+
+        default:
+            if (default_event_handler(action) == SYS_USB_CONNECTED)
+                return DIALOG_ABORT;
+            break;
+    }
+    return DIALOG_CONTINUE;
+}
+
 bool folder_select(char * header_text, char* setting, int setting_len)
 {
-    struct folder *root;
-    struct simplelist_info info;
+    static const struct dialog_callbacks cb = {
+        .measure   = folder_measure,
+        .draw      = folder_draw,
+        .on_action = folder_on_action,
+    };
+    struct folder_dlg s;
+    struct dialog d;
+    struct dialog_style style;
     size_t buf_size;
     bool changed = false;
+    int res;
 
     /* Upstream took the plugin buffer here; this is the same region under the
      * name it has since the plugin system went (system/app_buffer.h).
@@ -605,32 +867,55 @@ bool folder_select(char * header_text, char* setting, int setting_len)
     buffer_front = app_claim_buffer(&buf_size, "folder select");
     buffer_end = buffer_front + buf_size;
     logf("folder_select %d bytes free", (int)(buffer_end - buffer_front));
-    root = load_root();
+    s.root = load_root();
 
     logf("folders in: %s", setting);
     /* Load previous selection(s) */
-    select_paths(root, setting);
+    select_paths(s.root, setting);
     /* open the root so the top-level folders show right away */
-    if (child_load(&root->children[0], root))
-        root->children[0].expanded = true;
+    if (child_load(&s.root->children[0], s.root))
+        s.root->children[0].expanded = true;
     /* get current hash to check for changes later */
-    uint32_t hash = save_folders(root, hashed.buf, setting_len);
-    simplelist_info_init(&info, header_text, count_items(root), root);
-    info.get_name = folder_get_name;
-    info.get_icon = folder_get_icon;
-    info.action_callback = folder_action_callback;
-    /* Distinct activity so the theme can style the picker (expand/select icons)
-     * without colliding with the settings list it was opened from. */
+    uint32_t hash = save_folders(s.root, hashed.buf, setting_len);
+
+    s.selected = 0;
+    s.top_row = 0;
+    s.visible_rows = 1;
+    s.scroll_row = -1;
+    s.scroll_px = 0;
+    s.scroll_max = 0;
+    s.scroll_dir = 1;
+    s.scroll_wait = SCROLL_PAUSE;
+
+    /* Rows are buttons, but a tree of outlined boxes reads as clutter. An
+     * unselected row is borderless and takes the box's own fill, so it is just
+     * the glyph and the name; only the selected one becomes a shape, in the
+     * accent. Same treatment as the database search dialog. */
+    style = *dialog_get_default_style();
+    style.box_margin = BOX_PAD;     /* the default 10 costs a row of height */
+    style.button_border_width = 0;
+    style.button_bg = DIALOG_COLOR_INHERIT;
+    style.button_fg = DIALOG_COLOR_INHERIT;
+    style.button_bg_selected = DIALOG_COLOR_ACCENT;
+    style.button_fg_selected = DIALOG_COLOR_ON_ACCENT;
+
+    /* Distinct activity so a theme can style the status bar behind the box
+     * without colliding with the settings list it was opened from. The enum is
+     * a skin ABI -- removing a member renumbers %cs for every theme -- so this
+     * stays whether or not a theme uses it. */
     push_current_activity(ACTIVITY_FOLDERSELECT);
-    simplelist_show_list(&info);
+    dialog_init(&d, CONTEXT_LIST, header_text, &style, &cb, &s);
+    res = dialog_run(&d, POLL_IDLE);
     pop_current_activity();
+
     logf("folder_select %d bytes free", (int)(buffer_end - buffer_front));
-    /* done editing. check for changes */
-    if (hash != save_folders(root, hashed.buf, setting_len))
+    /* done editing. check for changes -- but not after USB took the screen:
+     * the tree is discarded then, and a yes/no put up now would run behind it */
+    if (res != DIALOG_ABORT && hash != save_folders(s.root, hashed.buf, setting_len))
     {  /* prompt for saving changes and commit if yes */
         if (yesno_pop(ID2P(LANG_SAVE_CHANGES)))
         {
-            save_folders(root, setting, setting_len);
+            save_folders(s.root, setting, setting_len);
             settings_save();
             logf("folders out: %s", setting);
             changed = true;

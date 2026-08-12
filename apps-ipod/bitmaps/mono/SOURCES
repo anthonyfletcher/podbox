@@ -13,3 +13,15 @@ default_icons.bmp
 podbox_icon_album.bmp
 podbox_icon_artist.bmp
 podbox_icon_track.bmp
+
+/* Row state for the folder picker: an expand chevron and a checkbox side by
+ * side, one bitmap per (expanded, included) pair, plus a leaf pair with no
+ * chevron for a folder that has nothing under it. Same reasoning as above --
+ * the picker's state must not depend on a theme drawing it, which is what an
+ * iconset entry would mean. */
+podbox_folder_closed_off.bmp
+podbox_folder_closed_on.bmp
+podbox_folder_open_off.bmp
+podbox_folder_open_on.bmp
+podbox_folder_leaf_off.bmp
+podbox_folder_leaf_on.bmp
