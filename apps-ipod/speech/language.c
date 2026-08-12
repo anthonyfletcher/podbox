@@ -36,6 +36,12 @@
 static unsigned char language_buffer[MAX_LANGUAGE_SIZE];
 static unsigned char lang_options = 0;
 
+/* Bytes of language_buffer holding the loaded .lng; the rest is spare and
+ * lang_override.c writes there. Only ever set on the path that fills the
+ * buffer -- a load that fails leaves the previous language in place, and the
+ * pointers into it still live. */
+static int language_buffer_used = 0;
+
 void lang_init(const unsigned char *builtin, unsigned char **dest, int count)
 {
     while(count--) {
@@ -81,6 +87,7 @@ int lang_load(const char *filename, const unsigned char *builtin,
             lseek(fd, foffset, SEEK_SET);
             read(fd, buffer, lang_size);
             buffer[max_lang_size - 1] = '\0'; /* ensure buffer is null terminated */
+            language_buffer_used = lang_size; /* before the walk consumes it */
             while(lang_size>3) {
                 id = ((buffer[0]<<8) | buffer[1]); /* get two-byte id */
                 buffer += 2;                       /* pass the id */
@@ -114,6 +121,14 @@ int lang_core_load(const char *filename)
     return lang_load(filename, core_language_builtin, language_strings,
                      language_buffer, 0, MAX_LANGUAGE_SIZE,
                      LANG_LAST_INDEX_IN_ARRAY);
+}
+
+/* The unused tail of the language buffer. With no .lng loaded that is all of
+   it, around 27KB. */
+unsigned char *lang_spare_buffer(int *size)
+{
+    *size = MAX_LANGUAGE_SIZE - language_buffer_used;
+    return language_buffer + language_buffer_used;
 }
 
 int lang_english_to_id(const char *english)

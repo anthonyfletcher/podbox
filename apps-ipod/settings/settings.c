@@ -48,6 +48,7 @@
 #include "usb.h"
 #include "backlight.h"
 #include "audio.h"
+#include "speech/lang_override.h"
 #include "speech/talk.h"
 #include "string-extra.h"
 #include "rtc.h"
@@ -1118,6 +1119,9 @@ void settings_apply(bool read_disk)
             lang_core_load(buf);
             CHART("<lang_core_load");
         }
+        /* Last, because loading a .lng points every string back at the
+         * built-in one first. */
+        lang_override_load();
         CHART(">talk_init");
         talk_init(); /* use voice of same language */
         CHART("<talk_init");

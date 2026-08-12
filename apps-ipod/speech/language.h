@@ -38,6 +38,9 @@ int lang_load(const char *filename, const unsigned char *builtin,
               unsigned int user_num, int max_lang_size,
               unsigned int max_id);
 
+/* the part of the language buffer no loaded .lng is using */
+unsigned char *lang_spare_buffer(int *size);
+
 /* get the ID of an english string so it can be localised */
 int lang_english_to_id(const char *english);
 /* get the english string of a given id */
