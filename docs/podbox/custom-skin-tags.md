@@ -269,6 +269,67 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 
 ---
 
+## Changed behaviour: `%dr` opacity
+
+```
+%dr(x, y, width, height [, start_colour] [, end_colour] [, opacity])
+```
+
+A seventh argument tints the rectangle instead of filling it: `opacity` runs
+from `0` (invisible) to `15` (opaque), and leaving it out means opaque, so every
+`%dr` you have already written behaves exactly as before.
+
+Optional arguments are positional, so reaching the seventh means writing the two
+colours. Give them as `-` to keep the viewport's own foreground — which is what
+you want when the dynamic-colour palette is driving that colour.
+
+**Two placement rules, and a tint is invisible or wrong if you break either.**
+
+**1. It goes in a `%VB` viewport.** Drawn into the normal foreground layer a
+tint survives right up until the first line of text crosses it, because every
+text line repaints its own strip of background first. In the backdrop layer the
+opposite happens: that repaint *restores* the tint, and text drawn over it
+blends into it.
+
+**2. It goes in the same viewport as whatever it darkens.** A `%VB` viewport
+wipes its own rectangle before it draws anything, so a tint given a viewport of
+its own has nothing left underneath and comes out as a solid block of colour.
+Put it after the `%Cd` that draws the art, in that viewport — tints are held
+back until the art has been drawn, so the order you write them in is the order
+you see.
+
+So the shape is two viewports, not three — the art and its tints, then the
+reveal, then the text:
+
+```
+%V(0,0,240,240,-)%VB%Vf(000000)%Cl(0,0,240,240,c,c)%Cd   # art into the backdrop
+%dr(20,120,200,50,-,-,8)                                 # 50% black over it
+%V(0,0,-,-,-)                                            # reveal the backdrop
+%V(20,135,200,22,2)
+Text that blends into the tint
+```
+
+Order matters: the reveal has to come after everything painted into the
+backdrop, and the text after the reveal. `%Vf(000000)` is there because `%dr`
+paints the *foreground* — without it the tint is a white wash, not a scrim.
+
+Eight tints per viewport; past that the extras are dropped.
+
+Two things to know before leaning on it:
+
+- **Use an antialiased font for text over a tint**, or the point is lost — the
+  blending happens at the glyph edges. Every font shipped with Themify_2 is
+  antialiased; a font you convert yourself with `convbdf` is not.
+- **A tint is much dearer per pixel than a plain fill**, because it has to read
+  the screen as well as write it. In the backdrop layer this costs nothing per
+  frame — `%dr` is only redrawn on a full repaint — but a full-screen tint is
+  still noticeable when the screen does repaint.
+
+Gradients and opacity do not combine: if you give both an `end_colour` and an
+opacity, the tint uses the start colour.
+
+---
+
 ## Changed behaviour: `%ft` key matching
 
 `%ft(file, key)` (read the text following `key` in a file) now **trims

@@ -36,6 +36,15 @@ static const struct tag_info custom_tags[] =
      * upstream Rockbox -- true of every tag in this file, and not new. */
     TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sss", 0|NOBREAK),
 
+    /* Shadows upstream's %dr ("[IP][IP][ip][ip]|ss"): the same token with one
+     * more optional parameter, opacity 0..15, absent meaning opaque. Optional
+     * parameters are positional, so reaching it means writing the two colours
+     * as '-' -- parse_drawrectangle() accepts that and keeps the viewport's
+     * foreground, which is what a panel tinted by the dynamic-colour palette
+     * needs. Only useful inside a %VB viewport; see lcd_blendrect(). */
+    TAG(SKIN_TOKEN_DRAWRECTANGLE, "dr", "[IP][IP][ip][ip]|ssi",
+        SKIN_REFRESH_STATIC),
+
     /* %tw/%Vw/%Vh transform or report their arguments and are consumed by an
      * enclosing %if/%sel, whose conditional render path drives the redraw, so
      * flag 0 (inherit) is right: the line's refresh follows its arguments.

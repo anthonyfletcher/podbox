@@ -603,6 +603,13 @@ extern void lcd_gradient_fillrect(int x, int y, int width, int height,
                                     unsigned start_rgb, unsigned end_rgb);
 extern void lcd_gradient_fillrect_part(int x, int y, int width, int height,
             unsigned start_rgb, unsigned end_rgb, int src_height, int row_skip);
+#if defined(HAVE_LCD_COLOR) && !defined(DISABLE_ALPHA_BITMAP)
+/* Fill with the foreground colour at `opacity`, blended with what is already
+ * there. 0 draws nothing, 15 is fully opaque. */
+extern void lcd_blendrect(int x, int y, int width, int height,
+                          unsigned opacity);
+#define LCD_BLEND_OPAQUE 15
+#endif
 extern void lcd_draw_border_viewport(void);
 extern void lcd_fill_viewport(void);
 extern void lcd_bitmap_part(const fb_data *src, int src_x, int src_y,

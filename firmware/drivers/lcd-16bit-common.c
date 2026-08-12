@@ -433,6 +433,58 @@ static inline unsigned blend_two_colors(unsigned c1, unsigned c2, unsigned a)
 #endif
 }
 
+/* Fill a rectangle with the viewport's foreground colour at `opacity`, blended
+ * with what is already in the destination. 0 draws nothing, ALPHA_MASK is fully
+ * opaque. Always a foreground paint; drawmode is not consulted.
+ *
+ * Read-modify-write on the destination, so roughly an order of magnitude dearer
+ * per pixel than lcd_fillrect()'s memset16. Colour and opacity are both
+ * constant, which lets the compiler hoist blend_two_colors()' spread and its
+ * second multiply out of the loop -- the font path cannot, because its alpha
+ * varies per pixel.
+ *
+ * Worth knowing before reaching for it: this is only useful drawn into the
+ * backdrop buffer. Every skin text line opaquely clears its own strip before
+ * drawing, so a blend written straight to the framebuffer is destroyed by the
+ * first line that crosses it. */
+void lcd_blendrect(int x, int y, int width, int height, unsigned opacity)
+{
+    struct viewport *vp = lcd_current_viewport;
+    fb_data *dst, *dst_end;
+    unsigned fg, alpha;
+    int len, step;
+
+    if (opacity == 0)
+        return;
+    if (opacity > ALPHA_MASK)
+        opacity = ALPHA_MASK;
+
+    if (!clip_viewport_rect(vp, &x, &y, &width, &height, NULL, NULL))
+        return;
+
+    /* blend_two_colors() takes the font convention, which runs the other way:
+     * 0 is fully opaque foreground, ALPHA_MASK fully transparent. */
+    alpha = ALPHA_MASK - opacity;
+    fg = vp->fg_pattern;
+
+    dst = FBADDR(x, y);
+    dst_end = FBADDR(x + width - 1, y + height - 1);
+
+    len  = STRIDE_MAIN(width, height);
+    step = STRIDE_MAIN(ROW_INC, COL_INC);
+
+    do
+    {
+        fb_data *px = dst;
+        fb_data *px_end = px + len;
+        do
+            *px = blend_two_colors(*px, fg, alpha);
+        while (++px < px_end);
+        dst += step;
+    }
+    while (dst <= dst_end);
+}
+
 static void ICODE_ATTR lcd_alpha_bitmap_part_mix(
     const fb_data* image, const unsigned char *alpha,
     int src_x, int src_y,

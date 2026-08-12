@@ -107,6 +107,10 @@ struct screen
     void (*backlight_set_timeout)(int index);
     bool (*backdrop_load)(const char *filename, char* backdrop_buffer);
     void (*backdrop_show)(char* backdrop_buffer);
+    /* Foreground fill at `opacity` (0 draws nothing, LCD_BLEND_OPAQUE is
+     * opaque), blended with what is already there. Only useful drawn into the
+     * backdrop buffer -- see lcd_blendrect(). */
+    void (*blendrect)(int x, int y, int width, int height, unsigned opacity);
     void (*gradient_fillrect)(int x, int y, int width, int height,
             unsigned start, unsigned end);
     void (*gradient_fillrect_part)(int x, int y, int width, int height,

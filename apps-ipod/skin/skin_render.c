@@ -69,6 +69,10 @@
 
 #define MAX_LINE 1024
 
+/* Tinted %dr rectangles held back per viewport; see pending_blend below. Beyond
+ * this many in one viewport the extras are dropped rather than mis-ordered. */
+#define SKIN_MAX_PENDING_BLENDS 8
+
 struct skin_draw_info {
     struct gui_wps *gwps;
     struct skin_viewport *skin_vp;
@@ -93,6 +97,20 @@ struct skin_draw_info {
      * it AFTER write_line(), the same way real images are drawn after the line
      * loop. NULL when the current line has no album art. */
     const struct bitmap *pending_aa;
+
+    /* Same problem one step further out. A tinted %dr composites with whatever
+     * is under it, and the album art and images are drawn once for the whole
+     * viewport by wps_display_images() -- after every line. Drawn where the tag
+     * sits, a tint would land under the art and vanish. Queued here instead and
+     * flushed after wps_display_images().
+     *
+     * So a tint only ever covers content from its OWN viewport. The viewport's
+     * clear_viewport() fills with bg_pattern when drawing into the backdrop
+     * buffer (lcd-16bit-common.c), which destroys whatever an earlier viewport
+     * put there -- so a tint in a viewport of its own has nothing to blend
+     * with. It belongs in the same viewport as the art it darkens. */
+    const struct draw_rectangle *pending_blend[SKIN_MAX_PENDING_BLENDS];
+    int pending_blend_count;
 };
 
 extern void sb_set_info_vp(enum screen_type screen, OFFSETTYPE(char*) label);
@@ -381,6 +399,13 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 struct draw_rectangle *rect =
                         SKINOFFSETTOPTR(skin_buffer, token->value.data);
                 if (!rect) break;
+                if (rect->opacity < LCD_BLEND_OPAQUE)
+                {
+                    /* Held back until after the art -- see pending_blend. */
+                    if (info->pending_blend_count < SKIN_MAX_PENDING_BLENDS)
+                        info->pending_blend[info->pending_blend_count++] = rect;
+                    break;
+                }
                 unsigned dr_start = dynamic_colors_resolve(rect->start_colour);
                 unsigned dr_end = dynamic_colors_resolve(rect->end_colour);
                 if (dr_start != dr_end &&
@@ -1069,6 +1094,20 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         line = SKINOFFSETTOPTR(skin_buffer, line->next);
     }
     wps_display_images(gwps, &skin_viewport->vp);
+
+    /* Tints go last: they blend with what is beneath them, which includes the
+     * album art and images wps_display_images() has just drawn. */
+    for (int i = 0; i < info.pending_blend_count; i++)
+    {
+        const struct draw_rectangle *rect = info.pending_blend[i];
+        unsigned backup = skin_viewport->vp.fg_pattern;
+        /* Start colour only. A tinted gradient would need a per-row blend and
+         * nothing wants one yet. */
+        skin_viewport->vp.fg_pattern = dynamic_colors_resolve(rect->start_colour);
+        display->blendrect(rect->x, rect->y, rect->width, rect->height,
+                           rect->opacity);
+        skin_viewport->vp.fg_pattern = backup;
+    }
 }
 
 void skin_render(struct gui_wps *gwps, unsigned refresh_mode)

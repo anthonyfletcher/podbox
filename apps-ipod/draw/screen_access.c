@@ -156,6 +156,7 @@ struct screen screens[NB_SCREENS] =
         .backlight_set_timeout=&backlight_set_timeout,
         .backdrop_load=&backdrop_load,
         .backdrop_show=&backdrop_show,
+        .blendrect = lcd_blendrect,
         .gradient_fillrect = lcd_gradient_fillrect,
         .gradient_fillrect_part = lcd_gradient_fillrect_part,
         .put_line = screen_helper_put_line,

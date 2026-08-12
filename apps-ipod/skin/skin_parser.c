@@ -666,19 +666,38 @@ static int parse_drawrectangle( struct skin_element *element,
     rect->start_colour = curr_vp->vp.fg_pattern;
     rect->end_colour = curr_vp->vp.fg_pattern;
 
-    if (element->params_count > 4)
+    /* The colours accept '-' as well as being absent, so an opacity can be
+     * given without one -- which is what a panel tinted in the viewport's own
+     * (possibly album-derived) foreground needs. */
+    if (element->params_count > 4 && !isdefault(get_param(element, 4)))
     {
         if (!parse_color(curr_screen, get_param_text(element, 4),
                     &rect->start_colour))
             return -1;
         rect->end_colour = rect->start_colour;
     }
-    if (element->params_count > 5)
+    if (element->params_count > 5 && !isdefault(get_param(element, 5)))
     {
         if (!parse_color(curr_screen, get_param_text(element, 5),
                     &rect->end_colour))
             return -1;
     }
+
+    /* Seventh parameter: opacity, 0..LCD_BLEND_OPAQUE. Absent means opaque, so
+     * every %dr written before this existed keeps the plain fill path. */
+    rect->opacity = LCD_BLEND_OPAQUE;
+    if (element->params_count > 6)
+    {
+        param = get_param(element, 6);
+        if (!isdefault(param))
+        {
+            if (param->data.number < 0 ||
+                param->data.number > LCD_BLEND_OPAQUE)
+                return -1;
+            rect->opacity = (uint8_t)param->data.number;
+        }
+    }
+
     token->value.data = PTRTOSKINOFFSET(skin_buffer, rect);
 
     return 0;

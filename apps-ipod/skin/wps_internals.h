@@ -142,6 +142,9 @@ struct draw_rectangle {
     int16_t height;
     unsigned start_colour;
     unsigned end_colour;
+    /* 0..LCD_BLEND_OPAQUE; opaque unless the theme said otherwise, so every
+     * existing %dr keeps taking the plain fill path. */
+    uint8_t opacity;
 };
 
 struct align_pos {
