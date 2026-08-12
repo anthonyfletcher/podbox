@@ -212,6 +212,10 @@ static fb_data aat_band[AAT_BAND_MAX * ART_CACHE_MAX_DIM];
 static struct img_filter art_filter;
 static char art_filter_spec[ARTWORK_FILTER_MAX];
 
+/* The message outlives the compile it came from: `next` below is a local, and
+ * the caller reads *err after this function has returned. */
+static char art_filter_err[IMG_FILTER_ERR_MAX];
+
 bool art_filter_set(const char *spec, const char **err, bool *changed)
 {
     struct img_filter next;
@@ -229,7 +233,10 @@ bool art_filter_set(const char *spec, const char **err, bool *changed)
     if (!img_filter_compile(spec, IMG_CLASSES_INPLACE, &next))
     {
         if (err)
-            *err = next.error;
+        {
+            strmemccpy(art_filter_err, next.error, sizeof(art_filter_err));
+            *err = art_filter_err;
+        }
         return false;
     }
 
