@@ -503,8 +503,11 @@ static void format_line(struct playlist_entry* track, char* str,
                         int len)
 {
     char *id3viewc = NULL;
-    /* the currently playing track is bracketed, so it is identifiable
-     * without relying on colour or an icon */
+    /* Playing, moving and queued are all marked in the row text, in the same
+     * order playlist_callback_icons() picks its glyph. The icon is not enough
+     * on its own: `playlist viewer icons` off unhooks the callback entirely,
+     * and a theme need never map the ids. Move mode in particular is unusable
+     * blind -- you are dragging a track you cannot see. */
     char *skipped, *prefix, *suffix;
     skipped = prefix = suffix = "";
     if (track->index == viewer.current_playing_track)
@@ -512,6 +515,10 @@ static void format_line(struct playlist_entry* track, char* str,
         prefix = "[";
         suffix = "]";
     }
+    else if (track->index == viewer.moving_playlist_index)
+        prefix = ">";
+    else if (track->attr & PLAYLIST_ATTR_QUEUED)
+        prefix = "+";
     if (track->attr & PLAYLIST_ATTR_SKIPPED)
         skipped = "(ERR) ";
     if (!(track->attr & PLAYLIST_ATTR_RETRIEVE_ID3_ATTEMPTED))
