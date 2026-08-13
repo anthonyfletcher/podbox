@@ -549,6 +549,8 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &sep_menu,
             &db_albumart,
             &db_artistart,
+            &wps_art_source,          /* general_settings.c, also under
+                                         Playback with the rest of that screen */
             &artwork_filter_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */

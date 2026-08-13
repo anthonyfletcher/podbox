@@ -18082,13 +18082,13 @@
   desc: in Theme settings, which picture the now-playing screen shows
   user: core
   <source>
-    *: "Artwork"
+    *: "Now Playing Artwork"
   </source>
   <dest>
-    *: "Artwork"
+    *: "Now Playing Artwork"
   </dest>
   <voice>
-    *: "Artwork"
+    *: "Now playing artwork"
   </voice>
 </phrase>
 <phrase>

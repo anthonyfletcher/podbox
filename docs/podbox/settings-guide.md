@@ -57,10 +57,13 @@ Settings
 └─ Changed Settings…           everything no longer at its default
 ```
 
-One screen appears in more than one place on purpose, as the same screen rather
-than a copy: **Viewers** is under both Appearance and Library, because
+Two things appear in more than one place on purpose, each as the same item
+rather than a copy. **Viewers** is under both Appearance and Library, because
 the viewers are opened from the browsers and look the way the theme tells them
-to.
+to. **Now Playing Artwork** is under both Appearance ▸ Elements and Playback ▸
+What's Playing Screen: it is the one row of that screen about how anything
+looks, and it belongs with the other two artwork rows as much as with the
+screen it applies to.
 
 ---
 
@@ -241,7 +244,7 @@ out here.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
+| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 | Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
 | Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
 

@@ -692,8 +692,12 @@ MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET_CONTEXT_ITEMS), reset_wps_i
                   NULL, Icon_Queued);
 
 /* Which picture the screen shows. A property of this screen rather than of the
- * theme: no skin sets it, and a theme that wanted to could not. */
-MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
+ * theme: no skin sets it, and a theme that wanted to could not.
+ *
+ * Exported because it is the one row here that is also about how the player
+ * looks, so Appearance lists it too -- the same item in both places rather
+ * than two items over one variable. */
+MENUITEM_SETTING_EXPORTED(wps_art_source, &global_settings.wps_art_source, NULL);
 
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&wps_art_source
