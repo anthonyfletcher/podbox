@@ -308,6 +308,25 @@ bool gui_synclist_flush_inhibited(void)
     return list_flush_inhibited;
 }
 
+/* The opening draw of a list screen, drawn twice.
+ *
+ * A skinned list's conditionals are shared state: on the first pass they still
+ * hold whatever the previous screen left them at -- most visibly %?La, whose
+ * album-layout viewports render the top row at the wrong height -- and only a
+ * second pass sees what this screen set. Any keypress already produces that
+ * second pass, which is why the wrong frame never survives interaction.
+ *
+ * The first pass is flush-inhibited, so it settles the conditionals without
+ * ever reaching the panel. Only the opening draw needs this; redraws inside an
+ * event loop already start from a settled state. */
+void gui_synclist_draw_settled(struct gui_synclist *lists)
+{
+    gui_synclist_inhibit_flush(true);
+    gui_synclist_draw(lists);
+    gui_synclist_inhibit_flush(false);
+    gui_synclist_draw(lists);
+}
+
 /*
  * Force a full screen update.
  */
@@ -1005,20 +1024,8 @@ bool simplelist_show_list(struct simplelist_info *info)
 
     gui_synclist_select_item(&lists, info->selection);
 
-    /* Draw twice to settle the first frame, the first pass flush-inhibited so
-     * it never reaches the screen. A skinned list's shared conditionals still
-     * hold whatever the previous screen left them at on the opening pass --
-     * most visibly %?La, whose album-layout viewports render the top row in a
-     * transient state -- and a second pass renders it clean, the same way any
-     * keypress already would.
-     *
-     * Same fix as do_menu()'s menu_draw_settled(), update_dir() in browser.c
-     * and main_menu_config.c. Here rather than in each caller so that every
-     * simplelist screen gets it. */
-    gui_synclist_inhibit_flush(true);
-    gui_synclist_draw(&lists);
-    gui_synclist_inhibit_flush(false);
-    gui_synclist_draw(&lists);
+    /* Here rather than in each caller, so every simplelist screen gets it. */
+    gui_synclist_draw_settled(&lists);
 
     if (info->speak_onshow)
         gui_synclist_speak_item(&lists);

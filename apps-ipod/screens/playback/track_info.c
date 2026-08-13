@@ -502,7 +502,7 @@ refresh_info:
         gui_synclist_set_voice_callback(&id3_lists, id3_speak_item);
     gui_synclist_set_nb_items(&id3_lists, info.count);
     gui_synclist_set_title(&id3_lists, str(LANG_TRACK_INFO), NOICON);
-    gui_synclist_draw(&id3_lists);
+    gui_synclist_draw_settled(&id3_lists);
     gui_synclist_speak_item(&id3_lists);
     while (true) {
         if(!list_do_action(CONTEXT_LIST,HZ/2, &id3_lists, &key)

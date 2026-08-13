@@ -705,16 +705,10 @@ static int update_dir(void)
                  < top_item + gui_synclist_get_nb_lines(list, SCREEN_MAIN))
             gui_synclist_set_top_item(list, top_item);
     }
-    /* Draw twice to settle the top row: after a change between lists of
-     * different row heights (tall album-art rows <-> ordinary rows) the shared
-     * %?La conditional flips on the first row, leaving its album-layout
-     * viewports in a transient state; a second pass renders it clean, the same
-     * way any user interaction already does. The first pass is flush-inhibited
-     * so that transient frame never reaches the screen (no flicker). */
-    gui_synclist_inhibit_flush(true);
-    gui_synclist_draw(list);
-    gui_synclist_inhibit_flush(false);
-    gui_synclist_draw(list);
+    /* Settled, because moving between lists of different row heights (tall
+     * album-art rows <-> ordinary rows) is exactly what leaves the shared
+     * conditionals wrong for a frame. */
+    gui_synclist_draw_settled(list);
     gui_synclist_speak_item(list);
     return tc.filesindir;
 }

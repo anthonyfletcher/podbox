@@ -502,16 +502,9 @@ bool option_screen(const struct settings_list *setting,
     gui_synclist_set_nb_items(&lists, nb_items);
     gui_synclist_select_item(&lists, selected);
 
-    /* Draw twice to settle the first frame, the first pass flush-inhibited so
-     * it never reaches the screen. The shared skin conditionals still hold
-     * what the menu behind this left them at on the opening pass -- %?La most
-     * visibly, which sets the row height -- and only a second pass sees this
-     * list's own state. Same fix as menu_draw_settled() and update_dir(); this
-     * is the most-opened list in the firmware, so it is worth its own copy. */
-    gui_synclist_inhibit_flush(true);
-    gui_synclist_draw(&lists);
-    gui_synclist_inhibit_flush(false);
-    gui_synclist_draw(&lists);
+    /* The most-opened list in the firmware, and the one behind every setting
+     * row, so it inherits whatever the menu left the conditionals at. */
+    gui_synclist_draw_settled(&lists);
     /* talk the item */
     gui_synclist_speak_item(&lists);
     while (!done)

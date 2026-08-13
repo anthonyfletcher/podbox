@@ -320,16 +320,7 @@ int main_menu_config(void)
     gui_synclist_set_icon_callback(&list, menu_get_icon);
     gui_synclist_set_nb_items(&list, menu_item_count);
     gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
-    /* Draw twice to settle the top row: entering from a list of a different
-     * row height (e.g. a tall album-art list) leaves the shared %?La album
-     * conditional transiently true on the first row, flashing its album-layout
-     * viewports for one frame -- the same issue tree.c's update_dir() fixes.
-     * The first pass is flush-inhibited so that transient frame never reaches
-     * the screen. */
-    gui_synclist_inhibit_flush(true);
-    gui_synclist_draw(&list);
-    gui_synclist_inhibit_flush(false);
-    gui_synclist_draw(&list);
+    gui_synclist_draw_settled(&list);
     gui_synclist_speak_item(&list);
 
 

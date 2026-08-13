@@ -834,7 +834,12 @@ static void update_gui(struct gui_synclist * playlist_lists, bool init)
                   &playlist_callback_icons:NULL);
     gui_synclist_set_title(playlist_lists, viewer.title, Icon_Playlist);
     gui_synclist_select_item(playlist_lists, viewer.selected_track);
-    gui_synclist_draw(playlist_lists);
+    /* init marks the passes that open the screen; the rest are redraws of a
+       list already on screen, which need no settling. */
+    if (init)
+        gui_synclist_draw_settled(playlist_lists);
+    else
+        gui_synclist_draw(playlist_lists);
     gui_synclist_speak_item(playlist_lists);
 }
 

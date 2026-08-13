@@ -459,6 +459,11 @@ void browse_cuesheet(struct cuesheet *cue)
                                  2*cue_find_current_track(cue, id3->elapsed));
     }
 
+    /* The loop below redraws at the top of every pass, so the opening frame is
+       settled here rather than there -- the alternative settles again on every
+       keypress. */
+    gui_synclist_draw_settled(&lists);
+
     while (!done)
     {
         gui_synclist_draw(&lists);

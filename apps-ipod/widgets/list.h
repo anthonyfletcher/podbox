@@ -217,6 +217,11 @@ extern int gui_synclist_get_nb_items(struct gui_synclist * lists);
 extern int  gui_synclist_get_sel_pos(struct gui_synclist * lists);
 
 extern void gui_synclist_draw(struct gui_synclist * lists);
+/* The opening draw of a list screen: draws twice so the shared skin
+   conditionals are settled, with the first pass never reaching the panel.
+   Use it wherever a list is first shown; plain gui_synclist_draw() for the
+   redraws after that. */
+void gui_synclist_draw_settled(struct gui_synclist *lists);
 /* Suppress the LCD flush of the next list draw(s) -- render only, no update. */
 void gui_synclist_inhibit_flush(bool inhibit);
 bool gui_synclist_flush_inhibited(void);
