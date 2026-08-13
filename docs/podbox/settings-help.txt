@@ -1024,3 +1024,47 @@ awkwardly on one that does not.
 Stops long entries scrolling on the main menu, leaving them truncated. The main
 menu is glanced at rather than read, and text moving under the cursor there is
 more distracting than helpful.
+
+# Action rows. These have no cfg name, so they are keyed by their label under
+# an "action: " namespace. Renaming a row orphans its stanza -- Explain then
+# says there is nothing, which is the safe way to fail.
+
+[action: Update Database]
+Looks for music added or changed since the last scan and folds it into the
+database. The fix for a new album not showing up in the Music browser.
+
+Much quicker than a rebuild, because it only reads what it has to.
+
+[action: Rebuild Database]
+Throws the database away and reads every file on the player again.
+
+Slow -- minutes on a full disk -- and rarely what you want: Update Database
+finds new music on its own. Worth it only if the database looks wrong rather
+than merely incomplete.
+
+[action: Update Index]
+Refreshes the album and artist lists that Album Covers, Artist Portraits and the
+listening charts read. Fixes a browser that disagrees with the database.
+
+[action: Rebuild Index]
+Discards those album and artist lists and derives them from the database again.
+Only useful if updating did not fix it.
+
+[action: Update Art Cache]
+Generates thumbnails for artwork that does not have one yet.
+
+The cache stops once it has covered everything it knew about, so artwork added
+to folders it has already been through -- artist photographs especially -- is
+never picked up on its own. This is how you ask.
+
+[action: Rebuild Art Cache]
+Deletes every thumbnail and generates them all again from the original images.
+
+Slow. Use it after changing Fast Build, which only affects thumbnails made from
+then on, or if the cached images themselves look wrong.
+
+[action: Rescan Documents & Images]
+Rebuilds the flat Documents and Images lists from a walk of the disk.
+
+It reruns itself after a USB session, which is when files normally change, so
+this is for when they changed some other way.

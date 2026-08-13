@@ -294,12 +294,11 @@ static bool item_hidden(const struct menu_item_ex *item, int depth)
  * press. The 5G powers its ATA interface down after seven idle seconds, so
  * that turns a button press into a possible disk spin-up. The file is read
  * only when someone actually asks. */
-static void explain_setting(const struct settings_list *setting)
+static void explain(const char *key, const char *title)
 {
     char text[512];
 
-    if (!setting->cfg_name
-        || !settings_help_lookup(setting->cfg_name, text, sizeof text))
+    if (!key || !settings_help_lookup(key, text, sizeof text))
     {
         splash(HZ, ID2P(LANG_NO_EXPLANATION));
         return;
@@ -307,10 +306,39 @@ static void explain_setting(const struct settings_list *setting)
 
     FOR_NB_SCREENS(i)
         viewportmanager_theme_enable(i, false, NULL);
-    view_text(setting->lang_id != -1 ? (const char *)str(setting->lang_id)
-                                     : setting->cfg_name, text);
+    view_text(title, text);
     FOR_NB_SCREENS(i)
         viewportmanager_theme_undo(i, false);
+}
+
+static void explain_setting(const struct settings_list *setting)
+{
+    explain(setting->cfg_name,
+            setting->lang_id != -1 ? (const char *)str(setting->lang_id)
+                                   : setting->cfg_name);
+}
+
+/* An action row -- Rebuild Database, Clear Backdrop -- has no settings_list
+ * entry and so no cfg name to key its help by. It is keyed by its own label
+ * instead, under an "action: " namespace so the two cannot collide:
+ *
+ *     [action: Rebuild Database]
+ *
+ * The label rather than something more stable because it is the only identity
+ * such a row has at runtime. Renaming a row therefore orphans its stanza, which
+ * shows as Explain saying there is nothing rather than as anything worse. */
+static void explain_action(const char *label)
+{
+    char key[96];
+
+    if (!label)
+    {
+        splash(HZ, ID2P(LANG_NO_EXPLANATION));
+        return;
+    }
+
+    snprintf(key, sizeof key, "action: %s", label);
+    explain(key, label);
 }
 
 /* A top row asked for by whoever is about to open a menu, consumed once by the
@@ -753,6 +781,23 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                     } /* switch(do_menu()) */
                     if (menu->flags & MENU_EXITAFTERTHISMENU)
                         done = true; /* in case context_menu_show menu contains setting */
+                    redraw_lists = true;
+                }
+                else if ((type == MT_FUNCTION_CALL
+                          || type == MT_FUNCTION_CALL_W_PARAM)
+                         && (temp->flags & MENU_HAS_DESC))
+                {
+                    /* Explain only. There is nothing to reset on an action and
+                       nothing the quickscreen could do with one. Requires a
+                       fixed label, so the dynamic-text rows are left out --
+                       their text is built per draw and is nobody's key. */
+                    MENUITEM_STRINGLIST(action_op_menu,
+                                        ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                                        ID2P(LANG_EXPLAIN));
+
+                    if (do_menu(&action_op_menu, NULL, NULL, false) == 0)
+                        explain_action(P2STR(temp->callback_and_desc->desc));
+
                     redraw_lists = true;
                 }
             } /* else if (!in_stringlist) */

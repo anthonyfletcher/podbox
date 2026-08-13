@@ -14736,13 +14736,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Rebuild Cache"
+    *: "Rebuild Art Cache"
   </source>
   <dest>
-    *: "Rebuild Cache"
+    *: "Rebuild Art Cache"
   </dest>
   <voice>
-    *: "Rebuild Cache"
+    *: "Rebuild Art Cache"
   </voice>
 </phrase>
 <phrase>
@@ -14932,13 +14932,13 @@
   desc: in pictureflow
   user: core
   <source>
-    *: "Update Cache"
+    *: "Update Art Cache"
   </source>
   <dest>
-    *: "Update Cache"
+    *: "Update Art Cache"
   </dest>
   <voice>
-    *: "Update Cache"
+    *: "Update Art Cache"
   </voice>
 </phrase>
 <phrase>
