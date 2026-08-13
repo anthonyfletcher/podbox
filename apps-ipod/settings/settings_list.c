@@ -981,10 +981,11 @@ const struct settings_list settings[] = {
         INT(DEFAULT_THEME_SELECTOR_TEXT),"line selector text color",UNUSED},
 
 
-    /* Modal dialog chrome, edited under UI Settings -> Edit Theme -> Dialogs
-     * or in a theme .cfg. The metric defaults are the chrome a theme gets for
-     * saying nothing, so they are the shipped look rather than
-     * dialog_style_default()'s bare 1px square borders.
+    /* Modal dialog chrome: the metrics under Appearance -> Dialogs, the
+     * colours under Appearance -> Colours, or a theme .cfg names them all.
+     * The metric defaults are the chrome a theme gets for saying nothing, so
+     * they are the shipped look rather than dialog_style_default()'s bare
+     * 1px square borders.
      *
      * F_THEMERESET throughout is what makes "for saying nothing" true. Without
      * it every value below is inherited, so a theme is handed the last theme's

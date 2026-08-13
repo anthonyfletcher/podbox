@@ -1149,10 +1149,10 @@ static void lv_skip(int dir)
  * Entry point
  * ------------------------------------------------------------------------ */
 
-/* Hold-Menu settings, the same menu as Settings > Lyrics Viewer. The theme
- * goes back on just for the menu's own chrome, then we take the screen again
- * and re-read whatever was changed -- font, colours and spacing all move the
- * layout, so the whole screen is redrawn rather than patched. */
+/* Hold-Menu settings, the same menu as Library > Viewers > Lyrics Viewer.
+ * The theme goes back on just for the menu's own chrome, then we take the
+ * screen again and re-read whatever was changed -- font, colours and spacing
+ * all move the layout, so the whole screen is redrawn rather than patched. */
 static int lv_menu(void)
 {
     int sel = 0, ret;

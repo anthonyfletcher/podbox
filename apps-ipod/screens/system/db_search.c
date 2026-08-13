@@ -14,7 +14,7 @@
  *
  * Selecting a result returns a GO_TO_* code for root_menu.c to dispatch.
  *
- * Three settings shape it, under General Settings > Search: how many results
+ * Three settings shape it, under Library > Music > Search: how many results
  * are kept, how many letters must be typed before a scan runs, and which of
  * the three tags leads.
  *

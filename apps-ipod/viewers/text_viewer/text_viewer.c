@@ -810,9 +810,9 @@ static void tv_setup_screen(void)
     tv_apply_settings();
 }
 
-/* Hold-Menu settings menu, shared with Settings > Text viewer. Re-enables the
- * theme just for the menu chrome, then drops back to our own full-screen
- * drawing and re-applies whatever the reader changed. */
+/* Hold-Menu settings menu, shared with Library > Viewers > Text Viewer.
+ * Re-enables the theme just for the menu chrome, then drops back to our own
+ * full-screen drawing and re-applies whatever the reader changed. */
 static int tv_menu(void)
 {
     int sel = 0, ret;

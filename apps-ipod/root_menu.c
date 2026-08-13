@@ -1260,8 +1260,8 @@ void root_menu_set_default(void* setting, void* defaultval)
          * with no documents on it they would be two rows that only ever say
          * there is nothing to show.
          *
-         * That home is a setting now: General Settings > Music > Music Menu
-         * Settings turns any Music row off, and nothing here knows. Turn off
+         * That home is a setting now: Library > Music > Edit Music Menu
+         * turns any Music row off, and nothing here knows. Turn off
          * Random album there without adding it here and the feature has
          * nowhere left to be reached from -- the user's to make, but not one
          * either screen warns about. */
