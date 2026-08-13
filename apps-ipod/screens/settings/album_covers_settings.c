@@ -68,38 +68,11 @@ MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year
 MENUITEM_SETTING(album_covers_background, &global_settings.album_covers_background, NULL);
 MENUITEM_SETTING(album_covers_statusbar, &global_settings.album_covers_statusbar, NULL);
 
-/* Artwork only. Rebuild purges every cached thumbnail so they regenerate from
- * source; update fills in what is missing -- the cache thread idles once it has
- * covered the current track count, so artwork added to already-indexed folders
- * (artist photos especially, dropped in long after the music) is never picked
- * up on its own.
- *
- * These do not touch the database index. That is a list of albums and
- * artists read out of the database, holding no artwork at all, so the two go
- * stale for entirely different reasons: artwork when files change on disk, the
- * index when the database does. Rebuilding one to fix the other only costs
- * time. The index actions are in the Database menu (general_settings.c). */
-static int art_cache_menu_rebuild(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_REBUILD_CACHE)))
-        bg_task_rebuild(&art_cache_task);
-    return 0;
-}
-MENUITEM_FUNCTION(art_cache_rebuild_item, 0, ID2P(LANG_REBUILD_CACHE),
-                  art_cache_menu_rebuild, NULL, Icon_NOICON);
-
-static int art_cache_menu_update(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_UPDATE_CACHE)))
-        bg_task_update(&art_cache_task);
-    return 0;
-}
-MENUITEM_FUNCTION(art_cache_update_item, 0, ID2P(LANG_UPDATE_CACHE),
-                  art_cache_menu_update, NULL, Icon_NOICON);
-
-/* The index rebuild/update actions belong to the Database menu
- * (general_settings.c), not here: the charts read the same index, and it goes
- * stale for the database's reasons rather than the carousel's. */
+/* Rebuilding and updating the cache are not here any more: they sit with every
+ * other rebuild and update under Library > Maintenance, where the difference
+ * between them can be read off the screen rather than remembered. This screen
+ * keeps what is genuinely about the artwork cache -- how it builds, and what it
+ * could not find. */
 
 /* Off decodes the source image once per thumbnail size; on decodes it once for
  * the largest and derives the rest from that. Only affects thumbnails generated
@@ -130,9 +103,7 @@ MENUITEM_FUNCTION(art_health_artists_item, 0, ID2P(LANG_ART_HEALTH_ARTISTS),
 MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_Menu_setting,
             &art_cache_fast_build,
             &art_health_albums_item,
-            &art_health_artists_item,
-            &art_cache_rebuild_item,
-            &art_cache_update_item,
+            &art_health_artists_item,
             &debug_log_artcache);
 
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Menu_setting,

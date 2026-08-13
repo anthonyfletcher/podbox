@@ -38,6 +38,7 @@
 #include "system/activity.h"
 #include "system/bg_task.h"      /* tagcache_task, the standard triggers */
 #include "screens/covers/album_covers.h"  /* album_covers_task (the db index) */
+#include "metadata/art_cache.h"           /* art_cache_task */
 #include "files/file_index.h"
 #include "system/format_time.h"
 #include "system/volume.h"
@@ -49,12 +50,6 @@
 static void tagcache_rebuild_with_splash(void)
 {
     bg_task_rebuild(&tagcache_task);
-    splash(HZ*2, ID2P(LANG_TAGCACHE_FORCE_UPDATE_SPLASH));
-}
-
-static void tagcache_update_with_splash(void)
-{
-    bg_task_update(&tagcache_task);
     splash(HZ*2, ID2P(LANG_TAGCACHE_FORCE_UPDATE_SPLASH));
 }
 
@@ -80,10 +75,6 @@ MENUITEM_SETTING(tagcache_scan_on_startup,
                  &global_settings.tagcache_scan_on_startup, NULL);
 MENUITEM_SETTING(tagcache_autocommit,
                  &global_settings.tagcache_autocommit, NULL);
-MENUITEM_FUNCTION(tc_init, 0, ID2P(LANG_TAGCACHE_FORCE_UPDATE),
-                  (int(*)(void))tagcache_rebuild_with_splash, NULL, Icon_NOICON);
-MENUITEM_FUNCTION(tc_update, 0, ID2P(LANG_TAGCACHE_UPDATE),
-                  (int(*)(void))tagcache_update_with_splash, NULL, Icon_NOICON);
 MENUITEM_SETTING(runtimedb, &global_settings.runtimedb, NULL);
 
 MENUITEM_FUNCTION(tc_export, 0, ID2P(LANG_TAGCACHE_EXPORT),
@@ -96,39 +87,82 @@ MENUITEM_FUNCTION(tc_import, 0, ID2P(LANG_TAGCACHE_IMPORT),
 MENUITEM_FUNCTION(tc_paths, 0, ID2P(LANG_SELECT_DATABASE_DIRS),
                   dirs_to_scan, NULL, Icon_NOICON);
 
-/* The album and artist list derived from the database -- what the carousels
- * scroll and the charts rank. Rebuild discards it and reads the database
- * again; update keeps what still applies. Here rather than with the carousel
- * settings because it is derived from the database and goes stale when the
- * database changes, not when the carousel does anything. */
-static int db_summary_rebuild(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_REBUILD_INDEX)))
-        bg_task_rebuild(&album_covers_task);
-    return 0;
-}
-MENUITEM_FUNCTION(db_summary_rebuild_item, 0, ID2P(LANG_REBUILD_INDEX),
-                  db_summary_rebuild, NULL, Icon_NOICON);
-
-static int db_summary_update(void)
-{
-    if (yesno_pop_confirm(ID2P(LANG_UPDATE_INDEX)))
-        bg_task_update(&album_covers_task);
-    return 0;
-}
-MENUITEM_FUNCTION(db_summary_update_item, 0, ID2P(LANG_UPDATE_INDEX),
-                  db_summary_update, NULL, Icon_NOICON);
-
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
                 &tagcache_scan_on_startup, &tagcache_scan_on_eject,
                 &tagcache_autocommit,
                 &runtimedb, &tc_paths,
-                &tc_init, &tc_update,
-                &db_summary_rebuild_item, &db_summary_update_item,
                 &tc_export, &tc_import, &debug_log_tagcache
                 );
+
+/** Library maintenance **/
+
+/* Every rebuild and update in one screen, ordered cheapest first.
+ *
+ * They were in three menus and it hid that they disagreed with each other. The
+ * two database rows did not confirm at all -- and a full rebuild is the slowest
+ * thing the firmware does -- while the index and cache rows did. The splash was
+ * two seconds, one second, or missing. And two rows were named for the wrong
+ * verb: LANG_TAGCACHE_FORCE_UPDATE labelled the *rebuild*, and the file rescan
+ * was called "Rebuild" while calling bg_task_update().
+ *
+ * All seven are the same two calls over four tasks, so this is a table and one
+ * handler rather than seven near-identical functions. It is fewer lines than
+ * the rows it replaces, and the three inconsistencies cannot come back: there
+ * is one confirm, one splash and one naming pattern by construction.
+ *
+ * Every one of these only *queues* work -- the background task does it -- which
+ * is why the splash says started rather than done. */
+static const struct maint_action {
+    struct bg_task *task;
+    int   lang_id;
+    bool  rebuild;            /* false = update */
+} maint_actions[] = {
+    { &tagcache_task,     LANG_UPDATE_DB,      false },
+    { &album_covers_task, LANG_UPDATE_INDEX,   false },
+    { &art_cache_task,    LANG_UPDATE_CACHE,   false },
+    { &file_index_task,   LANG_RESCAN_FILES,   false },
+    { &tagcache_task,     LANG_REBUILD_DB,     true  },
+    { &album_covers_task, LANG_REBUILD_INDEX,  true  },
+    { &art_cache_task,    LANG_REBUILD_CACHE,  true  },
+};
+
+static int maint_run(void *param)
+{
+    const struct maint_action *a = &maint_actions[(intptr_t)param];
+
+    if (yesno_pop_confirm(ID2P(a->lang_id)))
+    {
+        if (a->rebuild)
+            bg_task_rebuild(a->task);
+        else
+            bg_task_update(a->task);
+        splash(HZ, ID2P(LANG_MAINT_STARTED));
+    }
+    return 0;
+}
+
+#define MAINT_ITEM(name, idx, lang)                                     \
+    MENUITEM_FUNCTION_W_PARAM(name, 0, ID2P(lang), maint_run,           \
+                              (void*)idx, NULL, Icon_NOICON)
+
+MAINT_ITEM(maint_update_db,      0, LANG_UPDATE_DB);
+MAINT_ITEM(maint_update_index,   1, LANG_UPDATE_INDEX);
+MAINT_ITEM(maint_update_cache,   2, LANG_UPDATE_CACHE);
+MAINT_ITEM(maint_rescan_files,   3, LANG_RESCAN_FILES);
+MAINT_ITEM(maint_rebuild_db,     4, LANG_REBUILD_DB);
+MAINT_ITEM(maint_rebuild_index,  5, LANG_REBUILD_INDEX);
+MAINT_ITEM(maint_rebuild_cache,  6, LANG_REBUILD_CACHE);
+
+MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
+            &maint_update_db,
+            &maint_update_index,
+            &maint_update_cache,
+            &maint_rescan_files,
+            &maint_rebuild_db,
+            &maint_rebuild_index,
+            &maint_rebuild_cache);
 
 /** File view menu **/
 MENUITEM_SETTING(sort_case, &global_settings.sort_case, NULL);
@@ -177,18 +211,6 @@ static int clear_start_directory(void)
     splash(HZ, ID2P(LANG_RESET_DONE_CLEAR));
     return false;
 }
-/* The flat Documents and Images lists come from a background walk of the
- * disk. It reruns itself after a USB session, which is when files normally
- * change; this is for when they changed some other way. */
-static int file_index_rescan(void)
-{
-    bg_task_update(&file_index_task);
-    splash(HZ, ID2P(LANG_WAIT));
-    return 0;
-}
-MENUITEM_FUNCTION(file_index_rescan_item, 0, ID2P(LANG_REBUILD_FILE_INDEX),
-                  file_index_rescan, NULL, Icon_file_view_menu);
-
 MENUITEM_FUNCTION(clear_start_directory_item, 0, ID2P(LANG_RESET_START_DIR),
                   clear_start_directory, NULL, Icon_file_view_menu);
 
@@ -202,7 +224,6 @@ MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
                 &show_path_in_browser,
                 &clear_start_directory_item
                 ,&hotkey_tree_item
-                ,&file_index_rescan_item
                 );
 static int filemenu_callback(int action,
                              const struct menu_item_ex *this_item,
@@ -722,7 +743,8 @@ MAKE_MENU(library_menu, ID2P(LANG_LIBRARY), 0, Icon_Playlist,
           &album_covers_menu,
           &tagcache_menu,
           &art_cache_menu,
-          &viewers_menu);
+          &viewers_menu,
+          &maintenance_menu);
 
 /* See the note where usb_menu is defined: this is built last because it
    gathers menus defined above it. */

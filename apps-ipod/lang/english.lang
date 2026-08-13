@@ -19410,3 +19410,73 @@
     *: "Language and text"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_LIBRARY_MAINTENANCE
+  desc: settings submenu gathering every rebuild and update action
+  user: core
+  <source>
+    *: "Maintenance"
+  </source>
+  <dest>
+    *: "Maintenance"
+  </dest>
+  <voice>
+    *: "Maintenance"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_DB
+  desc: maintenance action, find newly added tracks
+  user: core
+  <source>
+    *: "Update Database"
+  </source>
+  <dest>
+    *: "Update Database"
+  </dest>
+  <voice>
+    *: "Update database"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_DB
+  desc: maintenance action, rebuild the database from scratch
+  user: core
+  <source>
+    *: "Rebuild Database"
+  </source>
+  <dest>
+    *: "Rebuild Database"
+  </dest>
+  <voice>
+    *: "Rebuild database"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESCAN_FILES
+  desc: maintenance action, rebuild the flat Documents and Images lists
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Rescan Documents & Images"
+  </dest>
+  <voice>
+    *: "Rescan documents and images"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAINT_STARTED
+  desc: splash after a maintenance action is queued to the background
+  user: core
+  <source>
+    *: "Started in the background"
+  </source>
+  <dest>
+    *: "Started in the background"
+  </dest>
+  <voice>
+    *: "Started in the background"
+  </voice>
+</phrase>
