@@ -29,7 +29,7 @@ extern const struct menu_item_ex
                                        hotkey settings it shares a screen
                                        with */
         , wps_art_source            /* general_settings.c -- listed under both
-                                       Playback > What's Playing Screen and
+                                       Playback > Now Playing Screen and
                                        Appearance > Elements */
         , scroll_settings_menu      /* display_settings.c -- shown under UI
                                        Settings, defined beside the other

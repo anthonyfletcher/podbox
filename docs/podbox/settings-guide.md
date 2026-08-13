@@ -61,7 +61,7 @@ Two things appear in more than one place on purpose, each as the same item
 rather than a copy. **Viewers** is under both Appearance and Library, because
 the viewers are opened from the browsers and look the way the theme tells them
 to. **Now Playing Artwork** is under both Appearance ▸ Elements and Playback ▸
-What's Playing Screen: it is the one row of that screen about how anything
+Now Playing Screen: it is the one row of that screen about how anything
 looks, and it belongs with the other two artwork rows as much as with the
 screen it applies to.
 
@@ -240,7 +240,7 @@ out here.
 | Automatic Resume | Remembers how far through each track you were, and returns there rather than starting from the beginning. | off |  |
 | Resume on Automatic Track Change | Whether an automatic position is also remembered when a track changes on its own. Custom limits it to folders you nominate, which is how to keep it for podcasts without applying it to albums. | never | **Adv** |
 
-### Playback — What's Playing Screen
+### Playback — Now Playing Screen
 
 | Setting | What it does | Default | |
 |---|---|---|---|

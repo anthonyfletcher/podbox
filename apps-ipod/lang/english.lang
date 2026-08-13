@@ -16182,13 +16182,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </source>
   <dest>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </dest>
   <voice>
-    *: "What's Playing Screen"
+    *: "Now playing screen"
   </voice>
 </phrase>
 <phrase>
