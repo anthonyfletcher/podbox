@@ -2205,7 +2205,55 @@ static void pf_clear_display(void)
     screens[SCREEN_MAIN].clear_viewport();
 }
 
-static void render_slide(struct slide_data *slide, const int alpha)
+/* The screen columns a slide would occupy, [*x0, *x1), clipped to the display.
+ * False if it lands entirely off-screen.
+ *
+ * Same projection as render_slide()'s, run on the slide's two vertical edges
+ * instead of every column -- a handful of divisions rather than a walk. Used to
+ * work out what hides what before anything is drawn. */
+static bool slide_x_range(struct slide_data *slide, int *x0, int *x1)
+{
+    struct dim *bmp = surface(slide);
+    PFreal cosr, sinr, zo, screen_cx, render_cx, xs, xp;
+    int sw, lo, hi;
+
+    if (!bmp || slide->angle > 255 || slide->angle < -255)
+        return false;
+
+    sw = bmp->width;
+    cosr = fcos(slide->angle);
+    sinr = fsin(slide->angle);
+    zo = PFREAL_ONE * slide->distance
+       - fmuln(MAXSLIDE_LEFT_R, fabs(sinr), PFREAL_SHIFT - 2, 0);
+    screen_cx = (global_settings.album_covers_parallel_slides && slide->angle != 0)
+        ? fdiv(CAM_DIST * slide->cx, CAM_DIST_R + zo) : 0;
+    render_cx = (screen_cx != 0) ? 0 : slide->cx;
+
+    xs = -sw * PFREAL_HALF + PFREAL_HALF;        /* left edge */
+    xp = fdiv(CAM_DIST * (render_cx + fmul(xs, cosr)),
+              CAM_DIST_R + zo + fmul(xs, sinr)) + screen_cx;
+    lo = (fmax(DISPLAY_LEFT_R, xp) - DISPLAY_LEFT_R + PFREAL_ONE - 1)
+         >> PFREAL_SHIFT;
+
+    xs = sw * PFREAL_HALF;                       /* right edge */
+    xp = fdiv(CAM_DIST * (render_cx + fmul(xs, cosr)),
+              CAM_DIST_R + zo + fmul(xs, sinr)) + screen_cx;
+    hi = (xp - DISPLAY_LEFT_R + PFREAL_ONE - 1) >> PFREAL_SHIFT;
+
+    if (lo < 0)
+        lo = 0;
+    if (hi > LCD_WIDTH)
+        hi = LCD_WIDTH;
+    *x0 = lo;
+    *x1 = hi;
+    return lo < hi;
+}
+
+/* Draw only columns in [x_from, x_to). The projection still has to walk every
+ * column -- its state is carried forward one step at a time -- but a culled
+ * column costs two divisions instead of a column of pixels. */
+static void render_slide_clipped(struct slide_data *slide, const int alpha,
+                                 int x_from, int x_to)
 {
     struct dim *bmp = surface(slide);
     if (!bmp) {
@@ -2312,6 +2360,9 @@ static void render_slide(struct slide_data *slide, const int alpha)
             dy = (CAM_DIST_R + zo + fmul(xs, sinr)) / CAM_DIST;
         }
 
+        if (x < x_from || x >= x_to)
+            goto next_column;   /* hidden: keep the projection, skip the pixels */
+
         const pix_t *ptr = &src[column * sh];
 
 #define PIXELSTEP_Y   BUFFER_WIDTH
@@ -2367,6 +2418,7 @@ static void render_slide(struct slide_data *slide, const int alpha)
         pf_px += (pixel - px_from) / PIXELSTEP_Y;
 #endif
 
+next_column:
         if (perspective)
         {
             xsnum += xsnumi;
@@ -2387,6 +2439,21 @@ static void render_slide(struct slide_data *slide, const int alpha)
     yield();
 #endif
     return;
+}
+
+static void render_slide(struct slide_data *slide, const int alpha)
+{
+    render_slide_clipped(slide, alpha, 0, LCD_WIDTH);
+}
+
+/* Whether `near` hiding `far` is a claim the geometry actually supports: same
+ * tilt, same bitmap height, same vertical offset. See coverflow_cull(). */
+static bool slide_match(struct slide_data *near, struct slide_data *far)
+{
+    struct dim *a = surface(near), *b = surface(far);
+
+    return a && b && a->height == b->height
+        && near->angle == far->angle && near->cy == far->cy;
 }
 
 void set_current_slide(const int slide_index)
@@ -2556,10 +2623,84 @@ static void flat_render(void)
     }
 }
 
+/* Columns a side slide need not draw because a nearer one on its own side
+ * already covers them.
+ *
+ * The tilt is what makes this exact. dy grows with xs, so a side slide is
+ * tallest at its outer edge and shortest at its inner one; where two of them
+ * overlap, the nearer slide is showing its outer part and the further slide its
+ * inner part, so the nearer one is the taller of the two and hides the other
+ * outright. Every drawn pixel is opaque -- fade_color() blends toward
+ * pf_bg_color and never reads the framebuffer -- so what it hides is wasted
+ * work rather than part of a blend.
+ *
+ * Both halves of that argument need the two slides to share an angle, a bitmap
+ * height and a vertical offset, and each is checked rather than assumed:
+ *
+ *   The centre slide tilts while a scroll runs, and for s < 0 its sinr changes
+ *   sign, which swaps which of its edges is the tall one. It can therefore be
+ *   shorter than the slide it appears to sit in front of, so it contributes no
+ *   coverage at all and index 0 is never culled.
+ *
+ *   coverflow_animate() also overrides index 0's angle on whichever side the
+ *   scroll is coming from, so even within a side the angles are not uniform.
+ *
+ * Coverage is carried only through indices 0 and 1, the two that every state of
+ * the alpha ramp draws -- so this needs to know nothing about the ramp. */
+static void coverflow_cull(int *left_to, int *right_from)
+{
+    int i, x0, x1, ledge = 0, redge = 0;
+    /* The slide every claim is checked against. Later contributors have to
+     * match it too, so one test per culled slide covers the lot. */
+    struct slide_data *lsrc = NULL, *rsrc = NULL;
+
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
+    {
+        left_to[i] = LCD_WIDTH;
+        right_from[i] = 0;
+    }
+
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
+    {
+        if (lsrc && slide_match(lsrc, &left_slides[i]))
+            left_to[i] = ledge;
+        if (rsrc && slide_match(rsrc, &right_slides[i]))
+            right_from[i] = redge;
+
+        if (i >= 2)     /* coverage comes from the always-drawn two only */
+            continue;
+
+        if ((!lsrc || slide_match(lsrc, &left_slides[i]))
+            && slide_x_range(&left_slides[i], &x0, &x1)
+            && (!lsrc || x1 >= ledge))      /* must join what is already covered */
+        {
+            ledge = lsrc ? MIN(ledge, x0) : x0;
+            if (!lsrc)
+                lsrc = &left_slides[i];
+        }
+        else
+            lsrc = NULL;
+
+        if ((!rsrc || slide_match(rsrc, &right_slides[i]))
+            && slide_x_range(&right_slides[i], &x0, &x1)
+            && (!rsrc || x0 <= redge))
+        {
+            redge = rsrc ? MAX(redge, x1) : x1;
+            if (!rsrc)
+                rsrc = &right_slides[i];
+        }
+        else
+            rsrc = NULL;
+    }
+}
+
 static void coverflow_render(void)
 {
     int nleft = ALBUM_COVERS_NUM_SLIDES;
     int nright = ALBUM_COVERS_NUM_SLIDES;
+    int left_to[MAX_SLIDES_COUNT], right_from[MAX_SLIDES_COUNT];
+
+    coverflow_cull(left_to, right_from);
 
     int alpha;
     int index;
@@ -2569,13 +2710,13 @@ static void coverflow_render(void)
             alpha = (index < nleft - 2) ? 256 : 128;
             alpha -= extra_fade;
             if (alpha > 0 )
-                render_slide(&left_slides[index], alpha);
+                render_slide_clipped(&left_slides[index], alpha, 0, left_to[index]);
         }
         for (index = nright - 2; index >= 0; index--) {
             alpha = (index < nright - 2) ? 256 : 128;
             alpha -= extra_fade;
             if (alpha > 0 )
-                render_slide(&right_slides[index], alpha);
+                render_slide_clipped(&right_slides[index], alpha, right_from[index], LCD_WIDTH);
         }
     } else {
         /* the first and last slide must fade in/fade out */
@@ -2607,7 +2748,7 @@ static void coverflow_render(void)
                 continue;
             }
             if (alpha > 0)
-                render_slide(&left_slides[index], alpha);
+                render_slide_clipped(&left_slides[index], alpha, 0, left_to[index]);
             alpha += 128;
             if (alpha > 256) alpha = 256;
         }
@@ -2630,7 +2771,7 @@ static void coverflow_render(void)
                 continue;
             }
             if (alpha > 0)
-                render_slide(&right_slides[index], alpha);
+                render_slide_clipped(&right_slides[index], alpha, right_from[index], LCD_WIDTH);
             alpha += 128;
             if (alpha > 256) alpha = 256;
         }
