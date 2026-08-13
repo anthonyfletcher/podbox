@@ -59,6 +59,9 @@
 #include "root_menu.h"
 #include "audio.h"
 #include "draw/viewport.h"
+#include "text_box.h"                     /* view_text */
+#include "splash.h"
+#include "screens/settings/settings_help.h"
 #include "screens/playback/quick_screen.h"
 #include "screens/shortcuts.h"
 #include "skin/statusbar_skinned.h"
@@ -282,6 +285,32 @@ static bool item_hidden(const struct menu_item_ex *item, int depth)
     }
 
     return false;
+}
+
+/* Show the explanation for a setting, or say there is not one.
+ *
+ * Offered on every setting rather than only where a stanza exists, which would
+ * mean reading the file before the context menu opens -- on every context
+ * press. The 5G powers its ATA interface down after seven idle seconds, so
+ * that turns a button press into a possible disk spin-up. The file is read
+ * only when someone actually asks. */
+static void explain_setting(const struct settings_list *setting)
+{
+    char text[512];
+
+    if (!setting->cfg_name
+        || !settings_help_lookup(setting->cfg_name, text, sizeof text))
+    {
+        splash(HZ, ID2P(LANG_NO_EXPLANATION));
+        return;
+    }
+
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_enable(i, false, NULL);
+    view_text(setting->lang_id != -1 ? (const char *)str(setting->lang_id)
+                                     : setting->cfg_name, text);
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_undo(i, false);
 }
 
 static int init_menu_lists(const struct menu_item_ex *menu,
@@ -635,8 +664,14 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                     const struct settings_list *setting =
                             find_setting(temp->variable);
 
+                    /* Explain first, Reset second, and that order is load
+                       bearing: non_quickscreen_op_menu below reuses the first
+                       N of these strings, so anything a non-quickscreenable
+                       setting must still offer has to come before the
+                       quickscreen entries. */
                     MENUITEM_STRINGLIST(settings_op_menu,
                                         ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                                        ID2P(LANG_EXPLAIN),
                                         ID2P(LANG_RESET_SETTING),
                                         ID2P(LANG_TOP_QS_ITEM),
                                         ID2P(LANG_LEFT_QS_ITEM),
@@ -647,7 +682,7 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
 
                     /* re-use the strings and desc from the settings_op_menu */
                     static const struct menu_item_ex non_quickscreen_op_menu =
-                    {MT_RETURN_ID|MENU_HAS_DESC|MENU_ITEM_COUNT(1),
+                    {MT_RETURN_ID|MENU_HAS_DESC|MENU_ITEM_COUNT(2),
                     { .strings = settings_op_menu_},
                     {.callback_and_desc = &settings_op_menu__}};
 
@@ -663,29 +698,32 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                     {
                         case GO_TO_PREVIOUS:
                             break;
-                        case 0: /* reset setting */
+                        case 0: /* explain */
+                            explain_setting(setting);
+                            break;
+                        case 1: /* reset setting */
                             reset_setting(setting, setting->setting);
                             settings_save();
                             settings_apply(false);
                             break;
-                        case 1: /* set as top QS item */
+                        case 2: /* set as top QS item */
                             global_settings.qs_items[QUICKSCREEN_TOP] = setting;
                             break;
-                        case 2: /* set as left QS item */
+                        case 3: /* set as left QS item */
                             global_settings.qs_items[QUICKSCREEN_LEFT] = setting;
                             break;
-                        case 3: /* set as bottom QS item */
+                        case 4: /* set as bottom QS item */
                             global_settings.qs_items[QUICKSCREEN_BOTTOM] = setting;
                             break;
-                        case 4: /* set as right QS item */
+                        case 5: /* set as right QS item */
                             global_settings.qs_items[QUICKSCREEN_RIGHT] = setting;
                             break;
-                        case 5: /* Add current value of setting to faves.
+                        case 6: /* Add current value of setting to faves.
                                    Same limitation on which can be
                                    added to the shortcuts menu as the quickscreen */
                             shortcuts_add(SHORTCUT_SETTING_APPLY, (void*)setting);
                             break;
-                        case 6: /* Add to faves. Same limitation on which can be
+                        case 7: /* Add to faves. Same limitation on which can be
                                   added to the shortcuts menu as the quickscreen */
                             shortcuts_add(SHORTCUT_SETTING, (void*)setting);
                             break;

@@ -1,0 +1,1016 @@
+# On-device explanations, shown by Explain in a setting's context menu.
+#
+# One stanza per setting, keyed by its cfg name -- the name it has in a .cfg
+# file and in settings-guide.md. Complete: every setting carried by
+# settings_tags.c has one.
+#
+# A new setting needs a stanza adding here, and nothing enforces that: a
+# setting without one is not an error, it simply has no explanation to show.
+# This finds any that have been missed, from the repository root:
+#
+#   comm -13 <(grep -oE '^\[[^]]+\]' docs/podbox/settings-help.txt \
+#               | tr -d '[]' | sort -u) \
+#            <(grep -E '^\{ "' apps-ipod/settings/settings_tags.c \
+#               | sed 's/^{ "//; s/".*//' | sort -u)
+#
+# Write for someone who has just found the setting and does not know what it
+# does. Say what it changes, and where it is useful or costly. Two or three
+# sentences; the screen is 320 pixels wide. Lines within a paragraph are joined
+# when read, so wrap freely -- but keep lines under 160 characters, which is
+# where the reader truncates.
+#
+# Shipped to /.rockbox/docs/settings-help.txt by bundle-help.sh.
+
+[bass cutoff]
+The frequency Bass works below. A lower number lifts only the deepest notes; a
+higher one reaches up into the lower mids and can muddy voices.
+
+Only does anything while Bass is set above zero.
+
+[treble cutoff]
+The frequency Treble works above. Lower reaches down towards voices, higher
+affects only the very top.
+
+Only does anything while Treble is set away from zero.
+
+[eq precut]
+Attenuates everything before the equaliser runs, to leave room for bands you
+have boosted.
+
+Boosting a band without precut can push the signal past what the output can
+represent, which clips and sounds harsh. If a preset sounds worse loud than
+quiet, this is the first thing to try.
+
+[antiskip]
+How much audio is read ahead and held in memory before the disk is allowed to
+stop.
+
+Raise it if playback stutters when the player is jostled. The cost is battery:
+a bigger buffer means longer reads, but fewer of them.
+
+[bidir limit]
+Text narrower than this share of the line bounces back and forth instead of
+scrolling off one side and round again.
+
+Bigger numbers mean more lines bounce. At 0 everything scrolls in one
+direction.
+
+[surround_fx1]
+The upper frequency limit of the Haas effect.
+
+The effect works by delaying part of the signal, which smears sound that has
+sharp attacks. Keeping the band away from the top end leaves cymbals and
+consonants alone.
+
+[surround_fx2]
+The lower frequency limit of the Haas effect.
+
+Bass carries most of the energy and almost none of the directional information,
+so leaving it out of the effect keeps the low end solid.
+
+[compressor knee]
+How abruptly compression starts once the signal passes the threshold.
+
+Hard knee applies the full ratio the moment the threshold is crossed. Soft knee
+eases it in over a few decibels, which is less audible on music.
+
+[compressor makeup gain]
+Compression makes loud parts quieter, so the whole track ends up quieter. This
+puts the level back.
+
+Auto works out how much was lost and adds it back, which is what you want
+unless you are matching another device.
+
+[dithering enabled]
+Adds a very quiet noise when reducing bit depth, which trades a little hiss for
+the absence of a particular kind of distortion on very quiet passages.
+
+Inaudible on almost all material through headphones.
+
+[disk spindown]
+How long the drive sits idle before it is allowed to stop.
+
+The single largest battery saving on a player with a spinning disk, and it does
+nothing at all on one with an SSD fitted.
+
+[battery capacity]
+The capacity of the cell actually fitted, in mAh.
+
+Only affects the runtime estimate, not charging. Worth correcting after a
+battery replacement, since a new cell is often a different size from the
+original.
+
+[storage mode]
+Tells power management what kind of drive is fitted, which decides whether it
+is worth spinning down and how aggressively.
+
+Auto detects it. Set it by hand only if a replacement drive is being detected
+wrongly.
+
+[glyphs]
+How many characters of the font are kept in memory at once.
+
+The default is plenty for European languages. Raise it if text in Chinese,
+Japanese or Korean redraws slowly, since those need far more than 250
+characters on screen over time.
+
+[progress bar radius]
+Corner rounding of the progress bar, in pixels. A theme-author setting: most
+themes draw their own bar and ignore it.
+
+[database art row height]
+Row height in the database browser when album or artist art is shown beside
+rows. A theme-author setting -- it has to match the artwork the theme draws.
+
+[dircache]
+Keeps the layout of the disk in memory so the file browser does not have to
+read it each time.
+
+Makes browsing much faster and costs a little memory. Needs a restart to take
+effect.
+
+[tagcache_ram]
+Keeps the database in memory instead of reading it from disk as you browse.
+
+Much faster, and the reason searching works at all. Quick skips the check that
+the copy on disk has not changed, which saves a few seconds at boot.
+
+[autoresume enable]
+Remembers how far through each track you were, and returns there rather than
+starting from the beginning.
+
+Meant for audiobooks and long podcasts. Needs a working database.
+
+[usb-dac]
+Lets the player act as a USB sound card for a computer.
+
+Never tested on this hardware. Leave it off unless you are willing to
+experiment.
+
+[replaygain type]
+Uses the loudness information many rippers write into files, so albums recorded
+at different levels play at a similar volume.
+
+Album gain keeps the balance between tracks on one record; track gain levels
+everything, which suits shuffling.
+
+[replaygain preamp]
+A fixed adjustment applied on top of whatever Replaygain works out.
+
+Useful if the whole library ends up quieter than you want once levelling is
+applied.
+
+[crossfade]
+Overlaps the end of one track with the start of the next.
+
+The setting chooses when it happens: only when a track ends on its own, only
+when you skip, or always. Overlapping a deliberately gapless album is usually
+not what you want.
+
+[volume]
+Output level, and the same value the volume buttons move. Shown in decibels
+below maximum, so -25 dB is quieter than -10 dB.
+
+[volume limit]
+A ceiling the volume control cannot pass. Useful with sensitive earphones,
+where the usable range is squeezed into the bottom of the scale.
+
+[bass]
+Lifts or cuts the low end. Bass Cutoff decides how far up it reaches.
+
+[treble]
+Lifts or cuts the high end. Treble Cutoff decides how far down it reaches.
+
+[balance]
+Shifts the output towards one ear. Meant for correcting a hearing difference or
+a worn earphone, not for effect.
+
+[channels]
+What ends up in each ear: normal stereo, both channels mixed to mono, one
+channel in both ears, the two swapped, or karaoke, which cancels whatever is
+common to both and so removes most centred vocals.
+
+Mono is the useful one if you often listen with a single earbud.
+
+[stereo_width]
+Widens or narrows the stereo image. Below 100% pulls it towards mono; above
+pushes it apart, which can sound impressive briefly and tiring for long.
+
+[volume fade]
+Ramps the volume down and up on stop and pause instead of cutting, which avoids
+the click a hard stop can produce.
+
+[afr enabled]
+Tames the harshness that makes long listening tiring, mostly in the upper mids.
+Subtle by design; if you can hear it working it is set too high.
+
+[crossfeed]
+Bleeds a little of each channel into the other, with a delay, so headphones
+sound less like two separate sources bolted to your head.
+
+Most noticeable on older recordings mixed hard left and right.
+
+[crossfeed direct gain]
+The level of the sound that reaches the ear it was mixed for. Lowering it makes
+the effect stronger by making the crossfed path relatively louder.
+
+[crossfeed cross gain]
+The level of the sound crossing to the other ear. The main strength control:
+closer to the direct gain means a narrower, more speaker-like image.
+
+[crossfeed hf attenuation]
+How much the crossed-over sound is dulled. A real head blocks high frequencies
+far more than low ones, so this is what makes the effect sound natural rather
+than like an echo.
+
+[crossfeed hf cutoff]
+The frequency above which the crossfed signal -- the part bled into the
+opposite ear -- starts being dulled. Lower values roll it off earlier and give
+a warmer, more distant effect.
+
+[eq enabled]
+Master switch for the ten-band equaliser. Load EQ is usually a better starting
+point than setting the bands by hand.
+
+[surround enabled]
+Delay in milliseconds for the Haas effect, which widens the image by delaying
+part of the signal rather than by changing its level. Zero is off.
+
+[surround balance]
+How the widened signal is weighted between left and right.
+
+[surround mix]
+How much of the effect is blended with the untouched signal. Lower values keep
+the original intact and add a suggestion of width.
+
+[side only]
+Applies the effect only to the difference between the channels, leaving
+anything mixed to the centre -- usually the voice -- untouched.
+
+[pbe]
+Adds harmonics above notes that are too low for small drivers to reproduce, so
+the ear infers the bass that is not physically there. Strength is a percentage;
+it distorts if pushed.
+
+[pbe precut]
+Attenuates the signal so the harmonics the effect adds do not push it into
+clipping.
+
+[compressor threshold]
+The level above which compression starts, and the switch for the whole effect
+-- at 0 dB nothing is compressed.
+
+Compression narrows the gap between loud and quiet, which keeps quiet passages
+audible on a noisy train at the cost of some dynamics.
+
+[compressor ratio]
+How hard the signal is held down once past the threshold. 2:1 is gentle, Limit
+allows essentially nothing above it.
+
+[compressor attack time]
+How quickly compression clamps down after a loud passage begins. Short catches
+transients and can dull drums; longer lets the initial hit through.
+
+[compressor release time]
+How quickly it lets go again. Too short pumps audibly on bass notes; too long
+leaves quiet material compressed after the loud part has passed.
+
+[replaygain noclip]
+Backs the gain off when applying it would push the track into clipping, rather
+than clipping it.
+
+[volume adjustment mode]
+Direct moves the volume in fixed decibel steps. Perceptual divides the range
+into steps that sound evenly spaced, which suits the bottom of the scale where
+a decibel is a large change.
+
+[perceptual volume step count]
+How many steps Perceptual mode divides the range into. More steps mean finer
+control and more presses to cross the range.
+
+[shuffle]
+Plays the current list in a random order. Changing it reshuffles what is
+already playing rather than waiting for the next list.
+
+[repeat]
+What happens at the end of the list: stop, start again, repeat the one track,
+reshuffle and go again, or loop between two marks you set.
+
+[play selected]
+Choosing a track starts from that track rather than from the top of the folder,
+with the rest of the folder queued behind it.
+
+[single mode]
+Stops after the current track, album, artist, genre or playlist instead of
+carrying on. Useful for falling asleep to one record.
+
+[party mode]
+Anything selected is added to the end of the queue instead of replacing it, so
+a second person cannot wipe out what is already lined up.
+
+[cuesheet support]
+Reads .cue files, so an album ripped as one long file still shows track names
+and can be skipped through.
+
+[folder navigation]
+At the end of a folder, move to the next one rather than stopping. Random picks
+one at random instead.
+
+[constrain next folder]
+When playback moves on to the next folder by itself, keeps that move inside the
+folder you started in -- so an album that runs on goes to its sibling rather
+than wandering off into the rest of the library.
+
+Only does anything while Auto-Change Directory is on.
+
+[skip length]
+Makes skip jump a fixed amount of time instead of a whole track. For long
+podcasts and mixes, where a track is an hour.
+
+[prevent track skip]
+Disables skipping entirely. For handing the player to someone else, or a pocket
+that presses buttons.
+
+[rewind across tracks]
+Rewinding past the start of a track continues into the previous one instead of
+stopping at the beginning.
+
+[resume rewind]
+Backs up a few seconds when resuming, so you hear a little of what came before
+rather than restarting mid-word.
+
+[rewind duration on pause]
+Backs up a few seconds every time you unpause, so you hear a little of what came
+before rather than restarting mid-word.
+
+[beep]
+A short beep when skipping tracks, as feedback that the press registered.
+
+[playback frequency]
+The sample rate the output runs at. Auto follows the file and is right almost
+always; forcing a rate resamples everything.
+
+[play log]
+Records what was played and when. On feeds the listening statistics; the
+Last.fm setting writes a scrobble log a computer can upload.
+
+[scan min step]
+How far the first press of fast forward or rewind moves. Smaller is better for
+finding a moment in a song, larger for crossing a long file.
+
+[seek acceleration]
+How quickly held seeking speeds up. Faster crosses an hour-long file in a
+moment but overshoots a three-minute song.
+
+[pause on headphone unplug]
+Pauses when the headphones are pulled out, so the music does not carry on
+without you. Can also resume automatically when they go back in.
+
+[disable autoresume if phones not present]
+Stops the player resuming at power-on when nothing is plugged in, which
+otherwise plays into a dock or an empty socket.
+
+[album art]
+Where cover art comes from: the thumbnail cache, files beside the music, or
+tags embedded in the files. Prefer Cache is fastest.
+
+[crossfade fade in delay]
+How long to wait after the incoming track starts before its volume begins to
+rise.
+
+[crossfade fade in duration]
+How long the incoming track takes to reach full volume.
+
+[crossfade fade out delay]
+How long the outgoing track holds its level before starting to fall.
+
+[crossfade fade out duration]
+How long the outgoing track takes to fall silent. Longer overlaps blur the join
+more.
+
+[crossfade fade out mode]
+Crossfade dips both tracks through the join. Mix holds the total level roughly
+constant, which sounds fuller but muddier where both tracks are busy.
+
+[autocreate bookmarks]
+Saves your position when you stop, so you can come back to it. Ask prompts each
+time; the recent-only settings save without adding a bookmark file to the
+folder.
+
+[autoupdate bookmarks]
+Overwrites the existing bookmark for a folder instead of adding another, so the
+list stays one entry per book rather than one per session.
+
+[autoload bookmarks]
+Offers the saved position when you next open a folder that has one.
+
+[use most-recent-bookmarks]
+Keeps a list of the last places you stopped, reachable from the main menu, as
+well as bookmarks stored beside the music.
+
+[autoresume next track]
+Whether an automatic position is also remembered when a track changes on its
+own. Custom limits it to folders you nominate, which is how to keep it for
+podcasts without applying it to albums.
+
+[sort playlists]
+The order saved playlists are listed in: by name, or by when they were made.
+
+[recursive directory insert]
+Adding a folder to a playlist also adds everything in its subfolders.
+
+[warn when erasing dynamic playlist]
+Asks before replacing a queue you have built up by hand, which is otherwise
+easy to lose with one Select.
+
+[keep current track when replacing playlist]
+Leaves the playing track in place when a new selection replaces the queue, so
+the music does not stop mid-song.
+
+[show shuffled adding options]
+Adds "insert shuffled" entries to the playlist context menus.
+
+[show queue options]
+Adds the queueing entries -- which play once and are then dropped -- to the
+context menus.
+
+[max files in playlist]
+The largest number of tracks a playlist may hold. Building very large lists is
+slow on this hardware, which is why the limit is lower here than on a computer.
+
+[playlist viewer icons]
+Draws icons beside the entries in the playing queue.
+
+[playlist viewer indices]
+Numbers the entries in the playing queue.
+
+[playlist viewer track display]
+Whether the queue shows filenames or the artist and title from the tags.
+
+[sort case]
+Whether uppercase sorts separately from lowercase, so that "Zoo" can come
+before "apple".
+
+[sort dirs]
+The order folders are listed in: by name, or by when they were last written.
+
+[sort files]
+The order files are listed in, including grouping by type.
+
+[sort interpret number]
+Whether "track2" comes before "track10" by reading the digits as a number, or
+after it by comparing them one character at a time.
+
+[show files]
+Which files the browser shows: everything, only what can be opened, only music,
+or only playlists. The quickest way to make a cluttered folder readable.
+
+[show filename exts]
+Whether names are shown with their extension. Hiding it is tidier; showing it
+helps when several files share a name.
+
+[follow playlist]
+Opens the browser at the folder the playing track came from, rather than where
+you last were.
+
+[show path in browser]
+Puts the current folder, or the whole path to it, in the title bar.
+
+[hotkey tree]
+What the hotkey button does in the file browser.
+
+[max files in dir]
+The largest number of entries loaded from one folder. A folder with more is
+truncated rather than refused.
+
+[tagcache_scan_on_startup]
+Rescans the library at every boot. Mostly redundant if Scan on Eject is on,
+since that is when the music can actually have changed, and it costs time at
+every start.
+
+[tagcache_scan_on_eject]
+Rescans after a USB session, which is the moment new music normally arrives.
+
+[tagcache_autocommit]
+Finishes a scan that was cut short by a flat battery or an unplug. Off asks
+first instead.
+
+[gather runtime data]
+Records play counts, ratings and when each track was last played. What the
+listening statistics are built from.
+
+[database scan paths]
+Restricts scanning to chosen folders, so spoken-word or sample libraries stay
+out of the music database.
+
+Changing it is best followed by a rebuild, or entries from the old set linger.
+
+[database sort albums by]
+The order album lists appear in throughout the Music menu: by name, or by
+release year with either end first.
+
+[debug log tagcache]
+Writes scan progress to a log file. For working out why a track is missing from
+the database.
+
+[search max rows]
+How many results a search keeps. More results take longer to scroll than to
+find; another letter is usually quicker.
+
+[search min letters]
+How many letters must be typed before searching starts. Raise it if
+one-letter searches return more than they are worth.
+
+[search order]
+Which of tracks, albums and artists is listed first in search results.
+
+[art cache fast build]
+Decodes each image once for the largest thumbnail and derives the smaller sizes
+from it, instead of decoding once per size.
+
+Much faster, slightly softer. Applies only to thumbnails made from now on.
+
+[debug log artcache]
+Writes thumbnail generation to a log file. For working out why a particular
+album has no art.
+
+[database album art]
+Draws album thumbnails beside the rows in the database browser. Needs a theme
+that supports artwork in lists, or the rows are tall and empty.
+
+[database artist art]
+Draws artist photographs beside the rows in the database browser. Needs a theme
+that supports artwork in lists, or the rows are tall and empty.
+
+[wps art source]
+Which picture the now-playing screen shows. Auto uses the artist photograph if
+you arrived through the artist menu, and the album cover otherwise.
+
+[artwork filter 1]
+First of three image adjustments applied to artwork before it is drawn. A
+theme-author setting: a theme that wants a treatment names it, and one that
+does not should have none.
+
+[artwork filter 2]
+Second image adjustment in the chain, applied after the first.
+
+[artwork filter 3]
+Third and last image adjustment in the chain.
+
+[album covers on select]
+What Select does on a cover: open the album's track list, or start playing it.
+
+[album covers show album name]
+Whether the album name is drawn over the covers, and where.
+
+[album covers show year]
+Adds the release year to the caption.
+
+[album covers background]
+Which theme colour fills the screen behind the covers.
+
+[album covers statusbar]
+Draws the status bar over the carousel. Off gives the covers the whole screen.
+
+[album covers sort albums by]
+The order covers appear in: by artist, by year, or by album name.
+
+[album covers sort artists by]
+The order artist portraits appear in: by name, or most played first.
+
+[album covers year sort order]
+Whether sorting by year puts the oldest or the newest first.
+
+[album covers view mode]
+3D angles the covers away on both sides. Flat lays them face-on and the same
+size, in two piles either side of the current one.
+
+[album covers scroll speed]
+How far a flick of the wheel carries. Affects both view modes.
+
+[album covers transition speed]
+How quickly the 3D view settles after scrolling. No effect in Flat, which times
+itself off the wheel instead.
+
+[album covers center margin]
+The gap between the front cover and its neighbours in the 3D view.
+
+[album covers slide tuck]
+How far the side covers stack back behind the front one in the 3D view.
+
+[album covers parallel slides]
+Draws the side covers face-on rather than angled, which reads as a row of
+covers rather than a tunnel.
+
+[album covers pile fade]
+How far the two piles in the Flat view are blended towards the background, so
+the cover in the middle stands out. Zero leaves them solid.
+
+[album covers pile offset]
+How far below the middle cover the Flat view's piles sit. A cover eases down
+onto its pile as it leaves and back up as it arrives.
+
+[wps]
+The skin drawn while music is playing. Part of a theme; loading a theme sets
+it.
+
+[sbs]
+The base skin -- the frame drawn behind lists and menus. Part of a theme.
+
+[font]
+The typeface used throughout the interface. A larger font is easier to read and
+fits fewer rows on screen.
+
+[font bold]
+An optional bold companion to the interface font, used where a screen wants
+emphasis. Unset means the regular font is used for both.
+
+[backdrop]
+An image drawn behind everything. Loading a theme replaces it, and a theme that
+names none clears it rather than keeping the last one.
+
+[foreground color]
+The colour of text and lines. Reset by loading a theme.
+
+[background color]
+The colour behind them. Reset by loading a theme.
+
+[selector type]
+How the highlighted row is marked: a pointer beside it, the row inverted, or a
+bar behind it in a flat or graduated colour.
+
+[line selector start color]
+The colour at the top of the graduated selector bar.
+
+[line selector end color]
+The colour at the bottom of the graduated bar behind the highlighted row.
+Setting it the same as the start colour gives a flat bar instead of a fade.
+
+[line selector text color]
+The colour of the text on the highlighted row, which has to read against the
+bar rather than against the background.
+
+[list separator height]
+The thickness of the rule between rows, in pixels. Auto follows the font, and
+off draws none.
+
+[list separator color]
+The colour of the rule drawn between rows in lists. Only visible where the
+separator has a height to draw.
+
+[statusbar]
+Whether the clock and battery strip is drawn, and at which edge.
+
+[scrollbar]
+Whether a scroll bar is drawn beside lists, and on which side.
+
+[scrollbar width]
+How wide the scroll bar beside lists is, in pixels.
+
+[volume display]
+Whether the status bar shows the volume as a bar or as a number.
+
+[battery display]
+Whether the status bar shows the battery as an icon or as a percentage.
+
+[show icons]
+Draws an icon beside each row in lists and menus. Turning them off gives the
+text more room.
+
+[iconset]
+The image file the list icons are taken from. A theme-author setting.
+
+[viewers iconset]
+The icon set used for file types in the browser. A theme-author setting.
+
+[filetype colours]
+A file naming a colour per extension, so the browser can colour-code types. A
+theme-author setting.
+
+[ui viewport]
+The rectangle a theme reserves for lists, so its own decoration is not drawn
+over. A theme-author setting.
+
+[dynamic colors]
+Recolours the interface from the artwork of whatever is playing. A skin not
+written for it will look wrong, since it cannot know what its colours will
+become.
+
+[dialog colours]
+How the confirmation and message boxes are coloured. Auto derives them from the
+theme -- or from the album while Dynamic Colors is running -- which is why it
+is the default. On uses the nine colours set by hand; off inherits the theme's
+flat.
+
+[dialog box foreground]
+The text colour inside a dialog. Only used when Dialog Colours is On.
+
+[dialog box background]
+The fill colour inside a dialog. Only used when Dialog Colours is On.
+
+[dialog box border colour]
+The colour of a dialog's own border. Only used when Dialog Colours is On.
+
+[dialog box border width]
+The thickness of that border, in pixels. Zero draws none.
+
+[dialog box margin]
+How far the dialog is inset from the edges of the screen.
+
+[dialog box shadow]
+A solid drop shadow offset down and to the right, which lifts the box off
+whatever is behind it. Zero turns it off.
+
+Applies whatever Dialog Colours is set to, so a theme can style the shadow
+without taking over all nine colours.
+
+[dialog box shadow colour]
+The colour of the drop shadow behind confirmation and message boxes. Black by
+default rather than a theme colour, because its job is to contrast with the box
+whatever the theme is doing.
+
+[dialog button foreground]
+The text colour of an unselected dialog button.
+
+[dialog button background]
+The fill colour of an unselected dialog button.
+
+[dialog button border colour]
+The border colour of an unselected dialog button.
+
+[dialog button foreground selected]
+The text colour of the selected dialog button.
+
+[dialog button background selected]
+The fill colour of the selected dialog button, which is what marks it as
+chosen.
+
+[dialog button border colour selected]
+The border colour of the selected dialog button.
+
+[dialog button border width]
+The thickness of a dialog button's border, in pixels.
+
+[dialog button border radius]
+How rounded the corners of a dialog button are. Zero is square.
+
+[peak meter release]
+How quickly the level meter falls back after a peak. Slower is easier to read,
+faster is more honest about the signal.
+
+[peak meter hold]
+How long the meter holds at a peak before starting to fall.
+
+[peak meter clip hold]
+How long a clipping indication stays on screen once triggered.
+
+[peak meter dbfs]
+Whether the meter's scale is in decibels, which matches how loudness is
+perceived, or a straight percentage.
+
+[peak meter min]
+The quiet end of the meter's range.
+
+[peak meter max]
+The loud end of the meter's range.
+
+[scroll speed]
+How quickly text too long for its line moves.
+
+[scroll delay]
+How long text waits before it starts moving, so a row can be read before it
+slides.
+
+[scroll step]
+How many pixels each step of scrolling text moves. One is smooth and costs more
+work; larger steps are jerkier and cheaper.
+
+[screen scroll step]
+How many pixels each step moves when a whole screen slides, rather than when
+text scrolls within one line. Smaller is smoother and costs more work.
+
+[scroll paginated]
+Lists move a screenful at a time instead of a row at a time.
+
+[list wraparound]
+Passing the last item returns to the first, rather than stopping.
+
+[list order]
+Whether lists are traversed from the top down or the bottom up.
+
+[hold_lr_for_scroll_in_list]
+Holding left or right scrolls a list rather than repeating whatever those
+buttons do on the current screen.
+
+[text viewer colour mode]
+Whether the text viewer follows the theme, inverts it, or uses plain black on
+white or white on black.
+
+[text viewer margin]
+Insets the text from the edges of the screen, which is easier to read at the
+cost of a few characters per line.
+
+[text viewer line spacing]
+Extra pixels between lines. A little space makes a wall of text much easier to
+follow.
+
+[text viewer page number]
+Shows a page counter at the foot.
+
+[text viewer font]
+A font used only by the text viewer, so reading can use a different typeface
+from the menus. Unset uses the interface font.
+
+[lyric colour mode]
+Whether the lyrics screen follows the theme, inverts it, or uses plain black on
+white or white on black.
+
+[lyric align]
+Whether lyric lines are aligned left, centred or right.
+
+[lyric line spacing]
+Extra pixels between lyric lines.
+
+[lyric previous opacity]
+How far lines that have already been sung fade back. Lower makes the current
+line stand out more.
+
+[lyric next opacity]
+How far lines still to come fade back.
+
+[lyric animation]
+How the display moves from one line to the next: instantly, or scrolling at one
+of three speeds.
+
+[lyric highlight]
+Highlights individual words as they are sung, where the file carries word
+timings. Files with only line timings are unaffected.
+
+[lyric backlight]
+Holds the backlight on while lyrics are showing, since a screen that keeps
+going dark defeats the point. Costs battery.
+
+[lyric font]
+A font used only by the lyrics screen. Unset uses the interface font.
+
+[backlight timeout]
+How long the backlight stays on after the last button press. The single biggest
+lever on battery life.
+
+[backlight timeout plugged]
+How long the backlight stays on after the last button press while the player
+is charging. Kept separate from the battery figure because there is less
+reason to be frugal on the mains.
+
+[backlight on button hold]
+What the backlight does while the hold switch is on: behave normally, stay off,
+or stay on.
+
+[caption backlight]
+Wakes the backlight briefly at each track change, so you can see what started
+without touching anything. Costs battery on a long album.
+
+[backlight fade in]
+How long the backlight takes to come up rather than snapping on.
+
+[backlight fade out]
+How long it takes to go down. A slow fade is gentler in the dark.
+
+[backlight filters first keypress]
+The press that wakes the screen does nothing else, so you cannot change a
+setting you could not see. Costs one extra press each time.
+
+[lcd sleep after backlight off]
+Powers the panel down entirely a while after the backlight goes out. Saves more
+than the backlight alone, and costs a moment to wake.
+
+[brightness]
+Panel brightness. Second only to the backlight timeout as a drain on the
+battery.
+
+[idle poweroff]
+How long the player sits idle, not playing, before switching itself off. Zero
+never does.
+
+[sleeptimer duration]
+How long the sleep timer runs for, after which the player switches itself off.
+Sets the length only; starting the timer is a separate entry on the same
+screen.
+
+[sleeptimer on startup]
+Starts the sleep timer automatically at power-on, for a player used mostly to
+fall asleep to.
+
+[keypress restarts sleeptimer]
+Any button press resets the countdown, so the timer only fires once you have
+actually stopped touching it.
+
+[usb charging]
+Whether the player charges from a USB connection. Force charges even from a
+port that does not advertise enough current, which not every port tolerates.
+
+[car adapter mode]
+Pauses when external power is cut and resumes when it returns, so the player
+follows the car's ignition.
+
+[delay before resume]
+How long to wait after power returns before resuming, so a stall or a restart
+does not start the music.
+
+[show shutdown message]
+Shows a message while shutting down, rather than the screen simply going dark.
+
+[start in screen]
+Which screen opens at power-on.
+
+[clear settings on hold]
+Holding a button during startup clears the settings. A way back from a
+configuration that makes the player unusable.
+
+[settings mode]
+How much of the settings tree is shown. Standard hides the advanced rows;
+Everything shows all of them.
+
+[show debug menu]
+Reveals the debug screens under System. They read hardware and internal state;
+nothing there is needed in normal use.
+
+[time format]
+Whether times are shown on a 12- or 24-hour clock.
+
+[lang]
+The language of the interface. Loading one replaces the built-in English.
+
+[default codepage]
+The character set assumed for tags that do not say which they use. Wrong
+guesses show accented characters as nonsense; Unicode is right for anything
+tagged recently.
+
+[default browser]
+Which browser the root and the now-playing screen return to: the database or
+the files.
+
+[wps select action]
+Where Select goes from the now-playing screen.
+
+[shortcuts instead of quickscreen]
+Whether a long press opens the quick screen or the shortcuts menu.
+
+[keyclick]
+A click through the headphones on each button press. Feedback in a pocket,
+irritating on a quiet passage.
+
+[hardware keyclick]
+A click from the player own speaker on each button press, rather than through
+the headphones. Audible without anything plugged in.
+
+[keyclick repeats]
+Whether auto-repeat -- a held button -- clicks each time or only once.
+
+[serial bitrate]
+The speed of the dock connector's serial line. Auto suits every accessory that
+follows the standard.
+
+[accessory power supply]
+Powers the accessory pin on the dock connector. Needed by some adapters, and a
+constant drain if nothing is attached.
+
+[lineout]
+Enables the dock's line output, which bypasses the volume control and feeds an
+amplifier at a fixed level.
+
+[usb mode]
+What a USB connection does: present the disk to the computer, or charge only.
+Charge only is useful with a car or a plug that would otherwise interrupt
+playback.
+
+[usb hid]
+Presents the player as a keyboard or remote control to the computer, so its
+buttons can drive playback there.
+
+[usb keypad mode]
+What the buttons send while acting as a USB device: media keys, a mouse, or
+presentation controls.
+
+[talk menu]
+Speaks menu entries aloud. Needs a voice file on the player.
+
+[talk dir]
+Whether folder names are spoken, and whether by number or spelled out.
+
+[talk file]
+Whether filenames are spoken, and how.
+
+[talk dir clip]
+Plays a recorded .talk clip for a folder where one exists, instead of speaking
+the name.
+
+[talk file clip]
+Plays a recorded .talk clip for an individual file where one exists, instead of
+speaking its name.
+
+[talk filetype]
+Speaks the file's type along with its name.
+
+[talk mixer level]
+How loud speech is relative to the music underneath it.

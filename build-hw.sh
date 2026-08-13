@@ -29,3 +29,4 @@ make zip
 ../bundle-theme.sh
 ../bundle-eqs.sh
 ../bundle-licenses.sh
+../bundle-help.sh

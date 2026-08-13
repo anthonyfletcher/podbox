@@ -112,7 +112,7 @@ static const struct tag_row tag_rows[] = {
 { "pbe precut",          TAG_ADVANCED|TAG_SOUND,                 "perceptual bass clipping" },
 
 /* compressor: threshold is the on/off, the rest shape it */
-{ "compressor threshold",    TAG_SOUND,                          "compressor dynamic range" },
+{ "compressor threshold",    TAG_ADVANCED|TAG_SOUND,                          "compressor dynamic range" },
 { "compressor makeup gain",  TAG_ADVANCED|TAG_SOUND,             "compressor" },
 { "compressor ratio",        TAG_ADVANCED|TAG_SOUND,             "compressor limit" },
 { "compressor knee",         TAG_ADVANCED|TAG_SOUND,             "compressor" },
@@ -130,10 +130,10 @@ static const struct tag_row tag_rows[] = {
 { "play selected",       TAG_PLAYBACK,                           NULL },
 { "single mode",         TAG_PLAYBACK,                           "stop after" },
 { "party mode",          TAG_PLAYBACK,                           "queue" },
-{ "cuesheet support",    TAG_PLAYBACK,                           "cue sheet" },
+{ "cuesheet support",    TAG_ADVANCED|TAG_PLAYBACK,                           "cue sheet" },
 { "folder navigation",   TAG_PLAYBACK,                           "auto change directory next folder" },
 { "constrain next folder", TAG_ADVANCED|TAG_PLAYBACK,            "auto change directory" },
-{ "skip length",         TAG_PLAYBACK,                           "podcast jump" },
+{ "skip length",         TAG_ADVANCED|TAG_PLAYBACK,                           "podcast jump" },
 { "prevent track skip",  TAG_ADVANCED|TAG_PLAYBACK,              "lock kiosk" },
 { "rewind across tracks",TAG_ADVANCED|TAG_PLAYBACK,              "rewind previous" },
 { "resume rewind",       TAG_ADVANCED|TAG_PLAYBACK,              "rewind before resume" },
@@ -157,9 +157,9 @@ static const struct tag_row tag_rows[] = {
 { "crossfade fade out mode",       TAG_ADVANCED|TAG_PLAYBACK,    "crossfade mix" },
 
 /* bookmarks and automatic resume */
-{ "autocreate bookmarks", TAG_PLAYBACK,                          "bookmark on stop" },
+{ "autocreate bookmarks", TAG_ADVANCED|TAG_PLAYBACK,                          "bookmark on stop" },
 { "autoupdate bookmarks", TAG_ADVANCED|TAG_PLAYBACK,             "bookmark" },
-{ "autoload bookmarks",   TAG_PLAYBACK,                          "bookmark load" },
+{ "autoload bookmarks",   TAG_ADVANCED|TAG_PLAYBACK,                          "bookmark load" },
 { "use most-recent-bookmarks", TAG_ADVANCED|TAG_PLAYBACK,        "bookmark recent" },
 { "autoresume enable",    TAG_PLAYBACK,                          "resume position" },
 { "autoresume next track",TAG_ADVANCED|TAG_PLAYBACK,             "resume" },
@@ -190,11 +190,11 @@ static const struct tag_row tag_rows[] = {
 { "dircache",            TAG_LIBRARY|TAG_SYSTEM,                 "directory cache speed" },
 
 /* --- the database -------------------------------------------------------- */
-{ "tagcache_ram",              TAG_LIBRARY|TAG_DATABASE,         "database ram memory load" },
-{ "tagcache_scan_on_startup",  TAG_LIBRARY|TAG_DATABASE,         "database scan boot" },
-{ "tagcache_scan_on_eject",    TAG_LIBRARY|TAG_DATABASE,         "database scan usb eject" },
+{ "tagcache_ram",              TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database ram memory load" },
+{ "tagcache_scan_on_startup",  TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database scan boot" },
+{ "tagcache_scan_on_eject",    TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database scan usb eject" },
 { "tagcache_autocommit",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "database commit" },
-{ "gather runtime data",       TAG_LIBRARY|TAG_DATABASE,         "play count rating runtime" },
+{ "gather runtime data",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "play count rating runtime" },
 { "database scan paths",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "directories folders" },
 { "database sort albums by",   TAG_LIBRARY,                      "sorting albums year" },
 { "debug log tagcache",        TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "log debug" },
@@ -335,7 +335,7 @@ static const struct tag_row tag_rows[] = {
 
 /* --- system -------------------------------------------------------------- */
 { "start in screen",     TAG_SYSTEM|TAG_APPEARANCE,              "start screen boot" },
-{ "show shutdown message", TAG_SYSTEM,                           "shutdown splash" },
+{ "show shutdown message", TAG_ADVANCED|TAG_SYSTEM,                           "shutdown splash" },
 { "clear settings on hold",TAG_ADVANCED|TAG_SYSTEM,              "reset recovery" },
 { "show debug menu",     TAG_ADVANCED|TAG_SYSTEM,                "debug" },
 { "settings mode",       TAG_SYSTEM,                             "basic advanced" },

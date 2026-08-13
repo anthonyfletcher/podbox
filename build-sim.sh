@@ -95,6 +95,7 @@ make zip
 ../bundle-theme.sh
 ../bundle-eqs.sh
 ../bundle-licenses.sh
+../bundle-help.sh
 
 # Install into the player's storage. .rockbox is replaced wholesale so a file
 # dropped from the build does not linger; everything beside it -- music, the

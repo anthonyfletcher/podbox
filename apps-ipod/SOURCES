@@ -139,6 +139,7 @@ screens/settings/common_settings.c
 screens/settings/settings_walk.c
 screens/settings/settings_search.c
 screens/settings/settings_changed.c
+screens/settings/settings_help.c
 screens/settings/playback_settings.c
 screens/settings/playlist_settings.c
 screens/settings/general_settings.c

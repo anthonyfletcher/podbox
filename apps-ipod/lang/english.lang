@@ -19508,3 +19508,31 @@
     *: "Everything"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EXPLAIN
+  desc: setting context menu entry, shows what the setting does
+  user: core
+  <source>
+    *: "Explain"
+  </source>
+  <dest>
+    *: "Explain"
+  </dest>
+  <voice>
+    *: "Explain"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_EXPLANATION
+  desc: splash when a setting has no explanation written for it
+  user: core
+  <source>
+    *: "No explanation for this one"
+  </source>
+  <dest>
+    *: "No explanation for this one"
+  </dest>
+  <voice>
+    *: "No explanation for this one"
+  </voice>
+</phrase>
