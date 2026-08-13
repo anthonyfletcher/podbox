@@ -190,34 +190,51 @@ MAKE_MENU(lss_settings, ID2P(LANG_SELECTOR_COLOR_MENU),
    returns all of them to the shipped defaults, so a theme that says nothing
    about dialogs cannot inherit the last theme's. That applies to changes made
    here too -- they last until the next theme is loaded. */
+
+/* The nine below are read only in DIALOG_COLORS_ON: Auto derives its three
+   from the theme (or the album), and Off inherits them. Listing them in the
+   other two modes would be listing nine rows that change nothing, so they are
+   hidden until the mode that reads them is chosen. */
+static int dialog_palette_callback(int action,
+                                   const struct menu_item_ex *this_item,
+                                   struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.dialog_colors != DIALOG_COLORS_ON)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_FUNCTION_W_PARAM(set_dlg_box_fg, 0, ID2P(LANG_DIALOG_BOX_FG),
                           set_color_func, (void*)COLOR_DLG_BOX_FG,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_box_bg, 0, ID2P(LANG_DIALOG_BOX_BG),
                           set_color_func, (void*)COLOR_DLG_BOX_BG,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_box_border, 0, ID2P(LANG_DIALOG_BOX_BORDER),
                           set_color_func, (void*)COLOR_DLG_BOX_BORDER,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_fg, 0, ID2P(LANG_DIALOG_BTN_FG),
                           set_color_func, (void*)COLOR_DLG_BTN_FG,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_bg, 0, ID2P(LANG_DIALOG_BTN_BG),
                           set_color_func, (void*)COLOR_DLG_BTN_BG,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_border, 0, ID2P(LANG_DIALOG_BTN_BORDER),
                           set_color_func, (void*)COLOR_DLG_BTN_BORDER,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_fg_sel, 0, ID2P(LANG_DIALOG_BTN_FG_SEL),
                           set_color_func, (void*)COLOR_DLG_BTN_FG_SEL,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_bg_sel, 0, ID2P(LANG_DIALOG_BTN_BG_SEL),
                           set_color_func, (void*)COLOR_DLG_BTN_BG_SEL,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_border_sel, 0,
                           ID2P(LANG_DIALOG_BTN_BORDER_SEL),
                           set_color_func, (void*)COLOR_DLG_BTN_BORDER_SEL,
-                          NULL, Icon_NOICON);
+                          dialog_palette_callback, Icon_NOICON);
 
 MENUITEM_SETTING(dialog_colors, &global_settings.dialog_colors, NULL);
 MENUITEM_SETTING(dialog_box_border_width,

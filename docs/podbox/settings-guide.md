@@ -331,17 +331,21 @@ out here.
 | Line Selector Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
 | Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 | **Adv** |
 | Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
-| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto derives them from the theme -- or from the album while Dynamic Colors is running -- which is why it is the default. On uses the nine colours set by hand; off inherits the theme's flat. | auto |  |
-| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 | **Adv** |
-| Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef | **Adv** |
-| Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 | **Adv** |
-| Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef | **Adv** |
-| Button Text | The text colour of an unselected dialog button. | e7f3ef | **Adv** |
-| Button Background | The fill colour of an unselected dialog button. | 000c21 | **Adv** |
-| Button Border | The border colour of an unselected dialog button. | e7f3ef | **Adv** |
-| Selected Button Text | The text colour of the selected dialog button. | 000c21 | **Adv** |
-| Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef | **Adv** |
-| Selected Button Border | The border colour of the selected dialog button. | e7f3ef | **Adv** |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
+| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
+| Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
+| Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Button Text | The text colour of an unselected dialog button. | e7f3ef |  |
+| Button Background | The fill colour of an unselected dialog button. | 000c21 |  |
+| Button Border | The border colour of an unselected dialog button. | e7f3ef |  |
+| Selected Button Text | The text colour of the selected dialog button. | 000c21 |  |
+| Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
+| Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
+
+The nine palette rows -- everything from Box Text down -- are listed only while
+Dialog Colour Mode is On, the one mode that reads them. Settings Mode does not
+hide them.
 
 ### Appearance — Elements
 

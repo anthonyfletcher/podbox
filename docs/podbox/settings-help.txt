@@ -700,19 +700,22 @@ written for it will look wrong, since it cannot know what its colours will
 become.
 
 [dialog colours]
-How the confirmation and message boxes are coloured. Auto derives them from the
-theme -- or from the album while Dynamic Colors is running -- which is why it
-is the default. On uses the nine colours set by hand; off inherits the theme's
-flat.
+How the confirmation and message boxes are coloured.
+
+Auto, the default, uses the theme's own two colours plus one accent on the
+selected button -- and the accent follows the album while Dynamic Colors is
+running. Off is the same two colours with no accent: the selected button is
+simply drawn inverted, which is what Rockbox has always done. On ignores both
+and uses the nine colours below, which appear only in that mode.
 
 [dialog box foreground]
-The text colour inside a dialog. Only used when Dialog Colours is On.
+The text colour inside a dialog. Only used when Dialog Colour Mode is On.
 
 [dialog box background]
-The fill colour inside a dialog. Only used when Dialog Colours is On.
+The fill colour inside a dialog. Only used when Dialog Colour Mode is On.
 
 [dialog box border colour]
-The colour of a dialog's own border. Only used when Dialog Colours is On.
+The colour of a dialog's own border. Only used when Dialog Colour Mode is On.
 
 [dialog box border width]
 The thickness of that border, in pixels. Zero draws none.
@@ -724,7 +727,7 @@ How far the dialog is inset from the edges of the screen.
 A solid drop shadow offset down and to the right, which lifts the box off
 whatever is behind it. Zero turns it off.
 
-Applies whatever Dialog Colours is set to, so a theme can style the shadow
+Applies whatever Dialog Colour Mode is set to, so a theme can style the shadow
 without taking over all nine colours.
 
 [dialog box shadow colour]
