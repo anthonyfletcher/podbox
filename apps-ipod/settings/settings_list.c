@@ -837,13 +837,14 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING,show_icons, LANG_SHOW_ICONS ,true,"show icons", NULL),
     OFFON_SETTING(0,show_debug_menu, LANG_SHOW_DEBUG_MENU, false,
                   "show debug menu", NULL),
-    /* Which tree the root Settings entry opens. F_BANFROMQS because the
+    /* How much of the settings tree is shown. F_BANFROMQS because the
        quickscreen would be a strange place to change the shape of the settings
        menu from. */
     CHOICE_SETTING(F_BANFROMQS, settings_mode, LANG_SETTINGS_MODE,
-                   SETTINGS_MODE_BASIC, "settings mode", "basic,advanced",
-                   NULL, 2, ID2P(LANG_SETTINGS_MODE_BASIC),
-                   ID2P(LANG_SETTINGS_MODE_ADVANCED)),
+                   SETTINGS_MODE_STANDARD, "settings mode",
+                   "standard,everything",
+                   NULL, 2, ID2P(LANG_SETTINGS_MODE_STANDARD),
+                   ID2P(LANG_SETTINGS_MODE_EVERYTHING)),
     /* system */
     INT_SETTING(F_TIME_SETTING, poweroff, LANG_POWEROFF_IDLE, 10,
                 "idle poweroff", UNIT_MIN, 0,60,1,

@@ -87,12 +87,22 @@ enum {
     DIALOG_COLORS_AUTO = 2,  /* derived from the theme's, or the album's     */
 };
 
-/* global_settings.settings_mode -- which tree the root Settings entry opens.
- * BASIC is a short flat page of the settings most people want; its last entry
- * opens the full tree, so nothing is unreachable either way. */
+/* global_settings.settings_mode -- how much of the settings tree is shown.
+ *
+ * There is one tree now, not two. STANDARD hides the rows tagged advanced;
+ * EVERYTHING shows them. What counts as advanced is settings_tags.c, and the
+ * rule behind it is in .specifications/settings-revamp-proposal.md: a setting
+ * is advanced if you need to know how the feature works to set it, if it
+ * shapes something whose on/off row is elsewhere, if it exists for one
+ * hardware case, or if it is theme-author territory.
+ *
+ * Two exceptions hold whatever the level: a destructive action is never
+ * hidden -- hiding Update Database hides the fix for "my new album isn't
+ * showing up" -- and an advanced setting is never the only way to undo a
+ * visible problem. */
 enum {
-    SETTINGS_MODE_BASIC = 0,
-    SETTINGS_MODE_ADVANCED = 1,
+    SETTINGS_MODE_STANDARD = 0,
+    SETTINGS_MODE_EVERYTHING = 1,
 };
 
 enum

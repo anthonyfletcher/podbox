@@ -626,14 +626,12 @@ extern struct menu_item_ex
         playlist_options,
         info_menu;
 
-/* The Settings entry opens whichever tree Settings Mode names. The basic page
- * carries its own way into the full one, so neither is a dead end. */
+/* One tree. Settings Mode decides how much of it is shown rather than which of
+ * two menus opens -- see the enum in settings.h. */
 static int settings_scrn(void * param)
 {
     (void)param;
-    return miscscrn(global_settings.settings_mode == SETTINGS_MODE_BASIC
-                    ? (void *)&basic_settings_menu
-                    : (void *)&main_menu_);
+    return miscscrn((void *)&main_menu_);
 }
 
 static const struct root_items items[] = {

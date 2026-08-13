@@ -19480,3 +19480,31 @@
     *: "Started in the background"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_STANDARD
+  desc: settings mode showing everything except the advanced rows
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_EVERYTHING
+  desc: settings mode showing every row including the advanced ones
+  user: core
+  <source>
+    *: "Everything"
+  </source>
+  <dest>
+    *: "Everything"
+  </dest>
+  <voice>
+    *: "Everything"
+  </voice>
+</phrase>

@@ -57,6 +57,13 @@ struct menu_func {
 #define MENU_FUNC_USEPARAM 0x80
 #define MENU_FUNC_CHECK_RETVAL 0x100
 
+/* Hidden unless Settings Mode is Everything.
+ *
+ * A setting does not need this -- settings_tags.c already says which are
+ * advanced, and the menu loop reads it. This is for the rows that have no
+ * settings_list entry to tag: submenus and MENUITEM_FUNCTION actions. */
+#define MENU_ADVANCED 0x200
+
 #define MENU_COUNT_MASK 0xFFF
 #define MENU_COUNT_SHIFT 12
 #define MENU_ITEM_COUNT(c) ((c&MENU_COUNT_MASK)<<MENU_COUNT_SHIFT)

@@ -468,5 +468,9 @@ MAKE_MENU(main_menu_, ID2P(LANG_SETTINGS), NULL,
         &appearance_menu,
         &power_menu,
         &system_menu,
+        /* At the foot of the root rather than buried in System: it changes the
+           shape of every screen in the tree, so it belongs where the tree
+           starts. Also listed under Settings Files, as the same item. */
+        &settings_mode_item,
         &settings_changed_item,
         );

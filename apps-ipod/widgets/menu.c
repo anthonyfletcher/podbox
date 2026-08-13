@@ -45,6 +45,7 @@
 #include "panic.h"
 #include "settings/settings.h"
 #include "settings/settings_list.h"
+#include "settings/settings_tags.h"
 #include "option_select.h"
 #include "speech/talk.h"
 #include "lang.h"
@@ -242,6 +243,47 @@ static char* init_title(const struct menu_item_ex *menu, int *icon,
     return title;
 }
 
+/* True if this row is hidden at the current Settings Mode.
+ *
+ * Two sources, because there are two kinds of row. A setting says so through
+ * settings_tags.c, which keeps that table the single place deciding what is
+ * advanced -- there is nothing to mark here and nothing to fall out of step.
+ * A submenu or an action has no settings_list entry to tag, so it carries
+ * MENU_ADVANCED itself.
+ *
+ * A submenu with nothing left to show hides too. That means marking every row
+ * of a screen advanced hides the screen, without anyone having to remember to
+ * mark the screen as well -- and it is why Peak Meter and Artwork Filter
+ * disappear whole rather than becoming empty lists. */
+static bool item_hidden(const struct menu_item_ex *item, int depth)
+{
+    int type;
+
+    if (!item || depth > MAX_MENUS)
+        return false;
+    if (item->flags & MENU_ADVANCED)
+        return true;
+
+    type = item->flags & MENU_TYPE_MASK;
+
+    if (type == MT_SETTING || type == MT_SETTING_W_TEXT)
+    {
+        const struct settings_list *setting = find_setting(item->variable);
+        return setting && (settings_tags_get(setting) & TAG_ADVANCED);
+    }
+
+    if (type == MT_MENU)
+    {
+        int count = MENU_GET_COUNT(item->flags);
+        for (int i = 0; i < count; i++)
+            if (!item_hidden(item->submenus[i], depth + 1))
+                return false;
+        return count > 0;
+    }
+
+    return false;
+}
+
 static int init_menu_lists(const struct menu_item_ex *menu,
                      struct gui_synclist *lists, int selected, bool callback,
                      struct viewport parent[NB_SCREENS], char* buf, size_t buf_sz)
@@ -267,7 +309,15 @@ static int init_menu_lists(const struct menu_item_ex *menu,
     for (i=0; i<count; i++)
     {
         if (type != MT_RETURN_ID)
+        {
+            /* A string list indexes by position and holds no items, so there
+               is nothing to hide there. */
+            if (global_settings.settings_mode == SETTINGS_MODE_STANDARD
+                && item_hidden(menu->submenus[i], 0))
+                continue;
+
             get_menu_callback(menu->submenus[i],&menu_callback);
+        }
 
         if (menu_callback(ACTION_REQUEST_MENUITEM,
             type==MT_RETURN_ID ? (void*)(intptr_t)i: menu->submenus[i], lists)
