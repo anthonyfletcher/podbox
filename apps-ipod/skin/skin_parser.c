@@ -1479,7 +1479,7 @@ static int parse_albumart_load(struct skin_element* element,
      * a same-sized unblurred one. That is right -- they want different
      * pixels -- and it is what keeps the saving: audio_load_albumart() runs
      * per buffered track, so a full-screen slot costs ~115 KiB per track
-     * where the decimated one costs about two. */
+     * where the decimated one costs about seven. */
     int div = img_filter_source_divisor(&aa->filter, aa->width, aa->height);
     dimensions.width = (aa->width + div - 1) / div;
     dimensions.height = (aa->height + div - 1) / div;

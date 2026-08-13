@@ -94,9 +94,10 @@ struct img_filter
      * placeholder until it is refolded per image. */
     bool has_adaptive;
 
-    /* The blur radius the chain asked for, in output pixels. 0 when it named
-     * no blur. What it really selects is the decimation factor -- see
-     * img_filter_source_divisor(). */
+    /* The blur window the chain asked for, in pixels of the decimated picture
+     * the blur runs on, not of the finished one. 0 when it named no blur.
+     * The finished picture is img_filter_source_divisor() times larger, so
+     * that is the factor between this and the softness on screen. */
     unsigned char blur_radius;
 
     /* Block edge for `pixellate`, in pixels. 0 when the chain named none. */
@@ -124,10 +125,10 @@ void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f);
  * for a source this size costs nothing and saves everything downstream from
  * carrying the full-size one. 1 for any chain that does not blur.
  *
- * Derived from the radius, rounded to a power of two, then raised if the
- * decimated picture would not fit the engine's fixed working buffer. A
- * caller sizing a source and the render must both ask, and get the same
- * answer for the same w and h. */
+ * The smallest power of two that fits the decimated picture in the engine's
+ * fixed working buffer, so the source keeps every pixel there is room for.
+ * The blur amount does not enter into it. A caller sizing a source and the
+ * render must both ask, and get the same answer for the same w and h. */
 int img_filter_source_divisor(const struct img_filter *f, int w, int h);
 
 /* Render a chain that resizes: source and destination may differ in size, and

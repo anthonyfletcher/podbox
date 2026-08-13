@@ -111,11 +111,12 @@ static const struct filter_def
     { "hue",        CO, OP_HUE,         1, AMT_REQUIRED,    0, 359,   0 },
     { "dither",     SC, OP_DITHER,      1, AMT_NONE,        0,   0,   0 },
     { "pixellate",  SP, OP_PIXELLATE,   1, AMT_DEFAULT,     2,  64,   8 },
-    /* Default 4, not the 8 the design note derives. 8 was chosen against a
-     * full-screen backdrop; an ordinary square art box is the commoner case
-     * and keeps far more of the cover at 4. A full-screen %Cl is forced back
-     * up to 8 by the working buffer anyway. */
-    { "blur",       RS, OP_BLUR,        1, AMT_DEFAULT,     1,  64,   4 },
+    /* The amount is the box window on the decimated picture, so 4 is about
+     * sixteen output pixels at the divisor an ordinary art box gets, and
+     * doubling it doubles the softness. The range stops at BLUR_MAX_TAPS
+     * rather than running past it: an amount that cannot move the window is
+     * better refused than silently ignored. */
+    { "blur",       RS, OP_BLUR,        1, AMT_DEFAULT,     1,  16,   4 },
 #undef RS
 #undef SP
 #undef SC
@@ -910,30 +911,42 @@ void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f)
 #define SPREAD(p)   ((((uint32_t)(p)) | (((uint32_t)(p)) << 16)) & SMASK)
 #define COLLAPSE(s) ((uint16_t)(((s) | ((s) >> 16)) & 0xFFFFU))
 
-/* Weights stay 5-bit (0..32). A 6-bit weight overflows green into nothing. */
-#define LERP(a, b, w) \
-    (((((a) * (32u - (w))) + ((b) * (w))) >> 5) & SMASK)
+/* One in each channel's field, so d * SPREAD_UNIT adds d to all three. */
+#define SPREAD_UNIT 0x00200801U
 
-/* The prefilter is deliberately small. Its job is not to blur -- the 8:1
- * decimation and the upscale do that -- but to take the facet lattice off
- * the upscale, the faint diamond grid bilinear leaves at source-pixel
- * boundaries because it is continuous and its gradient is not.
+/* Weights stay 5-bit (0..32). A 6-bit weight overflows green into nothing.
  *
- * Sized as a *fraction* of the decimated picture rather than as a number of
- * taps, because the decimated picture is not a fixed size: a full-screen %Cl
- * decimates to 40x30, a 160x160 one to 20x20. A window that is a fifth of
- * the first is two fifths of the second, and the difference is the whole
- * difference between a soft cover and a colour wash. That is how the design
- * note's 16 taps went wrong -- against a 40-wide picture it is nearly half
- * the width, and the facets survive it, since by then the lattice is the
- * only structure left. Measured over five covers at 320x240, mean difference
- * between neighbouring pixels: 255 unfiltered, 41 at four taps, 19 at eight,
- * 2 at sixteen.
+ * `d` is a 5-bit ordered-dither cell, and it is not a refinement -- without it
+ * the upscale blocks up. The shift throws away five fractional bits, and a
+ * blurred picture is precisely the case where they carry the whole signal:
+ * neighbouring source pixels differ by one level, so every interpolated value
+ * between them truncates back to the left-hand one and each source pixel
+ * becomes a flat div-wide block with the entire step at its edge. Dithering
+ * the fraction instead spreads that step across the block. Zero-mean, so the
+ * picture does not drift, and it is the same trick the colour stage uses on
+ * its own shift.
  *
- * A fifth, to the nearest power of two so the divide stays a shift. */
-#define BLUR_SPAN     5              /* window is 1/BLUR_SPAN of the picture */
+ * The dither is the last thing this word has room for: green's term alone
+ * reaches 63<<26, and with d at 31 in all three fields the sum peaks at
+ * 4,294,966,271 -- 1024 short of overflowing. Widening any field, or the
+ * weight, needs a wider accumulator first. */
+#define LERP(a, b, w, d) \
+    ((((a) * (32u - (w)) + (b) * (w) + (d) * SPREAD_UNIT) >> 5) & SMASK)
+
+/* The box window is what the chain's amount selects: `blur4` is a four-pixel
+ * window on the decimated picture, and since that picture is `div` times
+ * smaller than the finished one, the softness it produces is four times `div`
+ * output pixels. Doubling the amount doubles the softness.
+ *
+ * The floor is not a rounding convenience. Below two taps the box stops
+ * running and the upscale's facet lattice comes back -- the faint diamond grid
+ * bilinear leaves at source-pixel boundaries, because it is continuous and its
+ * gradient is not. Two taps is the smallest window that takes it off.
+ *
+ * Sixteen at the top so the amount keeps meaning something to the end of its
+ * range rather than saturating in the middle of it. */
 #define BLUR_MIN_TAPS 2
-#define BLUR_MAX_TAPS 8
+#define BLUR_MAX_TAPS 16
 #define BLUR_PASSES   2
 #define BLUR_MAX_DIV  16
 
@@ -941,13 +954,12 @@ void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f)
  * so this is a fixed static and a chain asking for less decimation than it
  * allows gets more.
  *
- * Square, at the screen's longer side over eight. That is what a full-screen
- * %Cl needs at the divisor of 8 the design settles on -- and squaring it,
- * for the price of a few hundred bytes, is what lets an ordinary square art
- * box reach a divisor of 4 as well. Without that every box taller than an
- * eighth of the screen is forced to 8 whatever radius it asked for, and the
- * radius stops meaning anything. */
-#define BLUR_MAX_W ((MAX(LCD_WIDTH, LCD_HEIGHT) + 7) / 8)
+ * Square, at the screen's longer side over four, so a destination of any size
+ * up to the whole screen reaches a divisor of 4. Sizing it for a divisor of 8
+ * instead saves 10 KB and costs the feature its point: a 240x240 panel is then
+ * built from a 30x30 source whatever radius it asked for, which is a colour
+ * wash rather than a blurred cover, and the radius stops meaning anything. */
+#define BLUR_MAX_W ((MAX(LCD_WIDTH, LCD_HEIGHT) + 3) / 4)
 #define BLUR_MAX_H BLUR_MAX_W
 
 static fb_data blur_buf[BLUR_MAX_W * BLUR_MAX_H];
@@ -959,12 +971,15 @@ int img_filter_source_divisor(const struct img_filter *f, int w, int h)
     if (!f || !(f->stages & IMG_CLASS_RESIZE) || w <= 0 || h <= 0)
         return 1;
 
-    /* The radius, to the nearest power of two: 1, 2, 4, 8, 16. A power of
-     * two keeps the upscale's weights an exact table. */
-    while (d < BLUR_MAX_DIV && f->blur_radius > d + d / 2)
-        d <<= 1;
-
-    /* Then as far again as the working buffer demands. */
+    /* As little as the working buffer will accept, so the picture keeps every
+     * pixel there is room for. The amount does not come into it -- it sets the
+     * window instead, which is the thing it is named for. Deriving the divisor
+     * from it as well decided how blurred a picture was twice over, and the
+     * buffer then overrode the answer at any useful size: at 240x240 every
+     * amount from 1 to 4 was clamped to the same divisor, so three quarters of
+     * the range did nothing.
+     *
+     * A power of two, which keeps the upscale's weights an exact table. */
     while (d < BLUR_MAX_DIV
            && ((w + d - 1) / d > BLUR_MAX_W || (h + d - 1) / d > BLUR_MAX_H))
         d <<= 1;
@@ -1012,10 +1027,16 @@ static void decimate(fb_data *dst, int cw, int ch,
 
 /* One box pass along a run of n pixels `step` apart, in place. The line
  * buffer carries the run with both ends extended by the tap radius, which is
- * how the edges clamp without a bounds test in the inner loop. */
+ * how the edges clamp without a bounds test in the inner loop.
+ *
+ * `half` rounds the divide to nearest. Truncating instead loses half a level
+ * a pass, and there are four of them -- two passes, each horizontal then
+ * vertical -- so the blurred picture came out two levels darker than the art
+ * it was made from, on every channel. */
 static void box_run(fb_data *p, int n, int step, uint32_t *line,
                     int taps, int shift)
 {
+    const uint32_t half = SPREAD_UNIT << (shift - 1);
     const int radius = taps / 2;
     const uint32_t first = SPREAD(p[0]);
     const uint32_t last  = SPREAD(p[(size_t)(n - 1) * step]);
@@ -1033,20 +1054,24 @@ static void box_run(fb_data *p, int n, int step, uint32_t *line,
         sum += line[i];
     for (int i = 0; i < n; i++)
     {
-        p[(size_t)i * step] = COLLAPSE((sum >> shift) & SMASK);
+        p[(size_t)i * step] = COLLAPSE(((sum + half) >> shift) & SMASK);
         sum += line[i + taps] - line[i];
     }
 }
 
-static void box_blur(fb_data *p, int cw, int ch)
+/* `want` is the window the chain asked for, in pixels of this picture. It is
+ * capped at the picture's own width as well as at BLUR_MAX_TAPS: a window
+ * wider than what it is averaging has nothing left to say, and every pixel
+ * would come back the same colour. */
+static void box_blur(fb_data *p, int cw, int ch, int want)
 {
     uint32_t line[MAX(BLUR_MAX_W, BLUR_MAX_H) + BLUR_MAX_TAPS];
-    const int want = MIN(cw, ch) / BLUR_SPAN;
     int taps = BLUR_MIN_TAPS, shift = 1;
 
-    /* Nearest power of two, so a picture that wants six taps gets eight
-     * rather than four -- which is what a full-screen %Cl wants, and what
-     * these renders were calibrated on. */
+    want = MIN(want, MIN(cw, ch));
+
+    /* Nearest power of two, so a chain that asks for six taps gets eight
+     * rather than four, and the shift stays exact. */
     while (taps < BLUR_MAX_TAPS && want >= taps + taps / 2)
     {
         taps <<= 1;
@@ -1110,11 +1135,17 @@ static void upscale(fb_data *dst, int dw, int dh, const fb_data *small,
         const fb_data *r0 = small + (size_t)sy * cw;
         const fb_data *r1 = (sy + 1 < ch) ? r0 + cw : r0;
         const unsigned char *brow = bayer8 + ((y & 7) << 3);
+        /* A different cell for the vertical blend than the horizontal one
+         * below, or the two roundings agree and the pattern reappears as
+         * diagonal structure. The vertical one is indexed by source column,
+         * because that is the grid it quantises on. */
+        const unsigned char *vrow = bayer8 + (((y + 4) & 7) << 3);
         fb_data *o = dst + (size_t)y * dw;
         int x = 0;
 
         for (int i = 0; i < cw; i++)
-            line[i] = LERP(SPREAD(r0[i]), SPREAD(r1[i]), wt[fy]);
+            line[i] = LERP(SPREAD(r0[i]), SPREAD(r1[i]), wt[fy],
+                           vrow[i & 7] >> 1);
         line[cw] = line[cw - 1];
 
         for (int i = 0; i < cw && x < dw; i++)
@@ -1123,7 +1154,7 @@ static void upscale(fb_data *dst, int dw, int dh, const fb_data *small,
 
             for (int k = 0; k < div && x < dw; k++, x++)
             {
-                unsigned p = COLLAPSE(LERP(a, b, wt[k]));
+                unsigned p = COLLAPSE(LERP(a, b, wt[k], brow[x & 7] >> 1));
                 int d = dither ? brow[x & 7] : 0;
 
                 o[x] = FB_SCALARPACK_LCD(
@@ -1166,7 +1197,7 @@ void img_filter_render(fb_data *dst, int dw, int dh,
     }
 
     decimate(blur_buf, cw, ch, src, sw, sh);
-    box_blur(blur_buf, cw, ch);
+    box_blur(blur_buf, cw, ch, f->blur_radius);
 
     if (f->stages & IMG_CLASS_SPATIAL)
     {
