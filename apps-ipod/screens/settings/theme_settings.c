@@ -442,8 +442,7 @@ MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
             &dialog_settings,
             &db_albumart,
             &db_artistart,
-            &artwork_filter_menu,
-            &forget_tweaks_item);
+            &artwork_filter_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 
@@ -465,4 +464,11 @@ MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             &peak_meter_menu,
             &main_menu_config_item,   /* main_menu.c */
             &shortcuts_replaces_quickscreen,
+            /* At the foot of Appearance rather than inside Theme Settings.
+               What it forgets is every appearance setting the user has changed
+               by hand, and those reach well past this screen -- the carousel's
+               geometry under Library, the playlist viewer's chrome under
+               Playback, the scrolling. A reset belongs at least as high as the
+               things it resets. */
+            &forget_tweaks_item,
 );

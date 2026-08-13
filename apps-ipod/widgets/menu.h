@@ -118,6 +118,11 @@ void do_setting_from_menu(const struct menu_item_ex *temp,
  * and does nothing. See the definition. */
 void do_setting_from_menu_standalone(const struct menu_item_ex *item,
                                      struct viewport parent[NB_SCREENS]);
+
+/* Ask for the next menu opened to put `item` at the top of the list, scrolling
+ * anything above it away. Consumed once. For a menu that deliberately opens
+ * past its own first row; see the definition. */
+void menu_set_pending_top_item(int item);
 void do_setting_screen(const struct settings_list *setting, const char * title,
                         struct viewport parent[NB_SCREENS]);
 

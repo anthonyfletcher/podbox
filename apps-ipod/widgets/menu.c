@@ -313,6 +313,22 @@ static void explain_setting(const struct settings_list *setting)
         viewportmanager_theme_undo(i, false);
 }
 
+/* A top row asked for by whoever is about to open a menu, consumed once by the
+ * next list build.
+ *
+ * A request rather than an argument because do_menu()'s start_selected is used
+ * by most of its callers to *restore* a position, and those want the list's
+ * usual habit of keeping a row visible above the cursor. Only a menu opening
+ * deliberately past its own first row wants that row scrolled away, and it is
+ * the caller who knows. Same shape as browser_db.c's pending_top_item, for the
+ * same reason. */
+static int pending_top_item = -1;
+
+void menu_set_pending_top_item(int item)
+{
+    pending_top_item = item;
+}
+
 static int init_menu_lists(const struct menu_item_ex *menu,
                      struct gui_synclist *lists, int selected, bool callback,
                      struct viewport parent[NB_SCREENS], char* buf, size_t buf_sz)
@@ -367,6 +383,13 @@ static int init_menu_lists(const struct menu_item_ex *menu,
         gui_synclist_set_voice_callback(lists, talk_menu_item);
     gui_synclist_set_nb_items(lists,current_subitems_count);
     gui_synclist_select_item(lists, find_menu_selection(selected));
+
+    /* After the selection, which sets a top row of its own. */
+    if (pending_top_item >= 0)
+    {
+        gui_synclist_set_top_item(lists, pending_top_item);
+        pending_top_item = -1;
+    }
 
     get_menu_callback(menu,&menu_callback);
     if (callback)

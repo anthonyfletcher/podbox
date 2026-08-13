@@ -481,10 +481,10 @@ static int wpsscrn(void* param)
 
     return ret_val;
 }
-static int miscscrn(void * param)
+/* Which of do_menu()'s return codes the root menu passes on, and which it
+ * treats as "we are done with that menu". */
+static int menu_result(int result)
 {
-    const struct menu_item_ex *menu = (const struct menu_item_ex*)param;
-    int result = do_menu(menu, NULL, NULL, false);
     switch (result)
     {
         case GO_TO_PLUGIN:
@@ -495,6 +495,12 @@ static int miscscrn(void * param)
         default:
             return GO_TO_ROOT;
     }
+}
+
+static int miscscrn(void * param)
+{
+    const struct menu_item_ex *menu = (const struct menu_item_ex*)param;
+    return menu_result(do_menu(menu, NULL, NULL, false));
 }
 
 
@@ -627,11 +633,19 @@ extern struct menu_item_ex
         info_menu;
 
 /* One tree. Settings Mode decides how much of it is shown rather than which of
- * two menus opens -- see the enum in settings.h. */
+ * two menus opens -- see the enum in settings.h.
+ *
+ * Opens on Sound Settings, with Search scrolled off the top rather than merely
+ * unselected. Search is a way *into* the tree rather than a part of it, and a
+ * settings screen whose first row is a search box reads as though that is
+ * where the settings start. Same treatment the album lists give [Random] and
+ * <All tracks>: one flick of the wheel brings it back. */
 static int settings_scrn(void * param)
 {
     (void)param;
-    return miscscrn((void *)&main_menu_);
+    int selected = 1;
+    menu_set_pending_top_item(1);
+    return menu_result(do_menu(&main_menu_, &selected, NULL, false));
 }
 
 static const struct root_items items[] = {
