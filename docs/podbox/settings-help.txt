@@ -1014,3 +1014,13 @@ Speaks the file's type along with its name.
 
 [talk mixer level]
 How loud speech is relative to the music underneath it.
+
+[Screen Scrolls Out Of View]
+Lets a line of scrolling text carry on past the edge of its viewport instead of
+stopping at it. Looks better on a theme whose list has room to spare, and clips
+awkwardly on one that does not.
+
+[Disable main menu scrolling]
+Stops long entries scrolling on the main menu, leaving them truncated. The main
+menu is glanced at rather than read, and text moving under the cursor there is
+more distracting than helpful.

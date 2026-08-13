@@ -1754,7 +1754,7 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, album_covers_year_sort_order, LANG_YEAR_SORT_ORDER,
                   0, "album covers year sort order", "ascending,descending",
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
-    OFFON_SETTING(0, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
+    OFFON_SETTING(F_THEMESETTING, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
                   false, "album covers show year", NULL),
     /* Defaults for a theme that says nothing, not the shipped look --
      * Themify_2 asks for the opposite of both in its own .cfg. Few status bars

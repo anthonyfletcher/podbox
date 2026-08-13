@@ -392,6 +392,8 @@ out here.
 | Paged Scrolling | Lists move a screenful at a time instead of a row at a time. | off |  |
 | List Wraparound | Passing the last item returns to the first, rather than stopping. | on |  |
 | List Order | Whether lists are traversed from the top down or the bottom up. | ascending | **Adv** |
+| Screen Scrolls Out of View | Lets a line of scrolling text carry on past the edge of its viewport instead of stopping at it. Looks better on a theme whose list has room to spare, and clips awkwardly on one that does not. | No | **Adv** |
+| Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. The main menu is glanced at rather than read, and text moving under the cursor there is more distracting than helpful. | No | **Adv** |
 | Hold Left/Right to Scroll a List | Holding left or right scrolls a list rather than repeating whatever those buttons do on the current screen. | on | **Adv** |
 
 ### Appearance — Peak Meter
@@ -513,7 +515,7 @@ out here.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Language | The language of the interface. Loading one replaces the built-in English. | English |  |
+| Language | The language of the interface. Loading one replaces the built-in English. |  |  |
 | Default Codepage | The character set assumed for tags that do not say which they use. Wrong guesses show accented characters as nonsense; Unicode is right for anything tagged recently. | utf-8 | **Adv** |
 | Time Format | Whether times are shown on a 12- or 24-hour clock. | 12hour |  |
 
@@ -549,47 +551,7 @@ foot of Theme Settings, throws them away and reloads the theme as its author
 shipped it.
 
 A `.cfg` counts as a theme, and so triggers the reset, only if it names a font.
-One that does not — `rockbox_default_icons.cfg` is two lines long — is a patch,
-and is applied on top of what is already there.
+One that does not is considered a patch, and is applied on top of what is already 
+there.
 
 See [`theme-guide.md`](theme-guide.md) §2 for this from the theme author's side.
-
----
-
-## Settings with no menu entry
-
-These exist only in a `.cfg` file. Most are for theme authors; the rest are
-remembered state rather than preferences, so there is nothing useful to set.
-
-| Name in `.cfg` | What it does |
-|---|---|
-| `start directory` | Remembered file-browser start point. |
-| `playlist catalog directory` | Where new playlists are written. |
-| `autoresume next track paths` | Folders Automatic Resume treats as custom. |
-| `database path` | Where the database files live. |
-| `qs top` / `qs left` / `qs right` / `qs bottom` | Which settings the quick screen shows. Set from a setting's context menu. |
-| `root menu order` | Written by Edit Main Menu. |
-| `music menu hidden` | Which Music menu rows are turned off. Written by Edit Music Menu. |
-| `music menu signature` | Identifies the row set the above was chosen against; a mismatch discards it. |
-| `theme` | The last theme loaded, so an appearance tweak knows which overlay to write to. |
-| `eq filter 0`–`9` | The equaliser bands. Set from the EQ screens, which show them properly. |
-
----
-
-## Keeping this document honest
-
-The tables are generated. Every setting in `settings_tags.c` appears exactly
-once, with the level it carries there and the description from
-`settings-help.txt`. To check nothing has drifted after adding a setting, from
-the repository root:
-
-```sh
-# a setting with no explanation written for it
-comm -13 <(grep -oE '^\[[^]]+\]' docs/podbox/settings-help.txt \
-            | tr -d '[]' | sort -u) \
-         <(grep -E '^\{ "' apps-ipod/settings/settings_tags.c \
-            | sed 's/^{ "//; s/".*//' | sort -u)
-```
-
-A setting missing from either file is not an error the build will catch: it
-simply has no explanation to show and no topic to be found under.

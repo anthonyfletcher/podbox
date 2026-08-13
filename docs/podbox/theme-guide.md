@@ -23,7 +23,12 @@ theme that only uses standard tags remains portable in both directions.
 Almost certainly it will load and parse. Third-party themes are not rejected.
 Three things behave differently, and only the first affects every theme:
 
-1. **More settings reset between themes** than you may expect (§2).
+1. **Every appearance setting resets when your theme loads** (§2). Nothing about
+   the look is inherited from the theme before yours, so anything you do not
+   name comes up at its default. This is the one that catches ported themes: a
+   theme that looked right on the author's player often relied on something the
+   previous theme had set. It also means your `.cfg` **must name a font**, or it
+   is not treated as a theme at all.
 2. **Album-derived colours** can rewrite every colour your theme names, if the
    theme opts in (§3).
 3. **List rendering** changes only if you opt into art rows (§5).
@@ -36,29 +41,73 @@ for them, because it checks syntax, not whether a tag draws.
 
 ## 2. Settings that reset between themes
 
-When the user loads a theme, settings in the list below are **reset to their
-defaults before your `.cfg` is read**. A theme that does not mention one gets the
-documented default rather than whatever the previous theme chose.
+**Nothing about the look is inherited any more.** When the user loads a theme,
+every setting that describes the appearance is reset to its default *before*
+your `.cfg` is read. A theme that does not mention a setting gets the shipped
+default, never whatever the previous theme chose.
 
-> `backdrop`, `font bold`, `dynamic colors`,
-> `database album art`, `database artist art`,
-> `album covers statusbar`, `album covers background`,
-> `progress bar radius`, and the whole `dialog …` block (§4).
+That is the whole point: without it, the same theme renders differently
+depending on what was loaded before it, and you cannot test your own work
+reliably.
 
-Everything else is **inherited** from the previously loaded theme. The ones that
-surprise people most:
+**What this means for you: name everything you care about.** If your theme
+looks right only because the previous one set something, it will not look right
+on a clean player.
 
-| Setting | Behaviour |
+The reset covers 67 settings — everything carrying `F_THEMESETTING` or
+`F_THEMERESET` in `settings_list.c`. In practice that is:
+
+| Group | Settings |
 |---|---|
-| `font` | Inherited. Name it, or your theme wears the last theme's font. |
-| `iconset`, `viewers iconset` | Inherited. A previous theme's iconset stays in force. |
-| `filetype colours` | Inherited. Set it to `-` unless you ship a `.colours` file. |
-| `selector type`, `scrollbar`, `statusbar`, `ui viewport` | Inherited. |
-| `database art row height` | **Inherited**, even though the two switches beside it reset. If you turn art rows on, always set the height too (§5). |
+| The skins and fonts | `wps`, `sbs`, `font`, `font bold` |
+| Colours | `foreground color`, `background color`, the three `line selector …` colours, `list separator color` |
+| Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
+| Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
+| Backdrop | `backdrop` |
+| Artwork | `database album art`, `database artist art`, `database art row height`, `dynamic colors`, `artwork filter 1`–`3` |
+| Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
+| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, and the 3D and Flat geometry |
+| Scrolling | `scroll speed`, `scroll delay`, `scroll step`, `bidir limit`, `screen scroll step`, and the two main-menu scrolling switches |
+| Playlist viewer | `playlist viewer icons`, `playlist viewer indices`, `playlist viewer track display` |
 
-`font bold` deserves a note: it now defaults to *none*, and when unset the bold
-UI font simply falls back to your regular `font`. Name it only if you ship a
-genuinely separate bold face.
+Settings that are *not* about the look — the backlight, brightness, sorting,
+playback behaviour — are untouched by a theme load, and a theme has no business
+setting them.
+
+### Your `.cfg` must name a font
+
+A `.cfg` counts as a theme, and so triggers the reset, **only if it names a
+`font`**. One that does not is treated as a patch and applied on top of whatever
+is already loaded, without resetting anything.
+
+That distinction exists so a small file that only changes the icons does not
+wipe the user's whole look. It also means:
+
+- a theme without a `font` line will **not** reset anything, and will inherit
+  the previous theme's appearance — exactly the trap the reset exists to
+  prevent;
+- `font: -` counts. It says "no font", which is a decision, and is what
+  upstream's failsafe theme uses.
+
+So: **always name a font.**
+
+### The user's own changes survive
+
+Anything the user changed by hand through the settings screens while your theme
+was loaded is kept in `/.rockbox/themes/<your theme>.usercfg` and re-applied
+*after* your `.cfg`. So a user who prefers your theme with the scrollbar on the
+left keeps that across reloads, and your `.cfg` is not what they see.
+
+You cannot override this and should not try. *Forget My Changes*, at the foot of
+Theme Settings, is how they get back to your theme as shipped.
+
+### The compiled defaults are bare
+
+`wps`, `sbs` and `font` all default to *none*. A player with no configuration at
+all shows the built-in font on an unthemed screen — there is no fallback theme
+behind yours. `font bold` also defaults to none, and when unset the bold UI font
+falls back to your regular `font`; name it only if you ship a genuinely separate
+bold face.
 
 ---
 
@@ -174,10 +223,15 @@ or paint the specific strips that nothing else covers. `%dr` fills with the
 ## 4. Dialog and progress chrome
 
 Modal dialogs (yes/no prompts, messages) draw with a shared style you can set
-from the `.cfg`. They also appear under **Settings ▸ Theme ▸ Dialogs** — the
-metrics and the shadow directly, the nine palette colours under **Colours ▸**.
-All of them reset between themes, including anything the user set by hand, so
-the menu is for trying values out and the `.cfg` is what makes them stick.
+from the `.cfg`. They also appear under **Settings ▸ Appearance ▸ Theme Settings
+▸ Dialogs** — the metrics and the shadow directly, the nine palette colours
+under **Colours ▸**.
+
+All of them reset when a theme loads, so your `.cfg` is what makes a value
+stick for everyone who loads your theme. A value the *user* sets through those
+menus sticks for them and survives the reset (§2), which is worth knowing before
+you conclude your `.cfg` is being ignored — it may simply be losing to their
+overlay.
 
 ### Metrics
 
@@ -279,7 +333,9 @@ database art row height: 46
 ```
 
 The height must be **greater than your `%Lb` row height**, or the rows stop
-counting as art rows. Remember it is inherited, not reset (§2) — always state it.
+counting as art rows. All three reset when your theme loads (§2), so all three
+have to be stated — naming the two switches without the height gives you the
+default height, which is probably not what your rows expect.
 
 ### The row layout
 
@@ -477,10 +533,14 @@ What it proves is that your tags and syntax are valid and your assets exist. It
 does not exercise colours, list rendering, the USB handover or anything else in
 this document — a theme can report "parsed OK" and still be wrong on screen.
 
-Two habits worth having:
+Three habits worth having:
 
 - **Validate your `.cfg` by eye against §2 and §8.** Nothing checks it, and every
   mistake in it is silent.
+- **Load your theme onto a player that has just been reset**, or after loading a
+  very different theme. Since nothing about the look is inherited any more (§2),
+  that is the only way to see what a new user sees — testing by reloading your
+  own theme over itself hides every setting you forgot to name.
 - **Test on the device early.** Static reasoning about the skin engine has a poor
   record; a build on hardware settles in one sync what an afternoon of reading
   does not.

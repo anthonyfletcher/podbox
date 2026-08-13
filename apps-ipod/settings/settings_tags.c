@@ -294,6 +294,10 @@ static const struct tag_row tag_rows[] = {
 { "scroll paginated",    TAG_SCROLLING|TAG_APPEARANCE,           "paged scrolling list" },
 { "list wraparound",     TAG_SCROLLING|TAG_APPEARANCE,           "wrap list" },
 { "list order",          TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "list ascending descending" },
+/* Both carry a sentence for a cfg name rather than the usual lowercase words.
+   They are settings like any other; the odd keys are upstream's. */
+{ "Screen Scrolls Out Of View", TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "scrolling offscreen edge" },
+{ "Disable main menu scrolling", TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "scrolling main menu root" },
 { "hold_lr_for_scroll_in_list", TAG_ADVANCED|TAG_SCROLLING,      "list scrolling hold" },
 
 /* --- the viewers --------------------------------------------------------- */
