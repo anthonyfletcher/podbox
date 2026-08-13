@@ -25,6 +25,7 @@
 #include "audio/playback.h"
 #include "pcm_sampr.h"
 #include "speech/talk.h"
+#include "exported_settings.h"   /* the playlist, bookmark and resume menus */
 
 static int setcrossfadeonexit_callback(int action,
                                        const struct menu_item_ex *this_item,
@@ -173,5 +174,12 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
           ,&play_frequency
           ,&album_art
         ,&playback_log
+          /* All three were under General Settings, which is where anything
+             that was not obviously Sound or Theme ended up. They are playback
+             behaviour: what the player does with a queue, and where it picks
+             up from. */
+          ,&playlist_settings
+          ,&bookmark_settings_menu
+          ,&autoresume_menu
          );
 

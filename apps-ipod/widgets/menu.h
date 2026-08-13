@@ -148,6 +148,15 @@ int do_menu(const struct menu_item_ex *menu, int *start_selected,
     static const struct menu_item_ex name =                  \
         {MT_SETTING, {.variable = (void*)var},{callback}};
 
+/*  As above, but reachable from another file, so one setting can be listed in
+    two branches of the tree as the *same* item. That is the safe kind of
+    cross-listing: one item means one callback, where a second
+    MENUITEM_SETTING for the same variable can quietly carry a different one --
+    the trap basic_settings.c documents. Declare it in exported_settings.h. */
+#define MENUITEM_SETTING_EXPORTED(name,var,callback)          \
+    const struct menu_item_ex name =                          \
+        {MT_SETTING, {.variable = (void*)var},{callback}};
+
 /*  Use this for settings which have a differnt title in their
     setting screen than in the menu (e.g scroll options */
 #define MENUITEM_SETTING_W_TEXT(name, var, str, callback )              \

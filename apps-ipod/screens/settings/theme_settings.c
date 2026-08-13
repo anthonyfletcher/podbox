@@ -445,13 +445,24 @@ MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
             &artwork_filter_menu,
             &forget_tweaks_item);
 
-MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
+extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
+
+/* Appearance: everything about how the player looks, which is what "UI
+   Settings" was trying to say. It gains the pieces that had been filed by the
+   subsystem that implements them rather than by what they do -- the peak meter
+   from Display, the viewers, brightness, and the root menu editor, which is
+   about what you see more than about anything else. */
+MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             NULL, Icon_Wps,
             &browse_themes,
             &browse_fonts,
+            &brightness_item,
             &theme_settings_menu,
             &scroll_settings_menu,
             &dynamic_colors,
             &wps_settings,
+            &viewers_menu,
+            &peak_meter_menu,
+            &main_menu_config_item,   /* main_menu.c */
             &shortcuts_replaces_quickscreen,
 );

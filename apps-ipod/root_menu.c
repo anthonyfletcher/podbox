@@ -616,14 +616,15 @@ static int playback_viewer_scrn(void* param)
 
 /* These are all static const'd from apps/menus/ *.c
    so little hack so we can use them */
+/* system_menu is not here: exported_settings.h declares it properly, and this
+   list drops the const, which conflicts. */
 extern struct menu_item_ex
         file_menu,
         tagcache_menu,
         main_menu_,
         manage_settings,
         playlist_options,
-        info_menu,
-        system_menu;
+        info_menu;
 
 /* The Settings entry opens whichever tree Settings Mode names. The basic page
  * carries its own way into the full one, so neither is a dead end. */

@@ -246,12 +246,6 @@ static int usbcharging_callback(int action,
     return action;
 }
 MENUITEM_SETTING(usb_charging, &global_settings.usb_charging, usbcharging_callback);
-MAKE_MENU(battery_menu, ID2P(LANG_BATTERY_MENU), 0, Icon_NOICON,
-#if BATTERY_CAPACITY_INC > 0
-            &battery_capacity,
-#endif
-            &usb_charging,
-         );
 MENUITEM_SETTING(usb_mode, &global_settings.usb_mode, NULL);
 /* Disk */
 MENUITEM_SETTING(disk_spindown, &global_settings.disk_spindown, NULL);
@@ -279,11 +273,6 @@ static int dircache_callback(int action,
     return action;
 }
 MENUITEM_SETTING(dircache, &global_settings.dircache, dircache_callback);
-MAKE_MENU(disk_menu, ID2P(LANG_DISK_MENU), 0, Icon_NOICON,
-          &disk_spindown,
-          &storage_mode,
-            &dircache,
-         );
 
 /* Limits menu */
 MENUITEM_SETTING(max_files_in_dir, &global_settings.max_files_in_dir, NULL);
@@ -321,27 +310,22 @@ MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, NULL);
 
 MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
 
-MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
-          0, Icon_System_menu,
-            &battery_menu,
-            &disk_menu,
-            &limits_menu,
-            &volume_adjust_mode,
-            &volume_adjust_norm_steps,
-            &car_adapter_mode_menu,
-            &serial_bitrate,
-            &accessory_supply,
-            &lineout_onoff,
-            &keyclick_menu,
+/* What the player does when something is plugged into it. */
+MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
+            &usb_mode,
             &usb_hid,
             &usb_keypad_mode,
 #ifdef USB_ENABLE_AUDIO
             &usb_audio,
 #endif
-
-            &usb_mode,
-            &show_debug_menu,
          );
+
+/* The dock connector's other pins. */
+MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
+            &serial_bitrate, &accessory_supply, &lineout_onoff);
+
+/* system_menu itself is built at the foot of this file, once the menus it
+   gathers -- Startup/Shutdown, Language & Text -- have been defined. */
 
 
 /** Startup/shutdown menu **/
@@ -403,20 +387,47 @@ MENUITEM_SETTING(show_shutdown_message, &global_settings.show_shutdown_message, 
 MENUITEM_SETTING(clear_settings_on_hold,
                  &global_settings.clear_settings_on_hold, NULL);
 
+/* The sleep timer is its own screen under Battery & Power rather than four
+   rows of Startup/Shutdown: it is the thing people reach for to make the
+   player stop on its own, and it has nothing to do with booting. */
+MAKE_MENU(sleep_timer_menu, ID2P(LANG_SLEEP_TIMER), 0, Icon_NOICON,
+            &sleeptimer_toggle,
+            &sleeptimer_duration,
+            &sleeptimer_on_startup,
+            &keypress_restarts_sleeptimer);
+
 MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
           0, Icon_System_menu,
             &show_shutdown_message,
             &start_screen,
-            &poweroff,
-            &sleeptimer_toggle,
-            &sleeptimer_duration,
-            &sleeptimer_on_startup,
-            &keypress_restarts_sleeptimer,
 #if defined(SETTINGS_CLEAR_ON_HOLD)
             &clear_settings_on_hold,
 #undef SETTINGS_CLEAR_ON_HOLD
 #endif
          );
+
+/* Battery & Power.
+ *
+ * The branch this re-cut exists for. Every row here was already in the tree
+ * and none of them were together: the backlight under Display, the capacity
+ * and USB charging under System > Battery, spindown and storage mode under
+ * System > Disk, idle poweroff and the sleep timer under Startup/Shutdown.
+ * Nothing anywhere said "battery", which is the thing an iPod owner tunes
+ * most.
+ *
+ * Ordered by how much difference each makes to runtime. */
+MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
+            &lcd_settings,        /* the backlight -- the biggest lever */
+            &brightness_item,
+            &poweroff,
+            &sleep_timer_menu,
+            &disk_spindown,
+            &storage_mode,
+            &usb_charging,
+#if BATTERY_CAPACITY_INC > 0
+            &battery_capacity,
+#endif
+            &car_adapter_mode_menu);
 
 
 /** Bookmark menu **/
@@ -678,27 +689,55 @@ MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &database_sort_albums_by, &music_menu_config_item, &search_menu
           );
 
-/** Settings menu **/
+/** The branches built here **/
+
+/* Reached from the root menu, and gathered into System below. */
+extern const struct menu_item_ex timedate_item, manage_settings;
+
+/* One family, not two: the text viewer and the lyrics viewer are the same
+   shape of screen with nearly the same settings, and splitting them by where
+   each is opened from would scatter them across two branches. Listed under
+   Appearance and under Library, as the same item. */
+MAKE_MENU(viewers_menu, ID2P(LANG_VIEWERS), 0, Icon_NOICON,
+          &text_viewer_menu, &lyric_viewer_menu);
 
 static struct browse_folder_info langs = { LANG_DIR, SHOW_LNG };
 
 MENUITEM_FUNCTION_W_PARAM(browse_langs, 0, ID2P(LANG_LANGUAGE),
                           browse_folder, (void*)&langs, NULL, Icon_Language);
 
-/* What's Playing Screen is not here: it sits under UI Settings, with the rest
- * of what the screens look like. */
-MAKE_MENU(settings_menu_item, ID2P(LANG_GENERAL_SETTINGS), 0,
-          Icon_General_settings_menu,
-          &playlist_settings, &file_menu,
+/* Everything about what words the player uses and how it reads them: the
+   language it speaks, the voice that speaks it, and the character set it
+   assumes for tags that do not say. */
+MAKE_MENU(language_menu, ID2P(LANG_LANGUAGE_AND_TEXT), 0, Icon_Language,
+          &browse_langs, &voice_settings_menu, &codepage_setting);
+
+/* Library: everything about what music the player knows about and how it is
+   presented -- as against Playback, which is about what happens when it is
+   played. The viewers are here as well as under Appearance; they are opened
+   from these browsers. */
+MAKE_MENU(library_menu, ID2P(LANG_LIBRARY), 0, Icon_Playlist,
+          &file_menu,
           &music_menu,
           &album_covers_menu,
-          &text_viewer_menu,
-          &lyric_viewer_menu,
           &tagcache_menu,
           &art_cache_menu,
-          &display_menu, &system_menu,
-          &startup_shutdown_menu,
-          &bookmark_settings_menu,
-          &autoresume_menu,
-          &browse_langs, &voice_settings_menu,
-          );
+          &viewers_menu);
+
+/* See the note where usb_menu is defined: this is built last because it
+   gathers menus defined above it. */
+MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
+          0, Icon_System_menu,
+            &usb_menu,
+            &accessories_menu,
+            &keyclick_menu,
+            &limits_menu,
+            &dircache,
+            &volume_adjust_mode,
+            &volume_adjust_norm_steps,
+            &startup_shutdown_menu,
+            &language_menu,
+            &timedate_item,
+            &manage_settings,
+            &show_debug_menu,
+         );

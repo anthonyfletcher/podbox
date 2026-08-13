@@ -122,7 +122,10 @@ MAKE_MENU(sel_backlight, ID2P(LANG_BACKLIGHT_SELECTIVE),
 
 MENUITEM_SETTING(lcd_sleep_after_backlight_off,
                 &global_settings.lcd_sleep_after_backlight_off, NULL);
-MENUITEM_SETTING(brightness_item, &global_settings.brightness, NULL);
+/* Listed under both Appearance and Battery & Power: it is how bright the
+   screen looks and the second biggest draw on the battery, and there is no
+   sense in which it is one and not the other. */
+MENUITEM_SETTING_EXPORTED(brightness_item, &global_settings.brightness, NULL);
 /* now the actual menu */
 MAKE_MENU(lcd_settings,ID2P(LANG_LCD_MENU),
             NULL, Icon_Display_menu
@@ -346,12 +349,12 @@ static int codepage_callback(int action,
     return action;
 }
 
-MENUITEM_SETTING(codepage_setting, &global_settings.default_codepage, codepage_callback);
+/* Listed under System > Language & Text: it is about reading tags, not the
+   display. Exported because that menu is built in general_settings.c. */
+MENUITEM_SETTING_EXPORTED(codepage_setting, &global_settings.default_codepage, codepage_callback);
 
 
-MAKE_MENU(display_menu, ID2P(LANG_DISPLAY),
-            NULL, Icon_Display_menu,
-            &lcd_settings,
-            &peak_meter_menu,
-            &codepage_setting,
-            );
+/* There is no Display menu any more. Its three entries went to the branches
+   they belong to: the backlight and brightness to Battery & Power, the peak
+   meter to Appearance, and the codepage to System > Language & Text, which is
+   about reading text rather than displaying it. */
