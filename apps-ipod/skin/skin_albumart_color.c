@@ -66,7 +66,16 @@
  * colour. */
 #define AA_SETTLE_TICKS   (HZ / 5)   /* 200ms */
 #define HISTOGRAM_BUCKETS 4096
-#define SAMPLE_STRIDE     4          /* sample every 4th pixel */
+
+/* How many pixels the histogram wants to see. The cached thumbnail below is
+ * exactly this many, so it is counted whole; the fallback path reads a skin's
+ * slot bitmap, which can be full-screen, and strides down to about this.
+ *
+ * Not fewer, because the bucket count is the floor: at one sample per bucket
+ * the winning bucket is decided by counts in single figures, and the
+ * saturation weight below multiplies that noise rather than damping it. Three
+ * passes over 16384 pixels is a couple of milliseconds, once per track. */
+#define SAMPLE_TARGET     16384      /* one whole 128px thumbnail */
 #define MIN_RATIO         600        /* target contrast ratio x100 (6:1) */
 #define SATURATION_BASE   8          /* base score for unsaturated colors */
 #define NO_ART_TIMEOUT    HZ         /* 1s timeout before concluding no art */
@@ -217,12 +226,13 @@ static void extract_colors(const struct bitmap *bmp)
     int width = bmp->width;
     int height = bmp->height;
     int total_pixels = width * height;
+    int stride = MAX(total_pixels / SAMPLE_TARGET, 1);
     int i;
 
     memset(histogram, 0, sizeof(histogram));
 
     /* Pass 1: build quantized histogram */
-    for (i = 0; i < total_pixels; i += SAMPLE_STRIDE)
+    for (i = 0; i < total_pixels; i += stride)
     {
         unsigned short px = (unsigned short)pixels[i];
         int r4 = (px >> 12) & 0xF;
@@ -288,7 +298,7 @@ static void extract_colors(const struct bitmap *bmp)
     long sum_r = 0, sum_g = 0, sum_b = 0;
     int count = 0;
 
-    for (i = 0; i < total_pixels; i += SAMPLE_STRIDE)
+    for (i = 0; i < total_pixels; i += stride)
     {
         unsigned short px = (unsigned short)pixels[i];
         int r4 = (px >> 12) & 0xF;
@@ -353,7 +363,7 @@ static void extract_colors(const struct bitmap *bmp)
         /* Average full-precision RGB for accent bucket */
         sum_r = sum_g = sum_b = 0;
         count = 0;
-        for (i = 0; i < total_pixels; i += SAMPLE_STRIDE)
+        for (i = 0; i < total_pixels; i += stride)
         {
             unsigned short px = (unsigned short)pixels[i];
             int r4 = (px >> 12) & 0xF;
