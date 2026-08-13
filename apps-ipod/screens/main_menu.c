@@ -24,6 +24,8 @@
 #include "widgets/menu.h"
 #include "system/app_util.h"
 #include "screens/settings/exported_settings.h"
+#include "screens/settings/settings_search.h"
+#include "screens/settings/settings_changed.h"
 #include "screens/browse/browser.h"
 #include "storage.h"
 #include "widgets/yesno.h"
@@ -426,12 +428,32 @@ MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
 
 /** Main menu **/
 
+/* At the top of the tree rather than buried in it: the whole point is to not
+ * have to know where a setting lives. Walks this same menu, which is why it is
+ * declared after everything it can reach. */
+MENUITEM_FUNCTION(settings_search_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_DB_SEARCH), settings_search_run,
+                  NULL, Icon_Menu_setting);
+
+/* Reports USB the way the other simplelist screens here do, so the menu
+ * unwinds rather than redrawing over the USB screen. */
+static int settings_changed_item_fn(void)
+{
+    return settings_changed_screen() ? MENU_ATTACHED_USB : 0;
+}
+
+MENUITEM_FUNCTION(settings_changed_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_SETTINGS_CHANGED), settings_changed_item_fn,
+                  NULL, Icon_Menu_setting);
+
 MAKE_MENU(main_menu_, ID2P(LANG_SETTINGS), NULL,
         Icon_Submenu_Entered,
+        &settings_search_item,
         &sound_settings,
         &playback_settings,
         &settings_menu_item, &theme_menu,
         &timedate_item,
         &main_menu_config_item,
         &manage_settings,
+        &settings_changed_item,
         );

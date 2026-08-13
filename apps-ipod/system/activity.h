@@ -54,7 +54,8 @@ enum current_activity {
     /* Appended, never inserted: this enum is a skin ABI -- the %cs token
      * compares against these numbers, so renumbering blanks conditionals in
      * every theme that uses it. */
-    ACTIVITY_PLAYBACKVIEWER
+    ACTIVITY_PLAYBACKVIEWER,
+    ACTIVITY_SETTINGS_SEARCH
 };
 
 /* custom string representation of activity */

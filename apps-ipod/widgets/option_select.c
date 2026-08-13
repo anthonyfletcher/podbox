@@ -502,6 +502,15 @@ bool option_screen(const struct settings_list *setting,
     gui_synclist_set_nb_items(&lists, nb_items);
     gui_synclist_select_item(&lists, selected);
 
+    /* Draw twice to settle the first frame, the first pass flush-inhibited so
+     * it never reaches the screen. The shared skin conditionals still hold
+     * what the menu behind this left them at on the opening pass -- %?La most
+     * visibly, which sets the row height -- and only a second pass sees this
+     * list's own state. Same fix as menu_draw_settled() and update_dir(); this
+     * is the most-opened list in the firmware, so it is worth its own copy. */
+    gui_synclist_inhibit_flush(true);
+    gui_synclist_draw(&lists);
+    gui_synclist_inhibit_flush(false);
     gui_synclist_draw(&lists);
     /* talk the item */
     gui_synclist_speak_item(&lists);
@@ -581,6 +590,17 @@ bool option_screen(const struct settings_list *setting,
 
     }
     pop_current_activity();
+
+    /* A value the user moved here is a tweak. If it describes the look, it
+     * belongs in the current theme's overlay so the next theme load does not
+     * silently discard it; the mark ignores everything else. Compared against
+     * the setting rather than `variable`, which for a temp-var setting is not
+     * where the committed value ends up. */
+    if (var_type == F_T_BOOL
+        ? (*(bool*)setting->setting ? 1 : 0) != oldvalue
+        : *(int*)setting->setting != oldvalue)
+        settings_mark_user_tweak(setting);
+
     return false;
 }
 

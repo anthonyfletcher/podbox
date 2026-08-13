@@ -1586,6 +1586,10 @@ const struct settings_list settings[] = {
                      DEFAULT_WPSNAME, WPS_DIR "/", ".wps"),
     TEXT_SETTING(F_THEMESETTING|F_NEEDAPPLY,sbs_file, "sbs",
                      DEFAULT_SBSNAME, SBS_DIR "/", ".sbs"),
+    /* Deliberately neither F_THEMESETTING nor F_THEMERESET: this records
+     * *which* theme is loaded, so a theme .cfg must not be able to set it and
+     * loading one must not clear it before it can be written. */
+    TEXT_SETTING(0, theme_file, "theme", "", THEME_DIR "/", ".cfg"),
     TEXT_SETTING(0,lang_file,"lang","",LANG_DIR "/",".lng"),
     /* F_THEMERESET: a theme that names no backdrop means it wants none, not
      * the last theme's image showing through everything it draws. */

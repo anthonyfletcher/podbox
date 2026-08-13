@@ -1005,6 +1005,19 @@ bool simplelist_show_list(struct simplelist_info *info)
 
     gui_synclist_select_item(&lists, info->selection);
 
+    /* Draw twice to settle the first frame, the first pass flush-inhibited so
+     * it never reaches the screen. A skinned list's shared conditionals still
+     * hold whatever the previous screen left them at on the opening pass --
+     * most visibly %?La, whose album-layout viewports render the top row in a
+     * transient state -- and a second pass renders it clean, the same way any
+     * keypress already would.
+     *
+     * Same fix as do_menu()'s menu_draw_settled(), update_dir() in browser.c
+     * and main_menu_config.c. Here rather than in each caller so that every
+     * simplelist screen gets it. */
+    gui_synclist_inhibit_flush(true);
+    gui_synclist_draw(&lists);
+    gui_synclist_inhibit_flush(false);
     gui_synclist_draw(&lists);
 
     if (info->speak_onshow)

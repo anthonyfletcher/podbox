@@ -78,6 +78,7 @@ widgets/menu.c
 widgets/option_select.c
 audio/peak_meter.c
 audio/spectrum_meter.c
+widgets/search_dialog.c
 widgets/splash.c
 widgets/text_box.c
 widgets/yesno.c
@@ -136,6 +137,9 @@ screens/main_menu_config.c
 screens/music_menu_config.c
 screens/settings/basic_settings.c
 screens/settings/common_settings.c
+screens/settings/settings_walk.c
+screens/settings/settings_search.c
+screens/settings/settings_changed.c
 screens/settings/playback_settings.c
 screens/settings/playlist_settings.c
 screens/settings/general_settings.c
@@ -248,6 +252,7 @@ skin/skin_albumart_color.c
 
 settings/settings.c
 settings/settings_list.c
+settings/settings_tags.c
 
 input/action.c
 input/core_keymap.c

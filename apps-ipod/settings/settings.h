@@ -308,6 +308,7 @@ enum {
     SETTINGS_SAVE_SOUND,
     SETTINGS_SAVE_EQPRESET,
     SETTINGS_SAVE_RESUMEINFO,
+    SETTINGS_SAVE_THEME_OVERLAY,
 };
 bool settings_save_config(int options);
 
@@ -338,6 +339,39 @@ enum optiontype { RB_INT, RB_BOOL };
 
 const struct settings_list* find_setting(const void* variable);
 const struct settings_list* find_setting_by_cfgname(const char* name);
+
+/* Whether a setting still holds its compiled default. Drives which settings
+ * config.cfg bothers to write (SETTINGS_SAVE_CHANGED), and the screen that
+ * lists what has been changed.
+ *
+ * Note what "default" means: the value compiled in, not the value the player
+ * started life with. The shipped config.cfg sets around thirty settings at
+ * first boot, and every one of those reads as changed. */
+bool settings_is_changed(const struct settings_list *setting);
+
+/* --- Theme-local appearance overrides --- */
+
+/* Record that the user changed `setting` themselves, and write it to the
+ * current theme's overlay.
+ *
+ * Loading a theme resets every F_THEMERESET setting before reading the theme's
+ * own .cfg, which is right -- a theme naming no backdrop must not inherit the
+ * last one's -- but it also destroys anything the user set by hand, including
+ * on a reload of the same theme. The overlay is what survives that: it is read
+ * straight after the theme's .cfg, so the user's choices land on top.
+ *
+ * Ignores anything without F_THEMERESET. Those are exactly the settings a
+ * theme load would otherwise discard, and keeping the overlay to them stops it
+ * becoming a second config.cfg with its own precedence rules.
+ *
+ * Call it from any path that writes an appearance setting *without* going
+ * through option_screen() -- the colour pickers, Clear Backdrop. A missed one
+ * is a tweak that silently fails to survive the next theme load. */
+void settings_mark_user_tweak(const struct settings_list *setting);
+
+/* Drop the current theme's overlay and reload the theme, so it looks the way
+ * its author shipped it. Returns false if there was nothing to forget. */
+bool settings_forget_theme_tweaks(void);
 bool cfg_int_to_string(const struct settings_list *setting, int val, char* buf, int buf_len);
 bool cfg_string_to_int(const struct settings_list *setting, int* out, const char* str);
 void cfg_to_string(const struct settings_list *setting, char* buf, int buf_len);
@@ -486,6 +520,11 @@ struct user_settings
 
     unsigned char wps_file[MAX_FILENAME+1];  /* last wps */
     unsigned char sbs_file[MAX_FILENAME+1];  /* last statusbar skin */
+    /* The theme itself, as against the pieces above: the name of the last
+     * .cfg loaded that described a look. Nothing reads it as a setting -- it
+     * exists so an appearance tweak knows which theme's overlay to be written
+     * to. See settings_mark_user_tweak(). */
+    unsigned char theme_file[MAX_FILENAME+1];
     unsigned char lang_file[MAX_FILENAME+1]; /* last language */
     unsigned char playlist_catalog_dir[MAX_PATHNAME+1];
     int skip_length; /* skip length */

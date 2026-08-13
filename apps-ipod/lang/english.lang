@@ -19256,3 +19256,59 @@
     *: "Save all cards"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SETTINGS_CHANGED
+  desc: title of the screen listing every setting that differs from its default
+  user: core
+  <source>
+    *: "Changed Settings"
+  </source>
+  <dest>
+    *: "Changed Settings"
+  </dest>
+  <voice>
+    *: "Changed settings"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_ALL_DEFAULT
+  desc: splash when no setting differs from its default
+  user: core
+  <source>
+    *: "Nothing changed from defaults"
+  </source>
+  <dest>
+    *: "Nothing changed from defaults"
+  </dest>
+  <voice>
+    *: "Nothing changed from defaults"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_FORGET_TWEAKS
+  desc: discard the appearance changes made by hand under the current theme
+  user: core
+  <source>
+    *: "Forget My Changes"
+  </source>
+  <dest>
+    *: "Forget My Changes"
+  </dest>
+  <voice>
+    *: "Forget my changes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_NO_TWEAKS
+  desc: splash when the current theme has no hand-made changes to forget
+  user: core
+  <source>
+    *: "No changes to forget"
+  </source>
+  <dest>
+    *: "No changes to forget"
+  </dest>
+  <voice>
+    *: "No changes to forget"
+  </voice>
+</phrase>

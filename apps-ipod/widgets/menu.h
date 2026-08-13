@@ -104,6 +104,13 @@ typedef int (*menu_callback_type)(int action,
                                   struct gui_synclist *this_list);
 void do_setting_from_menu(const struct menu_item_ex *temp,
                           struct viewport parent[NB_SCREENS]);
+
+/* As above, plus the ENTER/EXIT callback pair the menu loop would have fired.
+ * For opening a setting found some other way than by standing on its row --
+ * without it, a setting whose effect lives in its menu callback changes value
+ * and does nothing. See the definition. */
+void do_setting_from_menu_standalone(const struct menu_item_ex *item,
+                                     struct viewport parent[NB_SCREENS]);
 void do_setting_screen(const struct settings_list *setting, const char * title,
                         struct viewport parent[NB_SCREENS]);
 

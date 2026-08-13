@@ -440,12 +440,172 @@ static bool config_names_theme_setting(int fd, char *line, int line_size)
     return false;
 }
 
+/** Theme-local appearance overrides **/
+
+/* Which settings the user has changed by hand under the current theme. A
+ * pointer list rather than a bit per setting because the count is tiny -- a
+ * handful of deliberate choices, not a configuration -- and a list needs no
+ * compile-time bound on nb_settings.
+ *
+ * Not persisted. The overlay file is the record: reading it back at theme-load
+ * time re-marks everything in it, so a reboot loses nothing and no baseline
+ * has to be reconstructed. */
+#define MAX_TWEAKS 64
+static const struct settings_list *tweaked[MAX_TWEAKS];
+static int tweak_count;
+
+/* Where the current theme's overlay lives: beside the theme, named after it,
+ * and deliberately *not* a .cfg.
+ *
+ * The theme browser lists every .cfg in this directory, so an overlay called
+ * "Themify_2.user.cfg" appears in it as a theme named "Themify_2.user" --
+ * loading which would take the reset path, apply only the handful of settings
+ * the overlay holds, and then record itself as the current theme, so the next
+ * tweak would write "Themify_2.user.user.cfg". An extension the browser does
+ * not recognise keeps the file paired with its theme and out of the list.
+ *
+ * The contents are an ordinary config file and are read as one. */
+static bool theme_overlay_path(char *buf, size_t bufsz)
+{
+    if (!global_settings.theme_file[0])
+        return false;
+    snprintf(buf, bufsz, THEME_DIR "/%s.usercfg",
+             global_settings.theme_file);
+    return true;
+}
+
+static bool settings_write_config(const char* filename, int options);
+
+/* Record without writing. Kept separate from the public call because reading
+ * the overlay marks everything in it, and writing from there would truncate
+ * the file being read. */
+static bool mark_tweak(const struct settings_list *setting)
+{
+    /* Only what a theme load would otherwise discard -- see settings.h. */
+    if (!setting || !(setting->flags & F_THEMERESET))
+        return false;
+
+    for (int i = 0; i < tweak_count; i++)
+        if (tweaked[i] == setting)
+            return true;
+
+    if (tweak_count >= MAX_TWEAKS)
+        return false;
+
+    tweaked[tweak_count++] = setting;
+    return true;
+}
+
+static void write_theme_overlay(void)
+{
+    char path[MAX_PATH];
+
+    if (theme_overlay_path(path, sizeof path))
+        settings_write_config(path, SETTINGS_SAVE_THEME_OVERLAY);
+}
+
+void settings_mark_user_tweak(const struct settings_list *setting)
+{
+    /* Rewritten whole on every tweak, including one already marked -- the
+     * value has changed even when the marking has not. That is a disk write
+     * per appearance change, but every path that gets here has just called
+     * settings_save() for config.cfg, so the disk is already awake and this
+     * costs no spin-up of its own. */
+    if (mark_tweak(setting))
+        write_theme_overlay();
+}
+
+/* The theme name, from the path of the .cfg that described it. */
+static void set_theme_file(const char *file)
+{
+    const char *base = strrchr(file, '/');
+    char *dot;
+
+    base = base ? base + 1 : file;
+    strlcpy((char*)global_settings.theme_file, base,
+            sizeof global_settings.theme_file);
+
+    dot = strrchr((char*)global_settings.theme_file, '.');
+    if (dot)
+        *dot = '\0';
+}
+
+/* Parse an open config file into the settings. Shared by a theme's own .cfg
+ * and by the overlay read straight after it, so both feed the same
+ * theme_changed flag -- an override that names a skin still has to reach
+ * settings_apply_skins().
+ *
+ * `mark` re-marks every setting the file names, which is how the overlay
+ * survives a reboot: the file is the record of what was tweaked. */
+static void read_config_lines(int fd, char *line, int line_size,
+                              bool *theme_changed, bool mark)
+{
+    while (read_line(fd, line, line_size) > 0)
+    {
+        char *name, *value;
+
+        if (!settings_parseline(line, &name, &value))
+            continue;
+
+        /* name was not a valid setting; the old "openplugin" config line is
+         * ignored now that the plugin system is gone */
+        string_to_cfg(name, value, theme_changed);
+
+        if (mark)
+            mark_tweak(find_setting_by_cfgname(name));
+    }
+}
+
+/* The overlay, read after the theme's own .cfg and before anything is applied.
+ *
+ * It cannot be a settings_load_config() call, whichever flag it is given.
+ * With apply = true, the overlay names theme settings, so
+ * config_names_theme_setting() reports a theme and the F_THEMERESET loop runs
+ * a second time -- wiping the theme just read. With apply = false, the apply
+ * has already happened and nothing re-reads the backdrop, the colours or the
+ * skins. It has to be a step inside the sequence, which is what this is. */
+static void load_theme_overlay(char *line, int line_size, bool *theme_changed)
+{
+    char path[MAX_PATH];
+    int fd;
+
+    if (!theme_overlay_path(path, sizeof path))
+        return;
+
+    fd = open_utf8(path, O_RDONLY);
+    if (fd < 0)
+        return;
+
+    read_config_lines(fd, line, line_size, theme_changed, true);
+    close(fd);
+}
+
+bool settings_forget_theme_tweaks(void)
+{
+    char path[MAX_PATH];
+
+    if (!theme_overlay_path(path, sizeof path) || !file_exists(path))
+        return false;
+
+    remove(path);
+    tweak_count = 0;
+
+    /* Reload the theme so the screen shows what its author shipped, rather
+     * than leaving the tweaks standing until the next theme change. */
+    snprintf(path, sizeof path, THEME_DIR "/%s.cfg",
+             global_settings.theme_file);
+    settings_load_config(path, true);
+
+    return true;
+}
+
 bool settings_load_config(const char* file, bool apply)
 {
     logf("%s()\r\n", __func__);
     int fd;
     char line[SETTINGS_MAX_LINE];
     bool theme_changed = false;
+    bool is_theme = false;
 
     fd = open_utf8(file, O_RDONLY);
     if (fd < 0)
@@ -465,7 +625,7 @@ bool settings_load_config(const char* file, bool apply)
      * scan for one first and rewind. */
     if (apply)
     {
-        bool is_theme = config_names_theme_setting(fd, line, sizeof line);
+        is_theme = config_names_theme_setting(fd, line, sizeof line);
         lseek(fd, 0, SEEK_SET); /* the scan consumed the file either way */
         if (is_theme)
         {
@@ -474,21 +634,28 @@ bool settings_load_config(const char* file, bool apply)
                 if (settings[i].flags & F_THEMERESET)
                     reset_setting(&settings[i], settings[i].setting);
             }
+
+            /* Clear the marks with the settings they belong to. Without this,
+             * the first tweak under the new theme rewrites its overlay with
+             * everything still marked from the last one. */
+            tweak_count = 0;
+
+            /* Before the file is read, so a tweak made during this load knows
+             * which theme it belongs to. Gated on is_theme, so an EQ preset or
+             * a saved config -- FILE_ATTR_CFG fires for every .cfg the user
+             * can open -- does not become "the current theme". */
+            set_theme_file(file);
         }
     }
 
-    while (read_line(fd, line, sizeof line) > 0)
-    {
-        char *name, *value;
-        if (!settings_parseline(line, &name, &value))
-            continue;
-
-        /* name was not a valid setting; the old "openplugin" config line is
-         * ignored now that the plugin system is gone */
-        string_to_cfg(name, value, &theme_changed);
-    } /* while(...) */
-
+    read_config_lines(fd, line, sizeof line, &theme_changed, false);
     close(fd);
+
+    /* The user's own changes, on top of the theme and before anything is
+     * applied. */
+    if (is_theme)
+        load_theme_overlay(line, sizeof line, &theme_changed);
+
     if (apply)
     {
         /* Stop before the loading, not after it. settings_apply_skins() stops
@@ -608,7 +775,7 @@ void cfg_to_string(const struct settings_list *setting, char* buf, int buf_len)
 }
 
 
-static bool is_changed(const struct settings_list *setting)
+bool settings_is_changed(const struct settings_list *setting)
 {
     switch (setting->flags&F_T_MASK)
     {
@@ -675,7 +842,7 @@ static bool settings_write_config(const char* filename, int options)
         switch (options)
         {
             case SETTINGS_SAVE_CHANGED:
-                if (!is_changed(setting))
+                if (!settings_is_changed(setting))
                     continue;
                 break;
             case SETTINGS_SAVE_SOUND:
@@ -694,6 +861,20 @@ static bool settings_write_config(const char* filename, int options)
                 if (!(setting->flags & F_RESUMESETTING))
                     continue;
                 break;
+            case SETTINGS_SAVE_THEME_OVERLAY:
+            {
+                /* Only what the user changed by hand under this theme. */
+                bool marked = false;
+                for (int t = 0; t < tweak_count; t++)
+                    if (tweaked[t] == setting)
+                    {
+                        marked = true;
+                        break;
+                    }
+                if (!marked)
+                    continue;
+                break;
+            }
             case SETTINGS_SAVE_ALL:
             {
                 /*only save sound settings (volume) from F_RESUMESETTING items */

@@ -41,6 +41,9 @@ static int clear_main_backdrop(void)
 {
     global_settings.backdrop_file[0] = '-';
     global_settings.backdrop_file[1] = '\0';
+    /* Written without a settings screen, so the tweak is marked by hand --
+     * otherwise "no backdrop" lasts only until the next theme load. */
+    settings_mark_user_tweak(find_setting(global_settings.backdrop_file));
     skin_backdrop_load_setting();
     viewportmanager_theme_enable(SCREEN_MAIN, false, NULL);
     viewportmanager_theme_undo(SCREEN_MAIN, true);
@@ -49,6 +52,18 @@ static int clear_main_backdrop(void)
 }
 MENUITEM_FUNCTION(clear_main_bd, 0, ID2P(LANG_CLEAR_BACKDROP),
                   clear_main_backdrop, NULL, Icon_NOICON);
+
+/* Throw away the appearance changes made by hand under this theme and reload
+ * it, so it looks the way its author shipped it. The way back from having
+ * tweaked something into a corner, and the only way to empty the overlay. */
+static int forget_theme_tweaks(void)
+{
+    if (!settings_forget_theme_tweaks())
+        splash(HZ, ID2P(LANG_THEME_NO_TWEAKS));
+    return 0;
+}
+MENUITEM_FUNCTION(forget_tweaks_item, 0, ID2P(LANG_THEME_FORGET_TWEAKS),
+                  forget_theme_tweaks, NULL, Icon_NOICON);
 
 enum Colors {
     COLOR_FG = 0,
@@ -118,6 +133,11 @@ static int set_color_func(void* color)
                          colors[c].setting, banned_color);
     if (old_color != *colors[c].setting)
     {
+        /* Colours never reach option_screen() -- every row here is a
+         * MENUITEM_FUNCTION running the picker -- so the tweak is marked by
+         * hand. One call covers all fifteen, since they share this function. */
+        settings_mark_user_tweak(find_setting(colors[c].setting));
+
         /* settings_apply_skins() re-parses every skin, which is long enough to
          * read as a hang -- the picker has closed and nothing else is on screen
          * yet. splash(0, ...) draws and returns; the reload overdraws it. */
@@ -422,7 +442,8 @@ MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
             &dialog_settings,
             &db_albumart,
             &db_artistart,
-            &artwork_filter_menu);
+            &artwork_filter_menu,
+            &forget_tweaks_item);
 
 MAKE_MENU(theme_menu, ID2P(LANG_THEME_MENU),
             NULL, Icon_Wps,

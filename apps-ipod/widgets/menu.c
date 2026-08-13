@@ -398,6 +398,42 @@ void do_setting_from_menu(const struct menu_item_ex *temp,
     do_setting_screen(setting, title, parent);
 }
 
+/* Open a setting from outside any menu -- the settings search, which finds an
+ * item by walking the tree rather than by the user standing on it.
+ *
+ * do_setting_screen() alone is not enough. A setting whose effect is applied
+ * by its menu callback rather than by the setting itself -- Directory Cache
+ * enabling the cache, Charge During USB calling usb_charging_enable(), the
+ * sleep timer restarting a running countdown -- would change value and do
+ * nothing. So this reproduces what the menu loop does around a row: the same
+ * ENTER/EXIT pair, on the same item, in the same order.
+ *
+ * Calling the item's own callback rather than keeping a list of which settings
+ * need what is the point: there is nothing here to fall out of step, and a
+ * setting given a callback tomorrow is handled without anyone remembering
+ * this function exists.
+ *
+ * `this_list` is NULL, which every callback in the tree already tolerates --
+ * none reads it. */
+void do_setting_from_menu_standalone(const struct menu_item_ex *item,
+                                     struct viewport parent[NB_SCREENS])
+{
+    menu_callback_type cb;
+
+    if (!item)
+        return;
+
+    get_menu_callback(item, &cb);
+
+    /* A callback may refuse the item on entry, exactly as in a menu. */
+    if (cb(ACTION_ENTER_MENUITEM, item, NULL) == ACTION_EXIT_MENUITEM)
+        return;
+
+    do_setting_from_menu(item, parent);
+
+    cb(ACTION_EXIT_MENUITEM, item, NULL);
+}
+
 /* display a menu */
 /* Draw the menu list "settled": the first pass has flush inhibited so it never
  * reaches the screen, then a second pass flushes the final layout. This hides a
