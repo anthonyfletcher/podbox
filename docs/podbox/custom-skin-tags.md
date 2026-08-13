@@ -1,8 +1,12 @@
 # Custom skin tags
 
 Extra skin tags added by this build on top of the standard
-Rockbox skin language. They work in `.wps`, `.sbs` and `.fms` files exactly like
+Rockbox skin language. They work in `.wps` and `.sbs` files exactly like
 built-in tags.
+
+`.fms` is not one of them: neither target this build supports has a tuner
+(`CONFIG_TUNER` is commented out in both config headers), so there is no FM
+screen to draw and an `.fms` file is never rendered.
 
 **These tags are specific to this firmware.** A theme that uses them will not
 render correctly on stock Rockbox or on themes.rockbox.org — the tags simply
@@ -215,11 +219,16 @@ ones. Give them as `-` to keep the default:
 
 ### `%La(offset[, nowrap])` — list-item album art
 
-Album art for a menu/list row, for use in list-skinning viewports (alongside the
-standard `%LT` list text and `%LI` list icon). `offset` selects the row relative
-to the one being drawn (0 = that row); it defaults to 0. Pass `nowrap` to stop
-the offset wrapping around the ends of the list. Advanced — only meaningful
-inside a list viewport (`%Vi`).
+Album art for a menu/list row, alongside the standard `%LT` list text and `%LI`
+list icon. `offset` selects the row relative to the one being drawn (0 = that
+row); it defaults to 0. Pass `nowrap` to stop the offset wrapping around the
+ends of the list.
+
+**It only draws inside a skinned list's row layout** — a `%Vl(label, …)`
+viewport belonging to a `%Lb(label, …)` list, which is the same context `%LT`
+and `%LI` need. It is not a `%Vi` (UI viewport) tag, and it draws nothing
+outside a row layout. See §5 of [`theme-guide.md`](theme-guide.md) for the whole
+arrangement, including the row height that has to accompany it.
 
 ```
 %La(0)          # album art of the current list row
