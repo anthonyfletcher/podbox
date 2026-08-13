@@ -131,18 +131,26 @@ unsigned char *lang_spare_buffer(int *size)
     return language_buffer + language_buffer_used;
 }
 
-int lang_english_to_id(const char *english)
+/* Eighteen english strings are used by two phrases each, so a caller that
+   wants all of them resumes the scan rather than stopping at the first. */
+int lang_english_to_id_from(const char *english, int start_id)
 {
     int i;
     unsigned char *ptr = (unsigned char *) core_language_builtin;
     size_t ptrlen, len = strlen(english);
     for (i = 0; i < LANG_LAST_INDEX_IN_ARRAY; i++) {
         ptrlen = strlen((char *)ptr);
-        if ((ptrlen == len) && memcmp(ptr, english, ptrlen) == 0)
+        if ((i >= start_id) && (ptrlen == len) &&
+            memcmp(ptr, english, ptrlen) == 0)
             return i;
         ptr += ptrlen + 1; /* advance pointer to next string */
     }
     return -1;
+}
+
+int lang_english_to_id(const char *english)
+{
+    return lang_english_to_id_from(english, 0);
 }
 
 /* Settings that store a lang id must write the english string, not the

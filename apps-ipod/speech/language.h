@@ -43,6 +43,8 @@ unsigned char *lang_spare_buffer(int *size);
 
 /* get the ID of an english string so it can be localised */
 int lang_english_to_id(const char *english);
+/* the same, but from a starting id, for text shared by two phrases */
+int lang_english_to_id_from(const char *english, int start_id);
 /* get the english string of a given id */
 const char *lang_id_to_english(int lang_id);
 

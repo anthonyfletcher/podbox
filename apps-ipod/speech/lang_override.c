@@ -16,15 +16,17 @@
  * the new text up, because they all resolve to the same id.
  *
  * The key is matched against the built-in English blob, never against what is
- * on screen, so it stays English under a translation. A phrase that shares its
- * English text with another (there are 18 such pairs) resolves to the lower id
- * and the other cannot be reached; naming phrases by their LANG_ id instead is
- * a later stage.
+ * on screen, so it stays English under a translation. Eighteen english strings
+ * are shared by two phrases each; every one of them is renamed, which is
+ * usually what was meant since they read the same on screen. Where it is not,
+ * a "Date#2" suffix picks a single occurrence.
  *
  * Text that never passes through str() has no id and so cannot be overridden.
  * The splash() calls with literal strings are the ones users will notice.
  ****************************************************************************/
 
+#include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "file.h"
@@ -59,30 +61,61 @@ void lang_override_load(void)
 
     while (read_line(fd, line, sizeof line) > 0)
     {
-        char *english, *replacement;
-        int id, size;
+        char *english, *replacement, *hash;
+        unsigned char *stored = NULL;
+        int id, size, wanted = 0, seen = 0;
+        bool full = false;
 
         if (!settings_parseline(line, &english, &replacement))
             continue;
 
-        id = lang_english_to_id(english);
-        if (id < 0)
+        /* "Date#2" is the second phrase reading "Date", for the pairs where
+         * one replacement does not suit both. No phrase contains a '#', so
+         * the suffix needs no escape. */
+        hash = strrchr(english, '#');
+        if (hash && isdigit((unsigned char)hash[1]))
         {
-            DEBUGF("Override names no phrase: %s\n", english);
-            continue;
+            wanted = atoi(hash + 1);
+            *hash = '\0';
         }
 
-        size = strlen(replacement) + 1;
-        if (size > spare_left)
+        /* The 131 voice-only phrases have no english text, and an empty key
+         * would name every one of them. */
+        if (!*english)
+            continue;
+
+        for (id = lang_english_to_id(english); id >= 0;
+             id = lang_english_to_id_from(english, id + 1))
+        {
+            if (wanted && ++seen != wanted)
+                continue;
+
+            /* One copy however many phrases point at it. */
+            if (!stored)
+            {
+                size = strlen(replacement) + 1;
+                if (size > spare_left)
+                {
+                    full = true;
+                    break;
+                }
+                memcpy(spare, replacement, size);
+                stored = spare;
+                spare += size;
+                spare_left -= size;
+            }
+
+            language_strings[id] = stored;
+        }
+
+        if (full)
         {
             DEBUGF("Overrides do not fit the language buffer\n");
             break;
         }
 
-        memcpy(spare, replacement, size);
-        language_strings[id] = spare;
-        spare += size;
-        spare_left -= size;
+        if (!stored)
+            DEBUGF("Override names no phrase: %s\n", english);
     }
 
     close(fd);
