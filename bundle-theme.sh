@@ -48,19 +48,6 @@ mkdir -p "$STAGE/.rockbox/icons"
 cp "$ROOT/icons/tango_icons.16x16.bmp" "$STAGE/.rockbox/icons/"
 cp "$ROOT/icons/tango_icons_viewers.16x16.bmp" "$STAGE/.rockbox/icons/"
 
-# Themes still being worked on. `.theme-dev/` is gitignored, so this is a no-op
-# on a clean checkout and on the build server unless the files were copied
-# across by hand -- which is the point: they reach a test build without being
-# committed. Each entry is a `.rockbox` tree laid out as it appears on device.
-# A theme that ships moves into the block above.
-if [ -d "$ROOT/.theme-dev" ]; then
-    for dev in "$ROOT"/.theme-dev/*/.rockbox; do
-        [ -d "$dev" ] || continue
-        echo "bundle-theme.sh: including dev theme $(basename "$(dirname "$dev")")"
-        cp -R "$dev/." "$STAGE/.rockbox/"
-    done
-fi
-
 (cd "$STAGE" && zip -qr "$ZIP" .rockbox)
 
 # Upstream buildzip.pl copies the classic_statusbar theme straight out of

@@ -154,10 +154,112 @@ colours or art in lists.
 
 > A selection of additional themes for PodBox are available [here](https://github.com/anthonyfletcher/podbox-themes/)
 
-# User guides
+---
 
-- For guidance on using the new text input see [`text-input-guide.md`](docs/podbox/text-input-guide.md)
-- For guidance on navigating the settings menu see [`settings-guide.md`](docs/podbox/settings-guide.md)
+# Complete feature list
+
+## Root menu
+
+- Control the items displayed on the root menu and their order, promote items from the Music menu to the root menu.
+  - `Settings > Appearance > Edit Main Menu`
+
+## Music
+
+- Album art displayed next to album rows
+  - Theme dependent
+  - See above for artwork setup
+  - Control visibility via `Settings > Appearance > Elements > Album Art Rows`
+- Artist profile displayed next to artist rows
+  - Theme dependent
+  - See above for artwork setup
+  - Control visibility via `Settings > Appearance > Elements > Artist Art Rows`
+- Control the sort order of the albums list
+  - `Settings > Library > Music > Sort Albums By`
+- Start playing a random album
+  - `Music > Random Album`
+- Search with live results across track, album or artist names
+  - `Music > Search`
+  - Control ordering of results via `Settings > Library > Music > Search`
+  - See [`text-input-guide.md`](docs/podbox/text-input-guide.md) for guidance on inputting text
+- See the most played albums/artists
+  - `Music > Playback History`
+- See the most recently played albums/artists
+  - `Music > Playback History`
+- See your forgotten album/artists
+  - `Music > Playback History`
+- Control the items displayed in the Music menu and their order
+  - Change via `Settings > Library > Music > Edit Music Menu`
+
+## Album Covers/Artist Profiles
+
+- Simplified implementation which links to Music for tracks/albums
+- Control whether opening an album lists the album tracks or starts playing the album
+  - `Settings > Library > Carousel > On Album Select`
+- Display the covers/profiles in a flat top-down mode
+  - `Settings > Library > Carousel > View Mode`
+
+## What's playing
+
+- View lyrics for currently playing music
+  - Press `Select + Play`
+- Control how lyrics are displayed
+  - `Settings > Library > Viewers > Lyrics Viewer`
+- Show either album art or artist art in the now playing screen
+  - Theme dependent (must currently show album art)
+
+## Documents/Images
+
+- Re-engineered engine compatible with more formats
+- Control how documents are displayed (font, margin, line spacing, colours)
+  - `Settings > Library > Viewers > Text Viewer`
+- See a list of all documents and images stored on the device
+  - Hidden by default - enable via `Settings > Appearance > Edit Main Menu`
+- Continue reading added to the root menu to continue from where you left off
+
+## Appearance
+
+- Dynamic colouring of the UI based on the album/artist art including transformation of all theme colours.
+  - Theme dependent
+  - `Settings > Appearance > Colours > Dynamic Colours`
+- Edits to appearance settings save to a config file linked to the running theme, so when you revert themes your settings follow, and themes don't inherit settings they don't set
+  - `Settings > Appearance`
+  - To reset to default
+  - `Settings > Appearance > Forget My Changes`
+- Art filters available to modify art in both themes and from the cache (impacting art in rows and the carousels)
+  - `Settings > Appearance > Elements > Artwork Filter` (requires Settings Mode to be set to Everything)
+
+## Language
+
+- Override language strings with your own to customise your experience
+  - See [`language-override-guide.md`](docs/podbox/language-override-guide.md)
+
+## Settings
+
+- Settings reworked
+  - See [`settings-guide.md`](docs/podbox/settings-guide.md)
+- Search settings by keyword
+  - Settings > Search (scroll up)
+  - See [`text-input-guide.md`](docs/podbox/text-input-guide.md) for guidance on inputting text
+- Settings organised into "Standard" and "Everything" to filter out settings not commonly edited
+  - `Settings > Settings Mode`
+- See all changed settings in a single view
+  - `Settings > Changed Settings`
+- View a description of each setting from the setting menu
+  - Press `Select + Play` to open the context menu then select `Explain`
+
+## Behind the scenes
+
+- Art for use in the UI is cached for quick access to enable a fluid experience
+  - `Settings > Library > Art Cache` for settings
+  - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache` for tasks
+  - `System > Background Tasks` for monitoring
+- Information about albums, artists and play counts now centralised in a database summary index
+  - `Settings > Library > Maintenance > Update Index`/`Rebuild Index` for tasks
+  - `System > Background Tasks` for monitoring
+- Dialogs reworked to provide consistent and "themed" message, input, confirmation, search, colour, date/time and folder select boxes
+  - `Settings > Appearance > Colours` for settings
+- Additional theme tags to provide richer graphics
+  - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
 
 ---
 
@@ -171,9 +273,15 @@ themes for PodBox.
 
 ## Credits
 
-I'm not a C programmer, so this project has been developed with extensive AI assistance. The code itself is often AI-generated, but the ideas, feature design, specifications, testing, and iteration are mine.
+This project has been developed with extensive AI assistance. I am a software developer, 
+although C is not my primary language. I have driven the project's architecture, feature 
+design, specifications, implementation approach, testing, debugging, and iteration. AI 
+has been used as a development tool to assist with the C implementation, generate and 
+explore solutions, and accelerate development. The resulting code is reviewed, tested, 
+and iterated by me rather than being accepted as unreviewed generated output.
 
-This is a hobby project, built because I wanted a version of Rockbox that better suited how I use my iPod. I'm sharing it in the hope that others might find it useful too.
+This is a hobby project, built because I wanted a version of Rockbox that better suited 
+how I use my iPod. I'm sharing it in the hope that others might find it useful too.
 
 Built on the work of:
 - the [Rockbox](https://www.rockbox.org/) project
