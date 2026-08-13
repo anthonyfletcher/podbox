@@ -291,6 +291,8 @@ a decibel is a large change.
 How many steps Perceptual mode divides the range into. More steps mean finer
 control and more presses to cross the range.
 
+Direct mode never reads it, which is why the row is listed only in Perceptual.
+
 [shuffle]
 Plays the current list in a random order. Changing it reshuffles what is
 already playing rather than waiting for the next list.

@@ -309,9 +309,24 @@ MAKE_MENU(limits_menu, ID2P(LANG_LIMITS_MENU), 0, Icon_NOICON,
 MENUITEM_SETTING(shortcuts_replaces_quickscreen,
                  &global_settings.shortcuts_replaces_qs, NULL);
 
-/* Volume adjustment */
+/* Volume adjustment. The step count is what Perceptual divides the range into
+   and Direct never reads, so it is listed only in that mode. */
+static int volume_steps_callback(int action,
+                                 const struct menu_item_ex *this_item,
+                                 struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.volume_adjust_mode != VOLUME_ADJUST_PERCEPTUAL)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_SETTING(volume_adjust_mode, &global_settings.volume_adjust_mode, NULL);
-MENUITEM_SETTING(volume_adjust_norm_steps, &global_settings.volume_adjust_norm_steps, NULL);
+MENUITEM_SETTING(volume_adjust_norm_steps,
+                 &global_settings.volume_adjust_norm_steps,
+                 volume_steps_callback);
 
 /* Keyclick menu */
 MENUITEM_SETTING(keyclick, &global_settings.keyclick, NULL);

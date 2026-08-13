@@ -318,11 +318,15 @@ static int peak_meter_max(void) {
 }
 
 
-MENUITEM_FUNCTION(peak_meter_scale_item, 0, ID2P(LANG_PM_SCALE),
+/* Advanced like the three settings above them. These are function rows rather
+   than settings rows, so the tag on the setting cannot hide them and the flag
+   has to be given here -- and until all six carry it the screen itself, which
+   is meant to disappear in Standard, stays put. */
+MENUITEM_FUNCTION(peak_meter_scale_item, MENU_ADVANCED, ID2P(LANG_PM_SCALE),
                   peak_meter_scale, NULL, Icon_NOICON);
-MENUITEM_FUNCTION(peak_meter_min_item, 0, ID2P(LANG_PM_MIN),
+MENUITEM_FUNCTION(peak_meter_min_item, MENU_ADVANCED, ID2P(LANG_PM_MIN),
                   peak_meter_min, NULL, Icon_NOICON);
-MENUITEM_FUNCTION(peak_meter_max_item, 0, ID2P(LANG_PM_MAX),
+MENUITEM_FUNCTION(peak_meter_max_item, MENU_ADVANCED, ID2P(LANG_PM_MAX),
                   peak_meter_max, NULL, Icon_NOICON);
 MAKE_MENU(peak_meter_menu, ID2P(LANG_PM_MENU), NULL, Icon_NOICON,
           &peak_meter_release, &peak_meter_hold,

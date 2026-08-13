@@ -329,7 +329,7 @@ out here.
 | Line Selector Start Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
 | Line Selector End Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
 | Line Selector Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
-| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 | **Adv** |
+| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
 | Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
 | Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
 | Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
@@ -343,9 +343,12 @@ out here.
 | Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
 | Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
 
-The nine palette rows -- everything from Box Text down -- are listed only while
-Dialog Colour Mode is On, the one mode that reads them. Settings Mode does not
-hide them.
+Several rows here are listed only while something reads them, whatever Settings
+Mode says. The nine palette rows -- everything from Box Text down -- need
+Dialog Colour Mode on On. Line Selector Colours needs a selector type that
+draws a coloured bar, and its Secondary Colour needs the gradient. Separator
+Colour needs Line Separator set above zero, and Box Shadow Colour needs a
+shadow to colour.
 
 ### Appearance — Elements
 
@@ -476,7 +479,7 @@ hide them.
 | Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
 | Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
 | Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
-| Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. | 50 | **Adv** |
+| Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Direct mode never reads it, which is why the row is listed only in Perceptual. | 50 | **Adv** |
 | Start Screen | Which screen opens at power-on. | root |  |
 | Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
 | Clear Settings on Reset-Button Hold | Holding a button during startup clears the settings. A way back from a configuration that makes the player unusable. | off | **Adv** |

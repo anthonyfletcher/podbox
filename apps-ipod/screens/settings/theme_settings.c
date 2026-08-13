@@ -170,19 +170,85 @@ MENUITEM_FUNCTION_W_PARAM(set_bg_col, 0, ID2P(LANG_BACKGROUND_COLOR),
                           set_color_func, (void*)COLOR_BG, NULL, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_fg_col, 0, ID2P(LANG_FOREGROUND_COLOR),
                           set_color_func, (void*)COLOR_FG, NULL, Icon_NOICON);
+/* Which of the three the selector actually reads depends on its type: the
+   pointer and the inverted bar read none of them, a flat bar reads the primary
+   and the text colour, and only a gradient reads the secondary. Listed when
+   read and not otherwise, so the screen never offers a colour that cannot
+   show. Line Selector Type is in Elements. */
+static bool selector_is_coloured(void)
+{
+    return global_settings.cursor_style == SYNCLIST_CURSOR_COLOR
+        || global_settings.cursor_style == SYNCLIST_CURSOR_GRADIENT;
+}
+
+static int selector_color_callback(int action,
+                                   const struct menu_item_ex *this_item,
+                                   struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !selector_is_coloured())
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+/* The second colour of the gradient, and nothing else draws one. */
+static int selector_end_color_callback(int action,
+                                       const struct menu_item_ex *this_item,
+                                       struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.cursor_style != SYNCLIST_CURSOR_GRADIENT)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+/* The submenu goes with its rows: without this it would still be listed and
+   would open on an empty screen. */
+static int selector_menu_callback(int action,
+                                  const struct menu_item_ex *this_item,
+                                  struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !selector_is_coloured())
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_FUNCTION_W_PARAM(set_lss_col, 0, ID2P(LANG_SELECTOR_START_COLOR),
-                          set_color_func, (void*)COLOR_LSS, NULL, Icon_NOICON);
+                          set_color_func, (void*)COLOR_LSS,
+                          selector_color_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_lse_col, 0, ID2P(LANG_SELECTOR_END_COLOR),
-                          set_color_func, (void*)COLOR_LSE, NULL, Icon_NOICON);
+                          set_color_func, (void*)COLOR_LSE,
+                          selector_end_color_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(set_lst_col, 0, ID2P(LANG_SELECTOR_TEXT_COLOR),
-                          set_color_func, (void*)COLOR_LST, NULL, Icon_NOICON);
+                          set_color_func, (void*)COLOR_LST,
+                          selector_color_callback, Icon_NOICON);
+
+/* Drawn only where a separator has a height to draw. */
+static int separator_color_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.list_separator_height == 0)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_FUNCTION_W_PARAM(set_sep_col, 0, ID2P(LANG_LIST_SEPARATOR_COLOR),
-                          set_color_func, (void*)COLOR_SEP, NULL, Icon_NOICON);
+                          set_color_func, (void*)COLOR_SEP,
+                          separator_color_callback, Icon_NOICON);
 MENUITEM_FUNCTION(reset_colors, 0, ID2P(LANG_RESET_COLORS),
                   reset_color, NULL, Icon_NOICON);
 
 MAKE_MENU(lss_settings, ID2P(LANG_SELECTOR_COLOR_MENU),
-            NULL, Icon_NOICON,
+            selector_menu_callback, Icon_NOICON,
             &set_lss_col, &set_lse_col, &set_lst_col
          );
 
@@ -241,10 +307,24 @@ MENUITEM_SETTING(dialog_box_border_width,
                  &global_settings.dialog_box_border_width, NULL);
 MENUITEM_SETTING(dialog_box_margin, &global_settings.dialog_box_margin, NULL);
 MENUITEM_SETTING(dialog_box_shadow, &global_settings.dialog_box_shadow, NULL);
+/* Unlike the nine, this one applies in every dialog colour mode -- but only
+   when there is a shadow to colour. Dialog Box Shadow is in Dialogs. */
+static int shadow_color_callback(int action,
+                                 const struct menu_item_ex *this_item,
+                                 struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.dialog_box_shadow == 0)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_FUNCTION_W_PARAM(set_dlg_box_shadow_col, 0,
                           ID2P(LANG_DIALOG_BOX_SHADOW_COLOR),
                           set_color_func, (void*)COLOR_DLG_BOX_SHADOW,
-                          NULL, Icon_NOICON);
+                          shadow_color_callback, Icon_NOICON);
 MENUITEM_SETTING(dialog_btn_border_width,
                  &global_settings.dialog_btn_border_width, NULL);
 MENUITEM_SETTING(dialog_btn_border_radius,
