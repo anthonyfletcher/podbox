@@ -833,6 +833,11 @@ MENUITEM_RETURNVALUE(bookmarks, ID2P(LANG_BOOKMARK_MENU_RECENT_BOOKMARKS),
                         Icon_Bookmark);
 MENUITEM_RETURNVALUE(playlists, ID2P(LANG_PLAYLISTS), GO_TO_PLAYLISTS_SCREEN,
                      NULL, Icon_Playlist);
+/* The dynamic playlist -- what playing an album built, not a saved .m3u. Named
+ * for it: "queue" means a single track carrying PLAYLIST_QUEUED, which the
+ * viewer marks with a "+" in this very list. */
+MENUITEM_RETURNVALUE(current_playlist, ID2P(LANG_CURRENT_PLAYLIST),
+                     GO_TO_PLAYLIST_VIEWER, NULL, Icon_Playlist);
 MENUITEM_RETURNVALUE(system_menu_, ID2P(LANG_SYSTEM), GO_TO_SYSTEM_SCREEN,
                      NULL, Icon_System_menu);
 
@@ -857,6 +862,7 @@ static struct menu_table menu_table[] = {
     { "images", &images_item },
     { "spun", &spun_item },
     { "playlists", &playlists },
+    { "currentplaylist", &current_playlist },
     { "shortcuts", &shortcut_menu },
     { "settings", &menu_ },
     { "system_menu", &system_menu_ },
@@ -904,7 +910,8 @@ static void root_menu_apply_canonical_order(void)
         &random_album_item,
     };
     static const struct menu_item_ex * const after_tagnavi[] = {
-        &playlists, &documents_item, &images_item, &spun_item,
+        &current_playlist, &playlists,
+        &documents_item, &images_item, &spun_item,
         &file_browser, &shortcut_menu,
         &menu_, &system_menu_,
     };
@@ -1264,11 +1271,18 @@ void root_menu_set_default(void* setting, void* defaultval)
          * turns any Music row off, and nothing here knows. Turn off
          * Random album there without adding it here and the feature has
          * nowhere left to be reached from -- the user's to make, but not one
-         * either screen warns about. */
+         * either screen warns about.
+         *
+         * Current playlist is off for a different reason: it is already the
+         * first entry of the Playlists context menu ("View Current Playlist"),
+         * and the WPS reaches it too, so nothing is stranded by leaving the
+         * root row out -- unlike the four above, this one cannot be made
+         * unreachable from here. */
         if (menu_table[i].item == &random_album_item
             || menu_table[i].item == &db_search_item
             || menu_table[i].item == &documents_item
-            || menu_table[i].item == &images_item)
+            || menu_table[i].item == &images_item
+            || menu_table[i].item == &current_playlist)
             continue;
         root_menu__[out++] = (struct menu_item_ex *)menu_table[i].item;
     }
