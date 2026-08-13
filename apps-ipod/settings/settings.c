@@ -419,11 +419,23 @@ bool string_to_cfg(const char *name, char* value, bool *theme_changed)
     return true;
 }
 
-/* True if the open config file names any setting that describes the look, which
- * is what separates a theme from the other .cfg files the user can load. Takes
- * the caller's line buffer rather than another 640 bytes of stack, and leaves
- * the read position at wherever it stopped; the caller rewinds. */
-static bool config_names_theme_setting(int fd, char *line, int line_size)
+/* True if the open config file names a font, which is what separates a whole
+ * theme from a .cfg that only patches something.
+ *
+ * A theme gets the reset: every setting describing the look goes back to its
+ * default before the file is read, so the theme cannot inherit the last one's
+ * decisions. A patch must not, or "change my icons" -- themes/rockbox_default_
+ * icons.cfg is two lines long -- would take the wps, the sbs, the font and
+ * every colour with it.
+ *
+ * The font is the discriminator because a whole look has an opinion about its
+ * text, and nothing else in a .cfg reliably separates the two. `font: -` counts:
+ * it says "no font", which is a decision, and upstream's failsafe theme relies
+ * on exactly that.
+ *
+ * Takes the caller's line buffer rather than another 640 bytes of stack, and
+ * leaves the read position at wherever it stopped; the caller rewinds. */
+static bool config_is_theme(int fd, char *line, int line_size)
 {
     while (read_line(fd, line, line_size) > 0)
     {
@@ -434,13 +446,23 @@ static bool config_names_theme_setting(int fd, char *line, int line_size)
             continue;
 
         setting = find_setting_by_cfgname(name);
-        if (setting && (setting->flags & F_THEMESETTING))
+        if (setting && setting->setting == global_settings.font_file)
             return true;
     }
     return false;
 }
 
 /** Theme-local appearance overrides **/
+
+/* Every setting a theme load resets before reading the theme, and so also
+ * every setting the overlay is allowed to carry.
+ *
+ * The union of the two flags, not either alone. F_THEMESETTING is the honest
+ * description of "describes the look" and is what the wider reset is for -- a
+ * theme that names no iconset should not inherit the last one's. But
+ * dynamic_colors carries F_THEMERESET on its own, without F_THEMESETTING, so
+ * testing the tidier flag alone would quietly stop it resetting. */
+#define F_THEME_RESET_MASK (F_THEMESETTING | F_THEMERESET)
 
 /* Which settings the user has changed by hand under the current theme. A
  * pointer list rather than a bit per setting because the count is tiny -- a
@@ -482,7 +504,7 @@ static bool settings_write_config(const char* filename, int options);
 static bool mark_tweak(const struct settings_list *setting)
 {
     /* Only what a theme load would otherwise discard -- see settings.h. */
-    if (!setting || !(setting->flags & F_THEMERESET))
+    if (!setting || !(setting->flags & F_THEME_RESET_MASK))
         return false;
 
     for (int i = 0; i < tweak_count; i++)
@@ -560,7 +582,7 @@ static void read_config_lines(int fd, char *line, int line_size,
  *
  * It cannot be a settings_load_config() call, whichever flag it is given.
  * With apply = true, the overlay names theme settings, so
- * config_names_theme_setting() reports a theme and the F_THEMERESET loop runs
+ * config_is_theme() reports a theme and the F_THEMERESET loop runs
  * a second time -- wiping the theme just read. With apply = false, the apply
  * has already happened and nothing re-reads the backdrop, the colours or the
  * skins. It has to be a step inside the sequence, which is what this is. */
@@ -625,13 +647,13 @@ bool settings_load_config(const char* file, bool apply)
      * scan for one first and rewind. */
     if (apply)
     {
-        is_theme = config_names_theme_setting(fd, line, sizeof line);
+        is_theme = config_is_theme(fd, line, sizeof line);
         lseek(fd, 0, SEEK_SET); /* the scan consumed the file either way */
         if (is_theme)
         {
             for (int i = 0; i < nb_settings; i++)
             {
-                if (settings[i].flags & F_THEMERESET)
+                if (settings[i].flags & F_THEME_RESET_MASK)
                     reset_setting(&settings[i], settings[i].setting);
             }
 

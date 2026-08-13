@@ -33,6 +33,12 @@ mkdir -p "$STAGE/.rockbox"
 cp -R "$ROOT/themes/Themify_2/.rockbox/." "$STAGE/.rockbox/"
 cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/config.cfg"
 
+# The house style a theme is loaded on top of. Loading a theme resets every
+# setting describing the look, and without this the reset lands on upstream's
+# compiled defaults instead of the fork's -- so a theme that names no iconset
+# or scrollbar would drop those to values nobody chose. Read only during a
+# theme load; its absence is handled, so an old install still works.
+
 # The default iconset. buildzip.pl creates icons/ but copies nothing into it,
 # so DEFAULT_ICONSET ("tango_icons.16x16", settings_list.c) pointed at a file
 # that was never on the device. load_icons() fails silently and every icon

@@ -217,18 +217,25 @@ static const int backlight_fade[] = {0,100,200,300,500,1000,2000,3000,5000,10000
 
 static const char graphic_numeric[] = "graphic,numeric";
 
-/* Default theme settings.
- * This fork ships only Themify_2 (cabbiev2 is not bundled), so the compiled
- * fallbacks point at Themify_2. This makes it the default even when no
- * config.cfg is applied (settings reset, or a device that never received the
- * shipped .rockbox/config.cfg). */
-#define DEFAULT_WPSNAME  "Themify_2"
-#define DEFAULT_SBSNAME  "Themify_2"
+/* Default theme settings: none of them.
+ *
+ * These are what a theme load resets to before reading the theme, so naming a
+ * theme's files here would mean a theme that mentions no skin of its own came
+ * up wearing Themify_2's -- the same inherited-look fault the reset exists to
+ * prevent, just from the binary instead of from whatever was loaded last. The
+ * shipped look is named by themes/default-config.cfg, which is the first-boot
+ * config, and by Themify_2.cfg itself.
+ *
+ * "-" is the established "none" value and is what upstream's failsafe theme
+ * uses for its font. Reaching these at all means no config.cfg has been
+ * applied -- a fresh flash, or a Reset Settings -- and the honest answer there
+ * is a bare screen and the built-in font, not somebody's theme. */
+#define DEFAULT_WPSNAME  "-"
+#define DEFAULT_SBSNAME  "-"
 #define DEFAULT_FMS_NAME "cabbiev2"
 
   #define DEFAULT_FONT_HEIGHT 15
-  /* Themify_2's UI font (bundled); overrides the Adobe-Helvetica fallback. */
-  #define DEFAULT_FONTNAME "22-LeagueSpartan-Regular"
+  #define DEFAULT_FONTNAME "-"
 #define DEFAULT_GLYPHS 250
 #define MIN_GLYPHS 50
 #define MAX_GLYPHS 65540
@@ -811,7 +818,7 @@ const struct settings_list settings[] = {
     INT_SETTING(F_THEMESETTING, scrollbar_width, LANG_SCROLLBAR_WIDTH, 6,
                 "scrollbar width",UNIT_INT, 3, MAX(LCD_WIDTH/10,25), 1,
                 NULL, NULL, NULL),
-    TABLE_SETTING(F_ALLOW_ARBITRARY_VALS, list_separator_height, LANG_LIST_SEPARATOR,
+    TABLE_SETTING(F_THEMESETTING|F_ALLOW_ARBITRARY_VALS, list_separator_height, LANG_LIST_SEPARATOR,
                   0, "list separator height", "auto,off", UNIT_PIXEL,
                   list_pad_formatter, list_pad_getlang, NULL, 15,
                   -1,0,1,2,3,4,5,7,9,11,13,16,20,25,30),
@@ -824,10 +831,10 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(F_THEMESETTING, battery_display, LANG_BATTERY_DISPLAY, 0,
                    "battery display", graphic_numeric, NULL, 2,
                    ID2P(LANG_DISPLAY_GRAPHIC), ID2P(LANG_DISPLAY_NUMERIC)),
-    CHOICE_SETTING(0, timeformat, LANG_TIMEFORMAT, 0,
+    CHOICE_SETTING(0, timeformat, LANG_TIMEFORMAT, 1,
         "time format", "24hour,12hour", NULL, 2,
         ID2P(LANG_24_HOUR_CLOCK), ID2P(LANG_12_HOUR_CLOCK)),
-    OFFON_SETTING(0,show_icons, LANG_SHOW_ICONS ,true,"show icons", NULL),
+    OFFON_SETTING(F_THEMESETTING,show_icons, LANG_SHOW_ICONS ,true,"show icons", NULL),
     OFFON_SETTING(0,show_debug_menu, LANG_SHOW_DEBUG_MENU, false,
                   "show debug menu", NULL),
     /* Which tree the root Settings entry opens. F_BANFROMQS because the
@@ -935,21 +942,21 @@ const struct settings_list settings[] = {
                   getlang_time_unit_0_is_off,
                   backlight_set_fade_out, 10, backlight_fade),
 #endif
-    INT_SETTING(F_PADTITLE, scroll_speed, LANG_SCROLL_SPEED, 9,"scroll speed",
+    INT_SETTING(F_THEMESETTING|F_PADTITLE, scroll_speed, LANG_SCROLL_SPEED, 9,"scroll speed",
                 UNIT_INT, 0, 17, 1, NULL, NULL, lcd_scroll_speed),
-    INT_SETTING(F_TIME_SETTING | F_PADTITLE, scroll_delay, LANG_SCROLL_DELAY,
+    INT_SETTING(F_THEMESETTING|F_TIME_SETTING | F_PADTITLE, scroll_delay, LANG_SCROLL_DELAY,
                 1000, "scroll delay", UNIT_MS, 0, 3000, 100,
                 formatter_time_unit_0_is_off,
                 getlang_time_unit_0_is_off, lcd_scroll_delay),
-    INT_SETTING(0, bidir_limit, LANG_BIDIR_SCROLL, 50, "bidir limit",
+    INT_SETTING(F_THEMESETTING, bidir_limit, LANG_BIDIR_SCROLL, 50, "bidir limit",
                 UNIT_PERCENT, 0, 200, 25, NULL, NULL, lcd_bidir_scroll),
-    OFFON_SETTING(0, offset_out_of_view, LANG_SCREEN_SCROLL_VIEW,
+    OFFON_SETTING(F_THEMESETTING, offset_out_of_view, LANG_SCREEN_SCROLL_VIEW,
                   false, "Screen Scrolls Out Of View", NULL),
-    OFFON_SETTING(0, disable_mainmenu_scrolling, LANG_DISABLE_MAINMENU_SCROLLING,
+    OFFON_SETTING(F_THEMESETTING, disable_mainmenu_scrolling, LANG_DISABLE_MAINMENU_SCROLLING,
                   false, "Disable main menu scrolling", NULL),
-    INT_SETTING(F_PADTITLE, scroll_step, LANG_SCROLL_STEP, 6, "scroll step",
+    INT_SETTING(F_THEMESETTING|F_PADTITLE, scroll_step, LANG_SCROLL_STEP, 6, "scroll step",
                 UNIT_PIXEL, 1, LCD_WIDTH, 1, NULL, NULL, lcd_scroll_step),
-    INT_SETTING(F_PADTITLE, screen_scroll_step, LANG_SCREEN_SCROLL_STEP, 16,
+    INT_SETTING(F_THEMESETTING|F_PADTITLE, screen_scroll_step, LANG_SCREEN_SCROLL_STEP, 16,
                 "screen scroll step", UNIT_PIXEL, 1, LCD_WIDTH, 1, NULL, NULL, NULL),
     OFFON_SETTING(0,scroll_paginated,LANG_SCROLL_PAGINATED,
                   false,"scroll paginated",NULL),
@@ -1114,11 +1121,11 @@ const struct settings_list settings[] = {
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_UNKNOWN_TYPES),
                    ID2P(LANG_EXT_ONLY_VIEW_ALL)),
     OFFON_SETTING(0,browse_current,LANG_FOLLOW,false,"follow playlist",NULL),
-    OFFON_SETTING(0,playlist_viewer_icons,LANG_SHOW_ICONS,true,
+    OFFON_SETTING(F_THEMESETTING,playlist_viewer_icons,LANG_SHOW_ICONS,true,
                   "playlist viewer icons",NULL),
-    OFFON_SETTING(0,playlist_viewer_indices,LANG_SHOW_INDICES,true,
+    OFFON_SETTING(F_THEMESETTING,playlist_viewer_indices,LANG_SHOW_INDICES,true,
                   "playlist viewer indices",NULL),
-    CHOICE_SETTING(0, playlist_viewer_track_display, LANG_TRACK_DISPLAY, 0,
+    CHOICE_SETTING(F_THEMESETTING, playlist_viewer_track_display, LANG_TRACK_DISPLAY, 0,
                    "playlist viewer track display",
                    "track name,full path,title and album from tags,title from tags",
                    NULL, 4, ID2P(LANG_DISPLAY_TRACK_NAME_ONLY),
@@ -1403,7 +1410,7 @@ const struct settings_list settings[] = {
     SYSTEM_STATUS(0, dircache_size, 0, "DSZ"),
 
     CHOICE_SETTING(F_BANFROMQS, tagcache_ram, LANG_TAGCACHE_RAM,
-                   0, "tagcache_ram", "off,on,quick",
+                   2, "tagcache_ram", "off,on,quick",
                    NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_QUICK_IGNORE_DIRACHE)),
     OFFON_SETTING(F_BANFROMQS, tagcache_scan_on_eject, LANG_TAGCACHE_SCAN_ON_EJECT, true,
@@ -1413,7 +1420,7 @@ const struct settings_list settings[] = {
      * the boot-time check, which on a player whose library only changes over
      * USB is usually looking for changes that cannot have happened. */
     OFFON_SETTING(F_BANFROMQS, tagcache_scan_on_startup, LANG_SCAN_ON_STARTUP,
-                  true, "tagcache_scan_on_startup", NULL),
+                  false, "tagcache_scan_on_startup", NULL),
     /* A commit cut short (a flat battery, a USB session mid-scan) leaves work
      * to finish at the next boot. On means finish it; off asks first, which is
      * only worth having because the commit holds up the database for as long
@@ -1541,12 +1548,12 @@ const struct settings_list settings[] = {
                    ID2P(LANG_TEXT_VIEWER_COLOUR_INVERTED),
                    ID2P(LANG_TEXT_VIEWER_COLOUR_BOW),
                    ID2P(LANG_TEXT_VIEWER_COLOUR_WOB)),
-    OFFON_SETTING(0, text_viewer_margin, LANG_TEXT_VIEWER_MARGIN, false,
+    OFFON_SETTING(0, text_viewer_margin, LANG_TEXT_VIEWER_MARGIN, true,
                   "text viewer margin", NULL),
     INT_SETTING(0, text_viewer_line_spacing, LANG_TEXT_VIEWER_LINE_SPACING, 0,
                 "text viewer line spacing", UNIT_INT, 0, 8, 1,
                 NULL, NULL, NULL),
-    TEXT_SETTING(0, text_viewer_font_file, "text viewer font", "",
+    TEXT_SETTING(0, text_viewer_font_file, "text viewer font", "22-Literata",
                  FONT_DIR "/", ".fnt"),
     OFFON_SETTING(0, text_viewer_page_number, LANG_TEXT_VIEWER_PAGE_NUMBER,
                   false, "text viewer page number", NULL),
@@ -1676,22 +1683,22 @@ const struct settings_list settings[] = {
                    "album,artist,auto", wps_art_source_callback, 3,
                    ID2P(LANG_WPS_ART_ALBUM), ID2P(LANG_WPS_ART_ARTIST),
                    ID2P(LANG_WPS_ART_AUTO)),
-    CHOICE_SETTING(0, album_covers_view_mode, LANG_CAROUSEL_VIEW_MODE,
+    CHOICE_SETTING(F_THEMESETTING, album_covers_view_mode, LANG_CAROUSEL_VIEW_MODE,
                   0, "album covers view mode", "3d,flat", NULL, 2,
                   ID2P(LANG_CAROUSEL_VIEW_3D), ID2P(LANG_CAROUSEL_VIEW_FLAT)),
-    INT_SETTING(0, album_covers_pile_fade, LANG_CAROUSEL_PILE_FADE, 0,
+    INT_SETTING(F_THEMESETTING, album_covers_pile_fade, LANG_CAROUSEL_PILE_FADE, 0,
                 "album covers pile fade", UNIT_PERCENT, 0, 100, 5,
                 NULL, NULL, NULL),
-    INT_SETTING(0, album_covers_pile_offset, LANG_CAROUSEL_PILE_OFFSET, 0,
+    INT_SETTING(F_THEMESETTING, album_covers_pile_offset, LANG_CAROUSEL_PILE_OFFSET, 0,
                 "album covers pile offset", UNIT_PIXEL, 0, 8, 1,
                 NULL, NULL, NULL),
-    INT_SETTING(0, album_covers_center_margin, LANG_CENTRE_MARGIN, 0,
+    INT_SETTING(F_THEMESETTING, album_covers_center_margin, LANG_CENTRE_MARGIN, 0,
                 "album covers center margin", UNIT_INT, 0, 80, 1,
                 NULL, NULL, NULL),
-    INT_SETTING(0, album_covers_slide_tuck, LANG_NUMBER_OF_SLIDES, 32,
+    INT_SETTING(F_THEMESETTING, album_covers_slide_tuck, LANG_NUMBER_OF_SLIDES, 32,
                 "album covers slide tuck", UNIT_INT, 0, 64, 1,
                 NULL, NULL, NULL),
-    OFFON_SETTING(0, album_covers_parallel_slides, LANG_SPACING, true,
+    OFFON_SETTING(F_THEMESETTING, album_covers_parallel_slides, LANG_SPACING, true,
                   "album covers parallel slides", NULL),
     /* Diagnostics: append what the two background workers are doing to
      * .rockbox/tagcache.log and .rockbox/artcache.log. Both drive the same
@@ -1700,14 +1707,14 @@ const struct settings_list settings[] = {
                   "debug log tagcache", NULL),
     OFFON_SETTING(0, debug_log_artcache, LANG_DEBUG_LOG, false,
                   "debug log artcache", NULL),
-    INT_SETTING(0, album_covers_scroll_speed, LANG_SCROLL_SPEED, 200,
+    INT_SETTING(0, album_covers_scroll_speed, LANG_SCROLL_SPEED, 175,
                 "album covers scroll speed", UNIT_PERCENT, 100, 400, 25,
                 NULL, NULL, NULL),
     INT_SETTING(0, album_covers_transition_speed,
-                LANG_CAROUSEL_TRANSITION_SPEED, 400,
+                LANG_CAROUSEL_TRANSITION_SPEED, 325,
                 "album covers transition speed", UNIT_PERCENT, 100, 400, 25,
                 NULL, NULL, NULL),
-    CHOICE_SETTING(0, album_covers_show_album_name, LANG_SHOW_ALBUM_TITLE,
+    CHOICE_SETTING(F_THEMESETTING, album_covers_show_album_name, LANG_SHOW_ALBUM_TITLE,
                   4, "album covers show album name",
                   "hide,bottom,top,both top,both bottom", NULL, 5,
                   ID2P(LANG_HIDE_ALBUM_TITLE_NEW), ID2P(LANG_SHOW_AT_THE_BOTTOM_NEW),
@@ -1786,7 +1793,7 @@ const struct settings_list settings[] = {
                    ID2P(LANG_STRONG)),
     OFFON_SETTING(0, keyclick_repeats, LANG_KEYCLICK_REPEATS, false,
                   "keyclick repeats", NULL),
-    OFFON_SETTING(0, keyclick_hardware, LANG_KEYCLICK_HARDWARE, false,
+    OFFON_SETTING(0, keyclick_hardware, LANG_KEYCLICK_HARDWARE, true,
         "hardware keyclick", NULL),
     TEXT_SETTING(0, playlist_catalog_dir, "playlist catalog directory",
                      PLAYLIST_CATALOG_DEFAULT_DIR, NULL, NULL),
@@ -1882,7 +1889,7 @@ const struct settings_list settings[] = {
         ),
     OFFON_SETTING(0, clear_settings_on_hold, LANG_CLEAR_SETTINGS_ON_HOLD,
                   false, "clear settings on hold", NULL),
-    CHOICE_SETTING(0, playback_log, LANG_LOGGING, 0, "play log",
+    CHOICE_SETTING(0, playback_log, LANG_LOGGING, 1, "play log",
                    "off,on,last.fm", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUDIOSCROBBLER)),
 };
