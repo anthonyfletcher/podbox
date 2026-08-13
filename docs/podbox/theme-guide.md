@@ -99,7 +99,7 @@ was loaded is kept in `/.rockbox/themes/<your theme>.usercfg` and re-applied
 left keeps that across reloads, and your `.cfg` is not what they see.
 
 You cannot override this and should not try. *Forget My Changes*, at the foot of
-Theme Settings, is how they get back to your theme as shipped.
+Appearance, is how they get back to your theme as shipped.
 
 ### The compiled defaults are bare
 
@@ -223,9 +223,10 @@ or paint the specific strips that nothing else covers. `%dr` fills with the
 ## 4. Dialog and progress chrome
 
 Modal dialogs (yes/no prompts, messages) draw with a shared style you can set
-from the `.cfg`. They also appear under **Settings ▸ Appearance ▸ Theme Settings
-▸ Dialogs** — the metrics and the shadow directly, the nine palette colours
-under **Colours ▸**.
+from the `.cfg`. They also appear under **Settings ▸ Appearance ▸
+Dialogs** — the metrics there, the shadow colour and the nine palette colours
+under **Appearance ▸ Colours**. Every one of them is advanced, so Dialogs shows
+up only with Settings Mode on Everything.
 
 All of them reset when a theme loads, so your `.cfg` is what makes a value
 stick for everyone who loads your theme. A value the *user* sets through those

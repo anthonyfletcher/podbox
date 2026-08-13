@@ -186,13 +186,6 @@ MAKE_MENU(lss_settings, ID2P(LANG_SELECTOR_COLOR_MENU),
             &set_lss_col, &set_lse_col, &set_lst_col
          );
 
-/* now the actual menu */
-MAKE_MENU(colors_settings, ID2P(LANG_COLORS_MENU),
-            NULL, Icon_Display_menu,
-            &lss_settings,  &set_sep_col,
-            &set_bg_col, &set_fg_col, &reset_colors
-         );
-
 /* Modal dialog chrome. Every setting here is F_THEMERESET: loading a theme
    returns all of them to the shipped defaults, so a theme that says nothing
    about dialogs cannot inherit the last theme's. That applies to changes made
@@ -226,11 +219,6 @@ MENUITEM_FUNCTION_W_PARAM(set_dlg_btn_border_sel, 0,
                           set_color_func, (void*)COLOR_DLG_BTN_BORDER_SEL,
                           NULL, Icon_NOICON);
 
-MAKE_MENU(dialog_colors_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
-            &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
-            &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
-            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel);
-
 MENUITEM_SETTING(dialog_colors, &global_settings.dialog_colors, NULL);
 MENUITEM_SETTING(dialog_box_border_width,
                  &global_settings.dialog_box_border_width, NULL);
@@ -245,15 +233,15 @@ MENUITEM_SETTING(dialog_btn_border_width,
 MENUITEM_SETTING(dialog_btn_border_radius,
                  &global_settings.dialog_btn_border_radius, NULL);
 
+/* Shape only. Every colour a dialog uses -- the mode, the shadow and the nine
+   -- is under Colours with the rest of the palette, because someone deciding
+   what the player looks like thinks in colours before they think in widgets. */
 MAKE_MENU(dialog_settings, ID2P(LANG_DIALOGS_MENU), NULL, Icon_Display_menu,
             &dialog_box_border_width,
             &dialog_box_margin,
             &dialog_box_shadow,
-            &set_dlg_box_shadow_col,
             &dialog_btn_border_width,
-            &dialog_btn_border_radius,
-            &dialog_colors,
-            &dialog_colors_menu);
+            &dialog_btn_border_radius);
 
 
 
@@ -294,11 +282,6 @@ MENUITEM_SETTING(scrollbar_width, &global_settings.scrollbar_width, NULL);
 MENUITEM_SETTING(statusbar, &global_settings.statusbar, statusbar_callback);
 MENUITEM_SETTING(volume_type, &global_settings.volume_type, NULL);
 MENUITEM_SETTING(battery_display, &global_settings.battery_display, NULL);
-MAKE_MENU(bars_menu, ID2P(LANG_BARS_MENU), 0, Icon_NOICON,
-          &scrollbar_item, &scrollbar_width, &statusbar,
-          &volume_type
-          , &battery_display
-          );
 
 /*                                  */
 
@@ -425,21 +408,48 @@ MAKE_MENU(artwork_filter_menu, ID2P(LANG_ARTWORK_FILTER), NULL, Icon_NOICON,
             &artwork_filter_2,
             &artwork_filter_3);
 
-MENUITEM_SETTING(shortcuts_replaces_quickscreen,
-                 &global_settings.shortcuts_replaces_qs, NULL);
-
-/* The pieces a theme is built from. Loading a theme sets all of them at once,
-   so these are for adjusting one afterwards. */
-MAKE_MENU(theme_settings_menu, ID2P(LANG_THEME_SETTINGS_MENU), NULL, Icon_Wps,
+/* Appearance is split by what a setting does, not by which layer implements
+ * it: Skins picks the layouts, Colours picks the palette, Elements decides
+ * which pieces of chrome are drawn at all. Theme Settings, which used to hold
+ * a mixture of all three, is gone -- it read as "the leftovers", and a theme
+ * sets every one of these at once anyway. */
+MAKE_MENU(skins_menu, ID2P(LANG_SKINS), NULL, Icon_Wps,
             &browse_wps,
             &browse_sbs,
+            &clear_main_bd);
+
+/* Every colour the interface uses, in one screen.
+ *
+ * The dialog colours were behind Theme Settings > Dialogs, which meant looking
+ * in two places to answer one question. They are flat here rather than in a
+ * submenu of their own because Standard hides all nine anyway -- what is left
+ * is a short list, and Everything is for someone who has come looking. */
+MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
+            &set_fg_col,
+            &set_bg_col,
+            &lss_settings,
+            &set_sep_col,
+            &dynamic_colors,
+            &dialog_colors,                /* Dialog Colour Mode */
+            &set_dlg_box_shadow_col,
+            &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
+            &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
+            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel,
+            &reset_colors);
+
+/* The bars are here rather than in a Bars submenu of their own: three of the
+   five are one-line on/off choices, and burying them cost more than it saved.
+   Ordered outside-in -- the bars framing the screen, then what fills them,
+   then the marks drawn between and around the rows. */
+MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &show_icons,
-            &clear_main_bd,
-            &bars_menu,
+            &statusbar,
+            &scrollbar_item,
+            &scrollbar_width,
+            &volume_type,
+            &battery_display,
             &cursor_style,
             &sep_menu,
-            &colors_settings,
-            &dialog_settings,
             &db_albumart,
             &db_artistart,
             &artwork_filter_menu);
@@ -449,20 +459,21 @@ extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 /* Appearance: everything about how the player looks, which is what "UI
    Settings" was trying to say. It gains the pieces that had been filed by the
    subsystem that implements them rather than by what they do -- the peak meter
-   from Display, the viewers, brightness, and the root menu editor, which is
-   about what you see more than about anything else. */
+   from Display, the viewers, and the root menu editor, which is about what you
+   see more than about anything else. */
 MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             NULL, Icon_Wps,
             &browse_themes,
             &browse_fonts,
-            &theme_settings_menu,
+            &skins_menu,
+            &colours_menu,
+            &elements_menu,
+            &dialog_settings,
             &scroll_settings_menu,
-            &dynamic_colors,
             &wps_settings,
             &viewers_menu,
             &peak_meter_menu,
             &main_menu_config_item,   /* main_menu.c */
-            &shortcuts_replaces_quickscreen,
             /* At the foot of Appearance rather than inside Theme Settings.
                What it forgets is every appearance setting the user has changed
                by hand, and those reach well past this screen -- the carousel's

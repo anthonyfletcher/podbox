@@ -800,6 +800,15 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
 
                     redraw_lists = true;
                 }
+
+                /* Rebuild this menu's row mapping, which the context menu we
+                   just ran overwrote -- current_subitems is one global shared
+                   by every do_menu. Without it the rows redraw unfiltered, so
+                   an advanced row hidden by Standard comes back after a
+                   context press and opens the wrong screen. */
+                if (current_submenus_menu != menu)
+                    init_menu_lists(menu, &lists, selected, true, vps,
+                                    buf, sizeof buf);
             } /* else if (!in_stringlist) */
         }
         else if (action == ACTION_STD_MENU)

@@ -33,7 +33,7 @@ Two things are never hidden, whatever the mode:
   even though its tuning does not.
 
 A screen whose rows are all advanced disappears in Standard rather than opening
-empty. Database, Peak Meter and Artwork Filter are the three that do.
+empty. Database, Dialogs, Peak Meter and Artwork Filter are the four that do.
 
 Nothing is unreachable in Standard: **Search**, at the top of the tree, finds
 every setting whatever the mode, and opens it directly.
@@ -305,16 +305,13 @@ out here.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Font | The typeface used throughout the interface. A larger font is easier to read and fits fewer rows on screen. | none |  |
-| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
-| Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
 
-### Appearance — Theme Settings
+### Appearance — Skins
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | none |  |
 | Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | none |  |
-| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
 | Backdrop | An image drawn behind everything. Loading a theme replaces it, and a theme that names none clears it rather than keeping the last one. | none |  |
 | Bold Font | An optional bold companion to the interface font, used where a screen wants emphasis. Unset means the regular font is used for both. | none | **Adv** |
 | Iconset | The image file the list icons are taken from. A theme-author setting. | /.rockbox/icons/tango_icons.16x16.bmp | **Adv** |
@@ -322,14 +319,6 @@ out here.
 | Filetype Colours | A file naming a colour per extension, so the browser can colour-code types. A theme-author setting. | none | **Adv** |
 | UI Viewport | The rectangle a theme reserves for lists, so its own decoration is not drawn over. A theme-author setting. | none | **Adv** |
 | Progress Bar Radius | Corner rounding of the progress bar, in pixels. A theme-author setting: most themes draw their own bar and ignore it. | 2 | **Adv** |
-| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
-| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
-| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 | **Adv** |
-| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
-| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
-| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
-| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
-| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
 
 ### Appearance — Colours
 
@@ -340,21 +329,13 @@ out here.
 | Line Selector Start Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
 | Line Selector End Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
 | Line Selector Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
-
-### Appearance — Dialogs
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Dialog Colours | How the confirmation and message boxes are coloured. Auto derives them from the theme -- or from the album while Dynamic Colors is running -- which is why it is the default. On uses the nine colours set by hand; off inherits the theme's flat. | auto |  |
-| Box Border Width | The thickness of that border, in pixels. Zero draws none. | 2 | **Adv** |
-| Box Margin | How far the dialog is inset from the edges of the screen. | 10 | **Adv** |
-| Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
+| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 | **Adv** |
+| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto derives them from the theme -- or from the album while Dynamic Colors is running -- which is why it is the default. On uses the nine colours set by hand; off inherits the theme's flat. | auto |  |
 | Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 | **Adv** |
-| Box Text | The text colour inside a dialog. Only used when Dialog Colours is On. | e7f3ef | **Adv** |
-| Box Background | The fill colour inside a dialog. Only used when Dialog Colours is On. | 000c21 | **Adv** |
-| Box Border | The colour of a dialog's own border. Only used when Dialog Colours is On. | e7f3ef | **Adv** |
-| Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
-| Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
+| Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef | **Adv** |
+| Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 | **Adv** |
+| Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef | **Adv** |
 | Button Text | The text colour of an unselected dialog button. | e7f3ef | **Adv** |
 | Button Background | The fill colour of an unselected dialog button. | 000c21 | **Adv** |
 | Button Border | The border colour of an unselected dialog button. | e7f3ef | **Adv** |
@@ -362,16 +343,34 @@ out here.
 | Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef | **Adv** |
 | Selected Button Border | The border colour of the selected dialog button. | e7f3ef | **Adv** |
 
-### Appearance — Artwork in lists
+### Appearance — Elements
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
+| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
+| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
+| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
+| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
+| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
+| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
+| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 | Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Album Art Row Height | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Adv** |
 | Filter 1 | First of three image adjustments applied to artwork before it is drawn. A theme-author setting: a theme that wants a treatment names it, and one that does not should have none. | off | **Adv** |
 | Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
 | Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
+
+### Appearance — Dialogs
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Box Border Width | The thickness of that border, in pixels. Zero draws none. | 2 | **Adv** |
+| Box Margin | How far the dialog is inset from the edges of the screen. | 10 | **Adv** |
+| Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
+| Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
+| Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
 
 ### Appearance — Now Playing
 
@@ -470,6 +469,7 @@ out here.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
 | Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
 | Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
 | Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. | 50 | **Adv** |
@@ -548,7 +548,7 @@ geometry, the scrolling settings and the dialog chrome — every setting carryin
 **What you set by hand is not lost.** Changes made through the settings screens
 while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
 straight after the theme, so they survive the reset. *Forget My Changes*, at the
-foot of Theme Settings, throws them away and reloads the theme as its author
+foot of Appearance, throws them away and reloads the theme as its author
 shipped it.
 
 A `.cfg` counts as a theme, and so triggers the reset, only if it names a font.

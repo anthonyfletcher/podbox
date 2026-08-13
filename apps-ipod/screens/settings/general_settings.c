@@ -304,6 +304,11 @@ MAKE_MENU(limits_menu, ID2P(LANG_LIMITS_MENU), 0, Icon_NOICON,
            ,&default_glyphs
            );
 
+/* What a long press of Select opens. A control decision rather than an
+   appearance one, which is why it is here and not under Appearance. */
+MENUITEM_SETTING(shortcuts_replaces_quickscreen,
+                 &global_settings.shortcuts_replaces_qs, NULL);
+
 /* Volume adjustment */
 MENUITEM_SETTING(volume_adjust_mode, &global_settings.volume_adjust_mode, NULL);
 MENUITEM_SETTING(volume_adjust_norm_steps, &global_settings.volume_adjust_norm_steps, NULL);
@@ -668,7 +673,7 @@ static void reset_wps_items(void)
 {
     reset_setting(find_setting(&global_settings.context_wps), NULL);
 }
-MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET), reset_wps_items,
+MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET_CONTEXT_ITEMS), reset_wps_items,
                   NULL, Icon_Queued);
 
 /* Which picture the screen shows. A property of this screen rather than of the
@@ -752,6 +757,7 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
           0, Icon_System_menu,
             &usb_menu,
             &accessories_menu,
+            &shortcuts_replaces_quickscreen,
             &keyclick_menu,
             &limits_menu,
             &dircache,

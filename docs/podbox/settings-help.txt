@@ -13,6 +13,9 @@
 #            <(grep -E '^\{ "' apps-ipod/settings/settings_tags.c \
 #               | sed 's/^{ "//; s/".*//' | sort -u)
 #
+# Action rows are keyed differently -- see the "action: " note further down --
+# and are complete too: every MENUITEM_FUNCTION in the settings tree has one.
+#
 # Write for someone who has just found the setting and does not know what it
 # does. Say what it changes, and where it is useful or costly. Two or three
 # sentences; the screen is 320 pixels wide. Lines within a paragraph are joined
@@ -1068,3 +1071,323 @@ Rebuilds the flat Documents and Images lists from a walk of the disk.
 
 It reruns itself after a USB session, which is when files normally change, so
 this is for when they changed some other way.
+
+[action: Load Theme]
+Opens the list of installed themes. Choosing one applies the whole look at
+once -- fonts, skins, colours, which bars are drawn.
+
+Loading a theme also clears any appearance change you made by hand, so that a
+theme cannot inherit stray settings from the one before it. Anything you change
+afterwards is kept for that theme and reapplied the next time it is loaded.
+
+[action: Font]
+Picks a font file from /.rockbox/fonts.
+
+Under Appearance this is the interface font, used everywhere the theme does not
+say otherwise. Inside a viewer's own settings it is the font that viewer uses,
+leaving the rest of the interface alone.
+
+Bigger fonts fit fewer rows on screen and slow scrolling slightly.
+
+[action: Use UI Font]
+Drops this viewer's own font and goes back to the one the rest of the interface
+uses.
+
+[action: While Playing Screen]
+Picks the layout drawn while music is playing.
+
+The list is of .wps files in /.rockbox/wps. A theme sets this for you; change it
+here to keep a theme but play from a different screen.
+
+[action: Base Skin]
+Picks the frame drawn around the menus and browsers -- the status bar area, any
+backdrop, and where the list is allowed to sit.
+
+The list is of .sbs files in /.rockbox/wps. Themes with art beside their rows
+need their own base skin, so changing this to something else can leave the lists
+looking plain.
+
+[action: Clear Backdrop]
+Removes the background image, leaving the background colour showing through.
+
+The backdrop comes back the next time a theme is loaded.
+
+[action: Foreground Colour]
+The default text colour for lists and menus.
+
+A skin that sets its own colours overrides this for the parts it draws. If text
+has become unreadable, this and Background Colour are the pair to fix.
+
+[action: Background Colour]
+The colour behind lists and menus.
+
+Only visible where there is no backdrop image; Clear Backdrop makes it visible
+everywhere.
+
+[action: Primary Colour]
+The colour of the bar drawn behind the selected row, or its top edge when the
+selector is a gradient.
+
+[action: Secondary Colour]
+The bottom edge of the selection gradient. It fades from Primary to this.
+
+Only used when Line Selector Type is set to gradient; the other selector styles
+ignore it.
+
+[action: Text Colour]
+The colour of the text on the selected row, which would otherwise be the normal
+foreground colour and can vanish against a strong selector.
+
+[action: Line Separator Colour]
+The colour of the hairline drawn between rows.
+
+Only visible once Line Separator has been given a height above zero.
+
+[action: Box Text]
+The text colour inside a confirmation or message box.
+
+One of the nine dialog colours, which are used only when Dialog Colour Mode is
+set to use them rather than following the theme.
+
+[action: Box Background]
+The colour filling a confirmation or message box.
+
+[action: Box Border]
+The colour of the line around a dialog box.
+
+Invisible unless Dialog Box Border has a width above zero.
+
+[action: Box Shadow Colour]
+The colour of the shadow cast by a dialog box.
+
+Invisible unless Dialog Box Shadow is on. A colour close to the background gives
+a soft edge; a darker one makes the box look further off the screen.
+
+[action: Button Text]
+The label colour on the buttons in a dialog when they are not selected.
+
+[action: Button Background]
+The fill colour of the buttons in a dialog when they are not selected.
+
+[action: Button Border]
+The outline colour of the buttons in a dialog.
+
+Invisible unless Dialog Button Border has a width above zero.
+
+[action: Selected Button Text]
+The label colour on the dialog button that is currently chosen.
+
+This and its background are what tell you which way a Yes/No question will go,
+so keep them clearly different from the unselected pair.
+
+[action: Selected Button Background]
+The fill colour of the dialog button that is currently chosen.
+
+[action: Selected Button Border]
+The outline colour of the dialog button that is currently chosen.
+
+[action: Reset Colours]
+Puts the foreground, background, selector and separator colours back to the
+built-in defaults -- white on black.
+
+It does not touch the dialog colours, the backdrop or the skins.
+
+[action: Forget My Changes]
+Discards every appearance change you have made by hand and returns to what the
+current theme says.
+
+Those changes are kept in a file beside the theme, and this deletes it. It
+reaches wider than the Appearance screen: the carousel geometry, the playlist
+viewer chrome and the scrolling settings are all included.
+
+[action: Edit Main Menu]
+Chooses which rows appear on the main menu and what order they are in.
+
+Views from the Music browser can be promoted here, so an album list can sit on
+the first screen you see.
+
+[action: Edit Music Menu]
+Chooses which views appear inside Music and in what order.
+
+Turning off the ones you never open makes the list shorter without losing the
+database entries behind them.
+
+[action: Scale]
+Whether the peak meter is scaled by loudness or by raw sample value.
+
+Logarithmic matches how the ear hears level and keeps the meter moving over most
+of its width; linear leaves quiet music pinned to the left.
+
+[action: Minimum of Range]
+The level the peak meter treats as the bottom of its scale.
+
+Raising it stops quiet passages sitting at the far left, at the cost of hiding
+how quiet they really are.
+
+[action: Maximum of Range]
+The level the peak meter treats as full scale.
+
+Lower it if the meter never reaches the right-hand end.
+
+[action: Select Directories to Scan]
+Chooses which folders the database reads when it scans.
+
+Leaving out folders of podcasts or audiobooks keeps them out of the album and
+artist lists while still letting you play them from Files. Changing this offers
+a rebuild, because the database has to be built again to honour it.
+
+[action: Export Modifications]
+Writes play counts, ratings and last-played times to a file, so that a database
+rebuild does not lose them.
+
+[action: Import Modifications]
+Reads back a file written by Export Modifications and folds those play counts
+and ratings into the current database.
+
+[action: Missing Album Artwork]
+Lists the albums that have no artwork, so you can see what is worth finding
+covers for.
+
+Reads what is already in the artwork cache, so run Update Art Cache first if you
+have just added images.
+
+[action: Missing Artist Portraits]
+Lists the artists that have no photograph.
+
+Artist images are looked for beside the music and in the artist art folder.
+
+[action: Create Playlist]
+Builds a playlist from the folder you are in, including everything below it, and
+saves it in the playlist catalogue.
+
+[action: View Current Playlist]
+Opens what is queued to play now, where tracks can be moved or removed.
+
+[action: Save Current Playlist]
+Writes what is playing now to a playlist file, so that it survives being
+replaced by the next thing you play.
+
+[action: Reset Playlist Catalogue Directory]
+Puts the playlist catalogue back to /Playlists.
+
+Only useful if you have pointed it somewhere else and want the default back.
+
+[action: Start File Browser at /]
+Clears the saved start directory, so that Files opens at the root of the disk
+again.
+
+[action: Language]
+Picks a language file from /.rockbox/langs. It takes effect at once.
+
+Only text the firmware supplies is translated -- track and folder names are
+whatever the files say.
+
+[action: Set Time/Date]
+Sets the clock, which is what timestamps play counts and what the status bar
+shows.
+
+[action: Save .cfg File]
+Writes every setting that differs from the defaults to a .cfg file, which can be
+loaded again later or copied to another player.
+
+Useful as a backup before trying something drastic.
+
+[action: Save Theme Settings]
+Writes only the appearance settings -- fonts, skins, colours, bars -- to a .cfg
+file. This is how a theme of your own is made.
+
+[action: Save Sound Settings]
+Writes only the sound settings -- volume, tone, equaliser, crossfeed -- to a
+.cfg file.
+
+[action: Browse .cfg Files]
+Opens the list of saved .cfg files. Choosing one applies the settings it
+contains and leaves everything else alone.
+
+[action: Reset Settings]
+Puts every setting back to the built-in default and restarts.
+
+Themes, music and playlists are untouched -- this is the settings only. Save a
+.cfg file first if there is anything you want back afterwards.
+
+[action: Reset Context Menu]
+Clears the four while-playing context menu slots, so that the menu goes back to
+its default contents.
+
+[action: Settings]
+Chooses which button actions are allowed to happen with the backlight off.
+
+An action enabled here does its job without lighting the screen; one that is not
+lights the screen instead, and needs a second press.
+
+[action: Background Tasks]
+Shows what the player is doing in the background -- scanning, indexing, building
+thumbnails -- and how far along it is.
+
+The place to look when the disk is busy and nothing on screen says why.
+
+[action: Rockbox Info]
+Shows the version, how much memory and disk is free, and the battery reading.
+
+[action: Running Time]
+How long the player has been running and how long it has been playing, both
+since the counter was last reset.
+
+[action: Credits]
+The people who wrote Rockbox.
+
+[action: License]
+The GNU General Public License, version 2, which this firmware is released
+under.
+
+[action: Third-Party Licenses]
+The licences of the codecs, fonts and libraries this firmware includes.
+
+[action: Debug (Keep Out!)]
+Diagnostic screens for developers. Nothing in here is needed to use the player,
+and some of it can lock it up.
+
+[action: Changed Settings]
+Lists every setting that differs from its default, with what it is now.
+
+The quick answer to what did I change, and each row opens the setting itself.
+
+[action: Search]
+Finds a setting by name. Type part of what you are after and it lists the
+matches with the menu each one lives in.
+
+It searches the display name, the name a setting has in a .cfg file, and a few
+words describing it -- so art, cover and album all reach the artwork settings.
+
+[action: Simple EQ]
+The three-band tone control: bass, treble, and the mid-band between them.
+
+Enough for most adjustments. Advanced EQ reaches the same filters with full
+control over frequency and width.
+
+[action: Advanced EQ]
+Sets each of the five bands by hand -- frequency, gain and Q.
+
+Q is how wide the band is: low values shape a broad area, high values pick out a
+narrow problem.
+
+[action: Graphical EQ]
+Shows the equaliser curve and lets you drag the bands on it.
+
+Quicker than the numeric screens for judging the shape, less precise for setting
+an exact value.
+
+[action: Save EQ Preset]
+Writes the current equaliser settings to a .cfg file in /.rockbox/eqs, so they
+can be loaded again later.
+
+[action: Load EQ]
+Loads a saved equaliser preset, replacing the current band settings.
+
+[action: Reset EQ]
+Returns every band to flat, leaving the equaliser on.
+
+[action: Time & Date Settings]
+Opens the clock: the time and date themselves, and how they are shown.
+
+The clock is what timestamps play counts and what the status bar reads from.

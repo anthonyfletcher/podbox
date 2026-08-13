@@ -17673,13 +17673,13 @@
         context
   user: core
   <source>
-    *: "Main Menu Settings"
+    *: "Edit Main Menu"
   </source>
   <dest>
-    *: "Main Menu Settings"
+    *: "Edit Main Menu"
   </dest>
   <voice>
-    *: "Main Menu Settings"
+    *: "Edit main menu"
   </voice>
 </phrase>
 <phrase>
@@ -18701,13 +18701,13 @@
   desc: dialog settings, whether the nine colours below are used
   user: core
   <source>
-    *: "Dialog Colours"
+    *: "Dialog Colour Mode"
   </source>
   <dest>
-    *: "Dialog Colours"
+    *: "Dialog Colour Mode"
   </dest>
   <voice>
-    *: "Dialog Colours"
+    *: "Dialog colour mode"
   </voice>
 </phrase>
 <phrase>
@@ -19009,13 +19009,13 @@
   desc: General Settings > Music: opens the screen that turns Music menu rows on and off
   user: core
   <source>
-    *: "Music Menu Settings"
+    *: "Edit Music Menu"
   </source>
   <dest>
-    *: "Music Menu Settings"
+    *: "Edit Music Menu"
   </dest>
   <voice>
-    *: "Music Menu Settings"
+    *: "Edit music menu"
   </voice>
 </phrase>
 <phrase>
@@ -19534,5 +19534,47 @@
   </dest>
   <voice>
     *: "No explanation for this one"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKINS
+  desc: Appearance submenu holding the while-playing skin, base skin and backdrop
+  user: core
+  <source>
+    *: "Skins"
+  </source>
+  <dest>
+    *: "Skins"
+  </dest>
+  <voice>
+    *: "Skins"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ELEMENTS
+  desc: Appearance submenu holding which pieces of chrome are drawn
+  user: core
+  <source>
+    *: "Elements"
+  </source>
+  <dest>
+    *: "Elements"
+  </dest>
+  <voice>
+    *: "Elements"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_CONTEXT_ITEMS
+  desc: clears the four while-playing context menu slots
+  user: core
+  <source>
+    *: "Reset Context Menu"
+  </source>
+  <dest>
+    *: "Reset Context Menu"
+  </dest>
+  <voice>
+    *: "Reset context menu"
   </voice>
 </phrase>
