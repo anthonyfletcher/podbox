@@ -93,19 +93,19 @@ static int selectivebacklight_set_mask(void* param)
 
 
 /** LCD menu **/
-MENUITEM_SETTING(backlight_timeout, &global_settings.backlight_timeout, NULL);
-MENUITEM_SETTING(backlight_timeout_plugged,
+MENUITEM_SETTING_EXPORTED(backlight_timeout, &global_settings.backlight_timeout, NULL);
+MENUITEM_SETTING_EXPORTED(backlight_timeout_plugged,
                 &global_settings.backlight_timeout_plugged, NULL);
 
-MENUITEM_SETTING(backlight_on_button_hold,
+MENUITEM_SETTING_EXPORTED(backlight_on_button_hold,
                 &global_settings.backlight_on_button_hold, NULL);
 
-MENUITEM_SETTING(caption_backlight, &global_settings.caption_backlight, NULL);
+MENUITEM_SETTING_EXPORTED(caption_backlight, &global_settings.caption_backlight, NULL);
 #if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
-MENUITEM_SETTING(backlight_fade_in, &global_settings.backlight_fade_in, NULL);
-MENUITEM_SETTING(backlight_fade_out, &global_settings.backlight_fade_out, NULL);
+MENUITEM_SETTING_EXPORTED(backlight_fade_in, &global_settings.backlight_fade_in, NULL);
+MENUITEM_SETTING_EXPORTED(backlight_fade_out, &global_settings.backlight_fade_out, NULL);
 #endif
-MENUITEM_SETTING(bl_filter_first_keypress,
+MENUITEM_SETTING_EXPORTED(bl_filter_first_keypress,
                     &global_settings.bl_filter_first_keypress,
                     filterfirstkeypress_callback);
 
@@ -120,30 +120,18 @@ MENUITEM_FUNCTION(sel_backlight_mask, 0, ID2P(LANG_SETTINGS),
 MAKE_MENU(sel_backlight, ID2P(LANG_BACKLIGHT_SELECTIVE),
           NULL, Icon_Menu_setting, &bl_selective_actions, &sel_backlight_mask);
 
-MENUITEM_SETTING(lcd_sleep_after_backlight_off,
+MENUITEM_SETTING_EXPORTED(lcd_sleep_after_backlight_off,
                 &global_settings.lcd_sleep_after_backlight_off, NULL);
 /* Listed under both Appearance and Battery & Power: it is how bright the
    screen looks and the second biggest draw on the battery, and there is no
    sense in which it is one and not the other. */
 MENUITEM_SETTING_EXPORTED(brightness_item, &global_settings.brightness, NULL);
-/* now the actual menu */
-MAKE_MENU(lcd_settings,ID2P(LANG_LCD_MENU),
-            NULL, Icon_Display_menu
-            ,&backlight_timeout
-            ,&backlight_timeout_plugged
-            ,&backlight_on_button_hold
-            ,&caption_backlight
-#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
-            ,&backlight_fade_in, &backlight_fade_out
-#endif
-            ,&bl_filter_first_keypress
-            ,&sel_backlight
-            ,&lcd_sleep_after_backlight_off
-            /* Brightness is not here. This screen is the backlight -- when it
-               is on and for how long -- and brightness is a property of the
-               panel. It sits one level up, beside the backlight, under
-               Battery & Power. */
-         );
+
+/* There is no LCD Settings screen. Every row above is listed straight under
+   Battery & Power, which is built in general_settings.c -- hence the exported
+   form. The screen held the backlight and nothing else, and "LCD Settings"
+   named the hardware rather than the question being asked; anyone wondering
+   how long the light stays on was already in the right menu one level up. */
 
 
 

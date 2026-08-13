@@ -457,9 +457,23 @@ MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
  * most.
  *
  * Ordered by how much difference each makes to runtime. */
+/* The backlight rows first -- how long the light stays on is the biggest lever
+   there is on runtime -- then the panel, then everything else that spends the
+   battery. They were behind an LCD Settings submenu of their own; flattening
+   costs a longer screen and saves the step that hid the one setting most
+   worth changing. */
 MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
-            &lcd_settings,        /* the backlight -- the biggest lever */
+            &backlight_timeout,
+            &backlight_timeout_plugged,
             &brightness_item,
+            &backlight_on_button_hold,
+            &caption_backlight,
+#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
+            &backlight_fade_in, &backlight_fade_out,
+#endif
+            &bl_filter_first_keypress,
+            &sel_backlight,
+            &lcd_sleep_after_backlight_off,
             &poweroff,
             &sleep_timer_menu,
             &disk_spindown,

@@ -440,25 +440,20 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
-| Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
-| Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
-| Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
-| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. | force |  |
-| Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
-
-### Battery & Power — Backlight
-
-| Setting | What it does | Default | |
-|---|---|---|---|
 | Backlight | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
 | Backlight (While Plugged In) | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
+| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
 | Backlight on Hold | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
 | Caption Backlight | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
 | Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
 | Backlight Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
 | First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. | on | **Adv** |
 | Sleep (After Backlight Off) | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
+| Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
+| Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
+| Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
+| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. | force |  |
+| Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
 
 ### Battery & Power — Sleep Timer
 

@@ -44,8 +44,19 @@ extern const struct menu_item_ex
         , viewers_menu              /* general_settings.c -- listed under both
                                        Appearance and Library */
         , peak_meter_menu           /* display_settings.c -- under Appearance */
-        , lcd_settings              /* display_settings.c -- the backlight,
-                                       under Battery & Power */
+        /* display_settings.c -- the backlight rows, listed one by one under
+           Battery & Power rather than behind an LCD Settings screen */
+        , backlight_timeout
+        , backlight_timeout_plugged
+        , backlight_on_button_hold
+        , caption_backlight
+#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
+        , backlight_fade_in
+        , backlight_fade_out
+#endif
+        , bl_filter_first_keypress
+        , sel_backlight
+        , lcd_sleep_after_backlight_off
         , brightness_item           /* display_settings.c -- listed under both
                                        Appearance and Battery & Power, as one
                                        item so there is only one callback */
