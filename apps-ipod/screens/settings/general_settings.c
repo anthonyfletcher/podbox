@@ -77,14 +77,14 @@ MENUITEM_SETTING(tagcache_autocommit,
                  &global_settings.tagcache_autocommit, NULL);
 MENUITEM_SETTING(runtimedb, &global_settings.runtimedb, NULL);
 
-MENUITEM_FUNCTION(tc_export, 0, ID2P(LANG_TAGCACHE_EXPORT),
+MENUITEM_FUNCTION(tc_export, MENU_ADVANCED, ID2P(LANG_TAGCACHE_EXPORT),
                   browser_db_export,
                   NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION(tc_import, 0, ID2P(LANG_TAGCACHE_IMPORT),
+MENUITEM_FUNCTION(tc_import, MENU_ADVANCED, ID2P(LANG_TAGCACHE_IMPORT),
                   browser_db_import,
                   NULL, Icon_NOICON);
-MENUITEM_FUNCTION(tc_paths, 0, ID2P(LANG_SELECT_DATABASE_DIRS),
+MENUITEM_FUNCTION(tc_paths, MENU_ADVANCED, ID2P(LANG_SELECT_DATABASE_DIRS),
                   dirs_to_scan, NULL, Icon_NOICON);
 
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);

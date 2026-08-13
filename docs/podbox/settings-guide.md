@@ -1,523 +1,595 @@
 # Settings guide
 
-This guide is provided to help you navigate the settings available in PodBox.
+Every setting PodBox has, in the order you meet it, with what it does and
+whether it is hidden by default.
 
-The settings come in two shapes — a short **Basic** page, which is what a fresh
-install shows, and the full **Advanced** tree. The Basic page's last entry opens
-the full tree.
-
-Defaults below are what a **Reset Settings** produces. They are not always what
-your player is showing, for two reasons worth knowing before you go looking for
-a bug:
-
-- The shipped `config.cfg` sets some values at first boot, so the device starts
-  from that rather than from the compiled defaults.
-- Loading a theme resets a number of settings — see [§9](#9-settings-a-theme-resets).
-
-Where the two players differ, the entry says so: **(5G)** is the iPod Video,
-**(6G)** the iPod Classic.
+Descriptions here are the same text the player shows: **Explain**, in a
+setting's context menu, reads them from `/.rockbox/docs/settings-help.txt`, and
+the tables below are generated from that file. If the two ever disagree, the
+file is right and this document has gone stale.
 
 ---
 
-## 1. Basic and Advanced
+## Standard and Everything
 
-The Basic page, in order:
+The settings tree has one shape, and **Settings Mode** at the foot of it decides
+how much you see.
 
-| Setting |
-|---|
-| Volume |
-| Bass |
-| Treble |
-| Shuffle |
-| Repeat |
-| Brightness |
-| Backlight |
-| Load EQ |
-| Enable EQ |
-| Load Theme |
-| Font |
-| Idle Poweroff |
-| Main Menu Settings |
-| **Advanced** |
+- **Standard** hides the rows marked **Adv** below. It is what a new install
+  shows.
+- **Everything** shows all of them.
 
-Each of these is the *same* setting as its counterpart in the full tree, not a
-copy — change Bass here and Sound Settings shows the new value. Entries marked
-**●** in the sections below are the ones that appear on this page.
+A setting is marked advanced when the default is already the right answer for
+someone who has not thought about it — because you would need to know how the
+feature works to set it, because it shapes something whose on/off row is
+elsewhere, because it exists for one piece of hardware, or because it is there
+for theme authors.
 
----
+Two things are never hidden, whatever the mode:
 
-## 2. Sound Settings
+- **destructive actions**, because hiding Update Database would hide the fix for
+  *my new album isn't showing up*;
+- **the way back from a visible problem** — Dynamic Colors stays in Standard
+  even though its tuning does not.
 
-| Setting | What it does | Default |
-|---|---|---|
-| Volume ● | Output level. The same value the volume buttons move. | −25 dB |
-| Maximum Volume Limit | Ceiling the volume control cannot pass. | +6 dB **(5G)**, +12 dB **(6G)** |
-| Bass ● | Tone control, low shelf. | 0 dB |
-| Bass Cutoff | Corner frequency Bass acts below. | 1 **(5G)**, 2 **(6G)** |
-| Treble ● | Tone control, high shelf. | 0 dB |
-| Treble Cutoff | Corner frequency Treble acts above. | 1 |
-| Balance | Left/right level offset. | 0 |
-| Channel Configuration | Stereo, mono, mono left/right, karaoke, swap. | Stereo |
-| Stereo Width | Widens or narrows the stereo image. | 100% |
-| **Crossfeed** ▸ | Bleeds each channel into the other so headphones sound less "in-head". | |
-| ├ Crossfeed | Off / Simple (Meier) / Custom. | Off |
-| ├ Direct Gain | Level of the direct (same-ear) path. | −1.5 dB |
-| ├ Cross Gain | Level of the crossfed path. | −6.0 dB |
-| ├ High-Frequency Attenuation | How far the crossfed path is rolled off. | −16.0 dB |
-| └ High-Frequency Cutoff | Where that roll-off starts. | 700 Hz |
-| **Equalizer** ▸ | 10-band parametric EQ. | |
-| ├ Load EQ ● | Load one of the bundled presets. Cheaper than learning the bands. | *(action)* |
-| ├ Enable EQ ● | Master on/off. | Off |
-| ├ Graphical EQ | Draggable band-gain editor. | *(screen)* |
-| ├ Simple EQ | Gain only, one row per band. | all bands 0 dB |
-| ├ Advanced EQ | Gain, centre/cutoff frequency and Q per band. | 32–16000 Hz, Q 0.7–1.0 |
-| ├ Precut | Global attenuation, to leave headroom for boosted bands. | 0 dB |
-| ├ Save EQ Preset | Write the current curve to a `.cfg`. | *(action)* |
-| └ Reset EQ | Restore flat defaults. | *(action)* |
-| Dithering | Adds dither noise on bit-depth reduction. Inaudible in practice. | Off |
-| **Haas Surround** ▸ | Pseudo-surround by delaying one channel. | |
-| ├ Haas Surround | Delay in ms; 0 is off. | Off |
-| ├ Balance | Wet-signal L/R weighting. | 35% |
-| ├ f(x1) / f(x2) | Upper and lower band limits of the effect. | 3400 Hz / 320 Hz |
-| ├ Side Only | Apply to the side (difference) signal only. | Off |
-| └ Dry / Wet Mix | Effect blend. | 50% |
-| **Perceptual Bass Enhancement** ▸ | Adds harmonics so small drivers imply bass they cannot produce. | |
-| ├ Perceptual Bass Enhancement | Strength, 0–100%. | 0% |
-| └ Precut | Attenuation to stop the effect clipping. | −2.5 dB |
-| Auditory Fatigue Reduction | Tames harshness on long listens. | Off |
-| **Compressor** ▸ | Dynamic range compression — quiet passages stay audible in noise. | |
-| ├ Threshold | Level above which compression starts; 0 is off. | Off |
-| ├ Makeup Gain | Restores level lost to compression. | Auto |
-| ├ Ratio | 2:1 … 10:1, or Limit. | 4:1 |
-| ├ Knee | Hard or soft transition at the threshold. | Soft Knee |
-| ├ Attack Time | How fast it clamps down. | 5 ms |
-| └ Release Time | How fast it lets go. | 500 ms |
+A screen whose rows are all advanced disappears in Standard rather than opening
+empty. Database, Peak Meter and Artwork Filter are the three that do.
+
+Nothing is unreachable in Standard: **Search**, at the top of the tree, finds
+every setting whatever the mode, and opens it directly.
 
 ---
 
-## 3. Playback Settings
+## Where things are
 
-| Setting | What it does | Default |
-|---|---|---|
-| Shuffle ● | Randomise the playlist. Re-shuffles the live playlist immediately. | Off |
-| Repeat ● | Off / All / One / Shuffle / A-B. | Off |
-| Play Selected First | Selecting a track starts from it rather than the top of the folder. | Yes |
-| **Fast-Forward/Rewind** ▸ | | |
-| ├ FF/RW Min Step | Seek distance for the first press. | 1s |
-| └ FF/RW Accel | How fast held seeking speeds up. | Normal |
-| Anti-Skip Buffer | Audio kept buffered before the disk may spin down. Raise it if playback stutters when moving. | 5s |
-| Fade on Stop/Pause | Ramp the volume instead of cutting. | Yes |
-| Single Mode | Stop after one track / album / artist / genre / playlist. | Off |
-| Party Mode | New selections queue instead of replacing the playlist. | Off |
-| **Crossfade** ▸ | Overlap the end of one track with the start of the next. | |
-| ├ Enable Crossfade | Off / auto skip / manual skip / shuffle / always. | Off |
-| ├ Fade-In Delay / Duration | Shape of the incoming track. | 0s / 2s |
-| ├ Fade-Out Delay / Duration | Shape of the outgoing track. | 0s / 2s |
-| └ Fade-Out Mode | Crossfade (dip) or Mix (constant power). | Crossfade |
-| **Replaygain** ▸ | Applies the loudness tags many rippers write, so albums match in level. | |
-| ├ Replaygain Type | Track / Album / Track-if-shuffling / Off. | Track Gain If Shuffling |
-| ├ Prevent Clipping | Back the gain off rather than clip. | No |
-| └ Pre-amp | Fixed offset applied on top. | 0.0 dB |
-| Track Skip Beep | Beep on skip. | Off |
-| Auto-Change Directory | At the end of a folder, move to the next (or a random) one. | No |
-| Constrain Auto-Change | Keep that move inside the starting folder's parent. | No |
-| Cuesheet Support | Read `.cue` files so a single-file album shows track boundaries. | Off |
-| **Pause on Headphone Unplug** ▸ | | |
-| ├ Pause on Headphone Unplug | Off / pause / pause and resume on replug. | Off |
-| └ Disable resume on startup if phones unplugged | Do not auto-resume into a bare speaker or line-out. | No |
-| Skip Length | Make skip jump a fixed time instead of a whole track. Useful for long podcasts. | Skip Track |
-| Prevent Track Skipping | Locks out skip entirely — kiosk or party use. | No |
-| Rewind Across Tracks | Rewinding past the start of a track enters the previous one. | No |
-| Rewind Before Resume | Back up N seconds when resuming, to re-establish context. | Off |
-| Rewind on Pause | The same, on every unpause. | Off |
-| Frequency | Output sample rate. Auto is right almost always. | Auto |
-| Album Art | Where cover art comes from. | Prefer Cache |
-| Logging | Off / on / Last.fm scrobble log. | Off |
+```
+Settings
+├─ Search…                     find a setting by name, or by what it is about
+├─ Sound                       levels, tone, and the DSP effects
+├─ Playback                    what happens as music plays, and playlists,
+│                              bookmarks and resume
+├─ Library                     the browsers, the database, artwork, the viewers,
+│                              and Maintenance
+├─ Appearance                  themes, fonts, colours, scrolling and the screens
+├─ Battery & Power             backlight, brightness, sleep, disk and charging
+├─ System                      USB, accessories, language, time, settings files
+├─ Settings Mode               Standard or Everything
+└─ Changed Settings…           everything no longer at its default
+```
+
+Two settings appear in more than one place on purpose, as the same setting
+rather than a copy: **Brightness** is under Appearance and Battery & Power, and
+**Viewers** is under Appearance and Library.
 
 ---
 
-## 4. General Settings
+## Library — Maintenance
 
-### 4.1 Playlists
+Not settings but actions, gathered into one screen so the difference between
+them can be read rather than remembered. Ordered cheapest first, and each asks
+before it starts. All of them queue work for the background and return at once.
 
-| Setting | What it does | Default |
-|---|---|---|
-| Sort Playlists | Alphabetical / oldest / newest. | Alphabetical |
-| **Playlist Viewer Settings** ▸ Show Icons / Show Indices / Track Display | Chrome of the playlist viewer; Track Display picks filename vs. tags. | On / On / Track Name Only |
-| Recursively Insert Directories | Inserting a folder pulls in its subfolders. | On |
-| **Current Playlist** ▸ Warn When Erasing / Keep Current Track When Replacing / Show Shuffled Adding Options | Confirmations and which add-to-playlist options appear. | On / On / On |
-| **Current Playlist** ▸ Show Queue Options | Whether queue entries appear in context menus. | No |
-
-### 4.2 Files
-
-| Setting | What it does | Default |
-|---|---|---|
-| Sort Case Sensitive | Uppercase sorts separately from lowercase. | No |
-| Sort Directories | Alphabetical / by date / by newest date. | Alphabetical |
-| Sort Files | As above, plus by type. | Alphabetical |
-| Interpret Numbers When Sorting | `track2` before `track10` (whole numbers) vs. after (digits). | As Whole Numbers |
-| Show Files | All / Supported / Music / Playlists. Hides clutter. | Supported |
-| Show Filename Extensions | Off / on / unknown types only / only when viewing all types. | Only When Viewing All Types |
-| Follow Playlist | Browser opens at the playing track's folder. | No |
-| Show Path | Off / current directory / full path in the title. | Current Directory Only |
-| Start File Browser at / | Clears the remembered start directory. | *(action)* |
-| Hotkey | Action bound to the hotkey button in the browser. | Off |
-| Rescan Documents & Images | One-shot rebuild of the flat Documents and Images lists. Normally reruns itself after USB. | *(action)* |
-
-### 4.3 Music
-
-| Setting | What it does                                                                                                                                                         | Default |
-|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|
-| Sort Albums By | Name, or release year with the oldest or the newest first. Applies to every album list in the Music menu, not just the top one. Follows the same logic as Carousel. | Name |
-| Music Menu Settings | Opens a list of the Music menu's rows, each toggling on or off.                                                                                                      | *(action)* |
-| **Search** ▸ Maximum Results | Total results kept, 25–200 in steps of 25.                                                                                                                           | 50 |
-| **Search** ▸ Minimum Letters | How many letters must be typed before a search runs, 1–3. Raise it if one-letter searches return more than they are worth.                                            | 1 |
-| **Search** ▸ Result Order | Which of tracks, albums and artists is listed first, second and third. Six permutations.                                                                              | Tracks, Albums, Artists |
-
-### 4.4 Carousel
-
-Settings for the Album Covers and Artist Portraits screens.
-
-**View Mode** picks the layout, and most of the settings under it belong to one
-mode or the other. Those are named for the mode they shape and are shown only
-while it is selected, so the list changes as you switch — a row that would do
-nothing is not offered. Everything above View Mode, and Scroll Speed below it,
-applies to both.
-
-| Setting | What it does                                                                                                  | Default                             |
-|---|---------------------------------------------------------------------------------------------------------------|-------------------------------------|
-| On Album Select | What Select on a cover does: open the album's track list, or start playing it. Album Covers only. | Show Tracks |
-| Show Album Title | Only applies to Album Covers. Hide / album at bottom / album at top / album+artist top / album+artist bottom. | Show Album and Artist at the Bottom |
-| Show Year in Album Title | Only applies to Album Covers. Appends the year to the caption.                                                                              | No                                  |
-| Background | Which theme colour fills the screen behind the covers.                                                        | Background Colour                   |
-| Status Bar | Draw the status bar over the carousel.                                                                        | Off                                 |
-| Year Sort Order | Only applies to Album Covers. Ascending or descending, when sorting by year.                                                                | Ascending                           |
-| Sort Albums By | Artist+name / artist+year / year / name.                                                                      | Artist + Name                       |
-| Sort Artists By | Name or most played.                                                                                          | Name                                |
-| View Mode | **3D** is the tilted cover flow, covers angled away on both sides. **Flat** lays them face-on and all the same size, in two piles squared off against the screen edges with the current one on top in the middle; scrolling deals one cover from a pile to the middle and the last one onto the other pile. | 3D |
-| 3D Centre Margin | Gap between the front cover and its neighbours.                                                               | 0 ("20" via shipped config)         |
-| 3D Slide Tuck | How far back covers stack behind the front one.                                                               | 32                                  |
-| 3D Parallel Slides | Flat side covers instead of angled.                                                                           | On                                  |
-| 3D Transition Speed | Settle animation speed. No effect in Flat, which times itself off the wheel instead. | 400% ("325%" via shipped config)    |
-| Flat Pile Fade | How far the two piles are blended toward the background, so the cover in the middle stands out. 0 leaves them solid. | 0%                            |
-| Flat Pile Offset | How far below the middle cover the piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. 0 keeps them level. | 0px                        |
-| Scroll Speed | Flick speed. Applies to both modes — in Flat it scales how long a cover takes to be dealt. | 200% ("175%" via shipped config)    |
-
-### 4.5 Text Viewer
-
-| Setting | What it does | Default                       |
-|---|---|-------------------------------|
-| Colour Mode | Theme / theme inverted / black on white / white on black. | Theme                         |
-| Margin | Inset the text from the screen edge. | Off ("on" via shipped config) |
-| Line Spacing | Extra pixels between lines, 0–8. | 0                             |
-| Page Number | Show a page counter. | Off                           |
-| Font | Pick a `.fnt` for the viewer only. | *(none — uses the UI font)*  ("22-Literata" via shipped config) |
-| Use UI Font | Drop back to the theme's font. | *(action)*                    |
-
-### 4.6 Lyrics Viewer
-
-| Setting | What it does | Default |
-|---|---|---|
-| Colour Mode | As the text viewer. | Theme |
-| Alignment | Left / centre / right. | Centre |
-| Line Spacing | Extra pixels between lines, 0–10. | 2 |
-| Previous Line Opacity | How far past lines fade back. | 30% |
-| Next Line Opacity | How far upcoming lines fade back. | 55% |
-| Animation | Off / fast / normal / slow scroll between lines. | Normal |
-| Highlight Sung Words | Word-level highlighting where the file supports it. | On |
-| Keep Backlight On | Hold the backlight up while lyrics are showing. | On |
-| Font / Use UI Font | A `.fnt` for the viewer only, and the way back. | *(none)* |
-
-### 4.7 Database
-
-| Setting | What it does                                                                                                  | Default                          |
-|---|---------------------------------------------------------------------------------------------------------------|----------------------------------|
-| Load to RAM | Keep the database in memory: off / on / quick (ignore dircache). Faster browsing, more RAM.                   | Off ("quick" via shipped config) |
-| Scan on Startup | Rescan at every boot. Usually redundant if Scan on Eject is on.                                               | On  ("off" via shipped config)   |
-| Scan on Eject | Rescan after a USB session — the moment the library can actually have changed.                                | On                               |
-| Autocommit on Startup | Finish a commit cut short by a flat battery or a mid-scan USB session. Off asks first.                        | On                               |
-| Gather Runtime Data | Record play counts and ratings.                                                                               | On                               |
-| Select Directories to Scan | Restrict the scan to chosen folders. Offers a rebuild afterwards without which you may see duplicate entries. | `/`                              |
-| Rebuild Database | Full rebuild from scratch. Slow.                                                                              | *(action)*                       |
-| Update Database | Incremental rescan. The fix for "my new album isn't showing up".                                              | *(action)*                       |
-| Rebuild Index | Discard and re-derive the album/artist list the carousels and charts read.                                    | *(action)*                       |
-| Update Index | The same, keeping what still applies.                                                                         | *(action)*                       |
-| Export / Import Modifications | Move runtime data and edits in and out of a file.                                                             | *(action)*                       |
-| Write Debug Log | Append scan progress to `.rockbox/tagcache.log`.                                                              | Off                              |
-
-### 4.8 Art Cache
-
-| Setting | What it does | Default |
-|---|---|---|
-| Fast Build | Decode each source image once for the largest thumbnail and derive the rest. Applies to new thumbnails only. | Off |
-| Missing Album Artwork / Missing Artist Portraits | The folders the last pass could find no art for. | *(screens)* |
-| Rebuild Cache | Purge every thumbnail and regenerate. | *(action)* |
-| Update Cache | Fill in what is missing — the fix for art added to already-indexed folders. | *(action)* |
-| Write Debug Log | Append to `.rockbox/artcache.log`. | Off |
-
-### 4.9 Display
-
-#### LCD Settings
-
-| Setting | What it does | Default |
-|---|---|---|
-| Backlight ● | Backlight timeout on battery. The single biggest battery lever. | 15s |
-| Backlight (While Plugged In) | Separate timeout while charging. | 15s |
-| Backlight on Lock | Normal / off / on while hold is engaged. | Off |
-| Caption Backlight | Wake the backlight briefly at each track change. | Off |
-| Backlight Fade In / Fade Out | Ramp the backlight instead of switching. **(5G only)** | 300 ms / 2000 ms |
-| First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else. | Yes |
-| **Backlight Exemptions** ▸ Enabled / Settings | Actions that do *not* wake the backlight. | Off / none |
-| Sleep (After Backlight Off) | Power the LCD panel down N seconds after the backlight. Extra battery. | 5s |
-| Brightness ● | Panel brightness. | 16 of 32 **(5G)**, 32 of 63 **(6G)** |
-
-#### Peak Meter
-
-The level meter some themes draw.
-
-| Setting | What it does | Default |
-|---|---|---|
-| Peak Release | Fall-back rate. | 8 |
-| Peak Hold Time | How long a peak is held. | 500 ms |
-| Clip Hold Time | How long a clip indication is held. | 60s |
-| Scale | Logarithmic (dB) or linear (%). | Logarithmic |
-| Minimum / Maximum of Range | Ends of the displayed range; Scale decides how they read. | 60 / 0 |
-
-#### Default Codepage
-
-| Setting | What it does | Default |
-|---|---|---|
-| Default Codepage | Character set assumed for non-Unicode tags. | Unicode (UTF-8) |
-
-### 4.10 System
-
-| Setting | What it does | Default                                 |
-|---|---|-----------------------------------------|
-| **Battery** ▸ Battery Capacity | mAh of the fitted cell, so the runtime estimate is right after a replacement. | 400 mAh **(5G)**, 550 mAh **(6G)**      |
-| **Battery** ▸ Charge During USB Connection | Off / on / force. | On                                      |
-| **Disk** ▸ Disk Spindown | Idle seconds before the drive parks. Irrelevant on an SSD. | 5s                                      |
-| **Disk** ▸ Storage Mode | Auto / HDD / SSD. Tells power management what is fitted. | Auto                                    |
-| **Disk** ▸ Directory Cache | Keep the directory tree in RAM. Much faster browsing; needs a reboot. | On                                      |
-| **Limits** ▸ Max Entries in File Browser | Cap on entries loaded per folder. | 5000                                    |
-| **Limits** ▸ Max Playlist Size | Cap on playlist length. Lower on the 5G — building large playlists is slow there. | 2000 **(5G)**, 10000 **(6G)**           |
-| **Limits** ▸ Glyphs to Cache | Font glyph cache size. Raise for CJK. | 250                                     |
-| Volume Adjustment Mode | Direct (raw dB steps) or Perceptual (even-sounding steps). | Direct                                  |
-| Number of Volume Steps | How many steps Perceptual mode divides the range into. | 50                                      |
-| **Car Adapter Mode** ▸ Car Adapter Mode / Delay Before Resume | Auto-pause when the car's power cuts, resume when it returns. | Off / 5s                                |
-| Serial Bitrate | Accessory serial rate. | Auto                                    |
-| Accessory Power Supply | Power the dock accessory pin. | On                                      |
-| Line Out | Enable the dock line-out. | On                                      |
-| **Keyclick** ▸ Headphone Keyclick / Speaker Keyclick / Keyclick Repeats | Audible click on keypress, and whether auto-repeat clicks too. | Off / Off ("On" in shipped config) / No |
-| USB HID | Present as a USB keyboard or remote when plugged in. | Off                                     |
-| USB Keypad Mode | What the buttons send in HID mode. | Multimedia                              |
-| USB-DAC | Act as a USB audio device. **(5G; never tested on hardware)** | Never                                   |
-| USB Mode | Mass Storage or Charge Only when a host connects. | Mass Storage                            |
-| Show Debug Menu | Reveals the Debug entry under root → System. | Off                                     |
-
-### 4.11 Startup/Shutdown
-
-| Setting | What it does | Default |
-|---|---|---|
-| Show Shutdown Message | Splash on power-off. | Yes |
-| Start Screen | What opens at boot. | Main Menu |
-| Idle Poweroff ● | Minutes of inactivity before shutting down; 0 is never. | 10 min |
-| Sleep Timer | Start/stop the sleep timer now. The label shows time remaining. | *(action)* |
-| Default Sleep Timer Duration | Length the timer starts at. | 30 min |
-| Start Sleep Timer on Boot | Arm it automatically at power-on. | No |
-| Restart Sleep Timer on Keypress | Any button resets the countdown. | No |
-| Clear settings when reset button is held during startup | Recovery escape hatch for a bad config. | No |
-
-### 4.12 Bookmarking
-
-| Setting | What it does | Default |
-|---|---|---|
-| Bookmark on Stop | No / Yes / Ask / recent-only yes / recent-only ask. | No |
-| Update on Stop | Overwrite an existing bookmark rather than adding one. | No |
-| Load Last Bookmark | No / Yes / Ask, on entering a bookmarked folder. | No |
-| Maintain a List of Recent Bookmarks? | Feeds the root menu's Recent Bookmarks. | No |
-
-### 4.13 Automatic Resume
-
-| Setting | What it does | Default |
-|---|---|---|
-| Automatic Resume | Remember a per-track position and return to it. Needs a usable database, and offers to build one. | No |
-| Resume on Automatic Track Change | Never / always / in custom directories only. | Never |
-
-### 4.14 Language
-
-| Setting | What it does | Default |
-|---|---|---|
-| Language | Browse and load a `.lng` file. | English |
-
-### 4.15 Voice
-
-| Setting | What it does | Default |
-|---|---|---|
-| Voice Menus | Speak menu entries. Needs a voice file present. | On |
-| Voice Directories / Voice Filenames | Off / numbers / spell. | Off / Off |
-| Use Directory .talk Clips / Use File .talk Clips | Play per-item recorded clips where they exist. | Off / Off |
-| Say File Type | Announce the extension. | Off |
-| Announce Battery Level | Speak the battery level. | Off |
-| Voice Prompt Volume | Level of speech relative to music. | 100% |
-
-Voice builds are unverified in this fork.
+| Action | What it does |
+|---|---|
+| Update Database | Finds music added since the last scan. The fix for *my new album isn't showing up*. |
+| Update Index | Refreshes the album and artist lists the carousels and charts read. |
+| Update Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
+| Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
+| Rebuild Database | Discards the database and reads every file again. Slow. |
+| Rebuild Index | Discards the album and artist lists and derives them again. |
+| Rebuild Cache | Purges every thumbnail and regenerates from the original artwork. |
 
 ---
 
-## 5. UI Settings
+## Every setting
 
-| Setting | What it does                                                                                                                                                                                              | Default                                 |
-|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
-| Load Theme ● | Load a whole theme `.cfg` — skins, font, colours, backdrop at once.                                                                                                                                       | Themify_2                               |
-| Font ● | UI font.                                                                                                                                                                                                  | 22-LeagueSpartan-Regular                |
-| **Theme Settings** ▸ | The pieces a theme is built from — for adjusting one after loading a theme.                                                                                                                               |                                         |
-| ├ While Playing Screen | Pick the `.wps` skin.                                                                                                                                                                                     | Themify_2                               |
-| ├ Base Skin | Pick the `.sbs` — the frame drawn behind lists and menus.                                                                                                                                                 | Themify_2                               |
-| ├ Show Icons | Draw list icons.                                                                                                                                                                                          | On ("Off" in shipped config)           |
-| ├ Clear Backdrop | Drop the background image.                                                                                                                                                                                | *(action)*                              |
-| ├ **Status-/Scrollbar** ▸ Scroll Bar / Scroll Bar Width | Off / left / right, and its width.                                                                                                                                                                        | Left ("Right" in shipped config) / 6 px |
-| ├ **Status-/Scrollbar** ▸ Status Bar | Off / top / bottom.                                                                                                                                                                                       | Top                                     |
-| ├ **Status-/Scrollbar** ▸ Volume Display / Battery Display | Graphic or numeric in the status bar.                                                                                                                                                                     | Graphic / Graphic                       |
-| ├ Line Selector Type | Pointer / inverse bar / solid colour bar / gradient bar.                                                                                                                                                  | Bar (Gradient Colour)                   |
-| ├ Line Separator | Height of the rule between list rows. Auto / off / 1–30 px.                                                                                                                                               | Off                                     |
-| ├ **Colours** ▸ | List, selector and separator colours, and Reset Colours.                                                                                                                                                  | Themify_2 palette                       |
-| ├ **Dialogs** ▸ | Modal dialog chrome — see below.                                                                                                                                                                          |                                         |
-| ├ Album Art Rows | Draw album thumbnails beside database rows.  Requires a theme that supports drawing artwork in lists.                                                                                                     | Off ("On" in shipped config)            |
-| └ Artist Art Rows | The same for artist portraits.    Requires a theme that supports drawing artwork in lists.                                                                                                                | Off ("On" in shipped config)                                    |
-| **Scrolling** ▸ | How text and lists move — see below.                                                                                                                                                                      |                                         |
-| Dynamic Colors | Recolour the UI from the current album's artwork. A skin not written for it will look wrong.                                                                                                              | Off ("On" in shipped config)                                     |
-| **What's Playing Screen** ▸ | The now-playing screen's own settings.                                                                                                                                                                    |                                         |
-| ├ Artwork | Which art the screen shows. When set to auto, if the playlist was started via the Artist menu or from Artist Portraits, it will attempt to show the Artist art - otherwise the Album art will be shown. | Album Art                               |
-| ├ Default Browser | Which browser the now-playing screen and root default to.                                                                                                                                                 | Music |
-| ├ Select Action | Where Select from the now-playing screen goes.                                                                                                                                                            | Previous Screen |
-| ├ Hotkey | Action bound to the hotkey button in the now-playing screen.                                                                                                                                              | Lyrics |
-| ├ Set Context Item 1–4 | The four configurable rows at the bottom of the now-playing context menu.                                                                                                                                 | Track Info, Delete, Show in Files, Album Art |
-| └ Reset Settings | Restore the hotkey and the four rows to defaults.                                                                                                                                                         | *(action)* |
-| Quick Screen | What the long press opens: the quick screen (**On**) or the shortcuts menu.                                                                                                                               | On                                      |
+Rows marked **Adv** are hidden unless Settings Mode is Everything. Defaults are
+what a Reset Settings produces, read from the player itself rather than typed
+out here.
 
-### Dialogs
+### Sound Settings
 
-Chrome for modal dialogs (the yes/no and confirmation boxes).
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Volume | Output level, and the same value the volume buttons move. Shown in decibels below maximum, so -25 dB is quieter than -10 dB. | -25 |  |
+| Maximum Volume Limit | A ceiling the volume control cannot pass. Useful with sensitive earphones, where the usable range is squeezed into the bottom of the scale. | 6 |  |
+| Bass | Lifts or cuts the low end. Bass Cutoff decides how far up it reaches. | 0 |  |
+| Bass Cutoff | The frequency Bass works below. A lower number lifts only the deepest notes; a higher one reaches up into the lower mids and can muddy voices. | 1 | **Adv** |
+| Treble | Lifts or cuts the high end. Treble Cutoff decides how far down it reaches. | 0 |  |
+| Treble Cutoff | The frequency Treble works above. Lower reaches down towards voices, higher affects only the very top. | 1 | **Adv** |
+| Balance | Shifts the output towards one ear. Meant for correcting a hearing difference or a worn earphone, not for effect. | 0 |  |
+| Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. | stereo |  |
+| Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100 |  |
+| Fade on Stop/Pause | Ramps the volume down and up on stop and pause instead of cutting, which avoids the click a hard stop can produce. | on |  |
+| Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. | off | **Adv** |
+| Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. Subtle by design; if you can hear it working it is set too high. | off |  |
 
-| Setting | What it does | Default                      |
-|---|---|------------------------------|
-| Box Border Width | Width of the dialog's own border. | 2 px                         |
-| Box Margin | Inset of the box from the screen edge. | 10 px                        |
-| Box Shadow | Solid drop shadow, offset right and down; 0 turns it off. | 4 px                         |
-| Box Shadow Colour | Colour of that shadow. | Black                        |
-| Button Border Width | Width of a button's border. | 2 px                         |
-| Button Corner Radius | Corner rounding; 0 is square. | 0 px ("4" in shipped config) |
-| Dialog Colours | **Off** inherits every colour from the theme, flat. **On** uses the nine below. **Auto** derives them from the theme's colours, or from the album's while Dynamic Colors is running. | Auto                         |
-| **Colours** ▸ | Box Text / Background / Border, Button Text / Background / Border, and the same three for the selected button. | Themify_2 palette            |
+### Sound Settings — Crossfeed
 
-The nine colours only apply when Dialog Colours is **On** — Auto derives its own
-and ignores them.
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Crossfeed | Bleeds a little of each channel into the other, with a delay, so headphones sound less like two separate sources bolted to your head. | off |  |
+| Direct Gain | The level of the sound that reaches the ear it was mixed for. Lowering it makes the effect stronger by making the crossfed path relatively louder. | -15 | **Adv** |
+| Cross Gain | The level of the sound crossing to the other ear. The main strength control: closer to the direct gain means a narrower, more speaker-like image. | -60 | **Adv** |
+| High-Frequency Attenuation | How much the crossed-over sound is dulled. A real head blocks high frequencies far more than low ones, so this is what makes the effect sound natural rather than like an echo. | -160 | **Adv** |
+| High-Frequency Cutoff | The frequency above which the crossfed signal -- the part bled into the opposite ear -- starts being dulled. Lower values roll it off earlier and give a warmer, more distant effect. | 700 | **Adv** |
 
-The shadow is the exception: **Box Shadow** and **Box Shadow Colour** apply
-whatever Dialog Colours is set to, so a theme can style the shadow without
-having to take over all nine colours as well. It is black by default rather than
-a theme colour because its job is to lift the box off whatever is behind it, and
-a colour taken from the theme's own pair is the one guaranteed not to contrast
-with the box.
+### Sound Settings — Equalizer
 
-Every setting in this group is reset by loading a theme
-([§9](#9-settings-a-theme-resets)), including anything you set here by hand.
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Enable EQ | Master switch for the ten-band equaliser. Load EQ is usually a better starting point than setting the bands by hand. | off |  |
+| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. | 0 | **Adv** |
 
-### Scrolling
+### Sound Settings — Haas Surround
 
-The first four govern text too long for its line; the rest govern how lists move
-under the wheel.
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Haas Surround | Delay in milliseconds for the Haas effect, which widens the image by delaying part of the signal rather than by changing its level. Zero is off. | off |  |
+| Balance | How the widened signal is weighted between left and right. | 35 | **Adv** |
+| f(x1) | The upper frequency limit of the Haas effect. | 3400 | **Adv** |
+| f(x2) | The lower frequency limit of the Haas effect. | 320 | **Adv** |
+| Side Only | Applies the effect only to the difference between the channels, leaving anything mixed to the centre -- usually the voice -- untouched. | off | **Adv** |
+| Dry / Wet Mix | How much of the effect is blended with the untouched signal. Lower values keep the original intact and add a suggestion of width. | 50 | **Adv** |
 
-| Setting | What it does | Default                             |
-|---|---|-------------------------------------|
-| Scroll Speed | Speed of scrolling text. | 9 ("14" via shipped config)         |
-| Scroll Start Delay | Pause before long text starts moving. | 1000 ms ("1500" via shipped config) |
-| Scroll Step Size | Pixels per scroll step. | 6 px ("1" via shipped config)       |
-| Bidirectional Scroll Limit | Text under this width bounces instead of wrapping. | 50%                                 |
-| Screen Scrolls Out of View | Allow lines to scroll past the viewport edge. | No                                  |
-| Disable Main Menu Scrolling | Stop the root menu scrolling long entries. | No                                  |
-| Screen Scroll Step Size | Pixels per step for the above. | 16 px                               |
-| Paged Scrolling | Lists move a page at a time rather than a line. | No                                  |
-| List Wraparound | Past the last item, return to the first. | Yes                                 |
-| List Order | Ascending or descending list traversal. | Ascending                           |
+### Sound Settings — Perceptual Bass Enhancement
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Perceptual Bass Enhancement | Adds harmonics above notes that are too low for small drivers to reproduce, so the ear infers the bass that is not physically there. Strength is a percentage; it distorts if pushed. | 0 |  |
+| Precut | Attenuates the signal so the harmonics the effect adds do not push it into clipping. | -25 | **Adv** |
+
+### Sound Settings — Compressor
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Threshold | The level above which compression starts, and the switch for the whole effect -- at 0 dB nothing is compressed. | 0 | **Adv** |
+| Makeup Gain | Compression makes loud parts quieter, so the whole track ends up quieter. This puts the level back. | auto | **Adv** |
+| Ratio | How hard the signal is held down once past the threshold. 2:1 is gentle, Limit allows essentially nothing above it. | 4:1 | **Adv** |
+| Knee | How abruptly compression starts once the signal passes the threshold. | soft knee | **Adv** |
+| Attack Time | How quickly compression clamps down after a loud passage begins. Short catches transients and can dull drums; longer lets the initial hit through. | 5 | **Adv** |
+| Release Time | How quickly it lets go again. Too short pumps audibly on bass notes; too long leaves quiet material compressed after the loud part has passed. | 500 | **Adv** |
+
+### Sound Settings — Replaygain
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. | track shuffle |  |
+| Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | off | **Adv** |
+| Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. | 0 | **Adv** |
+
+### Playback
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Shuffle | Plays the current list in a random order. Changing it reshuffles what is already playing rather than waiting for the next list. | off |  |
+| Repeat | What happens at the end of the list: stop, start again, repeat the one track, reshuffle and go again, or loop between two marks you set. | off |  |
+| Play Selected First | Choosing a track starts from that track rather than from the top of the folder, with the rest of the folder queued behind it. | on |  |
+| Single Mode | Stops after the current track, album, artist, genre or playlist instead of carrying on. Useful for falling asleep to one record. | off |  |
+| Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
+| Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | off | **Adv** |
+| Auto-Change Directory | At the end of a folder, move to the next one rather than stopping. Random picks one at random instead. | off |  |
+| Constrain Auto-Change | When playback moves on to the next folder by itself, keeps that move inside the folder you started in -- so an album that runs on goes to its sibling rather than wandering off into the rest of the library. | off | **Adv** |
+| Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | track | **Adv** |
+| Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | off | **Adv** |
+| Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | off | **Adv** |
+| Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
+| Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
+| Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. | 5 | **Adv** |
+| Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
+| Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | auto | **Adv** |
+| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. | on | **Adv** |
+| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
+
+### Playback — Fast-Forward/Rewind
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| FF/RW Min Step | How far the first press of fast forward or rewind moves. Smaller is better for finding a moment in a song, larger for crossing a long file. | 1 | **Adv** |
+| FF/RW Accel | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | normal | **Adv** |
+
+### Playback — Crossfade
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Enable Crossfade | Overlaps the end of one track with the start of the next. | off |  |
+| Fade-In Delay | How long to wait after the incoming track starts before its volume begins to rise. | 0 | **Adv** |
+| Fade-In Duration | How long the incoming track takes to reach full volume. | 2 | **Adv** |
+| Fade-Out Delay | How long the outgoing track holds its level before starting to fall. | 0 | **Adv** |
+| Fade-Out Duration | How long the outgoing track takes to fall silent. Longer overlaps blur the join more. | 2 | **Adv** |
+| Fade-Out Mode | Crossfade dips both tracks through the join. Mix holds the total level roughly constant, which sounds fuller but muddier where both tracks are busy. | crossfade | **Adv** |
+
+### Playback — Pause on Headphone Unplug
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Pause on Headphone Unplug | Pauses when the headphones are pulled out, so the music does not carry on without you. Can also resume automatically when they go back in. | off |  |
+| Disable resume on startup if phones unplugged | Stops the player resuming at power-on when nothing is plugged in, which otherwise plays into a dock or an empty socket. | off | **Adv** |
+
+### Playback — Playlists
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Sort Playlists | The order saved playlists are listed in: by name, or by when they were made. | alpha |  |
+| Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | on |  |
+| Warn When Erasing Dynamic Playlist | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | on |  |
+| Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | on | **Adv** |
+| Show Shuffled Adding Options | Adds "insert shuffled" entries to the playlist context menus. | on | **Adv** |
+| Show Queue Options | Adds the queueing entries -- which play once and are then dropped -- to the context menus. | off | **Adv** |
+| Show Icons | Draws icons beside the entries in the playing queue. | on |  |
+| Show Indices | Numbers the entries in the playing queue. | on |  |
+| Track Display | Whether the queue shows filenames or the artist and title from the tags. | track name |  |
+
+### Playback — Bookmarks
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Bookmark on Stop | Saves your position when you stop, so you can come back to it. Ask prompts each time; the recent-only settings save without adding a bookmark file to the folder. | off | **Adv** |
+| Update on Stop | Overwrites the existing bookmark for a folder instead of adding another, so the list stays one entry per book rather than one per session. | off | **Adv** |
+| Load Last Bookmark | Offers the saved position when you next open a folder that has one. | off | **Adv** |
+| Maintain a List of Recent Bookmarks? | Keeps a list of the last places you stopped, reachable from the main menu, as well as bookmarks stored beside the music. | off | **Adv** |
+
+### Playback — Automatic Resume
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Automatic Resume | Remembers how far through each track you were, and returns there rather than starting from the beginning. | off |  |
+| Resume on Automatic Track Change | Whether an automatic position is also remembered when a track changes on its own. Custom limits it to folders you nominate, which is how to keep it for podcasts without applying it to albums. | never | **Adv** |
+
+### Library — Files
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Sort Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | off |  |
+| Sort Directories | The order folders are listed in: by name, or by when they were last written. | alpha |  |
+| Sort Files | The order files are listed in, including grouping by type. | alpha |  |
+| Interpret Numbers When Sorting | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | numbers |  |
+| Show Files | Which files the browser shows: everything, only what can be opened, only music, or only playlists. The quickest way to make a cluttered folder readable. | supported |  |
+| Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | view_all |  |
+| Follow Playlist | Opens the browser at the folder the playing track came from, rather than where you last were. | off |  |
+| Show Path | Puts the current folder, or the whole path to it, in the title bar. | current directory |  |
+| Hotkey | What the hotkey button does in the file browser. | Off, | **Adv** |
+
+### Library — Music
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Sort Albums By | The order album lists appear in throughout the Music menu: by name, or by release year with either end first. | name |  |
+| Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
+| Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
+| Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
+
+### Library — Carousel
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| On Album Select | What Select does on a cover: open the album's track list, or start playing it. | show tracks |  |
+| Show Album Title | Whether the album name is drawn over the covers, and where. | both bottom |  |
+| Show Year in Album Title | Adds the release year to the caption. | off |  |
+| Background | Which theme colour fills the screen behind the covers. | background |  |
+| Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | off |  |
+| Year Sort Order | Whether sorting by year puts the oldest or the newest first. | ascending | **Adv** |
+| Sort Albums By | The order covers appear in: by artist, by year, or by album name. | artist+name |  |
+| Sort Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
+| View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3d |  |
+| 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
+| 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |
+| 3D Parallel Slides | Draws the side covers face-on rather than angled, which reads as a row of covers rather than a tunnel. | on | **Adv** |
+| 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
+| Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
+| Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
+| Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175 |  |
+
+### Library — Database
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Load to RAM | Keeps the database in memory instead of reading it from disk as you browse. | quick | **Adv** |
+| Scan on Startup | Rescans the library at every boot. Mostly redundant if Scan on Eject is on, since that is when the music can actually have changed, and it costs time at every start. | off | **Adv** |
+| Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | on | **Adv** |
+| Autocommit on Startup | Finishes a scan that was cut short by a flat battery or an unplug. Off asks first instead. | on | **Adv** |
+| Gather Runtime Data | Records play counts, ratings and when each track was last played. What the listening statistics are built from. | on | **Adv** |
+| Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. | / | **Adv** |
+| Write Debug Log | Writes scan progress to a log file. For working out why a track is missing from the database. | off | **Adv** |
+
+### Library — Art Cache
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
+| Write Debug Log | Writes thumbnail generation to a log file. For working out why a particular album has no art. | off | **Adv** |
+
+### Appearance
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Font | The typeface used throughout the interface. A larger font is easier to read and fits fewer rows on screen. | none |  |
+| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
+| Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
+
+### Appearance — Theme Settings
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | none |  |
+| Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | none |  |
+| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
+| Backdrop | An image drawn behind everything. Loading a theme replaces it, and a theme that names none clears it rather than keeping the last one. | none |  |
+| Bold Font | An optional bold companion to the interface font, used where a screen wants emphasis. Unset means the regular font is used for both. | none | **Adv** |
+| Iconset | The image file the list icons are taken from. A theme-author setting. | /.rockbox/icons/tango_icons.16x16.bmp | **Adv** |
+| Viewers Iconset | The icon set used for file types in the browser. A theme-author setting. | /.rockbox/icons/tango_icons_viewers.16x16.bmp | **Adv** |
+| Filetype Colours | A file naming a colour per extension, so the browser can colour-code types. A theme-author setting. | none | **Adv** |
+| UI Viewport | The rectangle a theme reserves for lists, so its own decoration is not drawn over. A theme-author setting. | none | **Adv** |
+| Progress Bar Radius | Corner rounding of the progress bar, in pixels. A theme-author setting: most themes draw their own bar and ignore it. | 2 | **Adv** |
+| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
+| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
+| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 | **Adv** |
+| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
+| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
+| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
+| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
+| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
+
+### Appearance — Colours
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
+| Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
+| Line Selector Start Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
+| Line Selector End Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
+| Line Selector Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
+
+### Appearance — Dialogs
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Dialog Colours | How the confirmation and message boxes are coloured. Auto derives them from the theme -- or from the album while Dynamic Colors is running -- which is why it is the default. On uses the nine colours set by hand; off inherits the theme's flat. | auto |  |
+| Box Border Width | The thickness of that border, in pixels. Zero draws none. | 2 | **Adv** |
+| Box Margin | How far the dialog is inset from the edges of the screen. | 10 | **Adv** |
+| Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
+| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 | **Adv** |
+| Box Text | The text colour inside a dialog. Only used when Dialog Colours is On. | e7f3ef | **Adv** |
+| Box Background | The fill colour inside a dialog. Only used when Dialog Colours is On. | 000c21 | **Adv** |
+| Box Border | The colour of a dialog's own border. Only used when Dialog Colours is On. | e7f3ef | **Adv** |
+| Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
+| Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
+| Button Text | The text colour of an unselected dialog button. | e7f3ef | **Adv** |
+| Button Background | The fill colour of an unselected dialog button. | 000c21 | **Adv** |
+| Button Border | The border colour of an unselected dialog button. | e7f3ef | **Adv** |
+| Selected Button Text | The text colour of the selected dialog button. | 000c21 | **Adv** |
+| Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef | **Adv** |
+| Selected Button Border | The border colour of the selected dialog button. | e7f3ef | **Adv** |
+
+### Appearance — Artwork in lists
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Album Art Row Height | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Adv** |
+| Filter 1 | First of three image adjustments applied to artwork before it is drawn. A theme-author setting: a theme that wants a treatment names it, and one that does not should have none. | off | **Adv** |
+| Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
+| Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
+
+### Appearance — Now Playing
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
+| Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
+| Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
+
+### Appearance — Scrolling
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Scroll Speed | How quickly text too long for its line moves. | 9 |  |
+| Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
+| Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |
+| Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. | 50 | **Adv** |
+| Screen Scroll Step Size | How many pixels each step moves when a whole screen slides, rather than when text scrolls within one line. Smaller is smoother and costs more work. | 16 | **Adv** |
+| Paged Scrolling | Lists move a screenful at a time instead of a row at a time. | off |  |
+| List Wraparound | Passing the last item returns to the first, rather than stopping. | on |  |
+| List Order | Whether lists are traversed from the top down or the bottom up. | ascending | **Adv** |
+| Hold Left/Right to Scroll a List | Holding left or right scrolls a list rather than repeating whatever those buttons do on the current screen. | on | **Adv** |
+
+### Appearance — Peak Meter
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Peak Release | How quickly the level meter falls back after a peak. Slower is easier to read, faster is more honest about the signal. | 8 | **Adv** |
+| Peak Hold Time | How long the meter holds at a peak before starting to fall. | 500 | **Adv** |
+| Clip Hold Time | How long a clipping indication stays on screen once triggered. | 60 | **Adv** |
+| Logarithmic (dB) | Whether the meter's scale is in decibels, which matches how loudness is perceived, or a straight percentage. | on | **Adv** |
+| Minimum of Range | The quiet end of the meter's range. | 60 | **Adv** |
+| Maximum of Range | The loud end of the meter's range. | 0 | **Adv** |
+
+### Appearance / Library — Viewers
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Colour Mode | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
+| Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
+| Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
+| Page Number | Shows a page counter at the foot. | off |  |
+| Text Viewer Font | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. | /.rockbox/fonts/22-Literata.fnt |  |
+| Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
+| Alignment | Whether lyric lines are aligned left, centred or right. | centre |  |
+| Line Spacing | Extra pixels between lyric lines. | 2 | **Adv** |
+| Previous Line | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
+| Next Line | How far lines still to come fade back. | 55 | **Adv** |
+| Animation | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
+| Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
+| Keep Backlight On | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. Costs battery. | on |  |
+| Lyrics Font | A font used only by the lyrics screen. Unset uses the interface font. | none |  |
+
+### Battery & Power
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
+| Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
+| Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
+| Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
+| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. | force |  |
+| Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
+
+### Battery & Power — Backlight
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Backlight | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
+| Backlight (While Plugged In) | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
+| Backlight on Hold | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
+| Caption Backlight | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
+| Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
+| Backlight Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
+| First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. | on | **Adv** |
+| Sleep (After Backlight Off) | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
+
+### Battery & Power — Sleep Timer
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Default Sleep Timer Duration | How long the sleep timer runs for, after which the player switches itself off. Sets the length only; starting the timer is a separate entry on the same screen. | 30 |  |
+| Start Sleep Timer on Boot | Starts the sleep timer automatically at power-on, for a player used mostly to fall asleep to. | off | **Adv** |
+| Restart Sleep Timer on Keypress | Any button press resets the countdown, so the timer only fires once you have actually stopped touching it. | off | **Adv** |
+
+### Battery & Power — Car Adapter
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Car Adapter Mode | Pauses when external power is cut and resumes when it returns, so the player follows the car's ignition. | off | **Adv** |
+| Delay Before Resume | How long to wait after power returns before resuming, so a stall or a restart does not start the music. | 5 | **Adv** |
+
+### System
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
+| Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
+| Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. | 50 | **Adv** |
+| Start Screen | Which screen opens at power-on. | root |  |
+| Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
+| Clear Settings on Reset-Button Hold | Holding a button during startup clears the settings. A way back from a configuration that makes the player unusable. | off | **Adv** |
+| Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | standard |  |
+| Show Debug Menu | Reveals the debug screens under System. They read hardware and internal state; nothing there is needed in normal use. | off | **Adv** |
+
+### System — USB
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only is useful with a car or a plug that would otherwise interrupt playback. | mass storage |  |
+| USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. | off | **Adv** |
+| USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
+| USB-DAC | Lets the player act as a USB sound card for a computer. | Never | **Adv** |
+
+### System — Accessories
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
+| Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
+| Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
+
+### System — Keyclick
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Headphone Keyclick | A click through the headphones on each button press. Feedback in a pocket, irritating on a quiet passage. | off | **Adv** |
+| Speaker Keyclick | A click from the player own speaker on each button press, rather than through the headphones. Audible without anything plugged in. | on | **Adv** |
+| Keyclick Repeats | Whether auto-repeat -- a held button -- clicks each time or only once. | off | **Adv** |
+
+### System — Limits
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Max Entries in File Browser | The largest number of entries loaded from one folder. A folder with more is truncated rather than refused. | 5000 | **Adv** |
+| Max Playlist Size | The largest number of tracks a playlist may hold. Building very large lists is slow on this hardware, which is why the limit is lower here than on a computer. | 10000 | **Adv** |
+| Glyphs to Cache | How many characters of the font are kept in memory at once. | 250 | **Adv** |
+
+### System — Language & Text
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Language | The language of the interface. Loading one replaces the built-in English. | English |  |
+| Default Codepage | The character set assumed for tags that do not say which they use. Wrong guesses show accented characters as nonsense; Unicode is right for anything tagged recently. | utf-8 | **Adv** |
+| Time Format | Whether times are shown on a 12- or 24-hour clock. | 12hour |  |
+
+### System — Voice
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Voice Menus | Speaks menu entries aloud. Needs a voice file on the player. | on |  |
+| Voice Directories | Whether folder names are spoken, and whether by number or spelled out. | off | **Adv** |
+| Voice Filenames | Whether filenames are spoken, and how. | off | **Adv** |
+| Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | off | **Adv** |
+| Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | off | **Adv** |
+| Say File Type | Speaks the file's type along with its name. | off | **Adv** |
+| Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100 | **Adv** |
 
 ---
 
-## 6. Time & Date Settings
+## Settings a theme resets
 
-This screen draws a live clock above the menu.
+Loading a theme returns every setting that describes the look to its default
+before reading the theme's own `.cfg`, so a theme that says nothing about a
+setting cannot inherit the last theme's answer. Without that, the same theme
+renders differently depending on what was loaded before it.
 
-| Setting | What it does | Default |
-|---|---|---|
-| Set Time/Date | Clock editor. | *(screen)* |
-| Time Format | 24- or 12-hour. | 24-hour |
+That covers everything in Appearance, plus the artwork rows, the carousel's
+geometry, the scrolling settings and the dialog chrome — every setting carrying
+`F_THEMESETTING` or `F_THEMERESET` in `settings_list.c`.
 
----
+**What you set by hand is not lost.** Changes made through the settings screens
+while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
+straight after the theme, so they survive the reset. *Forget My Changes*, at the
+foot of Theme Settings, throws them away and reloads the theme as its author
+shipped it.
 
-## 7. Main Menu Settings
+A `.cfg` counts as a theme, and so triggers the reset, only if it names a font.
+One that does not — `rockbox_default_icons.cfg` is two lines long — is a patch,
+and is applied on top of what is already there.
 
-Not a settings list — a screen that reorders and hides root menu entries. It is
-also on the Basic page, because a root menu with the entries you actually use is
-worth more than most individual settings.
-
----
-
-## 8. Manage Settings
-
-| Entry | What it does | Default |
-|---|---|---|
-| Settings Mode | Basic or Advanced — see [§1](#1-basic-and-advanced). | Basic |
-| Browse .cfg Files | Load a saved configuration. | *(action)* |
-| Reset Settings | Restore every default in this document. Confirms first. | *(action)* |
-| Save .cfg File | Write all settings to a file. | *(action)* |
-| Save Sound Settings | Write only the sound and DSP settings. | *(action)* |
-| Save Theme Settings | Write only the theme settings. | *(action)* |
+See [`theme-guide.md`](theme-guide.md) §2 for this from the theme author's side.
 
 ---
 
-## 9. Settings a theme resets
-
-Loading a theme resets one group of settings to the defaults in this document
-*before* reading the theme's `.cfg`. That is deliberate: a theme which says
-nothing about a setting should get the shipped default, not whatever the last
-theme left behind. A backdrop is the clearest case — without the reset, a theme
-naming no backdrop would show the previous theme's image through everything it
-draws.
-
-It also means these do not stay put if you set them by hand and later load a
-theme:
-
-- Backdrop, and the bold font
-- Dynamic Colors
-- Every setting under **Dialogs**, including the shadow and all nine colours
-- Carousel Background and Status Bar
-- Album Art Rows and Artist Art Rows
-
-See [`theme-guide.md`](theme-guide.md) - §2 covers this from the theme author's side, including the full
-list and how to opt into it.
-
----
-
-## Appendix: settings with no menu entry
+## Settings with no menu entry
 
 These exist only in a `.cfg` file. Most are for theme authors; the rest are
-remembered state rather than preferences.
+remembered state rather than preferences, so there is nothing useful to set.
 
-| Name in `.cfg` | What it does | Default                                                                                   |
-|---|---|-------------------------------------------------------------------------------------------|
-| `progress bar radius` | Corner rounding of the progress bar. | 2                                                                                         |
-| `database art row height` | Row height used when art rows are on. | 52                                                                                        |
-| `font bold` | Bold UI font. Unset means "match the regular UI font". | *(unset)*                                                                                 |
-| `backdrop` | Background image. | *(none)*                                                                                  |
-| `iconset` / `viewers iconset` | List icons. | tango_icons.16x16                                                                         |
-| `filetype colours` | A `.colours` file for the file browser. | *(none)*                                                                                  |
-| `ui viewport` | The list viewport a theme reserves. | *(none)*                                                                                  |
-| `start directory` | Remembered file-browser start point. | `/`                                                                                       |
-| `playlist catalog directory` | Where new playlists are written. | `/Playlists`                                                                              |
-| `autoresume next track paths` | Folders Automatic Resume treats as custom. | `/podcast:/podcasts`                                                                      |
-| `database path` | Where the database files live. | `/.rockbox`                                                                               |
-| `qs top` / `qs left` / `qs right` / `qs bottom` | Which settings the quick screen shows. | — / Shuffle / Repeat / — ("Brightness / Shuffle / Repeat / Brightness" in default config) |
-| `root menu order` | Written by Main Menu Settings. | *(stock order)*                                                                           |
-| `music menu hidden` | Which Music menu rows are turned off. Written by Music Menu Settings. | *(none hidden)*                                                                           |
-| `music menu signature` | Identifies the row set the above was chosen against; a mismatch discards it. | 0                                                                                         |
-| `hold_lr_for_scroll_in_list` | Left/right holds scroll a list. | On                                                                                        |
+| Name in `.cfg` | What it does |
+|---|---|
+| `start directory` | Remembered file-browser start point. |
+| `playlist catalog directory` | Where new playlists are written. |
+| `autoresume next track paths` | Folders Automatic Resume treats as custom. |
+| `database path` | Where the database files live. |
+| `qs top` / `qs left` / `qs right` / `qs bottom` | Which settings the quick screen shows. Set from a setting's context menu. |
+| `root menu order` | Written by Edit Main Menu. |
+| `music menu hidden` | Which Music menu rows are turned off. Written by Edit Music Menu. |
+| `music menu signature` | Identifies the row set the above was chosen against; a mismatch discards it. |
+| `theme` | The last theme loaded, so an appearance tweak knows which overlay to write to. |
+| `eq filter 0`–`9` | The equaliser bands. Set from the EQ screens, which show them properly. |
+
+---
+
+## Keeping this document honest
+
+The tables are generated. Every setting in `settings_tags.c` appears exactly
+once, with the level it carries there and the description from
+`settings-help.txt`. To check nothing has drifted after adding a setting, from
+the repository root:
+
+```sh
+# a setting with no explanation written for it
+comm -13 <(grep -oE '^\[[^]]+\]' docs/podbox/settings-help.txt \
+            | tr -d '[]' | sort -u) \
+         <(grep -E '^\{ "' apps-ipod/settings/settings_tags.c \
+            | sed 's/^{ "//; s/".*//' | sort -u)
+```
+
+A setting missing from either file is not an error the build will catch: it
+simply has no explanation to show and no topic to be found under.
