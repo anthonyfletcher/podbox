@@ -57,9 +57,10 @@ Settings
 └─ Changed Settings…           everything no longer at its default
 ```
 
-Two settings appear in more than one place on purpose, as the same setting
-rather than a copy: **Brightness** is under Appearance and Battery & Power, and
-**Viewers** is under Appearance and Library.
+One screen appears in more than one place on purpose, as the same screen rather
+than a copy: **Viewers** is under both Appearance and Library, because
+the viewers are opened from the browsers and look the way the theme tells them
+to.
 
 ---
 

@@ -139,7 +139,10 @@ MAKE_MENU(lcd_settings,ID2P(LANG_LCD_MENU),
             ,&bl_filter_first_keypress
             ,&sel_backlight
             ,&lcd_sleep_after_backlight_off
-            ,&brightness_item
+            /* Brightness is not here. This screen is the backlight -- when it
+               is on and for how long -- and brightness is a property of the
+               panel. It sits one level up, beside the backlight, under
+               Battery & Power. */
          );
 
 
