@@ -46,11 +46,11 @@ every setting whatever the mode, and opens it directly.
 Settings
 ├─ Search…                     find a setting by name, or by what it is about
 ├─ Sound                       levels, tone, and the DSP effects
-├─ Playback                    what happens as music plays, and playlists,
-│                              bookmarks and resume
+├─ Playback                    what happens as music plays, the now-playing
+│                              screen, and playlists, bookmarks and resume
 ├─ Library                     the browsers, the database, artwork, the viewers,
 │                              and Maintenance
-├─ Appearance                  themes, fonts, colours, scrolling and the screens
+├─ Appearance                  themes, fonts, colours, scrolling and the menus
 ├─ Battery & Power             backlight, brightness, sleep, disk and charging
 ├─ System                      USB, accessories, language, time, settings files
 ├─ Settings Mode               Standard or Everything
@@ -237,6 +237,14 @@ out here.
 | Automatic Resume | Remembers how far through each track you were, and returns there rather than starting from the beginning. | off |  |
 | Resume on Automatic Track Change | Whether an automatic position is also remembered when a track changes on its own. Custom limits it to folders you nominate, which is how to keep it for podcasts without applying it to albums. | never | **Adv** |
 
+### Playback — What's Playing Screen
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
+| Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
+| Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
+
 ### Library — Files
 
 | Setting | What it does | Default | |
@@ -378,14 +386,6 @@ shadow to colour.
 | Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
 | Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
 | Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
-
-### Appearance — Now Playing
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
-| Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
-| Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
 
 ### Appearance — Scrolling
 

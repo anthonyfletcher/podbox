@@ -567,7 +567,6 @@ MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             &elements_menu,
             &dialog_settings,
             &scroll_settings_menu,
-            &wps_settings,
             &viewers_menu,
             &peak_meter_menu,
             &main_menu_config_item,   /* main_menu.c */

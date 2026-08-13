@@ -181,5 +181,9 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
           ,&playlist_settings
           ,&bookmark_settings_menu
           ,&autoresume_menu
+          /* The screen you watch music on, and it belongs with the music. It
+             was under Appearance, where only its artwork row was about how
+             anything looks -- the rest is what the buttons do there. */
+          ,&wps_settings
          );
 
