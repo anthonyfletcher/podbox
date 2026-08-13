@@ -584,8 +584,8 @@ static int aa_read_source(const struct aa_src *src, struct bitmap *bm, int fmt,
 
 /* Target size for an AA_FIT_COVER decode: scale so the SHORTER side lands on
  * exactly `dim`, leaving the longer side >= dim to be cropped away. False if the
- * source is too elongated to stage in the work buffer (caller falls back to
- * CONTAIN) or its dimensions are nonsense. */
+ * staged image would not fit the work buffer (caller falls back to CONTAIN) or
+ * its dimensions are nonsense. */
 static bool aa_cover_dim(int sw, int sh, int dim, int *tw, int *th)
 {
     if (sw <= 0 || sh <= 0)
@@ -609,8 +609,7 @@ static bool aa_cover_dim(int sw, int sh, int dim, int *tw, int *th)
     if (*th < dim)
         *th = dim;
 
-    return *tw <= dim * ART_CACHE_COVER_MAX_ASPECT &&
-           *th <= dim * ART_CACHE_COVER_MAX_ASPECT;
+    return (long)*tw * *th <= ART_CACHE_COVER_MAX_PX;
 }
 
 /* Centre-crop a tw x th image down to dim x dim, in place. Each output row sits
