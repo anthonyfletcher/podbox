@@ -269,6 +269,21 @@ static void pf_update_dynamic_colors(void)
  * the per-frame raw redraw first. */
 #define THREAD_STACK_SIZE DEFAULT_STACK_SIZE + 0x200
 
+/* Timing overlay, off. Set to 1 to draw a two-line readout over the covers:
+ * frames a second, microseconds inside the render, inside the per-slide yields
+ * and inside the flush, this screen's own share of wall clock, slides fetched
+ * by the loader, then the clear and slide loops timed apart, nanoseconds of
+ * slide loop per pixel written, and the CPU clock with its boost count.
+ *
+ * Worth keeping, because none of that is guessable. Measured on the 5G it
+ * turned out the flush is ~6% of wall clock while the render is ~94%, which is
+ * the opposite of what this screen's cost was assumed to be. Two rules if it
+ * is switched back on: the yields must stay separated out, since USEC_TIMER is
+ * wall clock and would otherwise bill the codec's time to the render; and
+ * ns-per-pixel means nothing without the clock beside it, being ~43 cycles at
+ * 80 MHz and ~16 at 30. */
+#define PF_SHOW_STATS 0
+
 #define EV_EXIT 9999
 #define EV_WAKEUP 1337
 
@@ -388,6 +403,19 @@ static int fade;
 /* Wall clock for the flip, see update_scroll_animation(). The scroll and
  * transition speed settings are calibrated as a per-frame step at this rate. */
 #define CAROUSEL_NOMINAL_FPS 30
+/* Most frames a second the screen will draw. The animation is advanced by
+ * elapsed time, not per frame, so this changes how many intermediate positions
+ * a flip is shown at and not how long the flip takes. Above it there is little
+ * left to see and a great deal to pay: a frame here costs 11-15 ms, so an
+ * uncapped loop spends essentially all the CPU it takes from playback drawing
+ * positions that are replaced before the panel has finished showing them.
+ *
+ * Equal to CAROUSEL_NOMINAL_FPS by coincidence rather than by rule -- that one
+ * calibrates the scroll and transition speed settings, so welding the two
+ * together would make retuning this rescale those. HZ/30 is 3 ticks, i.e. 33
+ * frames a second, tick granularity being what it is. */
+#define PF_MAX_FPS       30
+#define PF_FRAME_TICKS   MAX(HZ / PF_MAX_FPS, 1)
 static long anim_last_tick;
 static int anim_frac;
 /* Always 0: nothing sets it any more, but render_all_slides()'s fade
@@ -432,6 +460,32 @@ struct db_summary_t carousel_idx;
 
 static bool thread_is_running;
 static bool wants_to_quit;
+
+/* Bumped by the loader thread each time a slide near enough to be on screen
+ * gets its surface. The main loop draws a frame only when the picture has
+ * actually changed, and a cover arriving is one of the ways it changes -- the
+ * one nothing else would tell it about. Slides loaded further out are read long
+ * before they are looked at and would only ask for frames showing nothing new.
+ */
+static volatile unsigned int pf_slides_loaded;
+
+#if PF_SHOW_STATS
+/* Every slide the loader fetches, near the centre or not -- pf_slides_loaded
+ * counts only the ones worth a frame, and it is the far ones that cost the
+ * disk. */
+static volatile unsigned int pf_loads_total;
+/* Wall clock handed to other threads by render_slide()'s per-slide yield(),
+ * accumulated across one frame. Timing the render without separating this out
+ * measures the codec and the slide loader and calls the result "drawing". */
+static unsigned long pf_yield_us;
+/* The clear and the slide loops timed apart, and the pixels the slide loops
+ * actually wrote. Time per pixel is the number that matters: the loops are
+ * maybe fifteen cycles of arithmetic each, so anything far above that is the
+ * memory system, not the code. */
+static unsigned long pf_clear_us;
+static unsigned long pf_slides_us;
+static unsigned long pf_px;
+#endif
 
 /*
     Prevent picture loading thread from allocating
@@ -930,12 +984,16 @@ int get_scroll_line_offset(enum pf_scroll_line_type type)
     return scroll_lines[type].offset;
 }
 
-static void update_scroll_lines(void)
+/* True when a line actually moved, so the caller knows a frame is owed. A line
+ * parked at either end waiting out its delay does not count -- it is showing
+ * the same pixels as the frame before. */
+static bool update_scroll_lines(void)
 {
     int i;
+    bool moved = false;
 
     if (TIME_BEFORE(current_tick, scroll_line_info.next_scroll))
-        return;
+        return false;
 
     scroll_line_info.next_scroll = current_tick + scroll_line_info.ticks;
 
@@ -945,6 +1003,7 @@ static void update_scroll_lines(void)
         if (s->step && TIME_BEFORE(s->start_tick, current_tick))
         {
             s->offset -= s->step;
+            moved = true;
 
             if (s->offset >= 0) {
                 /* at beginning of line */
@@ -960,6 +1019,8 @@ static void update_scroll_lines(void)
             }
         }
     }
+
+    return moved;
 }
 
 
@@ -1554,6 +1615,14 @@ static inline bool load_and_prepare_surface(const int slide_index,
     if (cache_index < SLIDE_CACHE_SIZE)
         pf_sldcache.cache[cache_index].index = slide_index;
 
+    if (slide_index >= center_index - ALBUM_COVERS_NUM_SLIDES &&
+        slide_index <= center_index + ALBUM_COVERS_NUM_SLIDES)
+        pf_slides_loaded++;
+
+#if PF_SHOW_STATS
+    pf_loads_total++;
+#endif
+
     return true;
 }
 
@@ -2074,16 +2143,34 @@ void carousel_refresh(void)
    Fade the given color toward the theme background color.
    a = 256 means fully opaque (original color), a = 0 means fully bg.
  */
-static inline pix_t fade_color(pix_t c, unsigned a)
+/* The part of a fade that depends only on the slide's alpha and the background,
+ * lifted out of the pixel loop. Both background terms are whole multiplies, and
+ * leaving them where they were -- inside a function called per pixel -- had the
+ * loop doing four multiplies and two global loads for every pixel where two
+ * multiplies do. The compiler does not lift them itself at -Os. */
+struct pf_fade
+{
+    unsigned int a;     /* alpha, rounded to the step the blend works in */
+    unsigned int rb;    /* background red/blue contribution, pre-multiplied */
+    unsigned int g;     /* background green contribution */
+};
+
+static inline void fade_prepare(struct pf_fade *f, unsigned int a)
+{
+    a = (a + 2) & 0x1fc;
+    f->a  = a;
+    f->rb = pf_bg_rb * (0x100 - a);
+    f->g  = pf_bg_g  * (0x100 - a);
+}
+
+static inline pix_t fade_color(pix_t c, unsigned int fa, unsigned int frb,
+                               unsigned int fg)
 {
     unsigned int result;
-    a = (a + 2) & 0x1fc;
-    unsigned int inv_a = 0x100 - a;
-    result = (((c & 0xf81f) * a + pf_bg_rb * inv_a)) & 0xf81f00;
-    result |= (((c & 0x7e0) * a + pf_bg_g * inv_a)) & 0x7e000;
-    result >>= 8;
-    return result;
 
+    result  = ((c & 0xf81f) * fa + frb) & 0xf81f00;
+    result |= ((c & 0x7e0)  * fa + fg)  & 0x7e000;
+    return result >> 8;
 }
 
 /**
@@ -2193,6 +2280,24 @@ static void render_slide(struct slide_data *slide, const int alpha)
     const int vertical_offset = voff;
     const int p_start_upper = (half_height - 1 - vertical_offset) * PFREAL_ONE;
     const int p_start_lower = (half_height - vertical_offset) * PFREAL_ONE;
+    /* Once per slide, not once per pixel -- see struct pf_fade. */
+    /* Not named `fade`: that is the module-level animation ramp this function
+     * has no business shadowing. */
+    struct pf_fade fd;
+    fade_prepare(&fd, alpha);
+    /* Into plain locals so they land in registers rather than being reloaded
+     * through the struct on every pixel. */
+    const unsigned int fa = fd.a, frb = fd.rb, fg = fd.g;
+
+    /* Walked a column at a time, which is the order the source is stored in
+     * (art_sizes.h keeps the coverflow thumbnails column-major for exactly
+     * this) and keeps p, dy and both pointers in registers.
+     *
+     * Trap for anyone eyeing the 640-byte stride on the stores: turning this
+     * inside out to write along rows was tried and is ~20% *slower*. The
+     * per-column state has to move from registers into arrays, and the four
+     * extra array accesses a pixel cost more than the stores save. This loop is
+     * limited by its arithmetic, not by its access pattern. */
     for (x = xi; x < w; x++) {
         /* Rounding in the reverse projection above can leave xs a fraction
          * below the slide's left edge. The cast is unsigned, so that would
@@ -2215,6 +2320,9 @@ static void render_slide(struct slide_data *slide, const int alpha)
         int p = p_start_upper;
         int plim = MAX(0, p - (half_height-1) * dy);
         pix_t *pixel = LCDADDR(x, half_height-1 );
+#if PF_SHOW_STATS
+        const pix_t *px_from = pixel;
+#endif
 
         if (alpha == 256) {
             while (p >= plim) {
@@ -2224,14 +2332,21 @@ static void render_slide(struct slide_data *slide, const int alpha)
             }
         } else {
             while (p >= plim) {
-                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT], alpha);
+                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT],
+                                    fa, frb, fg);
                 p -= dy;
                 pixel -= PIXELSTEP_Y;
             }
         }
+#if PF_SHOW_STATS
+        pf_px += (px_from - pixel) / PIXELSTEP_Y;
+#endif
         p = p_start_lower;
         plim = MIN(sh * PFREAL_ONE, p + lower_half * dy);
         pixel = LCDADDR(x, half_height );
+#if PF_SHOW_STATS
+        px_from = pixel;
+#endif
 
         if (alpha == 256) {
             while (p < plim) {
@@ -2241,11 +2356,16 @@ static void render_slide(struct slide_data *slide, const int alpha)
             }
         } else {
             while (p < plim) {
-                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT], alpha);
+                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT],
+                                    fa, frb, fg);
                 p += dy;
                 pixel += PIXELSTEP_Y;
             }
         }
+
+#if PF_SHOW_STATS
+        pf_px += (pixel - px_from) / PIXELSTEP_Y;
+#endif
 
         if (perspective)
         {
@@ -2257,7 +2377,15 @@ static void render_slide(struct slide_data *slide, const int alpha)
 
     }
     /* let the music play... */
+#if PF_SHOW_STATS
+    {
+        unsigned long y0 = USEC_TIMER;
+        yield();
+        pf_yield_us += USEC_TIMER - y0;
+    }
+#else
     yield();
+#endif
     return;
 }
 
@@ -2484,7 +2612,17 @@ static void coverflow_render(void)
             if (alpha > 256) alpha = 256;
         }
         /* if step>0 and nright==1, right_slides[0] is fading in  */
-        alpha = ((step > 0) ? ((nright == 1) ? 128 : 0) : -64) + fade / 2;
+        /* -128, not -64. Both keep the ramp continuous across a crossing --
+         * that only constrains the difference between one index and the next --
+         * but only -128 also meets the resting state this side starts and ends
+         * a backwards scroll in. A scroll opens with fade at 256, so the ramp
+         * has to reproduce the step==0 alphas above at that value: index 2 at
+         * 128 needs X + 256 == 128. At -64 it came out 192 instead, and index 3
+         * came out at 64 where at rest it is not drawn at all -- so a cover
+         * appeared at the right edge, brightened its neighbour, and faded away
+         * again, once per scroll. The other three side/direction combinations
+         * were already exact; this was the only one adrift. */
+        alpha = ((step > 0) ? ((nright == 1) ? 128 : 0) : -128) + fade / 2;
         for (index = nright - 1; index >= 0; index--) {
             if (index == 0 && skip_right_0) {
                 alpha += 128;
@@ -2521,14 +2659,30 @@ static void coverflow_render(void)
 
 static void render_all_slides(void)
 {
+#if PF_SHOW_STATS
+    unsigned long t0, y0;
+#endif
     lcd_set_background(pf_bg_color);
     /* TODO: Optimizes this by e.g. invalidating rects */
+#if PF_SHOW_STATS
+    t0 = USEC_TIMER;
+#endif
     pf_clear_display();
+#if PF_SHOW_STATS
+    pf_clear_us = USEC_TIMER - t0;
+    pf_px = 0;
+    t0 = USEC_TIMER;
+    y0 = pf_yield_us;
+#endif
 
     if (flat_view())
         flat_render();
     else
         coverflow_render();
+#if PF_SHOW_STATS
+    /* The per-slide yields land in here, and belong to whoever ran. */
+    pf_slides_us = (USEC_TIMER - t0) - (pf_yield_us - y0);
+#endif
 }
 
 /* The two layouts, mid-flip. `s` is the direction (the scroll's step), and
@@ -3069,11 +3223,122 @@ bool carousel_reinit(void)
     return init();
 }
 
+#if PF_SHOW_STATS
+/* One second's worth of frames, reduced to a line drawn over the covers.
+ *
+ * The line reads "<n>fps r<us> f<us> b<pct>% l<n>": the frame rate actually
+ * achieved, the average microseconds inside the render and inside the flush,
+ * the share of wall clock those two accounted for, and how many slides the
+ * loader fetched. Between them those separate the three candidates, which is
+ * the whole point of it:
+ *
+ *   fps at the cap                -> this loop is keeping up; look elsewhere
+ *   fps low, busy high            -> saturated by its own drawing; transfer or
+ *                                    draw less, and f vs r says which
+ *   fps low, busy low             -> starved, not busy. The time is going to
+ *                                    other threads, and l says whether the
+ *                                    slide loader is the one taking it.
+ */
+static struct
+{
+    unsigned long render;       /* usec accumulated over the window */
+    unsigned long yielded;
+    unsigned long flush;
+    int frames;
+    unsigned long clear;
+    unsigned long slides;
+    unsigned long px;
+    unsigned int loads;         /* pf_loads_total when the window opened */
+    long window_start;
+    char line[48];
+    char line2[48];
+} pf_stats;
+
+static void pf_stats_frame(unsigned long render_us, unsigned long yield_us,
+                           unsigned long flush_us)
+{
+    long now = current_tick;
+    long elapsed;
+
+    pf_stats.render += render_us;
+    pf_stats.yielded += yield_us;
+    pf_stats.flush  += flush_us;
+    pf_stats.clear  += pf_clear_us;
+    pf_stats.slides += pf_slides_us;
+    pf_stats.px     += pf_px;
+    pf_stats.frames++;
+
+    elapsed = now - pf_stats.window_start;
+    if (elapsed < HZ || pf_stats.frames < 1)
+        return;
+
+    /* Wall clock the window covered, in the same units as the totals. `busy` is
+     * this screen's own share of it -- the yielded time belongs to whichever
+     * thread ran, not to us. */
+    unsigned long span = (unsigned long)elapsed * (1000000 / HZ);
+    unsigned long busy = pf_stats.render + pf_stats.flush;
+
+    snprintf(pf_stats.line, sizeof(pf_stats.line),
+             "%ldfps r%lu y%lu f%lu b%lu%% l%u%s",
+             (long)pf_stats.frames * HZ / elapsed,
+             pf_stats.render / pf_stats.frames,
+             pf_stats.yielded / pf_stats.frames,
+             pf_stats.flush / pf_stats.frames,
+             span ? busy * 100 / span : 0,
+             pf_loads_total - pf_stats.loads,
+             art_cache_is_busy() ? " ART" : "");
+
+    /* nspx is the whole point: nanoseconds of slide-loop time per pixel those
+     * loops wrote. Target-independent, so it means the same on both. */
+    /* The clock the above was measured at, because ns/px means opposite things
+     * at 30 MHz and 80 MHz -- healthy arithmetic in one reading, stalled memory
+     * in the other -- and cpu_boost() being *called* is not evidence that it is
+     * in effect. */
+    snprintf(pf_stats.line2, sizeof(pf_stats.line2),
+             "clr%lu sld%lu ns%lu %ldM b%d",
+             pf_stats.clear / pf_stats.frames,
+             pf_stats.slides / pf_stats.frames,
+             pf_stats.px ? pf_stats.slides * 1000 / pf_stats.px : 0,
+             FREQ / 1000000, get_cpu_boost_counter());
+
+    pf_stats.render = 0;
+    pf_stats.yielded = 0;
+    pf_stats.flush = 0;
+    pf_stats.clear = 0;
+    pf_stats.slides = 0;
+    pf_stats.px = 0;
+    pf_stats.frames = 0;
+    pf_stats.loads = pf_loads_total;
+    pf_stats.window_start = now;
+}
+
+static void pf_stats_draw(void)
+{
+    if (!pf_stats.line[0])
+        return;
+
+    lcd_setfont(FONT_SYSFIXED);
+    lcd_set_foreground(pf_fg_color);
+    lcd_putsxy(2, 2, pf_stats.line);
+    lcd_putsxy(2, 2 + font_get(FONT_SYSFIXED)->height, pf_stats.line2);
+    lcd_setfont(screens[SCREEN_MAIN].getuifont());
+}
+#endif /* PF_SHOW_STATS */
+
 static int album_covers_loop(void)
 {
     int ret;
     int button;
     bool art_was_building = art_cache_is_busy();
+    /* Whether the screen owes a frame, and whether that frame has to carry the
+     * rows above this screen's viewport with it. Both are sticky: the frame
+     * rate cap can defer a frame to a later time round the loop, and a reason
+     * to draw must survive until one actually does. */
+    bool frame_owed = true;
+    bool full_flush_owed = false;
+    /* Far enough back that the first frame is due immediately. */
+    long last_frame_tick = current_tick - PF_FRAME_TICKS;
+    unsigned int seen_slides_loaded = pf_slides_loaded;
 
     while (true) {
         /* An artwork pass finished while the carousel was open. Slides loaded
@@ -3090,6 +3355,7 @@ static int album_covers_loop(void)
             buf_ctx_unlock();
             queue_remove_from_head(&thread_q, EV_WAKEUP);
             queue_post(&thread_q, EV_WAKEUP, 0);
+            frame_owed = true;   /* every slide on screen just went away */
         }
         art_was_building = art_building;
 
@@ -3100,20 +3366,17 @@ static int album_covers_loop(void)
          * rendering will push both the SBS status bar and our content
          * atomically, avoiding one-frame flicker of theme artifacts. */
 
-        /* Idle-frame-rate backoff. This loop fully re-renders the coverflow
-         * and flushes the shared framebuffer (status bar included) on every
-         * wake-up, so individual frames can't be skipped -- the SBS stamps
-         * overlapping viewports into our area and relies on our lcd_update()
-         * to reach the LCD. What we can do is wake up less often when nothing
-         * is changing, which avoids the expensive per-frame redraw (a full
-         * viewport clear + recomposite of every slide) while the screen sits
-         * idle. Only back off when it is genuinely static: not animating a
-         * scroll, no caption text scrolling, cover cache fully built, no
-         * dynamic-colour fade in progress, and playback stopped (while
-         * playing, the status bar's time updates every second and a track
-         * change can start a colour fade, both of which want the normal
-         * rate). A button press interrupts the wait immediately, so
-         * responsiveness is unaffected. */
+        /* Idle-wake-rate backoff: how long to wait for a button before looking
+         * around again. Waking finds nothing to draw most of the time (see the
+         * frame test below) and costs almost nothing, so this only decides how
+         * promptly the screen notices a change, not how much work it does.
+         * Back off to twice a second when it is genuinely static: not animating
+         * a scroll, no caption text scrolling, cover cache fully built, no
+         * dynamic-colour fade in progress, and playback stopped (while playing,
+         * the status bar's time updates every second and a track change can
+         * start a colour fade, both of which want the normal rate). A button
+         * press interrupts the wait immediately, so responsiveness is
+         * unaffected. */
         bool caption_scrolling = scroll_lines[PF_SCROLL_TRACK].step
                               || scroll_lines[PF_SCROLL_ALBUM].step
                               || scroll_lines[PF_SCROLL_ARTIST].step;
@@ -3122,34 +3385,124 @@ static int album_covers_loop(void)
                       && aa_cache.inspected >= carousel_idx.album_ct
                       && !dynamic_colors_needs_repaint()
                       && !(audio_status() & AUDIO_STATUS_PLAY);
-        int timeout = (pf_state == pf_scrolling) ? 0
-                    : (quiescent ? HZ/2 : HZ/16);
+        int timeout;
+
+        if (pf_state == pf_scrolling || frame_owed)
+        {
+            /* There is a frame coming, so wait out the rest of its interval
+             * rather than going round again to find it still not due. Waiting
+             * zero -- which is what an animating carousel used to do -- turns
+             * the cap into a spin, and burns exactly the CPU the cap exists to
+             * hand back. */
+            /* Zero when the frame is already due or overdue: the poll returns
+             * at once and it is drawn. Waiting a tick there -- which is what
+             * this did at first -- throws 10 ms away on every frame that
+             * overruns its own interval, which on the 5G is all of them. */
+            long due_in = PF_FRAME_TICKS - (current_tick - last_frame_tick);
+            timeout = (due_in < 0) ? 0 : (int)due_in;
+        }
+        else
+            timeout = quiescent ? HZ/2 : HZ/16;
 
         skin_inhibit_flush(true);
         button = get_custom_action(CONTEXT_PLUGIN, timeout, get_context_map);
         skin_inhibit_flush(false);
 
-        /* SBS rendering in get_custom_action resets the viewport to default,
-         * and also leaves the global draw mode at whatever the skin's own
-         * text/menu elements last used (typically DRMODE_SOLID, an opaque
-         * background block) -- restore both, or draw_album_text()'s
-         * lcd_putsxy() below inherits that solid mode and paints an opaque
-         * block behind the album/artist text instead of drawing
-         * transparently over the coverflow's own background. */
-        lcd_set_viewport(&pf_vp);
-        lcd_set_drawmode(DRMODE_FG);
+        /* Whether the status bar drew during that call. Reading the flag takes
+         * responsibility for the flush, which is this screen's anyway -- the
+         * inhibit above stopped the skin engine from doing its own. It answers
+         * two questions at once: the SBS draws over the covers as well as its
+         * own strip, so a yes means the framebuffer no longer matches what is
+         * on the display and a frame is owed; and it is the only thing that
+         * touches the rows above this screen's viewport, so a no means the
+         * flush can leave them alone. */
+        if (skin_is_dirty(SCREEN_MAIN))
+        {
+            frame_owed = true;
+            full_flush_owed = true;
+        }
 
-        pf_update_dynamic_colors();
-        update_scroll_lines();
+        /* Runs every time round, not just on the frames that draw: it is what
+         * notices that a caption is due to move. */
+        if (update_scroll_lines())
+            frame_owed = true;
 
         if (pf_state == pf_scrolling)
-            update_scroll_animation();
-        render_all_slides();
-        model->draw_text();
+            frame_owed = true;
 
-        /* Copy offscreen buffer to LCD and give time to other threads */
-        lcd_update();
-        yield();
+        if (seen_slides_loaded != pf_slides_loaded)
+        {
+            seen_slides_loaded = pf_slides_loaded;
+            frame_owed = true;
+        }
+
+        if (dynamic_colors_needs_repaint())
+            frame_owed = true;
+
+        /* Draw only when the picture would come out different, and no more
+         * often than PF_MAX_FPS. A frame is a full viewport clear, a re-render
+         * of every slide and a flush of the screen, which is far and away the
+         * most expensive thing this loop does -- and idle frames used to pay
+         * all of it to arrive at pixels identical to the ones already there.
+         * Playback was what paid for them, since the wait above deliberately
+         * keeps its normal rate while a track is running.
+         *
+         * Timed from the start of the frame, so the cap is a rate and not a
+         * gap: a frame that overruns its own interval simply makes the next one
+         * due immediately, rather than having its cost added to the wait. */
+        if (frame_owed && current_tick - last_frame_tick >= PF_FRAME_TICKS)
+        {
+            frame_owed = false;
+            last_frame_tick = current_tick;
+#if PF_SHOW_STATS
+            unsigned long t_start = USEC_TIMER, t_flush;
+            pf_yield_us = 0;
+#endif
+
+            /* SBS rendering in get_custom_action resets the viewport to
+             * default, and also leaves the global draw mode at whatever the
+             * skin's own text/menu elements last used (typically DRMODE_SOLID,
+             * an opaque background block) -- restore both, or
+             * draw_album_text()'s lcd_putsxy() below inherits that solid mode
+             * and paints an opaque block behind the album/artist text instead
+             * of drawing transparently over the coverflow's own background. */
+            lcd_set_viewport(&pf_vp);
+            lcd_set_drawmode(DRMODE_FG);
+
+            pf_update_dynamic_colors();
+
+            if (pf_state == pf_scrolling)
+                update_scroll_animation();
+            render_all_slides();
+            model->draw_text();
+#if PF_SHOW_STATS
+            pf_stats_draw();
+            t_flush = USEC_TIMER;
+#endif
+
+            /* Copy offscreen buffer to LCD and give time to other threads.
+             * Everything below pf_vp_y is this screen's own; the rows above it
+             * only need sending when the status bar redrew into them. Full
+             * width either way, which is the single-burst path in both
+             * targets' drivers -- a narrower rect goes line by line. */
+            if (full_flush_owed)
+            {
+                lcd_update();
+                full_flush_owed = false;
+            }
+            else
+                lcd_update_rect(0, pf_vp_y, LCD_WIDTH, pf_height);
+#if PF_SHOW_STATS
+            pf_stats_frame((t_flush - t_start) - pf_yield_us, pf_yield_us,
+                           USEC_TIMER - t_flush);
+#endif
+            yield();
+        }
+
+        /* Whatever the button below is about to change, the frame showing it
+         * has not been drawn yet -- this one went out before the switch. */
+        if (button != ACTION_NONE)
+            frame_owed = true;
 
         switch (button) {
         case PF_QUIT:
