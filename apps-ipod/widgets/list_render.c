@@ -413,14 +413,33 @@ void list_draw(struct screen *display, struct gui_synclist *list)
     if (!gui_synclist_flush_inhibited())
     {
         unsigned int t_flush = USEC_TIMER;
-        if (list_need_full_update() | skin_is_dirty(display->screen_type))
+        struct skin_dirty_rect dr[SKIN_MAX_DIRTY_RECTS];
+        int nrects = skin_take_dirty_rects(display->screen_type, dr);
+
+        if (list_need_full_update())
         {
             display->set_viewport(NULL);
             display->update();
             sb_skin_force_next_update();
         }
         else
+        {
+            /* Whatever the skin repainted around the list, then the rows.
+             * Several small regions beat one whole screen: the skin usually
+             * owes a clock and a scrollbar, which together are a couple of
+             * thousand pixels against the display's seventy-odd. The viewport
+             * is put back before the rows so this leaves it where the plain
+             * update_viewport() always did. */
+            if (nrects > 0)
+            {
+                display->set_viewport(NULL);
+                for (int r = 0; r < nrects; r++)
+                    display->update_rect(dr[r].x, dr[r].y, dr[r].w, dr[r].h);
+                display->set_viewport(parent);
+                sb_skin_force_next_update();
+            }
             display->update_viewport();
+        }
         skin_note_flush(USEC_TIMER - t_flush);
     }
     display->set_viewport(last_vp);

@@ -422,14 +422,27 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
     display->set_viewport(parent);
     if (!gui_synclist_flush_inhibited())
     {
-        if (list_need_full_update() | skin_is_dirty(display->screen_type))
+        struct skin_dirty_rect dr[SKIN_MAX_DIRTY_RECTS];
+        int nrects = skin_take_dirty_rects(display->screen_type, dr);
+
+        if (list_need_full_update())
         {
             display->set_viewport(NULL);
             display->update();
             sb_skin_force_next_update();
         }
         else
+        {
+            if (nrects > 0)
+            {
+                display->set_viewport(NULL);
+                for (int r = 0; r < nrects; r++)
+                    display->update_rect(dr[r].x, dr[r].y, dr[r].w, dr[r].h);
+                display->set_viewport(parent);
+                sb_skin_force_next_update();
+            }
             display->update_viewport();
+        }
     }
     /* A custom scrollbar is drawn by the skin, and nothing else tells the skin
      * that the list moved -- so without this the bar lags behind the selection

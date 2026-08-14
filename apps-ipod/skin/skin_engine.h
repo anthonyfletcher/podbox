@@ -33,10 +33,26 @@ struct gui_wps;
 void skin_update(enum skinnable_screens skin, enum screen_type screen,
                  unsigned int update_type);
 
-/* Note that a skin was drawn but not flushed to the screen */
+/* Note that a skin was drawn but not flushed to the screen. The plain form
+ * means "somewhere" and costs a whole-screen flush; the rect form says where.
+ * Coordinates are absolute, as viewports store them.
+ *
+ * The regions are kept as a short list rather than merged into one box,
+ * because the things a skin repaints are often at opposite corners -- a clock
+ * top-left and a scrollbar down the right edge bound almost the whole display
+ * between them, while separately they are a couple of thousand pixels. */
+#define SKIN_MAX_DIRTY_RECTS 8
+
+struct skin_dirty_rect { short x, y, w, h; };
+
 void skin_mark_dirty(enum screen_type screen);
+void skin_mark_dirty_rect(enum screen_type screen, int x, int y, int w, int h);
 /* Take the pending-flush flag for a screen, clearing it */
 bool skin_is_dirty(enum screen_type screen);
+/* Take the regions owed, clamped to the display, writing at most
+ * SKIN_MAX_DIRTY_RECTS of them to `out`. Returns how many, 0 if none. */
+int skin_take_dirty_rects(enum screen_type screen,
+                          struct skin_dirty_rect *out);
 /* Hold off the flush while something else owns the screen */
 void skin_inhibit_flush(bool inhibit);
 bool skin_flush_inhibited(void);

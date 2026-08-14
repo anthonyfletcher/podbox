@@ -98,6 +98,9 @@ struct skin_draw_info {
      * loop. NULL when the current line has no album art. */
     const struct bitmap *pending_aa;
     const struct listitem *pending_aa_item;   /* the %La that asked for it */
+    /* Anything in this viewport actually reached the framebuffer, so the
+     * viewport's rectangle has to be flushed. See do_non_text_tags(). */
+    bool drew;
 
     /* Same problem one step further out. A tinted %dr composites with whatever
      * is under it, and the album art and images are drawn once for the whole
@@ -317,6 +320,16 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
     struct skin_viewport *skin_vp = info->skin_vp;
     struct wps_data *data = gwps->data;
     bool do_refresh = (element->tag->flags & info->refresh_type) > 0;
+
+    /* Most of the cases below put pixels on the screen themselves rather than
+     * contributing text to the line, and they all gate on do_refresh -- so
+     * this is the one place that catches every direct draw. It is deliberately
+     * before the switch: a tag that refreshes without drawing costs a flush of
+     * a region that did not change, where a draw that went unreported would
+     * leave a stale one on the LCD. Note that `needs_update` cannot stand in
+     * for this, as it only tracks tags that produce text. */
+    if (do_refresh)
+        info->drew = true;
 
     switch (token->type)
     {
@@ -1046,7 +1059,9 @@ bool skin_render_alternator(struct skin_element* element, struct skin_draw_info 
     return changed_lines || ret;
 }
 
-void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
+/* Returns whether anything was drawn, so the caller knows if this viewport's
+ * rectangle is owed a flush. */
+bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
                         struct skin_viewport* skin_viewport, unsigned long refresh_type)
 {
     struct screen *display = gwps->display;
@@ -1070,7 +1085,7 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
     bool needs_update, update_all = false;
     skin_buffer = get_skin_buffer(gwps->data);
     if (!skin_buffer)       /* unloaded skin -- see skin_render() */
-        return;
+        return false;
     /* Set images to not to be displayed */
     struct skin_token_list *imglist = SKINOFFSETTOPTR(skin_buffer, gwps->data->images);
     while (imglist)
@@ -1135,6 +1150,7 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
             }
             write_line(display, align, info.line_number,
                     info.line_scrolls, &info.line_desc);
+            info.drew = true;
         }
         /* Blit deferred list album art now, after write_line()'s background
          * clear, so the cover's top row isn't wiped (see pending_aa). */
@@ -1161,7 +1177,9 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
             display->blendrect(rect->x, rect->y, rect->width, rect->height,
                                rect->opacity);
         skin_viewport->vp.fg_pattern = backup;
+        info.drew = true;
     }
+    return info.drew;
 }
 
 void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
@@ -1189,6 +1207,11 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     /* Framebuffer is likely dirty */
     if ((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL)
     {
+        /* A full refresh repaints the ground between the viewports as well as
+         * the viewports themselves, so there is nothing a bounding box could
+         * save here. Partial refreshes are where it pays, and they take the
+         * per-viewport path at the bottom of the loop. */
+        skin_mark_dirty(display->screen_type);
         /* should already be the default buffer */
         struct viewport * first_vp = display->set_viewport_ex(NULL, 0);
         if (get_current_activity() == ACTIVITY_WPS)
@@ -1285,14 +1308,26 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         display->set_foreground(skin_viewport->vp.fg_pattern);
         display->set_background(skin_viewport->vp.bg_pattern);
 
+        bool drew = false;
         if ((vp_refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL)
         {
             display->clear_viewport();
+            drew = true;
         }
         /* render */
         if (viewport->children_count)
-            skin_render_viewport(get_child(viewport->children, 0), gwps,
-                                 skin_viewport, vp_refresh_mode);
+            drew |= skin_render_viewport(get_child(viewport->children, 0), gwps,
+                                         skin_viewport, vp_refresh_mode);
+
+        /* Backdrop viewports are marked too, though what they draw lands in
+         * the backdrop buffer rather than on screen: the region is the same
+         * one their foreground twin occupies, so the flush is owed anyway,
+         * and guessing otherwise would risk holding back a real change. */
+        if (drew)
+            skin_mark_dirty_rect(display->screen_type,
+                                 skin_viewport->vp.x, skin_viewport->vp.y,
+                                 skin_viewport->vp.width,
+                                 skin_viewport->vp.height);
 
         refresh_mode = old_refresh_mode;
     }

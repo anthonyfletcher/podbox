@@ -25,7 +25,9 @@ void clear_image_pos(struct gui_wps *gwps, struct gui_img *img);
 void wps_display_images(struct gui_wps *gwps, struct viewport* vp);
 
 
-void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
+/* Returns whether anything reached the framebuffer, so a caller that owns the
+ * flush knows whether this viewport's rectangle is owed one. */
+bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
                         struct skin_viewport* skin_viewport, unsigned long refresh_type);
 
 

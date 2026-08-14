@@ -68,8 +68,22 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode);
 /* Set when a skin has been rendered into the framebuffer but not yet flushed.
  * Nothing in the skin engine pushes pixels to the LCD any more; whoever runs
  * the update (normally GUI_EVENT_ACTIONUPDATE) asks here whether one is owed.
- * Reading the flag clears it -- the caller is taking responsibility for it. */
-static bool dirty[NB_SCREENS];
+ * Reading the flag clears it -- the caller is taking responsibility for it.
+ *
+ * `box` is the union of what actually changed, which is worth tracking because
+ * the flush is the expensive half of a frame -- pushing the whole 320x240 to
+ * the LCD costs several times the render that produced it, so a skin that
+ * repaints one small viewport should not pay for the other 99% of the screen.
+ * `whole` is the escape hatch for a caller that knows something changed but
+ * not where; a full refresh takes it, since that repaints the ground between
+ * viewports as well and there is nothing left to save. */
+static struct
+{
+    bool whole;
+    int  count;
+    struct { int x1, y1, x2, y2; } r[SKIN_MAX_DIRTY_RECTS];  /* x2/y2 exclusive */
+} pending[NB_SCREENS];
+
 static bool flush_inhibited = false;
 
 /* Hold the flush off across an action that owns the screen itself -- a
@@ -85,16 +99,127 @@ bool skin_flush_inhibited(void)
     return flush_inhibited;
 }
 
+static void pending_clear(enum screen_type screen)
+{
+    pending[screen].whole = false;
+    pending[screen].count = 0;
+}
+
 bool skin_is_dirty(enum screen_type screen)
 {
-    bool ret = dirty[screen];
-    dirty[screen] = false;
+    bool ret = pending[screen].whole || pending[screen].count > 0;
+    pending_clear(screen);
     return ret;
 }
 
 void skin_mark_dirty(enum screen_type screen)
 {
-    dirty[screen] = true;
+    pending[screen].whole = true;
+}
+
+/* Area a box would grow by to swallow another -- the cost of merging them. */
+static long merge_cost(int ax1, int ay1, int ax2, int ay2,
+                       int bx1, int by1, int bx2, int by2)
+{
+    int ux1 = MIN(ax1, bx1), uy1 = MIN(ay1, by1);
+    int ux2 = MAX(ax2, bx2), uy2 = MAX(ay2, by2);
+
+    return (long)(ux2 - ux1) * (uy2 - uy1)
+         - (long)(ax2 - ax1) * (ay2 - ay1);
+}
+
+void skin_mark_dirty_rect(enum screen_type screen, int x, int y, int w, int h)
+{
+    int x2 = x + w, y2 = y + h;
+    int i, best = 0;
+    long best_cost = 0;
+
+    if (w <= 0 || h <= 0 || pending[screen].whole)
+        return;
+
+    /* Already covered by something on the list -- most repaints are the same
+     * handful of viewports over and over, so this is the common case. */
+    for (i = 0; i < pending[screen].count; i++)
+    {
+        if (x >= pending[screen].r[i].x1 && y >= pending[screen].r[i].y1 &&
+            x2 <= pending[screen].r[i].x2 && y2 <= pending[screen].r[i].y2)
+            return;
+    }
+
+    if (pending[screen].count < SKIN_MAX_DIRTY_RECTS)
+    {
+        i = pending[screen].count++;
+        pending[screen].r[i].x1 = x;
+        pending[screen].r[i].y1 = y;
+        pending[screen].r[i].x2 = x2;
+        pending[screen].r[i].y2 = y2;
+        return;
+    }
+
+    /* Out of slots: fold it into whichever box grows least. Merging beats
+     * giving up and flushing everything, and the alternative -- an unbounded
+     * list -- costs more in per-rect flush overhead than it saves. */
+    for (i = 0; i < pending[screen].count; i++)
+    {
+        long cost = merge_cost(pending[screen].r[i].x1, pending[screen].r[i].y1,
+                               pending[screen].r[i].x2, pending[screen].r[i].y2,
+                               x, y, x2, y2);
+        if (i == 0 || cost < best_cost)
+        {
+            best = i;
+            best_cost = cost;
+        }
+    }
+    pending[screen].r[best].x1 = MIN(pending[screen].r[best].x1, x);
+    pending[screen].r[best].y1 = MIN(pending[screen].r[best].y1, y);
+    pending[screen].r[best].x2 = MAX(pending[screen].r[best].x2, x2);
+    pending[screen].r[best].y2 = MAX(pending[screen].r[best].y2, y2);
+}
+
+int skin_take_dirty_rects(enum screen_type screen,
+                          struct skin_dirty_rect *out)
+{
+    int n = 0;
+
+    if (pending[screen].whole)
+    {
+        out[0].x = 0;
+        out[0].y = 0;
+        out[0].w = screens[screen].lcdwidth;
+        out[0].h = screens[screen].lcdheight;
+        pending_clear(screen);
+        return 1;
+    }
+
+    for (int i = 0; i < pending[screen].count; i++)
+    {
+        int x1 = pending[screen].r[i].x1, y1 = pending[screen].r[i].y1;
+        int x2 = pending[screen].r[i].x2, y2 = pending[screen].r[i].y2;
+
+        /* lcd_update_rect() walks the framebuffer straight from FBADDR(x, y)
+         * without clipping -- the 6G's does no bounds check at all -- so a box
+         * reaching past an edge would read off the end of it. A viewport may
+         * be declared larger than the display. */
+        if (x1 < 0)
+            x1 = 0;
+        if (y1 < 0)
+            y1 = 0;
+        if (x2 > screens[screen].lcdwidth)
+            x2 = screens[screen].lcdwidth;
+        if (y2 > screens[screen].lcdheight)
+            y2 = screens[screen].lcdheight;
+
+        if (x2 <= x1 || y2 <= y1)
+            continue;
+
+        out[n].x = x1;
+        out[n].y = y1;
+        out[n].w = x2 - x1;
+        out[n].h = y2 - y1;
+        n++;
+    }
+    pending_clear(screen);
+    return n;
 }
 
 /* Flush whatever a skin render left in the framebuffer. Only for code that
@@ -129,12 +254,18 @@ void skin_note_flush(unsigned int usec)
 void skin_flush_dirty(void)
 {
     FOR_NB_SCREENS(i)
-        if (skin_is_dirty(i))
+    {
+        struct skin_dirty_rect dr[SKIN_MAX_DIRTY_RECTS];
+        int n = skin_take_dirty_rects(i, dr);
+
+        if (n > 0)
         {
             unsigned int t0 = USEC_TIMER;
-            screens[i].update();
+            for (int j = 0; j < n; j++)
+                screens[i].update_rect(dr[j].x, dr[j].y, dr[j].w, dr[j].h);
             skin_note_flush(USEC_TIMER - t0);
         }
+    }
 }
 
 void skin_update(enum skinnable_screens skin, enum screen_type screen,
@@ -149,10 +280,11 @@ void skin_update(enum skinnable_screens skin, enum screen_type screen,
         skin_request_full_update(skin);
 
     unsigned int t0 = USEC_TIMER;
+    /* skin_render() marks what it drew as it goes, per viewport, so a render
+     * that touched nothing owes no flush at all. */
     skin_render(gwps, skin_do_full_update(skin, screen) ?
                         SKIN_REFRESH_ALL : update_type);
     skin_note_render(USEC_TIMER - t0);
-    skin_mark_dirty(screen);
 }
 
 
