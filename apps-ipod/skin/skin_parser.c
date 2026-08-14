@@ -41,6 +41,7 @@
 #include "system/strutil.h"
 #include "system/app_buffer.h"
 #include "draw/viewport.h"
+#include "draw/round_rect.h"
 #include "audio/spectrum_meter.h"   /* SPECTRUM_MAX_BANDS */
 
 #include "skin_buffer.h"
@@ -515,15 +516,39 @@ static int parse_listitem(struct skin_element *element,
     if (!li)
         return -1;
     token->value.data = PTRTOSKINOFFSET(skin_buffer, li);
+    li->radius = 0;
+    li->mask = PTRTOSKINOFFSET(skin_buffer, NULL);
     if (element->params_count == 0)
         li->offset = 0;
     else
     {
         li->offset = get_param(element, 0)->data.number;
-        if (element->params_count > 1)
+        /* Written as '-' to reach the radius past it, wrap stays on -- and the
+         * text of a defaulted parameter must not be read at all. */
+        if (element->params_count > 1 && !isdefault(get_param(element, 1)))
             li->wrap = strcasecmp(get_param_text(element, 1), "nowrap") != 0;
         else
             li->wrap = true;
+    }
+
+    /* Third parameter: corner radius. Only %La's argument list reaches this
+     * far -- the text and icon tags sharing this parser take two. */
+    if (element->params_count > 2 && !isdefault(get_param(element, 2)))
+    {
+        int radius = get_param(element, 2)->data.number;
+        unsigned char *mask;
+
+        if (radius < 0 || radius > ROUND_RECT_MAX_RADIUS)
+            return -1;
+        if (radius > 0)
+        {
+            mask = skin_buffer_alloc(round_rect_mask_size(radius));
+            if (!mask)
+                return -1;
+            round_rect_build_mask(mask, radius, LCD_BLEND_OPAQUE);
+            li->radius = (uint8_t)radius;
+            li->mask = PTRTOSKINOFFSET(skin_buffer, mask);
+        }
     }
     return 0;
 }
@@ -703,6 +728,37 @@ static int parse_drawrectangle( struct skin_element *element,
                 param->data.number > LCD_BLEND_OPAQUE)
                 return -1;
             rect->opacity = (uint8_t)param->data.number;
+        }
+    }
+
+    /* Eighth parameter: corner radius. The coverage mask belongs to the tag
+     * rather than to a cache, because both of the things it depends on are
+     * settled here -- two rounded rectangles of different radii would
+     * otherwise rebuild it against each other on every frame they share. */
+    rect->radius = 0;
+    rect->mask = PTRTOSKINOFFSET(skin_buffer, NULL);
+    if (element->params_count > 7 && !isdefault(get_param(element, 7)))
+    {
+        int radius = get_param(element, 7)->data.number;
+        unsigned char *mask;
+
+        if (radius < 0 || radius > ROUND_RECT_MAX_RADIUS)
+            return -1;
+        /* A radius larger than the box is reduced to fit, the way the
+         * hard-edged rounded rectangles treat one. */
+        if (radius > rect->width / 2)
+            radius = rect->width / 2;
+        if (radius > rect->height / 2)
+            radius = rect->height / 2;
+
+        if (radius > 0)
+        {
+            mask = skin_buffer_alloc(round_rect_mask_size(radius));
+            if (!mask)
+                return -1;
+            round_rect_build_mask(mask, radius, rect->opacity);
+            rect->radius = (uint8_t)radius;
+            rect->mask = PTRTOSKINOFFSET(skin_buffer, mask);
         }
     }
 
@@ -1473,6 +1529,35 @@ static int parse_albumart_load(struct skin_element* element,
     {
         DEBUGF("%%Cl: %s\n", aa->filter.error);
         return WPS_ERROR_INVALID_PARAM;
+    }
+
+    /* Eighth parameter: corner radius. Clamped to the box rather than to the
+     * art, which is only known once a track has one -- art smaller than the
+     * box than falls back to square corners at draw time rather than taking
+     * a curve too big for it. */
+    aa->radius = 0;
+    aa->mask = PTRTOSKINOFFSET(skin_buffer, NULL);
+    if (element->params_count > 7 && !isdefault(get_param(element, 7)))
+    {
+        int radius = get_param(element, 7)->data.number;
+        unsigned char *mask;
+
+        if (radius < 0 || radius > ROUND_RECT_MAX_RADIUS)
+            return WPS_ERROR_INVALID_PARAM;
+        if (radius > aa->width / 2)
+            radius = aa->width / 2;
+        if (radius > aa->height / 2)
+            radius = aa->height / 2;
+
+        if (radius > 0)
+        {
+            mask = skin_buffer_alloc(round_rect_mask_size(radius));
+            if (!mask)
+                return -1;
+            round_rect_build_mask(mask, radius, LCD_BLEND_OPAQUE);
+            aa->radius = (uint8_t)radius;
+            aa->mask = PTRTOSKINOFFSET(skin_buffer, mask);
+        }
     }
 
     /* Slots dedupe by dimension, so a blurred %Cl no longer shares one with

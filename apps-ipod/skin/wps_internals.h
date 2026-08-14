@@ -145,6 +145,11 @@ struct draw_rectangle {
     /* 0..LCD_BLEND_OPAQUE; opaque unless the theme said otherwise, so every
      * existing %dr keeps taking the plain fill path. */
     uint8_t opacity;
+    /* Corner radius, 0 for square corners. The coverage mask is cut to this
+     * radius and this opacity when the tag is parsed, since neither can
+     * change afterwards; see draw/round_rect.h. */
+    uint8_t radius;
+    OFFSETTYPE(unsigned char *) mask;
 };
 
 struct align_pos {
@@ -246,6 +251,13 @@ struct skin_albumart {
     int filtered_art;
     short filtered_width;      /* what is really in it: the source fitted */
     short filtered_height;     /* inside the box, so smaller than it      */
+
+    /* Corner radius, 0 for square corners, with the coverage mask cut for it
+     * when the skin is parsed. The mask depends only on the radius -- the two
+     * planes carry their own strides -- so the one mask serves the art at
+     * whatever size it turns out to be. See draw/round_rect.h. */
+    uint8_t radius;
+    OFFSETTYPE(unsigned char *) mask;
 };
 
 
@@ -287,6 +299,12 @@ struct substring {
 struct listitem {
     bool wrap;
     int16_t offset;
+    /* %La only: corner radius for the row's cover, 0 for square, with the
+     * mask cut for it at parse time. Unlike %Cl there is nothing to clamp it
+     * against here -- a row's art is sized by its viewport at draw time -- so
+     * a radius too large for the cover that turns up is dropped there. */
+    uint8_t radius;
+    OFFSETTYPE(unsigned char *) mask;
 };
 
 /* %Sb(bars[,align[,radius]]): how many bars to split the band table into,

@@ -26,27 +26,30 @@ static const struct tag_info custom_tags[] =
      * outright, so an uppercase one here would make `gap` unreachable without
      * also writing an alignment. */
     TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|sii",SKIN_REFRESH_SPECTRUM),
-    TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|IS",  SKIN_REFRESH_DYNAMIC),
+    /* The wrap argument is lowercase 's' for the same reason: upstream's 'S'
+     * would make `radius` reachable only by also writing wrap or nowrap. */
+    TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|Isi", SKIN_REFRESH_DYNAMIC),
 
-    /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with one
-     * more optional string, the filter chain (draw/img_filter.h). The token
-     * id is unchanged, so parse_albumart_load() still handles it and only
-     * grows a clause.
+    /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with two
+     * more optional arguments, the filter chain (draw/img_filter.h) and a
+     * corner radius. The token id is unchanged, so parse_albumart_load()
+     * still handles it and only grows a clause.
      *
      * The one name here that deliberately collides with an upstream tag.
      * find_tag() consults this table first, which is what makes overriding a
      * tag possible at all rather than only adding to the set. The cost is
      * that a theme using the seventh parameter parses here and is rejected by
      * upstream Rockbox -- true of every tag in this file, and not new. */
-    TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sss", 0|NOBREAK),
+    TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sssi", 0|NOBREAK),
 
-    /* Shadows upstream's %dr ("[IP][IP][ip][ip]|ss"): the same token with one
-     * more optional parameter, opacity 0..15, absent meaning opaque. Optional
-     * parameters are positional, so reaching it means writing the two colours
-     * as '-' -- parse_drawrectangle() accepts that and keeps the viewport's
-     * foreground, which is what a panel tinted by the dynamic-colour palette
-     * needs. Only useful inside a %VB viewport; see lcd_blendrect(). */
-    TAG(SKIN_TOKEN_DRAWRECTANGLE, "dr", "[IP][IP][ip][ip]|ssi",
+    /* Shadows upstream's %dr ("[IP][IP][ip][ip]|ss"): the same token with two
+     * more optional parameters, opacity 0..15 and corner radius in pixels,
+     * both absent meaning a plain opaque rectangle. Optional parameters are
+     * positional, so reaching either means writing the two colours as '-' --
+     * parse_drawrectangle() accepts that and keeps the viewport's foreground,
+     * which is what a panel tinted by the dynamic-colour palette needs. A
+     * tint is only useful inside a %VB viewport; see lcd_blendrect(). */
+    TAG(SKIN_TOKEN_DRAWRECTANGLE, "dr", "[IP][IP][ip][ip]|ssii",
         SKIN_REFRESH_STATIC),
 
     /* %tw/%Vw/%Vh transform or report their arguments and are consumed by an

@@ -217,12 +217,19 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(8, -, -, 0)     # no gaps, square corners, from the bottom
 ```
 
-### `%La(offset[, nowrap])` — list-item album art
+### `%La(offset[, nowrap][, radius])` — list-item album art
 
 Album art for a menu/list row, alongside the standard `%LT` list text and `%LI`
 list icon. `offset` selects the row relative to the one being drawn (0 = that
 row); it defaults to 0. Pass `nowrap` to stop the offset wrapping around the
 ends of the list.
+
+A third argument rounds the cover's corners, in pixels, the way `%Cl`'s eighth
+does — anti-aliased, and blended with the row rather than knocked back to a
+colour, because the row's background is already drawn by the time the cover
+goes down. Unlike `%Cl` there is nothing to clamp it against when the skin
+loads, since a row's art is sized by its viewport; a radius too large for the
+cover that turns up is dropped and that cover keeps square corners.
 
 **It only draws inside a skinned list's row layout** — a `%Vl(label, …)`
 viewport belonging to a `%Lb(label, …)` list, which is the same context `%LT`
@@ -231,7 +238,8 @@ outside a row layout. See §5 of [`theme-guide.md`](theme-guide.md) for the whol
 arrangement, including the row height that has to accompany it.
 
 ```
-%La(0)          # album art of the current list row
+%La(0)              # album art of the current list row
+%La(0, -, 6)        # the same, with 6px rounded corners
 ```
 
 
@@ -295,14 +303,14 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 
 ---
 
-## Changed behaviour: `%Cl` album art filters
+## Changed behaviour: `%Cl` album art filters and rounded corners
 
 ```
-%Cl(x, y, maxwidth, maxheight [, xalign] [, yalign] [, filters])
+%Cl(x, y, maxwidth, maxheight [, xalign] [, yalign] [, filters] [, radius])
 ```
 
-A seventh argument filters the artwork before `%Cd` draws it. Leave it out and
-`%Cl` behaves exactly as it always has.
+A seventh argument filters the artwork before `%Cd` draws it, and an eighth
+rounds its corners. Leave them out and `%Cl` behaves exactly as it always has.
 
 `filters` is one or more names joined by `+`, each optionally carrying an amount
 written straight after the name. **No spaces anywhere in the chain.** An
@@ -365,12 +373,36 @@ Three things worth knowing before building a theme around it:
 There is also an `artwork filter:` theme setting that applies to the browser and
 carousel thumbnails. It takes the same names, minus `blur`.
 
----
+### Rounded corners
 
-## Changed behaviour: `%dr` opacity
+The eighth argument rounds the artwork's corners, in pixels, and smooths them:
 
 ```
-%dr(x, y, width, height [, start_colour] [, end_colour] [, opacity])
+%Cl(0,0,160,160,c,c,-,12)        # 12px corners, no filtering
+%Cl(0,0,160,160,c,c,darker20,16) # both
+```
+
+`0`, or leaving it out, gives the square corners artwork has always had. The
+radius is clamped to half the shorter side of the **box**, and refused above
+**32**. Arguments are positional, so reaching it without filtering means
+writing the filter chain as `-`.
+
+Three things follow from how it is drawn:
+
+- **The corners blend with whatever is beneath the artwork**, rather than
+  being knocked back to a colour. Put the art over a `%VB` backdrop and the
+  curve lands on the backdrop; put it over a panel and it lands on the panel.
+- **Only the corners cost anything.** The straight part of the picture is
+  still a plain blit, so a 16px radius blends 1024 pixels whatever size the
+  cover is.
+- **Artwork smaller than the box keeps square corners.** The radius is cut for
+  the box, and a cover too small to carry that curve falls back rather than
+  wearing one meant for something bigger.
+
+## Changed behaviour: `%dr` opacity and rounded corners
+
+```
+%dr(x, y, width, height [, start_colour] [, end_colour] [, opacity] [, radius])
 ```
 
 A seventh argument tints the rectangle instead of filling it: `opacity` runs
@@ -432,6 +464,38 @@ after the reveal.
   screen as well as writing it. In the backdrop layer that is once per repaint
   rather than once per frame, but a full-screen tint is still noticeable when
   the screen does repaint.
+
+### Rounded corners
+
+An eighth argument rounds the corners, in pixels, and smooths them:
+
+```
+%dr(0,0,-,-,182b4a,-,-,8)     # opaque panel, 8px corners
+%dr(0,0,-,-,000000,-,8,12)    # half-strength scrim, 12px corners
+```
+
+Radius `0`, or leaving it out, gives the square corners every `%dr` has always
+had. A radius larger than half the shorter side is reduced to fit, so a square
+box asking for half its own width comes out as a circle. Above **32** it is an
+error rather than a clamp — the mask grows as the square of the radius, and a
+64-pixel corner is larger than anything a 320x240 screen has room for.
+
+The corners are anti-aliased, blending with whatever is underneath, which is
+where the two useful facts about them come from:
+
+- **They cost about as much as a tint, but only over the corners.** The
+  straight three-quarters of the panel is still a plain fill. A 12px radius
+  blends 576 pixels however large the panel is.
+- **What is underneath has to be there already.** In the ordinary foreground
+  layer a rounded panel is drawn over whatever the viewport was cleared to; put
+  it in a `%VB` viewport and the smooth edge lands on the backdrop, which is
+  what makes it read as a panel floating over the artwork rather than a shape
+  cut out of a flat colour.
+
+**Gradients and a radius do not combine**, the same way gradients and opacity
+do not: give both an `end_colour` and a radius and the rectangle is filled with
+the start colour. A gradient corner would have to interpolate the row colour a
+second time and agree with the driver on every row.
 
 ---
 

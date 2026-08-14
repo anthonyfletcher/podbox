@@ -173,6 +173,19 @@ void ICODE_ATTR lcd_alpha_bitmap_part(const unsigned char *src, int src_x,
 {
     lcd_alpha_bitmap_part_mix(NULL, src, src_x, src_y, x, y, width, height, 0, stride);
 }
+
+/* Draw an image through an alpha mask, each plane carrying its own stride --
+ * which is the whole point, since lcd_bmp_part() derives both from one bitmap
+ * and so cannot take a mask of a different size. */
+void ICODE_ATTR lcd_alpha_bitmap_part_img(const fb_data *image,
+                                          const unsigned char *alpha,
+                                          int src_x, int src_y, int x, int y,
+                                          int width, int height,
+                                          int stride_image, int stride_alpha)
+{
+    lcd_alpha_bitmap_part_mix(image, alpha, src_x, src_y, x, y,
+                              width, height, stride_image, stride_alpha);
+}
 #endif /* !DISABLE_ALPHA_BITMAP */
 
 /* Draw a partial bitmap (mono or native) including alpha channel */

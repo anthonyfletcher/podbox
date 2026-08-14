@@ -111,6 +111,22 @@ struct screen
      * opaque), blended with what is already there. Only useful drawn into the
      * backdrop buffer -- see lcd_blendrect(). */
     void (*blendrect)(int x, int y, int width, int height, unsigned opacity);
+    /* Foreground fill through a coverage mask -- the blitter the anti-aliased
+     * font renderer draws glyphs with. `src` holds 4 bits per pixel, two to a
+     * byte with the first in the low nibble, 0 fully opaque to 15 fully
+     * transparent, and `stride` counts pixels rather than bytes. Blends with
+     * what is already in the viewport's buffer, so it wants DRMODE_FG. */
+    void (*alpha_bitmap_part)(const unsigned char *src, int src_x, int src_y,
+                              int stride, int x, int y, int width, int height);
+    /* The same, but painting an image instead of the foreground. The two
+     * planes carry their own strides, so one small mask serves any image;
+     * they share (src_x, src_y) though, which is why a caller wanting them at
+     * different offsets moves the image pointer rather than the coordinates. */
+    void (*alpha_bitmap_part_img)(const fb_data *image,
+                                  const unsigned char *alpha,
+                                  int src_x, int src_y, int x, int y,
+                                  int width, int height,
+                                  int stride_image, int stride_alpha);
     void (*gradient_fillrect)(int x, int y, int width, int height,
             unsigned start, unsigned end);
     void (*gradient_fillrect_part)(int x, int y, int width, int height,

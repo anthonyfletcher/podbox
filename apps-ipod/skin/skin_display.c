@@ -32,6 +32,7 @@
 #include "draw/scrollbar.h"
 #include "draw/screen_access.h"
 #include "draw/line.h"
+#include "draw/round_rect.h"
 #include "playlist/playlist.h"
 #include "audio.h"
 #include "database/tagcache.h"
@@ -769,11 +770,27 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
 
     if (!clear)
     {
-        /* Draw the bitmap */
-        gwps->display->bitmap_part(pixels, 0, 0,
-                                    STRIDE(gwps->display->screen_type,
-                                        src_w, src_h),
-                                   x, y, width, height);
+        int stride = STRIDE(gwps->display->screen_type, src_w, src_h);
+
+        if (aa->radius)
+        {
+            /* The corners blend with what is under them, so the art has to go
+             * down after whatever it sits on -- and DRMODE_FG is what makes
+             * the blend read the screen rather than the viewport's colours. */
+            const unsigned char *mask =
+                    SKINOFFSETTOPTR(get_skin_buffer(data), aa->mask);
+
+            gwps->display->set_drawmode(DRMODE_FG);
+            bitmap_part_round(gwps->display, pixels, stride,
+                              x, y, width, height, aa->radius, mask);
+            gwps->display->set_drawmode(DRMODE_SOLID);
+        }
+        else
+        {
+            /* Draw the bitmap */
+            gwps->display->bitmap_part(pixels, 0, 0, stride,
+                                       x, y, width, height);
+        }
     }
     else
     {

@@ -652,6 +652,21 @@ extern void lcd_scroll_step(int pixels);
 extern void lcd_bmp_part(const struct bitmap* bm, int src_x, int src_y,
                             int x, int y, int width, int height);
 extern void lcd_bmp(const struct bitmap* bm, int x, int y);
+#if defined(HAVE_LCD_COLOR) && !defined(DISABLE_ALPHA_BITMAP)
+/* Draw through a 4bpp alpha mask: the foreground colour, or an image. Alpha
+ * runs 0 (opaque) to 15 (transparent), two pixels to a byte with the first in
+ * the low nibble, and both strides count pixels. lcd_bmp_part() reaches the
+ * image form too, but takes both planes from one bitmap, so it cannot use a
+ * mask that is not the image's own size. */
+extern void lcd_alpha_bitmap_part(const unsigned char *src, int src_x,
+                                  int src_y, int stride, int x, int y,
+                                  int width, int height);
+extern void lcd_alpha_bitmap_part_img(const fb_data *image,
+                                      const unsigned char *alpha,
+                                      int src_x, int src_y, int x, int y,
+                                      int width, int height,
+                                      int stride_image, int stride_alpha);
+#endif
 extern void lcd_nine_segment_bmp(const struct bitmap* bm, int x, int y,
                                 int width, int height);
 

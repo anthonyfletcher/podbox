@@ -97,6 +97,7 @@ struct skin_draw_info {
      * it AFTER write_line(), the same way real images are drawn after the line
      * loop. NULL when the current line has no album art. */
     const struct bitmap *pending_aa;
+    const struct listitem *pending_aa_item;   /* the %La that asked for it */
 
     /* Same problem one step further out. A tinted %dr composites with whatever
      * is under it, and the album art and images are drawn once for the whole
@@ -130,6 +131,50 @@ get_child(OFFSETTYPE(struct skin_element**) children, int child)
 {
     OFFSETTYPE(struct skin_element*) *kids = SKINOFFSETTOPTR(skin_buffer, children);
     return SKINOFFSETTOPTR(skin_buffer, kids[child]);
+}
+
+/* The deferred list-row cover, rounded if its %La asked for that. By this
+ * point write_line() has drawn the row's background, so a rounded corner
+ * blends with the row rather than with whatever was there before it. Only a
+ * plain native bitmap can take the rounded path -- a mono or already-alpha'd
+ * one needs bmp_part()'s own dispatch. */
+static void draw_pending_aa(struct screen *display,
+                            const struct viewport *vp,
+                            const struct skin_draw_info *info)
+{
+    const struct bitmap *bmp = info->pending_aa;
+    const struct listitem *li = info->pending_aa_item;
+    int aw = MIN(bmp->width, vp->width);
+    int ah = MIN(bmp->height, vp->height);
+
+    if (li && li->radius && bmp->format == FORMAT_NATIVE && !bmp->alpha_offset)
+    {
+        display->set_drawmode(DRMODE_FG);
+        bitmap_part_round(display, (const fb_data *)bmp->data,
+                          LCD_FBSTRIDE(bmp->width, bmp->height),
+                          0, 0, aw, ah, li->radius,
+                          SKINOFFSETTOPTR(skin_buffer, li->mask));
+    }
+    else
+    {
+        display->set_drawmode(DRMODE_SOLID);
+        display->bmp_part(bmp, 0, 0, 0, 0, aw, ah);
+    }
+    display->set_drawmode(DRMODE_SOLID);
+}
+
+/* A %dr given a corner radius, drawn through the coverage mask cut for it when
+ * the skin was parsed. The corners blend with what is under them, which is
+ * what DRMODE_FG means here; the caller has already set the foreground. */
+static void draw_rounded_rect(struct screen *display,
+                              const struct draw_rectangle *rect)
+{
+    const unsigned char *mask = SKINOFFSETTOPTR(skin_buffer, rect->mask);
+
+    display->set_drawmode(DRMODE_FG);
+    fill_round_rect_aa(display, rect->x, rect->y, rect->width, rect->height,
+                       rect->radius, mask, rect->opacity);
+    display->set_drawmode(DRMODE_SOLID);
 }
 
 
@@ -408,7 +453,11 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 }
                 unsigned dr_start = dynamic_colors_resolve(rect->start_colour);
                 unsigned dr_end = dynamic_colors_resolve(rect->end_colour);
-                if (dr_start != dr_end &&
+                /* Rounding wins over a gradient, the way an opacity already
+                 * does: the corners blend one colour with what is under
+                 * them, and a per-row one would have to be interpolated
+                 * twice over and agree with the driver both times. */
+                if (dr_start != dr_end && !rect->radius &&
                     gwps->display->screen_type == SCREEN_MAIN)
                 {
                     gwps->display->gradient_fillrect(rect->x, rect->y, rect->width,
@@ -418,8 +467,11 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 {
                     unsigned backup = skin_vp->vp.fg_pattern;
                     skin_vp->vp.fg_pattern = dr_start;
-                    gwps->display->fillrect(rect->x, rect->y, rect->width,
-                        rect->height);
+                    if (rect->radius)
+                        draw_rounded_rect(gwps->display, rect);
+                    else
+                        gwps->display->fillrect(rect->x, rect->y, rect->width,
+                            rect->height);
                     skin_vp->vp.fg_pattern = backup;
                 }
             }
@@ -520,7 +572,10 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 /* Defer the blit to after write_line() (see pending_aa) so the
                  * line-background clear can't wipe the cover's top. */
                 if (bmp)
+                {
                     info->pending_aa = bmp;
+                    info->pending_aa_item = li;
+                }
             }
             break;
         }
@@ -1040,6 +1095,7 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         info.line_scrolls = false;
         info.force_redraw = false;
         info.pending_aa = NULL;
+        info.pending_aa_item = NULL;
         skin_viewport->fgbg_changed = false;
         if (info.line_desc.style&STYLE_GRADIENT)
         {
@@ -1083,12 +1139,7 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         /* Blit deferred list album art now, after write_line()'s background
          * clear, so the cover's top row isn't wiped (see pending_aa). */
         if (info.pending_aa)
-        {
-            int aw = MIN(info.pending_aa->width, skin_viewport->vp.width);
-            int ah = MIN(info.pending_aa->height, skin_viewport->vp.height);
-            display->set_drawmode(DRMODE_SOLID);
-            display->bmp_part(info.pending_aa, 0, 0, 0, 0, aw, ah);
-        }
+            draw_pending_aa(display, &skin_viewport->vp, &info);
         if (!info.no_line_break)
             info.line_number++;
         line = SKINOFFSETTOPTR(skin_buffer, line->next);
@@ -1104,8 +1155,11 @@ void skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
         /* Start colour only. A tinted gradient would need a per-row blend and
          * nothing wants one yet. */
         skin_viewport->vp.fg_pattern = dynamic_colors_resolve(rect->start_colour);
-        display->blendrect(rect->x, rect->y, rect->width, rect->height,
-                           rect->opacity);
+        if (rect->radius)
+            draw_rounded_rect(display, rect);
+        else
+            display->blendrect(rect->x, rect->y, rect->width, rect->height,
+                               rect->opacity);
         skin_viewport->vp.fg_pattern = backup;
     }
 }
@@ -1304,6 +1358,7 @@ void skin_render_playlistviewer(struct playlistviewer* viewer,
         info.line_scrolls = false;
         info.force_redraw = false;
         info.pending_aa = NULL;
+        info.pending_aa_item = NULL;
 
         info.cur_align_start = info.buf;
         align->left = info.buf;
@@ -1332,12 +1387,7 @@ void skin_render_playlistviewer(struct playlistviewer* viewer,
                     info.line_scrolls, &info.line_desc);
         }
         if (info.pending_aa)
-        {
-            int aw = MIN(info.pending_aa->width, skin_viewport->vp.width);
-            int ah = MIN(info.pending_aa->height, skin_viewport->vp.height);
-            display->set_drawmode(DRMODE_SOLID);
-            display->bmp_part(info.pending_aa, 0, 0, 0, 0, aw, ah);
-        }
+            draw_pending_aa(display, &skin_viewport->vp, &info);
         info.line_number++;
         info.offset++;
         start_item++;
