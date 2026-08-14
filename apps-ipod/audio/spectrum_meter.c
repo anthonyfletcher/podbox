@@ -122,6 +122,25 @@ static int scale_to_level(int raw)
     return level;
 }
 
+/* Move one band toward `level`: instant attack, exponential release. */
+static void approach_level(int band, int level)
+{
+    if (level > spectrum_level[band])
+        spectrum_level[band] = level; /* instant attack */
+    else if (spectrum_level[band] > level)
+    {
+        /* >> SPECTRUM_RELEASE_SHIFT truncates to 0 once the remaining
+         * gap drops below 8, which would otherwise freeze the level a
+         * few points short of the true (quieter) target forever.
+         * Guarantee at least 1 unit of decay per update so it always
+         * reaches the target. */
+        int decay = (spectrum_level[band] - level) >> SPECTRUM_RELEASE_SHIFT;
+        if (decay < 1)
+            decay = 1;
+        spectrum_level[band] -= decay;
+    }
+}
+
 void spectrum_meter_peek(void)
 {
     int count;
@@ -131,7 +150,17 @@ void spectrum_meter_peek(void)
     int band, i;
 
     if (!pcm || count < SPECTRUM_BLOCK_SIZE || samplerate <= 0)
-        return; /* not enough fresh data right now; keep last levels */
+    {
+        /* No audio to analyse: paused, stopped, or a tick with too little
+         * fresh data. Fall toward silence at the release rate rather than
+         * holding the last frame -- otherwise the bars stop dead at whatever
+         * height the final block left them, and stay there. Playback resuming
+         * is caught on the next tick by the instant attack, so a lull that
+         * turns out to be momentary costs a unit or two of height. */
+        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+            approach_level(band, 0);
+        return;
+    }
 
     for (i = 0; i < SPECTRUM_BLOCK_SIZE; i++)
         mono[i] = (int16_t)(((int)pcm[2 * i] + (int)pcm[2 * i + 1]) >> 1);
@@ -140,22 +169,8 @@ void spectrum_meter_peek(void)
     {
         int raw = goertzel_magnitude(mono, SPECTRUM_BLOCK_SIZE,
                                      band_freq_hz[band], samplerate);
-        int level = scale_to_level(raw);
 
-        if (level > spectrum_level[band])
-            spectrum_level[band] = level; /* instant attack */
-        else if (spectrum_level[band] > level)
-        {
-            /* >> SPECTRUM_RELEASE_SHIFT truncates to 0 once the remaining
-             * gap drops below 8, which would otherwise freeze the level a
-             * few points short of the true (quieter) target forever.
-             * Guarantee at least 1 unit of decay per update so it always
-             * reaches the target. */
-            int decay = (spectrum_level[band] - level) >> SPECTRUM_RELEASE_SHIFT;
-            if (decay < 1)
-                decay = 1;
-            spectrum_level[band] -= decay;
-        }
+        approach_level(band, scale_to_level(raw));
     }
 }
 
