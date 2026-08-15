@@ -119,7 +119,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh && ../bundle-help.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -136,10 +136,17 @@ make clean / make veryclean
 **Theme bundling — `make zip` is not enough.** `tools/buildzip.pl` is kept as
 close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Themify_2, no first-boot `config.cfg`, no
-EQ presets and upstream's licence file rather than this fork's**. Follow it with
-all three bundle scripts -- `../bundle-theme.sh`, `../bundle-eqs.sh`,
-`../bundle-licenses.sh`. `./build-hw.sh` and `./build-sim.sh` both run all
-three; a bare `make zip` runs none.
+EQ presets, no setting explanations and upstream's licence file rather than this
+fork's**. Follow it with all four bundle scripts -- `../bundle-theme.sh`,
+`../bundle-eqs.sh`, `../bundle-licenses.sh`, `../bundle-help.sh`.
+`./build-hw.sh` and `./build-sim.sh` both run all four; a bare `make zip` runs
+none.
+
+`bundle-help.sh` is the one whose absence is silent: it ships
+`docs/podbox/settings-help.txt` as `.rockbox/docs/settings-help.txt`, and
+without it every **Explain** entry in a setting's context menu finds no file and
+shows nothing. Nothing else misbehaves, so a zip built by hand without it looks
+finished.
 
 `bundle-theme.sh` also deletes the `classic_statusbar` theme, which
 `buildzip.pl` copies straight out of `wps/` without consulting `WPSLIST`. It

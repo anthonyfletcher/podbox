@@ -300,7 +300,15 @@ done
 # ----------------------------------------------------------------- verify ---
 # A themeless zip installs happily and leaves the player looking broken, so the
 # zip is checked rather than trusted -- `make zip` alone produces one, and only
-# bundle-theme.sh / bundle-eqs.sh put the theme and presets in.
+# the bundle-*.sh scripts put the theme, the presets and the setting
+# explanations in.
+#
+# Each entry is a file only a bundle script puts there, so a script that
+# silently did nothing is caught. settings-help.txt earns its place the most:
+# without it the Explain entry in every setting's context menu simply shows
+# nothing, and nothing else looks wrong, so it is the one omission a glance at
+# the player would not find. (bundle-licenses.sh has no entry -- it rewrites a
+# file buildzip.pl already ships, so its presence proves nothing.)
 
 say "Checking the zips"
 for target in $TARGETS; do
@@ -309,6 +317,7 @@ for target in $TARGETS; do
         set -e
         [ -f '$zip' ] || { echo 'missing: $zip' >&2; exit 1; }
         for want in .rockbox/themes/Themify_2.cfg .rockbox/eqs/Default.cfg \
+                    .rockbox/docs/settings-help.txt \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
