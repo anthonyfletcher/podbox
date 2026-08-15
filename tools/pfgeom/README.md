@@ -1,18 +1,27 @@
-# pfgeom — checking the carousel's occlusion cull
+# pfgeom — checking what the carousel does and does not draw
 
-The album-covers carousel does not draw the parts of a cover that a nearer one
+The album-covers carousel makes two claims about its own geometry, and both are
+the sort whose failure shows up as a stripe of stale framebuffer that nothing
+later repaints — on one album shape, at one point in one scroll, on hardware.
+`pfgeom` decides them on the host instead. It mirrors the carousel's projection,
+cull and draw order and renders frames across the whole settings space.
+
+**The cull.** The carousel does not draw the parts of a cover that a nearer one
 already hides (`cull_side()` and `slide_covers()` in
-`apps-ipod/screens/covers/carousel.c`). That is worth about a quarter of the
-pixels in a scrolling frame, and the cost of getting it wrong is a stripe of
-stale framebuffer that nothing later repaints — on one album shape, at one
-point in one scroll, on hardware.
+`apps-ipod/screens/covers/carousel.c`), which is worth about a quarter of the
+pixels in a scrolling frame. `pfgeom` renders each frame twice — once with the
+cull and once without — and compares **which slide finished on top of every
+pixel**. That is the exact test: the topmost writer is what picks the colour, so
+if the two renders agree everywhere then the cull removed only pixels that were
+going to be painted over anyway.
 
-`pfgeom` decides the question on the host instead. It mirrors the carousel's
-projection, cull and draw order, renders each frame twice — once with the cull
-and once without — and compares **which slide finished on top of every pixel**.
-That is the exact test: the topmost writer is what picks the colour, so if the
-two renders agree everywhere then the cull removed only pixels that were going
-to be painted over anyway.
+**The clear and the flush.** Neither covers the whole viewport any more; both
+are sized to the rows the covers can reach, worked out up front by
+`slide_rows()`. `pfgeom` checks that band against the rows a render really
+wrote. It found the first version of that bound one row short — `dy` dips just
+under `PFREAL_ONE` at the outer edge of a cover as wide as `DISPLAY_WIDTH`, and
+the lower loop's ceiling turns any shortfall into a whole extra row. Hence
+`PF_ROW_MARGIN`.
 
 It sweeps the settings that move the geometry (centre margin, slide tuck,
 parallel slides), the two things that resize the viewport (status bar height and

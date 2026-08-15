@@ -2209,16 +2209,10 @@ static inline pix_t fade_color(pix_t c, unsigned int fa, unsigned int frb,
  * then be incremented by (z + zo) and sin(r) respectively.
  */
 
-/* Clear only the PictureFlow viewport area (not the status bar).
- * Uses screen->clear_viewport() which fills with bg_pattern,
- * unlike lcd_fillrect(DRMODE_SOLID) which fills with fg_pattern. */
-static void pf_clear_display(void)
-{
-    screens[SCREEN_MAIN].clear_viewport();
-}
-
-/* The same, for `h` rows starting `y` rows down the viewport. Used to wipe the
- * caption on its own, when that is all that has moved.
+/* Clear `h` rows starting `y` rows down this screen's viewport -- never the
+ * status bar, which belongs to the theme. Uses screen->clear_viewport(), which
+ * fills with bg_pattern, unlike lcd_fillrect(DRMODE_SOLID) which fills with
+ * fg_pattern.
  *
  * The viewport is static because lcd_set_viewport() keeps the pointer rather
  * than a copy, so one on the stack would be dangling by the time anything drew
@@ -2237,6 +2231,61 @@ static void pf_clear_band(int y, int h)
     saved = lcd_set_viewport(&band_vp);
     screens[SCREEN_MAIN].clear_viewport();
     lcd_set_viewport(saved);
+}
+
+/* Where a bitmap `sh` rows tall sits in the drawable area. Shared, because two
+ * separate things need the same answer and must not drift: the render, to know
+ * where to start, and the frame logic, to know which rows a cover can reach.
+ *
+ * Clamped, because the lower loop reads its source row unsigned: a start below
+ * row 0 would wrap to a huge index and read far outside the bitmap rather than
+ * clipping. The upper loop needs no clamp; a negative start simply fails its
+ * first test. */
+static int slide_voff(int sh, PFreal cy)
+{
+    int voff = ((pf_half_height + pf_lower_half) - sh) / 2;
+
+    if (cy > 0)             /* the flat view's pile offset; zero in 3D */
+        voff += cy >> PFREAL_SHIFT;
+    if (voff > pf_half_height)
+        voff = pf_half_height;
+    return voff;
+}
+
+/* The rows a slide can write to, measured from the top of the viewport. Empty
+ * if the slide has no bitmap.
+ *
+ * Both of render_slide_clipped()'s loops start at the middle row and step by
+ * dy, so a slide is at its tallest where dy is at its least -- face-on, at
+ * dy == PFREAL_ONE, occupying exactly its own sh rows from slide_voff(). That
+ * bound holds whatever the tilt, which is why this can be had up front rather
+ * than counted as the columns are walked.
+ *
+ * Except that dy dips a whisker below PFREAL_ONE at the outer edge of a slide
+ * as wide as DISPLAY_WIDTH: zo is worked out from DISPLAY_WIDTH - 1 while the
+ * xs term reaches DISPLAY_WIDTH, so the two cancel one PFREAL_HALF short and
+ * dy bottoms out at 1021/1024. The lower loop takes a ceiling, so any shortfall
+ * at all buys a whole extra row -- one, since 160 rows of cover at 3/1024 over
+ * is half a row. PF_ROW_MARGIN covers it with a row to spare; tools/pfgeom
+ * checks the bound against the rows a render really wrote. */
+#define PF_ROW_MARGIN 2
+
+static void slide_rows(struct slide_data *slide, int *y0, int *y1)
+{
+    struct dim *bmp = surface(slide);
+    int voff, sh;
+
+    if (!bmp)
+    {
+        *y0 = pf_height;
+        *y1 = 0;
+        return;
+    }
+    sh = bmp->height;
+    voff = slide_voff(sh, slide->cy);
+    *y0 = MAX(0, voff - PF_ROW_MARGIN) + pf_draw_y_shift;
+    *y1 = MIN(pf_half_height + pf_lower_half, voff + sh + PF_ROW_MARGIN)
+        + pf_draw_y_shift;
 }
 
 /* The screen columns a slide would occupy, [*x0, *x1), clipped to the display.
@@ -2359,30 +2408,9 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
      * reads its source row unsigned: a start below row 0 would wrap to a huge
      * index and read far outside the bitmap rather than clipping. The upper
      * loop needs no clamp; a negative start simply fails its first test. */
-    int voff = ((half_height + lower_half) - sh) / 2;
-    if (slide->cy > 0)
-        voff += slide->cy >> PFREAL_SHIFT;
-    if (voff > half_height)
-        voff = half_height;
-    const int vertical_offset = voff;
+    const int vertical_offset = slide_voff(sh, slide->cy);
     const int p_start_upper = (half_height - 1 - vertical_offset) * PFREAL_ONE;
     const int p_start_lower = (half_height - vertical_offset) * PFREAL_ONE;
-
-    /* The rows this slide can reach, for the partial-frame test in
-     * album_covers_loop(). Both loops start at the middle row and step by dy,
-     * and dy is never less than PFREAL_ONE, so the slide is at its tallest when
-     * it is drawn face-on and occupies exactly its own sh rows from
-     * vertical_offset -- clipped to the drawable area. That is an upper bound
-     * whatever the tilt, so it can be had here rather than counted per column. */
-    {
-        int y0 = MAX(0, vertical_offset);
-        int y1 = MIN(half_height + lower_half, vertical_offset + sh);
-
-        if (y0 + pf_draw_y_shift < pf_slides_y0)
-            pf_slides_y0 = y0 + pf_draw_y_shift;
-        if (y1 + pf_draw_y_shift > pf_slides_y1)
-            pf_slides_y1 = y1 + pf_draw_y_shift;
-    }
     /* Once per slide, not once per pixel -- see struct pf_fade. */
     /* Not named `fade`: that is the module-level animation ramp this function
      * has no business shadowing. */
@@ -2948,20 +2976,49 @@ static void coverflow_render(void)
         render_slide(&left_slides[0], 256);
 }
 
-static void render_all_slides(void)
+/* The rows the covers will disturb this frame: the ones they can reach now,
+ * and the ones the last frame left behind and this clear has to wipe.
+ * pf_slides_y0/y1 is left holding just the former, which is what the caption
+ * has to keep clear of.
+ *
+ * Taken over every slide rather than the ones about to be drawn: which those
+ * are depends on the alpha ramp, the answer is the same whenever the covers are
+ * all one size, and over-reporting only costs a few rows of clear and flush. */
+static void cover_rows(int *y0, int *y1)
+{
+    int lo, hi, a, b, i;
+
+    slide_rows(&center_slide, &lo, &hi);
+
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
+    {
+        slide_rows(&left_slides[i], &a, &b);
+        lo = MIN(lo, a);
+        hi = MAX(hi, b);
+        slide_rows(&right_slides[i], &a, &b);
+        lo = MIN(lo, a);
+        hi = MAX(hi, b);
+    }
+
+    *y0 = MIN(lo, pf_slides_y0);
+    *y1 = MAX(hi, pf_slides_y1);
+    pf_slides_y0 = lo;
+    pf_slides_y1 = hi;
+}
+
+/* Clears `h` rows from `y` down the viewport and draws the covers into them.
+ * The caller works out the band -- it also has to flush it, and on the frames
+ * that carry a caption as well the two are decided together. */
+static void render_all_slides(int y, int h)
 {
 #if PF_SHOW_STATS
     unsigned long t0, y0;
 #endif
     lcd_set_background(pf_bg_color);
-    /* Reset before the slides run, not after: each one folds the rows it can
-     * reach into this, and the answer describes the frame about to be drawn. */
-    pf_slides_y0 = pf_height;
-    pf_slides_y1 = 0;
 #if PF_SHOW_STATS
     t0 = USEC_TIMER;
 #endif
-    pf_clear_display();
+    pf_clear_band(y, h);
 #if PF_SHOW_STATS
     pf_clear_us = USEC_TIMER - t0;
     pf_px = 0;
@@ -3666,6 +3723,12 @@ static int album_covers_loop(void)
     bool art_owed = true;
     bool caption_owed = true;
     bool full_flush_owed = false;
+    /* The viewport as a whole has changed and every row of it has to be cleared
+     * and sent, not just the rows the two halves above account for. True for
+     * the first frame, for anything that drew over the screen and did not say
+     * so, and for a change of background colour. */
+    bool full_repaint_owed = true;
+    pix_t last_bg = pf_bg_color;
     /* Far enough back that the first frame is due immediately. */
     long last_frame_tick = current_tick - PF_FRAME_TICKS;
     unsigned int seen_slides_loaded = pf_slides_loaded;
@@ -3764,7 +3827,11 @@ static int album_covers_loop(void)
                 if (dirty[i].y < pf_vp_y + pf_height
                     && dirty[i].y + dirty[i].h > pf_vp_y)
                 {
+                    /* It could have painted anywhere in the viewport, not just
+                     * over the covers, so the whole of it has to be laid down
+                     * again rather than the rows the covers account for. */
                     art_owed = true;
+                    full_repaint_owed = true;
                     full_flush_owed = true;
                 }
                 else
@@ -3788,9 +3855,14 @@ static int album_covers_loop(void)
         }
 
         /* The caption is drawn in the resolved foreground colour, so a fade
-         * moves it as much as it moves the covers. */
+         * moves it as much as it moves the covers -- and the two colours do not
+         * have to move together, so the caption cannot wait for a background
+         * change to notice. */
         if (dynamic_colors_needs_repaint())
+        {
             art_owed = true;
+            caption_owed = true;
+        }
 
         /* Repainting the caption on its own means wiping its rows first, and
          * that is only safe where no cover reached into them. Whether one did
@@ -3803,17 +3875,12 @@ static int album_covers_loop(void)
                     && pf_text_y + pf_text_h > pf_slides_y0)))
             art_owed = true;
 
-        /* Redrawing the covers wipes the whole viewport, caption included. */
-        if (art_owed)
-            caption_owed = true;
-
         /* Draw only what would come out different, and no more often than
-         * PF_MAX_FPS. A frame with the covers in it is a full viewport clear, a
-         * re-render of every slide and a flush of the screen, which is far and
-         * away the most expensive thing this loop does -- and idle frames used
-         * to pay all of it to arrive at pixels identical to the ones already
-         * there. Playback was what paid for them, since the wait above
-         * deliberately keeps its normal rate while a track is running.
+         * PF_MAX_FPS. Re-rendering the covers is far and away the most
+         * expensive thing this loop does -- and idle frames used to pay all of
+         * it to arrive at pixels identical to the ones already there. Playback
+         * was what paid for them, since the wait above deliberately keeps its
+         * normal rate while a track is running.
          *
          * Timed from the start of the frame, so the cap is a rate and not a
          * gap: a frame that overruns its own interval simply makes the next one
@@ -3822,6 +3889,12 @@ static int album_covers_loop(void)
             && current_tick - last_frame_tick >= PF_FRAME_TICKS)
         {
             bool drew_art = art_owed;
+            bool drew_caption = caption_owed;
+            /* The rows each half touches, and so the rows it has to clear
+             * before it draws and send afterwards. Nothing else in the viewport
+             * has changed since it was last flushed. */
+            int art_y = 0, art_h = 0;
+            bool joined;
 
             art_owed = false;
             caption_owed = false;
@@ -3829,6 +3902,9 @@ static int album_covers_loop(void)
 #if PF_SHOW_STATS
             unsigned long t_start = USEC_TIMER, t_flush;
             pf_yield_us = 0;
+            /* The overlay sits over the covers rather than in them, so it needs
+             * the whole viewport in play to have anywhere to go. */
+            full_repaint_owed = true;
 #endif
 
             /* SBS rendering in get_custom_action resets the viewport to
@@ -3842,28 +3918,67 @@ static int album_covers_loop(void)
             lcd_set_drawmode(DRMODE_FG);
 
             pf_update_dynamic_colors();
+            /* A fade repaints the ground itself, so every row of the viewport
+             * comes out different whether anything was drawn on it or not. */
+            if (pf_bg_color != last_bg)
+            {
+                last_bg = pf_bg_color;
+                full_repaint_owed = true;
+            }
 
             if (drew_art)
             {
+                int was = center_index;
+
                 if (pf_state == pf_scrolling)
                     update_scroll_animation();
-                render_all_slides();
+                /* The covers no longer wipe the caption on their way past, so
+                 * the crossing that hands the middle to the next album is what
+                 * says the caption is out of date. */
+                if (center_index != was)
+                    drew_caption = true;
+                cover_rows(&art_y, &art_h);
+                art_h -= art_y;
+                if (art_h <= 0)     /* no slide has a bitmap yet: nothing to
+                                     * clear, draw or send */
+                    drew_art = false;
             }
-            else
+
+            /* Whether the covers and the caption have to be handled as one
+             * region. They normally do not touch -- the caption is placed below
+             * the covers, or above them -- but how far down a cover reaches is
+             * a property of the album, so where they do meet the clear has to
+             * take both at once, or the second would wipe the first. */
+            joined = full_repaint_owed
+                  || (drew_art && pf_text_h > 0
+                      && pf_text_y < art_y + art_h
+                      && pf_text_y + pf_text_h > art_y);
+
+            if (joined)
             {
-                /* Only the caption moved. Its rows were not drawn into by the
-                 * covers -- checked above -- so wiping them disturbs nothing
-                 * else, and the background is the same colour the full clear
-                 * would have used. */
-                lcd_set_background(pf_bg_color);
-                pf_clear_band(pf_text_y, pf_text_h);
+                art_y = 0;
+                art_h = pf_height;
+                drew_art = true;
+                drew_caption = (pf_text_h > 0);
             }
-            model->draw_text();
-#if PF_SHOW_STATS
-            /* Sits over the covers, so it only has anywhere to go on a frame
-             * that cleared them. */
+
             if (drew_art)
-                pf_stats_draw();
+                render_all_slides(art_y, art_h);
+            if (drew_caption)
+            {
+                /* Wiping the caption's own rows disturbs nothing else: either
+                 * the covers stayed clear of them, or `joined` above has
+                 * already cleared the pair together and this is a no-op over
+                 * background the slides did not reach. */
+                if (!joined)
+                {
+                    lcd_set_background(pf_bg_color);
+                    pf_clear_band(pf_text_y, pf_text_h);
+                }
+                model->draw_text();
+            }
+#if PF_SHOW_STATS
+            pf_stats_draw();
             t_flush = USEC_TIMER;
 #endif
 
@@ -3877,10 +3992,15 @@ static int album_covers_loop(void)
                 lcd_update();
                 full_flush_owed = false;
             }
-            else if (drew_art)
-                lcd_update_rect(0, pf_vp_y, LCD_WIDTH, pf_height);
             else
-                lcd_update_rect(0, pf_vp_y + pf_text_y, LCD_WIDTH, pf_text_h);
+            {
+                if (drew_art)
+                    lcd_update_rect(0, pf_vp_y + art_y, LCD_WIDTH, art_h);
+                if (drew_caption && !joined)
+                    lcd_update_rect(0, pf_vp_y + pf_text_y,
+                                    LCD_WIDTH, pf_text_h);
+            }
+            full_repaint_owed = false;
 #if PF_SHOW_STATS
             pf_stats_frame((t_flush - t_start) - pf_yield_us, pf_yield_us,
                            USEC_TIMER - t_flush);
@@ -3891,7 +4011,16 @@ static int album_covers_loop(void)
         /* Whatever the button below is about to change, the frame showing it
          * has not been drawn yet -- this one went out before the switch. */
         if (button != ACTION_NONE)
+        {
             art_owed = true;
+            /* Only the wheel is on the hot path. Everything else can put
+             * something over the whole screen on its way -- the in-screen menu,
+             * a splash, the USB screen -- and none of them leave a note, so the
+             * next frame repaints the lot rather than the covers' own rows. */
+            if (button != PF_NEXT && button != PF_NEXT_REPEAT
+                && button != PF_PREV && button != PF_PREV_REPEAT)
+                full_repaint_owed = true;
+        }
 
         switch (button) {
         case PF_QUIT:

@@ -49,6 +49,7 @@ typedef int32_t PFreal;
 
 #define PF_CULL_MARGIN 1
 #define PF_CULL_MIRROR(v) (LCD_WIDTH - 1 - (v))
+#define PF_ROW_MARGIN 2
 
 /* the settings the geometry reads */
 static int set_center_margin = 0;       /* album covers center margin, 0..80 */
@@ -376,6 +377,50 @@ static void cull_side(struct slide_data *side, const int *alpha,
     }
 }
 
+static int slide_voff(int sh, PFreal cy)
+{
+    int voff = ((pf_half_height + pf_lower_half) - sh) / 2;
+
+    if (cy > 0)
+        voff += cy >> PFREAL_SHIFT;
+    if (voff > pf_half_height)
+        voff = pf_half_height;
+    return voff;
+}
+
+static void slide_rows(struct slide_data *slide, int *y0, int *y1)
+{
+    struct dim *bmp = surface(slide);
+    int voff, sh;
+
+    if (!bmp)
+    {
+        *y0 = pf_half_height + pf_lower_half;
+        *y1 = 0;
+        return;
+    }
+    sh = bmp->height;
+    voff = slide_voff(sh, slide->cy);
+    *y0 = MAX(0, voff - PF_ROW_MARGIN);
+    *y1 = MIN(pf_half_height + pf_lower_half, voff + sh + PF_ROW_MARGIN);
+}
+
+/* carousel.c's cover_rows() without the union against the previous frame --
+ * what the clear and the flush are sized from. */
+static void cover_rows(int *y0, int *y1)
+{
+    int lo, hi, a, b, i;
+
+    slide_rows(&center_slide, &lo, &hi);
+    for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++) {
+        slide_rows(&left_slides[i], &a, &b);
+        lo = MIN(lo, a); hi = MAX(hi, b);
+        slide_rows(&right_slides[i], &a, &b);
+        lo = MIN(lo, a); hi = MAX(hi, b);
+    }
+    *y0 = lo; *y1 = hi;
+}
+
 /* ======================= END CAROUSEL MIRROR =========================== */
 
 /* Stands in for the framebuffer: which slide wrote each pixel last. Two renders
@@ -556,6 +601,45 @@ static void pose(int dir, int tick)
     }
 }
 
+/* Rows the frame in fb_top actually wrote to. */
+static void written_rows(int *y0, int *y1)
+{
+    int y, x, lo = -1, hi = -1;
+
+    for (y = 0; y < FBH; y++)
+        for (x = 0; x < LCD_WIDTH; x++)
+            if (fb_top[y*LCD_WIDTH + x]) {
+                if (lo < 0) lo = y;
+                hi = y + 1;
+                break;
+            }
+    *y0 = (lo < 0) ? 0 : lo;
+    *y1 = (hi < 0) ? 0 : hi;
+}
+
+/* Rows the clear and the flush are sized from must contain every row the render
+ * wrote, or a cover comes out with a band of it missing. */
+static long long rows_short;
+static int rows_over_max;
+static long long rows_band, rows_view, rows_frames;
+
+static void check_rows(void)
+{
+    int by0, by1, wy0, wy1;
+
+    cover_rows(&by0, &by1);
+    written_rows(&wy0, &wy1);
+
+    if (wy1 > wy0 && (wy0 < by0 || wy1 > by1)) {
+        int over = MAX(by0 - wy0, wy1 - by1);
+        rows_short++;
+        if (over > rows_over_max) rows_over_max = over;
+    }
+    rows_band += (by1 > by0) ? by1 - by0 : 0;
+    rows_view += pf_half_height + pf_lower_half;
+    rows_frames++;
+}
+
 /* One frame, both ways round. Returns pixels the cull saved; *bad gets the
  * count of pixels the two renders disagree on, which must be zero. */
 static long check_frame(int dir, int tick, long *plain, long long *bad)
@@ -571,6 +655,7 @@ static long check_frame(int dir, int tick, long *plain, long long *bad)
     pose(dir, tick);
     memset(fb_top, 0, sizeof fb_top);
     culled = render_frame(1);
+    check_rows();
 
     for (i = 0; i < LCD_WIDTH * FBH; i++)
         if (fb_ref[i] != fb_top[i]) (*bad)++;
@@ -658,5 +743,15 @@ int main(int argc, char **argv)
     printf("culled    %lld pixels/frame  (%lld%% less)\n",
            (plain_total - saved) / frames, saved * 100 / plain_total);
     printf("stale pixels: %lld%s\n", bad, bad ? "  *** FAILED ***" : "  (pass)");
-    return bad ? 1 : 0;
+
+    /* The clear and the flush are sized from cover_rows() rather than the whole
+     * viewport, so that band has to contain everything the render wrote. */
+    printf("\ncover band  %lld%% of the drawable height "
+           "(what the clear and flush cost instead of all of it)\n",
+           rows_band * 100 / rows_view);
+    printf("frames written outside the band: %lld, worst overshoot %d rows%s\n",
+           rows_short, rows_over_max,
+           rows_short ? "  *** FAILED ***" : "  (pass)");
+
+    return (bad || rows_short) ? 1 : 0;
 }
