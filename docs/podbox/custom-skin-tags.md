@@ -359,9 +359,17 @@ than quietly drawing nothing.
 | `hue` | 0…359 | required | Rotate hue, in degrees |
 | `dither` | — | — | Ordered 8×8 Bayer |
 | `pixellate` | 2…64 | `8` | Block average, block edge in pixels |
-| `blur` | 1…64 | `4` | Radius in output pixels |
+| `blur` | 1…16 | `4` | Softness, but see below |
 
-Eight filters per chain.
+Eight filters per chain. An amount outside its range is a parse error, so the
+skin fails to load rather than drawing something you did not ask for.
+
+**`blur`'s amount is not a pixel count.** A blurring `%Cl` shrinks the cover
+before it works on it, and the amount is the blur window on that shrunken copy —
+so what you see is the amount multiplied by however far it was shrunk, which
+depends on the size of the box. Treat it as a dial rather than a measurement:
+`blur8` is twice as soft as `blur4` in any box, and the same amount reads softer
+in a large box than a small one.
 
 **`darker` with no amount adapts to the artwork**, targeting a fixed mean
 brightness rather than removing a fixed amount. That matters more than it
