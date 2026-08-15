@@ -242,6 +242,27 @@ arrangement, including the row height that has to accompany it.
 %La(0, -, 6)        # the same, with 6px rounded corners
 ```
 
+**There is no filter chain here, unlike `%Cl`, and there should not be.** Row
+covers come from the shared thumbnail cache, where one bitmap serves every row
+on screen and the screens after it; a filter rewrites pixels in place, so
+filtering one row's cover would filter all of them. To treat a row's cover
+differently, blend over it instead — a tinted `%dr` in the same viewport,
+written after the `%La`:
+
+```
+%Vl(PlainRows,0,1,44,44,-)
+%?La<%La%?Lc<|%dr(0,0,44,44,000000,-,6)>|>
+```
+
+That dims every cover except the selected row's, which is the cover equivalent
+of the usual `%?Lc<…>` text colour swap. The opacity is doing the work, not
+just setting the depth: a *tinted* `%dr` is held back until after the artwork
+has been drawn, while an opaque one draws where you wrote it and the cover
+lands on top. Keep it in the artwork's own viewport, and give it an explicit
+colour — `-` on a tinted `%dr` takes the *theme* foreground. If the cover is
+rounded, give the `%dr` the same radius or the tint squares the corners off
+again.
+
 
 ### `%lb` — background index building
 
@@ -303,14 +324,15 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 
 ---
 
-## Changed behaviour: `%Cl` album art filters and rounded corners
+## Changed behaviour: `%Cl` album art filters, rounded corners and names
 
 ```
-%Cl(x, y, maxwidth, maxheight [, xalign] [, yalign] [, filters] [, radius])
+%Cl(x, y, maxwidth, maxheight [, xalign] [, yalign] [, filters] [, radius] [, label])
 ```
 
-A seventh argument filters the artwork before `%Cd` draws it, and an eighth
-rounds its corners. Leave them out and `%Cl` behaves exactly as it always has.
+A seventh argument filters the artwork before `%Cd` draws it, an eighth rounds
+its corners, and a ninth names it so a `%Cd` can say which artwork it means.
+Leave them out and `%Cl` behaves exactly as it always has.
 
 `filters` is one or more names joined by `+`, each optionally carrying an amount
 written straight after the name. **No spaces anywhere in the chain.** An
@@ -364,8 +386,9 @@ Three things worth knowing before building a theme around it:
 - **The work happens once per track**, not per frame, so a blurred backdrop is
   free to draw. It runs when the art changes and is cached until it changes
   again.
-- **One `%Cl` per skin.** A blurred backdrop *and* a crisp cover in front of it
-  is the obvious thing to want and it does not work yet.
+- **Several `%Cl` per skin are fine**, and a blurred backdrop with a crisp
+  cover in front of it is what they are for. What costs memory is the artwork
+  **size**, not the tag — see the next section.
 - **Dynamic colours read the unfiltered art**, deliberately — the palette
   describes the album, not your treatment of it. `bw` would otherwise turn every
   derived colour grey.
@@ -399,6 +422,70 @@ Three things follow from how it is drawn:
   the box, and a cover too small to carry that curve falls back rather than
   wearing one meant for something bigger.
 
+### Naming artwork, and what more than one costs
+
+```
+%Cl(80,0,240,240,c,c,blur8,-,blurred)   # named 'blurred'
+%Cl(80,0,240,240,c,c,-,-,cover)         # named 'cover'
+...
+%Cd(blurred)
+%Cd(cover)
+```
+
+The ninth argument names an artwork; `%Cd(name)` draws that one. A bare `%Cd`
+draws the nearest `%Cl` **above it**, so `%Cl(a)%Cd%Cl(b)%Cd` draws a then b
+and a skin with a single `%Cl` behaves exactly as it always has. Names are
+unique within a file, and a `%Cl` has to come before the `%Cd` that uses it.
+Arguments are positional, so reaching the name means writing the filter chain
+and radius as `-`.
+
+**What costs memory is the artwork size, not the tag.** The player buffers a
+cover at each size a skin asks for, for every track it has buffered ahead —
+that is why there are only **two** sizes to go round. They are claimed by
+dimension and shared, so two `%Cl` describing the same box cost one buffered
+cover between them, and drawing one artwork in three viewports costs nothing
+extra. Only a new size spends a slot; ask for a third and it draws nothing,
+while everything else carries on.
+
+Two things that follow:
+
+- **Names are local to one file.** A `.sbs` cannot draw a `%Cl` the `.wps`
+  declared — declare one in each and let the matching size do the sharing.
+  The *pixels* cross the boundary; the name does not.
+- **A blurred `%Cl` always counts as its own size**, because it claims a
+  decimated source. That is what makes it cheap, not expensive.
+
+### Showing part of an artwork
+
+```
+%Cd([name] [, x, y, width, height])
+```
+
+The four optional arguments are a **window**: a rectangle of the viewport to
+reveal instead of the whole art box. All four or none.
+
+The rectangle is in viewport coordinates — the same frame `%Cl`'s x and y are
+in — and the artwork stays anchored where `%Cl` put it. So the window opens
+onto the composition rather than onto the bitmap: move it and a different part
+of the cover shows through. That is how one buffered cover serves several
+cut-outs without spending a second size on each.
+
+```
+%Cl(80,0,240,240,c,c,blur1,-,blurred)%Cd(blurred,80,0,160,240)
+%Cl(80,0,240,240,c,c,-,-,cover)%Cd(cover,240,0,80,240)
+```
+
+Both boxes are the same 240x240 at x=80, so `cover` shares whatever size a
+240x240 artwork already has — including one the `.wps` asked for. The windows
+then split the result: blurred across x=80–240, crisp across 240–320.
+
+- **A window is clipped to the artwork**, so one that misses it draws nothing.
+- **A corner radius rounds whatever rectangle is drawn**, so a window gets
+  rounded corners of its own rather than the box's.
+- **One `%Cd` per artwork per viewport.** A second in the same viewport
+  replaces the first rather than drawing as well, which is how a repeated
+  `%Cd` has always behaved. Give each window its own viewport.
+
 ## Changed behaviour: `%dr` opacity and rounded corners
 
 ```
@@ -426,6 +513,11 @@ A tint is invisible or wrong unless both of these hold.
 survives only until the first line of text crosses it, because every text line
 repaints its own strip of background first. In the backdrop layer that same
 repaint *restores* it, and text then blends into it.
+
+The exception is a viewport nothing draws text into afterwards, which is what
+makes the row-cover tint shown under `%La` work without `%VB`: that 44x44
+viewport holds the cover and the tint and nothing else, and the row's text
+lives in a viewport of its own beside it.
 
 **2. In the same viewport as whatever it darkens.** A `%VB` viewport wipes its
 own rectangle before drawing, so a tint given a viewport to itself has nothing
