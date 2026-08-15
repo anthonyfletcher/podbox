@@ -116,6 +116,11 @@ static struct skin_element *first_viewport;
 
 static struct line *curr_line;
 
+/* The %Cl parsed most recently, which is the art a bare %Cd draws. NULL until
+ * the first one, so a %Cd written above every %Cl still resolves -- at render
+ * time, to the skin's first. */
+static struct skin_albumart *curr_albumart;
+
 static int follow_lang_direction = 0;
 
 typedef int (*parse_function)(struct skin_element *element,
@@ -163,6 +168,9 @@ void *skin_find_item(const char *label, enum skin_find_what what,
         case SKIN_FIND_IMAGE:
             list.linkedlist = SKINOFFSETTOPTR(databuf, data->images);
         break;
+        case SKIN_FIND_ALBUMART:
+            list.linkedlist = SKINOFFSETTOPTR(databuf, data->albumart);
+        break;
         case SKIN_VARIABLE:
             list.linkedlist = SKINOFFSETTOPTR(databuf, data->skinvars);
         break;
@@ -193,6 +201,13 @@ void *skin_find_item(const char *label, enum skin_find_what what,
                 ret = SKINOFFSETTOPTR(databuf, token->value.data);
                 if (!ret) break;
                 itemlabel = SKINOFFSETTOPTR(databuf, ((struct gui_img *)ret)->label);
+                break;
+            case SKIN_FIND_ALBUMART:
+                if (!token) break;
+                ret = SKINOFFSETTOPTR(databuf, token->value.data);
+                if (!ret) break;
+                itemlabel = SKINOFFSETTOPTR(databuf,
+                                        ((struct skin_albumart *)ret)->label);
                 break;
             case SKIN_VARIABLE:
                 if (!token) break;
@@ -1483,7 +1498,7 @@ static int parse_albumart_load(struct skin_element* element,
                                struct wps_data *wps_data)
 {
     struct dim dimensions;
-    int albumart_slot;
+    struct skin_token_list *item;
     bool swap_for_rtl = lang_is_rtl() && follow_lang_direction;
     struct skin_albumart *aa = skin_buffer_alloc(sizeof(*aa));
     (void)token; /* silence warning */
@@ -1510,10 +1525,11 @@ static int parse_albumart_load(struct skin_element* element,
     if (swap_for_rtl)
         aa->x = (curr_vp->vp.width - aa->width - aa->x);
 
-    aa->state = WPS_ALBUMART_LOAD;
     aa->filter_handle = -1;
     aa->filtered_art = -1;
-    wps_data->albumart = PTRTOSKINOFFSET(skin_buffer, aa);
+    aa->slot = -1;
+    aa->label = PTRTOSKINOFFSET(skin_buffer, NULL);
+    aa->draw_win = PTRTOSKINOFFSET(skin_buffer, NULL);
 
     /* The filter chain has to be compiled before the slot is claimed: a
      * blurred chain wants a much smaller source than it draws, and the size
@@ -1560,19 +1576,47 @@ static int parse_albumart_load(struct skin_element* element,
         }
     }
 
+    /* Ninth parameter: the name a %Cd refers to this art by. Names have to be
+     * unique within the skin or a %Cd could not say which art it meant. */
+    if (element->params_count > 8 && !isdefault(get_param(element, 8)))
+    {
+        const char *label = get_param_text(element, 8);
+
+        if (skin_find_item(label, SKIN_FIND_ALBUMART, wps_data))
+        {
+            DEBUGF("%%Cl: duplicate label %s\n", label);
+            return WPS_ERROR_INVALID_PARAM;
+        }
+        aa->label = PTRTOSKINOFFSET(skin_buffer, (void*)label);
+    }
+
     /* Slots dedupe by dimension, so a blurred %Cl no longer shares one with
      * a same-sized unblurred one. That is right -- they want different
      * pixels -- and it is what keeps the saving: audio_load_albumart() runs
      * per buffered track, so a full-screen slot costs ~115 KiB per track
-     * where the decimated one costs about seven. */
+     * where the decimated one costs about seven.
+     *
+     * The same dedupe is what makes several %Cl affordable: any that agree on
+     * size share the one buffered bitmap, whether they are in this skin or the
+     * other one. Only a new size costs anything, and there are only
+     * MAX_MULTIPLE_AA of those to go round -- past that the claim fails and
+     * the art simply does not draw. */
     int div = img_filter_source_divisor(&aa->filter, aa->width, aa->height);
     dimensions.width = (aa->width + div - 1) / div;
     dimensions.height = (aa->height + div - 1) / div;
 
-    albumart_slot = playback_claim_aa_slot(&dimensions);
+    aa->slot = playback_claim_aa_slot(&dimensions);
 
-    if (0 <= albumart_slot)
-        wps_data->playback_aa_slot = albumart_slot;
+    /* Appended only now that nothing can still fail: an entry in the chain is
+     * one skin_data_free_buflib_allocs() will release a slot for. */
+    item = new_skin_token_list_item(NULL, aa);
+    if (!item)
+    {
+        playback_release_aa_slot(aa->slot);
+        return WPS_ERROR_INVALID_PARAM;
+    }
+    add_to_ll_chain(&wps_data->albumart, item);
+    curr_albumart = aa;   /* what a following bare %Cd will draw */
 
     if (element->params_count > 4 && !isdefault(get_param(element, 4)))
     {
@@ -1611,6 +1655,74 @@ static int parse_albumart_load(struct skin_element* element,
         }
     }
 
+    return 0;
+}
+
+/* %Cd([label][,x,y,w,h]): draw one of the skin's %Cl declarations, optionally
+ * through a window -- see struct skin_albumart_draw.
+ *
+ * A bare %Cd draws the nearest %Cl above it, which is what the load-then-draw
+ * pairing reads as and what skins written before labels existed rely on --
+ * `%Cl(a)%Cd%Cl(b)%Cd` draws a then b. With one %Cl, every %Cd means it, so
+ * nothing about an ordinary skin changes.
+ *
+ * A %Cd above every %Cl leaves the art NULL and is resolved at render time to
+ * the skin's first. A named one must already exist, the same rule %xd follows
+ * for images. */
+static int parse_albumart_display(struct skin_element* element,
+                                  struct wps_token *token,
+                                  struct wps_data *wps_data)
+{
+    struct skin_albumart_draw *ad = skin_buffer_alloc(sizeof(*ad));
+    struct skin_albumart *aa = curr_albumart;
+    int given = 0;
+
+    if (!ad)
+        return -1;
+
+    ad->x = ad->y = ad->w = ad->h = 0;   /* w == 0: the whole art box */
+
+    if (element->params_count > 0 && !isdefault(get_param(element, 0)))
+    {
+        const char *label = get_param_text(element, 0);
+
+        aa = skin_find_item(label, SKIN_FIND_ALBUMART, wps_data);
+        if (!aa)
+        {
+            DEBUGF("%%Cd: no %%Cl called %s\n", label);
+            return WPS_ERROR_INVALID_PARAM;
+        }
+    }
+
+    /* The window is all four or none: three of them describes no rectangle,
+     * and silently ignoring the ones that were written would hide the typo. */
+    for (int i = 1; i <= 4; i++)
+    {
+        if (element->params_count > i && !isdefault(get_param(element, i)))
+            given++;
+    }
+
+    if (given == 4)
+    {
+        ad->x = percent_parse_param(get_param(element, 1), curr_vp->vp.width);
+        ad->y = percent_parse_param(get_param(element, 2), curr_vp->vp.height);
+        ad->w = percent_parse_param(get_param(element, 3), curr_vp->vp.width);
+        ad->h = percent_parse_param(get_param(element, 4), curr_vp->vp.height);
+
+        if (ad->w <= 0 || ad->h <= 0)
+        {
+            DEBUGF("%%Cd: window has no area\n");
+            return WPS_ERROR_INVALID_PARAM;
+        }
+    }
+    else if (given != 0)
+    {
+        DEBUGF("%%Cd: a window needs all of x, y, width and height\n");
+        return WPS_ERROR_INVALID_PARAM;
+    }
+
+    ad->art = PTRTOSKINOFFSET(skin_buffer, aa);
+    token->value.data = PTRTOSKINOFFSET(skin_buffer, ad);
     return 0;
 }
 
@@ -1763,19 +1875,33 @@ void skin_data_free_buflib_allocs(struct wps_data *wps_data)
             font_unload(font_ids[--wps_data->font_count]);
     }
 
-    /* Freed here rather than in skin_data_reset(), which clears the offset to
-     * the album art struct the handle is kept in before it could be read. */
+    /* Both jobs are done here rather than in skin_data_reset(): the album art
+     * chain lives in the buffer this function goes on to free, so by the time
+     * that runs the filter handles and the slots they were claimed against
+     * can no longer be read. Clearing the chain below makes a second call a
+     * no-op, so no slot is released twice. */
     {
-        struct skin_albumart *aa =
+        struct skin_token_list *node =
                 SKINOFFSETTOPTR(skin_buffer, wps_data->albumart);
 
-        if (aa && aa->filter_handle > 0)
-            aa->filter_handle = core_free(aa->filter_handle);
+        while (node)
+        {
+            struct skin_albumart *aa = skin_albumart_of(skin_buffer, node);
+
+            if (aa)
+            {
+                if (aa->filter_handle > 0)
+                    aa->filter_handle = core_free(aa->filter_handle);
+                playback_release_aa_slot(aa->slot);
+            }
+            node = SKINOFFSETTOPTR(skin_buffer, node->next);
+        }
     }
 
 abort:
     wps_data->font_ids = PTRTOSKINOFFSET(skin_buffer, NULL); /* Safe if skin_buffer is NULL */
     wps_data->images = PTRTOSKINOFFSET(skin_buffer, NULL);
+    wps_data->albumart = PTRTOSKINOFFSET(skin_buffer, NULL);
     if (wps_data->buflib_handle > 0)
         core_unpin(wps_data->buflib_handle); /* balance the pin in skin_data_load() */
     wps_data->buflib_handle = core_free(wps_data->buflib_handle);
@@ -1795,12 +1921,7 @@ static void skin_data_reset(struct wps_data *wps_data)
     if (wps_data->backdrop_id >= 0)
         skin_backdrop_unload(wps_data->backdrop_id);
     backdrop_filename = NULL;
-    wps_data->albumart = INVALID_OFFSET;
-    if (wps_data->playback_aa_slot >= 0)
-    {
-        playback_release_aa_slot(wps_data->playback_aa_slot);
-        wps_data->playback_aa_slot = -1;
-    }
+    wps_data->albumart = INVALID_OFFSET;   /* slots already released above */
 
     wps_data->peak_meter_enabled = false;
     wps_data->wps_sb_tag = false;
@@ -2295,6 +2416,9 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_ALBUMART_LOAD:
                     function = parse_albumart_load;
                     break;
+                case SKIN_TOKEN_ALBUMART_DISPLAY:
+                    function = parse_albumart_display;
+                    break;
                 case SKIN_TOKEN_VAR_SET:
                 case SKIN_TOKEN_VAR_GETVAL:
                 case SKIN_TOKEN_VAR_TIMEOUT:
@@ -2394,6 +2518,7 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
     curr_vp = NULL;
     curr_viewport_element = NULL;
     first_viewport = NULL;
+    curr_albumart = NULL;
 
     if (isfile)
     {
@@ -2461,14 +2586,10 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
         skin_data_reset(wps_data);
         return false;
     }
-    /* last_albumart_{width,height} is either both 0 or valid AA dimensions */
-    struct skin_albumart *aa = SKINOFFSETTOPTR(skin_buffer, wps_data->albumart);
-    if (aa && (aa->state != WPS_ALBUMART_NONE ||
-        (((wps_data->last_albumart_height != aa->height) ||
-        (wps_data->last_albumart_width != aa->width)))))
-    {
+    /* The skin wants album art, so the sizes playback buffers have just
+     * changed -- have it rebuffer against the slots now claimed. */
+    if (skin_albumart_first(skin_buffer, wps_data->albumart))
         playback_update_aa_dims();
-    }
     wps_data->buflib_handle = core_alloc(skin_buffer_usage());
     if (wps_data->buflib_handle > 0)
     {
@@ -2495,19 +2616,25 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
          * keeping its aspect, so square art in a full-screen box uses 240x240
          * of the 320x240 asked for. */
         char *live_buffer = get_skin_buffer(wps_data);
-        struct skin_albumart *live =
+        struct skin_token_list *node =
                 SKINOFFSETTOPTR(live_buffer, wps_data->albumart);
 
-        if (live && (live->filter.stages & IMG_CLASS_RESIZE))
+        while (node)
         {
-            size_t bytes = (size_t)live->width * live->height
-                         * sizeof(fb_data);
+            struct skin_albumart *live = skin_albumart_of(live_buffer, node);
 
-            live->filter_handle = core_alloc(bytes);
-            if (live->filter_handle <= 0)
-                DEBUGF("%%Cl: no room for a %zu byte filter buffer\n", bytes);
-            else
-                stats->buflib_handles++;
+            if (live && (live->filter.stages & IMG_CLASS_RESIZE))
+            {
+                size_t bytes = (size_t)live->width * live->height
+                             * sizeof(fb_data);
+
+                live->filter_handle = core_alloc(bytes);
+                if (live->filter_handle <= 0)
+                    DEBUGF("%%Cl: no room for a %zu byte filter buffer\n", bytes);
+                else
+                    stats->buflib_handles++;
+            }
+            node = SKINOFFSETTOPTR(live_buffer, node->next);
         }
     }
 

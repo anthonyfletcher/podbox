@@ -30,17 +30,25 @@ static const struct tag_info custom_tags[] =
      * would make `radius` reachable only by also writing wrap or nowrap. */
     TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|Isi", SKIN_REFRESH_DYNAMIC),
 
-    /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with two
-     * more optional arguments, the filter chain (draw/img_filter.h) and a
-     * corner radius. The token id is unchanged, so parse_albumart_load()
-     * still handles it and only grows a clause.
+    /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with
+     * three more optional arguments, the filter chain (draw/img_filter.h), a
+     * corner radius, and the label a %Cd calls this art by. The token id is
+     * unchanged, so parse_albumart_load() still handles it and only grows a
+     * clause.
      *
-     * The one name here that deliberately collides with an upstream tag.
+     * The names here that deliberately collide with upstream tags.
      * find_tag() consults this table first, which is what makes overriding a
      * tag possible at all rather than only adding to the set. The cost is
      * that a theme using the seventh parameter parses here and is rejected by
      * upstream Rockbox -- true of every tag in this file, and not new. */
-    TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sssi", 0|NOBREAK),
+    TAG(SKIN_TOKEN_ALBUMART_LOAD, "Cl", "[iP][iP][iP][iP]|sssis", 0|NOBREAK),
+
+    /* Shadows upstream's %Cd (""): the same token, now able to name which %Cl
+     * it draws and to reveal only a window of it. Bare, it draws the nearest
+     * %Cl above it whole, which is what every existing theme means by it.
+     * The window's four are lowercase so each accepts '-'. */
+    TAG(SKIN_TOKEN_ALBUMART_DISPLAY, "Cd", "|s[ip][ip][ip][ip]",
+        SKIN_REFRESH_STATIC),
 
     /* Shadows upstream's %dr ("[IP][IP][ip][ip]|ss"): the same token with two
      * more optional parameters, opacity 0..15 and corner radius in pixels,

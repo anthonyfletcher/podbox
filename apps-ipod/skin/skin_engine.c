@@ -78,27 +78,13 @@ static void gui_skin_reset(struct gui_skin *skin)
     skin->failsafe_loaded = false;
     skin->needs_full_update = true;
     skin->gui_wps.data = data = &skin->data;
-    struct skin_albumart *aa_save;
-    unsigned char *buffer = get_skin_buffer(data);
-    /* copy to temp var to protect against memset */
-    if (buffer && (aa_save = SKINOFFSETTOPTR(buffer, data->albumart)))
-    {
-        short old_width, old_height;
-        old_width = aa_save->width;
-        old_height = aa_save->height;
-        memset(data, 0, sizeof(struct wps_data));
-        data->last_albumart_width = old_width;
-        data->last_albumart_height = old_height;
-    }
-    else
-        memset(data, 0, sizeof(struct wps_data));
+    memset(data, 0, sizeof(struct wps_data));
     skin->data.wps_loaded = false;
     skin->data.buflib_handle = -1;
     skin->data.tree = -1;
     skin->data.font_ids = -1;
     skin->data.images = -1;
     skin->data.albumart = -1;
-    skin->data.playback_aa_slot = -1;
     skin->gui_wps.data->backdrop_id = -1;
 }
 
@@ -129,9 +115,9 @@ static void skin_reset_buffers(int item, int screen)
      * list.c, viewport.c -- but not here, where the memory actually goes. */
     skinlist_set_cfg(screen, NULL);
 
+    /* The album art slots go back inside skin_data_free_buflib_allocs(), with
+     * the buffer that records which ones this skin claimed. */
     skin_data_free_buflib_allocs(&skins[item][screen].data);
-    if (skins[item][screen].data.playback_aa_slot >= 0)
-        playback_release_aa_slot(skins[item][screen].data.playback_aa_slot);
     if (skins[item][screen].data.backdrop_id >= 0)
         skin_backdrop_unload(skins[item][screen].data.backdrop_id);
 }

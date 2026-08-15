@@ -45,8 +45,11 @@ void write_line(struct screen *display, struct align_pos *format_align,
                 int line, bool scroll, struct line_desc *line_desc);
 void draw_peakmeters(struct gui_wps *gwps, int line_number,
                      struct viewport *viewport);
-/* Draw the album art bitmap from the given handle ID onto the given Skin.
-   Call with clear = true to clear the bitmap instead of drawing it. */
-void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear);
+/* Draw the album art bitmap from the given handle ID onto the given Skin, in
+   the box the %Cl `aa` describes. Call with clear = true to clear the bitmap
+   instead of drawing it. */
+struct skin_albumart;
+void draw_album_art(struct gui_wps *gwps, struct skin_albumart *aa,
+                    int handle_id, bool clear);
 
 #endif

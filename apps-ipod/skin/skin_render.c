@@ -563,11 +563,18 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             /* now draw the AA */
             if (do_refresh)
             {
-                struct skin_albumart *aa = SKINOFFSETTOPTR(skin_buffer, data->albumart);
+                struct skin_albumart_draw *ad =
+                        SKINOFFSETTOPTR(skin_buffer, token->value.data);
+                struct skin_albumart *aa =
+                        ad ? SKINOFFSETTOPTR(skin_buffer, ad->art) : NULL;
+                /* NULL only for a %Cd written above every %Cl, which the
+                 * parser could not bind. Take the skin's first. */
+                if (!aa)
+                    aa = skin_albumart_first(skin_buffer, data->albumart);
                 if (aa)
-                {    
-                    int handle = playback_current_aa_hid(data->playback_aa_slot);
-                    aa->draw_handle = handle;
+                {
+                    aa->draw_handle = playback_current_aa_hid(aa->slot);
+                    aa->draw_win = PTRTOSKINOFFSET(skin_buffer, ad);
                 }
             }
             break;
@@ -774,10 +781,21 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
                     }
                 }
             }
-            else if (token->type == SKIN_TOKEN_ALBUMART_DISPLAY && data->albumart)
+            else if (token->type == SKIN_TOKEN_ALBUMART_DISPLAY)
             {
-                draw_album_art(gwps,
-                        playback_current_aa_hid(data->playback_aa_slot), true);
+                struct skin_albumart_draw *ad =
+                        SKINOFFSETTOPTR(skin_buffer, token->value.data);
+                struct skin_albumart *aa =
+                        ad ? SKINOFFSETTOPTR(skin_buffer, ad->art) : NULL;
+                if (!aa)
+                    aa = skin_albumart_first(skin_buffer, data->albumart);
+                if (aa)
+                {
+                    /* Clear the same rectangle this %Cd would have drawn */
+                    aa->draw_win = PTRTOSKINOFFSET(skin_buffer, ad);
+                    draw_album_art(gwps, aa,
+                                   playback_current_aa_hid(aa->slot), true);
+                }
             }
         skip:
             child = SKINOFFSETTOPTR(skin_buffer, child->next);
@@ -1255,15 +1273,26 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
 
         /* The two once-per-art-change jobs, run once per render pass. The
          * filter goes second and must stay there: it rewrites the art in
-         * place, and the palette has to come from the unfiltered image. */
+         * place, and the palette has to come from the unfiltered image.
+         *
+         * Every %Cl is filtered -- each has its own chain -- but only the
+         * first sources the palette. There is one palette for the whole UI,
+         * so a later %Cl asking for a second one could only fight the first. */
         if (!art_checks_done)
         {
-            dynamic_colors_check_extraction(data->playback_aa_slot);
-
-            struct skin_albumart *aa =
+            struct skin_token_list *node =
                     SKINOFFSETTOPTR(skin_buffer, data->albumart);
-            if (aa)
-                skin_albumart_filter(data->playback_aa_slot, aa);
+            struct skin_albumart *first = skin_albumart_of(skin_buffer, node);
+
+            dynamic_colors_check_extraction(first ? first->slot : -1);
+
+            while (node)
+            {
+                struct skin_albumart *aa = skin_albumart_of(skin_buffer, node);
+                if (aa)
+                    skin_albumart_filter(aa->slot, aa);
+                node = SKINOFFSETTOPTR(skin_buffer, node->next);
+            }
 
             art_checks_done = true;
         }

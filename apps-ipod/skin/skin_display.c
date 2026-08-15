@@ -586,12 +586,19 @@ void wps_display_images(struct gui_wps *gwps, struct viewport* vp)
     struct wps_data *data = gwps->data;
     struct screen *display = gwps->display;
 
-    /* Album art goes down first so that mask images can be drawn over it. */
-    struct skin_albumart *aa = SKINOFFSETTOPTR(get_skin_buffer(data), data->albumart);
-    if (aa && aa->draw_handle >= 0)
+    /* Album art goes down first so that mask images can be drawn over it.
+     * Every %Cd rendered in this viewport left its own art marked to draw. */
+    char *buf = get_skin_buffer(data);
+    struct skin_token_list *aalist = SKINOFFSETTOPTR(buf, data->albumart);
+    while (aalist)
     {
-        draw_album_art(gwps, aa->draw_handle, false);
-        aa->draw_handle = -1;
+        struct skin_albumart *aa = skin_albumart_of(buf, aalist);
+        if (aa && aa->draw_handle >= 0)
+        {
+            draw_album_art(gwps, aa, aa->draw_handle, false);
+            aa->draw_handle = -1;
+        }
+        aalist = SKINOFFSETTOPTR(buf, aalist->next);
     }
 
     struct skin_token_list *list = SKINOFFSETTOPTR(get_skin_buffer(data), data->images);
@@ -835,16 +842,13 @@ void draw_peakmeters(struct gui_wps *gwps, int line_number,
 
 /* Draw the album art bitmap from the given handle ID onto the given WPS.
    Call with clear = true to clear the bitmap instead of drawing it. */
-void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
+void draw_album_art(struct gui_wps *gwps, struct skin_albumart *aa,
+                    int handle_id, bool clear)
 {
-    if (!gwps || !gwps->data || !gwps->display || handle_id < 0)
+    if (!gwps || !gwps->data || !gwps->display || handle_id < 0 || !aa)
         return;
 
     struct wps_data *data = gwps->data;
-    struct skin_albumart *aa = SKINOFFSETTOPTR(get_skin_buffer(data), data->albumart);
-
-    if (!aa)
-        return;
 
     /* A blurring chain has already rendered this track's art into the skin's
      * own buffer, at its own size; everything else drew, or will draw, from
@@ -900,6 +904,31 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
             y += (aa->height - height) / 2;
     }
 
+    /* A %Cd may ask for a window: a rectangle of the viewport to reveal
+     * instead of the whole art box. The art stays anchored where %Cl put it,
+     * so moving the window shows a different part of the cover -- which is
+     * what lets one buffered bitmap serve several cut-outs. Clipped to the
+     * art on both axes; a window that misses it entirely draws nothing. */
+    short sx = 0, sy = 0;
+    struct skin_albumart_draw *win =
+            SKINOFFSETTOPTR(get_skin_buffer(data), aa->draw_win);
+
+    if (win && win->w > 0 && win->h > 0)
+    {
+        int dx = win->x, dy = win->y, dw = win->w, dh = win->h;
+
+        sx = dx - x;
+        sy = dy - y;
+        if (sx < 0) { dw += sx; dx -= sx; sx = 0; }
+        if (sy < 0) { dh += sy; dy -= sy; sy = 0; }
+        if (dw > width  - sx) dw = width  - sx;
+        if (dh > height - sy) dh = height - sy;
+        if (dw <= 0 || dh <= 0)
+            return;
+
+        x = dx; y = dy; width = dw; height = dh;
+    }
+
     if (!clear)
     {
         int stride = STRIDE(gwps->display->screen_type, src_w, src_h);
@@ -913,14 +942,18 @@ void draw_album_art(struct gui_wps *gwps, int handle_id, bool clear)
                     SKINOFFSETTOPTR(get_skin_buffer(data), aa->mask);
 
             gwps->display->set_drawmode(DRMODE_FG);
-            bitmap_part_round(gwps->display, pixels, stride,
+            /* No source offset in this one, so walk the pointer instead. The
+             * radius rounds whatever rectangle is drawn, so a window gets
+             * rounded corners of its own. */
+            bitmap_part_round(gwps->display,
+                              pixels + (size_t)sy * stride + sx, stride,
                               x, y, width, height, aa->radius, mask);
             gwps->display->set_drawmode(DRMODE_SOLID);
         }
         else
         {
             /* Draw the bitmap */
-            gwps->display->bitmap_part(pixels, 0, 0, stride,
+            gwps->display->bitmap_part(pixels, sx, sy, stride,
                                        x, y, width, height);
         }
     }

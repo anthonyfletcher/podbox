@@ -210,15 +210,24 @@ struct playlistviewer {
 
 
 /* albumart definitions */
-#define WPS_ALBUMART_NONE           0      /* WPS does not contain AA tag */
-#define WPS_ALBUMART_CHECK          1      /* WPS contains AA conditional tag */
-#define WPS_ALBUMART_LOAD           2      /* WPS contains AA tag */
-
 #define WPS_ALBUMART_ALIGN_RIGHT    1    /* x align:   right */
 #define WPS_ALBUMART_ALIGN_CENTER   2    /* x/y align: center */
 #define WPS_ALBUMART_ALIGN_LEFT     4    /* x align:   left */
 #define WPS_ALBUMART_ALIGN_TOP      1    /* y align:   top */
 #define WPS_ALBUMART_ALIGN_BOTTOM   4    /* y align:   bottom */
+
+/* What one %Cd draws: which art, and optionally a window -- a rectangle of the
+ * viewport to reveal instead of the whole art box.
+ *
+ * The window is in viewport coordinates, the same frame %Cl's x/y are in, and
+ * the art stays anchored where %Cl put it. So the window opens onto the
+ * composition rather than onto the bitmap: slide it and a different part of
+ * the cover shows through, which is what lets one buffered art serve several
+ * cut-outs without a second slot. w == 0 means no window. */
+struct skin_albumart_draw {
+    OFFSETTYPE(struct skin_albumart *) art;
+    int16_t x, y, w, h;
+};
 
 struct skin_albumart {
     /* Album art support */
@@ -229,9 +238,24 @@ struct skin_albumart {
 
     unsigned char xalign; /* WPS_ALBUMART_ALIGN_LEFT, _CENTER, _RIGHT */
     unsigned char yalign; /* WPS_ALBUMART_ALIGN_TOP, _CENTER, _BOTTOM */
-    unsigned char state; /* WPS_ALBUMART_NONE, _CHECK, _LOAD */
+
+    /* %Cl's ninth parameter: the name a %Cd calls this art by. NULL when the
+     * skin gave none, which is the one a bare %Cd draws. */
+    OFFSETTYPE(const char *) label;
+
+    /* Where playback buffers this art. Claimed by dimension, so two %Cl
+     * asking for the same size -- in one skin or in two -- share a slot and
+     * the second costs the audio buffer nothing. -1 if none was free. */
+    int slot;
 
     int draw_handle;
+
+    /* The window the %Cd that asked for this draw wants, or NULL for the
+     * whole art box. Pending state like draw_handle: the %Cd sets both, the
+     * viewport's wps_display_images() consumes them. One %Cd per art per
+     * viewport, therefore -- a second overwrites the first, which is how a
+     * repeated %Cd has always behaved. Put each window in its own viewport. */
+    OFFSETTYPE(struct skin_albumart_draw *) draw_win;
 
     /* The chain %Cl's seventh parameter named, compiled at skin load. No
      * stages means the skin asked for no filtering. */
@@ -259,6 +283,27 @@ struct skin_albumart {
     uint8_t radius;
     OFFSETTYPE(unsigned char *) mask;
 };
+
+/* The art hanging off one node of wps_data->albumart. `buf` is the buffer the
+ * offsets are relative to: get_skin_buffer(data) once the skin is loaded, the
+ * parse buffer before that. Walk the chain with
+ *
+ *   for (node = SKINOFFSETTOPTR(buf, data->albumart); node;
+ *        node = SKINOFFSETTOPTR(buf, node->next))
+ */
+static inline struct skin_albumart *skin_albumart_of(char *buf,
+                                        const struct skin_token_list *node)
+{
+    struct wps_token *token = node ? SKINOFFSETTOPTR(buf, node->token) : NULL;
+    return token ? SKINOFFSETTOPTR(buf, token->value.data) : NULL;
+}
+
+/* The art a %Cd with no label draws: the skin's first %Cl. */
+static inline struct skin_albumart *skin_albumart_first(char *buf,
+                                        OFFSETTYPE(struct skin_token_list *) l)
+{
+    return skin_albumart_of(buf, SKINOFFSETTOPTR(buf, l));
+}
 
 
 struct line {
@@ -373,11 +418,10 @@ struct wps_data
     int16_t backdrop_id;
     bool use_extra_framebuffer;
 
-    OFFSETTYPE(struct skin_albumart *) albumart;
-    int    playback_aa_slot;
-    /* copy of albumart to survive skin resets, used to check if albumart
-     * dimensions changed on skin change */
-    int16_t last_albumart_width, last_albumart_height;
+    /* Every %Cl the skin declared, in the order written. A %Cd draws one of
+     * them by label, a bare %Cd the first. Several cost no more than one
+     * unless they ask for different sizes -- see skin_albumart.slot. */
+    OFFSETTYPE(struct skin_token_list *) albumart;
 
 
     bool peak_meter_enabled;
@@ -432,6 +476,7 @@ enum skin_find_what {
     SKIN_FIND_VP = 0,
     SKIN_FIND_UIVP,
     SKIN_FIND_IMAGE,
+    SKIN_FIND_ALBUMART,
     SKIN_VARIABLE,
 };
 void *skin_find_item(const char *label, enum skin_find_what what,
