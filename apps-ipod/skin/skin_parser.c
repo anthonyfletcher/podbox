@@ -2637,7 +2637,29 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
             node = SKINOFFSETTOPTR(live_buffer, node->next);
         }
     }
+    else
+    {
+        /* No buflib copy, so the chain the slots are recorded in dies with the
+         * parse buffer this function is about to let go of -- and
+         * skin_data_free_buflib_allocs() takes its `!skin_buffer` exit, having
+         * nothing left to walk. Give them back here or they are gone until
+         * reboot, which with two slots means album art stops working.
+         *
+         * The skin itself is already inert: get_skin_buffer() returns NULL
+         * without a handle and every renderer turns round on that. */
+        struct skin_token_list *node =
+                SKINOFFSETTOPTR(skin_buffer, wps_data->albumart);
 
+        while (node)
+        {
+            struct skin_albumart *aa = skin_albumart_of(skin_buffer, node);
+
+            if (aa)
+                playback_release_aa_slot(aa->slot);
+            node = SKINOFFSETTOPTR(skin_buffer, node->next);
+        }
+        wps_data->albumart = PTRTOSKINOFFSET(skin_buffer, NULL);
+    }
 
     skin_buffer = NULL;
     return true;
