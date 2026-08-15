@@ -609,7 +609,8 @@ static bool aa_cover_dim(int sw, int sh, int dim, int *tw, int *th)
     if (*th < dim)
         *th = dim;
 
-    return (long)*tw * *th <= ART_CACHE_COVER_MAX_PX;
+    return (long)*tw * *th <= ART_CACHE_COVER_MAX_PX &&
+           *tw <= ART_CACHE_COVER_MAX_W;
 }
 
 /* Centre-crop a tw x th image down to dim x dim, in place. Each output row sits
@@ -1057,10 +1058,12 @@ static bool aa_run_pass(void)
     bool aborted = false;
     int since_yield = 0;
 
-    /* An AA_FIT_COVER decode stages a non-square image (shorter side == dim,
-     * longer side up to dim * COVER_MAX_ASPECT) before cropping it square, so
-     * the buffer is sized for that worst case. Elongation on the other axis has
-     * the same pixel count and a narrower row, so this covers both. */
+    /* An AA_FIT_COVER decode stages a non-square image before cropping it
+     * square, so the buffer is sized for the widest one aa_cover_dim() will
+     * pass: the largest size at COVER_MAX_ASPECT. That fixes both of the terms
+     * BM_SCALED_SIZE adds up -- the pixels, and the scaler's line buffers,
+     * which depend on the width alone -- and those are the two bounds
+     * aa_cover_dim() tests a stage against. See art_sizes.h. */
     worksz = BM_SCALED_SIZE(ART_CACHE_MAX_DIM *
                                 ART_CACHE_COVER_MAX_ASPECT,
                             ART_CACHE_MAX_DIM, FORMAT_NATIVE, 0);

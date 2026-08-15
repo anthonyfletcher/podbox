@@ -78,18 +78,32 @@ static const struct art_size art_sizes[] =
  * cache generation. */
 #define ART_CACHE_COVER_MAX_ASPECT 2
 
-/* What AA_FIT_COVER actually tests against: the staging area's pixel count, not
- * a ratio. The buffer is sized for the largest size at the aspect above, and an
- * elongated image of the same pixel count has a narrower row, so anything
- * within this budget fits whichever way round it is.
+/* What AA_FIT_COVER tests against. The work buffer is not a plain rectangle, so
+ * two things bound a staged image and neither implies the other:
  *
- * Budgeting by area rather than by ratio is what lets a small thumbnail be
- * cropped from a far more elongated source than a large one, at no extra cost:
- * the 300px size still stops at 2:1, while the 128px carousel size reaches
- * about 10:1 -- past any real album art, so that size is square in practice.
- * Worth having, because a letterboxed thumbnail is also stored by rows rather
- * than transposed, and then costs a transpose on every single load. */
+ *   Area, because BM_SCALED_SIZE's pixel term is width * height. Budgeting by
+ *   area rather than by ratio is what lets a small thumbnail be cropped from a
+ *   more elongated source than a large one, at no extra cost -- the 300px size
+ *   still stops at 2:1 while the 128px carousel size reaches nearly 5:1, past
+ *   any real album art. Worth having, because a letterboxed thumbnail is stored
+ *   by rows rather than transposed, and then costs a transpose on every load.
+ *
+ *   Width, because BM_SCALED_SIZE's *other* term -- the scaler's line buffers,
+ *   which resize_on_load() sizes at 3 rows of uint32_argb -- grows with the
+ *   width alone, and area says nothing about it. Without this bound a 1400x128
+ *   stage passes the pixel budget while wanting two and a half times the
+ *   scratch the buffer was cut for. resize_on_load() would refuse rather than
+ *   overrun, so nothing breaks -- but aa_generate_one() has committed to a
+ *   COVER decode by then and does not fall back to CONTAIN, so the thumbnail
+ *   would simply never appear. Refusing here instead is what routes it to the
+ *   letterboxed decode that does work.
+ *
+ * Height needs no bound of its own: a tall stage is narrow, so it spends
+ * nothing on scratch and the area test alone holds it. */
 #define ART_CACHE_COVER_MAX_PX \
     ((long)ART_CACHE_MAX_DIM * ART_CACHE_COVER_MAX_ASPECT * ART_CACHE_MAX_DIM)
+
+#define ART_CACHE_COVER_MAX_W \
+    (ART_CACHE_MAX_DIM * ART_CACHE_COVER_MAX_ASPECT)
 
 #endif /* _ART_SIZES_H_ */
