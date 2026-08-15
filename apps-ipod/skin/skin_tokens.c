@@ -1262,6 +1262,37 @@ static const char* get_qs_token_value(struct wps_token *token, char *buf, int bu
     return P2STR(ID2P(qs_setting->lang_id));
 }
 
+/* Resolve a *skin* font id -- the number in %Fl(id,...) -- to the firmware
+ * font handle the font loader returned, which is what font_getstringsize()
+ * and friends want. The two numberings are unrelated: skin ids start at 2 and
+ * begin again for every skin, while firmware handles are handed out in load
+ * order across every skin the theme loads, so the SBS's fonts are numbered
+ * before the WPS's.
+ *
+ * The mapping lives in skinfonts[] in skin_parser.c, which cannot be read from
+ * here: it is parse scratch, cleared at the top of every skin_data_load(), so
+ * by render time it describes whichever skin was parsed last. This skin's own
+ * viewports carry both halves permanently instead -- parsed_fontid is what the
+ * skin wrote, vp.font what it resolved to -- so ask them.
+ *
+ * Returns -1 if no viewport in this skin uses the font, in which case there is
+ * no loaded font to measure in and the caller should fall back. */
+static int skin_fontid_to_font(struct wps_data *data, int skin_fontid)
+{
+    char *skinbuffer = get_skin_buffer(data);
+    struct skin_element *vp_list;
+
+    for (vp_list = SKINOFFSETTOPTR(skinbuffer, data->tree);
+         vp_list; vp_list = SKINOFFSETTOPTR(skinbuffer, vp_list->next))
+    {
+        struct skin_viewport *skin_vp =
+                SKINOFFSETTOPTR(skinbuffer, vp_list->data);
+        if (skin_vp && skin_vp->parsed_fontid == skin_fontid)
+            return skin_vp->vp.font;
+    }
+    return -1;
+}
+
 /* Return the tags value as text. buf should be used as temp storage if needed.
 
    intval is used with conditionals/enums: when this function is called,
@@ -1349,10 +1380,19 @@ const char *get_token_value(struct gui_wps *gwps,
              * else in the current viewport's font. The explicit form lets a
              * caller measure in a font the current viewport does not use --
              * e.g. deciding a title's layout from $VD, which does not run in
-             * the title's font. */
+             * the title's font.
+             *
+             * The argument is a skin font id, so it has to be translated; the
+             * viewport's own font is already a firmware handle. A font no
+             * viewport uses cannot be measured in, so fall back to the
+             * viewport's rather than measure in an unrelated one. */
             int fontid = (*gwps->display->current_viewport)->font;
             if (el->params_count >= 2 && p[1].type == INTEGER)
-                fontid = p[1].data.number;
+            {
+                int resolved = skin_fontid_to_font(data, p[1].data.number);
+                if (resolved >= 0)
+                    fontid = resolved;
+            }
             out_text = eval_select_param(gwps, skinbuffer, &p[0], offset,
                                          buf, buf_size);
             if (out_text)
@@ -1638,14 +1678,25 @@ const char *get_token_value(struct gui_wps *gwps,
             numeric_buf = buf;
             goto gtv_ret_numeric_tag_info;
         case SKIN_TOKEN_ALBUMART_FOUND:
-            if (SKINOFFSETTOPTR(get_skin_buffer(data), data->albumart))
+        {
+            /* True if any of the skin's %Cl has art buffered. The tag takes no
+             * label and asks about the track, not about one declaration --
+             * with several sizes on one track they answer alike unless a slot
+             * failed to fill, and then the useful answer is the optimistic
+             * one. */
+            char *skinbuf = get_skin_buffer(data);
+            struct skin_token_list *node =
+                    SKINOFFSETTOPTR(skinbuf, data->albumart);
+
+            while (node)
             {
-                int handle = -1;
-                handle = playback_current_aa_hid(data->playback_aa_slot);
-                if (handle >= 0)
+                struct skin_albumart *aa = skin_albumart_of(skinbuf, node);
+                if (aa && playback_current_aa_hid(aa->slot) >= 0)
                     return "C";
+                node = SKINOFFSETTOPTR(skinbuf, node->next);
             }
             return NULL;
+        }
 
         case SKIN_TOKEN_BATTERY_PERCENT:
         {
