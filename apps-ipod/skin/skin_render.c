@@ -678,6 +678,16 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
     return true;
 }
 
+/* Erasing is drawing. Three of the cases below put pixels down -- an image
+ * cleared, a hideable viewport cleared, album art cleared -- and none of them
+ * reaches do_non_text_tags(), which is where every other direct draw is caught
+ * for the flush. So each marks for itself.
+ *
+ * Two of them land in the current viewport, and `info->drew` covers those. The
+ * viewport clear does not: it paints a *different* viewport, one the render
+ * loop then skips outright (VP_DRAW_HIDDEN), so its rectangle would never be
+ * marked by anyone and the clear would sit in the framebuffer unflushed. That
+ * one asks for its own region. */
 static void do_tags_in_hidden_conditional(struct skin_element* branch,
                                           struct skin_draw_info *info)
 {
@@ -725,6 +735,7 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
                 struct gui_img *img = skin_find_item(SKINOFFSETTOPTR(skin_buffer, id->label),
                                                      SKIN_FIND_IMAGE, data);
                 clear_image_pos(gwps, img);
+                info->drew = true;
             }
             else if (token->type == SKIN_TOKEN_PEAKMETER)
             {
@@ -769,6 +780,13 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
                             skin_viewport->vp.bg_pattern =
                                 dynamic_colors_resolve(skin_viewport->dc_orig_bg);
                             gwps->display->clear_viewport();
+                            /* Nobody else will: the render loop skips this
+                             * viewport from here on. */
+                            skin_mark_dirty_rect(gwps->display->screen_type,
+                                                 skin_viewport->vp.x,
+                                                 skin_viewport->vp.y,
+                                                 skin_viewport->vp.width,
+                                                 skin_viewport->vp.height);
                             gwps->display->set_viewport_ex(&info->skin_vp->vp, VP_FLAG_VP_SET_CLEAN);
 
                             if (skin_viewport->output_to_backdrop_buffer)
@@ -795,6 +813,7 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
                     aa->draw_win = PTRTOSKINOFFSET(skin_buffer, ad);
                     draw_album_art(gwps, aa,
                                    playback_current_aa_hid(aa->slot), true);
+                    info->drew = true;
                 }
             }
         skip:
