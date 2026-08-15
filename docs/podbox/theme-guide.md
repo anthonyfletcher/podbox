@@ -147,25 +147,55 @@ keeps its *relationship* to your background rather than its wavelength. If your
 theme is built around one signature accent that must not move, put
 `dynamic colors: off` in your `.cfg` and everything below stops applying.
 
-### You must load album art, even if you never draw it
+### Where the colours come from
 
-This is the step people miss. The colours are extracted from the cover the
-playback engine has buffered, and **only a `%Cl` tag causes it to be buffered**.
-A theme with no `%Cl` anywhere will turn the setting on and see nothing happen —
-no error, no message.
+The palette is read from the album-art cache's own thumbnail — the same
+pre-scaled covers the carousel and the browser use. No skin tag is involved,
+so **a theme that never mentions album art still gets colours**, as long as the
+art cache has a thumbnail for the track's folder.
 
-If your theme already displays album art, you are done. If it does not, declare
-`%Cl` without a matching `%Cd`; the art is buffered and never drawn:
+When it does not, the extractor falls back to the cover the playback engine has
+buffered, and only a `%Cl` causes anything to be buffered. So a `%Cl` is worth
+declaring even in a theme that draws no artwork — it is what covers the tracks
+the cache has not reached:
 
 ```
 # Loaded for the colour extractor only. No %Cd, so nothing is drawn.
 %Cl(0,0,100,100,c,c)
 ```
 
-Put it in **both** the `.sbs` and the `.wps`, with the *same* dimensions so the
-two share a single buffered copy. The `.sbs` one matters because it makes the
-colours available on list screens before the playing screen has ever been
-opened.
+Put it in **both** the `.sbs` and the `.wps` with the *same* dimensions, so the
+two share a single buffered copy rather than spending both slots. The `.sbs`
+one matters because it makes the colours available on list screens before the
+playing screen has ever been opened.
+
+Two cases where that fallback is the only source, and a `%Cl` is doing real
+work:
+
+- **The "album art source" setting is Artist**, or Auto on a playlist built
+  from an artist browse. The cache path bows out deliberately there — a theme
+  showing artist portraits should not take its colours from the album cover —
+  so the palette comes from whatever the slot holds.
+- **A track whose folder the art cache has no thumbnail for**, which is any
+  album the cache has not got to yet.
+
+Two things to know if you are relying on that fallback:
+
+- **It reads the first `%Cl` in the skin**, so with several declared, that is
+  the one that has to hold usable artwork.
+- **It will not read artwork a filter chain has rewritten.** The palette
+  describes the album, not your treatment of it — a `bw` chain would otherwise
+  turn every derived colour grey. That covers the filters that work in place,
+  which is all of them except `blur`: a blurring chain renders into a buffer of
+  its own and leaves the buffered cover untouched, so it does not block
+  anything.
+
+So a skin whose first `%Cl` carries an in-place chain has no fallback. Adding an
+unfiltered one at the *same* size will not rescue it either — same size means
+the same buffered copy, and the chain rewrites that copy for both. Put an
+unfiltered `%Cl` first, at a size of its own, or accept the cache as the only
+source. See [`custom-skin-tags.md`](custom-skin-tags.md) for what a second size
+costs.
 
 ### Bitmaps
 
