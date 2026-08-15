@@ -309,6 +309,19 @@ Native assembler threads (ARM) with cooperative multitasking.
 - `tools/voice.pl` — voice file generator (TTS). Paths point at `apps-ipod/` but
   voice builds are unverified here; `VOICE_VERSION` no longer resolves because
   `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`
+- `tools/theme-lens/` — the skin reader, linter and previewer. `python serve.py
+  <theme folder>` (or double-click `ThemeLens.cmd`) edits that folder live;
+  `ctl.py` drives a running one from a script. **It carries its own copy of the
+  tag table**, so a change to `apps-ipod/skin/custom_tags.c` has to be mirrored
+  into `index.html` or the lens explains tags that no longer exist. Its list
+  fixtures are not mirrored — `extract-lists.py` reads them out of this
+  checkout, so re-run it with `--embed index.html` after a menu change
+
+**Nothing under `tools/theme-lens/` is built or shipped.** It is a development
+tool that happens to live in the tree, which is where it belongs: everything it
+has to stay right about — the tag table, the filter chain, the menus — is here.
+Upstream has no such directory, so it cannot conflict with `git merge
+rockbox/master`.
 
 ## Release Workflow
 
