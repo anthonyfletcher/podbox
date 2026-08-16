@@ -426,7 +426,27 @@ static int fade;
  * calibrates the scroll and transition speed settings, so welding the two
  * together would make retuning this rescale those. HZ/30 is 3 ticks, i.e. 33
  * frames a second, tick granularity being what it is. */
+/* The 6G draws faster than the 5G because its panel tears, and a shorter frame
+ * interval makes the tear smaller.
+ *
+ * Its driver DMAs into the panel's GRAM while the panel is scanning that same
+ * GRAM out, so every transfer crosses the scan somewhere and the rows either
+ * side of the crossing show consecutive animation positions. The seam is one
+ * frame of motion wide -- 6px at 30fps, measured on a scrolling frame -- so
+ * halving the interval halves it. It does not remove it: only waiting for the
+ * panel would, and this panel offers nothing to wait on. Its tearing-effect
+ * output is never enabled by the type 2/3 init sequence, and switching it on
+ * by hand produces no signal on any pin the SoC can read.
+ *
+ * The 5G writes into the BCM's own framebuffer and has it push a whole frame,
+ * so it cannot tear and has no reason to pay for the extra frames.
+ *
+ * HZ is 100, so the only rates the tick offers are 33, 50 and 100. */
+#if CONFIG_LCD == LCD_IPOD6GNANO3G4G
+#define PF_MAX_FPS       50
+#else
 #define PF_MAX_FPS       30
+#endif
 #define PF_FRAME_TICKS   MAX(HZ / PF_MAX_FPS, 1)
 static long anim_last_tick;
 static int anim_frac;
