@@ -220,10 +220,22 @@ bool parse_color(enum screen_type screen, char *text, int *value)
 
     if (screens[screen].depth > 2)
     {
+        bool fixed = false;
+
+        /* '!' before the digits pins the colour: the album palette carries
+         * every other literal over, and this is how a skin says not to. */
+        if (*text == '!')
+        {
+            fixed = true;
+            text++;
+        }
+
         if (hex_to_rgb(text, value) < 0)
             return false;
-        else
-            return true;
+
+        if (fixed)
+            *value |= COLOR_FIXED;
+        return true;
     }
 
     return false;

@@ -207,6 +207,9 @@ non-zero when the page reports an error.
 - Sublines do not alternate: a line with `;` in it draws the subline that stays
   up longest, which is the steady state a `%t(0.1)…;%t(3600)…` pair means.
 - Scrolling, gradients and `%Vs` styles beyond `invert` are not simulated.
+- Dynamic colours are not applied, so the preview draws every colour as
+  written. A `!`-prefixed one is parsed and explained, but it looks the same
+  here as an unprefixed one — the difference only shows on the player.
 - Tags that parse but do nothing on this hardware (recording, tuner, touch) are
   marked as such rather than left looking functional.
 

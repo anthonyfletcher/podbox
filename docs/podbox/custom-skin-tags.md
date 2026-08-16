@@ -599,6 +599,57 @@ second time and agree with the driver on every row.
 
 ---
 
+## Changed behaviour: fixed colours, `!rrggbb`
+
+Every colour argument in a skin now accepts a **leading `!`**, which means
+"leave this colour alone". Without it, dynamic colours move it.
+
+```
+%Vf(!e8c547)                  # this yellow, whatever is playing
+%Vf(e8c547)                   # carried onto the album's palette
+```
+
+This matters because dynamic colours do not only remap the theme's own
+foreground and background. Every other colour a skin spells out is *carried
+over* as well: measured against the theme's pair, and rebuilt in the same
+relationship to the album's, so a hand-picked accent keeps its role instead of
+staying put while everything around it moves. That is usually what you want,
+and `!` is how you say it is not — for a brand colour, a warning red, a logo
+panel, or anything whose meaning is the specific colour.
+
+It works on every argument that takes an `RRGGBB`:
+
+```
+%Vf(!182b4a)                  # viewport foreground
+%Vb(!f5f5f5)                  # viewport background
+%Vs(colour, !ff0000)          # text style colour
+%Vg(!101820, !2a3a52, !ffffff) # gradient start, end and text
+%dr(0,0,-,20,!ff0000)         # rectangle fill
+```
+
+Four things worth knowing:
+
+- **A fixed foreground is inherited.** The tags that default to the viewport's
+  foreground — `%dr`'s fill written as `-`, `%Vg`'s omitted text colour — pick
+  up the mark along with the colour, so a `-` under a fixed `%Vf` is fixed too.
+  The usual caveat about `-` still applies: it takes the foreground *as the
+  parser saw it*, which is the one on the viewport's declaration line, not one
+  a later `%Vf` set. Write the colour out if you are unsure.
+- **`%Vf(-)` cannot be fixed.** The `-` form means "the theme's own
+  foreground", and that is exactly the colour dynamic colours exist to change.
+  To fix a colour you have to spell it out.
+- **`!` is skin-only.** Colours in a `.cfg` — `foreground color`, `background
+  color`, the line selector — are the theme's roles, and they do not take the
+  prefix.
+- **CheckWPS rejects it.** That tool links upstream's colour parser rather than
+  this fork's, so it reports an invalid colour for a skin the firmware reads
+  quite happily. Theme Lens understands the prefix; CheckWPS does not.
+
+With **Dynamic Colours** off in the settings, `!rrggbb` and `rrggbb` are the
+same colour; nothing is being remapped either way.
+
+---
+
 ## Changed behaviour: `%ft` key matching
 
 `%ft(file, key)` (read the text following `key` in a file) now **trims

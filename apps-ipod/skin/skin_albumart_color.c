@@ -16,7 +16,8 @@
  * other colour a skin spells out is carried over instead: measured against the
  * theme's own pair, and rebuilt in the same relationship to the album's. So a
  * skin needs no syntax to take part -- a plain hex accent moves with the music
- * like the foreground and background do.
+ * like the foreground and background do. The syntax is for opting out: a
+ * colour written '!rrggbb' arrives flagged COLOR_FIXED and is left alone.
  *
  * The palette changes in one step, not over a fade -- see apply_colors() for
  * why the fade that used to be here could not be made to look right.
@@ -992,6 +993,12 @@ static unsigned int resolve_mapped(unsigned int original,
 
 unsigned int dynamic_colors_resolve(unsigned int original)
 {
+    /* Before the checks below, not after: the flag has to come off whether or
+     * not there is a palette to resolve against, since this is the only place
+     * that knows about it and the value goes on to the display from here. */
+    if (original & COLOR_FIXED)
+        return original & ~COLOR_FIXED;
+
     if (!global_settings.dynamic_colors || !cache.valid)
         return original;
 

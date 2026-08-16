@@ -16,7 +16,11 @@ void dynamic_colors_init(void);
 
 /* Resolve a color: if it matches theme fg/bg and dynamic colors are active,
  * return the album-art-derived color (with fade interpolation).
- * Otherwise return the original color unchanged. */
+ * Otherwise return the original color unchanged.
+ *
+ * Also where COLOR_FIXED (draw/color.h) comes off, so a colour a skin wrote
+ * with a leading '!' passes through untouched. Every skin colour reaches the
+ * display through here, which is what makes one strip enough. */
 unsigned int dynamic_colors_resolve(unsigned int original);
 
 /* True for a short window after the palette changes, during which whatever is

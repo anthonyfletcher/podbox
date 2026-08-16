@@ -15,8 +15,19 @@
  * success, -1 if the string is not a valid hex colour. */
 int hex_to_rgb(const char* hex, int* color);
 
+/* Set on a parsed colour written with a leading '!', marking it as one the
+ * dynamic-colour palette must leave alone. Colours are 16 bits on this
+ * display, so the flag rides above them in the same int and is stripped by
+ * dynamic_colors_resolve(), the one place every skin colour passes through.
+ *
+ * It stays set in the stored original, which is what carries the intent: the
+ * viewport keeps it in dc_orig_fg/dc_orig_bg, and the tags that default to the
+ * viewport's foreground (%Vg's text, %dr's fill) inherit it from there. */
+#define COLOR_FIXED (1u << 24)
+
 /* Parse a colour for the given screen, accepting the forms theme files and
- * skins use. Returns true if text held a usable colour. */
+ * skins use, plus a leading '!' for COLOR_FIXED. Returns true if text held a
+ * usable colour. */
 bool parse_color(enum screen_type screen, char *text, int *value);
 
 /* Mix c1 toward c2, per channel. t runs 0..256: 0 leaves c1 alone, 256 gives

@@ -922,7 +922,7 @@ const ARG_HELP = {
   "Vs:0": "style: invert, color, gradient or clear.",
   "Vs:1": "the colour for 'color', or the number of lines for 'gradient'.",
   "Vg:0": "gradient start colour.", "Vg:1": "gradient end colour.", "Vg:2": "text colour over the gradient.",
-  "Vf:0": "foreground colour, RRGGBB. On a viewport's own declaration line this becomes the viewport's starting colour; below it, it is a render-time instruction.",
+  "Vf:0": "foreground colour, RRGGBB, or !RRGGBB to fix it against dynamic colours. On a viewport's own declaration line this becomes the viewport's starting colour; below it, it is a render-time instruction.",
   "Vb:0": "background colour, RRGGBB.",
   "Vp:0": "playlist entry offset.", "Vp:1": "the skin code drawn for each entry.",
 
@@ -2952,8 +2952,11 @@ function applyImgFilters(px, w, h, steps) {
   }
 }
 
+/* A leading '!' marks the colour COLOR_FIXED (apps-ipod/draw/color.h): the
+   dynamic-colour palette leaves it as written. The preview does not apply that
+   palette at all, so here the prefix only has to be accepted and dropped. */
 const hexToRgb = s => {
-  const m = /^([0-9a-f]{6})$/i.exec(String(s).trim().replace(/^#/, ""));
+  const m = /^!?([0-9a-f]{6})$/i.exec(String(s).trim().replace(/^#/, ""));
   if (!m) return null;
   const v = parseInt(m[1], 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
@@ -3544,11 +3547,14 @@ function enumNote(tagName, argIdx, t) {
   const key = tagName + ":" + argIdx;
 
   if (COLOUR_ARGS.has(key)) {
-    if (/^[0-9a-f]{6}$/i.test(t)) return "colour RRGGBB — R " + parseInt(t.slice(0, 2), 16) +
-      ", G " + parseInt(t.slice(2, 4), 16) + ", B " + parseInt(t.slice(4, 6), 16);
+    /* A '!' before the digits pins the colour against dynamic colours. */
+    const fixed = t.startsWith("!"), h = fixed ? t.slice(1) : t;
+    if (/^[0-9a-f]{6}$/i.test(h)) return "colour RRGGBB — R " + parseInt(h.slice(0, 2), 16) +
+      ", G " + parseInt(h.slice(2, 4), 16) + ", B " + parseInt(h.slice(4, 6), 16) +
+      (fixed ? ". Fixed: dynamic colours leave it as written" : "");
     if (tagName === "Vs") return null;      /* %Vs(gradient,n) — a line count */
     if (t === "-" || t === "") return null; /* the default, which is a colour argument's usual state */
-    return "expects a colour as RRGGBB hex";
+    return "expects a colour as RRGGBB hex, optionally '!'-prefixed to fix it";
   }
 
   const spec = ARG_ENUMS[key];
