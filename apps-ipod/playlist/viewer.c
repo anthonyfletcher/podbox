@@ -658,7 +658,17 @@ static enum pv_context_result context_menu(int index)
                         ID2P(LANG_SHUFFLE), ID2P(LANG_SAVE),
                         ID2P(LANG_PLAYLISTVIEWER_SETTINGS)
                         );
+    /* Report as a context menu while it is up, the way every other one does
+     * (context_menu.c, album_covers.c, the image and lyric viewers). Without
+     * this the activity stays ACTIVITY_PLAYLISTVIEWER, so a theme switching on
+     * %cs dresses the menu as playlist rows -- numbering them, in Scrim's case.
+     * Popped conditionally because a menu item may have exited to another screen
+     * and popped it already. */
+    push_current_activity(ACTIVITY_CONTEXTMENU);
     int sel = do_menu(&menu_items, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+
     if (sel == MENU_ATTACHED_USB)
         return PV_CONTEXT_USB;
     else if (sel >= 0)
@@ -700,13 +710,21 @@ static enum pv_context_result context_menu(int index)
                 return viewer.playlist ? PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
             case 7:
             {
-                /* playlist viewer settings */
+                /* playlist viewer settings. Reported as a context menu for the
+                 * same reason as the one above: reached from a context menu, and
+                 * left as ACTIVITY_PLAYLISTVIEWER it gets dressed as playlist
+                 * rows. */
+                bool usb;
                 sel = global_settings.playlist_viewer_track_display;
-                if (MENU_ATTACHED_USB == do_menu(&viewer_settings_menu, NULL, NULL, false))
+                push_current_activity(ACTIVITY_CONTEXTMENU);
+                usb = (MENU_ATTACHED_USB ==
+                       do_menu(&viewer_settings_menu, NULL, NULL, false));
+                if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+                    pop_current_activity();
+                if (usb)
                     return PV_CONTEXT_USB;
-                else
-                    return (sel == global_settings.playlist_viewer_track_display) ?
-                           PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
+                return (sel == global_settings.playlist_viewer_track_display) ?
+                       PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
             }
         }
     }

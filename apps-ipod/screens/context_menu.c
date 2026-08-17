@@ -246,13 +246,13 @@ static int view_lyrics(void)
 MENUITEM_FUNCTION(wps_view_cur_playlist_item, 0, ID2P(LANG_VIEW_DYNAMIC_PLAYLIST),
                   wps_view_cur_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(search_playlist_item, 0, ID2P(LANG_SEARCH_IN_PLAYLIST),
-                  search_playlist, NULL, Icon_Playlist);
+                  search_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(playlist_save_item, 0, ID2P(LANG_SAVE_DYNAMIC_PLAYLIST),
-                  save_playlist, NULL, Icon_Playlist);
+                  save_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(reshuffle_item, 0, ID2P(LANG_SHUFFLE_PLAYLIST),
-                  shuffle_playlist, NULL, Icon_Playlist);
+                  shuffle_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(playing_time_item, 0, ID2P(LANG_PLAYING_TIME),
-                  playing_time, NULL, Icon_Playlist);
+                  playing_time, NULL, Icon_NOICON);
 MAKE_ONPLAYMENU( wps_playlist_menu, ID2P(LANG_CURRENT_PLAYLIST),
                  NULL, Icon_Playlist,
                  &wps_view_cur_playlist_item, &playlist_save_item,
@@ -398,38 +398,45 @@ static int treeplaylist_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list);
 
+/* These rows are actions, so they take the generic function-call icon rather
+ * than naming one: Icon_Playlist on all twenty of them filled whole menus with
+ * a single glyph that distinguished nothing. The queue variants are the one
+ * exception -- Icon_Queued is what the playlist viewer already draws on a queued
+ * track, so it says something the row text does not have to. The submenus
+ * themselves keep Icon_Playlist; each is one row in its parent, and it is what
+ * they are. */
 /* insert items */
 MENUITEM_FUNCTION_W_PARAM(i_pl_item, 0, ID2P(LANG_ADD),
                   add_to_playlist, &addtopl_insert,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(i_first_pl_item, 0, ID2P(LANG_PLAY_NEXT),
                   add_to_playlist, &addtopl_insert_first,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(i_last_pl_item, 0, ID2P(LANG_PLAY_LAST),
                   add_to_playlist, &addtopl_insert_last,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(i_shuf_pl_item, 0, ID2P(LANG_ADD_SHUFFLED),
                   add_to_playlist, &addtopl_insert_shuf,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 MENUITEM_FUNCTION_W_PARAM(i_last_shuf_pl_item, 0, ID2P(LANG_PLAY_LAST_SHUFFLED),
                   add_to_playlist, &addtopl_insert_last_shuf,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 /* queue items */
 MENUITEM_FUNCTION_W_PARAM(q_pl_item, 0, ID2P(LANG_QUEUE),
                   add_to_playlist, &addtopl_queue,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_Queued);
 MENUITEM_FUNCTION_W_PARAM(q_first_pl_item, 0, ID2P(LANG_QUEUE_FIRST),
                   add_to_playlist, &addtopl_queue_first,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_Queued);
 MENUITEM_FUNCTION_W_PARAM(q_last_pl_item, 0, ID2P(LANG_QUEUE_LAST),
                   add_to_playlist, &addtopl_queue_last,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_Queued);
 MENUITEM_FUNCTION_W_PARAM(q_shuf_pl_item, 0, ID2P(LANG_QUEUE_SHUFFLED),
                   add_to_playlist, &addtopl_queue_shuf,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_Queued);
 MENUITEM_FUNCTION_W_PARAM(q_last_shuf_pl_item, 0, ID2P(LANG_QUEUE_LAST_SHUFFLED),
                   add_to_playlist, &addtopl_queue_last_shuf,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_Queued);
 
 /* queue submenu */
 MAKE_ONPLAYMENU(queue_menu, ID2P(LANG_QUEUE_MENU),
@@ -443,11 +450,11 @@ MAKE_ONPLAYMENU(queue_menu, ID2P(LANG_QUEUE_MENU),
 /* replace playlist */
 MENUITEM_FUNCTION_W_PARAM(replace_pl_item, 0, ID2P(LANG_PLAY),
                   add_to_playlist, &addtopl_replace,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 
 MENUITEM_FUNCTION_W_PARAM(replace_shuf_pl_item, 0, ID2P(LANG_PLAY_SHUFFLED),
                   add_to_playlist, &addtopl_replace_shuffled,
-                  treeplaylist_callback, Icon_Playlist);
+                  treeplaylist_callback, Icon_NOICON);
 
 MAKE_ONPLAYMENU(browser_playlist_menu, ID2P(LANG_PLAYING_NEXT),
                 treeplaylist_callback, Icon_Playlist,
@@ -540,12 +547,22 @@ static int treeplaylist_callback(int action,
     return action;
 }
 
+/* These two open a context submenu of their own, so they report as one whatever
+ * called them. context_menu_show() pushes for the menu it opens directly, but
+ * these are reached from a row of that menu -- or straight from the playlist
+ * viewer, which has already restored its own activity by then. Left unpushed,
+ * the menu runs as whatever screen is underneath and a theme switching on %cs
+ * dresses it as that screen's rows. Popped conditionally, like the other sites:
+ * an item may have exited elsewhere and popped it already. */
 void context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb))
 {
     ctx_current_playlist_insert = playlist_insert_cb;
     selected_file_set(CONTEXT_STD, path, attr);
     in_queue_submenu = false;
+    push_current_activity(ACTIVITY_CONTEXTMENU);
     do_menu(&browser_playlist_menu, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
 }
 
 /* playlist catalog options */
@@ -566,9 +583,9 @@ static int cat_playlist_callback(int action,
                                  struct gui_synclist *this_list);
 
 MENUITEM_FUNCTION(cat_add_to_list, 0, ID2P(LANG_ADD_TO_EXISTING_PL),
-                  cat_add_to_a_playlist, NULL, Icon_Playlist);
+                  cat_add_to_a_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(cat_add_to_new, 0, ID2P(LANG_CATALOG_ADD_TO_NEW),
-                  cat_add_to_a_new_playlist, NULL, Icon_Playlist);
+                  cat_add_to_a_new_playlist, NULL, Icon_NOICON);
 MAKE_ONPLAYMENU(cat_playlist_menu, ID2P(LANG_ADD_TO_PL),
                 cat_playlist_callback, Icon_Playlist,
                 &cat_add_to_list, &cat_add_to_new);
@@ -577,7 +594,10 @@ void context_menu_show_playlist_cat(const char* track_name, int attr, void (*add
 {
     ctx_add_to_playlist = add_to_pl_cb;
     selected_file_set(CONTEXT_STD, track_name, attr);
+    push_current_activity(ACTIVITY_CONTEXTMENU);
     do_menu(&cat_playlist_menu, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
 }
 
 static int cat_playlist_callback(int action,
@@ -940,7 +960,7 @@ static bool set_catalogdir(void)
     return false;
 }
 MENUITEM_FUNCTION(set_catalogdir_item, 0, ID2P(LANG_PLAYLIST_DIR),
-                  set_catalogdir, clipboard_callback, Icon_Playlist);
+                  set_catalogdir, clipboard_callback, Icon_NOICON);
 
 static bool set_databasedir(void)
 {
@@ -1173,7 +1193,7 @@ MENUITEM_SETTING(sort_playlists, &global_settings.sort_playlists, sort_playlists
 
 MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
                   view_playlist,
-                  context_menu_callback, Icon_Playlist);
+                  context_menu_callback, Icon_NOICON);
 
 /* used when context_menu_show() is not called in the CONTEXT_WPS context */
 MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
