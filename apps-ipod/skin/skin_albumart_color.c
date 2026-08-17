@@ -54,6 +54,7 @@
 #include "file.h"
 #include "string-extra.h"
 #include "metadata/art_cache.h"      /* the palette's own source */
+#include "playlist/playlist.h"       /* playlist_is_from_artist -- Auto's rule */
 #include "draw/bmp.h"                /* struct bitmap, FORMAT_NATIVE */
 #include "draw/color.h"              /* blending, HSV and contrast helpers */
 #include "draw/img_filter.h"
@@ -475,9 +476,13 @@ static int palette_size_idx = -2;      /* -2 not looked up, -1 no such size */
  * render pass while the timeout below runs down; with it, once per track. */
 static unsigned int palette_miss;
 
-/* The album folder of a track path, hashed the way the cache keys on it: no
- * normalisation and no trailing slash. Anything else silently misses. */
-static unsigned int track_folder_hash(const char *path)
+/* The folder of a track path, hashed the way the cache keys on it: no
+ * normalisation and no trailing slash. Anything else silently misses.
+ *
+ * `artist` rises one more level, which is where the cache keeps a portrait --
+ * the same arithmetic load_cached_albumart() does, including refusing to rise
+ * past the volume root, where truncating to "" would key on the whole volume. */
+static unsigned int track_folder_hash(const char *path, bool artist)
 {
     const char *slash;
 
@@ -495,28 +500,82 @@ static unsigned int track_folder_hash(const char *path)
             return 0;
         memcpy(dir, path, n);
         dir[n] = '\0';
+
+        if (artist)
+        {
+            char *psep = strrchr(dir, '/');
+
+            if (!psep || psep == dir)
+                return 0;
+            *psep = '\0';
+        }
         return art_cache_dir_hash(dir);
     }
 }
 
-/* Extract from the cached thumbnail. False means there is none to read --
- * no database yet, a folder the caching pass has not reached, or one with no
- * art at all -- and the caller falls back to the skin's slot. */
-static bool palette_from_cache(void)
+/* Read one folder's cached thumbnail and take the palette from it. False means
+ * there is none to read: no database yet, a folder the caching pass has not
+ * reached, or one with no art at all. */
+static bool palette_from_folder(unsigned int hash, int dim)
 {
     struct art_cache_header hdr;
     struct bitmap bmp;
     char aat[MAX_PATH];
+    size_t bytes;
+    int fd;
+
+    if (hash == 0)
+        return false;
+
+    /* Ask where the thumbnail would be and open it, rather than asking
+     * whether it exists first -- the open is the existence test. A folder
+     * with no art has no file here, which is what keeps the shared "no art"
+     * placeholder from becoming somebody's palette. */
+    art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
+    fd = open(aat, O_RDONLY);
+    if (fd < 0)
+        return false;
+
+    bytes = (size_t)dim * dim * sizeof(fb_data);
+    if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
+        hdr.magic != ART_CACHE_MAGIC ||
+        hdr.version != ART_CACHE_FORMAT_VERSION ||
+        hdr.width != dim || hdr.height != dim ||
+        read(fd, palette_px, bytes) != (ssize_t)bytes)
+    {
+        close(fd);
+        return false;
+    }
+    close(fd);
+
+    /* Pixel order is not checked because a histogram does not care: this
+     * size is stored column-major for the carousel, and every pixel is
+     * counted whichever way round they sit. */
+    bmp.width = dim;
+    bmp.height = dim;
+    bmp.format = FORMAT_NATIVE;
+    bmp.data = (unsigned char *)palette_px;
+    extract_colors(&bmp);
+    return true;
+}
+
+/* Extract from the cached thumbnail, asking about the folder the now-playing
+ * screen is showing -- and the caller falls back to the skin's slot if there is
+ * nothing there.
+ *
+ * The cache holds portraits as well as covers, keyed by folder either way, so
+ * every setting can be served from here; only the folder differs. The rule is
+ * load_cached_albumart()'s, and the asymmetry in it is deliberate there: Auto
+ * asks for a portrait only for a playlist built from an artist browse and falls
+ * back to the cover, while the explicit Artist setting does not fall back,
+ * because a missing portrait is meant to be visible rather than papered over. */
+static bool palette_from_cache(void)
+{
+    unsigned int cand[2];
     char path[MAX_PATH];
     struct mp3entry *id3;
-    unsigned int hash;
-    size_t bytes;
-    int fd, dim;
-
-    /* A theme showing artist portraits should not have colours taken from the
-     * album cover, so leave it to the slot, which holds whatever it chose. */
-    if (global_settings.wps_art_source != WPS_ART_ALBUM)
-        return false;
+    unsigned int miss_key;
+    int n = 0, i, dim;
 
     if (palette_size_idx == -2)
         palette_size_idx = art_cache_size_index("coverflow");
@@ -534,44 +593,33 @@ static bool palette_from_cache(void)
         return false;
     strmemccpy(path, id3->path, sizeof(path));
 
-    hash = track_folder_hash(path);
-    if (hash == 0 || hash == palette_miss)
-        return false;
-
-    /* Ask where the thumbnail would be and open it, rather than asking
-     * whether it exists first -- the open is the existence test. A folder
-     * with no art has no file here, which is what keeps the shared "no art"
-     * placeholder from becoming somebody's palette. */
-    art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
-    fd = open(aat, O_RDONLY);
-    if (fd < 0)
+    if (global_settings.wps_art_source == WPS_ART_ARTIST)
+        cand[n++] = track_folder_hash(path, true);
+    else
     {
-        palette_miss = hash;
-        return false;
+        if (global_settings.wps_art_source == WPS_ART_AUTO &&
+            playlist_is_from_artist())
+        {
+            cand[n++] = track_folder_hash(path, true);
+        }
+        cand[n++] = track_folder_hash(path, false);
     }
 
-    bytes = (size_t)dim * dim * sizeof(fb_data);
-    if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
-        hdr.magic != ART_CACHE_MAGIC ||
-        hdr.version != ART_CACHE_FORMAT_VERSION ||
-        hdr.width != dim || hdr.height != dim ||
-        read(fd, palette_px, bytes) != (ssize_t)bytes)
-    {
-        close(fd);
-        palette_miss = hash;
+    /* The negative cache is keyed on the album folder whichever candidate was
+     * tried, because that is the one hash every setting can compute: it only has
+     * to name this track's folder set, and it is read back before any of them are
+     * opened. Set only when they all failed, or a fallback would be skipped the
+     * moment the portrait was missing. */
+    miss_key = track_folder_hash(path, false);
+    if (miss_key != 0 && miss_key == palette_miss)
         return false;
-    }
-    close(fd);
 
-    /* Pixel order is not checked because a histogram does not care: this
-     * size is stored column-major for the carousel, and every pixel is
-     * counted whichever way round they sit. */
-    bmp.width = dim;
-    bmp.height = dim;
-    bmp.format = FORMAT_NATIVE;
-    bmp.data = (unsigned char *)palette_px;
-    extract_colors(&bmp);
-    return true;
+    for (i = 0; i < n; i++)
+        if (palette_from_folder(cand[i], dim))
+            return true;
+
+    palette_miss = miss_key;
+    return false;
 }
 
 /* ---------------------------------------------------------------------- *
