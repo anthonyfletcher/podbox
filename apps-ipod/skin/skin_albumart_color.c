@@ -559,6 +559,39 @@ static bool palette_from_folder(unsigned int hash, int dim)
     return true;
 }
 
+/* The other source: whatever bitmap the skin buffered into its album-art slot.
+ * Second choice, because it is the theme's picture at the theme's size rather
+ * than the album's own, but it is all there is until the caching pass arrives.
+ *
+ * Pinned across the read. extract_colors() makes three passes, and the bitmap
+ * lives in the audio buffer where it is movable -- so anything that allocated
+ * between those passes could have it sampling two different pictures and
+ * producing a palette belonging to neither. Pinning forbids the move; the handle
+ * can still be *removed*, which is what the bufgetdata() test catches.
+ *
+ * False for a filtered slot: %Cl rewrites those in place, and a palette taken
+ * from one describes the theme's treatment of the album rather than the album --
+ * a bw chain would turn every derived colour grey. */
+static bool slot_filtered(int aa_slot, int handle);   /* with the filter chain */
+
+static bool palette_from_slot(int aa_slot, int handle)
+{
+    struct bitmap *bmp;
+    bool got;
+
+    if (slot_filtered(aa_slot, handle))
+        return false;
+    if (!buf_pin_handle(handle, true))
+        return false;
+
+    got = bufgetdata(handle, 0, (void *)&bmp) > 0;
+    if (got)
+        extract_colors(bmp);
+
+    buf_pin_handle(handle, false);
+    return got;
+}
+
 /* Extract from the cached thumbnail, asking about the folder the now-playing
  * screen is showing -- and the caller falls back to the skin's slot if there is
  * nothing there.
@@ -849,15 +882,22 @@ void dynamic_colors_check_extraction(int aa_slot)
     int handle = aa_slot >= 0 ? playback_current_aa_hid(aa_slot) : -1;
     if (handle >= 0)
     {
-        struct bitmap *bmp;
-        /* Never derive a palette from art a filter has already rewritten: it
-         * describes the album, not the theme's treatment of it, and a bw
-         * chain would otherwise turn every derived colour grey. Keeping the
-         * palette we have is the better of the two wrong answers. */
-        if (!slot_filtered(aa_slot, handle) &&
-            bufgetdata(handle, 0, (void *)&bmp) > 0)
-            extract_colors(bmp);
-        needs_extraction = false;
+        if (palette_from_slot(aa_slot, handle))
+        {
+            needs_extraction = false;
+            return;
+        }
+        /* Nothing came of the slot: a filter has rewritten it, or the handle
+         * went away mid-read. Keep the palette we have -- but keep asking,
+         * because the caching pass may still reach this album and the cache
+         * above is the better source anyway. Bounded by the same timeout, so a
+         * slot that stays filtered stops costing a retry every frame.
+         *
+         * Clearing the flag here regardless is what used to make a bad moment
+         * permanent: the first pass after a track change decided, and nothing
+         * asked again. */
+        if (current_tick - cache.track_change_tick > NO_ART_TIMEOUT)
+            needs_extraction = false;
     }
     else
     {
