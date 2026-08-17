@@ -773,7 +773,7 @@ const CUSTOM = {
   lw:["","Set while the firmware's generic 'working' flag is on"],
   la:["","Spinner frame index — a full turn takes about a second"],
   Sb:["i|sii","Draw a spectrum analyser filling this viewport",["bars","center","radius","gap"]],
-  La:["|IS","Album art for a list row",["offset","nowrap"]],
+  La:["|Isi","Album art for a list row",["offset","nowrap","radius"]],
   tw:["T|i","Pixel width of text — pass a font id when measuring outside its viewport",["text","fontid"]],
   Vw:["","Width of the current viewport, in pixels"],
   Vh:["","Height of the current viewport, in pixels"],
@@ -968,6 +968,7 @@ const ARG_HELP = {
   "LI:1": "'nowrap' stops the offset wrapping round the ends of the list.",
   "La:0": "row offset; 0 is the row being drawn.",
   "La:1": "'nowrap' stops the offset wrapping round the ends of the list.",
+  "La:2": "corner radius in pixels. Write the wrap argument as '-' to reach it.",
 
   /* widgets */
   "Sb:0": "number of bands, 1–8. Outside that it is clamped, not refused.",
@@ -1213,7 +1214,7 @@ function scan(text) {
     if (name === "V" || name === "Vl" || name === "Vi") cls = "t-vpdecl";
     i = nameAt + name.length;
 
-    let args = [];
+    let args = [], hasArgList = false;
     if (text[i] === "(") {
       const r = readArgs(i);
       paint(paintFrom, i, cls);
@@ -1221,11 +1222,14 @@ function scan(text) {
       paintArgs(r.args);
       if (r.end - 1 < text.length) paint(r.end - 1, r.end, "t-punct");
       args = r.args;
+      hasArgList = true;
       i = r.end;
     } else {
       paint(paintFrom, i, cls);
     }
-    return { type: "tag", name, args, info, custom: !!(info && info.custom), s: start, e: i, isCondSubject: !!isCondSubject };
+    /* hasArgList separates "%V" from "%V()" — the parser rejects the two
+       differently, and args is [] for both. */
+    return { type: "tag", name, args, hasArgList, info, custom: !!(info && info.custom), s: start, e: i, isCondSubject: !!isCondSubject };
   }
 
   function parseConditional() {
@@ -1394,6 +1398,7 @@ function build(text) {
   const lbLabels = new Set();            /* labels named by %Lb */
   const vdRefs = [], viRefs = [], lbRefs = [];
   const selNodes = [], twNodes = [], csTests = [], clNodes = [], drNodes = [];
+  const allTags = [];                    /* every tag written, nested ones too */
   /* Every %Cl in the skin, in the order written, and the one a bare %Cd binds
      to (the most recent). See the %Cl/%Cd block in walk(). */
   const arts = [], cdNodes = [];
@@ -1426,6 +1431,7 @@ function build(text) {
       if (n.type === "text" && top && n.text && n.text.trim() !== "")
         lineRec(n.s).draws.push("text");
       if (n.type === "tag") {
+        if (n.info) allTags.push(n);
         if (cur) { if (!cur.tags) cur.tags = new Map(); if (!cur.tags.has(n.name)) cur.tags.set(n.name, n.s); }
         if (top) {
           const rec = lineRec(n.s);
@@ -1529,10 +1535,6 @@ function build(text) {
     if (groupCount[v.label] > 1) v.part = groupSeen[v.label] + " of " + groupCount[v.label];
   }
 
-  /* ---------- semantic rules ----------
-     Each one encodes something the parser accepts happily and the renderer
-     then does something unhelpful with. */
-
   const labelKinds = new Map();
   for (const v of vps) {
     if (!v.label || v.label === "-") continue;
@@ -1540,6 +1542,68 @@ function build(text) {
     labelKinds.get(v.label).add(v.kind);
   }
   const add = (sev, off, rule, msg) => issues.push({ sev, off, rule, msg });
+
+  /* ---------- the parser's own rules ----------
+     Every rule below this block describes a skin that loads and then draws
+     wrong. These two describe one that does not load at all: skin_parse_tag()
+     in lib/skin_parser/skin_parser.c refuses it and Rockbox drops the whole
+     file — no line number, no message on screen, the theme simply does not
+     apply. That silence is the reason to catch them here rather than leave
+     them to the device.
+
+     Both read the same spec strings the inspector explains, so they stay
+     right only as long as the tables at the top of this file match
+     tag_table.c and custom_tags.c. */
+  for (const n of allTags) {
+    const spec = n.info.def[0] || "";
+    const names = n.info.def[2] || [];
+    const toks = specTokens(spec);
+    const last = toks.length ? toks[toks.length - 1] : null;
+    const nth = k => (names[k] ? '"' + names[k] + '"' : "argument " + (k + 1));
+    const plural = k => k + " argument" + (k === 1 ? "" : "s");
+
+    /* A. Argument count. The list may be left off entirely when the spec opens
+          with '?', or when every argument is optional — otherwise a tag with
+          required arguments and no '(' is ARGLIST_EXPECTED, too few is
+          INSUFFICIENT_ARGS and too many is TOO_MANY_ARGS. A trailing '*'
+          repeats the last token, so those specs can never overflow. */
+    if (!n.hasArgList) {
+      if (toks.required > 0 && !toks.qmark)
+        add("err", n.s, "arg-count",
+          "%" + n.name + " needs " + plural(toks.required) + " and is written with none. " +
+          "Rockbox rejects the whole skin on this — write %" + n.name + "(" +
+          (names.length ? names.slice(0, toks.required).join(",") : spec) + ").");
+    } else if (n.args.length < toks.required) {
+      add("err", n.s, "arg-count",
+        "%" + n.name + " needs " + plural(toks.required) + " and only " + n.args.length +
+        " " + (n.args.length === 1 ? "is" : "are") + " written — " + nth(n.args.length) +
+        " is missing. There is no '|' before it in the spec (" + spec + "), so it is required, " +
+        "and Rockbox rejects the whole skin rather than defaulting it.");
+    } else if (!(last && last.repeat) && n.args.length > toks.length) {
+      add("err", n.s, "arg-count",
+        "%" + n.name + " takes at most " + plural(toks.length) + " and " + n.args.length +
+        " are written. Rockbox rejects the whole skin on this.");
+    }
+
+    /* B. '-' means "use the default", and only a lowercase type code accepts
+          it. A bracketed group always does: the parser guesses the code from
+          the value written and lowercases it on the way, so [IP] takes '-'
+          even though both letters are capitals. Only a bare capital refuses.
+          A '-' followed by a digit is a negative number, not a default. */
+    if (n.hasArgList) n.args.forEach((a, k) => {
+      if (a.raw.trim() !== "-") return;
+      const tok = toks[k] || (last && last.repeat ? last : null);
+      if (!tok || tok.bracket || !/^[A-Z]$/.test(tok.t)) return;
+      add("err", a.s, "default-not-allowed",
+        "%" + n.name + " " + nth(k) + " has type '" + tok.t + "' — a capital, which rejects '-'. " +
+        "Only a lowercase type code treats it as \"use the default\". Rockbox rejects the whole " +
+        "skin on this, so write the value out.");
+    });
+  }
+
+  /* ---------- semantic rules ----------
+     From here on, each rule encodes something the parser accepts happily and
+     the renderer then does something unhelpful with. */
 
   /* 1. A NOBREAK tag suppresses this line's break, so the next line overdraws it.
         line_number resets per viewport, so this only bites when another drawing
@@ -3478,25 +3542,31 @@ cv.addEventListener("click", () => { if (hoverVp >= 0) selectVp(hoverVp, true); 
    The strings in the tag tables are the parser's own. Split one into a token
    per argument so each argument can say what it accepts: '|' marks where the
    optional ones begin, '*' repeats the token before it, '?' means the whole
-   list may be left off, and a bracketed group is a choice. */
+   list may be left off, and a bracketed group is a choice.
+
+   Two properties are hung on the returned array for the argument-count and
+   '-' rules below: `required` (how many must be written) and `qmark` (the '?'
+   prefix, which lets the whole argument list be omitted). */
 function specTokens(spec) {
   const out = [];
-  let optionalFrom = Infinity;
+  let optionalFrom = Infinity, qmark = false;
   for (let i = 0; i < spec.length; i++) {
     const c = spec[i];
-    if (c === "?") continue;
+    if (c === "?") { qmark = true; continue; }
     if (c === "|") { optionalFrom = out.length; continue; }
     if (c === "*") { if (out.length) out[out.length - 1].repeat = true; continue; }
     if (c === "[") {
       const j = spec.indexOf("]", i);
       if (j < 0) break;
-      out.push({ t: spec.slice(i + 1, j) });
+      out.push({ t: spec.slice(i + 1, j), bracket: true });
       i = j;
       continue;
     }
-    out.push({ t: c });
+    out.push({ t: c, bracket: false });
   }
   out.forEach((o, i) => { o.optional = i >= optionalFrom; });
+  out.required = Math.min(optionalFrom, out.length);
+  out.qmark = qmark;
   return out;
 }
 
@@ -3869,7 +3939,7 @@ function renderIssues() {
       '</div><p class="why">Named while drawing the skin now on screen, but absent from the loaded folder.</p></div>';
 
   if (!model.issues.length) {
-    pane.innerHTML = head + (head ? "" : '<p class="empty">Nothing to report. This checks both what the parser sees — unknown tags, unclosed brackets, viewports off the screen, labels named but never declared — and what the renderer will actually do with it: suppressed line breaks, row tags outside a list, unloaded fonts, screen ids that can never match.</p>');
+    pane.innerHTML = head + (head ? "" : '<p class="empty">Nothing to report. This checks both what the parser sees — unknown tags, unclosed brackets, argument counts, \'-\' on an argument that refuses it, viewports off the screen, labels named but never declared — and what the renderer will actually do with it: suppressed line breaks, row tags outside a list, unloaded fonts, screen ids that can never match.</p>');
     return;
   }
   pane.innerHTML = head + model.issues.map(is =>

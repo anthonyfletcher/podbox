@@ -47,8 +47,22 @@ back as the filter chain it compiles to; a value the parser would quietly
 ignore says so. The argument types (`[IP]`, `s`, `T*`) are spelled out, along
 with the rule behind them — lowercase accepts `-`, uppercase does not.
 
-**Lints.** Checks for things the parser accepts happily and the renderer then
-does something unhelpful with:
+**Lints.** Two rules cover what the parser itself refuses. Rockbox reports
+nothing when it does — the theme just fails to apply, with no line number and
+no message on screen — so these are the errors with no diagnostic anywhere
+else:
+
+| rule | catches |
+| --- | --- |
+| `arg-count` | a tag written with too few or too many arguments; an argument with no `\|` before it in the spec is required, whatever a `-` would have meant |
+| `default-not-allowed` | `-` written for an argument whose type code is a bare capital, which rejects it. A bracketed group such as `[IP]` always accepts `-`: the parser guesses the code from the value and lowercases it on the way |
+
+Both read the same spec strings the inspector explains, so they are only as
+right as the tag tables at the top of `index.html`. Re-diff those against
+`tag_table.c` and `custom_tags.c` after changing either.
+
+The rest catch things the parser accepts happily and the renderer then does
+something unhelpful with:
 
 | rule | catches |
 | --- | --- |
