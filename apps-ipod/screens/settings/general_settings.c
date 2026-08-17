@@ -202,7 +202,7 @@ MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_tree_item, 0,
                                   tree_context_menu_do_setting, (void*)0,
                                   tree_hotkey_get_name,
                                   tree_hotkey_speak_item,
-                                  (void*)0, NULL, Icon_Menu_setting);
+                                  (void*)0, NULL, Icon_NOICON);
 static int clear_start_directory(void)
 {
     path_append(global_settings.start_directory, PATH_ROOTSTR,
@@ -672,31 +672,31 @@ MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_wps_item, 0,
                                   wps_context_menu_do_setting, (void*)0,
                                   wps_context_menu_get_name,
                                   wps_context_menu_speak_item,
-                                  (void*)0, NULL, Icon_Menu_setting);
+                                  (void*)0, NULL, Icon_NOICON);
 
 MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_1, 0,
                                   wps_context_menu_do_setting, (void*)1,
                                   wps_context_menu_get_name,
                                   wps_context_menu_speak_item,
-                                  (void*)1, NULL, Icon_Menu_setting);
+                                  (void*)1, NULL, Icon_NOICON);
 
 MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_2, 0,
                                   wps_context_menu_do_setting, (void*)2,
                                   wps_context_menu_get_name,
                                   wps_context_menu_speak_item,
-                                  (void*)2, NULL, Icon_Menu_setting);
+                                  (void*)2, NULL, Icon_NOICON);
 
 MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_3, 0,
                                   wps_context_menu_do_setting, (void*)3,
                                   wps_context_menu_get_name,
                                   wps_context_menu_speak_item,
-                                  (void*)3, NULL, Icon_Menu_setting);
+                                  (void*)3, NULL, Icon_NOICON);
 
 MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_4, 0,
                                   wps_context_menu_do_setting, (void*)4,
                                   wps_context_menu_get_name,
                                   wps_context_menu_speak_item,
-                                  (void*)4, NULL, Icon_Menu_setting);
+                                  (void*)4, NULL, Icon_NOICON);
 
 static void reset_wps_items(void)
 {
@@ -743,7 +743,7 @@ MAKE_MENU(search_menu, ID2P(LANG_DB_SEARCH), 0, Icon_NOICON,
 MENUITEM_SETTING(database_sort_albums_by,
                  &global_settings.database_sort_albums_by, NULL);
 MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
-                  music_menu_config, NULL, Icon_Menu_setting);
+                  music_menu_config, NULL, Icon_NOICON);
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &database_sort_albums_by, &music_menu_config_item, &search_menu
           );

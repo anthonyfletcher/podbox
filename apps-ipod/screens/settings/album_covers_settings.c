@@ -100,13 +100,13 @@ static int art_health_artists(void)
 MENUITEM_FUNCTION(art_health_artists_item, 0, ID2P(LANG_ART_HEALTH_ARTISTS),
                   art_health_artists, NULL, Icon_NOICON);
 
-MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_Menu_setting,
+MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,
             &art_cache_fast_build,
             &art_health_albums_item,
-            &art_health_artists_item,
+            &art_health_artists_item,
             &debug_log_artcache);
 
-MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_Menu_setting,
+MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_on_select,
             &album_covers_show_album_name,
             &album_covers_show_year,

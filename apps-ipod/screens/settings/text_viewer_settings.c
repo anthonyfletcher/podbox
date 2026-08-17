@@ -67,7 +67,7 @@ MENUITEM_FUNCTION(text_viewer_font_reset_item, 0,
                   ID2P(LANG_TEXT_VIEWER_FONT_DEFAULT),
                   text_viewer_font_reset, NULL, Icon_Font);
 
-MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_Menu_setting,
+MAKE_MENU(text_viewer_menu, ID2P(LANG_TEXT_VIEWER), NULL, Icon_NOICON,
           &text_viewer_colour_mode,
           &text_viewer_margin,
           &text_viewer_line_spacing,

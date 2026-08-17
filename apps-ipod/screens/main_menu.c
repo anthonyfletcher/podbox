@@ -376,7 +376,7 @@ MENUITEM_FUNCTION(show_info_item, 0, ID2P(LANG_ROCKBOX_INFO),
 
 int time_screen(void* ignored);
 MENUITEM_FUNCTION(timedate_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_TIME_MENU),
-                  time_screen,  NULL, Icon_Menu_setting );
+                  time_screen,  NULL, Icon_NOICON);
 
 MENUITEM_FUNCTION(show_credits_item, 0, ID2P(LANG_CREDITS),
                   show_credits, NULL, Icon_NOICON);
@@ -424,7 +424,7 @@ MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_third_party_licenses_item, &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
-                  main_menu_config, NULL, Icon_Menu_setting);
+                  main_menu_config, NULL, Icon_NOICON);
 
 /** Main menu **/
 
@@ -433,7 +433,7 @@ MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
  * declared after everything it can reach. */
 MENUITEM_FUNCTION(settings_search_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_DB_SEARCH), settings_search_run,
-                  NULL, Icon_Menu_setting);
+                  NULL, Icon_NOICON);
 
 /* Reports USB the way the other simplelist screens here do, so the menu
  * unwinds rather than redrawing over the USB screen. */
@@ -444,7 +444,7 @@ static int settings_changed_item_fn(void)
 
 MENUITEM_FUNCTION(settings_changed_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_SETTINGS_CHANGED), settings_changed_item_fn,
-                  NULL, Icon_Menu_setting);
+                  NULL, Icon_NOICON);
 
 /* Six branches, cut by what a person is trying to do rather than by which
  * subsystem implements it.

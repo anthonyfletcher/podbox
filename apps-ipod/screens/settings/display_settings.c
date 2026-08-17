@@ -115,10 +115,10 @@ MENUITEM_SETTING(bl_selective_actions,
 
 MENUITEM_FUNCTION(sel_backlight_mask, 0, ID2P(LANG_SETTINGS),
                   selectivebacklight_set_mask, selectivebacklight_callback,
-                  Icon_Menu_setting);
+                  Icon_NOICON);
 
 MAKE_MENU(sel_backlight, ID2P(LANG_BACKLIGHT_SELECTIVE),
-          NULL, Icon_Menu_setting, &bl_selective_actions, &sel_backlight_mask);
+          NULL, Icon_NOICON, &bl_selective_actions, &sel_backlight_mask);
 
 MENUITEM_SETTING_EXPORTED(lcd_sleep_after_backlight_off,
                 &global_settings.lcd_sleep_after_backlight_off, NULL);

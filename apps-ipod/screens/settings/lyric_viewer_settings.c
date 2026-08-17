@@ -76,7 +76,7 @@ static int lyric_font_reset(void)
 MENUITEM_FUNCTION(lyric_font_reset_item, 0, ID2P(LANG_LYRICS_FONT_DEFAULT),
                   lyric_font_reset, NULL, Icon_Font);
 
-MAKE_MENU(lyric_viewer_menu, ID2P(LANG_LYRICS_MENU), NULL, Icon_Menu_setting,
+MAKE_MENU(lyric_viewer_menu, ID2P(LANG_LYRICS_MENU), NULL, Icon_NOICON,
           &lyric_colour_mode,
           &lyric_align,
           &lyric_line_spacing,
