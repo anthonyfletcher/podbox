@@ -23,6 +23,12 @@ fi
 # structure, so they drop straight in and merge: a font or iconset two themes
 # share is one file on the device.
 #
+# That merge is also the one thing to watch. Two themes shipping *different*
+# files under one name silently resolve to whichever copies last, and the theme
+# that loses gets the other's font. Today's two share no filename at all --
+# Themify_2 is LeagueSpartan and Literata, Scrim is Noto -- so nothing collides;
+# adding a third means checking that still holds.
+#
 # Named rather than globbed. themes/ mirrors upstream's tree, so a
 # `git merge rockbox/master` can put entries there, and a glob would quietly
 # start shipping stock themes that were never converted for this fork.
