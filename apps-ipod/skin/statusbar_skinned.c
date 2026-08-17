@@ -31,6 +31,13 @@
 #include "widgets/option_select.h"
 #include "string-extra.h"
 #include "skin_albumart_color.h"
+#include "button.h"                  /* button_queue_post -- see sb_busy_tick */
+#include "led.h"
+#include "system/activity.h"
+#include "metadata/art_cache.h"
+#include "database/tagcache.h"
+#include "database/db_summary.h"
+#include "files/file_index.h"
 
 /* initial setup of wps_data  */
 static int update_delay = DEFAULT_UPDATE_DELAY;
@@ -210,6 +217,89 @@ void do_sbs_update_callback(unsigned short id, void *param)
     button_queue_post(BUTTON_NONE, 0);
 }
 
+/* The four background passes behind %lb: the music database, the album index,
+ * the album-art thumbnail cache and the document/image index. None was asked
+ * for, none is visible, and any of them can be why a screen is slow to open --
+ * so they share one indicator. Here rather than beside the tag because the busy
+ * tick below needs the same question answered. */
+bool sb_background_busy(void)
+{
+    return tagcache_is_busy() || db_summary_is_busy()
+        || art_cache_is_busy() || file_index_is_busy();
+}
+
+/* Animate a busy indicator on a screen that is otherwise still.
+ *
+ * The status bar has no clock: sb_skin_update() is only reached from
+ * GUI_EVENT_ACTIONREDRAW, which the UI sends when it draws something. So on an
+ * idle list nothing samples a time-based tag, and a %la spinner sits on one
+ * frame until the user moves. Posting an empty button breaks the action loop's
+ * wait, and the redraw that follows samples the tag.
+ *
+ * That post is not a keypress. reset_poweroff_timer() and the backlight live in
+ * button_tick()'s keypress path (firmware/drivers/button.c), not in
+ * button_queue_post(), so a long database build still gets to sleep.
+ *
+ * The pace is a real choice, not a consequence: force_waiting bypasses
+ * sb_skin_update()'s own next_update throttle, so this sets the bar's refresh
+ * rate outright while it runs. update_delay is what that rate would otherwise
+ * be, which makes it the cheapest pace that still animates -- about 7 frames a
+ * second. A spinner with more frames than that drops some, which is invisible
+ * when consecutive frames differ only slightly. */
+static void sb_busy_tick(void)
+{
+    static long next_poke = 0;
+    static bool was_busy = false;
+    bool busy;
+
+    if (TIME_BEFORE(current_tick, next_poke))
+        return;
+    next_poke = current_tick + update_delay;
+
+    /* Nothing to animate on a bar that is not drawn, or a dark screen: the
+     * update would be skipped anyway and the wakeup wasted. */
+    if (!sbs_loaded[SCREEN_MAIN] || !lcd_active())
+        return;
+
+    /* Somebody is already driving the UI. The action loop is turning over and
+     * the bar refreshes with it, so a wakeup here animates nothing and only
+     * lengthens the queue the wheel's own events are waiting in -- which is
+     * what made scrolling drag while the database was building.
+     *
+     * Before was_busy is touched, deliberately: a fall that happens while the
+     * user is scrolling is not lost, it is just handled on the next idle tick. */
+    if (!button_queue_empty())
+        return;
+
+    /* The union of the three indicators a skin can draw: %lh, %lb and %lw. */
+    busy = led_read(HZ/2) || sb_background_busy() || ui_working();
+
+    /* One poke after the last one, or the indicator stays on screen: the tag
+     * turns false but nothing repaints the line it was drawn on, so the final
+     * frame sits there until the user moves. */
+    if (!busy && !was_busy)
+        return;
+
+    /* While it runs, deliberately not skin_request_full_update(): the indicator
+     * is a dynamic tag, so the ordinary non-static refresh redraws it and the
+     * dirty-rect flush transfers its rectangle alone. A full update repaints the
+     * whole bar, backdrop composite included -- what a track change needs, and
+     * far more than a spinner frame does. Asking for one every frame is what
+     * made lists drag.
+     *
+     * The last poke is the exception and does need one. A line is only rewritten
+     * when its content changed, and a tag that stops producing text is not a
+     * change the engine notices -- the line simply comes out shorter and nothing
+     * erases what the longer one left. Once, at the end of the work, a full
+     * repaint costs nothing worth counting. */
+    if (!busy)
+        skin_request_full_update(CUSTOM_STATUSBAR);
+    was_busy = busy;
+
+    force_waiting = true;
+    button_queue_post(BUTTON_NONE, 0);
+}
+
 void sb_skin_set_update_delay(int delay)
 {
     update_delay = delay;
@@ -310,5 +400,6 @@ void sb_skin_init(void)
     {
         oldinfovp_label[i] = VP_DEFAULT_LABEL;
     }
+    tick_add_task(sb_busy_tick);
 }
 

@@ -63,14 +63,11 @@
 #include "audio/peak_meter.h"
 /* Image stuff */
 #include "metadata/albumart.h"
-#include "metadata/art_cache.h"
 #include "playlist/playlist.h"
 #include "audio/playback.h"
 #include "tdspeed.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
-#include "database/db_summary.h"      /* db_summary_is_busy -- the %lb indicator */
-#include "files/file_index.h"         /* file_index_is_busy -- likewise */
 
 #include "wps_internals.h"
 #include "custom_tokens.h"
@@ -1876,26 +1873,14 @@ const char *get_token_value(struct gui_wps *gwps,
                 return NULL;
         case SKIN_TOKEN_VLED_BUILDING:
         {
-            /* database, album-index, thumbnail-cache and document/image-index
-             * background work in progress. All four are passes the user did not
-             * ask for and cannot see, and any of them can be the reason a
-             * screen is slow to open -- so they share one indicator rather than
-             * each having their own.
+            /* The four background passes; sb_background_busy() names them, since
+             * the tick that animates this indicator asks the same question.
              *
              * The file index earns its place the hard way: left out, its
              * whole-disk walk reported as plain disk activity (%lh), which
              * reads as ordinary loading and hid a walk running right through a
              * USB handshake. */
-            bool building = false;
-            if (tagcache_is_busy())
-                building = true;
-            if (db_summary_is_busy())
-                building = true;
-            if (art_cache_is_busy())
-                building = true;
-            if (file_index_is_busy())
-                building = true;
-            return building ? "b" : NULL;
+            return sb_background_busy() ? "b" : NULL;
         }
         case SKIN_TOKEN_VLED_WORKING:
             /* generic busy flag for other long-running work; set via
