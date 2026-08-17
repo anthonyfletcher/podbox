@@ -1,0 +1,91 @@
+#-----------------------------------------------#
+# Scrimp -- SBS
+#-----------------------------------------------#
+#
+#--- Fonts ---#
+%Fl(2,24x24_Icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+#
+#--- Images ---#
+# The volume bar's track and fill; see the overlay at the end of the file.
+%xl(vbg,volband.bmp,0,0)
+%xl(vwf,volfill.bmp,0,0)
+#
+#--- Background layer ---#
+#
+# Album art
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(80,0,240,240,c,c,blur1,-,blurred)%Cd(blurred)
+#
+# Menu background tint
+%dr(0,0,320,35,ffffff,-,11)
+#
+# Menu background tint
+%dr(0,35,320,205,000000,-,11)
+#
+# Quick menu tint
+%?if(%cs,=,10)<%dr(20,46,280,180,000000,-,6,11)>
+#
+#--- Foreground layer ---#
+#
+%V(0,0,-,-,-)
+#
+# Setup rows
+%Lb(Rows,300,30)
+#
+# Top bar
+%?mv(3)<%Vd(Volume)|%Vd(Chrome)>
+#
+# List title
+%Vl(Chrome,0,0,320,35,3)
+%Vl(Chrome,10,7,180,20,3)%Vf(000000)
+%?if(%cs,=,10)<Quick Screen|%?if(%Lt,=,Rockbox)<Main Menu|%s%Lt>>
+#
+# Status icons
+%Vl(Chrome,190,5,120,24,2)%Vf(000000)
+%ar%?or(%lh,%lb,%lw)<%?la<Ã|Ä|Å|Æ|Ç|È|É|Ê>>%?ps<H>%?mm<|J|J|J|J>%?bl<1|1|2|3|4|5|6|7>%?bc<8>
+#
+# List viewport
+%Vi(-,10,46,300,184,-)
+#
+# Quick menu
+%Vi(QuickArea,34,60,252,152,3)
+%?if(%cs,=,10)<%VI(QuickArea)>
+#
+# Row setup
+#
+# - Row icon
+%Vl(Rows,36,3,24,24,2)
+%?La<|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album]))))<|%?Lc<%Vf(ffffff)|%Vf(ababab)>%?if(%cs,=,7)<%sel(%LI,1,g,0,v,2,c,33,w,34,x,-1,-,y)|%sel(%LT,%Sx([All Tracks]),Z,%Sx([Random]),Î,%Sx([Untagged]),Ù,%Sx([By album]),U,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),z,%Sx(Music),T,%Sx(Album Covers),V,%Sx(Artist Portraits),X,%Sx(Current Playlist),Í,%Sx(Playlists),c,%Sx(Spun),s,%Sx(Files),g,%Sx(Settings),£,%Sx(System),Ò,%Sx(Shortcuts),¾,%Sx(Random Album),Î,%Sx(Playback History),r,%Sx(Shuffle Songs),H,%Sx(Documents),z,%Sx(Images),¡,%Sx(Search),Þ,%Sx(Album),à,%Sx(Albums),à,%Sx(Artist),W,%Sx(Artists),W,%Sx(Album Artist),á,%Sx(Album Artists),á,%Sx(Genre),Y,%Sx(Year),t,%Sx(Composer),â,%Sx(User Rating),o,%Sx(Recently Added),q,%Sx(First Letter),k,%Sx(Tracks by),S,%Sx(Search by...),ß,%sel(%LT,%Sx(Same as currently played track),¼,%Sx(Sound Settings),±,%Sx(Playback Settings),ö,%Sx(Library),Ü,%Sx(Appearance),¦,%Sx(Battery & Power),³,%Sx(Settings Mode),ª,%Sx(Changed Settings),«,%Sx(Tracks),Z,%Sx(Artists between Years),è,%Sx(Albums between Years),ç,%Sx(Score),ó,%Sx(Comment),ò,%Sx(Add to Playlist...),ê,%Sx(Remove),Ï,%Sx(Move),ñ,%Sx(Show Track Info),i,%Sx(Shuffle),H,%Sx(Save),Ô,%Sx(View),¥,%Sx(Playing Next...),d,%Sx(Rename),ð,%Sx(Properties),i,%Sx(Delete),Ï,%Sx(Add to Shortcuts),¾,%Sx(Sort Playlist),¾,%Sx(Cut),ï,%Sx(Copy),î,%Sx(Paste),ô,%Sx(Delete Directory),í,%Sx(Create Directory),ì,%Sx(Set As...),e,%Sx(Files),z,%sel(%LT,%Sx(Volume),O,%Sx(Bass),R,%Sx(Treble),R,%Sx(Equalizer),P,%Sx(Repeat),J,%Sx(Bookmarking),e,%Sx(Carousel),V,%Sx(Art Cache),¡,%Sx(Load Theme),¾,%Sx(Font),j,%Sx(Edit Main Menu),i,%Sx(Backlight),§,%Sx(Brightness),¯,%Sx(Idle Poweroff),´,%Sx(Time & Date Settings),p,%Sx(Show in Files),h,%Sx(View Current Playlist),Í,%Sx(Save Current Playlist),Ô,%Sx(Search in Playlist),Þ,%Sx(Playing Time),Ë,%Sx(Reshuffle),H,%Sx(Add),½,%Sx(Play),A,%sel(%LI,19,À,2,c))))>>>
+#
+# - Row number
+%Vl(Rows,36,7,24,20,3)
+%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album]))))<%ar%?Lc<%Vf(ffffff)|%Vf(ababab)>%?if(%cs,=,5)<%LN|%ma(%LN,+,-1)>>
+#
+# - Row text
+%Vl(Rows,80,5,184,20,-)
+%?La<|%?Lc<%Vf(ffffff)|%Vf(ababab)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>
+#
+# Album/Artist row setup
+#
+# - Special row icon
+%Vl(Rows,26,11,24,24,2)
+%?La<%?Lc<%Vf(ffffff)|%Vf(ababab)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),Î,%Sx([Untagged]),Ù,%Sx([By album]),U)>
+#
+# - Row art. 
+%Vl(Rows,16,1,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La%?Lc<|%dr(0,0,44,44,000000,-,6)>>
+#
+# - Row text
+%Vl(Rows,80,13,220,20,-)
+%?La<%?Lc<%Vf(ffffff)|%Vf(ababab)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
+#
+# Volume overlay
+%Vl(Volume,0,0,320,35,3)%Vg(!000000,!000000,!ffffff)
+%Vs(gradient) 
+%Vs(gradient) 
+%Vs(gradient) 
+%Vl(Volume,8,6,304,24,2)%Vg(!000000,!000000,!ffffff)%Vf(!ffffff)
+%Vs(gradient)%?pv<M|N|N>%arO
+%Vl(Volume,40,15,240,6,-)%Vf(!ffffff)
+%pv(0,0,240,6,image,vwf,backdrop,vbg)
+

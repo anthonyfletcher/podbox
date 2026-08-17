@@ -1,8 +1,7 @@
 #!/bin/sh
-# Bundle Themify_2 -- this fork's only shipped theme -- into a rockbox.zip
-# produced by `make zip`, and make it the first-boot default via a
-# pre-populated config.cfg (applied before any compiled DEFAULT_WPSNAME /
-# DEFAULT_SBSNAME fallback takes effect).
+# Bundle this fork's themes into a rockbox.zip produced by `make zip`, and make
+# Themify_2 the first-boot default via a pre-populated config.cfg (applied
+# before any compiled DEFAULT_WPSNAME / DEFAULT_SBSNAME fallback takes effect).
 #
 # This lives here rather than in tools/buildzip.pl so that file stays as close
 # to upstream as possible. `make zip` alone produces a themeless zip;
@@ -20,17 +19,29 @@ if [ ! -f "$ZIP" ]; then
     exit 1
 fi
 
-# themes/Themify_2/.rockbox is already laid out with the on-device directory
-# structure, so it drops straight in.
+# Each themes/<name>/.rockbox is already laid out with the on-device directory
+# structure, so they drop straight in and merge: a font or iconset two themes
+# share is one file on the device.
 #
-# default-config.cfg sits beside the theme rather than inside it: it is the
-# build's first-boot config, not part of Themify_2, and it names settings that
-# have nothing to do with the theme. Keeping it in themes/Themify_2 made it
-# look like one of that theme's files and meant it moved whenever the theme did.
+# Named rather than globbed. themes/ mirrors upstream's tree, so a
+# `git merge rockbox/master` can put entries there, and a glob would quietly
+# start shipping stock themes that were never converted for this fork.
+THEMES="Themify_2 Scrim"
+#
+# default-config.cfg sits beside the themes rather than inside one: it is the
+# build's first-boot config, not part of any theme, and it names settings that
+# have nothing to do with a theme. Keeping it in themes/Themify_2 made it look
+# like one of that theme's files and meant it moved whenever the theme did.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox"
-cp -R "$ROOT/themes/Themify_2/.rockbox/." "$STAGE/.rockbox/"
+for theme in $THEMES; do
+    if [ ! -d "$ROOT/themes/$theme/.rockbox" ]; then
+        echo "bundle-theme.sh: themes/$theme/.rockbox is missing" >&2
+        exit 1
+    fi
+    cp -R "$ROOT/themes/$theme/.rockbox/." "$STAGE/.rockbox/"
+done
 cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/config.cfg"
 
 # The house style a theme is loaded on top of. Loading a theme resets every
@@ -52,7 +63,7 @@ cp "$ROOT/icons/tango_icons_viewers.16x16.bmp" "$STAGE/.rockbox/icons/"
 
 # Upstream buildzip.pl copies the classic_statusbar theme straight out of
 # wps/ rather than going through WPSLIST, so it lands in the zip even though
-# this fork ships only Themify_2. Drop the directory and the two loose .sbs
+# it is not one of the themes above. Drop the directory and the two loose .sbs
 # files it writes alongside (the trailing slash pattern does not match those).
 zip -qd "$ZIP" '.rockbox/wps/classic_statusbar/*' >/dev/null 2>&1 || true
 zip -qd "$ZIP" '.rockbox/wps/classic_statusbar.sbs' \
@@ -68,4 +79,4 @@ zip -qd "$ZIP" '.rockbox/wps/classic_statusbar.sbs' \
 zip -qd "$ZIP" '.rockbox/rocks/*' '.rockbox/rocks/' >/dev/null 2>&1 || true
 zip -qd "$ZIP" '.rockbox/viewers.config' >/dev/null 2>&1 || true
 
-echo "bundled Themify_2 + config.cfg into $ZIP"
+echo "bundled$(for t in $THEMES; do printf ' %s' "$t"; done) + config.cfg into $ZIP"
