@@ -309,6 +309,11 @@ done
 # nothing, and nothing else looks wrong, so it is the one omission a glance at
 # the player would not find. (bundle-licenses.sh has no entry -- it rewrites a
 # file buildzip.pl already ships, so its presence proves nothing.)
+#
+# Both themes are named, because bundle-theme.sh copies them one at a time and a
+# missing one would leave the other's check passing. Scrim's .sbs and one of its
+# bitmaps go in too: the fonts and bitmaps live in directories the other theme
+# also writes into, so a theme can be half-copied without the .cfg noticing.
 
 say "Checking the zips"
 for target in $TARGETS; do
@@ -316,7 +321,9 @@ for target in $TARGETS; do
     ssh "$SERVER" "
         set -e
         [ -f '$zip' ] || { echo 'missing: $zip' >&2; exit 1; }
-        for want in .rockbox/themes/Themify_2.cfg .rockbox/eqs/Default.cfg \
+        for want in .rockbox/themes/Themify_2.cfg .rockbox/themes/Scrim.cfg \
+                    .rockbox/wps/Scrim.sbs .rockbox/wps/scrim/volband.bmp \
+                    .rockbox/eqs/Default.cfg \
                     .rockbox/docs/settings-help.txt \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
