@@ -33,7 +33,12 @@
 
 /* Band center frequencies, log-spaced ~60Hz-12kHz (bass to treble).
  * spectrum_meter_get_bar() picks evenly-spaced entries from this table
- * when fewer than SPECTRUM_MAX_BANDS bars are requested. */
+ * when fewer than SPECTRUM_MAX_BANDS bars are requested.
+ *
+ * These are analysed exactly, but a SPECTRUM_BLOCK_SIZE window resolves
+ * samplerate/SPECTRUM_BLOCK_SIZE (~172Hz at 44.1kHz), so the lowest bands
+ * sit well inside one resolution cell and read partly as each other. They
+ * are distinct, not independent; separating them needs a longer block. */
 static const int band_freq_hz[SPECTRUM_MAX_BANDS] =
 {
     60, 150, 400, 1000, 2500, 4000, 7000, 12000
@@ -58,21 +63,35 @@ static int spectrum_level[SPECTRUM_MAX_BANDS];
 #define SPECTRUM_LOG_MAX (10L << 16)
 
 /* Goertzel magnitude of 'freq_hz' within 'count' mono samples, for a
- * mixer output rate of 'samplerate' Hz. Fixed point throughout (Q14 via
- * fp14_cos, same convention apps/plugins/fft/fft.c uses for fp_sqrt). */
+ * mixer output rate of 'samplerate' Hz. Fixed point throughout, with the
+ * filter coefficient 2*cos(2*pi*freq_hz/samplerate) held in Q29.
+ *
+ * The precision is load-bearing, so resist simplifying it back to a
+ * coarser angle: cos() flattens out near 0 Hz, so a small error in the
+ * coefficient is a large error in the frequency it actually tunes to.
+ * At 60Hz a Q14 coefficient steps in jumps of ~40Hz, and fp14_cos()'s
+ * whole degrees are worse still -- 1 degree is 122Hz here, which puts
+ * the two lowest bands on the same coefficient and draws them identically.
+ * Q29 rather than more because it is the highest that keeps 2*cos inside
+ * 32 bits, so both operands of the inner multiply stay the width they
+ * were at Q14 and only the product needs 64. */
 static int goertzel_magnitude(const int16_t *samples, int count,
                               int freq_hz, int samplerate)
 {
-    int k = (int)(((long long)count * freq_hz) / samplerate);
-    int angle_deg = (int)(((long long)k * 360) / count);
-    long coeff_q14 = 2 * fp14_cos(angle_deg);
+    unsigned long phase = (unsigned long)
+                          (((uint64_t)freq_hz << 32) / samplerate);
+    long cos_s31, coeff_q29;
     long q1 = 0, q2 = 0;
     long long mag_sq;
     int i;
 
+    /* fp_sincos() returns cos in s0.31, i.e. 2*cos already in Q30. */
+    fp_sincos(phase, &cos_s31);
+    coeff_q29 = cos_s31 >> 1;
+
     for (i = 0; i < count; i++)
     {
-        long q0 = (long)(((long long)coeff_q14 * q1) >> 14) - q2 + samples[i];
+        long q0 = (long)(((long long)coeff_q29 * q1) >> 29) - q2 + samples[i];
         q2 = q1;
         q1 = q0;
     }
@@ -86,7 +105,7 @@ static int goertzel_magnitude(const int16_t *samples, int count,
     q2 /= (count / 2);
 
     mag_sq = (long long)q1 * q1 + (long long)q2 * q2
-           - (((long long)coeff_q14 * q1) >> 14) * q2;
+           - (((long long)coeff_q29 * q1) >> 29) * q2;
     if (mag_sq < 0)
         mag_sq = 0; /* rounding can occasionally push this slightly negative */
     if (mag_sq > 0x7fffffffLL)
