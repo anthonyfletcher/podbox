@@ -19,25 +19,15 @@ if [ ! -f "$ZIP" ]; then
     exit 1
 fi
 
-# Each themes/<name>/.rockbox is already laid out with the on-device directory
-# structure, so they drop straight in and merge: a font or iconset two themes
-# share is one file on the device.
-#
-# That merge is also the one thing to watch. Two themes shipping *different*
-# files under one name silently resolve to whichever copies last, and the theme
-# that loses gets the other's font. Today's two share no filename at all --
-# Themify_2 is LeagueSpartan and Literata, Scrim is Noto -- so nothing collides;
-# adding a third means checking that still holds.
-#
-# Named rather than globbed. themes/ mirrors upstream's tree, so a
-# `git merge rockbox/master` can put entries there, and a glob would quietly
-# start shipping stock themes that were never converted for this fork.
+# Each themes/<name>/.rockbox already has the on-device layout, so they merge on
+# copy. Trap: two themes shipping different files under one name resolve to
+# whichever copies last -- check for filename collisions when adding a theme.
+# Named rather than globbed, or a `git merge rockbox/master` would quietly start
+# shipping stock themes that were never converted.
 THEMES="Themify_2 Scrim"
 #
-# default-config.cfg sits beside the themes rather than inside one: it is the
-# build's first-boot config, not part of any theme, and it names settings that
-# have nothing to do with a theme. Keeping it in themes/Themify_2 made it look
-# like one of that theme's files and meant it moved whenever the theme did.
+# default-config.cfg is the build's first-boot config, not part of any theme,
+# so it sits beside them rather than inside one.
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox"

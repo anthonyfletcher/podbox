@@ -298,22 +298,12 @@ for target in $SIM_TARGETS; do
 done
 
 # ----------------------------------------------------------------- verify ---
-# A themeless zip installs happily and leaves the player looking broken, so the
-# zip is checked rather than trusted -- `make zip` alone produces one, and only
-# the bundle-*.sh scripts put the theme, the presets and the setting
-# explanations in.
-#
-# Each entry is a file only a bundle script puts there, so a script that
-# silently did nothing is caught. settings-help.txt earns its place the most:
-# without it the Explain entry in every setting's context menu simply shows
-# nothing, and nothing else looks wrong, so it is the one omission a glance at
-# the player would not find. (bundle-licenses.sh has no entry -- it rewrites a
-# file buildzip.pl already ships, so its presence proves nothing.)
-#
-# Both themes are named, because bundle-theme.sh copies them one at a time and a
-# missing one would leave the other's check passing. Scrim's .sbs and one of its
-# bitmaps go in too: the fonts and bitmaps live in directories the other theme
-# also writes into, so a theme can be half-copied without the .cfg noticing.
+# A themeless zip installs happily and leaves the player looking broken, so each
+# entry below is a file only a bundle script writes -- one that silently did
+# nothing is caught. settings-help.txt matters most: without it every Explain
+# menu entry shows nothing and nothing else looks wrong. Both themes are named,
+# plus an .sbs and a bitmap, because themes share directories and a half-copied
+# one still passes a .cfg-only check.
 
 say "Checking the zips"
 for target in $TARGETS; do
