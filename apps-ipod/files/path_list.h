@@ -35,9 +35,8 @@ struct path_list {
  *    pinned block is one buflib cannot compact across -- so a viewer opened
  *    from the list got a smaller contiguous pool than the same viewer opened
  *    from anywhere else;
- *  - the scratch buffer has a fixed size, which bounds the read. The old code
- *    allocated the whole file however large it was, and kept only the first
- *    PATH_LIST_MAX lines of it.
+ *  - the scratch buffer has a fixed size, which bounds the read: only the
+ *    first PATH_LIST_MAX lines are kept, whatever the file's size.
  *
  * Only one list exists at a time, and holding this buffer means nothing else
  * may ask for it -- so a caller that opens another screen (browser_flat opens

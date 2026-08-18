@@ -238,22 +238,17 @@ static void get_pic_list(bool single_file)
     pname++;
 
     /* The neighbours to page through come from the file browser's cached
-     * directory, which describes this file only when the browser is what
-     * opened it. The flat Images list (screens/browse/browser_flat.c) opens
-     * files from anywhere without moving the browser.
+     * directory, which describes this file only when the browser opened it --
+     * the flat Images list (screens/browse/browser_flat.c) opens files from
+     * anywhere without moving the browser, and the cache is shared with the
+     * database browser, so it may hold something else entirely.
      *
-     * Two things have to hold, and comparing the paths alone is not enough --
-     * that was the first attempt at this and it still failed. getcwd() returns
-     * the browser's last directory whether or not it ever loaded it, so for a
-     * file at the volume root the paths matched, the empty cache was trusted,
-     * and the viewer reported "No supported files". The cache must also
-     * actually contain the file being opened.
-     *
-     * The cache is still preferred where it genuinely applies: it is ordered
-     * the way the browser displays it, and paging should follow the order the
-     * file was picked from. It is also shared with the database browser, so it
-     * may hold something else entirely -- another reason to check rather than
-     * assume. */
+     * Trap: comparing the paths is not enough. getcwd() returns the browser's
+     * last directory whether or not it ever loaded it, so for a file at the
+     * volume root the paths match, the empty cache is trusted, and the viewer
+     * reports "No supported files". The cache must also contain the file being
+     * opened. Preferred where it does apply, since it is ordered the way the
+     * browser displays it and paging should follow that order. */
     /* np_file's directory, without the trailing slash -- which getcwd() does
      * not return either, except at the root where the slash is the whole
      * name. */

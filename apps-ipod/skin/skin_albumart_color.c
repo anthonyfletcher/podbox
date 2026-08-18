@@ -20,7 +20,7 @@
  * colour written '!rrggbb' arrives flagged COLOR_FIXED and is left alone.
  *
  * The palette changes in one step, not over a fade -- see apply_colors() for
- * why the fade that used to be here could not be made to look right.
+ * why a fade cannot be made to look right here.
  *
  * The module also owns the other once-per-art-change job, running a skin's
  * %Cl filter chain over the art -- not because filtering has anything to do
@@ -191,22 +191,17 @@ static unsigned int lerp_color(unsigned int c1, unsigned int c2, int t)
 
 /* Change to a new pair of colours, or back to the theme's, in one step.
  *
- * These used to be interpolated over 250ms, and the transition looked wrong in
- * a way that took a long time to pin down: specific elements -- the status
- * boxes, the glyphs framing the spectrum -- appeared to fade differently from
- * everything around them, though they always arrived correctly.
+ * Trap: do not interpolate these over a fade. The screen is painted by several
+ * independent schedules -- the skin's own refresh, the meters' animation
+ * cycles, the status bar's throttle -- and an interpolated colour is only
+ * coherent if every one of them samples it on the same tick, which they do not.
+ * Elements drawn on different schedules then show different points along the
+ * fade at once, so the status boxes and the glyphs framing the spectrum appear
+ * to fade differently from everything around them.
  *
- * The cause is that the screen is painted by several independent schedules:
- * the skin's own refresh, the meters' animation cycles, the status bar's
- * throttle. An interpolated colour is only coherent if every one of them
- * samples it on the same tick, and they do not -- so elements drawn on
- * different schedules showed different points along the fade at once. Holding
- * a fade at a fixed midpoint made every element agree, which is what proved it
- * was the motion rather than the colours.
- *
- * Changing in one step removes the intermediate values entirely. Whenever each
- * schedule next paints, it paints the final colour; the worst case is an
- * element being one frame late, which is not visible. */
+ * One step removes the intermediate values entirely: whenever each schedule
+ * next paints, it paints the final colour, and the worst case is an element
+ * being one frame late, which is not visible. */
 static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
                          bool to_defaults)
 {
@@ -1072,10 +1067,10 @@ static unsigned int resolve_mapped(unsigned int original,
      * The selector colours need no cases here. Written as the theme's own
      * foreground or background they arrive as those values and are answered
      * above; given a third colour they meant it, and it is carried over like
-     * any other. The bar used to be forced to the accent instead, which
-     * collided whenever the selector text was the theme foreground -- the
-     * common way to write a theme, and the foreground maps to the accent too,
-     * so bar and text landed on one colour and the selected row went blank. */
+     * any other. Trap: forcing the bar to the accent instead collides whenever
+     * the selector text is the theme foreground -- the common way to write a
+     * theme, and the foreground maps to the accent too, so bar and text land on
+     * one colour and the selected row goes blank. */
     return transform_cached(original);
 }
 

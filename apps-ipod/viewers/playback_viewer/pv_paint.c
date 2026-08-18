@@ -212,7 +212,7 @@ static long seg_dist2(long px, long py, long x1, long y1, long x2, long y2)
  * actually straddling the edge need the square root, and they are a thin
  * outline around a shape that is mostly interior and exterior -- so the
  * Newton iteration, and the several software divisions it costs, runs for a
- * small fraction of the pixels it used to. */
+ * small fraction of the pixels. */
 static int coverage_d2(long hw, long d2)
 {
     long inner = hw - SUBPX / 2;
@@ -764,9 +764,9 @@ bool pv_nav_interrupt(int button)
 
     /* A wheel event abandons an animation only when it is the one that will
      * turn the card, and is then left for pv_nav_step() to count. The others
-     * are counted here and dropped, since the deck loop never sees them --
-     * they used to abandon the animation too, which is why three wheel events
-     * in four killed a card's animation and then navigated nowhere. */
+     * are counted here and dropped, since the deck loop never sees them. Trap:
+     * letting them abandon the animation too kills a card's animation on three
+     * wheel events in four and then navigates nowhere. */
     if (wheel_at_card(wheel_plus(dir)))
         return true;
 

@@ -45,11 +45,10 @@ static const struct button_mapping button_context_standard[]  = {
      * not PLAY -- and a list that cannot act on it ignores it. */
     { ACTION_TREE_WPS,          BUTTON_PLAY|BUTTON_REL,             BUTTON_PLAY },
     /* Held PLAY does nothing, and must still be claimed here so it does not
-     * fall through as a cascade: it used to mean a second "back" (LEFT and MENU
-     * already do that), which dropped out of the list while the button was
-     * still down -- the next repeat then reached the browser as stop, and the
-     * release arrived as the jump above. Claiming it also moves last_button on,
-     * so the release no longer matches the tap entry. */
+     * fall through as a cascade: an entry that drops out of the list while the
+     * button is still down lets the next repeat reach the browser as stop, and
+     * the release arrive as the jump above. Claiming it also moves last_button
+     * on, so the release does not match the tap entry. */
     { ACTION_NONE,              BUTTON_PLAY|BUTTON_REPEAT,          BUTTON_NONE },
 
     LAST_ITEM_IN_LIST

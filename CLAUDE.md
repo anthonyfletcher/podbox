@@ -64,10 +64,34 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Documentation
 
-Comments, commit descriptions and documentation should NOT describe the journey - only the destination.  The purpose
-of the documentation is for programmers reading the output - they don't need to know how you got there.
-The only exception is if you think there's a trap they might themselves fall into - then you can include it. Be brief!
-Keep your documentation short and snappy.
+**Comments describe the destination, not the journey.** A reader needs what the
+code does and why it is that way, not how you got there.
+
+**The trap exception is about content, not form.** A trap someone would
+otherwise fall into earns its comment - but state it as a present-tense rule.
+These two carry the identical warning:
+
+```c
+/* Trap: writing along rows instead is ~20% slower - the per-column state
+ * moves from registers into arrays. */
+```
+```c
+/* Turning this inside out to write along rows was tried and is ~20% slower. */
+```
+
+The second is the same fact told as a war story. Only the first is allowed.
+This is the rule that gets broken most, because almost any rejected alternative
+can be called a trap - so the test is the wording, not the justification. If you
+write *was tried*, *used to*, *previously*, *at first*, *the old code*,
+*turned out* or *we tried*, you are narrating. Rewrite the sentence as a rule.
+
+**Be brief - and check it, don't feel it:**
+- A blank line inside a comment block usually means it is too long. One
+  paragraph is the target; a second needs a reason.
+- A comment longer than the code it explains is suspect. File headers are
+  exempt; they carry the file's parts map.
+
+The journey belongs in the commit message, if anywhere.
 
 ---
 

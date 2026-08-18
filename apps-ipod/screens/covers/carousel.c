@@ -275,10 +275,9 @@ static void pf_update_dynamic_colors(void)
  * by the loader, then the clear and slide loops timed apart, nanoseconds of
  * slide loop per pixel written, and the CPU clock with its boost count.
  *
- * Worth keeping, because none of that is guessable. Measured on the 5G it
- * turned out the flush is ~6% of wall clock while the render is ~94%, which is
- * the opposite of what this screen's cost was assumed to be. Two rules if it
- * is switched back on: the yields must stay separated out, since USEC_TIMER is
+ * Worth keeping, because none of that is guessable: measured on the 5G, the
+ * flush is ~6% of wall clock and the render ~94%. Two rules if it is switched
+ * back on: the yields must stay separated out, since USEC_TIMER is
  * wall clock and would otherwise bill the codec's time to the render; and
  * ns-per-pixel means nothing without the clock beside it, being ~43 cycles at
  * 80 MHz and ~16 at 30. */
@@ -1165,13 +1164,11 @@ static void thread(void)
                  * run is stale: load_new_slide() reads center_index afresh
                  * every call, so the next load already aims at the new
                  * neighbourhood -- going back through the queue to learn that
-                 * changes nothing except when the loading resumes. It used to
-                 * abandon the run on any pending event, which during a scroll
-                 * meant roughly one slide loaded per centre change, against the
-                 * 2 * ALBUM_COVERS_NUM_SLIDES + 1 a moving centre needs. The
-                 * loader lost ground for as long as the animation ran and only
-                 * caught up once it stopped, which is what "the art appears
-                 * after the animation settles" was. */
+                 * changes nothing except when the loading resumes. Trap:
+                 * abandoning the run on any pending event loads roughly one
+                 * slide per centre change during a scroll, against the
+                 * 2 * ALBUM_COVERS_NUM_SLIDES + 1 a moving centre needs, so the
+                 * art only catches up once the animation stops. */
                 while (!queue_empty(&thread_q)) {
                     queue_wait_w_tmo(&thread_q, &ev, 0);
                     if (ev.id == EV_EXIT)
@@ -2442,11 +2439,11 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
      * (art_sizes.h keeps the coverflow thumbnails column-major for exactly
      * this) and keeps p, dy and both pointers in registers.
      *
-     * Trap for anyone eyeing the 640-byte stride on the stores: turning this
-     * inside out to write along rows was tried and is ~20% *slower*. The
-     * per-column state has to move from registers into arrays, and the four
-     * extra array accesses a pixel cost more than the stores save. This loop is
-     * limited by its arithmetic, not by its access pattern. */
+     * Trap for anyone eyeing the 640-byte stride on the stores: writing along
+     * rows instead is ~20% *slower*. The per-column state moves from registers
+     * into arrays, and the four extra array accesses a pixel cost more than the
+     * stores save. This loop is limited by its arithmetic, not its access
+     * pattern. */
     for (x = xi; x < w; x++) {
         /* Rounding in the reverse projection above can leave xs a fraction
          * below the slide's left edge. The cast is unsigned, so that would
@@ -3108,13 +3105,11 @@ static void flat_animate(int s, PFreal ftick)
      * when hunting for one anyway.
      *
      * The scroll then stops dead rather than settling, and that is deliberate.
-     * Replaying the missed move afterwards was tried: it has to bring back the
-     * cover that was on top, which a snapped scroll had already taken out of
-     * the middle, so it flickers. Holding a cover back so the last one could be
-     * dealt for real does not work either -- the engine only ever aims two
-     * ahead, so holding one back leaves a single gap and every cover ends up
-     * dealt. Stopping dead is the honest end to a gesture that was never
-     * showing an animation in the first place. */
+     * Replaying the missed move afterwards flickers: it has to bring back the
+     * cover a snapped scroll already took out of the middle. Holding a cover
+     * back so the last one can be dealt for real does not work either -- the
+     * engine only ever aims two ahead, so holding one back leaves a single gap
+     * and every cover ends up dealt. */
     if (pf_flat_snap) {
         flat_idle();
         return;
@@ -3806,9 +3801,9 @@ static int album_covers_loop(void)
              * the cap into a spin, and burns exactly the CPU the cap exists to
              * hand back. */
             /* Zero when the frame is already due or overdue: the poll returns
-             * at once and it is drawn. Waiting a tick there -- which is what
-             * this did at first -- throws 10 ms away on every frame that
-             * overruns its own interval, which on the 5G is all of them. */
+             * at once and it is drawn. Waiting a tick there instead throws
+             * 10 ms away on every frame that overruns its own interval, which
+             * on the 5G is all of them. */
             long due_in = PF_FRAME_TICKS - (current_tick - last_frame_tick);
             timeout = (due_in < 0) ? 0 : (int)due_in;
         }

@@ -123,13 +123,11 @@ static enum themable_icons menu_get_icon(int selected_item, void * data)
  * render into the buffer they're handed and return that same pointer back,
  * but others -- e.g. root_menu.c's get_wps_item_name(), which just returns
  * ID2P(LANG_NOW_PLAYING)/ID2P(LANG_RESUME_PLAYBACK) directly -- never touch
- * the buffer at all and only communicate via the return value. Previously
- * this discarded that return value and unconditionally used dest->dyn_name
- * instead (matching only the first kind of callback), which for the WPS
- * item meant reading back whatever dest->dyn_name happened to already
- * contain -- all zero bytes the first time any given slot is used, i.e. an
- * empty string. apps/menu.c's own get_menu_item_name() is the correct,
- * established pattern to follow here (capture and use the return value). */
+ * the buffer at all and only communicate via the return value. Trap: using
+ * dest->dyn_name and discarding the return value matches only the first kind
+ * of callback, and reads back whatever that slot already held -- zero bytes,
+ * i.e. an empty string, the first time. Capture and use the return value, as
+ * apps/menu.c's own get_menu_item_name() does. */
 static unsigned char *item_name(int n, struct items *dest)
 {
     const struct menu_item_ex *item = menu_table[n].item;

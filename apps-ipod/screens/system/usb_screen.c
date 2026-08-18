@@ -102,10 +102,9 @@ static void usb_screen_fix_viewports(struct screen *screen,
      * no skin update at any point. The message below is plain fill and text
      * drawing, which is all this screen does.
      *
-     * Themes cannot draw the USB screen here, deliberately. Rendering the .sbs
-     * once before the handover was tried and reverted: it never worked reliably
-     * from every entry screen, and the connect window is the wrong place to
-     * spend CPU. Cooperative scheduling means a long non-yielding stretch
+     * Themes cannot draw the USB screen here, deliberately: the connect window
+     * is the wrong place to spend CPU. Cooperative scheduling means a long
+     * non-yielding stretch
      * starves the USB thread whatever its priority, and the host has
      * SET_ADDRESS outstanding -- when it gives up, the port wedges and only a
      * physical unplug clears it. Treat any work added between here and

@@ -311,9 +311,7 @@ static void report_index_error(int res)
  * from here shrinks it, and shrinking it stops playback and rebuffers the
  * current track. The app buffer is linker-reserved RAM that sits idle unless
  * a screen has borrowed it, so it costs nothing dynamic and playback never
- * notices -- and it is larger than the core_alloc this used to make, so the
- * index has more room than before, not less. The carousel reads the same
- * index into the same buffer.
+ * notices. The carousel reads the same index into the same buffer.
  *
  * Claimed rather than borrowed because it is held while the chart is on
  * screen, which means nothing reachable from that list may want it. Nothing

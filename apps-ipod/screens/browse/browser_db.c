@@ -2784,21 +2784,19 @@ static bool enter_artist_albums_directly(struct browser_context *c,
 /* Can this root-menu row be offered as a main-menu shortcut, on this pass?
  *
  * Both kinds qualify: a "->" row that browses a tag (pass 0), and a "==>" row
- * that opens a submenu (pass 1). Only the first kind used to, which is why
- * Playback History could not be put on the main menu however much it looked
- * like it should be. What rules a row out is having no stable identity to arm
- * a jump with: a tag browse with no tags, or a submenu that leads nowhere.
+ * that opens a submenu (pass 1). What rules a row out is having no stable
+ * identity to arm a jump with: a tag browse with no tags, or a submenu that
+ * leads nowhere.
  * Everything else (shuffle songs) is an action rather than a place.
  *
  * The two passes are the point, not a tidiness. A row's position in this
  * enumeration is its *slot number*, and the slot number is what a saved
  * main-menu configuration records -- root_menu.c writes "tagnavi6" and reads
- * it back. Admitting submenu rows in menu order therefore renumbered every
- * slot from the first submenu onwards, silently repointing saved
- * configurations at different rows: a "tagnavi6" that meant User Rating came
- * back as First Letter. Enumerating all the tag rows first and the submenus
- * after leaves every previously saved slot meaning exactly what it did, and
- * gives the submenus numbers that were never in use.
+ * it back. Admitting submenu rows in menu order would renumber every slot from
+ * the first submenu onwards, silently repointing saved configurations at
+ * different rows -- a "tagnavi6" meaning User Rating comes back as First
+ * Letter. Enumerating all the tag rows first and the submenus after leaves
+ * every saved slot meaning what it did, and gives the submenus unused numbers.
  *
  * So: only ever append a new kind of row as a later pass. */
 static bool root_row_eligible(const struct menu_entry *item, int pass)

@@ -653,20 +653,13 @@ struct bg_task album_covers_task =
     .request = album_covers_request,
 };
 
-/* Restored to (almost) exactly how the original plugin's draw_album_text()
- * worked: drawn directly inside pf_vp -- the same viewport the coverflow
- * itself uses, not a separate panel -- overlaid near the top or bottom of
- * that same area, using pf_fg_color (dynamic_colors_resolve()-derived, so
- * the now-playing dynamic colour fade applies here too, same as everywhere
- * else in the UI). Differences from the original: no text_crossfade
- * (removed, see B2) so this always uses center_index rather than tracking
- * a mid-scroll transition index; no show_statusbar variant (the status bar
- * is always theme-controlled now, never toggled off by this screen); the
- * album name uses pf_bold_font rather than always FONT_UI -- a genuinely
- * separate, actually-bold font file if the theme configured one (see
- * global_settings.bold_font_file's comment in settings.h), not faked. A
- * faux-bold (double-drawn, offset by a pixel) treatment was tried here
- * first and reverted -- didn't look right. */
+/* Drawn directly inside pf_vp -- the same viewport the coverflow itself uses,
+ * not a separate panel -- overlaid near the top or bottom of that area, in
+ * pf_fg_color, so the now-playing dynamic colour fade applies here as it does
+ * everywhere else. Always center_index: there is no mid-scroll transition to
+ * track. The album name uses pf_bold_font, a genuinely separate bold font file
+ * where the theme configured one (global_settings.bold_font_file, settings.h)
+ * -- not a double-drawn faux bold, which does not look right. */
 static void draw_album_text(void)
 {
     char album_and_year[MAX_PATH];

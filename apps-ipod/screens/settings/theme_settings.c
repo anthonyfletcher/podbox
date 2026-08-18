@@ -555,11 +555,9 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 
-/* Appearance: everything about how the player looks, which is what "UI
-   Settings" was trying to say. It gains the pieces that had been filed by the
-   subsystem that implements them rather than by what they do -- the peak meter
-   from Display, the viewers, and the root menu editor, which is about what you
-   see more than about anything else. */
+/* Appearance: everything about how the player looks, filed by what a setting
+   does rather than by the subsystem that implements it -- so the peak meter,
+   the viewers and the root menu editor all sit here. */
 MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             NULL, Icon_Wps,
             &browse_themes,

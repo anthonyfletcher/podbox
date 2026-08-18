@@ -485,9 +485,9 @@ static const int wps_context_menu_default =
 static const int tree_hotkey_default = HOTKEY_OFF;
 
 /* "cutoff, q, gain" in the old format, "cutoff, q, gain, TYPE" in the new one.
- * A band's filter type used to be fixed by which setting it was, so a config
- * written before the type existed carries no fourth field and its type comes
- * from the setting name instead -- see the EQ_BAND_OLD entries below. */
+ * A config written before the type existed carries no fourth field, and its
+ * type comes from the setting name instead -- see the EQ_BAND_OLD entries
+ * below. */
 static void eq_load_from_cfg(void *setting, char *value, bool has_type)
 {
     struct eq_band_setting *eq = setting;

@@ -1113,11 +1113,10 @@ static FORCE_INLINE unsigned finish_pixel(unsigned p,
  * intermediate does the same number of blends and wants a hundred times the
  * memory.
  *
- * Linear weights. Smoothstep was tried on the prototypes: same cost, and it
- * cures the faint lattice bilinear leaves at the source-pixel boundaries,
- * but it flattens the middle of each source pixel into blockiness instead.
- * What actually cures the lattice is a blur before the upscale, which is
- * what box_blur() already is. */
+ * Linear weights, not smoothstep: smoothstep costs the same and cures the
+ * faint lattice bilinear leaves at the source-pixel boundaries, but flattens
+ * the middle of each source pixel into blockiness instead. The lattice is
+ * cured by a blur before the upscale, which is what box_blur() already is. */
 static void upscale(fb_data *dst, int dw, int dh, const fb_data *small,
                     int cw, int ch, int div, const struct img_filter *f)
 {
