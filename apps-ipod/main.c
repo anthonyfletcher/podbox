@@ -190,7 +190,12 @@ int main(void)
 #define BOOT_BAR_W      160
 #define BOOT_BAR_H        7
 #define BOOT_BAR_X      ((LCD_WIDTH - BOOT_BAR_W) / 2)
+/* The bar alone is centred, with the caption hanging below it, rather than the
+ * two centred as a pair: the bar is the thing the eye tracks, and it must not
+ * move the moment a caption appears under it. */
+#define BOOT_BAR_Y      ((LCD_HEIGHT - BOOT_BAR_H) / 2)
 #define BOOT_CAPTION_PAD 10                             /* bar to caption gap */
+#define BOOT_CAPTION_Y  (BOOT_BAR_Y + BOOT_BAR_H + BOOT_CAPTION_PAD)
 
 /* A colour set. The background fills the screen, the caption draws in `fg` and
  * the progress bar in `accent`. Nothing else is on screen, so a set has to
@@ -250,18 +255,6 @@ static const struct boot_palette *boot_palette(void)
     }
 
     return boot_pal;
-}
-
-/* Bar and caption are centred as a pair. The caption's height counts whether
- * or not there is a caption yet, so the bar does not move the moment text
- * appears -- jarring on a screen where the bar is the only thing meant to be
- * moving. */
-static int boot_bar_y(void) INIT_ATTR;
-static int boot_bar_y(void)
-{
-    int h = BOOT_BAR_H + BOOT_CAPTION_PAD + font_get(FONT_SYSFIXED)->height;
-
-    return (LCD_HEIGHT - h) / 2;
 }
 
 /* Stages in the order init() reaches them, each worth a share of the bar.
@@ -363,7 +356,6 @@ static void boot_paint(int step, int total)
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
     struct viewport *last_vp;
-    int bar_y = boot_bar_y();
 
     lcd_set_background(pal->bg);
     lcd_set_foreground(pal->fg);
@@ -376,12 +368,11 @@ static void boot_paint(int step, int total)
     {
         int tw, th;
         screen->getstringsize(boot_caption, &tw, &th);
-        screen->putsxy((vp.width - tw) / 2,
-                       bar_y + BOOT_BAR_H + BOOT_CAPTION_PAD, boot_caption);
+        screen->putsxy((vp.width - tw) / 2, BOOT_CAPTION_Y, boot_caption);
     }
 
     vp.fg_pattern = pal->accent;
-    progress_bar_draw(screen, BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H,
+    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
@@ -401,17 +392,16 @@ static void boot_paint_bar(int step, int total)
     struct screen *screen = &screens[SCREEN_MAIN];
     struct viewport vp;
     struct viewport *last_vp;
-    int bar_y = boot_bar_y();
 
     boot_viewport(&vp);
     vp.fg_pattern = boot_palette()->accent;
     last_vp = screen->set_viewport(&vp);
 
-    progress_bar_draw(screen, BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H,
+    progress_bar_draw(screen, BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H,
                       step, total, global_settings.progress_bar_radius);
 
     screen->set_viewport(last_vp);
-    lcd_update_rect(BOOT_BAR_X, bar_y, BOOT_BAR_W, BOOT_BAR_H);
+    lcd_update_rect(BOOT_BAR_X, BOOT_BAR_Y, BOOT_BAR_W, BOOT_BAR_H);
 }
 
 static void boot_progress(enum boot_stage stage, int num, int den,
