@@ -661,7 +661,7 @@ static enum pv_context_result context_menu(int index)
     /* Report as a context menu while it is up, the way every other one does
      * (context_menu.c, album_covers.c, the image and lyric viewers). Without
      * this the activity stays ACTIVITY_PLAYLISTVIEWER, so a theme switching on
-     * %cs dresses the menu as playlist rows -- numbering them, in Scrim's case.
+     * %cs dresses the menu as playlist rows -- numbering them.
      * Popped conditionally because a menu item may have exited to another screen
      * and popped it already. */
     push_current_activity(ACTIVITY_CONTEXTMENU);

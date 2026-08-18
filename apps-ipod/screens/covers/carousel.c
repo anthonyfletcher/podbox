@@ -2114,12 +2114,10 @@ static void recalc_offsets(void)
  * the bottom hands that variation straight to the gap.
  *
  * Keyed to the *album* font, not the artist font or the larger of the two,
- * because the gap reads as belonging to the line above it. Keying it to the
- * larger font was tried and is wrong on real themes: Themify_2 sets an 18px
- * bold album line under a 25px regular artist line, and sizing the gap by the
- * 25px font made it visibly too wide, while BONES -- 17px for both lines --
- * looked right. Half the album ascent gives 6px and 7px respectively, which
- * matches how they actually look.
+ * because the gap reads as belonging to the line above it. Sizing it by the
+ * larger font goes visibly too wide wherever a theme sets a small album line
+ * under a large artist one. Half the album ascent lands at 6-7px across the
+ * fonts themes use, which matches how they look.
  *
  * Half an ascent also reliably exceeds a descent (ascent runs ~70% of the box,
  * descent ~28%), so a descending album name still clears the line below. */
