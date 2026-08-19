@@ -214,6 +214,9 @@ static bool settings_crc_changed(void)
 }
 
 /** Reading from a config file **/
+
+static bool settings_write_config(const char* filename, int options);
+
 /*
  * load settings from disk
  */
@@ -226,7 +229,23 @@ void settings_load(void)
     rename_temp_file(RESUMEFILE_TEMP, RESUMEFILE, RESUMEFILE".old");
     rename_temp_file(CONFIGFILE_TEMP, CONFIGFILE, CONFIGFILE".old");
 
-    settings_load_config(CONFIGFILE, false); /* load user_settings items */
+    /* First boot: with no settings of the user's own, the build's defaults
+     * stand in and are written out as the user's, which is what stops them
+     * being consulted again. Writing now rather than leaving it to the next
+     * save is load-bearing -- a save records only what differs from the
+     * compiled defaults, so a setting the user moves back to its compiled
+     * value would be missing from config.cfg and set again from here on every
+     * boot. This has to sit after the renames above, or the boot following the
+     * first save finds config.cfg missing and overwrites a full set of the
+     * user's settings with the shipped ones. */
+    if (!file_exists(CONFIGFILE) &&
+        settings_load_config(DEFAULTCONFIGFILE, false))
+    {
+        settings_write_config(CONFIGFILE, SETTINGS_SAVE_CHANGED);
+    }
+    else
+        settings_load_config(CONFIGFILE, false); /* load user_settings items */
+
     settings_load_config(RESUMEFILE, false); /* load system_status items */
 
     /* fixed settings file has final say on user_settings AND system_status items */
@@ -495,8 +514,6 @@ static bool theme_overlay_path(char *buf, size_t bufsz)
              global_settings.theme_file);
     return true;
 }
-
-static bool settings_write_config(const char* filename, int options);
 
 /* Record without writing. Kept separate from the public call because reading
  * the overlay marks everything in it, and writing from there would truncate

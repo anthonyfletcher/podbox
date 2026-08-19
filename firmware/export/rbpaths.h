@@ -122,6 +122,10 @@
 
 #define RESUMEFILE          ROCKBOX_DIR "/.resume.cfg"
 #define CONFIGFILE          ROCKBOX_DIR "/config.cfg"
+/* Read only when the player has no config.cfg of its own; the build owns
+ * it, so shipping a new one changes what a fresh player starts with and
+ * nothing else. */
+#define DEFAULTCONFIGFILE   ROCKBOX_DIR "/default-config.cfg"
 #define FIXEDSETTINGSFILE   ROCKBOX_DIR "/fixed.cfg"
 
 #define PLAYLIST_CONTROL_FILE   ROCKBOX_DIR "/.playlist_control"

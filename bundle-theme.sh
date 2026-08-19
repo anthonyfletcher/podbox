@@ -1,6 +1,6 @@
 #!/bin/sh
 # Bundle this fork's themes into a rockbox.zip produced by `make zip`, and make
-# Themify_2 the first-boot default via a pre-populated config.cfg (applied
+# Themify_2 the first-boot default via a shipped default-config.cfg (applied
 # before any compiled DEFAULT_WPSNAME / DEFAULT_SBSNAME fallback takes effect).
 #
 # This lives here rather than in tools/buildzip.pl so that file stays as close
@@ -38,7 +38,11 @@ for theme in $THEMES; do
     fi
     cp -R "$ROOT/themes/$theme/.rockbox/." "$STAGE/.rockbox/"
 done
-cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/config.cfg"
+# The firmware reads this only when the player has no config.cfg of its own,
+# so shipping it never takes an existing player's settings with it. Never
+# ship config.cfg itself: that file is the device's, and an install that
+# overwrites or deletes it resets the player.
+cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/default-config.cfg"
 
 # The house style a theme is loaded on top of. Loading a theme resets every
 # setting describing the look, and without this the reset lands on upstream's
@@ -75,4 +79,4 @@ zip -qd "$ZIP" '.rockbox/wps/classic_statusbar.sbs' \
 zip -qd "$ZIP" '.rockbox/rocks/*' '.rockbox/rocks/' >/dev/null 2>&1 || true
 zip -qd "$ZIP" '.rockbox/viewers.config' >/dev/null 2>&1 || true
 
-echo "bundled$(for t in $THEMES; do printf ' %s' "$t"; done) + config.cfg into $ZIP"
+echo "bundled$(for t in $THEMES; do printf ' %s' "$t"; done) + default-config.cfg into $ZIP"
