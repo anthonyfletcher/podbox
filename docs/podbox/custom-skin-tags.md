@@ -301,11 +301,13 @@ refreshes:
 
 Best placed in a viewport that is only shown while something is loading.
 
-**One revolution a second, whatever the frame count.** The gap between frames is
-a second divided by however many you provide, so a four-frame spinner steps four
-times a second and a twenty-frame one twenty times — both come back round in a
-second, and there is nothing to tune. The frame count changes how finely the
-turn is divided, not how fast it turns.
+**One revolution a second.** The gap between frames is a second divided by
+however many you provide, so a four-frame spinner steps four times a second and
+a twenty-frame one twenty times. Both come round in exactly a second, as does
+any frame count that divides 100 — 2, 4, 5, 10, 20, 25, 50. Anything else falls
+a little short, and past about 25 it shows: 30 frames turn in 0.9s, 60 in 0.6s.
+Pick a divisor of 100 and the frame count changes how finely the turn is
+divided, not how fast it turns.
 
 **It is a reading of the clock, not a counter**, and that is why frames can be
 missed rather than queued. Whoever draws the tag samples it, so a frame shorter

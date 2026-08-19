@@ -1897,9 +1897,12 @@ const char *get_token_value(struct gui_wps *gwps,
              * spinner advances via ordinary value-change refreshes with no
              * reliance on skin sub-image timers.
              *
-             * One revolution a second whatever the frame count, so the
-             * interval is a second divided by however many frames the theme
-             * gave us. That is what lets one tag serve both kinds of spinner.
+             * One revolution a second, so the interval is a second divided by
+             * however many frames the theme gave us. That is what lets one tag
+             * serve both kinds of spinner. The division is in whole ticks, so
+             * it is exact only for a frame count dividing HZ; others run short
+             * by the remainder, and past HZ frames the clamp below stretches
+             * the turn instead.
              *
              * This is a function of the clock rather than a counter: whoever
              * draws it samples it, and a frame shorter than their sampling
