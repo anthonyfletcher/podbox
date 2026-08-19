@@ -54,8 +54,7 @@ reliably.
 looks right only because the previous one set something, it will not look right
 on a clean player.
 
-The reset covers 67 settings — everything carrying `F_THEMESETTING` or
-`F_THEMERESET` in `settings_list.c`. In practice that is:
+The reset covers 67 settings:
 
 | Group | Settings |
 |---|---|
@@ -173,9 +172,9 @@ Two cases where that fallback is the only source, and a `%Cl` is doing real
 work:
 
 - **The "album art source" setting is Artist**, or Auto on a playlist built
-  from an artist browse. The cache path bows out deliberately there — a theme
-  showing artist portraits should not take its colours from the album cover —
-  so the palette comes from whatever the slot holds.
+  from an artist browse. The palette then comes from whatever the slot holds, so
+  a theme showing artist portraits takes its colours from the portrait rather
+  than from the album cover.
 - **A track whose folder the art cache has no thumbnail for**, which is any
   album the cache has not got to yet.
 
@@ -292,8 +291,8 @@ dialog box shadow colour: 000000
 `dialog box shadow: 0` turns it off.
 
 **These two ignore `dialog colours`** — unlike the nine below, they apply on
-`off`, `on` and `auto` alike. That is deliberate: it means you can style the
-shadow without having to take over the whole palette to do it.
+`off`, `on` and `auto` alike, so you can style the shadow without taking over
+the whole palette to do it.
 
 Black is the default rather than a colour taken from your theme, because the
 shadow's job is to lift the box off whatever sits behind it, and a colour drawn
@@ -347,40 +346,56 @@ The art callback is consumed only by the skinned list renderer. The moment your
 settings screens, the file browser, everything. There is no way to skin only the
 album list. Budget for reproducing your theme's ordinary list appearance too.
 
-Do not try to gate `%Lb` on `%cs` or on `%?La`. The row config is remembered once
-the tag renders and is never cleared, and lists are drawn before the status bar
-is, so which renderer draws a given list would depend on which screen last
-painted. Gating it produces lists that draw no text at all.
+Gate `%Lb` on `%?Ld` and on nothing else. Anything else gives you lists that
+draw no text at all — `%?La` because it cannot answer until a `%Lb` has already
+rendered, `%cs` and `%Lt` because they identify only some of the levels you
+want.
+
+You rarely need two configs anyway. A second row *height* is `%Lb`'s fifth
+argument (below); reach for a second `%Lb` only when the art layout wants a
+different row *width* or a different set of viewports.
 
 ### Turning it on
 
-All three lines, or the browser never attaches an art callback and you get tall
-empty rows:
+Both switches, or the browser never attaches an art callback and the art branch
+never draws:
 
 ```
 database album art: on
 database artist art: on
-database art row height: 46
 ```
 
-The height must be **greater than your `%Lb` row height**, or the rows stop
-counting as art rows. All three reset when your theme loads (§2), so all three
-have to be stated — naming the two switches without the height gives you the
-default height, which is probably not what your rows expect.
+They reset when your theme loads (§2), so both have to be stated.
+
+The row height for an art list is the **fifth argument to `%Lb`** (below). Name
+it there rather than in the `.cfg`: it sits with the viewport offsets that
+depend on it, and it applies to that row config alone. A `%Lb` that names none
+falls back to the `database art row height` setting, which is one value for the
+whole player.
+
+Whichever supplies it, the height must be **greater than your `%Lb` row height**
+or the rows stop counting as art rows and `%?La` goes false.
 
 ### The row layout
 
-`%Lb(label, width, height)` declares the row config; `%Vl(label, …)` viewports
-with the same label are the row layout, drawn once per row; `%La` inside one
-draws that row's cover.
+`%Lb(label, width, height[, tile][, art height])` declares the row config;
+`%Vl(label, …)` viewports with the same label are the row layout, drawn once per
+row; `%La` inside one draws that row's cover.
 
 ```
-%Lb(Rows,180,21)
+%Lb(Rows,180,21,-,46)
 
 %Vl(Rows,0,0,180,21,-)%?La<|%?Lc<%Vs(invert)>%s%LT>
 %Vl(Rows,0,1,44,44,-)%?La<%La|>
 %Vl(Rows,48,12,132,21,-)%?La<%?Lc<%Vs(invert)>%s%LT|>
 ```
+
+21px rows normally, 46px when the list draws art. Write the tile argument as
+`-` to reach past it.
+
+The art-branch offsets are measured against that 46: the cover at y=1 leaves a
+pixel above and below its 44px square, and the text at y=12 is `(46 - 21) / 2`.
+Change the 46 and both move with it.
 
 **Geometry rules, all of which bite:**
 
@@ -407,6 +422,10 @@ no cover, so the art branch must cope — either leave the slot empty and let th
 text sit indented with the rest, or draw a glyph there.
 
 There is no way to ask whether *this particular row* has a cover.
+
+`%?Ld` asks the same question at list level and answers it before anything is
+drawn, which is why it is the one tag that can choose between two `%Lb`. Inside
+a row the two agree; in chrome, only `%Ld` answers at all.
 
 ### Marking the selected row
 

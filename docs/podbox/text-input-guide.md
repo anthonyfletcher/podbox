@@ -114,7 +114,7 @@ character, so a long query costs one scan rather than twenty.
 | Album | Album | Opens that album's tracks |
 | Artist | Album artist | Opens that artist's albums |
 
-Per-track artist is deliberately not searched.
+Per-track artist is not searched; search the album artist instead.
 
 ### Moving around
 

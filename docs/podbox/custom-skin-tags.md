@@ -234,20 +234,20 @@ cover that turns up is dropped and that cover keeps square corners.
 **It only draws inside a skinned list's row layout** — a `%Vl(label, …)`
 viewport belonging to a `%Lb(label, …)` list, which is the same context `%LT`
 and `%LI` need. It is not a `%Vi` (UI viewport) tag, and it draws nothing
-outside a row layout. See §5 of [`theme-guide.md`](theme-guide.md) for the whole
-arrangement, including the row height that has to accompany it.
+outside a row layout. The taller row an art list needs is `%Lb`'s fifth
+argument (below); see §5 of [`theme-guide.md`](theme-guide.md) for the whole
+arrangement.
 
 ```
 %La(0)              # album art of the current list row
 %La(0, -, 6)        # the same, with 6px rounded corners
 ```
 
-**There is no filter chain here, unlike `%Cl`, and there should not be.** Row
-covers come from the shared thumbnail cache, where one bitmap serves every row
-on screen and the screens after it; a filter rewrites pixels in place, so
-filtering one row's cover would filter all of them. To treat a row's cover
-differently, blend over it instead — a tinted `%dr` in the same viewport,
-written after the `%La`:
+**`%La` takes no filter chain.** One cached bitmap serves every row on screen,
+so anything applied to a cover applies to all of them.
+
+To treat one row's cover differently, blend over it: a tinted `%dr` in the same
+viewport, written after the `%La`:
 
 ```
 %Vl(PlainRows,0,1,44,44,-)
@@ -324,6 +324,50 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 
 ---
 
+### `%Ld` — does the list on screen draw art rows
+
+True while the list being drawn is a database album or artist level with its
+art switch on. It takes no arguments, and unlike `%?La` it answers before any
+row has been drawn — so it works in status-bar chrome, on a tiled list, and as
+the test on a conditional that picks a row config:
+
+```
+%?Ld<%Lb(Covers,300,66)|%Lb(Rows,300,30)>
+```
+
+**Use it for that last one.** `%?La` cannot choose a `%Lb`: it can only answer
+once a `%Lb` has rendered, so a skin gated on it never picks either branch and
+the list draws no text at all.
+
+Inside a row the two agree, and there `%?La` reads better.
+
+For a second row *height* you do not need this tag: that is `%Lb`'s fifth
+argument, below.
+
+## Changed behaviour: `%Lb`'s art row height
+
+```
+%Lb(label, width, height [, tile] [, art height])
+```
+
+A fifth argument is the row pitch for a list that draws art. Leave it out and
+`%Lb` behaves as it always has.
+
+```
+%Lb(Rows,300,30)          # 30px rows, always
+%Lb(Rows,300,30,-,46)     # 30px rows, 46px on an art list
+%Lb(Grid,100,90,tile)     # a cover grid, unchanged
+```
+
+Write the tile argument as `-` to reach past it.
+
+Leave it out and the height comes from `database art row height` in the theme
+`.cfg` instead — one value for every art list on the player, rather than one per
+row config.
+
+**It must exceed the ordinary height.** Set the two equal and the list stops
+counting as an art list: `%?La` goes false and your art branch never draws.
+
 ## Changed behaviour: `%Cl` album art filters, rounded corners and names
 
 ```
@@ -397,9 +441,9 @@ Three things worth knowing before building a theme around it:
 - **Several `%Cl` per skin are fine**, and a blurred backdrop with a crisp
   cover in front of it is what they are for. What costs memory is the artwork
   **size**, not the tag — see the next section.
-- **Dynamic colours read the unfiltered art**, deliberately — the palette
-  describes the album, not your treatment of it. `bw` would otherwise turn every
-  derived colour grey.
+- **Dynamic colours read the unfiltered art**, so a `bw` chain greys the artwork
+  you draw and leaves the derived colours alone. The palette describes the
+  album, not your treatment of it.
 
 There is also an `artwork filter:` theme setting that applies to the browser and
 carousel thumbnails. It takes the same names, minus `blur`.

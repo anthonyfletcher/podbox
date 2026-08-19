@@ -57,8 +57,9 @@ Settings
 └─ Changed Settings…           everything no longer at its default
 ```
 
-Two things appear in more than one place on purpose, each as the same item
-rather than a copy. **Viewers** is under both Appearance and Library, because
+Two things appear in more than one place, each as the same item rather than a
+copy — set it in either and both show the change. **Viewers** is under both
+Appearance and Library, because
 the viewers are opened from the browsers and look the way the theme tells them
 to. **Now Playing Artwork** is under both Appearance ▸ Elements and Playback ▸
 Now Playing Screen: it is the one row of that screen about how anything
@@ -266,7 +267,11 @@ out here.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort Albums By | The order album lists appear in throughout the Music menu: by name, or by release year with either end first. | name |  |
+| Sort Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
+| Sort Albums By ▸ Artist | The order for the album list inside an artist. Genre and Year reach albums through an artist too, so they follow this one. | default |  |
+| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. | default |  |
+| Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
+| Sort Albums By ▸ Other Lists | The order for every album list with no row of its own above, and what the four **default** values follow. By name, or by release year with either end first. | name |  |
 | Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
 | Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
@@ -547,8 +552,7 @@ setting cannot inherit the last theme's answer. Without that, the same theme
 renders differently depending on what was loaded before it.
 
 That covers everything in Appearance, plus the artwork rows, the carousel's
-geometry, the scrolling settings and the dialog chrome — every setting carrying
-`F_THEMESETTING` or `F_THEMERESET` in `settings_list.c`.
+geometry, the scrolling settings and the dialog chrome.
 
 **What you set by hand is not lost.** Changes made through the settings screens
 while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
