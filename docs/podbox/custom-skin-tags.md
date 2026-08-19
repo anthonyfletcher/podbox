@@ -447,9 +447,6 @@ Three things worth knowing before building a theme around it:
   you draw and leaves the derived colours alone. The palette describes the
   album, not your treatment of it.
 
-There is also an `artwork filter:` theme setting that applies to the browser and
-carousel thumbnails. It takes the same names, minus `blur`.
-
 ### Rounded corners
 
 The eighth argument rounds the artwork's corners, in pixels, and smooths them:

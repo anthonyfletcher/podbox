@@ -38,9 +38,12 @@
 #include <string.h>
 #include "gcc_extensions.h"          /* FORCE_INLINE */
 #include "fixedpoint.h"
+#include "kernel.h"              /* yield() between bands */
 #include "draw/img_filter.h"
 
+#ifndef ARRAYLEN
 #define ARRAYLEN(a) (sizeof(a) / sizeof((a)[0]))
+#endif
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -880,6 +883,32 @@ void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f)
             levels_dither_pass(px, w, h, f);
         else
             levels_pass(px, n, f);
+    }
+}
+
+/* Enough pixels per band to keep the per-band overhead irrelevant, few enough
+ * that no band holds the CPU for long. */
+#define IMG_FILTER_BAND_PIXELS 4096
+
+void img_filter_apply_banded(fb_data *px, int w, int h,
+                             const struct img_filter *f)
+{
+    int rows;
+
+    if (!f || !f->stages || w <= 0 || h <= 0)
+        return;
+
+    rows = IMG_FILTER_BAND_PIXELS / w;
+    if (rows < 1)
+        rows = 1;
+
+    for (int y = 0; y < h; y += rows)
+    {
+        int band = MIN(rows, h - y);
+
+        img_filter_apply(px + (size_t)y * w, w, band, f);
+        if (y + band < h)
+            yield();
     }
 }
 

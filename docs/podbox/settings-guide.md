@@ -33,7 +33,7 @@ Two things are never hidden, whatever the mode:
   even though its tuning does not.
 
 A screen whose rows are all advanced disappears in Standard rather than opening
-empty. Database, Dialogs, Peak Meter and Artwork Filter are the four that do.
+empty. Database, Dialogs and Peak Meter are the three that do.
 
 Nothing is unreachable in Standard: **Search**, at the top of the tree, finds
 every setting whatever the mode, and opens it directly.
@@ -381,9 +381,6 @@ shadow to colour.
 | Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Album Art Row Height | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Adv** |
-| Filter 1 | First of three image adjustments applied to artwork before it is drawn. A theme-author setting: a theme that wants a treatment names it, and one that does not should have none. | off | **Adv** |
-| Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
-| Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
 
 ### Appearance — Dialogs
 

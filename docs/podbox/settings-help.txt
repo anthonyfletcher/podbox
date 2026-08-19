@@ -554,17 +554,6 @@ that supports artwork in lists, or the rows are tall and empty.
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.
 
-[artwork filter 1]
-First of three image adjustments applied to artwork before it is drawn. A
-theme-author setting: a theme that wants a treatment names it, and one that
-does not should have none.
-
-[artwork filter 2]
-Second image adjustment in the chain, applied after the first.
-
-[artwork filter 3]
-Third and last image adjustment in the chain.
-
 [album covers on select]
 What Select does on a cover: open the album's track list, or start playing it.
 

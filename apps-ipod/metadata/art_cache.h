@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "system/bg_task.h"
+#include "draw/img_filter.h"  /* struct img_filter, the caller-supplied chain */
 #include "art_sizes.h"       /* enum art_layout, named by the file header */
 
 struct bitmap;
@@ -61,34 +62,14 @@ void art_cache_init(void);
  * pixel byte count, or <= 0 on failure. Used by the buffering path so the WPS
  * renders the 300px cache instead of re-decoding source art.
  *
- * `filter` says whether the theme's artwork filter is applied on the way out.
- * It is an argument rather than something this function looks up, because the
- * buffering path shares it and must pass false: the bitmap it loads is what
- * the dynamic-colour extractor derives its palette from, and that palette has
- * to describe the album rather than the theme's treatment of it. */
-int art_cache_load_aat(int fd, struct bitmap *bm, int max_size, bool filter);
+ * `filter` is the chain to run on the way out, or NULL for none. It is the
+ * caller's rather than this function's, because each consumer treats cached art
+ * differently and the buffering path must pass NULL: the bitmap it loads is what
+ * the dynamic-colour extractor derives its palette from, and that palette has to
+ * describe the album rather than anyone's treatment of it. */
+int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
+                       const struct img_filter *filter);
 
-/* The theme's cached-art filter (the `artwork filter` setting), compiled.
- *
- * Every consumer of cached artwork asks for it filtered rather than reading
- * raw pixels and filtering them itself. That is a boundary, not tidiness: it
- * leaves "filter on read" and "store a filtered variant per size" a choice
- * that can still be made later, without any consumer changing. */
-
-/* Recompile from `spec`. Returns false on a bad chain, or one naming a filter
- * this tier cannot run -- `blur` needs a destination of its own, and these
- * readers only have the one they were handed. The previous filter is kept,
- * and *err (may be NULL) names the offending filter.
- *
- * *changed (may be NULL) says whether cached pixels will now look different,
- * which is the caller's cue to throw away anything it has already filtered. */
-bool art_filter_set(const char *spec, const char **err, bool *changed);
-
-/* Run the filter over w*h native pixels in place. Does nothing when the theme
- * asked for none. Filters in bands with a yield between them: a 300px frame
- * is 90,000 pixels, and the threads this runs on are ones the codec is
- * competing with. */
-void art_filter_apply(void *px, int w, int h);
 
 /* True while a generation pass is running. Drives the status-bar %lc token. */
 bool art_cache_is_busy(void);

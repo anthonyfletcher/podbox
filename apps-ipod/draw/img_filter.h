@@ -120,6 +120,12 @@ bool img_filter_compile(const char *spec, unsigned allowed_classes,
  * spatial, colour, levels, dither -- whatever order the chain named them. */
 void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f);
 
+/* img_filter_apply() over a tall image, a band at a time, yielding between
+ * bands. A browser thumbnail is one band and never yields; a 300px frame is
+ * twenty-odd. Use this for anything the user might be waiting on. */
+void img_filter_apply_banded(fb_data *px, int w, int h,
+                             const struct img_filter *f);
+
 /* How much smaller than the finished picture the source may be, for a chain
  * that blurs: the blur throws that detail away in its first step, so asking
  * for a source this size costs nothing and saves everything downstream from

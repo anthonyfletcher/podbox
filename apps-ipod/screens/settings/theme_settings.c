@@ -493,18 +493,6 @@ MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
 MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
 MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
 
-/* The filters cached artwork is read through, one slot at a time, run in the
- * order they are listed. A slot each rather than one typed chain: the chains
- * worth having are short, and entering one on a click wheel is not. */
-MENUITEM_SETTING(artwork_filter_1, &global_settings.artwork_filter[0], NULL);
-MENUITEM_SETTING(artwork_filter_2, &global_settings.artwork_filter[1], NULL);
-MENUITEM_SETTING(artwork_filter_3, &global_settings.artwork_filter[2], NULL);
-
-MAKE_MENU(artwork_filter_menu, ID2P(LANG_ARTWORK_FILTER), NULL, Icon_NOICON,
-            &artwork_filter_1,
-            &artwork_filter_2,
-            &artwork_filter_3);
-
 /* Appearance is split by what a setting does, not by which layer implements
  * it: Skins picks the layouts, Colours picks the palette, Elements decides
  * which pieces of chrome are drawn at all. Theme Settings, which used to hold
@@ -549,9 +537,8 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &sep_menu,
             &db_albumart,
             &db_artistart,
-            &wps_art_source,          /* general_settings.c, also under
+            &wps_art_source);         /* general_settings.c, also under
                                          Playback with the rest of that screen */
-            &artwork_filter_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 

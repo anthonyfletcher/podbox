@@ -286,9 +286,6 @@ static bool browser_aa_load(const char *path, int slot)
     {
         char *store = core_get_data_pinned(browser_aa_handle);
         ok = read(fd, store + (size_t)slot * bytes, bytes) == (ssize_t)bytes;
-        if (ok)
-            art_filter_apply(store + (size_t)slot * bytes,
-                             browser_aa_dim, browser_aa_dim);
         core_put_data_pinned(store);
     }
 

@@ -31,26 +31,9 @@ struct opt_items {
 /** Setting values defines **/
 #define MAX_FILENAME 32
 #define MAX_PATHNAME 80
-/* The artwork filter is built from a few slots rather than typed as a chain:
- * the on-screen keyboard is a poor way to enter one on a click wheel, and the
- * useful chains are short. Three is enough for the shapes that matter -- a
- * colour filter, a levels filter, and the dither that tidies up after them.
- *
- * A slot's value indexes this list, which is also what the config file
- * stores, so there is one list rather than one for the file and one for the
- * engine. Entry 0 is "no filter"; the rest are chains as
- * draw/img_filter.h spells them. `blur` is not here and could not be: it
- * needs a destination of its own, which the artwork readers do not have. */
-#define ARTWORK_FILTER_SLOTS 3
-#define ARTWORK_FILTER_CFG_VALS \
-    "off,bw,invert,brightness25,brightness-25,contrast40,contrast-40," \
-    "saturate50,saturate-50,hue180,reduce4,dither,pixellate8"
-#define ARTWORK_FILTER_COUNT 13
-#define ARTWORK_FILTER_MAX   64   /* room for every slot, joined by '+' */
 
 /* Rebuild the chain from the slots, compile it, and throw away any cached
  * artwork that no longer matches. */
-void artwork_filter_apply(void);
 #define MAX_PATHLIST (MAX_PATHNAME*2)
 
 /* The values are assigned to the enums so that they correspond to */
@@ -602,7 +585,6 @@ struct user_settings
      * browser read it, one slot each, run in order. A theme-wide property
      * rather than a skin tag, because the carousel is not skinned at all and
      * the browser's thumbnails come from one cache shared by every row. */
-    int artwork_filter[ARTWORK_FILTER_SLOTS];
     int wps_art_source;  /* WPS_ART_*: album cover, artist portrait, or by
                             where the playlist came from */
 

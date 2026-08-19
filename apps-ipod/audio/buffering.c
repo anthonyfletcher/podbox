@@ -875,7 +875,7 @@ static int load_image(int fd, const char *path,
          * rather than the theme's treatment of it -- a bw chain here would
          * turn every derived colour grey. Skin art has its own filter, on the
          * %Cl that loads it. */
-        rc = art_cache_load_aat(fd, bmp, (int)max_size, false);
+        rc = art_cache_load_aat(fd, bmp, (int)max_size, NULL);
     }
     else if (aa != NULL) {
         lseek(fd, aa->pos, SEEK_SET);

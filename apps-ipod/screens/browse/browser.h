@@ -121,11 +121,11 @@ struct browser_context* browser_get_context(void);
 void browser_flush(void);
 void browser_restore(void);
 
-/* Throw away the cached row thumbnails. They are filtered as they are read,
- * so a change to the artwork filter leaves the ones already in the cache
- * showing the old treatment. Unlike the browser's, the carousel's slide cache
- * lives in a buffer released when its screen exits, so it has nothing to
- * invalidate -- it reads every slide again on the way in. */
+/* Throw away the cached row thumbnails, for a caller that has changed what a
+ * row's art should look like: they are treated as they are read, so the ones
+ * already cached keep the old treatment. Unlike the browser's, the carousel's
+ * slide cache lives in a buffer released when its screen exits, so it has
+ * nothing to invalidate -- it reads every slide again on the way in. */
 void browser_albumart_invalidate(void);
 /* True while the on-screen browse level draws tall album/artist art rows. */
 bool browser_showing_art(void);

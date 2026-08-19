@@ -209,9 +209,6 @@ static const struct tag_row tag_rows[] = {
 { "database artist art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows photo thumbnail" },
 { "database art row height", TAG_ADVANCED|TAG_ARTWORK|TAG_THEMEAUTHOR, "art rows" },
 { "wps art source",      TAG_ARTWORK|TAG_APPEARANCE,             "cover art artist photo" },
-{ "artwork filter 1",    TAG_ADVANCED|TAG_ARTWORK|TAG_THEMEAUTHOR, "filter levels" },
-{ "artwork filter 2",    TAG_ADVANCED|TAG_ARTWORK|TAG_THEMEAUTHOR, "filter levels" },
-{ "artwork filter 3",    TAG_ADVANCED|TAG_ARTWORK|TAG_THEMEAUTHOR, "filter levels" },
 { "dynamic colors",      TAG_APPEARANCE|TAG_ARTWORK,             "dynamic colours album" },
 
 /* --- the carousel -------------------------------------------------------- */
