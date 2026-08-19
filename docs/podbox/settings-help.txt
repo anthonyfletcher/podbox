@@ -511,8 +511,11 @@ out of the music database.
 Changing it is best followed by a rebuild, or entries from the old set linger.
 
 [database sort albums by]
-The order album lists appear in throughout the Music menu: by name, or by
-release year with either end first.
+The order for every album list that has no row of its own under Album Sort
+Order: by name, or by release year with either end first.
+
+The four rows above it override this for the lists they name, so this is what
+the rest of the Music menu follows.
 
 [debug log tagcache]
 Writes scan progress to a log file. For working out why a track is missing from
@@ -1216,6 +1219,26 @@ Chooses which views appear inside Music and in what order.
 
 Turning off the ones you never open makes the list shorter without losing the
 database entries behind them.
+
+[action: All Albums]
+The order for the Albums list opened straight from the Music menu, which holds
+every album on the player.
+
+Default follows Other Lists, so this row only needs setting when you want this
+one list to differ.
+
+[action: Artist]
+The order for the album list inside an artist. Genre and Year reach albums
+through an artist too, so they follow this row as well.
+
+Year here reads as a discography in release order, which is usually what an
+artist's albums want.
+
+[action: Album Artist]
+The order for the album list inside an album artist.
+
+[action: Composer]
+The order for the album list inside a composer.
 
 [action: Scale]
 Whether the peak meter is scaled by loudness or by raw sample value.

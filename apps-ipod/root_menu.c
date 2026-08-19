@@ -133,26 +133,25 @@ static bool wait_for_tagcache_ready(void)
                 break;
             }
 
-            /* Check if ready status is known */
-            if (!stat->readyvalid)
-                continue;
-
             /* The database isn't usable yet (missing, or a previous build
              * never finished). The background tagcache thread builds a
              * missing database on its own now, but if we've landed here with
-             * nothing in progress, kick a rebuild automatically. Progress is
-             * shown non-intrusively by the status-bar activity indicator
-             * (%ld), not a modal splash -- the previous screen stays visible
-             * underneath. */
-            if (!reinit_attempted && !stat->ready &&
+             * nothing in progress, kick a rebuild automatically.
+             *
+             * readyvalid gates this and nothing else: a rebuild must not be
+             * decided from a ready status nobody has ascertained. It is set
+             * only by tagcache_commit_finalize(), so a commit that began
+             * before this boot's first finalize leaves it false for the whole
+             * run -- which is why the progress below must not sit behind it. */
+            if (stat->readyvalid && !reinit_attempted && !stat->ready &&
                 stat->processed_entries == 0 && stat->commit_step == 0)
             {
                 reinit_attempted = true;
                 tagcache_rebuild();
             }
 
-            /* Announce building progress by voice only (the status bar shows
-             * the activity visually). */
+            /* Announce building progress by voice, ahead of the splash below
+             * so the richer wording is the one that is spoken. */
             static long talked_tick = 0;
             if(global_settings.talk_menu &&
                (talked_tick == 0
@@ -171,6 +170,36 @@ static bool wait_for_tagcache_ready(void)
                     talk_id(LANG_BUILDING_DATABASE, true);
                 }
             }
+
+            /* The status-bar activity indicator (%ld) reports a scan running
+             * behind another screen, and cannot report this one: the wait is
+             * blocking, so the screen underneath is frozen and reads as broken
+             * without something drawn over it saying why and how to leave. */
+            if (stat->commit_step > 0)
+            {
+                /* splash_progress() voices what it draws, which the block
+                 * above has just said at more length. */
+                bool talk = global_settings.talk_menu;
+                global_settings.talk_menu = false;
+                if (lang_is_rtl())
+                    splash_progress(stat->commit_step,
+                                    tagcache_get_max_commit_step(),
+                                    "(%s) [%d/%d] %s", str(LANG_OFF_ABORT),
+                                    stat->commit_step,
+                                    tagcache_get_max_commit_step(),
+                                    str(LANG_TAGCACHE_INIT));
+                else
+                    splash_progress(stat->commit_step,
+                                    tagcache_get_max_commit_step(),
+                                    "%s [%d/%d] (%s)", str(LANG_TAGCACHE_INIT),
+                                    stat->commit_step,
+                                    tagcache_get_max_commit_step(),
+                                    str(LANG_OFF_ABORT));
+                global_settings.talk_menu = talk;
+            }
+            else
+                splashf(0, str(LANG_BUILDING_DATABASE),
+                        stat->processed_entries); /* (voiced above) */
         }
     }
     return tagcache_reachable();

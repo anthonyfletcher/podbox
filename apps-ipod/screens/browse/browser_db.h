@@ -25,6 +25,25 @@ enum database_sort_albums {
     DB_SORT_ALBUMS_YEAR_DESC,
 };
 
+/* The parent an album list hangs under, which is what decides its order.
+ * The level above is the whole identity, so Genre and Year both reach albums
+ * through an artist level and share DB_ALBUM_CTX_ARTIST with it. A parent
+ * that is none of these -- anything a tagnavi_user.config invents -- has no
+ * slot and takes database_sort_albums_by. */
+enum db_album_sort_ctx {
+    DB_ALBUM_CTX_ROOT = 0,      /* an album list with no level above it */
+    DB_ALBUM_CTX_ARTIST,
+    DB_ALBUM_CTX_ALBUMARTIST,
+    DB_ALBUM_CTX_COMPOSER,
+    DB_ALBUM_CTX_COUNT
+};
+
+/* That context's stored order: a DB_SORT_ALBUMS_* value, or -1 for "follow
+ * database_sort_albums_by". Pass -1 to browser_db_album_sort_set() to put it
+ * back. Neither call saves; the caller does. */
+int browser_db_album_sort_get(int ctx);
+void browser_db_album_sort_set(int ctx, int order);
+
 int browser_db_export(void);
 int browser_db_import(void);
 void browser_db_init(void) INIT_ATTR;

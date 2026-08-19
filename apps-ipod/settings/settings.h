@@ -668,6 +668,12 @@ struct user_settings
      * year comes from the summary index, not the database, so this is separate
      * from the carousel's own sort. */
     int  database_sort_albums_by;
+    /* Per-context overrides of the line above: two bits for each
+     * DB_ALBUM_CTX_*, holding DB_SORT_ALBUMS_* + 1, or 0 for "follow
+     * database_sort_albums_by". A context is the level an album list hangs
+     * under, so Artist and Album Artist can order their albums differently
+     * while everything else keeps one answer. See browser_db.h. */
+    int  database_album_sort_ctx;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

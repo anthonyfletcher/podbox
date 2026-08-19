@@ -740,12 +740,64 @@ MAKE_MENU(search_menu, ID2P(LANG_DB_SEARCH), 0, Icon_NOICON,
 
 /* How the Music browser presents what the database holds -- as against the
  * Database menu below, which is about building and maintaining it. */
+
+/* Album order, per parent context. The setting behind these is one packed word
+ * (browser_db.h), so there is no settings_list.c entry per context to hang an
+ * ordinary row off and each row runs the option screen itself. "Other Lists"
+ * is the plain database_sort_albums_by setting, which the four above fall back
+ * to and which still answers for any parent with no row of its own. */
+static const int album_sort_ctx_lang[DB_ALBUM_CTX_COUNT] = {
+    [DB_ALBUM_CTX_ROOT]        = LANG_ALL_ALBUMS,
+    [DB_ALBUM_CTX_ARTIST]      = LANG_ID3_ARTIST,
+    [DB_ALBUM_CTX_ALBUMARTIST] = LANG_ID3_ALBUMARTIST,
+    [DB_ALBUM_CTX_COMPOSER]    = LANG_ID3_COMPOSER,
+};
+
+static int album_sort_ctx_option(void *param)
+{
+    static const struct opt_items orders[] = {
+        { STR(LANG_SORT_USE_DEFAULT) },
+        { STR(LANG_NAME) },
+        { STR(LANG_SORT_BY_YEAR_ASC) },
+        { STR(LANG_SORT_BY_YEAR_DESC) },
+    };
+    int ctx = (int)(intptr_t)param;
+    int choice = browser_db_album_sort_get(ctx) + 1;
+
+    if (set_option(str(album_sort_ctx_lang[ctx]), &choice, RB_INT,
+                   orders, ARRAYLEN(orders), NULL))
+    {
+        browser_db_album_sort_set(ctx, choice - 1);
+        settings_save();
+    }
+    return 0;
+}
+
+MENUITEM_FUNCTION_W_PARAM(album_sort_root, 0, ID2P(LANG_ALL_ALBUMS),
+                          album_sort_ctx_option,
+                          (void*)(intptr_t)DB_ALBUM_CTX_ROOT, NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(album_sort_artist, 0, ID2P(LANG_ID3_ARTIST),
+                          album_sort_ctx_option,
+                          (void*)(intptr_t)DB_ALBUM_CTX_ARTIST, NULL, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(album_sort_albumartist, 0, ID2P(LANG_ID3_ALBUMARTIST),
+                          album_sort_ctx_option,
+                          (void*)(intptr_t)DB_ALBUM_CTX_ALBUMARTIST, NULL,
+                          Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(album_sort_composer, 0, ID2P(LANG_ID3_COMPOSER),
+                          album_sort_ctx_option,
+                          (void*)(intptr_t)DB_ALBUM_CTX_COMPOSER, NULL,
+                          Icon_NOICON);
 MENUITEM_SETTING(database_sort_albums_by,
                  &global_settings.database_sort_albums_by, NULL);
+MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
+          &album_sort_root, &album_sort_artist, &album_sort_albumartist,
+          &album_sort_composer, &database_sort_albums_by
+          );
+
 MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
                   music_menu_config, NULL, Icon_NOICON);
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &database_sort_albums_by, &music_menu_config_item, &search_menu
+          &album_sort_menu, &music_menu_config_item, &search_menu
           );
 
 /** The branches built here **/

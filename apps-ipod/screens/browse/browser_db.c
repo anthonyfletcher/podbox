@@ -1765,6 +1765,63 @@ static void tcs_get_basename(struct tagcache_search *tcs, bool is_basename)
     }
 }
 
+/* Two bits per context, holding the order plus one so that 0 is free to mean
+ * "nothing chosen here". Eight bits used of the setting's range. */
+#define ALBUM_SORT_SHIFT(ctx)   ((ctx) * 2)
+
+int browser_db_album_sort_get(int ctx)
+{
+    int slot;
+
+    if (ctx < 0 || ctx >= DB_ALBUM_CTX_COUNT)
+        return -1;
+
+    slot = (global_settings.database_album_sort_ctx >> ALBUM_SORT_SHIFT(ctx)) & 3;
+    return slot ? slot - 1 : -1;
+}
+
+void browser_db_album_sort_set(int ctx, int order)
+{
+    int packed;
+
+    if (ctx < 0 || ctx >= DB_ALBUM_CTX_COUNT)
+        return;
+
+    packed = global_settings.database_album_sort_ctx & ~(3 << ALBUM_SORT_SHIFT(ctx));
+    if (order >= 0)
+        packed |= ((order + 1) & 3) << ALBUM_SORT_SHIFT(ctx);
+    global_settings.database_album_sort_ctx = packed;
+}
+
+/* Which context an album list at this level belongs to, or -1 for a parent
+ * with no slot of its own. */
+static int album_sort_ctx(int level)
+{
+    if (level <= 0)
+        return DB_ALBUM_CTX_ROOT;
+
+    switch (csi->tagorder[level - 1])
+    {
+        case tag_artist:
+        case tag_virt_canonicalartist:
+            return DB_ALBUM_CTX_ARTIST;
+        case tag_albumartist:
+            return DB_ALBUM_CTX_ALBUMARTIST;
+        case tag_composer:
+            return DB_ALBUM_CTX_COMPOSER;
+        default:
+            return -1;
+    }
+}
+
+/* The order an album list at this level is drawn in. */
+static int album_sort_order(int level)
+{
+    int order = browser_db_album_sort_get(album_sort_ctx(level));
+
+    return order < 0 ? global_settings.database_sort_albums_by : order;
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -1879,11 +1936,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     }
 
     /* Album lists ordered by year rather than name; see write_year_prefix().
-     * The table is refused outright when the saved index predates the current
-     * database commit, because its seeks would then match the wrong albums --
-     * so a stale index leaves the list in name order rather than a wrong one. */
-    if (tag == tag_album
-        && global_settings.database_sort_albums_by != DB_SORT_ALBUMS_NAME)
+     * The order is per context, so Artist's albums can run by year while the
+     * root Albums list runs by name. The table is refused outright when the
+     * saved index predates the current database commit, because its seeks would
+     * then match the wrong albums -- so a stale index leaves the list in name
+     * order rather than a wrong one. */
+    int album_order = tag == tag_album ? album_sort_order(level)
+                                       : DB_SORT_ALBUMS_NAME;
+    if (album_order != DB_SORT_ALBUMS_NAME)
     {
         size_t ytab_sz;
 
@@ -1895,8 +1955,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             year_prefix = YEAR_PREFIX_LEN;
             strip = YEAR_PREFIX_LEN;
             sort = true;
-            sort_inverse = (global_settings.database_sort_albums_by
-                            == DB_SORT_ALBUMS_YEAR_DESC);
+            sort_inverse = (album_order == DB_SORT_ALBUMS_YEAR_DESC);
         }
         else
             year_tab = NULL;
