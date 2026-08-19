@@ -217,7 +217,7 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(8, -, -, 0)     # no gaps, square corners, from the bottom
 ```
 
-### `%La(offset[, nowrap][, radius])` — list-item album art
+### `%La(offset[, nowrap][, radius][, filters])` — list-item album art
 
 Album art for a menu/list row, alongside the standard `%LT` list text and `%LI`
 list icon. `offset` selects the row relative to the one being drawn (0 = that
@@ -238,16 +238,31 @@ outside a row layout. The taller row an art list needs is `%Lb`'s fifth
 argument (below); see §5 of [`theme-guide.md`](theme-guide.md) for the whole
 arrangement.
 
+**The size follows the viewport.** The cover is drawn at the largest cached
+size that fits inside the `%Vl` holding it, 1:1 and never scaled, so a viewport
+smaller than the art leaves it cropped and one larger leaves a gap. Size the
+viewport to the art you want and it is drawn at that size.
+
+A fourth argument filters the cover, with the same names `%Cl` takes and the
+same `+` joining them, minus `blur` — that one needs a destination of its own
+and a row's cover is drawn straight from the browser's slot. An unrecognised
+name fails the skin at load rather than quietly drawing nothing.
+
 ```
-%La(0)              # album art of the current list row
-%La(0, -, 6)        # the same, with 6px rounded corners
+%La(0)                  # album art of the current list row
+%La(0, -, 6)            # the same, with 6px rounded corners
+%La(0, -, -, bw)        # greyed, square corners
+%La(0, -, 6, bw+dither) # both, and dithered after the levels change
 ```
 
-**`%La` takes no filter chain.** One cached bitmap serves every row on screen,
-so anything applied to a cover applies to all of them.
+The chain is the row config's, so two `%Lb` layouts can treat their covers
+differently, and neither reaches the carousel, the now-playing screen or the
+colours derived from the album. What it costs is a cache slot per treatment:
+the browser keeps eight, and covers drawn two ways occupy two apiece.
 
-To treat one row's cover differently, blend over it: a tinted `%dr` in the same
-viewport, written after the `%La`:
+**It is the whole cover or nothing.** To treat one *row* differently — the
+selected one, say — blend over it instead: a tinted `%dr` in the same viewport,
+written after the `%La`:
 
 ```
 %Vl(PlainRows,0,1,44,44,-)

@@ -54,6 +54,7 @@
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
+#include "draw/img_filter.h"    /* the slides' own treatment */
 #include "lang.h"
 #include "widgets/splash.h"
 #include "draw/viewport.h"
@@ -1435,6 +1436,11 @@ static bool free_slide_prio(int prio)
 /**
  Free all slides ranked above the given priority.
 */
+void carousel_drop_slides(void)
+{
+    free_all_slide_prio(0);
+}
+
 static void free_all_slide_prio(int prio)
 {
     while (free_slide_prio(prio))
@@ -1502,6 +1508,59 @@ static int read_pfraw(char* filename, int prio)
 
     close( fh );
     return hid;
+}
+
+/* The chain the slides are drawn through, compiled from the setting on first
+ * use and whenever the setting moves. Kept here rather than recompiled per
+ * slide: a scroll loads slides continuously and the spec parses the same every
+ * time. carousel_filter_changed() is what tells the menu a reload is due. */
+static struct img_filter carousel_chain;
+static int carousel_chain_from[CAROUSEL_FILTER_SLOTS] = { -1, -1, -1 };
+
+static const struct img_filter *carousel_filter(void)
+{
+    char spec[CAROUSEL_FILTER_MAX];
+    size_t used = 0;
+
+    if (!memcmp(carousel_chain_from, global_settings.album_covers_filter,
+                sizeof(carousel_chain_from)))
+        return carousel_chain.stages ? &carousel_chain : NULL;
+
+    spec[0] = '\0';
+    for (int i = 0; i < CAROUSEL_FILTER_SLOTS; i++)
+    {
+        const char *p = CAROUSEL_FILTER_CFG_VALS;
+        int idx = global_settings.album_covers_filter[i];
+        size_t len;
+
+        if (idx <= 0)                       /* entry 0 is "off" */
+            continue;
+        while (idx-- > 0 && p)
+        {
+            p = strchr(p, ',');
+            if (p)
+                p++;
+        }
+        if (!p)
+            continue;
+        len = strcspn(p, ",");
+        if (used + len + 2 > sizeof(spec))
+            continue;
+        if (used)
+            spec[used++] = '+';
+        memcpy(spec + used, p, len);
+        used += len;
+        spec[used] = '\0';
+    }
+
+    /* IMG_CLASSES_INPLACE refuses `blur`, which the list above cannot name
+     * anyway -- the tier rule lives in the engine rather than in the list, and
+     * that is the right way round. */
+    if (!img_filter_compile(spec, IMG_CLASSES_INPLACE, &carousel_chain))
+        carousel_chain.stages = 0;
+    memcpy(carousel_chain_from, global_settings.album_covers_filter,
+           sizeof(carousel_chain_from));
+    return carousel_chain.stages ? &carousel_chain : NULL;
 }
 
 /* Read a shared-cache thumbnail from an open fd (.aat: struct art_cache_header
@@ -1573,6 +1632,12 @@ static int read_aat(int fh, int prio)
                 dst[col * h + row] = rowbuf[col];
         }
     }
+
+    /* Height and width that way round: the slide is stored column-major, so a
+     * "row" of this buffer is a column of the picture. Only the dither cares
+     * -- it is the one filter that reads a pixel's position -- and a Bayer
+     * grid turned on its side is still a Bayer grid. */
+    img_filter_apply_banded(dst, h, w, carousel_filter());
 
     return hid;
 }

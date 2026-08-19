@@ -26,9 +26,14 @@ static const struct tag_info custom_tags[] =
      * outright, so an uppercase one here would make `gap` unreachable without
      * also writing an alignment. */
     TAG(SKIN_TOKEN_SPECTRUM_BARS,      "Sb", "i|sii",SKIN_REFRESH_SPECTRUM),
-    /* The wrap argument is lowercase 's' for the same reason: upstream's 'S'
-     * would make `radius` reachable only by also writing wrap or nowrap. */
-    TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|Isi", SKIN_REFRESH_DYNAMIC),
+    /* The wrap argument is lowercase 's' for the same reason as the filter
+     * chain after it: upstream's 'S' would make the arguments past it
+     * reachable only by also writing wrap or nowrap.
+     *
+     * The chain is the row's own, not a setting's. One cached bitmap serves
+     * every row on screen, so the browser keeps a slot per treatment rather
+     * than filtering in place. */
+    TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|Isis", SKIN_REFRESH_DYNAMIC),
 
     /* List-level "the list on screen draws art rows", answered from browser
      * state rather than from a drawn row. %?La cannot do this job: it needs a

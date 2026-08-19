@@ -32,6 +32,23 @@ struct opt_items {
 #define MAX_FILENAME 32
 #define MAX_PATHNAME 80
 
+/* Cover Flow's filter chain, entered a slot at a time rather than typed: the
+ * on-screen keyboard is a poor way to write one on a click wheel, and the
+ * chains worth having are short. Three covers the shapes that matter -- a
+ * colour filter, a levels filter, and the dither that tidies up after them.
+ *
+ * A slot's value indexes this list, which is also what the config file stores,
+ * so there is one list rather than one for the file and one for the engine.
+ * Entry 0 is "no filter"; the rest are chains as draw/img_filter.h spells
+ * them. `blur` is not here and could not be: it needs a destination of its
+ * own, and a slide is decoded into one sized for the picture. */
+#define CAROUSEL_FILTER_SLOTS 3
+#define CAROUSEL_FILTER_CFG_VALS \
+    "off,bw,invert,brightness25,brightness-25,contrast40,contrast-40," \
+    "saturate50,saturate-50,hue180,reduce4,dither,pixellate8"
+#define CAROUSEL_FILTER_COUNT 13
+#define CAROUSEL_FILTER_MAX   64   /* room for every slot, joined by '+' */
+
 /* Rebuild the chain from the slots, compile it, and throw away any cached
  * artwork that no longer matches. */
 #define MAX_PATHLIST (MAX_PATHNAME*2)
@@ -641,6 +658,8 @@ struct user_settings
     bool album_covers_show_year;
     int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
     bool album_covers_statusbar;  /* show it, or take the screen and cover it */
+    /* CAROUSEL_FILTER_CFG_VALS indices, run in order, on the slides only. */
+    int  album_covers_filter[CAROUSEL_FILTER_SLOTS];
     /* Music menu rows the user has turned off: one bit per row of
      * tagnavi.config's root menu, by position, valid only against the row set
      * whose signature is stored beside it. See browser_db.h. */

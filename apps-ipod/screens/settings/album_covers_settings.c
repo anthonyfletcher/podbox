@@ -106,6 +106,17 @@ MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,
             &art_health_artists_item,
             &debug_log_artcache);
 
+/* The chain the slides are drawn through, one slot at a time in the order
+ * listed. Cover Flow's own rather than shared with the browser rows: it is not
+ * a skinned screen, so a setting is the only way it can be told. */
+MENUITEM_SETTING(album_covers_filter_1, &global_settings.album_covers_filter[0], NULL);
+MENUITEM_SETTING(album_covers_filter_2, &global_settings.album_covers_filter[1], NULL);
+MENUITEM_SETTING(album_covers_filter_3, &global_settings.album_covers_filter[2], NULL);
+MAKE_MENU(album_covers_filter_menu, ID2P(LANG_ARTWORK_FILTER), NULL, Icon_NOICON,
+            &album_covers_filter_1,
+            &album_covers_filter_2,
+            &album_covers_filter_3);
+
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_on_select,
             &album_covers_show_album_name,
@@ -123,5 +134,6 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_transition_speed,
             &album_covers_pile_fade,
             &album_covers_pile_offset,
+            &album_covers_filter_menu,
             /* Shared, so last. */
             &album_covers_scroll_speed);

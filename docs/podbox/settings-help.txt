@@ -554,6 +554,17 @@ that supports artwork in lists, or the rows are tall and empty.
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.
 
+[album covers filter 1]
+First of three image adjustments applied to the covers in Cover Flow. The
+browser's rows are treated by the theme instead, so this changes the carousel
+and nothing else.
+
+[album covers filter 2]
+Second image adjustment in the chain, applied after the first.
+
+[album covers filter 3]
+Third and last image adjustment in the chain.
+
 [album covers on select]
 What Select does on a cover: open the album's track list, or start playing it.
 

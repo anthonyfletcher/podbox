@@ -143,6 +143,13 @@ int art_cache_size_dim(int size_index)
     return art_sizes[size_index].dim;
 }
 
+enum art_layout art_cache_size_layout(int size_index)
+{
+    if (size_index < 0 || size_index >= ART_CACHE_NUM_SIZES)
+        return AA_ROWS;
+    return art_sizes[size_index].layout;
+}
+
 const char *art_cache_size_name(int size_index)
 {
     if (size_index < 0 || size_index >= ART_CACHE_NUM_SIZES)

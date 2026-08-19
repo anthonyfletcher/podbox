@@ -825,6 +825,9 @@ static int album_on_menu(void)
     int old_show_name  = global_settings.album_covers_show_album_name;
     int old_cache_ver  = pf_cfg.cache_version;
     bool old_statusbar = global_settings.album_covers_statusbar;
+    int old_filter[CAROUSEL_FILTER_SLOTS];
+
+    memcpy(old_filter, global_settings.album_covers_filter, sizeof(old_filter));
 
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
@@ -846,6 +849,13 @@ static int album_on_menu(void)
     if (global_settings.album_covers_sort_albums_by != old_sort
         || global_settings.album_covers_year_sort_order != old_year_order)
         sort_albums(global_settings.album_covers_sort_albums_by, true);
+
+    /* A treatment reaches a slide only as it is loaded, so the ones already
+     * decoded have to go -- otherwise the new look arrives a screen at a time
+     * as the user scrolls past them. */
+    if (memcmp(old_filter, global_settings.album_covers_filter,
+               sizeof(old_filter)))
+        carousel_drop_slides();
 
     /* Re-apply the live geometry settings (zoom / margins / tilt). Cheap and
      * keeps the current slide; harmless after the above. */

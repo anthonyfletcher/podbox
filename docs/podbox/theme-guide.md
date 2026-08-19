@@ -65,7 +65,7 @@ The reset covers 67 settings:
 | Backdrop | `backdrop` |
 | Artwork | `database album art`, `database artist art`, `database art row height`, `dynamic colors` |
 | Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
-| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, and the 3D and Flat geometry |
+| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, and the 3D and Flat geometry |
 | Scrolling | `scroll speed`, `scroll delay`, `scroll step`, `bidir limit`, `screen scroll step`, and the two main-menu scrolling switches |
 | Playlist viewer | `playlist viewer icons`, `playlist viewer indices`, `playlist viewer track display` |
 

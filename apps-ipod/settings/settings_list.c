@@ -1733,6 +1733,27 @@ const struct settings_list settings[] = {
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
     OFFON_SETTING(F_THEMESETTING, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
                   false, "album covers show year", NULL),
+#define CAROUSEL_FILTER_CHOICES \
+                   ID2P(LANG_OFF),               ID2P(LANG_FILTER_BW),  \
+                   ID2P(LANG_FILTER_INVERT),     ID2P(LANG_FILTER_BRIGHTER), \
+                   ID2P(LANG_FILTER_DARKER),     ID2P(LANG_FILTER_CONTRAST_UP), \
+                   ID2P(LANG_FILTER_CONTRAST_DOWN), ID2P(LANG_FILTER_COLOUR_UP), \
+                   ID2P(LANG_FILTER_COLOUR_DOWN), ID2P(LANG_FILTER_HUE), \
+                   ID2P(LANG_FILTER_POSTERISE),  ID2P(LANG_DITHERING),   \
+                   ID2P(LANG_FILTER_PIXELLATE)
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_filter[0],
+                   LANG_ARTWORK_FILTER_1, 0, "album covers filter 1",
+                   CAROUSEL_FILTER_CFG_VALS, NULL,
+                   CAROUSEL_FILTER_COUNT, CAROUSEL_FILTER_CHOICES),
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_filter[1],
+                   LANG_ARTWORK_FILTER_2, 0, "album covers filter 2",
+                   CAROUSEL_FILTER_CFG_VALS, NULL,
+                   CAROUSEL_FILTER_COUNT, CAROUSEL_FILTER_CHOICES),
+    CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_filter[2],
+                   LANG_ARTWORK_FILTER_3, 0, "album covers filter 3",
+                   CAROUSEL_FILTER_CFG_VALS, NULL,
+                   CAROUSEL_FILTER_COUNT, CAROUSEL_FILTER_CHOICES),
+#undef CAROUSEL_FILTER_CHOICES
     /* Defaults for a theme that says nothing, not the shipped look --
      * Themify_2 asks for the opposite of both in its own .cfg. Few status bars
      * span the full width, and one that does not sits over a screen that does

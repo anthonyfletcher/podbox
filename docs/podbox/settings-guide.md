@@ -288,6 +288,9 @@ out here.
 | Year Sort Order | Whether sorting by year puts the oldest or the newest first. | ascending | **Adv** |
 | Sort Albums By | The order covers appear in: by artist, by year, or by album name. | artist+name |  |
 | Sort Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
+| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
+| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
+| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
 | View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3d |  |
 | 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
 | 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |

@@ -59,6 +59,7 @@
 #include "screens/bookmark.h"
 #include "screens/context_menu.h"
 #include "core_alloc.h"
+#include "draw/img_filter.h"   /* the row chain the skin hands down */
 #include "metadata/art_cache.h"
 #include "power.h"
 #include "input/action.h"
@@ -216,17 +217,31 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
  * background, so a row just has no cover until the cache catches up. */
 #define TREE_AA_SLOTS 8
 
-static int browser_aa_size_idx = -2;   /* -2 == not looked up, -1 == no such size */
+/* The largest cached size a row will be given. It keeps the 300px "wps" entry
+ * out of reach -- that is a 180KB read per slot to draw a thumbnail -- and
+ * leaves room for a larger row size to be added to art_sizes[] without this
+ * needing to know about it. */
+#define TREE_AA_MAX_DIM 64
+
 static int browser_aa_handle = -1;     /* pixel store for the slots */
-static int browser_aa_dim;
-static int browser_aa_item[TREE_AA_SLOTS];  /* item cached in each slot, -1 empty */
+static int browser_aa_dim;             /* edge of the size currently loaded */
+static int browser_aa_size_idx = -1;   /* which art_sizes[] entry that is */
 static int browser_aa_victim;               /* round-robin replacement */
 static struct bitmap browser_aa_bm;         /* handed back; points into the store */
+
+/* A slot holds one item drawn one way. The size and the treatment are part of
+ * the key because a skin can ask for either per row config, and a slot loaded
+ * under one must never be handed back for another. */
+static struct {
+    int      item;          /* -1 when empty */
+    int      dim;
+    uint32_t filter_hash;
+} browser_aa_slot[TREE_AA_SLOTS];
 
 static void browser_aa_reset(void)
 {
     for (int i = 0; i < TREE_AA_SLOTS; i++)
-        browser_aa_item[i] = -1;
+        browser_aa_slot[i].item = -1;
     browser_aa_victim = 0;
 }
 
@@ -235,21 +250,52 @@ void browser_albumart_invalidate(void)
     browser_aa_reset();
 }
 
+/* Bytes one slot occupies. Fixed at the ceiling rather than following the size
+ * in use: the store is core_alloc'd, so resizing it on every move between two
+ * lists asking for different sizes would shrink the audio buffer and force a
+ * rebuffer each time. A smaller thumbnail simply uses part of its slot. */
 static size_t browser_aa_slot_bytes(void)
 {
-    return (size_t)browser_aa_dim * browser_aa_dim * FB_DATA_SZ;
+    return (size_t)TREE_AA_MAX_DIM * TREE_AA_MAX_DIM * FB_DATA_SZ;
 }
 
-static bool browser_aa_ready(void)
+/* The cached size to draw a row of `want` pixels with: the largest row size
+ * that fits inside it. The draw is 1:1 and the viewport only clips, so a
+ * larger one would crop the cover rather than shrink it.
+ *
+ * Falls back to the smallest row size when nothing fits, which is what makes a
+ * theme whose art viewport is tiny draw something rather than nothing. */
+static int browser_aa_pick_size(int want)
 {
-    if (browser_aa_size_idx == -2)
+    int best = -1, best_dim = 0, smallest = -1, smallest_dim = 0;
+
+    for (int i = 0; i < art_cache_num_sizes(); i++)
     {
-        browser_aa_size_idx = art_cache_size_index("list");
-        if (browser_aa_size_idx >= 0)
-            browser_aa_dim = art_cache_size_dim(browser_aa_size_idx);
+        int dim = art_cache_size_dim(i);
+
+        if (art_cache_size_layout(i) != AA_ROWS || dim > TREE_AA_MAX_DIM)
+            continue;
+        if (smallest < 0 || dim < smallest_dim)
+            smallest = i, smallest_dim = dim;
+        if (dim <= want && dim > best_dim)
+            best = i, best_dim = dim;
     }
-    if (browser_aa_size_idx < 0)
+    return best >= 0 ? best : smallest;
+}
+
+static bool browser_aa_ready(int want)
+{
+    int idx = browser_aa_pick_size(want);
+
+    if (idx < 0)
         return false;
+
+    if (idx != browser_aa_size_idx)
+    {
+        browser_aa_size_idx = idx;
+        browser_aa_dim = art_cache_size_dim(idx);
+        browser_aa_reset();   /* every slot holds the old size */
+    }
 
     if (browser_aa_handle <= 0)
     {
@@ -268,10 +314,16 @@ static bool browser_aa_ready(void)
  * Copied in whole, so it has to be stored the way it is drawn: rows. The list
  * size is (art_sizes.h), but that is checked rather than assumed -- a size
  * stored by columns would otherwise load without complaint and draw mirrored. */
-static bool browser_aa_load(const char *path, int slot)
+static bool browser_aa_load(const char *path, int slot,
+                            const struct img_filter *filter)
 {
     struct art_cache_header hdr;
-    size_t bytes = browser_aa_slot_bytes();
+    /* What this thumbnail occupies, against where the slot starts. The two
+     * differ whenever the size in use is below the ceiling the store was cut
+     * for, and reading with the wrong one lands every slot but the first on
+     * top of its neighbour. */
+    size_t bytes  = (size_t)browser_aa_dim * browser_aa_dim * FB_DATA_SZ;
+    size_t stride = browser_aa_slot_bytes();
     bool ok = false;
     int fd = open(path, O_RDONLY);
 
@@ -285,7 +337,10 @@ static bool browser_aa_load(const char *path, int slot)
         hdr.width == browser_aa_dim && hdr.height == browser_aa_dim)
     {
         char *store = core_get_data_pinned(browser_aa_handle);
-        ok = read(fd, store + (size_t)slot * bytes, bytes) == (ssize_t)bytes;
+        ok = read(fd, store + (size_t)slot * stride, bytes) == (ssize_t)bytes;
+        if (ok && filter)
+            img_filter_apply_banded((fb_data *)(store + (size_t)slot * stride),
+                                    browser_aa_dim, browser_aa_dim, filter);
         core_put_data_pinned(store);
     }
 
@@ -294,20 +349,25 @@ static bool browser_aa_load(const char *path, int slot)
 }
 
 static const struct bitmap *browser_get_albumart(int selected_item, void * data,
-                                              struct dim *size)
+                                              struct dim *size,
+                                              const struct img_filter *filter,
+                                              uint32_t filter_hash)
 {
     struct browser_context *local_tc = (struct browser_context *)data;
     char dir[MAX_PATH];
     char aat[MAX_PATH];
     int slot;
+    /* The shorter edge: a row viewport is not always square, and the cover has
+     * to fit the tighter of the two or it is cropped. */
+    int want = size ? MIN(size->width, size->height) : TREE_AA_MAX_DIM;
 
-    (void)size;   /* we always hand back dim x dim; the skin clips to its viewport */
-
-    if (selected_item < local_tc->special_entry_count || !browser_aa_ready())
+    if (selected_item < local_tc->special_entry_count || !browser_aa_ready(want))
         return NULL;
 
     for (slot = 0; slot < TREE_AA_SLOTS; slot++)
-        if (browser_aa_item[slot] == selected_item)
+        if (browser_aa_slot[slot].item == selected_item &&
+            browser_aa_slot[slot].dim == browser_aa_dim &&
+            browser_aa_slot[slot].filter_hash == filter_hash)
             goto hit;
 
     /* One list is either an album list or an artist list; resolve the row to the
@@ -330,11 +390,13 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
 
     slot = browser_aa_victim;
     browser_aa_victim = (browser_aa_victim + 1) % TREE_AA_SLOTS;
-    browser_aa_item[slot] = -1;    /* in case the load fails partway */
+    browser_aa_slot[slot].item = -1;    /* in case the load fails partway */
 
-    if (!browser_aa_load(aat, slot))
+    if (!browser_aa_load(aat, slot, filter))
         return NULL;
-    browser_aa_item[slot] = selected_item;
+    browser_aa_slot[slot].item = selected_item;
+    browser_aa_slot[slot].dim = browser_aa_dim;
+    browser_aa_slot[slot].filter_hash = filter_hash;
 
 hit:
     browser_aa_bm.width  = browser_aa_dim;
@@ -342,6 +404,9 @@ hit:
     browser_aa_bm.format = FORMAT_NATIVE;
     browser_aa_bm.data   = (unsigned char *)core_get_data(browser_aa_handle) +
                         (size_t)slot * browser_aa_slot_bytes();
+    /* The size actually drawn, which the renderer clips to its viewport. */
+    if (size)
+        size->width = size->height = browser_aa_dim;
     return &browser_aa_bm;
 }
 

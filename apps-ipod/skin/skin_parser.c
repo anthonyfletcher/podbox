@@ -533,6 +533,8 @@ static int parse_listitem(struct skin_element *element,
     token->value.data = PTRTOSKINOFFSET(skin_buffer, li);
     li->radius = 0;
     li->mask = PTRTOSKINOFFSET(skin_buffer, NULL);
+    li->filter = PTRTOSKINOFFSET(skin_buffer, NULL);
+    li->filter_hash = 0;
     if (element->params_count == 0)
         li->offset = 0;
     else
@@ -563,6 +565,39 @@ static int parse_listitem(struct skin_element *element,
             round_rect_build_mask(mask, radius, LCD_BLEND_OPAQUE);
             li->radius = (uint8_t)radius;
             li->mask = PTRTOSKINOFFSET(skin_buffer, mask);
+        }
+    }
+
+    /* Fourth parameter: the filter chain, compiled here so a misspelt filter
+     * fails the skin at load rather than quietly drawing nothing.
+     *
+     * IMG_CLASSES_INPLACE refuses `blur`, which needs a destination of its
+     * own; a row's cover is drawn from a browser slot sized for the picture
+     * and nothing else. */
+    if (element->params_count > 3 && !isdefault(get_param(element, 3)))
+    {
+        struct img_filter *f = skin_buffer_alloc(sizeof(*f));
+
+        if (!f)
+            return -1;
+        if (!img_filter_compile(get_param_text(element, 3),
+                                IMG_CLASSES_INPLACE, f))
+        {
+            DEBUGF("%%La: %s\n", f->error);
+            return -1;
+        }
+        if (f->stages)
+        {
+            const unsigned char *b = (const unsigned char *)f;
+            uint32_t h = 2166136261u;
+
+            li->filter = PTRTOSKINOFFSET(skin_buffer, f);
+            /* FNV-1a over the compiled chain: two %La naming the same
+             * treatment share a slot, and a slot loaded under one chain is
+             * never reused for another. */
+            for (size_t i = 0; i < offsetof(struct img_filter, error); i++)
+                h = (h ^ b[i]) * 16777619u;
+            li->filter_hash = h ? h : 1;   /* 0 means "no chain" */
         }
     }
     return 0;

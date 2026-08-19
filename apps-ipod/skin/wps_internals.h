@@ -350,6 +350,12 @@ struct listitem {
      * a radius too large for the cover that turns up is dropped there. */
     uint8_t radius;
     OFFSETTYPE(unsigned char *) mask;
+    /* %La only: the chain this row's cover is drawn through, or NULL. The
+     * hash identifies it to the browser's slot cache -- the skin buffer is
+     * freed on reload, so a stored pointer would dangle where a value
+     * cannot. */
+    OFFSETTYPE(struct img_filter *) filter;
+    uint32_t filter_hash;
 };
 
 /* %Sb(bars[,align[,radius]]): how many bars to split the band table into,

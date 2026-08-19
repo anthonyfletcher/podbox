@@ -186,5 +186,9 @@ bool carousel_reinit(void);
  * in place, keeping the current slide -- for a visual settings change that
  * doesn't need an index rebuild. */
 void carousel_refresh(void);
+/* Throw away every decoded slide, for a caller that has changed how one should
+ * look. They are treated as they are loaded, so the ones already in the buffer
+ * keep the old treatment until something evicts them. */
+void carousel_drop_slides(void);
 
 #endif /* _CAROUSEL_H_ */

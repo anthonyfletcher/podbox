@@ -19,6 +19,10 @@
 #include "skin/skin_engine.h"
 #include "draw/line.h"
 
+/* Pointer-only here: a row's album-art chain is compiled in the skin buffer
+ * and this header has no business in the filter engine. */
+struct img_filter;
+
 #define SCROLLBAR_WIDTH global_settings.scrollbar_width
 
 enum synclist_cursor
@@ -58,8 +62,17 @@ typedef enum themable_icons list_get_icon(int selected_item, void * data);
  *  Note: the returned pointer is only valid until the next call into the
  *        callback's backing cache, so it must be drawn immediately.
  */
+/*  - size : the row viewport, in. The callback picks the cached size it draws
+ *           from; the draw is 1:1 and the viewport only clips, so nothing is
+ *           scaled to fit and nothing may exceed what was asked for.
+ *  - filter : the chain to treat the art with, or NULL. `filter_hash` names it
+ *           for cache-keying, because the skin buffer the chain lives in is
+ *           freed on reload and a stored pointer would dangle.
+ */
 typedef const struct bitmap * list_get_albumart(int selected_item, void * data,
-                                                struct dim *size);
+                                                struct dim *size,
+                                                const struct img_filter *filter,
+                                                uint32_t filter_hash);
 /*
  * Text callback
  *  - selected_item : an integer that tells the number of the item to display
@@ -264,7 +277,10 @@ int skinlist_get_item_number(void);
 int skinlist_get_item_row(void);
 int skinlist_get_item_column(void);
 enum themable_icons skinlist_get_item_icon(int offset, bool wrap);
-const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap, struct dim *size);
+const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
+                                                struct dim *size,
+                                                const struct img_filter *filter,
+                                                uint32_t filter_hash);
 /* True when the current skinned row is one drawn taller than the list config's
  * pitch (an album-art row). Backs the %?La conditional. */
 bool skinlist_item_is_art_row(enum screen_type screen, int offset, bool wrap);

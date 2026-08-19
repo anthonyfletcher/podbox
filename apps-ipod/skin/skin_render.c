@@ -588,7 +588,9 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 if (!li) break;
                 struct dim size = { skin_vp->vp.width, skin_vp->vp.height };
                 const struct bitmap *bmp =
-                        skinlist_get_item_albumart(li->offset, li->wrap, &size);
+                        skinlist_get_item_albumart(li->offset, li->wrap, &size,
+                            SKINOFFSETTOPTR(skin_buffer, li->filter),
+                            li->filter_hash);
                 /* Defer the blit to after write_line() (see pending_aa) so the
                  * line-background clear can't wipe the cover's top. */
                 if (bmp)

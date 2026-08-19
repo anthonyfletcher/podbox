@@ -144,6 +144,10 @@ const char *art_cache_noart_list(bool artists);
 /* Number of configured thumbnail sizes, and accessors for each. */
 int         art_cache_num_sizes(void);
 int         art_cache_size_dim(int size_index);
+/* How a size is stored. A reader that copies pixels straight out wants
+ * AA_ROWS; the column-major sizes exist for one consumer that reads them
+ * that way and are unusable to anyone else. */
+enum art_layout art_cache_size_layout(int size_index);
 const char *art_cache_size_name(int size_index);
 /* Index of the named size in the table, or -1 if not present. */
 int         art_cache_size_index(const char *name);

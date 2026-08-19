@@ -138,12 +138,16 @@ enum themable_icons skinlist_get_item_icon(int offset, bool wrap)
     return current_list->callback_get_item_icon(item, current_list->data);
 }
 
-const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap, struct dim *size)
+const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
+                                                struct dim *size,
+                                                const struct img_filter *filter,
+                                                uint32_t filter_hash)
 {
     int item = offset_to_item(offset, wrap);
     if (item < 0 || !current_list || current_list->callback_get_item_albumart == NULL)
         return NULL;
-    return current_list->callback_get_item_albumart(item, current_list->data, size);
+    return current_list->callback_get_item_albumart(item, current_list->data,
+                                                    size, filter, filter_hash);
 }
 
 /* Whether the current list is an album-art list -- one drawing rows taller than
