@@ -614,7 +614,10 @@ static int parse_listitemviewport(struct skin_element *element,
     if (!cfg)
         return -1;
     cfg->data = wps_data;
+    /* skin_buffer_alloc() does not zero, and both of these are read on every
+     * row draw whether or not the tag named them. */
     cfg->tile = false;
+    cfg->art_height = 0;
     cfg->label = PTRTOSKINOFFSET(skin_buffer, get_param_text(element, 0));
     cfg->width = -1;
     cfg->height = -1;
@@ -627,9 +630,17 @@ static int parse_listitemviewport(struct skin_element *element,
     if (!isdefault(param))
         cfg->height = param->data.number;
 
-    if (element->params_count > 3 &&
+    /* isdefault() first: the slot is a nullable string now, so '-' can appear
+     * here to reach the art height past it, and the text of a defaulted
+     * parameter must not be read at all. */
+    if (element->params_count > 3 && !isdefault(get_param(element, 3)) &&
         !strcmp(get_param_text(element, 3), "tile"))
         cfg->tile = true;
+
+    /* The row height for a list that draws art. Zero means the theme says
+     * nothing and the setting still answers -- see list_item_height(). */
+    if (element->params_count > 4 && !isdefault(get_param(element, 4)))
+        cfg->art_height = get_param(element, 4)->data.number;
     token->value.data = PTRTOSKINOFFSET(skin_buffer, (void*)cfg);
     return 0;
 }

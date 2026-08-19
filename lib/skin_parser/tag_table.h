@@ -315,6 +315,7 @@ enum skin_token_type {
      * tag-table rows are kept out of tag_table.c (see apps custom_tags.c). */
     SKIN_TOKEN_SPECTRUM_BARS,
     SKIN_TOKEN_LIST_ITEM_ALBUMART,
+    SKIN_TOKEN_LIST_HAS_ART_ROWS,
     SKIN_TOKEN_VLED_BUILDING,
     SKIN_TOKEN_VLED_WORKING,
     SKIN_TOKEN_LOADING_ANIM,

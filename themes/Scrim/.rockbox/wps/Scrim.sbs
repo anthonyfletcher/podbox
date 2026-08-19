@@ -30,7 +30,7 @@
 %V(0,0,-,-,-)
 #
 # Setup rows
-%Lb(Rows,300,30)
+%Lb(Rows,300,30,-,46)
 #
 # Top bar
 %?mv(3)<%Vd(Volume)|%Vd(Chrome)>

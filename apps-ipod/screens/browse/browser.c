@@ -523,8 +523,13 @@ static int browser_get_file_position(char * filename)
 /* Whether the browse level currently on screen draws tall art rows (album or
  * artist art). Set by update_dir() before each redraw, so it is valid when the
  * themed status bar renders its chrome -- unlike the per-row %La, which needs a
- * drawn list row. The theme reads it (via %La outside a row) to drop the left
- * rounded corner that would otherwise clash with the square art. */
+ * drawn list row. The theme reads it (via %Ld, or %La outside a row) to drop
+ * the left rounded corner that would otherwise clash with the square art.
+ *
+ * Cleared when the outermost browse returns, or it would still be true over the
+ * settings list and the chrome would dress that as an art list. A nested browse
+ * returning must not clear it: the browse underneath is still on screen and
+ * will not necessarily redraw. */
 static bool db_showing_art;
 
 bool browser_showing_art(void)
@@ -1319,6 +1324,8 @@ int rockbox_browse(struct browse_context *browse)
     backup_count--;
     if (backup_count >= 0)
         tc = backups[backup_count];
+    else
+        db_showing_art = false;    /* no browse left on screen */
 
     return ret_val;
 }

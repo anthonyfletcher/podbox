@@ -1600,6 +1600,10 @@ const char *get_token_value(struct gui_wps *gwps,
             return skinlist_item_is_art_row(gwps->display->screen_type,
                                             li->offset, li->wrap) ? "a" : "";
         }
+        case SKIN_TOKEN_LIST_HAS_ART_ROWS:
+            /* List-level, and answerable before anything draws -- which is what
+             * lets it choose between two %Lb where %?La cannot. */
+            return browser_showing_art() ? "a" : "";
         case SKIN_TOKEN_LIST_NEEDS_SCROLLBAR:
             return skinlist_needs_scrollbar(gwps->display->screen_type) ? "s" : "";
         case SKIN_TOKEN_PLAYLIST_NAME:

@@ -156,9 +156,18 @@ bool list_display_title(struct gui_synclist *list, enum screen_type screen)
 
 int list_item_height(struct gui_synclist *list, enum screen_type screen)
 {
-    /* An explicit uniform override wins. Otherwise the skin's own row height
-     * (%Lb) for a skinned list -- NOT the font height, so an ordinary row keeps
-     * the pitch the theme drew its decoration for -- else the viewport font. */
+    /* A height the skin named for art rows wins, then an explicit uniform
+     * override, then the skin's own row height (%Lb) for a skinned list -- NOT
+     * the font height, so an ordinary row keeps the pitch the theme drew its
+     * decoration for -- else the viewport font.
+     *
+     * The skin comes first so that declaring the height is the whole opt-in: a
+     * theme that says nothing goes on taking the override, which the browser
+     * fills from `database art row height`. */
+    int a = skinlist_art_row_height(screen, list);
+    if (a > 0)
+        return a;
+
     if (list->line_height_override > 0)
         return list->line_height_override;
 
@@ -232,6 +241,10 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     )
 {
     gui_list->callback_get_item_icon = NULL;
+    /* Every list starts without art. Left uninitialised this is stack garbage
+     * for the many screens whose synclist is a local, and a skin asking a row
+     * for its art then calls it as a function pointer. */
+    gui_list->callback_get_item_albumart = NULL;
     gui_list->callback_get_item_name = callback_get_item_name;
     gui_list->line_height_override = 0;   /* default skin/font row height */
     gui_list->callback_speak_item = NULL;

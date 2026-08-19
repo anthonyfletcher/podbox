@@ -30,6 +30,21 @@ static const struct tag_info custom_tags[] =
      * would make `radius` reachable only by also writing wrap or nowrap. */
     TAG(SKIN_TOKEN_LIST_ITEM_ALBUMART, "La", "|Isi", SKIN_REFRESH_DYNAMIC),
 
+    /* List-level "the list on screen draws art rows", answered from browser
+     * state rather than from a drawn row. %?La cannot do this job: it needs a
+     * rendered %Lb to answer, so it can never decide which %Lb renders. */
+    TAG(SKIN_TOKEN_LIST_HAS_ART_ROWS,  "Ld", "",     SKIN_REFRESH_DYNAMIC),
+
+    /* Shadows upstream's %Lb ("Sii|S"): the same token with a fifth argument,
+     * the row height to use when the list draws art. Without it that height
+     * comes from a setting in the theme .cfg, which is a second height the skin
+     * cannot see and one number for every art list on the player.
+     *
+     * The tile slot is lowercase here so '-' can reach past it. It stays fourth
+     * rather than moving: tile is upstream, so a third-party theme may be using
+     * it and reordering would break that theme silently. */
+    TAG(SKIN_TOKEN_LIST_ITEM_CFG,      "Lb", "Sii|si", SKIN_REFRESH_DYNAMIC),
+
     /* Shadows upstream's %Cl ("[iP][iP][iP][iP]|ss"): the same token with
      * three more optional arguments, the filter chain (draw/img_filter.h), a
      * corner radius, and the label a %Cd calls this art by. The token id is

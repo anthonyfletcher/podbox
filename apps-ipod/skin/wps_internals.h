@@ -379,6 +379,10 @@ struct listitem_viewport_cfg {
     int16_t     height;
     int16_t     xmargin;
     int16_t     ymargin;
+    /* Row height when the list draws art (%Lb's 5th argument); 0 when the skin
+     * declares none. Taller than 'height' by construction, which is the
+     * invariant %?La and the list centring both test. */
+    int16_t     art_height;
     bool    tile;
 };
 

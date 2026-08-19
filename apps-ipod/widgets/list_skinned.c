@@ -178,6 +178,22 @@ int skinlist_row_height(enum screen_type screen, struct gui_synclist *list)
     return listcfg[screen]->height;
 }
 
+/* Zero unless this list draws art AND the skin named a height for that case, so
+ * a caller can ask without first working out which of the two it is looking at.
+ * The art test is the callback, the same one skinlist_item_is_art_row() opens
+ * with -- a list has art rows exactly when something can supply the art. */
+int skinlist_art_row_height(enum screen_type screen, struct gui_synclist *list)
+{
+    /* skinlist_is_configured() tolerates a NULL list; this one reads a field of
+     * it, so the check has to be its own. */
+    if (!list || !skinlist_is_configured(screen, list) || listcfg[screen]->tile)
+        return 0;
+    if (listcfg[screen]->art_height <= 0 ||
+        list->callback_get_item_albumart == NULL)
+        return 0;
+    return listcfg[screen]->art_height;
+}
+
 int skinlist_get_line_count(enum screen_type screen, struct gui_synclist *list)
 {
     struct viewport *parent = (list->parent[screen]);
