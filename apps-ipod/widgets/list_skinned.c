@@ -194,6 +194,16 @@ int skinlist_art_row_height(enum screen_type screen, struct gui_synclist *list)
     return listcfg[screen]->art_height;
 }
 
+/* One unless the config tiles, so a caller can divide by this unconditionally.
+ * The MAX() is not decoration: a %Lb wider than its %Vi divides to zero, and
+ * the caller's next move is to divide by what comes back. */
+int skinlist_get_columns(enum screen_type screen, struct gui_synclist *list)
+{
+    if (!list || !skinlist_is_configured(screen, list) || !listcfg[screen]->tile)
+        return 1;
+    return MAX(1, list->parent[screen]->width / listcfg[screen]->width);
+}
+
 int skinlist_get_line_count(enum screen_type screen, struct gui_synclist *list)
 {
     struct viewport *parent = (list->parent[screen]);

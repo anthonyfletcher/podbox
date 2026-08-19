@@ -29,7 +29,6 @@
  *   - simplelist_*: the convenience wrapper for a quick list screen
  ****************************************************************************/
 #include <stdarg.h>
-#include <stdio.h>
 #include "config.h"
 #include "lcd.h"
 #include "font.h"
@@ -370,6 +369,41 @@ static void gui_list_put_selection_on_screen(struct gui_synclist * gui_list,
     int difference = gui_list->selected_item - gui_list->start_item[screen];
     const int scroll_limit_up   = (nb_lines < gui_list->selected_size+2 ? 0:1);
     const int scroll_limit_down = (scroll_limit_up+gui_list->selected_size);
+
+    /* A grid scrolls by a row. The arithmetic below counts items, which on a
+     * tiled list moves the top by one tile and shuffles every column sideways;
+     * nothing is mis-drawn, so it reads as the grid being restless rather than
+     * as a fault here. Working in rows and multiplying back keeps start_item a
+     * multiple of the column count by construction, at both ends.
+     *
+     * Deliberately no lookahead. The linear path keeps a row of context below
+     * the selection; with the two visible rows a cover grid actually has, that
+     * would mean the selection could never occupy the bottom row and the grid
+     * would scroll on every step through it. */
+    int cols = skinlist_get_columns(screen, gui_list);
+    if (cols > 1)
+    {
+        int rows       = MAX(1, nb_lines / cols);
+        int sel_row    = gui_list->selected_item / cols;
+        int start_row  = gui_list->start_item[screen] / cols;
+        /* MAX() so an empty list does not lean on truncation toward zero. */
+        int last_row   = (MAX(1, gui_list->nb_items) - 1) / cols;
+        int bottom_row = MAX(0, last_row - rows + 1);
+
+        if (sel_row < start_row)
+            start_row = sel_row;
+        else if (sel_row >= start_row + rows)
+            start_row = sel_row - rows + 1;
+
+        /* Row-aligned, unlike the item clamp below: the last screen keeps its
+         * columns and shows a part-filled final row rather than repeating
+         * tiles to fill itself. */
+        if (start_row > bottom_row)
+            start_row = bottom_row;
+
+        gui_list->start_item[screen] = start_row * cols;
+        return;
+    }
 
     if (gui_list->selected_size >= nb_lines)
     {

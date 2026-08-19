@@ -277,6 +277,10 @@ int skinlist_row_height(enum screen_type screen, struct gui_synclist *list);
 /* The pitch %Lb asks for on a list that draws art (its 5th argument); 0 when
  * the skin declares none, which is what leaves the setting answering. */
 int skinlist_art_row_height(enum screen_type screen, struct gui_synclist *list);
+/* Columns in the skinned grid drawing `list`; 1 when it is not tiled, so a
+ * caller can treat every list as a grid and only the tiled ones behave like
+ * one. */
+int skinlist_get_columns(enum screen_type screen, struct gui_synclist *list);
 
 
 /* If the list has a pending postponed scheduled announcement, that
