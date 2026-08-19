@@ -93,6 +93,33 @@ write *was tried*, *used to*, *previously*, *at first*, *the old code*,
 
 The journey belongs in the commit message, if anywhere.
 
+**A document has a reader. Write to them, not to the next implementer.**
+A guide, a reference or a README is read by someone trying to *use* the
+thing - a theme author, a player owner, whoever runs the script. They are not
+deciding whether the design was right, and telling them it was is noise. This
+is the same fault as narrating in a comment, one level up: it is writing to
+the wrong reader.
+
+Three things to cut:
+
+- **Design defences.** *and there should not be*, *that is deliberate*, *on
+  purpose*, *considered and rejected*, *would be worse*, *is the right call*.
+  The reader cannot act on any of it. A recommendation is not a defence -
+  "use `auto` unless you need to pin the colours" tells them what to do, and
+  stays.
+- **Mechanism they cannot see.** Internals earn a line only when they predict
+  something the reader will hit. "one cached bitmap serves every row" earns
+  its place, because it says why no filter is offered; "the row config is
+  remembered once the tag renders and is never cleared" does not.
+- **Source paths and line numbers**, in any document whose reader does not
+  have the tree open. `settings_list.c` means nothing to someone writing a
+  theme. An internals document is the exception and should say so at the top.
+
+The test, sentence by sentence: **what does the reader do differently for
+having read this?** If the answer is nothing, it belongs in the commit message
+or in `.specifications/`, not in the document. Apply it hardest to the
+sentence you were proudest of.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
