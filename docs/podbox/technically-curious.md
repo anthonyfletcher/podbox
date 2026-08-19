@@ -48,10 +48,13 @@ scripts, and a handful of others — are catalogued. See
 ## Prerequisites
 
 You need the Rockbox ARM cross-compiler. Build it once with
-`tools/rockboxdev.sh` (choose the `arm-elf-eabi` toolchain) and put
-`arm-elf-eabi-gcc` on your `PATH`. Linux or macOS; the build does not run
-natively on Windows. The simulator wants SDL2 and a host compiler instead, and
-can be cross-compiled *for* Windows — see
+`bash ./tools/rockboxdev.sh` (choose the `arm-elf-eabi` toolchain) and put
+`arm-elf-eabi-gcc` on your `PATH`. **Invoke it through `bash`**, not as
+`./tools/rockboxdev.sh` — the script says `#!/bin/sh` but locates its own
+`toolchain-patches/` through `BASH_SOURCE`, so under a `sh` that is not bash it
+looks in the wrong place and quietly builds an *unpatched* gcc. Linux or macOS;
+the build does not run natively on Windows. The simulator wants SDL2 and a host
+compiler instead, and can be cross-compiled *for* Windows — see
 [Running the simulator](#running-the-simulator).
 
 ## Build
@@ -71,7 +74,7 @@ Rockbox builds out of tree, and `build-hw.sh` is only wrapping four steps:
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip
-../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh
+../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh && ../bundle-help.sh
 ```
 
 Two of them are easy to get wrong by hand, and both fail quietly:
@@ -81,9 +84,12 @@ Two of them are easy to get wrong by hand, and both fail quietly:
   instead — you get working firmware with none of this fork's work in it.
 - **`make zip` on its own is incomplete.** `tools/buildzip.pl` is deliberately
   kept close to Rockbox and knows nothing about this fork, so its zip has no
-  theme, no first-boot `config.cfg`, no EQ presets, and Rockbox's licence file
-  rather than this fork's. The three `bundle-*.sh` scripts add them and strip
-  what a plugin-less build cannot use.
+  themes, no first-boot config, no iconset, no EQ presets, no setting
+  explanations, and Rockbox's licence file rather than this fork's. The four
+  `bundle-*.sh` scripts add them and strip what a plugin-less build cannot use.
+  `bundle-help.sh` is the one to watch: skip it and every **Explain** entry in
+  a setting's context menu simply shows nothing, while everything else looks
+  finished.
 
 For an incremental rebuild, re-run everything except `configure` from inside the
 existing build directory.
@@ -103,9 +109,10 @@ output.
 
 You need SDL2 and a host compiler; the Windows build also wants `mingw-w64` and
 an SDL2 mingw development package reachable as
-`x86_64-w64-mingw32-sdl2-config`. The result is `build-sim-<target>/rockboxui`,
-and `simdisk/` beside it stands in for the player's storage — drop music in
-there and it appears in Files.
+`x86_64-w64-mingw32-sdl2-config`. The result is `build-sim-<target>/rockboxui`
+— or `build-sim-<target>-win32/rockboxui.exe`, which you copy to a Windows
+machine together with its `simdisk/`. That directory stands in for the player's
+storage: drop music in there and it appears in Files.
 
 Like `build-hw.sh` this is a clean build, with one exception: **`simdisk/`
 survives it.** Your music and database are worth more than the rebuild.
@@ -116,7 +123,8 @@ survives it.** Your music and database are worth more than the rebuild.
 mkdir build-sim-ipodvideo && cd build-sim-ipodvideo
 ../tools/configure --target=ipodvideo --type=s --appsdir=apps-ipod
 make -j"$(nproc)"
-make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh
+make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh \
+         && ../bundle-help.sh
 rm -rf simdisk/.rockbox && unzip -q rockbox.zip -d simdisk/
 ```
 
@@ -135,7 +143,7 @@ character at a time, and only `A` forwards the rest.
 |---|---|
 | `--debugwps` | Traces skin parsing: which `.wps` and `.sbs` loaded, and what every `%Sx()` lang lookup resolved to |
 | `F5` | Screendump — a pixel-exact 320x240 BMP written into `simdisk/` |
-| System > Debug | The portable debug screens, including **Skin Engine RAM usage** |
+| System > Debug (Keep Out!) | The portable debug screens, including **Skin Engine RAM usage**. The row is hidden until you turn on Settings > System > Show Debug Menu |
 
 Controls are the arrow keys, Enter, Esc and Space, or the numeric keypad laid
 out like the click wheel. Note that **Right**, not Enter, opens a list item —
@@ -158,7 +166,7 @@ assuming it was on hardware, which is
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `apps-ipod/` | The application layer — all of this fork's UI work. See [`apps-ipod/README.md`](../../apps-ipod/README.md), which explains the layout and where new code goes. |
 | `firmware/` | Hardware abstraction, drivers, kernel. Close to Rockbox; see [`upstream-divergence.md`](upstream-divergence.md) for changes.     |
-| `lib/rbcodec/` | Codecs and DSP. Rockbox's, unmodified.                                                                                                                   |
+| `lib/` | Codecs, DSP and the skin parser. Rockbox's, near enough — `rbcodec/` gains one metadata flag and `skin_parser/` the hooks the extra tags need. |
 | `apps/` | Rockbox's original application layer. **Never built.** Kept so merges apply cleanly — do not edit it.                              |
 | `uisimulator/` | Rockbox's SDL simulator support, unmodified and used as-is. The fork's side of it is [`apps-ipod/sim/`](../../apps-ipod/sim/README.md). |
 | `docs/podbox/` | This fork's own documentation.                                                                                                                           |

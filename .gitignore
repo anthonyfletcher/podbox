@@ -355,6 +355,6 @@ __pycache__
 /.idea/
 /.claude/
 
-# Themes under development -- bundled into the zip when present, absent from
-# a clean checkout (see bundle-theme.sh)
+# Themes under development. Nothing bundles these -- bundle-theme.sh ships the
+# named list in themes/, so a theme only reaches a build once it moves there.
 /.theme-dev/

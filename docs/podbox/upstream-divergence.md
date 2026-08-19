@@ -23,22 +23,24 @@ This document covers **everything else**: the files under `firmware/`, `lib/`,
 
 ## Scope
 
-The comparison base is Rockbox commit `24c3779146` — the commit this fork was
-rebased onto, not the original fork point. To regenerate the list:
+The comparison base is Rockbox commit `2d2b03d314`, the last upstream commit
+merged in — not the original fork point, and no longer the `24c3779146` this
+fork was rebased onto. It moves with every merge, so derive it rather than
+typing it. To regenerate the list:
 
 ```bash
 git diff --name-status $(git merge-base HEAD rockbox/master)..HEAD -- . ':(exclude)apps-ipod'
 ```
 
 Most of what that lists is code, build-system or build-script files; the rest is
-documentation, the Themify_2 theme, the EQ presets and the logo. Run it rather
-than trusting a count written down here — this document is a guide to *why* the
-files differ, and the set moves every time one is added.
+documentation, the Themify_2 and Scrim themes, the EQ presets and the logo. Run
+it rather than trusting a count written down here — this document is a guide to
+*why* the files differ, and the set moves every time one is added.
 
 **`apps/` is byte-identical to upstream, and stays that way.** It is kept so
 `git merge rockbox/master` applies without delete/modify conflicts. The same
 goes for `manual/`, `android/`, `backdrops/`, `screenshots/` and every `themes/`
-entry but Themify_2. Being unused is not a reason to prune them.
+entry but Themify_2 and Scrim. Being unused is not a reason to prune them.
 
 **`uisimulator/` is upstream-identical too, but it is no longer unused** — the
 simulator builds and runs. See "The simulator needs nothing here" below.
@@ -49,18 +51,16 @@ fork's own.
 
 ### Not everything the command lists is divergence
 
-The base is a fixed commit, so a file taken from a *later* upstream commit also
-shows as modified — identical to current `rockbox/master`, different from the
-rebase point, and not a fork patch at all. Distinguish them:
+The base is the last commit merged, so a file taken from a *later* upstream
+commit also shows as modified — identical to current `rockbox/master`,
+different from the base, and not a fork patch at all. Distinguish them:
 
 ```bash
 git diff --stat HEAD rockbox/master -- <file>   # empty output: upstream-identical
 ```
 
-Current forward-ports, held here so they are not mistaken for local work:
-`firmware/common/strcasestr.c`, `firmware/drivers/lcd-bitmap-common.c`,
-`lib/rbcodec/dsp/eq.c`, `lib/rbcodec/dsp/eq.h`. Each is recorded in
-[`upstream-commit-log.md`](upstream-commit-log.md), which is the per-commit
+There are none outstanding as of the merge through `2d2b03d314`. Each one is
+recorded in [`upstream-commit-log.md`](upstream-commit-log.md), the per-commit
 companion to this file: it answers *what was done about a given upstream
 commit*, where this one answers *why a given file differs*.
 
@@ -78,7 +78,10 @@ commit*, where this one answers *why a given file differs*.
 | `powermgmt.c` | The charger case sets `CHARGING` unconditionally instead of falling through, and the battery-level test keys off `charge_state > DISCHARGING` | On the 6G the charge-status line oscillates against weak USB sources, so `charging_state()` reads false while charging is genuinely happening. Upstream's fallthrough flips the reported state back and forth, and with it the voltage-to-percentage curve, which moves the reading several points. |
 | `powermgmt.c` | New `charge_finished`, debounced 8 samples off `charging_state()` and held until unplug; the 99 % cap now needs it as well as `charge_state` | The change above answered two questions with one variable and got the second wrong. Curve selection wants debounced charger *presence*; the "< 100 % until charging is finished" cap wants "is charge still going in?", which `charge_state` cannot say — it reads `CHARGING` from plug-in to unplug, so **a full battery never showed 100 %**. Splitting them keeps the oscillation fix and releases the cap. Other targets never set the flag, so they keep upstream's behaviour exactly. |
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined for non-bootloader 6G builds (upstream defines it only inside the disabled bootloader block) | The 6G keeps a serial log. **`export/logf.h` is no longer touched:** `MAX_LOGF_SIZE` had been raised 16 KiB → 256 KiB, which on this target is a 256 KiB always-resident `logfbuffer` in `.bss` — jointly the largest object in `rockbox.elf`. Restored to upstream's 16 KiB, so that header is byte-identical again and the buffer costs what upstream intends. Note `logf()` here is a real `vsnprintf`, not `do {} while(0)`, and `apps/playback.c` and `apps/codecs.c` arm `LOGF_ENABLE` *upstream* — so the 6G's audio path does log on every buffering and codec event. Nothing of this reaches the 5G, which leaves `ROCKBOX_HAS_LOGF` undefined. |
+| `SOURCES` | `target/arm/s5l8702/ipod6g/mikey-6g.c` wrapped in `#ifdef HAVE_MIKEY_REMOTE` | The inline earphone remote is held out at `export/config.h` (see below), and this is the one hook upstream did not already guard. Without it the driver still compiles, alone, against a gate nothing else honours. |
+| `export/rbpaths.h` | New `DEFAULTCONFIGFILE`, `.rockbox/default-config.cfg` | The build ships a first-boot config, and it must not be `config.cfg` — that file is the player's, so an install overwriting it resets the player's settings. The firmware reads this one only when no `config.cfg` exists. |
 | `drivers/lcd-16bit-common.c`, `export/lcd.h` | New `lcd_blendrect(x, y, w, h, opacity)` and `LCD_BLEND_OPAQUE`, beside `lcd_fillrect` | Fills with the foreground colour blended against what is already there, for the skin engine's `%dr` opacity argument (`custom-skin-tags.md`). The blending itself is upstream's — it reuses `blend_two_colors()`, the primitive the antialiased font path already runs on. What is new is a rectangle case, where colour and opacity are both loop-invariant and the 4bpp alpha stream disappears. Guarded by `HAVE_LCD_COLOR && !DISABLE_ALPHA_BITMAP`, matching the code it sits in. **It is only useful drawn into the backdrop buffer** — see the note at the function, and §5 of `.specifications/COMPOSITED_BACKDROP_LAYER.md` for why. |
+| `drivers/lcd-color-common.c`, `export/lcd.h` | New `lcd_alpha_bitmap_part_img()`, and `export/lcd.h` now declares it and `lcd_alpha_bitmap_part()` | Draws an image through a 4bpp alpha mask with a stride per plane, which is what an anti-aliased corner radius on `%dr`, `%Cl` and `%La` needs — the mask is generated per radius and is not the image's own size, so `lcd_bmp_part()` cannot serve. The blitter itself is upstream's antialiased-font path; both declarations were previously private to the drivers. Guarded by `HAVE_LCD_COLOR && !DISABLE_ALPHA_BITMAP`. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm functions, the `alarm_disable` table and the `rtc_init()` call to `rtc_check_alarm_started()` wrapped in `#ifdef HAVE_RTC_ALARM` | The prototypes in `export/rtc.h` are already guarded, but this driver referenced them unconditionally — it was the only RTC driver without the guard, because every upstream target using the PCF50605 defines `HAVE_RTC_ALARM`. Undefining it for the 5G broke the build. Now matches the shape of `rtc_ds1339_ds3231.c`, `rtc_e8564.c` and the rest, so this is upstream's own convention rather than a fork invention. |
 
 ## firmware/ — USB stack
@@ -237,11 +240,11 @@ future decline is not in that position, it needs a row here.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `export/config.h` | `#undef HAVE_MIKEY_REMOTE`, after the target configs are included | Holds out the iPod Classic inline earphone remote (upstream `b217a55059`), whose wiring is in `firmware/SOURCES`, `export/button.h` and `target/arm/ipod/button-clickwheel.c` — none of which this fork edits, so a merge would take all three and build the driver. Every hook is `#ifdef`'d on this and `mikey-6g.c` is only reached through them. Deferred on maturity, not applicability: see the commit log, which also lists what taking it would need beyond the upstream diff. |
+| `export/config.h` | `#undef HAVE_MIKEY_REMOTE`, after the target configs are included | Holds out the iPod Classic inline earphone remote (upstream `b217a55059`), whose wiring is in `firmware/SOURCES`, `export/button.h` and `target/arm/ipod/button-clickwheel.c` — the last two this fork does not edit, so a merge would take them and build the driver. Every hook is `#ifdef`'d on this and `mikey-6g.c` is only reached through them; `firmware/SOURCES` needed the guard added, and has a row above. Deferred on maturity, not applicability: see the commit log, which also lists what taking it would need beyond the upstream diff. |
 | `export/config.h` | New `PODBOX_NO_USB_IAP`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. There is no dock or accessory here to test iAP against, and shipping an untestable subsystem invites unreproducible bug reports. **Settled 2026-07-29: this stays off permanently** — see below. It also suppresses `HAVE_MULTIMEDIA_KEYS`, which nothing in `apps-ipod/` uses. |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | DAP-only fork; no recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | There is no plugin system. The name survives for the core scratch buffer (`apps-ipod/system/app_buffer.c`) that core screens allocate from. |
-| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined | Serial logging on by default for this target, which has never been run on hardware. Pairs with the enlarged `MAX_LOGF_SIZE`. |
+| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined | Serial logging on by default for this target; upstream defines it only inside the disabled bootloader block. The log itself has never been read off hardware. `MAX_LOGF_SIZE` is upstream's 16 KiB — see the `export/logf.h` note in the core table for why it was put back. |
 | `export/config/ipod6g.h` | `TARGET_EXTRA_THREADS 1` | Raises `MAXTHREADS`. Sits inside the block that enables `IPOD_ACCESSORY_PROTOCOL`, which needs a thread. |
 | `export/config/ipodvideo.h` | `HAVE_RECORDING` commented out | As above. |
 | `export/config/ipodvideo.h` | `CONFIG_TUNER`, `HAVE_RDS_CAP`, `CONFIG_RDS` commented out | The Apple remote tuner accessory is not a target of this build. Leaving them defined left a whole FM surface reachable and pointless: Radio Screen theme option, Radio Settings menu, main-menu FM entry. Now matches `ipod6g.h`, which never defined them. |
@@ -272,8 +275,9 @@ targets satisfy upstream's gate, and RockPod shipped MFi digital audio on the
   `USB_ENABLE_AUDIO` is already on there and untested, so enabling this too
   would stack two unproven USB features on one controller.
 
-The comment at `config.h:1402` says re-enabling needs "nothing else". True of
-the build — it compiles — but not of the behaviour, per the first point.
+The comment at the `PODBOX_NO_USB_IAP` define says re-enabling needs "nothing
+else". True of the build — it compiles — but not of the behaviour, per the
+first point.
 
 **Serial iAP is unaffected and stays on.** It is a different transport
 (`IPOD_ACCESSORY_PROTOCOL`, UART pins on the dock connector), implemented in
@@ -288,7 +292,7 @@ records that it carries no RockPod code and tracks upstream.
 | --- | --- | --- |
 | `rbcodec/metadata/mp4.c`, `metadata.h` | New `bool has_video` on `struct mp3entry`, set when the MP4 handler box reads `vide` | Lets tagcache skip music videos in MP4 containers. |
 | `skin_parser/tag_table.c` | `find_custom_tag()` declared **weak** and called **first** in `find_tag()` | This fork's skin engine has tags upstream does not (see `custom-skin-tags.md`), and they are registered from the app layer rather than by editing upstream's table. Weak so `lib/skin_parser` still links standalone (the theme editor), where it resolves to NULL and is skipped. |
-| `skin_parser/tag_table.h` | Five new `SKIN_TOKEN_*` enum members | The token type field is a 1-byte short-enum, so the values must be members of *this* enum to fit and to be matched. Only the values live here; the tag-table rows stay in the app layer's `custom_tags.c`. |
+| `skin_parser/tag_table.h` | Six new `SKIN_TOKEN_*` enum members | The token type field is a 1-byte short-enum, so the values must be members of *this* enum to fit and to be matched. Only the values live here; the tag-table rows stay in the app layer's `custom_tags.c`. |
 | `skin_parser/tag_table.h` | New `SKIN_REFRESH_SPECTRUM`, added to `SKIN_REFRESH_NON_STATIC` | So spectrum-bar lines are redrawn on the changes-over-time pass. |
 
 **Why custom tags are looked up first.** Upstream's search tries three
@@ -315,8 +319,9 @@ instead** — it will succeed, and produce the wrong firmware.
 | `configure` | `picklang()` scans `${coreapps}/lang/*.lang` | Was hardcoded to `apps`. |
 | `root.make` | New `APPSBUILDDIR`; bitmaps include and the `voice` target use it | Objects mirror their source path under `$(BUILDDIR)`, so the output path has to track `COREAPPSDIR` too. |
 | `mkinfo.pl` | Detects a core build by comparing `APPSDIR` against `COREAPPSDIR`, not by matching `/\/apps$/` | Otherwise `rockbox-info.txt` silently loses its `Actual size`, `RAM usage` and `Features` lines. |
-| `buildzip.pl` | New `$APPSDIR` from the environment, for `tagnavi.config` and `lang/Invalid*.talk` | This file is kept as close to upstream as possible, so it gets the smallest change that works — just the files genuinely shipped *from* the application layer. Everything else, including its `apps/plugins` paths, is untouched. |
+| `buildzip.pl` | New `$APPSDIR` from the environment, for `tagnavi.config` and `lang/Invalid*.talk` | This file is kept as close to upstream as possible, so it gets the smallest change that works — just the files genuinely shipped *from* the application layer. Its `apps/plugins` paths are left alone; `bundle-theme.sh` deletes what they ship instead. |
 | `buildzip.pl` | New `$APPSBUILDDIR`, the basename of `COREAPPSDIR`, for `lang/*.lng` and `lang/*.zip` | **Two different questions, two different variables.** `$APPSDIR` is a *source* path; the `.lng` files are *build products*, named relative to the build directory buildzip runs in. Upstream's hardcoded `apps/lang/*.lng` exists in the source tree and is empty in the build tree, so every one of the 48 compiled languages was silently dropped from the zip and Settings > Language browsed an empty directory. `COREAPPSDIR` rather than `APPSDIR` because a bootloader build points the latter at `bootloader/`, which has no lang directory at all. |
+| `buildzip.pl` | Upstream's `.map`-bundling block deleted, with a comment left in its place | `rockbox.map` is ~4 MB of text, and the zip is `/MIR`-synced onto the player, so it would cost that on the user's disk at every sync. It buys nothing here either — a panic address is resolved with `nm` on the crashing build's `rockbox.elf`, which the release does not ship. The comment is what makes the next merge conflict here instead of quietly restoring the block. |
 | `voice.pl`, `langstatus` | Derive the application directory from `COREAPPSDIR`, falling back to whichever of `apps-ipod/` or `apps/` exists | Both were hardcoded to `apps-ipod/lang/`, which solved the same problem two ways in one tree and would break silently on the next `--appsdir` change. `voice.pl` does get `COREAPPSDIR` when make invokes it; the fallback is for a hand-run, which is the only way `langstatus` is ever used. Voice builds are unverified here regardless — `VOICE_VERSION` no longer resolves because `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`. |
 
 ### New tools
@@ -325,16 +330,26 @@ instead** — it will succeed, and produce the wrong firmware.
 | --- | --- | --- |
 | `convfnt.c` | Exports one glyph from a Rockbox `.fnt` to an 8-bit greyscale `.bmp`, and imports an edited `.bmp` back | This fork's theme icon fonts are **4 bpp**, and `convbdf` cannot round-trip them (BDF is 1 bpp). The file header documents the `RB12` layout, including that 4 bpp pixels are nibbles, low nibble first, inverted relative to ink (15 = background, 0 = full) while the `.bmp` is the other way round. |
 | `art_fetch/art_fetch.py`, `art_fetch/README.md` | Python 3 album and artist artwork fetcher (`requests`, `Pillow`, `mutagen`) | Library maintenance. Not part of any build; run by hand. |
+| `eq_refit/eq_refit.py`, `eq_refit/README.md` | Re-fits an EQ preset onto fewer bands, keeping its response | Every enabled band is a biquad pass over every sample; a nine-band preset spends most of a PP5022 on the equaliser and starves the UI. Run by hand when adding an `eqs/` preset. |
+| `pfgeom/pfgeom.c`, `pfgeom/README.md` | Host program that mirrors the album-covers carousel's projection, cull and draw order, and renders frames across the settings space | The carousel's occlusion cull fails as a stripe of stale framebuffer on one album shape at one point in one scroll. This decides it on the host instead of on hardware. It is a **mirror** of `apps-ipod/screens/covers/carousel.c`, so a change to the cull has to be made in both or it stops proving anything. |
+| `spun_testlog.pl` | Synthesises a playback-log family, plus the expected parse | The development device has no listening history, and Spun's reader depends on cases that take months to accumulate — rotation boundaries, a year change, plays logged against an unset clock. |
 
-### Build-failure documentation
+### The other build types
+
+`(N)ormal`, `(B)ootloader`, `(C)heckWPS`, `(D)atabase` and `(S)imulator` all
+build. `(W)arble` is offered by `configure` and does not; nothing here uses it.
+Only CheckWPS needed a change:
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `checkwps/README` | New "DOES NOT BUILD IN THIS FORK" section | `configure` still offers `--type=C`, so someone will try. Its `SOURCES` and `.make` name core files at `apps/` paths that no longer exist. It would also need `lib/skin_parser` built with this fork's custom tags, or it rejects valid themes. |
-| `database/README` | New "DOES NOT BUILD IN THIS FORK" section | Same for `--type=D`, plus it needs a replacement for the deleted uisimulator filesystem backend. |
+| `checkwps/SOURCES` | One line added: `../../apps-ipod/skin/custom_tags.c` | `find_custom_tag()` is weak (see `lib/skin_parser` above), so without this it resolves to NULL and CheckWPS rejects every skin using a fork tag on the first one. With it, `--type=C` builds and Themify_2's two skins both report "WPS parsed OK". |
 
-Neither affects a normal firmware build. `(W)arble` is equally broken and
-equally unbuilt. **`(S)imulator` is not** — it works; see below.
+It has to be **run from inside a `.rockbox` directory** — skin font paths are
+relative to the on-device layout and will not resolve from anywhere else, and
+it then fails on the fonts rather than on the skin.
+
+The database tool runs from the top level of a mounted player and writes the
+database files itself, so the player does not have to scan.
 
 ### The simulator needs nothing here
 
@@ -370,23 +385,25 @@ the build machine, but no repository change.
 
 ## Repo root
 
-`make zip` alone produces an **incomplete** zip: no theme, no first-boot config,
-no EQ presets, upstream's licence file rather than this fork's, and a pile of
-files this fork cannot use. That is because `buildzip.pl` is kept
-upstream-shaped. The three bundle scripts make up the difference, and
-`build-hw.sh` runs all three.
+`make zip` alone produces an **incomplete** zip: no themes, no first-boot
+config, no default iconset, no EQ presets, no setting explanations, upstream's
+licence file rather than this fork's, and a pile of files this fork cannot use.
+That is because `buildzip.pl` is kept upstream-shaped. The four bundle scripts
+make up the difference, and `build-hw.sh` runs all four.
 
 | File | What it is | Why it exists |
 | --- | --- | --- |
-| `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs both bundle scripts after `make zip`. The supported way to produce a shippable build. |
+| `README.md`, `CLAUDE.md` | The fork's own README, and the instructions an assistant working in this tree is given | Upstream has neither. |
+| `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs all four bundle scripts after `make zip`. The supported way to produce a shippable build. |
 | `build-sim.sh` | The same for the simulator, into `build-sim-<target>[-win32]/`; takes a second argument `native` or `win` | Adds the steps a simulator needs and a device does not: unpacking the finished zip into `simdisk/`, and carrying an existing `simdisk/` across the clean so a rebuild does not destroy the test music and database. `win` selects `--type=as6` — **(A)dvanced** plus `s` and `6`, because `configure` matches the build type one character at a time and plain `--type=s6` silently produces a *normal* build. |
-| `bundle-theme.sh` | Injects Themify_2 and a pre-populated `config.cfg` into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. The `config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback. |
+| `bundle-theme.sh` | Injects Themify_2 and Scrim, `default-config.cfg` and the default iconset into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. `default-config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback; it is a separate file from `config.cfg` because that one belongs to the player and an install must never overwrite it. The iconset goes in because `buildzip.pl` creates `icons/` and copies nothing into it, so `DEFAULT_ICONSET` names a file that is not on the device and every icon silently falls back to the compiled-in 6x8 blob. Themes are named in the script, not globbed, or a merge from Rockbox would start shipping stock themes nobody converted. |
 | `bundle-eqs.sh` | Injects `eqs/*.cfg` into `.rockbox/eqs/` | The presets live at the repo root, not the `lib/rbcodec/dsp/eqs/` that `buildzip.pl` copies from — that directory is empty here. |
-| `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other two: `buildzip.pl` copies upstream's file and is kept upstream-shaped. |
-| `docs/podbox/LICENSES` | The fork's own licence notices — Literata, League Spartan, Themify 2 — with the SIL Open Font License 1.1 reproduced in full | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
+| `bundle-help.sh` | Ships `docs/podbox/settings-help.txt` as `.rockbox/docs/settings-help.txt` | **The one whose absence is silent.** Without it every **Explain** entry in a setting's context menu finds no file and shows nothing; nothing else misbehaves, so a zip built without it looks finished. |
+| `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other three: `buildzip.pl` copies upstream's file and is kept upstream-shaped. |
+| `docs/podbox/LICENSES` | The fork's own licence notices — Literata, League Spartan and Noto under the OFL, Material Design Icons under Apache 2.0, Themify 2 under CC BY-SA — with the SIL Open Font License 1.1 reproduced in full | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
 | `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies each zip, then replaces the rolling `latest` release | Publishing by hand gets three things wrong — asset names colliding, `gh` needing `--repo` on the server, and a leftover tag being reused rather than moved. |
-| `docs/CREDITS` | Three attribution blocks prepended: Themify, RockPod, and a "For RockBox:" heading before upstream's list | This fork ships a theme and inherits a large body of hardware work from another fork, both GPLv2 with named authors. Upstream's list is left untouched below the heading, so a merge from Rockbox applies to it cleanly. |
-| `.gitignore` | `/build*` narrowed to `/build-hw-*/`, `/build-hw/`, `/build-sim-*/`, `/build-sim/`; adds `/notes/`, `/.specifications/` | Local working drafts. The `build-sim-*` glob covers the per-target simulator directories (`build-sim-ipodvideo`, `build-sim-win32`); upstream's bare `/build-sim/` matches none of them. |
+| `docs/CREDITS` | Three attribution blocks prepended: Themify, RockPod, and a "For RockBox:" heading before upstream's list | This fork ships themes and inherits a large body of hardware work from another fork, both GPLv2 with named authors. Upstream's list is left untouched below the heading, so a merge from Rockbox applies to it cleanly. |
+| `.gitignore` | `/build*` narrowed to `/.build/`, `/build-hw-*/`, `/build-hw/`, `/build-sim-*/`, `/build-sim/`; adds `/notes/`, `/.specifications/`, `/dist/`, `/iconsources/`, `/.theme-dev/`, `/.idea/`, `/.claude/` | Local working drafts, release zips fetched back from the build server, and editor state. The `build-sim-*` glob covers the per-target simulator directories (`build-sim-ipodvideo`, `build-sim-win32`); upstream's bare `/build-sim/` matches none of them. |
 | `wps/WPSLIST` | `cabbiev2` theme block removed (180 lines); explanatory comment added | `wpsbuild.pl` builds from this file, so delisting is what stops cabbiev2 shipping. The files stay in `wps/` because the tree mirrors upstream. `rockbox_failsafe` is kept — it is the skin engine's emergency fallback if a configured skin fails to parse. |
 
 **What `bundle-theme.sh` deletes, and why the deletions live there:**
@@ -400,7 +417,9 @@ upstream-shaped. The three bundle scripts make up the difference, and
   `--appsdir`, for a loader this fork does not have. Plus `viewers.config`, now
   that the extension-to-viewer mapping is compiled into `filetypes.c`.
 
-Together these take the zip from 163 files to 95.
+Between them they drop several dozen entries from the zip. Count them from a
+finished build rather than from a figure written here — the total moves every
+time a theme or a bundled file is added.
 
 ---
 
