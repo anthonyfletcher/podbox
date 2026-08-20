@@ -538,6 +538,10 @@ or artist -- and lets you browse by them, so a singer with no album of their own
 still turns up. On, Music gains a Featured Artists row and an artist's album
 list gains one for the records they only guest on; the credits are worked out
 once per boot, at the first entry to Music. Needs the database loaded to RAM.
+A name with a comma or an ampersand in it, like Tyler, The Creator, reads as two
+people unless the player has an album under it. Put such names one per line in
+/.rockbox/known_artists.txt and they are treated as whole; the file is read
+when the credits are worked out, so a boot or a database update applies it.
 
 [art cache fast build]
 Decodes each image once for the largest thumbnail and derives the smaller sizes

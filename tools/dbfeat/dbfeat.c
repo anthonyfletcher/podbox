@@ -34,6 +34,7 @@ static const char * const library[] = {
     "Rihanna",
     "Kylie Minogue",
     "Jay-Z",
+    "Tyler, The Creator",
     "Guest One",
     "Guest Two",
 };
@@ -126,6 +127,14 @@ static const struct testcase cases[] = {
 { "Song (feat. Unknown One, Unknown Two)",
   { "Unknown One", "Unknown Two", NULL }, NULL },
 { "Song (feat. Drake, Unknown Two)",  { "Drake", "Unknown Two", NULL }, NULL },
+
+/* --- a name that is itself punctuated ---------------------------- */
+{ "Song (feat. Tyler, The Creator)",
+  { "Tyler, The Creator", NULL }, NULL },
+{ "Song (feat. Tyler, The Creator & Drake)",
+  { "Tyler, The Creator", "Drake", NULL }, NULL },
+{ "Song (feat. Drake & Tyler, The Creator)",
+  { "Drake", "Tyler, The Creator", NULL }, NULL },
 { "Song (feat. Some Band & Co)",
   { "Some Band", "Co", NULL },
   "a guest band the library has never heard of comes apart" },

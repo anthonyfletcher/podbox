@@ -15,7 +15,7 @@
  *
  * Parts, in order:
  *   - the table, and what it is made of
- *   - the album-artist set the parse asks about
+ *   - the album-artist set the parse asks about, and the names a user adds
  *   - recording a guest and a track
  *   - the three crawls that fill it
  *   - resolving the two things a crawl cannot say
@@ -28,7 +28,10 @@
 #include <string.h>
 #include "config.h"
 #include "system.h"
+#include "rbpaths.h"
+#include "file.h"
 #include "settings/settings.h"
+#include "system/strutil.h"         /* read_line */
 #include "database/tagcache.h"
 #include "db_featured.h"
 
@@ -143,6 +146,54 @@ static bool artist_set_has(uint32_t h)
     }
 
     return false;
+}
+
+/* Names the user has told the player about, one per line. An artist whose own
+ * name is punctuated -- "Tyler, The Creator" -- splits in two otherwise, since
+ * nothing in the string says whether that comma is inside a name or between
+ * two, and the library only knows if it has an album under it.
+ *
+ * They go into the same set the album artists do, so they answer the same
+ * question and need no rule of their own. That is also what makes them work
+ * inside a longer credit: "feat. Tyler, The Creator & Drake" cuts after the
+ * longest opening run the set knows, which is now the whole of the first name.
+ *
+ * Absent is the ordinary case and costs one failed open. Read at build time,
+ * so an edit takes effect at the next boot -- or at the next database update,
+ * or from the debug screen, both of which build the table again. */
+#define KNOWN_ARTISTS_FILE ROCKBOX_DIR "/known_artists.txt"
+
+static void read_known_artists(void)
+{
+    char line[TAGCACHE_BUFSZ];
+    int fd = open(KNOWN_ARTISTS_FILE, O_RDONLY);
+    bool first = true;
+
+    if (fd < 0)
+        return;
+
+    while (read_line(fd, line, sizeof(line)) > 0)
+    {
+        char *s = line;
+
+        /* A byte-order mark, which a Windows editor adds without saying so.
+         * Left in place it belongs to the first name and nothing matches it. */
+        if (first)
+        {
+            first = false;
+            if ((unsigned char)s[0] == 0xEF && (unsigned char)s[1] == 0xBB &&
+                (unsigned char)s[2] == 0xBF)
+                s += 3;
+        }
+
+        s = skip_whitespace(s);
+        if (*s == '#' || !*s)
+            continue;
+
+        artist_set_add(name_hash(s, (int)strlen(s)));
+    }
+
+    close(fd);
 }
 
 /* The one question db_featured_parse() puts to the library. */
@@ -408,6 +459,7 @@ bool db_featured_build(void)
         return false;
 
     scan_album_artists();
+    read_known_artists();
     scan_titles();
     scan_track_artists();
 
