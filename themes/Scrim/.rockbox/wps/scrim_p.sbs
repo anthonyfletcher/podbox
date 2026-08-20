@@ -70,11 +70,11 @@
 # - Row shape. 1 icon, 2 number, 3 bare. <Random> sits at index 0 of a track
 #   list and has no track number of its own, so it takes the icon shape.
 %Vl(Rows,0,0,1,1,-)
-%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%if(%Lt,=,%Sx(Music))),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,=,%Sx([Random]))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))))<%vs(shape,set,2)|%vs(shape,set,3)>>
+%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%if(%Lt,=,%Sx(Music))),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,=,%Sx([Random]))),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,=,%Sx([Featured In]))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
 # - Row icon
 %Vl(Rows,2,3,24,24,2)
-%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),w,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Current Playlist),U,%Sx(Playlists),m,%Sx(Spun),z,%Sx(Files),¡,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%sel(%LI,19,Þ,2,m)))>>>
+%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),w,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Current Playlist),U,%Sx(Playlists),m,%Sx(Spun),z,%Sx(Files),¡,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%sel(%LI,19,Þ,2,m)))>>>
 #
 # - Row number
 %Vl(Rows,2,5,24,20,3)
@@ -88,9 +88,9 @@
 #
 # - Row text
 %Vl(Rows,46,5,226,20,-)
-%?La<|%?if(%vg(shape),!=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
+%?La<|%?if(%vg(shape),!=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
 %Vl(Rows,12,5,260,20,-)
-%?La<|%?if(%vg(shape),=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
+%?La<|%?if(%vg(shape),=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
 #
 # - Chevron
 %Vl(Rows,272,3,24,24,2)
@@ -100,11 +100,11 @@
 #
 # - Special row icon
 %Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Untagged]),¿,%Sx([By album]),d)>
+%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
 #
 # - Row art.
 %Vl(Rows,0,1,44,44,-)
-%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La%?Lc<|%dr(0,0,44,44,000000,-,6)>>
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La%?Lc<|%dr(0,0,44,44,000000,-,6)>>
 #
 # - Selection bar
 %Vl(Rows,50,0,3,46,-)
@@ -112,7 +112,7 @@
 #
 # - Row text
 %Vl(Rows,60,13,230,20,-)
-%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
+%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
 #
 # Grid cell setup
 #
@@ -123,17 +123,16 @@
 #
 # - Special cell icon
 %Vl(Grid,19,14,24,24,2)
-%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Untagged]),¿,%Sx([By album]),d)
+%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)
 #
 # - Cell art
 %Vl(Grid,9,4,44,44,-)
-%La(0,-,6)
-<%La%?Lc<|%dr(0,0,44,44,!000000,-,6)>>
+%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,6)%?Lc<|%dr(0,0,44,44,!000000,-,6)>>
 #
 # - Cell text
 %Vl(Grid,9,50,87,38,-)%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>
-%wr(0,%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT))
-%wr(1,%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT))
+%wr(0,%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT))
+%wr(1,%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT))
 #
 # Quick settings boxes
 #
