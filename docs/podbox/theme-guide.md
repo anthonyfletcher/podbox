@@ -417,11 +417,19 @@ Change the 46 and both move with it.
 
 Despite the name, `%?La` is a property of the whole list: it is true on album and
 artist lists and false everywhere else. So in an album list **every** row takes
-the art branch, including `[All Tracks]`, `[Random]` and `[Untagged]`. Those have
-no cover, so the art branch must cope — either leave the slot empty and let the
-text sit indented with the rest, or draw a glyph there.
+the art branch, including `[All Tracks]`, `[Random]`, `[Featured In]` and
+`[Untagged]`. Those have no cover, so the art branch must cope — either leave
+the slot empty and let the text sit indented with the rest, or draw a glyph
+there.
 
 There is no way to ask whether *this particular row* has a cover.
+
+**In a tile grid `%?La` is false outright**, tiled configs being excluded from
+the art-row test, so a grid cannot use it to guard its cell art at all. Exclude
+the special rows by name instead — `%if(%LT,!=,%Sx([Random]))` and one more per
+row — or the art branch draws over the glyph you put in their place. A dimming
+`%dr` written for unselected covers is the usual casualty: it is held back until
+after the artwork, which puts it on top of the icon.
 
 `%?Ld` asks the same question at list level and answers it before anything is
 drawn, which is why it is the one tag that can choose between two `%Lb`. Inside
