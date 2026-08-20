@@ -343,6 +343,10 @@ static int extra_history[MAX_DIR_LEVELS];
 static bool position_past_specials;
 static int pending_top_item = -1;
 
+/* Whether the root menu's first drawn row is Search. Set by load_root(), read
+ * once the row count is known -- see browser_db_load(). */
+static bool root_opens_on_search;
+
 /* a few memory alloc helper */
 static int browser_db_handle;
 static size_t browser_db_bufsize, browser_db_buf_used;
@@ -2493,6 +2497,7 @@ static int load_root(struct browser_context *c)
 
     tc = c;
     c->currtable = TABLE_ROOT;
+    root_opens_on_search = false;
     /* Before the rows are enumerated, because one of them asks the table
      * whether it is empty. The crawl happens once per boot; after that this
      * is a comparison against what the database looked like then. */
@@ -2566,6 +2571,9 @@ static int load_root(struct browser_context *c)
             {
                 const struct builtin_row *b =
                     &builtin_rows[menu->items[i]->link];
+
+                if (rows == 0 && b->table == TABLE_DB_SEARCH)
+                    root_opens_on_search = true;
 
                 /* The config's label is documentation; this one is
                  * translated. */
@@ -3200,6 +3208,23 @@ int browser_db_load(struct browser_context* c)
 
     /* The _total_ numer of entries available. */
     c->dirlength = c->filesindir = count;
+
+    /* The Music menu opens past Search, the way the settings tree does
+     * (settings_scrn() in root_menu.c). A search box as the first row reads as
+     * though that is where the library starts, and one flick of the wheel
+     * brings it back -- the same treatment the album lists give their special
+     * rows just below.
+     *
+     * Only when Search really is the first row: it can be turned off or moved
+     * in the Music settings, and a tagnavi_user.config may not have it at all.
+     * selected_item == 0 is what tells an opening list from one restoring a
+     * position, exactly as it does below. */
+    if (table == TABLE_ROOT && root_opens_on_search
+        && c->selected_item == 0 && count > 1)
+    {
+        c->selected_item = 1;
+        pending_top_item = 1;
+    }
 
     /* A freshly entered level opens on its first real row rather than on
      * <All tracks>/<Random>: those are shortcuts, not what the list is *for*,
