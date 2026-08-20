@@ -372,6 +372,7 @@ struct spectrum_bars {
     int16_t radius;
     int16_t gap;        /* pixels between bars; 1 unless the skin said otherwise */
     bool center_aligned;
+    bool radiate;       /* one bank per channel, opening out from the middle */
 };
 
 /* %wt(text[,align[,fallback]]): the text token to draw, an optional fallback

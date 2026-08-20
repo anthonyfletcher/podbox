@@ -192,11 +192,22 @@ zero yield 0). `a` and `b` may be numbers or tags.
 
 ## Widgets and indicators
 
-### `%Sb(bars[, center[, radius[, gap]]])` — spectrum analyser
+### `%Sb(bars[, align[, radius[, gap]]])` — spectrum analyser
 
 Draws an audio spectrum analyser filling the current viewport. `bars` is the
-number of bands, 1–8 (values outside that range are clamped). Pass `center` as a
-second argument to grow the bars from the middle rather than up from the bottom.
+number of bands, 1–8 (values outside that range are clamped).
+
+`align` chooses the layout. Left out, the bars grow up from the bottom with
+bass on the left and treble on the right. The two alternatives are:
+
+- `center` grows each bar from the middle of the viewport instead of up from
+  the bottom.
+- `radiate` opens the meter out from the middle: bass at the centre running to
+  treble at both edges, and the bars growing from the midline. The left half is
+  fed from the left channel and the right half from the right, so the two sides
+  only match while the mix does — on a centre-panned track it will look
+  mirrored. It lays the band table out twice, so `bars` counts the bands on
+  *each* side and `%Sb(8, radiate)` is sixteen columns wide.
 
 `radius` rounds the corners of each bar; 0, the default, leaves them square.
 There is no upper limit — the radius is fitted to the bar being drawn, so a
@@ -215,6 +226,7 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(5, center)
 %V(20,40,120,60,-)%Sb(5, center, 2)
 %V(20,40,120,60,-)%Sb(8, -, -, 0)     # no gaps, square corners, from the bottom
+%V(20,40,160,60,-)%Sb(6, radiate, 2)  # 12 columns opening out from the middle
 ```
 
 ### `%La(offset[, nowrap][, radius][, filters])` — list-item album art

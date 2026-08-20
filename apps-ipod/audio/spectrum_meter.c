@@ -27,13 +27,13 @@
 #include "fixedpoint.h"
 #include "spectrum_meter.h"
 
-/* Mono samples analyzed per update. Small enough to stay cheap, large
- * enough to resolve the lowest band frequency reasonably. */
+/* Samples per channel analyzed per update. Small enough to stay cheap,
+ * large enough to resolve the lowest band frequency reasonably. */
 #define SPECTRUM_BLOCK_SIZE 256
 
 /* Band center frequencies, log-spaced ~60Hz-12kHz (bass to treble).
- * spectrum_meter_get_bar() picks evenly-spaced entries from this table
- * when fewer than SPECTRUM_MAX_BANDS bars are requested.
+ * bar_to_band() picks evenly-spaced entries from this table when fewer
+ * than SPECTRUM_MAX_BANDS bars are requested.
  *
  * These are analysed exactly, but a SPECTRUM_BLOCK_SIZE window resolves
  * samplerate/SPECTRUM_BLOCK_SIZE (~172Hz at 44.1kHz), so the lowest bands
@@ -44,8 +44,10 @@ static const int band_freq_hz[SPECTRUM_MAX_BANDS] =
     60, 150, 400, 1000, 2500, 4000, 7000, 12000
 };
 
-/* Smoothed 0-100 level per band. */
-static int spectrum_level[SPECTRUM_MAX_BANDS];
+/* Smoothed 0-100 level per band, held apart for each channel (0 = left,
+ * 1 = right). Both banks always run: a stereo display reads them apart,
+ * and the mono one averages them. */
+static int spectrum_level[2][SPECTRUM_MAX_BANDS];
 
 /* Instant attack, exponential release (divide the gap by 2^shift each
  * update) -- mirrors typical VU meter ballistics. */
@@ -62,9 +64,12 @@ static int spectrum_level[SPECTRUM_MAX_BANDS];
 #define SPECTRUM_LOG_MIN (4L << 16)
 #define SPECTRUM_LOG_MAX (10L << 16)
 
-/* Goertzel magnitude of 'freq_hz' within 'count' mono samples, for a
- * mixer output rate of 'samplerate' Hz. Fixed point throughout, with the
- * filter coefficient 2*cos(2*pi*freq_hz/samplerate) held in Q29.
+/* Goertzel magnitude of 'freq_hz' within 'count' samples taken every
+ * 'stride' entries of 'samples', for a mixer output rate of 'samplerate'
+ * Hz. The stride is what lets one channel of an interleaved stereo buffer
+ * be filtered where it lies, with no de-interleaving copy. Fixed point
+ * throughout, with the filter coefficient 2*cos(2*pi*freq_hz/samplerate)
+ * held in Q29.
  *
  * The precision is load-bearing, so resist simplifying it back to a
  * coarser angle: cos() flattens out near 0 Hz, so a small error in the
@@ -75,7 +80,7 @@ static int spectrum_level[SPECTRUM_MAX_BANDS];
  * Q29 rather than more because it is the highest that keeps 2*cos inside
  * 32 bits, so both operands of the inner multiply stay the width they
  * were at Q14 and only the product needs 64. */
-static int goertzel_magnitude(const int16_t *samples, int count,
+static int goertzel_magnitude(const int16_t *samples, int count, int stride,
                               int freq_hz, int samplerate)
 {
     unsigned long phase = (unsigned long)
@@ -91,7 +96,8 @@ static int goertzel_magnitude(const int16_t *samples, int count,
 
     for (i = 0; i < count; i++)
     {
-        long q0 = (long)(((long long)coeff_q29 * q1) >> 29) - q2 + samples[i];
+        long q0 = (long)(((long long)coeff_q29 * q1) >> 29) - q2
+                + samples[i * stride];
         q2 = q1;
         q1 = q0;
     }
@@ -142,21 +148,22 @@ static int scale_to_level(int raw)
 }
 
 /* Move one band toward `level`: instant attack, exponential release. */
-static void approach_level(int band, int level)
+static void approach_level(int channel, int band, int level)
 {
-    if (level > spectrum_level[band])
-        spectrum_level[band] = level; /* instant attack */
-    else if (spectrum_level[band] > level)
+    if (level > spectrum_level[channel][band])
+        spectrum_level[channel][band] = level; /* instant attack */
+    else if (spectrum_level[channel][band] > level)
     {
         /* >> SPECTRUM_RELEASE_SHIFT truncates to 0 once the remaining
          * gap drops below 8, which would otherwise freeze the level a
          * few points short of the true (quieter) target forever.
          * Guarantee at least 1 unit of decay per update so it always
          * reaches the target. */
-        int decay = (spectrum_level[band] - level) >> SPECTRUM_RELEASE_SHIFT;
+        int decay = (spectrum_level[channel][band] - level)
+                    >> SPECTRUM_RELEASE_SHIFT;
         if (decay < 1)
             decay = 1;
-        spectrum_level[band] -= decay;
+        spectrum_level[channel][band] -= decay;
     }
 }
 
@@ -164,9 +171,8 @@ void spectrum_meter_peek(void)
 {
     int count;
     const int16_t *pcm = mixer_channel_get_buffer(PCM_MIXER_CHAN_PLAYBACK, &count);
-    int16_t mono[SPECTRUM_BLOCK_SIZE];
     int samplerate = mixer_get_frequency();
-    int band, i;
+    int channel, band;
 
     if (!pcm || count < SPECTRUM_BLOCK_SIZE || samplerate <= 0)
     {
@@ -176,37 +182,62 @@ void spectrum_meter_peek(void)
          * height the final block left them, and stay there. Playback resuming
          * is caught on the next tick by the instant attack, so a lull that
          * turns out to be momentary costs a unit or two of height. */
-        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
-            approach_level(band, 0);
+        for (channel = 0; channel < 2; channel++)
+            for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+                approach_level(channel, band, 0);
         return;
     }
 
-    for (i = 0; i < SPECTRUM_BLOCK_SIZE; i++)
-        mono[i] = (int16_t)(((int)pcm[2 * i] + (int)pcm[2 * i + 1]) >> 1);
-
-    for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+    /* 'count' is frames, so the buffer holds two interleaved int16 per frame
+     * and channel N is every second sample starting at offset N. */
+    for (channel = 0; channel < 2; channel++)
     {
-        int raw = goertzel_magnitude(mono, SPECTRUM_BLOCK_SIZE,
-                                     band_freq_hz[band], samplerate);
+        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+        {
+            int raw = goertzel_magnitude(pcm + channel, SPECTRUM_BLOCK_SIZE, 2,
+                                         band_freq_hz[band], samplerate);
 
-        approach_level(band, scale_to_level(raw));
+            approach_level(channel, band, scale_to_level(raw));
+        }
     }
 }
 
-int spectrum_meter_get_bar(int bar, int nbars)
+/* Which band table entry display bar 'bar' of 'nbars' reads, or -1 when the
+ * bar is out of range. Fewer bars than bands pick evenly-spaced entries. */
+static int bar_to_band(int bar, int nbars)
 {
     int band;
 
     if (nbars <= 0)
-        return 0;
+        return -1;
     if (nbars > SPECTRUM_MAX_BANDS)
         nbars = SPECTRUM_MAX_BANDS;
     if (bar < 0 || bar >= nbars)
-        return 0;
+        return -1;
 
     band = (bar * SPECTRUM_MAX_BANDS) / nbars;
     if (band >= SPECTRUM_MAX_BANDS)
         band = SPECTRUM_MAX_BANDS - 1;
 
-    return spectrum_level[band];
+    return band;
+}
+
+int spectrum_meter_get_bar(int bar, int nbars)
+{
+    int band = bar_to_band(bar, nbars);
+
+    if (band < 0)
+        return 0;
+
+    return (spectrum_level[0][band] + spectrum_level[1][band]) / 2;
+}
+
+int spectrum_meter_get_bar_channel(int bar, int nbars, int channel)
+{
+    int band = bar_to_band(bar, nbars);
+
+    if (band < 0 || channel < 0 || channel > 1)
+        return 0;
+
+    return spectrum_level[channel][band];
 }

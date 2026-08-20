@@ -613,7 +613,10 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 int vp_w = skin_vp->vp.width;
                 int vp_h = skin_vp->vp.height;
                 int gap = sb->gap;
-                int bar_w = (vp_w - gap * (sb->bars - 1)) / sb->bars;
+                /* Radiate puts up the whole band table twice, once per
+                 * channel, so the tag's bar count is per side. */
+                int cols = sb->radiate ? sb->bars * 2 : sb->bars;
+                int bar_w = (vp_w - gap * (cols - 1)) / cols;
                 int i;
 
                 if (bar_w < 1)
@@ -629,10 +632,27 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                 gwps->display->clear_viewport();
 
                 gwps->display->set_drawmode(DRMODE_SOLID);
-                for (i = 0; i < sb->bars; i++)
+                for (i = 0; i < cols; i++)
                 {
-                    int level = spectrum_meter_get_bar(i, sb->bars);
-                    int bar_h = (level * vp_h) / 100;
+                    int level;
+                    int bar_h;
+
+                    if (sb->radiate)
+                    {
+                        /* Bass at the middle running out to treble at both
+                         * edges, the left half fed from the left channel and
+                         * the right half from the right -- so the two sides
+                         * only match while the mix does. */
+                        bool right = i >= sb->bars;
+                        int band = right ? i - sb->bars : sb->bars - 1 - i;
+
+                        level = spectrum_meter_get_bar_channel(band, sb->bars,
+                                                               right ? 1 : 0);
+                    }
+                    else
+                        level = spectrum_meter_get_bar(i, sb->bars);
+
+                    bar_h = (level * vp_h) / 100;
                     int x = i * (bar_w + gap);
                     int y;
 

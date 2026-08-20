@@ -617,10 +617,19 @@ static int parse_spectrumbars(struct skin_element *element,
         sb->bars = 1;
     else if (sb->bars > SPECTRUM_MAX_BANDS)
         sb->bars = SPECTRUM_MAX_BANDS;
+    /* skin_buffer_alloc() does not zero, so both of these are written on
+     * every path. Radiate opens out from the centre of the viewport in both
+     * directions, so it carries centre growth with it. */
+    sb->center_aligned = false;
+    sb->radiate = false;
     if (element->params_count > 1 && !isdefault(get_param(element, 1)))
-        sb->center_aligned = strcasecmp(get_param_text(element, 1), "center") == 0;
-    else
-        sb->center_aligned = false;
+    {
+        const char *align = get_param_text(element, 1);
+        if (strcasecmp(align, "radiate") == 0)
+            sb->center_aligned = sb->radiate = true;
+        else
+            sb->center_aligned = strcasecmp(align, "center") == 0;
+    }
     /* Corner radius. No upper clamp: fill_round_rect() fits it to whatever
      * bar it is drawing, and a short bar rounds less than a tall one. */
     if (element->params_count > 2 && !isdefault(get_param(element, 2)))
@@ -634,7 +643,7 @@ static int parse_spectrumbars(struct skin_element *element,
     if (element->params_count > 3 && !isdefault(get_param(element, 3)))
         sb->gap = get_param(element, 3)->data.number;
     else
-        sb->gap = (sb->bars > 1) ? 1 : 0;
+        sb->gap = (sb->bars > 1 || sb->radiate) ? 1 : 0;
     if (sb->gap < 0)
         sb->gap = 0;
     return 0;
