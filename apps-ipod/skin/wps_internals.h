@@ -442,6 +442,9 @@ struct wps_data
 
     bool peak_meter_enabled;
     bool spectrum_enabled;
+    /* The skin draws the quickscreen itself (%QL and the rest), so the
+     * built-in layout stands down -- see gui_quickscreen_draw(). */
+    bool draws_quickscreen;
     bool wps_sb_tag;
     bool show_sb_on_wps;
     bool wps_loaded;

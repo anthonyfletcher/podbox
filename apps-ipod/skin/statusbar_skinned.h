@@ -41,6 +41,9 @@ enum themable_icons sb_get_icon(enum screen_type screen);
 
 
 int sb_get_backdrop(enum screen_type screen);
+/* True when the base skin carries the quickscreen tags, i.e. draws that screen
+   itself and wants the built-in layout to stand down. */
+bool sb_skin_draws_quickscreen(enum screen_type screen);
 void sb_process(enum screen_type screen, struct wps_data *data, bool preprocess);
 
 void do_sbs_update_callback(unsigned short id, void *param);

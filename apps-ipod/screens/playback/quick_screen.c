@@ -32,6 +32,7 @@
 #include "screens/shortcuts.h"
 #include "system/appevents.h"
 #include "skin/statusbar_skinned.h"  /* sb_skin_force_next_update */
+#include "skin/skin_display.h"        /* skin_mark_dirty */
 
  /* 1 top, 1 bottom, 2 on either side, 1 for the icons
   * if enough space, top and bottom have 2 lines */
@@ -181,7 +182,19 @@ static void gui_quickscreen_draw(struct gui_quickscreen *qs,
     struct viewport *parent = &qs->parent[screen];
     struct viewport *vps = qs->vps[screen];
     struct viewport *vp_icons = &qs->vp_icons[screen];
-    struct viewport *last_vp = display->set_viewport(parent);
+    struct viewport *last_vp;
+
+    /* A base skin carrying the quickscreen tags draws this screen itself, and
+     * this layout would land on top of it as a second, unstyled copy. Stand
+     * down, but still say the values moved -- nothing else tells the skin. */
+    if (sb_skin_draws_quickscreen(screen))
+    {
+        sb_skin_force_next_update();
+        skin_mark_dirty(screen);
+        return;
+    }
+
+    last_vp = display->set_viewport(parent);
     display->clear_viewport();
 
     for (i = 0; i < QUICKSCREEN_ITEM_COUNT; i++)

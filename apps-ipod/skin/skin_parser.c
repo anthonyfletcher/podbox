@@ -1971,6 +1971,7 @@ static void skin_data_reset(struct wps_data *wps_data)
     wps_data->albumart = INVALID_OFFSET;   /* slots already released above */
 
     wps_data->peak_meter_enabled = false;
+    wps_data->draws_quickscreen = false;
     wps_data->wps_sb_tag = false;
     wps_data->show_sb_on_wps = false;
     wps_data->wps_loaded = false;
@@ -2407,6 +2408,16 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_LIST_TITLE_TEXT:
                     sb_skin_has_title(curr_screen);
+                    break;
+                case SKIN_TOKEN_TOP_QUICKSETTING_NAME:
+                case SKIN_TOKEN_TOP_QUICKSETTING_VALUE:
+                case SKIN_TOKEN_BOTTOM_QUICKSETTING_NAME:
+                case SKIN_TOKEN_BOTTOM_QUICKSETTING_VALUE:
+                case SKIN_TOKEN_LEFT_QUICKSETTING_NAME:
+                case SKIN_TOKEN_LEFT_QUICKSETTING_VALUE:
+                case SKIN_TOKEN_RIGHT_QUICKSETTING_NAME:
+                case SKIN_TOKEN_RIGHT_QUICKSETTING_VALUE:
+                    wps_data->draws_quickscreen = true;
                     break;
                 case SKIN_TOKEN_DRAWRECTANGLE:
                     function = parse_drawrectangle;
