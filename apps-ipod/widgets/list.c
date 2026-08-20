@@ -383,25 +383,40 @@ static void gui_list_put_selection_on_screen(struct gui_synclist * gui_list,
     int cols = skinlist_get_columns(screen, gui_list);
     if (cols > 1)
     {
-        int rows       = MAX(1, nb_lines / cols);
-        int sel_row    = gui_list->selected_item / cols;
-        int start_row  = gui_list->start_item[screen] / cols;
+        const int rows    = MAX(1, nb_lines / cols);
+        const int visible = rows * cols;
         /* MAX() so an empty list does not lean on truncation toward zero. */
-        int last_row   = (MAX(1, gui_list->nb_items) - 1) / cols;
-        int bottom_row = MAX(0, last_row - rows + 1);
+        const int last    = MAX(1, gui_list->nb_items) - 1;
+        int start = gui_list->start_item[screen];
+        int delta = gui_list->selected_item - start;
+        int offset, full;
 
-        if (sel_row < start_row)
-            start_row = sel_row;
-        else if (sel_row >= start_row + rows)
-            start_row = sel_row - rows + 1;
+        /* Whole rows, and the top row keeps whatever offset into the list it
+         * already had rather than being snapped to a multiple of the columns.
+         * A database level opens scrolled past its special rows; holding the
+         * offset leaves those in a part-row above the grid instead of giving
+         * them two cells of the first screen, and moving down from there
+         * costs nothing. Scrolling up to the very top is the one place the
+         * offset can change, because item 0 has to reach the top row to be
+         * seen at all. */
+        if (delta < 0)
+            start -= ((-delta + cols - 1) / cols) * cols;
+        else if (delta >= visible)
+            start += ((delta - visible) / cols + 1) * cols;
+        if (start < 0)
+            start = 0;
 
-        /* Row-aligned, unlike the item clamp below: the last screen keeps its
-         * columns and shows a part-filled final row rather than repeating
-         * tiles to fill itself. */
-        if (start_row > bottom_row)
-            start_row = bottom_row;
+        /* Keep the last screenful full rather than trailing off into empty
+         * rows -- in whole rows from wherever the top row sits, so the last
+         * screen keeps its columns and shows a part-filled final row rather
+         * than repeating tiles to fill itself. */
+        offset = start % cols;
+        full = last >= offset
+             ? offset + MAX(0, (last - offset) / cols + 1 - rows) * cols : 0;
+        if (start > full)
+            start = full;
 
-        gui_list->start_item[screen] = start_row * cols;
+        gui_list->start_item[screen] = start;
         return;
     }
 
