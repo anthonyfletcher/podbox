@@ -116,6 +116,49 @@ struct img_filter
 bool img_filter_compile(const char *spec, unsigned allowed_classes,
                         struct img_filter *out);
 
+/* How light a picture is, in the two ways a scrim cares about. Both 0..255 on
+ * the weights the palette extractor uses.
+ *
+ * `bright` is the luminance nine tenths of the picture falls below. Text is
+ * read against the brightest thing it crosses rather than against the
+ * average, and on a real cover the two are far apart: a sleeve averaging 132
+ * has a ninth decile of 199, so a scrim aimed at the mean leaves the band the
+ * title sits on half as bright again as it was asked to be. */
+struct img_levels
+{
+    short mean;
+    short bright;
+};
+
+/* Measure a block of native pixels. Cheap enough to take off the source of a
+ * blurred chain: a box blur moves neither figure much, so the small picture
+ * answers for the large one. */
+void img_filter_measure(const fb_data *px, int w, int h,
+                        struct img_levels *out);
+
+/* Resolve a chain's adaptive filters against one picture and refold its
+ * table. `lighter`, `darker` and `scrim` ask for as much as this picture
+ * needs and no more, which is not knowable until the picture is in hand -- so
+ * a chain carrying one compiles with a placeholder table and is not fit to
+ * run until this has been called for the image it will act on.
+ *
+ * Call it once per image, before the passes below. A chain with nothing
+ * adaptive in it is left alone, so calling it always is safe and costs a
+ * branch. Rebuilding the table is 128 operations against the tens of
+ * thousands the passes do, and a picture needing no scrim at all drops the
+ * levels stage outright.
+ *
+ *   lv     img_filter_measure() of the picture. NULL leaves the chain on its
+ *          placeholder table, which is the identity.
+ *   avoid  the luminance the picture has to stay clear of -- what text drawn
+ *          over it will be, which on a themed screen is not a constant. Only
+ *          `scrim` reads it, and it is the one filter that can lighten or
+ *          darken depending on the answer. -1 for "nothing named", where
+ *          `scrim` falls back to assuming light text.
+ */
+void img_filter_adapt(struct img_filter *f, const struct img_levels *lv,
+                      int avoid);
+
 /* Rewrite w*h native pixels in place. Stages run in canonical order --
  * spatial, colour, levels, dither -- whatever order the chain named them. */
 void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f);

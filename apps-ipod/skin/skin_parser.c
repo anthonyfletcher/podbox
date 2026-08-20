@@ -1573,6 +1573,7 @@ static int parse_albumart_load(struct skin_element* element,
 
     aa->filter_handle = -1;
     aa->filtered_art = -1;
+    aa->filter_avoid = -1;
     aa->slot = -1;
     aa->label = PTRTOSKINOFFSET(skin_buffer, NULL);
     aa->draw_win = PTRTOSKINOFFSET(skin_buffer, NULL);

@@ -153,6 +153,12 @@ static int compute_luminance(int r8, int g8, int b8)
     return (r8 * 77 + g8 * 150 + b8 * 29) >> 8;
 }
 
+static int color_luminance(unsigned int c)
+{
+    return compute_luminance(RGB_UNPACK_RED(c), RGB_UNPACK_GREEN(c),
+                             RGB_UNPACK_BLUE(c));
+}
+
 /* WCAG relative luminance, 0..LUM_MAX.
  *
  * sRGB is linearised with a gamma of 2.0 rather than the exact piecewise 2.4
@@ -737,12 +743,15 @@ static void render_filtered(struct skin_albumart *aa, int handle,
 
 void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
 {
-    const struct img_filter *filter = aa ? &aa->filter : NULL;
+    struct img_filter *filter = aa ? &aa->filter : NULL;
     const bool resizes = filter && (filter->stages & IMG_CLASS_RESIZE);
     struct bitmap *bmp;
-    int handle;
+    int handle, avoid = -1;
 
-    if (!filter || !filter->stages)
+    /* An adaptive chain that folded to nothing for the last picture still has
+     * work to do for the next one, so its stages are not the test for whether
+     * there is anything to run. */
+    if (!filter || (!filter->stages && !filter->has_adaptive))
         return;
     if (aa_slot < 0 || aa_slot >= AA_FILTER_SLOTS)
         return;
@@ -750,6 +759,30 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
     handle = playback_current_aa_hid(aa_slot);
     if (handle < 0)
         return;                                  /* not buffered yet */
+
+    /* What text over this art will be drawn in: the album's accent when
+     * dynamic colours are on and have a palette, the theme's own foreground
+     * otherwise. Reading the setting through the palette rather than the
+     * accent directly is what makes both cases one line. */
+    if (filter->has_adaptive)
+    {
+        avoid = color_luminance(
+                    dynamic_colors_resolve(global_settings.fg_color));
+
+        /* A scrim is cut for one text colour, and the palette can move
+         * without the art changing -- on a dynamic-colours toggle, or when
+         * extraction lands later than the first render. Render it again.
+         *
+         * Only the blurring tier can do that: it renders into a destination
+         * of its own from a source nothing has touched, so it can be run
+         * twice. An in-place chain has already rewritten the buffered pixels
+         * and a second pass would darken them twice over, so that tier holds
+         * the scrim it has until the art is buffered afresh. */
+        if (resizes && avoid != aa->filter_avoid)
+            aa->filtered_art = -1;
+        aa->filter_avoid = (short)avoid;
+    }
+
     if (resizes ? (aa->filtered_art == handle)
                 : (filtered_handle[aa_slot] == handle))
         return;                                  /* already done */
@@ -764,6 +797,19 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
      * one (dither) would need the real row length. */
     if (bufgetdata(handle, 0, (void *)&bmp) <= 0)
         return;
+
+    /* An adaptive chain names no amount and is not fit to run until it has
+     * seen the picture, so its table is folded here, once per buffered image.
+     * The levels come off the art as buffered -- which is the unfiltered
+     * picture, and for a blurring chain is already the decimated one. */
+    if (filter->has_adaptive)
+    {
+        struct img_levels lv;
+
+        img_filter_measure((const fb_data *)bmp->data,
+                           bmp->width, bmp->height, &lv);
+        img_filter_adapt(filter, &lv, avoid);
+    }
 
     if (resizes)
     {
@@ -908,12 +954,6 @@ void dynamic_colors_check_extraction(int aa_slot)
         }
         /* else: keep trying on next render */
     }
-}
-
-static int color_luminance(unsigned int c)
-{
-    return compute_luminance(RGB_UNPACK_RED(c), RGB_UNPACK_GREEN(c),
-                             RGB_UNPACK_BLUE(c));
 }
 
 /* Where c sits along the theme's background-to-foreground line, 0..256, and

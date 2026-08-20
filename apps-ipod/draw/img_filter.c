@@ -33,6 +33,7 @@
  */
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -67,6 +68,7 @@ enum channel_op_id
 {
     OP_INVERT,
     OP_BRIGHTNESS,
+    OP_GAIN,
     OP_CONTRAST,
     OP_REDUCE,
     OP_SATURATE,
@@ -83,6 +85,7 @@ enum amount_kind
     AMT_REQUIRED,   /* the filter means nothing without one               */
     AMT_DEFAULT,    /* absent means `def`                                 */
     AMT_ADAPTIVE,   /* absent means "derive it from the image"            */
+    AMT_DERIVED,    /* an amount is an error: always from the image       */
 };
 
 static const struct filter_def
@@ -103,8 +106,18 @@ static const struct filter_def
 #define RS IMG_CLASS_RESIZE
     { "invert",     LV, OP_INVERT,      1, AMT_NONE,        0,   0,   0 },
     { "brightness", LV, OP_BRIGHTNESS,  1, AMT_REQUIRED, -100, 100,   0 },
-    { "lighter",    LV, OP_BRIGHTNESS,  1, AMT_ADAPTIVE,    0, 100,   0 },
-    { "darker",     LV, OP_BRIGHTNESS, -1, AMT_ADAPTIVE,    0, 100,   0 },
+    /* Scaling, not sliding: these three exist to move a picture out of the
+     * way of text without bleaching it, which is what OP_GAIN is for. So
+     * `lighter50` is half as bright again rather than half way to white, and
+     * only `darker100`, a scale of zero, reaches an end of the scale. */
+    { "lighter",    LV, OP_GAIN,        1, AMT_ADAPTIVE,    0, 300,   0 },
+    { "darker",     LV, OP_GAIN,       -1, AMT_ADAPTIVE,    0, 100,   0 },
+    /* Brightness again, but neither the amount nor the direction is knowable
+     * from the spec: both come from the picture and the colour it has to stay
+     * clear of. sign and the range are unread -- adaptive_amount() returns an
+     * amount already signed, and the parser range-checks only what was
+     * written, which here is nothing. */
+    { "scrim",      LV, OP_GAIN,        1, AMT_DERIVED,     0,   0,   0 },
     { "contrast",   LV, OP_CONTRAST,    1, AMT_REQUIRED, -100, 100,   0 },
     { "reduce",     LV, OP_REDUCE,      1, AMT_DEFAULT,     2, 256,   4 },
     /* bw is saturate with the sign turned round: bw100 is saturate-100.
@@ -165,6 +178,20 @@ static unsigned channel_op(unsigned op, int amount, unsigned v, unsigned max)
             return clamp_level((int)v + ((int)(max - v) * amount + 50) / 100,
                                max);
         return clamp_level((int)v - ((int)v * -amount + 50) / 100, max);
+
+    case OP_GAIN:
+        /* Every channel by the same factor, so the ratio between them -- which
+         * is what colour is -- survives the change in brightness. -50 is half
+         * as bright, +100 twice.
+         *
+         * OP_BRIGHTNESS is not this. Its two arms are not mirrors: darkening
+         * scales, but lightening slides toward white, which converges the
+         * channels and takes the chroma with them. Measured over ten covers,
+         * a scrim written that way costs five to ten times the saturation the
+         * scaling one does. Brightness keeps that shape because a theme
+         * asking for brightness by name is asking to move toward an end of
+         * the scale; a scrim is asking to stay out of the way. */
+        return clamp_level(((int)v * (100 + amount) + 50) / 100, max);
 
     case OP_CONTRAST:
     {
@@ -297,15 +324,130 @@ static short scale_coeff(int32_t v, int out_bits, int in_bits)
  * Folding                                                                *
  * ---------------------------------------------------------------------- */
 
+/* The mean luminance a fixed-target adaptive filter leaves behind, the gap
+ * `scrim` keeps between a picture and the text over it, and how far either may
+ * scale a picture to get there, as a percentage of what it was.
+ *
+ * A constant amount is wrong in both directions across a real library: 40%
+ * is not enough to read white text over a white sleeve and turns a dark one
+ * to mud.
+ *
+ * The two bounds are not symmetrical because the two directions are not.
+ * Scaling down cannot overflow, so the floor is only there to stop a cover
+ * being crushed to black, and 31% is the 22/32 the design note settled on.
+ * Scaling up runs into the top of the fields, and the three channels arrive
+ * there at different gains: past about 2x a dark cover grows flat white areas
+ * with a fringe on them, measured over ten covers off the player. Reaching
+ * the target matters less than that -- a backdrop that is merely lighter
+ * still carries the text. */
+#define ADAPT_LUM_MAX  255              /* the scale a mean is measured on */
+#define ADAPT_TARGET   80
+#define ADAPT_GAP      (ADAPT_LUM_MAX - ADAPT_TARGET)
+#define ADAPT_FLOOR    31
+#define ADAPT_CEIL     200
+
+/* How far to scale a picture of this mean to land it on `target`, as an amount
+ * for OP_GAIN. One expression for both directions, which is what scaling buys
+ * over sliding toward an end of the scale: the factor is simply the ratio of
+ * where the picture should be to where it is.
+ *
+ * The division truncates, so a picture lands on the target or a shade past it
+ * and never short of it -- the safe side when the point is text staying
+ * legible. */
+static int scrim_amount(int mean, int target)
+{
+    int a;
+
+    if (mean <= 0)
+        return 0;                       /* nothing to scale */
+    if (target < 0)
+        target = 0;                     /* a target past the end of the scale */
+
+    a = target * 100 / mean - 100;
+    if (a < ADAPT_FLOOR - 100)
+        a = ADAPT_FLOOR - 100;
+    else if (a > ADAPT_CEIL - 100)
+        a = ADAPT_CEIL - 100;
+    return a;
+}
+
+/* What an adaptive filter does to this picture, as a signed amount.
+ *
+ * `avoid` is the luminance the picture has to stay clear of -- what text over
+ * it will be drawn in -- or -1 when the caller named none. `scrim` is the
+ * only filter here that reads it, and the only one that can go either way: it
+ * moves the picture away from `avoid` -- but only ever downward, and only as
+ * far as it has to. `lighter` and `darker` each hold to a fixed target and
+ * move one way, so a cover already past it is left alone rather than dragged
+ * back.
+ *
+ * `scrim` stands down entirely for dark text rather than lightening to meet
+ * it, because dark text is itself evidence that the artwork is already light.
+ * A theme's text colour on this build is the palette's accent, and
+ * skin_albumart_color.c derives that to contrast with the artwork's dominant
+ * colour -- it goes dark only when the dominant is light. So a picture facing
+ * dark text has already been contrasted against, and lifting it again is the
+ * same compensation twice: it costs the artwork its colour for nothing, since
+ * raising a picture's black point drives every channel toward the top of its
+ * field and the chroma goes with them. A theme that wants a lift anyway can
+ * still name `lighter`.
+ *
+ * Darkening works from the ninth decile rather than the mean. Text is read
+ * against the brightest band it crosses, and on a real sleeve the two are far
+ * apart -- one averaging 132 has a ninth decile of 199, so aiming at the mean
+ * leaves the band under the title half as bright again as it was asked to
+ * be. */
+static int adaptive_amount(const struct filter_def *d,
+                           const struct img_levels *lv, int avoid)
+{
+    bool darken;
+    int a;
+
+    if (d->amt == AMT_DERIVED)
+    {
+        /* Nothing named to avoid: fall back to what `darker` assumes, which
+         * is light text -- the common case, and the one a theme gets by
+         * default. */
+        if (avoid < 0)
+            avoid = ADAPT_LUM_MAX;
+
+        if (2 * avoid < ADAPT_LUM_MAX)
+            return 0;                   /* dark text: nothing to do */
+        darken = true;
+        a = scrim_amount(lv->bright, avoid - ADAPT_GAP);
+    }
+    else
+    {
+        darken = d->sign < 0;
+        a = scrim_amount(darken ? lv->bright : lv->mean,
+                         darken ? ADAPT_TARGET : ADAPT_GAP);
+    }
+
+    /* One way only, whichever way was chosen. The target is the least a
+     * picture has to move, not where it belongs: one already clear of the
+     * text is left as it is rather than dragged back toward it. */
+    if (darken)
+        return a < 0 ? a : 0;
+    return a > 0 ? a : 0;
+}
+
 /* Compose every levels filter in the chain into one table, in the order the
  * chain wrote them, then decide what the result is worth running.
  *
- * An adaptive filter contributes nothing here -- its amount is not known
- * until an image arrives -- so the table it leaves is a placeholder and the
- * stage stays claimed even when the placeholder is the identity. */
-static void fold_levels(struct img_filter *f)
+ * `mean` is the picture's mean luminance, or -1 when no picture is in hand.
+ * Without one an adaptive filter contributes nothing -- its amount is not
+ * known until an image arrives -- so the table it leaves is a placeholder and
+ * the stage stays claimed even when the placeholder is the identity. */
+static void fold_levels(struct img_filter *f,
+                        const struct img_levels *lv, int avoid)
 {
-    bool identity = true, complement = true;
+    bool identity = true, complement = true, has_levels = false;
+
+    /* Whether the chain names a levels filter at all. The stage bit is
+     * dropped below when the folded table turns out to do nothing, so it
+     * cannot be read back on a later fold -- this can. */
+    for (int i = 0; i < f->nsteps && !has_levels; i++)
+        has_levels = filters[f->steps[i].def].cls == IMG_CLASS_LEVELS;
 
     for (int c = 0; c < 3; c++)
     {
@@ -320,9 +462,16 @@ static void fold_levels(struct img_filter *f)
             const struct filter_def *d = &filters[f->steps[i].def];
             int amount;
 
-            if (d->cls != IMG_CLASS_LEVELS || f->steps[i].adaptive)
+            if (d->cls != IMG_CLASS_LEVELS)
                 continue;
-            amount = d->sign * f->steps[i].amount;
+            if (f->steps[i].adaptive)
+            {
+                if (!lv)
+                    continue;
+                amount = adaptive_amount(d, lv, avoid);
+            }
+            else
+                amount = d->sign * f->steps[i].amount;
 
             for (unsigned v = 0; v <= max; v++)
                 t[v] = channel_op(d->op, amount, t[v], max);
@@ -352,8 +501,27 @@ static void fold_levels(struct img_filter *f)
     }
 
     f->levels_complement = complement;
-    if (identity && !f->has_adaptive)
+
+    /* A table that does nothing costs a pass to prove it, so the stage goes.
+     * An unresolved adaptive one is the exception: its table is a placeholder
+     * and says nothing yet about what the stage will be worth. Set as well as
+     * cleared, so a picture that wants a scrim gets the stage back after one
+     * that wanted none took it away. */
+    if (has_levels && !(identity && (lv || !f->has_adaptive)))
+        f->stages |= IMG_CLASS_LEVELS;
+    else
         f->stages &= ~IMG_CLASS_LEVELS;
+}
+
+void img_filter_adapt(struct img_filter *f, const struct img_levels *lv,
+                      int avoid)
+{
+    if (!f || !f->has_adaptive || !lv)
+        return;
+    if (avoid > ADAPT_LUM_MAX)
+        avoid = ADAPT_LUM_MAX;          /* negative stays: it means "none" */
+
+    fold_levels(f, lv, avoid);
 }
 
 /* The same for the colour stage: multiply every colour filter's matrix
@@ -506,6 +674,11 @@ bool img_filter_compile(const char *spec, unsigned allowed_classes,
         case AMT_ADAPTIVE:
             adaptive = !have_amount;
             break;
+        case AMT_DERIVED:
+            if (have_amount)
+                return fail(out, name, "takes no amount");
+            adaptive = true;
+            break;
         }
 
         if (!adaptive && d->amt != AMT_NONE &&
@@ -526,7 +699,7 @@ bool img_filter_compile(const char *spec, unsigned allowed_classes,
     if (out->stages & IMG_CLASS_COLOUR)
         fold_colour(out);
     if (out->stages & IMG_CLASS_LEVELS)
-        fold_levels(out);
+        fold_levels(out, NULL, -1);
 
     /* The spatial filters do not fold -- two blurs, or two block sizes, in
      * one chain is not a thing anyone means -- so the larger wins. */
@@ -842,6 +1015,60 @@ static void pixellate_pass(fb_data *px, int w, int h, int block)
 static bool levels_worth_dithering(const struct img_filter *f)
 {
     return f->lut_span[0] > 1 || f->lut_span[1] > 1 || f->lut_span[2] > 1;
+}
+
+/* The 77/150/29 luminance weights skin_albumart_color.c extracts a palette
+ * with, rescaled so they act on field values directly and a pixel costs three
+ * multiplies rather than three divisions into 8-bit channels. The +128 is the
+ * rounding that brings white out at exactly 255. */
+#define LUM_W(w, m)  ((255 * (w) + (m) / 2) / (m))
+#define LUM_RED      LUM_W(77,  LCD_MAX_RED)
+#define LUM_GREEN    LUM_W(150, LCD_MAX_GREEN)
+#define LUM_BLUE     LUM_W(29,  LCD_MAX_BLUE)
+
+/* Four luminance levels to a bucket: enough to place a percentile within a
+ * step nothing can see, and 64 shorts of stack rather than 256 ints. */
+#define LEVEL_BUCKETS 64
+#define LEVEL_SHIFT   2
+
+void img_filter_measure(const fb_data *px, int w, int h,
+                        struct img_levels *out)
+{
+    unsigned short hist[LEVEL_BUCKETS];
+    uint32_t total = 0, n, seen = 0, want;
+
+    if (!out)
+        return;
+    out->mean = out->bright = 0;
+    if (!px || w <= 0 || h <= 0)
+        return;
+
+    memset(hist, 0, sizeof hist);
+    n = (uint32_t)w * h;
+
+    for (uint32_t i = 0; i < n; i++)
+    {
+        unsigned p = FB_UNPACK_SCALAR_LCD(px[i]);
+        unsigned lum = (RGB_UNPACK_RED_LCD(p)   * LUM_RED
+                      + RGB_UNPACK_GREEN_LCD(p) * LUM_GREEN
+                      + RGB_UNPACK_BLUE_LCD(p)  * LUM_BLUE + 128) >> 8;
+
+        total += lum;
+        if (hist[lum >> LEVEL_SHIFT] < USHRT_MAX)
+            hist[lum >> LEVEL_SHIFT]++;
+    }
+
+    out->mean = (short)(total / n);
+
+    /* The top of the bucket the ninth decile falls in, so `bright` is never
+     * an under-estimate of what the text has to be read against. */
+    want = n - n / 10;
+    for (int b = 0; b < LEVEL_BUCKETS; b++)
+        if ((seen += hist[b]) >= want)
+        {
+            out->bright = (short)(((b + 1) << LEVEL_SHIFT) - 1);
+            break;
+        }
 }
 
 void img_filter_apply(fb_data *px, int w, int h, const struct img_filter *f)

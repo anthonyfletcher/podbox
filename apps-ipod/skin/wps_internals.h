@@ -276,6 +276,12 @@ struct skin_albumart {
     short filtered_width;      /* what is really in it: the source fitted */
     short filtered_height;     /* inside the box, so smaller than it      */
 
+    /* The text luminance the art in there was scrimmed against, or -1 for a
+     * chain that never asked. The palette can move without the art changing,
+     * and a scrim cut for white text is the wrong one once the accent has
+     * gone dark. */
+    short filter_avoid;
+
     /* Corner radius, 0 for square corners, with the coverage mask cut for it
      * when the skin is parsed. The mask depends only on the radius -- the two
      * planes carry their own strides -- so the one mask serves the art at
