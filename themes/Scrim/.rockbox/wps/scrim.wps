@@ -1,5 +1,5 @@
 #-----------------------------------------------#
-# Scrim -- WPS
+# Scrim
 #-----------------------------------------------#
 #
 #--- Fonts ---#
@@ -7,8 +7,10 @@
 %Fl(2,26-noto-sans-medium.fnt)
 %Fl(3,12-noto-sans.fnt)
 %Fl(4,24x24_Icons.fnt)
+%Fl(5,18-noto-sans-bold.fnt)
 #
 #--- Images ---#
+#
 %xl(vbg,volband.bmp,0,0)
 %xl(vwf,volfill.bmp,0,0)
 #
@@ -60,21 +62,21 @@
 # Top bar
 %?mv(3)<%Vd(Volume)|%Vd(Chrome)>
 #
-# Status icons
-# - Transport: stopped C, playing A, paused B, ffwd G, rewind F.
+# - Status icons - Transport: stopped C, playing A, paused B, ffwd G, rewind F.
 %Vl(Chrome,0,0,320,35,4)
-%Vl(Chrome,2,2,24,24,4)
-%?mp<C|A|B|G|F>
+%Vl(Chrome,2,2,76,24,4)
+%?mp<C|A|B|G|F>%?ps<H>%?mm<|J|J|J|J>
 #
 # Spectrum analyser
 %V(0,200,80,40,-)%Sb(8,-,-,0)
 #
 # Volume overlay
-%Vl(Volume,0,0,320,35,3)%Vg(!000000,!000000,!ffffff)
+%Vl(Volume,0,0,320,35,5)%Vg(000000,000000,ffffff)
 %Vs(gradient) 
 %Vs(gradient) 
 %Vs(gradient) 
-%Vl(Volume,8,6,304,24,4)%Vg(!000000,!000000,!ffffff)%Vf(!ffffff)
+%Vl(Volume,8,6,304,24,4)%Vg(000000,000000,ffffff)%Vf(ffffff)
 %Vs(gradient)%?pv<M|N|N>%arO
-%Vl(Volume,40,15,240,6,-)%Vf(!ffffff)
-%pv(0,0,240,6,image,vwf,backdrop,vbg)
+%Vl(Volume,40,15,240,6,-)%Vf(ffffff)
+%dr(0,0,240,6,000000)%pv(0,0,240,6,image,vwf,backdrop,vbg)
+
