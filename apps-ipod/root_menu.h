@@ -92,6 +92,14 @@ enum {
     GO_TO_IMAGES,
     /* Spun: the playback-log statistics deck (viewers/playback_viewer/). */
     GO_TO_SPUN,
+    /* The guests the library credits (screens/browse/featured_artists.c).
+     * Reached only from the Music menu's built-in row, so it has no root-menu
+     * entry -- but it still needs a code, because that is how a browse level
+     * hands control back. */
+    GO_TO_FEATURED_ARTISTS,
+    /* One artist's guest appearances, armed by featured_artists_arm(). The
+     * browser's [Featured In] row, and the same track list as above. */
+    GO_TO_FEATURED_TRACKS,
 };
 extern struct menu_item_ex root_menu_;
 

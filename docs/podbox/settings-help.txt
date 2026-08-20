@@ -532,6 +532,13 @@ one-letter searches return more than they are worth.
 [search order]
 Which of tracks, albums and artists is listed first in search results.
 
+[featured artists]
+Reads guest credits out of your tags -- the "feat. Somebody" in a track title
+or artist -- and lets you browse by them, so a singer with no album of their own
+still turns up. On, Music gains a Featured Artists row and an artist's album
+list gains one for the records they only guest on; the credits are worked out
+once per boot, at the first entry to Music. Needs the database loaded to RAM.
+
 [art cache fast build]
 Decodes each image once for the largest thumbnail and derives the smaller sizes
 from it, instead of decoding once per size.

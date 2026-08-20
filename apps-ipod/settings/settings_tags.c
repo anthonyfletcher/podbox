@@ -201,6 +201,7 @@ static const struct tag_row tag_rows[] = {
 { "search max rows",     TAG_LIBRARY,                            "search find results" },
 { "search min letters",  TAG_LIBRARY,                            "search find letters" },
 { "search order",        TAG_LIBRARY,                            "search find order" },
+{ "featured artists",    TAG_LIBRARY,                            "guest feat credits" },
 
 /* --- artwork ------------------------------------------------------------- */
 { "art cache fast build",TAG_ADVANCED|TAG_ARTWORK,               "thumbnail cache" },

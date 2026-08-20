@@ -31,8 +31,11 @@ audio/audio_path.c
 #ifdef HAVE_TAGCACHE
 database/tagcache.c
 database/db_summary.c
+database/db_featured.c
+database/db_featured_parse.c
 screens/browse/browser_db.c
 screens/browse/album_charts.c
+screens/browse/featured_artists.c
 #endif
 
 playlist/catalog.c

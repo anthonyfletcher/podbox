@@ -58,6 +58,8 @@
 #include "settings/settings.h"
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* db_summary_log_play */
+#include "database/db_featured.h"  /* the guest table the rows are drawn from */
+#include "screens/browse/featured_artists.h"
 #include "browser_db.h"
 #include "lang.h"
 #include "logf.h"
@@ -134,6 +136,8 @@ enum table {
     TABLE_ALBUM_CHARTS,
     TABLE_RANDOM_ALBUM,
     TABLE_DB_SEARCH,
+    TABLE_FEATURED_ARTISTS,
+    TABLE_FEATURED_TRACKS,
 };
 
 static const struct id3_to_search_mapping {
@@ -180,6 +184,7 @@ enum variables {
  *
  * 'available' gates a row that cannot always do its job; NULL means always. */
 static bool db_search_available(void);
+static bool featured_artists_available(void);
 
 static const struct builtin_row {
     const char *id;
@@ -203,6 +208,8 @@ static const struct builtin_row {
       TABLE_ALBUM_CHARTS, ALBUM_CHART_FORGOTTEN,        NULL },
     { "chart_artists_forgotten",   LANG_FORGOTTEN_ARTISTS,
       TABLE_ALBUM_CHARTS, ARTIST_CHART_FORGOTTEN,       NULL },
+    { "featured_artists", LANG_FEATURED_ARTISTS, TABLE_FEATURED_ARTISTS, 0,
+      featured_artists_available },
 };
 
 /* The search screen scans the tag files, which off disk is a seek and a read
@@ -212,6 +219,21 @@ static const struct builtin_row {
 static bool db_search_available(void)
 {
     return global_settings.tagcache_ram != TAGCACHE_RAM_OFF;
+}
+
+/* Three tests, and they are three different kinds. The setting says what the
+ * user asked for. The ramcache setting says whether the table could be built
+ * at all -- off it costs a seek and a read per entry, which is not slow but
+ * unusable. And an empty table means the library credits nobody, so the row
+ * would lead to a list with nothing in it.
+ *
+ * Nothing here builds: load_root() has already called db_featured_ensure()
+ * by the time it asks, which is what lets the emptiness test be honest. */
+static bool featured_artists_available(void)
+{
+    return global_settings.featured_artists &&
+           global_settings.tagcache_ram != TAGCACHE_RAM_OFF &&
+           db_featured_count() > 0;
 }
 
 /* Capacity 10 000 entries (for example 10k different artists) */
@@ -1822,6 +1844,37 @@ static int album_sort_order(int level)
     return order < 0 ? global_settings.database_sort_albums_by : order;
 }
 
+/* How many tracks the [Featured In] row would show at browse level 'level':
+ * the ones crediting this artist as a guest on somebody else's record. 0 when
+ * the row does not belong here at all.
+ *
+ * Three things have to hold. The level lists albums; the level above it is an
+ * artist level, which is what keeps the row off the root Album list while
+ * letting it appear on the album lists reached through Genre and Year; and the
+ * artist has guest appearances that are not their own.
+ *
+ * current_title[level] is that artist -- it is what browser_db_get_title()
+ * draws at the top of the screen. It is a *display* name, so a
+ * tagnavi_user.config that formats its artist level will not match the tag and
+ * the row simply will not appear. The alternative is carrying the seek down a
+ * level, which is not worth it. */
+static int featured_row_count(int level)
+{
+    int parent;
+
+    if (!csi || level < 1 || level >= csi->tagorder_count)
+        return 0;
+    if (csi->tagorder[level] != tag_album)
+        return 0;
+
+    parent = csi->tagorder[level - 1];
+    if (parent != tag_virt_canonicalartist && parent != tag_albumartist &&
+        parent != tag_artist)
+        return 0;
+
+    return db_featured_guest_tracks(current_title[level], NULL, 0);
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2004,6 +2057,29 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             dptr->newtable = TABLE_NAVIBROWSE;
             dptr->name = ID2P(LANG_TAGNAVI_RANDOM);
             dptr->extraseek = -1;
+            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+            dptr->idx_id = 0;
+            dptr++;
+            current_entry_count++;
+            c->special_entry_count++;
+        }
+        sidx++;
+    }
+    /* [Featured In], on an artist's album list only -- see
+     * featured_row_count(). It goes last of the three: putting it first would
+     * renumber the other two, and position_past_specials scrolls a freshly
+     * entered level past its special rows by counting them.
+     *
+     * The label cannot be the artist's name. A special row's name has to
+     * outlive the entry, which is why these all point at static strings
+     * rather than into the entries arena. */
+    if (featured_row_count(level) > 0)
+    {
+        if (offset <= sidx)
+        {
+            dptr->newtable = TABLE_FEATURED_TRACKS;
+            dptr->name = ID2P(LANG_FEATURED_IN);
+            dptr->extraseek = 0;
             dptr->customaction = ONPLAY_NO_CUSTOMACTION;
             dptr->idx_id = 0;
             dptr++;
@@ -2417,6 +2493,10 @@ static int load_root(struct browser_context *c)
 
     tc = c;
     c->currtable = TABLE_ROOT;
+    /* Before the rows are enumerated, because one of them asks the table
+     * whether it is empty. The crawl happens once per boot; after that this
+     * is a comparison against what the database looked like then. */
+    db_featured_ensure();
     /* The root menu has no <All tracks>/<Random> rows. Only retrieve_entries()
      * cleared this, so without it the count from the last browse level would
      * still be standing when a root submenu is loaded -- and anything keyed on
@@ -3233,6 +3313,17 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
 
     if (newextra == TABLE_DB_SEARCH)
         return GO_TO_DB_SEARCH;
+
+    if (newextra == TABLE_FEATURED_ARTISTS)
+        return GO_TO_FEATURED_ARTISTS;
+
+    if (newextra == TABLE_FEATURED_TRACKS)
+    {
+        /* Still the album level here, so this is the artist whose list the
+         * row was drawn on. */
+        featured_artists_arm(current_title[c->currextra]);
+        return GO_TO_FEATURED_TRACKS;
+    }
 
     if (c->dirlevel >= MAX_DIR_LEVELS)
         return 0;

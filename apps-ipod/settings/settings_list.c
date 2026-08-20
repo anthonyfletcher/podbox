@@ -1711,6 +1711,13 @@ const struct settings_list settings[] = {
     INT_SETTING(F_BANFROMQS, music_menu_sig, LANG_MUSIC_BROWSER, 0,
                 "music menu signature", UNIT_INT, 0, 0x7fffffff, 1,
                 NULL, NULL, NULL),
+    /* Guest credits, mined out of the title and per-track artist tags. Off by
+     * default: reading them is a guess at what a tag meant, and a library
+     * whose owner did not ask for it should not grow rows out of one. Off,
+     * db_featured builds nothing at all -- this is the gate that saves the
+     * crawl, not one that only hides its result. */
+    OFFON_SETTING(F_BANFROMQS, featured_artists, LANG_FEATURED_ARTISTS, false,
+                  "featured artists", NULL),
     /* The database browser's own album ordering. Separate from the carousel's
      * above: that one groups by artist as well, which a browser list has
      * already done by navigation. */

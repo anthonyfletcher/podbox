@@ -580,6 +580,9 @@ struct user_settings
     int db_search_max_rows;      /* 0..7 -> 25..200 results, in steps of 25 */
     int db_search_min_letters;   /* 0..2 -> 1..3 letters before a scan runs */
     int db_search_order;         /* DB_SEARCH_ORDER_* */
+    /* Read guest credits ("feat. X") out of titles and per-track artists, so
+     * the browser can list them. Off, the table is never built. */
+    bool featured_artists;
     bool autoresume_enable;   /* enable auto-resume feature? */
     int autoresume_automatic; /* resume next track? 0=never, 1=always,
                                  2=custom */

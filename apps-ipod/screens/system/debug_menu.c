@@ -56,6 +56,7 @@
 #include "dircache.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
+#include "database/db_featured.h"
 #include "system/app_buffer.h"
 #include "viewers/playback_viewer/pv_log.h"
 #include "viewers/playback_viewer/pv_stats.h"
@@ -1492,6 +1493,69 @@ static bool dbg_usb_info(void)
  * database means the logged paths and the database's disagree in form -- and
  * since the artwork cache keys off the same strings, artwork is missing
  * everything too, silently. */
+/* The guest table (database/db_featured.c): what a build finds, and how long
+ * it takes.
+ *
+ * Timed because the case for rebuilding it at every entry to Music rather
+ * than persisting it rests on the crawl being fast, and nothing has measured
+ * that. The sizes are reported beside it because they are a guess too: what
+ * did not fit was dropped, and only this screen says so. */
+static bool dbg_featured(void)
+{
+    struct simplelist_info info;
+    struct db_featured_stats st;
+    long tick;
+    int n, shown;
+
+    if (!global_settings.featured_artists)
+    {
+        splash(HZ * 3, "Off: Settings > Library > Music");
+        return false;
+    }
+    if (!tagcache_is_in_ram())
+    {
+        splash(HZ * 3, "Needs the database loaded to RAM");
+        return false;
+    }
+
+    splash(0, "Reading credits...");
+    tick = current_tick;
+    if (!db_featured_build())
+    {
+        splash(HZ * 3, "Database busy");
+        return false;
+    }
+    tick = current_tick - tick;
+
+    db_featured_get_stats(&st);
+    n = db_featured_count();
+
+    /* info_init resets the line count, so it has to come before the lines
+     * rather than after them. */
+    simplelist_info_init(&info, "Featured artists", 0, NULL);
+    info.scroll_all = true;
+    simplelist_reset_lines();
+
+    /* SIMPLELIST_MAX_LINES is 32, and going over it wraps the count to zero
+     * and shows an empty screen -- hence the ceiling on the names. */
+    simplelist_addline("Build %ld ms%s", tick * 1000 / HZ,
+                       st.truncated ? " TRUNCATED" : "");
+    simplelist_addline("%d titles, %d album artists", st.titles, st.artists);
+    simplelist_addline("%d guests/%d, %d tracks/%d",
+                       n, DB_FEATURED_GUEST_MAX, st.tracks,
+                       DB_FEATURED_PAIR_MAX);
+    simplelist_addline("Names %d/%d B", st.arena_used, DB_FEATURED_ARENA);
+
+    shown = MIN(n, 24);
+    for (int i = 0; i < shown; i++)
+        simplelist_addline("%s (%d)", db_featured_name(i),
+                           db_featured_track_count(i));
+    if (shown < n)
+        simplelist_addline("... and %d more", n - shown);
+
+    return simplelist_show_list(&info);
+}
+
 static bool dbg_pv_stats(void)
 {
     struct simplelist_info info;
@@ -1985,6 +2049,7 @@ static const struct {
         { "View dircache info", dbg_dircache_info },
         { "View database info", dbg_tagcache_info },
         { "Spun stats", dbg_pv_stats },
+        { "Featured artists", dbg_featured },
 #ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },
 #endif

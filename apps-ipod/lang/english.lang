@@ -19145,6 +19145,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_FEATURED_ARTISTS
+  desc: General Settings > Music: browse by the guests credited in track tags
+  user: core
+  <source>
+    *: "Featured Artists"
+  </source>
+  <dest>
+    *: "Featured Artists"
+  </dest>
+  <voice>
+    *: "Featured Artists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_IN
+  desc: "[Featured In]" entry on an artist's album list in the tag browser
+  user: core
+  <source>
+    *: "[Featured In]"
+  </source>
+  <dest>
+    *: "[Featured In]"
+  </dest>
+  <voice>
+    *: "Featured In"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_APPLYING_THEME
   desc: boot screen caption while the theme's skins are being loaded
   user: core

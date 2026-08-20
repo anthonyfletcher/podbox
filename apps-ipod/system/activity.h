@@ -55,7 +55,8 @@ enum current_activity {
      * compares against these numbers, so renumbering blanks conditionals in
      * every theme that uses it. */
     ACTIVITY_PLAYBACKVIEWER,
-    ACTIVITY_SETTINGS_SEARCH
+    ACTIVITY_SETTINGS_SEARCH,
+    ACTIVITY_FEATUREDARTISTS
 };
 
 /* custom string representation of activity */

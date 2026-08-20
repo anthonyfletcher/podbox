@@ -51,6 +51,7 @@
 #include "screens/covers/album_covers.h"
 #include "screens/system/db_search.h"
 #include "screens/browse/album_charts.h"
+#include "screens/browse/featured_artists.h"
 #include "screens/browse/browser_flat.h"
 #include "speech/language.h"
 #include "files/filetypes.h"
@@ -585,6 +586,22 @@ static int db_search_scrn(void* param)
     return db_search_run();
 }
 
+static int featured_artists_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return featured_artists_show();
+}
+
+static int featured_tracks_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return featured_artists_run();
+}
+
 static int artist_portraits_scrn(void* param)
 {
     (void)param;
@@ -656,6 +673,7 @@ static int playback_viewer_scrn(void* param)
 extern struct menu_item_ex
         file_menu,
         tagcache_menu,
+        music_menu,
         main_menu_,
         manage_settings,
         playlist_options,
@@ -697,6 +715,8 @@ static const struct root_items items[] = {
     [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
     [GO_TO_RANDOM_ALBUM] = { random_album_scrn, NULL, &tagcache_menu },
     [GO_TO_DB_SEARCH] = { db_search_scrn, NULL, &tagcache_menu },
+    [GO_TO_FEATURED_ARTISTS] = { featured_artists_scrn, NULL, &music_menu },
+    [GO_TO_FEATURED_TRACKS] = { featured_tracks_scrn, NULL, &music_menu },
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },

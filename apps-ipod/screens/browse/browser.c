@@ -1047,6 +1047,10 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_RANDOM_ALBUM);
                     case GO_TO_DB_SEARCH:
                         return exit_to_new_screen(GO_TO_DB_SEARCH);
+                    case GO_TO_FEATURED_ARTISTS:
+                        return exit_to_new_screen(GO_TO_FEATURED_ARTISTS);
+                    case GO_TO_FEATURED_TRACKS:
+                        return exit_to_new_screen(GO_TO_FEATURED_TRACKS);
                     case GO_TO_ROOT: exit_func = true; break;
                     default:
                         break;
