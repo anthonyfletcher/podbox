@@ -531,6 +531,143 @@ void pv_percent(const struct pv_theme *th, int cx, int cy, int sz)
     pv_disc(th, x1 - r, y1 - r, r, col, 256);
 }
 
+/* A crown: three spikes on a rounded base, a bead on each tip and a jewel in
+ * the middle.
+ *
+ * Filled by scanline rather than assembled from capsules, because a crown is
+ * a silhouette and an outline of one reads as a zigzag. Each row is the union
+ * of up to three spans -- one per spike, merging into a single span below the
+ * valleys -- and coverage is how much of a pixel those spans cover, so the
+ * sloping edges anti-alias against the gradient the way every other shape
+ * here does.
+ *
+ * The rounded bottom corners are part of that span rather than a capsule laid
+ * over it. A second shape drawn across the first would blend its own edge
+ * against the gradient over pixels the body has already filled, leaving a
+ * dark arc inside a corner that is supposed to be solid.
+ */
+void pv_crown(const struct pv_theme *th, int cx, int cy, int w,
+              unsigned col, unsigned hi)
+{
+    int h    = w * 66 / 100;
+    int half = w / 2;
+    int cr   = h / 8;                   /* how round the bottom corners are */
+    int tipr = w / 20;
+    int x0 = cx - half, x1 = cx + half;
+    int ytop = cy - h / 2;
+    int ybot = cy + h / 2;
+    int yval, dy;
+    long X0 = (long)x0 * SUBPX, X1 = (long)x1 * SUBPX;
+    long CX = (long)cx * SUBPX;
+    long reach = CX - X0;               /* how far a spike spreads, each side */
+    long CRU;
+
+    if (tipr < 2)
+        tipr = 2;
+    if (cr < 3)
+        cr = 3;
+    CRU = (long)cr * SUBPX;
+
+    /* The spikes take the upper part; what is left below the valleys is solid
+     * across, and is the base. */
+    yval = ytop + (ybot - ytop) * 62 / 100;
+    dy = yval - ytop;
+    if (dy < 1)
+        dy = 1;
+
+    lcd_set_drawmode(DRMODE_SOLID);
+
+    for (int ay = ytop; ay <= ybot; ay++)
+    {
+        long sa[3], sb[3];
+        long spread, below;
+        unsigned bg;
+        int n, run = -1;
+
+        if (ay < 0 || ay >= PV_H)
+            continue;
+
+        bg = pv_grad_at(th, ay);
+
+        spread = (long)(ay - ytop) * SUBPX * reach / (2 * (long)dy * SUBPX);
+
+        /* The outermost edges reach half a pixel past the tip columns, which
+         * is where the outside of those pixels is -- everything here is in
+         * pv_disc()'s units, where a coordinate is a pixel's centre. */
+        if (2 * spread >= reach)
+        {
+            sa[0] = X0 - SUBPX / 2; sb[0] = X1 + SUBPX / 2;
+            n = 1;
+        }
+        else
+        {
+            sa[0] = X0 - SUBPX / 2; sb[0] = X0 + spread;
+            sa[1] = CX - spread;    sb[1] = CX + spread;
+            sa[2] = X1 - spread;    sb[2] = X1 + SUBPX / 2;
+            n = 3;
+        }
+
+        below = (long)(ay - (ybot - cr)) * SUBPX;
+        if (n == 1 && below > 0)
+        {
+            long inset;
+
+            if (below > CRU)
+                below = CRU;
+            inset = CRU - isqrtl(CRU * CRU - below * below);
+            sa[0] += inset;
+            sb[0] -= inset;
+        }
+
+        for (int px = x0 - 1; px <= x1 + 1; px++)
+        {
+            long pa = (long)px * SUBPX - SUBPX / 2, pb = pa + SUBPX;
+            long covered = 0;
+            int cov;
+
+            for (int i = 0; i < n; i++)
+            {
+                long lo = sa[i] > pa ? sa[i] : pa;
+                long up = sb[i] < pb ? sb[i] : pb;
+
+                if (up > lo)
+                    covered += up - lo;
+            }
+            cov = (int)(covered * 256 / SUBPX);
+
+            /* Whole pixels in a row are all the same colour, so they go down
+             * as one span the way pv_disc() does it. */
+            if (cov >= 255)
+            {
+                if (run < 0)
+                    run = px;
+                continue;
+            }
+            if (run >= 0)
+            {
+                lcd_set_foreground(col);
+                lcd_hline(run, px - 1, ay);
+                run = -1;
+            }
+            if (cov <= 0)
+                continue;
+
+            lcd_set_foreground(pv_blend(bg, col, cov));
+            lcd_drawpixel(px, ay);
+        }
+
+        if (run >= 0)
+        {
+            lcd_set_foreground(col);
+            lcd_hline(run, x1 + 1, ay);
+        }
+    }
+
+    pv_disc(th, x0, ytop, tipr, hi, 256);
+    pv_disc(th, cx, ytop, tipr, hi, 256);
+    pv_disc(th, x1, ytop, tipr, hi, 256);
+}
+
 /* ------------------------------------------------------------------ text */
 
 void pv_text_centre(int y, const char *s, unsigned colour)

@@ -445,6 +445,15 @@ static unsigned char is_new[(PV_N_BADGES + 7) / 8];
 static unsigned long when[PV_N_BADGES];
 static enum pv_badge_vis vis[PV_N_BADGES];
 static bool progress_loaded;
+static int  new_n;
+
+/* Whether there was a file to be new against.
+ *
+ * A device with a year of history unlocks most of the table the first time it
+ * is evaluated, and none of it is news. Nothing counts as new unless progress
+ * was read in full first, which covers a fresh device, a file the sync
+ * deleted and a truncated one in the same rule. */
+static bool had_progress;
 
 static bool bit_get(const unsigned char *m, int i)
 {
@@ -483,6 +492,10 @@ static void progress_load(void)
             memset(seen, 0, sizeof(seen));
             memset(when, 0, sizeof(when));
         }
+        else
+        {
+            had_progress = true;
+        }
     }
     close(fd);
 }
@@ -517,15 +530,28 @@ void pv_badges_save(void)
         remove(PV_BADGES_PATH);
 }
 
+/* Put every unlocked badge back to unannounced, for testing the crowns.
+ *
+ * The dates survive, because classify() only stamps a badge that has none --
+ * otherwise the one hook that makes the feature testable would destroy the
+ * earned dates every time it was used. */
+void pv_badges_rearm(void)
+{
+    progress_load();
+    memset(seen, 0, sizeof(seen));
+    had_progress = true;     /* the save below is the file to be new against */
+    pv_badges_save();
+}
+
 int pv_badges_classify(void)
 {
     bool goal_taken[PV_AM_COUNT];
     unsigned long now;
-    int newn = 0;
 
     progress_load();
     memset(goal_taken, 0, sizeof(goal_taken));
     memset(is_new, 0, sizeof(is_new));
+    new_n = 0;
 
     now = (unsigned long)mktime(get_time());
 
@@ -536,14 +562,20 @@ int pv_badges_classify(void)
             vis[i] = PV_BV_DONE;
             if (!bit_get(seen, i))
             {
-                /* First time this has been seen unlocked. The log cannot say
-                 * when it was actually earned -- only that it is earned now
-                 * -- so today is the honest answer, and a badge earned before
-                 * this ever ran keeps 0 and says so. */
-                bit_set(is_new, i);
                 bit_set(seen, i);
-                when[i] = now;
-                newn++;
+
+                /* The log cannot say when this was actually earned -- only
+                 * that it is earned now -- so today is the honest answer. A
+                 * badge that already carries a date keeps it, and one earned
+                 * before this ever ran keeps 0 and says so. */
+                if (when[i] == 0)
+                    when[i] = now;
+
+                if (had_progress)
+                {
+                    bit_set(is_new, i);
+                    new_n++;
+                }
             }
         }
         else if (!(pv_badges_table[i].flags & PV_BADGE_SECRET)
@@ -559,7 +591,27 @@ int pv_badges_classify(void)
         }
     }
 
-    return newn;
+    return new_n;
+}
+
+int pv_badges_new_count(void)
+{
+    return new_n;
+}
+
+/* Walked rather than kept in a list: this is called once per announcement
+ * page, against a few hundred rows, next to a full-screen gradient. */
+int pv_badges_new_index(int k)
+{
+    if (k >= 0)
+    {
+        for (int i = 0; i < PV_N_BADGES; i++)
+        {
+            if (bit_get(is_new, i) && k-- == 0)
+                return i;
+        }
+    }
+    return -1;
 }
 
 enum pv_badge_vis pv_badges_vis(int i)

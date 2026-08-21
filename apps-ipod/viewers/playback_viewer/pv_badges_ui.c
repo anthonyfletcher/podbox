@@ -78,6 +78,19 @@ static int tier_of(int i)
     return (t >= 0 && t < PV_TIER_N) ? t : PV_TIER_GOLD;
 }
 
+/* A whole palette from one metal: the wall's own colours are gold over a dark
+ * tint of itself, and every tier is built the same way. */
+static void tier_theme(struct pv_theme *th, int t)
+{
+    const unsigned black = LCD_RGBPACK(0, 0, 0);
+
+    th->bg0    = pv_blend(black, tier_col[t], 52);
+    th->bg1    = pv_blend(black, tier_col[t], 18);
+    th->num0   = tier_hi[t];
+    th->num1   = tier_col[t];
+    th->accent = tier_col[t];
+}
+
 /* ------------------------------------------------------------------ rows */
 
 static void draw_row(int y, int i, bool selected)
@@ -246,15 +259,14 @@ int pv_badges_browse(const struct pv_totals *t)
 {
     int total = pv_badges_count();
     int done = pv_badges_unlocked_count();
-    int newn, cursor = 0, top = 0;
+    int newn = pv_badges_new_count();
+    int cursor = 0, top = 0;
 
     (void)t;
 
-    newn = pv_badges_classify();
-
-    /* Seen the moment the wall is opened, not when it is closed: leaving by
-     * pulling the USB cable should still count as having looked. */
-    pv_badges_save();
+    /* Classifying is the deck's job, on the way in. The wall is only ever
+     * reached through the deck, so the work is already done -- and doing it
+     * again here would clear the new set while the deck is still showing it. */
 
     for (;;)
     {
@@ -297,6 +309,87 @@ int pv_badges_browse(const struct pv_totals *t)
                 top = cursor - ROWS + 1;
         }
     }
+}
+
+/* -------------------------------------------------------- the crown page */
+
+/* How many crowns are worth turning through to get to the deck.
+ *
+ * Everything announced in one pass carries the same timestamp -- the log can
+ * only say a badge is earned now, not when it was crossed -- so "the latest
+ * few" is the tail of the table, which within a ladder is its highest rungs.
+ * The rest are not lost: they are on the wall, dated, and the last page says
+ * how many. */
+#define CROWN_MAX 5
+
+int pv_badges_crown_count(void)
+{
+    int n = pv_badges_new_count();
+
+    return n > CROWN_MAX ? CROWN_MAX : n;
+}
+
+int pv_badges_crown(int k, int n, int dir)
+{
+    int extra = pv_badges_new_count() - n;      /* what the cap left out */
+    int i = pv_badges_new_index(k + extra);
+    const struct pv_badge *b = pv_badges_get(i);
+    unsigned long earned;
+    struct pv_theme th;
+    char buf[64], fb[64];
+    int t;
+
+    if (!b)
+        return 0;
+
+    t = tier_of(i);
+    tier_theme(&th, t);
+
+#ifdef HAVE_ADJUSTABLE_CPU_FREQ
+    cpu_boost(true);            /* a full gradient and an anti-aliased shape */
+#endif
+
+    pv_fill(&th);
+    pv_kicker(22, "ACHIEVEMENT UNLOCKED", tier_col[t]);
+    pv_underline(&th, 43);
+
+    pv_crown(&th, PV_W / 2, 92, 64, tier_col[t], tier_hi[t]);
+
+    pv_fit_text(b->name, PV_W - 20, fb, sizeof(fb));
+    pv_text_centre(132, fb, tier_hi[t]);
+
+    pv_fit_text(b->desc, PV_W - 20, fb, sizeof(fb));
+    pv_text_centre(158, fb, PV_TEXT_DIM);
+
+    earned = pv_badges_when(i);
+    if (earned > 0)
+    {
+        int dy, dm, dd;
+
+        pv_civil_from_days((long)(earned / 86400UL), &dy, &dm, &dd);
+        snprintf(buf, sizeof(buf), "earned %s %d %d",
+                 pv_month_abbr[dm], dd, dy);
+    }
+    else
+    {
+        strlcpy(buf, "earned before records began", sizeof(buf));
+    }
+    pv_text_centre(186, buf, PV_TEXT_DIM);
+
+    if (extra > 0 && k == n - 1)
+    {
+        snprintf(buf, sizeof(buf), "+%d more on the wall", extra);
+        pv_text_centre(206, buf, PV_TEXT_DIM);
+    }
+
+    pv_page_dots(&th, k, n);
+
+#ifdef HAVE_ADJUSTABLE_CPU_FREQ
+    cpu_boost(false);
+#endif
+
+    pv_present(dir);
+    return 0;
 }
 
 /* ------------------------------------------------------------- the card */

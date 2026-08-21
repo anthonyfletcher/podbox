@@ -41,10 +41,25 @@
 #include "pv_art.h"
 #include "pv_stats.h"
 #include "pv_cards.h"
+#include "pv_badges.h"
 #include "pv_badges_ui.h"
 #include "pv_export.h"
 #include "pv_year.h"
 #include "playback_viewer.h"
+
+/* The deck's pages, crowns and cards alike.
+ *
+ * Anything unlocked since the last look is announced before the deck, so the
+ * page index starts below zero and only its non-negative half is a card. That
+ * keeps PV_CARD_COUNT meaning what it has always meant: a conditional card at
+ * the front would shift every id and make every card's page dots wrong. */
+static int pv_page_draw(int page, int n_new, int dir,
+                        const struct pv_totals *t)
+{
+    if (page < 0)
+        return pv_badges_crown(page + n_new, n_new, dir);
+    return pv_cards_draw(page, dir, t);
+}
 
 /* Hold-Menu menu, the same gesture the text and image viewers use.
  *
@@ -55,7 +70,7 @@
  *
  * The theme comes back just for the menu chrome, the way the other viewers
  * do it, and the screen is handed back to our own drawing on the way out. */
-static int pv_menu(int card, const struct pv_totals *t)
+static int pv_menu(int page, int n_new, const struct pv_totals *t)
 {
     enum { PVM_SAVE_CARD = 0, PVM_SAVE_ALL };
     int result;
@@ -77,7 +92,7 @@ static int pv_menu(int card, const struct pv_totals *t)
          * card rather than of the menu that was just dismissed -- or of a
          * number still counting up. */
         pv_set_export(true);
-        pv_cards_draw(card, 0, t);
+        pv_page_draw(page, n_new, 0, t);
         pv_set_export(false);
         pv_export_card();
     }
@@ -95,7 +110,7 @@ int playback_viewer_screen(void)
     enum pv_build_result r;
     void *buf;
     size_t bufsz;
-    int card = 0, btn = 0;
+    int n_new, page, btn = 0;
     int ret = GO_TO_PREVIOUS;
     bool held = false;      /* the Menu hold that opened the menu is still down */
 
@@ -123,6 +138,17 @@ int playback_viewer_screen(void)
         return ret;
     }
 
+    /* Decide what is newly unlocked while the model is still in front of us,
+     * and commit it before anything is drawn: seen the moment the deck opens,
+     * so leaving by pulling the USB cable still counts as having looked. */
+    pv_badges_classify();
+    pv_badges_save();
+
+    /* The crowns come first, so the deck is entered through them when there
+     * is anything to announce and at the intro card when there is not. */
+    n_new = pv_badges_crown_count();
+    page = -n_new;
+
     push_current_activity(ACTIVITY_PLAYBACKVIEWER);
     FOR_NB_SCREENS(i)
         viewportmanager_theme_enable(i, false, NULL);
@@ -135,7 +161,7 @@ int playback_viewer_screen(void)
      * only asks the queue when the last card ran to completion. That is what
      * lets the wheel flip through the deck at its own speed rather than at
      * the speed of the animations. */
-    btn = pv_cards_draw(card, 0, &totals);
+    btn = pv_page_draw(page, n_new, 0, &totals);
 
     for (;;)
     {
@@ -159,22 +185,22 @@ int playback_viewer_screen(void)
         }
 
         step = pv_nav_step(btn);
-        if (step > 0 && card < PV_CARD_COUNT - 1)
+        if (step > 0 && page < PV_CARD_COUNT - 1)
         {
-            card++;
-            btn = pv_cards_draw(card, +1, &totals);
+            page++;
+            btn = pv_page_draw(page, n_new, +1, &totals);
             continue;
         }
-        if (step < 0 && card > 0)
+        if (step < 0 && page > -n_new)
         {
-            card--;
-            btn = pv_cards_draw(card, -1, &totals);
+            page--;
+            btn = pv_page_draw(page, n_new, -1, &totals);
             continue;
         }
         /* The year card is the one card that is also a way in: SELECT hands
          * the screen to the week browser until it hands it back. */
         if ((btn & ~BUTTON_REPEAT) == BUTTON_SELECT
-            && card == PV_CARD_YEAR && pv_year_available())
+            && page == PV_CARD_YEAR && pv_year_available())
         {
             if (pv_year_browse(pv_cards_theme(PV_CARD_YEAR), &totals)
                 == SYS_USB_CONNECTED)
@@ -183,12 +209,12 @@ int playback_viewer_screen(void)
                 ret = GO_TO_ROOT;
                 break;
             }
-            btn = pv_cards_draw(card, 0, &totals);
+            btn = pv_page_draw(page, n_new, 0, &totals);
             continue;
         }
 
         /* So is the achievements card. */
-        if ((btn & ~BUTTON_REPEAT) == BUTTON_SELECT && card == PV_CARD_ACH)
+        if ((btn & ~BUTTON_REPEAT) == BUTTON_SELECT && page == PV_CARD_ACH)
         {
             if (pv_badges_browse(&totals) == SYS_USB_CONNECTED)
             {
@@ -196,7 +222,7 @@ int playback_viewer_screen(void)
                 ret = GO_TO_ROOT;
                 break;
             }
-            btn = pv_cards_draw(card, 0, &totals);
+            btn = pv_page_draw(page, n_new, 0, &totals);
             continue;
         }
 
@@ -207,7 +233,7 @@ int playback_viewer_screen(void)
          * read as "leave". */
         if (btn == (BUTTON_MENU | BUTTON_REPEAT))
         {
-            if (pv_menu(card, &totals) == MENU_ATTACHED_USB)
+            if (pv_menu(page, n_new, &totals) == MENU_ATTACHED_USB)
             {
                 ret = GO_TO_ROOT;
                 break;
@@ -217,7 +243,7 @@ int playback_viewer_screen(void)
              * the release as well, and a stuck 'held' would swallow the next
              * press to leave. */
             held = (button_status() & BUTTON_MENU) != 0;
-            btn = pv_cards_draw(card, 0, &totals);
+            btn = pv_page_draw(page, n_new, 0, &totals);
             continue;
         }
         if (btn == (BUTTON_MENU | BUTTON_REL))

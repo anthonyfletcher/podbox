@@ -64,6 +64,11 @@ void pv_number(const struct pv_theme *th, int cx, int oy, const char *s,
 /* A percent sign to match, built from two discs and a diagonal. */
 void pv_percent(const struct pv_theme *th, int cx, int cy, int sz);
 
+/* A crown of width w, centred on (cx, cy): 'col' for the metal, 'hi' for the
+ * tips and the jewel. */
+void pv_crown(const struct pv_theme *th, int cx, int cy, int w,
+              unsigned col, unsigned hi);
+
 void pv_text_centre(int y, const char *s, unsigned colour);
 void pv_text_centre2(int y, const char *a, unsigned ca,
                      const char *b, unsigned cb);

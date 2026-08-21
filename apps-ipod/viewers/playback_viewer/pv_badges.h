@@ -162,16 +162,31 @@ enum pv_badge_vis
 };
 
 /* Work out what each row shows, load the saved progress, and stamp anything
- * newly unlocked with today's date. Returns how many are new since the badge
- * wall was last looked at. Call after pv_badges_eval(). */
+ * newly unlocked with today's date. Returns how many are new since the last
+ * look. Call after pv_badges_eval(), once per crunch: a second call finds
+ * everything already seen and reports nothing new, which would pull the set
+ * out from under whatever is still drawing it.
+ *
+ * Nothing is ever new against a device that had no progress file to compare
+ * with -- a fresh one, or one whose file the sync deleted -- or the first run
+ * would announce most of the table at once. */
 int  pv_badges_classify(void);
 
 enum pv_badge_vis pv_badges_vis(int i);
 bool pv_badges_is_new(int i);
 unsigned long pv_badges_when(int i);   /* 0 = earned before records began */
 
+/* The new set, for the screens that announce it. Valid until the next
+ * pv_badges_classify(). */
+int  pv_badges_new_count(void);
+int  pv_badges_new_index(int k);       /* the k'th new badge, or -1 */
+
 /* Persist what has been seen and when. Worth doing once the user has
  * actually looked, so "NEW" survives until then. */
 void pv_badges_save(void);
+
+/* Mark every unlocked badge unannounced again, keeping the earned dates.
+ * A test hook: nothing but the debug menu should call it. */
+void pv_badges_rearm(void);
 
 #endif /* _PV_BADGES_H */

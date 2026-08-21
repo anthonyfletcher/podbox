@@ -17,6 +17,18 @@
 int pv_badges_card(const struct pv_theme *th, int idx, int dir,
                    const struct pv_totals *t);
 
+/* How many announcement pages to show: what pv_badges_classify() found, up to
+ * the few it is worth paging through before the deck. */
+int pv_badges_crown_count(void);
+
+/* One announcement page: the k'th of n badges unlocked since the last look,
+ * in its own metal, drawn ahead of the deck. 'dir' is the transition, as for
+ * a card. Returns 0 -- there is no figure to count, so nothing to interrupt.
+ *
+ * Reads what pv_badges_classify() decided and nothing else: no log, no model,
+ * no file. */
+int pv_badges_crown(int k, int n, int dir);
+
 /* The wall itself, entered with SELECT from that card: one scrolling row per
  * badge, with the selected row's description and progress underneath.
  *

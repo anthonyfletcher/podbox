@@ -60,6 +60,7 @@
 #include "system/app_buffer.h"
 #include "viewers/playback_viewer/pv_log.h"
 #include "viewers/playback_viewer/pv_stats.h"
+#include "viewers/playback_viewer/pv_badges.h"
 #include "crc32.h"
 #include "logf.h"
 #include "disk.h"
@@ -1640,6 +1641,16 @@ static bool dbg_pv_stats(void)
     return simplelist_show_list(&info);
 }
 
+/* Put every earned badge back to unannounced, so the next Spun opens on the
+ * crowns. A badge cannot be unlocked to order, so this is the only way to see
+ * that screen without months of listening. The earned dates survive. */
+static bool dbg_pv_rearm(void)
+{
+    pv_badges_rearm();
+    splash(HZ * 2, "Spun: crowns re-armed");
+    return false;
+}
+
 static bool dbg_tagcache_info(void)
 {
     struct simplelist_info info;
@@ -2049,6 +2060,7 @@ static const struct {
         { "View dircache info", dbg_dircache_info },
         { "View database info", dbg_tagcache_info },
         { "Spun stats", dbg_pv_stats },
+        { "Spun: re-arm crowns", dbg_pv_rearm },
         { "Featured artists", dbg_featured },
 #ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },
