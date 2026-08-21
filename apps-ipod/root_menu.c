@@ -583,6 +583,11 @@ static int album_covers_scrn(void* param)
 static int db_search_scrn(void* param)
 {
     (void)param;
+    /* Nothing armed here. Every Search reaches db_search_run() through this
+     * function, the Music and Audiobooks rows included, so arming anything
+     * would overwrite what browser_db_enter() had just asked for. Covering
+     * the whole library is what an unarmed search already does, and that is
+     * exactly what the main menu's own row wants. */
     return db_search_run();
 }
 
@@ -1156,6 +1161,55 @@ static void root_menu_fixup_tagnavi_slots(void)
     root_menu_apply_canonical_order();
 }
 
+/* Segregate Audiobooks owns the Audiobooks row: one setting, one feature.
+ * Turning the setting on puts the row in the main menu and turning it off
+ * takes it away, so nobody has to visit Customize Main Menu to finish
+ * switching the thing on.
+ *
+ * Customize Main Menu still lists it, which is deliberate -- that screen is
+ * how a row is *positioned*, and taking it away would mean the one row nobody
+ * could move. Toggling the setting re-asserts whichever state it wants.
+ *
+ * Safe before tagnavi.config is parsed: the slot comes back -1 and this does
+ * nothing, which is why root_menu() calls it again on first entry. */
+void root_menu_set_audiobooks_row(bool on)
+{
+    int slot = browser_db_spoken_main_menu_slot();
+    struct menu_item_ex *item;
+    unsigned count = MENU_GET_COUNT(root_menu_.flags);
+    unsigned i;
+
+    if (slot < 0 || slot >= TAGNAVI_MAIN_MENU_SLOTS)
+        return;
+
+    item = (struct menu_item_ex *)
+        menu_table[MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS + slot].item;
+
+    for (i = 0; i < count; i++)
+        if (root_menu__[i] == item)
+            break;
+
+    if (on)
+    {
+        if (i < count || count >= MAX_MENU_ITEMS)
+            return;                     /* already there, or no room */
+        root_menu__[count++] = item;
+    }
+    else
+    {
+        if (i >= count)
+            return;                     /* already absent */
+        memmove(&root_menu__[i], &root_menu__[i + 1],
+                (count - i - 1) * sizeof(root_menu__[0]));
+        count--;
+    }
+
+    root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
+                        | MENU_ITEM_COUNT(count);
+
+    root_menu_apply_canonical_order();
+}
+
 struct menu_table *root_menu_get_options(int *nb_options)
 {
     *nb_options = root_menu_active_count();
@@ -1560,6 +1614,9 @@ void root_menu(void)
     int selected = 0;
 
     root_menu_fixup_tagnavi_slots();
+    /* Now that tagnavi.config has been parsed the slot can be found, which it
+     * could not be when the setting was loaded. */
+    root_menu_set_audiobooks_row(global_settings.segregate_audiobooks);
     push_current_activity(ACTIVITY_MAINMENU);
     next_screen = root_menu_setup_screens();
 

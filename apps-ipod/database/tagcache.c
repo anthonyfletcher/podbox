@@ -87,6 +87,7 @@
 #include "usb.h"
 #include "metadata.h"
 #include "tagcache.h"
+#include "db_spoken.h"
 #include "widgets/yesno.h"
 #include "core_alloc.h"
 #include "crc32.h"
@@ -230,7 +231,7 @@ static const char * const tags_str[] = { "artist", "album", "genre", "title",
 #else /* strings for logf debugging */
     "tag_virt_basename", "tag_virt_length_min", "tag_virt_length_sec",
     "tag_virt_playtime_min", "tag_virt_playtime_sec",
-    "tag_virt_entryage", "tag_virt_autoscore"
+    "tag_virt_entryage", "tag_virt_autoscore", "tag_virt_spoken"
 };
 /* more debug strings */
 static const char * const tag_type_str[] = {
@@ -1263,6 +1264,10 @@ static long check_virtual_tags(int tag, int idx_id,
             }
             break;
 
+        case tag_virt_spoken:
+            data = db_spoken_is_spoken_seek(tc_find_tag(tag_genre, idx_id, idx));
+            break;
+
         /* How many commits before the file has been added to the DB. */
         case tag_virt_entryage:
             data = current_tcmh.commitid
@@ -1715,6 +1720,46 @@ static bool build_lookup_list(struct tagcache_search *tcs)
 }
 
 
+/* The genre seeks tag_virt_spoken answers from hold good only for the commit
+ * they were read at -- a commit re-sorts the tag files and moves every seek in
+ * them. Refreshed as a search starts because that is the one point every
+ * clause check is downstream of, and there is no other moment both late enough
+ * to have a database and early enough to be before the question.
+ *
+ * Three things the flag and the captured commitid are each load-bearing for:
+ *
+ * db_spoken_build() runs a search of its own and so arrives back here. Without
+ * the flag that is unbounded recursion rather than a wasted rebuild.
+ *
+ * The build sleeps while another thread holds the read lock, so a commit can
+ * land while it runs. Recording the commitid read *before* it means such a
+ * build is rebuilt next time rather than standing as current.
+ *
+ * A build that could not read the database records nothing, so it is retried
+ * rather than leaving an empty table looking authoritative.
+ *
+ * A search starting while a build is in progress skips the update and reads
+ * however much of the table is filled, so for the length of one rebuild it
+ * may call an audiobook music. A lock would trade that for blocking a UI
+ * search behind a background one, which is the worse of the two. */
+static int32_t spoken_commitid = -1;
+static bool spoken_building;
+
+static void spoken_table_update(void)
+{
+    int32_t built_at;
+
+    if (spoken_building || spoken_commitid == current_tcmh.commitid)
+        return;
+
+    built_at = current_tcmh.commitid;
+
+    spoken_building = true;
+    if (db_spoken_build())
+        spoken_commitid = built_at;
+    spoken_building = false;
+}
+
 bool tagcache_search(struct tagcache_search *tcs, int tag)
 {
     /* NOTE: call tagcache_search_finish(&tcs) when finished or BAD things may happen (TM) */
@@ -1728,6 +1773,10 @@ bool tagcache_search(struct tagcache_search *tcs, int tag)
     memset(tcs, 0, sizeof(struct tagcache_search));
     if (tc_stat.commit_step > 0 || !tc_stat.ready)
         return false;
+
+    /* Before write_lock++ below, so the rebuild's own search is an ordinary
+     * one rather than one nested inside a half-built search. */
+    spoken_table_update();
 
     tcs->position = sizeof(struct tagcache_header);
     tcs->type = tag;

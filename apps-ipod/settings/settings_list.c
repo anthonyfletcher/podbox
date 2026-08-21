@@ -59,6 +59,8 @@
 #include "screens/context_menu.h"
 #include "playlist/playlist.h"
 #include "screens/browse/browser.h"
+#include "database/db_summary.h"   /* db_summary_invalidate */
+#include "root_menu.h"             /* root_menu_set_audiobooks_row */
 
 #include "audio/voice_thread.h"
 
@@ -618,6 +620,19 @@ static void playback_frequency_callback(int sample_rate_hz)
 static void albumart_callback(int mode)
 {
     set_albumart_mode(mode);
+}
+
+/* Two things follow from this one, which is the point of it being one setting.
+ *
+ * The album and artist index is built once and saved, so it holds whatever the
+ * setting said at the time. Nothing about the database has changed, and the
+ * index's own staleness checks only watch that -- so without the invalidate
+ * the carousel and Random album keep serving the old list until something else
+ * forces a rebuild. */
+static void segregate_audiobooks_callback(bool segregate)
+{
+    root_menu_set_audiobooks_row(segregate);
+    db_summary_invalidate();
 }
 
 /* The buffered bitmap is chosen per track, so nothing changes on screen until
@@ -1788,6 +1803,10 @@ const struct settings_list settings[] = {
                   false, "database album art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_artistart, LANG_DB_ARTIST_ART,
                   false, "database artist art", NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_bookart, LANG_DB_BOOK_ART,
+                  false, "database audiobook art", NULL),
+    OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
+                  false, "segregate audiobooks", segregate_audiobooks_callback),
     {F_T_INT|F_THEMESETTING, &global_settings.db_art_row_height, -1,
         INT(52), "database art row height", UNUSED},
     OFFON_SETTING(0, art_cache_fast_build, LANG_ART_CACHE_FAST_BUILD, false,

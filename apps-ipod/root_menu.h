@@ -20,6 +20,10 @@ struct menu_table {
 };
 
 struct menu_table *root_menu_get_options(int *nb_options);
+/* Add or remove the Audiobooks row, which Segregate Audiobooks owns -- see
+ * root_menu_set_audiobooks_row() for why the setting rather than Customize
+ * Main Menu decides whether it is there. */
+void root_menu_set_audiobooks_row(bool on);
 
 /* Number of reserved root-menu shortcut slots for tagnavi.config's root
  * ("main") menu's direct tag-browse rows -- see the comment at

@@ -797,9 +797,11 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
 MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
                   music_menu_config, NULL, Icon_NOICON);
 MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
+MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
+                 NULL);
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &album_sort_menu, &music_menu_config_item, &featured_artists,
-          &search_menu
+          &segregate_audiobooks, &search_menu
           );
 
 /** The branches built here **/

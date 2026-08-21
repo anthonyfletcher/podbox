@@ -18022,6 +18022,90 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_DB_BOOK_ART
+  desc: in Settings, database browser audiobook art rows
+  user: core
+  <source>
+    *: "Audiobook Art Rows"
+  </source>
+  <dest>
+    *: "Audiobook Art Rows"
+  </dest>
+  <voice>
+    *: "Audiobook Art Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_AUDIOBOOKS
+  desc: in Settings, keep audiobooks apart from the music
+  user: core
+  <source>
+    *: "Segregate Audiobooks"
+  </source>
+  <dest>
+    *: "Segregate Audiobooks"
+  </dest>
+  <voice>
+    *: "Segregate Audiobooks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOKS
+  desc: the Audiobooks menu, and its main-menu row
+  user: core
+  <source>
+    *: "Audiobooks"
+  </source>
+  <dest>
+    *: "Audiobooks"
+  </dest>
+  <voice>
+    *: "Audiobooks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK
+  desc: in the Audiobooks menu, browse by book
+  user: core
+  <source>
+    *: "Book"
+  </source>
+  <dest>
+    *: "Book"
+  </dest>
+  <voice>
+    *: "Book"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR
+  desc: in the Audiobooks menu, browse by author
+  user: core
+  <source>
+    *: "Author"
+  </source>
+  <dest>
+    *: "Author"
+  </dest>
+  <voice>
+    *: "Author"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED
+  desc: in the Audiobooks menu, books played lately
+  user: core
+  <source>
+    *: "Recently played"
+  </source>
+  <dest>
+    *: "Recently played"
+  </dest>
+  <voice>
+    *: "Recently played"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_REBUILD_INDEX
   desc: in Carousel settings, rebuild the album index
   user: core

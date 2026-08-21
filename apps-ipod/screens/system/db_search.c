@@ -40,6 +40,7 @@
 #include "widgets/search_dialog.h"
 #include "widgets/splash.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"       /* which albums and artists are books */
 #include "playlist/playlist.h"
 #include "screens/browse/browser_db.h"   /* the two enter_..._on_next_load */
 #include "system/activity.h"
@@ -138,6 +139,49 @@ static bool add_match(int tag, const char *name, int32_t seek, int32_t idx_id)
  * into the string blob for each. With no filter and no clause,
  * tagcache_get_next() instead crawls the tag file sequentially: the same
  * strings for a fraction of the memory traffic, and already sorted. */
+/* The arming is a one-shot, spent by the next db_search_run(). It has to be,
+ * because the row that armed it and the main menu's own row both arrive at the
+ * same screen through the same function -- so "nothing armed" and "the whole
+ * library" are deliberately the same state, and a scope left standing would
+ * silently narrow the next search someone opened. */
+static int armed_scope = DB_SEARCH_ALL;
+static int active_scope = DB_SEARCH_ALL;
+
+void db_search_arm_scope(int scope)
+{
+    armed_scope = scope;
+}
+
+/* Whether a row this scan turned up belongs on the side being searched.
+ *
+ * The three tags need three answers. A title is per track, so the tag itself
+ * says. Album and album artist are unique-valued -- their tag files hold one
+ * entry per distinct string with no track behind it -- so they are answered
+ * from the tables db_spoken builds for exactly this. */
+static bool match_in_scope(int tag, const struct tagcache_search *tcs)
+{
+    bool spoken;
+
+    if (active_scope == DB_SEARCH_ALL
+        || !global_settings.segregate_audiobooks)
+        return true;
+
+    switch (tag)
+    {
+        case tag_album:
+            spoken = db_spoken_album_is_spoken(tcs->result_seek);
+            break;
+        case tag_albumartist:
+            spoken = db_spoken_artist_is_spoken(tcs->result_seek);
+            break;
+        default:
+            spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
+            break;
+    }
+
+    return spoken == (active_scope == DB_SEARCH_SPOKEN);
+}
+
 static int run_search(const char *query, void *ctx)
 {
     char buf[TAGCACHE_BUFSZ];
@@ -169,6 +213,7 @@ static int run_search(const char *query, void *ctx)
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
         {
             if (strcasestr(buf, query)
+                && match_in_scope(tags[i], &tcs)
                 && !add_match(tags[i], buf, tcs.result_seek, tcs.idx_id))
                 break;
         }
@@ -257,6 +302,10 @@ int db_search_run(void)
     struct search_provider p = provider;
     int chosen;
 
+    /* Spend the arming, whether or not this screen goes on to open. */
+    active_scope = armed_scope;
+    armed_scope = DB_SEARCH_ALL;
+
     /* Both gates the real feature would need. A commit holds tagcache's
      * read_lock for its whole length and tagcache_search() waits on it with
      * sleep(1), so calling in from a foreground screen during one is a freeze
@@ -272,6 +321,12 @@ int db_search_run(void)
         splash(HZ * 2, "Needs the database in RAM");
         return GO_TO_PREVIOUS;
     }
+
+    /* Here, not in run_search(): it costs two passes over the master index,
+     * and a scan runs every time the query settles. Skipped entirely when
+     * nothing is being scoped. */
+    if (active_scope != DB_SEARCH_ALL && global_settings.segregate_audiobooks)
+        db_spoken_groups_ensure();
 
     /* str() is not a constant expression, so the title is filled in here
      * rather than in the initialiser above. */

@@ -729,15 +729,36 @@ static int update_dir(void)
                             global_settings.show_icons?browser_get_fileicon:NULL);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
-     * and the whole off path never touch the art-resolution code. */
+     * and the whole off path never touch the art-resolution code.
+     *
+     * An audiobook browse asks its own toggle instead of those two, since a
+     * book list is an album list and an author list is an artist list, and
+     * tall rows are a different bargain over a few dozen books than over a few
+     * thousand albums. It has to be asked first for that reason: db_albumart
+     * answers for a book list as readily as for any other.
+     *
+     * Only the books, though. A book has a cover, embedded if not beside it,
+     * but next to nobody keeps a photograph of an author -- so tall rows there
+     * buy a column of identical "no art" placeholders at the price of half the
+     * rows on screen. An audiobook author list is plain whatever either toggle
+     * says.
+     *
+     * Every level of an audiobook browse is a spoken one, the tracks under a
+     * book included, which is the other reason the level test governs: a track
+     * list carries no art in any menu. */
     {
         bool tall_rows = false;
         if (*tc.dirfilter == SHOW_ID3DB)
         {
-            if (global_settings.db_albumart && browser_db_is_album_list(&tc))
-                tall_rows = true;
-            else if (global_settings.db_artistart && browser_db_is_artist_list(&tc))
-                tall_rows = true;
+            bool album = browser_db_is_album_list(&tc);
+            bool artist = !album && browser_db_is_artist_list(&tc);
+
+            if (browser_db_is_spoken_list(&tc))
+                tall_rows = album && global_settings.db_bookart;
+            else if (album)
+                tall_rows = global_settings.db_albumart;
+            else if (artist)
+                tall_rows = global_settings.db_artistart;
         }
         db_showing_art = tall_rows;
         gui_synclist_set_albumart_callback(list,

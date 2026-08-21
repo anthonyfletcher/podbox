@@ -60,6 +60,7 @@
 #include "database/db_summary.h"   /* db_summary_log_play */
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "screens/browse/featured_artists.h"
+#include "screens/system/db_search.h"   /* db_search_arm_scope */
 #include "browser_db.h"
 #include "lang.h"
 #include "logf.h"
@@ -507,6 +508,7 @@ static int get_tag(int *tag)
         TAG_MATCH("artist", tag_artist) \
         TAG_MATCH("length", tag_length) \
         TAG_MATCH("rating", tag_rating) \
+        TAG_MATCH("spoken", tag_virt_spoken) \
         TAG_MATCH("%limit", var_limit) \
         TAG_MATCH("%strip", var_strip) \
         TAG_MATCH("bitrate", tag_bitrate) \
@@ -1879,6 +1881,58 @@ static int featured_row_count(int level)
     return db_featured_guest_tracks(current_title[level], NULL, 0);
 }
 
+/* Whether the browse being set up asks about spoken word itself.
+ *
+ * The whole instruction is searched, not the current level, because a clause
+ * written at the album level still governs the tracks below it (see
+ * retrieve_entries(), which adds every level's clauses up to the current one).
+ * So an audiobook browse answers true at each of its levels.
+ *
+ * Naming the tag is the whole of what marks a row as being about books, and
+ * it is deliberately not a list of menus: anything keyed on which menu a row
+ * sits in would be tied to one tagnavi.config, and a tagnavi_user.config
+ * would silently lose both the art and the exclusion. */
+static bool csi_mentions_spoken(void)
+{
+    int i, j;
+
+    if (!csi)
+        return false;
+
+    for (i = 0; i < MAX_TAGS; i++)
+        for (j = 0; j < csi->clause_count[i]; j++)
+            if (csi->clause[i][j]->tag == tag_virt_spoken)
+                return true;
+
+    return false;
+}
+
+/* The clause that keeps spoken word out. One object, reused for every place
+ * it has to be inserted -- tagcache stores the pointer and only reads it. */
+static struct tagcache_search_clause exclude_spoken_clause = {
+    .tag = tag_virt_spoken,
+    .type = clause_is,
+    .numeric = true,
+    .source = source_constant,
+    .numeric_data = 0,
+    .str = NULL,
+};
+
+/* Set while a browse the user reached by *naming* what they wanted is open --
+ * a result chosen in Search, which is not scoped to music. Such a browse shows
+ * whatever was picked, book or not: filtering it would answer a request for
+ * one album by name with an empty list. Cleared by load_root(), i.e. as soon
+ * as any menu is drawn again. */
+static bool browse_picked_by_name;
+
+/* Whether this browse should have spoken word kept out of it. */
+static bool exclude_spoken_wanted(void)
+{
+    return global_settings.segregate_audiobooks
+        && !browse_picked_by_name
+        && !csi_mentions_spoken();
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -1950,12 +2004,35 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     /* because tagcache saves the clauses, we need to lock the buffer
      * for the entire duration of the search */
     core_pin(browser_db_handle);
-    for (i = 0; i <= level; i++)
     {
-        int j;
+        /* Spoken word is kept out of every browse that does not ask for it.
+         *
+         * Once per group, not once per search. A condition list is a flat sum
+         * of products -- "|" separates groups of ANDed clauses, and a group
+         * that passes ends the check (see check_clauses() in tagcache.c) -- so
+         * a single clause appended at the end would only ever guard the last
+         * group. The "Same as currently played track" rows have four, and
+         * three of them would let audiobooks straight through.
+         *
+         * One clause object serves every insertion: the search stores the
+         * pointer and only ever reads it. */
+        bool exclude = exclude_spoken_wanted();
 
-        for (j = 0; j < csi->clause_count[i]; j++)
-            tagcache_search_add_clause(&tcs, csi->clause[i][j]);
+        if (exclude)
+            tagcache_search_add_clause(&tcs, &exclude_spoken_clause);
+
+        for (i = 0; i <= level; i++)
+        {
+            int j;
+
+            for (j = 0; j < csi->clause_count[i]; j++)
+            {
+                tagcache_search_add_clause(&tcs, csi->clause[i][j]);
+
+                if (exclude && csi->clause[i][j]->type == clause_logical_or)
+                    tagcache_search_add_clause(&tcs, &exclude_spoken_clause);
+            }
+        }
     }
 
     current_offset = offset;
@@ -2349,6 +2426,7 @@ static bool row_submenu_has_items(const struct menu_entry *item)
 static bool loading_for_shortcut;
 
 static int load_root(struct browser_context *c);
+static bool menu_mentions_spoken(const struct menu_root *m);
 
 static int load_root_for_shortcut(struct browser_context *c)
 {
@@ -2498,6 +2576,12 @@ static int load_root(struct browser_context *c)
     tc = c;
     c->currtable = TABLE_ROOT;
     root_opens_on_search = false;
+    /* Not while loading the root only to find a row in it: the jump straight
+     * into a named album runs load_root_for_shortcut() first, and clearing
+     * here wiped the exemption before the browse it exists to protect --
+     * which showed up as a searched-for book opening an empty list. */
+    if (!loading_for_shortcut)
+        browse_picked_by_name = false;
     /* Before the rows are enumerated, because one of them asks the table
      * whether it is empty. The crawl happens once per boot; after that this
      * is a comparison against what the database looked like then. */
@@ -2534,6 +2618,17 @@ static int load_root(struct browser_context *c)
         /* Turned off in the Music settings. Only the root menu is offered
          * there, and only while the mask still describes this row set. */
         if (hide_mask && (hide_mask & row_hide_bit(i)))
+            continue;
+
+        /* The Audiobooks row belongs to Segregate Audiobooks and is a
+         * main-menu row, so it is not drawn here. It has to *live* in this
+         * menu even so: only rows of the root menu can be offered as
+         * main-menu shortcuts (see root_row_eligible()), which is why it is
+         * hidden rather than moved. Still built while a shortcut is being
+         * resolved -- that is how the main-menu row finds it. */
+        if (c->currextra == rootmenu && !loading_for_shortcut
+            && menu->items[i]->type == menu_load
+            && menu_mentions_spoken(menus[menu->items[i]->link]))
             continue;
 
         dptr->name = (char*)menu->items[i]->name;
@@ -2789,6 +2884,7 @@ void browser_db_enter_album_tracks_on_next_load(long album_seek,
                                              const char *album_title)
 {
     pending_album_seek = album_seek;
+    browse_picked_by_name = true;
     strlcpy(pending_album_title, album_title ? album_title : "",
             sizeof(pending_album_title));
     browser_db_enter_by_tag_on_next_load(tag_album);
@@ -2810,6 +2906,7 @@ void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title)
 {
     pending_artist_seek = albumartist_seek;
+    browse_picked_by_name = true;
     strlcpy(pending_artist_title, artist_title ? artist_title : "",
             sizeof(pending_artist_title));
     browser_db_enter_by_tag_on_next_load(tag_albumartist);
@@ -3000,6 +3097,61 @@ bool browser_db_get_main_menu_row(int index, int *out_tag,
         }
     }
     return false;
+}
+
+/* Whether any row of 'm' asks about spoken word. Used to recognise the
+ * audiobooks menu without knowing what it is called: a tagnavi_user.config may
+ * name it anything, and the tag is the only thing that has to be there. */
+static bool menu_mentions_spoken(const struct menu_root *m)
+{
+    int i, j, k;
+
+    if (!m)
+        return false;
+
+    for (i = 0; i < m->itemcount; i++)
+    {
+        const struct search_instruction *si = &m->items[i]->si;
+
+        for (j = 0; j < MAX_TAGS; j++)
+            for (k = 0; k < si->clause_count[j]; k++)
+                if (si->clause[j][k]->tag == tag_virt_spoken)
+                    return true;
+    }
+
+    return false;
+}
+
+int browser_db_spoken_main_menu_slot(void)
+{
+    struct menu_root *root;
+    int pass, i, count = 0;
+
+    if (rootmenu < 0 || rootmenu >= menu_count)
+        return -1;
+
+    root = menus[rootmenu];
+    if (!root)
+        return -1;
+
+    /* Same enumeration as browser_db_get_main_menu_row(), because the answer
+     * is an index into it. */
+    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
+    {
+        for (i = 0; i < root->itemcount; i++)
+        {
+            if (!root_row_eligible(root->items[i], pass))
+                continue;
+
+            if (root->items[i]->type == menu_load
+                && menu_mentions_spoken(menus[root->items[i]->link]))
+                return count;
+
+            count++;
+        }
+    }
+
+    return -1;
 }
 
 int browser_db_get_main_menu_tag_row_count(void)
@@ -3282,6 +3434,92 @@ int browser_db_take_pending_top_item(void)
  * true, make sure that you are back at the previous dirlevel, by
  * calling browser_db_exit as needed, with is_visible set to false.
  */
+/* The path of the one track below the row whose tag entry is at `seek`, if
+ * there is exactly one.
+ *
+ * This is what lets a book held in a single file play when it is chosen
+ * rather than opening a list holding only itself. Nothing about it is
+ * particular to books: a music album of one track behaves the same way, which
+ * is the right answer there too.
+ *
+ * Filters and clauses are built the way retrieve_entries() builds them, and
+ * for the same reason -- an album seek identifies a *name*, so counting
+ * without the levels above would count every album that shares one.
+ *
+ * Two rows are read, but that is not what it costs. A filtered search walks
+ * the master index and fills its seek list a batch at a time, and an album
+ * holds fewer tracks than a batch, so the first read scans the index to the
+ * end. Entering an album therefore does that walk twice: once here and once
+ * in retrieve_entries(), which needs every track anyway. Affordable on a
+ * select, where it happens once; unthinkable per row while drawing a list.
+ */
+static bool single_track_path(struct browser_context* c, int seek,
+                              char *buf, int buflen)
+{
+    struct tagcache_search tcs;
+    struct tagcache_search_clause level_clause[MAX_TAGS];
+    int level = c->currextra + 1;   /* the level a descent would enter */
+    int i, j, found = 0;
+
+    if (!csi || c->currextra < 0 || level >= csi->tagorder_count)
+        return false;
+    if (csi->tagorder[level] != tag_title)
+        return false;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return false;
+
+    for (i = 0; i < level; i++)
+    {
+        /* The row just chosen has no result_seek yet -- it is only recorded
+         * once the descent actually happens. */
+        int s = (i == c->currextra) ? seek : csi->result_seek[i];
+
+        if (TAGCACHE_IS_NUMERIC(csi->tagorder[i]))
+        {
+            struct tagcache_search_clause *cc = &level_clause[i];
+
+            memset(cc, 0, sizeof(*cc));
+            cc->tag = csi->tagorder[i];
+            cc->type = clause_is;
+            cc->numeric = true;
+            cc->numeric_data = s;
+            tagcache_search_add_clause(&tcs, cc);
+        }
+        else
+            tagcache_search_add_filter(&tcs, csi->tagorder[i], s);
+    }
+
+    for (i = 0; i <= level; i++)
+        for (j = 0; j < csi->clause_count[i]; j++)
+            tagcache_search_add_clause(&tcs, csi->clause[i][j]);
+
+    /* One buffer serves both: the first path is written into it and stays
+     * there unless a second row exists, in which case the path is not
+     * wanted. */
+    while (tagcache_get_next(&tcs, buf, buflen))
+    {
+        if (++found > 1)
+            break;
+    }
+
+    tagcache_search_finish(&tcs);
+
+    return found == 1;
+}
+
+/* Play `path` on its own, as the whole of a new playlist. */
+static int play_single_track(const char *path)
+{
+    if (playlist_create(NULL, NULL) < 0)
+        return 0;
+    if (playlist_insert_track(NULL, path, PLAYLIST_INSERT_LAST, false, true) < 0)
+        return 0;
+
+    playlist_start(0, 0, 0);
+    return GO_TO_WPS;
+}
+
 int browser_db_enter(struct browser_context* c, bool is_visible)
 {
     logf( "%s", __func__);
@@ -3337,7 +3575,15 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         return GO_TO_RANDOM_ALBUM;
 
     if (newextra == TABLE_DB_SEARCH)
+    {
+        /* Which menu the row sits in is the scope: the Audiobooks menu's
+         * Search covers books, every other menu's covers music. The main
+         * menu's own Search row is not this one -- root_menu.c arms that,
+         * and it covers both. */
+        db_search_arm_scope(menu_mentions_spoken(menus[c->currextra])
+                            ? DB_SEARCH_SPOKEN : DB_SEARCH_MUSIC);
         return GO_TO_DB_SEARCH;
+    }
 
     if (newextra == TABLE_FEATURED_ARTISTS)
         return GO_TO_FEATURED_ARTISTS;
@@ -3348,6 +3594,36 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
          * row was drawn on. */
         featured_artists_arm(current_title[c->currextra]);
         return GO_TO_FEATURED_TRACKS;
+    }
+
+    /* A book held in one file is an album of one track, and descending into
+     * it opens a list holding only itself. Play it instead.
+     *
+     * Here with the synthetic rows above, and for their reason: this leaves
+     * before the dirlevel and history bookkeeping, so coming back from the
+     * WPS lands on this list exactly as it was. The clauses being read live
+     * in the browser_db buffer, which is movable and not yet pinned this far
+     * up the function. */
+    if (c->currtable == TABLE_NAVIBROWSE && newextra == TABLE_NAVIBROWSE)
+    {
+        char path[MAX_PATH];
+        bool one;
+
+        core_pin(browser_db_handle);
+        one = single_track_path(c, seek, path, sizeof(path));
+        core_unpin(browser_db_handle);
+
+        if (one)
+        {
+            if (global_settings.party_mode && audio_status())
+            {
+                splash(HZ, ID2P(LANG_PARTY_MODE));
+                return 0;
+            }
+            if (!warn_on_pl_erase())
+                return 0;
+            return play_single_track(path);
+        }
     }
 
     if (c->dirlevel >= MAX_DIR_LEVELS)
@@ -4073,6 +4349,11 @@ bool browser_db_is_album_list(struct browser_context* c)
     if (c->currextra < 0 || c->currextra >= csi->tagorder_count)
         return false;
     return csi->tagorder[c->currextra] == tag_album;
+}
+
+bool browser_db_is_spoken_list(struct browser_context* c)
+{
+    return c->currtable == TABLE_NAVIBROWSE && csi_mentions_spoken();
 }
 
 /* True when this browse level is listing artists -- the rows that can carry

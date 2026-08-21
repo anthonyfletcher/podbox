@@ -685,6 +685,18 @@ struct user_settings
     /* Artist art (a photo in <artist>/folder.jpg) on artist browse rows, same
      * mechanism as db_albumart. On by default. */
     bool db_artistart;
+    /* Art on the book rows of an audiobook browse, overriding the two above
+     * for those lists only -- tall rows are a different bargain over a few
+     * dozen books than over a few thousand albums. Author rows are never
+     * given art: hardly anyone keeps a photograph of one. Off by default. */
+    bool db_bookart;
+    /* Audiobooks kept apart from the music: spoken word out of the Music
+     * menu, Album covers, Artist portraits and Random album, and the
+     * Audiobooks row put in the main menu. One setting rather than two,
+     * because half of the arrangement is no use on its own. Off by default:
+     * it changes what a library looks like, and only an owner who has
+     * audiobooks wants it. */
+    bool segregate_audiobooks;
     /* Uniform row height when album or artist art is on -- a little above the
      * cover size so the square fits. Ignored when both are off. */
     int  db_art_row_height;

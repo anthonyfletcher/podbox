@@ -602,6 +602,34 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
     return ret;
 }
 
+/* Spoken word is kept out of the index when the setting says so, which is what
+ * reaches Album covers, Artist portraits, Random album and the charts -- all
+ * four read this index rather than the database.
+ *
+ * The index is written to disk, so a change to the setting has to invalidate
+ * it: nothing here notices, the saved file's own staleness checks being about
+ * the database rather than about what was asked of it. See
+ * db_summary_invalidate(), which the setting's callback calls.
+ *
+ * One clause object serves both searches -- tagcache stores the pointer and
+ * only reads it -- and neither carries any other clause, so there are no
+ * logical-or groups to insert it into (unlike the browse; see
+ * retrieve_entries() in browser_db.c). */
+static struct tagcache_search_clause exclude_spoken_clause = {
+    .tag = tag_virt_spoken,
+    .type = clause_is,
+    .numeric = true,
+    .source = source_constant,
+    .numeric_data = 0,
+    .str = NULL,
+};
+
+static void exclude_spoken(struct tagcache_search *tcs)
+{
+    if (global_settings.segregate_audiobooks)
+        tagcache_search_add_clause(tcs, &exclude_spoken_clause);
+}
+
 /* Create an index of all artists from the database, into whichever index pfi
  * currently points at. Like everything else here it assumes build_mutex is
  * held and pfi is set -- db_summary_build_artists() is how an outside caller
@@ -620,6 +648,7 @@ static int build_artist_index(struct tagcache_search *tcs,
     pfi->artist_names = *buf;
 
     tagcache_search(tcs, tag_albumartist);
+    exclude_spoken(tcs);
     res = get_tcs_search_res(ePFS_ARTIST, tcs, &(*buf), bufsz);
     tagcache_search_finish(tcs);
     if (res < SUCCESS)
@@ -1287,6 +1316,7 @@ static int create_album_index(void)
     pfi->album_names = buf;
 
     tagcache_search(&tcs, tag_album);
+    exclude_spoken(&tcs);
     res = get_tcs_search_res(ePFS_ALBUM, &tcs, &buf, &buf_size);
     tagcache_search_finish(&tcs);
     if (res < SUCCESS)

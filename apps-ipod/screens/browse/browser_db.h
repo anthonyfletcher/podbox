@@ -66,6 +66,9 @@ char *browser_db_get_title(struct browser_context* c);
 int browser_db_get_attr(struct browser_context* c);
 bool browser_db_is_album_list(struct browser_context* c);
 bool browser_db_is_artist_list(struct browser_context* c);
+/* True when this browse was reached through a menu row asking about the
+ * `spoken` tag -- an audiobook list, at any of its levels. */
+bool browser_db_is_spoken_list(struct browser_context* c);
 /* True when the path down to the browser's current level came through an artist
  * level. Recorded on a playlist built from here, for the "auto" WPS art
  * source. */
@@ -110,6 +113,10 @@ void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
  * shuffle) don't count. Used by root_menu.c to know how many of its reserved
  * GO_TO_TAGNAVI_FIRST..LAST slots are backed by a real row. */
 int browser_db_get_main_menu_tag_row_count(void);
+/* The main-menu slot index of the row opening the audiobooks menu, or -1.
+ * Recognised by its rows asking about the `spoken` tag rather than by its
+ * name, so a renamed or user-written menu still counts. */
+int browser_db_spoken_main_menu_slot(void);
 /* The Nth (0-based) such row: its raw (P2STR-resolvable) display name, and
  * whichever identity it has -- *out_tag for a tag-browse row, *out_menu_id for
  * a submenu row, the other left as -1/NULL. Feed whichever came back to the
