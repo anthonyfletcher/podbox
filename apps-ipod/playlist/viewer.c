@@ -1219,7 +1219,7 @@ bool search_playlist(void)
                                         &say_search_item:NULL);
     gui_synclist_set_nb_items(&playlist_lists, found_indicies_count);
     gui_synclist_select_item(&playlist_lists, 0);
-    gui_synclist_draw(&playlist_lists);
+    gui_synclist_draw_settled(&playlist_lists);
     gui_synclist_speak_item(&playlist_lists);
     while (!exit)
     {
