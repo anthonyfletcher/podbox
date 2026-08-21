@@ -2787,6 +2787,18 @@ bool browser_db_back_exits(const struct browser_context *c)
     return shortcut_base_level >= 0 && c->dirlevel == shortcut_base_level;
 }
 
+/* Forget any shortcut base. Entering Music by the front door is never a
+ * shortcut, so the level one recorded belongs to a session that has ended.
+ *
+ * The base level is otherwise cleared only by browser_db_load()'s fresh-root
+ * block, which a session resuming at a level of its own never reaches -- so a
+ * stale base outlives its jump and makes BACK leave the browser at whatever
+ * depth it names, with no way to climb to the Music menu above it. */
+void browser_db_clear_shortcut_base(void)
+{
+    shortcut_base_level = -1;
+}
+
 static int loaded_row_for_menu_id(struct browser_context *c, int rows,
                                   const char *menu_id)
 {

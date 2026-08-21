@@ -117,6 +117,7 @@ static bool wait_for_tagcache_ready(void)
     if (!tagcache_reachable())
     {
         bool reinit_attempted = false;
+        int idle_passes = 0;
 
         /* Now display progress until it's ready or the user exits */
         while(!tagcache_reachable())
@@ -149,7 +150,31 @@ static bool wait_for_tagcache_ready(void)
             {
                 reinit_attempted = true;
                 tagcache_rebuild();
+                idle_passes = 0;  /* it gets a grace window of its own */
             }
+
+            /* Nothing is building, and nothing here can start one: either a
+             * rebuild has been asked for already and did not take, or
+             * readyvalid withholds the one above. The progress splash below
+             * has no timeout, so left to itself it reports a build that is
+             * not happening, for as long as the screen is up.
+             *
+             * A few passes of grace first -- the tagcache thread finalizes
+             * about a second after boot, and until it does this state is
+             * indistinguishable from a database that is merely still being
+             * checked. After that a restart really is the repair: the boot
+             * check commits a leftover database_tmp.tcd, and rebuilds
+             * outright when the headers do not pass. */
+            if (stat->commit_step == 0 && stat->processed_entries == 0)
+            {
+                if (++idle_passes > 6)
+                {
+                    splash(HZ*2, ID2P(LANG_PLEASE_REBOOT));
+                    break;
+                }
+            }
+            else
+                idle_passes = 0;
 
             /* Announce building progress by voice, ahead of the splash below
              * so the richer wording is the one that is spoken. */
@@ -249,6 +274,22 @@ static int browser(void* param)
             last_ft_dirlevel = tc->dirlevel;
             tc->dirlevel = last_db_dirlevel;
             tc->selected_item = last_db_selection;
+            /* dirlevel and currtable have to agree, and this entry restores
+             * only the first of them -- the table is whatever the last
+             * database session left behind, which is not always a session
+             * this one is resuming. A shortcut's listing or an album entered
+             * from Album covers both end at level 0 with the table pointing
+             * into the tree, and Music then opened inside that listing with
+             * nothing above it: BACK left the browser instead of climbing to
+             * the Music menu, and no press reached the menu at all.
+             *
+             * Level 0 is the Music menu, so that is the only table it can
+             * mean. Forcing it also takes browser_db_load()'s fresh-root
+             * path, which is where the shortcut base below is cleared. */
+            if (tc->dirlevel == 0)
+                tc->currtable = 0;
+            /* A resume of its own is never a shortcut's jump, at any level. */
+            browser_db_clear_shortcut_base();
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         break;
 

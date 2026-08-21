@@ -4197,6 +4197,10 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
 
     if (!check_database())
     {
+        /* Said out loud: the working indicator check_database() raises while
+         * it waits stops with it, so without this the screen simply hands
+         * back to whatever opened it and the press reads as ignored. */
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
         pop_current_activity();
         return GO_TO_PREVIOUS;
     }

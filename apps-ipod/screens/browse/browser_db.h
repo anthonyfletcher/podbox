@@ -54,6 +54,9 @@ int browser_db_load(struct browser_context* c);
  * current level is the one a main-menu shortcut entered at, and the menu it
  * would pop to is the one the shortcut existed to skip. */
 bool browser_db_back_exits(const struct browser_context *c);
+/* Forget any shortcut base, so BACK pops levels normally again. For a browse
+ * that is starting on its own account rather than resuming a shortcut's jump. */
+void browser_db_clear_shortcut_base(void);
 /* The top row a freshly loaded level wants shown (it opens scrolled past its
  * <All tracks>/<Random> rows), or -1 for no preference. Clears the request, so
  * only the load that made it is affected -- call once, right after selecting. */
