@@ -59,8 +59,14 @@ enum {
 
     ZOOM_IN,
     ZOOM_OUT,
+    ZOOM_FIT,
     NEXT_FRAME,
 };
+
+/* The downscale value naming the fit-to-screen rendering, as opposed to the
+ * integer downscales 1..8 the decoders were written around. It is 0 because
+ * that is the one index the decoders' disp[9] caches never used. */
+#define DS_FIT 0
 
 /* Settings. jpeg needs these */
 struct imgview_settings
@@ -115,6 +121,16 @@ struct image_decoder {
 extern struct imgview_settings iv_settings;
 extern bool iv_running_slideshow;   /* loading image because of slideshow */
 extern bool iv_slideshow_enabled;   /* run slideshow */
+
+/* Size of the DS_FIT rendering, set by the viewer once the image's own size is
+ * known and read by the decoders. Zero when the picture has no fit rung --
+ * either it already fits at 1:1, or an integer downscale lands on the same
+ * size, and DS_FIT is then never asked for. */
+extern int iv_fit_width, iv_fit_height;
+
+/* For decoders that cannot scale to an arbitrary size in one pass: the integer
+ * downscale to render before resampling down to the fit size. */
+int iv_fit_source_ds(int x_size, int y_size);
 
 /* callback updating a progress meter while image decoding (image_viewer.c) */
 void cb_progress(int current, int total);

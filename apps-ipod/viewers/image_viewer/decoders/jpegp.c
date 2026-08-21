@@ -30,7 +30,8 @@ struct t_disp
 
 /************************* Globals ***************************/
 
-/* decompressed image in the possible sizes (1,2,4,8), wasting the other */
+/* decompressed image in the possible sizes: DS_FIT and 1,2,4,8, wasting the
+ * other slots */
 static struct t_disp disp[9];
 
 static struct JPEGD jpg; /* too large for stack */
@@ -52,6 +53,10 @@ static void draw_image_rect(struct image_info *info,
 static int img_mem(int ds)
 {
     struct JPEGD* j = &jpg;
+
+    if (ds == DS_FIT)
+        return iv_fit_width * iv_fit_height * sizeof(fb_data);
+
     return j->Y/ds * j->X/ds*sizeof(fb_data);
 }
 
@@ -133,11 +138,79 @@ static int load_image(char *filename, struct image_info *info,
     return PLUGIN_OK;
 }
 
+static int get_image(struct image_info *info, int frame, int ds);
+
+/* Render the fit view: the RAINBOW loop below steps the source in whole
+ * pixels, so it cannot land on an arbitrary size in one pass. Take the
+ * smallest integer rung that is still at least as large and shrink that.
+ *
+ * Trap: the pool allocator empties itself and clears every cached rendering
+ * when it runs out, so a second allocation can take the first one's source
+ * away. That is what the retry is for -- the second pass starts from an empty
+ * pool, where both fit. */
+static int get_image_fit(struct image_info *info, int frame)
+{
+    struct JPEGD* p_jpg = &jpg;
+    struct t_disp* p_fit = &disp[DS_FIT];
+    int src_ds = iv_fit_source_ds(p_jpg->X, p_jpg->Y);
+    struct bitmap bmp_src, bmp_dst;
+    int status, tries;
+
+    for (tries = 0; tries < 2; tries++)
+    {
+        status = get_image(info, frame, src_ds);
+        if (status != PLUGIN_OK)
+            return status;
+
+        p_fit->bitmap = malloc(img_mem(DS_FIT));
+        if (p_fit->bitmap != NULL)
+            break;
+
+        /* the pool is full of other renderings: empty it and go round once
+         * more, which re-renders the source into a pool that now has room */
+        clear_mem_pool();
+        memset(&disp, 0, sizeof(disp));
+    }
+
+    if (p_fit->bitmap == NULL)
+        return PLUGIN_ERROR;
+
+    /* get_image() left the source's size on info */
+    bmp_src.width = info->width;
+    bmp_src.height = info->height;
+    bmp_src.data = disp[src_ds].bitmap;
+
+    bmp_dst.width = iv_fit_width;
+    bmp_dst.height = iv_fit_height;
+    bmp_dst.data = p_fit->bitmap;
+
+    cpu_boost(true);
+    smooth_resize_bitmap(&bmp_src, &bmp_dst);
+    cpu_boost(false);
+
+    info->width = iv_fit_width;
+    info->height = iv_fit_height;
+    info->data = p_fit;
+    return PLUGIN_OK;
+}
+
 static int get_image(struct image_info *info, int frame, int ds)
 {
     (void)frame;
     struct JPEGD* p_jpg = &jpg;
     struct t_disp* p_disp = &disp[ds]; /* short cut */
+
+    if (ds == DS_FIT)
+    {
+        info->width = iv_fit_width;
+        info->height = iv_fit_height;
+        info->data = p_disp;
+
+        if (p_disp->bitmap != NULL)
+            return PLUGIN_OK;
+
+        return get_image_fit(info, frame);
+    }
 
     info->width = p_jpg->X / ds;
     info->height = p_jpg->Y / ds;

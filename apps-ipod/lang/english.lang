@@ -19733,3 +19733,17 @@
     *: "Default"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_IV_ZOOM_PAN
+  desc: in the image viewer settings menu
+  user: core
+  <source>
+    *: "Zoom / Pan"
+  </source>
+  <dest>
+    *: "Zoom / Pan"
+  </dest>
+  <voice>
+    *: "Zoom and Pan"
+  </voice>
+</phrase>

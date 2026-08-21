@@ -22,10 +22,11 @@
 /* decoder context struct */
 static struct gif_decoder decoder;
 
-/* pointers to decompressed frame in the possible sizes ds = (1,2,4,8)
- * basicaly equivalent to *disp[n][4] where n is the number of frames
- * in gif file. The matrix is allocated after decoded frames.
+/* pointers to decompressed frame in the possible sizes ds = (1,2,4,8) plus
+ * DS_FIT, basicaly equivalent to *disp[n][DISP_SLOTS] where n is the number of
+ * frames in gif file. The matrix is allocated after decoded frames.
  */
+#define DISP_SLOTS 5
 static unsigned char **disp;
 static unsigned char *disp_buf;
 
@@ -44,6 +45,10 @@ static void draw_image_rect(struct image_info *info,
 static int img_mem(int ds)
 {
     struct gif_decoder *p_decoder = &decoder;
+
+    if (ds == DS_FIT)
+        return (iv_fit_width * iv_fit_height * FB_DATA_SZ + 3) & ~3;
+
     return (p_decoder->native_img_size/ds + 3) & ~3;
 }
 
@@ -95,10 +100,12 @@ static int load_image(char *filename, struct image_info *info,
     info->delay = p_decoder->delay;
 
     /* check mem constraints
-     * each frame can have 4 scaled versions with ds = (1,2,4,8)
+     * each frame can have DISP_SLOTS scaled versions: ds = (1,2,4,8) and the
+     * fit-to-screen one
      */
     img_size = (p_decoder->native_img_size*p_decoder->frames_count + 3) & ~3;
-    disp_size = (sizeof(unsigned char *)*p_decoder->frames_count*4 + 3) & ~3;
+    disp_size = (sizeof(unsigned char *)*p_decoder->frames_count*DISP_SLOTS
+                 + 3) & ~3;
 
     /* No memory to allocate disp matrix */
     if (memory_size < img_size + disp_size)
@@ -110,17 +117,21 @@ static int load_image(char *filename, struct image_info *info,
     *buf_size = memory_max - disp_buf;
 
     /* set all pointers to NULL initially */
-    memset(disp, 0, sizeof(unsigned char *)*p_decoder->frames_count*4);
+    memset(disp, 0, sizeof(unsigned char *)*p_decoder->frames_count*DISP_SLOTS);
 
     return PLUGIN_OK;
 }
 
 /* small helper to convert scalling factor ds
- * into disp[frame][] array index
+ * into disp[frame][] array index. DS_FIT takes the slot above the four
+ * integer downscales.
  */
 static int ds2index(int ds)
 {
     int index = 0;
+
+    if (ds == DS_FIT)
+        return DISP_SLOTS - 1;
 
     ds >>= 1;
     while (ds)
@@ -134,11 +145,19 @@ static int ds2index(int ds)
 
 static int get_image(struct image_info *info, int frame, int ds)
 {
-    unsigned char **p_disp = disp + frame*4 + ds2index(ds);
+    unsigned char **p_disp = disp + frame*DISP_SLOTS + ds2index(ds);
     struct gif_decoder *p_decoder = &decoder;
 
-    info->width = p_decoder->width / ds;
-    info->height = p_decoder->height / ds;
+    if (ds == DS_FIT)
+    {
+        info->width = iv_fit_width;
+        info->height = iv_fit_height;
+    }
+    else
+    {
+        info->width = p_decoder->width / ds;
+        info->height = p_decoder->height / ds;
+    }
     info->data = p_disp;
 
     if (*p_disp != NULL)
@@ -148,7 +167,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     }
 
     /* assign image buffer */
-    if (ds > 1)
+    if (ds != 1)
     {
         struct bitmap bmp_src, bmp_dst;
 
@@ -163,14 +182,14 @@ static int get_image(struct image_info *info, int frame, int ds)
                 /* leave unscaled pointer allone,
                  * set rest to NULL
                  */
-                p_disp = disp + i*4 + 1;
-                memset(p_disp, 0, 3*sizeof(unsigned char *));
+                p_disp = disp + i*DISP_SLOTS + 1;
+                memset(p_disp, 0, (DISP_SLOTS-1)*sizeof(unsigned char *));
             }
 
             /* start again from the beginning of the buffer */
             disp_buf = p_decoder->mem +
                        p_decoder->native_img_size*p_decoder->frames_count +
-                       sizeof(unsigned char *)*p_decoder->frames_count*4;
+                       sizeof(unsigned char *)*p_decoder->frames_count*DISP_SLOTS;
         }
 
         *p_disp = disp_buf;

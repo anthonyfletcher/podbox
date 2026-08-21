@@ -27,7 +27,8 @@ struct t_disp
 
 /************************* Globals ***************************/
 
-/* decompressed image in the possible sizes (1,2,4,8), wasting the other */
+/* decompressed image in the possible sizes: DS_FIT and 1,2,4,8, wasting the
+ * other slots */
 static struct t_disp disp[9];
 
 /* the root of the images, hereafter are decompresed ones */
@@ -56,6 +57,9 @@ static void draw_image_rect(struct image_info *info,
 
 static int img_mem(int ds)
 {
+    if (ds == DS_FIT)
+        return iv_fit_width * iv_fit_height * sizeof (fb_data);
+
     return (bmp.width/ds) * (bmp.height/ds) * sizeof (fb_data);
 }
 
@@ -148,8 +152,16 @@ static int get_image(struct image_info *info, int frame, int ds)
     (void)frame;
     struct t_disp* p_disp = &disp[ds]; /* short cut */
 
-    info->width = bmp.width/ds;
-    info->height = bmp.height/ds;
+    if (ds == DS_FIT)
+    {
+        info->width = iv_fit_width;
+        info->height = iv_fit_height;
+    }
+    else
+    {
+        info->width = bmp.width/ds;
+        info->height = bmp.height/ds;
+    }
     info->data = p_disp;
 
     if (p_disp->bitmap != NULL)
@@ -159,7 +171,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     }
 
     /* assign image buffer */
-    if (ds > 1)
+    if (ds != 1)
     {
         int size; /* resized image size */
         struct bitmap bmp_dst;
@@ -169,7 +181,7 @@ static int get_image(struct image_info *info, int frame, int ds)
         {
             /* have to discard the current */
             int i;
-            for (i=1; i<=8; i++)
+            for (i=0; i<=8; i++)
                 disp[i].bitmap = NULL; /* invalidate all bitmaps */
             buf_images = buf_root; /* start again from the beginning of the buffer */
             buf_images_size = root_size;

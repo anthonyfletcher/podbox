@@ -11,12 +11,16 @@
  * How it is built:
  *   - A plain core app, entered as image_viewer(file) and returning a GO_TO_*
  *     code, dispatched from the file browser like the text viewer.
+ *   - A picture opens on the fit rung, DS_FIT, scaled so all of it is on
+ *     screen. Zoom and pan live behind the Zoom / Pan setting; the default key
+ *     map pages between files and leaves on a tap of Menu, like the text
+ *     viewer (image_viewer_button.h has both maps).
  *   - Colour 320x240 only; there are no greylib or mono paths.
  *   - Decoders are linked in and chosen from a static table (image_decoder.h),
  *     not loaded as overlays.
  *   - It owns the whole screen with the theme disabled, shows the file's name
- *     while the first image decodes, and draws decode/zoom progress as a dialog
- *     over the retained image rather than blanking the screen.
+ *     while the first image decodes, and draws decode progress as a dialog over
+ *     the retained image rather than blanking the screen.
  *
  * Memory: one core_alloc_maximum() block holds both the file-name list and the
  * decoded image, carved up by get_pic_list() advancing `buf` past the list. It
@@ -85,13 +89,6 @@ struct imgview_settings iv_settings =
 bool iv_slideshow_enabled = false;
 bool iv_running_slideshow = false;
 
-/* True only while a zoom is being re-decoded. */
-static bool iv_zooming = false;
-
-/* True until the first image has been decoded, so that decode reports progress
- * under the name splash. */
-static bool iv_first_load = true;
-
 static fb_data rgb_linebuf[LCD_WIDTH];  /* Line buffer for scrolling when
                                            DITHER_DIFFUSION is set        */
 
@@ -112,6 +109,14 @@ static volatile bool iv_usb_dropped = false;
 static int ds, ds_min, ds_max; /* downscaling and limits */
 static struct image_info image_info;
 
+/* Size of the DS_FIT rendering; 0 when this picture has no fit rung. */
+int iv_fit_width = 0, iv_fit_height = 0;
+
+/* Zoom / Pan mode: false is the navigation key map, where Left and Right move
+ * between pictures and a tap of Menu leaves. Session state, kept across a move
+ * to the next picture; only the settings menu changes it. */
+static bool iv_zoom_mode = false;
+
 /* the current full file name */
 static char np_file[MAX_PATH];
 static int curfile = -1, direction = DIR_NEXT, entries = 0;
@@ -129,7 +134,7 @@ static enum image_type image_type = IMAGE_UNKNOWN;
 static struct viewport iv_vp;
 
 /* forward declarations */
-static int show_menu(void); /* returns 1 to quit the viewer */
+static int show_menu(void); /* MENU_ATTACHED_USB, or 0 */
 
 /** Implementation **/
 
@@ -362,9 +367,11 @@ void cb_progress(int current, int total)
      * message and re-frames the dialog every call, which is what costs. */
     next_progress_tick = now + HZ/8;
 
-    /* Shown for the first decode and while zooming; on file navigation the
-     * previous image stays up, and slideshows keep the screen clear. */
-    if ((iv_first_load || iv_zooming) && !iv_running_slideshow)
+    /* Every foreground decode reports: the first one, a zoom, and moving to
+     * the next picture, which is the slowest of the three on a large image.
+     * Slideshows keep the screen clear. Each decode arms a delay first, so a
+     * picture that arrives quickly never flashes a dialog up. */
+    if (!iv_running_slideshow)
         splash_progress(current, total, "%s\n%s", str(LANG_WAIT), iv_filename());
 
     yield(); /* be nice to the other threads */
@@ -473,6 +480,10 @@ static void pan_view_down(struct image_info *info)
 static int scroll_bmp(struct image_info *info)
 {
     static long ss_timeout = 0;
+    /* Static because a zoom returns from here and comes straight back: a local
+     * would forget the hold that opened the settings menu, and the release
+     * ending it would arrive at a fresh loop looking exactly like a tap. */
+    static int lastbutton = BUTTON_NONE;
 
     int button;
 
@@ -518,39 +529,62 @@ static int scroll_bmp(struct image_info *info)
         switch(button)
         {
         case IMGVIEW_LEFT:
-            if (entries > 1 && info->width <= LCD_WIDTH
-                            && info->height <= LCD_HEIGHT)
+            if (iv_zoom_mode)
+            {
+                pan_view_left(info);
+                break;
+            }
+            if (entries > 1)
             {
                 int result = change_filename(DIR_PREV);
                 if (entries > 1)
                     return result;
             }
-            /* fallthrough */
+            break;
+
+        /* Panning repeats; paging does not. A held Left would otherwise queue
+         * one decode per repeat, none of them interruptible. */
         case IMGVIEW_LEFT | BUTTON_REPEAT:
-            pan_view_left(info);
+            if (iv_zoom_mode)
+                pan_view_left(info);
             break;
 
         case IMGVIEW_RIGHT:
-            if (entries > 1 && info->width <= LCD_WIDTH
-                            && info->height <= LCD_HEIGHT)
+            if (iv_zoom_mode)
+            {
+                pan_view_right(info);
+                break;
+            }
+            if (entries > 1)
             {
                 int result = change_filename(DIR_NEXT);
                 if (entries > 1)
                     return result;
             }
-            /* fallthrough */
+            break;
+
         case IMGVIEW_RIGHT | BUTTON_REPEAT:
-            pan_view_right(info);
+            if (iv_zoom_mode)
+                pan_view_right(info);
             break;
 
         case IMGVIEW_UP:
             /* no BUTTON_REPEAT variant: Menu+repeat is the settings gesture */
-            pan_view_up(info);
+            if (iv_zoom_mode)
+                pan_view_up(info);
+            break;
+
+        case IMGVIEW_EXIT:
+            /* The release that ends a hold is not a tap: the menu has just
+             * closed on it. */
+            if (!iv_zoom_mode && lastbutton != IMGVIEW_MENU)
+                return PLUGIN_OK;
             break;
 
         case IMGVIEW_DOWN:
         case IMGVIEW_DOWN | BUTTON_REPEAT:
-            pan_view_down(info);
+            if (iv_zoom_mode)
+                pan_view_down(info);
             break;
 
         case BUTTON_NONE:
@@ -575,22 +609,36 @@ static int scroll_bmp(struct image_info *info)
                     return change_filename(DIR_NEXT);
                 }
             }
-            else
+            else if (info->frames_count > 1)
                 return NEXT_FRAME;
 
+            /* Nothing happened and a still picture has no next frame, so keep
+             * waiting. Answering NEXT_FRAME here divides by frames_count,
+             * which every decoder but the GIF one leaves at zero. */
             break;
 
         case IMGVIEW_ZOOM_IN:
-            return ZOOM_IN;
+            if (iv_zoom_mode)
+                return ZOOM_IN;
             break;
 
         case IMGVIEW_ZOOM_OUT:
-            return ZOOM_OUT;
+            if (iv_zoom_mode)
+                return ZOOM_OUT;
             break;
 
         case IMGVIEW_MENU:
-            if (show_menu() == 1)
-                return PLUGIN_OK;
+        {
+            bool was_zoom_mode = iv_zoom_mode;
+
+            if (show_menu() == MENU_ATTACHED_USB)
+                return PLUGIN_USB_CONNECTED;
+
+            /* Leaving the mode has to put the picture back to fitting the
+             * screen: the navigation map has no pan in it, so a view left
+             * zoomed could not be moved off the corner it was showing. */
+            if (was_zoom_mode && !iv_zoom_mode)
+                return ZOOM_FIT;
 
             /* the menu ran with the theme on; repaint our image */
             lcd_clear_display();
@@ -598,12 +646,7 @@ static int scroll_bmp(struct image_info *info)
                             info->width-info->x, info->height-info->y);
             lcd_update();
             break;
-
-#ifdef IMGVIEW_QUIT
-        case IMGVIEW_QUIT:
-            return PLUGIN_OK;
-            break;
-#endif
+        }
 
         default:
             /* Reached only if the hook did not already drop the buffer (USB
@@ -616,6 +659,9 @@ static int scroll_bmp(struct image_info *info)
             break;
 
         } /* switch */
+
+        if (button != BUTTON_NONE)
+            lastbutton = button;
     } /* while (true) */
 }
 
@@ -647,6 +693,94 @@ static int max_downscale(struct image_info *info)
     }
 
     return downscale;
+}
+
+/* Work out the DS_FIT rendering: the largest one that has all of the picture
+ * on screen, one side landing exactly on a screen edge.
+ *
+ * The integer ladder cannot express it. It stops at 1:8 -- a hard limit, since
+ * the decoders index their caches by the downscale -- so a 4032x3024 photo
+ * gets no smaller than 504x378 and cannot fit at all; and even where it does
+ * fit, 1000x750 lands on 1:4 and shows at 250x187 because there is no rung at
+ * 1:3.125.
+ *
+ * Leaves iv_fit_width/height at 0 when there is nothing to add: a picture
+ * already smaller than the screen (fitting never enlarges), or one where an
+ * integer rung is the same size, which would put a duplicate on the ladder. */
+static void calc_fit_size(struct image_info *info)
+{
+    int w, h;
+
+    iv_fit_width = iv_fit_height = 0;
+
+    if (info->x_size <= LCD_WIDTH && info->y_size <= LCD_HEIGHT)
+        return;
+
+    /* Match the width, and take the height instead if that overflows. */
+    w = LCD_WIDTH;
+    h = info->y_size * LCD_WIDTH / info->x_size;
+    if (h > LCD_HEIGHT)
+    {
+        h = LCD_HEIGHT;
+        w = info->x_size * LCD_HEIGHT / info->y_size;
+    }
+
+    if (w == info->x_size/ds_max && h == info->y_size/ds_max)
+        return;
+
+    iv_fit_width = MAX(1, w);
+    iv_fit_height = MAX(1, h);
+}
+
+/* The rung above DS_FIT: the largest integer downscale that still renders
+ * wider or taller than the screen, and so is the first one worth panning.
+ * Stepping to ds_max instead would be a no-op or a shrink -- 1000x750 fits at
+ * 1:4, which is smaller than its fit rendering. */
+static int ds_above_fit(struct image_info *info)
+{
+    int downscale = 8;
+
+    while (downscale > 1 && info->x_size/downscale <= LCD_WIDTH
+                         && info->y_size/downscale <= LCD_HEIGHT)
+    {
+        downscale /= 2;
+    }
+
+    return downscale;
+}
+
+/* The integer rung a decoder that cannot scale freely should render before
+ * resampling down to the fit size: the smallest rendering that is still at
+ * least as big as the fit one, so the resample only ever shrinks. Clamped to
+ * what memory allows, which can make it smaller -- a slightly soft picture
+ * beats refusing to show one. */
+int iv_fit_source_ds(int x_size, int y_size)
+{
+    int downscale = 8;
+
+    while (downscale > 1 && (x_size/downscale < iv_fit_width
+                          || y_size/downscale < iv_fit_height))
+    {
+        downscale /= 2;
+    }
+
+    return MAX(downscale, ds_min);
+}
+
+/* Displayed size at a given downscale, DS_FIT included. */
+static void scaled_size(struct image_info *info, int downscale,
+                        int *p_w, int *p_h)
+{
+    if (downscale == DS_FIT)
+    {
+        *p_w = iv_fit_width;
+        *p_h = iv_fit_height;
+    }
+    else
+    {
+        *p_w = info->x_size/downscale;
+        *p_h = info->y_size/downscale;
+    }
 }
 
 /* set the view to the given center point, limit if necessary */
@@ -690,10 +824,6 @@ static int load_and_show(char *filename, struct image_info *info,
         return change_filename(direction);
     }
 
-    /* Load-time decoding shows no progress dialog (the name splash stays up);
-     * only a later zoom re-decode does. */
-    iv_zooming = false;
-
 reload_decoder:
     /* Note: the screen is deliberately NOT cleared here -- the previous image
      * stays up while the next one decodes, with the progress dialog over it. */
@@ -711,6 +841,10 @@ reload_decoder:
     }
     memset(info, 0, sizeof(*info));
     remaining = buf_size;
+
+    /* Reading and parsing the file reports progress too -- on a large picture
+     * over a spinning disk it is the part that is worth watching. */
+    splash_progress_set_delay(HZ/4);
 
     if (button_get(false) == IMGVIEW_MENU)
         status = PLUGIN_ABORT;
@@ -758,16 +892,27 @@ reload_decoder:
     else if (ds_max < ds_min && !(ds_max == 1 && imgdec->unscaled_avail))
         ds_max = ds_min;
 
-    ds = ds_max; /* initialize setting */
-    cx = info->x_size/ds/2; /* center the view */
-    cy = info->y_size/ds/2;
+    calc_fit_size(info);
+
+    /* The fit rendering needs a buffer of its own, and there is not always one
+     * to be had: a picture that only opened at all because its decoder can
+     * show the unscaled original (ds_min == 0 above) has no room to resize
+     * into. Drop the rung rather than decode past the end of the buffer. */
+    if (iv_fit_width && imgdec->img_mem(DS_FIT) > remaining)
+        iv_fit_width = iv_fit_height = 0;
+
+    /* Open on the fit rung where there is one, so the whole picture is on
+     * screen; navigation mode cannot pan, and would leave anything larger
+     * stuck showing its middle. */
+    ds = iv_fit_width ? DS_FIT : ds_max;
+    scaled_size(info, ds, &cx, &cy); /* center the view */
+    cx /= 2;
+    cy /= 2;
 
     /* used to loop through subimages in animated gifs */
     int frame = 0;
     do  /* loop the image prepare and decoding when zoomed */
     {
-        /* a re-entry here after ZOOM_IN/OUT is a zoom re-decode -> show progress */
-        iv_zooming = (status == ZOOM_IN || status == ZOOM_OUT);
         /* Hold the progress dialog back for 250ms, so an image that decodes
          * quickly never flashes one up. */
         splash_progress_set_delay(HZ/4);
@@ -798,7 +943,17 @@ reload_decoder:
 
             if (status == ZOOM_IN)
             {
-                if (ds > ds_min || (imgdec->unscaled_avail && ds > 1))
+                if (ds == DS_FIT)
+                {
+                    int step = ds_above_fit(info);
+                    if (step < ds_min)
+                        continue; /* memory allows nothing larger */
+                    ds = step;
+                    /* the fit view showed all of it, so zoom to the middle */
+                    cx = info->x_size/ds/2;
+                    cy = info->y_size/ds/2;
+                }
+                else if (ds > ds_min || (imgdec->unscaled_avail && ds > 1))
                 {
                     /* if 1/1 is always available, jump ds from ds_min to 1. */
                     int zoom = (ds == ds_min)? ds_min: 2;
@@ -813,6 +968,9 @@ reload_decoder:
 
             if (status == ZOOM_OUT)
             {
+                if (ds == DS_FIT)
+                    continue; /* the whole picture is already on screen */
+
                 if (ds < ds_max)
                 {
                     /* if ds is 1 and ds_min is > 1, jump ds to ds_min. */
@@ -822,12 +980,35 @@ reload_decoder:
                     cx /= zoom; /* prepare the position in the new image */
                     cy /= zoom;
                 }
+                else if (iv_fit_width)
+                {
+                    ds = DS_FIT; /* the rung below the integer ladder */
+                    cx = iv_fit_width/2;
+                    cy = iv_fit_height/2;
+                }
                 else
                     continue;
             }
 
-            /* next frame in animated content */
-            if (status == NEXT_FRAME)
+            /* Zoom / Pan turned off: back to the whole picture. Always falls
+             * through to the redraw below, even when the view was already
+             * there -- the menu drew over the picture on its way out. */
+            if (status == ZOOM_FIT)
+            {
+                ds = iv_fit_width ? DS_FIT : ds_max;
+                scaled_size(info, ds, &cx, &cy);
+                cx /= 2;
+                cy /= 2;
+                /* back to the first frame, which is also what makes the
+                 * redraw below clear the screen the menu drew on */
+                frame = 0;
+            }
+
+            /* Next frame in animated content. The frames_count test is not
+             * redundant with the one guarding NEXT_FRAME in scroll_bmp():
+             * every decoder but the GIF one leaves the count at zero, so
+             * anything that reaches here another way divides by it. */
+            if (status == NEXT_FRAME && info->frames_count > 1)
                 frame = (frame + 1)%info->frames_count;
 
             break;
@@ -881,24 +1062,24 @@ static bool find_album_art(int *offset, int *filesize, int *status)
 
 /** Iv_settings menu **/
 
-/* return 1 to quit */
+/* Returns MENU_ATTACHED_USB if the viewer must leave, otherwise 0. */
 static int show_menu(void)
 {
     int result;
 
     enum menu_id
     {
-        MIID_TOGGLE_SS_MODE = 0,
+        MIID_ZOOM_PAN = 0,
+        MIID_TOGGLE_SS_MODE,
         MIID_CHANGE_SS_MODE,
         MIID_DITHERING,
-        MIID_QUIT,
     };
 
     MENUITEM_STRINGLIST(menu, "Image Viewer", NULL,
+                        ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME),
-                        ID2P(LANG_DITHERING),
-                        ID2P(LANG_MENU_QUIT));
+                        ID2P(LANG_DITHERING));
 
     static const struct opt_items slideshow[2] = {
         { STR(LANG_OFF) },
@@ -919,6 +1100,10 @@ static int show_menu(void)
 
     switch (result)
     {
+        case MIID_ZOOM_PAN:
+            set_option(str(LANG_IV_ZOOM_PAN), &iv_zoom_mode, RB_BOOL,
+                       slideshow, 2, NULL);
+            break;
         case MIID_TOGGLE_SS_MODE:
             set_option(str(LANG_SLIDESHOW_MODE), &iv_slideshow_enabled, RB_BOOL,
                        slideshow, 2, NULL);
@@ -932,9 +1117,6 @@ static int show_menu(void)
             set_option(str(LANG_DITHERING), &iv_settings.jpeg_dither_mode, RB_INT,
                        dithering, DITHER_NUM_MODES, NULL);
             break;
-        case MIID_QUIT:
-            result = 1;
-            break;
     }
 
     pop_current_activity();
@@ -945,7 +1127,9 @@ static int show_menu(void)
     lcd_set_foreground(LCD_WHITE);
     lcd_set_background(LCD_BLACK);
 
-    return (result == 1) ? 1 : 0;
+    /* USB arriving while the menu was up has already freed the buffer, so the
+     * caller must leave rather than redraw from it. */
+    return (result == MENU_ATTACHED_USB) ? MENU_ATTACHED_USB : 0;
 }
 
 /** Screen ownership **/
@@ -1041,7 +1225,7 @@ int image_viewer(const char *file)
     image_type = IMAGE_UNKNOWN;
     imgdec = NULL;
     iv_running_slideshow = false;
-    iv_first_load = true;
+    iv_zoom_mode = false;
 
     push_current_activity(ACTIVITY_IMAGEVIEWER);
     iv_setup_screen();
@@ -1050,7 +1234,6 @@ int image_viewer(const char *file)
     do
     {
         condition = load_and_show(np_file, &image_info, offset, filesize, status);
-        iv_first_load = false;
         if (condition >= PLUGIN_OTHER)
         {
             if(!is_album_art)

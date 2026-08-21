@@ -44,6 +44,9 @@ static int img_mem(int ds)
 {
     LodePNG_Decoder *p_decoder = &decoder;
 
+    if (ds == DS_FIT)
+        return iv_fit_width * iv_fit_height * FB_DATA_SZ;
+
     return (p_decoder->infoPng.width/ds) *
            (p_decoder->infoPng.height/ds) *
            FB_DATA_SZ;
@@ -139,8 +142,16 @@ static int get_image(struct image_info *info, int frame, int ds)
     unsigned char **p_disp = &disp[ds]; /* short cut */
     LodePNG_Decoder *p_decoder = &decoder;
 
-    info->width = p_decoder->infoPng.width / ds;
-    info->height = p_decoder->infoPng.height / ds;
+    if (ds == DS_FIT)
+    {
+        info->width = iv_fit_width;
+        info->height = iv_fit_height;
+    }
+    else
+    {
+        info->width = p_decoder->infoPng.width / ds;
+        info->height = p_decoder->infoPng.height / ds;
+    }
     info->data = p_disp;
 
     if (*p_disp != NULL)
@@ -150,7 +161,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     }
 
     /* assign image buffer */
-    if (ds > 1) {
+    if (ds != 1) {
         struct bitmap bmp_src, bmp_dst;
 
         int size = img_mem(ds);
@@ -158,7 +169,7 @@ static int get_image(struct image_info *info, int frame, int ds)
         if (disp_buf + size >= p_decoder->buf + p_decoder->buf_size) {
             /* have to discard the current */
             int i;
-            for (i=1; i<=8; i++)
+            for (i=0; i<=8; i++)
                 disp[i] = NULL; /* invalidate all bitmaps */
 
             /* start again from the beginning of the buffer */

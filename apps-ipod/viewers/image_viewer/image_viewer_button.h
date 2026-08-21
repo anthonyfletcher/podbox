@@ -16,15 +16,18 @@
 #include "config.h"
 #include "button.h"
 
-/* Controls (iPod wheel), matching the rest of the system -- hold Menu for the
- * menu, Select to leave:
- *   scroll wheel      zoom in / out
- *   Menu (tap)        pan up (when zoomed)
- *   Menu (hold)       open the settings menu (slideshow, dithering, quit)
- *   Play              pan down (when zoomed)
- *   Left / Right      pan left / right (when zoomed); previous / next image
- *                     when the image fits the screen
- *   Select            exit the viewer
+/* Controls. The viewer has two key maps; the "Zoom / Pan" row in the settings
+ * menu -- hold Menu -- swaps between them, and nothing else does.
+ *
+ *                  navigation (default)     zoom / pan
+ *   wheel          -                        zoom in / out
+ *   Left / Right   previous / next picture  pan, repeating
+ *   Menu (tap)     leave the viewer         pan up
+ *   Menu (hold)    settings menu            settings menu
+ *   Play           -                        pan down, repeating
+ *
+ * Menu leaves on the release, not the press: the press cannot yet be told
+ * apart from the start of a hold.
  */
 #define IMGVIEW_ZOOM_IN     BUTTON_SCROLL_FWD
 #define IMGVIEW_ZOOM_OUT    BUTTON_SCROLL_BACK
@@ -33,6 +36,6 @@
 #define IMGVIEW_LEFT        BUTTON_LEFT
 #define IMGVIEW_RIGHT       BUTTON_RIGHT
 #define IMGVIEW_MENU        (BUTTON_MENU | BUTTON_REPEAT)
-#define IMGVIEW_QUIT        (BUTTON_SELECT | BUTTON_REL)
+#define IMGVIEW_EXIT        (BUTTON_MENU | BUTTON_REL)
 
 #endif /* _IMAGE_VIEWER_BUTTONS_H */

@@ -38,6 +38,9 @@ static void draw_image_rect(struct image_info *info,
 
 static int img_mem(int ds)
 {
+    if (ds == DS_FIT)
+        return iv_fit_width * iv_fit_height * FB_DATA_SZ;
+
     return (ppm.x/ds) * (ppm.y/ds) * FB_DATA_SZ;
 }
 
@@ -105,8 +108,16 @@ static int get_image(struct image_info *info, int frame, int ds)
     unsigned char **p_disp = &disp[ds]; /* short cut */
     struct ppm_info *p_ppm = &ppm;
 
-    info->width = ppm.x / ds;
-    info->height = ppm.y / ds;
+    if (ds == DS_FIT)
+    {
+        info->width = iv_fit_width;
+        info->height = iv_fit_height;
+    }
+    else
+    {
+        info->width = ppm.x / ds;
+        info->height = ppm.y / ds;
+    }
     info->data = p_disp;
 
     if (*p_disp != NULL)
@@ -116,7 +127,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     }
 
     /* assign image buffer */
-    if (ds > 1)
+    if (ds != 1)
     {
         struct bitmap bmp_src, bmp_dst;
         int size = img_mem(ds);
@@ -125,7 +136,7 @@ static int get_image(struct image_info *info, int frame, int ds)
         {
             /* have to discard the current */
             int i;
-            for (i=1; i<=8; i++)
+            for (i=0; i<=8; i++)
                 disp[i] = NULL; /* invalidate all bitmaps */
 
             /* start again from the beginning of the buffer */
