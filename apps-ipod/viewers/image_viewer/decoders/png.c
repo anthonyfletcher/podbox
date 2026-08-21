@@ -15,6 +15,7 @@
 #include "lcd.h"
 #include "file.h"
 #include "kernel.h"
+#include "logf.h"
 #include "draw/bmp.h"
 #include "tinf.h"
 #include "png_decoder.h"
@@ -69,7 +70,8 @@ static int load_image(char *filename, struct image_info *info,
     fd = open(filename, O_RDONLY);
     if (fd < 0)
     {
-        splashf(HZ, "err opening %s: %d", filename, fd);
+        logf("png: open failed, %d", fd);
+        splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
 
@@ -115,18 +117,8 @@ static int load_image(char *filename, struct image_info *info,
             return PLUGIN_OUTOFMEM;
         }
 
-        if (LodePNG_perror(p_decoder) != NULL)
-        {
-            splash(HZ, LodePNG_perror(p_decoder));
-        }
-        else if (p_decoder->error == TINF_DATA_ERROR)
-        {
-            splash(HZ, "Zlib decompressor error");
-        }
-        else
-        {
-            splashf(HZ, "other error : %ld", p_decoder->error);
-        }
+        logf("png: decode failed, %ld", p_decoder->error);
+        splashf(HZ * 3, "Could not decode %s", filename);
 
         return PLUGIN_ERROR;
     }

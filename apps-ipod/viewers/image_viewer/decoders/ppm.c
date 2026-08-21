@@ -14,6 +14,7 @@
 #include "lcd.h"
 #include "file.h"
 #include "kernel.h"
+#include "logf.h"
 #include "draw/bmp.h"        /* struct bitmap */
 #include "ppm_decoder.h"
 #include "../image_viewer.h"
@@ -62,7 +63,8 @@ static int load_image(char *filename, struct image_info *info,
     fd = open(filename, O_RDONLY);
     if (fd < 0)
     {
-        splashf(HZ, "err opening %s: %d", filename, fd);
+        logf("ppm: open failed, %d", fd);
+        splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
 

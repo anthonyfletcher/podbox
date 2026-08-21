@@ -524,7 +524,7 @@ static int bf_action_cb(int action, struct gui_synclist* list)
         }
         else
         {
-            splash(HZ/1, "Attempting a 64k allocation");
+            splash(HZ, "Attempting a 64k allocation");
             int handle = core_alloc(64<<10);
             splash(HZ/2, (handle > 0) ? "Success":"Fail");
             /* for some reason simplelist doesn't allow adding items here if
@@ -1742,7 +1742,7 @@ static bool cpu_boost_log_dump(void)
     int count = cpu_boost_log_getcount();
     char *str = cpu_boost_log_getlog_first();
 
-    splashf(HZ, "Boost Log File Dumped");
+    splash(HZ, "Boost Log File Dumped");
 
     /* nothing to print ? */
     if(count == 0)
@@ -1976,7 +1976,7 @@ static bool dbg_syscfg(void) {
 #define FLASH_PAGE_SIZE (FLASH_SIZE >> 8)
 
 static bool dbg_bootflash_dump(void) {
-    splashf(HZ, "Please wait...");
+    splash(HZ, "Please wait...");
 
     int fd;
 
@@ -1984,7 +1984,7 @@ static bool dbg_bootflash_dump(void) {
 
     if (fd < 0)
     {
-        splashf(HZ * 3, "Error opening file");
+        splash(HZ * 3, "Error opening file");
         return false;
     }
 
@@ -1998,7 +1998,7 @@ static bool dbg_bootflash_dump(void) {
 
     bootflash_close(SPI_PORT);
     close(fd);
-    splashf(HZ * 3, "Dump saved to /bootflash.bin");
+    splash(HZ * 3, "Dump saved to /bootflash.bin");
 
     return false;
 }

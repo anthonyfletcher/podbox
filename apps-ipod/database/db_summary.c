@@ -1830,7 +1830,7 @@ static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
              * owns no screen, and there is nothing the user could do anyway --
              * the carousel will simply build it again when asked. */
             if (save_album_index() < 0 && !building_bg)
-                splash(HZ, "Could not write index");
+                splash(HZ * 2, "Could not write index");
         }
     }
 

@@ -13,6 +13,7 @@
 #include "system.h"
 #include "lcd.h"
 #include "kernel.h"
+#include "logf.h"
 #include "../image_viewer.h"
 
 #include "jpeg81.h"
@@ -115,7 +116,8 @@ static int load_image(char *filename, struct image_info *info,
         {
             return PLUGIN_OUTOFMEM;
         }
-        splashf(HZ, "unsupported %d", status);
+        logf("jpegp: decode failed, %d", status);
+        splashf(HZ * 3, "Could not decode %s", filename);
         return  PLUGIN_ERROR;
     }
 

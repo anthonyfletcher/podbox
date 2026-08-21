@@ -44,6 +44,7 @@
 #include "file.h"            /* MAX_PATH */
 #include "fs_attr.h"         /* ATTR_DIRECTORY */
 #include "kernel.h"          /* HZ, current_tick, TIME_AFTER, sleep, yield */
+#include "logf.h"
 #include "button.h"
 #include "lang.h"            /* str(), LANG_* */
 #include "settings/settings.h"        /* global_settings, set_option/int/bool, ID2P */
@@ -325,7 +326,7 @@ static int change_filename(int direct)
 
     if (entries == 0)
     {
-        splash(HZ, "No supported files");
+        splash(HZ * 2, "No supported files");
         return PLUGIN_ERROR;
     }
 
@@ -703,7 +704,8 @@ reload_decoder:
         imgdec = get_image_decoder(image_type);
         if (imgdec == NULL)
         {
-            splashf(2*HZ, "Unknown type: %d", image_type);
+            logf("image viewer: no decoder for type %d", image_type);
+            splash(HZ * 2, "Unsupported file");
             return PLUGIN_ERROR;
         }
     }
@@ -723,7 +725,7 @@ reload_decoder:
 
     if (status == PLUGIN_OUTOFMEM)
     {
-        splash(HZ, "Too large");
+        splash(HZ * 2, "Image too large");
         file_pt[curfile] = NULL;
         return change_filename(direction);
     }
@@ -733,7 +735,7 @@ reload_decoder:
         return change_filename(direction);
     }
     else if (status == PLUGIN_ABORT) {
-        splash(HZ, "Aborted");
+        splash(HZ, "Cancelled");
         return PLUGIN_OK;
     }
 
@@ -748,7 +750,7 @@ reload_decoder:
         }
         else
         {
-            splash(HZ, "Too large");
+            splash(HZ * 2, "Image too large");
             file_pt[curfile] = NULL;
             return change_filename(direction);
         }
@@ -982,7 +984,7 @@ int image_viewer(const char *file)
     {
         if (!find_album_art(&offset, &filesize, &status))
         {
-            splash(HZ * 2, "No file");
+            splash(HZ * 2, "Could not open the file");
             return GO_TO_PREVIOUS;
         }
         is_album_art = true;
@@ -1006,7 +1008,7 @@ int image_viewer(const char *file)
     buf_handle = core_alloc_maximum(&buf_size, NULL);
     if (buf_handle <= 0)
     {
-        splash(HZ * 2, "Out of Memory");
+        splash(HZ * 2, "Out of memory");
         return GO_TO_PREVIOUS;
     }
 
@@ -1032,7 +1034,7 @@ int image_viewer(const char *file)
     {
         iv_release_buffer();
         remove_event(SYS_EVENT_USB_INSERTED, iv_usb_inserted);
-        splash(HZ, "No supported files");
+        splash(HZ * 2, "No supported files");
         return GO_TO_PREVIOUS;
     }
 

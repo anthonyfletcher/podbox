@@ -13,6 +13,7 @@
 #include "lcd.h"
 #include "file.h"
 #include "kernel.h"
+#include "logf.h"
 #include "draw/bmp.h"        /* struct bitmap, read_bmp_fd, FORMAT_* */
 #include "draw/resize.h"     /* format_native */
 #include "../image_viewer.h"
@@ -79,7 +80,8 @@ static int load_image(char *filename, struct image_info *info,
     fd = open(filename, O_RDONLY);
     if (fd < 0)
     {
-        splashf(HZ, "err opening %s: %d", filename, fd);
+        logf("bmp: open failed, %d", fd);
+        splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
     if (offset)
@@ -103,7 +105,8 @@ static int load_image(char *filename, struct image_info *info,
     if (size <= 0)
     {
         close(fd);
-        splashf(HZ, "read error %d", size);
+        logf("bmp: size probe failed, %d", size);
+        splashf(HZ * 3, "Could not read %s", filename);
         return PLUGIN_ERROR;
     }
 
@@ -125,7 +128,8 @@ static int load_image(char *filename, struct image_info *info,
 
     if (size <= 0)
     {
-        splashf(HZ, "load error %d", size);
+        logf("bmp: decode failed, %d", size);
+        splashf(HZ * 3, "Could not decode %s", filename);
         return PLUGIN_ERROR;
     }
 

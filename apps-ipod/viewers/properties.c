@@ -339,14 +339,14 @@ static bool assemble_track_info(const char *filename, struct dir_stats *stats)
 
     if (mul_id3_count == 0)
     {
-        splashf(HZ*2, "None found");
+        splash(HZ * 2, "No matching files");
         return false;
     }
     else if (mul_id3_count > 1) /* otherwise, the retrieved id3 can be used as-is */
         finalize_id3(&id3);
 
     if (skipped_count > 0)
-        splashf(HZ*2, "Skipped %d", skipped_count);
+        splashf(HZ * 2, "Skipped %d files", skipped_count);
 
     return true;
 }

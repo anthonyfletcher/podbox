@@ -101,7 +101,7 @@ enum image_type get_image_type(const char *name, bool quiet)
                 if (!quiet && type != magic_list[i].type)
                 {
                     /* file extension is wrong. */
-                    splashf(HZ*1, "Note: File extension is not correct");
+                    splash(HZ * 2, "Wrong file extension");
                 }
                 type = magic_list[i].type;
                 break;

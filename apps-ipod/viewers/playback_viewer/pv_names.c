@@ -281,7 +281,7 @@ static void map_sweep(void)
         map_n++;
 
         if ((map_n & 63) == 0)
-            splashf(0, "Reading database... %d/%d", map_n, map_db_entries);
+            splashf(0, "Reading the database (%d/%d)", map_n, map_db_entries);
     }
 
     tagcache_search_finish(&tcs);

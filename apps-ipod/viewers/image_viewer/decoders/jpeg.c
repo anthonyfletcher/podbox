@@ -17,6 +17,7 @@
 #include "lcd.h"
 #include "file.h"
 #include "kernel.h"
+#include "logf.h"
 #include "../image_viewer.h"
 #include "jpeg_decoder.h"
 #include "yuv2rgb.h"
@@ -92,7 +93,8 @@ static int load_image(char *filename, struct image_info *info,
     fd = open(filename, O_RDONLY);
     if (fd < 0)
     {
-        splashf(HZ, "err opening %s: %d", filename, fd);
+        logf("jpeg: open failed, %d", fd);
+        splashf(HZ * 3, "Could not open %s", filename);
         return PLUGIN_ERROR;
     }
 
@@ -206,7 +208,8 @@ static int get_image(struct image_info *info, int frame, int ds)
     cpu_boost(false);
     if (status)
     {
-        splashf(HZ, "decode error %d", status);
+        logf("jpeg: decode failed, %d", status);
+        splash(HZ * 2, "Could not decode the image");
         return PLUGIN_ERROR;
     }
 

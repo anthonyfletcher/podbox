@@ -184,7 +184,7 @@ bool log_viewer_dump(void)
 {
     int fd;
 
-    splashf(HZ, "Log File Dumped");
+    splash(HZ, "Log File Dumped");
 
     /* nothing to print ? */
     if(logfindex == 0 && !logfwrap)

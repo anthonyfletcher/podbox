@@ -12,6 +12,7 @@
 #include "system.h"
 #include "lcd.h"
 #include "kernel.h"
+#include "logf.h"
 #include "draw/bmp.h"        /* struct bitmap */
 #include "../image_viewer.h"
 
@@ -83,7 +84,8 @@ static int load_image(char *filename, struct image_info *info,
         if (p_decoder->error == D_GIF_ERR_NOT_ENOUGH_MEM)
             return PLUGIN_OUTOFMEM;
 
-        splashf(HZ, "%s", GifErrorString(p_decoder->error));
+        logf("gif: %s", GifErrorString(p_decoder->error));
+        splashf(HZ * 3, "Could not decode %s", filename);
         return PLUGIN_ERROR;
     }
 

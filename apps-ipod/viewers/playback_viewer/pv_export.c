@@ -134,13 +134,13 @@ void pv_export_deck(const struct pv_totals *t)
 
 void pv_export_card(void)
 {
-    splash(HZ, "No screendump in this build");
+    splash(HZ * 2, "No screendump in this build");
 }
 
 void pv_export_deck(const struct pv_totals *t)
 {
     (void)t;
-    splash(HZ, "No screendump in this build");
+    splash(HZ * 2, "No screendump in this build");
 }
 
 #endif /* HAVE_SCREENDUMP */

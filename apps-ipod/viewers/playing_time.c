@@ -527,7 +527,7 @@ void playing_time_screen(void)
 {
     if (!audio_status())
     {
-        splash(HZ*2, "Nothing Playing");
+        splash(HZ * 2, "Nothing playing");
         return;
     }
 

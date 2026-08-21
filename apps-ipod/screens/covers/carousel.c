@@ -3384,7 +3384,7 @@ enum {
 
 static void error_wait(const char *message)
 {
-    splashf(0, "%s. Press any button to continue.", message);
+    splashf(0, "%s -- press any button to continue", message);
     while (get_action(CONTEXT_STD, 1) == ACTION_NONE)
         yield();
     sleep(2 * HZ);
@@ -3571,12 +3571,12 @@ static bool init(void)
 
     if (ret == ERROR_BUFFER_FULL)
     {
-        error_wait("Not enough memory for album names");
+        error_wait("Out of memory");
         return false;
     }
     else if (ret == ERROR_NO_ALBUMS)
     {
-        error_wait("No albums found. Please enable database");
+        error_wait("No albums found -- turn the database on");
         return false;
     }
     else if (ret == ERROR_USER_ABORT)
@@ -3599,7 +3599,7 @@ static bool init(void)
                                  sizeof(long));
     if (aa_bufsz < aa_min)
     {
-        error_wait("Not enough memory for album art cache");
+        error_wait("Out of memory");
         return false;
     }
 
@@ -3623,7 +3623,7 @@ static bool init(void)
             pf_cfg.cache_version = CACHE_REBUILD;
             pf_config_save();
         }
-        error_wait("Could not load the empty slide");
+        error_wait("Could not load the placeholder cover");
         return false;
     }
 
@@ -3634,13 +3634,13 @@ static bool init(void)
 
     if ((empty_slide_hid = read_pfraw(EMPTY_SLIDE, 0)) < 0)
     {
-        error_wait("Unable to load empty slide image");
+        error_wait("Could not load the placeholder cover");
         return false;
     }
 
     if (!create_pf_thread())
     {
-        error_wait("Cannot create thread!");
+        error_wait("Could not start the carousel");
         return false;
     }
 

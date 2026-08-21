@@ -260,7 +260,7 @@ bool collect_dir_stats(struct dir_stats *stats, bool (*id3_cb)(const char*))
     DIR* dir =  opendir(stats->dirname);
     if (!dir)
     {
-        splashf(HZ*2, "open error: %s", stats->dirname);
+        splashf(HZ * 3, "Could not open %s", stats->dirname);
         return false;
     }
     else if (!stats->dirname[1]) /* root dir */

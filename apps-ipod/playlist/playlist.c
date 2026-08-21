@@ -3490,7 +3490,7 @@ int playlist_resume(void)
 
         if (result < 0 || current_command == PLAYLIST_COMMAND_ERROR)
         {
-            splashf(HZ*2, "Err: %d, %s", result, str(LANG_PLAYLIST_CONTROL_INVALID));
+            splashf(HZ * 2, "Err: %d, %s", result, str(LANG_PLAYLIST_CONTROL_INVALID));
             goto out;
         }
 
@@ -3506,7 +3506,7 @@ int playlist_resume(void)
             if ((total_read + count) >= control_file_size)
             {
                 /* no newline at end of control file */
-                splashf(HZ*2, "Err: EOF, %s", str(LANG_PLAYLIST_CONTROL_INVALID));
+                splashf(HZ * 2, "Err: EOF, %s", str(LANG_PLAYLIST_CONTROL_INVALID));
                 result = -15;
                 goto out;
             }
