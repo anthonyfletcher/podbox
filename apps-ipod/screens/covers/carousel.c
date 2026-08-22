@@ -3423,21 +3423,23 @@ static bool init(void)
     config_set_defaults(&pf_cfg); /* must appear before pf_config_load */
     pf_config_load();
 
-    /* Hiding the status bar means disabling the theme for as long as this
-     * screen is up -- nothing less stops the SBS drawing into our area.
-     * cleanup() pops it. Showing it needs only a temporary push, so that
-     * viewport_set_defaults() reads the theme whatever the ambient state. */
+    /* The theme is pushed for as long as this screen is up, either way, and
+     * cleanup() pops it. Hiding the status bar means pushing it off -- nothing
+     * less stops the SBS drawing into our area. Showing it means pushing it
+     * ON, and holding that: this screen is reachable from the WPS as well as
+     * from the menu (wps.c disables the theme and calls album_covers()
+     * directly), so the ambient state is not "enabled" whatever the caller.
+     * Reading the viewport under a temporary push and then restoring the
+     * ambient state left the bar missing on exactly that path.
+     *
+     * Trap: %Vi is whichever %VI the SBS last selected, so this is read before
+     * the SBS has seen the new activity -- a theme picking none for it leaves
+     * the previous screen's in force. */
     pf_show_statusbar = global_settings.album_covers_statusbar;
     pf_theme_pushed = true;
     FOR_NB_SCREENS(i)
         viewportmanager_theme_enable(i, pf_show_statusbar, NULL);
     viewport_set_defaults(&pf_vp, SCREEN_MAIN);
-    if (pf_show_statusbar)
-    {
-        FOR_NB_SCREENS(i)
-            viewportmanager_theme_undo(i, false);
-        pf_theme_pushed = false;
-    }
 
     pf_vp.buffer = &pf_framebuffer;
     pf_vp.x = 0;
