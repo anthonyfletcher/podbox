@@ -43,6 +43,7 @@
 #include "draw/icon.h"
 #include "widgets/list.h"
 #include "skin/skin_engine.h"
+#include "checkwps.h"
 
 extern bool debug_wps;   /* checkwps.c: the -v flag */
 
@@ -104,12 +105,19 @@ void *app_get_buffer(size_t *buffer_size, const char *owner)
  * Screen furniture
  * --------------------------------------------------------------------- */
 
-/* No status bar, so no info viewport and no title: viewport_set_defaults()
- * falls back to the full screen, and the parser's %Lt handling records a title
- * request that nothing later reads. */
+/* The info viewport is the one cross-file channel between skins: every
+ * viewport a .wps declares without colours of its own is filled from this one
+ * by viewport_set_defaults(). Name an .sbs before a .wps on the command line
+ * and checkwps.c stashes the .sbs's %Vi here, so the .wps resolves the way it
+ * does on the player; with no .sbs it stays empty and viewport_set_defaults()
+ * falls back to the full screen.
+ *
+ * The title is a separate matter: the parser's %Lt handling records a request
+ * that nothing later reads. */
 struct viewport *sb_skin_get_info_vp(enum screen_type screen)
 {
-    (void)screen; return NULL;
+    (void)screen;
+    return checkwps_have_sbs_info_vp ? &checkwps_sbs_info_vp : NULL;
 }
 
 const char *sb_get_persistent_title(enum screen_type screen)
@@ -352,6 +360,7 @@ void set_keypress_restarts_sleep_timer(bool enable) { (void)enable; }
 void set_poweroff_timeout(int timeout) { (void)timeout; }
 int  sound_max(int setting) { (void)setting; return 0; }
 void sound_set_channels(int value) { (void)value; }
+void tag_trim_init(void) { }
 
 int talk_time_intervals(long time, int unit_idx, bool enqueue)
 {
