@@ -18,8 +18,10 @@ moves inside `apps-ipod/`, update the stub here and nothing outside notices.
 
 ## The contract, as measured
 
-Every `#include "*.h"` under `firmware/`, `lib/` and `bootloader/`, matched
-against the `apps-ipod/` header set:
+Every `#include "*.h"` under `firmware/`, `lib/`, `bootloader/` and
+`uisimulator/`, matched against the `apps-ipod/` header set. `uisimulator/` is
+on that list because the simulator builds and is upstream's code as-is, so it
+reaches in by bare name exactly the way `firmware/` does:
 
 | Stub | Included by |
 |---|---|
@@ -31,6 +33,7 @@ against the `apps-ipod/` header set:
 | `fracmul.h` | `lib/rbcodec/dsp/*.c` (10 files) |
 | `rbcodecconfig.h` | `lib/rbcodec/codecs/codecs.h`, `lib/rbcodec/dsp/*.c`, `lib/rbcodec/platform.h` |
 | `rbcodecplatform.h` | `lib/rbcodec/platform.h` |
+| `screens.h` | `uisimulator/common/stubs.c` |
 | `plugin.h` | `lib/rbcodec/metadata/hes.c` — vestigial; the include needs nothing, and deleting that one line would let `plugin.h` go entirely. `lib/` is out of scope. This stub forwards to nothing; it **is** the empty header. |
 
 The list covers files this fork compiles. Other targets' sources include these

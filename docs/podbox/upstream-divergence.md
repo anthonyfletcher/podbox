@@ -33,14 +33,14 @@ git diff --name-status $(git merge-base HEAD rockbox/master)..HEAD -- . ':(exclu
 ```
 
 Most of what that lists is code, build-system or build-script files; the rest is
-documentation, the Themify_2 and Scrim themes, the EQ presets and the logo. Run
+documentation, the themes and the logo. Run
 it rather than trusting a count written down here — this document is a guide to
 *why* the files differ, and the set moves every time one is added.
 
 **`apps/` is byte-identical to upstream, and stays that way.** It is kept so
 `git merge rockbox/master` applies without delete/modify conflicts. The same
 goes for `manual/`, `android/`, `backdrops/`, `screenshots/` and every `themes/`
-entry but Themify_2 and Scrim. Being unused is not a reason to prune them.
+entry this fork did not convert. Being unused is not a reason to prune them.
 
 **`uisimulator/` is upstream-identical too, but it is no longer unused** — the
 simulator builds and runs. See "The simulator needs nothing here" below.
@@ -330,19 +330,28 @@ instead** — it will succeed, and produce the wrong firmware.
 | --- | --- | --- |
 | `convfnt.c` | Exports one glyph from a Rockbox `.fnt` to an 8-bit greyscale `.bmp`, and imports an edited `.bmp` back | This fork's theme icon fonts are **4 bpp**, and `convbdf` cannot round-trip them (BDF is 1 bpp). The file header documents the `RB12` layout, including that 4 bpp pixels are nibbles, low nibble first, inverted relative to ink (15 = background, 0 = full) while the `.bmp` is the other way round. |
 | `art_fetch/art_fetch.py`, `art_fetch/README.md` | Python 3 album and artist artwork fetcher (`requests`, `Pillow`, `mutagen`) | Library maintenance. Not part of any build; run by hand. |
-| `eq_refit/eq_refit.py`, `eq_refit/README.md` | Re-fits an EQ preset onto fewer bands, keeping its response | Every enabled band is a biquad pass over every sample; a nine-band preset spends most of a PP5022 on the equaliser and starves the UI. Run by hand when adding an `eqs/` preset. |
+| `eq_refit/eq_refit.py`, `eq_refit/README.md` | Re-fits an EQ preset onto fewer bands, keeping its response | Every enabled band is a biquad pass over every sample; a nine-band preset spends most of a PP5022 on the equaliser and starves the UI. Run by hand on a preset written for this player. |
 | `pfgeom/pfgeom.c`, `pfgeom/README.md` | Host program that mirrors the album-covers carousel's projection, cull and draw order, and renders frames across the settings space | The carousel's occlusion cull fails as a stripe of stale framebuffer on one album shape at one point in one scroll. This decides it on the host instead of on hardware. It is a **mirror** of `apps-ipod/screens/covers/carousel.c`, so a change to the cull has to be made in both or it stops proving anything. |
+| `dbfeat/dbfeat.c`, `dbfeat/README.md` | Host program that compiles `apps-ipod/database/db_featured_parse.c` as it stands and runs it over a table of tag strings with the guests each must yield | Every rule in that parser is a guess about how people write tags, and a wrong one reaches the user as a browser row naming somebody who does not exist. Unlike `pfgeom` there is no copy to drift: the parse file compiles here unmodified, and only the library lookup is stood in for. |
+| `check-settings-docs.sh` | Whether `settings-help.txt` and `settings-guide.md` still describe the settings that exist. Five checks; silence means they agree | Nothing in the build looks at either document, and every way they go stale is invisible on the device — **Explain** shows nothing, Search cannot find a row, the guide describes a player that does not exist. Run it from the repository root after touching a setting. |
 | `spun_testlog.pl` | Synthesises a playback-log family, plus the expected parse | The development device has no listening history, and Spun's reader depends on cases that take months to accumulate — rotation boundaries, a year change, plays logged against an unset clock. |
 
 ### The other build types
 
 `(N)ormal`, `(B)ootloader`, `(C)heckWPS`, `(D)atabase` and `(S)imulator` all
 build. `(W)arble` is offered by `configure` and does not; nothing here uses it.
-Only CheckWPS needed a change:
+Only CheckWPS needed changes, and it needed all of these:
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `checkwps/SOURCES` | One line added: `../../apps-ipod/skin/custom_tags.c` | `find_custom_tag()` is weak (see `lib/skin_parser` above), so without this it resolves to NULL and CheckWPS rejects every skin using a fork tag on the first one. With it, `--type=C` builds and Themify_2's two skins both report "WPS parsed OK". |
+| `checkwps/SOURCES` | Every application-layer file repointed from `apps/` to `apps-ipod/`, plus `stubs.c` | Upstream's parser is a different parser. It rejects `!rrggbb`, and it reads past the end of a `%dr` given an opacity or a radius and crashes. Linking this fork's `skin_parser.c` is the only way the tool answers the same question the player does. |
+| `checkwps/checkwps.make` | Include path rebuilt around `$(COREAPPSDIR)/api` and `$(COREAPPSDIR)`, mirroring `apps-ipod/apps.make`; `features.txt` and `english.lang` taken from there too; `-DSYSFONT_HEIGHT=8` | `apps-ipod/` includes are written relative to the application layer, and `APPSDIR` is the tool's own directory for this build type. `font.h` skips the generated `sysfont.h` under `__PCTOOL__`. |
+| `checkwps/include/` | Shadows of `storage.h`, `usb.h` and `powermgmt.h` | Three firmware headers stop declaring things under `__PCTOOL__`; `apps-ipod/` names them unconditionally. Same shape as `apps-ipod/sim/include/`, and the shadow says which declaration it restores. |
+| `checkwps/stubs.c` | New: the allocator, the status bar, the settings lookups and every settings callback | The real parser reaches for the running firmware. Each group states what its callers do with the answer, so a stub that starts lying is visible. |
+| `checkwps/checkwps.c` | Includes prefixed for the `apps-ipod/` layout; a line pointing at `-v` when a skin fails with no error line | A font or bitmap failure is a `debugf` and prints nothing on its own. |
+| `apps-ipod/skin/wps_internals.h` | `VP_DEFAULT_LABEL` is `NULL` under `__PCTOOL__` again | `OFFSETTYPE()` is the real pointer type there, not an offset, so a numeric sentinel does not compile. Upstream carries the same pair. |
+| `apps-ipod/features.txt` | `usb_hid` gate takes `__PCTOOL__` as well as `SIMULATOR` | Same reason as the simulator: `settings_list.c` registers the setting unconditionally, so the build fails on the phrase rather than on the feature. |
+| `configure` | `if [ -n \`echo $app_type \| grep "sdl"\` ]` → a real grep test | The unquoted backtick collapses to `[ -n ]`, which is always true, so `--type=c` demanded an SDL it never links. That stopped the build on any box without SDL. |
 
 It has to be **run from inside a `.rockbox` directory** — skin font paths are
 relative to the on-device layout and will not resolve from anywhere else, and
@@ -385,23 +394,22 @@ the build machine, but no repository change.
 
 ## Repo root
 
-`make zip` alone produces an **incomplete** zip: no themes, no first-boot
-config, no default iconset, no EQ presets, no setting explanations, upstream's
-licence file rather than this fork's, and a pile of files this fork cannot use.
-That is because `buildzip.pl` is kept upstream-shaped. The four bundle scripts
-make up the difference, and `build-hw.sh` runs all four.
+`make zip` alone produces an **incomplete** zip: no theme, no first-boot
+config, no default iconset, no setting explanations, upstream's licence file
+rather than this fork's, and a pile of files this fork cannot use. That is
+because `buildzip.pl` is kept upstream-shaped. The three bundle scripts make up
+the difference, and `build-hw.sh` runs all three.
 
 | File | What it is | Why it exists |
 | --- | --- | --- |
 | `README.md`, `CLAUDE.md` | The fork's own README, and the instructions an assistant working in this tree is given | Upstream has neither. |
-| `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs all four bundle scripts after `make zip`. The supported way to produce a shippable build. |
+| `build-hw.sh` | Clean build for either target into `build-hw-<target>/`; accepts `ipod6g`/`6g` or `ipodvideo`/`5g` | Passes `--appsdir=apps-ipod` and runs all three bundle scripts after `make zip`. The supported way to produce a shippable build. |
 | `build-sim.sh` | The same for the simulator, into `build-sim-<target>[-win32]/`; takes a second argument `native` or `win` | Adds the steps a simulator needs and a device does not: unpacking the finished zip into `simdisk/`, and carrying an existing `simdisk/` across the clean so a rebuild does not destroy the test music and database. `win` selects `--type=as6` — **(A)dvanced** plus `s` and `6`, because `configure` matches the build type one character at a time and plain `--type=s6` silently produces a *normal* build. |
-| `bundle-theme.sh` | Injects Themify_2 and Scrim, `default-config.cfg` and the default iconset into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. `default-config.cfg` makes Themify_2 the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback; it is a separate file from `config.cfg` because that one belongs to the player and an install must never overwrite it. The iconset goes in because `buildzip.pl` creates `icons/` and copies nothing into it, so `DEFAULT_ICONSET` names a file that is not on the device and every icon silently falls back to the compiled-in 6x8 blob. Themes are named in the script, not globbed, or a merge from Rockbox would start shipping stock themes nobody converted. |
-| `bundle-eqs.sh` | Injects `eqs/*.cfg` into `.rockbox/eqs/` | The presets live at the repo root, not the `lib/rbcodec/dsp/eqs/` that `buildzip.pl` copies from — that directory is empty here. |
+| `bundle-theme.sh` | Injects Scrim, `default-config.cfg` and the default iconset into the zip; deletes files the build cannot use | Lives here rather than in `buildzip.pl` so that file stays upstream-shaped. `default-config.cfg` makes Scrim the first-boot default, applied before any compiled `DEFAULT_WPSNAME` fallback; it is a separate file from `config.cfg` because that one belongs to the player and an install must never overwrite it. The iconset goes in because `buildzip.pl` creates `icons/` and copies nothing into it, so `DEFAULT_ICONSET` names a file that is not on the device and every icon silently falls back to the compiled-in 6x8 blob. The theme is named in the script, not globbed, or a merge from Rockbox would start shipping stock themes nobody converted. Scrim is the only one in the build; the rest of `themes/` is published separately by `release.sh`. |
 | `bundle-help.sh` | Ships `docs/podbox/settings-help.txt` as `.rockbox/docs/settings-help.txt` | **The one whose absence is silent.** Without it every **Explain** entry in a setting's context menu finds no file and shows nothing; nothing else misbehaves, so a zip built without it looks finished. |
 | `bundle-licenses.sh` | Prepends `docs/podbox/LICENSES` to upstream's `docs/LICENSES` and replaces `.rockbox/docs/LICENSES.txt` | The fork imports fonts and artwork upstream does not, and their licences have to travel with the build. Same reason as the other three: `buildzip.pl` copies upstream's file and is kept upstream-shaped. |
-| `docs/podbox/LICENSES` | The fork's own licence notices — Literata, League Spartan and Noto under the OFL, Material Design Icons under Apache 2.0, Themify 2 under CC BY-SA — with the SIL Open Font License 1.1 reproduced in full | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
-| `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies each zip, then replaces the rolling `latest` release | Publishing by hand gets three things wrong — asset names colliding, `gh` needing `--repo` on the server, and a leftover tag being reused rather than moved. |
+| `docs/podbox/LICENSES` | The fork's own licence notices — Literata and Noto under the OFL, Material Design Icons under Apache 2.0 — with the SIL Open Font License 1.1 reproduced in full. It covers what the build ships, which is Scrim's fonts; a theme published on its own carries its own notices in `.rockbox/docs` | Prepended to upstream's `docs/LICENSES` by `bundle-licenses.sh`. The OFL requires its notice to travel with the font, and the device is offline, so a URL is not enough; upstream's file inlines every licence it references and these follow that. |
+| `release.sh` | Builds both targets on a build server from a `git archive` of HEAD, verifies every zip, then replaces the rolling `Themes`, `Simulator` and `latest` releases in that order | Publishing by hand gets four things wrong — asset names colliding, `gh` needing `--repo` on the server, a leftover tag being reused rather than moved, and the publish order, which decides which release GitHub features on the front page. |
 | `docs/CREDITS` | Three attribution blocks prepended: Themify, RockPod, and a "For RockBox:" heading before upstream's list | This fork ships themes and inherits a large body of hardware work from another fork, both GPLv2 with named authors. Upstream's list is left untouched below the heading, so a merge from Rockbox applies to it cleanly. |
 | `.gitignore` | `/build*` narrowed to `/.build/`, `/build-hw-*/`, `/build-hw/`, `/build-sim-*/`, `/build-sim/`; adds `/notes/`, `/.specifications/`, `/dist/`, `/iconsources/`, `/.theme-dev/`, `/.idea/`, `/.claude/` | Local working drafts, release zips fetched back from the build server, and editor state. The `build-sim-*` glob covers the per-target simulator directories (`build-sim-ipodvideo`, `build-sim-win32`); upstream's bare `/build-sim/` matches none of them. |
 | `wps/WPSLIST` | `cabbiev2` theme block removed (180 lines); explanatory comment added | `wpsbuild.pl` builds from this file, so delisting is what stops cabbiev2 shipping. The files stay in `wps/` because the tree mirrors upstream. `rockbox_failsafe` is kept — it is the skin engine's emergency fallback if a configured skin fails to parse. |

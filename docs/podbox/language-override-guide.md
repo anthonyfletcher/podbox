@@ -8,8 +8,9 @@ menu, in the setting's own screen, in the context menu, and in any theme that
 asks for that text by name.
 
 This is not a translation system. It edits the English wording of individual
-phrases, one line each, and leaves the other ~1,270 alone. For a whole language
-you want a `.lng` file instead, from *Settings → General → Language*.
+phrases, one line each, and leaves the other thousand-odd alone. For a whole
+language you want a `.lng` file instead, from *Settings → System → Language & Text →
+Language*.
 
 ---
 
@@ -59,10 +60,10 @@ The file is read when the player applies its settings, which is:
   the player plugged in, eject, and read the new wording as it comes back;
 - when a theme or a `.cfg` is loaded, and after *Reset Settings*.
 
-There is **one gap**: picking a language from *Settings → General → Language*
-loads the `.lng` and drops your overrides until the next reboot. Loading a
-language resets every phrase to built-in first, and nothing re-applies the file
-at that point. Reboot after changing language.
+There is **one gap**: picking a language from *Settings → System → Language &
+Text → Language* loads the `.lng` and drops your overrides until the next
+reboot. Loading a language resets every phrase to built-in first, and nothing
+re-applies the file at that point. Reboot after changing language.
 
 ---
 
@@ -76,21 +77,35 @@ Themes come along for free. A skin that writes `%Sx(Shuffle)` is naming that
 same phrase, so it renders your replacement without being touched. See
 [`custom-skin-tags.md`](custom-skin-tags.md).
 
-**Keep any `%s`, `%d` or `%%` exactly as they are, and in the same order.** They
-are filled in with a value when the phrase is shown, so
-`Battery: %d%% %dh %dm` may become `Charge: %d%% %dh %dm`, but dropping one of
-them prints nonsense.
+**Keep any `%s` and `%d` exactly as they are, and in the same order.** They are
+blanks the player fills in when the phrase is shown — `%d` with a number, `%s`
+with a word. Reword the sentence around them as much as you like; just do not
+drop one, add one, retype one, or swap two of them over:
+
+```
+Saved %d tracks (%s): Wrote %d tracks to (%s)   # fine
+Saved %d tracks (%s): Wrote the tracks to (%s)  # dropped  -- line ignored
+Saved %d tracks (%s): Wrote %d of %d to (%s)    # added    -- line ignored
+Saved %d tracks (%s): Wrote %s tracks (%d)      # reordered -- line ignored
+```
+
+A line that gets it wrong is skipped and the built-in wording stays, so the
+worst outcome is a rename that appears not to have worked.
+
+**Write a literal per cent sign as `%%`.** A lone `%` is read as the start of
+one of those blanks, so `50% done` counts as a blank and the line is skipped;
+`50%% done` is what you want.
 
 ### Words the player uses twice
 
-Eighteen words are used by two separate phrases each — the same wording as a
-settings label and again as a Track Info or properties row, say. These fourteen
-among them:
+Twenty-one words are used by two separate phrases each — the same wording as a
+settings label and again as a Track Info or properties row, say:
 
 ```
-Album Art   Time     Date       Path     Filename   Playlist
-Track Gain  Music    Cancel     Auto     Custom     Fast
-Slow        Use UI Font
+Album Art   Auto     Cancel     Custom   Date       Fast
+Filename    Files    Games      Music    Normal     Path
+Playlist    Search   Slow       Time     Track Gain Use UI Font
+Rebuild Database     Update Database     Rescan Documents & Images
 ```
 
 **Both are renamed.** `Album Art: Cover` changes the setting *and* the Track
@@ -108,6 +123,10 @@ Date#2: Modified
 firmware holds them — which is not the order you meet them on screen, so try
 one and look. There is no way to tell them apart from the file other than by
 trying.
+
+The last three in that list are worth care. They are Maintenance rows, and a
+row's explanation is looked up by the words on the row — so renaming one leaves
+*Explain* on it blank.
 
 ---
 

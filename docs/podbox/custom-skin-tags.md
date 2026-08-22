@@ -43,6 +43,9 @@ Returns the pixel width of `text` when drawn. With one argument it measures in
 the **current viewport's font**; with a second argument it measures in an
 explicit loaded font id (the number you pass to `%Fl` / the last field of `%Vl`).
 
+`text` has to be a **tag** — `%tw(%it)`, not `%tw(Hello)`. A literal there fails
+the skin at load. The same holds for `%wt`'s first argument and `%sel`'s subject.
+
 The explicit-font form matters when you decide layout in the viewport-
 declaration ($VD) block, which does *not* run in your title's font — pass the
 font id so the measurement is correct.
@@ -63,6 +66,32 @@ one layout that adapts instead of hard-coding pixel numbers.
 ```
 %?if(%tw(%it), >, %Vw)<...too wide...|...fits...>
 ```
+
+---
+
+## Line boxes
+
+### `%Vy([height])` — the height of the line text sits in
+
+Sets the box a line of text is drawn in, in pixels. The text is centred
+vertically in that box and `%Vs(invert)` fills it, so one number squares both
+the text and the selection bar with a row that is taller than its font.
+
+Bare, or with `-`, means the **current viewport's height** — what a skinned
+list row wants. A number sets the box to exactly that many pixels.
+
+Left out, the box is the font's height: a viewport taller than its font draws
+the text against the top edge and inverts only a font-high stripe of the row.
+
+```
+# A 30px list row in a 22px font: text centred, selection covering the row.
+%Vl(Rows,0,0,240,30,3)%Vy
+%?Lc<%Vs(invert)>%s %LT
+```
+
+Like `%Vf` and `%Vb`, `%Vy` suppresses the line break, so declare it on the
+viewport's own line and put the content on the line after — anything sharing a
+line with it is carried into the next one.
 
 ---
 
@@ -105,6 +134,9 @@ alignment possible.
   bottom-left, `cc` = centred, `tr` = top-right.
 - `fallback` — an optional tag drawn when `text` is empty (e.g. the filename
   when a track has no title tag).
+
+**Eight lines at most.** A block that wraps past eight is cut there whatever the
+viewport has room for, so a tall box wanting more lines than that needs `%wr`.
 
 Because it fills the viewport, `%wt` goes *on* the viewport, not on its own
 content line:
@@ -252,13 +284,20 @@ arrangement.
 
 **The size follows the viewport.** The cover is drawn at the largest cached
 size that fits inside the `%Vl` holding it, 1:1 and never scaled, so a viewport
-smaller than the art leaves it cropped and one larger leaves a gap. Size the
-viewport to the art you want and it is drawn at that size.
+smaller than the art leaves it cropped and one larger leaves a gap. The cache
+offers rows one size, **44×44** — nothing above 64 pixels is offered to a row at
+all — so make the viewport 44×44 and the cover fills it.
 
 A fourth argument filters the cover, with the same names `%Cl` takes and the
 same `+` joining them, minus `blur` — that one needs a destination of its own
 and a row's cover is drawn straight from the browser's slot. An unrecognised
 name fails the skin at load rather than quietly drawing nothing.
+
+**The adaptive filters are refused here.** A row's cover is never measured, so
+there is no brightness for one to work from. `scrim` is not available at all;
+`lighter` and `darker` are, but only with an amount written — `darker30`, not a
+bare `darker`. Either mistake fails the skin at load and names itself, the same
+way a misspelt filter does.
 
 ```
 %La(0)                  # album art of the current list row
@@ -418,13 +457,16 @@ than quietly drawing nothing.
 %Cl(0,0,320,240,c,c,blur8+bw+darker30)
 %Cl(10,10,100,100,c,c,hue180+saturate40)
 %Cl(10,10,100,100,c,c,bw+reduce3+dither)
+%Cl(0,0,320,240,c,c,blur6+scrim)
 ```
 
 | Name | Amount | Default | Effect |
 |---|---|---|---|
 | `invert` | — | — | Complement every channel |
 | `brightness` | −100…100 | required | Toward white or black |
-| `lighter` / `darker` | 0…100 | adaptive | Brightness, but see below |
+| `lighter` | 0…300 | adaptive | Scale every channel up — see below |
+| `darker` | 0…100 | adaptive | Scale every channel down — see below |
+| `scrim` | — | — | Darken until the text over it reads — see below |
 | `contrast` | −100…100 | required | Away from or toward mid-grey |
 | `reduce` | 2…256 | `4` | Posterise to n levels per channel |
 | `bw` | 0…100 | `100` | Toward greyscale |
@@ -444,12 +486,35 @@ depends on the size of the box. Treat it as a dial rather than a measurement:
 `blur8` is twice as soft as `blur4` in any box, and the same amount reads softer
 in a large box than a small one.
 
-**`darker` with no amount adapts to the artwork**, targeting a fixed mean
-brightness rather than removing a fixed amount. That matters more than it
-sounds: a fixed darken is simultaneously too weak on a white cover — where white
-text over it is genuinely unreadable — and destructive on an already-dark one.
-`lighter` is the mirror, for a theme drawing dark text. Give either an explicit
-amount and you get that amount instead.
+**`lighter` and `darker` scale, they do not slide.** The amount is a percentage
+of what the picture already is, not a distance toward an end of the scale:
+`lighter50` is half as bright again, `lighter200` three times as bright, and only
+`darker100` — a scale of zero — reaches an end. That is why `lighter` runs to
+300 while `darker` stops at 100. For the sliding kind, use `brightness`.
+
+**With no amount they adapt to the artwork**, each holding to a fixed target and
+moving one way only, so a cover already past it is left alone rather than dragged
+back. `darker` measures the picture's brightest band rather than its average,
+because that is the band text has to be read against.
+
+**`scrim` darkens only as far as the text over it needs.** It is the one filter
+that reads something outside the picture: the colour that text will be drawn in,
+which is the theme's foreground — or the album's accent, while dynamic colours
+are running. Three things follow.
+
+- **It only ever darkens.** Facing dark text it does nothing at all, because a
+  dark accent is itself evidence that the artwork is already light.
+- **It moves the picture the least it can.** A cover already clear of the text is
+  left as it is.
+- **On a chain without `blur` it is cut once.** A scrim is cut for one text
+  colour, and the palette can move without the artwork changing — turning dynamic
+  colours on, or the album's colours arriving a moment after the first draw. Only
+  a blurring chain renders from an untouched source and can be cut again; an
+  in-place chain has already rewritten the buffered cover, and keeps the scrim it
+  has until the cover is loaded afresh — which is the next album, not the next
+  track, since one buffered cover serves every track of a record. Adding `blur1`
+  to the chain is enough to make it re-cuttable, at the cost of a little
+  softness.
 
 **Order in the chain does not decide order of execution.** Stages always run
 spatial → colour → levels → dither, whatever order you wrote them in; within a
@@ -464,9 +529,10 @@ decimated copy and the later stages fold into its upscale.
 
 Three things worth knowing before building a theme around it:
 
-- **The work happens once per track**, not per frame, so a blurred backdrop is
-  free to draw. It runs when the art changes and is cached until it changes
-  again.
+- **The work happens once per cover**, not per frame, so a blurred backdrop is
+  free to draw. It runs when the artwork is loaded and is cached until it is
+  loaded again — which is once for a whole album, since one buffered cover
+  serves every track of a record. Skipping within an album costs nothing.
 - **Several `%Cl` per skin are fine**, and a blurred backdrop with a crisp
   cover in front of it is what they are for. What costs memory is the artwork
   **size**, not the tag — see the next section.
@@ -580,8 +646,7 @@ as it stood when the parser reached this line", and `%Vf` only feeds into that o
 the viewport's own declaration line — so a `-` anywhere below quietly takes the
 *theme* foreground. On a light-on-dark theme that turns a scrim into a white
 wash, which looks exactly like the blending being broken when it is working
-perfectly. (It also crashes CheckWPS, which is built against stock Rockbox's
-`%dr` and reads past the end of the argument list.)
+perfectly.
 
 ### Where a tint has to go
 
@@ -711,12 +776,59 @@ Four things worth knowing:
 - **`!` is skin-only.** Colours in a `.cfg` — `foreground color`, `background
   color`, the line selector — are the theme's roles, and they do not take the
   prefix.
-- **CheckWPS rejects it.** That tool links upstream's colour parser rather than
-  this fork's, so it reports an invalid colour for a skin the firmware reads
-  quite happily. Theme Lens understands the prefix; CheckWPS does not.
-
 With **Dynamic Colours** off in the settings, `!rrggbb` and `rrggbb` are the
 same colour; nothing is being remapped either way.
+
+---
+
+## Changed behaviour: `%cs` screen numbers
+
+`%cs` reports which screen is on, as a number, and this build has screens
+upstream does not. The numbers are an interface: a skin encodes them, so they
+are only ever appended to, never renumbered.
+
+| | | | |
+|---|---|---|---|
+| 0 unknown | 9 *unused* | 18 bookmarks | 27 documents |
+| 1 main menu | 10 quickscreen | 19 shortcuts | 28 images |
+| 2 while playing | 11 *reserved* | 20 track info | 29 search |
+| 3 *unused* | 12 option chooser | 21 USB | 30 lyrics |
+| 4 *unused* | 13 playlist catalogue | 22 album covers | 31 Spun |
+| 5 playlist viewer | 14 *unused* | 23 text viewer | 32 settings search |
+| 6 settings | 15 context menu | 24 image viewer | 33 featured artists |
+| 7 files | 16 system screen | 25 folder picker | |
+| 8 database | 17 time and date | 26 album charts | |
+
+The gaps are real and stay: 3 and 4 are recording and radio, 9 and 14 the plugin
+browser and a running plugin, 11 the pitch screen. None of them can happen here.
+A skin may test them; it will never match.
+
+Two are worth knowing about before you write a branch for them:
+
+- **21, the USB screen, is never reached.** The firmware draws that screen
+  itself and your `.sbs` is not rendered at all while the cable is in. See §6 of
+  [`theme-guide.md`](theme-guide.md).
+- **22, the album covers carousel, draws only your status bar** — and only
+  while *Album Covers Status Bar* is on. The rest of the screen is the
+  carousel's, coloured from the `.cfg` rather than from your skin.
+
+---
+
+## Changed behaviour: the `%Q` tags take over the quickscreen
+
+The eight quickscreen tags are `%QT`/`%Qt`, `%QR`/`%Qr`, `%QB`/`%Qb` and
+`%QL`/`%Ql` — the name and the value of each of the four settings. **Naming any
+one of them in a `.sbs` stands the firmware's own layout down**, and the
+quickscreen becomes whatever your base skin draws on `%?if(%cs, =, 10)`.
+
+It is the whole screen or none of it. There is no way to keep the built-in
+layout and add to it, and no way to skin one of the four positions — the tags
+are counted at load, so a single `%Qt` left in from a theme you started from
+takes the screen and leaves it blank.
+
+The tags report the settings and nothing else; the wheel and the four buttons
+keep their usual meanings. Draw the four positions where the buttons are — top,
+bottom, left, right — or the screen stops explaining itself.
 
 ---
 

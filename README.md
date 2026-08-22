@@ -4,7 +4,16 @@ PodBox is a modified version of Rockbox for the iPod Classic and iPod Video with
 Rockbox whilst providing album and artist art everywhere with colour schemes that
 follow the music.
 
-> Please note that PodBox is still a work in progress and receiving regular updates until stable.
+# Key features
+
+## Colours that follow the music
+
+<img src="docs/podbox/images/ss_grid_art_colours.png" alt="Screenshot"/>
+
+The interface re-colours itself from the current album art, throughout the user
+interface.  PodBox ships with [Scrim](themes/scrim/README.md) - a new theme built around the enhanced theme
+features including art filters, alpha blend boxes and spectrum visualization. There
+are two variants with different playing screens.
 
 ## Art everywhere
 
@@ -15,12 +24,6 @@ artist rows. Two carousels are available from the main menu — **Album Covers**
 and **Artist Portraits** — and you can go straight from a cover into that album,
 or from an artist into their albums.
 
-## Colours that follow the music
-
-<img src="docs/podbox/images/ss_grid_art_colours.png" alt="Screenshot"/>
-
-The interface re-colours itself from the current album art, throughout the user
-interface.  There's also a mini spectrum visualiser for the now-playing screen.
 
 ## Instant search
 
@@ -28,14 +31,13 @@ interface.  There's also a mini spectrum visualiser for the now-playing screen.
 
 You can now search across tracks, albums and artists with instant results.  Additionally,
 the grid keyboard is gone, replaced by a single-line editor driven entirely by the click
-wheel.
+wheel.  Search is also available in settings to make finding things easier.
 
 ## Themed throughout
 
 <img src="docs/podbox/images/ss_grid_theme_everywhere.png" alt="Screenshot"/>
 
-A modified version of the **Themify 2** theme ships as the default. Dialogs,
-splashes and prompts have been standardised and improved, and screens that used to
+Dialogs, splashes and prompts have been standardised and improved, and screens that used to
 break out of the theme no longer do.
 
 ## Your music library
@@ -44,7 +46,8 @@ break out of the theme no longer do.
 
 The database menu is now called Music and its views can be promoted onto the main menu. You
 can also turn items on and off inside the Music menu, order albums by year, and see
-album and artist chart information (frequently played, recently played, forgotten).
+album and artist chart information (frequently played, recently played, forgotten). You can
+even break Audiobooks out into their own root menu (see below).
 
 ## Documents, pictures and lyrics too
 
@@ -79,7 +82,7 @@ you want [Rockbox](https://www.rockbox.org) itself, which supports 80+ players.
 
 ## Installing PodBox
 
-Grab the zip for your player — `rockbox-ipod6g.zip` for the Classic,
+Grab the zip for your player [here](https://github.com/anthonyfletcher/podbox/releases) — `rockbox-ipod6g.zip` for the Classic,
 `rockbox-ipodvideo-5g.zip` for the Video — and unzip it into the root of the
 iPod's disk, so that the `.rockbox` folder sits alongside your music. That is
 the whole update.
@@ -146,13 +149,23 @@ with a different extension e.g. `Artist/Album/01 Track.lrc`
 
 # Installing themes
 
-To get the most out of PodBox you should use the modified [Themify 2](themes/Themify_2/README.md) theme
-included as it supports all the new features built into PodBox and has received the most testing.
-
 PodBox will support all Rockbox themes, however without modification they will **not** support dynamic
 colours or art in lists.
 
-> A selection of additional themes for PodBox are available [here](https://github.com/anthonyfletcher/podbox-themes/)
+To get the most out of PodBox you should use Scrim, the theme PodBox ships with.
+
+Additional [themes](themes/README.md) designed for PodBox are a separate download, one zip each, from 
+the [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Themes):
+
+- [themify 2](themes/themify_2/README.md)
+- [obsede 2](themes/obsede_2/README.md)
+- [bony](themes/bony/README.md)
+
+All PodBox themes attempt to support as many languages as possible.
+
+Unzip onto the root of the iPod, the same way you installed PodBox, then pick
+it under `Settings > Appearance > Load Theme`. Each zip carries the fonts its theme needs, so
+they can be installed in any order and on their own.
 
 ---
 
@@ -181,6 +194,11 @@ colours or art in lists.
   - `Music > Search`
   - Control ordering of results via `Settings > Library > Music > Search`
   - See [`text-input-guide.md`](docs/podbox/text-input-guide.md) for guidance on inputting text
+- See featured artists and their associated tracks - plus from an artist
+see the tracks they feature in
+  - `Settings > Library > Music > Featured Artists` to enable functionality
+  - `Music > Featured Artists` to access
+  - See [`featured-artists-guide.md`](docs/podbox/featured-artists-guide.md) for more information
 - See the most played albums/artists
   - `Music > Playback History`
 - See the most recently played albums/artists
@@ -189,10 +207,19 @@ colours or art in lists.
   - `Music > Playback History`
 - Control the items displayed in the Music menu and their order
   - Change via `Settings > Library > Music > Edit Music Menu`
+- Trim noise from track and album names (like featuring information)
+  - Off by default.  Turn it on via `Settings > Library > Music > Trim Titles`
+
+## Audiobooks
+- Audiobooks can be segregated from Music into their own root menu and are excluded
+from the Music menu and carousels
+  - Turn the feature on by going to `Settings > Library > Music > Segregate Audiobooks`
+  - Audiobooks should have a genre of "audiobook", "spoken word", "book", or "podcast".
 
 ## Album Covers/Artist Profiles
 
 - Simplified implementation which links to Music for tracks/albums
+- Significantly improved performance (particularly on iPod 5)
 - Control whether opening an album lists the album tracks or starts playing the album
   - `Settings > Library > Carousel > On Album Select`
 - Display the covers/profiles in a flat top-down mode
@@ -201,15 +228,18 @@ colours or art in lists.
 ## What's playing
 
 - View lyrics for currently playing music
-  - Press `Select + Play`
+  - Press `Select + Play` (the hotkey's default; reassign it under `Settings > Playback > Now Playing Screen`)
 - Control how lyrics are displayed
   - `Settings > Library > Viewers > Lyrics Viewer`
 - Show either album art or artist art in the now playing screen
   - Theme dependent (must currently show album art)
+  - In auto mode the art will be shown depending on how you arrived at playing the track. If
+you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
+ Album > Track` the album art would show.
 
 ## Documents/Images
 
-- Re-engineered engine compatible with more formats
+- Re-engineered text engine compatible with more formats
 - Control how documents are displayed (font, margin, line spacing, colours)
   - `Settings > Library > Viewers > Text Viewer`
 - See a list of all documents and images stored on the device
@@ -225,8 +255,8 @@ colours or art in lists.
   - `Settings > Appearance`
   - To reset to default
   - `Settings > Appearance > Forget My Changes`
-- Art filters available to modify art in both themes and from the cache (impacting art in rows and the carousels)
-  - `Settings > Appearance > Elements > Artwork Filter` (requires Settings Mode to be set to Everything)
+- Art filters available to modify art in the carousel
+  - `Settings > Library > Carousel > Artwork Filter`
 
 ## Language
 
@@ -245,7 +275,7 @@ colours or art in lists.
 - See all changed settings in a single view
   - `Settings > Changed Settings`
 - View a description of each setting from the setting menu
-  - Press `Select + Play` to open the context menu then select `Explain`
+  - Hold `Select` to open the context menu then select `Explain`
 
 ## Behind the scenes
 
@@ -287,10 +317,9 @@ Built on the work of:
 - the [Rockbox](https://www.rockbox.org/) project
 - the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes))
 - the [Spun](https://github.com/majorsiebe/Stats_for_iPod) project (Siebe Majoor: aka [@majorsiebe](https://github.com/majorsiebe))
-- the [Themify 2](themes/Themify_2/README.md) project (Evan Kenny: aka [Dook](https://d00k.net/))
 
 ## Licence
 
-[GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+Both RockBox and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
 
 See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).

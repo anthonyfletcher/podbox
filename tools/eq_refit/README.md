@@ -39,7 +39,7 @@ the rate it was fitted for; 44.1 kHz is the default and covers most material.
 
 Usage:
 ```
-py tools/eq_refit.py eqs/Default.cfg
-py tools/eq_refit.py eqs/*.cfg --out-dir eqs-refit
-py tools/eq_refit.py eqs/Warm.cfg --bands 3 --quiet
+py tools/eq_refit.py mypreset.cfg
+py tools/eq_refit.py presets/*.cfg --out-dir refitted
+py tools/eq_refit.py mypreset.cfg --bands 3 --quiet
 ```

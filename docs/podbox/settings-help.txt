@@ -1,20 +1,14 @@
 # On-device explanations, shown by Explain in a setting's context menu.
 #
 # One stanza per setting, keyed by its cfg name -- the name it has in a .cfg
-# file and in settings-guide.md. Complete: every setting carried by
-# settings_tags.c has one.
+# file and in settings-guide.md. Complete: every setting with a name on
+# screen has one, and so does every MENUITEM_FUNCTION in the settings tree.
+# Action rows are keyed differently -- see the "action: " note further down.
 #
-# A new setting needs a stanza adding here, and nothing enforces that: a
-# setting without one is not an error, it simply has no explanation to show.
-# This finds any that have been missed, from the repository root:
-#
-#   comm -13 <(grep -oE '^\[[^]]+\]' docs/podbox/settings-help.txt \
-#               | tr -d '[]' | sort -u) \
-#            <(grep -E '^\{ "' apps-ipod/settings/settings_tags.c \
-#               | sed 's/^{ "//; s/".*//' | sort -u)
-#
-# Action rows are keyed differently -- see the "action: " note further down --
-# and are complete too: every MENUITEM_FUNCTION in the settings tree has one.
+# A new setting needs a stanza adding here, and the build does not care: one
+# without is not an error, it simply has no explanation to show. Run
+# tools/check-settings-docs.sh from the repository root to find any that have
+# been missed, here or in settings-guide.md.
 #
 # Write for someone who has just found the setting and does not know what it
 # does. Say what it changes, and where it is useful or costly. Two or three
@@ -232,8 +226,8 @@ opposite ear -- starts being dulled. Lower values roll it off earlier and give
 a warmer, more distant effect.
 
 [eq enabled]
-Master switch for the ten-band equaliser. Load EQ is usually a better starting
-point than setting the bands by hand.
+Master switch for the ten-band equaliser. Graphical EQ is usually an easier
+starting point than setting the bands by hand.
 
 [surround enabled]
 Delay in milliseconds for the Haas effect, which widens the image by delaying
@@ -532,6 +526,28 @@ one-letter searches return more than they are worth.
 [search order]
 Which of tracks, albums and artists is listed first in search results.
 
+[segregate audiobooks]
+Keeps spoken word out of the music and gives it an Audiobooks row on the main
+menu. Albums, artists, the carousel and search then show music only.
+
+The genre tag is the whole of the evidence -- Audiobook, Spoken Word, Podcast
+and the like. A book tagged as music browses as music, and retagging it is the
+fix.
+
+[trim titles]
+Shortens the album and track names on the now playing screen by dropping a
+trailing note about the pressing -- "(feat. Clairo)", "(Taylor's Version)",
+"[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off,
+and where a whole album says the same thing after every track.
+
+Nothing on disk changes and neither does the database, so browsing and
+searching still see the full names and switching this off brings them back.
+A note at the start of a name is always kept.
+
+What counts as a note is a list in /.rockbox/trim.config, which you can edit:
+one pattern per line, and * matches anything. Switching this setting off and
+on again re-reads it.
+
 [featured artists]
 Reads guest credits out of your tags -- the "feat. Somebody" in a track title
 or artist -- and lets you browse by them, so a singer with no album of their own
@@ -560,6 +576,10 @@ that supports artwork in lists, or the rows are tall and empty.
 [database artist art]
 Draws artist photographs beside the rows in the database browser. Needs a theme
 that supports artwork in lists, or the rows are tall and empty.
+
+[database audiobook art]
+Draws cover art beside the rows in the Audiobooks browser. Needs a theme that
+supports artwork in lists, or the rows are tall and empty.
 
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
@@ -1365,7 +1385,10 @@ thumbnails -- and how far along it is.
 
 The place to look when the disk is busy and nothing on screen says why.
 
-[action: Rockbox Info]
+[action: About]
+What this firmware is, what it is built on and who made it.
+
+[action: System Info]
 Shows the version, how much memory and disk is free, and the battery reading.
 
 [action: Running Time]
@@ -1418,10 +1441,13 @@ an exact value.
 
 [action: Save EQ Preset]
 Writes the current equaliser settings to a .cfg file in /.rockbox/eqs, so they
-can be loaded again later.
+can be loaded again later. This is the only thing that puts anything in that
+folder: no presets are shipped, so Load EQ has nothing to offer until you have
+saved one.
 
 [action: Load EQ]
-Loads a saved equaliser preset, replacing the current band settings.
+Loads a preset saved by Save EQ Preset, replacing the current band settings.
+Empty on a new install, since none are shipped.
 
 [action: Reset EQ]
 Returns every band to flat, leaving the equaliser on.

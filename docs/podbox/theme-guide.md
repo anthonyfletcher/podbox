@@ -54,7 +54,7 @@ reliably.
 looks right only because the previous one set something, it will not look right
 on a clean player.
 
-The reset covers 67 settings:
+The reset covers 68 settings:
 
 | Group | Settings |
 |---|---|
@@ -63,15 +63,60 @@ The reset covers 67 settings:
 | Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
 | Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
 | Backdrop | `backdrop` |
-| Artwork | `database album art`, `database artist art`, `database art row height`, `dynamic colors` |
+| Artwork | `database album art`, `database artist art`, `database audiobook art`, `database art row height`, `dynamic colors` |
 | Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
-| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, and the 3D and Flat geometry |
+| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, `album covers filter`, and the 3D and Flat geometry |
 | Scrolling | `scroll speed`, `scroll delay`, `scroll step`, `bidir limit`, `screen scroll step`, and the two main-menu scrolling switches |
 | Playlist viewer | `playlist viewer icons`, `playlist viewer indices`, `playlist viewer track display` |
 
 Settings that are *not* about the look — the backlight, brightness, sorting,
 playback behaviour — are untouched by a theme load, and a theme has no business
 setting them.
+
+### Filtering the carousel's covers
+
+`album covers filter 1`, `2` and `3` each take one treatment from a fixed list,
+and run in the order given:
+
+```
+off  bw  invert  brightness25  brightness-25  contrast40  contrast-40
+saturate50  saturate-50  hue180  reduce4  dither  pixellate8
+```
+
+Anything outside that list is **ignored without a word** — `pixellate10` in one
+of these three leaves the carousel unfiltered, because the value has to be one
+of those spellings exactly.
+
+`album covers filter` takes a whole chain instead, written the way `%Cl` takes
+one, and **overrides all three** when it is set:
+
+```
+album covers filter: pixellate10+reduce4
+```
+
+That is the one to reach for: the three numbered settings exist so the settings
+screen has something to offer, and their list is what a menu can show rather
+than what the engine can do. Amounts are free, and steps join with `+`. See the
+filter list in the skin tag reference for what is available; a chain that will
+not compile — `blur`, or `darker` and the other adaptive ones, which need more
+than the slide's own buffer — leaves the covers unfiltered rather than half
+done.
+
+### Editing a `.cfg` that is already loaded does nothing
+
+A theme `.cfg` is **imported once, when the theme is selected** — its values are
+copied into the player's own `config.cfg` and the link ends there. Editing the
+theme file afterwards changes nothing at all until you select the theme again.
+
+This bites hardest while a theme is being written, because the settings that
+are *not* taking effect are the ones you just changed. Re-select the theme
+after every edit, or check `config.cfg` to see what the player actually holds.
+
+The reverse is also true and easier to miss: most look-related settings are
+reset to their defaults *before* the theme file is read (that is what makes a
+theme self-contained rather than inheriting the last one's leftovers). So a
+value you set by hand in `config.cfg`, or from the settings menu, is discarded
+the moment any theme loads. If you want it to stick, it belongs in the `.cfg`.
 
 ### Your `.cfg` must name a font
 
@@ -151,12 +196,21 @@ theme is built around one signature accent that must not move, put
 The palette is read from the album-art cache's own thumbnail — the same
 pre-scaled covers the carousel and the browser use. No skin tag is involved,
 so **a theme that never mentions album art still gets colours**, as long as the
-art cache has a thumbnail for the track's folder.
+art cache has a thumbnail for the track's folder. With the album art source set
+to Artist — or to Auto on a playlist built from an artist browse — the cached
+portrait is read instead, so a theme showing artist photos takes its colours
+from the photo rather than from the cover.
 
-When it does not, the extractor falls back to the cover the playback engine has
-buffered, and only a `%Cl` causes anything to be buffered. So a `%Cl` is worth
-declaring even in a theme that draws no artwork — it is what covers the tracks
-the cache has not reached:
+When the cache has nothing for the folder, the extractor falls back to the
+cover the playback engine has buffered, and only a `%Cl` causes anything to be
+buffered. A theme with no `%Cl` keeps its own colours until the caching pass
+reaches that album.
+
+That is the whole of what a colour-only `%Cl` buys: colours on the first play
+of an album the cache has not got to yet. It is not free — a 100×100 cover is
+about 20 KB of the audio buffer for every track buffered ahead, and it spends
+one of the two artwork sizes the whole UI has to share. Declare one if first
+plays matter to you:
 
 ```
 # Loaded for the colour extractor only. No %Cd, so nothing is drawn.
@@ -167,16 +221,6 @@ Put it in **both** the `.sbs` and the `.wps` with the *same* dimensions, so the
 two share a single buffered copy rather than spending both slots. The `.sbs`
 one matters because it makes the colours available on list screens before the
 playing screen has ever been opened.
-
-Two cases where that fallback is the only source, and a `%Cl` is doing real
-work:
-
-- **The "album art source" setting is Artist**, or Auto on a playlist built
-  from an artist browse. The palette then comes from whatever the slot holds, so
-  a theme showing artist portraits takes its colours from the portrait rather
-  than from the album cover.
-- **A track whose folder the art cache has no thumbnail for**, which is any
-  album the cache has not got to yet.
 
 Two things to know if you are relying on that fallback:
 
@@ -357,15 +401,20 @@ different row *width* or a different set of viewports.
 
 ### Turning it on
 
-Both switches, or the browser never attaches an art callback and the art branch
-never draws:
+One switch per kind of list, or the browser never attaches an art callback and
+the art branch never draws:
 
 ```
 database album art: on
 database artist art: on
+database audiobook art: on
 ```
 
-They reset when your theme loads (§2), so both have to be stated.
+They reset when your theme loads (§2), so each has to be stated. The third is
+easy to miss: an audiobook album list is a spoken list, and it reads
+`database audiobook art` rather than `database album art` — so a theme naming
+only the first two draws plain rows under Audiobooks. There is no artist-art
+switch for spoken lists: an audiobook author list is plain whatever you set.
 
 The row height for an art list is the **fifth argument to `%Lb`** (below). Name
 it there rather than in the `.cfg`: it sits with the viewport offsets that
@@ -410,8 +459,10 @@ Change the 46 and both move with it.
   paints over whatever is beside the list, and nothing ever erases it.
 - **Declare ordinary-row viewports before art-row ones.** A row viewport clears
   its own line, and the reverse order wipes the cover.
-- The cover is a fixed **44×44**, drawn clipped and never scaled, so the art
-  viewport must be at least 44×44.
+- **The cover fills as much of its viewport as a cached size allows.** It is
+  drawn 1:1 and never scaled, so a smaller viewport crops it and a larger one
+  leaves a gap. The cache offers rows one size, **44×44**, so make the art
+  viewport that and nothing else fits any better.
 
 ### `%?La` answers per *list*, not per row
 
@@ -483,7 +534,8 @@ needs one of each, in the same colour.
 **Themes cannot draw this screen.** When USB is connected the firmware draws its
 own message box over whatever was on screen. Your `.sbs` is not rendered at all
 for the whole session, so a `%cs` 21 branch never runs and none of your status
-bar shows.
+bar shows. (`custom-skin-tags.md` has the whole `%cs` table, including which
+other numbers can never come up here.)
 
 Upstream Rockbox does the opposite — it keeps the theme up and repaints it a
 couple of times a second — so themes ported from upstream often carry a USB
@@ -548,34 +600,7 @@ escaping.
 
 ---
 
-## 8. Things that catch people out
-
-**A `.cfg` value the parser does not recognise is discarded in silence.** The
-setting keeps whatever it already had, nothing appears on screen, and the theme
-still loads. The usual cause is writing the label shown in the settings menu
-rather than the value the file expects:
-
-| Written | Accepted values | Result |
-|---|---|---|
-| `statusbar: custom` | `off`, `top`, `bottom` | ignored — a theme with its own bar gets the built-in one |
-| `selector type: bar (solid colour)` | `bar (color)` | falls back to the default |
-| `battery display: graphical` | `graphic` | ignored |
-
-**Filenames longer than 32 characters are discarded the same way.** `font`,
-`font bold`, `iconset` and the rest cap the basename — without the directory and
-the extension — at 32 characters. A longer one is rejected outright, so your
-theme quietly keeps the previous theme's font. This applies only to `.cfg`
-settings: a `%Fl(id, name.fnt)` inside a skin has no such limit, so the same font
-file can work as a preloaded skin font and fail as `font:`.
-
-**A custom iconset's row order is fixed.** The bitmap is divided into exactly 32
-equal slots and each slot is a specific icon; you cannot name, reorder or add
-one. Match the order of a stock iconset. A bitmap of the wrong height is not an
-error — the slots simply come out the wrong size.
-
----
-
-## 9. Checking your theme
+## 8. Checking your theme
 
 `checkwps` parses a skin and reports syntax errors and missing fonts or bitmaps.
 It must be **run from inside a `.rockbox` directory**, because font and bitmap
@@ -591,14 +616,18 @@ What it proves is that your tags and syntax are valid and your assets exist. It
 does not exercise colours, list rendering, the USB handover or anything else in
 this document — a theme can report "parsed OK" and still be wrong on screen.
 
-Three habits worth having:
+It runs the same parser the player does, so every tag in this document is
+understood — `!rrggbb` fixed colours and the extra `%dr` arguments included. A
+tag it rejects is a tag the player rejects too.
 
-- **Validate your `.cfg` by eye against §2 and §8.** Nothing checks it, and every
-  mistake in it is silent.
-- **Load your theme onto a player that has just been reset**, or after loading a
-  very different theme. Since nothing about the look is inherited any more (§2),
-  that is the only way to see what a new user sees — testing by reloading your
-  own theme over itself hides every setting you forgot to name.
-- **Test on the device early.** Static reasoning about the skin engine has a poor
-  record; a build on hardware settles in one sync what an afternoon of reading
-  does not.
+A skin can also fail *after* it has parsed, on a font or a bitmap it names.
+There is no line and no caret for that, only "WPS parsing failure" and a note to
+run it again with `-v`, which names the file it could not open. Two things
+account for most of them:
+
+- **A name whose capitals do not match**, if you are checking on Linux or a Mac
+  with a case-sensitive disk. The player's disk is FAT and does not distinguish
+  `24x24_Icons.fnt` from `24x24_icons.fnt`; those do.
+- **An image drawn but never preloaded.** `%xd(icons,…)` needs its
+  `%xl(icons,…)` earlier in the same file, and the failure reads as a syntax
+  error somewhere near the `%xd`, not as a missing declaration.

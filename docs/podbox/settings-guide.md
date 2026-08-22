@@ -1,12 +1,7 @@
 # Settings guide
 
-Every setting PodBox has, in the order you meet it, with what it does and
-whether it is hidden by default.
-
-Descriptions here are the same text the player shows: **Explain**, in a
-setting's context menu, reads them from `/.rockbox/docs/settings-help.txt`, and
-the tables below are generated from that file. If the two ever disagree, the
-file is right and this document has gone stale.
+This document is a guide to every setting PodBox has (which is MANY), in the order you 
+meet it, with what it does and whether it is hidden by default.
 
 ---
 
@@ -21,9 +16,8 @@ how much you see.
 
 A setting is marked advanced when the default is already the right answer for
 someone who has not thought about it — because you would need to know how the
-feature works to set it, because it shapes something whose on/off row is
-elsewhere, because it exists for one piece of hardware, or because it is there
-for theme authors.
+feature works to set it, or because it shapes something whose on/off row is
+elsewhere.
 
 Two things are never hidden, whatever the mode:
 
@@ -31,12 +25,6 @@ Two things are never hidden, whatever the mode:
   *my new album isn't showing up*;
 - **the way back from a visible problem** — Dynamic Colors stays in Standard
   even though its tuning does not.
-
-A screen whose rows are all advanced disappears in Standard rather than opening
-empty. Database, Dialogs and Peak Meter are the three that do.
-
-Nothing is unreachable in Standard: **Search**, at the top of the tree, finds
-every setting whatever the mode, and opens it directly.
 
 ---
 
@@ -57,15 +45,6 @@ Settings
 └─ Changed Settings…           everything no longer at its default
 ```
 
-Two things appear in more than one place, each as the same item rather than a
-copy — set it in either and both show the change. **Viewers** is under both
-Appearance and Library, because
-the viewers are opened from the browsers and look the way the theme tells them
-to. **Now Playing Artwork** is under both Appearance ▸ Elements and Playback ▸
-Now Playing Screen: it is the one row of that screen about how anything
-looks, and it belongs with the other two artwork rows as much as with the
-screen it applies to.
-
 ---
 
 ## Library — Maintenance
@@ -78,19 +57,13 @@ before it starts. All of them queue work for the background and return at once.
 |---|---|
 | Update Database | Finds music added since the last scan. The fix for *my new album isn't showing up*. |
 | Update Index | Refreshes the album and artist lists the carousels and charts read. |
-| Update Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
+| Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
 | Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
 | Rebuild Database | Discards the database and reads every file again. Slow. |
 | Rebuild Index | Discards the album and artist lists and derives them again. |
-| Rebuild Cache | Purges every thumbnail and regenerates from the original artwork. |
+| Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
 
 ---
-
-## Every setting
-
-Rows marked **Adv** are hidden unless Settings Mode is Everything. Defaults are
-what a Reset Settings produces, read from the player itself rather than typed
-out here.
 
 ### Sound Settings
 
@@ -123,7 +96,7 @@ out here.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enable EQ | Master switch for the ten-band equaliser. Load EQ is usually a better starting point than setting the bands by hand. | off |  |
+| Enable EQ | Master switch for the ten-band equaliser. Graphical EQ is usually an easier starting point than setting the bands by hand. | off |  |
 | Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. | 0 | **Adv** |
 
 ### Sound Settings — Haas Surround
@@ -268,14 +241,16 @@ out here.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Sort Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
-| Sort Albums By ▸ Artist | The order for the album list inside an artist. Genre and Year reach albums through an artist too, so they follow this one. | default |  |
+| Sort Albums By ▸ Artist | The order for the album list inside an artist. Genre and Year reach albums through an artist too, so they follow this row as well. | default |  |
 | Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. | default |  |
 | Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
-| Sort Albums By ▸ Other Lists | The order for every album list with no row of its own above, and what the four **default** values follow. By name, or by release year with either end first. | name |  |
+| Sort Albums By ▸ Other Lists | The order for every album list that has no row of its own under Album Sort Order: by name, or by release year with either end first. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
 | Featured Artists | Reads guest credits out of your tags -- the "feat. Somebody" in a track title or artist -- and lets you browse by them, so a singer with no album of their own still turns up. On, Music gains a Featured Artists row and an artist's album list gains one for the records they only guest on; the credits are worked out once per boot, at the first entry to Music. Needs the database loaded to RAM. A name with a comma or an ampersand in it, like Tyler, The Creator, reads as two people unless the player has an album under it. Put such names one per line in /.rockbox/known_artists.txt and they are treated as whole; the file is read when the credits are worked out, so a boot or a database update applies it. | off |  |
-| Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
-| Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
-| Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
+| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu. Albums, artists, the carousel and search then show music only. The genre tag is the whole of the evidence -- Audiobook, Spoken Word, Podcast and the like. A book tagged as music browses as music, and retagging it is the fix. | off |  |
+| Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "(Taylor's Version)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off, and where a whole album says the same thing after every track. Nothing on disk changes and neither does the database, so browsing and searching still see the full names and switching this off brings them back. A note at the start of a name is always kept. What counts as a note is a list in /.rockbox/trim.config, which you can edit: one pattern per line, and * matches anything. Switching this setting off and on again re-reads it. | off |  |
+| Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
+| Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
+| Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
 
 ### Library — Carousel
 
@@ -332,13 +307,6 @@ out here.
 |---|---|---|---|
 | While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | none |  |
 | Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | none |  |
-| Backdrop | An image drawn behind everything. Loading a theme replaces it, and a theme that names none clears it rather than keeping the last one. | none |  |
-| Bold Font | An optional bold companion to the interface font, used where a screen wants emphasis. Unset means the regular font is used for both. | none | **Adv** |
-| Iconset | The image file the list icons are taken from. A theme-author setting. | /.rockbox/icons/tango_icons.16x16.bmp | **Adv** |
-| Viewers Iconset | The icon set used for file types in the browser. A theme-author setting. | /.rockbox/icons/tango_icons_viewers.16x16.bmp | **Adv** |
-| Filetype Colours | A file naming a colour per extension, so the browser can colour-code types. A theme-author setting. | none | **Adv** |
-| UI Viewport | The rectangle a theme reserves for lists, so its own decoration is not drawn over. A theme-author setting. | none | **Adv** |
-| Progress Bar Radius | Corner rounding of the progress bar, in pixels. A theme-author setting: most themes draw their own bar and ignore it. | 2 | **Adv** |
 
 ### Appearance — Colours
 
@@ -346,10 +314,10 @@ out here.
 |---|---|---|---|
 | Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
 | Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
-| Line Selector Start Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
-| Line Selector End Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
-| Line Selector Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
-| Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
+| Line Selector Colours ▸ Primary Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
+| Line Selector Colours ▸ Secondary Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
+| Line Selector Colours ▸ Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
+| Line Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
 | Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
 | Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
 | Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
@@ -384,7 +352,9 @@ shadow to colour.
 | Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 | Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Album Art Row Height | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Adv** |
+| Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Cfg** |
+| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 
 ### Appearance — Dialogs
 
@@ -410,7 +380,6 @@ shadow to colour.
 | List Order | Whether lists are traversed from the top down or the bottom up. | ascending | **Adv** |
 | Screen Scrolls Out of View | Lets a line of scrolling text carry on past the edge of its viewport instead of stopping at it. Looks better on a theme whose list has room to spare, and clips awkwardly on one that does not. | No | **Adv** |
 | Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. The main menu is glanced at rather than read, and text moving under the cursor there is more distracting than helpful. | No | **Adv** |
-| Hold Left/Right to Scroll a List | Holding left or right scrolls a list rather than repeating whatever those buttons do on the current screen. | on | **Adv** |
 
 ### Appearance — Peak Meter
 
@@ -425,22 +394,22 @@ shadow to colour.
 
 ### Appearance / Library — Viewers
 
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Colour Mode | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
-| Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
-| Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
-| Page Number | Shows a page counter at the foot. | off |  |
-| Text Viewer Font | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. | /.rockbox/fonts/22-Literata.fnt |  |
-| Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
-| Alignment | Whether lyric lines are aligned left, centred or right. | centre |  |
-| Line Spacing | Extra pixels between lyric lines. | 2 | **Adv** |
-| Previous Line | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
-| Next Line | How far lines still to come fade back. | 55 | **Adv** |
-| Animation | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
-| Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
-| Keep Backlight On | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. Costs battery. | on |  |
-| Lyrics Font | A font used only by the lyrics screen. Unset uses the interface font. | none |  |
+| Setting                              | What it does | Default | |
+|--------------------------------------|---|---|---|
+| Text Viewer ▸ Colour Mode            | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
+| Text Viewer ▸ Margin                 | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
+| Text Viewer ▸ Line Spacing           | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
+| Text Viewer ▸ Page Number            | Shows a page counter at the foot. | off |  |
+| Text Viewer ▸ Font                   | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. |  |  |
+| Lyrics Viewer ▸ Colour Mode          | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
+| Lyrics Viewer ▸ Alignment            | Whether lyric lines are aligned left, centred or right. | centre |  |
+| Lyrics Viewer ▸ Line Spacing         | Extra pixels between lyric lines. | 2 | **Adv** |
+| Lyrics Viewer ▸ Previous Line        | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
+| Lyrics Viewer ▸ Next Line            | How far lines still to come fade back. | 55 | **Adv** |
+| Lyrics Viewer ▸ Animation            | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
+| Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
+| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. Costs battery. | on |  |
+| Lyrics Viewer ▸ Font                 | A font used only by the lyrics screen. Unset uses the interface font. |  |  |
 
 ### Battery & Power
 
@@ -560,9 +529,3 @@ while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
 straight after the theme, so they survive the reset. *Forget My Changes*, at the
 foot of Appearance, throws them away and reloads the theme as its author
 shipped it.
-
-A `.cfg` counts as a theme, and so triggers the reset, only if it names a font.
-One that does not is considered a patch, and is applied on top of what is already 
-there.
-
-See [`theme-guide.md`](theme-guide.md) §2 for this from the theme author's side.

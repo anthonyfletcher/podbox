@@ -9,8 +9,6 @@
 - **[RockPod](https://github.com/nuxcodes/rockpod)** is a separate fork of Rockbox and PodBox carries some of its work:
   iPod hardware support (SSD-aware power management, S5L8702 boot and clock
   fixes, codec and charging fixes) and builds on the album-art "dynamic colours".
-- **[Themify 2](../../themes/Themify_2/README.md)** is a theme by [Dook](https://d00k.net/).
-  RockPod modified it and the version here is modified further again.
 
 ## What is different from Rockbox
 
@@ -23,8 +21,9 @@
   have. There *is* a desktop simulator, which is a development tool rather than
   a build of the firmware; see [Running the simulator](#running-the-simulator).
 - **No plugin system.** The handful of plugins worth keeping became ordinary core
-  screens: the text and image viewers, properties, playing time, credits. If you
-  miss Doom you need help.
+  screens: the text and image viewers, properties, playing time, credits. Two
+  more were written as core screens from the start — the lyrics viewer and the
+  Spun listening-statistics deck. If you miss Doom you need help.
 
 **The application layer is a different tree.** `apps-ipod/` replaces Rockbox's
 `apps/`: reorganised by purpose to make development easier, and every file
@@ -74,7 +73,7 @@ Rockbox builds out of tree, and `build-hw.sh` is only wrapping four steps:
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip
-../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh && ../bundle-help.sh
+../bundle-theme.sh && ../bundle-licenses.sh && ../bundle-help.sh
 ```
 
 Two of them are easy to get wrong by hand, and both fail quietly:
@@ -84,9 +83,9 @@ Two of them are easy to get wrong by hand, and both fail quietly:
   instead — you get working firmware with none of this fork's work in it.
 - **`make zip` on its own is incomplete.** `tools/buildzip.pl` is deliberately
   kept close to Rockbox and knows nothing about this fork, so its zip has no
-  themes, no first-boot config, no iconset, no EQ presets, no setting
-  explanations, and Rockbox's licence file rather than this fork's. The four
-  `bundle-*.sh` scripts add them and strip what a plugin-less build cannot use.
+  theme, no first-boot config, no iconset, no setting explanations, and
+  Rockbox's licence file rather than this fork's. The three `bundle-*.sh`
+  scripts add them and strip what a plugin-less build cannot use.
   `bundle-help.sh` is the one to watch: skip it and every **Explain** entry in
   a setting's context menu simply shows nothing, while everything else looks
   finished.
@@ -123,8 +122,7 @@ survives it.** Your music and database are worth more than the rebuild.
 mkdir build-sim-ipodvideo && cd build-sim-ipodvideo
 ../tools/configure --target=ipodvideo --type=s --appsdir=apps-ipod
 make -j"$(nproc)"
-make zip && ../bundle-theme.sh && ../bundle-eqs.sh && ../bundle-licenses.sh \
-         && ../bundle-help.sh
+make zip && ../bundle-theme.sh && ../bundle-licenses.sh && ../bundle-help.sh
 rm -rf simdisk/.rockbox && unzip -q rockbox.zip -d simdisk/
 ```
 

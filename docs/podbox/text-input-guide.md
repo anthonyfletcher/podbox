@@ -98,15 +98,18 @@ Search puts the same editor above a live list of database matches. It is the
 best place to get a feel for the control, because results appear as you type.
 
 **Finding it.** It sits in the **Music** list directly above *Search by…*. It
-can also be added to the main menu (*Settings → Main Menu Settings*). Both
-entries are hidden unless the database is loaded into RAM — the scan reads every tag, which
-from disk is unusably slow.
+can also be added to the main menu (*Settings → Appearance → Edit Main Menu*).
+Both entries are hidden unless the database is loaded into RAM — the scan reads
+every tag, which from disk is unusably slow.
 
 The search runs about a second after you stop turning the wheel, not on every
-character, so a long query costs one scan rather than twenty.
+character, so a long query costs one scan rather than twenty. It waits for a
+minimum number of letters first, one by default; *Settings → Library → Music →
+Search → Minimum Letters* raises it if one-letter searches turn up more than
+they are worth.
 
 **What is matched.** Case-insensitive, anywhere in the text — `beat` finds
-*Heartbeat*. Three tags are searched, and the results are grouped in this order:
+*Heartbeat*. Three tags are searched, and the results are grouped by tag:
 
 | Icon | Tag | Selecting it |
 |---|---|---|
@@ -115,6 +118,10 @@ character, so a long query costs one scan rather than twenty.
 | Artist | Album artist | Opens that artist's albums |
 
 Per-track artist is not searched; search the album artist instead.
+
+Tracks come first, then albums, then artists. *Settings → Library → Music →
+Search → Result Order* offers the other five arrangements, so whichever you
+look for most can be the group you land on.
 
 ### Moving around
 
@@ -127,4 +134,7 @@ Per-track artist is not searched; search the album artist instead.
 **Between visits.** The query is remembered until the player reboots, so
 reopening Search resumes where you left off and re-runs itself a moment later.
 
-The query is capped at 32 characters and the first 200 matches are kept.
+The query is capped at 32 characters. How many matches are kept is *Settings →
+Library → Music → Search → Maximum Results* — 50 by default, and up to 200.
+Raising it is rarely the answer: another letter finds the record quicker than
+scrolling does.
