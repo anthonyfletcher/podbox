@@ -215,7 +215,7 @@ usbstack
  * otherwise leave ungenerated in a sim, and the build fails on the phrase
  * rather than on the feature. Both hardware targets satisfy all three
  * conditions already, so none of their lang output changes. */
-#if defined(USB_ENABLE_HID) || defined(SIMULATOR)
+#if defined(USB_ENABLE_HID) || defined(SIMULATOR) || defined(__PCTOOL__)
 usb_hid
 #if defined(HAVE_USB_HID_MOUSE)
 usb_hid_mouse

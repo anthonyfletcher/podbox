@@ -23,14 +23,14 @@
 #include <string.h>
 #include "config.h"
 #include "checkwps.h"
-#include "resize.h"
-#include "wps.h"
+#include "draw/resize.h"
+#include "screens/playback/wps.h"
 #include "skin_buffer.h"
 #include "skin_debug.h"
-#include "skin_engine.h"
-#include "wps_internals.h"
-#include "settings.h"
-#include "viewport.h"
+#include "skin/skin_engine.h"
+#include "skin/wps_internals.h"
+#include "settings/settings.h"
+#include "draw/viewport.h"
 #include "file.h"
 #include "font.h"
 
@@ -163,7 +163,7 @@ int remote_getwidth(void) { return LCD_REMOTE_WIDTH; }
 int remote_getheight(void) { return LCD_REMOTE_HEIGHT; }
 #endif
 
-static inline bool backdrop_load(const char *filename, char* backdrop_buffer)
+bool backdrop_load(const char *filename, char* backdrop_buffer)
 {
  (void)filename; (void)backdrop_buffer; return true;
 }
@@ -361,6 +361,11 @@ int main(int argc, char **argv)
         if (!res) {
             printf("WPS parsing failure\n");
             skin_error_format_message();
+            /* A skin can also fail after it has parsed, on a bitmap or a font
+             * it names. That leaves no error line, and the reason is a debugf
+             * which only -v shows. */
+            if (!skin_error_line() && !debug_wps)
+                printf("Run again with -v for the reason.\n");
             ret = 3;
             goto done;
         }

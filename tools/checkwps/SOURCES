@@ -1,12 +1,16 @@
 #undef unix /* messes up filesystem-unix.c below */
-../../apps/gui/skin_engine/skin_parser.c
+../../apps-ipod/skin/skin_parser.c
 ../../apps-ipod/skin/custom_tags.c
-../../apps/gui/skin_engine/skin_backdrops.c
-../../apps/gui/viewport.c
-../../apps/language.c
-../../apps/misc.c
-../../apps/settings.c
-../../apps/settings_list.c
+../../apps-ipod/skin/skin_backdrops.c
+../../apps-ipod/draw/viewport.c
+../../apps-ipod/speech/language.c
+../../apps-ipod/draw/color.c
+../../apps-ipod/settings/settings_list.c
+../../apps-ipod/system/strutil.c
+../../apps-ipod/draw/round_rect.c
+../../apps-ipod/draw/img_filter.c
+../../lib/fixedpoint/fixedpoint.c
+../../firmware/common/itoa_buf.c
 ../../firmware/common/strmemccpy.c
 ../../firmware/common/strlcpy.c
 ../../firmware/common/pathfuncs.c
@@ -17,9 +21,7 @@
 ../../firmware/target/hosted/filesystem-unix.c
 #endif /* WIN32 */
 ../../firmware/target/hosted/filesystem-app.c
-#ifdef DEBUG
-../../firmware/debug.c
-#endif
 checkwps.c
+stubs.c
 
-../../apps/recorder/bmp.c
+../../apps-ipod/draw/bmp.c

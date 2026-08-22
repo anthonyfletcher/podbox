@@ -19,3 +19,24 @@ To add a new target
 -------------------
 
 No action necessary, list of targets is parsed out of the configure script
+
+PodBox notes
+------------
+
+This is not upstream's checkwps any more. It links the skin engine from
+apps-ipod/, so it accepts every tag the player does -- upstream's parser
+rejects a !rrggbb fixed colour and crashes on a %dr given an opacity or a
+radius.
+
+Run it from inside a .rockbox directory. Font and bitmap paths in a skin are
+relative to the on-device layout, so from anywhere else it fails on the fonts
+rather than on the skin.
+
+    cd <theme>/.rockbox && checkwps.ipodvideo wps/*.sbs wps/*.wps
+
+A skin can fail after it has parsed, on a font or bitmap it names. There is no
+error line for that -- the reason is a debugf, and -v is what shows it.
+
+stubs.c stands in for the rest of the firmware: the allocator, the status bar,
+and every callback the settings table names. A new setting whose callback is
+not there fails the link, and one more line is the fix.

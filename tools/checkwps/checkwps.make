@@ -8,23 +8,31 @@
 ENGLISH := english
 
 # Use global GCCOPTS
-GCCOPTS += -D__PCTOOL__ -DCHECKWPS
+# __PCTOOL__ makes font.h skip the generated sysfont.h, which this build has
+# no rule for; the height is the 08-Schumacher-Clean system font's.
+GCCOPTS += -D__PCTOOL__ -DCHECKWPS -DSYSFONT_HEIGHT=8
 
 CHECKWPS_SRC = $(call preprocess, $(TOOLSDIR)/checkwps/SOURCES)
 CHECKWPS_OBJ = $(call c2obj,$(CHECKWPS_SRC)) $(BUILDDIR)/lang/lang_core.o
 
 OTHER_SRC += $(CHECKWPS_SRC)
 
-INCLUDES = -I$(ROOTDIR)/apps/gui \
-           -I$(ROOTDIR)/apps/gui/skin_engine \
+# The skin parser is the fork's, not upstream's, so the application-layer
+# include path has to be the one apps-ipod/apps.make sets: api/ first, then
+# the directory itself. APPSDIR is this tool's own directory here, so it is
+# COREAPPSDIR that names the application layer.
+# checkwps/include holds shadows of the three firmware headers that stop
+# declaring things under __PCTOOL__, and has to be found FIRST for their
+# #include_next to work.
+INCLUDES = -I$(TOOLSDIR)/checkwps/include \
+           -I$(COREAPPSDIR)/api \
+           -I$(COREAPPSDIR) \
            -I$(FIRMDIR)/kernel/include \
            -I$(ROOTDIR)/firmware/export \
            -I$(ROOTDIR)/firmware/include \
            -I$(ROOTDIR)/firmware/target/hosted \
            -I$(ROOTDIR)/firmware/target/hosted/sdl \
-           -I$(ROOTDIR)/apps \
-           -I$(ROOTDIR)/apps/recorder \
-           -I$(ROOTDIR)/apps/radio \
+           -I$(ROOTDIR)/lib/fixedpoint \
            -I$(ROOTDIR)/lib/rbcodec \
            -I$(ROOTDIR)/lib/rbcodec/metadata \
            -I$(ROOTDIR)/lib/rbcodec/dsp \
@@ -49,7 +57,7 @@ $(BUILDDIR)/fontbundle.h: $(ROOTDIR)/fonts/*bdf
 
 #### Everything below is hacked in from apps.make and lang.make
 
-$(BUILDDIR)/apps/features: $(ROOTDIR)/apps/features.txt
+$(BUILDDIR)/apps/features: $(COREAPPSDIR)/features.txt
 	$(SILENT)mkdir -p $(BUILDDIR)/apps
 	$(SILENT)mkdir -p $(BUILDDIR)/lang
 	$(call PRINTS,PP $(<F))
@@ -62,9 +70,9 @@ $(BUILDDIR)/apps/genlang-features:  $(BUILDDIR)/apps/features
 
 $(BUILDDIR)/lang_enum.h: $(BUILDDIR)/lang/lang.h $(TOOLSDIR)/genlang
 
-$(BUILDDIR)/lang/lang.h: $(ROOTDIR)/apps/lang/$(ENGLISH).lang $(BUILDDIR)/apps/features $(TOOLSDIR)/genlang $(BUILDDIR)/apps/genlang-features
+$(BUILDDIR)/lang/lang.h: $(COREAPPSDIR)/lang/$(ENGLISH).lang $(BUILDDIR)/apps/features $(TOOLSDIR)/genlang $(BUILDDIR)/apps/genlang-features
 	$(call PRINTS,GEN lang.h)
-	$(SILENT)$(TOOLSDIR)/genlang -e=$(ROOTDIR)/apps/lang/$(ENGLISH).lang -p=$(BUILDDIR)/lang -t=$(MODELNAME):`cat $(BUILDDIR)/apps/genlang-features` $<
+	$(SILENT)$(TOOLSDIR)/genlang -e=$(COREAPPSDIR)/lang/$(ENGLISH).lang -p=$(BUILDDIR)/lang -t=$(MODELNAME):`cat $(BUILDDIR)/apps/genlang-features` $<
 
 $(BUILDDIR)/lang/lang_core.c: $(BUILDDIR)/lang/lang.h $(TOOLSDIR)/genlang
 

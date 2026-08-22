@@ -180,7 +180,13 @@ struct gradient_config {
 #define VP_DRAW_WASHIDDEN   0x4
 /* these are never drawn, nor cleared, i.e. just ignored */
 #define VP_NEVER_VISIBLE    0x8
+/* CheckWPS compiles the parser with __PCTOOL__, where OFFSETTYPE() is the
+ * real pointer type rather than an offset, so the sentinel has to be one. */
+#ifndef __PCTOOL__
 #define VP_DEFAULT_LABEL    -200
+#else
+#define VP_DEFAULT_LABEL    NULL
+#endif
 #define VP_DEFAULT_LABEL_STRING "|"
 struct skin_viewport {
     struct viewport vp;   /* The LCD viewport struct */

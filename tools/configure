@@ -434,7 +434,9 @@ simcc () {
 
  sdl=`findsdl $winbuild`
 
- if [ -n `echo $app_type | grep "sdl"` ]; then
+ # The unquoted backtick collapses to a bare [ -n ], which is always true, so
+ # every simcc type demanded SDL. CheckWPS and warble link none of it.
+ if echo "$app_type" | grep -q "sdl"; then
     if [ -z "$sdl" ]; then
         echo "configure didn't find ${sdl_config}, which indicates that you"
         echo "don't have SDL (properly) installed. Please correct and"

@@ -24,6 +24,4 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define SYSFONT_HEIGHT 8
-
 #endif
