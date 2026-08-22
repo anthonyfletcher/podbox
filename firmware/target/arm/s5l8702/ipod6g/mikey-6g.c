@@ -52,6 +52,8 @@
 #include "i2c-s5l8702.h"
 #include "mikey-target.h"
 
+extern int rec_hw_ver;   /* capture hardware version, gpio-s5l8702.c */
+
 #define MIKEY_ADDR      0x72
 #define MIKEY_REG_MODE  0       /* mic bias + detection-engine mode */
 #define MIKEY_REG_BTN   4       /* center-button level */
@@ -101,6 +103,15 @@ void mikey_reset(void)
 {
     mikey_write(MIKEY_REG_MODE, MIKEY_MODE_OFF);
     mikey_write(1, 0x80);
+}
+
+/* One raw read of the mode register, return code and all. Separates the two
+ * things an absent remote looks like from the debug screen: a NAK (non-zero
+ * rc) means the jack is empty or this unit has no Mikey, while rc 0 means
+ * the chip is here and answering. */
+int mikey_probe(unsigned char *reg0)
+{
+    return i2c_read(0, MIKEY_ADDR, MIKEY_REG_MODE, 1, reg0);
 }
 
 /* The three the polling thread shares with its callers. mikey_btn is written
@@ -336,6 +347,13 @@ int mikey_button_read(void)
 
 void mikey_init(void)
 {
+    /* Version 0 capture hardware -- the 80GB and fat 160GB models -- has no
+     * jack microphone and no Mikey on the bus, so there is nothing to poll.
+     * The version table is in gpio-s5l8702.c. Without this the thread runs
+     * anyway and probes until its retry budget is spent. */
+    if (rec_hw_ver == 0)
+        return;
+
     /* Presence can't be probed here: the chip only ACKs while the
      * jack is occupied (booting without headphones must not disable
      * the remote). The thread probes on insertion instead and backs

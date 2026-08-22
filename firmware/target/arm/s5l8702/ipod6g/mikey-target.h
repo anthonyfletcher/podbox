@@ -27,6 +27,7 @@
 unsigned char mikey_read(int address);
 int  mikey_write(int address, unsigned char val);
 void mikey_reset(void);
+int  mikey_probe(unsigned char *reg0);
 
 /* Recording-path handover: while the jack mic is enabled the remote
  * polling backs off and Mikey stays in plain mic-bias mode. */

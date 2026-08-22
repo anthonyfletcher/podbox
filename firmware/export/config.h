@@ -613,31 +613,6 @@ Lyre prototype 1 */
 #endif
 #endif
 
-/* ---- Upstream features this fork declines -------------------------------
- *
- * A decision not to take an upstream feature has to be expressed in code, here
- * or somewhere else this fork owns. Recording it in a document is not enough:
- * `git merge rockbox/master` only stops to ask about files this fork also
- * edits, and takes upstream's copy of everything else without asking. So a
- * feature whose wiring lives in files this fork has never touched arrives
- * enabled, no matter what any document says about it.
- *
- * Undefining the gate is the cheapest way to hold one out. The code can then
- * land wherever a merge puts it and compile to nothing, so nothing has to be
- * kept out of the tree by hand.
- *
- * Reasoning for each of these is in docs/podbox/upstream-commit-log.md.
- */
-
-/* b217a55059 -- iPod Classic inline earphone remote, decoded by the jack
- * "Mikey" controller. Deferred on maturity: upstream reverse engineered the
- * protocol on-device, and the debug hook it ships exists because the remote-ID
- * behaviour varies between units. Every hook it adds is #ifdef'd on this, and
- * mikey-6g.c is only reached through them, so undefining it compiles out the
- * driver and its polling thread. Delete this line to take the feature -- and
- * see the commit log first, it needs more than the upstream diff. */
-#undef HAVE_MIKEY_REMOTE
-
 /* keep this include after the target configs */
 #ifdef SIMULATOR
 #include "config/sim.h"
@@ -1425,9 +1400,7 @@ Lyre prototype 1 */
  * here can reproduce. This is not a judgement on the code.
  *
  * To re-enable: delete PODBOX_NO_USB_IAP below. Nothing else is needed --
- * the driver, its SOURCES entries and the descriptors are all already present.
- * Note it also brings HAVE_MULTIMEDIA_KEYS back, which nothing in apps-ipod
- * currently consumes. */
+ * the driver, its SOURCES entries and the descriptors are all already present. */
 #define PODBOX_NO_USB_IAP
 
 #if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) \
@@ -1435,13 +1408,16 @@ Lyre prototype 1 */
 #define USB_ENABLE_IAP
 #endif
 
-#if defined(USB_ENABLE_IAP)
-#define HAVE_MULTIMEDIA_KEYS
-#endif
-
 #endif /* BOOTLOADER */
 
 #endif /* HAVE_USBSTACK */
+
+/* "this target can produce multimedia key codes". Two independent producers,
+ * so this sits outside the USB block: a dock or head unit over USB iAP, and
+ * the 6G's inline earphone remote. Both gates are non-bootloader only. */
+#if defined(USB_ENABLE_IAP) || defined(HAVE_MIKEY_REMOTE)
+#define HAVE_MULTIMEDIA_KEYS
+#endif
 
 /* This attribute can be used to enable to detection of plugin file handles leaks.
  * When enabled, the plugin core will monitor open/close/creat and when the plugin exits

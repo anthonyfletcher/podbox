@@ -144,6 +144,13 @@ bool dbg_hw_info(void)
             _DEBUG_PRINTF("mikey remote ctrl: %s r4=%02x r5=%02x",
                             mikey_present() ? "ok" : "--",
                             mikey_read(4), mikey_read(5));
+            {
+                unsigned char r0 = 0;
+                int rc = mikey_probe(&r0);
+                _DEBUG_PRINTF("  jack=%d hw=%d probe rc=%d r0=%02x",
+                            headphones_inserted() ? 1 : 0, rec_hw_ver,
+                            rc, r0);
+            }
 #endif
             line++;
             _DEBUG_PRINTF("ADC:");

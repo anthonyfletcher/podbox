@@ -43,6 +43,7 @@
 #include "screens/playback/wps.h"      /* pause_action, unpause_action */
 #include "screens/browse/browser.h"  /* browser_flush, browser_restore */
 #include "audio/voice_thread.h" /* voice_wait */
+#include "volume.h"      /* adjust_volume */
 #include "activity.h"
 #include "app_util.h"
 #include "shutdown.h"
@@ -355,6 +356,52 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
         case SYS_PHONE_UNPLUGGED:
             hp_unplug_change(false);
             return SYS_PHONE_UNPLUGGED;
+#ifdef HAVE_MULTIMEDIA_KEYS
+        /* Multimedia keys bypass the action system entirely -- action.c lets
+         * them through as raw button codes, so every screen reaches them here
+         * through its default case. The 6G's inline earphone remote produces
+         * only PLAYPAUSE and the two volume codes; the rest are for a dock or
+         * head unit over iAP. */
+        case BUTTON_MULTIMEDIA_PLAYPAUSE:
+        {
+            int status = audio_status();
+            if (status & AUDIO_STATUS_PLAY)
+            {
+                if (status & AUDIO_STATUS_PAUSE)
+                    unpause_action(true);
+                else
+                    pause_action(true);
+            }
+            else if (playlist_resume() != -1)
+            {
+                playlist_start(global_status.resume_index,
+                               global_status.resume_elapsed,
+                               global_status.resume_offset);
+            }
+            return event;
+        }
+        case BUTTON_MULTIMEDIA_NEXT:
+            audio_next();
+            return event;
+        case BUTTON_MULTIMEDIA_PREV:
+            audio_prev();
+            return event;
+        case BUTTON_MULTIMEDIA_STOP:
+            list_stop_handler();
+            return event;
+        case BUTTON_MULTIMEDIA_VOLUME_UP:
+        case BUTTON_MULTIMEDIA_VOLUME_UP|BUTTON_REPEAT:
+            adjust_volume(1);
+            return event;
+        case BUTTON_MULTIMEDIA_VOLUME_DOWN:
+        case BUTTON_MULTIMEDIA_VOLUME_DOWN|BUTTON_REPEAT:
+            adjust_volume(-1);
+            return event;
+        case BUTTON_MULTIMEDIA_REW:
+        case BUTTON_MULTIMEDIA_FFWD:
+            /* seeking would have to be driven from the WPS */
+            return 0;
+#endif
     }
     return 0;
 }
