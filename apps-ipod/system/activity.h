@@ -29,8 +29,8 @@ enum current_activity {
        written against, not an internal detail: dropping an entry silently
        renumbers every activity below it and repoints each %cs test at the
        wrong screen. This slot held the pitch screen, which no longer exists;
-       it stays to keep the numbering that Themify_2 and any other skin
-       already encode. Add new activities at the end. */
+       it stays to keep the numbering that skins already encode. Add new
+       activities at the end. */
     ACTIVITY_RESERVED_11,
     ACTIVITY_OPTIONSELECT,
     ACTIVITY_PLAYLISTBROWSER,

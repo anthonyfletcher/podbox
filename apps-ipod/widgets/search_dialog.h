@@ -9,8 +9,8 @@
  *
  * A dialog rather than a screen: a screen must take its input box out of the
  * theme's list rectangle, and themes decorate that rectangle from viewports at
- * absolute coordinates -- Themify_2's Sub_Menu_Corners spans y=52..64 over a
- * list starting at y=55, so a shortened list loses its own rounded corners.
+ * absolute coordinates -- corner pieces are placed to meet the top edge the
+ * list already has, so a list shortened to make room leaves them behind.
  * Dialog styling is self-contained.
  *
  * Everything about *what* a match is belongs to the provider: the scan, where
@@ -21,6 +21,13 @@
  * The provider is asked to scan only once the query has stood still for about
  * a second, not on every keystroke, so a scan may be as slow as a sequential
  * crawl without costing anything at the keyboard.
+ *
+ * One box at a time. The dialog's whole state is a single static -- seven
+ * hundred bytes is not worth putting on an arbitrary caller's stack -- so a
+ * second search opened from inside a first one takes the first one's state
+ * with it. The providers stack the same way: their hit tables are statics
+ * too. Nothing nests today; a screen reached *from* a result may not open a
+ * search of its own.
  */
 
 #ifndef _GUI_SEARCH_DIALOG_H_

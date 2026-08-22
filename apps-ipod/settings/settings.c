@@ -498,10 +498,10 @@ static int tweak_count;
  * and deliberately *not* a .cfg.
  *
  * The theme browser lists every .cfg in this directory, so an overlay called
- * "Themify_2.user.cfg" appears in it as a theme named "Themify_2.user" --
- * loading which would take the reset path, apply only the handful of settings
- * the overlay holds, and then record itself as the current theme, so the next
- * tweak would write "Themify_2.user.user.cfg". An extension the browser does
+ * "scrim.user.cfg" appears in it as a theme named "scrim.user" -- loading
+ * which would take the reset path, apply only the handful of settings the
+ * overlay holds, and then record itself as the current theme, so the next
+ * tweak would write "scrim.user.user.cfg". An extension the browser does
  * not recognise keeps the file paired with its theme and out of the list.
  *
  * The contents are an ordinary config file and are read as one. */
