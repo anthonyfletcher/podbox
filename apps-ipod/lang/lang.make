@@ -63,7 +63,10 @@ $(APPSBUILDDIR)/lang/lang-enum.txt: $(BUILDDIR)/lang_enum.h
 
 $(APPSBUILDDIR)/lang/voicestrings.zip: $(VOICEOBJ) $(wildcard $(APPSBUILDDIR)/lang/*.talk) $(APPSBUILDDIR)/lang/voice-corrections.txt $(APPSBUILDDIR)/lang/lang-enum.txt
 	$(call PRINTS,ZIP $(subst $(BUILDDIR)/,,$@))
-	$(SILENT)zip -9 -q $@ $(subst $(BUILDDIR)/,,$^)
+	$(SILENT)zip -X -9 -q $@ $(subst $(BUILDDIR)/,,$^)
+ifneq ($(REPRODUCIBLE_ZIP),)
+	$(SILENT)strip-nondeterminism $@
+endif
 
 #copy any included talk files to the /lang directory
 $(APPSBUILDDIR)/lang/%.talk: $(COREAPPSDIR)/lang/%.talk
