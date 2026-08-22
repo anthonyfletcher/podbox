@@ -313,8 +313,8 @@ for target in $TARGETS; do
         [ -f '$zip' ] || { echo 'missing: $zip' >&2; exit 1; }
         for want in .rockbox/themes/Themify_2.cfg .rockbox/themes/Scrim.cfg \
                     .rockbox/wps/Scrim.sbs .rockbox/wps/scrim/volband.bmp \
-                    .rockbox/eqs/Default.cfg \
                     .rockbox/docs/settings-help.txt \
+                    .rockbox/trim.config \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
