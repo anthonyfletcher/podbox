@@ -111,6 +111,16 @@ static const struct tag_info custom_tags[] =
      * %Sb), so DYNAMIC to redraw as the text changes. */
     TAG(SKIN_TOKEN_TEXT_BOX,           "wt", "T|ST",       SKIN_REFRESH_DYNAMIC),
 
+    /* The height of the line box text sits in. The drawing code already centres
+     * a string inside it (print_line, draw/line.c) and fills it for
+     * %Vs(invert) (style_line); nothing let a skin say what it was. Left alone
+     * it is the font's height, so a viewport taller than its font draws the
+     * text at the top and fills only part of it. Bare, or '-', means the
+     * viewport's own height -- what a skinned list row wants: text centred in
+     * the row and the selection covering all of it. */
+    TAG(SKIN_TOKEN_LINE_HEIGHT,        "Vy", "|i",
+        SKIN_REFRESH_STATIC | NOBREAK),
+
     TAG(SKIN_TOKEN_UNKNOWN,            "",   "",      0)   /* terminator */
 };
 #undef TAG

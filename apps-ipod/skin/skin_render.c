@@ -351,6 +351,9 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             struct line_desc *data = SKINOFFSETTOPTR(skin_buffer, token->value.data);
             struct line_desc *linedes = &info->line_desc;
             if (!data || !linedes) return false;
+            /* %Vy's height outlives this, so writing the two in either order
+             * means the same thing. */
+            int keep_height = linedes->height;
             /* gradient colors are handled with a separate tag
              * (SKIN_TOKEN_VIEWPORT_GRADIENT_SETUP, see below). since it may
              * come before the text style tag color fields need to be preserved */
@@ -378,8 +381,17 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                     linedes->text_color =
                         dynamic_colors_resolve(data->text_color);
             }
+            linedes->height = keep_height;
         }
         break;
+        case SKIN_TOKEN_LINE_HEIGHT:
+            /* 0 from the parser means the viewport's own height. print_line()
+             * centres the string in this, and style_line() fills it for
+             * %Vs(invert), so one number squares the text and the selection
+             * bar with a row taller than its font. */
+            info->line_desc.height = token->value.i > 0 ?
+                                     token->value.i : info->skin_vp->vp.height;
+            break;
         case SKIN_TOKEN_VIEWPORT_GRADIENT_SETUP:
         {
             struct gradient_config *cfg = SKINOFFSETTOPTR(skin_buffer, token->value.data);

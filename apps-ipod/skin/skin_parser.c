@@ -2452,6 +2452,15 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_VIEWPORT_TEXTSTYLE:
                     function = parse_viewporttextstyle;
                     break;
+                case SKIN_TOKEN_LINE_HEIGHT:
+                    /* 0 stands for "the viewport's own height", which is only
+                     * known at render; a written height is taken as it is. */
+                    if (element->params_count > 0 &&
+                        !isdefault(get_param(element, 0)))
+                        token->value.i = get_param(element, 0)->data.number;
+                    else
+                        token->value.i = 0;
+                    break;
                 case SKIN_TOKEN_VIEWPORT_DRAWONBG:
                     curr_vp->output_to_backdrop_buffer = true;
                     backdrop_filename = BACKDROP_BUFFERNAME;

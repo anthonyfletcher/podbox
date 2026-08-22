@@ -150,11 +150,18 @@ const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
                                                     size, filter, filter_hash);
 }
 
-/* Whether the current list is an album-art list -- one drawing rows taller than
- * the skin's own pitch, with an album-art callback to fill them. This is what
- * %?La tests, so a theme can lay art rows out differently (art + inset text)
- * from ordinary rows sharing the same list config. It's a list-level property
- * (every row is the same height), so the item offset is irrelevant. */
+/* Whether the current list is an album-art list -- one with an album-art
+ * callback and a row height named for that case. This is what %?La tests, so a
+ * theme can lay art rows out differently (art + inset text) from ordinary rows
+ * sharing the same list config. It's a list-level property (every row is the
+ * same height), so the item offset is irrelevant.
+ *
+ * The art height only has to match the skin's own pitch, not beat it. A cover
+ * that fills its row exactly is a deliberate layout -- one row's art meets the
+ * next's with no gap down the screen -- and requiring a taller row refused it
+ * silently: the theme lost its art rows altogether and nothing said why.
+ * Shorter than the pitch still is not an art row; a height that small named
+ * nothing to lay out. */
 bool skinlist_item_is_art_row(enum screen_type screen, int offset, bool wrap)
 {
     (void)offset; (void)wrap;
@@ -164,7 +171,7 @@ bool skinlist_item_is_art_row(enum screen_type screen, int offset, bool wrap)
     {
         return false;
     }
-    return list_item_height(current_list, screen) > listcfg[screen]->height;
+    return list_item_height(current_list, screen) >= listcfg[screen]->height;
 }
 
 static bool is_selected = false;
