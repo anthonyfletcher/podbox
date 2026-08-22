@@ -101,6 +101,7 @@ screens/browse/browser.c
 screens/browse/browser_disk.c
 screens/browse/browser_flat.c
 screens/context_menu.c
+screens/system/about.c
 screens/system/art_health.c
 screens/system/bg_task_info.c
 screens/system/db_search.c
@@ -161,6 +162,7 @@ screens/settings/time_settings.c
 viewers/credits.c
 viewers/playing_time.c
 viewers/properties.c
+viewers/text_reel.c
 
 /* Synchronised lyrics for the playing track. lyrics.c finds, loads and indexes
  * .lrc/.lrc8/.snc files and ID3 SYLT frames (ported from the lrcplayer

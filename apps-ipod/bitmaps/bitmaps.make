@@ -39,7 +39,6 @@ BMPHFILES = $(BMPINCDIR)/default_icons.h \
 	$(BMPINCDIR)/podbox_folder_open_on.h \
 	$(BMPINCDIR)/podbox_folder_leaf_off.h \
 	$(BMPINCDIR)/podbox_folder_leaf_on.h \
-	$(BMPINCDIR)/podboxcredits.h \
 	$(BMPINCDIR)/podboxnoart.h
 
 $(BMPHFILES): $(BMPOBJ)

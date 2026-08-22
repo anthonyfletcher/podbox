@@ -5789,13 +5789,13 @@
   desc: displayed topmost on the info screen and in the info menu
   user: core
   <source>
-    *: "Rockbox Info"
+    *: "System Info"
   </source>
   <dest>
-    *: "Rockbox Info"
+    *: "System Info"
   </dest>
   <voice>
-    *: "Rockbox Info"
+    *: "System Info"
   </voice>
 </phrase>
 <phrase>

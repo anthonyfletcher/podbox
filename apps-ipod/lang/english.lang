@@ -6016,13 +6016,13 @@
   desc: displayed topmost on the info screen and in the info menu
   user: core
   <source>
-    *: "Rockbox Info"
+    *: "System Info"
   </source>
   <dest>
-    *: "Rockbox Info"
+    *: "System Info"
   </dest>
   <voice>
-    *: "Rockbox Info"
+    *: "System Info"
   </voice>
 </phrase>
 <phrase>
@@ -19745,5 +19745,19 @@
   </dest>
   <voice>
     *: "Zoom and Pan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ABOUT
+  desc: in the System menu, opens the About page
+  user: core
+  <source>
+    *: "About"
+  </source>
+  <dest>
+    *: "About"
+  </dest>
+  <voice>
+    *: "About"
   </voice>
 </phrase>

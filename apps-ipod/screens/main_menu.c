@@ -35,6 +35,7 @@
 #include "widgets/splash.h"
 #include "screens/system/debug_menu.h"
 #include "screens/system/bg_task_info.h"
+#include "screens/system/about.h"
 #include "version.h"
 #include "time.h"
 #include "screens/playback/wps.h"
@@ -378,6 +379,9 @@ int time_screen(void* ignored);
 MENUITEM_FUNCTION(timedate_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_TIME_MENU),
                   time_screen,  NULL, Icon_NOICON);
 
+MENUITEM_FUNCTION(show_about_item, 0, ID2P(LANG_ABOUT),
+                  about_screen, NULL, Icon_NOICON);
+
 MENUITEM_FUNCTION(show_credits_item, 0, ID2P(LANG_CREDITS),
                   show_credits, NULL, Icon_NOICON);
 
@@ -419,7 +423,7 @@ MENUITEM_FUNCTION(bg_task_info, 0, ID2P(LANG_BG_TASK_INFO),
                   bg_task_info_item, NULL, Icon_NOICON);
 
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
-          &show_info_item, &show_credits_item,
+          &show_about_item, &show_info_item, &show_credits_item,
           &show_runtime_item, &bg_task_info, &show_license_item,
           &show_third_party_licenses_item, &debug_menu_item);
 

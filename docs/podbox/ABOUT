@@ -1,0 +1,32 @@
+About PodBox
+
+PodBox is a reimagining of Rockbox for the iPod.
+
+It keeps everything that makes Rockbox powerful, then reshapes it around a simple idea: your music should be visual, personal and easy to rediscover.
+
+Albums, artists and playlists are brought to life with artwork throughout the interface. Colours adapt to what's playing. Browsing feels faster, search responds as you type, and your library becomes something to explore rather than simply scroll through.
+
+PodBox adds artist profiles, album cover browsing, listening history, forgotten favourites, customisable menus, dynamic themes, improved document viewing, enhanced settings, and countless quality-of-life improvements designed for modern music libraries.
+
+Under the surface, new indexing, caching and artwork systems help keep everything responsive, even on older hardware.
+
+This is a hobby project, built because I wanted a version of Rockbox that better suited how I use my iPod. If it happens to improve yours too, then that's a bonus.
+
+Built with extensive AI assistance. While AI has helped explore ideas, generate implementations and accelerate development, the design, architecture, feature decisions, testing, debugging and direction of the project remain my own.
+
+Built On:
+
+Rockbox
+The firmware underneath all of this, and the result of more than two decades of work by hundreds of contributors.
+
+RockPod by Nux Li
+Where this fork began, and the inspiration for PodBox.
+
+Spun by Siebe Majoor
+An annual listening summary generated from your own playback history.
+
+Terms:
+
+PodBox is free software released under the GNU General Public License version 2.
+
+It is provided without warranty of any kind.

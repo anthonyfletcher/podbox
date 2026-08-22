@@ -79,4 +79,14 @@ $(BUILDDIR)/credits.raw credits.raw: $(DOCSDIR)/CREDITS $(APPSDIR)/plugins/credi
 
 $(APPSBUILDDIR)/credits.o: $(BUILDDIR)/credits.raw
 
+# The About screen (screens/system/about.c) #includes docs/podbox/ABOUT as one
+# quoted entry per line of the document -- the array the text reel scrolls --
+# so the page is in the binary rather than in a file that has to be on the
+# disk. The trailing "" keeps the initialiser valid when the document is
+# empty, and the \r rule copes with a checkout that has CRLF line endings.
+$(BUILDDIR)/about.raw about.raw: $(DOCSDIR)/podbox/ABOUT
+	$(call PRINTS,Create about.raw){ sed -e 's/\r$$//' -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/' -e 's/$$/",/' $< ; echo '""' ; } > $(BUILDDIR)/$(@F)
+
+$(APPSBUILDDIR)/screens/system/about.o: $(BUILDDIR)/about.raw
+
 ASMDEFS_SRC += $(APPSDIR)/system/core_asmdefs.c
