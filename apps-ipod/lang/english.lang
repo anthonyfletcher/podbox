@@ -19243,6 +19243,21 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_TRIM_TITLES
+  desc: General Settings > Music: drop "(feat. X)", "(Deluxe Edition)" and the
+        like from the names the now playing screen shows
+  user: core
+  <source>
+    *: "Trim Titles"
+  </source>
+  <dest>
+    *: "Trim Titles"
+  </dest>
+  <voice>
+    *: "Trim Titles"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_FEATURED_IN
   desc: "[Featured In]" entry on an artist's album list in the tag browser
   user: core

@@ -45,6 +45,7 @@ playlist/viewer.c
 
 metadata/cuesheet.c
 metadata/mul_id3.c
+metadata/tag_trim.c
 #ifdef HAVE_ALBUMART
 metadata/albumart.c
 metadata/art_cache.c

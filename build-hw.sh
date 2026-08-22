@@ -30,3 +30,4 @@ make zip
 ../bundle-eqs.sh
 ../bundle-licenses.sh
 ../bundle-help.sh
+../bundle-trim.sh

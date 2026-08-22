@@ -46,6 +46,7 @@
 #include "sound.h"
 #include "debug.h"
 #include "metadata/cuesheet.h"
+#include "metadata/tag_trim.h"
 #include "replaygain.h"
 #include "core_alloc.h"
 #include "crc32.h"
@@ -357,11 +358,11 @@ const char *get_cuesheetid3_token(struct wps_token *token, struct mp3entry *id3,
         case SKIN_TOKEN_METADATA_COMPOSER:
             return *track->songwriter ? track->songwriter : NULL;
         case SKIN_TOKEN_METADATA_ALBUM:
-            return *cue->title ? cue->title : NULL;
+            return *cue->title ? tag_trim(cue->title, buf, buf_size) : NULL;
         case SKIN_TOKEN_METADATA_ALBUM_ARTIST:
             return *cue->performer ? cue->performer : NULL;
         case SKIN_TOKEN_METADATA_TRACK_TITLE:
-            return *track->title ? track->title : NULL;
+            return *track->title ? tag_trim(track->title, buf, buf_size) : NULL;
         case SKIN_TOKEN_METADATA_TRACK_NUMBER:
             snprintf(buf, buf_size, "%d/%d",
                      cue->curr_track_idx+offset_tracks+1, cue->track_count);
@@ -418,7 +419,7 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
             case SKIN_TOKEN_METADATA_COMPOSER:
                 return id3->composer;
             case SKIN_TOKEN_METADATA_ALBUM:
-                return id3->album;
+                return tag_trim(id3->album, buf, buf_size);
             case SKIN_TOKEN_METADATA_ALBUM_ARTIST:
                 return id3->albumartist;
             case SKIN_TOKEN_METADATA_GROUPING:
@@ -442,7 +443,7 @@ const char *get_id3_token(struct wps_token *token, struct mp3entry *id3,
                 }
                 return NULL;
             case SKIN_TOKEN_METADATA_TRACK_TITLE:
-                return id3->title;
+                return tag_trim(id3->title, buf, buf_size);
             case SKIN_TOKEN_METADATA_VERSION:
                 switch (id3->id3version)
                 {

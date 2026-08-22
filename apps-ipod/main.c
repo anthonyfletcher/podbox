@@ -53,6 +53,7 @@
 #include "speech/talk.h"
 #include "system/shutdown.h"
 #include "dircache.h"
+#include "metadata/tag_trim.h"
 #include "database/tagcache.h"
 #include "metadata/art_cache.h"
 #include "database/db_summary.h"
@@ -749,6 +750,7 @@ static void init(void)
     playlist_init();
     browser_mem_init();
     filetype_init();
+    tag_trim_init();
 
     shortcuts_init();
 

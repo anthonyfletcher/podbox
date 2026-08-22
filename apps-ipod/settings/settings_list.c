@@ -60,6 +60,7 @@
 #include "playlist/playlist.h"
 #include "screens/browse/browser.h"
 #include "database/db_summary.h"   /* db_summary_invalidate */
+#include "metadata/tag_trim.h"     /* tag_trim_init */
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
 
 #include "audio/voice_thread.h"
@@ -634,6 +635,14 @@ static void segregate_audiobooks_callback(bool segregate)
 {
     root_menu_set_audiobooks_row(segregate);
     db_summary_invalidate();
+}
+
+/* The pattern file is read at startup, so switching this on is also how an
+ * edited trim.config is picked up without a reboot. */
+static void trim_titles_callback(bool trim)
+{
+    (void)trim;
+    tag_trim_init();
 }
 
 /* The buffered bitmap is chosen per track, so nothing changes on screen until
@@ -1735,6 +1744,11 @@ const struct settings_list settings[] = {
      * crawl, not one that only hides its result. */
     OFFON_SETTING(F_BANFROMQS, featured_artists, LANG_FEATURED_ARTISTS, false,
                   "featured artists", NULL),
+    /* Cosmetic and reversible: the tag keeps whatever it said, so this only
+     * ever changes what is on the screen. Off by default because the list of
+     * what to drop is a judgement about someone else's library. */
+    OFFON_SETTING(F_BANFROMQS, trim_titles, LANG_TRIM_TITLES, false,
+                  "trim titles", trim_titles_callback),
     /* The database browser's own album ordering. Separate from the carousel's
      * above: that one groups by artist as well, which a browser list has
      * already done by navigation. */

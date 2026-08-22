@@ -202,6 +202,7 @@ static const struct tag_row tag_rows[] = {
 { "search min letters",  TAG_LIBRARY,                            "search find letters" },
 { "search order",        TAG_LIBRARY,                            "search find order" },
 { "featured artists",    TAG_LIBRARY,                            "guest feat credits" },
+{ "trim titles",         TAG_LIBRARY|TAG_APPEARANCE,             "tidy shorten feat remaster version" },
 
 /* --- artwork ------------------------------------------------------------- */
 { "art cache fast build",TAG_ADVANCED|TAG_ARTWORK,               "thumbnail cache" },
