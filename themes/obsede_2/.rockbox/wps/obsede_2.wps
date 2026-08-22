@@ -1,0 +1,127 @@
+#-----------------------------------------------#
+#Obsede' 2
+#Original code by Serge Fnstll
+#Based on OneBit_OLED by Jihoon Kim that based on OneBit_VFD by chronicallyoffline
+#CC BY-SA 3.0
+#-----------------------------------------------#
+# Disable Status Bar
+%wd
+#
+# Preload Fonts
+%Fl(3,32-noto-sans-medium.fnt)
+%Fl(5,14-noto-sans.fnt)
+%Fl(6,12-noto-sans.fnt)
+%Fl(7,24-noto-sans.fnt)
+%Fl(8,24x24_Icons.fnt)
+%Fl(9,16-noto-sans-bold.fnt)
+#
+# Preload Images
+%xl(vol,vol.bmp,0,0)
+%xl(prog,prog.bmp,0,0)
+#
+# Display Viewports
+%Vd(main)
+%Vd(metadata)%?C<%Vd(withAlbumArt)|%Vd(noAlbumArt)>%?mv(3)<%Vd(volume)|%Vd(prog)>%?ps<%Vd(shuffle)%?mm<%Vd(oneMode)|%Vd(repeat2)%Vd(twoModes)>|%?mm<%Vd(noModes)|%Vd(repeat1)%Vd(oneMode)>>
+#
+#############################
+##### Background Layer ######
+#############################
+#
+%V(0,0,320,240,-)%VB
+%dr(45,225,230,4,ffffff,-,4)
+#
+%Vl(main,0,0,320,240,-)
+#
+# Album Art Preload
+%Cl(0,0,140,140,r,c)
+#
+#######################
+##### Play Screen #####
+#######################
+#
+# Clear Display
+%Vl(metadata,0,0,320,240,-)
+#
+# Album Art
+%Vl(metadata,173,40,140,140,-)
+%Cd
+#
+# Playback Mode, Shuffle and Repeat
+%Vl(metadata,0,0,24,24,8)%Vf(-)
+%?mp<C|A|B|G|F>
+#
+%Vl(shuffle,24,0,24,24,8)%Vf(-)
+H
+#
+%Vl(repeat1,24,0,24,24,8)%Vf(-)
+J
+#
+%Vl(repeat2,48,0,24,24,8)%Vf(-)
+J
+#
+# Track Number
+%Vl(noModes,28,4,108,17,9)%Vf(e3e3e3)
+%al%pp of %pe
+%Vl(oneMode,52,4,84,17,9)%Vf(e3e3e3)
+%al%pp of %pe
+%Vl(twoModes,76,4,60,17,9)%Vf(e3e3e3)
+%al%pp of %pe
+#
+# Hold
+%Vl(metadata,148,0,24,24,8)%Vf(ffffff)
+%?mh<À>
+#
+# Clock
+%Vl(metadata,222,4,65,17,9)%Vf(e3e3e3)
+%ar%?cf<%cH|%cl>:%cM%?cf<| %cp>
+#
+# Battery
+%V(290,0,24,24,8)%Vf(ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>>
+#
+# Track Artist or Title
+%Vl(noAlbumArt,6,43,-6,28,7)%Vf(707070)
+%?C<|%aL%s%?ia<%ia|%?it<%it|%fn>>>
+%Vl(withAlbumArt,6,43,161,30,7)%Vf(707070)
+%?C<%aL%s%?ia<%ia|%?it<%it|%fn>>>
+#
+# Track Title
+%Vl(noAlbumArt,6,68,-6,36,3)%Vf(e3e3e3)
+%?C<|%aL%s%?ia<%it>>
+%Vl(withAlbumArt,6,68,161,36,3)%Vf(e3e3e3)
+%?C<%aL%s%?ia<%it>>
+#
+# Album Title
+%Vl(noAlbumArt,6,107,-6,15,5)%Vf(707070)
+%?C<|%aL%s%?id<%id|Unknown Album>>
+%Vl(withAlbumArt,6,107,161,15,5)%Vf(707070)
+%?C<%aL%s%?id<%id|Unknown Album>>
+#
+# Album Year
+%Vl(metadata,6,125,161,14,6)%Vf(707070)
+%?iy<%ss(0,4, %iy)|>
+#
+# Volume Icons
+# %?pv splits the range in three: fully attenuated, at or below 0dB, above it.
+# The right-hand glyph is a fixed marker for the loud end of the bar.
+%Vl(volume,12,215,24,24,8)%Vf(ff7508)
+%?pv<M|N|N>
+#
+%Vl(volume,284,215,24,24,8)%Vf(ff7508)
+O
+#
+# Volume Bar
+%Vl(volume,45,225,230,4,-)%Vf(ff7508)
+%pv(0,0,230,4,vol)
+#
+# Time Elapsed
+%Vl(prog,6,219,35,16,9)%Vf(e3e3e3)
+%al%?if(%pc,<,600)< |>%pc
+#
+# Progress Bar
+%Vl(prog,45,225,230,4,-)%Vf(-)
+%pb(0,0,230,4,prog)
+#
+# Total Track Time
+%Vl(prog,279,219,35,16,9)%Vf(e3e3e3)
+%ar%pt

@@ -1,14 +1,21 @@
 #!/bin/sh
 # Build the current commit on the build server and publish it as the rolling
-# `latest` release, plus the Windows simulator as the rolling `Simulator` one.
+# `latest` release, plus the Windows simulator as `Simulator` and the extra
+# themes as `Themes`.
 #
-# There are no version tags. Every run replaces both releases and moves their
-# tags to the commit that was built, so the release page always shows the
+# There are no version tags. Every run replaces all three releases and moves
+# their tags to the commit that was built, so the release page always shows the
 # current build and nothing else.
 #
-# Two releases rather than four assets on one: the firmware zips unpack onto a
-# player and the simulator zips unpack onto a PC, and a page that offers all
-# four side by side invites unpacking the wrong one.
+# Three releases rather than one page of assets: the firmware zips unpack onto
+# a player, the simulator zips unpack onto a PC and the theme zips are optional
+# extras, and a page that offers them all side by side invites unpacking the
+# wrong one.
+#
+# `latest` is published last. GitHub features whichever release was created
+# most recently, and that is the one the repository's front page links to, so
+# the order of the publish steps at the bottom decides what a visitor is
+# offered first. It has to be the firmware.
 #
 # The build server is not recorded here -- see PODBOX_BUILD_SERVER below.
 #
@@ -36,7 +43,7 @@
 #   -y            don't ask for confirmation before publishing
 #   --draft       create the releases as drafts
 #   --dry-run     build and verify, then stop -- the existing releases stand
-#   --no-sim      firmware only; leave the Simulator release as it is
+#   --no-sim      skip the simulator; leave the Simulator release as it is
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
 # installed and authenticated THERE -- see the --repo note further down. The
@@ -57,9 +64,17 @@ REMOTE_ROOT=${PODBOX_BUILD_ROOT:-podbox-release}
 
 TARGETS="ipod6g ipodvideo"
 
-# The two releases, reused forever. Their tags are moved to each commit built.
+# The three releases, reused forever. Their tags are moved to each commit built.
 RELEASE=latest
 SIM_RELEASE=Simulator
+THEMES_RELEASE=Themes
+
+# The themes published as their own download. Scrim is not among them: it is
+# the theme the firmware ships with, and bundle-theme.sh puts it in the build.
+# Named rather than globbed, for the same reason bundle-theme.sh names its one
+# -- a `git merge rockbox/master` must not start publishing stock themes that
+# were never converted.
+EXTRA_THEMES="themify_2 obsede_2 bony"
 
 # Published asset names. The build directory's own name means nothing to
 # somebody choosing a download.
@@ -75,6 +90,7 @@ sim_asset_name() {
         ipodvideo) echo "simulator-ipodvideo-5g.zip" ;;
     esac
 }
+theme_asset_name() { echo "$1.zip"; }
 
 cd "$(dirname "$0")"
 
@@ -208,7 +224,8 @@ echo "  $(printf '%s\n' "$CHANGES" | wc -l | tr -d ' ') commits to list"
 
 NOTES=$(mktemp)
 SIM_NOTES=$(mktemp)
-trap 'rm -f "$NOTES" "$SIM_NOTES"' EXIT
+THEMES_NOTES=$(mktemp)
+trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
 
 {
     printf 'Built from `%s` on `%s`.\n\n' "$(git rev-parse HEAD)" "$BRANCH"
@@ -236,14 +253,33 @@ trap 'rm -f "$NOTES" "$SIM_NOTES"' EXIT
     printf '%s\n' "$CHANGES"
 } > "$SIM_NOTES"
 
+# The themes are files in the tree rather than something built, so these notes
+# carry no commit list: nothing here changes with most commits, and a changelog
+# of firmware work would only mislead somebody after a theme.
+{
+    printf 'Extra themes for PodBox, each modified to support dynamic colours\n'
+    printf 'and art in lists. Scrim is not here: it ships with the firmware.\n\n'
+    printf '| file | theme |\n| --- | --- |\n'
+    for theme in $EXTRA_THEMES; do
+        printf '| `%s` | [%s](https://github.com/%s/blob/%s/themes/%s/README.md) |\n' \
+            "$(theme_asset_name "$theme")" "$theme" "$SLUG" "$BRANCH" "$theme"
+    done
+    printf '\nUnzip onto the root of the player, so the `.rockbox` folder lands\n'
+    printf 'on top of the one already there, then pick it under\n'
+    printf 'Settings > Load Theme.\n\n'
+    printf 'Each zip carries the fonts its theme needs, so they can be\n'
+    printf 'installed in any order and on their own.\n'
+} > "$THEMES_NOTES"
+
 # ------------------------------------------------------------------- plan ---
 
 cat <<PLAN
 
-  releases   $RELEASE${WITH_SIM:+ and $SIM_RELEASE}${DRAFT:+  (draft)}
+  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} then $RELEASE${DRAFT:+  (draft)}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS${WITH_SIM:+  (firmware and Windows simulator)}
+  themes     $EXTRA_THEMES
   build in   $SERVER:$REMOTE_ROOT/$RELEASE
 
 release notes
@@ -259,11 +295,16 @@ if [ -n "$WITH_SIM" ]; then
     echo
 fi
 
+echo "themes release notes"
+echo "--------------------"
+cat "$THEMES_NOTES"
+echo
+
 if [ -n "$DRY_RUN" ]; then
     echo "(--dry-run: will build and verify, then stop before publishing)"
 elif [ -z "$ASSUME_YES" ]; then
-    printf 'Build this and replace the %s release? [y/N] ' \
-        "$RELEASE${WITH_SIM:+ and $SIM_RELEASE}"
+    printf 'Build this and replace the %s releases? [y/N] ' \
+        "$THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $RELEASE"
     read -r reply
     case "$reply" in
         y|Y|yes|YES) ;;
@@ -301,9 +342,9 @@ done
 # A themeless zip installs happily and leaves the player looking broken, so each
 # entry below is a file only a bundle script writes -- one that silently did
 # nothing is caught. settings-help.txt matters most: without it every Explain
-# menu entry shows nothing and nothing else looks wrong. Both themes are named,
-# plus an .sbs and a bitmap, because themes share directories and a half-copied
-# one still passes a .cfg-only check.
+# menu entry shows nothing and nothing else looks wrong. Scrim is named by its
+# .cfg, its .sbs and a bitmap, because a half-copied theme still passes a
+# .cfg-only check.
 
 say "Checking the zips"
 for target in $TARGETS; do
@@ -311,8 +352,8 @@ for target in $TARGETS; do
     ssh "$SERVER" "
         set -e
         [ -f '$zip' ] || { echo 'missing: $zip' >&2; exit 1; }
-        for want in .rockbox/themes/Themify_2.cfg .rockbox/themes/Scrim.cfg \
-                    .rockbox/wps/Scrim.sbs .rockbox/wps/scrim/volband.bmp \
+        for want in .rockbox/themes/scrim.cfg \
+                    .rockbox/wps/scrim.sbs .rockbox/wps/scrim/volband.bmp \
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
                     .rockbox/rockbox.ipod; do
@@ -320,6 +361,40 @@ for target in $TARGETS; do
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
         done
         printf '  %-10s ok  (%s)\n' '$target' \"\$(du -h '$zip' | cut -f1)\"
+    "
+done
+
+# Packed from the extracted archive, like everything else here -- not zipped
+# from the dev tree, whose checkout is CRLF and would ship skins the player
+# reads with a stray carriage return on every line.
+#
+# Each theme's README goes in as .rockbox/docs, because the fonts it names
+# are licensed under the OFL and the notice has to travel with them. They no
+# longer travel in the firmware zip: that one carries Scrim's fonts only.
+say "Packing the themes"
+for theme in $EXTRA_THEMES; do
+    asset=$(theme_asset_name "$theme")
+    ssh "$SERVER" "
+        set -e
+        cd '$REMOTE_DIR'
+        [ -d 'themes/$theme/.rockbox' ] ||
+            { echo 'themes/$theme/.rockbox is missing' >&2; exit 1; }
+        out=\$(pwd)/'$asset'
+        stage=\$(mktemp -d)
+        trap 'rm -rf \"\$stage\"' EXIT
+        cp -R 'themes/$theme/.rockbox' \"\$stage/\"
+        mkdir -p \"\$stage/.rockbox/docs\"
+        cp 'themes/$theme/README.md' \"\$stage/.rockbox/docs/$theme.md\"
+        rm -f \"\$out\"
+        (cd \"\$stage\" && zip -qr \"\$out\" .rockbox)
+        for want in .rockbox/themes/$theme.cfg .rockbox/wps/$theme.sbs \
+                    .rockbox/wps/$theme.wps .rockbox/docs/$theme.md; do
+            unzip -l \"\$out\" | grep -q \"\$want\" ||
+                { echo \"$theme zip is missing \$want\" >&2; exit 1; }
+        done
+        unzip -l \"\$out\" | grep -q '\.rockbox/fonts/.*\.fnt' ||
+            { echo '$theme zip carries no fonts' >&2; exit 1; }
+        printf '  %-14s ok  (%s)\n' '$theme' \"\$(du -h \"\$out\" | cut -f1)\"
     "
 done
 
@@ -334,7 +409,7 @@ for target in $SIM_TARGETS; do
         set -e
         cd '$REMOTE_DIR/build-sim-$target-win32'
         [ -f rockboxui.exe ] || { echo 'missing: $target rockboxui.exe' >&2; exit 1; }
-        [ -f simdisk/.rockbox/themes/Themify_2.cfg ] ||
+        [ -f simdisk/.rockbox/themes/scrim.cfg ] ||
             { echo '$target simulator has no theme in simdisk' >&2; exit 1; }
         rm -f '../$asset'
         zip -qr '../$asset' rockboxui.exe simdisk
@@ -352,6 +427,10 @@ for target in $SIM_TARGETS; do
     asset=$(sim_asset_name "$target")
     scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
 done
+for theme in $EXTRA_THEMES; do
+    asset=$(theme_asset_name "$theme")
+    scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
+done
 
 if [ -n "$DRY_RUN" ]; then
     say "Dry run: built and verified, nothing published"
@@ -361,27 +440,81 @@ fi
 
 # ---------------------------------------------------------------- publish ---
 # Everything below this line is visible outside, and is deliberately last.
+#
+# The order is themes, then simulator, then firmware, and it is the firmware
+# being LAST that matters: GitHub features the most recently created release,
+# and that is the one the repository's front page offers. A visitor who follows
+# it must land on the build, not on a theme or the simulator.
+#
+# The cost of that order is that a failure in the last step leaves fresh Themes
+# and Simulator releases beside a stale `latest`. Everything is built and
+# verified before any of this runs, so what remains is a network or gh failure;
+# re-running the script republishes all three.
 
 SHA=$(git rev-parse HEAD)
 
-say "Replacing the $RELEASE release"
 # --repo is REQUIRED on every gh call here and must not be dropped. gh infers
 # the repo from the origin of the checkout it runs in, and the server's origin
 # is upstream Rockbox, not this fork -- so an inferred release would target the
 # wrong repo. (CLAUDE.md's "no --repo" note describes running gh on the local
 # machine, where origin *is* the fork. It does not apply on the server.)
 #
-# The old release and its tag go first. `gh release create` reuses an existing
-# tag rather than moving it, so a leftover tag would publish these zips against
-# an older commit. The second line covers a tag left behind by a run that died
-# between the two.
+# Each release deletes its old self and its tag first. `gh release create`
+# reuses an existing tag rather than moving it, so a leftover tag would publish
+# these zips against an older commit. The second delete covers a tag left
+# behind by a run that died between the two; it goes through gh rather than
+# `git push --delete` because this script may itself be running on the server,
+# where the fork is an https remote with no credentials -- a push there fails
+# silently and leaves the stale tag for `gh release create` to reuse.
+#
+# --target names the commit each new tag is created at, on GitHub. Nothing tags
+# locally: a rolling tag left in the dev checkout only goes stale.
+
+say "Replacing the $THEMES_RELEASE release"
+ssh "$SERVER" "gh release delete '$THEMES_RELEASE' --repo '$SLUG' --yes \
+    --cleanup-tag || true"
+ssh "$SERVER" "gh api --method DELETE --silent \
+    'repos/$SLUG/git/refs/tags/$THEMES_RELEASE' 2>/dev/null || true"
+
+scp -q "$THEMES_NOTES" "$SERVER:$REMOTE_DIR/themes-notes.md"
+# The zips were named in the packing step, so there is nothing to rename here
+# -- unlike the firmware, whose two builds both make rockbox.zip.
+ssh "$SERVER" "cd '$REMOTE_DIR' && \
+    gh release create '$THEMES_RELEASE' \
+    --repo '$SLUG' \
+    --target '$SHA' \
+    --title 'Extra themes' \
+    --notes-file themes-notes.md \
+    $DRAFT \
+    $(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done)"
+
+say "Published $COMMIT as $THEMES_RELEASE"
+echo "  https://github.com/$SLUG/releases/tag/$THEMES_RELEASE"
+
+if [ -n "$SIM_TARGETS" ]; then
+    say "Replacing the $SIM_RELEASE release"
+    ssh "$SERVER" "gh release delete '$SIM_RELEASE' --repo '$SLUG' --yes \
+        --cleanup-tag || true"
+    ssh "$SERVER" "gh api --method DELETE --silent \
+        'repos/$SLUG/git/refs/tags/$SIM_RELEASE' 2>/dev/null || true"
+
+    scp -q "$SIM_NOTES" "$SERVER:$REMOTE_DIR/simulator-notes.md"
+    ssh "$SERVER" "cd '$REMOTE_DIR' && \
+        gh release create '$SIM_RELEASE' \
+        --repo '$SLUG' \
+        --target '$SHA' \
+        --title 'Windows simulator' \
+        --notes-file simulator-notes.md \
+        $DRAFT \
+        $(sim_asset_name ipod6g) $(sim_asset_name ipodvideo)"
+
+    say "Published $COMMIT as $SIM_RELEASE"
+    echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
+fi
+
+say "Replacing the $RELEASE release"
 ssh "$SERVER" "gh release delete '$RELEASE' --repo '$SLUG' --yes --cleanup-tag \
     || true"
-# Second line, for a tag orphaned by a run that died between the two. It goes
-# through gh rather than `git push --delete` because this script may itself be
-# running on the server, where the fork is an https remote with no credentials
-# -- a push there fails silently and leaves the stale tag for `gh release
-# create` to reuse.
 ssh "$SERVER" "gh api --method DELETE --silent \
     'repos/$SLUG/git/refs/tags/$RELEASE' 2>/dev/null || true"
 
@@ -390,9 +523,6 @@ scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
 # BEFORE upload. gh's `file#text` syntax does not do this -- it sets a display
 # label and leaves the asset name as the filename, so uploading that way sends
 # two assets both named rockbox.zip and the second one collides.
-#
-# --target names the commit the new tag is created at, on GitHub. Nothing tags
-# locally: a rolling tag left in the dev checkout only goes stale.
 ssh "$SERVER" "cd '$REMOTE_DIR' && \
     cp build-hw-ipod6g/rockbox.zip $(asset_name ipod6g) && \
     cp build-hw-ipodvideo/rockbox.zip $(asset_name ipodvideo) && \
@@ -406,30 +536,5 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
 
 say "Published $COMMIT as $RELEASE"
 echo "  https://github.com/$SLUG/releases/tag/$RELEASE"
-
-# The simulator release is second because it is the lesser of the two: if this
-# half fails, the firmware is already out rather than held hostage to it.
-if [ -n "$SIM_TARGETS" ]; then
-    say "Replacing the $SIM_RELEASE release"
-    ssh "$SERVER" "gh release delete '$SIM_RELEASE' --repo '$SLUG' --yes \
-        --cleanup-tag || true"
-    ssh "$SERVER" "gh api --method DELETE --silent \
-        'repos/$SLUG/git/refs/tags/$SIM_RELEASE' 2>/dev/null || true"
-
-    scp -q "$SIM_NOTES" "$SERVER:$REMOTE_DIR/simulator-notes.md"
-    # The zips were built and named in the packing step, so there is nothing to
-    # rename here -- unlike the firmware, whose two builds both make rockbox.zip.
-    ssh "$SERVER" "cd '$REMOTE_DIR' && \
-        gh release create '$SIM_RELEASE' \
-        --repo '$SLUG' \
-        --target '$SHA' \
-        --title 'Windows simulator' \
-        --notes-file simulator-notes.md \
-        $DRAFT \
-        $(sim_asset_name ipod6g) $(sim_asset_name ipodvideo)"
-
-    say "Published $COMMIT as $SIM_RELEASE"
-    echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
-fi
 
 echo "  local copies in dist/"

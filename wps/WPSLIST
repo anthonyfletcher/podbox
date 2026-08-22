@@ -18,7 +18,7 @@
 #
 # All sections should list what font and status bar setting they "like".
 #
-# Note: this fork ships only Themify_2 as its theme (bundled by
+# Note: this fork ships only scrim as its theme (bundled by
 # bundle-theme.sh, not listed here). The stock "cabbiev2" theme files are still
 # in wps/ -- the tree mirrors upstream -- but they are deliberately not listed
 # here, and this file is what wpsbuild.pl builds from, so they are not shipped.

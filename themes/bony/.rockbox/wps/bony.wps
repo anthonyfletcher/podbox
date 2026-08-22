@@ -1,0 +1,81 @@
+#-----------------------------------------------#
+#bony
+#by Anthony Fletcher for PodBox
+#Based on BONES by Chuck Lardo
+#CC BY-SA 4.0
+#-----------------------------------------------#
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,15-ProFont.fnt)
+%Fl(3,24-seven-fifteen.fnt)
+%Fl(4,48-seven-fifteen.fnt)
+#
+#Preload images
+%xl(PBB,pb_back.bmp,0,0)
+%xl(PB,pb.bmp,0,0)
+%xl(VBB,vb_back.bmp,0,0)
+%xl(VB,vb.bmp,0,0)
+#
+#Background layer
+#
+#- Album art
+%V(0,0,-,-,-)%Vb(000000)%Vf(ffffff)%VB%Cl(120,0,240,240,c,c,pixellate10,-,pixels)%Cd(pixels,240,0,80,240)
+#
+#Foreground layer
+#
+%V(0,0,-,-,-)%Vf(ffffff)%?ps<%?mm<|%Vd(repeat1)>|%?mm<|%Vd(repeat2)>>
+#
+#- Track number
+%V(20,20,100,15,2)%Vb(000000)%Vf(ffffff)
+%alTRACK %in
+#
+#- Shuffle
+%V(120,20,100,-,2)%Vb(000000)%Vf(ffffff)
+%ac%?ps<SHUFFLE ON>%Vs(invert)
+#
+#- Repeat
+%Vl(repeat1,120,35,100,-,2)%Vb(000000)%Vf(ffffff)
+%ac%?mm<|REPEAT|REPEAT|REPEAT|REPEAT> %?mm<|ALL|ONE|SHUFFLE|A-B>%Vs(invert)
+#
+%Vl(repeat2,120,20,100,-,2)%Vb(000000)%Vf(ffffff)
+%ac%?mm<|REPEAT|REPEAT|REPEAT|REPEAT> %?mm<|ALL|ONE|SHUFFLE|A-B>%Vs(invert)
+#
+#- Track title
+%V(20,55,200,-,4)%Vb(000000)%Vf(ffffff)
+%s%it
+#
+#- Artist/Album
+%V(20,102,200,26,3)%Vb(000000)%Vf(ffffff)
+%s%t(6)%ia;%s%t(6)%id
+#
+#- File type
+%V(20,140,60,15,2)%Vb(000000)%Vf(ffffff)
+%?fc<MP1|MP2|MP3|AIFF|WAV|VORBIS|FLAC|MPC|A52|WAVPAC|ALAC|AAC|SHORTEN|SID|ADX|NSF|SPEEX|SPC|APE|WMA|?>
+#
+#- Play/Pause
+%V(160,140,60,15,2)%Vb(000000)%Vf(ffffff)
+%ar%?mp<[STOP]|[PLAY]|[PAUSE]|[FF]|[RW]>
+#
+#- Volume bar
+%V(20,162,-,-,-)%Vb(000000)%Vf(ffffff)
+%pv(0,0,140,11,VB,backdrop,VBB)
+#
+#- Volume text
+%V(170,160,50,15,2)%Vb(000000)%Vf(ffffff)
+%ar%pvdb
+#
+#- Track progress bar
+%V(20,180,-,-,-)%Vb(000000)%Vf(ffffff)
+%pb(0,0,200,21,PB,backdrop,PBB)
+#
+#- Time elapsed
+%V(20,205,40,15,2)%Vb(000000)%Vf(ffffff)
+%al%pc
+#
+#- Time total
+%V(180,205,40,15,2)%Vb(000000)%Vf(ffffff)
+%ar%pt
+#

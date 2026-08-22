@@ -1,0 +1,84 @@
+#-----------------------------------------------#
+#scrim
+#by Anthony Fletcher for PodBox
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#--- Fonts ---#
+#
+%Fl(2,26-noto-sans-medium.fnt)
+%Fl(3,12-noto-sans.fnt)
+%Fl(4,24x24_Icons.fnt)
+%Fl(5,18-noto-sans-bold.fnt)
+#
+#--- Images ---#
+#
+%xl(vbg,volband.bmp,0,0)
+%xl(vwf,volfill.bmp,0,0)
+#
+#--- Background layer ---#
+#
+# Album art
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(80,0,240,240,c,c,-,-,original)%Cd(original)
+#
+# Album panel tint
+%?if(%tw(%it,2),>,230)<%dr(0,50,240,90,000000,-,10)|%dr(0,77,240,63,000000,-,10)>
+#
+# Progress tint
+%dr(0,140,240,5,!ffffff,-,6)
+#
+#--- Foreground layer ---#
+#
+%V(0,0,-,-,-)
+#
+# Disable the status bar
+%wd
+#   
+# Pick tall or short viewport
+%?if(%tw(%it,2),>,230)<%Vd(Tall)|%Vd(Short)>
+#
+# Album panel contents
+#
+# - Track title
+%Vl(Short,5,85,230,28,2)
+%it
+%Vl(Tall,5,58,230,55,2)%wt(%it,tl)
+#
+# - Album
+%Vf(b3b3b3)%V(5,113,230,20,-)
+%s%id
+#
+# Progress
+%Vf(ffffff)%V(0,140,240,5,-)%pb(0,0,-,-,noborder)
+#
+# Under panel
+#
+# - Track number
+%V(5,150,30,14,3)
+%?if(%pp,<,10)<0>%pp
+#
+# - Remaining time.
+%V(45,150,30,14,3)
+%ar%pr
+#
+# Top bar
+%?mv(3)<%Vd(Volume)|%Vd(Chrome)>
+#
+# - Status icons - Transport: stopped C, playing A, paused B, ffwd G, rewind F.
+%Vl(Chrome,0,0,320,35,4)
+%Vl(Chrome,2,2,76,24,4)
+%?mp<C|A|B|G|F>%?ps<H>%?mm<|J|J|J|J>
+#
+# Spectrum analyser
+%V(0,200,80,40,-)%Sb(8,-,-,0)
+#
+# Volume overlay
+%Vl(Volume,0,0,320,35,5)%Vg(000000,000000,ffffff)
+%Vs(gradient) 
+%Vs(gradient) 
+%Vs(gradient) 
+%Vl(Volume,8,6,304,24,4)%Vg(000000,000000,ffffff)%Vf(ffffff)
+%Vs(gradient)%?pv<M|N|N>%arO
+%Vl(Volume,40,15,240,6,-)%Vf(!ffffff)
+%dr(0,0,240,6,000000)%pv(0,0,240,6,image,vwf,backdrop,vbg)
+

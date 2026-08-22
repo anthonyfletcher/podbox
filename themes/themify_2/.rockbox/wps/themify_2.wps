@@ -1,0 +1,347 @@
+#-----------------------------------------------#
+#Themify 2
+#Original code by Dook 2025
+#Creative Commons Attribution-ShareAlike 3.0
+#Unported (CC BY-SA 3.0)
+#-----------------------------------------------#
+#
+#--- Viewport Declarations ---# $VD
+# these need to be here to prevent rendering issues.
+#
+# CC: $VD picks which title viewport to show up front. It measures the
+# CC: track title length (%ss slices of %it) and, if it fits on one line,
+# CC: uses a single-line title; otherwise it splits into a dual-line title
+# CC: at the right space. 'High_' variants are used when two sublines show.
+%?or(%if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,off),%if(%ft(themes/themify_2.preferences,sub-line mode:),=,off))<%Vd(Single_Line_Song_Title)|%Vd(High_Single_Line_Song_Title)>
+#
+# CC: Then pick the subline viewport(s) from the theme prefs (sub-line mode
+# CC: / extra sub-line mode: artist, album, rating, file_format, year,
+# CC: volume_meter, off...).
+%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,volume_meter)<%Vd(Single_Line_Subline_Volume_Meter)|%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,off)<%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,rating)<%Vd(Single_Line_Subline_Rating)|%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,file_format)<%Vd(Single_Line_File_Format)|%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,year)<%Vd(Single_Line_Song_Year)|%Vd(Single_Line_Subline_Text)>>>|%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,off)<%Vd(Single_Line_Subline_Text)|%Vd(High_Single_Line_Subline_Text)%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,rating)<%Vd(High_Single_Line_Subline_Rating)|%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,file_format)<%Vd(High_Single_Line_File_Format)|%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,year)<%Vd(High_Single_Line_Song_Year)|%Vd(High_Single_Line_Extra_Subline_Text)>>>>>>
+#
+#- Battery -#
+# CC: Enable numeric or graphical battery per the theme setting.
+%?St(battery display)<%Vd(Battery_Graphical)|%Vd(Battery_Numeric)>
+#
+#- Status Bar -#
+# CC: Enable the status bar; the 'Long' variant when a sleep timer (%bs) or
+# CC: hold (%mh) icon is present, plus the sub-status icons unless minimal mode.
+%?bs<%Vd(Status_Bar_Long)|%?mh<%Vd(Status_Bar_Long)|%Vd(Status_Bar_Short)>>%Vd(Status_Bar)%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<|%?bs<%Vd(Sub_Status_Bar_Long)|%?mh<%Vd(Sub_Status_Bar_Long)|%Vd(Sub_Status_Bar_Short)>>>
+#
+#- Playlist Position -#
+%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<|%?if(%pe,!=,1)<%?if(%pe, >=, 100)<%Vd(Playlist_Position_Three_Lines)|%Vd(Playlist_Position_Single_Line)>>>
+#
+%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<|%?or(%if(%bs,=,%bs),%if(%mh,=,h))<|%Vd(Sub_Status_Backdrop_Long)%Vd(Sub_Status_Backdrop_Long_Flush)|%Vd(Sub_Status_Backdrop_Short)%Vd(Sub_Status_Backdrop_Short_Flush)>>
+#
+#--- END ---#
+#
+#
+#--- Graphics Reset ---# $GR
+# need to flush the background and foreground, or the previous screen's background remains.
+# CC: $GR: flush both layers so the previous screen's background doesn't
+# CC: bleed through; %wd disables the default statusbar.
+%V(0,0,-,-,-)%VB
+%V(0,0,-,-,-)
+%wd
+#
+#--- END ---#
+#
+#
+#--- Font-loading ---# $FL
+# CC: $FL: preload the fonts used below (title, artist/album, and the icon
+# CC: fonts). The number is the font id referenced as the last %V/%Vl arg.
+%Fl(2,22-LeagueSpartan-Bold.fnt) # song titles font
+%Fl(3,18-LeagueSpartan-Medium.fnt) # artist/album and playlist position font
+%Fl(4,../wps/themify_2/Player_Icons.fnt) # vector icons for the song playback status
+%Fl(5,../wps/themify_2/16-LeagueSpartan-SemiBold.fnt) # numeric battery Font
+%Fl(6,../wps/themify_2/UI_Vectors.fnt) # ui drawing vectors
+%Fl(7,../wps/themify_2/Blank_Font.fnt,5) # blank font
+%Fl(8,../wps/themify_2/14x13_Compacticons.fnt,120) # vector icons for the status bar
+%Fl(9,../wps/themify_2/Graphics_Font.fnt) # vector icons 
+#
+#--- END ---#
+#
+#
+#--- Album Art ---# $AA
+#
+# in this instance the character u is a 14% opacity block used to shade the background.
+# CC: $AA: draw the album-art frame, then the real art (%C = art available)
+# CC: or the fallback placeholder.
+%Vd(Album_Widget)%?C<%Vd(Album_Art)|%Vd(Album_Fallback_Art)>
+# CC: Load the album art into a 160x160 area (%Cl position, %Cd draw); the
+# CC: 'v' rows shade the backdrop behind it.
+%Vl(Album_Art,0,22,160,160,9)%VB%Cl(0,0,160,160)%Cd
+vvvvvvv
+vvvvvvv
+vvvvvvv
+vvvvvvv
+vvvvvvv
+vvvvvvv
+vvvvvvv
+%Vl(Album_Fallback_Art,0,22,160,42,9)%VB
+uuuuuuu
+uuuuuuu
+%Vl(Album_Fallback_Art,0,64,160,100,9)%VB
+abcdeuw
+fghijuw
+klmnopw
+uuqrstw
+%Vl(Album_Fallback_Art,0,164,160,18,9)%VB
+uuuuuuu
+#
+%Vl(Album_Fallback_Art,0,22,160,160,-)
+%V(159,22,1,1,-)%VB
+# CC: The rounded frame/mask drawn around the album art.
+%Vl(Album_Widget,0,16,145,6,-)%VB%dr(0,0,-,-)
+%Vl(Album_Widget,160,38,6,128,-)%VB%dr(0,0,-,-)
+%Vl(Album_Widget,160,38,6,128,-)%dr(0,0,-,-)
+%Vl(Album_Widget,0,182,166,6,-)%VB%dr(0,0,-,-)
+%Vl(Album_Widget,0,188,166,33,-)%dr(0,0,-,-)
+# cutout the visible album art in the foreground layer
+%Vl(Album_Art,0,38,160,128,-)
+# draw the rounded edges
+%Vl(Album_Widget,0,16,166,22,6)%aRb
+%Vl(Album_Widget,0,166,166,22,6)%aRc
+%Vl(Album_Widget,144,199,22,22,6)d
+#
+#-- Song Position --#
+#
+# for cuesheet bookmarks
+%V(18,191,126,5,-)%VB%dr(0,0,-,-)
+%V(18,191,126,5,-)%pb(0,0,-,-,noborder)
+#
+#
+%V(17,196,127,5,7)%VB
+#
+#- Custom Player Slider Legend -#
+# Ø = Slider Rounded Start
+# Ò = Slider Rounded End
+# Ñ = 1px
+# Ô = 5px
+# Õ = 10px
+# Ö = 20px
+# × = 25px
+# Ó = Slider BG Rounded End
+#
+# CC: Custom progress slider. %px = playback position (0-100); the glyph
+# CC: string builds a rounded bar of the right length (see legend above).
+%V(17,196,127,5,6)%aLØ%aR%?px<ÒÖ××××Ó|ÒÖ××××Ó|ÒÑÑÑÑÔÕ××××Ó|ÒÑÑÑÔÕ××××Ó|ÒÑÑÔÕ××××Ó|ÒÑÔÕ××××Ó|ÒÔÕ××××Ó|ÒÑÑÑÑÕ××××Ó|ÒÑÑÑÕ××××Ó|ÒÑÑÕ××××Ó|ÒÑÕ××××Ó|ÒÕ××××Ó|ÒÑÑÑÑÔ××××Ó|ÒÑÑÑÔ××××Ó|ÒÑÑÔ××××Ó|ÒÑÔ××××Ó|ÒÔ××××Ó|ÒÑÑÑÑ××××Ó|ÒÑÑÑ××××Ó|ÒÑÑ××××Ó|ÒÑ××××Ó|Ò××××Ó|ÒÑÑÑÑÖ×××Ó|ÒÑÑÑÖ×××Ó|ÒÑÑÖ×××Ó|ÒÑÑÖ×××Ó|ÒÑÖ×××Ó|ÒÖ×××Ó|ÒÑÑÑÑÔÕ×××Ó|ÒÑÑÑÔÕ×××Ó|ÒÑÑÔÕ×××Ó|ÒÑÔÕ×××Ó|ÒÔÕ×××Ó|ÒÑÑÑÑÕ×××Ó|ÒÑÑÑÕ×××Ó|ÒÑÑÕ×××Ó|ÒÑÕ×××Ó|ÒÕ×××Ó|ÒÑÑÑÑÔ×××Ó|ÒÑÑÑÔ×××Ó|ÒÑÑÔ×××Ó|ÒÑÔ×××Ó|ÒÔ×××Ó|ÒÑÑÑÑ×××Ó|ÒÑÑÑ×××Ó|ÒÑÑ×××Ó|ÒÑ×××Ó|Ò×××Ó|ÒÑÑÑÑÖ××Ó|ÒÑÑÑÖ××Ó|ÒÑÑÖ××Ó|ÒÑÖ××Ó|ÒÖ××Ó|ÒÑÑÑÑÔÕ××Ó|ÒÑÑÑÔÕ××Ó|ÒÑÑÔÕ××Ó|ÒÑÔÕ××Ó|ÒÔÕ××Ó|ÒÑÑÑÑÕ××Ó|ÒÑÑÑÕ××Ó|ÒÑÑÕ××Ó|ÒÑÕ××Ó|ÒÕ××Ó|ÒÑÑÑÑÔ××Ó|ÒÑÑÑÔ××Ó|ÒÑÑÔ××Ó|ÒÑÔ××Ó|ÒÔ××Ó|ÒÑÑÑÑ××Ó|ÒÑÑÑ××Ó|ÒÑÑ××Ó|ÒÑ××Ó|Ò××Ó|ÒÑÑÑÑÖ×Ó|ÒÑÑÑÖ×Ó|ÒÑÑÖ×Ó|ÒÑÖ×Ó|ÒÖ×Ó|ÒÑÑÑÑÔÕ×Ó|ÒÑÑÑÔÕ×Ó|ÒÑÑÔÕ×Ó|ÒÑÔÕ×Ó|ÒÔÕ×Ó|ÒÑÑÑÑÕ×Ó|ÒÑÑÑÕ×Ó|ÒÑÑÕ×Ó|ÒÑÕ×Ó|ÒÕ×Ó|ÒÑÑÑÑÔ×Ó|ÒÑÑÑÔ×Ó|ÒÑÑÔ×Ó|ÒÑÔ×Ó|ÒÔ×Ó|ÒÑÑÑÑ×Ó|ÒÑÑÑ×Ó|ÒÑÑ×Ó|ÒÑ×Ó|Ò×Ó|ÒÑÑÑÑÖÓ|ÒÑÑÑÖÓ|ÒÑÑÖÓ|ÒÑÖÓ|ÒÖÓ|ÒÑÑÑÑÔÕÓ|ÒÑÑÑÔÕÓ|ÒÑÑÔÕÓ|ÒÑÔÕÓ|ÒÔÕÓ|ÒÑÑÑÑÕÓ|ÒÑÑÑÕÓ|ÒÑÑÕÓ|ÒÑÕÓ|ÒÕÓ|ÒÑÑÑÑÔÓ|ÒÑÑÑÔÓ|ÒÑÑÔÓ|ÒÑÔÓ|ÒÔÓ|ÒÑÑÑÑÓ|ÒÑÑÑÓ|ÒÑÑÓ|ÒÑÓ|ÒÓ|ÒÑ|Ù>
+#
+#--- END ---#
+#
+#
+#--- Status Bar ---# $SB
+#
+%V(283,14,37,29,-)%VB%dr(0,0,37,8)%dr(0,21,37,8)%dr(30,8,7,13)
+%V(283,14,37,29,-)
+# CC: $SB: the WPS status-bar background (Long variant, extra width for the
+# CC: hold/sleep icon).
+%Vl(Status_Bar_Long,264,14,19,29,-)%VB%dr(0,0,19,8)%dr(0,21,19,8)%dr(12,8,7,13)
+%Vl(Status_Bar_Long,264,14,19,29,-)
+#
+#- Hold and Sleep Icons -#
+%Vl(Status_Bar_Long,263,22,13,14,8)%Vs(invert)%?bs<%?mh<%t(3)o;%t(3)q|q>|%?mh<o>>
+#
+#-- Battery Status --#
+#
+#- Numerical Battery Display --#
+# CC: WPS battery (numeric here, graphical below), same idea as the .sbs.
+%Vl(Battery_Numeric,283,22,30,14,8)%Vs(invert)EFG
+%Vl(Battery_Numeric,285,24,24,9,5)%VB%?bc<%t(3)%ac%bl;%t(2)|%?if(%bl,<=,15)<%t(2)%ac%bl;%t(.5)|%ac%bl>>
+%Vl(Battery_Numeric,285,24,24,9,5)%?bc<%t(3)%ac%bl;%t(2)|%?if(%bl,<=,15)<%t(2)%ac%bl;%t(.5)|%ac%bl>>
+#
+# charging Icon
+%Vl(Battery_Numeric,291,22,12,13,8)%?bc<%t(3);%Vs(invert)%t(2)%acK|>
+#
+#- Graphical Battery Display --#
+#%?bl<unknown|...|100%>
+%Vl(Battery_Graphical,283,22,30,14,8)%aL%Vs(invert)%?bc<%?bl<|îö|ïö|ðö|ñö|òö|óö|ôö|õö|õö|õö|õö|õö|õö|õö|õö|õö|õø|õù|õú|õû|õü|õý>G|%?bl<|Öâ|×â|Øâ|Ùâ|Úâ|Ûâ|Üâ|Ýâ|Þâ|ßâ|àâ|áã|áä|áå|áæ|áç|áè|áé|áê|áë|áì|áí>>G
+#
+#
+#-- Sub Status Backdrops --#
+# the backdrop is broken down into 3 shapes, the end, the start and a filler. the end and start are shown if any are true, and the filler is shown in the middle if more than one icon is active, per icon.
+#
+# when hold or sleep icon isn't active.
+#- Short Backdrop -#
+# CC: Sub-status backdrop: a pill sized to fit whichever of the shuffle /
+# CC: repeat / HQ-audio icons are active (%ps shuffle, %mm repeat, %fc codec).
+%Vl(Sub_Status_Backdrop_Short,202,14,82,29,6)%VB
+%aR%?or(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<À>%?and(%if(%ps, !=, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?and(%if(%ps, =, 1),%if(%mm, =, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11),%if(%fc, !=, 13)))<Á>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?or(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Â>
+#
+%Vl(Sub_Status_Backdrop_Short_Flush,202,14,71,29,7)#
+#
+#- Long Backdrop -#
+# shown when hold or sleep states are active.
+%Vl(Sub_Status_Backdrop_Long,183,14,82,29,6)%VB
+%aR%?or(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<À>%?and(%if(%ps, !=, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?and(%if(%ps, =, 1),%if(%mm, =, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11),%if(%fc, !=, 13)))<Á>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Á>%?or(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<Â>
+#
+%Vl(Sub_Status_Backdrop_Long_Flush,183,14,71,29,7)#
+#
+%Vl(Status_Bar_Short,273,14,10,29,6)%Vs(invert)%aL%?mh<a|a>
+%Vl(Status_Bar_Long,254,14,10,29,6)%Vs(invert)%aL%?mh<a|a>
+#
+# icon slot 1
+# CC: The shuffle / repeat / HQ-audio status glyphs themselves.
+%Vl(Sub_Status_Bar_Short,252,22,14,13,8)%?and(%if(%ps, =, 1),%or(%if(%mm, =, 1),%if(%mm, >, 1)),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<m>%?and(%if(%ps, =, 1),%or(%if(%mm, =, 1),%if(%mm, >, 1)),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<m>%?and(%if(%ps, !=, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<n>%?and(%if(%ps, !=, 1),%if(%mm, =, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+#
+# icon slot 1
+%Vl(Sub_Status_Bar_Long,232,22,14,13,8)%?and(%if(%ps, =, 1),%or(%if(%mm, =, 1),%if(%mm, >, 1)),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<m>%?and(%if(%ps, =, 1),%or(%if(%mm, =, 1),%if(%mm, >, 1)),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<m>%?and(%if(%ps, !=, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<n>%?and(%if(%ps, !=, 1),%if(%mm, =, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+#
+# icon slot 2
+%Vl(Sub_Status_Bar_Short,231,22,14,13,8)%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<n>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<n>%?and(%or(%and(%if(%ps, !=, 1),%if(%mm, >, 1)),%and(%if(%ps, =, 1),%if(%mm, =, 1))),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+#
+# icon slot 2
+%Vl(Sub_Status_Bar_Long,211,22,14,13,8)%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<n>%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, !=, 4),%if(%fc, !=, 5),%if(%fc, !=, 7),%if(%fc, !=, 11)))<n>%?and(%or(%and(%if(%ps, !=, 1),%if(%mm, >, 1)),%and(%if(%ps, =, 1),%if(%mm, =, 1))),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+#
+# icon slot 3 - just hq audio
+%Vl(Sub_Status_Bar_Short,210,22,14,14,8)%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+# icon slot 3 - just hq audio
+%Vl(Sub_Status_Bar_Long,190,22,14,14,8)%?and(%if(%ps, =, 1),%if(%mm, >, 1),%or(%if(%fc, =, 4),%if(%fc, =, 5),%if(%fc, =, 7),%if(%fc, =, 11)))<p>
+#
+#--- END ---#
+#
+#
+#--- Player & Playlist Status ---# $PS
+#-- Player Status Backdrops --#
+#
+# CC: $PS: rounded backdrop behind the play controls; the glyphs change with
+# CC: play state (%mp) and whether the volume popup (%mv) is up.
+%V(196,154,124,29,6)%VB
+%aR%?if(%mp,<=,3)<%?mv(1)<ÍÎ|%?mp<ÃÄ|ÉÊ|ÃÄ>>|ÃÄ>%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<|%?if(%pe,!=,1)<ÇÇ>>È
+#
+%V(196,183,124,29,6)%VB
+%aR%?if(%mp,<=,3)<%?mv(1)<ÏÐ|%?mp<ÅÆ|ËÌ|ÅÆ>>|ÅÆ>%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<|%?if(%pe,!=,1)<ÇÇ>>È
+#
+%V(196,154,124,57,7)
+#
+#
+#-- Play, Pause, Forward, Rewind and Volume --#
+# don't display volume if fastwarding etc.
+# CC: Choose the play-status vs volume-popup viewport, short or long form
+# CC: (long leaves room for the playlist counter when not in minimal mode).
+%?if(%ft(themes/themify_2.preferences,minimal player mode:),=,on)<%?if(%mp,<=,3)<%?mv(1)<%Vd(Player_Volume_Short)|%Vd(Player_Status_Short)>|%Vd(Player_Status_Short)>|%?if(%pe,!=,1)<%?if(%mp,<=,3)<%?mv(1)<%Vd(Player_Volume_Long)|%Vd(Player_Status_Long)>|%Vd(Player_Status_Long)>|%?if(%mp,<=,3)<%?mv(1)<%Vd(Player_Volume_Short)|%Vd(Player_Status_Short)>|%Vd(Player_Status_Short)>>>
+#
+#- Shorter Dialog Positions -#
+# The spectrum lives in its own hideable viewport (Player_Spectrum_Short),
+# padded 8px inside the 46x46 box so bars stay within the round container
+# instead of drawing into its corners (inscribed-square side for a 46px
+# circle is ~32.5px, so 30x30 leaves a small safety margin). %V/%Vl are
+# structural tags -- the parser starts a brand-new viewport the instant it
+# sees one, even mid-line, so embedding one directly inside a %?mp<...>
+# conditional branch silently breaks the conditional's own parsing. %Vd
+# (plain show/hide, used everywhere else in this file for this exact kind
+# of toggle) has no such restriction, so the toggle goes through that
+# instead, against this separately-declared viewport.
+#
+# Player_Status_Short is declared (and so rendered) BEFORE Player_Spectrum_Short
+# deliberately: viewports render in file/tree order, and Player_Status_Short's
+# own region fully contains Player_Spectrum_Short's. Declaring the spectrum
+# viewport first (as an earlier version of this file did) meant Player_Status_
+# Short's own full-refresh clear ran *after* the spectrum had already drawn its
+# bars for that pass, wiping them out right before the frame reached the
+# screen -- track changes fire several full-redraw passes in quick succession
+# (title, art, colors...), so this showed up as the spectrum visibly clearing
+# and redrawing itself repeatedly right at track boundaries. Spectrum drawn
+# last means nothing later in the same pass can clear over it.
+# Spectrum only while actually playing -- restores the %mp branching the
+# original play/pause/ff/rw animation had, which an earlier unconditional
+# %Sb call dropped (that's why pause used to show the spectrum instead of
+# a pause icon). Static ff/rw glyphs here rather than the original's frame
+# animation, to keep this simple; can be re-animated later if wanted.
+#
+# %Sb (spectrum bars) also gated on %mv(1) (volume popup NOT active) here,
+# separately from the %?mp gating above: declaration order alone (Spectrum
+# before Volume, "later wins") only controls one-time full-refresh
+# ordering, but %Sb carries its own independent, much higher-frequency
+# SKIN_REFRESH_SPECTRUM refresh cycle. That cycle kept repainting the
+# spectrum's bars into this same region every animation tick regardless of
+# what else had drawn there since, so the volume popup -- refreshed far
+# less often (%pv is SKIN_REFRESH_DYNAMIC) -- won the ordering exactly once
+# and then got redrawn over within milliseconds. The %?mp branching above
+# doesn't help here because %Player_Status_Short stays "shown" (sticky,
+# same as everywhere else %Vd() is used in this file) even on a pass where
+# %mv(1) is true and it isn't the one being freshly %Vd()'d, so its nested
+# %Vd(Player_Spectrum_*) call -- and the spectrum's own refresh -- still
+# fires. Suppressing %Sb itself, rather than trying to out-order it, is the
+# only way to stop it drawing over the popup for as long as %mv(1) holds.
+# CC: Play/pause/ff/rw indicator; while playing it shows the spectrum
+# CC: analyser (%Sb), declared last so nothing clears over it (see comment).
+%Vl(Player_Status_Short,260,160,46,46,4)%?mp<|%Vd(Player_Spectrum_Short)|1|æ|õ>
+%Vl(Player_Spectrum_Short,268,168,30,30,4)%?mv(1)<|%Sb(5,center,1)>
+# volume Slider, one character for the 91 positions of regular volume settings.
+# CC: Volume popup: one glyph per volume step (%pv).
+%Vl(Player_Volume_Short,260,160,46,46,4)%?pv<4|5|6|7|8|9|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|À|Á|Â|Ã|Ä|Å|Ç|È|É|Ê|Ë|Ì|Í|Î|Ï|Ð|Ñ|Ò|Ó|Ô|Õ|Ö|×|Ø|Ù|Ú|Û|Ü|Ý|Þ|ß|à|á|â|ã|ä|ä|å>
+#
+#- Longer Dialog Positions -#
+# Same reasoning as Player_Status_Short/Player_Spectrum_Short above --
+# Status declared (and rendered) first, Spectrum last, and %Sb gated on
+# %mv(1) for the same reason (see the comment above).
+%Vl(Player_Status_Long,202,160,46,46,4)%?mp<|%Vd(Player_Spectrum_Long)|1|æ|õ>
+%Vl(Player_Spectrum_Long,210,168,30,30,4)%?mv(1)<|%Sb(3,radiate,1)>
+# volume Slider, one character for the 91 positions of regular volume settings.
+#
+%Vl(Player_Volume_Long,202,160,46,46,4)%?pv<4|5|6|7|8|9|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z|À|Á|Â|Ã|Ä|Å|Ç|È|É|Ê|Ë|Ì|Í|Î|Ï|Ð|Ñ|Ò|Ó|Ô|Õ|Ö|×|Ø|Ù|Ú|Û|Ü|Ý|Þ|ß|à|á|â|ã|ä|ä|å>
+#
+#-- Playlist Position --#
+#
+# CC: Playlist position ("n of m"), shown as one or three lines depending on
+# CC: how big the numbers are.
+%Vl(Playlist_Position_Three_Lines,250,167,68,12,3)%?mv<%?mp<%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)||||>|%?mp<%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)|%ac%pp %Sx(of)||||>>
+%Vl(Playlist_Position_Three_Lines,250,187,68,12,3)%ac%pe
+#
+%Vl(Playlist_Position_Single_Line,250,176,68,12,3)%ac%pp %Sx(of) %pe
+#
+#--- END ---#
+#
+#
+#--- Song Info ---# $SI
+#
+#-- Single Line Title --#
+#
+#- Single Line Title when one subline active -#
+# CC: $SI: single-line track title (%it, or filename %fn if untagged).
+%Vl(Single_Line_Song_Title,180,64,132,40,2)%wt(%it,bl,%fn)
+#
+# CC: The subline text, filled from whichever field the sub-line-mode pref
+# CC: selects (artist/album/genre/playlist/bitrate/playtime).
+%Vl(Single_Line_Subline_Text,180,112,132,16,3)%?if(%St(scroll speed),=,1)<|%s>%aL%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,off)<%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,artist)<%?ia<%ia|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,album)<%?id<%id|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,genre)<%?ig<%ig|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,playlist_name)<%?pn<%pn|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,bitrate)<%fbkbps>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,song_playtime)<%pc/%pt>|%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,artist)<%?ia<%ia|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,album)<%?id<%id|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,genre)<%?ig<%ig|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,playlist_name)<%?pn<%pn|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,bitrate)<%fbkbps>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,song_playtime)<%pc/%pt>>
+#
+%Vl(Single_Line_Subline_Volume_Meter,180,116,132,18,6)%VB%aLllllllllllllllllll
+# CC: Alternative subline: a live volume meter (%pL) instead of text.
+%Vl(Single_Line_Subline_Volume_Meter,180,116,132,18,6)%aL%?pS(0.2)<|%?if(%pL,=,0)<%t(2.5);%t(2)k|%?pL<k|kk|kkk|kkkk|kkkkk|kkkkkk|kkkkkkk|kkkkkkkk|kkkkkkkkk|kkkkkkkkkk|kkkkkkkkkkk|kkkkkkkkkkkk|kkkkkkkkkkkkk|kkkkkkkkkkkkkk|kkkkkkkkkkkkkkk|kkkkkkkkkkkkkkkk|kkkkkkkkkkkkkkkkk|kkkkkkkkkkkkkkkkkk>>>
+#
+# CC: Alternative subline: the track rating as filled/empty stars (%rr).
+%Vl(Single_Line_Subline_Rating,180,116,132,18,8)%aL%?rr<uuuuu|vuuuu|wuuuu|wvuuu|wwuuu|wwvuu|wwwuu|wwwvu|wwwwu|wwwwv|wwwww>
+#
+# CC: Alternative subline: a file-format badge sized to the codec name (%fc).
+%Vl(Single_Line_File_Format,181,111,120,18,6)%aL%VBÚÛÛÛÛ%?if(%ss(8,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(7,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(6,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(5,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(4,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛ|%?if(%ss(3,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛ|%?if(%ss(2,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛ|%?if(%ss(1,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛ>>>>>>>>Ü
+%Vl(Single_Line_File_Format,181,111,120,18,7)
+%Vl(Single_Line_File_Format,188,114,120,18,3)%aL%fc
+#
+# CC: Alternative subline: a year badge (%iy).
+%Vl(Single_Line_Song_Year,181,111,50,20,6)%VB%aL%?iy<ÝÞÞÞÞÞß>
+%Vl(Single_Line_Song_Year,181,111,50,20,7)
+%Vl(Single_Line_Song_Year,187,115,37,16,3)%ac%?if(%ss(0,4,%iy),=,%iy)<%iy|%ss(0,4,%iy)>
+#
+#
+#-- Single Line Title when two sublines active --#
+#
+%Vl(High_Single_Line_Song_Title,180,54,132,40,2)%wt(%it,bl,%fn)
+#
+%Vl(High_Single_Line_Subline_Text,180,102,132,16,3)%?if(%St(scroll speed),=,1)<|%s>%aL%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,artist)<%?ia<%ia|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,album)<%?id<%id|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,genre)<%?ig<%ig|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,playlist_name)<%?pn<%pn|%d(1)>>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,bitrate)<%fbkbps>%?if(%ft(themes/themify_2.preferences,sub-line mode:),=,song_playtime)<%pc/%pt>
+#
+%Vl(High_Single_Line_Extra_Subline_Text,180,127,132,16,3)%?if(%St(scroll speed),=,1)<|%s>%aL%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,artist)<%?ia<%ia|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,album)<%?id<%id|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,genre)<%?ig<%ig|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,playlist_name)<%?pn<%pn|%d(1)>>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,bitrate)<%fbkbps>%?if(%ft(themes/themify_2.preferences,extra sub-line mode:),=,song_playtime)<%pc/%pt>
+#
+%Vl(High_Single_Line_Subline_Rating,180,126,132,18,8)%aL%?rr<uuuuu|vuuuu|wuuuu|wvuuu|wwuuu|wwvuu|wwwuu|wwwvu|wwwwu|wwwwv|wwwww>
+#
+%Vl(High_Single_Line_File_Format,181,126,120,18,6)%aL%VBÚÛÛÛÛ%?if(%ss(8,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(7,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(6,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(5,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛÛÛ|%?if(%ss(4,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛÛÛ|%?if(%ss(3,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛÛÛ|%?if(%ss(2,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛÛ|%?if(%ss(1,2,%fc),=,%ss(-2,-,%fc))<ÛÛÛ>>>>>>>>Ü
+%Vl(High_Single_Line_File_Format,181,126,120,18,-)
+%Vl(High_Single_Line_File_Format,188,129,120,18,3)%aL%fc
+#
+%Vl(High_Single_Line_Song_Year,181,126,50,20,6)%VB%aL%?iy<ÝÞÞÞÞÞß>
+%Vl(High_Single_Line_Song_Year,181,126,50,20,-)
+%Vl(High_Single_Line_Song_Year,187,130,37,16,3)%ac%?if(%ss(0,4,%iy),=,%iy)<%iy|%ss(0,4,%iy)>
+#
+#--- END ---#
+#
+#

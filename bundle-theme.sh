@@ -1,7 +1,11 @@
 #!/bin/sh
-# Bundle this fork's themes into a rockbox.zip produced by `make zip`, and make
-# Themify_2 the first-boot default via a shipped default-config.cfg (applied
-# before any compiled DEFAULT_WPSNAME / DEFAULT_SBSNAME fallback takes effect).
+# Bundle this fork's theme into a rockbox.zip produced by `make zip`, and make
+# scrim the first-boot default via a shipped default-config.cfg (applied before
+# any compiled DEFAULT_WPSNAME / DEFAULT_SBSNAME fallback takes effect).
+#
+# Scrim is the only theme the firmware zip carries. The others in themes/ are
+# published as their own download by release.sh, so a player takes only the
+# theme it starts with and picks up the rest if it wants them.
 #
 # This lives here rather than in tools/buildzip.pl so that file stays as close
 # to upstream as possible. `make zip` alone produces a themeless zip;
@@ -19,12 +23,12 @@ if [ ! -f "$ZIP" ]; then
     exit 1
 fi
 
-# Each themes/<name>/.rockbox already has the on-device layout, so they merge on
-# copy. Trap: two themes shipping different files under one name resolve to
-# whichever copies last -- check for filename collisions when adding a theme.
+# themes/<name>/.rockbox already has the on-device layout, so it merges on copy.
 # Named rather than globbed, or a `git merge rockbox/master` would quietly start
-# shipping stock themes that were never converted.
-THEMES="Themify_2 Scrim"
+# shipping stock themes that were never converted. Trap: two themes shipping
+# different files under one name resolve to whichever copies last -- check for
+# filename collisions before adding a second one here.
+THEMES="scrim"
 #
 # default-config.cfg is the build's first-boot config, not part of any theme,
 # so it sits beside them rather than inside one.

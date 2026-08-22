@@ -1,0 +1,91 @@
+#-----------------------------------------------#
+#bony
+#by Anthony Fletcher for PodBox
+#Based on BONES by Chuck Lardo
+#CC BY-SA 4.0
+#-----------------------------------------------#
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,15-ProFont.fnt)
+%Fl(3,24-seven-fifteen.fnt)
+#
+#Background layer
+#
+#- Album art
+%V(0,0,-,-,-)%Vb(ffffff)%Vf(000000)%VB%Cl(-40,0,240,240,c,c,pixellate10,-,pixels)%Cd(pixels,0,0,80,240)
+#
+#- Title bar background
+%dr(80,0,240,30,000000)
+#
+#Foreground layer
+%V(0,0,-,-,-)
+%Vd(Chrome)%?if(%cs,=,10)<%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
+#
+#Set up rows
+%Lb(Rows,240,30,-,30)
+#
+#Set up list
+%Vi(list,80,30,240,210,3)%Vb(ffffff)%Vf(000000)
+#
+#- Nowhere to be seen: the quick screen draws its own panels, and the list
+#- would otherwise still be under them.
+%Vi(qsblank,0,0,1,1,-)
+#
+%V(0,0,-,-,-)%Vb(ffffff)%Vf(000000)%?if(%cs,=,10)<%VI(qsblank)|%VI(list)>
+#
+#- Plain row
+%Vl(Rows,0,0,240,30,3)%Vy
+%?La<|%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%?if(%LT,=,%Sx(Now Playing))<%s %LT: %?it<%it|%fn>|%s %LT>>
+#
+#- Art row
+%Vl(Rows,0,0,240,30,3)%Vy
+%?La<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%s      %LT>
+#
+#- Row art
+%Vl(Rows,10,0,30,30,-)
+%?and(%La,%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([By album])))<%La(0,-,-,pixellate10)>
+#
+#- Special row symbols for art rows
+%Vl(Rows,10,0,30,30,3)%Vy
+%?and(%La,%or(%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([By album]))))<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%ac%sel(%LT,%Sx([Random]),&,%Sx([All Tracks]),*,%Sx([Untagged]),?,%Sx([Featured In]),+)%?if(%LT,=,%Sx([By album]))<%#>>
+#
+#- Title
+%Vl(Chrome,88,3,180,24,3)%Vf(ffffff)
+%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<Main Menu|%s%Lt>>
+#
+#- Status icons
+%Vl(Chrome,264,7,48,15,2)%Vf(ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<%||/|-|\>|>%?bc<%?bl<[   ]|[+  ]|[++ ]|[+++]>|%?bl<[   ]|[=  ]|[== ]|[===]>>
+#
+#
+#Quick screen. Naming any %Q tag is what stops the firmware drawing its own
+#layout over the skin. Four rows rather than the firmware's cross, labelled the
+#way the WPS labels its transport -- [PLAY], [STOP], so [UP], [LEFT]. Row pitch
+#and %Vy are the list's, so the screen reads as one more list.
+#
+#- Up
+%Vl(QuickT,90,75,130,30,3)%Vy%Vf(000000)
+%al[ UP ] %QT
+%Vl(QuickT,230,75,80,30,3)%Vy%Vf(000000)
+%ar%s%Qt
+#
+#- Left
+%Vl(QuickL,90,105,130,30,3)%Vy%Vf(000000)
+%al[LEFT] %QL
+%Vl(QuickL,230,105,80,30,3)%Vy%Vf(000000)
+%ar%s%Ql
+#
+#- Right
+%Vl(QuickR,90,135,130,30,3)%Vy%Vf(000000)
+%al[RGHT] %QR
+%Vl(QuickR,230,135,80,30,3)%Vy%Vf(000000)
+%ar%s%Qr
+#
+#- Down
+%Vl(QuickB,90,165,130,30,3)%Vy%Vf(000000)
+%al[DOWN] %QB
+%Vl(QuickB,230,165,80,30,3)%Vy%Vf(000000)
+%ar%s%Qb

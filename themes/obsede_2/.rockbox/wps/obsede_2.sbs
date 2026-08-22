@@ -1,0 +1,129 @@
+#-----------------------------------------------#
+#Obsede' 2
+#Original code by Serge Fnstll
+#Based on OneBit_OLED by Jihoon Kim that based on OneBit_VFD by chronicallyoffline
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+# Disable Status Bar
+%wd
+#
+# Disable Title
+#%?Lt<|>
+#
+# Preload Font
+%Fl(2,16-noto-sans.fnt)
+%Fl(4,16-noto-sans-bold.fnt)
+%Fl(6,24x24_Icons.fnt)
+#
+# Preload Images
+%xl(star,nocover.bmp,0,0)
+%xl(icons,__list_icons__,0,0)
+#
+# Row config
+%Lb(Rows,160,21,-,46)
+#
+%Vd(bg)
+#
+# Album Art Preload
+%Cl(-40,0,240,240,c,c)
+%?if(%cs, !=, 21)<%?C<%Vd(noStar)|%Vd(withStar)>>
+%?if(%cs, =, 10)<%Vd(qsTitle)%VI(clearScreen)%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>|%VI(menu)%Vd(info)>
+#
+#Clear Screen
+%Vi(clearScreen,0,0,1,1,-)
+#
+# Display Viewports
+#
+# Background
+%Vl(bg,0,0,160,24,-)%Vf(000000)%dr(0,0,-,-)
+#
+# - With Album Art
+%Vl(noStar,160,0,160,240,-)
+%Cd
+#
+# - No Album Art
+%Vl(withStar,160,0,160,240,-)
+%xd(star)
+#
+# Menu
+%Vi(menu,0,24,160,216,-)
+%Vf(434343)
+#
+# Menu Title
+%Vl(info,2,4,129,18,4)
+%Vf(e3e3e3)
+%al%s%?cs<Main Menu|%?Lt<%Lt>>
+#
+# Quick Screen title viewport
+%Vl(qsTitle,2,4,129,18,4)
+%Vf(e3e3e3)
+%alQuick Screen
+#
+%V(133,0,24,24,6)%Vf(ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>>
+#
+##########################
+###### Quick Screen ######
+##########################
+#
+# - QuickL
+%Vl(QuickL,4,28,152,49,-)%Vf(2a2a2a)
+%dr(0,0,-,-)
+%Vl(QuickL,6,28,24,24,6)%Vb(2a2a2a)%Vf(9a9a9a)
+à
+%Vl(QuickL,32,32,120,17,2)%Vb(2a2a2a)%Vf(9a9a9a)
+%s%QL
+%Vl(QuickL,6,52,24,24,6)%Vb(2a2a2a)%Vf(ffffff)
+%sel(%QL,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Ql,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickL,32,56,120,17,4)%Vb(2a2a2a)%Vf(ffffff)
+%s%Ql
+# - QuickT
+%Vl(QuickT,4,81,152,49,-)%Vf(2a2a2a)
+%dr(0,0,-,-)
+%Vl(QuickT,6,81,24,24,6)%Vb(2a2a2a)%Vf(9a9a9a)
+Ý
+%Vl(QuickT,32,85,120,17,2)%Vb(2a2a2a)%Vf(9a9a9a)
+%s%QT
+%Vl(QuickT,6,105,24,24,6)%Vb(2a2a2a)%Vf(ffffff)
+%sel(%QT,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qt,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickT,32,109,120,17,4)%Vb(2a2a2a)%Vf(ffffff)
+%s%Qt
+# - QuickR
+%Vl(QuickR,4,134,152,49,-)%Vf(2a2a2a)
+%dr(0,0,-,-)
+%Vl(QuickR,6,134,24,24,6)%Vb(2a2a2a)%Vf(9a9a9a)
+Þ
+%Vl(QuickR,32,138,120,17,2)%Vb(2a2a2a)%Vf(9a9a9a)
+%s%QR
+%Vl(QuickR,6,158,24,24,6)%Vb(2a2a2a)%Vf(ffffff)
+%sel(%QR,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qr,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickR,32,162,120,17,4)%Vb(2a2a2a)%Vf(ffffff)
+%s%Qr
+# - QuickB
+%Vl(QuickB,4,187,152,49,-)%Vf(2a2a2a)
+%dr(0,0,-,-)
+%Vl(QuickB,6,187,24,24,6)%Vb(2a2a2a)%Vf(9a9a9a)
+ß
+%Vl(QuickB,32,191,120,17,2)%Vb(2a2a2a)%Vf(9a9a9a)
+%s%QB
+%Vl(QuickB,6,211,24,24,6)%Vb(2a2a2a)%Vf(ffffff)
+%sel(%QB,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qb,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickB,32,215,120,17,4)%Vb(2a2a2a)%Vf(ffffff)
+%s%Qb
+#
+# The selected row gets a bar a shade lighter than the background. It spans the full 
+# 0..160 row width, on art rows and ordinary ones alike.
+%Vl(Rows,0,0,7,21,6)%?La<|%?Lc<%Vb(2a2a2a)|%Vb(000000)>%?St(show icons)<%?if(%LI,>=,0)<%xd(icons,%LI,2)>>>
+%Vl(Rows,7,0,153,21,-)
+%?La<|%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vf(9a9a9a)>%s%LT>
+%Vl(Rows,0,0,160,24,6)%?La<%?Lc<%Vb(2a2a2a)|%Vb(000000)>|>
+%Vl(Rows,0,24,160,22,6)%?La<%?Lc<%Vb(2a2a2a)|%Vb(000000)>|>
+#- Row art. The special rows carry no cover of their own, and %La is a
+#- list-level test that is true on them too, so they are excluded by name --
+#- one single-branch %?and, so a row it skips draws nothing and clears
+#- nothing. The icons below take their place.
+%Vl(Rows,0,1,44,44,-)%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>
+#- Special row icons, centred in the 44px cover box, from 24x24_Icons (font 6).
+%Vl(Rows,10,11,24,24,6)%?and(%La,%or(%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([By album]))))<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
+%Vl(Rows,50,11,110,24,-)%?La<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%s%LT|>

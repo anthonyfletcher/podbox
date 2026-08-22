@@ -1,0 +1,166 @@
+#-----------------------------------------------#
+#scrim_p
+#by Anthony Fletcher for PodBox
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#--- Fonts ---#
+%Fl(2,24x24_Icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+%Fl(4,12-noto-sans.fnt)
+#
+#--- Images ---#
+# The volume bar's track and fill; see the overlay at the end of the file.
+%xl(vbg,volband.bmp,0,0)
+%xl(vwf,volfill.bmp,0,0)
+#
+#--- Background layer ---#
+#
+# Album art
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim,-,blurred)%Cd(blurred)
+#
+# Background panels
+%dr(0,0,320,35,ffffff,-,12)
+%dr(0,35,320,205,000000,-,7)
+#
+# Quick settings boxes
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%dr(12,62,144,72,ffffff,-,3,10)>%?if(%QT,!=,ERR)<%dr(164,62,144,72,ffffff,-,3,10)>%?if(%QR,!=,ERR)<%dr(12,142,144,72,ffffff,-,3,10)>%?if(%QB,!=,ERR)<%dr(164,142,144,72,ffffff,-,3,10)>>
+#
+#--- Foreground layer ---#
+#
+# Order is load-bearing. A conditional that flips runs write_line(), which clears
+# its line's rect first -- text or not. 
+%V(0,0,-,-,-)
+#
+# Top bar
+%?mv(3)<%Vd(Volume)|%Vd(Chrome)>
+#
+# Quick settings. Cover Flow's %VI rides this line because a conditional
+# that flips clears its line's rect.
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>%?if(%cs,=,22)<%VI(covers)>
+#
+# Setup rows
+%Lb(Rows,300,30,-,46)
+#
+# - Title
+%Vl(Chrome,0,0,320,35,3)
+%Vl(Chrome,10,8,205,20,3)%Vf(000000)
+%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<Main Menu|%s%Lt>>
+#
+# - Status icons. The charging glyphs mirror the level glyphs band for
+#   band; one covers levels 2 to 5, so it stands in four places.
+%Vl(Chrome,289,5,24,24,2)%Vf(000000)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>>
+#
+# - Time
+%Vl(Chrome,210,8,70,24,1)%Vf(000000)
+%ar%?cf<%cH:%cM|%cl:%cM %cP>
+#
+# List viewport
+%Vi(-,10,46,300,184,-)
+#
+# Cover Flow viewport. That screen takes only the top edge from %Vi and
+# fills the rest of the screen itself, so it needs one without the list's
+# padding.
+%Vi(covers,0,35,320,205,-)
+#
+# Row setup
+#
+# - Row shape. 1 icon, 2 number, 3 bare. <Random> sits at index 0 of a track
+#   list and has no track number of its own, so it takes the icon shape.
+%Vl(Rows,0,0,1,1,-)
+%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%if(%Lt,=,%Sx(Music))),%and(%if(%cs,=,8),%if(%Lt,=,%Sx(Audiobooks))),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,=,%Sx([Random]))),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,=,%Sx([Featured In]))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%LI,=,0),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))))<%vs(shape,set,2)|%vs(shape,set,3)>>
+#
+# - Row icon
+%Vl(Rows,2,3,24,24,2)
+%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Current Playlist),U,%Sx(Playlists),m,%Sx(Spun),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Recently played),µ,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%sel(%LI,19,Þ,2,m)))>>>
+#
+# - Row number
+%Vl(Rows,0,5,30,20,3)
+%?if(%vg(shape),=,2)<%ac%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?if(%cs,=,5)<%LN|%ma(%LN,+,-1)>>
+#
+# - Selection bar
+%Vl(Rows,36,0,3,30,-)
+%?La<|%?if(%vg(shape),!=,3)<%?Lc<%dr(0,0,3,30,ffffff,-,14,3)>>>
+%Vl(Rows,2,0,3,30,-)
+%?La<|%?if(%vg(shape),=,3)<%?Lc<%dr(0,0,3,30,ffffff,-,14,3)>>>
+#
+# - Row text
+%Vl(Rows,46,5,226,20,-)
+%?La<|%?if(%vg(shape),!=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>>
+%Vl(Rows,12,5,260,20,-)
+%?La<|%?if(%vg(shape),=,3)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
+#
+# - Chevron
+%Vl(Rows,272,3,24,24,2)
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>Þ>>
+#
+# Album/Artist row setup
+#
+# - Special row icon
+%Vl(Rows,10,11,24,24,2)
+%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
+#
+# - Row art.
+%Vl(Rows,0,1,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La%?Lc<|%dr(0,0,44,44,!000000,-,6)>>
+#
+# - Selection bar
+%Vl(Rows,50,0,3,46,-)
+%?and(%La,%Lc)<%dr(0,0,3,46,ffffff,-,14,3)>
+#
+# - Row text
+%Vl(Rows,60,13,230,20,-)
+%?La<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
+#
+# Quick settings boxes
+#
+# - Left
+%Vl(QuickL,20,72,24,24,2)%Vf(ffffff)
+à
+%Vl(QuickL,50,75,98,20,3)%Vf(ffffff)
+%s%QL
+%Vl(QuickL,20,100,24,24,2)%Vf(ffffff)
+%sel(%QL,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Ql,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickL,50,103,98,20,-)%Vf(ffffff)
+%s%Ql
+#
+# - Up
+%Vl(QuickT,172,72,24,24,2)%Vf(ffffff)
+Ý
+%Vl(QuickT,202,75,98,20,3)%Vf(ffffff)
+%s%QT
+%Vl(QuickT,172,100,24,24,2)%Vf(ffffff)
+%sel(%QT,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qt,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickT,202,103,98,20,-)%Vf(ffffff)
+%s%Qt
+#
+# - Right
+%Vl(QuickR,20,152,24,24,2)%Vf(ffffff)
+Þ
+%Vl(QuickR,50,155,98,20,3)%Vf(ffffff)
+%s%QR
+%Vl(QuickR,20,180,24,24,2)%Vf(ffffff)
+%sel(%QR,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qr,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickR,50,183,98,20,-)%Vf(ffffff)
+%s%Qr
+#
+# - Down
+%Vl(QuickB,172,152,24,24,2)%Vf(ffffff)
+ß
+%Vl(QuickB,202,155,98,20,3)%Vf(ffffff)
+%s%QB
+%Vl(QuickB,172,180,24,24,2)%Vf(ffffff)
+%sel(%QB,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qb,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickB,202,183,98,20,-)%Vf(ffffff)
+%s%Qb
+#
+# Volume overlay
+%Vl(Volume,0,0,320,35,3)%Vg(000000,000000,ffffff)
+%Vs(gradient) 
+%Vs(gradient) 
+%Vl(Volume,8,6,304,24,2)%Vg(000000,000000,ffffff)%Vf(ffffff)
+%Vs(gradient)%?pv<M|N|N>%arO
+%Vl(Volume,40,15,240,6,-)%Vf(!ffffff)
+%dr(0,0,240,6,000000)%pv(0,0,240,6,image,vwf,backdrop,vbg)
+
