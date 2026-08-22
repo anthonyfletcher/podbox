@@ -23,7 +23,7 @@ This document covers **everything else**: the files under `firmware/`, `lib/`,
 
 ## Scope
 
-The comparison base is Rockbox commit `2d2b03d314`, the last upstream commit
+The comparison base is Rockbox commit `789d796120`, the last upstream commit
 merged in — not the original fork point, and no longer the `24c3779146` this
 fork was rebased onto. It moves with every merge, so derive it rather than
 typing it. To regenerate the list:
@@ -59,7 +59,7 @@ different from the base, and not a fork patch at all. Distinguish them:
 git diff --stat HEAD rockbox/master -- <file>   # empty output: upstream-identical
 ```
 
-There are none outstanding as of the merge through `2d2b03d314`. Each one is
+There are none outstanding as of the merge through `789d796120`. Each one is
 recorded in [`upstream-commit-log.md`](upstream-commit-log.md), the per-commit
 companion to this file: it answers *what was done about a given upstream
 commit*, where this one answers *why a given file differs*.
