@@ -34,9 +34,10 @@
 #include "skin/statusbar_skinned.h"  /* sb_skin_force_next_update */
 #include "skin/skin_display.h"        /* skin_mark_dirty */
 
- /* 1 top, 1 bottom, 2 on either side, 1 for the icons
-  * if enough space, top and bottom have 2 lines */
-#define MIN_LINES 5
+ /* 2 lines for each of the three vertical sections (top/middle/bottom).
+  * With less space than that, the top and bottom each lose a line -- at
+  * exactly 5 they would otherwise overlap the middle one. */
+#define MIN_LINES (3*2)
 #define MAX_NEEDED_LINES 10
  /* pixels between the 2 center items minimum or between text and icons,
   * and between text and parent boundaries */
@@ -392,14 +393,10 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
         }
         else if (button == button_enter)
             can_quit = true;
-        else if (button == ACTION_QS_VOLUP) {
+        else if (button == ACTION_QS_VOLUP)
             adjust_volume(1);
-            sb_skin_force_next_update();
-        }
-        else if (button == ACTION_QS_VOLDOWN) {
+        else if (button == ACTION_QS_VOLDOWN)
             adjust_volume(-1);
-            sb_skin_force_next_update();
-        }
         else if (button == ACTION_STD_CONTEXT)
         {
             qs->result |= QUICKSCREEN_GOTO_SHORTCUTS_MENU;
@@ -410,6 +407,15 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
 
         if (button == ACTION_STD_CANCEL)
             break;
+
+        /* A base skin may show a setting this screen just changed -- shuffle,
+         * repeat, a brightness slider. Bypass the status bar's update_delay so
+         * it agrees with the row the user is looking at. Only on a real press:
+         * get_action() above times out five times a second, and forcing on
+         * those would repaint the bar continuously for as long as the
+         * quickscreen is open. */
+        if (button != ACTION_NONE)
+            sb_skin_force_next_update();
     }
     /* Notify that we're exiting this screen */
     cond_talk_ids_fq(VOICE_OK);
