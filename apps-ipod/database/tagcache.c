@@ -5414,6 +5414,14 @@ bool tagcache_is_busy(void)
     return tc_stat.scanning || tc_stat.commit_step > 0;
 }
 
+bool tagcache_search_ready(void)
+{
+    /* read_lock, not tagcache_is_busy(): the two do not agree. A commit holds
+     * read_lock from well before commit_step is set to well after it is
+     * cleared, and that whole span is what tagcache_search() waits out. */
+    return !read_lock;
+}
+
 void tagcache_start_scan(void)
 {
     queue_post(&tagcache_queue, Q_START_SCAN, 0);

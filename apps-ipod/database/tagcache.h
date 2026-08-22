@@ -197,6 +197,15 @@ void tagcache_get_marks(struct tagcache_marks *m);
 /* True while a database build/update scan or commit is in progress. Used to
  * drive the status-bar activity indicator (%ld) instead of a modal splash. */
 bool tagcache_is_busy(void);
+/* Whether a search would start now or wait. tagcache_search() opens by polling
+ * read_lock, which a commit or a rebuild holds for as long as it runs -- so on
+ * a thread that must not stall, ask this first and do without the answer.
+ *
+ * Reliable rather than advisory, because threads here are cooperative: nothing
+ * else runs between this returning true and the search that follows it, so the
+ * lock cannot be taken in the gap. That holds only if the caller does not
+ * yield in between. */
+bool tagcache_search_ready(void);
 int tagcache_get_commit_step(void);
 bool tagcache_prepare_shutdown(void);
 void tagcache_shutdown(void);
