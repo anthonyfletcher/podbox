@@ -33,6 +33,7 @@
 #include <string-extra.h>
 #include <file.h>
 #include "config.h"
+#include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
 #include "widgets/splash.h"
@@ -79,25 +80,6 @@ static unsigned int *pool_slots;   /* pool offset + 1; 0 = empty */
 static int pool_slot_mask;
 static int pool_slot_n, pool_slot_max;
 
-static unsigned int hash_str(const char *s)
-{
-    unsigned int h = 2166136261u;
-    while (*s)
-    {
-        h ^= (unsigned char)*s++;
-        h *= 16777619u;
-    }
-    return h;
-}
-
-static int next_pow2(int v)
-{
-    int p = 1;
-    while (p < v)
-        p <<= 1;
-    return p;
-}
-
 /* ------------------------------------------------------------------ pool */
 
 /* Intern a string, returning its offset. Offset 0 is the empty string, which
@@ -114,7 +96,7 @@ static unsigned int pool_intern(const char *s)
     if (!s || !s[0])
         return 0;
 
-    h = hash_str(s);
+    h = fnv1a_str(s);
 
     if (pool_slots)
     {
@@ -170,7 +152,7 @@ static const struct map_entry *map_get(const char *path)
     if (!map_n)
         return NULL;
 
-    h = hash_str(path);
+    h = fnv1a_str(path);
     s = (int)(h & (unsigned)map_mask);
     while (map_slots[s])
     {
@@ -268,7 +250,7 @@ static void map_sweep(void)
     {
         struct map_entry *e = &map[map_n];
 
-        e->hash = hash_str(fname);
+        e->hash = fnv1a_str(fname);
         e->artist = tagcache_retrieve(&tcs, tcs.idx_id, tag_artist,
                                       meta, sizeof(meta))
                     ? pool_intern(meta) : 0;
@@ -313,9 +295,9 @@ size_t pv_names_init(void *buf, size_t bufsz)
 
     /* 24 bytes an entry covers an artist, an album and a title for a
      * typically-named library, with the repeats deduped away. Offsets are
-     * full ints, so nothing here is capped at 64 KB -- a library whose
-     * strings did not fit used to lose every name past that point and fall
-     * back to guesswork without saying so. */
+     * full ints rather than 16-bit: a pool capped at 64 KB loses every name
+     * past that point, and the screen then falls back to guesswork from the
+     * filename without saying it has. */
     map_pool_cap = (unsigned)map_cap * 24;
     if (map_pool_cap < 4096)
         map_pool_cap = 4096;

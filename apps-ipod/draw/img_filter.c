@@ -33,7 +33,6 @@
  */
 
 #include <ctype.h>
-#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -587,7 +586,7 @@ static bool fail(struct img_filter *f, const char *name, const char *reason)
     return false;
 }
 
-bool img_filter_compile(const char *spec, unsigned allowed_classes,
+bool img_filter_compile(const char *spec, unsigned allowed,
                         struct img_filter *out)
 {
     const char *p = spec;
@@ -654,7 +653,7 @@ bool img_filter_compile(const char *spec, unsigned allowed_classes,
 
         if (!d)
             return fail(out, name, "unknown filter");
-        if (!(d->cls & allowed_classes))
+        if (!(d->cls & allowed))
             return fail(out, name, "not permitted here");
 
         switch (d->amt)
@@ -680,6 +679,15 @@ bool img_filter_compile(const char *spec, unsigned allowed_classes,
             adaptive = true;
             break;
         }
+
+        /* Refused rather than compiled and left inert. `lighter` and `darker`
+         * are still available here with an amount written, which is why the
+         * two are told apart -- one is a fixable spelling, the other is a
+         * filter this caller cannot offer at all. */
+        if (adaptive && !(allowed & IMG_ALLOW_ADAPTIVE))
+            return fail(out, name, d->amt == AMT_ADAPTIVE
+                                     ? "needs an amount here"
+                                     : "not permitted here");
 
         if (!adaptive && d->amt != AMT_NONE &&
             (amount < d->min || amount > d->max))
@@ -1027,14 +1035,20 @@ static bool levels_worth_dithering(const struct img_filter *f)
 #define LUM_BLUE     LUM_W(29,  LCD_MAX_BLUE)
 
 /* Four luminance levels to a bucket: enough to place a percentile within a
- * step nothing can see, and 64 shorts of stack rather than 256 ints. */
+ * step nothing can see, and 64 counters of stack rather than 256.
+ *
+ * Trap: the counters have to be as wide as the pixel count. A 16-bit one
+ * saturates at 65535, which is below the ninth decile of a full-screen
+ * picture -- the walk below then never reaches `want`, falls out of the loop
+ * and leaves `bright` at zero, so a flat white cover reports as having no
+ * bright band and gets no scrim at all. */
 #define LEVEL_BUCKETS 64
 #define LEVEL_SHIFT   2
 
 void img_filter_measure(const fb_data *px, int w, int h,
                         struct img_levels *out)
 {
-    unsigned short hist[LEVEL_BUCKETS];
+    uint32_t hist[LEVEL_BUCKETS];
     uint32_t total = 0, n, seen = 0, want;
 
     if (!out)
@@ -1054,8 +1068,7 @@ void img_filter_measure(const fb_data *px, int w, int h,
                       + RGB_UNPACK_BLUE_LCD(p)  * LUM_BLUE + 128) >> 8;
 
         total += lum;
-        if (hist[lum >> LEVEL_SHIFT] < USHRT_MAX)
-            hist[lum >> LEVEL_SHIFT]++;
+        hist[lum >> LEVEL_SHIFT]++;
     }
 
     out->mean = (short)(total / n);
@@ -1228,12 +1241,13 @@ int img_filter_source_divisor(const struct img_filter *f, int w, int h)
         return 1;
 
     /* As little as the working buffer will accept, so the picture keeps every
-     * pixel there is room for. The amount does not come into it -- it sets the
-     * window instead, which is the thing it is named for. Deriving the divisor
-     * from it as well decided how blurred a picture was twice over, and the
-     * buffer then overrode the answer at any useful size: at 240x240 every
-     * amount from 1 to 4 was clamped to the same divisor, so three quarters of
-     * the range did nothing.
+     * pixel there is room for.
+     *
+     * Trap: the amount must not come into it. It sets the window, which is the
+     * thing it is named for, and deriving the divisor from it as well decides
+     * how blurred a picture is twice over -- with the buffer overriding the
+     * answer at any useful size. At 240x240 that clamps every amount from 1 to
+     * 4 onto the same divisor, and three quarters of the range does nothing.
      *
      * A power of two, which keeps the upscale's weights an exact table. */
     while (d < BLUR_MAX_DIV

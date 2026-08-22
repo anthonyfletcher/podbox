@@ -10,6 +10,7 @@
 #ifndef _GUI_SPLASH_H_
 #define _GUI_SPLASH_H_
 
+#include <stdbool.h>
 #include "draw/screen_access.h"
 #include "gcc_extensions.h"
 
@@ -30,6 +31,10 @@ extern void splashf(int ticks, const char *fmt, ...) ATTRIBUTE_PRINTF(2, 3);
 
 /* set a delay before displaying the progress meter the first time */
 extern void splash_progress_set_delay(long delay_ticks);
+/* Silence the progress meter's own voice, for a caller that announces the same
+ * work in better words. Sticky: set it before a run of splash_progress() calls
+ * and clear it after. */
+extern void splash_progress_set_silent(bool silent);
 /*
  * Puts a splash message centered on all the screens with a progressbar
  *  - current : current progress increment

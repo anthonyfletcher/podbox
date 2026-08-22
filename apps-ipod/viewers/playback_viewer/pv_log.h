@@ -5,6 +5,11 @@
  * GNU General Public License (version 2+)
  *
  * Interface to pv_log.c.
+ *
+ * One reader at a time. The stream position and its 16 KB buffer are file
+ * statics, so a second read started while one is running takes the first
+ * one's place in the file. In particular an entry callback must not call back
+ * in here -- pv_log_size() and pv_log_peek() included.
  ****************************************************************************/
 #ifndef _PV_LOG_H
 #define _PV_LOG_H

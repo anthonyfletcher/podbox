@@ -33,6 +33,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "config.h"
+#include "system/hash.h"
 #include "core_alloc.h"
 #include "file.h"
 #include "kernel.h"
@@ -571,9 +572,12 @@ static int parse_listitem(struct skin_element *element,
     /* Fourth parameter: the filter chain, compiled here so a misspelt filter
      * fails the skin at load rather than quietly drawing nothing.
      *
-     * IMG_CLASSES_INPLACE refuses `blur`, which needs a destination of its
-     * own; a row's cover is drawn from a browser slot sized for the picture
-     * and nothing else. */
+     * IMG_CLASSES_INPLACE refuses two things. `blur` needs a destination of
+     * its own, and a row's cover is drawn from a browser slot sized for the
+     * picture and nothing else. The adaptive filters need the cover measured
+     * before the chain runs, and nothing on this path measures one -- so they
+     * are refused here too, rather than compiling into a pass that costs a
+     * walk over every thumbnail and changes nothing. */
     if (element->params_count > 3 && !isdefault(get_param(element, 3)))
     {
         struct img_filter *f = skin_buffer_alloc(sizeof(*f));
@@ -588,15 +592,15 @@ static int parse_listitem(struct skin_element *element,
         }
         if (f->stages)
         {
-            const unsigned char *b = (const unsigned char *)f;
-            uint32_t h = 2166136261u;
-
             li->filter = PTRTOSKINOFFSET(skin_buffer, f);
             /* FNV-1a over the compiled chain: two %La naming the same
              * treatment share a slot, and a slot loaded under one chain is
-             * never reused for another. */
-            for (size_t i = 0; i < offsetof(struct img_filter, error); i++)
-                h = (h ^ b[i]) * 16777619u;
+             * never reused for another. Everything up to `error`, which is
+             * the one field that says nothing about what the chain does.
+             * img_filter_compile() zeroes the whole struct first, so the
+             * padding between fields is hashed and is stable. */
+            uint32_t h = fnv1a_bytes(f, offsetof(struct img_filter, error));
+
             li->filter_hash = h ? h : 1;   /* 0 means "no chain" */
         }
     }
@@ -1582,6 +1586,7 @@ static int parse_albumart_load(struct skin_element* element,
 
     aa->filter_handle = -1;
     aa->filtered_art = -1;
+    aa->filtered_gen = 0;       /* skin_albumart_gen() never returns 0 */
     aa->filter_avoid = -1;
     aa->slot = -1;
     aa->label = PTRTOSKINOFFSET(skin_buffer, NULL);

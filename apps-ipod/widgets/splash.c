@@ -234,6 +234,17 @@ void splash_progress_set_delay(long delay_ticks)
     talked_tick = 0;
 }
 
+/* Hold the meter's own "loading, n per cent" for a caller that announces the
+ * same work itself and says more about it. Sticky, like the delay above: it
+ * belongs to the run of calls rather than to one of them, and the caller
+ * clears it when the run ends. */
+static bool progress_silent = false;
+
+void splash_progress_set_silent(bool silent)
+{
+    progress_silent = silent;
+}
+
 /* splash a progress meter */
 void splash_progress(int current, int total, const char *fmt, ...)
 {
@@ -251,7 +262,7 @@ void splash_progress(int current, int total, const char *fmt, ...)
         vp_flag = 0; /* don't mark vp dirty to prevent flashing */
     }
 
-    if (global_settings.talk_menu &&
+    if (global_settings.talk_menu && !progress_silent &&
         total > 0 &&
         TIME_AFTER(current_tick, talked_tick + HZ*5))
     {

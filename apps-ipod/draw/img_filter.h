@@ -37,10 +37,23 @@
 #define IMG_CLASS_SPATIAL   (1u << 3)   /* neighbours, in place         */
 #define IMG_CLASS_RESIZE    (1u << 4)   /* neighbours, own destination  */
 
-/* The two tiers, as an `allowed_classes` argument. */
+/* Not a class -- a permission, carried in the same word because it answers
+ * the same question the classes do: what will this caller accept?
+ *
+ * An adaptive filter (`scrim`, and `lighter`/`darker` written without an
+ * amount) names no amount and is not fit to run until img_filter_adapt() has
+ * shown it the picture. A caller that never calls that has to refuse one:
+ * compiled anyway, the chain claims its stage over an identity table and
+ * every image pays a pass that does nothing. */
+#define IMG_ALLOW_ADAPTIVE  (1u << 5)
+
+/* The two tiers, as an `allowed` argument. Only the tier with a destination
+ * of its own adapts, because only that one has a caller holding the picture
+ * before the chain runs. */
 #define IMG_CLASSES_INPLACE (IMG_CLASS_LEVELS | IMG_CLASS_COLOUR | \
                              IMG_CLASS_SCREEN | IMG_CLASS_SPATIAL)
-#define IMG_CLASSES_ALL     (IMG_CLASSES_INPLACE | IMG_CLASS_RESIZE)
+#define IMG_CLASSES_ALL     (IMG_CLASSES_INPLACE | IMG_CLASS_RESIZE | \
+                             IMG_ALLOW_ADAPTIVE)
 
 #define IMG_FILTER_MAX_CHAIN 8
 #define IMG_FILTER_ERR_MAX   48
@@ -111,9 +124,10 @@ struct img_filter
 };
 
 /* Parse and fold a chain. Returns false, with out->error set, on a bad spec
- * or one naming a filter the caller's tier does not permit. A NULL or empty
- * spec is not an error -- it compiles to a chain with no stages. */
-bool img_filter_compile(const char *spec, unsigned allowed_classes,
+ * or one naming a filter the caller's tier does not permit -- which includes
+ * an adaptive filter where `allowed` withholds IMG_ALLOW_ADAPTIVE. A NULL or
+ * empty spec is not an error: it compiles to a chain with no stages. */
+bool img_filter_compile(const char *spec, unsigned allowed,
                         struct img_filter *out);
 
 /* How light a picture is, in the two ways a scrim cares about. Both 0..255 on

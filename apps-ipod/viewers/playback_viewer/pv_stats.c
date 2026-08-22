@@ -32,6 +32,7 @@
 #include <string-extra.h>
 #include <file.h>            /* MAX_PATH */
 #include "config.h"
+#include "system/hash.h"
 #include "kernel.h"      /* current_tick, HZ */
 #include "system.h"      /* cpu_boost */
 #ifdef HAVE_ALBUMART
@@ -88,25 +89,6 @@ static void *abuf_alloc(size_t n)
     return p;
 }
 
-static int next_pow2(int v)
-{
-    int p = 1;
-    while (p < v)
-        p <<= 1;
-    return p;
-}
-
-static unsigned int hash_str(const char *s)
-{
-    unsigned int h = 2166136261u;
-    while (*s)
-    {
-        h ^= (unsigned char)*s++;
-        h *= 16777619u;
-    }
-    return h;
-}
-
 static bool htable_init(struct pv_htable *t, int cap)
 {
     int slots = next_pow2(cap * 2);
@@ -135,7 +117,7 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name)
     int i;
 
     strlcpy(key, name, sizeof(key));
-    h = hash_str(key);
+    h = fnv1a_str(key);
     i = (int)(h & (unsigned)t->mask);
 
     while (t->slots[i])
@@ -251,7 +233,7 @@ static void htable_reindex(struct pv_htable *t)
     memset(t->slots, 0, (size_t)(t->mask + 1) * sizeof(int));
     for (int i = 0; i < t->n; i++)
     {
-        int s = (int)(hash_str(t->items[i].name) & (unsigned)t->mask);
+        int s = (int)(fnv1a_str(t->items[i].name) & (unsigned)t->mask);
         while (t->slots[s])
             s = (s + 1) & t->mask;
         t->slots[s] = i + 1;
@@ -337,6 +319,12 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
 
 fail:
     pv_index_read_end();
+    /* Everything the read may already have written, back to empty. The badge
+     * state is the one that does not look like a table: it is read whole
+     * before the capacities are checked, so a rejected index leaves its
+     * counters standing, and the full replay the caller falls back to then
+     * feeds the whole log on top of them. */
+    pv_badges_reset(&badge_state);
     day_n = 0;
     t_artist.n = t_title.n = t_album.n = 0;
     return false;
@@ -695,7 +683,7 @@ const struct pv_agg *pv_stats_find(enum pv_table which, const char *name)
     /* The stored form, as htable_get() uses -- a longer name would hash
      * differently from its own truncated row and never be found. */
     strlcpy(key, name, sizeof(key));
-    h = hash_str(key);
+    h = fnv1a_str(key);
     i = (int)(h & (unsigned)t->mask);
 
     while (t->slots[i])
@@ -846,8 +834,15 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
 
         /* Three ways in, in order of what they cost. Each falls through to
          * the next, so a saved index that cannot be trusted is simply not
-         * used -- there is no repair path and no half-loaded state. */
-        if (index_load(out, log_size, &covered) && covered <= log_size)
+         * used -- there is no repair path and no half-loaded state.
+         *
+         * Trap: index_load() has already filled the tables and set t_*.n by
+         * the time it returns true, so nothing may be tested alongside it
+         * here. A second condition failing would drop into the replay below
+         * and count the whole log a second time on top of what was loaded.
+         * The watermark is checked where it can still act -- against the
+         * header, in pv_index_read_begin(). */
+        if (index_load(out, log_size, &covered))
         {
             out->from_index = true;
             lines = (covered < log_size)

@@ -37,6 +37,7 @@
 #include <stddef.h>
 #include "string-extra.h"
 #include "config.h"
+#include "system/hash.h"
 #include "system.h"          /* ALIGN_BUFFER/alignof */
 #include "rbpaths.h"
 #include "kernel.h"
@@ -108,9 +109,9 @@ struct play_rec
  *   PFIH -> PFII: both gained key, and the header gained the commitid/serial
  *                 watermarks.
  *   PFII -> PFIJ: the header gained the deleted count.
- *   PFIJ -> PFIK: artist_ct/album_ct widened from uint16_t to int32_t, which
- *                 moves every field after them. A library past 65535 albums
- *                 used to wrap silently. */
+ *   PFIJ -> PFIK: artist_ct/album_ct are int32_t rather than uint16_t, which
+ *                 moves every field after them. They have to be: a 16-bit
+ *                 count wraps silently past 65535 albums. */
 #define INDEX_HDR "PFIK"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
@@ -318,15 +319,15 @@ static int compare_index_order(const void *a_v, const void *b_v)
  * of tagcache anyway. */
 static uint32_t name_key(const char *a, const char *b)
 {
-    uint32_t h = 2166136261u;
+    uint32_t h = FNV1A_BASIS;
 
     for (; a && *a; a++)
-        h = (h ^ (unsigned char)*a) * 16777619u;
+        h = fnv1a_byte(h, (unsigned char)*a);
 
-    h *= 16777619u;   /* the joining NUL */
+    h = fnv1a_byte(h, 0);   /* the joining NUL */
 
     for (; b && *b; b++)
-        h = (h ^ (unsigned char)*b) * 16777619u;
+        h = fnv1a_byte(h, (unsigned char)*b);
 
     return h;
 }

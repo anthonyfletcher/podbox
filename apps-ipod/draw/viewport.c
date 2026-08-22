@@ -136,7 +136,8 @@ static void toggle_theme(enum screen_type screen, bool force)
     {
         screens[screen].backdrop_show(NULL);
         screens[screen].scroll_stop();
-        skin_is_dirty(screen); /* nothing will flush it; drop the flag */
+        /* Nothing will flush it, so drop what is owed. */
+        skin_take_dirty(screen);
     }
     /* let list initialize viewport in case viewport dimensions is changed. */
     send_event(GUI_EVENT_THEME_CHANGED, NULL);

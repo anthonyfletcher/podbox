@@ -23,6 +23,11 @@
  *
  * Text that never passes through str() has no id and so cannot be overridden.
  * The splash() calls with literal strings are the ones users will notice.
+ *
+ * A handful of phrases are used as printf formats rather than as text, so a
+ * replacement has to ask for the same arguments the built-in one does. That
+ * is checked here -- see format_signature() -- and a line that fails it is
+ * skipped rather than applied.
  ****************************************************************************/
 
 #include <ctype.h>
@@ -43,6 +48,71 @@
 /* A phrase and its replacement share the line, so this bounds both. Longer
  * lines are read to their end and the tail discarded, as elsewhere. */
 #define MAX_OVERRIDE_LINE 256
+
+/* Conversion specifiers in one format string, in order: one entry per '%'
+ * that consumes an argument, holding its length modifier and conversion
+ * character. "%%" is a literal per cent and consumes nothing, so it
+ * contributes none.
+ *
+ * Trap: some phrases are handed to splashf() and snprintf() as the format
+ * rather than as text -- str(LANG_BUILDING_DATABASE) takes an int,
+ * str(LANG_EQUALIZER_BAND) takes another. A replacement that drops or retypes
+ * one of those makes the caller read the wrong thing off the stack, and
+ * "%s" against an int is a data abort. This file is hand-edited and not
+ * compiled by genlang, so the check has to live here.
+ *
+ * Sixteen is far more than any phrase in the tree carries; a replacement
+ * needing more is refused by the truncation, which is the safe direction. */
+#define SIG_MAX 16
+
+static void format_signature(const char *s, char *sig)
+{
+    int n = 0;
+
+    while (*s)
+    {
+        if (*s++ != '%')
+            continue;
+        if (*s == '\0')
+            break;                  /* a trailing '%' converts nothing */
+        if (*s == '%')
+        {
+            s++;                    /* a literal per cent, no argument */
+            continue;
+        }
+
+        /* Flags, width and precision say nothing about the argument's type,
+         * so a translation may set them freely. */
+        while (*s && strchr("-+ #0123456789.*", *s))
+            s++;
+        while (*s && strchr("hlLzjt", *s))
+        {
+            if (n < SIG_MAX - 1)
+                sig[n++] = *s;
+            s++;
+        }
+        if (*s == '\0')
+            break;
+        if (n < SIG_MAX - 1)
+            sig[n++] = *s;
+        s++;
+    }
+
+    sig[n] = '\0';
+}
+
+/* Whether 'replacement' asks its caller for the same arguments 'english'
+ * does. Word order is free -- rearranging the sentence around the numbers is
+ * most of what a rename is for -- but the conversions themselves must match
+ * in kind and in order, since Rockbox's printf has no positional form. */
+static bool format_compatible(const char *english, const char *replacement)
+{
+    char a[SIG_MAX], b[SIG_MAX];
+
+    format_signature(english, a);
+    format_signature(replacement, b);
+    return strcmp(a, b) == 0;
+}
 
 void lang_override_load(void)
 {
@@ -83,6 +153,14 @@ void lang_override_load(void)
          * would name every one of them. */
         if (!*english)
             continue;
+
+        /* The key is the built-in text, which is what a caller using it as a
+         * format was written against. */
+        if (!format_compatible(english, replacement))
+        {
+            DEBUGF("Override changes the arguments of: %s\n", english);
+            continue;
+        }
 
         for (id = lang_english_to_id(english); id >= 0;
              id = lang_english_to_id_from(english, id + 1))

@@ -496,9 +496,10 @@ MENUITEM_SETTING(db_bookart, &global_settings.db_bookart, NULL);
 
 /* Appearance is split by what a setting does, not by which layer implements
  * it: Skins picks the layouts, Colours picks the palette, Elements decides
- * which pieces of chrome are drawn at all. Theme Settings, which used to hold
- * a mixture of all three, is gone -- it read as "the leftovers", and a theme
- * sets every one of these at once anyway. */
+ * which pieces of chrome are drawn at all. There is no screen holding a
+ * mixture of the three, and a new setting belongs under whichever of the
+ * three questions it answers -- a theme sets all of them at once anyway, so
+ * grouping by layer would only read as "the leftovers". */
 MAKE_MENU(skins_menu, ID2P(LANG_SKINS), NULL, Icon_Wps,
             &browse_wps,
             &browse_sbs,

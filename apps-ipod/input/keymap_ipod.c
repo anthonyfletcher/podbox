@@ -121,9 +121,9 @@ static const struct button_mapping button_context_settings[]  = {
  * -- move between rows. That leaves MENU held as the only cancel, alongside the
  * Cancel button.
  *
- * One table for both: they are the same shape, and CONTEXT_SETTINGS (which the
- * colour picker used to fall through to) has no up/down at all, because the
- * screen it replaced only ever had one row to move along. */
+ * One table for both: they are the same shape. Neither falls through to
+ * CONTEXT_SETTINGS, which serves single-row screens and so has no up/down to
+ * inherit. */
 static const struct button_mapping button_context_settings_grid[]  = {
     { ACTION_SETTINGS_INC,          BUTTON_SCROLL_FWD,                BUTTON_NONE },
     { ACTION_SETTINGS_INCREPEAT,    BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },

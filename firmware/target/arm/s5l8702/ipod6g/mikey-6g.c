@@ -103,9 +103,13 @@ void mikey_reset(void)
     mikey_write(1, 0x80);
 }
 
-static int mikey_btn = BUTTON_NONE;
+/* The three the polling thread shares with its callers. mikey_btn is written
+ * there and read from the button driver's tick; mic_active goes the other way.
+ * Single words either way, so a torn read is not the hazard -- a cached one
+ * is, which is what the volatile forbids. */
+static volatile int mikey_btn = BUTTON_NONE;
 static volatile bool mic_active = false;
-static bool mikey_detected = false;
+static volatile bool mikey_detected = false;
 static long mikey_stack[DEFAULT_STACK_SIZE/2/sizeof(long)];
 
 bool mikey_present(void)

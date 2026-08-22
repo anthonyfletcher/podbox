@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "system/hash.h"
 #include "system.h"
 #include "rbpaths.h"
 #include "file.h"
@@ -77,7 +78,7 @@ static bool truncated;
  * the compare that follows a hash match makes it nothing at all. */
 static uint32_t name_hash(const char *s, int len)
 {
-    uint32_t h = 2166136261u;
+    uint32_t h = FNV1A_BASIS;
     const char *e = s + len;
 
     while (s < e && (*s == ' ' || *s == '\t'))
@@ -88,7 +89,7 @@ static uint32_t name_hash(const char *s, int len)
     for (; s < e; s++)
     {
         char c = (*s >= 'A' && *s <= 'Z') ? (char)(*s + ('a' - 'A')) : *s;
-        h = (h ^ (unsigned char)c) * 16777619u;
+        h = fnv1a_byte(h, (unsigned char)c);
     }
 
     return h ? h : 1;

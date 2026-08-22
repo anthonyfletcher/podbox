@@ -4,7 +4,8 @@
  * The scratch buffer, as a plain array.
  *
  * apps-ipod/system/app_buffer.c takes `pluginbuf` from the target linker
- * script -- the region a plugin used to run in, which core screens now borrow.
+ * script. The name is the linker's, not this fork's -- there is no plugin
+ * system here, and the region is scratch space core screens borrow.
  * A simulator has no linker script, so the symbol has to come from somewhere.
  * Upstream does the same thing at apps/plugin.c for hosted builds.
  *

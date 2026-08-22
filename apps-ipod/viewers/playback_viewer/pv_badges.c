@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "config.h"
+#include "system/hash.h"
 #include <file.h>
 #include "rbpaths.h"
 #include "timefuncs.h"
@@ -53,17 +54,6 @@
 static long am_val[PV_AM_COUNT];
 static unsigned char unlocked[(PV_N_BADGES + 7) / 8];
 static int unlocked_n;
-
-static unsigned int hash_str(const char *s)
-{
-    unsigned int h = 2166136261u;
-    while (*s)
-    {
-        h ^= (unsigned char)*s++;
-        h *= 16777619u;
-    }
-    return h;
-}
 
 void pv_badges_reset(struct pv_badge_state *st)
 {
@@ -141,7 +131,7 @@ void pv_badges_feed(struct pv_badge_state *st, unsigned long ts, bool valid_ts,
     if (st->day_secs > st->day_secs_max)
         st->day_secs_max = st->day_secs;
 
-    h = hash_str(title);
+    h = fnv1a_str(title);
     for (i = 0; i < st->daytrk_n; i++)
     {
         if (st->daytrk[i].hash == h)

@@ -46,6 +46,7 @@
 #include <stdlib.h>
 #include "string-extra.h"
 #include "config.h"
+#include "system/hash.h"
 #include "system.h"
 #include "kernel.h"
 #include "rbpaths.h"
@@ -2477,7 +2478,7 @@ static bool root_row_drawable(const struct menu_entry *item)
 int browser_db_root_row_signature(void)
 {
     struct menu_root *root;
-    uint32_t h = 2166136261u;
+    uint32_t h = FNV1A_BASIS;
     int i;
 
     if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
@@ -2494,8 +2495,8 @@ int browser_db_root_row_signature(void)
             (const char *)P2STR((unsigned char *)root->items[i]->name);
 
         for (; *s; s++)
-            h = (h ^ (unsigned char)*s) * 16777619u;
-        h = (h ^ (unsigned char)root->items[i]->type) * 16777619u;
+            h = fnv1a_byte(h, (unsigned char)*s);
+        h = fnv1a_byte(h, (unsigned char)root->items[i]->type);
     }
 
     /* Positive, so it never collides with the 0 a menu-less parse returns. */

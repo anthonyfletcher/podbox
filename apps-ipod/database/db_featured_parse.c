@@ -260,10 +260,14 @@ static const char *find_cut(const char *start, const char *end,
     {
         const char *ls, *le, *rs, *re;
         const char *sep = next_sep(p, end, seplen);
-        int len = *seplen;
+        int len;
 
+        /* Read after the test: next_sep() leaves *seplen alone when it finds
+         * nothing, and on the first pass that is the caller's uninitialised
+         * local. */
         if (sep == NULL)
             break;
+        len = *seplen;
 
         ls = start;
         le = sep;

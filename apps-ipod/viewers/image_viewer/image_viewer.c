@@ -12,9 +12,10 @@
  *   - A plain core app, entered as image_viewer(file) and returning a GO_TO_*
  *     code, dispatched from the file browser like the text viewer.
  *   - A picture opens on the fit rung, DS_FIT, scaled so all of it is on
- *     screen. Zoom and pan live behind the Zoom / Pan setting; the default key
- *     map pages between files and leaves on a tap of Menu, like the text
- *     viewer (image_viewer_button.h has both maps).
+ *     screen. Zoom and pan live behind the Zoom / Pan setting, which reads the
+ *     one key table (image_viewer_button.h) two ways: off, Left and Right page
+ *     between files and a tap of Menu leaves, as in the text viewer; on, the
+ *     same four buttons pan and the way out is Quit on the menu.
  *   - Colour 320x240 only; there are no greylib or mono paths.
  *   - Decoders are linked in and chosen from a static table (image_decoder.h),
  *     not loaded as overlays.
@@ -114,8 +115,18 @@ int iv_fit_width = 0, iv_fit_height = 0;
 
 /* Zoom / Pan mode: false is the navigation key map, where Left and Right move
  * between pictures and a tap of Menu leaves. Session state, kept across a move
- * to the next picture; only the settings menu changes it. */
+ * to the next picture; only the settings menu changes it.
+ *
+ * The mode spends Menu on panning up, so it has no tap to leave on. Quit on
+ * the menu is the way out of it -- see show_menu(). */
 static bool iv_zoom_mode = false;
+
+/* The button the last pass of scroll_bmp() saw, so a release can be told from
+ * a tap: the release that ends a Menu hold arrives after the menu has closed
+ * and must not read as "leave". Reset on entry rather than merely static --
+ * a session left mid-hold would otherwise swallow the next session's first
+ * tap of Menu. */
+static int iv_lastbutton = BUTTON_NONE;
 
 /* the current full file name */
 static char np_file[MAX_PATH];
@@ -134,7 +145,7 @@ static enum image_type image_type = IMAGE_UNKNOWN;
 static struct viewport iv_vp;
 
 /* forward declarations */
-static int show_menu(void); /* MENU_ATTACHED_USB, or 0 */
+static int show_menu(void); /* MENU_ATTACHED_USB, IV_MENU_QUIT, or 0 */
 
 /** Implementation **/
 
@@ -480,10 +491,6 @@ static void pan_view_down(struct image_info *info)
 static int scroll_bmp(struct image_info *info)
 {
     static long ss_timeout = 0;
-    /* Static because a zoom returns from here and comes straight back: a local
-     * would forget the hold that opened the settings menu, and the release
-     * ending it would arrive at a fresh loop looking exactly like a tap. */
-    static int lastbutton = BUTTON_NONE;
 
     int button;
 
@@ -577,7 +584,7 @@ static int scroll_bmp(struct image_info *info)
         case IMGVIEW_EXIT:
             /* The release that ends a hold is not a tap: the menu has just
              * closed on it. */
-            if (!iv_zoom_mode && lastbutton != IMGVIEW_MENU)
+            if (!iv_zoom_mode && iv_lastbutton != IMGVIEW_MENU)
                 return PLUGIN_OK;
             break;
 
@@ -630,9 +637,12 @@ static int scroll_bmp(struct image_info *info)
         case IMGVIEW_MENU:
         {
             bool was_zoom_mode = iv_zoom_mode;
+            int menu = show_menu();
 
-            if (show_menu() == MENU_ATTACHED_USB)
+            if (menu == MENU_ATTACHED_USB)
                 return PLUGIN_USB_CONNECTED;
+            if (menu == IV_MENU_QUIT)
+                return PLUGIN_OK;
 
             /* Leaving the mode has to put the picture back to fitting the
              * screen: the navigation map has no pan in it, so a view left
@@ -661,7 +671,7 @@ static int scroll_bmp(struct image_info *info)
         } /* switch */
 
         if (button != BUTTON_NONE)
-            lastbutton = button;
+            iv_lastbutton = button;
     } /* while (true) */
 }
 
@@ -1073,13 +1083,29 @@ static int show_menu(void)
         MIID_TOGGLE_SS_MODE,
         MIID_CHANGE_SS_MODE,
         MIID_DITHERING,
+        MIID_QUIT,
     };
 
+    /* Two spellings of one menu, differing only in the Quit row.
+     *
+     * Quit earns a row in Zoom / Pan mode alone: that map spends Menu on
+     * panning up, so the tap of Menu that leaves the viewer is not available
+     * and the menu is the only way out. The navigation map already leaves on
+     * a tap, where a Quit row is one more thing to read past.
+     *
+     * The rows above it are identical in both, so one set of ids serves both
+     * and MIID_QUIT can only ever come back from the second. */
     MENUITEM_STRINGLIST(menu, "Image Viewer", NULL,
                         ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME),
                         ID2P(LANG_DITHERING));
+    MENUITEM_STRINGLIST(menu_zoom, "Image Viewer", NULL,
+                        ID2P(LANG_IV_ZOOM_PAN),
+                        ID2P(LANG_SLIDESHOW_MODE),
+                        ID2P(LANG_SLIDESHOW_TIME),
+                        ID2P(LANG_DITHERING),
+                        ID2P(LANG_MENU_QUIT));
 
     static const struct opt_items slideshow[2] = {
         { STR(LANG_OFF) },
@@ -1096,7 +1122,7 @@ static int show_menu(void)
     viewportmanager_theme_enable(SCREEN_MAIN, true, NULL);
     push_current_activity(ACTIVITY_CONTEXTMENU);
 
-    result = do_menu(&menu, NULL, NULL, false);
+    result = do_menu(iv_zoom_mode ? &menu_zoom : &menu, NULL, NULL, false);
 
     switch (result)
     {
@@ -1128,8 +1154,11 @@ static int show_menu(void)
     lcd_set_background(LCD_BLACK);
 
     /* USB arriving while the menu was up has already freed the buffer, so the
-     * caller must leave rather than redraw from it. */
-    return (result == MENU_ATTACHED_USB) ? MENU_ATTACHED_USB : 0;
+     * caller must leave rather than redraw from it. Quit is the other answer
+     * the caller has to act on; everything else is a setting it redraws for. */
+    if (result == MENU_ATTACHED_USB)
+        return MENU_ATTACHED_USB;
+    return (result == MIID_QUIT) ? IV_MENU_QUIT : 0;
 }
 
 /** Screen ownership **/
@@ -1163,6 +1192,8 @@ int image_viewer(const char *file)
     int condition;
     int offset = 0, filesize = 0, status;
     bool is_album_art = false;
+
+    iv_lastbutton = BUTTON_NONE;
 
     if (!file)
     {

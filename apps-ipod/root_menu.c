@@ -119,6 +119,11 @@ static bool wait_for_tagcache_ready(void)
         bool reinit_attempted = false;
         int idle_passes = 0;
 
+        /* The commit meter below is drawn with its own voice held, because
+         * the block inside the loop says the same thing at more length and
+         * two announcements of one commit talk over each other. */
+        splash_progress_set_silent(true);
+
         /* Now display progress until it's ready or the user exits */
         while(!tagcache_reachable())
         {
@@ -203,10 +208,6 @@ static bool wait_for_tagcache_ready(void)
              * without something drawn over it saying why and how to leave. */
             if (stat->commit_step > 0)
             {
-                /* splash_progress() voices what it draws, which the block
-                 * above has just said at more length. */
-                bool talk = global_settings.talk_menu;
-                global_settings.talk_menu = false;
                 if (lang_is_rtl())
                     splash_progress(stat->commit_step,
                                     tagcache_get_max_commit_step(),
@@ -221,12 +222,13 @@ static bool wait_for_tagcache_ready(void)
                                     stat->commit_step,
                                     tagcache_get_max_commit_step(),
                                     str(LANG_OFF_ABORT));
-                global_settings.talk_menu = talk;
             }
             else
                 splashf(0, str(LANG_BUILDING_DATABASE),
                         stat->processed_entries); /* (voiced above) */
         }
+
+        splash_progress_set_silent(false);
     }
     return tagcache_reachable();
 }

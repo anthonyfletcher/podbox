@@ -1553,9 +1553,9 @@ static const struct img_filter *carousel_filter(void)
         spec[used] = '\0';
     }
 
-    /* IMG_CLASSES_INPLACE refuses `blur`, which the list above cannot name
-     * anyway -- the tier rule lives in the engine rather than in the list, and
-     * that is the right way round. */
+    /* IMG_CLASSES_INPLACE refuses `blur` and the adaptive filters, none of
+     * which the list above can name anyway -- the tier rule lives in the
+     * engine rather than in the list, and that is the right way round. */
     if (!img_filter_compile(spec, IMG_CLASSES_INPLACE, &carousel_chain))
         carousel_chain.stages = 0;
     memcpy(carousel_chain_from, global_settings.album_covers_filter,
@@ -3787,8 +3787,8 @@ static int album_covers_loop(void)
      * expensive half by a wide margin, and while a track plays most frames want
      * nothing to do with them: the status bar ticks its clock about seven times
      * a second, and a caption too long for its box steps sideways at the scroll
-     * rate. Both used to cost a full viewport clear, a re-render of every slide
-     * and a full-screen flush.
+     * rate. Neither is a reason to clear the viewport, re-render every slide
+     * and flush the screen, which is what one shared "redraw" flag costs.
      *
      * All three are sticky: the frame rate cap can defer a frame to a later
      * time round the loop, and a reason to draw must survive until one draws. */
@@ -3855,10 +3855,9 @@ static int album_covers_loop(void)
         if (pf_state == pf_scrolling || art_owed || caption_owed)
         {
             /* There is a frame coming, so wait out the rest of its interval
-             * rather than going round again to find it still not due. Waiting
-             * zero -- which is what an animating carousel used to do -- turns
-             * the cap into a spin, and burns exactly the CPU the cap exists to
-             * hand back. */
+             * rather than going round again to find it still not due. Trap:
+             * waiting zero here turns the cap into a spin, and burns exactly
+             * the CPU the cap exists to hand back. */
             /* Zero when the frame is already due or overdue: the poll returns
              * at once and it is drawn. Waiting a tick there instead throws
              * 10 ms away on every frame that overruns its own interval, which
@@ -3882,8 +3881,8 @@ static int album_covers_loop(void)
          * screen's viewport, and then nothing it drew has anything to do with
          * the covers: the rectangle goes straight to the display and no frame
          * is owed at all. That is the whole point of asking where rather than
-         * whether -- while a track plays the clock alone used to cost seven
-         * full frames a second.
+         * whether -- answering "whether" costs seven full frames a second
+         * while a track plays, for a clock that moved.
          *
          * A theme is free to paint over the covers as well, though, and then
          * the framebuffer no longer matches the display: the covers have to be
@@ -3949,10 +3948,10 @@ static int album_covers_loop(void)
 
         /* Draw only what would come out different, and no more often than
          * PF_MAX_FPS. Re-rendering the covers is far and away the most
-         * expensive thing this loop does -- and idle frames used to pay all of
-         * it to arrive at pixels identical to the ones already there. Playback
-         * was what paid for them, since the wait above deliberately keeps its
-         * normal rate while a track is running.
+         * expensive thing this loop does, and an idle frame pays all of it to
+         * arrive at pixels identical to the ones already there -- out of the
+         * same budget the codec is drawing on, since the wait above
+         * deliberately keeps its normal rate while a track is running.
          *
          * Timed from the start of the frame, so the cap is a rate and not a
          * gap: a frame that overruns its own interval simply makes the next one

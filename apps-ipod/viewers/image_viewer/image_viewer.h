@@ -61,6 +61,10 @@ enum {
     ZOOM_OUT,
     ZOOM_FIT,
     NEXT_FRAME,
+
+    /* show_menu()'s "the user asked to leave", which is not a button and so
+     * cannot come back as one. */
+    IV_MENU_QUIT,
 };
 
 /* The downscale value naming the fit-to-screen rendering, as opposed to the

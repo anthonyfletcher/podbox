@@ -47,8 +47,11 @@ struct skin_dirty_rect { short x, y, w, h; };
 
 void skin_mark_dirty(enum screen_type screen);
 void skin_mark_dirty_rect(enum screen_type screen, int x, int y, int w, int h);
-/* Take the pending-flush flag for a screen, clearing it */
-bool skin_is_dirty(enum screen_type screen);
+/* Take the pending-flush flag for a screen: says whether one is owed, and
+ * clears it. Named for the clearing rather than the answer -- the caller is
+ * taking responsibility for the flush, and one site calls it for that alone
+ * and drops the answer. */
+bool skin_take_dirty(enum screen_type screen);
 /* Take the regions owed, clamped to the display, writing at most
  * SKIN_MAX_DIRTY_RECTS of them to `out`. Returns how many, 0 if none. */
 int skin_take_dirty_rects(enum screen_type screen,
@@ -89,8 +92,6 @@ void skin_backdrop_set_buffer(int backdrop_id, struct skin_viewport *svp);
  */
 int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout);
 
-void skin_load(enum skinnable_screens skin, enum screen_type screen,
-               const char *buf, bool isfile);
 struct gui_wps *skin_get_gwps(enum skinnable_screens skin, enum screen_type screen);
 void gui_sync_skin_init(void);
 

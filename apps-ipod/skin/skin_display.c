@@ -105,7 +105,7 @@ static void pending_clear(enum screen_type screen)
     pending[screen].count = 0;
 }
 
-bool skin_is_dirty(enum screen_type screen)
+bool skin_take_dirty(enum screen_type screen)
 {
     bool ret = pending[screen].whole || pending[screen].count > 0;
     pending_clear(screen);
@@ -855,7 +855,8 @@ void draw_album_art(struct gui_wps *gwps, struct skin_albumart *aa,
      * the buffered bitmap. Only the source differs -- the cropping and
      * alignment below are the same either way. */
     const bool blurred = aa->filter_handle > 0
-                      && aa->filtered_art == handle_id;
+                      && aa->filtered_art == handle_id
+                      && aa->filtered_gen == skin_albumart_gen();
     const fb_data *pixels;
     struct bitmap *bmp;
     short src_w, src_h;
