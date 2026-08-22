@@ -109,6 +109,8 @@ get_param(struct skin_element *element, int param_number)
 
 /* which screen are we parsing for? */
 static enum screen_type curr_screen;
+/* And which skin. %Lt, for one, means nothing outside an .sbs. */
+static enum skinnable_screens curr_skin;
 
 /* the current viewport */
 static struct skin_element *curr_viewport_element;
@@ -2564,7 +2566,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
 
 /* to setup up the wps-data from a format-buffer (isfile = false)
    from a (wps-)file (isfile = true)*/
-bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
+bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
+                    struct wps_data *wps_data,
                     const char *buf, bool isfile, struct skin_stats *stats)
 {
     char *wps_buffer = NULL;
@@ -2595,6 +2598,7 @@ bool skin_data_load(enum screen_type screen, struct wps_data *wps_data,
     skin_data_reset(wps_data);
     wps_data->wps_loaded = false;
     curr_screen = screen;
+    curr_skin = skin;
     curr_line = NULL;
     curr_vp = NULL;
     curr_viewport_element = NULL;
