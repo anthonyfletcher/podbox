@@ -669,6 +669,12 @@ struct user_settings
     bool album_covers_statusbar;  /* show it, or take the screen and cover it */
     /* CAROUSEL_FILTER_CFG_VALS indices, run in order, on the slides only. */
     int  album_covers_filter[CAROUSEL_FILTER_SLOTS];
+    /* A filter chain written out in full, as draw/img_filter.h spells them and
+     * as %Cl takes them. Empty means the three slots above decide; anything
+     * here overrides all of them. It exists because the slots are a menu
+     * device -- a fixed list is what a settings screen can offer -- while a
+     * .cfg is written by hand and has no such excuse. */
+    char album_covers_filter_chain[CAROUSEL_FILTER_MAX];
     /* Music menu rows the user has turned off: one bit per row of
      * tagnavi.config's root menu, by position, valid only against the row set
      * whose signature is stored beside it. See browser_db.h. */

@@ -1777,6 +1777,12 @@ const struct settings_list settings[] = {
                    LANG_ARTWORK_FILTER_3, 0, "album covers filter 3",
                    CAROUSEL_FILTER_CFG_VALS, NULL,
                    CAROUSEL_FILTER_COUNT, CAROUSEL_FILTER_CHOICES),
+    /* No menu row: a filter chain is not something to type on a click wheel,
+     * and the three slots above are the screen's way of saying the same thing.
+     * This is for a .cfg, where the fixed list is only in the way -- it takes
+     * any chain the engine compiles, amounts and '+' included. */
+    TEXT_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_filter_chain,
+                 "album covers filter", "", NULL, NULL),
 #undef CAROUSEL_FILTER_CHOICES
     /* Defaults for a theme that says nothing, not the shipped look. Few
      * status bars span the full width, and one that does not sits over a

@@ -826,8 +826,11 @@ static int album_on_menu(void)
     int old_cache_ver  = pf_cfg.cache_version;
     bool old_statusbar = global_settings.album_covers_statusbar;
     int old_filter[CAROUSEL_FILTER_SLOTS];
+    char old_chain[CAROUSEL_FILTER_MAX];
 
     memcpy(old_filter, global_settings.album_covers_filter, sizeof(old_filter));
+    strmemccpy(old_chain, global_settings.album_covers_filter_chain,
+               sizeof(old_chain));
 
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
@@ -852,9 +855,12 @@ static int album_on_menu(void)
 
     /* A treatment reaches a slide only as it is loaded, so the ones already
      * decoded have to go -- otherwise the new look arrives a screen at a time
-     * as the user scrolls past them. */
+     * as the user scrolls past them. Both halves are compared: the written-out
+     * chain overrides the three slots, so either changing changes the picture.
+     */
     if (memcmp(old_filter, global_settings.album_covers_filter,
-               sizeof(old_filter)))
+               sizeof(old_filter))
+        || strcmp(old_chain, global_settings.album_covers_filter_chain))
         carousel_drop_slides();
 
     /* Re-apply the live geometry settings (zoom / margins / tilt). Cheap and

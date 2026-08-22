@@ -1516,17 +1516,31 @@ static int read_pfraw(char* filename, int prio)
  * time. carousel_filter_changed() is what tells the menu a reload is due. */
 static struct img_filter carousel_chain;
 static int carousel_chain_from[CAROUSEL_FILTER_SLOTS] = { -1, -1, -1 };
+static char carousel_chain_from_text[CAROUSEL_FILTER_MAX] = "\1";
 
 static const struct img_filter *carousel_filter(void)
 {
     char spec[CAROUSEL_FILTER_MAX];
+    const char *text = global_settings.album_covers_filter_chain;
     size_t used = 0;
 
+    /* Both halves are compared, not just the one in force: switching between
+     * them changes the picture without either alone having changed. */
     if (!memcmp(carousel_chain_from, global_settings.album_covers_filter,
-                sizeof(carousel_chain_from)))
+                sizeof(carousel_chain_from)) &&
+        !strcmp(carousel_chain_from_text, text))
         return carousel_chain.stages ? &carousel_chain : NULL;
 
     spec[0] = '\0';
+    if (text[0])
+    {
+        /* Written out in full, so the slots have nothing to say. Overlong is
+         * treated as no filter rather than as a truncated one, which would
+         * compile to something the theme never asked for. */
+        if (strlcpy(spec, text, sizeof(spec)) >= sizeof(spec))
+            spec[0] = '\0';
+    }
+    else
     for (int i = 0; i < CAROUSEL_FILTER_SLOTS; i++)
     {
         const char *p = CAROUSEL_FILTER_CFG_VALS;
@@ -1553,13 +1567,16 @@ static const struct img_filter *carousel_filter(void)
         spec[used] = '\0';
     }
 
-    /* IMG_CLASSES_INPLACE refuses `blur` and the adaptive filters, none of
-     * which the list above can name anyway -- the tier rule lives in the
-     * engine rather than in the list, and that is the right way round. */
+    /* IMG_CLASSES_INPLACE refuses `blur` and the adaptive filters. The list
+     * above cannot name them anyway; a chain written out by hand can, and is
+     * refused here -- the tier rule lives in the engine rather than in the
+     * list, and that is the right way round. A chain that will not compile
+     * leaves the slides unfiltered rather than half filtered. */
     if (!img_filter_compile(spec, IMG_CLASSES_INPLACE, &carousel_chain))
         carousel_chain.stages = 0;
     memcpy(carousel_chain_from, global_settings.album_covers_filter,
            sizeof(carousel_chain_from));
+    strlcpy(carousel_chain_from_text, text, sizeof(carousel_chain_from_text));
     return carousel_chain.stages ? &carousel_chain : NULL;
 }
 
