@@ -65,6 +65,7 @@
 #include "draw/icon.h"
 #include "draw/viewport.h"
 #include "draw/progress_bar.h"
+#include "skin/skin_albumart_color.h"
 #include "skin/skin_engine.h"
 #include "skin/statusbar_skinned.h"
 #include "bootchart.h"
@@ -120,17 +121,25 @@ int main(void)
     CHART(">init");
     init();
     CHART("<init");
-    /* Hand the screen over to the UI in the theme's colours.
+    /* Hand the screen over to the UI in the colours it will use.
      *
      * The boot screen paints in its own palette and leaves it set --
      * settings_apply() establishes the theme's during init(), but boot stages
      * run after it and each repaint puts the palette's back. clear_display()
      * fills with whatever background is current, so without this the boot
-     * background is what shows through wherever the theme does not paint. */
+     * background is what shows through wherever the theme does not paint.
+     *
+     * The album's colours, not the theme's, where the last session left a
+     * resume point: seeding here is what lets the first screen appear already
+     * carrying them, and the colours have to be resolved for the clear below
+     * or the theme's background shows through until something repaints. */
+    dynamic_colors_seed_resume();
+    unsigned int boot_fg = dynamic_colors_resolve(global_settings.fg_color);
+    unsigned int boot_bg = dynamic_colors_resolve(global_settings.bg_color);
     FOR_NB_SCREENS(i)
     {
-        screens[i].set_foreground(global_settings.fg_color);
-        screens[i].set_background(global_settings.bg_color);
+        screens[i].set_foreground(boot_fg);
+        screens[i].set_background(boot_bg);
         screens[i].clear_display();
         screens[i].update();
     }

@@ -223,10 +223,10 @@ static const char graphic_numeric[] = "graphic,numeric";
  *
  * These are what a theme load resets to before reading the theme, so naming a
  * theme's files here would mean a theme that mentions no skin of its own came
- * up wearing Themify_2's -- the same inherited-look fault the reset exists to
- * prevent, just from the binary instead of from whatever was loaded last. The
- * shipped look is named by themes/default-config.cfg, which is the first-boot
- * config, and by Themify_2.cfg itself.
+ * up wearing the shipped theme's -- the same inherited-look fault the reset
+ * exists to prevent, just from the binary instead of from whatever was loaded
+ * last. The shipped look is named by themes/default-config.cfg, which is the
+ * first-boot config, and by the theme's own .cfg.
  *
  * "-" is the established "none" value and is what upstream's failsafe theme
  * uses for its font. Reaching these at all means no config.cfg has been
@@ -253,7 +253,8 @@ static const char graphic_numeric[] = "graphic,numeric";
     #define DEFAULT_VIEWERS_ICONSET "tango_icons_viewers.16x16"
 
 
-/* Themify_2 palette, so a colours reset falls back to the shipped theme. */
+/* What a colours reset falls back to: a fixed set, not the shipped theme's --
+ * those are named in themes/default-config.cfg. */
 #define DEFAULT_THEME_FOREGROUND LCD_RGBPACK(0xe1, 0xf0, 0xee)
 #define DEFAULT_THEME_BACKGROUND LCD_RGBPACK(0x00, 0x0c, 0x21)
 #define DEFAULT_THEME_SELECTOR_START LCD_RGBPACK(0xff, 0xeb, 0x9c)
@@ -742,6 +743,7 @@ const struct settings_list settings[] = {
     SYSTEM_STATUS(0, resume_elapsed, -1,     "ELA"),
     SYSTEM_STATUS(0, resume_offset,  -1,     "OFF"),
     SYSTEM_STATUS(0, resume_modified, false, "PLM"),
+    SYSTEM_STATUS(0, resume_art_hash, 0,     "AAH"),
     SYSTEM_STATUS(0, runtime,         0,     "CRT"),
     SYSTEM_STATUS(0, topruntime,      0,     "TRT"),
     SYSTEM_STATUS(0, last_screen,    -1,     "PVS"),
@@ -1021,8 +1023,8 @@ const struct settings_list settings[] = {
         LANG_DIALOG_BTN_BORDER_WIDTH, 2, "dialog button border width",
         UNIT_PIXEL, 0, 10, 1, NULL, NULL, NULL),
     /* Square by default: a radius is a look, and a theme that says nothing
-     * should get the plain shape rather than this fork's. Themify_2 asks for
-     * the rounded one in its own .cfg. */
+     * should get the plain shape rather than this fork's. A theme that wants
+     * rounded buttons asks for one in its own .cfg. */
     INT_SETTING(F_THEMESETTING|F_THEMERESET, dialog_btn_border_radius,
         LANG_DIALOG_BTN_BORDER_RADIUS, 0, "dialog button border radius",
         UNIT_PIXEL, 0, 20, 1, NULL, NULL, NULL),
@@ -1776,10 +1778,9 @@ const struct settings_list settings[] = {
                    CAROUSEL_FILTER_CFG_VALS, NULL,
                    CAROUSEL_FILTER_COUNT, CAROUSEL_FILTER_CHOICES),
 #undef CAROUSEL_FILTER_CHOICES
-    /* Defaults for a theme that says nothing, not the shipped look --
-     * Themify_2 asks for the opposite of both in its own .cfg. Few status bars
-     * span the full width, and one that does not sits over a screen that does
-     * as a gap rather than a bar.
+    /* Defaults for a theme that says nothing, not the shipped look. Few
+     * status bars span the full width, and one that does not sits over a
+     * screen that does as a gap rather than a bar.
      *
      * F_THEMERESET is what makes that true. Without it these keep the last
      * theme's answer, so a theme saying nothing inherits a reserved status bar

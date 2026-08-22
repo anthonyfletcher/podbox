@@ -47,6 +47,18 @@ void dynamic_colors_check_extraction(int aa_slot);
 struct skin_albumart;
 void skin_albumart_filter(int aa_slot, struct skin_albumart *aa);
 
+/* Which run of buffered art the filter guards refer to. It moves whenever the
+ * art changes, so `filtered_gen == skin_albumart_gen()` is the question "is
+ * what I rendered still this track's cover?" -- one a handle id cannot answer
+ * on its own, since buflib reissues ids. Compared, never interpreted. */
+unsigned skin_albumart_gen(void);
+
+/* Take the palette from the folder the last session's resume point belongs to.
+ * Boot only, called before the first screen is painted: it establishes the
+ * colours rather than changing them, so nothing repaints. Does nothing without
+ * a resume point, a remembered folder, or a thumbnail cached for it. */
+void dynamic_colors_seed_resume(void);
+
 /* Re-save theme default colors (call after theme .cfg is applied) */
 void dynamic_colors_save_theme(void);
 

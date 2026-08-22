@@ -270,9 +270,16 @@ struct skin_albumart {
      * `filtered_art` is the art handle already rendered into it. Per skin
      * rather than per slot -- unlike the in-place case there is no danger in
      * two skins rendering the same art, and they each have their own
-     * destination to render it into. */
+     * destination to render it into.
+     *
+     * `filtered_gen` is which run of art it belongs to. A handle id on its
+     * own is not enough of an answer: buflib hands the same id back for the
+     * next track's art often enough, and the render is then skipped and the
+     * previous cover drawn. skin_albumart_gen() counts track changes, and a
+     * buffer stamped with an older count is stale whatever its handle says. */
     int filter_handle;
     int filtered_art;
+    unsigned filtered_gen;
     short filtered_width;      /* what is really in it: the source fitted */
     short filtered_height;     /* inside the box, so smaller than it      */
 

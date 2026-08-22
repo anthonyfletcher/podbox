@@ -12,6 +12,10 @@
  * adjusted for contrast so text drawn in them stays readable against the
  * background. Skins read the result through the dynamic-colour tags.
  *
+ * Once per boot as well, where there is no track to extract from: the palette
+ * is taken from the folder the last session left a resume point in, so the
+ * first screen comes up in the colours the device was left wearing.
+ *
  * The six colours a theme names are matched by value and mapped by role. Every
  * other colour a skin spells out is carried over instead: measured against the
  * theme's own pair, and rebuilt in the same relationship to the album's. So a
@@ -33,8 +37,8 @@
  *   - luminance, contrast and blending helpers
  *   - extract_colors(): sampling the bitmap and choosing the palette
  *   - the %Cl filter chain, applied in place once per art change
- *   - track-change hook, theme colour save/restore, and the once-per-render
- *     check that drives both jobs
+ *   - track-change hook, the boot seed, theme colour save/restore, and the
+ *     once-per-render check that drives both jobs
  *   - carrying a skin's own colours over to the new palette
  *   - the accessors skins resolve their colour tags through, which also
  *     report whether a change is recent enough to need another repaint
@@ -101,7 +105,7 @@
 #define ACCENT_MIN_RATIO  300
 
 /* Transformed colours remembered between palette changes. A skin uses a
- * handful -- Themify_2 uses two, and every stock theme together uses three. */
+ * handful, so this sits well clear of what one asks for. */
 #define XFORM_CACHE_SIZE  16
 
 #ifndef MIN
@@ -217,6 +221,10 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
     cache.change_tick = current_tick;
     cache.needs_full_update = true;
     cache.needs_screen_clear = true;
+    /* The theme's own pair belongs to no album, so there is nothing for the
+     * next boot to seed from. */
+    if (to_defaults)
+        global_status.resume_art_hash = 0;
     forget_transforms();
 }
 
@@ -514,6 +522,21 @@ static unsigned int track_folder_hash(const char *path, bool artist)
     }
 }
 
+/* The edge of the thumbnails the palette is taken from, or 0 if this build
+ * caches no such size or caches it larger than the buffer above. */
+static int palette_dim(void)
+{
+    int dim;
+
+    if (palette_size_idx == -2)
+        palette_size_idx = art_cache_size_index("coverflow");
+    if (palette_size_idx < 0)
+        return 0;
+
+    dim = art_cache_size_dim(palette_size_idx);
+    return (dim > 0 && dim <= PALETTE_MAX_DIM) ? dim : 0;
+}
+
 /* Read one folder's cached thumbnail and take the palette from it. False means
  * there is none to read: no database yet, a folder the caching pass has not
  * reached, or one with no art at all. */
@@ -557,6 +580,9 @@ static bool palette_from_folder(unsigned int hash, int dim)
     bmp.format = FORMAT_NATIVE;
     bmp.data = (unsigned char *)palette_px;
     extract_colors(&bmp);
+    /* Remembered for the next boot, which has a resume point but no playing
+     * track to derive a folder from. */
+    global_status.resume_art_hash = hash;
     return true;
 }
 
@@ -611,13 +637,8 @@ static bool palette_from_cache(void)
     unsigned int miss_key;
     int n = 0, i, dim;
 
-    if (palette_size_idx == -2)
-        palette_size_idx = art_cache_size_index("coverflow");
-    if (palette_size_idx < 0)
-        return false;
-
-    dim = art_cache_size_dim(palette_size_idx);
-    if (dim <= 0 || dim > PALETTE_MAX_DIM)
+    dim = palette_dim();
+    if (dim == 0)
         return false;
 
     /* audio_current_track() hands back the engine's live entry, not a copy,
@@ -683,10 +704,25 @@ static bool palette_from_cache(void)
 
 static volatile int filtered_handle[AA_FILTER_SLOTS];
 
+/* Which run of art the guards above and in struct skin_albumart refer to.
+ * Bumped whenever the buffered art changes under us, which is what makes a
+ * repeated handle id harmless: a guard stamped with an older count is stale
+ * however well its handle matches. */
+static unsigned filter_gen = 1;
+
+unsigned skin_albumart_gen(void)
+{
+    return filter_gen;
+}
+
 static void forget_filtered(void)
 {
     for (int i = 0; i < AA_FILTER_SLOTS; i++)
         filtered_handle[i] = -1;
+    /* Never 0, which is what a skin's art carries before it has rendered
+     * anything -- so a freshly parsed %Cl cannot match the current run. */
+    if (++filter_gen == 0)
+        filter_gen = 1;
 }
 
 static bool slot_filtered(int aa_slot, int handle)
@@ -739,6 +775,7 @@ static void render_filtered(struct skin_albumart *aa, int handle,
     aa->filtered_width = (short)dw;
     aa->filtered_height = (short)dh;
     aa->filtered_art = handle;
+    aa->filtered_gen = filter_gen;
 }
 
 void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
@@ -783,7 +820,8 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
         aa->filter_avoid = (short)avoid;
     }
 
-    if (resizes ? (aa->filtered_art == handle)
+    if (resizes ? (aa->filtered_art == handle
+                   && aa->filtered_gen == filter_gen)
                 : (filtered_handle[aa_slot] == handle))
         return;                                  /* already done */
 
@@ -827,9 +865,11 @@ static void track_change_cb(unsigned short id, void *param)
 {
     (void)param;
     needs_extraction = true;
-    /* New art means the filter owes it a pass. Handle ids are the test for
-     * that and a new one nearly always differs -- this covers the case where
-     * buflib hands the same id back for different art. */
+    /* New art means the filter owes it a pass. Both tiers are told, and both
+     * by the same call: it clears the in-place tier's per-slot handles and
+     * moves the generation the blurring tier stamps its own destination with.
+     * A handle id alone would not do it -- buflib reissues ids, and a reissue
+     * reads as "already filtered". */
     forget_filtered();
     palette_miss = 0;
     if (id == PLAYBACK_EVENT_TRACK_CHANGE)
@@ -858,6 +898,34 @@ void dynamic_colors_init(void)
         add_event(PLAYBACK_EVENT_CUR_TRACK_READY, track_change_cb);
         events_registered = true;
     }
+}
+
+/* Come up in the colours the device was left in, before anything is drawn.
+ *
+ * The palette normally arrives with a track, and at boot there is no track --
+ * only a resume point, which names a file but not the folder the palette is
+ * derived from. That folder's hash is stored beside it, so the same cached
+ * thumbnail is read again here and the same palette comes out.
+ *
+ * Boot only, and before the first paint: the markers a palette change usually
+ * raises are wound back afterwards, because they exist to make screens already
+ * on display catch up and there are none. Leaving them is what would make the
+ * boot screen visibly recolour rather than simply appear. */
+void dynamic_colors_seed_resume(void)
+{
+    int dim = palette_dim();
+
+    if (!global_settings.dynamic_colors ||
+        global_status.resume_index == -1 ||
+        global_status.resume_art_hash == 0 || dim == 0)
+        return;
+
+    if (!palette_from_folder(global_status.resume_art_hash, dim))
+        return;
+
+    cache.needs_full_update = false;
+    cache.needs_screen_clear = false;
+    cache.change_tick = current_tick - AA_SETTLE_TICKS;
 }
 
 void dynamic_colors_save_theme(void)
@@ -925,6 +993,8 @@ void dynamic_colors_check_extraction(int aa_slot)
     {
         if (palette_from_slot(aa_slot, handle))
         {
+            /* A skin's own picture, which the next boot cannot reach. */
+            global_status.resume_art_hash = 0;
             needs_extraction = false;
             return;
         }
@@ -934,9 +1004,9 @@ void dynamic_colors_check_extraction(int aa_slot)
          * above is the better source anyway. Bounded by the same timeout, so a
          * slot that stays filtered stops costing a retry every frame.
          *
-         * Clearing the flag here regardless is what used to make a bad moment
-         * permanent: the first pass after a track change decided, and nothing
-         * asked again. */
+         * Trap: clearing the flag regardless makes one bad moment permanent.
+         * The first pass after a track change then decides the palette, and
+         * nothing asks again. */
         if (current_tick - cache.track_change_tick > NO_ART_TIMEOUT)
             needs_extraction = false;
     }

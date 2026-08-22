@@ -423,6 +423,12 @@ struct system_status
     uint32_t resume_crc32; /* crc32 of the name of the file */
     uint32_t resume_elapsed; /* elapsed time in last file */
     uint32_t resume_offset; /* byte offset in mp3 file */
+    /* Folder the dynamic-colour palette was last taken from, hashed the way
+       the art cache keys on it, or 0 for none. It sits beside the resume point
+       because it answers what the resume point cannot: resume_crc32 is of the
+       filename alone, so nothing else here names the folder whose cached
+       thumbnail the palette came from. */
+    uint32_t resume_art_hash;
     /* Write-only, and not persisted: firmware/sound.c and
        lib/rbcodec/dsp/tdspeed.c store the value they applied here. Both mirror
        upstream, so the fields have to stay even though this fork has no pitch
