@@ -14,7 +14,9 @@
 #include "iap-core.h"
 #include "iap-lingo.h"
 #include "dir.h"
+#include "rbpaths.h"
 #include "settings.h"
+#include "system/strutil.h"          /* open_utf8, read_line */
 #include "screens/browse/browser_disk.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
@@ -1029,12 +1031,24 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  5   0x14  Command ID (bits 7:0)
              *  6   0xE5  Telegram payload checksum byte
              *
-             * We return ROCKBOX, should this be definable?
-             * Should it be Volume Name?
+             * The name is the first line of <ROCKBOX_DIR>/playername.txt, or
+             * "Rockbox" when there is no such file. Should it be Volume Name?
              */
         {
+            char ipod_name[32] = "Rockbox";
+            int fd = open_utf8(ROCKBOX_DIR "/playername.txt", O_RDONLY);
+            if (fd >= 0)
+            {
+                char line[sizeof(ipod_name)];
+                /* An empty first line keeps the default. read_line() returns
+                 * bytes consumed, so a lone newline reads as success -- the
+                 * string is what says whether there is a name. */
+                if (read_line(fd, line, sizeof(line)) > 0 && line[0] != '\0')
+                    strcpy(ipod_name, line);
+                close(fd);
+            }
             IAP_TX_INIT4(0x04, 0x0015);
-            IAP_TX_PUT_STRING("ROCKBOX");
+            IAP_TX_PUT_STRING(ipod_name);
             iap_send_tx();
             break;
         }
