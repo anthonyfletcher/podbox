@@ -53,6 +53,20 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa);
  * on its own, since buflib reissues ids. Compared, never interpreted. */
 unsigned skin_albumart_gen(void);
 
+/* Playback has loaded a new art bitmap, and `handle` is where it put it. Two
+ * things follow: the chain owes that buffer a pass, and any record of having
+ * filtered a handle of this id describes a picture that no longer exists,
+ * since buflib reissues ids.
+ *
+ * Call it from the load and not from the track change. Art outlives a track --
+ * playback hands the same handle back for every track of an album -- and a
+ * chain that rewrites pixels in place must not run over one of those twice.
+ *
+ * Called on the audio thread, and safe there because playback makes the handle
+ * current only after this returns: the UI thread cannot match on an id this
+ * has not finished striking off. */
+void skin_albumart_art_opened(int handle);
+
 /* Take the palette from the folder the last session's resume point belongs to.
  * Boot only, called before the first screen is painted: it establishes the
  * colours rather than changing them, so nothing repaints. Does nothing without

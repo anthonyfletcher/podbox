@@ -596,17 +596,17 @@ static bool palette_from_folder(unsigned int hash, int dim)
  * producing a palette belonging to neither. Pinning forbids the move; the handle
  * can still be *removed*, which is what the bufgetdata() test catches.
  *
- * False for a filtered slot: %Cl rewrites those in place, and a palette taken
- * from one describes the theme's treatment of the album rather than the album --
- * a bw chain would turn every derived colour grey. */
-static bool slot_filtered(int aa_slot, int handle);   /* with the filter chain */
+ * False for art the chain has already rewritten: %Cl rewrites in place, and a
+ * palette taken from one describes the theme's treatment of the album rather
+ * than the album -- a bw chain would turn every derived colour grey. */
+static bool art_filtered(int handle);                 /* with the filter chain */
 
-static bool palette_from_slot(int aa_slot, int handle)
+static bool palette_from_slot(int handle)
 {
     struct bitmap *bmp;
     bool got;
 
-    if (slot_filtered(aa_slot, handle))
+    if (art_filtered(handle))
         return false;
     if (!buf_pin_handle(handle, true))
         return false;
@@ -682,32 +682,48 @@ static bool palette_from_cache(void)
  * ---------------------------------------------------------------------- */
 
 /* The chain rewrites the album art slot's own copy of the bitmap, so it has
- * to run exactly once per handle -- twice would darken a cover twice, or
+ * to run exactly once per buffer -- twice would darken a cover twice, or
  * invert it back.
  *
- * Keyed by slot rather than by skin because slots dedupe by dimension: a
- * status bar and a WPS asking for the same size share one bitmap, and a
- * per-skin guard would filter it once each. The sharing has a second
- * consequence this cannot fix, and it is worth knowing: two skins on one slot
- * both show whichever chain ran first. Declaring different sizes separates
- * them.
+ * The guard is therefore the set of art buffers already rewritten, keyed by
+ * handle. A handle is the buffer, which is what makes it the right key: slots
+ * dedupe by dimension, so a status bar and a WPS asking for the same size
+ * share one bitmap and one entry covers both. The sharing has a consequence
+ * this cannot fix, and it is worth knowing: two skins on one slot both show
+ * whichever chain ran first. Declaring different sizes separates them.
+ *
+ * A set rather than one entry per slot because art outlives the track it was
+ * loaded for. Playback keeps a handle for the album it is in the middle of and
+ * hands the same one back for every track of it, so a guard cleared on a track
+ * change would filter one buffer once per skip -- and a slot alternating
+ * between folder art and embedded art needs both remembered at once.
+ *
+ * A handle id alone would not do, because buflib reissues them. What makes it
+ * do is skin_albumart_art_opened(): playback calls it for every art bitmap it
+ * loads, so an id that comes back meaning a different picture is struck off
+ * before it can become current.
  *
  * Filtering in place cannot be undone, which shows up in one place: change
- * theme mid-track and the art keeps the outgoing theme's treatment until the
- * next track. Re-running the guard would be worse -- the new chain would
- * compose on top of the old one's output rather than replace it.
+ * theme mid-album and the art keeps the outgoing theme's treatment until the
+ * next album. Striking the entries instead would be worse -- the new chain
+ * would compose on top of the old one's output rather than replace it.
  *
  * One above SKINNABLE_SCREENS_COUNT because that is the largest playback.c's
- * MAX_MULTIPLE_AA can be (it grows by one for USB iAP). The bounds test is
- * what actually keeps this safe, not the size. */
+ * MAX_MULTIPLE_AA can be (it grows by one for USB iAP), and room for three
+ * buffers each, which is every one that can be alive at once: the slot's
+ * current handle and the two playback holds for the album. Overflowing costs
+ * one wasted pass, not a wrong picture. */
 #define AA_FILTER_SLOTS (SKINNABLE_SCREENS_COUNT + 1)
+#define AA_FILTERED_MAX (AA_FILTER_SLOTS * 3)
 
-static volatile int filtered_handle[AA_FILTER_SLOTS];
+/* Zero is the empty entry; buflib issues no such handle. */
+static volatile int filtered_art[AA_FILTERED_MAX];
+static int filtered_next;
 
-/* Which run of art the guards above and in struct skin_albumart refer to.
- * Bumped whenever the buffered art changes under us, which is what makes a
- * repeated handle id harmless: a guard stamped with an older count is stale
- * however well its handle matches. */
+/* Which run of art the guards in struct skin_albumart refer to. Bumped
+ * whenever art is loaded, which is what makes a repeated handle id harmless:
+ * a guard stamped with an older count is stale however well its handle
+ * matches. */
 static unsigned filter_gen = 1;
 
 unsigned skin_albumart_gen(void)
@@ -715,20 +731,46 @@ unsigned skin_albumart_gen(void)
     return filter_gen;
 }
 
-static void forget_filtered(void)
+static bool art_filtered(int handle)
 {
-    for (int i = 0; i < AA_FILTER_SLOTS; i++)
-        filtered_handle[i] = -1;
-    /* Never 0, which is what a skin's art carries before it has rendered
+    if (handle <= 0)
+        return false;
+
+    for (int i = 0; i < AA_FILTERED_MAX; i++)
+        if (filtered_art[i] == handle)
+            return true;
+    return false;
+}
+
+static void remember_filtered(int handle)
+{
+    if (handle <= 0 || art_filtered(handle))
+        return;
+
+    filtered_art[filtered_next] = handle;
+    if (++filtered_next == AA_FILTERED_MAX)
+        filtered_next = 0;
+}
+
+void skin_albumart_art_opened(int handle)
+{
+    if (handle <= 0)
+        return;
+
+    for (int i = 0; i < AA_FILTERED_MAX; i++)
+        if (filtered_art[i] == handle)
+            filtered_art[i] = 0;
+
+    /* The blurring tier renders into a destination of its own, so nothing
+     * there is rewritten twice and its guard asks a different question: is
+     * what I rendered still the cover on screen? Counting loads rather than
+     * track changes is what stops it re-rendering the same art once per track
+     * of an album.
+     *
+     * Never 0, which is what a skin's art carries before it has rendered
      * anything -- so a freshly parsed %Cl cannot match the current run. */
     if (++filter_gen == 0)
         filter_gen = 1;
-}
-
-static bool slot_filtered(int aa_slot, int handle)
-{
-    return aa_slot >= 0 && aa_slot < AA_FILTER_SLOTS
-        && filtered_handle[aa_slot] == handle;
 }
 
 /* Fit a source of sw x sh inside a bw x bh box, keeping its aspect -- the
@@ -822,7 +864,7 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
 
     if (resizes ? (aa->filtered_art == handle
                    && aa->filtered_gen == filter_gen)
-                : (filtered_handle[aa_slot] == handle))
+                : art_filtered(handle))
         return;                                  /* already done */
 
     /* The bitmap lives in the audio buffer and is movable, and this reads it
@@ -857,7 +899,7 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
     {
         img_filter_apply((fb_data *)bmp->data, bmp->width, bmp->height,
                          filter);
-        filtered_handle[aa_slot] = handle;
+        remember_filtered(handle);
     }
 }
 
@@ -865,12 +907,8 @@ static void track_change_cb(unsigned short id, void *param)
 {
     (void)param;
     needs_extraction = true;
-    /* New art means the filter owes it a pass. Both tiers are told, and both
-     * by the same call: it clears the in-place tier's per-slot handles and
-     * moves the generation the blurring tier stamps its own destination with.
-     * A handle id alone would not do it -- buflib reissues ids, and a reissue
-     * reads as "already filtered". */
-    forget_filtered();
+    /* Nothing is said to the filter here. A track change is not an art change:
+     * skin_albumart_art_opened() is, and it is the load that calls it. */
     palette_miss = 0;
     if (id == PLAYBACK_EVENT_TRACK_CHANGE)
         cache.track_change_tick = current_tick;
@@ -991,7 +1029,7 @@ void dynamic_colors_check_extraction(int aa_slot)
     int handle = aa_slot >= 0 ? playback_current_aa_hid(aa_slot) : -1;
     if (handle >= 0)
     {
-        if (palette_from_slot(aa_slot, handle))
+        if (palette_from_slot(handle))
         {
             /* A skin's own picture, which the next boot cannot reach. */
             global_status.resume_art_hash = 0;

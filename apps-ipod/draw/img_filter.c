@@ -975,20 +975,47 @@ static void levels_dither_pass(fb_data *px, int w, int h,
  * overlap, so writing one cannot disturb one not yet read; there is no
  * ordering constraint and no second buffer.
  *
- * Unpacked accumulation, like the blur's decimate(): a block at the right or
- * bottom edge is whatever is left, so the count is not a power of two and a
- * shift will not divide it. */
+ * Unpacked accumulation, like the blur's decimate(). */
+
+/* Dividing the three sums by the block's pixel count is what a small block
+ * costs nearly all of: neither target has a divider, so each division is a
+ * call, and at the shortest block that is three of them for every four pixels
+ * -- four fifths of the pass, and four times what a whole `bw` costs. One
+ * reciprocal per band brings a block down to three multiplies.
+ *
+ * Exact, not an approximation. Rounding the reciprocal up makes
+ * (v * recip) >> MEAN_SHIFT equal v / n for every v short of a bound, and
+ * MEAN_MAX_N is where that bound bites: a channel sums at most 63 a pixel, so
+ * the condition is 63n(n-1) < 2^MEAN_SHIFT. The shift is as large as the
+ * 32-bit product allows, which is what puts the cap as high as it is.
+ *
+ * Past the cap a block is 23 pixels square or more, and three divisions spread
+ * over 529 pixels do not show. Those divide, and so does the one block a band
+ * has clipped by the right edge -- along with the whole of a band clipped by
+ * the bottom. */
+#define MEAN_SHIFT  24
+#define MEAN_MAX_N  512
+
+static unsigned mean_recip(unsigned n)
+{
+    return n <= MEAN_MAX_N ? ((1u << MEAN_SHIFT) + n - 1) / n : 0;
+}
+
 static void pixellate_pass(fb_data *px, int w, int h, int block)
 {
     for (int y = 0; y < h; y += block)
     {
         const int bh = MIN(block, h - y);
+        /* Every block of this band but the last holds the same count. */
+        const unsigned full_n = (unsigned)block * bh;
+        const unsigned full_recip = mean_recip(full_n);
 
         for (int x = 0; x < w; x += block)
         {
             const int bw = MIN(block, w - x);
             unsigned r = 0, g = 0, b = 0;
             unsigned n = (unsigned)bw * bh;
+            unsigned recip = n == full_n ? full_recip : 0;
             unsigned flat;
 
             for (int j = 0; j < bh; j++)
@@ -1005,7 +1032,10 @@ static void pixellate_pass(fb_data *px, int w, int h, int block)
                 }
             }
 
-            flat = LCD_RGBPACK_LCD(r / n, g / n, b / n);
+            flat = recip ? LCD_RGBPACK_LCD((r * recip) >> MEAN_SHIFT,
+                                           (g * recip) >> MEAN_SHIFT,
+                                           (b * recip) >> MEAN_SHIFT)
+                         : LCD_RGBPACK_LCD(r / n, g / n, b / n);
             for (int j = 0; j < bh; j++)
             {
                 fb_data *row = px + (size_t)(y + j) * w + x;

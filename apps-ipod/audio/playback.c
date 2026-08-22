@@ -67,6 +67,7 @@
 
 #include "metadata/albumart.h"
 #include "metadata/art_cache.h"
+#include "skin/skin_albumart_color.h"   /* art loads invalidate the %Cl guard */
 
 #include "pcm_mixer.h"
 
@@ -1977,6 +1978,7 @@ static int load_album_art_from_path(char *path, struct bufopen_bitmap_data *user
         strcpy(last_folder_aa_path, path);
     }
     int hid = bufopen(path, 0, TYPE_BITMAP, user_data);
+    skin_albumart_art_opened(hid);
     if (hid != ERR_BUFFER_FULL && (same_path || is_cacheable))
         last_folder_aa_hid[i] = hid;
     return hid;
@@ -2139,6 +2141,7 @@ static int audio_load_albumart(struct track_info *infop,
 
                 user_data.embedded_albumart = &track_id3->albumart;
                 hid = bufopen(track_id3->path, 0, TYPE_BITMAP, &user_data);
+                skin_albumart_art_opened(hid);
                 if (hid != ERR_BUFFER_FULL && (same_album || is_cacheable))
                     last_embedded_aa_hid[i] = hid;
             }
