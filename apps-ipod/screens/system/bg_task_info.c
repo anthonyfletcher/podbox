@@ -1,10 +1,10 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * A live view of the three background tasks: the tag database, the carousel's
- * album index and the artwork thumbnail cache.
+ * A live view of the background work: the tag database, the carousel's album
+ * index, the artwork thumbnail cache and the document and image index.
  *
- * Everything shown is read from state those three already keep for their own
+ * Everything shown is read from state those four already keep for their own
  * purposes -- nothing here asks them to measure anything, and nothing here
  * runs when the screen is closed. The one thing deliberately *not* shown is
  * the database's current file: tc_stat.curentry is only held still long enough
@@ -24,6 +24,7 @@
 #include "database/tagcache.h"
 #include "database/db_summary.h"
 #include "metadata/art_cache.h"
+#include "files/file_index.h"
 #include "system/bg_task.h"
 #include "bg_task_info.h"
 
@@ -111,6 +112,27 @@ static void add_art_cache_lines(void)
     }
 }
 
+/* Not a bg_task tick -- it runs its own thread on its own triggers -- so its
+ * state comes from the walk rather than from bg_task_state(). */
+static void add_file_index_lines(void)
+{
+    const char *dir = file_index_activity();
+    int docs, images;
+
+    file_index_counts(&docs, &images);
+
+    simplelist_addline("Documents & Images: %s", file_index_state());
+
+    /* Zero until a pass has run this boot; the lists on disk may be older. */
+    if (docs || images)
+        simplelist_addline("  Found: %d documents, %d images", docs, images);
+
+    /* A whole-disk walk has no total to count against, so where it has got to
+     * is the whole of the progress there is. */
+    if (dir[0])
+        simplelist_addline("  Now: %s", dir);
+}
+
 static int bg_task_info_callback(int action, struct gui_synclist *lists)
 {
     (void)lists;
@@ -120,6 +142,7 @@ static int bg_task_info_callback(int action, struct gui_synclist *lists)
     add_tagcache_lines();
     add_db_summary_lines();
     add_art_cache_lines();
+    add_file_index_lines();
 
     if (action == ACTION_NONE)
         return ACTION_REDRAW;

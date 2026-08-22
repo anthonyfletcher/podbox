@@ -21,8 +21,9 @@
  * bg_task's staleness rule is the database's entry count (see bg_task.c), and
  * that does not move when a .txt or a .jpg appears. So this uses the
  * .request-only shape -- the same one the tag database itself uses -- and
- * supplies its own triggers: the two menu entries, a USB session (the one
- * moment files reliably change), and having no index at all at startup.
+ * supplies its own triggers: the maintenance menu's Rescan row, a USB session
+ * (the one moment files reliably change), and having no index at all at
+ * startup.
  *
  * Parts, in order:
  *   - the lists on disk
@@ -78,6 +79,28 @@ static char fi_path[MAX_PATH];
 bool file_index_is_busy(void)
 {
     return fi_busy;
+}
+
+const char *file_index_state(void)
+{
+    if (fi_busy)
+        return "Scanning";
+    if (fi_wants_scan)
+        return "Waiting";
+    return "Idle";
+}
+
+/* The writers keep their line counts past the close, so these are the last
+ * pass's totals once it has finished and its running ones while it walks. */
+void file_index_counts(int *docs, int *images)
+{
+    *docs = fi_docs.count;
+    *images = fi_images.count;
+}
+
+const char *file_index_activity(void)
+{
+    return fi_busy ? fi_path : "";
 }
 
 const char *file_index_list(bool images)
