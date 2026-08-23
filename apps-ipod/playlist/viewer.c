@@ -403,7 +403,7 @@ static bool playlist_viewer_init(struct playlist_viewer * viewer,
 
     buffer = app_claim_buffer(&buffer_size, "playlist viewer");
     if (!buffer || buffer_size <= MAX_PATH + id3_size)
-        return false;
+        goto fail;
 
     if (require_index_buffer)
         index_buffer_size = playlist_get_index_bufsz(buffer_size - id3_size - (MAX_PATH + 1));
@@ -469,8 +469,17 @@ static bool playlist_viewer_init(struct playlist_viewer * viewer,
     }
 
     if (!update_playlist(true))
-        return false;
+        goto fail;
     return true;
+
+    /* All or nothing: a false return means the scratch buffer is not held, so
+     * a caller that gives up here has nothing to hand back and every
+     * successful init is paired with exactly one close_playlist_viewer().
+     * Not the exit above it -- that one returns before the claim, and
+     * releasing a buffer somebody else holds is what panics. */
+fail:
+    app_release_buffer("playlist viewer");
+    return false;
 }
 
 /* Format trackname for display purposes */
@@ -587,9 +596,11 @@ static enum pv_context_result show_track_info(const struct playlist_entry *curre
            PV_CONTEXT_USB : PV_CONTEXT_UNCHANGED;
 }
 
+/* Give back everything playlist_viewer_init() took, and nothing else. Silencing
+ * the voice belongs to whoever was talking, which is not always this: the
+ * search reports how many tracks it found on its way out. */
 static void close_playlist_viewer(void)
 {
-    talk_shutup();
     if (viewer.playlist)
     {
         if (viewer.initial_selection)
@@ -1114,6 +1125,7 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
 
 exit:
     pop_current_activity_without_refresh();
+    talk_shutup();
     close_playlist_viewer();
     return ret;
 }
@@ -1156,11 +1168,18 @@ bool search_playlist(void)
     long talked_tick = 0;
     struct gui_synclist playlist_lists;
     struct playlist_track_info track;
+    /* Up here with the rest, so the exits below jump over no initialiser. */
+    struct playlist_search_data s_data = {.track = &track,
+                                          .found_indicies = found_indicies};
 
+    /* The scratch buffer is claimed from here on, so every exit below leaves
+     * through close_playlist_viewer() -- it is what hands it back, and a
+     * screen that keeps it panics the next one to ask (system/app_buffer.c).
+     * This path opens no playlist file, so that is all it has left to do. */
     if (!playlist_viewer_init(&viewer, NULL, false, NULL))
         return ret;
     if (kbd_input(search_str, sizeof(search_str), NULL) < 0)
-        return ret;
+        goto exit;
     lcd_clear_display();
     playlist_count = playlist_amount_ex(viewer.playlist);
     cond_talk_ids_fq(LANG_WAIT);
@@ -1205,11 +1224,9 @@ bool search_playlist(void)
     cond_talk_ids_fq(LANG_ALL, TALK_ID(found_indicies_count, UNIT_INT),
                      LANG_PLAYLIST_SEARCH_MSG);
     if (!found_indicies_count)
-    {
-        return ret;
-    }
+        goto exit;
+
     backlight_on();
-    struct playlist_search_data s_data = {.track = &track, .found_indicies = found_indicies};
     gui_synclist_init(&playlist_lists, playlist_search_callback_name,
                       &s_data, false, 1, NULL);
     gui_synclist_set_title(&playlist_lists, str(LANG_SEARCH_RESULTS), NOICON);
@@ -1248,6 +1265,9 @@ bool search_playlist(void)
                 break;
         }
     }
-    talk_shutup();
+    talk_shutup();          /* the list's own announcements, not the count */
+
+exit:
+    close_playlist_viewer();
     return ret;
 }

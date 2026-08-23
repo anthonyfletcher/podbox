@@ -20,8 +20,8 @@
  * Parts, in order:
  *   - browser_context accessors and directory-entry lookup
  *   - the list callbacks: filename, colour, icon, album art, voice
- *   - album art slots for the browsing screen
- *   - init, cache locking, and the buflib move callback
+ *   - album art slots for the browsing screen, and the store's move callback
+ *   - init, cache locking, and the directory cache's move callback
  *   - update_dir(): reading a directory into the cache and configuring the list
  *   - current-file and current-directory tracking, including getcwd wrapping
  *   - dirbrowse(): the browse loop and its actions
@@ -229,6 +229,32 @@ static int browser_aa_size_idx = -1;   /* which art_sizes[] entry that is */
 static int browser_aa_victim;               /* round-robin replacement */
 static struct bitmap browser_aa_bm;         /* handed back; points into the store */
 
+/* browser_aa_bm.data is a raw address inside the store, and the skin engine
+ * holds it across work that yields: %La stashes the bitmap while the line's
+ * tags are evaluated and blits it only after write_line(), which draws the
+ * row's text and reads any glyph it has not cached from disk. A core_alloc()
+ * on the artwork or index thread during that yield compacts the pool, and an
+ * ops-less allocation is one buflib moves without telling anyone -- so the
+ * blit would read from where the store used to be.
+ *
+ * Moving it is fine; losing track of it is not. The store holds pixels and
+ * nothing that points within itself, and the slot table is keyed by item
+ * rather than by address, so the one pointer that has to follow the block is
+ * this one. Pinning instead would work but leaves 64K immovable in the middle
+ * of the pool for as long as the browser is up. */
+static int browser_aa_move_callback(int handle, void *current, void *new)
+{
+    (void)handle;
+    if (browser_aa_bm.data)
+        browser_aa_bm.data += (char *)new - (char *)current;
+    return BUFLIB_CB_OK;
+}
+
+static struct buflib_callbacks browser_aa_ops = {
+    .move_callback = browser_aa_move_callback,
+    .shrink_callback = NULL,
+};
+
 /* A slot holds one item drawn one way. The size and the treatment are part of
  * the key because a skin can ask for either per row config, and a slot loaded
  * under one must never be handed back for another. */
@@ -299,7 +325,8 @@ static bool browser_aa_ready(int want)
 
     if (browser_aa_handle <= 0)
     {
-        browser_aa_handle = core_alloc(TREE_AA_SLOTS * browser_aa_slot_bytes());
+        browser_aa_handle = core_alloc_ex(TREE_AA_SLOTS * browser_aa_slot_bytes(),
+                                          &browser_aa_ops);
         if (browser_aa_handle <= 0)
             return false;   /* no memory right now; try again next redraw */
         browser_aa_reset();
