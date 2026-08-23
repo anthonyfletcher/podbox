@@ -257,20 +257,25 @@ static bool parse_bookmark(char *filenamebuf,
         len = MIN(TEMP_BUF_SIZE - 1, len);
         strmemccpy(global_temp_buffer, s, len + 1);
 
-        if (end != NULL)
+        /* No separator means no track field, and a caller that asked for
+         * one then gets its own uninitialised stack back: play_bookmark()
+         * seeks to a filename nobody wrote, and say_bookmark() speaks it.
+         * create_bookmark() always emits the separator, so a line without
+         * one is damaged, and this function is documented to say so. */
+        if (end == NULL)
+            return false;
+
+        end++;
+        if (strip_dir)
         {
-            end++;
-            if (strip_dir)
+            s = strrchr(end, '/');
+            if (s)
             {
-                s = strrchr(end, '/');
-                if (s)
-                {
-                    end = s;
-                    end++;
-                }
+                end = s;
+                end++;
             }
-            strmemccpy(filenamebuf, end, filenamebufsz);
         }
+        strmemccpy(filenamebuf, end, filenamebufsz);
      }
 
     return true;
