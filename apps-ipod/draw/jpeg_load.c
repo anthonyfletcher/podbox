@@ -856,7 +856,12 @@ static bool skip_bytes_read_buf(struct jpeg* p_jpeg)
     {
         int count = -p_jpeg->buf_left;
         fill_buf(p_jpeg);
-        if (p_jpeg->buf_left < 0)
+        /* Nothing read is the end of it, not a reason to ask again: `count`
+         * does not shrink when the refill is empty, so the loop would take
+         * the same turn forever -- and with len exhausted the read costs no
+         * disk and does not yield, which makes it a spin rather than a
+         * stall. jpeg_getc() draws the same line at the same place. */
+        if (p_jpeg->buf_left <= 0)
             return false;
         p_jpeg->buf_left -= count;
         p_jpeg->buf_index += count;
