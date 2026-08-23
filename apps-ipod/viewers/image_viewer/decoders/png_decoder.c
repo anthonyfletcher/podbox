@@ -1728,6 +1728,27 @@ void LodePNG_decode(LodePNG_Decoder* decoder,
     size_t line_buf_size;
     /* parse header */
     LodePNG_inspect(decoder, in, insize);
+    if (decoder->error)
+        return;
+
+    /* Both dimensions come whole out of the IHDR and nothing has bounded
+     * them. Every product below is 32-bit unsigned, so 65536 by 65536
+     * wraps to zero and the memory test passes on an image that then
+     * decodes a row at a time into the buffer it was supposed to fit.
+     * Testing the dimensions against the buffer first is what keeps the
+     * three sums below inside the range they are measured in; anything
+     * that genuinely does not fit still falls out of that test as
+     * OUT_OF_MEMORY. A zero dimension is not a picture. */
+    if (decoder->infoPng.width == 0 || decoder->infoPng.height == 0)
+    {
+        decoder->error = 93;
+        return;
+    }
+    if (decoder->infoPng.height > decoder->buf_size / decoder->infoPng.width)
+    {
+        decoder->error = OUT_OF_MEMORY;
+        return;
+    }
     
     
     /* Check memory available against worst case where
