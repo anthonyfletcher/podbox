@@ -194,11 +194,6 @@ they can be installed in any order and on their own.
   - `Music > Search`
   - Control ordering of results via `Settings > Library > Music > Search`
   - See [`text-input-guide.md`](docs/podbox/text-input-guide.md) for guidance on inputting text
-- See featured artists and their associated tracks - plus from an artist
-see the tracks they feature in
-  - `Settings > Library > Music > Featured Artists` to enable functionality
-  - `Music > Featured Artists` to access
-  - See [`featured-artists-guide.md`](docs/podbox/featured-artists-guide.md) for more information
 - See the most played albums/artists
   - `Music > Playback History`
 - See the most recently played albums/artists
@@ -208,12 +203,25 @@ see the tracks they feature in
 - Control the items displayed in the Music menu and their order
   - Change via `Settings > Library > Music > Edit Music Menu`
 - Trim noise from track and album names (like featuring information)
-  - Off by default.  Turn it on via `Settings > Library > Music > Trim Titles`
+  - Off by default.  Turn the feature on by going to `Settings > Library > Music > Trim Titles`
+
+## Featured Artists
+
+<img src="docs/podbox/images/ss_grid_featured_in.png"/>
+
+- See featured artists and their associated tracks - plus from an artist
+  see the tracks they feature in
+  - Off by default.  Turn the feature on by going to `Settings > Library > Music > Featured Artists`
+  - `Music > Featured Artists` to access
+  - See [`featured-artists-guide.md`](docs/podbox/featured-artists-guide.md) for more information
 
 ## Audiobooks
+
+<img src="docs/podbox/images/ss_grid_audio_books.png"/>
+
 - Audiobooks can be segregated from Music into their own root menu and are excluded
 from the Music menu and carousels
-  - Turn the feature on by going to `Settings > Library > Music > Segregate Audiobooks`
+  - Off by default.  Turn the feature on by going to `Settings > Library > Music > Segregate Audiobooks`
   - Audiobooks should have a genre of "audiobook", "spoken word", "book", or "podcast".
 
 ## Album Covers/Artist Profiles
@@ -279,7 +287,8 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 
 ## Behind the scenes
 
-- Upstream mikey support for remote control earbuds (untested on this build)
+- Upstream "mikey chip" support for remote control earbuds (untested on this build)
+- Improved consistency of the `Back` and `Menu` button in menus
 - Art for use in the UI is cached for quick access to enable a fluid experience
   - `Settings > Library > Art Cache` for settings
   - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache` for tasks
@@ -289,7 +298,7 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
   - `System > Background Tasks` for monitoring
 - Dialogs reworked to provide consistent and "themed" message, input, confirmation, search, colour, date/time and folder select boxes
   - `Settings > Appearance > Colours` for settings
-- Additional theme tags to provide richer graphics
+- Additional theme tags to provide richer graphics and support easier theme development
   - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
 
 ---
@@ -321,6 +330,6 @@ Built on the work of:
 
 ## Licence
 
-Both RockBox and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
+RockBox, RockPod and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
 
 See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
