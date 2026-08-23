@@ -44,6 +44,7 @@
 #include "file.h"
 #include "lang.h"
 #include "database/tagcache.h"
+#include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/art_cache.h"      /* art_cache_dir_hash */
 #include "widgets/splash.h"
 #include "widgets/yesno.h"           /* gui_syncyesno_run, YESNO_YES */
@@ -476,6 +477,34 @@ static void resolve_art_hashes(struct tagcache_search *tcs,
         *artist_hash = art_cache_dir_hash(path);
 }
 
+/* Spoken word is kept out of the index when the setting says so, which is what
+ * reaches Album covers, Artist portraits, Random album and the charts -- all
+ * four read this index rather than the database.
+ *
+ * Dropped entry by entry rather than by a clause on the search, because a
+ * clause moves tagcache off the tag file and onto the master index (see
+ * build_lookup_list() there): the names would then be collected in database
+ * order, and this index is ordered by their offsets into the name blobs. The
+ * order of every screen reading it is that order.
+ *
+ * The index is written to disk, so a change to the setting has to invalidate
+ * it: nothing here notices, the saved file's own staleness checks being about
+ * the database rather than about what was asked of it. See
+ * db_summary_invalidate(), which the setting's callback calls. */
+static bool exclude_spoken(const struct tagcache_search *tcs)
+{
+    return global_settings.segregate_audiobooks
+        && db_spoken_group_is_book(tcs->type, tcs->result_seek);
+}
+
+/* Before the search rather than during it: the table is built by searches of
+ * its own, which cannot run inside another. */
+static void exclude_spoken_prepare(int tag)
+{
+    if (global_settings.segregate_audiobooks)
+        db_spoken_group_ensure(tag);
+}
+
 /* adds tagcache_search results into artist/album index */
 static int get_tcs_search_res(int type, struct tagcache_search *tcs,
                               void **buf, size_t *bufsz)
@@ -499,6 +528,9 @@ static int get_tcs_search_res(int type, struct tagcache_search *tcs,
 
     while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
     {
+        if (exclude_spoken(tcs))
+            continue;
+
         if (progress_cancel(0, 0, NULL))
         {
             ret = ERROR_USER_ABORT;
@@ -633,34 +665,6 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
     return ret;
 }
 
-/* Spoken word is kept out of the index when the setting says so, which is what
- * reaches Album covers, Artist portraits, Random album and the charts -- all
- * four read this index rather than the database.
- *
- * The index is written to disk, so a change to the setting has to invalidate
- * it: nothing here notices, the saved file's own staleness checks being about
- * the database rather than about what was asked of it. See
- * db_summary_invalidate(), which the setting's callback calls.
- *
- * One clause object serves both searches -- tagcache stores the pointer and
- * only reads it -- and neither carries any other clause, so there are no
- * logical-or groups to insert it into (unlike the browse; see
- * retrieve_entries() in browser_db.c). */
-static struct tagcache_search_clause exclude_spoken_clause = {
-    .tag = tag_virt_spoken,
-    .type = clause_is,
-    .numeric = true,
-    .source = source_constant,
-    .numeric_data = 0,
-    .str = NULL,
-};
-
-static void exclude_spoken(struct tagcache_search *tcs)
-{
-    if (global_settings.segregate_audiobooks)
-        tagcache_search_add_clause(tcs, &exclude_spoken_clause);
-}
-
 /* Create an index of all artists from the database, into whichever index pfi
  * currently points at. Like everything else here it assumes build_mutex is
  * held and pfi is set -- db_summary_build_artists() is how an outside caller
@@ -678,8 +682,8 @@ static int build_artist_index(struct tagcache_search *tcs,
     /* artist names starts at beginning of buf */
     pfi->artist_names = *buf;
 
+    exclude_spoken_prepare(tag_albumartist);
     tagcache_search(tcs, tag_albumartist);
-    exclude_spoken(tcs);
     res = get_tcs_search_res(ePFS_ARTIST, tcs, &(*buf), bufsz);
     tagcache_search_finish(tcs);
     if (res < SUCCESS)
@@ -1347,8 +1351,8 @@ static int create_album_index(void)
     /* album_names starts at the beginning of buf */
     pfi->album_names = buf;
 
+    exclude_spoken_prepare(tag_album);
     tagcache_search(&tcs, tag_album);
-    exclude_spoken(&tcs);
     res = get_tcs_search_res(ePFS_ALBUM, &tcs, &buf, &buf_size);
     tagcache_search_finish(&tcs);
     if (res < SUCCESS)

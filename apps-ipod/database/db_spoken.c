@@ -19,7 +19,7 @@
  * Parts, in order:
  *   - the genre names, and matching one
  *   - the seek table, and reading it out of the database
- *   - the albums and artists that hold spoken word, for Search
+ *   - the albums and artists that are books, for the lists that hide them
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "system.h"           /* ARRAYLEN */
 #include "logf.h"
 #include "string-extra.h"
 #include "database/tagcache.h"
@@ -99,9 +100,9 @@ bool db_spoken_is_spoken_genre(const char *genre)
 static long spoken_seek[SPOKEN_SEEK_MAX];
 static int spoken_ct;
 
-/* Declared here rather than with the group tables below because
- * db_spoken_build() clears it: a commit moves their seeks too. */
-static bool groups_valid;
+/* Cleared by db_spoken_build(), which runs when the commit the tables were
+ * read at is no longer the current one -- a commit moves their seeks too. */
+static void groups_invalidate(void);
 
 /* The search state is static rather than automatic because this runs inside
  * tagcache_search(), on whichever thread happened to start a search: a
@@ -116,7 +117,7 @@ bool db_spoken_build(void)
     spoken_ct = 0;
     /* The album and artist seeks below are into tag files the commit that
      * brought us here re-sorted, so they are as stale as the genre ones. */
-    groups_valid = false;
+    groups_invalidate();
 
     if (!tagcache_search(&build_tcs, tag_genre))
         return false;
@@ -159,17 +160,43 @@ bool db_spoken_is_spoken_seek(long genre_seek)
 }
 
 /* ------------------------------------------------------------------ *
- * the albums and artists that hold spoken word                       *
+ * the albums and artists that are books                              *
  * ------------------------------------------------------------------ */
 
-/* A library with more spoken-word albums than this keeps the first of them,
- * and Search treats the rest as music. */
+/* Album, album artist and canonical artist are unique-valued, so their tag
+ * files hold one entry per distinct string with no track behind it -- there
+ * is nothing to ask about the genre of. These tables answer for them instead,
+ * built once per commit by asking the database which of them hold spoken word
+ * and which hold music.
+ *
+ * A group is a book when it holds spoken word and no music. That is the same
+ * answer a tag_virt_spoken clause gives -- a filtered list keeps a group as
+ * soon as one of its tracks passes -- so a mixed album reads as music whether
+ * it was asked by clause or by table, and the two routes cannot disagree.
+ * Buying that is the whole of what the second pass is for.
+ *
+ * A library with more spoken-word groups than a table holds keeps the first
+ * of them; the rest read as music. */
 #define SPOKEN_GROUP_MAX 192
 
-static long spoken_album[SPOKEN_GROUP_MAX];
-static int spoken_album_ct;
-static long spoken_artist[SPOKEN_GROUP_MAX];
-static int spoken_artist_ct;
+static struct spoken_group {
+    int tag;
+    long seek[SPOKEN_GROUP_MAX];
+    int ct;
+    bool valid;
+} spoken_groups[] = {
+    { tag_album,                 { 0 }, 0, false },
+    { tag_albumartist,           { 0 }, 0, false },
+    { tag_virt_canonicalartist,  { 0 }, 0, false },
+};
+
+static void groups_invalidate(void)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAYLEN(spoken_groups); i++)
+        spoken_groups[i].valid = false;
+}
 
 /* Its own search state, not build_tcs. A search started here runs
  * spoken_table_update() on the way in, which may rebuild the genre table
@@ -187,69 +214,140 @@ static const struct tagcache_search_clause is_spoken_clause = {
     .str = NULL,
 };
 
-static int collect_spoken_group(int tag, long *out, int max)
-{
-    int n = 0;
+static const struct tagcache_search_clause is_music_clause = {
+    .tag = tag_virt_spoken,
+    .type = clause_is,
+    .numeric = true,
+    .source = source_constant,
+    .numeric_data = 0,
+    .str = NULL,
+};
 
-    if (!tagcache_search(&group_tcs, tag))
-        return 0;
+static struct spoken_group *group_for(int tag)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAYLEN(spoken_groups); i++)
+    {
+        if (spoken_groups[i].tag == tag)
+            return &spoken_groups[i];
+    }
+
+    return NULL;
+}
+
+/* Fill the table with every group holding a spoken-word track. */
+static bool collect_spoken(struct spoken_group *g)
+{
+    g->ct = 0;
+
+    if (!tagcache_search(&group_tcs, g->tag))
+        return false;
 
     /* Without this the search reports one result per track rather than one
-     * per album, and a single book would fill the table on its own. */
+     * per group, and a single book would fill the table on its own. */
     tagcache_search_set_uniqbuf(&group_tcs, group_uniqbuf,
                                 sizeof(group_uniqbuf));
     tagcache_search_add_clause(&group_tcs,
-                               (struct tagcache_search_clause *)&is_spoken_clause);
+                        (struct tagcache_search_clause *)&is_spoken_clause);
 
     while (tagcache_get_next(&group_tcs, build_buf, sizeof(build_buf)))
     {
-        if (n >= max)
+        if (g->ct >= SPOKEN_GROUP_MAX)
         {
             logf("db_spoken: group table full");
             break;
         }
-        out[n++] = group_tcs.result_seek;
+        g->seek[g->ct++] = group_tcs.result_seek;
     }
 
     tagcache_search_finish(&group_tcs);
 
-    return n;
+    return true;
 }
 
-void db_spoken_groups_ensure(void)
+/* Take back out of it every group that holds music too, leaving the books. */
+static bool drop_mixed(struct spoken_group *g)
 {
-    if (groups_valid)
+    int i, kept = 0;
+
+    if (g->ct == 0)
+        return true;
+
+    if (!tagcache_search(&group_tcs, g->tag))
+        return false;
+
+    tagcache_search_set_uniqbuf(&group_tcs, group_uniqbuf,
+                                sizeof(group_uniqbuf));
+    tagcache_search_add_clause(&group_tcs,
+                        (struct tagcache_search_clause *)&is_music_clause);
+
+    while (tagcache_get_next(&group_tcs, build_buf, sizeof(build_buf)))
+    {
+        for (i = 0; i < g->ct; i++)
+        {
+            if (g->seek[i] == group_tcs.result_seek)
+            {
+                /* A seek is an offset into the tag file, so no real entry
+                 * sits at -1 and marking is free of a second array. */
+                g->seek[i] = -1;
+                break;
+            }
+        }
+    }
+
+    tagcache_search_finish(&group_tcs);
+
+    for (i = 0; i < g->ct; i++)
+    {
+        if (g->seek[i] >= 0)
+            g->seek[kept++] = g->seek[i];
+    }
+    g->ct = kept;
+
+    return true;
+}
+
+void db_spoken_group_ensure(int tag)
+{
+    struct spoken_group *g = group_for(tag);
+
+    if (!g || g->valid)
         return;
 
-    spoken_album_ct = collect_spoken_group(tag_album, spoken_album,
-                                           SPOKEN_GROUP_MAX);
-    spoken_artist_ct = collect_spoken_group(tag_albumartist, spoken_artist,
-                                            SPOKEN_GROUP_MAX);
-    groups_valid = true;
+    /* A pass that could not read the database empties the table rather than
+     * leaving a half-built one standing: nothing is then hidden, and the
+     * table stays invalid so the next caller builds it again. */
+    if (collect_spoken(g) && drop_mixed(g))
+    {
+        g->valid = true;
+    }
+    else
+    {
+        g->ct = 0;
+    }
 
-    logf("db_spoken: %d spoken albums, %d artists",
-         spoken_album_ct, spoken_artist_ct);
+    logf("db_spoken: %d books by tag %d", g->ct, g->tag);
 }
 
-static bool seek_in(const long *tab, int ct, long seek)
+bool db_spoken_group_tag(int tag)
 {
+    return group_for(tag) != NULL;
+}
+
+bool db_spoken_group_is_book(int tag, long seek)
+{
+    const struct spoken_group *g = group_for(tag);
     int i;
 
-    for (i = 0; i < ct; i++)
+    if (!g)
+        return false;
+
+    for (i = 0; i < g->ct; i++)
     {
-        if (tab[i] == seek)
+        if (g->seek[i] == seek)
             return true;
     }
 
     return false;
-}
-
-bool db_spoken_album_is_spoken(long album_seek)
-{
-    return seek_in(spoken_album, spoken_album_ct, album_seek);
-}
-
-bool db_spoken_artist_is_spoken(long artist_seek)
-{
-    return seek_in(spoken_artist, spoken_artist_ct, artist_seek);
 }

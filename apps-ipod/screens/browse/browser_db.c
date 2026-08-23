@@ -60,6 +60,7 @@
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* db_summary_log_play */
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
+#include "database/db_spoken.h"    /* which albums and artists are books */
 #include "screens/browse/featured_artists.h"
 #include "screens/system/db_search.h"   /* db_search_arm_scope */
 #include "browser_db.h"
@@ -1947,12 +1948,52 @@ static struct tagcache_search_clause exclude_spoken_clause = {
  * as any menu is drawn again. */
 static bool browse_picked_by_name;
 
+/* Whether a search on 'tag' can afford to be told by clause.
+ *
+ * Adding any clause moves tagcache off the tag file and onto the master
+ * index (see build_lookup_list() there), so a search on a unique-valued tag
+ * comes back in database order rather than alphabetically. A root list has no
+ * clauses and no %format of its own and so is not sorted afterwards, which
+ * leaves the tag file's own order the whole of what puts it in order. Track
+ * and numeric lists are sorted either way and can carry the clause; the
+ * unique tags are answered from db_spoken's tables instead, and the ones with
+ * no table -- genre, composer -- keep their books. */
+static bool exclude_by_clause_ok(int tag)
+{
+    return tag == tag_title || tag == tag_filename || TAGCACHE_IS_NUMERIC(tag);
+}
+
+/* Whether every level of this browse can have spoken word kept out of it.
+ *
+ * Genre and composer can have it neither way: a clause would cost their list
+ * its order, and db_spoken keeps no table for them. Filtering the levels
+ * below one anyway is worse than filtering none of it -- the browse would
+ * offer an "Audiobook" genre and then show nothing underneath it -- so a
+ * browse that passes through such a level is left alone entirely, and its
+ * books stay where the genre says they are. */
+static bool exclude_spoken_possible(void)
+{
+    int i;
+
+    for (i = 0; i < csi->tagorder_count; i++)
+    {
+        int tag = csi->tagorder[i];
+
+        if (!db_spoken_group_tag(tag) && !exclude_by_clause_ok(tag))
+            return false;
+    }
+
+    return true;
+}
+
 /* Whether this browse should have spoken word kept out of it. */
 static bool exclude_spoken_wanted(void)
 {
     return global_settings.segregate_audiobooks
+        && csi
         && !browse_picked_by_name
-        && !csi_mentions_spoken();
+        && !csi_mentions_spoken()
+        && exclude_spoken_possible();
 }
 
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
@@ -1994,6 +2035,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         tag = tag_filename;
     }
 
+    /* Both before the search: the table is built by searches of its own,
+     * which cannot run inside this one. */
+    bool exclude = exclude_spoken_wanted();
+    bool exclude_by_seek = exclude && db_spoken_group_tag(tag);
+
+    if (exclude_by_seek)
+        db_spoken_group_ensure(tag);
+
     if (!tagcache_search(&tcs, tag))
         return -1;
 
@@ -2027,7 +2076,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * for the entire duration of the search */
     core_pin(browser_db_handle);
     {
-        /* Spoken word is kept out of every browse that does not ask for it.
+        /* Spoken word is kept out of every browse that does not ask for it,
+         * by clause where a clause is affordable and by seek below where it
+         * is not.
          *
          * Once per group, not once per search. A condition list is a flat sum
          * of products -- "|" separates groups of ANDed clauses, and a group
@@ -2038,9 +2089,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
          *
          * One clause object serves every insertion: the search stores the
          * pointer and only ever reads it. */
-        bool exclude = exclude_spoken_wanted();
+        bool exclude_by_clause = exclude && exclude_by_clause_ok(tag);
 
-        if (exclude)
+        if (exclude_by_clause)
             tagcache_search_add_clause(&tcs, &exclude_spoken_clause);
 
         for (i = 0; i <= level; i++)
@@ -2051,7 +2102,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             {
                 tagcache_search_add_clause(&tcs, csi->clause[i][j]);
 
-                if (exclude && csi->clause[i][j]->type == clause_logical_or)
+                if (exclude_by_clause
+                    && csi->clause[i][j]->type == clause_logical_or)
                     tagcache_search_add_clause(&tcs, &exclude_spoken_clause);
             }
         }
@@ -2196,6 +2248,11 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
+        /* Ahead of the offset count, or a page would be short by however
+         * many books fell inside it. */
+        if (exclude_by_seek && db_spoken_group_is_book(tag, tcs.result_seek))
+            continue;
+
         if (total_count++ < offset)
             continue;
 
@@ -2375,7 +2432,12 @@ entry_skip_formatter:
     }
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
+    {
+        if (exclude_by_seek && db_spoken_group_is_book(tag, tcs.result_seek))
+            continue;
+
         total_count++;
+    }
 
     tagcache_search_finish(&tcs);
     browser_unlock_cache(c);

@@ -528,7 +528,9 @@ Which of tracks, albums and artists is listed first in search results.
 
 [segregate audiobooks]
 Keeps spoken word out of the music and gives it an Audiobooks row on the main
-menu. Albums, artists, the carousel and search then show music only.
+menu. Albums, artists, the carousel and search then show music only. The genre
+and composer lists are left as they are, so a book is still reachable under
+its own genre.
 
 The genre tag is the whole of the evidence -- Audiobook, Spoken Word, Podcast
 and the like. A book tagged as music browses as music, and retagging it is the

@@ -32,24 +32,28 @@ bool db_spoken_build(void);
  * as an error. */
 bool db_spoken_is_spoken_seek(long genre_seek);
 
-/* Whether the album, or the album artist, at 'seek' has any spoken-word track.
+/* Whether the album, album artist or canonical artist at 'seek' is a book --
+ * it holds spoken word and no music.
  *
- * Search needs this and a genre seek cannot answer it. Album and album artist
- * are unique-valued, so a crawl of their tag files yields one entry per
- * distinct string with no track behind it -- there is nothing to ask about the
- * genre of. These are built instead by asking the database which albums and
- * artists hold a spoken track, once, and keeping the answers.
+ * These three are unique-valued, so a crawl of their tag files yields one
+ * entry per distinct string with no track behind it; there is nothing to ask
+ * about the genre of, and a search that asks by clause instead comes back in
+ * database order rather than alphabetically. The tables answer both.
  *
- * Call db_spoken_groups_ensure() first. Both are false until it has run, so a
- * caller that forgets sees everything as music rather than nothing at all. */
-bool db_spoken_album_is_spoken(long album_seek);
-bool db_spoken_artist_is_spoken(long artist_seek);
+ * The answer matches what a tag_virt_spoken clause would have decided, so a
+ * mixed album reads as music either way. db_spoken_group_tag() says whether a
+ * tag has a table at all; anything else is false, i.e. music.
+ *
+ * Call db_spoken_group_ensure() first. Everything is music until it has run,
+ * so a caller that forgets hides nothing rather than everything. */
+bool db_spoken_group_tag(int tag);
+bool db_spoken_group_is_book(int tag, long seek);
 
-/* Build those two tables if they are missing or stale. Two filtered passes
- * over the master index, so this is for a screen that is about to need them,
- * not for the search path itself -- it is cheap only because it happens once
- * per database commit. Runs its own searches; not to be called from inside
- * one. */
-void db_spoken_groups_ensure(void);
+/* Build one tag's table if it is missing or stale, and do nothing for a tag
+ * that has none. Two passes over the master index, so this is for a screen
+ * that is about to need that tag, not for the search path itself -- it is
+ * cheap only because it happens once per database commit. Runs its own
+ * searches; not to be called from inside one. */
+void db_spoken_group_ensure(int tag);
 
 #endif /* _DB_SPOKEN_H */

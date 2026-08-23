@@ -154,10 +154,9 @@ void db_search_arm_scope(int scope)
 
 /* Whether a row this scan turned up belongs on the side being searched.
  *
- * The three tags need three answers. A title is per track, so the tag itself
- * says. Album and album artist are unique-valued -- their tag files hold one
- * entry per distinct string with no track behind it -- so they are answered
- * from the tables db_spoken builds for exactly this. */
+ * A title is per track, so the tag itself says. Album and album artist are
+ * unique-valued -- their tag files hold one entry per distinct string with no
+ * track behind it -- so they are answered from the tables db_spoken keeps. */
 static bool match_in_scope(int tag, const struct tagcache_search *tcs)
 {
     bool spoken;
@@ -166,18 +165,10 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
         || !global_settings.segregate_audiobooks)
         return true;
 
-    switch (tag)
-    {
-        case tag_album:
-            spoken = db_spoken_album_is_spoken(tcs->result_seek);
-            break;
-        case tag_albumartist:
-            spoken = db_spoken_artist_is_spoken(tcs->result_seek);
-            break;
-        default:
-            spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
-            break;
-    }
+    if (db_spoken_group_tag(tag))
+        spoken = db_spoken_group_is_book(tag, tcs->result_seek);
+    else
+        spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
 
     return spoken == (active_scope == DB_SEARCH_SPOKEN);
 }
@@ -322,11 +313,14 @@ int db_search_run(void)
         return GO_TO_PREVIOUS;
     }
 
-    /* Here, not in run_search(): it costs two passes over the master index,
-     * and a scan runs every time the query settles. Skipped entirely when
-     * nothing is being scoped. */
+    /* Here, not in run_search(): each table costs two passes over the master
+     * index, and a scan runs every time the query settles. Skipped entirely
+     * when nothing is being scoped. */
     if (active_scope != DB_SEARCH_ALL && global_settings.segregate_audiobooks)
-        db_spoken_groups_ensure();
+    {
+        db_spoken_group_ensure(tag_album);
+        db_spoken_group_ensure(tag_albumartist);
+    }
 
     /* str() is not a constant expression, so the title is filled in here
      * rather than in the initialiser above. */
