@@ -19,7 +19,7 @@
 #--- Background layer ---#
 #
 # Album art
-%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim,-,blurred)%Cd(blurred)%Cl(105,10,110,110,c,c,-,8,original)%Cd(original)
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim+dither,-,blurred)%Cd(blurred)%Cl(105,10,110,110,c,c,-,8,original)%Cd(original)
 %dr(0,185,320,85,000000,-,6,10)
 #
 # Progress tint

@@ -163,6 +163,11 @@ static unsigned clamp_level(int v, unsigned max)
     return (unsigned)v;
 }
 
+/* `v` and `max` are both the field scaled by IMG_FILTER_LUT_ONE. Every op
+ * below is a ratio of the one to the other, so scaling both leaves the
+ * arithmetic untouched -- which is what lets a chain fold without rounding to
+ * a level between each pair of filters. OP_REDUCE is the exception and says
+ * why. */
 static unsigned channel_op(unsigned op, int amount, unsigned v, unsigned max)
 {
     switch (op)
@@ -211,11 +216,18 @@ static unsigned channel_op(unsigned op, int amount, unsigned v, unsigned max)
     {
         /* `amount` levels spread across the field, so the ends land exactly
          * on 0 and max whatever the field is worth. More levels than the
-         * field holds is not an error, just nothing to do. */
+         * field holds is not an error, just nothing to do.
+         *
+         * Trap: that ceiling counts levels the display can show, so it comes
+         * off the unscaled field. Against `max` it is never reached, and
+         * `reduce256` on a five-bit channel quantises 32 levels onto a
+         * 256-step ladder none of whose steps it lands on -- an identity that
+         * arrives about 3% dark. */
         unsigned n = (unsigned)amount, q;
+        const unsigned levels = (max >> IMG_FILTER_LUT_FRAC) + 1;
 
-        if (n > max + 1)
-            n = max + 1;
+        if (n > levels)
+            n = levels;
         if (n < 2)
             n = 2;
         q = (v * (n - 1) + max / 2) / max;
@@ -441,6 +453,7 @@ static void fold_levels(struct img_filter *f,
                         const struct img_levels *lv, int avoid)
 {
     bool identity = true, complement = true, has_levels = false;
+    bool fractional = false;
 
     /* Whether the chain names a levels filter at all. The stage bit is
      * dropped below when the folded table turns out to do nothing, so it
@@ -450,11 +463,15 @@ static void fold_levels(struct img_filter *f,
 
     for (int c = 0; c < 3; c++)
     {
-        unsigned char *t = f->lut + channels[c].offset;
+        unsigned short *t = f->lut + channels[c].offset;
         const unsigned max = channels[c].max;
 
+        /* The whole fold runs on the scaled field, so no filter's output is
+         * rounded to a level before the next one reads it. */
+        const unsigned smax = max << IMG_FILTER_LUT_FRAC;
+
         for (unsigned v = 0; v <= max; v++)
-            t[v] = v;
+            t[v] = (unsigned short)(v << IMG_FILTER_LUT_FRAC);
 
         for (int i = 0; i < f->nsteps; i++)
         {
@@ -473,21 +490,23 @@ static void fold_levels(struct img_filter *f,
                 amount = d->sign * f->steps[i].amount;
 
             for (unsigned v = 0; v <= max; v++)
-                t[v] = channel_op(d->op, amount, t[v], max);
+                t[v] = (unsigned short)channel_op(d->op, amount, t[v], smax);
         }
 
-        /* How coarse the finished table is: the longest stretch of inputs it
-         * sends to one output. `reduce4` on a five-bit field gives 10, an
-         * identity or a complement gives 1, and the dither stage reads it as
-         * how far to jitter a value to break that stretch up. */
+        /* What the finished table is, in the three terms the passes ask
+         * about: is it the identity, is it the complement, and has the dither
+         * anything to work with -- a fraction to round, or a run to jitter
+         * across. */
         unsigned run = 1, span = 1;
 
         for (unsigned v = 0; v <= max; v++)
         {
-            if (t[v] != v)
+            if (t[v] != (v << IMG_FILTER_LUT_FRAC))
                 identity = false;
-            if (t[v] != max - v)
+            if (t[v] != smax - (v << IMG_FILTER_LUT_FRAC))
                 complement = false;
+            if (t[v] & (IMG_FILTER_LUT_ONE - 1))
+                fractional = true;
 
             if (v > 0 && t[v] == t[v-1])
                 run++;
@@ -500,6 +519,7 @@ static void fold_levels(struct img_filter *f,
     }
 
     f->levels_complement = complement;
+    f->levels_fractional = fractional;
 
     /* A table that does nothing costs a pass to prove it, so the stage goes.
      * An unresolved adaptive one is the exception: its table is a placeholder
@@ -750,18 +770,25 @@ bool img_filter_compile(const char *spec, unsigned allowed,
  * where the matrix, the table and the dither all apply to the pixel on its
  * way out.
  *
- * It reaches them in two different ways, because they lose precision in two
- * different places:
+ * Both reach it the same way, because both carry eight fractional bits into a
+ * shift: the Bayer cell replaces the fixed rounding constant. Exact, and
+ * free.
  *
- *   - the colour stage carries eight fractional bits into its shift, so the
- *     Bayer value simply replaces the fixed rounding constant. Exact, and
- *     free. This is what fixes bw's banding: RGB565 has no true grey, so a
- *     smooth gradient collapses onto 32 levels without it.
- *   - the levels stage has no fraction to round -- the table has already
- *     decided. So the jitter goes on the way *in*, moving the value across
- *     the table's own steps. `lut_span` says how wide those steps are, which
- *     is what makes this work for `reduce` without knowing what `reduce` is.
- *     A table with nothing to dither has a span of 1 and the jitter is zero.
+ * Trap: the fraction has to survive the fold to be worth rounding. Round each
+ * filter's output to a level before the next one runs and the table arrives
+ * here exact, with nothing left for a cell to move -- the dither then costs a
+ * pass and changes almost no pixel. Over 470 covers that difference is a
+ * banding figure of 1.23 against 0.14, and on the worst cover the exact table
+ * dithers to something worse than not dithering at all.
+ *
+ * Rounding the output is not the whole of it, because it cannot break a run:
+ * where the table sends several inputs to one value, every one of them rounds
+ * the same way. That is `reduce`, which is asked for by name, and there the
+ * value is also jittered on the way *in*, across `lut_span` levels. A gain
+ * never needs it -- it compresses, but each input still lands on its own
+ * fraction, so the span is 1 and BAYER_JITTER returns zero. Doing both to a
+ * gain anyway is measurably worse than doing neither: 1.16 banding, and the
+ * worst grain of any option tried.
  */
 static const unsigned char bayer8[64] =
 {
@@ -779,7 +806,9 @@ static const unsigned char bayer8[64] =
  * mean is unchanged and the image does not drift lighter or darker. */
 #define BAYER_ROUND(b)  (((b) << 2) + 2)
 
-/* A Bayer cell as a signed jitter across `span` input levels, zero-mean. */
+/* A Bayer cell as a signed jitter across `span` input levels, zero-mean. A
+ * span of 1 gives zero, which is what keeps this off every table that has no
+ * run in it without a test. */
 #define BAYER_JITTER(b, span)  ((((b) * (span)) >> 6) - ((span) >> 1))
 
 /* ---------------------------------------------------------------------- *
@@ -836,18 +865,28 @@ static FORCE_INLINE unsigned matrix_pixel(unsigned p, const short *m, int rnd)
                            CLAMP_FIELD(nb, LCD_MAX_BLUE));
 }
 
-static FORCE_INLINE unsigned levels_pixel(unsigned p, const unsigned char *lr,
-                                    const unsigned char *lg,
-                                    const unsigned char *lb,
+/* `rnd` is the constant the table's fraction is rounded with -- 128 for
+ * round-to-nearest, a Bayer cell for the dithered loops. `jr`/`jg`/`jb` move
+ * the value along the table on the way in, which only a table with a run in
+ * it needs; BAYER_JITTER of a span of 1 is zero, so the ordinary case pays an
+ * add rather than a branch. The table is already clamped to the field, so
+ * nothing needs clamping on the way out: the largest entry plus the largest
+ * cell still rounds down to `max`. */
+static FORCE_INLINE unsigned levels_pixel(unsigned p, const unsigned short *lr,
+                                    const unsigned short *lg,
+                                    const unsigned short *lb, int rnd,
                                     int jr, int jg, int jb)
 {
-    int r = (int)RGB_UNPACK_RED_LCD(p)   + jr;
-    int g = (int)RGB_UNPACK_GREEN_LCD(p) + jg;
-    int b = (int)RGB_UNPACK_BLUE_LCD(p)  + jb;
+    int ir = (int)RGB_UNPACK_RED_LCD(p)   + jr;
+    int ig = (int)RGB_UNPACK_GREEN_LCD(p) + jg;
+    int ib = (int)RGB_UNPACK_BLUE_LCD(p)  + jb;
+    unsigned r = lr[CLAMP_FIELD(ir, LCD_MAX_RED)]   + rnd;
+    unsigned g = lg[CLAMP_FIELD(ig, LCD_MAX_GREEN)] + rnd;
+    unsigned b = lb[CLAMP_FIELD(ib, LCD_MAX_BLUE)]  + rnd;
 
-    return LCD_RGBPACK_LCD(lr[CLAMP_FIELD(r, LCD_MAX_RED)],
-                           lg[CLAMP_FIELD(g, LCD_MAX_GREEN)],
-                           lb[CLAMP_FIELD(b, LCD_MAX_BLUE)]);
+    return LCD_RGBPACK_LCD(r >> IMG_FILTER_LUT_FRAC,
+                           g >> IMG_FILTER_LUT_FRAC,
+                           b >> IMG_FILTER_LUT_FRAC);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -923,9 +962,9 @@ static void colour_dither_pass(fb_data *px, int w, int h, const short *m)
 
 static void levels_pass(fb_data *px, size_t n, const struct img_filter *f)
 {
-    const unsigned char *lr = f->lut + channels[0].offset;
-    const unsigned char *lg = f->lut + channels[1].offset;
-    const unsigned char *lb = f->lut + channels[2].offset;
+    const unsigned short *lr = f->lut + channels[0].offset;
+    const unsigned short *lg = f->lut + channels[1].offset;
+    const unsigned short *lb = f->lut + channels[2].offset;
 
     if (f->levels_complement)
     {
@@ -941,16 +980,18 @@ static void levels_pass(fb_data *px, size_t n, const struct img_filter *f)
     while (n--)
     {
         unsigned p = FB_UNPACK_SCALAR_LCD(*px);
-        *px++ = FB_SCALARPACK_LCD(levels_pixel(p, lr, lg, lb, 0, 0, 0));
+        *px++ = FB_SCALARPACK_LCD(
+                    levels_pixel(p, lr, lg, lb, IMG_FILTER_LUT_ONE / 2,
+                                 0, 0, 0));
     }
 }
 
 static void levels_dither_pass(fb_data *px, int w, int h,
                                const struct img_filter *f)
 {
-    const unsigned char *lr = f->lut + channels[0].offset;
-    const unsigned char *lg = f->lut + channels[1].offset;
-    const unsigned char *lb = f->lut + channels[2].offset;
+    const unsigned short *lr = f->lut + channels[0].offset;
+    const unsigned short *lg = f->lut + channels[1].offset;
+    const unsigned short *lb = f->lut + channels[2].offset;
     const int sr = f->lut_span[0], sg = f->lut_span[1], sb = f->lut_span[2];
 
     for (int y = 0; y < h; y++)
@@ -963,8 +1004,9 @@ static void levels_dither_pass(fb_data *px, int w, int h,
             unsigned p = FB_UNPACK_SCALAR_LCD(*px);
 
             *px = FB_SCALARPACK_LCD(
-                      levels_pixel(p, lr, lg, lb, BAYER_JITTER(d, sr),
-                                   BAYER_JITTER(d, sg), BAYER_JITTER(d, sb)));
+                      levels_pixel(p, lr, lg, lb, BAYER_ROUND(d),
+                                   BAYER_JITTER(d, sr), BAYER_JITTER(d, sg),
+                                   BAYER_JITTER(d, sb)));
         }
     }
 }
@@ -1047,12 +1089,14 @@ static void pixellate_pass(fb_data *px, int w, int h, int block)
     }
 }
 
-/* Is there anything for the dither to do to the levels stage? A table that
- * steps one input at a time has no run to break up, and jittering it would
- * only blur the mapping. */
+/* Is there anything for the dither to do to the levels stage? Either half of
+ * it will serve: a fraction to round, or a run to jitter across. A table with
+ * neither is exact at every level, and the dithered loop would write the same
+ * pixels the plain one does. */
 static bool levels_worth_dithering(const struct img_filter *f)
 {
-    return f->lut_span[0] > 1 || f->lut_span[1] > 1 || f->lut_span[2] > 1;
+    return f->levels_fractional
+        || f->lut_span[0] > 1 || f->lut_span[1] > 1 || f->lut_span[2] > 1;
 }
 
 /* The 77/150/29 luminance weights skin_albumart_color.c extracts a palette
@@ -1404,7 +1448,7 @@ static FORCE_INLINE unsigned finish_pixel(unsigned p,
               ? (p ^ FIELD_MASK)
               : levels_pixel(p, f->lut + channels[0].offset,
                              f->lut + channels[1].offset,
-                             f->lut + channels[2].offset, jr, jg, jb);
+                             f->lut + channels[2].offset, rnd, jr, jg, jb);
     return p;
 }
 

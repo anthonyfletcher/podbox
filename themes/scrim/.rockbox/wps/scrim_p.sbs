@@ -17,7 +17,7 @@
 #--- Background layer ---#
 #
 # Album art
-%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim,-,blurred)%Cd(blurred)
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim+dither,-,blurred)%Cd(blurred)
 #
 # Background panels
 %dr(0,0,320,35,ffffff,-,12)

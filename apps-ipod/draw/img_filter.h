@@ -68,10 +68,20 @@ struct img_filter_step
     short         amount;       /* as written, before the filter's sign */
 };
 
-/* One channel entry per level: 32 red, 64 green, 32 blue -- 128 bytes on
- * RGB565. A whole chain of levels filters folds into this one table, so
+/* One channel entry per level: 32 red, 64 green, 32 blue on RGB565. A whole
+ * chain of levels filters folds into this one table, so
  * `invert+brightness20+reduce4` costs exactly what `invert` alone costs. */
 #define IMG_FILTER_LUT_SIZE (LCD_MAX_RED + LCD_MAX_GREEN + LCD_MAX_BLUE + 3)
+
+/* The table holds each output at IMG_FILTER_LUT_FRAC fractional bits rather
+ * than as a level, which is what gives the dither stage something to round.
+ * A gain of 56% sends eight of the thirty-two red levels onto the same
+ * output; the fraction is the only record of which eight, and rounding it
+ * against a Bayer cell is what puts that detail back as a pattern the eye
+ * averages. Eight bits, so the same rounding constant serves the colour
+ * stage, and 63 << 8 still leaves an unsigned short room for the cell. */
+#define IMG_FILTER_LUT_FRAC  8
+#define IMG_FILTER_LUT_ONE   (1 << IMG_FILTER_LUT_FRAC)
 
 struct img_filter
 {
@@ -80,13 +90,22 @@ struct img_filter
      * named. Zero means the whole chain is a no-op. */
     unsigned stages;
 
-    unsigned char lut[IMG_FILTER_LUT_SIZE];
+    unsigned short lut[IMG_FILTER_LUT_SIZE];
 
-    /* Per channel, the longest run of input levels the table sends to one
-     * output -- how coarse it is, and so how far the dither stage has to
-     * jitter a value to break the run up. 1 means there is nothing to
-     * dither. */
+    /* Per channel, the longest run of inputs the table sends to one output --
+     * at full precision, so a run means the table has genuinely forgotten
+     * which input a pixel came from. A gain never does: it compresses, but
+     * every input still lands on its own fraction, so the span is 1 and
+     * rounding that fraction is the whole of the dither. `reduce` does, on
+     * purpose, and there the dither also has to jitter the value on the way
+     * *in* to break the run up -- which is what this measures. */
     unsigned char lut_span[3];
+
+    /* Some entry lands between two levels, so rounding the table against a
+     * dither cell reaches a different level for some pixels. False for a
+     * table that is exact everywhere -- an identity, a complement, or a
+     * `reduce` whose levels happen to divide the field. */
+    bool levels_fractional;
 
     /* The colour stage, row-major: out[o] = sum(matrix[o*3+i] * in[i]) >> 8.
      * A whole chain of colour filters folds into this one matrix the way a
