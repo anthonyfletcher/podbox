@@ -112,10 +112,19 @@ void ts_emit(ts_pend *p, const uint8_t *b, size_t n)
         p->buf[p->tail++ % TS_PEND] = *b++;
 }
 
+/* All or nothing, because ts_emit() stops at the byte the ring fills on.
+ * A stage whose step outruns the headroom it reserved would otherwise leave
+ * a half-written sequence in the stream, and ts_read() promises callers it
+ * never splits one. Dropping the character loses the same text and keeps the
+ * output well-formed; the stages that reserve four bytes per codepoint never
+ * reach this. */
 void ts_emit_cp(ts_pend *p, uint32_t cp)
 {
     uint8_t t[4];
     size_t n = ts_utf8_put(t, cp);
+
+    if (ts_pend_free(p) < n)
+        return;
     ts_emit(p, t, n);
 }
 
