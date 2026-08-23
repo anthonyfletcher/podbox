@@ -4030,6 +4030,9 @@ static bool insert_all_playlist(struct browser_context *c,
     {
         if (playlist_insert_context_create(NULL, &context, position, queue, false) < 0)
         {
+            /* create() keeps the playlist lock even when it fails;
+             * release() is the only thing that gives it back. */
+            playlist_insert_context_release(&context);
             tagcache_search_finish(&tcs);
             cpu_boost(false);
             return false;

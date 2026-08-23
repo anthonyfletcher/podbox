@@ -2561,6 +2561,9 @@ int db_summary_play_album(const struct album_data *album)
     if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
                                        false, false) < 0)
     {
+        /* create() keeps the playlist lock even when it fails; release()
+         * is the only thing that gives it back. */
+        playlist_insert_context_release(&context);
         tagcache_search_finish(&tcs);
         cpu_boost(false);
         return -1;
