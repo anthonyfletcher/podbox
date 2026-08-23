@@ -279,6 +279,7 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 
 ## Behind the scenes
 
+- Upstream mikey support for remote control earbuds (untested on this build)
 - Art for use in the UI is cached for quick access to enable a fluid experience
   - `Settings > Library > Art Cache` for settings
   - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache` for tasks
