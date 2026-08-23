@@ -509,7 +509,12 @@ int resize_on_load(struct bitmap *bm, bool dither, struct dim *src,
                                   : output_row_32_native;
     if (format)
         ctx.output_row = format->output_row_32[format_index];
-    if (sw > dw)
+    /* dw < 2 joins the downscale branch because the linear scaler divides
+     * by dw - 1: with one output pixel there is no pair to interpolate
+     * between, and a one-pixel-wide picture fitted to a box reaches here
+     * with sw and dw both 1. The area scaler divides by sw instead, which
+     * the decoders now guarantee is at least 1. */
+    if (sw > dw || dw < 2)
     {
         ctx.h_scaler = scale_h_area;
         uint32_t h_div = (1U << 24) / sw;

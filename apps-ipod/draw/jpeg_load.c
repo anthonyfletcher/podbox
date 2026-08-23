@@ -2048,7 +2048,14 @@ int clip_jpeg_fd(int fd, int flags,
 
     /*the dim array in rockbox is limited to 2^15-1 pixels, so we cannot resize
       images larger than this without overflowing */
-    if(p_jpeg->x_size > 32767 || p_jpeg->y_size > 32767)
+    /* The low bound matters as much as the high one: recalc_dimension()
+     * divides by both source dimensions, so a declared height of zero
+     * divides by zero -- silently on the player, where ARM integer
+     * division yields zero, and fatally in the simulator. A negative one
+     * survives that and reaches the scalers, whose loop bound is cast to
+     * unsigned. */
+    if(p_jpeg->x_size > 32767 || p_jpeg->y_size > 32767
+       || p_jpeg->x_size < 1 || p_jpeg->y_size < 1)
     {
         JDEBUGF("Aborting resize of image > 32767 pixels\n");
         return -1;

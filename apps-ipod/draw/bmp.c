@@ -423,6 +423,15 @@ int read_bmp_fd(int fd,
         rset.rowstep = -1;
     }
 
+    /* A dimension of zero divides by zero in recalc_dimension(), and a
+     * negative one survives it and reaches the scalers, where the loop
+     * bound is cast to unsigned and becomes enormous. Neither is a
+     * picture. */
+    if (src_dim.width < 1 || src_dim.height < 1) {
+        DEBUGF("read_bmp_fd: BMP has no area.");
+        return -3;
+    }
+
     depth = letoh16(bmph.bit_count);
     /* 4-byte boundary aligned */
     read_width = ((src_dim.width * (depth == 15 ? 16 : depth) + 7) >> 3);
