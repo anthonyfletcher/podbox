@@ -789,7 +789,13 @@ static int NOINLINE get_strfind_value(struct gui_wps *gwps,
     const unsigned char *c;
     ucschar_t ch;
 
-    if (!element || !element->params) return -1;
+    /* Convert before testing, here and at the seven guards like it: an
+     * absent parameter list is stored as offset -1, so testing the offset
+     * itself passes and params[0] then dereferences NULL. Every tag
+     * reaching these helpers has a mandatory first argument, so nothing
+     * arrives without one today; a tag whose arguments are all optional
+     * would. */
+    if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return -1;
     struct skin_tag_parameter *params =
             SKINOFFSETTOPTR(skinbuffer, element->params);
 
@@ -819,7 +825,7 @@ static const char* NOINLINE get_pad_value(struct gui_wps *gwps,
     const char *t;
     int n, len, bytes;
 
-    if (!element || !element->params) return NULL;
+    if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
 
     /* buf_size is signed, and the clamps below take buf_size - 1: at zero that
      * is -1, which reaches memcpy() as SIZE_MAX and writes buf[-1]. No caller
@@ -874,7 +880,7 @@ static const char* NOINLINE get_wordwrap_token_value(struct gui_wps *gwps,
     struct font *pf;
     const unsigned char *line_start;
 
-    if (!element || !element->params) return NULL;
+    if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
     struct skin_tag_parameter *params =
             SKINOFFSETTOPTR(skinbuffer, element->params);
 
@@ -968,7 +974,7 @@ static const char* NOINLINE get_select_token_value(struct gui_wps *gwps,
     const char *val;
     int i;
 
-    if (!element || !element->params) return NULL;
+    if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
     struct skin_tag_parameter* params =
             SKINOFFSETTOPTR(skinbuffer, element->params);
 
@@ -1343,7 +1349,7 @@ const char *get_token_value(struct gui_wps *gwps,
             char *skinbuffer = get_skin_buffer(data);
             struct skin_element *element =
                     SKINOFFSETTOPTR(skinbuffer, token->value.data);
-            if (!element || !element->params) return NULL;
+            if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
             struct skin_tag_parameter* params =
                     SKINOFFSETTOPTR(skinbuffer, element->params);
             struct skin_tag_parameter* thistag;
@@ -1371,7 +1377,7 @@ const char *get_token_value(struct gui_wps *gwps,
             struct skin_element *el =
                     SKINOFFSETTOPTR(skinbuffer, token->value.data);
             int w = 0, h;
-            if (!el || !el->params) return NULL;
+            if (!el || !SKINOFFSETTOPTR(skinbuffer, el->params)) return NULL;
             struct skin_tag_parameter *p =
                     SKINOFFSETTOPTR(skinbuffer, el->params);
             /* Measure in an explicit font when %tw(text, fontid) is given,
@@ -1428,7 +1434,7 @@ const char *get_token_value(struct gui_wps *gwps,
             char *skinbuffer = get_skin_buffer(data);
             struct skin_element *el =
                     SKINOFFSETTOPTR(skinbuffer, token->value.data);
-            if (!el || !el->params) return NULL;
+            if (!el || !SKINOFFSETTOPTR(skinbuffer, el->params)) return NULL;
             struct skin_tag_parameter *p =
                     SKINOFFSETTOPTR(skinbuffer, el->params);
             int a = eval_param_int(gwps, skinbuffer, &p[0], offset,
@@ -1457,7 +1463,7 @@ const char *get_token_value(struct gui_wps *gwps,
             char *skinbuffer = get_skin_buffer(data);
             struct skin_element *el =
                     SKINOFFSETTOPTR(skinbuffer, token->value.data);
-            if (!el || !el->params) return NULL;
+            if (!el || !SKINOFFSETTOPTR(skinbuffer, el->params)) return NULL;
             struct skin_tag_parameter *p =
                     SKINOFFSETTOPTR(skinbuffer, el->params);
             const char *t = eval_select_param(gwps, skinbuffer, &p[0],

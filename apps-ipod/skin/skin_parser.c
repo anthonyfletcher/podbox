@@ -337,7 +337,16 @@ static int parse_image_display(struct skin_element *element,
             id->token = get_param_code(element, 1)->data;
         /* specify a number. 1 being the first subimage (i.e top) NOT 0 */
         else if (param1->type == INTEGER)
+        {
+            /* Bounded here for the same reason the letter form below
+             * is: nothing downstream asks. wps_display_images() tests
+             * only that img->display is not negative, and bmp_part()
+             * takes the row it is given, so a subimage past the last
+             * one reads that far past the loaded bitmap. */
             id->subimage = param1->data.number - 1;
+            if (id->subimage < 0 || id->subimage >= img->num_subimages)
+                return WPS_ERROR_INVALID_PARAM;
+        }
         if (element->params_count > 2)
             id->offset = get_param(element, 2)->data.number;
     }
@@ -401,6 +410,14 @@ static int parse_image_load(struct skin_element *element,
         /* Invalid image ID */
         return WPS_ERROR_INVALID_PARAM;
     }
+    /* One subimage is the whole picture; fewer is not a picture. Zero
+     * divides when the height is split below -- silently on the player,
+     * where ARM integer division yields zero, and fatally in the
+     * simulator -- and a negative count puts every subimage above the
+     * top of the bitmap. */
+    if (subimages < 1)
+        return WPS_ERROR_INVALID_PARAM;
+
     img = skin_buffer_alloc(sizeof(*img));
     if (!img)
         return WPS_ERROR_INVALID_PARAM;
