@@ -75,7 +75,11 @@ int browser_flat(bool images)
         simplelist_info_init(&info, title, list.count, NULL);
         info.get_name = flat_get_name;
 
-        simplelist_show_list(&info);
+        if (simplelist_show_list(&info))
+        {
+            ret = GO_TO_ROOT;
+            break;
+        }
 
         if (info.selection < 0)
             break;                       /* backed out */

@@ -9,8 +9,9 @@
 #include <stdbool.h>
 
 /* List the folders the artwork cache found no art for -- artist folders when
- * 'artists' is set, album folders otherwise. False if there was nothing to
- * show, having already said so. */
+ * 'artists' is set, album folders otherwise. True if the list was left for the
+ * root menu; false otherwise, which includes having nothing to show and
+ * saying so. */
 bool art_health_screen(bool artists);
 
 #endif /* _ART_HEALTH_H */

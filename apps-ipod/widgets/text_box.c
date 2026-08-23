@@ -282,12 +282,17 @@ int view_text(const char *title, const char *text)
         case ACTION_LISTTREE_PGDOWN:
             scroll_down(&info, info.display_lines);
             break;
-        case ACTION_STD_MENU:
+        /* The two jumps are the two holds: MENU held for the top, SELECT held
+         * for the bottom. A MENU tap is left to mean what it means everywhere
+         * else. */
+        case ACTION_STD_QUICKSCREEN:
             scroll_to_top(&info);
             break;
         case ACTION_STD_CONTEXT:
             scroll_to_bottom(&info);
             break;
+        case ACTION_STD_MENU:
+            return 1;
         case ACTION_STD_OK:
         case ACTION_STD_CANCEL:
             return 0;

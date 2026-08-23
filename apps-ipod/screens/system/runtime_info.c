@@ -19,6 +19,7 @@
 #include "widgets/list.h"
 #include "widgets/yesno.h"
 #include "system/format_time.h"
+#include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "runtime_info.h"
 
 
@@ -100,6 +101,6 @@ int view_runtime(void)
     if(global_settings.talk_menu)
         info.get_talk = runtime_speak_data;
     info.scroll_all = true;
-    return simplelist_show_list(&info);
+    return simplelist_show_list(&info) ? MENU_ATTACHED_USB : 0;
 }
 

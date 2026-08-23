@@ -380,7 +380,13 @@ void simplelist_info_init(struct simplelist_info *info, char* title,
 
 /* show a list.
    if list->action_callback != NULL it is called with the action ACTION_REDRAW
-    before the list is dislplayed for the first time */
+    before the list is dislplayed for the first time.
+   Returns true when the screen was left for the root menu -- MENU, or a USB
+    attach. A caller that would otherwise return to its own parent must pass
+    that on (GO_TO_ROOT, MENU_ATTACHED_USB or ONPLAY_MAINMENU, whichever its
+    own caller reads) rather than swallowing it.
+   info->selection is the chosen row, -1 if the list was left without one, or
+    -2 for PLAY when wps_on_play is set. */
 bool simplelist_show_list(struct simplelist_info *info);
 
 #endif /* _GUI_LIST_H_ */

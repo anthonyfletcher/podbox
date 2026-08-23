@@ -12,7 +12,8 @@
 
 /* Full-screen scrollable display for a string already in memory. Not to be
  * confused with viewers/text_viewer/, which streams documents from a file.
- * Returns 1 if USB was connected while displaying, 0 otherwise. */
+ * Returns 1 if it was left for the root menu -- MENU, or a USB attach --
+ * 0 otherwise. */
 int view_text(const char *title, const char *text);
 
 #endif /* _TEXT_BOX_H_ */

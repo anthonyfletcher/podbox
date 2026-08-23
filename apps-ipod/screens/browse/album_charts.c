@@ -372,9 +372,9 @@ int album_charts_show(enum album_chart kind)
         simplelist_info_init(&info, str(chart_title(kind)), chart_len, NULL);
         info.get_name = chart_get_name;
 
-        simplelist_show_list(&info);
-
-        if (info.selection >= 0)
+        if (simplelist_show_list(&info))
+            ret = GO_TO_ROOT;
+        else if (info.selection >= 0)
         {
             /* The same handoffs Album covers and Artist portraits use: arm the
              * browser to enter directly on its next load, then return the code

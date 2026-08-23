@@ -173,6 +173,13 @@ static int item_action_callback(int action, struct gui_synclist *list)
         return ACTION_REDRAW;
     }
 
+    /* This is a setting's value screen, not a place in the menu tree, so MENU
+     * closes it the way it closes any other one -- back to the setting's own
+     * menu, not out to the root. The mask goes back either way; there is no
+     * cancel here. */
+    if (action == ACTION_STD_MENU)
+        return ACTION_STD_CANCEL;
+
     return action;
 }
 

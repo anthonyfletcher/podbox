@@ -796,7 +796,8 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
           &album_sort_composer, &database_sort_albums_by
           );
 
-MENUITEM_FUNCTION(music_menu_config_item, 0, ID2P(LANG_MUSIC_MENU_SETTINGS),
+MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_MUSIC_MENU_SETTINGS),
                   music_menu_config, NULL, Icon_NOICON);
 MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
 MENUITEM_SETTING(trim_titles, &global_settings.trim_titles, NULL);

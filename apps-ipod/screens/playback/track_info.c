@@ -521,11 +521,19 @@ refresh_info:
 
                 if (view_text)
                 {
+                    int leave;
                     FOR_NB_SCREENS(i)
                         viewportmanager_theme_enable(i, false, NULL);
-                    view_text(title_and_text[0], title_and_text[1]);
+                    leave = view_text(title_and_text[0], title_and_text[1]);
                     FOR_NB_SCREENS(i)
                         viewportmanager_theme_undo(i, false);
+                    /* The field view was left for the root menu, so this list
+                     * goes with it rather than redrawing underneath. */
+                    if (leave)
+                    {
+                        ret = true;
+                        break;
+                    }
                 }
                 gui_synclist_set_title(&id3_lists, str(LANG_TRACK_INFO), NOICON);
                 gui_synclist_draw(&id3_lists);

@@ -294,7 +294,7 @@ static bool item_hidden(const struct menu_item_ex *item, int depth)
  * press. The 5G powers its ATA interface down after seven idle seconds, so
  * that turns a button press into a possible disk spin-up. The file is read
  * only when someone actually asks. */
-static void explain(const char *key, const char *title)
+static bool explain(const char *key, const char *title)
 {
     /* Static rather than automatic: view_text() below runs a whole screen of
      * its own from this frame, so half a kilobyte here sits under all of it.
@@ -304,21 +304,23 @@ static void explain(const char *key, const char *title)
     if (!key || !settings_help_lookup(key, text, sizeof text))
     {
         splash(HZ, ID2P(LANG_NO_EXPLANATION));
-        return;
+        return false;
     }
 
     FOR_NB_SCREENS(i)
         viewportmanager_theme_enable(i, false, NULL);
-    view_text(title, text);
+    int leave = view_text(title, text);
     FOR_NB_SCREENS(i)
         viewportmanager_theme_undo(i, false);
+
+    return leave != 0;
 }
 
-static void explain_setting(const struct settings_list *setting)
+static bool explain_setting(const struct settings_list *setting)
 {
-    explain(setting->cfg_name,
-            setting->lang_id != -1 ? (const char *)str(setting->lang_id)
-                                   : setting->cfg_name);
+    return explain(setting->cfg_name,
+                   setting->lang_id != -1 ? (const char *)str(setting->lang_id)
+                                          : setting->cfg_name);
 }
 
 /* An action row -- Rebuild Database, Clear Backdrop -- has no settings_list
@@ -330,18 +332,18 @@ static void explain_setting(const struct settings_list *setting)
  * The label rather than something more stable because it is the only identity
  * such a row has at runtime. Renaming a row therefore orphans its stanza, which
  * shows as Explain saying there is nothing rather than as anything worse. */
-static void explain_action(const char *label)
+static bool explain_action(const char *label)
 {
     char key[96];
 
     if (!label)
     {
         splash(HZ, ID2P(LANG_NO_EXPLANATION));
-        return;
+        return false;
     }
 
     snprintf(key, sizeof key, "action: %s", label);
-    explain(key, label);
+    return explain(key, label);
 }
 
 /* A top row asked for by whoever is about to open a menu, consumed once by the
@@ -739,7 +741,13 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                         case GO_TO_PREVIOUS:
                             break;
                         case 0: /* explain */
-                            explain_setting(setting);
+                            /* MENU in the explanation means the root menu,
+                               not back to this row's context. */
+                            if (explain_setting(setting))
+                            {
+                                ret = GO_TO_ROOT;
+                                done = true;
+                            }
                             break;
                         case 1: /* reset setting */
                             reset_setting(setting, setting->setting);
@@ -784,8 +792,12 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                                         ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
                                         ID2P(LANG_EXPLAIN));
 
-                    if (do_menu(&action_op_menu, NULL, NULL, false) == 0)
-                        explain_action(P2STR(temp->callback_and_desc->desc));
+                    if (do_menu(&action_op_menu, NULL, NULL, false) == 0
+                        && explain_action(P2STR(temp->callback_and_desc->desc)))
+                    {
+                        ret = GO_TO_ROOT;
+                        done = true;
+                    }
 
                     redraw_lists = true;
                 }

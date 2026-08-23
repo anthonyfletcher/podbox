@@ -215,11 +215,12 @@ static int props_action_cb(int action, struct gui_synclist *lists)
 
     FOR_NB_SCREENS(j)
         viewportmanager_theme_enable(j, false, NULL);
-    view_text((char *) p2str(props[i]), (char *) props[i + 1]);
+    int leave = view_text((char *) p2str(props[i]), (char *) props[i + 1]);
     FOR_NB_SCREENS(j)
         viewportmanager_theme_undo(j, false);
 
-    return ACTION_REDRAW;
+    /* The field view was left for the root menu, so this list goes with it. */
+    return leave ? ACTION_STD_MENU : ACTION_REDRAW;
 }
 
 static int browse_file_or_dir(struct dir_stats *stats)

@@ -17,6 +17,7 @@
 #include "screens/covers/album_covers.h"
 #include "metadata/art_cache.h"
 #include "screens/system/art_health.h"
+#include "root_menu.h"          /* MENU_ATTACHED_USB */
 
 /* The settings each view mode owns are named for it and grouped together under
  * View Mode, and each is hidden while the other mode is selected -- a row that
@@ -86,18 +87,18 @@ MENUITEM_SETTING(debug_log_artcache, &global_settings.debug_log_artcache, NULL);
  * always been in Background Tasks; these are the folders behind them. */
 static int art_health_albums(void)
 {
-    art_health_screen(false);
-    return 0;
+    return art_health_screen(false) ? MENU_ATTACHED_USB : 0;
 }
-MENUITEM_FUNCTION(art_health_albums_item, 0, ID2P(LANG_ART_HEALTH_ALBUMS),
+MENUITEM_FUNCTION(art_health_albums_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_ART_HEALTH_ALBUMS),
                   art_health_albums, NULL, Icon_NOICON);
 
 static int art_health_artists(void)
 {
-    art_health_screen(true);
-    return 0;
+    return art_health_screen(true) ? MENU_ATTACHED_USB : 0;
 }
-MENUITEM_FUNCTION(art_health_artists_item, 0, ID2P(LANG_ART_HEALTH_ARTISTS),
+MENUITEM_FUNCTION(art_health_artists_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_ART_HEALTH_ARTISTS),
                   art_health_artists, NULL, Icon_NOICON);
 
 MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,

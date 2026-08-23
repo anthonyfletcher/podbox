@@ -37,9 +37,11 @@
 #include "lang.h"
 #include "rbpaths.h"
 #include "widgets/menu.h"
+#include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "debug_menu.h"
 #include "kernel.h"
 #include "input/action.h"
+#include "system/shutdown.h"   /* default_event_handler */
 #include "debug.h"
 #include "thread.h"
 #include "powermgmt.h"
@@ -342,6 +344,7 @@ static bool dbg_buffering_thread(void)
     int button;
     int line;
     bool done = false;
+    bool to_root = false;
     size_t bufused;
     size_t bufsize = pcmbuf_get_bufsize();
     int pcmbufdescs = pcmbuf_descs();
@@ -405,6 +408,10 @@ static bool dbg_buffering_thread(void)
                 audio_prev();
                 break;
             case ACTION_STD_CANCEL:
+                done = true;
+                break;
+            case ACTION_STD_MENU:
+                to_root = true;
                 done = true;
                 break;
         }
@@ -502,7 +509,7 @@ static bool dbg_buffering_thread(void)
     FOR_NB_SCREENS(i)
         screens[i].setfont(FONT_UI);
 
-    return false;
+    return to_root;
 #undef STR_DATAREM
 }
 
@@ -591,6 +598,7 @@ static bool dbg_partitions(void)
 static bool dbg_pcf(void)
 {
     int line;
+    int button;
 
     lcd_setfont(FONT_SYSFIXED);
     lcd_clear_display();
@@ -613,11 +621,16 @@ static bool dbg_pcf(void)
         lcd_putsf(0, line++, "D3REGC: %02x", pcf50605_read(0x26));
         lcd_putsf(0, line++, "LPREG1: %02x", pcf50605_read(0x27));
         lcd_update();
-        if (action_userabort(HZ/10))
+        /* action_userabort() answers CANCEL only, so this screen polls for
+         * itself to see MENU as well -- and takes over the USB handling that
+         * came with it. */
+        button = get_action(CONTEXT_STD, HZ/10);
+        if (button == ACTION_STD_CANCEL || button == ACTION_STD_MENU)
         {
             lcd_setfont(FONT_UI);
-            return false;
+            return button == ACTION_STD_MENU;
         }
+        default_event_handler(button);
     }
 
     lcd_setfont(FONT_UI);
@@ -633,8 +646,8 @@ static bool dbg_cpufreq(void)
 {
     int line;
     int button;
-    int x = 0;
     bool done = false;
+    bool to_root = false;
 
     lcd_setfont(FONT_SYSFIXED);
     lcd_clear_display();
@@ -644,8 +657,8 @@ static bool dbg_cpufreq(void)
         line = 0;
 
         int temp = FREQ / 1000;
-        lcd_putsf(x, line++, "Frequency: %ld.%ld MHz", temp / 1000, temp % 1000);
-        lcd_putsf(x, line++, "boost_counter: %d", get_cpu_boost_counter());
+        lcd_putsf(0, line++, "Frequency: %ld.%ld MHz", temp / 1000, temp % 1000);
+        lcd_putsf(0, line++, "boost_counter: %d", get_cpu_boost_counter());
 
 
         lcd_update();
@@ -660,23 +673,22 @@ static bool dbg_cpufreq(void)
             case ACTION_STD_NEXT:
                 cpu_boost(false);
                 break;
-            case ACTION_STD_MENU:
-                x--;
-                break;
             case ACTION_STD_OK:
-                x = 0;
                 while (get_cpu_boost_counter() > 0)
                     cpu_boost(false);
                 set_cpu_frequency(CPUFREQ_DEFAULT);
                 break;
 
+            case ACTION_STD_MENU:
+                to_root = true;
+                /* fallthrough */
             case ACTION_STD_CANCEL:
-                done = true;;
+                done = true;
         }
         lcd_clear_display();
     }
     lcd_setfont(FONT_UI);
-    return false;
+    return to_root;
 }
 #endif /* HAVE_ADJUSTABLE_CPU_FREQ */
 
@@ -863,6 +875,10 @@ static bool view_battery(void)
             case ACTION_STD_CANCEL:
                 lcd_setfont(FONT_UI);
                 return false;
+
+            case ACTION_STD_MENU:
+                lcd_setfont(FONT_UI);
+                return true;
         }
     }
     lcd_setfont(FONT_UI);
@@ -1206,7 +1222,7 @@ static int ata_smart_callback(int btn, struct gui_synclist *lists)
     (void)lists;
     static bool read_done = false;
 
-    if (btn == ACTION_STD_CANCEL)
+    if (btn == ACTION_STD_CANCEL || btn == ACTION_STD_MENU)
     {
         read_done = false;
         return btn;
@@ -1313,6 +1329,7 @@ static int dircache_callback(int btn, struct gui_synclist *lists)
             break;
     #endif /* DIRCACHE_DUMPSTER */
         case ACTION_STD_CANCEL:
+        case ACTION_STD_MENU:
             if (*(int *)lists->data > 0 && info.status == DIRCACHE_SCANNING)
             {
                 splash(HZ, ID2P(LANG_SCANNING_DISK));
@@ -1401,7 +1418,7 @@ static int database_callback(int btn, struct gui_synclist *lists)
         return ACTION_NONE;
     }
 
-    if (btn == ACTION_STD_CANCEL)
+    if (btn == ACTION_STD_CANCEL || btn == ACTION_STD_MENU)
     {
         update_entries = 0;
         tagcache_screensync_enable(false);
@@ -1797,12 +1814,25 @@ extern unsigned int wheel_velocity;
 
 static bool dbg_scrollwheel(void)
 {
+    int button;
+    bool to_root = false;
+
     lcd_setfont(FONT_SYSFIXED);
 
     while (1)
     {
-        if (action_userabort(HZ/10))
+        /* action_userabort() answers CANCEL only, so this screen polls for
+         * itself to see MENU as well -- and takes over the USB handling that
+         * came with it. */
+        button = get_action(CONTEXT_STD, HZ/10);
+        if (button == ACTION_STD_CANCEL)
             break;
+        if (button == ACTION_STD_MENU)
+        {
+            to_root = true;
+            break;
+        }
+        default_event_handler(button);
 
         lcd_clear_display();
 
@@ -1821,7 +1851,7 @@ static bool dbg_scrollwheel(void)
         lcd_update();
     }
     lcd_setfont(FONT_UI);
-    return false;
+    return to_root;
 }
 #endif /* !SIMULATOR -- the scroll wheel */
 
@@ -2019,7 +2049,9 @@ static bool dbg_bootflash_dump(void) {
 /** The menu **/
 static const struct {
     unsigned char *desc; /* string or ID */
-    bool (*function) (void); /* return true if USB was connected */
+    /* True if the screen was left for the root menu -- MENU, or a USB
+     * attach. menu_action_callback() takes this list out with it. */
+    bool (*function) (void);
 } menuitems[] = {
 #if defined(CPU_PP) && !(CONFIG_STORAGE & STORAGE_SD)
         { "Dump ROM contents", dbg_save_roms },
@@ -2104,8 +2136,10 @@ static int menu_action_callback(int btn, struct gui_synclist *lists)
     {
         FOR_NB_SCREENS(i)
            viewportmanager_theme_enable(i, false, NULL);
-        menuitems[selection].function();
-        btn = ACTION_REDRAW;
+        /* A screen returns true when it was left for the root menu -- MENU, or
+         * a USB attach. Handing that back as ACTION_STD_MENU takes this list
+         * out with it rather than redrawing underneath. */
+        btn = menuitems[selection].function() ? ACTION_STD_MENU : ACTION_REDRAW;
         FOR_NB_SCREENS(i)
             viewportmanager_theme_undo(i, false);
     }
@@ -2146,7 +2180,7 @@ int debug_menu(void)
     info.action_callback = menu_action_callback;
     info.get_name        = menu_get_name;
     info.get_talk        = menu_get_talk;
-    return (simplelist_show_list(&info)) ? 1 : 0;
+    return simplelist_show_list(&info) ? MENU_ATTACHED_USB : 0;
 }
 
 bool run_debug_screen(char* screen)
@@ -2154,12 +2188,13 @@ bool run_debug_screen(char* screen)
     for (unsigned i=0; i<ARRAYLEN(menuitems); i++)
         if (!strcasecmp(screen, menuitems[i].desc))
         {
+            bool to_root;
             FOR_NB_SCREENS(j)
                viewportmanager_theme_enable(j, false, NULL);
-            menuitems[i].function();
+            to_root = menuitems[i].function();
             FOR_NB_SCREENS(j)
                 viewportmanager_theme_undo(j, false);
-            return true;
+            return to_root;
         }
 
     return false;

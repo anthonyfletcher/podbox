@@ -10,7 +10,8 @@
 #ifndef _RUNTIME_INFO_H_
 #define _RUNTIME_INFO_H_
 
-/* Running-time / top-time statistics screen. */
+/* Running-time / top-time statistics screen. MENU_ATTACHED_USB if it was left
+ * for the root menu, otherwise 0. */
 int view_runtime(void);
 
 #endif /* _RUNTIME_INFO_H_ */

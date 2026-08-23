@@ -368,11 +368,12 @@ static int show_info(void)
     if(global_settings.talk_menu)
          info.get_talk = info_speak_item;
     info.action_callback = info_action_callback;
-    return (simplelist_show_list(&info)) ? 1 : 0;
+    return simplelist_show_list(&info) ? MENU_ATTACHED_USB : 0;
 }
 
 
-MENUITEM_FUNCTION(show_info_item, 0, ID2P(LANG_ROCKBOX_INFO),
+MENUITEM_FUNCTION(show_info_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_ROCKBOX_INFO),
                   show_info, NULL, Icon_NOICON);
 
 int time_screen(void* ignored);
@@ -385,7 +386,8 @@ MENUITEM_FUNCTION(show_about_item, 0, ID2P(LANG_ABOUT),
 MENUITEM_FUNCTION(show_credits_item, 0, ID2P(LANG_CREDITS),
                   show_credits, NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION(show_runtime_item, 0, ID2P(LANG_RUNNING_TIME),
+MENUITEM_FUNCTION(show_runtime_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_RUNNING_TIME),
                   view_runtime, NULL, Icon_NOICON);
 
 /* Hide the Debug entry unless the "Show Debug Menu" setting is on (default off:
@@ -402,24 +404,27 @@ static int debug_menu_callback(int action,
     return action;
 }
 
-MENUITEM_FUNCTION(debug_menu_item, 0, ID2P(LANG_DEBUG),
+MENUITEM_FUNCTION(debug_menu_item, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_DEBUG),
                   debug_menu, debug_menu_callback, Icon_NOICON);
 
-MENUITEM_FUNCTION(show_license_item, 0, ID2P(LANG_LICENSE),
+MENUITEM_FUNCTION(show_license_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_LICENSE),
                   show_license, NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION(show_third_party_licenses_item, 0,
+MENUITEM_FUNCTION(show_third_party_licenses_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_THIRD_PARTY_LICENSES),
                   show_third_party_licenses, NULL, Icon_NOICON);
 
-/* The screen reports a USB attach the way simplelist does, as a bool; the menu
- * wants it as MENU_ATTACHED_USB so it unwinds rather than redrawing. */
+/* The screen reports leaving for the root menu the way simplelist does, as a
+ * bool; the menu wants it as MENU_ATTACHED_USB so it unwinds rather than
+ * redrawing. */
 static int bg_task_info_item(void)
 {
     return bg_task_info_screen() ? MENU_ATTACHED_USB : 0;
 }
 
-MENUITEM_FUNCTION(bg_task_info, 0, ID2P(LANG_BG_TASK_INFO),
+MENUITEM_FUNCTION(bg_task_info, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_BG_TASK_INFO),
                   bg_task_info_item, NULL, Icon_NOICON);
 
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,

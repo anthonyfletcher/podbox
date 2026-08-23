@@ -1115,7 +1115,17 @@ bool simplelist_show_list(struct simplelist_info *info)
                 gui_synclist_set_nb_items(&lists,
                         simplelist_line_count*info->selection_size);
         }
-        if (action == ACTION_STD_CANCEL)
+        if (action == ACTION_STD_MENU)
+        {
+            /* Out to the root menu, as MENU does everywhere else. Reported
+             * through the return value rather than the selection, because it
+             * means to a caller what a USB attach means: do not just go back
+             * to whoever opened this screen. */
+            info->selection = -1;
+            ret = true;
+            break;
+        }
+        else if (action == ACTION_STD_CANCEL)
         {
             info->selection = -1;
             break;

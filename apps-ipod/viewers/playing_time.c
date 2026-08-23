@@ -520,15 +520,15 @@ static bool playing_time(void)
     return pt_display_stats(&pti);
 }
 
-/* Core entry point: set up the themed status bar, run the screen. The USB
- * result is intentionally unused, matching the previous plugin_load() caller
- * which discarded it. */
-void playing_time_screen(void)
+/* Core entry point: set up the themed status bar, run the screen. */
+bool playing_time_screen(void)
 {
+    bool to_root;
+
     if (!audio_status())
     {
         splash(HZ * 2, "Nothing playing");
-        return;
+        return false;
     }
 
     FOR_NB_SCREENS(i)
@@ -537,8 +537,10 @@ void playing_time_screen(void)
         viewportmanager_theme_enable(i, true, NULL);
     }
 
-    playing_time();
+    to_root = playing_time();
 
     FOR_NB_SCREENS(i)
         viewportmanager_theme_undo(i, false);
+
+    return to_root;
 }

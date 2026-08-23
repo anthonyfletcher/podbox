@@ -679,7 +679,6 @@ static int shortcut_menu_get_action(int action, struct gui_synclist *lists)
     }
 
     if (action == ACTION_STD_OK
-     || action == ACTION_STD_MENU
      || action == ACTION_STD_QUICKSCREEN)
     {
         return ACTION_STD_CANCEL;
@@ -769,7 +768,12 @@ int do_shortcut_menu(void *ignored)
         list.get_talk = global_settings.talk_menu ? shortcut_menu_speak_item : NULL;
 
         if (simplelist_show_list(&list))
-            break; /* some error happened?! */
+        {
+            /* MENU, or a USB attach: out to the root rather than back to
+             * whichever screen opened this one. */
+            done = GO_TO_ROOT;
+            break;
+        }
 
         if (list.selection == -1)
             break;
@@ -842,7 +846,8 @@ int do_shortcut_menu(void *ignored)
                     break;
                 }
                 case SHORTCUT_DEBUGITEM:
-                    run_debug_screen(sc->u.path);
+                    if (run_debug_screen(sc->u.path))
+                        done = GO_TO_ROOT;
                     break;
                 case SHORTCUT_SHUTDOWN:
 #if CONFIG_CHARGING && !defined(HAVE_POWEROFF_WHILE_CHARGING)

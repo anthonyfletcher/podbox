@@ -274,7 +274,8 @@ static int run_track_list(const char *title)
 
     simplelist_info_init(&info, (char *)title, track_ct, NULL);
     info.get_name = track_get_name;
-    simplelist_show_list(&info);
+    if (simplelist_show_list(&info))
+        ret = GO_TO_ROOT;
 
     /* Given back before anything is played: the insert context wants it. */
     app_release_buffer("featured tracks");
@@ -340,7 +341,11 @@ int featured_artists_show(void)
         info.get_name = guest_get_name;
         info.action_callback = guest_action_cb;
         info.selection = selection;
-        simplelist_show_list(&info);
+        if (simplelist_show_list(&info))
+        {
+            ret = GO_TO_ROOT;
+            break;
+        }
 
         if (pending_go_to != 0)
         {

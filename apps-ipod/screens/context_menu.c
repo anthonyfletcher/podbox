@@ -226,7 +226,8 @@ static int wps_view_cur_playlist(void)
 
 static void playing_time(void)
 {
-    playing_time_screen();
+    if (playing_time_screen())
+        context_menu_result = ONPLAY_MAINMENU;
 }
 
 static void view_album_art(void)
@@ -1471,10 +1472,12 @@ int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
     info.get_icon = hotkey_get_icon;
     info.get_talk = hotkey_get_talk;
     info.selection = selected;
-    simplelist_show_list(&info);
+    bool to_root = simplelist_show_list(&info);
 
     if (execute)
     {
+        if (to_root)
+            return ONPLAY_MAINMENU;
         if (info.selection < 0) /* canceled */
             return ONPLAY_RELOAD_DIR;
         return execute_hotkey(hk_menu[info.selection]->action);

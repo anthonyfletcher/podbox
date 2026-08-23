@@ -51,6 +51,7 @@
 #include "exported_settings.h"
 #include "audio/pcmbuf.h"
 #include "widgets/option_select.h"
+#include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "string-extra.h"
 
 static void eq_apply(void);
@@ -224,7 +225,8 @@ static int eq_do_simple_menu(void * param)
 
     while (true)
     {
-        simplelist_show_list(&info);
+        if (simplelist_show_list(&info))
+            return MENU_ATTACHED_USB;
         if (info.selection < 0)
             break;
         pcmbuf_set_low_latency(true);
@@ -236,7 +238,7 @@ static int eq_do_simple_menu(void * param)
     }
     return 0;
 }
-MENUITEM_FUNCTION(gain_menu, 0, ID2P(LANG_EQUALIZER_GAIN),
+MENUITEM_FUNCTION(gain_menu, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_EQUALIZER_GAIN),
 	              eq_do_simple_menu, NULL, Icon_Submenu);
 
 static void selection_to_banditem(int selection, int expanded_band, int *band, int *item)
@@ -373,7 +375,8 @@ static int eq_do_advanced_menu(void * param)
 
     while (true)
     {
-        simplelist_show_list(&info);
+        if (simplelist_show_list(&info))
+            return MENU_ATTACHED_USB;
         if (info.selection < 0)
             break;
         selection_to_banditem(info.selection, selected_band, &band, &item);
@@ -437,7 +440,8 @@ static int eq_do_advanced_menu(void * param)
     }
     return 0;
 }
-MENUITEM_FUNCTION(advanced_menu, 0, ID2P(LANG_EQUALIZER_ADVANCED),
+MENUITEM_FUNCTION(advanced_menu, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_EQUALIZER_ADVANCED),
                   eq_do_advanced_menu, NULL, Icon_EQ);
 
 enum eq_slider_mode {

@@ -58,6 +58,7 @@ bool art_health_screen(bool artists)
 {
     struct simplelist_info info;
     char title[64];
+    bool to_root;
 
     if (!path_list_load(&list, art_cache_noart_list(artists), PATH_LIST_MAX))
     {
@@ -75,8 +76,8 @@ bool art_health_screen(bool artists)
     info.get_name = health_get_name;
     info.action_callback = health_action;
 
-    simplelist_show_list(&info);
+    to_root = simplelist_show_list(&info);
 
     path_list_free(&list);
-    return true;
+    return to_root;
 }

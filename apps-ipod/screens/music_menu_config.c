@@ -24,6 +24,7 @@
 #include "widgets/list.h"
 #include "widgets/splash.h"
 #include "browse/browser_db.h"
+#include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "music_menu_config.h"
 
 /* One row per bit of the mask; the rest cannot be hidden and so are not
@@ -123,6 +124,7 @@ static void save_rows(void)
 int music_menu_config(void)
 {
     struct simplelist_info info;
+    bool to_root;
 
     load_rows();
 
@@ -138,8 +140,8 @@ int music_menu_config(void)
     info.get_icon = row_get_icon;
     info.action_callback = row_action_callback;
 
-    simplelist_show_list(&info);
+    to_root = simplelist_show_list(&info);
 
     save_rows();
-    return 0;
+    return to_root ? MENU_ATTACHED_USB : 0;
 }
