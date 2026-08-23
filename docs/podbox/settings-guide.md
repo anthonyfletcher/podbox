@@ -60,7 +60,6 @@ before it starts. All of them queue work for the background and return at once.
 | Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
 | Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
 | Rebuild Database | Discards the database and reads every file again. Slow. |
-| Rebuild Index | Discards the album and artist lists and derives them again. |
 | Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
 
 ---

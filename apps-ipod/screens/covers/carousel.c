@@ -300,17 +300,6 @@ static const unsigned char pf_dither_table[16] =
 #define CONFIG_FILE ROCKBOX_DIR "/album_covers.cfg"
 
 /** structs we use */
-struct albumart_t {
-    struct bitmap input_bmp;
-    char pfraw_file[MAX_PATH];
-    char file[MAX_PATH];
-    int idx;
-    int slides;
-    int inspected;
-    void * buf;
-    size_t buf_sz;
-};
-
 struct slide_data {
     int slide_index;
     int angle;
@@ -369,7 +358,9 @@ struct pfraw_header {
     int32_t height;         /* bmap height in pixels */
 };
 
-static struct albumart_t aa_cache;
+/* Scratch for the placeholder slide, carved out of the app buffer by
+ * init(). create_empty_slide() is the only thing that draws into it. */
+static void *pf_placeholder_buf;
 struct pf_config_t pf_cfg;
 
 /** below we allocate the memory we want to use **/
@@ -676,10 +667,7 @@ static void config_save(const char *filename, const struct configdata *cfg,
 static struct configdata config[] =
 {
     { TYPE_INT, 0, 100, { .int_p = &pf_cfg.cache_version }, "cache version", NULL },
-    { TYPE_BOOL, 0, 1, { .bool_p = &pf_cfg.update_albumart }, "update albumart", NULL },
     { TYPE_INT, 0, 999999, { .int_p = &pf_cfg.last_album }, "last album", NULL },
-    { TYPE_INT, 0, 999999, { .int_p = &aa_cache.idx }, "art cache pos", NULL },
-    { TYPE_INT, 0, 999999, { .int_p = &aa_cache.inspected }, "art cache inspected", NULL },
 };
 
 #define CONFIG_NUM_ITEMS (sizeof(config) / sizeof(struct configdata))
@@ -730,7 +718,6 @@ static bool check_database(void)
 static void config_set_defaults(struct pf_config_t *cfg)
 {
      cfg->cache_version = CACHE_REBUILD;
-     cfg->update_albumart = false;
      cfg->last_album = 0;
 }
 
@@ -1094,23 +1081,24 @@ static bool save_pfraw(char* filename, struct bitmap *bm)
  */
 static int create_empty_slide(bool force)
 {
-    if (!aa_cache.buf)
+    if (!pf_placeholder_buf)
         return false;
 
     if ( force || ! file_exists( EMPTY_SLIDE ) )  {
-        pix_t *px = (pix_t*)aa_cache.buf;
+        struct bitmap bm = { 0 };
+        pix_t *px = pf_placeholder_buf;
         int n = DISPLAY_WIDTH * DISPLAY_WIDTH;
         int i;
 
         for (i = 0; i < n; i++)
             px[i] = EMPTY_SLIDE_COLOR;
 
-        aa_cache.input_bmp.width = DISPLAY_WIDTH;
-        aa_cache.input_bmp.height = DISPLAY_WIDTH;
-        aa_cache.input_bmp.format = FORMAT_NATIVE;
-        aa_cache.input_bmp.data = (char*)aa_cache.buf;
+        bm.width = DISPLAY_WIDTH;
+        bm.height = DISPLAY_WIDTH;
+        bm.format = FORMAT_NATIVE;
+        bm.data = pf_placeholder_buf;
 
-        if (!save_pfraw(EMPTY_SLIDE, &aa_cache.input_bmp))
+        if (!save_pfraw(EMPTY_SLIDE, &bm))
             return false;
     }
 
@@ -1448,17 +1436,19 @@ static void free_all_slide_prio(int prio)
 }
 
 
-/**
- Read the pfraw image given as filename and return the hid of the buffer
- */
+/* Read a pfraw image into the slide cache; a buflib handle, or -1.
+ *
+ * Only the placeholder comes through here, and both callers assign the result
+ * to empty_slide_hid -- so failing to -1 is what makes the failure sayable.
+ * Handing back empty_slide_hid instead would hand a caller its own stale
+ * answer: by the time it runs, buflib_init() has emptied the context that
+ * handle came from, and nothing in the new one answers to it. */
 static int read_pfraw(char* filename, int prio)
 {
     struct pfraw_header bmph;
     int fh = open(filename, O_RDONLY);
-    if( fh < 0 ) {
-        /* pf_cfg.cache_version = CACHE_UPDATE; -- don't invalidate on missing pfraw */
-        return empty_slide_hid;
-    }
+    if( fh < 0 )
+        return -1;
 
     /* A short read (truncated/corrupted cache file, e.g. from a power-off
      * mid-write) leaves bmph partially or fully uninitialized, and a
@@ -1473,7 +1463,7 @@ static int read_pfraw(char* filename, int prio)
         bmph.width > DISPLAY_WIDTH || bmph.height > DISPLAY_HEIGHT)
     {
         close(fh);
-        return empty_slide_hid;
+        return -1;
     }
 
     int size =  sizeof(struct dim) +
@@ -1503,7 +1493,7 @@ static int read_pfraw(char* filename, int prio)
     {
         close( fh );
         buflib_free(&buf_ctx, hid);
-        return empty_slide_hid;
+        return -1;
     }
 
     close( fh );
@@ -1699,22 +1689,10 @@ static inline bool load_and_prepare_surface(const int slide_index,
         }
     }
 
-    /* Fall back to this screen's own pfraw cache when a shared thumbnail
-     * isn't available yet (e.g. background generation hasn't reached it),
-     * so nothing regresses versus before the shared cache existed. A model
-     * without a legacy cache (returns false) just shows the empty slide. */
+    /* No thumbnail for this slide yet -- the background pass has not reached
+     * it, or the folder has no art. The placeholder stands in until it does. */
     if (!got_shared)
-    {
-        char pfraw_file[MAX_PATH];
-        if (model->legacy_art(slide_index, pfraw_file, sizeof(pfraw_file)))
-        {
-            hid = read_pfraw(pfraw_file, prio);
-            if (hid < 0)
-                return false; /* allocation failure: retry later */
-        }
-        else
-            hid = empty_slide_hid;
-    }
+        hid = empty_slide_hid;
 
     pf_sldcache.cache[cache_index].hid = hid;
     if (cache_index < SLIDE_CACHE_SIZE)
@@ -1882,7 +1860,10 @@ fatal_fail:
  */
 static inline struct dim *get_slide(const int hid)
 {
-    if (!hid)
+    /* Every buflib handle is positive, so this covers "none" (0) and "could
+     * not load it" (-1) alike. buflib_get_data() indexes handle_table[-hid],
+     * which for a negative one lands outside the buffer entirely. */
+    if (hid <= 0)
         return NULL;
 
     struct dim *bmp;
@@ -2737,14 +2718,6 @@ bool pf_resume_last_album = false;
  * the persisted config. */
 int pf_resume_album_index;
 
-/* True once every slide's art has been inspected (the background art cache is
- * fully populated for this index). The album model gates its "please wait"
- * splashes on this rather than reaching into aa_cache directly. */
-bool carousel_cache_ready(void)
-{
-    return aa_cache.inspected >= carousel_idx.album_ct;
-}
-
 /* carousel_settle: settle an in-progress scroll animation to idle. */
 void carousel_settle(void)
 {
@@ -2765,7 +2738,20 @@ void carousel_reload(int (*compare)(const void *, const void *))
 
     /* Empty cache and restart cover loading thread */
     buflib_init(&buf_ctx, (void *)carousel_idx.buf, carousel_idx.buf_sz);
+
+    /* The handle from before the buflib_init() above means nothing now, so the
+     * placeholder has to be read into the new context -- and the result
+     * checked, as init() checks it. Left unchecked, a -1 reaches get_slide()
+     * for every slide that has no cover yet. Zero is the honest answer when it
+     * cannot be had: those slides then draw nothing until the screen is
+     * reopened, which is where create_empty_slide() writes the file again. */
     empty_slide_hid = read_pfraw(EMPTY_SLIDE, 0);
+    if (empty_slide_hid < 0)
+    {
+        empty_slide_hid = 0;
+        splash(HZ, "Could not load the placeholder cover");
+    }
+
     initialize_slide_cache();
     create_pf_thread();
 }
@@ -3418,7 +3404,7 @@ static bool init(void)
     wants_to_quit = false;
 
     /* must appear before config load */
-    memset(&aa_cache, 0, sizeof(struct albumart_t));
+    pf_placeholder_buf = NULL;
 
     config_set_defaults(&pf_cfg); /* must appear before pf_config_load */
     pf_config_load();
@@ -3603,41 +3589,45 @@ static bool init(void)
 
     number_of_slides = model->count();
 
-    /* Thumbnails come from the background album-art cache (art_cache.c), not
-     * from here. Marking inspection complete up front keeps the idle-loop
-     * generator from running and the navigation "wait for cache" splashes
-     * from appearing; slides are read from the shared .aat cache, falling
-     * back to a pfraw or the empty slide. */
-    aa_cache.inspected = model->count();
+    /* Reserve the scratch the placeholder is drawn into. Sized by its only
+     * user: create_empty_slide() fills DISPLAY_WIDTH squared and save_pfraw()
+     * writes that back out. Cover art never passes through here -- the
+     * thumbnails belong to the shared cache (metadata/art_cache.c) and
+     * read_aat() reads them straight into buflib. */
+    size_t placeholder_sz = ALIGN_UP((size_t)DISPLAY_WIDTH * DISPLAY_WIDTH
+                                   * sizeof(pix_t), sizeof(long));
+    /* The largest slide read_aat() will accept, and so what one costs the
+     * cache below. */
+    size_t slide_max = (size_t)DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(pix_t);
 
-    /* Reserve the album-art scratch buffer. Both models need it: create_empty_slide()
-     * builds the placeholder into aa_cache.buf, and (album only) the pfraw
-     * generator caches thumbnails there. */
-    size_t aa_min = DISPLAY_WIDTH * DISPLAY_HEIGHT * sizeof(pix_t);
-    size_t aa_bufsz = ALIGN_DOWN(MAX(aa_min * 3, carousel_idx.buf_sz / 8),
-                                 sizeof(long));
-    if (aa_bufsz < aa_min)
+    ALIGN_BUFFER(carousel_idx.buf, carousel_idx.buf_sz, sizeof(long));
+
+    /* Against what the index actually left, not against itself. buf_sz is a
+     * size_t, so a reservation larger than the space remaining wraps it to
+     * about 4GB and buflib_init() below puts its handle table past the end of
+     * memory -- which the first slide allocation then writes to. The cache
+     * also has to keep enough for the placeholder and one cover, or there is
+     * nothing for the screen to show. */
+    if (carousel_idx.buf_sz < placeholder_sz + 2 * slide_max)
     {
         error_wait("Out of memory");
         return false;
     }
 
-    ALIGN_BUFFER(carousel_idx.buf, carousel_idx.buf_sz, sizeof(long));
-    aa_cache.buf = (char*) carousel_idx.buf;
-    aa_cache.buf_sz = aa_bufsz;
+    pf_placeholder_buf = carousel_idx.buf;
 
-    carousel_idx.buf += aa_bufsz;
-    carousel_idx.buf_sz -= aa_bufsz;
+    carousel_idx.buf += placeholder_sz;
+    carousel_idx.buf_sz -= placeholder_sz;
 
     pf_cover_size_idx = art_cache_size_index("coverflow");
 
     buflib_init(&buf_ctx, (void *)carousel_idx.buf, carousel_idx.buf_sz);
     initialize_slide_cache();
 
-    if (!create_empty_slide(model->has_pfraw_cache &&
+    if (!create_empty_slide(model->owns_cache_version &&
                             pf_cfg.cache_version != CACHE_VERSION))
     {
-        if (model->has_pfraw_cache)
+        if (model->owns_cache_version)
         {
             pf_cfg.cache_version = CACHE_REBUILD;
             pf_config_save();
@@ -3866,7 +3856,6 @@ static int album_covers_loop(void)
                               || scroll_lines[PF_SCROLL_ARTIST].step;
         bool quiescent = pf_state != pf_scrolling
                       && !caption_scrolling
-                      && aa_cache.inspected >= carousel_idx.album_ct
                       && !dynamic_colors_needs_repaint()
                       && !(audio_status() & AUDIO_STATUS_PLAY);
         int timeout;

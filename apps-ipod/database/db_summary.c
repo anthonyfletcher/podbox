@@ -1819,12 +1819,11 @@ static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
         set_working_for_build(false);
 
         /* Writing the index is the whole of what a rebuild does. In
-         * particular it does not invalidate the carousel's slide cache: those
-         * files are keyed by a hash of the album and artist names
-         * (album_legacy_art()), not by list position, so the same album still
-         * resolves to the same file however the list is reordered. Nothing in
-         * this file may touch the carousel's config -- see background_build()
-         * for what goes wrong when it does. */
+         * particular it does not invalidate any artwork: thumbnails are keyed
+         * by the folder they came from, not by list position, so the same
+         * album still resolves to the same file however the list is
+         * reordered. Nothing in this file may touch the carousel's config --
+         * see background_build() for what goes wrong when it does. */
         if (ret == 0)
         {
             /* Only the foreground caller may report this: the background pass

@@ -1088,10 +1088,6 @@ than merely incomplete.
 Refreshes the album and artist lists that Album Covers, Artist Portraits and the
 listening charts read. Fixes a browser that disagrees with the database.
 
-[action: Rebuild Index]
-Discards those album and artist lists and derives them from the database again.
-Only useful if updating did not fix it.
-
 [action: Update Art Cache]
 Generates thumbnails for artwork that does not have one yet.
 

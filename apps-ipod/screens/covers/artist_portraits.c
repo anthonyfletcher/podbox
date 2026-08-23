@@ -140,14 +140,6 @@ static unsigned int artist_art_key(int index)
     return carousel_idx.artist_index[index].art_hash;
 }
 
-/* Artists have no per-screen pfraw cache; a missing photo just shows the empty
- * slide. */
-static bool no_legacy_art(int index, char *path, int len)
-{
-    (void)index; (void)path; (void)len;
-    return false;
-}
-
 /* Select an artist: open that album-artist's own album listing in the database
  * browser (armed for the next load; BACK returns here). Records the slide to
  * resume to, so backing out lands on the artist just visited rather than on
@@ -279,7 +271,6 @@ static const struct carousel_model artist_model = {
     .build_index = artist_build_index,
     .count       = artist_count,
     .art_key     = artist_art_key,
-    .legacy_art  = no_legacy_art,
     .enter       = artist_enter,
     .jump_prev   = artist_jump_prev,
     .jump_next   = artist_jump_next,
@@ -288,7 +279,7 @@ static const struct carousel_model artist_model = {
     .sort_prev   = carousel_sort_noop,
     .set_initial = artist_set_initial,
     .on_menu     = artist_on_menu,
-    .has_pfraw_cache = false,
+    .owns_cache_version = false,
     .title       = "Artist Portraits",
 };
 

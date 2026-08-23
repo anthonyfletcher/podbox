@@ -18107,16 +18107,16 @@
 </phrase>
 <phrase>
   id: LANG_REBUILD_INDEX
-  desc: in Carousel settings, rebuild the album index
+  desc: deprecated
   user: core
   <source>
-    *: "Rebuild Index"
+    *: ""
   </source>
   <dest>
-    *: "Rebuild Index"
+    *: ""
   </dest>
   <voice>
-    *: "Rebuild Index"
+    *: ""
   </voice>
 </phrase>
 <phrase>

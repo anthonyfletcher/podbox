@@ -107,10 +107,15 @@ MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
  * verb: LANG_TAGCACHE_FORCE_UPDATE labelled the *rebuild*, and the file rescan
  * was called "Rebuild" while calling bg_task_update().
  *
- * All seven are the same two calls over four tasks, so this is a table and one
- * handler rather than seven near-identical functions. It is fewer lines than
+ * All six are the same two calls over four tasks, so this is a table and one
+ * handler rather than six near-identical functions. It is fewer lines than
  * the rows it replaces, and the three inconsistencies cannot come back: there
  * is one confirm, one splash and one naming pattern by construction.
+ *
+ * The index has an update row and no rebuild row, because for that task the
+ * two would do the same thing: it is a single file that is always rewritten
+ * whole, so a rebuild has nothing to discard that an update does not
+ * overwrite. See album_covers_request().
  *
  * Every one of these only *queues* work -- the background task does it -- which
  * is why the splash says started rather than done. */
@@ -124,7 +129,6 @@ static const struct maint_action {
     { &art_cache_task,    LANG_UPDATE_CACHE,   false },
     { &file_index_task,   LANG_RESCAN_FILES,   false },
     { &tagcache_task,     LANG_REBUILD_DB,     true  },
-    { &album_covers_task, LANG_REBUILD_INDEX,  true  },
     { &art_cache_task,    LANG_REBUILD_CACHE,  true  },
 };
 
@@ -152,8 +156,7 @@ MAINT_ITEM(maint_update_index,   1, LANG_UPDATE_INDEX);
 MAINT_ITEM(maint_update_cache,   2, LANG_UPDATE_CACHE);
 MAINT_ITEM(maint_rescan_files,   3, LANG_RESCAN_FILES);
 MAINT_ITEM(maint_rebuild_db,     4, LANG_REBUILD_DB);
-MAINT_ITEM(maint_rebuild_index,  5, LANG_REBUILD_INDEX);
-MAINT_ITEM(maint_rebuild_cache,  6, LANG_REBUILD_CACHE);
+MAINT_ITEM(maint_rebuild_cache,  5, LANG_REBUILD_CACHE);
 
 MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
             &maint_update_db,
@@ -161,7 +164,6 @@ MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
             &maint_update_cache,
             &maint_rescan_files,
             &maint_rebuild_db,
-            &maint_rebuild_index,
             &maint_rebuild_cache);
 
 /** File view menu **/

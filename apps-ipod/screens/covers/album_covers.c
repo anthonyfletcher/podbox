@@ -9,7 +9,7 @@
  * Original code: http://code.google.com/p/pictureflow/
  *
  * Cover-flow album browser built on carousel.c. Supplies the slide model
- * -- album list, art loading and its disk cache, sort order -- and what
+ * -- album list, artwork key, sort order -- and what
  * happens on select.
  *
  * carousel.c owns the rendering and the input loop; this file only answers
@@ -18,16 +18,17 @@
  * looks like, and what to do when one is chosen. artist_portraits.c is the
  * other implementation of the same model.
  *
- * The album list is built once by scanning tagcache and written to an index
- * file, so subsequent opens read the index instead of rescanning. Slide
- * images are cached to disk as .pfraw (pre-scaled raw pixels) for the same
- * reason -- decoding album art per frame would be far too slow.
+ * The album list comes from the database index (database/db_summary.c), which
+ * is built once and read back from disk on later opens. Cover art is the
+ * shared thumbnail cache's (metadata/art_cache.c); this file only says which
+ * folder a slide's art lives in, through art_key().
  *
  * Parts, in order:
- *   - the album index: building it from tagcache, sorting, and the on-disk form
- *   - locating cover art for an album, and rendering it into the slide cache
+ *   - reading names out of the index, and the letter/year jumps over it
+ *   - resolving a track to a slide, and a slide to its artwork key
+ *   - the display order: the sort comparators and re-sorting in place
  *   - the text drawn under the slides
- *   - the model callbacks: counts, names, sort order, select and menu
+ *   - the maintenance task, the in-screen menu, and select
  *   - album_model itself, and album_covers() which runs the carousel with it
  ****************************************************************************/
 
@@ -102,80 +103,6 @@
  * screen's own lcd_update(), and %Vd()'d content left "shown" by whatever
  * screen preceded this one bleeds through. Themeable layout means giving up
  * the per-frame raw redraw first. */
-/* The album index file, and the four-byte magic at its start. */
-/* Holds the artist name blob as well as the albums -- artist_portraits.c
- * reads carousel_idx.artist_names/artist_index straight out of it -- so the
- * name is deliberately not album-specific. Regenerated if absent. */
-
-/** structs we use */
-struct albumart_t {
-    struct bitmap input_bmp;
-    char pfraw_file[MAX_PATH];
-    char file[MAX_PATH];
-    int idx;
-    int slides;
-    int inspected;
-    void * buf;
-    size_t buf_sz;
-};
-
-struct slide_data {
-    int slide_index;
-    int angle;
-    PFreal cx;
-    PFreal cy;
-    PFreal distance;
-    int cached_slot; /* last cache slot this slide resolved to (see surface()) */
-};
-
-struct slide_cache {
-    int index;      /* index of the cached slide */
-    int hid;        /* handle ID of the cached slide */
-    short next; /* "next" slide, with LRU last */
-    short prev; /* "previous" slide */
-};
-
-struct rect {
-    int left;
-    int right;
-    int top;
-    int bottom;
-};
-
-struct load_slide_event_data {
-    int slide_index;
-    int cache_index;
-};
-
-struct pf_slide_cache
-{
-    struct slide_cache cache[SLIDE_CACHE_SIZE];
-    int free;
-    int used;
-    int left_idx;
-    int right_idx;
-    int center_idx;
-};
-
-struct pf_scroll_line_info {
-    long ticks;         /* number of ticks between each move */
-    long delay;         /* number of ticks to delay starting scrolling */
-    int step;           /* pixels to move */
-    long next_scroll;   /* tick of the next move */
-};
-
-struct pf_scroll_line {
-    int width;          /* width of the string */
-    int offset;         /* x coordinate of the string */
-    int step;           /* 0 if scroll is disabled. otherwise, pixels to move */
-    long start_tick;    /* tick when to start scrolling */
-};
-
-struct pfraw_header {
-    int32_t width;          /* bmap width in pixels */
-    int32_t height;         /* bmap height in pixels */
-};
-
 
 /* Scratch id3 used to resolve the currently playing/selected track into an
  * album index (id3_get_index()) and to look up album art (retrieve_id3()).
@@ -200,7 +127,6 @@ enum pf_states {
 
 static int  album_count(void);
 static unsigned int album_art_key(int slide_index);
-static bool album_legacy_art(int index, char *path, int len);
 static int  album_enter(int index);
 static int  jmp_idx_prev(void);
 static int  jmp_idx_next(void);
@@ -216,7 +142,6 @@ static const struct carousel_model album_model = {
     .build_index = album_build_index,
     .count       = album_count,
     .art_key     = album_art_key,
-    .legacy_art  = album_legacy_art,
     .enter       = album_enter,
     .jump_prev   = jmp_idx_prev,
     .jump_next   = jmp_idx_next,
@@ -226,7 +151,7 @@ static const struct carousel_model album_model = {
     .set_initial = set_initial_slide,
     .on_menu     = album_on_menu,
     .prepare     = album_prepare,
-    .has_pfraw_cache = true,
+    .owns_cache_version = true,
     .title       = "Album Covers",
 };
 
@@ -277,12 +202,6 @@ static char* get_slide_name(const int slide_index, bool artist)
 
 static int jmp_idx_prev(void)
 {
-    if (!carousel_cache_ready())
-    {
-        splash(HZ*2, str(LANG_WAIT_FOR_CACHE));
-        return center_index;
-    }
-
     /* Step back to the first slide of a run.
      *
      * Two cases, and the same three lines cover both. Standing part-way into a
@@ -331,12 +250,6 @@ static int jmp_idx_prev(void)
 
 static int jmp_idx_next(void)
 {
-    if (!carousel_cache_ready())
-    {
-        splash(HZ*2, str(LANG_WAIT_FOR_CACHE));
-        return center_index;
-    }
-
     if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
     {
         int current_year = carousel_idx.album_index[center_index].year;
@@ -518,15 +431,6 @@ static int album_count(void)
     return carousel_idx.album_ct;
 }
 
-/* carousel_model.legacy_art for the album model: this screen's own per-album
- * pfraw cache, keyed by a hash of the album+artist names. Always available. */
-static bool album_legacy_art(int index, char *path, int len)
-{
-    snprintf(path, len, CACHE_PREFIX "/%x%x.pfraw",
-             mfnv(get_album_name(index)), mfnv(get_album_artist(index)));
-    return true;
-}
-
 static void set_initial_slide(const char* selected_file)
 {
     if (pf_resume_last_album)
@@ -576,13 +480,6 @@ static bool sort_albums(int new_sorting, bool from_settings)
         ID2P(LANG_NAME)
     };
 
-    /* Only change sorting once artwork has been inspected */
-    if (!carousel_cache_ready())
-    {
-        splash(HZ*2, str(LANG_WAIT_FOR_CACHE));
-        return false;
-    }
-
     carousel_settle();
 
     global_settings.album_covers_sort_albums_by = new_sorting;
@@ -615,37 +512,25 @@ static void album_sort_prev(void)
                 % SORT_VALUES_SIZE, false);
 }
 
-static void album_covers_rebuild_cache(void)
-{
-    pf_cfg.update_albumart = false;
-    pf_cfg.cache_version = CACHE_REBUILD;
-    remove(EMPTY_SLIDE);
-    db_summary_invalidate();  /* so the background pass rebuilds too */
-    pf_config_save();
-}
-
-static void album_covers_update_cache(void)
-{
-    pf_cfg.update_albumart = true;
-    pf_cfg.cache_version = CACHE_REBUILD;
-    remove(EMPTY_SLIDE);
-    db_summary_invalidate();  /* so the background pass rebuilds too */
-    pf_config_save();
-}
-
 /* bg_task.request: the carousel drives itself, so this is a task only in the
  * sense that the menu can reach it the same way as the others.
  *
  * It is not one background pass but two things going stale together: the
- * carousel's own on-disk state above, which nothing else touches, and the
- * album index, which really is a bg_task and is told separately. Pointing a
- * menu at that index alone would leave the first half undone. */
+ * carousel's own on-disk state, which nothing else touches, and the album
+ * index, which really is a bg_task and is told separately. Pointing a menu at
+ * that index alone would leave the first half undone.
+ *
+ * `rebuild` is ignored, and the menu offers only the one row because of it:
+ * the index is a single file that is always rewritten whole, so there is
+ * nothing a rebuild could discard that an update does not overwrite anyway --
+ * db_summary_invalidate() says the same about its own half. */
 static void album_covers_request(bool rebuild)
 {
-    if (rebuild)
-        album_covers_rebuild_cache();
-    else
-        album_covers_update_cache();
+    (void)rebuild;
+    pf_cfg.cache_version = CACHE_REBUILD;
+    remove(EMPTY_SLIDE);
+    db_summary_invalidate();
+    pf_config_save();
 }
 
 struct bg_task album_covers_task =

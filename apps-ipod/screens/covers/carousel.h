@@ -93,7 +93,6 @@ struct carousel_model {
     int  (*build_index)(void);                         /* build the slide data; SUCCESS/ERROR_* */
     int  (*count)(void);                               /* number of slides */
     unsigned int (*art_key)(int index);                /* art_cache key, or 0 */
-    bool (*legacy_art)(int index, char *path, int len);/* pre-cache fallback art, or false */
     int  (*enter)(int index);                          /* select: drill in; returns GO_TO_* */
     int  (*jump_prev)(void);                           /* jump to prev section (letter/year) */
     int  (*jump_next)(void);                           /* jump to next section */
@@ -105,7 +104,7 @@ struct carousel_model {
      * direct calls into a specific model's code. */
     int  (*on_menu)(void);   /* MENU-hold: run the in-screen menu; GO_TO_* or CAROUSEL_MENU_* */
     void (*prepare)(void);   /* one-off post-init setup (e.g. cache-version bookkeeping) */
-    bool has_pfraw_cache;                              /* this screen's own pfraw thumbnail cache */
+    bool owns_cache_version;                           /* honours pf_cfg.cache_version */
     const char *title;                                 /* status-bar title */
 };
 
@@ -115,7 +114,6 @@ struct carousel_model {
 struct pf_config_t
 {
      int cache_version;
-     bool update_albumart;
      int last_album;
 };
 
@@ -163,10 +161,6 @@ void carousel_caption_layout(bool two_lines, struct pf_caption *out);
 /* Persist the engine's pf_cfg to its config file (album model calls this after
  * changing last_album / triggering a cache rebuild). */
 void pf_config_save(void);
-/* True once the current index's art has all been inspected (background art
- * cache fully populated); the album model gates its "please wait" splashes on
- * this instead of touching engine buffer state directly. */
-bool carousel_cache_ready(void);
 
 /* Engine restart operations the album model drives (re-sort, in-screen rebuild).
  * These wrap the render thread / slide cache / buffer lifecycle so model code
