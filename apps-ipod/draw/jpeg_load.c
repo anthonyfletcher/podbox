@@ -978,8 +978,22 @@ static int process_markers(struct jpeg* p_jpeg)
                     p_jpeg->frameheader[i].vertical_sampling = c & 0x0F;
                     p_jpeg->frameheader[i].quanttable_select =
                         e_getc(p_jpeg, -1);
+                    /* Zero is rejected as firmly as too-large, and the low
+                     * bound is the load-bearing half: fix_headers() handles
+                     * (1,1), (1,2), (2,1) and (2,2) and its remaining `else`
+                     * is empty -- it is a void function and cannot report --
+                     * so anything else runs on with x_mbl and the membership
+                     * tables left at zero. A zero factor then drives
+                     * h_scale[1] to -1, which makes zero_need negative (a
+                     * MEMSET length), k_need an index before zig[], and
+                     * decode_buf_size zero for a buffer the decoder goes on
+                     * writing rows into. A sampling factor of 0 is not legal
+                     * JPEG; only a corrupt or hostile file carries one, and
+                     * the artwork cache decodes whatever the library holds. */
                     if (p_jpeg->frameheader[i].horizontal_sampling > 2
-                     || p_jpeg->frameheader[i].vertical_sampling > 2)
+                     || p_jpeg->frameheader[i].vertical_sampling > 2
+                     || p_jpeg->frameheader[i].horizontal_sampling < 1
+                     || p_jpeg->frameheader[i].vertical_sampling < 1)
                     return -3; /* Unsupported SOF0 subsampling */
                 }
                 p_jpeg->blocks = n;
