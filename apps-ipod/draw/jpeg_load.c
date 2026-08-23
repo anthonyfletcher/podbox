@@ -918,6 +918,39 @@ do {\
 })
 
 /* Preprocess the JPEG JFIF file */
+/* Is this a real prefix code, or does it claim more codes of some length than
+ * that length has room for?
+ *
+ * Nothing else asks, and the length check beside the call sites is not the
+ * same question. fix_huff_tbl() generates codes by the canonical rule, and an
+ * over-subscribed table simply runs that generator past the end of its length:
+ * huffcode[p] grows beyond 2^l, and the lookahead fill shifts it left into
+ * look_nbits[], which has 256 entries. 162 codes of length one -- which the
+ * AC length check permits -- puts the write about 80 KB past the end of it,
+ * through the rest of struct jpeg and out the far side. The same overflow
+ * leaves mincode[] above any code that can actually be read, so the slow
+ * decode path indexes pub[] from a negative offset as well.
+ *
+ * The bookkeeping is DEFLATE's, and the same this tree already uses in
+ * ts_inflate.c's construct(): every length doubles the codes available and
+ * spends what the table asks for, so going negative means it asked for more
+ * than exist. An incomplete table (left > 0) is left alone -- it decodes, and
+ * refusing it would reject files that work.
+ */
+static bool huff_counts_ok(const int *counts)
+{
+    int l, left = 1;
+
+    for (l = 0; l < 16; l++)
+    {
+        left <<= 1;
+        left -= counts[l];
+        if (left < 0)
+            return false;
+    }
+    return true;
+}
+
 static int process_markers(struct jpeg* p_jpeg)
 {
     unsigned char c;
@@ -1045,6 +1078,9 @@ static int process_markers(struct jpeg* p_jpeg)
                             }
                             if(16 + sum > AC_LEN)
                                 return -10; /* longer than allowed */
+                            if(!huff_counts_ok(
+                                   p_jpeg->hufftable[i].huffmancodes_ac))
+                                return -12; /* not a prefix code */
 
                             for (; j < 16 + sum; j++)
                             {
@@ -1064,6 +1100,9 @@ static int process_markers(struct jpeg* p_jpeg)
                             }
                             if(16 + sum > DC_LEN)
                                 return -11; /* longer than allowed */
+                            if(!huff_counts_ok(
+                                   p_jpeg->hufftable[i].huffmancodes_dc))
+                                return -13; /* not a prefix code */
 
                             for (; j < 16 + sum; j++)
                             {
