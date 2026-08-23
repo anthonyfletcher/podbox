@@ -700,11 +700,21 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                 else
                     type = -1;
 
-                if (type == MT_SETTING_W_TEXT || type == MT_SETTING)
+                /* find_setting() answers NULL for a row whose variable has
+                   no settings_list entry -- a setting deleted without its
+                   menu item going with it, which is the failure this tree
+                   is already shaped to expect. Every arm of the menu below
+                   dereferences it, and is_setting_quickscreenable() calls
+                   NULL quickscreenable, so it is the long menu that opens.
+                   Offer nothing rather than the choice of eight faults. */
+                const struct settings_list *ctx_setting =
+                        (type == MT_SETTING_W_TEXT || type == MT_SETTING) ?
+                            find_setting(temp->variable) : NULL;
+
+                if (ctx_setting)
                 {
                     const struct menu_item_ex *context_menu;
-                    const struct settings_list *setting =
-                            find_setting(temp->variable);
+                    const struct settings_list *setting = ctx_setting;
 
                     /* Explain first, Reset second, and that order is load
                        bearing: non_quickscreen_op_menu below reuses the first
