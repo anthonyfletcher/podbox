@@ -237,7 +237,13 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
 
     sw = hdr.width;
     sh = hdr.height;
+    /* Both dimensions, not just the one that sizes aat_band[]. sh drives
+     * the row arithmetic below, and a header claiming a huge height
+     * overflows dy * sh, which can leave sy1 behind sy0 -- `rows` is then
+     * negative, the clamp above it only tests the high side, and read()
+     * takes it as a size_t. 300 is the largest the cache ever writes. */
     if (sw <= 0 || sh <= 0 || sw > ART_CACHE_MAX_DIM ||
+        sh > ART_CACHE_MAX_DIM ||
         dw <= 0 || dh <= 0 || dw > sw || dh > sh)   /* downscale only */
         return -1;
     if ((size_t)dw * dh * FB_DATA_SZ > (size_t)max_size)
