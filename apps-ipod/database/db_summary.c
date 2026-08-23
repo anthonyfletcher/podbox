@@ -497,12 +497,25 @@ static bool exclude_spoken(const struct tagcache_search *tcs)
         && db_spoken_group_is_book(tcs->type, tcs->result_seek);
 }
 
-/* Before the search rather than during it: the table is built by searches of
- * its own, which cannot run inside another. */
-static void exclude_spoken_prepare(int tag)
+/* Start a search with the table it will be filtered against already built.
+ *
+ * The build has to happen before the search -- it runs searches of its own,
+ * which cannot nest -- and both halves have to name one tag, which is why the
+ * search is started here rather than beside the call: exclude_spoken() above
+ * then reads that tag back off the search and the two cannot drift apart.
+ *
+ * False when the table would not build, which is a reason to come back later
+ * rather than to carry on. This index is written to disk and its own staleness
+ * checks are about the database, so an unfiltered one built now would stand as
+ * the answer until the setting is toggled or the database commits. */
+static bool search_excluding_spoken(struct tagcache_search *tcs, int tag)
 {
-    if (global_settings.segregate_audiobooks)
-        db_spoken_group_ensure(tag);
+    if (global_settings.segregate_audiobooks && db_spoken_group_tag(tag)
+        && !db_spoken_group_ensure(tag))
+        return false;
+
+    tagcache_search(tcs, tag);
+    return true;
 }
 
 /* adds tagcache_search results into artist/album index */
@@ -682,8 +695,9 @@ static int build_artist_index(struct tagcache_search *tcs,
     /* artist names starts at beginning of buf */
     pfi->artist_names = *buf;
 
-    exclude_spoken_prepare(tag_albumartist);
-    tagcache_search(tcs, tag_albumartist);
+    if (!search_excluding_spoken(tcs, tag_albumartist))
+        return ERROR_USER_ABORT;
+
     res = get_tcs_search_res(ePFS_ARTIST, tcs, &(*buf), bufsz);
     tagcache_search_finish(tcs);
     if (res < SUCCESS)
@@ -1351,8 +1365,9 @@ static int create_album_index(void)
     /* album_names starts at the beginning of buf */
     pfi->album_names = buf;
 
-    exclude_spoken_prepare(tag_album);
-    tagcache_search(&tcs, tag_album);
+    if (!search_excluding_spoken(&tcs, tag_album))
+        return ERROR_USER_ABORT;
+
     res = get_tcs_search_res(ePFS_ALBUM, &tcs, &buf, &buf_size);
     tagcache_search_finish(&tcs);
     if (res < SUCCESS)

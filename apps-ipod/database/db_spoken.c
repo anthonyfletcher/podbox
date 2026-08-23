@@ -190,12 +190,20 @@ static struct spoken_group {
     { tag_virt_canonicalartist,  { 0 }, 0, false },
 };
 
+/* Set for the length of one build; see db_spoken_group_ensure(). */
+static bool groups_building;
+
+/* Set by a commit, and read by a build to find out one landed inside it. */
+static bool groups_disturbed;
+
 static void groups_invalidate(void)
 {
     unsigned int i;
 
     for (i = 0; i < ARRAYLEN(spoken_groups); i++)
         spoken_groups[i].valid = false;
+
+    groups_disturbed = true;
 }
 
 /* Its own search state, not build_tcs. A search started here runs
@@ -266,23 +274,30 @@ static bool collect_spoken(struct spoken_group *g)
     return true;
 }
 
-/* Take back out of it every group that holds music too, leaving the books. */
+/* Take back out of it every group that holds music too, leaving the books.
+ *
+ * No uniqbuf, unlike the pass above. This one's results are the groups holding
+ * music, which is most of the library, and a buffer big enough to unique them
+ * would dwarf the table it is protecting -- so the search reports one result
+ * per track and this walks the candidates for each. Marking is idempotent, so
+ * a group arriving twice simply fails to match the second time, and the walk
+ * stops as soon as every candidate has been struck out. */
 static bool drop_mixed(struct spoken_group *g)
 {
     int i, kept = 0;
+    int left = g->ct;
 
-    if (g->ct == 0)
+    if (left == 0)
         return true;
 
     if (!tagcache_search(&group_tcs, g->tag))
         return false;
 
-    tagcache_search_set_uniqbuf(&group_tcs, group_uniqbuf,
-                                sizeof(group_uniqbuf));
     tagcache_search_add_clause(&group_tcs,
                         (struct tagcache_search_clause *)&is_music_clause);
 
-    while (tagcache_get_next(&group_tcs, build_buf, sizeof(build_buf)))
+    while (left > 0
+           && tagcache_get_next(&group_tcs, build_buf, sizeof(build_buf)))
     {
         for (i = 0; i < g->ct; i++)
         {
@@ -291,6 +306,7 @@ static bool drop_mixed(struct spoken_group *g)
                 /* A seek is an offset into the tag file, so no real entry
                  * sits at -1 and marking is free of a second array. */
                 g->seek[i] = -1;
+                left--;
                 break;
             }
         }
@@ -308,26 +324,59 @@ static bool drop_mixed(struct spoken_group *g)
     return true;
 }
 
-void db_spoken_group_ensure(int tag)
+bool db_spoken_group_ensure(int tag)
 {
     struct spoken_group *g = group_for(tag);
 
-    if (!g || g->valid)
-        return;
+    if (!g)
+        return false;
+
+    if (g->valid)
+        return true;
+
+    /* One build at a time, and the loser goes away rather than waiting.
+     *
+     * Both passes yield -- build_lookup_list() in tagcache.c does, once per
+     * entry it accepts -- and the callers are on two threads: the album index
+     * builds on its own while the browse and the search run on the main one.
+     * A second entrant would memset group_tcs out from under the first, so it
+     * is turned away instead, with the table left invalid for it to try again
+     * on its next visit. Blocking would put a browse behind a background pass,
+     * which is the worse of the two; the same trade tagcache.c makes for the
+     * genre table.
+     *
+     * The flag is enough on its own: nothing between the test and the set
+     * yields, so no other thread can run in between. */
+    if (groups_building)
+        return false;
+
+    groups_building = true;
 
     /* A pass that could not read the database empties the table rather than
      * leaving a half-built one standing: nothing is then hidden, and the
-     * table stays invalid so the next caller builds it again. */
-    if (collect_spoken(g) && drop_mixed(g))
+     * table stays invalid so the next caller builds it again.
+     *
+     * A commit landing between the two passes costs the build the same way:
+     * the seeks the first gathered are into a tag file the commit re-sorted,
+     * and the second reads the new one. That gap is the only place a commit
+     * can land -- a search holds tagcache's write lock and a commit waits for
+     * it -- and groups_invalidate() is how it announces itself. */
+    if (collect_spoken(g))
     {
-        g->valid = true;
-    }
-    else
-    {
-        g->ct = 0;
+        groups_disturbed = false;
+
+        if (drop_mixed(g) && !groups_disturbed)
+            g->valid = true;
     }
 
+    if (!g->valid)
+        g->ct = 0;
+
+    groups_building = false;
+
     logf("db_spoken: %d books by tag %d", g->ct, g->tag);
+
+    return g->valid;
 }
 
 bool db_spoken_group_tag(int tag)

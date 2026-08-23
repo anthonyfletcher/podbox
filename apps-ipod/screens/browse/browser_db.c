@@ -1957,10 +1957,14 @@ static bool browse_picked_by_name;
  * leaves the tag file's own order the whole of what puts it in order. Track
  * and numeric lists are sorted either way and can carry the clause; the
  * unique tags are answered from db_spoken's tables instead, and the ones with
- * no table -- genre, composer -- keep their books. */
+ * no table -- genre, composer -- keep their books.
+ *
+ * Asked with the tag the browse names as well as the one it searches on, so
+ * tag_virt_basename belongs here beside the tag_filename it becomes below. */
 static bool exclude_by_clause_ok(int tag)
 {
-    return tag == tag_title || tag == tag_filename || TAGCACHE_IS_NUMERIC(tag);
+    return tag == tag_title || tag == tag_filename
+        || tag == tag_virt_basename || TAGCACHE_IS_NUMERIC(tag);
 }
 
 /* Whether every level of this browse can have spoken word kept out of it.
@@ -2035,13 +2039,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         tag = tag_filename;
     }
 
-    /* Both before the search: the table is built by searches of its own,
-     * which cannot run inside this one. */
+    /* Before the search: the table is built by searches of its own, which
+     * cannot run inside this one. A table that would not build -- another
+     * thread is building it -- leaves this browse unfiltered rather than
+     * half-filtered; the next entry to the screen has it. */
     bool exclude = exclude_spoken_wanted();
-    bool exclude_by_seek = exclude && db_spoken_group_tag(tag);
-
-    if (exclude_by_seek)
-        db_spoken_group_ensure(tag);
+    bool exclude_by_seek = exclude && db_spoken_group_ensure(tag);
 
     if (!tagcache_search(&tcs, tag))
         return -1;

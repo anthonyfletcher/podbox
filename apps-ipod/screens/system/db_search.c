@@ -152,6 +152,20 @@ void db_search_arm_scope(int scope)
     armed_scope = scope;
 }
 
+/* Build the tables the two scoped sides are told apart by, if they are not
+ * built already. Two passes over the master index each, so it is worth the
+ * call being cheap when there is nothing to do -- which it is: db_spoken
+ * answers a current table at once. Nothing to do at all when no scope is
+ * being applied. */
+static void scope_tables_ensure(void)
+{
+    if (active_scope == DB_SEARCH_ALL || !global_settings.segregate_audiobooks)
+        return;
+
+    db_spoken_group_ensure(tag_album);
+    db_spoken_group_ensure(tag_albumartist);
+}
+
 /* Whether a row this scan turned up belongs on the side being searched.
  *
  * A title is per track, so the tag itself says. Album and album artist are
@@ -195,6 +209,12 @@ static int run_search(const char *query, void *ctx)
      * rather than leaving the last scan's on screen. */
     if ((int)strlen(query) < setting_min_letters())
         return 0;
+
+    /* Built at the screen's entry, but asked for again here: a build that
+     * lost to the one running on the album index's thread has to be retried
+     * or the scoped sides read as music for the rest of the session. Asking
+     * costs nothing once a table is current. */
+    scope_tables_ensure();
 
     for (i = 0; i < ARRAYLEN(search_tags[0]); i++)
     {
@@ -313,14 +333,10 @@ int db_search_run(void)
         return GO_TO_PREVIOUS;
     }
 
-    /* Here, not in run_search(): each table costs two passes over the master
-     * index, and a scan runs every time the query settles. Skipped entirely
-     * when nothing is being scoped. */
-    if (active_scope != DB_SEARCH_ALL && global_settings.segregate_audiobooks)
-    {
-        db_spoken_group_ensure(tag_album);
-        db_spoken_group_ensure(tag_albumartist);
-    }
+    /* Here rather than only in run_search(): the tables cost two passes over
+     * the master index each, and this is the moment the user is not waiting
+     * on a result. */
+    scope_tables_ensure();
 
     /* str() is not a constant expression, so the title is filled in here
      * rather than in the initialiser above. */

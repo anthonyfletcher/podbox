@@ -532,9 +532,20 @@ menu. Albums, artists, the carousel and search then show music only. The genre
 and composer lists are left as they are, so a book is still reachable under
 its own genre.
 
-The genre tag is the whole of the evidence -- Audiobook, Spoken Word, Podcast
-and the like. A book tagged as music browses as music, and retagging it is the
-fix.
+The genre tag is the whole of the evidence. A genre counts if it has
+"audiobook", "audio book" or "spoken word" anywhere in it, so Audiobooks,
+Audiobook/Fiction and Spoken Word & Poetry all match; and it counts if it is
+exactly "book", "books", "spoken", "speech", "podcast", "non-music" or
+"nonmusic", which are too short to go looking for inside longer names.
+Capitals make no difference.
+
+Nothing else is read. Track length and title look much the same on a book, a
+live set and a long classical movement, so a book tagged as music browses as
+music and retagging it is the fix.
+
+An album or an artist has to be spoken word throughout to count as a book. One
+music track on it and the whole of it stays with the music, which is what keeps
+a compilation with a poem on it out of the Audiobooks menu.
 
 [trim titles]
 Shortens the album and track names on the now playing screen by dropping a
