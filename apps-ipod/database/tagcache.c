@@ -4460,7 +4460,13 @@ static bool load_tagcache(void)
         bytesleft -= sizeof (struct tagcache_header);
 
         fd = open_tag_fd(tch, tag, false);
-        if (rc < 0)
+        /* fd, not rc: rc last held an alignment gap and is never
+         * negative, so a tag file that would not open was not noticed
+         * here. *tch is then whatever the buffer held, and an
+         * entry_count of zero or less walks past the loop below
+         * without a read ever failing -- leaving the load reporting
+         * success with one tag block never filled in. */
+        if (fd < 0)
             goto failure;
 
         /* Load the entries for this tag */
@@ -4652,6 +4658,12 @@ static bool check_file_refs(bool auto_update)
     {
         logf(TAGCACHE_FILE_INDEX " open fail", tag_filename);
         debug_log(DEBUG_LOG_TAGCACHE, "refs: filename tagfile open failed");
+        /* The pin above is held from here to wend_finished, and this is
+         * the one exit between the two. Left taken it is never dropped:
+         * the RAM database is the largest thing in the pool and buflib
+         * cannot move a pinned block, so from here on nothing that needs
+         * to compact can have it -- the audio buffer included. */
+        tcrc_buffer_unlock();
         return false;
     }
 
@@ -4686,8 +4698,22 @@ static bool check_file_refs(bool auto_update)
         }
 
         int idx_id = tfe.idx_id; /* dircache reference clobbers *tfe */
-        struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
         unsigned int searchflag;
+
+        /* The loader checks this too, but only for the entries the
+         * tag file's own header admits to; this walk runs to the end
+         * of the file. Everything below writes at idx_id -- the flag,
+         * the dircache fileref, and delete_entry() -- so an entry past
+         * that count writes outside the RAM database. */
+        if (idx_id < 0 || idx_id >= current_tcmh.tch.entry_count)
+        {
+            logf("corrupt filename tagfile entry: idxid=%d", idx_id);
+            debug_log(DEBUG_LOG_TAGCACHE, "refs: bad idx_id %d", idx_id);
+            ret = false;
+            goto wend_finished;
+        }
+
+        struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
         if (!auto_update)
         {
             if(idx->flag & FLAG_DIRCACHE) /* already found */
