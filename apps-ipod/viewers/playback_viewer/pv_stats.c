@@ -291,6 +291,19 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
     t_album.n  = n_album;
     day_n      = n_days;
 
+    /* The rows arrived as bytes, and everything downstream reads name as
+     * a string -- htable_reindex() hashes it a character at a time and
+     * stops at a zero. A file supplying a full-width name with no room
+     * for one runs off the row and into the next. Being terminated is a
+     * property of the type rather than a claim about the figures, so it
+     * is settled here rather than left to a rebuild. */
+    for (int i = 0; i < n_artist; i++)
+        t_artist.items[i].name[PV_NAME_MAX - 1] = '\0';
+    for (int i = 0; i < n_title; i++)
+        t_title.items[i].name[PV_NAME_MAX - 1] = '\0';
+    for (int i = 0; i < n_album; i++)
+        t_album.items[i].name[PV_NAME_MAX - 1] = '\0';
+
     htable_reindex(&t_artist);
     htable_reindex(&t_title);
     htable_reindex(&t_album);
