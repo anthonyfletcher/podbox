@@ -1130,6 +1130,37 @@ bool skin_render_alternator(struct skin_element* element, struct skin_draw_info 
     return changed_lines || ret;
 }
 
+/* Lay down the tinted %dr rectangles a viewport's lines held back.
+ *
+ * Last, because they blend with what is beneath them, which includes the album
+ * art and the images wps_display_images() draws once for the whole viewport.
+ *
+ * Both renderers call this. The playlist viewer builds its own draw_info and
+ * runs the same line loop, so its lines can queue a blend just as readily --
+ * and with nothing to flush them a translucent %dr inside a %Vp parsed,
+ * evaluated, queued and vanished. */
+static void flush_pending_blends(struct screen *display,
+                                 struct skin_viewport *skin_viewport,
+                                 struct skin_draw_info *info)
+{
+    for (int i = 0; i < info->pending_blend_count; i++)
+    {
+        const struct draw_rectangle *rect = info->pending_blend[i];
+        unsigned backup = skin_viewport->vp.fg_pattern;
+        /* Start colour only. A tinted gradient would need a per-row blend and
+         * nothing wants one yet. */
+        skin_viewport->vp.fg_pattern = dynamic_colors_resolve(rect->start_colour);
+        if (rect->radius)
+            draw_rounded_rect(display, rect);
+        else
+            display->blendrect(rect->x, rect->y, rect->width, rect->height,
+                               rect->opacity);
+        skin_viewport->vp.fg_pattern = backup;
+        info->drew = true;
+    }
+    info->pending_blend_count = 0;
+}
+
 /* Returns whether anything was drawn, so the caller knows if this viewport's
  * rectangle is owed a flush. */
 bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
@@ -1233,23 +1264,7 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
     }
     wps_display_images(gwps, &skin_viewport->vp);
 
-    /* Tints go last: they blend with what is beneath them, which includes the
-     * album art and images wps_display_images() has just drawn. */
-    for (int i = 0; i < info.pending_blend_count; i++)
-    {
-        const struct draw_rectangle *rect = info.pending_blend[i];
-        unsigned backup = skin_viewport->vp.fg_pattern;
-        /* Start colour only. A tinted gradient would need a per-row blend and
-         * nothing wants one yet. */
-        skin_viewport->vp.fg_pattern = dynamic_colors_resolve(rect->start_colour);
-        if (rect->radius)
-            draw_rounded_rect(display, rect);
-        else
-            display->blendrect(rect->x, rect->y, rect->width, rect->height,
-                               rect->opacity);
-        skin_viewport->vp.fg_pattern = backup;
-        info.drew = true;
-    }
+    flush_pending_blends(display, skin_viewport, &info);
     return info.drew;
 }
 
@@ -1509,4 +1524,6 @@ void skin_render_playlistviewer(struct playlistviewer* viewer,
         info.offset++;
         start_item++;
     }
+
+    flush_pending_blends(display, skin_viewport, &info);
 }

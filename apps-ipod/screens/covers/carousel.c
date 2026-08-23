@@ -607,7 +607,12 @@ static void config_load(const char *filename, const struct configdata *cfg,
 
     while (read_line(fd, buf, sizeof(buf)) > 0)
     {
-        settings_parseline(buf, &name, &val);
+        /* Both are left untouched for a comment or a line with no colon, and
+         * they are uninitialised locals -- a config truncated by a power loss
+         * mid-save is enough to reach the strcmp below with a stray pointer. */
+        if (!settings_parseline(buf, &name, &val))
+            continue;
+
         for (i = 0; i < num_items; i++)
         {
             if (strcmp(cfg[i].name, name))

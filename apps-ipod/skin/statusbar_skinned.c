@@ -365,10 +365,10 @@ char* sb_create_from_settings(enum screen_type screen)
             char fg[8], bg[8];
             int i = 0;
             comma++;
-            while (*comma != ',' && i < (int) sizeof(fg) - 1)
+            while (*comma && *comma != ',' && i < (int) sizeof(fg) - 1)
                 fg[i++] = *comma++;
             fg[i] = '\0'; comma++; i=0;
-            while (*comma != ')'  && i < (int) sizeof(bg) - 1)
+            while (*comma && *comma != ')' && i < (int) sizeof(bg) - 1)
                 bg[i++] = *comma++;
             bg[i] = '\0';
             len += snprintf(end, remaining-len, ") %%Vf(%s) %%Vb(%s)\n", fg, bg);

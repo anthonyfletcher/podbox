@@ -319,7 +319,16 @@ static void get_pic_list(bool single_file)
 
 static int change_filename(int direct)
 {
-    bool file_erased = (file_pt[curfile] == NULL);
+    bool file_erased;
+
+    /* get_pic_list() leaves this at -1 when the file being shown was not in
+     * the listing it built -- deleted between the browser reading the
+     * directory and the viewer opening it, or a directory too large for the
+     * buffer. Start at the top rather than indexing before the array. */
+    if (curfile < 0)
+        curfile = 0;
+
+    file_erased = (file_pt[curfile] == NULL);
     direction = direct;
 
     curfile += (direct == DIR_PREV? entries - 1: 1);

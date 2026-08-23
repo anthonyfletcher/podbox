@@ -116,6 +116,32 @@ struct play_rec
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
+/* Whether a header just read off the disk describes something that could fit
+ * in `bufsz` -- and, more to the point, whose counts survive being multiplied
+ * by a struct size.
+ *
+ * Every reader of the file has to ask this before it multiplies or adds any of
+ * these four fields, because the failure is not a rejected file: a count large
+ * enough to overflow the 32-bit size arithmetic wraps to a *small* number, the
+ * reads sized from it are satisfied, and the loop that then walks the real
+ * count runs off the end of the allocation. carry_over_prepare() writes in
+ * that loop.
+ *
+ * The magic does not cover this. It is four bytes at the front of the file,
+ * and a header scribbled by a bad unmount keeps them while the counts behind
+ * them turn to noise. Bounding each count by what the buffer could hold at
+ * best is enough: the products below cannot then exceed bufsz, so the sums the
+ * callers make of them cannot wrap either. */
+static bool header_fits(const struct db_summary_t *d, size_t bufsz)
+{
+    return d->album_ct  >= 0
+        && d->artist_ct >= 0
+        && (size_t)d->album_ct  <= bufsz / sizeof(struct album_data)
+        && (size_t)d->artist_ct <= bufsz / sizeof(struct artist_data)
+        && d->album_len  <= bufsz
+        && d->artist_len <= bufsz;
+}
+
 /* Shared by every walk below; the models keep their own where they need one. */
 static struct tagcache_search tcs;
 
@@ -574,6 +600,10 @@ static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
                     return ERROR_USER_ABORT;
 
                 seek = pfi->album_index[-j].artist_seek;
+                /* Per album, as the same walk in create_album_index() does.
+                 * Left at 2 by a miss, every later album searches whatever
+                 * truncated range that miss left behind and never wraps. */
+                retry = 0;
 
     retry_artist_lookup:
                 retry++;
@@ -1033,6 +1063,7 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
 
     if (read(fd, &old, sizeof(old)) != sizeof(old)
         || memcmp(&old.header, INDEX_HDR, sizeof(old.header)) != 0
+        || !header_fits(&old, *bufsz)
         || old.album_ct == 0)
     {
         close(fd);
@@ -1591,6 +1622,7 @@ static int load_artist_index(struct db_summary_t *target,
     if ((unsigned long)filesize(fr) <= sizeof(data)
         || read(fr, &data, sizeof(data)) != sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || !header_fits(&data, bsz)
         || data.artist_ct == 0)
         goto failure;
 
@@ -1693,7 +1725,8 @@ static int load_album_index(void){
         if (fsize > sizeof(data))
         {
             if (read(fr, &data, sizeof(data)) == sizeof(data) &&
-                memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) == 0)
+                memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) == 0 &&
+                header_fits(&data, bufstart_sz))
             {
                 name_sz = data.artist_len + data.album_len;
                 album_idx_sz = data.album_ct * sizeof(struct album_data);
@@ -2184,6 +2217,7 @@ static int reader_start(struct db_summary_reader *r)
     if (fsize <= (off_t)sizeof(data)
         || read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || !header_fits(&data, (size_t)fsize)
         || data.album_ct == 0)
         goto failure;
 
@@ -2302,6 +2336,7 @@ int db_summary_read_year_table(struct db_summary_year *out, int max)
     ret = ERROR_NO_ALBUMS;
     if (read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
+        || !header_fits(&data, (size_t)filesize(fd))
         || data.album_ct == 0 || data.album_ct > max)
         goto done;
 

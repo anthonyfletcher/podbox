@@ -294,7 +294,11 @@ static int id3_get_index(struct mp3entry *id3)
             album_idx = carousel_idx.album_index[i].name_idx;
             artist_idx = carousel_idx.album_index[i].artist_idx;
 
-            if(!strcmp(carousel_idx.album_names + album_idx, current_album) &&
+            /* An album whose artist never resolved carries -1, which is a
+             * real state -- the duplicate pass writes it. Reading the blob at
+             * that offset walks off its front. */
+            if(artist_idx >= 0 &&
+               !strcmp(carousel_idx.album_names + album_idx, current_album) &&
                 !strcasecmp(carousel_idx.artist_names + artist_idx,
                             current_artist))
                 return i;
@@ -459,7 +463,8 @@ static void reselect(unsigned int hash_album, unsigned int hash_artist)
         album_idx = carousel_idx.album_index[i].name_idx;
         artist_idx = carousel_idx.album_index[i].artist_idx;
 
-        if(hash_album == mfnv(carousel_idx.album_names + album_idx) &&
+        if(artist_idx >= 0 &&
+           hash_album == mfnv(carousel_idx.album_names + album_idx) &&
            hash_artist == mfnv(carousel_idx.artist_names + artist_idx))
         {
             set_current_slide(i);
