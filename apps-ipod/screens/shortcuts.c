@@ -243,6 +243,19 @@ static void shortcuts_ata_idle_callback(void)
 
     if (first_idx_to_writeback < 0)
         return;
+
+    /* This runs on the storage thread. A lock already taken means the
+     * menu is up and something is holding a raw shortcut pointer, and
+     * the reload at the end of this function frees the whole chain --
+     * which the lock does not prevent, since a free is not a move. Come
+     * back when the menu has closed; call_storage_idle_notifys() will
+     * not ask again for another thirty seconds. */
+    if (buflib_move_lock > 0)
+    {
+        register_storage_idle_func(shortcuts_ata_idle_callback);
+        return;
+    }
+
     fd = open(SHORTCUTS_FILENAME, append|O_RDWR|O_CREAT, 0644);
     if (fd < 0)
         return;
