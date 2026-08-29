@@ -9,6 +9,8 @@
 #ifndef PCMBUF_H
 #define PCMBUF_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 /* Commit PCM data */
@@ -56,6 +58,38 @@ void pcmbuf_soft_mode(bool shhh);
 /* Time and position */
 unsigned int pcmbuf_get_position_key(void);
 void pcmbuf_sync_position_update(void);
+
+/* Analysis tap: read committed-but-unplayed PCM without consuming it. What
+ * the codec has decoded but the DAC has not reached yet is the only source
+ * of audio the player has not heard, so this is where anything wanting to
+ * react ahead of the sound reads. */
+struct pcmbuf_peek
+{
+    const int16_t *pcm;     /* Interleaved stereo, two int16 per frame */
+    int            frames;  /* Frames available at pcm */
+    unsigned long  elapsed; /* Track time of the first frame, carried only */
+    unsigned int   pos_key; /* where pos_key is non-zero (see stamp_chunk) */
+};
+
+/* Seed a peek cursor at the play position. */
+size_t pcmbuf_peek_start(void);
+
+/* Hand back the committed chunk at *index and step *index past it. False
+ * once the cursor reaches the codec, and false if it no longer points into
+ * committed data -- playback moved, or the codec lapped it -- in which case
+ * reseed rather than trusting the cursor. */
+bool pcmbuf_peek_next(size_t *index, struct pcmbuf_peek *peek);
+
+/* Whether a cursor that returned nothing is merely caught up with the codec
+ * rather than stale. This is the difference between waiting and reseeding,
+ * and pcmbuf_peek_next() alone cannot say which. */
+bool pcmbuf_peek_valid(size_t index);
+
+/* Milliseconds of audio between the play position and 'index'. */
+unsigned int pcmbuf_peek_lead_ms(size_t index);
+
+/* Milliseconds of committed-but-unplayed audio: the look-ahead available. */
+unsigned int pcmbuf_lookahead_ms(void);
 
 /* Misc */
 bool pcmbuf_is_lowdata(void);

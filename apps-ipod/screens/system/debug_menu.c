@@ -55,6 +55,7 @@
 #include "system/strutil.h"
 #include "widgets/splash.h"
 #include "screens/shortcuts.h"
+#include "screens/system/beat_debug.h"
 #include "dircache.h"
 #include "draw/viewport.h"
 #include "database/tagcache.h"
@@ -2094,6 +2095,7 @@ static const struct {
         { "Spun stats", dbg_pv_stats },
         { "Spun: re-arm crowns", dbg_pv_rearm },
         { "Featured artists", dbg_featured },
+        { "Beat analysis", beat_debug_screen },
 #ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },
 #endif

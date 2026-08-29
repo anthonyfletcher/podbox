@@ -22,7 +22,9 @@
  *   - track change: arming and cancelling the boundary callbacks
  *   - playback: the PCM callback, start/stop/pause
  *   - crossfade: the fader, and mixing the outgoing tail with the incoming track
- *   - debug metrics, fade/volume control, position reporting, sample rate
+ *   - debug metrics, and the analysis tap that reads decoded audio ahead of
+ *     the DAC without consuming it
+ *   - fade/volume control, position reporting, sample rate
  ****************************************************************************/
 #include <stdio.h>
 #include "config.h"
@@ -1303,6 +1305,84 @@ int pcmbuf_used_descs(void)
 int pcmbuf_descs(void)
 {
     return pcmbuf_desc_count;
+}
+
+
+/** Analysis tap **/
+
+/* Nothing here consumes, locks or copies: a caller walks the same committed
+ * region the PCM interrupt is draining, behind chunk_widx and ahead of
+ * chunk_ridx, which no writer touches. The cursor is the caller's, so two
+ * readers do not interfere with each other or with playback.
+ *
+ * A cursor left alone falls behind chunk_ridx and is eventually overwritten
+ * by the codec. index_committed() is what catches that, so a caller must
+ * treat a false return as "reseed", not as "no data yet". */
+
+size_t pcmbuf_peek_start(void)
+{
+    return chunk_ridx;
+}
+
+bool pcmbuf_peek_next(size_t *index, struct pcmbuf_peek *peek)
+{
+    size_t i = *index;
+    struct chunkdesc *desc;
+
+    if (!index_committed(i))
+        return false;
+
+    desc = index_chunkdesc(i);
+
+    peek->pcm     = index_buffer(i);
+    peek->frames  = desc->size / PCMBUF_SAMPLE_SIZE;
+    peek->elapsed = desc->elapsed;
+    peek->pos_key = desc->pos_key;
+
+    *index = index_next(i);
+    return true;
+}
+
+bool pcmbuf_peek_valid(size_t index)
+{
+    return index_committed(index) || index == chunk_widx;
+}
+
+/* Bytes to milliseconds. A crossfade-sized buffer is large enough that the
+ * numerator overflows 32 bits, hence the widening. */
+static unsigned int pcmbuf_bytes_to_ms(size_t bytes)
+{
+    unsigned int byterate = BYTERATE;
+
+    if (byterate == 0)
+        return 0;
+
+    return (unsigned int)(((uint64_t)bytes * 1000) / byterate);
+}
+
+unsigned int pcmbuf_peek_lead_ms(size_t index)
+{
+    size_t ridx = chunk_ridx;
+
+    /* pcmbuf_peek_valid(), not index_committed(): a cursor that has caught up
+     * sits *on* chunk_widx, which is not committed data but is the position
+     * furthest ahead a reader can legitimately hold -- and is where a reader
+     * keeping up with the codec spends nearly all its time. Testing
+     * committedness here answered zero for the steady state. */
+    if (!pcmbuf_peek_valid(index))
+        return 0;
+
+    /* Same unfolding as pcmbuf_unplayed_bytes(): the cursor may have wrapped
+     * past the reader. */
+    if (ridx > index)
+        index += pcmbuf_size;
+
+    return pcmbuf_bytes_to_ms(index - ridx);
+}
+
+unsigned int pcmbuf_lookahead_ms(void)
+{
+    return pcmbuf_bytes_to_ms(pcmbuf_unplayed_bytes());
 }
 
 

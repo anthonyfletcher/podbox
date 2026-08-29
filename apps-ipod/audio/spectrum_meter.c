@@ -39,7 +39,7 @@
  * samplerate/SPECTRUM_BLOCK_SIZE (~172Hz at 44.1kHz), so the lowest bands
  * sit well inside one resolution cell and read partly as each other. They
  * are distinct, not independent; separating them needs a longer block. */
-static const int band_freq_hz[SPECTRUM_MAX_BANDS] =
+const int spectrum_band_freq_hz[SPECTRUM_MAX_BANDS] =
 {
     60, 150, 400, 1000, 2500, 4000, 7000, 12000
 };
@@ -55,7 +55,7 @@ static int spectrum_level[2][SPECTRUM_MAX_BANDS];
 
 /* Rough perceptual (log-like) compression range: ln(raw magnitude) below
  * SPECTRUM_LOG_MIN maps to level 0, above SPECTRUM_LOG_MAX maps to level
- * 100. Now that goertzel_magnitude() normalizes back to an amplitude-
+ * 100. Now that spectrum_goertzel_magnitude() normalizes back to an amplitude-
  * comparable scale (0-32767ish), these are calibrated against that range:
  * ln(50)=~4 (near-silent noise floor) and ln(20000)=~10 (a hot but not
  * necessarily full-scale signal reaches 100, giving some headroom rather
@@ -80,7 +80,7 @@ static int spectrum_level[2][SPECTRUM_MAX_BANDS];
  * Q29 rather than more because it is the highest that keeps 2*cos inside
  * 32 bits, so both operands of the inner multiply stay the width they
  * were at Q14 and only the product needs 64. */
-static int goertzel_magnitude(const int16_t *samples, int count, int stride,
+int spectrum_goertzel_magnitude(const int16_t *samples, int count, int stride,
                               int freq_hz, int samplerate)
 {
     unsigned long phase = (unsigned long)
@@ -123,7 +123,7 @@ static int goertzel_magnitude(const int16_t *samples, int count, int stride,
 /* Maps a raw Goertzel magnitude to a 0-100 display level with a rough
  * log-like compression, so quiet passages still show visible movement
  * instead of just the loudest band lighting up. */
-static int scale_to_level(int raw)
+int spectrum_scale_to_level(int raw)
 {
     long logval;
     int level;
@@ -131,7 +131,7 @@ static int scale_to_level(int raw)
     if (raw <= 0)
         return 0;
     /* raw can reach ~46000 for a loud on-frequency signal (see
-     * goertzel_magnitude's mag_sq clamp); "raw << 16" must stay inside
+     * spectrum_goertzel_magnitude's mag_sq clamp); "raw << 16" must stay inside
      * signed 32-bit range for fp16_log's Q16 input. */
     if (raw > 32767)
         raw = 32767;
@@ -194,10 +194,12 @@ void spectrum_meter_peek(void)
     {
         for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
         {
-            int raw = goertzel_magnitude(pcm + channel, SPECTRUM_BLOCK_SIZE, 2,
-                                         band_freq_hz[band], samplerate);
+            int raw = spectrum_goertzel_magnitude(pcm + channel,
+                                                  SPECTRUM_BLOCK_SIZE, 2,
+                                                  spectrum_band_freq_hz[band],
+                                                  samplerate);
 
-            approach_level(channel, band, scale_to_level(raw));
+            approach_level(channel, band, spectrum_scale_to_level(raw));
         }
     }
 }

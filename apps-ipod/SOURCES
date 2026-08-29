@@ -83,6 +83,8 @@ widgets/menu.c
 widgets/option_select.c
 audio/peak_meter.c
 audio/spectrum_meter.c
+audio/beat_analyse.c
+audio/beat_track.c
 widgets/search_dialog.c
 widgets/splash.c
 widgets/text_box.c
@@ -106,6 +108,7 @@ screens/system/about.c
 screens/system/art_health.c
 screens/system/bg_task_info.c
 screens/system/db_search.c
+screens/system/beat_debug.c
 screens/system/debug_menu.c
 files/file_ops.c
 files/file_index.c
