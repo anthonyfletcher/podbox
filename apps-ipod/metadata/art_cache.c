@@ -1252,6 +1252,12 @@ void art_cache_init(void)
     cache_busy = false;
     queue_init(&aa_queue, true);
 
+    /* Start the log from a readable point once per boot, so it says what this
+     * run did rather than every run since the setting went on -- and so the
+     * file exists from boot however the setting was set. Settings are loaded
+     * before init_tagcache() reaches here, so the gate reads the real value. */
+    debug_log_restart(DEBUG_LOG_ARTCACHE);
+
     /* A format bump leaves every cached thumbnail unreadable, but it does not
      * move the database's entry count -- so the marker still says this library
      * is covered, and the pass that would purge and regenerate them would

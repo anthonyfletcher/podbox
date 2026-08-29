@@ -5477,6 +5477,9 @@ void tagcache_stop_scan(void)
 
 void tagcache_init(void)
 {
+    /* Per boot, for the same reason art_cache_init() does it. */
+    debug_log_restart(DEBUG_LOG_TAGCACHE);
+
     memset(&tc_stat, 0, sizeof(struct tagcache_stat));
     memset(&current_tcmh, 0, sizeof(struct master_header));
     filenametag_fd = -1;

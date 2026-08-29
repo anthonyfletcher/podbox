@@ -49,6 +49,7 @@
 #include "kernel.h"
 #include "system/volume.h"
 #include "system/strutil.h"     /* skip_whitespace() */
+#include "system/debug_log.h"
 #include "audio/playback.h"
 #include "widgets/list.h"
 #include "rbunicode.h"
@@ -651,6 +652,21 @@ static void wps_art_source_callback(int mode)
 {
     (void)mode;
     playback_update_aa_dims();
+}
+
+/* Switching a diagnostic log on starts it from a readable point, and gives
+ * the file at once -- so an empty log after a run means the worker never
+ * reached its first marker, rather than that logging was never on. */
+static void debug_log_tagcache_callback(bool on)
+{
+    if (on)
+        debug_log_restart(DEBUG_LOG_TAGCACHE);
+}
+
+static void debug_log_artcache_callback(bool on)
+{
+    if (on)
+        debug_log_restart(DEBUG_LOG_ARTCACHE);
 }
 
 /* perform shuffle/unshuffle of the current playlist based on the boolean provided */
@@ -1701,10 +1717,12 @@ const struct settings_list settings[] = {
     /* Diagnostics: append what the two background workers are doing to
      * .rockbox/tagcache.log and .rockbox/artcache.log. Both drive the same
      * "Building" indicator, so when it will not go away these say which. */
-    OFFON_SETTING(0, debug_log_tagcache, LANG_DEBUG_LOG, false,
-                  "debug log tagcache", NULL),
-    OFFON_SETTING(0, debug_log_artcache, LANG_DEBUG_LOG, false,
-                  "debug log artcache", NULL),
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                  debug_log_tagcache, LANG_DEBUG_LOG, false,
+                  "debug log tagcache", debug_log_tagcache_callback),
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                  debug_log_artcache, LANG_DEBUG_LOG, false,
+                  "debug log artcache", debug_log_artcache_callback),
     INT_SETTING(0, album_covers_scroll_speed, LANG_SCROLL_SPEED, 175,
                 "album covers scroll speed", UNIT_PERCENT, 100, 400, 25,
                 NULL, NULL, NULL),
