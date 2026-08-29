@@ -324,7 +324,13 @@ your own version.
 Theme builders: See [`theme-guide.md`](docs/podbox/theme-guide.md) for guidance on creating
 themes for PodBox.
 
-## Credits
+## Licence
+
+RockBox, RockPod and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
+
+See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
+
+## Development credits
 
 This project has been developed with extensive AI assistance. I am a software developer, 
 although C is not my primary language. I have driven the project's architecture, feature 
@@ -341,11 +347,7 @@ Built on the work of:
 - the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes))
 - the [Spun](https://github.com/majorsiebe/Stats_for_iPod) project (Siebe Majoor: aka [@majorsiebe](https://github.com/majorsiebe))
 
-## Licence
-
-RockBox, RockPod and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
-
-See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
+## Other credits
 
 ### Spike video
 
@@ -353,3 +355,24 @@ See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LI
 - Music provided by NoCopyrightSounds
 - Free Download/Stream: http://ncs.io/Recall
 - Watch: http://ncs.lnk.to/RecallAT/youtube
+
+### Artwork in screenshots
+
+- Angine de Poitrine - Vol.II - [Website](https://anginedepoitrine.com/)
+  - Artwork: Arielle Corbeau - [Website](https://www.instagram.com/ariellecorbeau)
+- Battles - Glass Drop - [Website](https://battles.warp.net/)
+  - Artwork: Lesley Unruh - [Website](http://www.unruhphoto.com)
+- Everything Everything - Get To Heaven - [Website](https://everything-everything.co.uk/)
+  - Artwork: Andrew Archer - [Website](https://www.andrewarcher.com)
+- Kowloon - Come Over - [Website](https://www.kowloonkowloon.com/)
+  - Artwork: Ram Han - [Website](https://www.instagram.com/ram__han/)
+- POLKADOT STINGRAY - 全知全能 - [Website](https://polkadot-stingray.jp/)
+  - Artwork: Shizuku (雫) - [Website](https://www.instagram.com/plkshizuku/)
+- Sabrina Carpenter - Man's Best Friend - [Website](https://www.sabrinacarpenter.com/)
+  - Artwork: Bryce Anderson - [Website](https://www.instagram.com/brvceanderson)
+- Spoon - Hot Thoughts - [Website](http://spoontheband.com/)
+  - Artwork: Christine Messersmith
+- Vampire Weekend - Contra - [Website](http://vampireweekend.com/)
+  - Artwork: Complicated
+
+
