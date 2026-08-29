@@ -102,6 +102,13 @@ static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
 
+/* Names collected by one round of aa_purge_thumbs(). A thumbnail is
+ * "%08x.aat" and the shared placeholder "_fallback.aat", so 32 bytes holds
+ * any of them with room to spare; anything longer is left alone rather than
+ * truncated, since a truncated name names a different file. */
+#define AA_PURGE_BATCH 64
+static char aa_purge_names[AA_PURGE_BATCH][32];
+
 /* Queue event id: the current track's embedded art was offered for caching. */
 #define AA_EVENT_OFFER 1
 
@@ -372,27 +379,59 @@ static void aa_purge_thumbs(void)
     remove(AA_NOART_ALBUMS);
     remove(AA_NOART_ARTISTS);
 
+    debug_log(DEBUG_LOG_ARTCACHE, "purge: start");
+
     for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
     {
-        DIR *d;
-        struct dirent *e;
+        int total = 0, n, removed;
 
         snprintf(dirpath, sizeof(dirpath), THUMBCACHE_DIR "/%s",
                  art_sizes[i].name);
-        d = opendir(dirpath);
-        if (!d)
-            continue;
 
-        while ((e = readdir(d)))
+        /* Trap: removing an entry while readdir() walks the same directory
+         * mutates the structure being enumerated, which loses entries at best
+         * and does not terminate at worst. Names are collected with the
+         * directory open and deleted with it closed, a batch at a time, and
+         * a round that frees nothing stops rather than rescanning forever. */
+        do
         {
-            if (e->d_name[0] == '.')
-                continue;
-            snprintf(filepath, sizeof(filepath), "%s/%s", dirpath, e->d_name);
-            remove(filepath);
-            yield();
+            DIR *d = opendir(dirpath);
+            struct dirent *e;
+
+            if (!d)
+                break;
+
+            n = 0;
+            while (n < AA_PURGE_BATCH && (e = readdir(d)))
+            {
+                if (e->d_name[0] == '.')
+                    continue;
+                if (strlcpy(aa_purge_names[n], e->d_name,
+                            sizeof(aa_purge_names[0]))
+                        >= sizeof(aa_purge_names[0]))
+                    continue;
+                n++;
+            }
+            closedir(d);
+
+            removed = 0;
+            for (int j = 0; j < n; j++)
+            {
+                snprintf(filepath, sizeof(filepath), "%s/%s", dirpath,
+                         aa_purge_names[j]);
+                if (remove(filepath) == 0)
+                    removed++;
+                yield();
+            }
+            total += removed;
         }
-        closedir(d);
+        while (n == AA_PURGE_BATCH && removed > 0);
+
+        debug_log(DEBUG_LOG_ARTCACHE, "purge: %s %d files",
+                  art_sizes[i].name, total);
     }
+
+    debug_log(DEBUG_LOG_ARTCACHE, "purge: done");
 }
 
 /* The format version stamped alongside the cache, or -1 if there is none. */
