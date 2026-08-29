@@ -61,6 +61,7 @@
 #include "database/db_summary.h"   /* db_summary_log_play */
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "database/db_spoken.h"    /* which albums and artists are books */
+#include "metadata/book_resume.h"  /* where a book was left */
 #include "screens/browse/featured_artists.h"
 #include "screens/system/db_search.h"   /* db_search_arm_scope */
 #include "browser_db.h"
@@ -141,6 +142,7 @@ enum table {
     TABLE_DB_SEARCH,
     TABLE_FEATURED_ARTISTS,
     TABLE_FEATURED_TRACKS,
+    TABLE_BOOK_RESUME,
 };
 
 static const struct id3_to_search_mapping {
@@ -2000,6 +2002,49 @@ static bool exclude_spoken_wanted(void)
         && exclude_spoken_possible();
 }
 
+/* ------------------------------------------------------------------ *
+ * the Resume row                                                     *
+ * ------------------------------------------------------------------ */
+
+/* A book's track list opens with a row that picks it up where it was left,
+ * and that row is the whole of how a book played from the shelf is resumed:
+ * its playlist is built out of the database, so there is no directory and no
+ * playlist file for a bookmark to be keyed to. Choosing a chapter by hand
+ * still plays it from its start, which is the only way left to hear one
+ * again.
+ *
+ * The position is held from the load that drew the row to the press that
+ * plays it, and across the later pages of the same level -- the file is read
+ * on the first page, which is the only one the row can appear on.
+ */
+static struct book_resume resume_pos;
+static bool resume_row;             /* the level being shown has the row */
+static bool resume_armed;           /* the next playlist starts at it */
+
+/* The book a track list is under -- its album, which is what the shelf
+ * browses books by -- or NULL where this is not one. */
+static const char *level_book(struct browser_context *c, int level, int tag)
+{
+    if (!global_settings.segregate_audiobooks)
+        return NULL;
+    if (c->currtable != TABLE_NAVIBROWSE || tag != tag_title)
+        return NULL;
+    if (!csi || level < 1 || level >= csi->tagorder_count)
+        return NULL;
+    if (csi->tagorder[level - 1] != tag_album || !csi_mentions_spoken())
+        return NULL;
+
+    return current_title[level];
+}
+
+/* Whether this level opens with a Resume row. */
+static bool book_resume_row(struct browser_context *c, int level, int tag)
+{
+    const char *book = level_book(c, level, tag);
+
+    return book != NULL && book_resume_get(book, &resume_pos);
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2038,6 +2083,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         is_basename = true;
         tag = tag_filename;
     }
+
+    /* Before the search and the cache lock, because it reads a file of its
+     * own. Only the first page can carry the row, and the pages after it
+     * keep the answer this one wrote. */
+    if (offset == 0)
+        resume_row = book_resume_row(c, level, tag);
 
     /* Before the search: the table is built by searches of its own, which
      * cannot run inside this one. A table that would not build -- another
@@ -2193,6 +2244,26 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * <All tracks> precedes it and at index 0 when it does not. */
     int sidx = 0;
 
+    if (resume_row)
+    {
+        if (offset <= sidx)
+        {
+            dptr->newtable = TABLE_BOOK_RESUME;
+            dptr->name = ID2P(LANG_BOOK_RESUME);
+            /* -1 so insert_all_playlist() drops the row when it builds the
+             * book's playlist: it retrieves a track by this seek, and a 0
+             * would resolve to whichever track the database indexed first
+             * and put it at the head of the book. */
+            dptr->extraseek = -1;
+            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+            dptr->idx_id = 0;
+            dptr++;
+            current_entry_count++;
+            c->special_entry_count++;
+        }
+        sidx++;
+    }
+
     if (tag != tag_title && tag != tag_filename)
     {
         if (offset <= sidx)
@@ -2208,7 +2279,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         }
         sidx++;
     }
-    if (tag != tag_filename)
+    /* <Random> everywhere except over spoken word: playing a book's
+     * chapters in a scrambled order is not something to offer. */
+    if (tag != tag_filename && !(tag == tag_title && csi_mentions_spoken()))
     {
         if (offset <= sidx)
         {
@@ -3489,7 +3562,10 @@ int browser_db_load(struct browser_context* c)
          * rather than one restoring a stored position -- the request is armed
          * one navigation earlier, so it must not act on a load that has since
          * been given a real position to return to. */
-        if (c->selected_item == 0 && c->special_entry_count > 0 &&
+        /* Except on a book already started: its Resume row is what the list
+         * is for, and scrolling it away would hide the only row that plays
+         * the book rather than a chapter of it. */
+        if (!resume_row && c->selected_item == 0 && c->special_entry_count > 0 &&
             count > c->special_entry_count)
         {
             c->selected_item = c->special_entry_count;
@@ -3607,15 +3683,32 @@ static bool single_track_path(struct browser_context* c, int seek,
     return found == 1;
 }
 
-/* Play `path` on its own, as the whole of a new playlist. */
-static int play_single_track(const char *path)
+/* Play `path` on its own, as the whole of a new playlist. 'book' names the
+ * book it holds, or is NULL where it is not one.
+ *
+ * A book in one file has no track list and so no Resume row to put on one,
+ * which leaves playing the book as the only gesture there is -- so that is
+ * the one that resumes it. The track has to match as well as the name: two
+ * books can share an album tag, and the position belongs to a file. */
+static int play_single_track(const char *path, const char *book)
 {
+    struct book_resume pos;
+    unsigned long elapsed = 0, offset = 0;
+
+    if (book != NULL
+        && (book_resume_get(book, &pos) || book_resume_get(path, &pos))
+        && strcmp(pos.track, path) == 0)
+    {
+        elapsed = pos.elapsed;
+        offset = pos.offset;
+    }
+
     if (playlist_create(NULL, NULL) < 0)
         return 0;
     if (playlist_insert_track(NULL, path, PLAYLIST_INSERT_LAST, false, true) < 0)
         return 0;
 
-    playlist_start(0, 0, 0);
+    playlist_start(0, elapsed, offset);
     return GO_TO_WPS;
 }
 
@@ -3635,6 +3728,31 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     dptr = browser_db_get_entry(c, c->selected_item);
 
     c->dirfull = false;
+
+    /* Ahead of the <Random> test below, which this row's seek would
+     * otherwise answer, and ahead of the history and dirlevel bookkeeping,
+     * so that returning from the WPS lands on the list as it was. The row
+     * plays the level it sits on, like the track rows do, but from where the
+     * book was left. */
+    if (dptr->newtable == TABLE_BOOK_RESUME)
+    {
+        if (global_settings.party_mode && audio_status())
+        {
+            splash(HZ, ID2P(LANG_PARTY_MODE));
+            return 0;
+        }
+        if (!warn_on_pl_erase())
+            return 0;
+
+        resume_armed = true;
+        if (browser_db_play_folder(c) < 0)
+        {
+            resume_armed = false;
+            return 0;
+        }
+        return GO_TO_WPS;
+    }
+
     seek = dptr->extraseek;
     if (seek == -1) /* <Random> menu item was selected */
     {
@@ -3706,10 +3824,18 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     if (c->currtable == TABLE_NAVIBROWSE && newextra == TABLE_NAVIBROWSE)
     {
         char path[MAX_PATH];
+        char book[BOOK_KEY_MAX];
+        bool spoken = global_settings.segregate_audiobooks
+                      && csi_mentions_spoken();
         bool one;
+
+        book[0] = '\0';
 
         core_pin(browser_db_handle);
         one = single_track_path(c, seek, path, sizeof(path));
+        if (one && spoken)
+            strmemccpy(book, (const char *)P2STR((unsigned char *)dptr->name),
+                       sizeof(book));
         core_unpin(browser_db_handle);
 
         if (one)
@@ -3721,7 +3847,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             }
             if (!warn_on_pl_erase())
                 return 0;
-            return play_single_track(path);
+            return play_single_track(path, book[0] ? book : NULL);
         }
     }
 
@@ -4327,6 +4453,30 @@ int browser_db_add_to_playlist(const char* playlist, bool new_playlist)
     return browser_db_insert_selection(0, false, playlist, new_playlist) ? 0 : -1;
 }
 
+/* Where 'track' sits in the playlist that was just built. 'hint' is where it
+ * sat when the position was saved, which is right whenever the book has not
+ * changed since -- the scan behind it is what covers a chapter added, removed
+ * or retagged. -1 if the track is not in the playlist at all. */
+static int playlist_track_index(const char *track, int hint)
+{
+    struct playlist_track_info info;
+    int i, amount = playlist_amount();
+
+    if (hint >= 0 && hint < amount
+        && playlist_get_track_info(NULL, hint, &info) >= 0
+        && strcmp(info.filename, track) == 0)
+        return hint;
+
+    for (i = 0; i < amount; i++)
+    {
+        if (playlist_get_track_info(NULL, i, &info) >= 0
+            && strcmp(info.filename, track) == 0)
+            return i;
+    }
+
+    return -1;
+}
+
 static int browser_db_play_folder(struct browser_context* c)
 {
     logf( "%s", __func__);
@@ -4351,6 +4501,23 @@ static int browser_db_play_folder(struct browser_context* c)
 
     if (!insert_all_playlist(c, NULL, false, PLAYLIST_INSERT_LAST, false))
         return -2;
+
+    if (resume_armed)
+    {
+        /* Neither of the adjustments below: the index came from finding the
+         * saved chapter in the playlist just built, and shuffling a book
+         * would lose the thing being resumed. */
+        int index = playlist_track_index(resume_pos.track, resume_pos.index);
+
+        resume_armed = false;
+
+        if (index >= 0)
+        {
+            playlist_start(index, resume_pos.elapsed, resume_pos.offset);
+            loaded_entries_crc = browser_db_data_crc(c);
+            return 0;
+        }
+    }
 
     int n = c->filesindir - c->special_entry_count;
     bool has_playlist_been_randomized = n > playlist_get_current()->max_playlist_size;

@@ -269,27 +269,27 @@
 # CC: pushed skin_render_line's recursion near the stack limit.
 %?La<|%?Lc<%Vs(invert)A%aRB>>
 #
-%Vl(Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Featured In]))<%?Lc<%Vs(invert)>7>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+%Vl(Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Resume]))<%?Lc<%Vs(invert)>A>%?if(%LT,=,%Sx([Featured In]))<%?Lc<%Vs(invert)>7>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
 #
-%Vl(Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Featured In])<Featured In>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+%Vl(Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Resume])<Resume>%?if(%LT,=,[Featured In])<Featured In>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
 #
-%Vl(Menu_No_Icons,9,4,283,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+%Vl(Menu_No_Icons,9,4,283,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
 #
 # CC: Album-list layout (%?La true only). The skin renderer recurses once per
 # CC: nesting level (skin_render_line), so these stay shallow -- depth, not
 # CC: viewport count, is what overflows the stack. The baseline viewports above
 # CC: are left untouched so ordinary lists keep their exact (safe) depth.
 # CC: Cover on the left; %La self-blanks to the placeholder until the cache fills.
-%Vl(Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,4)>|>
+%Vl(Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,4)>|>
 # CC: Special rows have no cover, so draw their glyph icon centred in the art slot.
 # CC: Font 8 (14x13_Compacticons) is the menu icon font -- the last %Vl param is
 # CC: the font id, not a radius; with the default font these render as letters.
-%Vl(Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Featured In]))<7>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+%Vl(Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Resume]))<A>%?if(%LT,=,%Sx([Featured In]))<7>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
 # CC: Rounded selection bar around the name only (right of the cover) when selected.
 %Vl(Menu_No_Icons,54,11,248,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
 # CC: Name shifted right of the cover, vertically centred. Friendly labels for the
 # CC: special rows; %LT (optionally scrolling) for real albums.
-%Vl(Menu_No_Icons,63,15,229,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Featured In]))<Featured In>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+%Vl(Menu_No_Icons,63,15,229,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Resume]))<Resume>%?if(%LT,=,%Sx([Featured In]))<Featured In>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
 #
 #
 #-- Menu Drawing without Scrollbar --#
@@ -361,19 +361,19 @@
 # CC: the grouped special-row frame was removed).
 %Vl(No_Scroll_Menu_No_Icons,0,0,314,30,6)%?La<|%?Lc<%Vs(invert)A%aRB>>
 #
-%Vl(No_Scroll_Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Featured In]))<%?Lc<%Vs(invert)>7>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
+%Vl(No_Scroll_Menu_No_Icons,9,8,14,14,8)%?La<|%?if(%LT,=,%Sx([All Tracks]))<%?Lc<%Vs(invert)>b>%?if(%LT,=,%Sx([Random]))<%?Lc<%Vs(invert)>a>%?if(%LT,=,%Sx([Resume]))<%?Lc<%Vs(invert)>A>%?if(%LT,=,%Sx([Featured In]))<%?Lc<%Vs(invert)>7>%?if(%LT,=,%Sx([Untagged]))<%?Lc<%Vs(invert)>e>%?if(%LT,=,%Sx([By album]))<%?Lc<%Vs(invert)>Î>>
 #
-%Vl(No_Scroll_Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Featured In])<Featured In>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
+%Vl(No_Scroll_Menu_No_Icons,28,4,264,22,-)%?La<|%?Lc<%Vs(invert)>%?if(%Sx([Random]),=,[Random])<%?if(%LT,=,[All Tracks])<All Tracks>%?if(%LT,=,[Random])<Random>%?if(%LT,=,[Resume])<Resume>%?if(%LT,=,[Featured In])<Featured In>%?if(%LT,=,[Untagged])<Untagged>%?if(%LT,=,[By album])<By album>|%LT>>
 #
-%Vl(No_Scroll_Menu_No_Icons,9,4,295,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
+%Vl(No_Scroll_Menu_No_Icons,9,4,295,22,-)%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT>>
 #
 # CC: Album-list layout (%?La true only) -- see Menu_No_Icons. Kept shallow so
 # CC: ordinary sub-menus (which render through THIS config when the scrollbar is
 # CC: on) keep their exact baseline nesting depth and cannot overflow.
-%Vl(No_Scroll_Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,4)>|>
-%Vl(No_Scroll_Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Featured In]))<7>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
+%Vl(No_Scroll_Menu_No_Icons,2,2,48,48,-)%?La<%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,4)>|>
+%Vl(No_Scroll_Menu_No_Icons,19,18,14,14,8)%?La<%?if(%LT,=,%Sx([All Tracks]))<b>%?if(%LT,=,%Sx([Random]))<a>%?if(%LT,=,%Sx([Resume]))<A>%?if(%LT,=,%Sx([Featured In]))<7>%?if(%LT,=,%Sx([Untagged]))<e>%?if(%LT,=,%Sx([By album]))<Î>|>
 %Vl(No_Scroll_Menu_No_Icons,54,11,260,30,6)%?La<%?Lc<%Vs(invert)A%aRB|>|>
-%Vl(No_Scroll_Menu_No_Icons,63,15,241,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Featured In]))<Featured In>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
+%Vl(No_Scroll_Menu_No_Icons,63,15,241,22,-)%?La<%?Lc<%Vs(invert)>%?if(%LT,=,%Sx([All Tracks]))<All Tracks>%?if(%LT,=,%Sx([Random]))<Random>%?if(%LT,=,%Sx([Resume]))<Resume>%?if(%LT,=,%Sx([Featured In]))<Featured In>%?if(%LT,=,%Sx([Untagged]))<Untagged>%?if(%LT,=,%Sx([By album]))<By album>%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?if(%St(scroll speed),=,1)<|%s>%LT>|>
 #
 #
 #-- Menu top fill (square corners) --#

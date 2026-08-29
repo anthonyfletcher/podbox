@@ -40,6 +40,7 @@
 #include "database/tagcache.h"
 #include "screens/system/usb_screen.h"
 #include "screens/bookmark.h"
+#include "metadata/book_resume.h"
 #include "screens/playback/wps.h"      /* pause_action, unpause_action */
 #include "screens/browse/browser.h"  /* browser_flush, browser_restore */
 #include "audio/voice_thread.h" /* voice_wait */
@@ -122,6 +123,7 @@ static bool clean_shutdown(enum shutdown_type sd_type,
         if (batt_safe) /* do not save on critical battery */
         {
             bookmark_autobookmark(false);
+            book_resume_save();
 
             /* audio_stop_recording == audio_stop for HWCODEC */
             audio_stop();
@@ -162,6 +164,7 @@ bool list_stop_handler(void)
         if (!global_settings.party_mode)
         {
             bookmark_autobookmark(true);
+            book_resume_save();
             audio_stop();
             ret = true;  /* bookmarking can make a refresh necessary */
         }

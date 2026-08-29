@@ -539,6 +539,13 @@ exactly "book", "books", "spoken", "speech", "podcast", "non-music" or
 "nonmusic", which are too short to go looking for inside longer names.
 Capitals make no difference.
 
+Books also keep their place. Pausing, stopping, switching the player off or
+starting something else writes down where a book had got to, and opening that
+book again under Audiobooks puts a Resume row at the top of its chapter list.
+Choosing a chapter instead plays that chapter from its start; a book held in a
+single file has no chapter list, so playing it resumes it. The last sixteen
+books are remembered.
+
 Nothing else is read. Track length and title look much the same on a book, a
 live set and a long classical movement, so a book tagged as music browses as
 music and retagging it is the fix.

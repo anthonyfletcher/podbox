@@ -19916,3 +19916,17 @@
     *: "Spike Info"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_BOOK_RESUME
+  desc: in the Audiobooks browser, the row that picks a book up where it was left
+  user: core
+  <source>
+    *: "[Resume]"
+  </source>
+  <dest>
+    *: "[Resume]"
+  </dest>
+  <voice>
+    *: "Resume"
+  </voice>
+</phrase>

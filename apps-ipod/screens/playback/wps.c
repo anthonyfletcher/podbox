@@ -52,6 +52,7 @@
 #include "draw/icon_bitmaps.h"
 #include "lang.h"
 #include "screens/bookmark.h"
+#include "metadata/book_resume.h"
 #include "system/activity.h"
 #include "system/app_util.h"
 #include "audio/sound_feedback.h"
@@ -146,6 +147,9 @@ void wps_do_action(enum wps_do_action_type action, bool updatewps)
         {
             settings_save();
         }
+
+        /* A book is usually left paused rather than stopped. */
+        book_resume_save();
     }
 
     /* Bugfix only do a skin refresh if in one of the below screens */
@@ -525,6 +529,7 @@ static long do_wps_exit(long action, bool bookmark)
     update_non_static();
     if (bookmark)
         bookmark_autobookmark(true);
+    book_resume_save();
     audio_stop();
 
     ab_reset_markers();

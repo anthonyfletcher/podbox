@@ -35,6 +35,7 @@
 #include "draw/viewport.h"
 #include "draw/bmp.h"
 #include "playlist/playlist.h"
+#include "metadata/book_resume.h"
 #include "app_util.h"
 
 /* units used with output_dyn_value */
@@ -97,6 +98,13 @@ char *output_dyn_value(char *buf,
 
 bool warn_on_pl_erase(void)
 {
+    /* Every path that replaces the current playlist asks here first, which
+     * makes this the one place a book being listened to is left behind
+     * without a pause or a stop to record it. Saving is silent unless a book
+     * really is playing, and a cancelled erase saves a position that is still
+     * the right one. */
+    book_resume_save();
+
     if (global_status.resume_index != -1 &&
         global_settings.warnon_erase_dynplaylist &&
         !global_settings.party_mode &&

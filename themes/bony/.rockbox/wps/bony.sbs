@@ -46,11 +46,11 @@
 #
 #- Row art
 %Vl(Rows,10,0,30,30,-)
-%?and(%La,%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([By album])))<%La(0,-,-,pixellate10)>
+%?and(%La,%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([By album])))<%La(0,-,-,pixellate10)>
 #
 #- Special row symbols for art rows
 %Vl(Rows,10,0,30,30,3)%Vy
-%?and(%La,%or(%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([By album]))))<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%ac%sel(%LT,%Sx([Random]),&,%Sx([All Tracks]),*,%Sx([Untagged]),?,%Sx([Featured In]),+)%?if(%LT,=,%Sx([By album]))<%#>>
+%?and(%La,%or(%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Resume])),%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([By album]))))<%?Lc<%Vf(000000)%Vs(invert)|%Vf(000000)>%ac%sel(%LT,%Sx([Random]),&,%Sx([Resume]),~,%Sx([All Tracks]),*,%Sx([Untagged]),?,%Sx([Featured In]),+)%?if(%LT,=,%Sx([By album]))<%#>>
 #
 #- Title
 %Vl(Chrome,88,3,180,24,3)%Vf(ffffff)
