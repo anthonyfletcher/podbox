@@ -4831,9 +4831,28 @@ static bool search_root_exists(const char *path)
 #define add_search_root(a) do {} while(0)
 #define free_search_roots(a) do {} while(0)
 
-static bool check_dir(const char *dirname, int add_files)
+/* Deepest directory nesting the scan will follow. A music library is four or
+ * five levels; this is well clear of any real one.
+ *
+ * Trap: the recursion below has no other bound. Upstream guards recursive
+ * SYMLINKS by turning them into search roots, but a FAT directory whose
+ * cluster chain has been corrupted into pointing at an ancestor is not a
+ * symlink and loops forever -- walking entries without limit, and holding one
+ * more DIR handle at every level until none are left. Once they are gone
+ * every open() in the firmware fails, including the one debug_log() makes,
+ * so the player stops with nothing written anywhere that says why. */
+#define TAGCACHE_MAX_DEPTH 16
+
+static bool check_dir(const char *dirname, int add_files, int depth)
 {
     int success = false;
+
+    if (depth > TAGCACHE_MAX_DEPTH)
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "depth limit at %s", dirname);
+        logf("tagcache: depth limit at %s", dirname);
+        return false;
+    }
 
     DIR *dir = opendir(dirname);
     if (!dir)
@@ -4876,7 +4895,7 @@ static bool check_dir(const char *dirname, int add_files)
             if (info.attribute & ATTR_LINK)
                 add_search_root(curpath);
             else
-                check_dir(curpath, add_files);
+                check_dir(curpath, add_files, depth + 1);
         }
         else if (add_files)
         {
@@ -5015,7 +5034,7 @@ void do_tagcache_build(const char *path[])
         if (ret)
         {
             if (dir_exists(this->path))
-                ret = check_dir(this->path, true);
+                ret = check_dir(this->path, true, 0);
             else
                 logf("Dir not found %s", this->path);
         }
