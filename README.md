@@ -56,7 +56,18 @@ even break Audiobooks out into their own root menu (see below).
 While the plugins have gone, the image viewer has been ported to the core system and
 there's an improved text viewer that handles more file formats (including txt, lrc,
 fb2, epub, docx, pdf, md, html and rtf).  There's also a new lyric viewer that can
-be accessed from the "what's playing" screen by pressing select+play.
+be accessed from the "what's playing" screen by pressing `select+play`.
+
+## Spike
+
+https://github.com/user-attachments/assets/05af8d6b-33a6-4882-a8aa-bca1fbabdb54
+
+Play Spike while listening to your music. The game analyses each track's rhythm 
+and generates unique levels that move with the beat. Challenge yourself to play 
+through an entire album or tackle tracks individually to set new high scores.
+
+Launch Spike from the context menu (hold <code>Select</code>) on the Now Playing 
+screen, or while a track is highlighted in the music browser.
 
 ## Spun embedded
 
@@ -223,6 +234,8 @@ they can be installed in any order and on their own.
 from the Music menu and carousels
   - Off by default.  Turn the feature on by going to `Settings > Library > Music > Segregate Audiobooks`
   - Audiobooks should have a genre of "audiobook", "spoken word", "book", or "podcast".
+- Audiobooks automatically receive a "resume" function - you don't need to bookmark
+your position.
 
 ## Album Covers/Artist Profiles
 
@@ -333,3 +346,10 @@ Built on the work of:
 RockBox, RockPod and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
 
 See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
+
+### Spike video
+
+- Song: Gabriawll - Recall
+- Music provided by NoCopyrightSounds
+- Free Download/Stream: http://ncs.io/Recall
+- Watch: http://ncs.lnk.to/RecallAT/youtube
