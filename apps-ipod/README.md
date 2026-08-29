@@ -99,6 +99,7 @@ Ordered by how much they own, as above:
 | `widgets/` | Reusable controls. Called by someone else, hand control back. list, dialog, yesno, splash, option_select, colour picker, folder select, keyboard, menu, text_box. |
 | `screens/` | Full screens. Navigated *to*; run their own loop until the user leaves. |
 | `viewers/` | File-format applications: their own model, view and input. `text_viewer/` (streaming document engine), `image_viewer/`, `lyric_viewer/`, `playback_viewer/` (the Spun deck), properties, playing_time, and the text reel behind the credits and About pages. |
+| `games/` | Games. One directory each: `spike/`. A game owns the screen and the whole keymap the way a viewer owns a file format, and runs on a clock of its own rather than on user input, which is why it is not a `screens/` entry. |
 | `skin/` | The skin interpreter, backdrops, and the skinned status bar. |
 
 `screens/` is subdivided:
@@ -152,6 +153,7 @@ Apply the four-step distinction in order:
 | Is it called by something else, and does it hand control back when done (a question, a picker)? | `widgets/` |
 | Is it navigated to, owning the screen until the user leaves? | `screens/` |
 | Does it also own a file format and a document model? | `viewers/` |
+| Does it also own the whole keymap, and run on a clock rather than on input? | `games/` |
 
 Everything else goes by subject matter. If a file would land in `system/`, stop
 and check whether it really belongs to a domain — `system/` is the residue, not

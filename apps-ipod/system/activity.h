@@ -56,7 +56,8 @@ enum current_activity {
      * every theme that uses it. */
     ACTIVITY_PLAYBACKVIEWER,
     ACTIVITY_SETTINGS_SEARCH,
-    ACTIVITY_FEATUREDARTISTS
+    ACTIVITY_FEATUREDARTISTS,
+    ACTIVITY_SPIKE
 };
 
 /* custom string representation of activity */

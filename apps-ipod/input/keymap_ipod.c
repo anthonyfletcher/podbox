@@ -54,6 +54,36 @@ static const struct button_mapping button_context_standard[]  = {
     LAST_ITEM_IN_LIST
 }; /* button_context_standard */
 
+/* No cascade: a game screen that fell through to the list keys would answer
+   a turn of the wheel with a scroll. Everything the WPS does that does not
+   want SELECT carries over unchanged, because a run is the WPS with a game
+   over it -- play/pause, the two skips, and the wheel, which is the volume
+   while the field is moving and the offset slider on the pause overlay.
+   SELECT is the jump and is the only thing given up. */
+static const struct button_mapping button_context_spike[]  = {
+    { ACTION_SPIKE_JUMP,  BUTTON_SELECT,                    BUTTON_NONE },
+    { ACTION_NONE,           BUTTON_SELECT|BUTTON_REPEAT,      BUTTON_NONE },
+    { ACTION_NONE,           BUTTON_SELECT|BUTTON_REL,         BUTTON_NONE },
+    { ACTION_SPIKE_PAUSE, BUTTON_PLAY|BUTTON_REL,           BUTTON_PLAY },
+    /* Held PLAY is claimed rather than left free, for the reason the browser
+       claims it: an entry that drops out while the button is still down lets
+       the release match the tap entry on the way past. */
+    { ACTION_NONE,           BUTTON_PLAY|BUTTON_REPEAT,        BUTTON_NONE },
+    { ACTION_SPIKE_EXIT,  BUTTON_MENU|BUTTON_REL,           BUTTON_MENU },
+    /* Held Menu is everything the game can be told. The tap above cannot
+       also fire, because the repeat replaces the prebutton the release is
+       matched against -- which is what the prebutton column is for. */
+    { ACTION_SPIKE_OPTIONS, BUTTON_MENU|BUTTON_REPEAT,      BUTTON_NONE },
+    { ACTION_SPIKE_UP,    BUTTON_SCROLL_FWD,                BUTTON_NONE },
+    { ACTION_SPIKE_UP,    BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },
+    { ACTION_SPIKE_DOWN,  BUTTON_SCROLL_BACK,               BUTTON_NONE },
+    { ACTION_SPIKE_DOWN,  BUTTON_SCROLL_BACK|BUTTON_REPEAT, BUTTON_NONE },
+    { ACTION_SPIKE_NEXT,  BUTTON_RIGHT,                     BUTTON_NONE },
+    { ACTION_SPIKE_PREV,  BUTTON_LEFT,                      BUTTON_NONE },
+
+    LAST_ITEM_IN_LIST
+}; /* button_context_spike */
+
 static const struct button_mapping button_context_tree[]  = {
     { ACTION_TREE_WPS,          BUTTON_PLAY|BUTTON_REL,      BUTTON_PLAY },
     /* Held PLAY does nothing here either. This context serves the main menu as
@@ -403,6 +433,9 @@ const struct button_mapping* get_context_mapping(int context)
 
         case CONTEXT_LIST:
             return button_context_standard;
+
+        case CONTEXT_SPIKE:
+            return button_context_spike;
 
         case CONTEXT_SETTINGS_TIME:
         case CONTEXT_SETTINGS_COLOURCHOOSER:

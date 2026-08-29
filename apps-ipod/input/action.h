@@ -96,6 +96,7 @@ enum {
     CONTEXT_USB_HID_MODE_PRESENTATION,
     CONTEXT_USB_HID_MODE_BROWSER,
     CONTEXT_USB_HID_MODE_MOUSE,
+    CONTEXT_SPIKE, /* uses the ACTION_SPIKE_ defines below */
     LAST_CONTEXT_PLACEHOLDER,
 };
 
@@ -291,6 +292,17 @@ enum {
     ACTION_USB_HID_MOUSE_WHEEL_SCROLL_UP,
     ACTION_USB_HID_MOUSE_WHEEL_SCROLL_DOWN,
     ACTION_USB_HID_LAST, /* Place holder */
+
+    /* Spike. One verb, and the jump is bound to the press rather than
+       the release: how long a button is held is not the player's timing. */
+    ACTION_SPIKE_JUMP,
+    ACTION_SPIKE_PAUSE,
+    ACTION_SPIKE_EXIT,
+    ACTION_SPIKE_UP,
+    ACTION_SPIKE_DOWN,
+    ACTION_SPIKE_NEXT,
+    ACTION_SPIKE_PREV,
+    ACTION_SPIKE_OPTIONS,
 
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };

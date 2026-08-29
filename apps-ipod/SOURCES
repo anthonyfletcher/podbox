@@ -139,6 +139,19 @@ screens/covers/artist_portraits.c
 screens/covers/carousel.c
 #endif
 
+games/spike/spike.c
+games/spike/spike_bar.c
+games/spike/spike_clock.c
+games/spike/spike_draw.c
+games/spike/spike_gen.c
+games/spike/spike_menu.c
+games/spike/spike_music.c
+games/spike/spike_pose.c
+games/spike/spike_score.c
+games/spike/spike_tap.c
+games/spike/spike_text.c
+games/spike/spike_world.c
+
 screens/settings/display_settings.c
 screens/settings/eq_settings.c
 screens/main_menu.c
