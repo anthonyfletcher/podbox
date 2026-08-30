@@ -63,6 +63,7 @@ draw/progress_bar.c
 draw/round_rect.c
 draw/screen_access.c
 draw/scrollbar.c
+draw/text_shadow.c
 draw/viewport.c
 #if defined(HAVE_ALBUMART) || defined(HAVE_JPEG)
 draw/resize.c

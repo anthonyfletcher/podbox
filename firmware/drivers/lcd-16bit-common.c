@@ -684,7 +684,15 @@ static void ICODE_ATTR lcd_alpha_bitmap_part_mix(
             /*fg == vp->fg_pattern*/
             do
             {
-                *dst = blend_two_colors(*dst, fg, READ_ALPHA());
+                /* Not `alpha`: READ_ALPHA() reads a pointer of that name. */
+                unsigned a = READ_ALPHA();
+
+                /* Most of a glyph's box is fully transparent, and blending
+                 * that leaves the destination as it was -- ALPHA_MASK weights
+                 * the destination alone. Reading the alpha still has to
+                 * happen: it is what advances the stream. */
+                if (a != ALPHA_MASK)
+                    *dst = blend_two_colors(*dst, fg, a);
                 dst += COL_INC;
             } while (--col);
             break;

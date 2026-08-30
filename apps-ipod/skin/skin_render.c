@@ -351,9 +351,9 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             struct line_desc *data = SKINOFFSETTOPTR(skin_buffer, token->value.data);
             struct line_desc *linedes = &info->line_desc;
             if (!data || !linedes) return false;
-            /* %Vy's height outlives this, so writing the two in either order
-             * means the same thing. */
-            int keep_height = linedes->height;
+            /* %Vy's height and %Vt's shadow outlive this, so writing them in
+             * any order means the same thing. */
+            struct line_desc keep = *linedes;
             /* gradient colors are handled with a separate tag
              * (SKIN_TOKEN_VIEWPORT_GRADIENT_SETUP, see below). since it may
              * come before the text style tag color fields need to be preserved */
@@ -381,7 +381,33 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                     linedes->text_color =
                         dynamic_colors_resolve(data->text_color);
             }
-            linedes->height = keep_height;
+            linedes->height = keep.height;
+            linedes->style |= keep.style & STYLE_SHADOW;
+            linedes->shadow_color = keep.shadow_color;
+            linedes->shadow_x = keep.shadow_x;
+            linedes->shadow_y = keep.shadow_y;
+            linedes->shadow_blur = keep.shadow_blur;
+            linedes->shadow_opacity = keep.shadow_opacity;
+        }
+        break;
+        case SKIN_TOKEN_VIEWPORT_TEXTSHADOW:
+        {
+            struct line_desc *data = SKINOFFSETTOPTR(skin_buffer, token->value.data);
+            struct line_desc *linedes = &info->line_desc;
+            if (!data) return false;
+            if (data->style & STYLE_SHADOW)
+            {
+                linedes->style |= STYLE_SHADOW;
+                /* Resolved every frame like the viewport colours, so a shadow
+                 * named as a palette colour follows the album. */
+                linedes->shadow_color = dynamic_colors_resolve(data->shadow_color);
+                linedes->shadow_x = data->shadow_x;
+                linedes->shadow_y = data->shadow_y;
+                linedes->shadow_blur = data->shadow_blur;
+                linedes->shadow_opacity = data->shadow_opacity;
+            }
+            else
+                linedes->style &= ~STYLE_SHADOW;
         }
         break;
         case SKIN_TOKEN_LINE_HEIGHT:

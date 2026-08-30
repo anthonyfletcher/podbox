@@ -95,6 +95,56 @@ line with it is carried into the next one.
 
 ---
 
+## Text shadow
+
+### `%Vt(colour[, x, y, blur, opacity])` — drop shadow behind the text
+
+Draws the viewport's text a second time underneath itself: offset, blurred and
+in a colour of its own. It applies from the tag onwards to every line the
+viewport draws, and survives a later `%Vs`, so the two can be written in either
+order.
+
+| | |
+|---|---|
+| `colour` | `rrggbb`, or `-` to switch the shadow off from here down |
+| `x`, `y` | offset in pixels, -8 to 8. Default `1`, `1` — down and to the right |
+| `blur` | softness radius in pixels, 0 to 3. Default `2`; `0` gives a hard edge |
+| `opacity` | `0` invisible to `15` solid. Default `15` |
+
+```
+# White title over artwork, lifted off it by a soft dark shadow.
+%Vl(Title,0,0,320,26,2)%Vy(26)
+%Vf(FFFFFF)%Vt(000000,1,1,2,12)
+%s%?it<%it|%fn>
+```
+
+Arguments are positional, so reaching a later one means writing `-` for the
+ones before it — `%Vt(000000,-,-,3)` keeps the default offset and softens it.
+Like `%Vf` and `%Vb`, `%Vt` suppresses the line break, so declare it on the
+viewport's own line.
+
+**Give the line room.** The shadow is clipped to the viewport but not to the
+line, so one that reaches past the line box spills into the row below, where
+that row's own drawing cuts it off. Make the box taller than the font by at
+least the offset plus the blur — `%Vy` is the lever — or keep the shadow small.
+
+**What it reaches.** Every line of skin-drawn text in the viewport, including
+the rows of a skinned list (`%Lb`), and it follows scrolling text. `%wt` draws
+its own way and takes no shadow, and neither do the rows of a list the theme
+has not skinned. Text on a line taller than 48 pixels gets a hard-edged shadow
+whatever the blur says.
+
+**A blurred shadow is worked out on a half-resolution grid**, which is invisible
+in a blur and keeps the cost down. `blur` 0 is drawn from the glyphs themselves
+instead, so a hard shadow stays exactly as sharp as the text.
+
+**What it costs.** One pass over the text's own box — its glyphs, a blur and
+a composite — every time the line is drawn, and a scrolling line is drawn
+again at every scroll step. One or two shadowed lines are comfortable; a
+screenful of scrolling ones is not.
+
+---
+
 ## Word wrap
 
 ### `%wr(n, text)` — nth word-wrapped line

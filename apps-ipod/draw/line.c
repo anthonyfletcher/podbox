@@ -22,6 +22,7 @@
 #include "settings/settings.h"
 #include "debug.h"
 #include "viewport.h"
+#include "draw/text_shadow.h"
 #include "skin/skin_albumart_color.h"
 #include "debug.h"
 
@@ -111,11 +112,17 @@ static void put_text(struct screen *display,
                       const char *text, bool prevent_scroll,
                       int text_skip_pixels)
 {
-    /* set drawmode because put_icon() might have changed it */
     unsigned drmode = DRMODE_FG;
     if (line->style & STYLE_INVERT)
         drmode = DRMODE_SOLID | DRMODE_INVERSEVID;
 
+    /* Before the text and from the same string, so a scrolling line carries
+     * its shadow along: the scroller re-enters here with the line_desc it
+     * was given. */
+    if (line->style & STYLE_SHADOW)
+        text_shadow_draw(display, x, y, text, text_skip_pixels, line);
+
+    /* set drawmode because put_icon() and the shadow might have changed it */
     display->set_drawmode(drmode);
 
     if (line->scroll && !prevent_scroll)

@@ -121,6 +121,18 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_LINE_HEIGHT,        "Vy", "|i",
         SKIN_REFRESH_STATIC | NOBREAK),
 
+    /* %Vt(colour[,x,y,blur,opacity]): a drop shadow behind the viewport's
+     * text, from here down. '-' for the colour turns it off again. The four
+     * numbers are lowercase so each accepts '-' and the one after it stays
+     * reachable; left out they give a soft shadow a pixel down and to the
+     * right.
+     *
+     * Separate from %Vs rather than a mode of it: %Vs replaces the line style
+     * wholesale, so a shadow written as one would have to be re-stated after
+     * every colour or gradient change. */
+    TAG(SKIN_TOKEN_VIEWPORT_TEXTSHADOW, "Vt", "s|iiii",
+        SKIN_REFRESH_STATIC | NOBREAK),
+
     TAG(SKIN_TOKEN_UNKNOWN,            "",   "",      0)   /* terminator */
 };
 #undef TAG

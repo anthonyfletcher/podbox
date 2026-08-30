@@ -38,10 +38,17 @@ enum line_styles {
     STYLE_GRADIENT   = 0x08,
     /* Modifier for the text color, which will be taken from line_desc.text_color */
     STYLE_COLORED    = 0x10,
+    /* Modifier: draw a drop shadow behind the text, from the shadow_ fields */
+    STYLE_SHADOW     = 0x20,
     /* These are used internally */
     _STYLE_DECO_MASK = 0x0f,
     _STYLE_MODE_MASK = 0x7F,
 };
+
+/* Ceilings on a drop shadow, bounding the scratch it is drawn in --
+ * see draw/text_shadow.c. */
+#define TEXT_SHADOW_MAX_OFFSET 8
+#define TEXT_SHADOW_MAX_BLUR   3
 
 struct line_desc {
     /* height of the line (in pixels). -1 to inherit the height
@@ -62,6 +69,11 @@ struct line_desc {
     /* line color if STYLE_COLORBAR or STYLE_GRADIENT is specified, in native
      * lcd format (convert with LCD_RGBPACK() if necessary) */
     unsigned line_color, line_end_color;
+    /* drop shadow if STYLE_SHADOW is specified: colour in native lcd format,
+     * offset from the text in pixels, blur radius in pixels (0 for a hard
+     * edge) and opacity, 0 to LCD_BLEND_OPAQUE */
+    unsigned shadow_color;
+    int8_t shadow_x, shadow_y, shadow_blur, shadow_opacity;
     /* line decorations, see STYLE_DEFAULT etc. */
     enum line_styles style;
     /* whether the line can scroll */

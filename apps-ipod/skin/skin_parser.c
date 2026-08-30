@@ -712,6 +712,60 @@ static int parse_listitemviewport(struct skin_element *element,
     return 0;
 }
 
+/* Optional numbers, with sane defaults: a shadow written as %Vt(colour) is
+ * one pixel down and right, softened just enough to read as a shadow rather
+ * than a second copy of the text. */
+#define SHADOW_DEFAULT_OFFSET  1
+#define SHADOW_DEFAULT_BLUR    2
+
+static int shadow_param(struct skin_element *element, int n, int dflt,
+                        int lowest, int highest)
+{
+    if (element->params_count <= n || isdefault(get_param(element, n)))
+        return dflt;
+
+    int value = get_param(element, n)->data.number;
+    if (value < lowest)
+        value = lowest;
+    else if (value > highest)
+        value = highest;
+    return value;
+}
+
+static int parse_viewporttextshadow(struct skin_element *element,
+                                    struct wps_token *token,
+                                    struct wps_data *wps_data)
+{
+    (void)wps_data;
+    struct line_desc *line = skin_buffer_alloc(sizeof(*line));
+    unsigned colour;
+
+    *line = (struct line_desc)LINE_DESC_DEFINIT;
+
+    /* A '-' colour is the way off: the style then carries no STYLE_SHADOW,
+     * which the render clause reads as "drop the shadow from here down". */
+    if (!isdefault(get_param(element, 0)))
+    {
+        if (!parse_color(curr_screen, get_param_text(element, 0), &colour))
+            return 1;
+        line->style = STYLE_SHADOW;
+        line->shadow_color = colour;
+        line->shadow_x = shadow_param(element, 1, SHADOW_DEFAULT_OFFSET,
+                                      -TEXT_SHADOW_MAX_OFFSET,
+                                      TEXT_SHADOW_MAX_OFFSET);
+        line->shadow_y = shadow_param(element, 2, SHADOW_DEFAULT_OFFSET,
+                                      -TEXT_SHADOW_MAX_OFFSET,
+                                      TEXT_SHADOW_MAX_OFFSET);
+        line->shadow_blur = shadow_param(element, 3, SHADOW_DEFAULT_BLUR,
+                                         0, TEXT_SHADOW_MAX_BLUR);
+        line->shadow_opacity = shadow_param(element, 4, LCD_BLEND_OPAQUE,
+                                            0, LCD_BLEND_OPAQUE);
+    }
+
+    token->value.data = PTRTOSKINOFFSET(skin_buffer, line);
+    return 0;
+}
+
 static int parse_viewporttextstyle(struct skin_element *element,
                                    struct wps_token *token,
                                    struct wps_data *wps_data)
@@ -2470,6 +2524,9 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     break;
                 case SKIN_TOKEN_VIEWPORT_TEXTSTYLE:
                     function = parse_viewporttextstyle;
+                    break;
+                case SKIN_TOKEN_VIEWPORT_TEXTSHADOW:
+                    function = parse_viewporttextshadow;
                     break;
                 case SKIN_TOKEN_LINE_HEIGHT:
                     /* 0 stands for "the viewport's own height", which is only
