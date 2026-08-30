@@ -104,6 +104,11 @@
  * the stricter bar reliably destroys the colour it was meant to protect. */
 #define ACCENT_MIN_RATIO  300
 
+/* Contrast the accent aims for against the artwork itself, in hundredths. The
+ * same 3:1, and for the same reason: this is text laid over a picture rather
+ * than body text on a flat fill. */
+#define ART_MIN_RATIO     300
+
 /* Transformed colours remembered between palette changes. A skin uses a
  * handful, so this sits well clear of what one asks for. */
 #define XFORM_CACHE_SIZE  16
@@ -228,6 +233,37 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
     forget_transforms();
 }
 
+/* Mean full-precision colour of the sampled pixels a quantised bucket caught.
+ * The histogram is 4 bits a channel, so the bucket index alone is not a colour
+ * worth putting on screen. */
+static void average_bucket(const fb_data *pixels, int total_pixels, int stride,
+                           int bucket, int *out_r, int *out_g, int *out_b)
+{
+    long sum_r = 0, sum_g = 0, sum_b = 0;
+    int count = 0;
+    int i;
+
+    for (i = 0; i < total_pixels; i += stride)
+    {
+        unsigned short px = (unsigned short)pixels[i];
+        int r4 = (px >> 12) & 0xF;
+        int g4 = (px >> 7) & 0xF;
+        int b4 = (px >> 1) & 0xF;
+
+        if (((r4 << 8) | (g4 << 4) | b4) == bucket)
+        {
+            sum_r += RGB_UNPACK_RED(px);
+            sum_g += RGB_UNPACK_GREEN(px);
+            sum_b += RGB_UNPACK_BLUE(px);
+            count++;
+        }
+    }
+
+    *out_r = count ? (int)(sum_r / count) : 0;
+    *out_g = count ? (int)(sum_g / count) : 0;
+    *out_b = count ? (int)(sum_b / count) : 0;
+}
+
 static void extract_colors(const struct bitmap *bmp)
 {
     if (!bmp->data || bmp->width <= 0 || bmp->height <= 0)
@@ -238,6 +274,8 @@ static void extract_colors(const struct bitmap *bmp)
     int height = bmp->height;
     int total_pixels = width * height;
     int stride = MAX(total_pixels / SAMPLE_TARGET, 1);
+    long sum_lum = 0;
+    int nsamples = 0;
     int i;
 
     memset(histogram, 0, sizeof(histogram));
@@ -252,7 +290,15 @@ static void extract_colors(const struct bitmap *bmp)
         int bucket = (r4 << 8) | (g4 << 4) | b4;
         if (histogram[bucket] < UINT16_MAX)
             histogram[bucket]++;
+        sum_lum += r4 * 77 + g4 * 150 + b4 * 29;
+        nsamples++;
     }
+
+    /* The picture's own mean luminance, on the 0..255 scale that
+     * compute_luminance() uses. The running total weights 4-bit channels, and
+     * 17 is what widens a 4-bit channel to 8. */
+    int art_lum = nsamples ? (int)(((sum_lum / nsamples) * 17) >> 8) : 0;
+    int32_t art_rl = rel_luminance(art_lum, art_lum, art_lum);
 
     /* Find dominant bucket (skip near-black/near-white, prefer saturated) */
     int best_bucket = -1;
@@ -306,29 +352,10 @@ static void extract_colors(const struct bitmap *bmp)
         return; /* empty image? */
 
     /* Pass 2: average full-precision RGB for dominant bucket */
-    long sum_r = 0, sum_g = 0, sum_b = 0;
-    int count = 0;
+    int dom_r, dom_g, dom_b;
 
-    for (i = 0; i < total_pixels; i += stride)
-    {
-        unsigned short px = (unsigned short)pixels[i];
-        int r4 = (px >> 12) & 0xF;
-        int g4 = (px >> 7) & 0xF;
-        int b4 = (px >> 1) & 0xF;
-        int bucket = (r4 << 8) | (g4 << 4) | b4;
-
-        if (bucket == best_bucket)
-        {
-            sum_r += RGB_UNPACK_RED(px);
-            sum_g += RGB_UNPACK_GREEN(px);
-            sum_b += RGB_UNPACK_BLUE(px);
-            count++;
-        }
-    }
-
-    int dom_r = count ? (int)(sum_r / count) : 0;
-    int dom_g = count ? (int)(sum_g / count) : 0;
-    int dom_b = count ? (int)(sum_b / count) : 0;
+    average_bucket(pixels, total_pixels, stride, best_bucket,
+                   &dom_r, &dom_g, &dom_b);
     unsigned int dominant = LCD_RGBPACK(dom_r, dom_g, dom_b);
     int dom_lum = compute_luminance(dom_r, dom_g, dom_b);
     int32_t dom_rl = rel_luminance(dom_r, dom_g, dom_b);
@@ -371,28 +398,8 @@ static void extract_colors(const struct bitmap *bmp)
     unsigned int accent;
     if (accent_bucket >= 0)
     {
-        /* Average full-precision RGB for accent bucket */
-        sum_r = sum_g = sum_b = 0;
-        count = 0;
-        for (i = 0; i < total_pixels; i += stride)
-        {
-            unsigned short px = (unsigned short)pixels[i];
-            int r4 = (px >> 12) & 0xF;
-            int g4 = (px >> 7) & 0xF;
-            int b4 = (px >> 1) & 0xF;
-            int bucket = (r4 << 8) | (g4 << 4) | b4;
-
-            if (bucket == accent_bucket)
-            {
-                sum_r += RGB_UNPACK_RED(px);
-                sum_g += RGB_UNPACK_GREEN(px);
-                sum_b += RGB_UNPACK_BLUE(px);
-                count++;
-            }
-        }
-        acc_r = count ? (int)(sum_r / count) : 0;
-        acc_g = count ? (int)(sum_g / count) : 0;
-        acc_b = count ? (int)(sum_b / count) : 0;
+        average_bucket(pixels, total_pixels, stride, accent_bucket,
+                       &acc_r, &acc_g, &acc_b);
         accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
     }
     else
@@ -436,6 +443,75 @@ static void extract_colors(const struct bitmap *bmp)
             acc_r = acc_g = acc_b = (dom_lum < 128) ? 255 : 0;
 
         accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
+    }
+
+    /* The dominant is not the only thing the accent is read against: a theme
+     * that paints over the artwork puts the accent straight on the picture,
+     * and the pair chosen above says nothing about that. The accent is picked
+     * by count, so a cover that is mostly one flat expanse hands its own
+     * background back as the text colour.
+     *
+     * Only a dark accent needs catching. A light one over light art is the
+     * `scrim` filter's job -- it darkens the picture to make room -- but it
+     * stands down below half scale, reading a dark accent as evidence that
+     * the artwork is already light, which is what a dark expanse disproves.
+     * The replacement settles for ACCENT_MIN_RATIO against the dominant
+     * rather than MIN_RATIO, because nothing clears 6:1 above a mid-luminance
+     * dominant: the pair that produced a dark accent is the pair with no
+     * light answer. The dark accent stands when even white fails both bars --
+     * a bright dominant over dark art asks for two opposite colours and can
+     * have only one. */
+    if (compute_luminance(acc_r, acc_g, acc_b) < 128 &&
+        contrast_ratio(art_rl, rel_luminance(acc_r, acc_g, acc_b))
+            < ART_MIN_RATIO)
+    {
+        int rescue_bucket = -1;
+        unsigned int rescue_score = 0;
+
+        for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+        {
+            if (histogram[i] == 0 || i == best_bucket)
+                continue;
+
+            int r4 = (i >> 8) & 0xF;
+            int g4 = (i >> 4) & 0xF;
+            int b4 = i & 0xF;
+            int r8 = (r4 << 4) | r4;
+            int g8 = (g4 << 4) | g4;
+            int b8 = (b4 << 4) | b4;
+            int32_t cand_rl = rel_luminance(r8, g8, b8);
+
+            if (contrast_ratio(dom_rl, cand_rl) < ACCENT_MIN_RATIO)
+                continue;
+            if (contrast_ratio(art_rl, cand_rl) < ART_MIN_RATIO)
+                continue;
+
+            int max_c = MAX(MAX(r4, g4), b4);
+            int min_c = MIN(MIN(r4, g4), b4);
+            int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
+            unsigned int score = (unsigned int)histogram[i]
+                               * (sat + SATURATION_BASE) / SATURATION_BASE;
+
+            if (score > rescue_score)
+            {
+                rescue_score = score;
+                rescue_bucket = i;
+            }
+        }
+
+        if (rescue_bucket >= 0)
+        {
+            average_bucket(pixels, total_pixels, stride, rescue_bucket,
+                           &acc_r, &acc_g, &acc_b);
+            accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
+        }
+        else if (contrast_ratio(dom_rl, rel_luminance(255, 255, 255))
+                     >= ACCENT_MIN_RATIO &&
+                 contrast_ratio(art_rl, rel_luminance(255, 255, 255))
+                     >= ART_MIN_RATIO)
+        {
+            accent = LCD_RGBPACK(255, 255, 255);
+        }
     }
 
     apply_colors(accent, dominant, false);
