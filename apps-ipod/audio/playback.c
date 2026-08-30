@@ -56,6 +56,7 @@
 #include "playback.h"
 #include "storage.h"
 #include "system/app_util.h"
+#include "system/bg_task.h"    /* the headroom a background pass needs */
 #include "audio/sound_feedback.h"
 #include "settings/settings.h"
 #include "audiohw.h"
@@ -1129,7 +1130,34 @@ static void audio_reset_buffer(void)
     audiobuf_handle = core_alloc_maximum(&filebuflen, &ops);
 
     if (audiobuf_handle > 0)
+    {
+        /* Hand the background workers their peak back before laying the buffer
+         * out. core_alloc_maximum() takes all of core, so a pass allocating
+         * later takes what it needs out of here through shrink_callback(),
+         * which stops playback and rebuffers the track to do it -- heard as a
+         * gap, and seen as the album art blanking, on the first track of every
+         * boot. The buffer ends this size either way; leaving the room now is
+         * the difference between finding it free and taking it. */
+        size_t reserve = bg_task_reserve_bytes();
+        size_t layout = pcmbuf_size_reqd() + scratch_mem_size()
+                      + AUDIO_BUFFER_RESERVE;
+
+        /* Trap: the reserve has to be a pointer-sized multiple, because
+         * pcmbuf_init() places its descriptor array by counting back from the
+         * end of what is left. An odd reserve misaligns that array, and the
+         * halfword store in init_buffer_state() then data-aborts on ARM. A
+         * host build has no such rule and runs it clean. */
+        reserve = ALIGN_UP(reserve, sizeof (intptr_t));
+
+        if (reserve > 0 && filebuflen > reserve + layout &&
+            core_shrink(audiobuf_handle, core_get_data(audiobuf_handle),
+                        filebuflen - reserve))
+        {
+            filebuflen -= reserve;
+        }
+
         audio_reset_buffer_noalloc(core_get_data(audiobuf_handle));
+    }
     else
     /* someone is abusing core_alloc_maximum(). Fix this evil guy instead of
      * trying to handle OOM without hope */

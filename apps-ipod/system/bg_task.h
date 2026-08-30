@@ -21,6 +21,7 @@
 #define _BG_TASK_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include "config.h"
 #include "kernel.h"
 
@@ -58,6 +59,14 @@ struct bg_task
      * than in RAM so an unchanged library costs nothing at startup. */
     const char *done_file;
     int rank;
+
+    /* Peak this task's pass holds from core at once, or 0 for a task that
+     * allocates nothing. The audio buffer takes all of core once playback has
+     * run, so memory asked for here comes back out of it through playback's
+     * shrink_callback(), which stops and rebuffers the track to get it.
+     * Declaring the peak is what lets audio_reset_buffer() leave the room
+     * unclaimed instead. */
+    size_t work_bytes;
 
     /* The pass. Returns false if it did not finish -- interrupted, or the
      * memory it needed was not free. The marker is written only on true, so a
@@ -105,6 +114,11 @@ struct bg_task
  * never ticked, so it has nothing to register and no marker to read. Calling
  * this for one is harmless, so a caller need not know which kind it holds. */
 void bg_task_init(struct bg_task *task);
+
+/* The largest work_bytes any registered task declares: what the audio buffer
+ * has to leave free for a background pass not to be paid for in stopped
+ * playback. Zero until the tasks have registered. */
+size_t bg_task_reserve_bytes(void);
 
 /* One turn of a task's thread loop: wait on the queue with a timeout, then do
  * whatever that turn calls for. Intended to be the entire thread body. */

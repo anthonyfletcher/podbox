@@ -165,6 +165,20 @@ void bg_task_init(struct bg_task *task)
     bg_tasks[bg_tasks_count++] = task;
 }
 
+size_t bg_task_reserve_bytes(void)
+{
+    size_t most = 0;
+    int i;
+
+    for (i = 0; i < bg_tasks_count; i++)
+    {
+        if (bg_tasks[i]->work_bytes > most)
+            most = bg_tasks[i]->work_bytes;
+    }
+
+    return most;
+}
+
 bool bg_task_preempted(const struct bg_task *task)
 {
     int i;

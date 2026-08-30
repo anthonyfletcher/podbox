@@ -1029,6 +1029,19 @@ const char *art_cache_noart_list(bool artists)
     return artists ? AA_NOART_ARTISTS : AA_NOART_ALBUMS;
 }
 
+/* The scratch one decode needs. An AA_FIT_COVER decode stages a non-square
+ * image before cropping it square, so the buffer is sized for the widest one
+ * aa_cover_dim() will pass: the largest size at COVER_MAX_ASPECT. That fixes
+ * both of the terms BM_SCALED_SIZE adds up -- the pixels, and the scaler's
+ * line buffers, which depend on the width alone -- and those are the two
+ * bounds aa_cover_dim() tests a stage against. See art_sizes.h. */
+static size_t aa_work_bytes(void)
+{
+    return BM_SCALED_SIZE(ART_CACHE_MAX_DIM * ART_CACHE_COVER_MAX_ASPECT,
+                          ART_CACHE_MAX_DIM, FORMAT_NATIVE, 0)
+           + JPEG_DECODE_OVERHEAD;
+}
+
 static bool aa_run_pass(void)
 {
     struct tagcache_search tcs;
@@ -1039,16 +1052,7 @@ static bool aa_run_pass(void)
     bool aborted = false;
     int since_yield = 0;
 
-    /* An AA_FIT_COVER decode stages a non-square image before cropping it
-     * square, so the buffer is sized for the widest one aa_cover_dim() will
-     * pass: the largest size at COVER_MAX_ASPECT. That fixes both of the terms
-     * BM_SCALED_SIZE adds up -- the pixels, and the scaler's line buffers,
-     * which depend on the width alone -- and those are the two bounds
-     * aa_cover_dim() tests a stage against. See art_sizes.h. */
-    worksz = BM_SCALED_SIZE(ART_CACHE_MAX_DIM *
-                                ART_CACHE_COVER_MAX_ASPECT,
-                            ART_CACHE_MAX_DIM, FORMAT_NATIVE, 0);
-    worksz += JPEG_DECODE_OVERHEAD;
+    worksz = aa_work_bytes();
 
     wh = core_alloc(worksz);
     if (wh <= 0)
@@ -1197,10 +1201,7 @@ static void aa_handle_offer(void)
     if (!need)
         return;   /* already cached (folder art wins) */
 
-    worksz = BM_SCALED_SIZE(ART_CACHE_MAX_DIM *
-                                ART_CACHE_COVER_MAX_ASPECT,
-                            ART_CACHE_MAX_DIM, FORMAT_NATIVE, 0);
-    worksz += JPEG_DECODE_OVERHEAD;
+    worksz = aa_work_bytes();
     wh = core_alloc(worksz);
     if (wh <= 0)
         return;
@@ -1308,6 +1309,11 @@ void art_cache_init(void)
      * constant that can only move across a firmware update. */
     if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
         remove(AA_DONE_FILE);
+
+    /* A pass holds the decode scratch and the seen-set at once, so the peak
+     * declared to bg_task is both. */
+    art_cache_task.work_bytes = aa_work_bytes()
+                              + AA_SEEN_SLOTS * sizeof(unsigned int);
 
     bg_task_init(&art_cache_task);
     aa_thread_id = create_thread(aa_thread, aa_stack, sizeof(aa_stack), 0,

@@ -2487,6 +2487,7 @@ struct bg_task db_summary_task =
 {
     .done_file   = DB_SUMMARY_DONE,
     .rank        = BG_RANK_INDEX,
+    .work_bytes  = IDX_BUILD_BUFSZ,
     .run         = background_build,
     .artifact_ok = saved_index_present,
 };
