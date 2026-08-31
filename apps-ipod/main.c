@@ -754,6 +754,17 @@ static void init(void)
 
     shortcuts_init();
 
+#ifdef USB_ENABLE_AUDIO
+    /* The only safe moment for these: the settings are loaded, so the setting
+     * can be read, and audio_init() below has not claimed the RAM yet, so
+     * nothing has to be shrunk to make room. The driver cannot claim them
+     * itself -- doing it from the USB thread wedges the player. Skipped
+     * entirely when the setting is off, which is what keeps the ~129K off
+     * everyone who does not use a USB-DAC. */
+    if (global_settings.usb_audio != 0)
+        usb_audio_alloc_buffers();
+#endif
+
     boot_progress(BOOT_AUDIO, 0, 0, str(LANG_WAIT));
     CHART(">audio_init");
     audio_init();

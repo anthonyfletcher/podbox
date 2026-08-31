@@ -345,6 +345,16 @@ void usb_set_audio(int value);
 
 /* true while host-PCM (USB-DAC) playback is active */
 bool usb_audio_get_active(void);
+
+/* Claim the USB-DAC receive and DSP buffers, ~129K. Call once at boot, after
+ * the settings are loaded -- so the setting can be consulted -- and before
+ * audio_init(), so nothing has to be shrunk to make room. It must not happen
+ * on the USB thread: see the definition in usbstack/usb_audio.c. Idempotent. */
+int usb_audio_alloc_buffers(void);
+
+/* Whether that call has happened and succeeded. False until the player is
+ * restarted with the setting on, and the driver stays inactive while it is. */
+bool usb_audio_buffers_ready(void);
 #endif
 
 #if defined(USB_ENABLE_STORAGE) && defined(HAVE_MULTIDRIVE)

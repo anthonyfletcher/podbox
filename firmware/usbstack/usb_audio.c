@@ -515,10 +515,26 @@ static void usb_audio_init(void)
     }
 }
 
-int usb_audio_request_buf(void)
+/*
+ * Claim the receive and DSP buffers, once, at boot.
+ *
+ * This must not run on the USB thread. core_alloc() of ~129K after audio_init()
+ * is met by shrinking the audio buffer, and that callback stops playback with a
+ * synchronous queue_send -- issued from inside the SET_CONFIGURATION handler it
+ * blocks the USB thread mid-control-transfer and the player stops responding.
+ * usb_storage's transfer buffer was moved to boot for the same reason.
+ *
+ * Called from the application layer once the settings are loaded and before
+ * audio_init(), so the audio buffer does not exist yet and nothing is shrunk.
+ * Idempotent: a second call with the buffers already held does nothing.
+ */
+int usb_audio_alloc_buffers(void)
 {
-    // stop playback first thing
-    audio_stop();
+    if (rx_buffer_handle > 0 && dsp_buf_handle > 0)
+        return 0;
+
+    /* No audio_stop() here: this runs before audio_init(), so the audio queue
+     * does not exist yet and nothing can be playing to stop. */
 
     // attempt to allocate the receive buffers
     rx_buffer_handle = core_alloc(REAL_BUF_SIZE);
@@ -558,14 +574,14 @@ int usb_audio_request_buf(void)
     return 0;
 }
 
-void usb_audio_free_buf(void)
+/*
+ * Whether the buffers claimed at boot are there. The driver cannot make them
+ * itself -- see usb_audio_alloc_buffers() -- so a setting switched on since
+ * boot leaves this false until the player is restarted.
+ */
+bool usb_audio_buffers_ready(void)
 {
-    // logf("usbaudio: free buffer");
-    rx_buffer_handle = core_free(rx_buffer_handle);
-    rx_buffer = NULL;
-
-    dsp_buf_handle = core_free(dsp_buf_handle);
-    dsp_buf = NULL;
+    return rx_buffer_handle > 0 && dsp_buf_handle > 0;
 }
 
 unsigned int usb_audio_get_out_ep(void)
@@ -1170,9 +1186,13 @@ static int usb_audio_init_connection(void)
 {
     logf("usbaudio: init connection");
 
-    // make sure we can get the buffers first...
-    if (usb_audio_request_buf())
+    /* Claimed at boot, or not at all. Allocating here is what wedged the
+     * player -- see usb_audio_alloc_buffers(). */
+    if (!usb_audio_buffers_ready())
+    {
+        logf("usbaudio: no buffers, restart with the setting on");
         return -1;
+    }
 
     usbaudio_active = true;
     dsp = dsp_get_config(CODEC_IDX_AUDIO);
@@ -1205,7 +1225,6 @@ static void usb_audio_disconnect(void)
         return;
 
     usb_audio_stop_playback();
-    usb_audio_free_buf();
     usbaudio_active = false;
 }
 

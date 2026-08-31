@@ -347,7 +347,25 @@ MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
 MENUITEM_SETTING(usb_hid, &global_settings.usb_hid, NULL);
 MENUITEM_SETTING(usb_keypad_mode, &global_settings.usb_keypad_mode, NULL);
 #ifdef USB_ENABLE_AUDIO
-MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, NULL);
+/* The receive buffers are claimed at boot, from this setting -- the driver
+ * cannot claim them itself, because doing that from the USB thread wedges the
+ * player. So switching this on takes effect at the next start. */
+static int usb_audio_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    switch (action)
+    {
+        case ACTION_EXIT_MENUITEM: /* on exit */
+            if (global_settings.usb_audio != 0 && !usb_audio_buffers_ready())
+                splash(HZ*2, ID2P(LANG_PLEASE_REBOOT));
+            break;
+    }
+    return action;
+}
+MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, usb_audio_callback);
 #endif
 
 
