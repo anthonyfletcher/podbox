@@ -1390,7 +1390,18 @@ Lyre prototype 1 */
 #endif
 #endif
 
-#ifdef USB_HAS_ISOCHRONOUS
+/* USB audio is off on both targets, and neither has ever performed it.
+ * ipodvideo (ARC) hangs the player when the host configures the isochronous
+ * endpoint -- the shared driver is not reached, and that target has no logf to
+ * find out where it stops. ipod6g (DesignWare) initialises cleanly and assigns
+ * its endpoints, but no host enumerates the audio function, in either the
+ * charge-only or the mass-storage composite. Two faults, two layers.
+ *
+ * To re-enable: delete PODBOX_NO_USB_AUDIO, and restore the setting's row in
+ * settings_tags.c with its help stanza and guide entry, removed with it. */
+#define PODBOX_NO_USB_AUDIO
+
+#if defined(USB_HAS_ISOCHRONOUS) && !defined(PODBOX_NO_USB_AUDIO)
 #define USB_ENABLE_AUDIO
 #endif
 

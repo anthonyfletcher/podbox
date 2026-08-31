@@ -139,7 +139,13 @@ builds two**, both ARM and both 320x240. The wider target trees under
 This tree is a custom build for **iPod Classic 6G/7G** and **iPod Video 5G/5.5G**. Changes may diverge from upstream Rockbox to suit these targets. The two iPods share the same 320x240 LCD and most app-layer code, but have different SoCs, USB controllers, and board-level drivers:
 
 - **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. Full feature set including MFi digital audio, SSD power management.
-- **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes). USB audio is **on** here: `config.h` uses upstream's generic `USB_HAS_ISOCHRONOUS` gate for `USB_ENABLE_AUDIO`, and the ARC controller declares it, so `rockbox-info.txt` lists `usbdac`. This is new since the Rockbox rebase — RockPod had narrowed the gate to `CONFIG_CPU == S5L8702`, which excluded this target — and it has **never been exercised on hardware**.
+- **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes). USB audio is **off**, as it is on the 6G — see `PODBOX_NO_USB_AUDIO` below.
+
+USB audio is **off** on both targets: `config.h` defines `PODBOX_NO_USB_AUDIO`.
+Tested 2026-08-31 and neither player performed it — the 5G hangs when the host
+configures the isochronous endpoint, the 6G is never enumerated as an audio
+device. Delete the define to re-enable; the comment there says what else the
+setting needs back.
 
 USB iAP is separately **off** on both targets: `config.h` defines `PODBOX_NO_USB_IAP`, which suppresses the otherwise-automatic `USB_ENABLE_IAP`. Delete that define to re-enable; nothing else is needed.
 

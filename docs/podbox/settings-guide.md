@@ -465,7 +465,6 @@ shadow to colour.
 | USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only is useful with a car or a plug that would otherwise interrupt playback. | mass storage |  |
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
-| USB-DAC | Lets the player act as a USB sound card for a computer. | Never | **Adv** |
 
 ### System — Accessories
 

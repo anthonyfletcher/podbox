@@ -138,12 +138,6 @@ starting from the beginning.
 
 Meant for audiobooks and long podcasts. Needs a working database.
 
-[usb-dac]
-Lets the player act as a USB sound card for a computer.
-
-Never tested on this hardware. Leave it off unless you are willing to
-experiment.
-
 [replaygain type]
 Uses the loudness information many rippers write into files, so albums recorded
 at different levels play at a similar volume.
