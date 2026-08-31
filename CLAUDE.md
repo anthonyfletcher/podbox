@@ -170,7 +170,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-licenses.sh && ../bundle-help.sh && ../bundle-trim.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -187,10 +187,9 @@ make clean / make veryclean
 **Theme bundling — `make zip` is not enough.** `tools/buildzip.pl` is kept as
 close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Scrim, no first-boot `config.cfg`, no
-setting explanations, no title trimming patterns and upstream's licence file
-rather than this fork's**. Follow it with all four bundle scripts --
-`../bundle-theme.sh`, `../bundle-licenses.sh`, `../bundle-help.sh`,
-`../bundle-trim.sh`. `./build-hw.sh` and `./build-sim.sh` both run all four; a
+setting explanations and no title trimming patterns**. Follow it with all three
+bundle scripts -- `../bundle-theme.sh`, `../bundle-help.sh`,
+`../bundle-trim.sh`. `./build-hw.sh` and `./build-sim.sh` both run all three; a
 bare `make zip` runs none.
 
 Scrim is the only theme in the build. The others in `themes/` are published

@@ -17910,20 +17910,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_THIRD_PARTY_LICENSES
-  desc: in system menu, opens docs/LICENSES (imported third-party code)
-  user: core
-  <source>
-    *: "Third-Party Licenses"
-  </source>
-  <dest>
-    *: "Third-Party Licenses"
-  </dest>
-  <voice>
-    *: "Third-Party Licenses"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_DIAG_OK
   desc: generic
   user: core

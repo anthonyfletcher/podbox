@@ -88,12 +88,11 @@ cd "$BUILDDIR"
 JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 make -j"$JOBS"
 
-# buildzip.pl knows nothing about this fork's theme, licence file or setting
-# explanations, so a zip straight from `make zip` has none of them. The same
-# scripts build-hw.sh runs, for the same reason.
+# buildzip.pl knows nothing about this fork's theme, setting explanations or
+# title trimming patterns, so a zip straight from `make zip` has none of them.
+# The same scripts build-hw.sh runs, for the same reason.
 make zip
 ../bundle-theme.sh
-../bundle-licenses.sh
 ../bundle-help.sh
 ../bundle-trim.sh
 

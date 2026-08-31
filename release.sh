@@ -344,7 +344,9 @@ done
 # nothing is caught. settings-help.txt matters most: without it every Explain
 # menu entry shows nothing and nothing else looks wrong. Scrim is named by its
 # .cfg, its .sbs and a bitmap, because a half-copied theme still passes a
-# .cfg-only check.
+# .cfg-only check. A font licence is named too: those texts are how the OFL
+# notice reaches the player, and bundle-theme.sh only picks them up because it
+# copies the whole theme directory.
 
 say "Checking the zips"
 for target in $TARGETS; do
@@ -356,6 +358,7 @@ for target in $TARGETS; do
                     .rockbox/wps/scrim.sbs .rockbox/wps/scrim/volband.bmp \
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
+                    .rockbox/fonts/LICENSE-Noto.txt \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
@@ -394,6 +397,8 @@ for theme in $EXTRA_THEMES; do
         done
         unzip -l \"\$out\" | grep -q '\.rockbox/fonts/.*\.fnt' ||
             { echo '$theme zip carries no fonts' >&2; exit 1; }
+        unzip -l \"\$out\" | grep -q '\.rockbox/fonts/LICENSE-' ||
+            { echo '$theme zip carries fonts with no licence' >&2; exit 1; }
         printf '  %-14s ok  (%s)\n' '$theme' \"\$(du -h \"\$out\" | cut -f1)\"
     "
 done

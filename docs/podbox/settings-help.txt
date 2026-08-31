@@ -1429,9 +1429,6 @@ The people who wrote Rockbox.
 The GNU General Public License, version 2, which this firmware is released
 under.
 
-[action: Third-Party Licenses]
-The licences of the codecs, fonts and libraries this firmware includes.
-
 [action: Debug (Keep Out!)]
 Diagnostic screens for developers. Nothing in here is needed to use the player,
 and some of it can lock it up.

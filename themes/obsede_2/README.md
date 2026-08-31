@@ -11,12 +11,14 @@ Modified to support dynamic colours, album/artist art and the Noto Sans font.
 ## Material Design Icons
 - Created by Google (https://fonts.google.com/icons)
 - Licensed under the Apache License Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
-- 
+- Full text: `/.rockbox/fonts/LICENSE-Material-Design-Icons.txt`
+
 ## Noto Sans Font
 - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
 - This Font Software is licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org/).
 - Built from MicroNotoSans - a fork of Noto Sans by Evan Kenny aka [Dook](https://d00k.net/)
 - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
+- Full text: `/.rockbox/fonts/LICENSE-Noto.txt`
 
 ## Screenshots
 

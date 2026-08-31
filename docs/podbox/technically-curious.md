@@ -73,7 +73,7 @@ Rockbox builds out of tree, and `build-hw.sh` is only wrapping four steps:
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip
-../bundle-theme.sh && ../bundle-licenses.sh && ../bundle-help.sh
+../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
 ```
 
 Two of them are easy to get wrong by hand, and both fail quietly:
@@ -83,9 +83,9 @@ Two of them are easy to get wrong by hand, and both fail quietly:
   instead — you get working firmware with none of this fork's work in it.
 - **`make zip` on its own is incomplete.** `tools/buildzip.pl` is deliberately
   kept close to Rockbox and knows nothing about this fork, so its zip has no
-  theme, no first-boot config, no iconset, no setting explanations, and
-  Rockbox's licence file rather than this fork's. The three `bundle-*.sh`
-  scripts add them and strip what a plugin-less build cannot use.
+  theme, no first-boot config, no iconset, no setting explanations and no
+  title trimming patterns. The three `bundle-*.sh` scripts add them and strip
+  what a plugin-less build cannot use.
   `bundle-help.sh` is the one to watch: skip it and every **Explain** entry in
   a setting's context menu simply shows nothing, while everything else looks
   finished.
@@ -122,7 +122,7 @@ survives it.** Your music and database are worth more than the rebuild.
 mkdir build-sim-ipodvideo && cd build-sim-ipodvideo
 ../tools/configure --target=ipodvideo --type=s --appsdir=apps-ipod
 make -j"$(nproc)"
-make zip && ../bundle-theme.sh && ../bundle-licenses.sh && ../bundle-help.sh
+make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
 rm -rf simdisk/.rockbox && unzip -q rockbox.zip -d simdisk/
 ```
 

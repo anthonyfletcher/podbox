@@ -4,7 +4,7 @@ These themes have been modified to support features of PodBox. They are not in
 the build: each is a zip of its own on the
 [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Themes),
 carrying the fonts it needs. Scrim, the theme PodBox starts with, ships with the
-firmware instead.  
+firmware instead.
 
 ## themify_2
 

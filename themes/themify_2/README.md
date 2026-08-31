@@ -12,7 +12,8 @@ Modified to support dynamic colours and album/artist art.  Icons added for new f
 - Copyright 2020 The League Spartan Project Authors (https://github.com/theleagueof/league-spartan)
 - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/devanagari)
 - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
-- License: SIL Open Font License, Version 1.1 (https://openfontlicense.org/).
+- Licensed under the SIL Open Font License, Version 1.1.  The full text ships
+  beside the fonts, as `/.rockbox/fonts/LICENSE-LeagueSpartan.txt`.
 
 ## Screenshots
 

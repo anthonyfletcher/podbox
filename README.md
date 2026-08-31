@@ -329,7 +329,9 @@ themes for PodBox.
 
 RockBox, RockPod and additions by PodBox are licensed under the [GNU General Public License v2.0](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
 
-See [`docs/LICENSES`](docs/LICENSES) and [`docs/podbox/LICENSES`](docs/podbox/LICENSES).
+Imported code governed by a previous licence is listed in
+[`docs/LICENSES`](docs/LICENSES); the fonts and themes this fork adds are
+credited below, each with a link to its full licence text.
 
 ## Development credits
 
@@ -350,14 +352,61 @@ Built on the work of:
 
 ## Other credits
 
-### Spike video
+### Themes
+
+- Themify 2
+  - Created by: Evan Kenny aka [Dook](https://d00k.net/)
+  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+- Obsede' 2
+  - Created by: Serge Fahnenstell
+  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+- Bony
+  - Based on BONES created by: Chuck Lardo
+  - License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/deed.en)
+
+### Fonts
+
+Each theme carries the full licence text of the fonts it ships, beside them in
+its own `.rockbox/fonts/`. The links below point at one copy of each.
+
+- Material Design Icons
+  - Created by Google (https://fonts.google.com/icons)
+  - Licensed under the Apache License Version 2.0 —
+    [full text](themes/scrim/.rockbox/fonts/LICENSE-Material-Design-Icons.txt)
+- Noto Sans/Serif Font
+  - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
+  - Noto Sans built from MicroNotoSans - a fork of Noto Sans by Evan Kenny aka [Dook](https://d00k.net/)
+  - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
+  - Licensed under the SIL Open Font License, Version 1.1 —
+    [full text](themes/scrim/.rockbox/fonts/LICENSE-Noto.txt)
+- Seven Fifteen Font
+  - Copyright Douglas Vautour (https://burpyfresh.itch.io/seven-fifteen-font)
+  - Bundled together with UnifontEX, a fork of GNU Unifont maintained by stgiga
+    (https://github.com/stgiga/UnifontEX), which draws the scripts Seven Fifteen
+    does not cover
+  - Seven Fifteen licensed under CC BY-SA 4.0; UnifontEX under the GNU General
+    Public License version 2 or later with the GNU font embedding exception, or
+    the SIL Open Font License version 1.1 —
+    [full text](themes/scrim/.rockbox/fonts/LICENSE-Seven-Fifteen.txt)
+- League Spartan Font
+  - Copyright 2020 The League Spartan Project Authors (https://github.com/theleagueof/league-spartan)
+  - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/devanagari)
+  - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
+  - Licensed under the SIL Open Font License, Version 1.1 —
+    [full text](themes/themify_2/.rockbox/fonts/LICENSE-LeagueSpartan.txt)
+- ProFont Font
+  - Copyright 2014 Andrew Welch, Carl R. Osterwald, Stephen C. Gilardi
+  - Licensed under the MIT License —
+    [full text](themes/bony/.rockbox/fonts/LICENSE-ProFont.txt)
+
+### Spike Video
 
 - Song: Gabriawll - Recall
 - Music provided by NoCopyrightSounds
 - Free Download/Stream: http://ncs.io/Recall
 - Watch: http://ncs.lnk.to/RecallAT/youtube
 
-### Artwork in screenshots
+### Album Artwork
 
 - Angine de Poitrine - Vol.II - [Website](https://anginedepoitrine.com/)
   - Artwork: Arielle Corbeau - [Website](https://www.instagram.com/ariellecorbeau)

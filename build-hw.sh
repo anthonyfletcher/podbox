@@ -27,6 +27,5 @@ JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 make -j"$JOBS"
 make zip
 ../bundle-theme.sh
-../bundle-licenses.sh
 ../bundle-help.sh
 ../bundle-trim.sh

@@ -4,7 +4,7 @@
  * Copyright (C) 2007 Jonathan Gordon
  * GNU General Public License (version 2+)
  *
- * The main menu: system info, version, running time, credits, licences,
+ * The main menu: system info, version, running time, credits, the licence,
  * and the manage-settings submenu.
  ****************************************************************************/
 
@@ -117,12 +117,6 @@ static int show_credits(void)
 static int show_license(void)
 {
     return text_viewer(ROCKBOX_DIR "/docs/COPYING.txt") == GO_TO_ROOT
-           ? SYS_USB_CONNECTED : 0;
-}
-
-static int show_third_party_licenses(void)
-{
-    return text_viewer(ROCKBOX_DIR "/docs/LICENSES.txt") == GO_TO_ROOT
            ? SYS_USB_CONNECTED : 0;
 }
 
@@ -411,10 +405,6 @@ MENUITEM_FUNCTION(show_license_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_LICENSE),
                   show_license, NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION(show_third_party_licenses_item, MENU_FUNC_CHECK_RETVAL,
-                  ID2P(LANG_THIRD_PARTY_LICENSES),
-                  show_third_party_licenses, NULL, Icon_NOICON);
-
 /* The screen reports leaving for the root menu the way simplelist does, as a
  * bool; the menu wants it as MENU_ATTACHED_USB so it unwinds rather than
  * redrawing. */
@@ -430,7 +420,7 @@ MENUITEM_FUNCTION(bg_task_info, MENU_FUNC_CHECK_RETVAL,
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_about_item, &show_info_item, &show_credits_item,
           &show_runtime_item, &bg_task_info, &show_license_item,
-          &show_third_party_licenses_item, &debug_menu_item);
+          &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
                   main_menu_config, NULL, Icon_NOICON);
