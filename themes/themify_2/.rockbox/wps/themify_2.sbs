@@ -311,11 +311,11 @@
 # CC: Geometry mirrors Menu_With_Icons / No_Scroll_Menu_With_Icons; only the icon
 # CC: source differs.
 %Vl(File_Browser,0,0,302,30,6)%?Lc<%Vs(invert)A%aRB>
-%Vl(File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,1,1,33,S,34,T,0,U,V)
+%Vl(File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Search))<y|%sel(%LI,1,1,33,S,34,T,0,U,V)>
 %Vl(File_Browser,29,4,265,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
 #
 %Vl(No_Scroll_File_Browser,0,0,314,30,6)%?Lc<%Vs(invert)A%aRB>
-%Vl(No_Scroll_File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%sel(%LI,1,1,33,S,34,T,0,U,V)
+%Vl(No_Scroll_File_Browser,9,9,14,14,8)%?Lc<%Vs(invert)>%?if(%LT,=,%Sx(Search))<y|%sel(%LI,1,1,33,S,34,T,0,U,V)>
 %Vl(No_Scroll_File_Browser,27,4,277,22,-)%?Lc<%Vs(invert)>%?if(%St(scroll speed),=,1)<|%s>%LT
 #
 #

@@ -5,7 +5,7 @@
 #-----------------------------------------------#
 #
 #--- Fonts ---#
-%Fl(2,24x24_Icons.fnt)
+%Fl(2,24x24-icons.fnt)
 %Fl(3,18-noto-sans-bold.fnt)
 %Fl(4,12-noto-sans.fnt)
 #
@@ -73,7 +73,7 @@
 #
 # - Row icon
 %Vl(Rows,2,3,24,24,2)
-%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Current Playlist),U,%Sx(Playlists),m,%Sx(Spun),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Recently played),µ,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%sel(%LI,19,Þ,2,m)))>>>
+%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Current Playlist),U,%Sx(Playlists),m,%Sx(Spun),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Recently played),µ,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%sel(%LI,19,Þ,2,m)))>>>
 #
 # - Row number
 %Vl(Rows,0,5,30,20,3)

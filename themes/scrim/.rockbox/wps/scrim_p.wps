@@ -8,7 +8,7 @@
 #
 %Fl(2,26-noto-sans-medium.fnt)
 %Fl(3,12-noto-sans.fnt)
-%Fl(4,24x24_Icons.fnt)
+%Fl(4,24x24-icons.fnt)
 %Fl(5,18-noto-sans-bold.fnt)
 #
 #--- Images ---#
@@ -41,9 +41,9 @@
 %V(15,125,290,28,2)
 %s%ac%it
 #
-# - Album
+# - Sub-line: artist, album or playlist_name, per scrim.preferences
 %Vf(ffffff)%V(15,155,290,20,-)
-%s%ac%id
+%s%ac%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist)<%ia|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,playlist_name)<%pn|%id>>
 #
 # Progress
 %Vf(ffffff)%V(50,198,220,3,-)%pb(0,0,-,-,noborder)

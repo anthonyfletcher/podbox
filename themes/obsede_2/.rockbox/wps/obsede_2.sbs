@@ -14,7 +14,7 @@
 # Preload Font
 %Fl(2,16-noto-sans.fnt)
 %Fl(4,16-noto-sans-bold.fnt)
-%Fl(6,24x24_Icons.fnt)
+%Fl(6,24x24-icons.fnt)
 #
 # Preload Images
 %xl(star,nocover.bmp,0,0)
@@ -124,6 +124,6 @@
 #- one single-branch %?and, so a row it skips draws nothing and clears
 #- nothing. The icons below take their place.
 %Vl(Rows,0,1,44,44,-)%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>
-#- Special row icons, centred in the 44px cover box, from 24x24_Icons (font 6).
+#- Special row icons, centred in the 44px cover box, from 24x24-icons (font 6).
 %Vl(Rows,10,11,24,24,6)%?and(%La,%or(%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Resume])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([By album]))))<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
 %Vl(Rows,50,11,110,24,-)%?La<%?Lc<%Vb(2a2a2a)%Vf(ffffff)|%Vb(000000)%Vf(9a9a9a)>%s%LT|>

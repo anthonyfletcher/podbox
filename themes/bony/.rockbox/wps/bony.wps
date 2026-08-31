@@ -9,7 +9,7 @@
 %wd
 #
 #Preload fonts
-%Fl(2,15-ProFont.fnt)
+%Fl(2,15-profont.fnt)
 %Fl(3,24-seven-fifteen.fnt)
 %Fl(4,48-seven-fifteen.fnt)
 #

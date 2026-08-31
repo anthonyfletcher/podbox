@@ -1,0 +1,11 @@
+#-----------------------------------------------#
+#scrim
+#by Anthony Fletcher for PodBox
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#-- Sub Line --#
+# The line under the track title in the music player. Applies to both
+# scrim and scrim_p; reload the theme after changing it.
+# Possible Values: artist, album, playlist_name
+sub-line mode: artist
