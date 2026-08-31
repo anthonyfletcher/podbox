@@ -35,6 +35,8 @@
 #include "rbunicode.h"
 #include "screens/bookmark.h"
 #include "screens/browse/browser.h"
+#include "speech/talk.h"
+#include "pathfuncs.h"
 
 #define CUE_DIR ROCKBOX_DIR "/cue"
 
@@ -414,6 +416,11 @@ int cue_find_current_track(struct cuesheet *cue, unsigned long curpos)
     return i;
 }
 
+/* Shared by the voice callback and the play branch below, which run on the
+ * same thread and never overlap. On the stack it would be a second MAX_PATH
+ * buffer in a screen that already carries one. */
+static char cue_path_buf[MAX_PATH+1];
+
 /* callback that gives list item titles for the cuesheet browser */
 static const char* list_get_name_cb(int selected_item,
                                     void *data,
@@ -429,6 +436,29 @@ static const char* list_get_name_cb(int selected_item,
                  cue->tracks[selected_item/2].performer);
 
     return buffer;
+}
+
+/* Voices a row: the track number, then the performer and the title, using
+ * talk clips from the cuesheet's own directory where it has them. */
+static int cuesheet_list_voice_cb(int list_index, void *data)
+{
+    struct cuesheet *cue = (struct cuesheet *)data;
+    int index = list_index / 2;
+    const char *nameptr;
+    size_t dirlen;
+
+    talk_id(LANG_PLAYTIME_TRACK, true);
+    talk_number(index + 1, true);
+
+    dirlen = path_dirname(cue->file, &nameptr);
+    strmemccpy(cue_path_buf, cue->file, MIN(dirlen + 1, sizeof(cue_path_buf)));
+
+    talk_file_or_spell(cue_path_buf, cue->tracks[index].performer,
+                       TALK_IDARRAY(LANG_ID3_ARTIST), true);
+    talk_file_or_spell(cue_path_buf, cue->tracks[index].title,
+                       TALK_IDARRAY(LANG_ID3_TITLE), true);
+
+    return 0;
 }
 
 void browse_cuesheet(struct cuesheet *cue)
@@ -452,6 +482,8 @@ void browse_cuesheet(struct cuesheet *cue)
     gui_synclist_set_nb_items(&lists, 2*cue->track_count);
     gui_synclist_set_title(&lists, title, 0);
 
+    if (global_settings.talk_menu)
+        gui_synclist_set_voice_callback(&lists, cuesheet_list_voice_cb);
 
     if (id3)
     {
@@ -463,6 +495,7 @@ void browse_cuesheet(struct cuesheet *cue)
        settled here rather than there -- the alternative settles again on every
        keypress. */
     gui_synclist_draw_settled(&lists);
+    gui_synclist_speak_item(&lists);
 
     while (!done)
     {
@@ -492,10 +525,9 @@ void browse_cuesheet(struct cuesheet *cue)
                 if (!startit || !*cue->file)
                     break;
 
-                char file[MAX_PATH];
-                strmemccpy(file, cue->file, MAX_PATH);
-                char *fname = strrsplt(file, '/');
-                char *dirname = fname <= file + 1 ? "/" : file;
+                strmemccpy(cue_path_buf, cue->file, sizeof(cue_path_buf));
+                char *fname = strrsplt(cue_path_buf, '/');
+                char *dirname = fname <= cue_path_buf + 1 ? "/" : cue_path_buf;
                 bookmark_play(dirname, 0, elapsed, 0, current_tick, fname);
                 break;
                 } /* ACTION_STD_OK */
