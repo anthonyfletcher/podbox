@@ -1592,7 +1592,7 @@ const struct settings_list settings[] = {
     INT_SETTING(0, text_viewer_line_spacing, LANG_TEXT_VIEWER_LINE_SPACING, 0,
                 "text viewer line spacing", UNIT_INT, 0, 8, 1,
                 NULL, NULL, NULL),
-    TEXT_SETTING(0, text_viewer_font_file, "text viewer font", "22-Literata",
+    TEXT_SETTING(0, text_viewer_font_file, "text viewer font", "22-noto-serif",
                  FONT_DIR "/", ".fnt"),
     OFFON_SETTING(0, text_viewer_page_number, LANG_TEXT_VIEWER_PAGE_NUMBER,
                   false, "text viewer page number", NULL),
