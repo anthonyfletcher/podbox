@@ -56,6 +56,7 @@ struct gui_quickscreen
     struct viewport vp_icons[NB_SCREENS];
     int button_enter;
     int result;
+    int volume_item;     /* slot showing Volume, or QUICKSCREEN_ITEM_COUNT */
 };
 
 static void quickscreen_fix_viewports(struct gui_quickscreen *qs,
@@ -393,10 +394,20 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
         }
         else if (button == button_enter)
             can_quit = true;
-        else if (button == ACTION_QS_VOLUP)
-            adjust_volume(1);
-        else if (button == ACTION_QS_VOLDOWN)
-            adjust_volume(-1);
+        else if (button == ACTION_QS_VOLUP || button == ACTION_QS_VOLDOWN)
+        {
+            adjust_volume(button == ACTION_QS_VOLUP ? 1 : -1);
+
+            /* The volume keys change a setting this screen may be displaying,
+             * and nothing else on this branch redraws it. Only worth the pass
+             * when Volume occupies a slot; a skin drawing its own quickscreen
+             * returns from the draw and is served by the force below. */
+            if (qs->volume_item < QUICKSCREEN_ITEM_COUNT)
+            {
+                FOR_NB_SCREENS(i)
+                    gui_quickscreen_draw(qs, i);
+            }
+        }
         else if (button == ACTION_STD_CONTEXT)
         {
             qs->result |= QUICKSCREEN_GOTO_SHORTCUTS_MENU;
@@ -429,12 +440,16 @@ int quick_screen_quick(int button_enter)
     struct gui_quickscreen qs;
     bool usb = false;
 
-    for (int i = 0; i < 4; ++i)
+    qs.volume_item = QUICKSCREEN_ITEM_COUNT;
+
+    for (int i = 0; i < QUICKSCREEN_ITEM_COUNT; ++i)
     {
         qs.items[i] = global_settings.qs_items[i];
 
         if (!is_setting_quickscreenable(qs.items[i]))
             qs.items[i] = NULL;
+        else if (qs.items[i]->lang_id == LANG_VOLUME)
+            qs.volume_item = i;
     }
 
     int ret = gui_syncquickscreen_run(&qs, button_enter, &usb);
