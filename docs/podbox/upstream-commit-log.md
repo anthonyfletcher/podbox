@@ -435,7 +435,7 @@ selectively does not want a merge available. Diff the two checkouts instead.
 | 2026-07-31 | `bf6a974` | PictureFlow: don't snap the centre slide when no time has passed | **Adopted** | With the above. |
 | 2026-07-31 | `0a3446e` | PictureFlow: fix the centre-slide flash properly, and bound the advance | **Adopted** | `320c006b4f` for the bound, `bdb8a73e8d` for the flash — reached separately here, from the alpha ramp rather than the centre derivation. |
 | 2026-08-02 | — | *(upstream `104f57252b`, iap stack 6K → 8K)* | **Superseded** | Rockbox raised the same stack to 8KB. RockPod's 12KB comes from measurement and is the one taken; 8KB is 1.23× the measured worst case, where every other thread in the image runs at 1.8× or better. |
-| 2026-08-28 | `3b6d477` | iap: overhaul accessory protocol support | **Adopted (in part)** | 154 files, +54,025/−2,426 -- larger than everything else in this table put together, and triaged in parts rather than as a commit. Four parts are in; the serial-iAP half is still to look at. See *How `3b6d477` is being taken* below. |
+| 2026-08-28 | `3b6d477` | iap: overhaul accessory protocol support | **Adopted (in part)** | 154 files, +54,025/−2,426 -- larger than everything else in this table put together, and triaged in parts rather than as a commit. See *How `3b6d477` is being taken* below for what each part was worth. |
 
 Complete through `3b6d477` (2026-08-28), RockPod's tip as of 2026-08-31.
 Checked with `git ls-remote` rather than against a local checkout -- a stale
@@ -467,7 +467,28 @@ their before-side is often not ours.
 | `playlist/playlist.c` | **Adopted (in part)** | Two groups. `get_track_filename()` read `utf8` and `amount` before taking the lock and `filename`/`dirlen` after releasing it; `playlist_get_track_info()` walked `indices[]` and `rotate_index()` under no lock at all, from the viewer, the database browser and four places in `iap/`, while the audio thread mutates them. And the control file's own writes ignored three return values -- `fsync()`, and both `lseek()`s, the second of which records the position a track's name starts at, so a failed seek stored -1 as that position. The staged/snapshot API is declined. |
 | `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | Not a fix. Its new symbols are `ATA_SSD_DEEP_SLEEP_TICKS`, `ata_clock_gated`, `ata_sleep_pending` and `ata_disk_is_iflash()` -- an independent implementation of the SSD two-stage sleep this fork already ships (see `upstream-divergence.md`). Comparing two implementations of one feature buys nothing while ours is the one that has run. |
 | `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | Unchanged: both are *Deliberately not changed* in `upstream-divergence.md`, and that holds until USB audio is exercised on hardware. |
-| `iap/iap-core.c`, `iap-lingo*.c` | **Open** | The serial-iAP half, which is live here. Triaged on the rule the earlier RockPod iAP rows used -- take the defect fixes, decline the feature work -- and not yet done. |
+| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | Serial iAP is live here, so this half was read rather than assumed. Taken: two frame checks in `iap_getc()`, where a short-form length below 2 or above 0xFC and a long-form length below 0xFD are malformed and now drop the frame, instead of reaching the lingo handlers for their own `CHECKLEN` to catch. The rest does not separate -- see below. |
+
+### Why the serial half is mostly not separable
+
+The lingo files' bulk is the IDPS transaction-ID model, and this copy still has
+no IDPS state -- the same reason `3b6fd8d` and the six commits on it are N/A
+above. Every rewritten bounds check there is the same number with a `doff` of
+zero added to it: `iap-lingo1.c`'s three `CHECKLEN`s become `L1_NEED` macros
+that expand to exactly what they replaced while transaction IDs are off. There
+is no `iap-lingo7.c` here at all.
+
+`iap-core.c`'s bulk is a **transport indirection** -- `iap_transport_send` as a
+function pointer, `iap_set_transport()`, `iap_transport_claim()`,
+`iap_getc_transport()`, USB power sampling, mid-frame handoff between
+transports. It exists so iAP can run over USB as well as the dock connector's
+UART, and `PODBOX_NO_USB_IAP` compiles that out. What is called the serial path
+over there is one transport behind an abstraction built for the other one; here
+it is the only one, reached directly.
+
+`iap-lingo4.c` is +2973 of Extended Interface database browsing -- `l4_db_*`,
+`playlist_catalog_*`, sorted track selection, indexed text sending -- which is
+the declined feature itself.
 
 One thing found while reading rather than ported from anywhere: `handle_scsi()`
 takes `lun` straight from the host's CBW and indexes `ejected[]` and `locked[]`

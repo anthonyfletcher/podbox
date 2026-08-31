@@ -674,6 +674,15 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             /* large packet */
             s->state = ST_LENH;
         } else {
+            /* A short-form frame carries at least a lingo and a command, and
+             * lengths above 0xFC are the long form's. Either way the frame is
+             * malformed, so drop it here rather than hand the lingo handlers
+             * a length only their own CHECKLEN would catch. */
+            if (x < 0x02 || x > 0xFC)
+            {
+                s->state = ST_SYNC;
+                break;
+            }
             /* small packet.
              * Compare by addition: iap_rxlen is unsigned, so (iap_rxlen-2)
              * wraps to ~4G once the buffer fills to within one byte, and
@@ -699,8 +708,10 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
     case ST_LENL:
         s->check += x;
         s->len += x;
-        /* Same underflow as the small-packet check above. */
-        if ((s->len == 0) || ((uint32_t)s->len + 2 > iap_rxlen)) {
+        /* Same underflow as the small-packet check above. A long-form
+         * frame shorter than 0xFD should have been sent short-form. */
+        if ((s->len < 0x00FD) || (s->len > 0xFFFA)
+            || ((uint32_t)s->len + 2 > iap_rxlen)) {
             /* invalid length */
             s->state = ST_SYNC;
             break;
