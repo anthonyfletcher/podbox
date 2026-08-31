@@ -485,7 +485,6 @@ int main(int argc, char **argv)
     struct wps_data wps={0};
     enum screen_type screen = SCREEN_MAIN;
     enum skinnable_screens skin;
-    struct screen* wps_screen;
 
     /* No arguments -> print the help text
      * Also print the help text upon -h or --help */
@@ -493,7 +492,7 @@ int main(int argc, char **argv)
         strcmp(argv[1],"-h") == 0 ||
         strcmp(argv[1],"--help") == 0 )
     {
-        printf("Usage: checkwps [OPTIONS] filename.wps [filename2.wps]...\n");
+        printf("Usage: checkwps [OPTIONS] filename.wps [filename2.sbs]...\n");
         printf("\nOPTIONS:\n");
         printf("\t-v\t\tverbose\n");
         printf("\t-vv\t\tmore verbose\n");
@@ -556,12 +555,10 @@ int main(int argc, char **argv)
         else if (valid > 0)
             continue; /* skip (unsupported by this target but not an error) */
 
-        wps_screen = &screens[screen];
-
         res = skin_data_load(skin, screen, &wps, name, true, &stats);
 
         if (!res) {
-            printf("WPS parsing failure\n");
+            printf("%s parsing failure\n", ext);
             skin_error_format_message();
             /* A skin can also fail after it has parsed, on a bitmap or a font
              * it names. That leaves no error line, and the reason is a debugf
@@ -572,7 +569,7 @@ int main(int argc, char **argv)
             goto done;
         }
 
-        printf("WPS parsed OK\n\n");
+        printf("%s parsed OK\n\n", ext);
 
         if (want_viewports)
             dump_viewports(name, &wps, screen);
