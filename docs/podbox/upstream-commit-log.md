@@ -236,7 +236,7 @@ Two rules, both earned:
 | 2026-08-09 | `ef20bc4c78` | usb: keep the USB Serial setting across connects | **N/A** | Same gate as `6ad1fd074a`. The `apps/debug_menu.c` half has nothing to land on either -- `apps-ipod/` has no `toggle_usb_serial()`. |
 | 2026-08-11 | `444c9ce4bd` | manual: add touchscreen settings section | **N/A** | `manual/` is not built, and there is no touchscreen. |
 | 2026-08-11 | `51d7d56803` `459c5e7937` | ap80max: new hosted port, then moved to the 'unstable' list | **N/A** | Other target. **Conflicts in `wps/WPSLIST`**: it adds five AP80MAX lines to blocks this fork deleted whole. Resolution is ours -- the file lists only `rockbox_default_icons` and `rockbox_failsafe`, and the shipped theme is bundled by `bundle-theme.sh`. |
-| 2026-08-11 | `fd8d6f10a1` | synopsys-dwmac: bugfixes | **Adopted** | With `b616047311`, as one net port -- that commit exists to correct this one. `usb-designware.c` is the **6G's** USB OTG driver and this fork has never modified it, so both arrive with the merge: a non-zero multi-count for periodic INs in dedicated-FIFO mode, ISO frame polarity, and high-speed ISO max packet 1023 -> 1024. `USB_ENABLE_AUDIO` is on for the 6G, so the USB DAC path moves under them. Not exercised on hardware here. |
+| 2026-08-11 | `fd8d6f10a1` | synopsys-dwmac: bugfixes | **Adopted** | With `b616047311`, as one net port -- that commit exists to correct this one. `usb-designware.c` is the **6G's** USB OTG driver and this fork has never modified it, so both arrive with the merge: a non-zero multi-count for periodic INs in dedicated-FIFO mode, ISO frame polarity, and high-speed ISO max packet 1023 -> 1024. They move the USB DAC path, which `PODBOX_NO_USB_AUDIO` now compiles out -- see *USB audio is off* below. |
 | 2026-08-13 | `0ca22b9a71` `814747492c` `a89e1f999d` `c93c7bfdcb` `0e0982cb29` `7e53e85cb2` `9641d54fee` | touchscreen: flick detector and kinetic scrolling v2/v3, plus two build fixes | **N/A** | Backports, landed together. Every hunk is inside `HAVE_TOUCHSCREEN`, including the new `apps/gesture.c` (gated in `apps/SOURCES`) and the three `kinetic_scroll_*` settings. Neither player defines it. |
 | 2026-08-14 | `0b52c28933` | dircache: use alloca to avoid VLA in struct extension | **Adopted** | `firmware/common/dircache.c`, unmodified here, so it arrives with the merge. A clang accommodation; identical behaviour under gcc. |
 | 2026-08-14 | `9a7ffac2e4` `8f8a0e5230` | pcm_sink: per-sink swvol/hwvol selection | **Adopted** | Both targets get a new `.volume_type` member in their `builtin_pcm_sink` (`pcm-pp.c`, `pcm-s5l8702.c`), and `config.h` gains `WANT_SWVOL`/`WANT_SWVOL_32`. Neutral here by construction: neither target defines `HAVE_SW_VOLUME_CONTROL` or `PCM_NATIVE_BITDEPTH`, so `PCM_NATIVE_VOLUME_TYPE` resolves to `PCM_SINK_HWVOL`, which is what both already do. It still has to compile, and `firmware/SOURCES` swaps the `pcm_sw_volume.c` gate. |
@@ -248,14 +248,14 @@ Two rules, both earned:
 | 2026-08-18 | `b621a519e2` `f69ee23fa1` `11817f99f8` | stm32h7 sdmmc: bus-frequency helper, CMD12 ordering | **N/A** | Other target. |
 | 2026-08-19 | `2c5482cab9` `e3f622a851` | splash: iPod reFresh colour workaround made pixel-format independent | **N/A** | `widgets/splash.c` is a 290-line rewrite with no such workaround, and both targets are RGB565 native, where upstream's old literals `63422`/`65535` are exactly `LCD_RGBPACK(244,244,244)` and `(255,255,255)`. Nothing to port, and nothing it would change. |
 | 2026-08-13 | `789d796120` | quickscreen: make %QT hide built-in UI | **Adopted (independently)** | The same fix, reached here first (`eaa80e9feb`) and reaching further. Upstream sets a flag when `%QT` is parsed **in an SBS**; `skin/skin_parser.c` sets `wps_data->draws_quickscreen` on any of the eight `%Q` tags in any skin, and `sb_skin_draws_quickscreen()` stands the built-in layout down. Note `%QT` is upstream's own tag (`lib/skin_parser/tag_table.c`), not a fork one, and means the same thing in both trees -- the top setting's name. Upstream's commit message names the same lag in the same theme this fork converted. |
-| 2026-08-15 | `30a5f1d858` | quickscreen: redraw only the relevant viewports | **Adopted (in part)** | A 132-line restructure of upstream's `quickscreen.c` so a changed setting repaints one viewport instead of the screen. It applies -- `screens/playback/quick_screen.c` still redraws whole -- but buys less here, because the shipped themes all draw the quickscreen themselves and that path returns before any of this. **Reachability is the whole of this row, and "no shipped theme" is the wrong test.** Every theme in `themes/` carries the `%Q` tags, so `gui_quickscreen_draw()` stands down on all of them -- but a third-party theme that does not use those tags gets the built-in layout, and most do not. That is the population this serves. Taken: `quickscreen_draw_item()` factored out of the draw loop, and `quickscreen_update()` built on it, repainting only the viewports showing the setting that moved rather than clearing the screen and redrawing four items and four icons for a one-line change. `gui_quickscreen_do_button()` gains an out-parameter naming the slot. Two deviations: `quickscreen_update()` carries the same skinned stand-down the full draw has, which upstream has no equivalent of, and the commit's cosmetic reflow of the icon block is not taken -- churn, as with `cacbd9aad2`. |
+| 2026-08-15 | `30a5f1d858` | quickscreen: redraw only the relevant viewports | **Adopted (in part)** | `quickscreen_draw_item()` factored out of the draw loop, and `quickscreen_update()` built on it: a changed setting repaints its own viewports instead of clearing the screen and redrawing four items and four icons. `gui_quickscreen_do_button()` gains an out-parameter naming the slot. **Judge this by third-party themes, not the shipped ones** -- every theme in `themes/` carries the `%Q` tags, so the built-in layout never draws on them, but a theme without those tags gets it and most do not. Two deviations: `quickscreen_update()` repeats the skinned stand-down the full draw has, which upstream has no equivalent of; the reflow of the icon block is churn and is not taken, as with `cacbd9aad2`. |
 | 2026-08-16 | `50b13493d2` | skin_engine: make skin file type available to parser | **Adopted** | Ported by hand (`fa354b7f61`). `skin_data_load()` takes the skin type ahead of the screen and `skin_parser.c` keeps it in `curr_skin`; nothing reads it yet, upstream having added it for tags that need to know which skin they are in. **Merge-blocking, and a good illustration of the half-landed shape**: the apps half lands in the `apps/` mirror that nothing compiles, while its caller in `tools/checkwps/` *is* built here, so the merge produced a six-argument call to a five-argument function and only CheckWPS noticed. |
 | 2026-08-17 | `3d44fe94f3` | skin_display: simplify skin_wait_for_action | **Declined** | A complexity reduction; this fork has upstream's pre-simplification version. All three behaviour changes it lists are inert here: the `TIMEOUT_NOBLOCK` case needs the FM screen, and `CONFIG_TUNER` is commented out in both target configs; the multi-screen `next_refresh` fix needs `NB_SCREENS > 1`, and `draw/screen_access.h` defines it as 1; the third is `>` becoming `>=`. Nothing to gain but the shape, and `skin_display.c` has diverged enough that taking it is a rewrite rather than a patch. Settled 2026-08-31 so it stops being re-read. |
-| 2026-08-17 | `9cd4352256` | quickscreen: fix missing redraw for QS_VOL action | **Adopted** | A real defect here too: with Volume in a quickscreen slot, the volume keys change it and the displayed value does not move. `quick_screen.c` has no draw at all on that branch. Upstream's fix calls `quickscreen_update(qs, item)`, which arrives with `30a5f1d858` above -- so either take that first, or adapt to a whole-screen `gui_quickscreen_draw()`, which costs more per press and is correct. **Reachable only without a theme**, which bounds how much it is worth: every theme in `themes/` carries the `%Q` tags, so `gui_quickscreen_draw()` stands down on all of them, and the `button != ACTION_NONE` force at the foot of the loop (`8cfa4bfd8c`) already repaints the skin on a volume press. The built-in layout has no such fallback, which is what this fixes, and a third-party theme without the `%Q` tags is where it is seen. Taken as upstream wrote it, on `30a5f1d858` above: `volume_item` records which slot holds Volume, found by `lang_id == LANG_VOLUME` at setup, and the branch calls `quickscreen_update()` on it. A quickscreen with no Volume slot redraws nothing. |
+| 2026-08-17 | `9cd4352256` | quickscreen: fix missing redraw for QS_VOL action | **Adopted** | With Volume in a quickscreen slot the volume keys changed it and the row went on showing the old value -- that branch drew nothing. `volume_item` records the slot, found by `lang_id == LANG_VOLUME` at setup, and the branch calls `quickscreen_update()` from `30a5f1d858` above; a quickscreen without Volume redraws nothing. Seen only under a theme without the `%Q` tags, for the reason in that row. |
 | 2026-08-19 | `9039355bf8` | timeout: include `<stdint.h>` for intptr_t | **Adopted** | `firmware/kernel/include/timeout.h`, unmodified here, so it arrives with the merge. |
 | 2026-06-26 | `2be2aeb2a2` `0e2a3cc0c6` `4d3c7aed03` `9cef2a3aef` `ce47229857` | 3DS: circle pad, software tone controls, clean power-off, touchscreen gating, data directories | **N/A** | Other target. `firmware/target/hosted/ctru/` and `config/ctru.h` throughout; the last of the five landed 2026-08-26. |
 | 2026-07-25 | `ec59f570dd` | keyboard: point-mode virtual keyboard for touchscreens | **N/A** | Every hunk is inside `HAVE_TOUCHSCREEN`, which neither player defines, and the two config headers it enables the mode on are other targets. PodBox's keyboard is its own click-wheel screen besides -- see `0e3355de50`. |
-| 2026-08-15 | `c04c2c3e0b` | FS#13892: voice feedback in the Cuesheet browser | **Adopted** | Voices the index, performer and title of each cuesheet row, using talk clips where the directory has them. Lands on `metadata/cuesheet.c`, whose `browse_cuesheet()` is upstream's shape unchanged, and every prerequisite is present: `gui_synclist_set_voice_callback()`, `talk_file_or_spell()`, `TALK_IDARRAY`, `path_dirname()` and `LANG_PLAYTIME_TRACK`. The commit also hoists `file[MAX_PATH]` out of the action loop into a file-scope buffer the voice callback shares, which is taken -- the screen already carries one `MAX_PATH` buffer on the stack. One deviation: the directory is cut with `strmemccpy()` rather than upstream's `snprintf()` followed by a manual NUL at the return value, which is `strlen()` of the whole path and so lands past what was written. |
+| 2026-08-15 | `c04c2c3e0b` | FS#13892: voice feedback in the Cuesheet browser | **Adopted** | Each row voices its track number, then performer and title, preferring a talk clip from the cuesheet's directory. `browse_cuesheet()` is upstream's shape here, so it ports as written. The file-scope path buffer comes with it -- the screen already carries one `MAX_PATH` on the stack. One deviation: the directory is cut with `strmemccpy()`, not upstream's `snprintf()` plus a manual NUL at its return value, which is `strlen()` of the whole path and lands past what was written. |
 | 2026-08-15 | `aeaee5da45` | voice.pl: extract PERFORMER and TITLE from cuesheets | **Adopted** | Generates talk clips for cuesheet tracks, which is what makes `c04c2c3e0b` audible on a player whose clips are pre-generated. Its hunks are in `gentalkclips()` from line 754, clear of this fork's `appsdir()` changes at 524 and 604, so it merged without conflict. Voice builds are unverified here either way. |
 | 2026-08-17 | `1f1db58d44` `afe5e7191d` `bafcb38ec9` `cdad8cde64` `94a0fe608a` `5e71adddf9` `69a36026f8` `a95f9debb2` `99c18f336c` | sdmmc: SCR in `tCardInfo`, cache-buffer helper, CMD23, activity LED, generic polling helper, init cleanup, single-block timeout quirk | **N/A** | Both targets are `STORAGE_ATA`, so `firmware/SOURCES` compiles neither `sdmmc.c` (gated on `STORAGE_MMC \| STORAGE_SD`) nor `drivers/sdmmc_host.c` and the new `drivers/sdmmc_poll.c` (gated on `HAVE_SDMMC_HOST`). The `apps/debug_menu.c` half of `1f1db58d44` prints the SCR on a card-info screen `apps-ipod/` does not have. Landed through 2026-08-29. |
 | 2026-08-18 | `f40cae6cdc` | x1000: rewrite the SD driver using sdmmc_host | **N/A** | Other target, and the consumer of the cluster above. |
@@ -265,7 +265,7 @@ Two rules, both earned:
 | 2026-08-25 | `3f1ec2385f` | FS#13988: Hungarian translation update | **N/A** | `magyar.lang` only, with no `english.lang` hunk. See *Why the translation commits are N/A* below. |
 | 2026-08-25 | `fd2b070bb1` | FS#13984: Rockbox Utility SAPI5 voice volume control | **Adopted (in part)** | The `tools/sapi_voice.vbs` half only, as `a467bfc55f`: a `--volume` option threaded into the SAPI voice object. This fork has never modified that file, so it merged without conflict. The `utils/rbutilqt/` half that would set the option is N/A. |
 | 2026-08-28 | `8536d981a8` | checkwps: print the file name extension instead of "WPS" | **Adopted** | Two `printf`s take the extension already parsed by `check_filetype()`, so an `.sbs` failure stops saying *WPS parsing failure*. It also deletes `wps_screen`, which `50b13493d2` orphaned -- `tools/checkwps/checkwps.c` still declares and assigns it here. That file is a fork file, and it is the merge's only conflict: the `parsed OK` line sits at the head of a block this fork has extended with `--viewports` and the `.sbs` viewport carry-over. Taking upstream's line and keeping the block resolves it; the other two hunks merged on their own. |
-| 2026-08-28 | `70fd3e1f1e` | ipodcolor: fall back to UDMA 1 | **N/A** | `firmware/target/arm/pp/ata-target.h` is shared with `ipodvideo`, but the new term is `!defined(IPOD_COLOR)` and the 5G keeps `ATA_MAX_UDMA 2`. Worth knowing rather than acting on: the 4G and now the Color are both held at UDMA 1 for reported instability at 30 MHz, and the 5G runs the same controller at the same clock. |
+| 2026-08-28 | `70fd3e1f1e` | ipodcolor: fall back to UDMA 1 | **N/A** | `firmware/target/arm/pp/ata-target.h` is shared with `ipodvideo`, but the new term is `!defined(IPOD_COLOR)` and the 5G keeps `ATA_MAX_UDMA 2`. |
 | 2026-08-28 | `28e5a125ab` | configure: macos: fix checkwps error messages | **N/A** | The binutils-version probe is skipped on `Darwin` for the sdl-sim, sdl-app and checkwps types, replacing a precedence bug in the `[ ] \|\| [ ] && [ ]` chain. Guarded on `uname = Darwin`, which neither the development machine nor the build server is. `tools/configure` is a fork file but its nearest change is 450 lines away, so this merges clean. |
 
 Complete through `9cef2a3aef` (2026-08-29), merged as `d16a9c8b11`, which is
@@ -374,6 +374,27 @@ The 5G is not without a remote: it defines `IPOD_ACCESSORY_PROTOCOL`
 (`ipodvideo.h`) and `button-clickwheel.c` already ORs in
 `remote_control_rx()`, so dock-connector remotes work there over serial iAP.
 
+## USB audio is off
+
+Both targets, by `PODBOX_NO_USB_AUDIO` in `config.h`. It was on until
+2026-08-31, when it was tried on each player for the first time:
+
+| | 5G (ARC) | 6G (DesignWare) |
+| --- | --- | --- |
+| Player | Hangs; needs a hard reset | Fine |
+| Driver init | Never completes | Completes, endpoints assigned |
+| Host | Binds a USB audio driver | Never enumerates the audio function |
+
+Two faults in two layers. The shared driver runs clean on the 6G, so the 5G
+hang is in ARC's isochronous endpoint path, which that target has no `logf` to
+investigate. The 6G's descriptors are refused in both the charge-only and the
+mass-storage composite.
+
+Off rather than declined: the buffer allocation was moved to boot along the
+way, which fixes a real hazard for whoever picks this up. Three upstream rows
+above touch it -- `fd8d6f10a1`, `b616047311` and `ea775fa501` -- and all three
+now land on code that does not compile.
+
 ## Why the translation commits are N/A
 
 Four commits above are N/A, and the reason is not the obvious one.
@@ -438,61 +459,33 @@ Complete through `3b6d477` (2026-08-28), RockPod's tip as of 2026-08-31.
 Checked with `git ls-remote` rather than against a local checkout -- a stale
 clone reads as "nothing new" whether or not that is true.
 
-## How `3b6d477` is being taken
+## What was taken from `3b6d477`
 
-One commit, and too large to hold a single status. It aligns IDPS,
-authentication, transport, notification, tuner, button, USB-audio and
-digital-volume lifecycles with MFi R46, implements EI 1.13 browsing over
-tagcache or iTunesDB snapshots, and brings a host-side test rig
-(`apps/iap/test/`) with it.
+154 files, +54,025/-2,426: MFi R46 lifecycles, EI 1.13 browsing over a tagcache
+or iTunesDB snapshot, and a host-side test rig.
 
 **The feature it exists for cannot run here.** EI browsing is Extended
 Interface lingo over USB iAP, which `PODBOX_NO_USB_IAP` compiles out, and there
-is no accessory here to test it against. So `iap-db.c` (4910 lines),
-`iap-media.c` (2516), the artwork and chapter readers and the test rig are all
-**Declined**, along with the API added elsewhere to serve them.
+is no accessory to test against. `iap-db.c` (4910 lines), `iap-media.c` (2516),
+the artwork and chapter readers and the test rig are **Declined**, with the API
+added elsewhere to serve them.
 
-What is taken is the hardening underneath, judged hunk by hunk against *this*
-tree rather than RockPod's -- their `firmware/` and `lib/` are pre-rebase, so
-their before-side is often not ours.
+Taken is the hardening underneath, judged against *this* tree -- RockPod's
+`firmware/` and `lib/` are pre-rebase, so their before-side is often not ours.
 
 | Part | Status | What |
 | --- | --- | --- |
-| `lib/rbcodec/metadata/mp4.c` | **Adopted (in part)** | `size` is `uint32_t`, so a `chpl` box shorter than its own nine-byte header wraps it and the container loop then seeks by ~4GB. Both reads are checked now too. The `IPOD_ACCESSORY_PROTOCOL` half -- `has_embedded_chapters`, `embedded_chapters` -- is the chapters feature and is declined. |
-| `database/tagcache.c`, `.h` | **Adopted (in part)** | A database read error was indistinguishable from "this entry does not match the clause", so a corrupt or truncated index answered a short list as though it were the whole one. `open_master_fd()` at `build_lookup_list()` was the one call of four in the file not checking its return. The walk is bounded by `master_entry_count` from the master header, so a short read is a truncated file rather than the end of one, and a new `failed` flag carries a read error out of `check_clauses()` instead of dropping the entry. The snapshot accessors are declined. |
-| `usbstack/usb_storage.c` | **Adopted (independently)** | The host's LBA and block count are scaled by the sector multiplier at the call site, in 32-bit arithmetic, and `sector_t` is 32-bit without `STORAGE_64BIT_SECTOR` -- so `sector + count` can wrap past the range test and turn a request the device should refuse into an in-range access at the wrong offset. On a write that is silent corruption. One `set_transfer_range()` serves all four of `READ_10`, `READ_16`, `WRITE_10` and `WRITE_16`, widening before it compares. Written here rather than ported: RockPod's version also rewrites `READ_CAPACITY_16` and drops the `flags` and `lowest_aligned_lba` alignment reporting this tree has. |
-| `playlist/playlist.c` | **Adopted (in part)** | Two groups. `get_track_filename()` read `utf8` and `amount` before taking the lock and `filename`/`dirlen` after releasing it; `playlist_get_track_info()` walked `indices[]` and `rotate_index()` under no lock at all, from the viewer, the database browser and four places in `iap/`, while the audio thread mutates them. And the control file's own writes ignored three return values -- `fsync()`, and both `lseek()`s, the second of which records the position a track's name starts at, so a failed seek stored -1 as that position. The staged/snapshot API is declined. |
-| `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | Not a fix. Its new symbols are `ATA_SSD_DEEP_SLEEP_TICKS`, `ata_clock_gated`, `ata_sleep_pending` and `ata_disk_is_iflash()` -- an independent implementation of the SSD two-stage sleep this fork already ships (see `upstream-divergence.md`). Comparing two implementations of one feature buys nothing while ours is the one that has run. |
-| `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | Unchanged: both are *Deliberately not changed* in `upstream-divergence.md`, and that holds until USB audio is exercised on hardware. |
-| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | Serial iAP is live here, so this half was read rather than assumed. Taken: two frame checks in `iap_getc()`, where a short-form length below 2 or above 0xFC and a long-form length below 0xFD are malformed and now drop the frame, instead of reaching the lingo handlers for their own `CHECKLEN` to catch. The rest does not separate -- see below. |
+| `lib/rbcodec/metadata/mp4.c` | **Adopted (in part)** | `size` is `uint32_t`, so a `chpl` box shorter than its nine-byte header wraps it and the loop then seeks by ~4GB. Both reads are checked now. The `IPOD_ACCESSORY_PROTOCOL` half is the chapters feature; declined. |
+| `database/tagcache.c`, `.h` | **Adopted (in part)** | A read error was indistinguishable from "this entry does not match the clause", so a truncated index answered a short list as the whole one. `open_master_fd()` in `build_lookup_list()` was the one call of four not checking its return. The walk is bounded by `master_entry_count`, and a new `failed` flag carries a read error out of `check_clauses()`. Snapshot accessors declined. |
+| `usbstack/usb_storage.c` | **Adopted (independently)** | The host's LBA and count are scaled by the sector multiplier in 32-bit arithmetic, and `sector_t` is 32-bit here, so `sector + count` can wrap past the range test -- a request the device should refuse becomes an in-range access at the wrong offset, which on a write is silent corruption. One `set_transfer_range()` serves `READ_10`, `READ_16`, `WRITE_10` and `WRITE_16`. Written here, not ported: RockPod's also rewrites `READ_CAPACITY_16` and drops alignment reporting this tree has. |
+| `playlist/playlist.c` | **Adopted (in part)** | `get_track_filename()` read `utf8` and `amount` before taking the lock and `filename`/`dirlen` after releasing it; `playlist_get_track_info()` walked `indices[]` under no lock at all, from the viewer, the browser and four places in `iap/`, while the audio thread mutates them. The control file also ignored `fsync()` and both `lseek()`s -- the second records where a track's name starts, so a failed seek stored -1 there. Staged/snapshot API declined. |
+| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | Two frame checks in `iap_getc()`: a short-form length below 2 or above 0xFC, and a long-form below 0xFD, are malformed and drop the frame rather than reaching the lingo handlers. The rest does not separate. The lingo files' bulk is the IDPS transaction-ID model, and this copy has no IDPS state -- every rewritten bounds check is the same number with a `doff` of zero. `iap-core.c`'s bulk is a transport indirection so iAP can also run over USB, which is compiled out. `iap-lingo4.c` is the EI browsing itself. |
+| `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | Not a fix: `ATA_SSD_DEEP_SLEEP_TICKS`, `ata_clock_gated`, `ata_disk_is_iflash()` are an independent implementation of the SSD two-stage sleep this fork already ships. |
+| `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | Both are *Deliberately not changed* in `upstream-divergence.md`, and USB audio is now compiled out entirely. |
 
-### Why the serial half is mostly not separable
-
-The lingo files' bulk is the IDPS transaction-ID model, and this copy still has
-no IDPS state -- the same reason `3b6fd8d` and the six commits on it are N/A
-above. Every rewritten bounds check there is the same number with a `doff` of
-zero added to it: `iap-lingo1.c`'s three `CHECKLEN`s become `L1_NEED` macros
-that expand to exactly what they replaced while transaction IDs are off. There
-is no `iap-lingo7.c` here at all.
-
-`iap-core.c`'s bulk is a **transport indirection** -- `iap_transport_send` as a
-function pointer, `iap_set_transport()`, `iap_transport_claim()`,
-`iap_getc_transport()`, USB power sampling, mid-frame handoff between
-transports. It exists so iAP can run over USB as well as the dock connector's
-UART, and `PODBOX_NO_USB_IAP` compiles that out. What is called the serial path
-over there is one transport behind an abstraction built for the other one; here
-it is the only one, reached directly.
-
-`iap-lingo4.c` is +2973 of Extended Interface database browsing -- `l4_db_*`,
-`playlist_catalog_*`, sorted track selection, indexed text sending -- which is
-the declined feature itself.
-
-One thing found while reading rather than ported from anywhere: `handle_scsi()`
-takes `lun` straight from the host's CBW and indexes `ejected[]` and `locked[]`
-with it, both `NUM_DRIVES` long, as well as passing it to the storage and disk
-layers. `disk_get_sector_multiplier()` answers 0 for a drive it does not
-recognise, which then divides into `block_count`. It is bounded against
-`storage_num_drives()` now, where it is still a protocol error.
+Found while reading rather than ported: `handle_scsi()` took `lun` straight from
+the host's CBW and indexed `ejected[]` and `locked[]` with it, both `NUM_DRIVES`
+long. It is bounded against `storage_num_drives()` now.
 
 # Noted exceptions
 

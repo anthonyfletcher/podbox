@@ -86,7 +86,7 @@ commit*, where this one answers *why a given file differs*.
 | `drivers/lcd-16bit-common.c` | `lcd_alpha_bitmap_part_mix()`'s `DRMODE_FG` case skips the blend for a fully transparent pixel | Most of a glyph's box is transparent, and the blitter had no early out: `blend_two_colors()` with `ALPHA_MASK` weights the destination alone and hands it straight back, so those pixels were paying about thirty instructions to write themselves unchanged. The test costs two and takes them to twelve — that is every anti-aliased glyph the player draws, as well as the skin's `%Vt` text shadow, which is the caller that made it worth measuring. Only that case: under `DRMODE_SOLID` a transparent pixel is the background and still has to be painted. The alpha is read either way — `READ_ALPHA()` is what advances the stream — into a local that must not be called `alpha`, the name of the pointer the macro walks. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm functions, the `alarm_disable` table and the `rtc_init()` call to `rtc_check_alarm_started()` wrapped in `#ifdef HAVE_RTC_ALARM` | The prototypes in `export/rtc.h` are already guarded, but this driver referenced them unconditionally — it was the only RTC driver without the guard, because every upstream target using the PCF50605 defines `HAVE_RTC_ALARM`. Undefining it for the 5G broke the build. Now matches the shape of `rtc_ds1339_ds3231.c`, `rtc_e8564.c` and the rest, so this is upstream's own convention rather than a fork invention. |
 
-| `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()` and `dircache_get_index_path()` | The cache already holds every filename on the player in RAM, but its public API only resolves a path it is *given* — there is no way to ask what it contains, so a whole-player filename search had no source but a disk index of its own. These expose the sweep upstream already performs privately: `dircache_foreach_name()` is `dircache_dump()`'s `FOR_EACH_CACHE_ENTRY` loop with a callback instead of an `fdprintf`, and paths are built per *hit* rather than per entry because each one costs a walk to the root. Two departures from the file's conventions, both deliberate. The sweep takes the filesystem lock as **READER**, where every other entry point takes `dircache_lock()` (the WRITER): it only reads, and it runs long enough that an exclusive lock would hold off the audio thread's buffering throughout — reader still excludes the scanning thread, which holds the writer across a whole build. And `dircache_is_ready()` reads the volume statuses **unlocked**, because `dircache_get_info()` answers the same question behind the writer lock and so blocks for the length of a scan — which is the wait a readiness check exists to avoid. |
+| `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()` and `dircache_get_index_path()` | The cache holds every filename on the player in RAM, but its public API only resolves a path it is *given*, so a whole-player search had no source but a disk index of its own. These expose the sweep upstream already performs privately: `dircache_foreach_name()` is `dircache_dump()`'s `FOR_EACH_CACHE_ENTRY` loop with a callback instead of an `fdprintf`, and paths are built per *hit* rather than per entry because each one costs a walk to the root. Two departures from the file's conventions. The sweep takes the filesystem lock as **READER**, where every other entry point takes `dircache_lock()` (the WRITER): it only reads, and it runs long enough that an exclusive lock would hold off the audio thread's buffering throughout — reader still excludes the scanning thread, which holds the writer across a whole build. And `dircache_is_ready()` reads the volume statuses **unlocked**, because `dircache_get_info()` answers the same question behind the writer lock and so blocks for the length of a scan — which is the wait a readiness check exists to avoid. |
 
 ## firmware/ — USB stack
 
@@ -256,11 +256,12 @@ future decline is not in that position, it needs a row here.
 | `export/config/ipodvideo.h` | `CONFIG_TUNER`, `HAVE_RDS_CAP`, `CONFIG_RDS` commented out | The Apple remote tuner accessory is not a target of this build. Leaving them defined left a whole FM surface reachable and pointless: Radio Screen theme option, Radio Settings menu, main-menu FM entry. Now matches `ipod6g.h`, which never defined them. |
 | `export/config/ipodvideo.h` | `HAVE_RTC_ALARM` commented out | The wake-up alarm could never be made to work, and the 5G was the only target that built it — `ipod6g.h` already had it commented out. The Apple bootloader clears the PCF interrupt registers before Rockbox runs, so `rtc_check_alarm_started()` guesses instead: it calls it a wake if the clock matches the alarm registers to within ten seconds, comparing seconds as raw BCD so the real window is 0–9. A 5G booting off a spinning disk usually misses it, and misses silently. The whole apps-side alarm — screen, wake image, menu entry, `CONTEXT_ALARMSCREEN` — is removed rather than left compiled out. |
 
-> **USB audio is on for both targets.** RockPod restricted `USB_ENABLE_AUDIO` to
-> the S5L8702; that restriction was deliberately not carried forward. The
-> generic gate and ARC isochronous support both predate the fork, so dropping it
-> restores USB audio on the 5G rather than introducing it. DesignWare (6G) and
-> ARC (5G) both set `USB_HAS_ISOCHRONOUS`.
+> **USB audio is off on both targets**, by `PODBOX_NO_USB_AUDIO`. It was on
+> until 2026-08-31, and neither player ever performed it: the 5G hangs when the
+> host configures the isochronous endpoint, and no host enumerates the 6G's
+> audio function. Two faults in two layers; the define's comment has the
+> detail. Off is not a judgement on the code, and the work to make the
+> allocation safe is in the tree for whoever picks it up.
 
 ### USB iAP stays off — decided, not deferred
 
@@ -368,11 +369,9 @@ database files itself, so the player does not have to scan.
 
 ### The simulator needs nothing here
 
-The simulator was brought up without changing a single file outside
-`apps-ipod/`. That is worth stating in a document about divergence, because the
-obvious assumption is the opposite: `uisimulator/`, `firmware/target/hosted/sdl/`
-and `tools/root.make`'s `sdl-sim` path are all upstream's, unmodified, and all
-of them work.
+Nothing outside `apps-ipod/` changed to bring the simulator up.
+`uisimulator/`, `firmware/target/hosted/sdl/` and `tools/root.make`'s
+`sdl-sim` path are all upstream's, unmodified, and all work.
 
 What had to change was `apps-ipod/` believing it was on hardware — a shim
 directory plus a handful of restored upstream `#ifdef`s, documented in
