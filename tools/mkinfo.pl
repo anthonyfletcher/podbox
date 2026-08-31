@@ -31,7 +31,12 @@ sub cmd1line {
 sub definescan {
     my ($f, $d)=($_[0], $_[1]);
     my $v;
-    open(M, "<$f");
+    if (!open(M, "<$f")) {
+        # Silence here is how "Voice format:" came to be empty: the only
+        # symptom is a field this script still prints, blank.
+        warn "mkinfo.pl: cannot read $f for $d: $!\n";
+        return $v;
+    }
     while(<M>) {
         if($_ =~ /\#define\s+$d\s+([^\s]+)\s?/) {
             $v = $1;
@@ -103,7 +108,13 @@ printf O ("Manufacturer: %s\n", $ENV{'MANUFACTURER'});
 printf O ("Version: %s", `$ENV{TOOLSDIR}/version.sh $ENV{ROOTDIR}`);
 printf O ("Binary: %s\n", $ENV{'BINARY'});
 printf O ("Binary size: %s\n", filesize($ENV{'BINARY'}));
-printf O ("Voice format: %s\n", definescan("$ENV{APPSDIR}/talk.h", "VOICE_VERSION"));
+# talk.h is the application layer's, so COREAPPSDIR rather than APPSDIR -- a
+# bootloader build points the latter at bootloader/. This fork groups it
+# under speech/; upstream's flat layout keeps it at the top.
+my $talkdir = $ENV{'COREAPPSDIR'} || $ENV{'APPSDIR'};
+my $talkh = "$talkdir/speech/talk.h";
+$talkh = "$talkdir/talk.h" unless -r $talkh;
+printf O ("Voice format: %s\n", definescan($talkh, "VOICE_VERSION"));
 
 # A core build is one compiling the application layer, whatever directory that
 # lives in -- --appsdir can move it, so match COREAPPSDIR rather than "apps".
