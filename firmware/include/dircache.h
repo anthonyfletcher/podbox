@@ -22,6 +22,7 @@
 #define _DIRCACHE_H
 
 #include "mv.h"
+#include <stdbool.h>
 #include <string.h>    /* size_t */
 #include <sys/types.h> /* ssize_t */
 
@@ -173,6 +174,37 @@ int dircache_search(unsigned int flags, struct dircache_fileref *dcfrefp,
 
 int dircache_fileref_cmp(const struct dircache_fileref *dcfrefp1,
                          const struct dircache_fileref *dcfrefp2);
+
+
+/** Walking the whole cache **/
+
+/* Whether there is a complete cache to walk: one built and none being rebuilt.
+ * Cheaper than dircache_get_info(), and answerable during a build, which that
+ * is not -- use this to decide whether to offer something cache-backed. */
+bool dircache_is_ready(void);
+
+/* Visit every entry. 'cb' is given the entry's name, its cache index and its
+ * attributes, and returns false to stop early. Returns the number of entries
+ * visited, or -1 if there is no cache to walk.
+ *
+ * What counts as a match belongs to the caller. Resolve only the entries it
+ * keeps with dircache_get_index_path(): a path costs a walk to the root, so
+ * building one per entry rather than per hit is the difference between a sweep
+ * and a crawl.
+ *
+ * Results can be short of the disk without saying so. Nothing below
+ * DIRCACHE_MAX_DEPTH is cached, the cache stops growing at DIRCACHE_LIMIT, and
+ * a build that hit either still reports itself ready -- so a caller showing
+ * these to someone should compare dircache_get_info()'s sizeused against
+ * size_limit and say the list may be incomplete. */
+int dircache_foreach_name(bool (*cb)(const char *name, int idx,
+                                     unsigned int attr, void *ctx),
+                          void *ctx);
+
+/* Full path of an index handed to that callback, as strlcpy: the length the
+ * path needs, or negative if it cannot be resolved. Creating or removing a
+ * file invalidates indexes, so resolve them before doing either. */
+ssize_t dircache_get_index_path(int idx, char *buf, size_t size);
 
 
 /** Debug screen/info stuff **/

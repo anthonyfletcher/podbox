@@ -18,4 +18,9 @@ int browser_disk_assemble_path(char *buf, size_t bufsz,
 int browser_disk_build_playlist(struct browser_context* c, int start_index);
 bool browser_disk_play_playlist(char* pathname, char* dirname, char* filename);
 
+/* The top row a freshly loaded directory wants shown, or -1 for no preference:
+ * a root carrying the Search row opens scrolled past it. Clears the request.
+ * The counterpart to browser_db_take_pending_top_item(). */
+int browser_disk_take_pending_top_item(void);
+
 #endif

@@ -59,6 +59,12 @@
 #include "pathfuncs.h"
 #include "root_menu.h"
 
+/* The top row a freshly loaded directory wants shown, or -1 for no preference.
+ * A list re-chooses its top row when the selection moves, not on a plain draw,
+ * so opening scrolled past the Search row has to be asked for out here and
+ * applied after the selection is set -- see browser.c. */
+static int pending_top_item = -1;
+
 static struct compare_data
 {
     int sort_dir; /* qsort key for sorting directories */
@@ -182,7 +188,10 @@ static void check_file_thumbnails(struct browser_context* c)
     browser_lock_cache(c);
     entries = browser_get_entries(c);
 
-    for (i=0; i < c->filesindir; i++)
+    /* Past the Search row: it has no file behind it to have a .talk clip, and
+     * the test below indexes back from the end of a name long enough to hold
+     * the extension. */
+    for (i = c->special_entry_count; i < c->filesindir; i++)
     {
         if (entries[i].attr & ATTR_DIRECTORY)
             continue; /* we're not touching directories */
@@ -327,6 +336,35 @@ int browser_disk_load(struct browser_context* c, const char* tempdir)
     c->dirfull = false;
 
     browser_lock_cache(c);
+
+    /* The Search row, when this browse asked for one and we are at the top of
+     * it. Built before the directory is read so that it is entry 0, and
+     * counted as a special entry so that everything keyed on that -- the album
+     * art rows, and the opening position below -- steps over it.
+     *
+     * Written straight into the caches rather than through the readdir loop:
+     * it has no directory entry behind it, and every filter in that loop is
+     * about what a real one contains. */
+    c->special_entry_count = 0;
+    if (!tempdir && c->dirlevel == 0 && c->browse
+        && (c->browse->flags & BROWSE_SEARCH_ROW))
+    {
+        struct entry* dptr = browser_get_entry_at(c, 0);
+        const char *label = str(LANG_DB_SEARCH);
+        int len = strlen(label);
+
+        if (dptr && len < c->cache.name_buffer_size)
+        {
+            dptr->attr = FILE_ATTR_SEARCH;
+            dptr->time_write = 0;
+            dptr->name = core_get_data(c->cache.name_buffer_handle);
+            strcpy(dptr->name, label);
+            name_buffer_used = len + 1;
+            files_in_dir = 1;
+            c->special_entry_count = 1;
+        }
+    }
+
     while ((entry = readdir(dir))) {
         int len;
         struct dirinfo info;
@@ -435,16 +473,42 @@ int browser_disk_load(struct browser_context* c, const char* tempdir)
             cmp_data._compar = strncasecmp;
     }
 
-    qsort(browser_get_entries(c), files_in_dir, sizeof(struct entry), compare);
+    /* The Search row sorts nowhere: it is not a filename and it has to stay at
+     * the top, so the sort starts past it. */
+    qsort(browser_get_entries(c) + c->special_entry_count,
+          files_in_dir - c->special_entry_count, sizeof(struct entry), compare);
 
     /* If thumbnail talking is enabled, make an extra run to mark files with
        associated thumbnails, so we don't do unsuccessful spinups later. */
     if (global_settings.talk_file_clip)
         check_file_thumbnails(c); /* map .talk to ours */
 
+    /* Open past the Search row, the way a database level opens past its own
+     * special rows. A search box as the first thing on screen reads as though
+     * that is where the files start, and one flick of the wheel brings it
+     * back. selected_item == 0 is what tells a list opening at the top from
+     * one restoring a position, exactly as it does in browser_db.c. */
+    if (c->special_entry_count > 0 && c->selected_item == 0
+        && files_in_dir > c->special_entry_count)
+    {
+        c->selected_item = c->special_entry_count;
+        pending_top_item = c->special_entry_count;
+    }
+
     browser_unlock_cache(c);
     return 0;
 }
+
+/* Returns the top row a freshly loaded directory wants shown, or -1 if it has
+ * no preference. Clears the request, so a later redraw (or a list the user has
+ * since scrolled) is not forced back to it. */
+int browser_disk_take_pending_top_item(void)
+{
+    int item = pending_top_item;
+    pending_top_item = -1;
+    return item;
+}
+
 static void browser_disk_load_font(char *file)
 {
     int current_font_id;
@@ -562,6 +626,20 @@ int browser_disk_enter(struct browser_context* c)
         int start_index=0;
 
         switch ( file_attr & FILE_ATTR_MASK ) {
+            /* The synthetic Search row. Which box it opens is the browse's,
+             * not the row's: the playlist catalogue searches playlist names,
+             * everything else searches filenames.
+             *
+             * Returned rather than broken out of. The tail of this function
+             * sends any browse above NUM_FILTER_MODES to the root once its row
+             * has acted, which is right for a picker -- choosing a theme ends
+             * the browse -- but this row has not acted, it is asking for a
+             * screen. Breaking here would hand back GO_TO_ROOT instead, and
+             * the catalogue (SHOW_M3U) is exactly such a browse. */
+            case FILE_ATTR_SEARCH:
+                return (*c->dirfilter == SHOW_M3U) ? GO_TO_PLAYLIST_SEARCH
+                                                   : GO_TO_FILE_SEARCH;
+
             case FILE_ATTR_M3U:
                 play = browser_disk_play_playlist(buf, c->currdir, file->name);
 

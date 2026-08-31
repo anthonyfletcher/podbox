@@ -17,7 +17,12 @@
 
 #ifdef SIMULATOR
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "string-extra.h"     /* strlcpy */
+#include "file.h"             /* MAX_PATH */
+#include "dir.h"              /* the walk the shim reads instead of a cache */
 #include "dircache.h"
 
 void dircache_init(size_t last_size)
@@ -98,6 +103,130 @@ void dircache_get_info(struct dircache_info *info)
     memset(info, 0, sizeof (*info));
     info->status = DIRCACHE_IDLE;
     info->statusdesc = "Disabled (simulator)";
+}
+
+
+/** Walking the whole cache **/
+
+/* The one part of this file that does not report an empty cache. A screen
+ * built on the walk would otherwise be missing from the simulator entirely --
+ * not degraded, absent -- and it is a screen, so the simulator is where it is
+ * looked at. The walk reads simdisk instead, which is small enough that the
+ * cost the real one is designed around does not arise.
+ *
+ * Indexes are 1-based, as the real cache's are, and name a slot in the table
+ * the walk fills. They mean nothing after the next walk, which is the same
+ * lifetime the real ones have. */
+#define SHIM_MAX_ENTRIES 20000
+#define SHIM_MAX_DEPTH   15
+
+static char **shim_paths;
+static int    shim_count;
+
+static void shim_free_paths(void)
+{
+    for (int i = 0; i < shim_count; i++)
+        free(shim_paths[i]);
+    shim_count = 0;
+}
+
+/* Records 'path' and returns its 1-based index, or 0 if the table is full. */
+static int shim_record(const char *path)
+{
+    if (shim_count >= SHIM_MAX_ENTRIES)
+        return 0;
+
+    if (!shim_paths)
+    {
+        shim_paths = malloc(SHIM_MAX_ENTRIES * sizeof (*shim_paths));
+        if (!shim_paths)
+            return 0;
+    }
+
+    shim_paths[shim_count] = strdup(path);
+    if (!shim_paths[shim_count])
+        return 0;
+
+    return ++shim_count;
+}
+
+bool dircache_is_ready(void)
+{
+    return true;
+}
+
+/* Depth-first, mirroring the order a real build produces. Returns false once
+ * the callback has asked to stop, which unwinds the recursion. */
+static bool shim_walk(char *path, int depth,
+                      bool (*cb)(const char *name, int idx,
+                                 unsigned int attr, void *ctx),
+                      void *ctx, int *count)
+{
+    DIR *dir;
+    struct dirent *entry;
+    size_t len = strlen(path);
+
+    if (depth > SHIM_MAX_DEPTH)
+        return true;
+
+    dir = opendir(path);
+    if (!dir)
+        return true;
+
+    while ((entry = readdir(dir)))
+    {
+        struct dirinfo info;
+        bool go_on;
+
+        if (entry->d_name[0] == '.')
+            continue;
+
+        if (len + 1 + strlen((char *)entry->d_name) >= MAX_PATH)
+            continue;
+        snprintf(path + len, MAX_PATH - len, "%s%s",
+                 len > 1 ? "/" : "", (char *)entry->d_name);
+
+        info = dir_get_info(dir, entry);
+
+        (*count)++;
+        go_on = cb((char *)entry->d_name, shim_record(path), info.attribute,
+                   ctx);
+
+        if (go_on && (info.attribute & ATTR_DIRECTORY))
+            go_on = shim_walk(path, depth + 1, cb, ctx, count);
+
+        path[len] = '\0';
+
+        if (!go_on)
+        {
+            closedir(dir);
+            return false;
+        }
+    }
+
+    closedir(dir);
+    return true;
+}
+
+int dircache_foreach_name(bool (*cb)(const char *name, int idx,
+                                     unsigned int attr, void *ctx),
+                          void *ctx)
+{
+    char path[MAX_PATH] = "/";
+    int count = 0;
+
+    shim_free_paths();
+    shim_walk(path, 0, cb, ctx, &count);
+
+    return count;
+}
+
+ssize_t dircache_get_index_path(int idx, char *buf, size_t size)
+{
+    if (idx < 1 || idx > shim_count)
+        return -1;
+
+    return strlcpy(buf, shim_paths[idx - 1], size);
 }
 
 #endif /* SIMULATOR */

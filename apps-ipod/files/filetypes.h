@@ -40,6 +40,11 @@
 #define FILE_ATTR_LOG   0x1500 /* log file */
 #define FILE_ATTR_TXT   0x1600 /* document handled by the core text viewer */
 #define FILE_ATTR_IMG   0x1700 /* image handled by the core image viewer */
+/* Not a file type: the browser's synthetic Search row carries it so that the
+ * enter dispatch, which is a switch over these values, can route the row
+ * without a second mechanism. No extension maps to it, so filetype_get_attr()
+ * never produces it and only browser_disk_load() ever sets it. */
+#define FILE_ATTR_SEARCH 0x1800
 #define FILE_ATTR_MASK  0xFF00 /* which bits tree.c uses for file types */
 
 long filetype_get_voiceclip(int attr);

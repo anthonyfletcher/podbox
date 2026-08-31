@@ -204,6 +204,18 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
     {
         struct entry *entry = get_valid_entry(__func__, local_tc, selected_item);
 
+        /* The Search row is not a file type, so the registry filetype_get_icon
+         * consults has no entry for it and the row would draw blank. Which
+         * icon follows the browse, the same way the row's destination does:
+         * the catalogue searches playlists, everything else searches files.
+         *
+         * Only themes that draw their own icon column override this -- Scrim
+         * and Themify_2 test for the row by name in their .sbs and use a
+         * search glyph. The rest fall through to here. */
+        if ((entry->attr & FILE_ATTR_MASK) == FILE_ATTR_SEARCH)
+            return (*local_tc->dirfilter == SHOW_M3U) ? Icon_Playlist
+                                                      : Icon_Folder;
+
         return filetype_get_icon(entry->attr);
     }
 }
@@ -808,9 +820,11 @@ static int update_dir(void)
      * rows (<All tracks>/<Random>), so the list reads as starting at the first
      * real entry -- they are still one press up. Must follow the select, which
      * would otherwise keep one row visible above the cursor. */
-    if (*tc.dirfilter == SHOW_ID3DB)
     {
-        int top_item = browser_db_take_pending_top_item();
+        /* The file browser asks the same way for its Search row. */
+        int top_item = (*tc.dirfilter == SHOW_ID3DB)
+                           ? browser_db_take_pending_top_item()
+                           : browser_disk_take_pending_top_item();
         /* Only if the selection still fits on screen below it. The list
          * re-chooses its top row when the selection moves, not on a plain
          * draw, so a top row that pushed the cursor out of sight would simply
@@ -1071,7 +1085,11 @@ static int dirbrowse(void)
                     struct entry *entry =
                                 get_valid_entry(__func__, &tc, tc.selected_item);
                     short attr = entry->attr;
-                    if(!(attr & ATTR_DIRECTORY))
+                    /* The Search row is not a file to hand back: a picker
+                     * would return it as the chosen one. It falls through to
+                     * the enter dispatch, which opens the box. */
+                    if(!(attr & ATTR_DIRECTORY)
+                       && (attr & FILE_ATTR_MASK) != FILE_ATTR_SEARCH)
                     {
                         tc.browse->flags |= BROWSE_SELECTED;
                         get_current_file(tc.browse->buf, tc.browse->bufsize);
@@ -1099,6 +1117,12 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_FEATURED_ARTISTS);
                     case GO_TO_FEATURED_TRACKS:
                         return exit_to_new_screen(GO_TO_FEATURED_TRACKS);
+                    /* The file browser's and the catalogue's own Search rows
+                     * (the FILE_ATTR_SEARCH case in browser_disk_enter()). */
+                    case GO_TO_FILE_SEARCH:
+                        return exit_to_new_screen(GO_TO_FILE_SEARCH);
+                    case GO_TO_PLAYLIST_SEARCH:
+                        return exit_to_new_screen(GO_TO_PLAYLIST_SEARCH);
                     case GO_TO_ROOT: exit_func = true; break;
                     default:
                         break;
@@ -1194,6 +1218,15 @@ static int dirbrowse(void)
                 int attr = 0;
 
                 if (tc.browse->flags & BROWSE_NO_CONTEXT_MENU)
+                    break;
+
+                /* The Search row has no file behind it. Left to itself the
+                 * menu below assembles currdir + the row's name and offers
+                 * delete, rename and add-to-playlist against a path that does
+                 * not exist. */
+                if (!id3db && numentries
+                    && (get_valid_entry(__func__, &tc, tc.selected_item)->attr
+                        & FILE_ATTR_MASK) == FILE_ATTR_SEARCH)
                     break;
 
                 if(!numentries)

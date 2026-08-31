@@ -258,7 +258,7 @@ your position.
 you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
  Album > Track` the album art would show.
 
-## Documents/Images
+## Files/Documents/Images
 
 - Re-engineered text engine compatible with more formats
 - Control how documents are displayed (font, margin, line spacing, colours)
@@ -266,6 +266,7 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 - See a list of all documents and images stored on the device
   - Hidden by default - enable via `Settings > Appearance > Edit Main Menu`
 - Continue reading added to the root menu to continue from where you left off
+- Search across all files
 
 ## Appearance
 

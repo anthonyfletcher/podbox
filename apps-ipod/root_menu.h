@@ -104,6 +104,14 @@ enum {
     /* One artist's guest appearances, armed by featured_artists_arm(). The
      * browser's [Featured In] row, and the same track list as above. */
     GO_TO_FEATURED_TRACKS,
+    /* The two browser search boxes, reached from the Search row at the top of
+     * the file browser's root and of the playlist catalogue. Neither has a row
+     * in the root menu; the codes exist because that is how a browse level
+     * hands control back. Only the first is dispatched from items[] --
+     * catalog.c consumes the second itself, so that leaving the box returns to
+     * the catalogue rather than to the root. */
+    GO_TO_FILE_SEARCH,
+    GO_TO_PLAYLIST_SEARCH,
 };
 extern struct menu_item_ex root_menu_;
 

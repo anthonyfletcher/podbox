@@ -77,6 +77,17 @@ not in a new way. If a stub's return value has no correct choice, that is a
 signal the call site genuinely needs a guard — put the guard in `apps-ipod/` and
 say why, rather than inventing a value here.
 
+**One shim implements rather than stubs, and it is the exception that shows
+where the rule stops.** `dircache_foreach_name()` and
+`dircache_get_index_path()` back the file browser's Search row, and the row is
+hidden when the cache cannot answer — so a stub reporting an empty cache would
+not degrade the feature, it would remove the screen from the simulator
+altogether. A screen is the one thing the simulator exists to look at. So
+`shim-dircache.c` walks `simdisk` instead, which is small enough that the cost
+the real sweep is designed around does not arise. The test the rule is really
+asking is whether the caller stays correct: apply it to the *screen*, not only
+to the return value.
+
 Two return values are load-bearing, and getting either wrong hangs the boot
 silently rather than failing:
 

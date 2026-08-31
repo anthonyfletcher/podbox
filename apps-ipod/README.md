@@ -109,8 +109,9 @@ Ordered by how much they own, as above:
 - `covers/` — cover flow: album covers, artist portraits
 - `playback/` — wps, track info, quick screen
 - `settings/` — the settings screens, every `*_settings` file
-- `system/` — debug menu, log viewer, usb, runtime info, time set, database
-  search, background tasks, art health, about
+- `system/` — debug menu, log viewer, usb, runtime info, time set, the three
+  searches (database, files, playlist names), background tasks, art health,
+  about
 
 and at the top level: bookmark, context_menu, shortcuts, main_menu, and the two
 menu editors behind it (main_menu_config, music_menu_config).

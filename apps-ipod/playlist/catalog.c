@@ -35,6 +35,7 @@
 #include "speech/talk.h"
 #include "viewer.h"
 #include "screens/bookmark.h"
+#include "screens/system/playlist_search.h"
 #include "root_menu.h"
 #include "general.h"
 
@@ -149,7 +150,12 @@ static int display_playlists(char* playlist, enum catbrowse_status_flags status)
 
     struct browse_context browse = {
         .dirfilter = SHOW_M3U,
-        .flags = BROWSE_SELECTONLY | (view ? 0 : BROWSE_NO_CONTEXT_MENU),
+        /* The Search row only when this is the catalogue being browsed. The
+         * other caller is the "add to which playlist?" picker, where the
+         * question is which of these to write to and a box that opens one for
+         * reading answers something else. */
+        .flags = BROWSE_SELECTONLY
+                 | (view ? BROWSE_SEARCH_ROW : BROWSE_NO_CONTEXT_MENU),
         .title = str(LANG_PLAYLISTS),
         .icon = Icon_Playlist,
         .root = selected_playlist,
@@ -187,6 +193,18 @@ restart:
     else /* browse playlist dir */
     {
         int browse_ret = rockbox_browse(&browse);
+
+        /* The catalogue's Search row. Run here rather than handed up to
+         * root_menu.c: leaving the box belongs back in the catalogue, which is
+         * where the search started, and the restart below is already how this
+         * screen returns from the playlist viewer. */
+        if (browse_ret == GO_TO_PLAYLIST_SEARCH)
+        {
+            browse_ret = playlist_search_run();
+            if (browse_ret == GO_TO_PREVIOUS)
+                goto restart;
+        }
+
         if (browse_ret == GO_TO_WPS
             || (view && browse_ret == GO_TO_PREVIOUS_MUSIC))
             result = 0;

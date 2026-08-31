@@ -110,6 +110,8 @@ screens/system/about.c
 screens/system/art_health.c
 screens/system/bg_task_info.c
 screens/system/db_search.c
+screens/system/file_search.c
+screens/system/playlist_search.c
 screens/system/beat_debug.c
 screens/system/debug_menu.c
 files/file_ops.c

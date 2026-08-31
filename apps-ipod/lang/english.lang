@@ -18275,7 +18275,7 @@
 </phrase>
 <phrase>
   id: LANG_DB_SEARCH
-  desc: in the Music menu, search the database for text
+  desc: the Search row, and the title of every search box
   user: core
   <source>
     *: "Search"

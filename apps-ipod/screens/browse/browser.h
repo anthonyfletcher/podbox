@@ -32,6 +32,7 @@ struct entry {
 #define BROWSE_RUNFILE          0x0004  /* open the file with its viewer instead of browsing */
 #define BROWSE_DIRFILTER        0x0080  /* override global_settings.dirfilter with browse_context.dirfilter */
 #define BROWSE_SELECTED         0x0100  /* this bit is set if user selected item */
+#define BROWSE_SEARCH_ROW       0x0200  /* a Search row at the top of the root */
 
 
 struct browser_context;

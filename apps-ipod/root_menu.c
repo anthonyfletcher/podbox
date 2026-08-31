@@ -50,6 +50,8 @@
 #include "database/tagcache.h"
 #include "screens/covers/album_covers.h"
 #include "screens/system/db_search.h"
+#include "screens/system/file_search.h"
+#include "dircache.h"                 /* whether the file search has a source */
 #include "screens/browse/album_charts.h"
 #include "screens/browse/featured_artists.h"
 #include "screens/browse/browser_flat.h"
@@ -364,6 +366,15 @@ static int browser(void* param)
         .root = folder,
     };
 
+    /* The Search row at the top of the file browser's root. Offered only when
+     * the directory cache can answer it: the names it searches are the cache's
+     * and there is no second source, so without one the row would open a box
+     * that finds nothing. Decided per browse rather than per directory load --
+     * a cache that finishes building while the browser is open is picked up
+     * the next time it is entered. */
+    if ((intptr_t)param == GO_TO_FILEBROWSER && dircache_is_ready())
+        browse.flags |= BROWSE_SEARCH_ROW;
+
     ret_val = rockbox_browse(&browse);
 
     if (ret_val == GO_TO_WPS
@@ -634,6 +645,12 @@ static int db_search_scrn(void* param)
     return db_search_run();
 }
 
+static int file_search_scrn(void* param)
+{
+    (void)param;
+    return file_search_run();
+}
+
 static int featured_artists_scrn(void* param)
 {
     (void)param;
@@ -763,6 +780,7 @@ static const struct root_items items[] = {
     [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
     [GO_TO_RANDOM_ALBUM] = { random_album_scrn, NULL, &tagcache_menu },
     [GO_TO_DB_SEARCH] = { db_search_scrn, NULL, &tagcache_menu },
+    [GO_TO_FILE_SEARCH] = { file_search_scrn, NULL, &file_menu },
     [GO_TO_FEATURED_ARTISTS] = { featured_artists_scrn, NULL, &music_menu },
     [GO_TO_FEATURED_TRACKS] = { featured_tracks_scrn, NULL, &music_menu },
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },

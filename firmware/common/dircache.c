@@ -2791,6 +2791,113 @@ int dircache_fileref_cmp(const struct dircache_fileref *dcfrefp1,
     return cmp;
 }
 
+
+/** Walking the whole cache **/
+
+/**
+ * is there a complete cache to walk?
+ *
+ * Deliberately unlocked. dircache_get_info() answers the same question but
+ * takes the lock to do it, and a build holds the writer for its whole
+ * duration -- so asking that way during a scan blocks until the scan finishes,
+ * which is exactly the wait a caller checks in order to avoid.
+ */
+bool dircache_is_ready(void)
+{
+    bool ready = false;
+
+    for (int i = 0; i < NUM_VOLUMES; i++)
+    {
+        switch (dircache.dcvol[i].status)
+        {
+        case DIRCACHE_SCANNING: return false; /* mid-build; entries are partial */
+        case DIRCACHE_READY:    ready = true; break;
+        case DIRCACHE_IDLE:     break;
+        }
+    }
+
+    return ready && dircache_runinfo.handle > 0;
+}
+
+/**
+ * visit every entry in the cache, in entry order
+ */
+int dircache_foreach_name(bool (*cb)(const char *name, int idx,
+                                     unsigned int attr, void *ctx),
+                          void *ctx)
+{
+    int count = 0;
+
+    if (!dircache_is_ready())
+        return -1;
+
+    /* READER where the rest of this file takes dircache_lock(), which is the
+     * WRITER. The sweep only reads entries, and it is long enough that the
+     * exclusive lock would hold off the audio thread's buffering for its whole
+     * duration. Reader still excludes the scanning thread, which holds the
+     * writer across a build. */
+    file_internal_lock_READER();
+
+    if (!dircache_runinfo.handle)
+        count = -1;
+    else
+    {
+        /* 'cb' is the caller's code and may yield, and a yield is when buflib
+         * can move this buffer out from under the sweep. */
+        core_pin(dircache_runinfo.handle);
+
+        char name[DC_MAX_NAME + 1];
+
+        FOR_EACH_CACHE_ENTRY(ce)
+        {
+            entry_name_copy(name, ce);
+            count++;
+
+            if (!cb(name, get_index(ce), ce->attr, ctx))
+                break;
+        }
+
+        core_unpin(dircache_runinfo.handle);
+    }
+
+    file_internal_unlock_READER();
+
+    return count;
+}
+
+/**
+ * return the full path of a cache index
+ */
+ssize_t dircache_get_index_path(int idx, char *buf, size_t size)
+{
+    ssize_t rc;
+
+    if (!buf)
+        size = 0;
+    else if (size)
+        *buf = '\0';
+
+    file_internal_lock_READER();
+
+    if (!dircache_runinfo.handle)
+        rc = -2;
+    else
+    {
+        struct get_path_sub_data data =
+        {
+            .buf        = buf,
+            .size       = size,
+            .serialhash = DC_SERHASH_START,
+        };
+
+        rc = get_path_sub(idx, &data);
+    }
+
+    file_internal_unlock_READER();
+
+    return rc;
+}
+
 /** Debug screen/info stuff **/
 
 /**

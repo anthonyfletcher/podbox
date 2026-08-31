@@ -57,7 +57,9 @@ enum current_activity {
     ACTIVITY_PLAYBACKVIEWER,
     ACTIVITY_SETTINGS_SEARCH,
     ACTIVITY_FEATUREDARTISTS,
-    ACTIVITY_SPIKE
+    ACTIVITY_SPIKE,
+    ACTIVITY_FILE_SEARCH,
+    ACTIVITY_PLAYLIST_SEARCH
 };
 
 /* custom string representation of activity */

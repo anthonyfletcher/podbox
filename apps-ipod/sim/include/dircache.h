@@ -27,6 +27,7 @@
 
 #ifndef HAVE_DIRCACHE
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -91,6 +92,11 @@ int dircache_search(unsigned int flags, struct dircache_fileref *dcfrefp,
 int dircache_fileref_cmp(const struct dircache_fileref *dcfrefp1,
                          const struct dircache_fileref *dcfrefp2);
 void dircache_get_info(struct dircache_info *info);
+bool dircache_is_ready(void);
+int dircache_foreach_name(bool (*cb)(const char *name, int idx,
+                                     unsigned int attr, void *ctx),
+                          void *ctx);
+ssize_t dircache_get_index_path(int idx, char *buf, size_t size);
 
 /* The real header's !HAVE_DIRCACHE branch defines these the other way round,
  * to strip dircache arguments out of the call sites upstream guards.
