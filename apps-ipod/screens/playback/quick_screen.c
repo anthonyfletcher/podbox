@@ -173,13 +173,72 @@ static void quickscreen_fix_viewports(struct gui_quickscreen *qs,
     vps[QUICKSCREEN_RIGHT].flags  |= VP_FLAG_ALIGN_RIGHT;
 }
 
+/* Draw one item into the viewport the caller has already set. */
+static void quickscreen_draw_item(struct gui_quickscreen *qs,
+                                  struct screen *display,
+                                  enum quickscreen_item i, bool single_line)
+{
+    char buf[MAX_PATH];
+    unsigned const char *title, *value;
+    int temp;
+
+    title = P2STR(ID2P(qs->items[i]->lang_id));
+    temp = option_value_as_int(qs->items[i]);
+    value = option_get_valuestring(qs->items[i], buf, MAX_PATH, temp);
+
+    if (single_line)
+    {
+        char text[MAX_PATH];
+        snprintf(text, MAX_PATH, "%s: %s", title, value);
+        display->puts_scroll(0, 0, text);
+    }
+    else
+    {
+        display->puts_scroll(0, 0, title);
+        display->puts_scroll(0, 1, value);
+    }
+}
+
+/* Repaint just the viewports showing the setting that moved. The icons and the
+ * other three items are unchanged, and on this hardware a whole-screen clear
+ * for a one-line change is visible. Matched by setting rather than by index,
+ * so a setting occupying two slots updates in both. */
+static void quickscreen_update(struct gui_quickscreen *qs,
+                               enum quickscreen_item selected)
+{
+    FOR_NB_SCREENS(screen)
+    {
+        struct screen *display = &screens[screen];
+        struct viewport *vps = qs->vps[screen];
+
+        /* Same stand-down as the full draw: the skin owns the screen. */
+        if (sb_skin_draws_quickscreen(screen))
+        {
+            sb_skin_force_next_update();
+            skin_mark_dirty(screen);
+            continue;
+        }
+
+        for (int i = 0; i < QUICKSCREEN_ITEM_COUNT; i++)
+        {
+            if (qs->items[i] != qs->items[selected])
+                continue;
+
+            struct viewport *last_vp = display->set_viewport(&vps[i]);
+            display->clear_viewport();
+            quickscreen_draw_item(qs, display, i,
+                                  viewport_get_nb_lines(&vps[i]) < 2);
+            display->set_viewport(last_vp);
+        }
+
+        skin_mark_dirty(screen);
+    }
+}
+
 static void gui_quickscreen_draw(struct gui_quickscreen *qs,
                                  enum screen_type screen)
 {
     int i;
-    char buf[MAX_PATH];
-    unsigned const char *title, *value;
-    int temp;
     struct screen *display = &screens[screen];
     struct viewport *parent = &qs->parent[screen];
     struct viewport *vps = qs->vps[screen];
@@ -205,23 +264,7 @@ static void gui_quickscreen_draw(struct gui_quickscreen *qs,
         if (!qs->items[i])
             continue;
         display->set_viewport(vp);
-
-        title = P2STR(ID2P(qs->items[i]->lang_id));
-        temp = option_value_as_int(qs->items[i]);
-        value = option_get_valuestring(qs->items[i],
-                                       buf, MAX_PATH, temp);
-
-        if (viewport_get_nb_lines(vp) < 2)
-        {
-            char text[MAX_PATH];
-            snprintf(text, MAX_PATH, "%s: %s", title, value);
-            display->puts_scroll(0, 0, text);
-        }
-        else
-        {
-            display->puts_scroll(0, 0, title);
-            display->puts_scroll(0, 1, value);
-        }
+        quickscreen_draw_item(qs, display, i, viewport_get_nb_lines(vp) < 2);
     }
     /* draw the icons */
     display->set_viewport(vp_icons);
@@ -302,7 +345,8 @@ static void talk_qs_option(const struct settings_list *opt, bool enqueue)
  *  - button : the key we are going to analyse
  * returns : true if the button corresponded to an action, false otherwise
  */
-static bool gui_quickscreen_do_button(struct gui_quickscreen * qs, int button)
+static bool gui_quickscreen_do_button(struct gui_quickscreen * qs, int button,
+                                      enum quickscreen_item *item_out)
 {
     int item;
     bool previous = false;
@@ -335,6 +379,7 @@ static bool gui_quickscreen_do_button(struct gui_quickscreen * qs, int button)
 
     option_select_next_val(qs->items[item], previous, true);
     talk_qs_option(qs->items[item], false);
+    *item_out = item;
     return true;
 }
 
@@ -342,6 +387,7 @@ static bool gui_quickscreen_do_button(struct gui_quickscreen * qs, int button)
 static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter, bool *usb)
 {
     int button;
+    enum quickscreen_item changed;
     /* To quit we need either :
      *  - a second press on the button that made us enter
      *  - an action taken while pressing the enter button,
@@ -385,12 +431,11 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
             *usb = true;
             return qs->result | QUICKSCREEN_IN_USB;
         }
-        if (gui_quickscreen_do_button(qs, button))
+        if (gui_quickscreen_do_button(qs, button, &changed))
         {
             qs->result |= QUICKSCREEN_CHANGED;
             can_quit = true;
-            FOR_NB_SCREENS(i)
-                gui_quickscreen_draw(qs, i);
+            quickscreen_update(qs, changed);
         }
         else if (button == button_enter)
             can_quit = true;
@@ -403,10 +448,7 @@ static int gui_syncquickscreen_run(struct gui_quickscreen * qs, int button_enter
              * when Volume occupies a slot; a skin drawing its own quickscreen
              * returns from the draw and is served by the force below. */
             if (qs->volume_item < QUICKSCREEN_ITEM_COUNT)
-            {
-                FOR_NB_SCREENS(i)
-                    gui_quickscreen_draw(qs, i);
-            }
+                quickscreen_update(qs, qs->volume_item);
         }
         else if (button == ACTION_STD_CONTEXT)
         {
