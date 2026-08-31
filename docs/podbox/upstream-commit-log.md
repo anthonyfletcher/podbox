@@ -435,7 +435,7 @@ selectively does not want a merge available. Diff the two checkouts instead.
 | 2026-07-31 | `bf6a974` | PictureFlow: don't snap the centre slide when no time has passed | **Adopted** | With the above. |
 | 2026-07-31 | `0a3446e` | PictureFlow: fix the centre-slide flash properly, and bound the advance | **Adopted** | `320c006b4f` for the bound, `bdb8a73e8d` for the flash — reached separately here, from the alpha ramp rather than the centre derivation. |
 | 2026-08-02 | — | *(upstream `104f57252b`, iap stack 6K → 8K)* | **Superseded** | Rockbox raised the same stack to 8KB. RockPod's 12KB comes from measurement and is the one taken; 8KB is 1.23× the measured worst case, where every other thread in the image runs at 1.8× or better. |
-| 2026-08-28 | `3b6d477` | iap: overhaul accessory protocol support | **Pending** | 154 files, +54,025/−2,426 -- larger than everything else in this table put together, and it is triaged in parts rather than as a commit. See *How `3b6d477` is being taken* below. |
+| 2026-08-28 | `3b6d477` | iap: overhaul accessory protocol support | **Adopted (in part)** | 154 files, +54,025/−2,426 -- larger than everything else in this table put together, and triaged in parts rather than as a commit. Four parts are in; the serial-iAP half is still to look at. See *How `3b6d477` is being taken* below. |
 
 Complete through `3b6d477` (2026-08-28), RockPod's tip as of 2026-08-31.
 Checked with `git ls-remote` rather than against a local checkout -- a stale
@@ -447,44 +447,34 @@ One commit, and too large to hold a single status. It aligns IDPS,
 authentication, transport, notification, tuner, button, USB-audio and
 digital-volume lifecycles with MFi R46, implements EI 1.13 browsing over
 tagcache or iTunesDB snapshots, and brings a host-side test rig
-(`apps/iap/test/`, its own Makefiles and stubs) for protocol, HID, UART, audio,
-end-to-end, golden-wire, mutation and sanitizer coverage.
+(`apps/iap/test/`) with it.
 
-**Most of it has nothing here to land on, and the reason is the one in *USB iAP
-and serial iAP* below.** The browsing feature it exists for -- a head unit
-listing artists and playing a chosen album -- is Extended Interface lingo over
-a transport this fork compiles out, and there is no accessory here to test any
-of it against. So the bulk (`iap-db.c` at 4910 lines, `iap-media.c` at 2516,
-artwork, chapters, the test rig) is not the part being taken.
+**The feature it exists for cannot run here.** EI browsing is Extended
+Interface lingo over USB iAP, which `PODBOX_NO_USB_IAP` compiles out, and there
+is no accessory here to test it against. So `iap-db.c` (4910 lines),
+`iap-media.c` (2516), the artwork and chapter readers and the test rig are all
+**Declined**, along with the API added elsewhere to serve them.
 
-What is being taken is the part that touches files this fork owns and cares
-about, judged hunk by hunk:
+What is taken is the hardening underneath, judged hunk by hunk against *this*
+tree rather than RockPod's -- their `firmware/` and `lib/` are pre-rebase, so
+their before-side is often not ours.
 
-| RockPod path | Why it is worth a look |
-| --- | --- |
-| `firmware/usbstack/usb_storage.c` | This fork has diverged here -- `host_wrote` and the boot-time buffer claim. Any hardening in the same functions has to be read against those. |
-| `firmware/target/arm/s5l8702/ipod6g/storage_ata-6g.c` | The single largest divergence in the tree (SSD mode). A 232-line change to it is either a fix worth having or a collision worth knowing about. |
-| `apps/tagcache.c`, `apps/playlist.c` | Snapshot support, but the hunks that bound or lock a search are separable from the iAP feature they were written for. |
-| `lib/rbcodec/metadata/mp4.c` | This fork carries `has_video` in the same file. |
-| `firmware/usbstack/usb_audio.c`, `usb-designware.c` | *Deliberately not changed* in `upstream-divergence.md`, and that decision stands until USB audio is exercised on hardware. Listed so the row is not re-opened by accident. |
+| Part | Status | What |
+| --- | --- | --- |
+| `lib/rbcodec/metadata/mp4.c` | **Adopted (in part)** | `size` is `uint32_t`, so a `chpl` box shorter than its own nine-byte header wraps it and the container loop then seeks by ~4GB. Both reads are checked now too. The `IPOD_ACCESSORY_PROTOCOL` half -- `has_embedded_chapters`, `embedded_chapters` -- is the chapters feature and is declined. |
+| `database/tagcache.c`, `.h` | **Adopted (in part)** | A database read error was indistinguishable from "this entry does not match the clause", so a corrupt or truncated index answered a short list as though it were the whole one. `open_master_fd()` at `build_lookup_list()` was the one call of four in the file not checking its return. The walk is bounded by `master_entry_count` from the master header, so a short read is a truncated file rather than the end of one, and a new `failed` flag carries a read error out of `check_clauses()` instead of dropping the entry. The snapshot accessors are declined. |
+| `usbstack/usb_storage.c` | **Adopted (independently)** | The host's LBA and block count are scaled by the sector multiplier at the call site, in 32-bit arithmetic, and `sector_t` is 32-bit without `STORAGE_64BIT_SECTOR` -- so `sector + count` can wrap past the range test and turn a request the device should refuse into an in-range access at the wrong offset. On a write that is silent corruption. One `set_transfer_range()` serves all four of `READ_10`, `READ_16`, `WRITE_10` and `WRITE_16`, widening before it compares. Written here rather than ported: RockPod's version also rewrites `READ_CAPACITY_16` and drops the `flags` and `lowest_aligned_lba` alignment reporting this tree has. |
+| `playlist/playlist.c` | **Adopted (in part)** | Two groups. `get_track_filename()` read `utf8` and `amount` before taking the lock and `filename`/`dirlen` after releasing it; `playlist_get_track_info()` walked `indices[]` and `rotate_index()` under no lock at all, from the viewer, the database browser and four places in `iap/`, while the audio thread mutates them. And the control file's own writes ignored three return values -- `fsync()`, and both `lseek()`s, the second of which records the position a track's name starts at, so a failed seek stored -1 as that position. The staged/snapshot API is declined. |
+| `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | Not a fix. Its new symbols are `ATA_SSD_DEEP_SLEEP_TICKS`, `ata_clock_gated`, `ata_sleep_pending` and `ata_disk_is_iflash()` -- an independent implementation of the SSD two-stage sleep this fork already ships (see `upstream-divergence.md`). Comparing two implementations of one feature buys nothing while ours is the one that has run. |
+| `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | Unchanged: both are *Deliberately not changed* in `upstream-divergence.md`, and that holds until USB audio is exercised on hardware. |
+| `iap/iap-core.c`, `iap-lingo*.c` | **Open** | The serial-iAP half, which is live here. Triaged on the rule the earlier RockPod iAP rows used -- take the defect fixes, decline the feature work -- and not yet done. |
 
-The serial-iAP half of `iap-core.c` and the lingo files is triaged after that,
-on the same rule the earlier RockPod iAP rows used: take the defect fixes,
-decline the feature work. A row per part replaces the **Pending** above as each
-is settled.
-
-## Why the PictureFlow selector commits are N/A
-
-Seven of them, and the reason is one fact worth stating once: **this fork's
-carousel has no track list.** `enum pf_states` is `{ pf_idle, pf_scrolling }`
-(`screens/covers/carousel.c`), there is no `draw_gradient()` or
-`draw_track_selector()`, and selecting an album either opens the browser or
-plays it. Everything RockPod did to make that list agree with the core list's
-"selector type" setting has nothing here to act on.
-
-One leftover: `pf_lse_color` (`carousel.c`) is still resolved every frame
-and never drawn with. It served the track list. Dead, and recorded rather than
-removed.
+One thing found while reading rather than ported from anywhere: `handle_scsi()`
+takes `lun` straight from the host's CBW and indexes `ejected[]` and `locked[]`
+with it, both `NUM_DRIVES` long, as well as passing it to the storage and disk
+layers. `disk_get_sector_multiplier()` answers 0 for a drive it does not
+recognise, which then divides into `block_count`. It is bounded against
+`storage_num_drives()` now, where it is still a protocol error.
 
 # Noted exceptions
 

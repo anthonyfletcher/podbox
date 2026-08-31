@@ -395,10 +395,9 @@ static int rotate_index(const struct playlist_info* playlist, int index)
     return index;
 }
 
-static void sync_control_unlocked(struct playlist_info* playlist)
+static int sync_control_unlocked(struct playlist_info* playlist)
 {
-    if (playlist->control_fd >= 0)
-        fsync(playlist->control_fd);
+    return playlist->control_fd >= 0 ? fsync(playlist->control_fd) : 0;
 }
 
 static int update_control_unlocked(struct playlist_info* playlist,
@@ -408,7 +407,8 @@ static int update_control_unlocked(struct playlist_info* playlist,
     int fd = playlist->control_fd;
     int result;
 
-    lseek(fd, 0, SEEK_END);
+    if (lseek(fd, 0, SEEK_END) < 0)
+        return -1;
 
     switch (command)
     {
@@ -421,7 +421,13 @@ static int update_control_unlocked(struct playlist_info* playlist,
                           command == PLAYLIST_COMMAND_ADD ? 'A' : 'Q', i1, i2);
         if (result > 0)
         {
-            *seekpos = lseek(fd, 0, SEEK_CUR);
+            /* Where the track's name starts, which is what the index for
+             * it is built from. An unchecked seek records -1 there. */
+            off_t position = lseek(fd, 0, SEEK_CUR);
+
+            if (position < 0)
+                return -1;
+            *seekpos = position;
             result = fdprintf(fd, "%s\n", s1);
         }
         break;
@@ -1056,14 +1062,18 @@ static int get_track_filename(struct playlist_info* playlist, int index,
     int max = -1;
     char tmp_buf[MAX_PATH+1];
     char dir_buf[MAX_PATH+1];
-    bool utf8 = playlist->utf8;
+    bool utf8;
     if (buf_length > 0)
         buf[0] = '\0';
 
-    if (index < 0 || index >= playlist->amount)
-        return -1;
-
     playlist_write_lock(playlist);
+    utf8 = playlist->utf8;
+
+    if (index < 0 || index >= playlist->amount)
+    {
+        playlist_write_unlock(playlist);
+        return -1;
+    }
 
     bool control_file = playlist->indices[index] & PLAYLIST_INSERT_TYPE_MASK;
     unsigned long seek = playlist->indices[index] & PLAYLIST_SEEK_MASK;
@@ -1130,13 +1140,11 @@ static int get_track_filename(struct playlist_info* playlist, int index,
         }
     }
 
+    max = format_track_path(buf, tmp_buf, buf_length,
+                            playlist->filename, playlist->dirlen);
     playlist_write_unlock(playlist);
 
-    if (format_track_path(buf, tmp_buf, buf_length,
-                          playlist->filename, playlist->dirlen) < 0)
-        return -1;
-
-    return 0;
+    return max < 0 ? -1 : 0;
 }
 
 /*
@@ -2369,12 +2377,15 @@ int playlist_get_seed(const struct playlist_info* playlist)
 int playlist_get_track_info(struct playlist_info* playlist, int index,
                             struct playlist_track_info* info)
 {
+    int result = -1;
+
     if (!playlist)
         playlist = &current_playlist;
 
+    playlist_read_lock(playlist);
     if (get_track_filename(playlist, index,
                            info->filename, sizeof(info->filename)) != 0)
-        return -1;
+        goto out;
 
     info->attr = 0;
 
@@ -2391,8 +2402,11 @@ int playlist_get_track_info(struct playlist_info* playlist, int index,
 
     info->index = index;
     info->display_index = rotate_index(playlist, index) + 1;
+    result = 0;
 
-    return 0;
+out:
+    playlist_read_unlock(playlist);
+    return result;
 }
 
 /*
