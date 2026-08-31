@@ -122,7 +122,27 @@ struct spk_frame
      * band is cleared and redrawn thirty times a second over a viewport that
      * lives on a stack frame. */
     const char *caption;
+    int  caption_w;      /* the title's width, measured when it changed */
+    bool caption_scroll; /* ...and whether it travels or is simply cropped */
+
+    /* Where every character of it begins, in pixels from the start. The face
+     * is proportional -- the .fnt carries a width table, whatever the source
+     * face was called -- so a character is not a fixed step and the only way
+     * to cut between two of them is to know where they are.
+     *
+     * Measured once when the caption changes: font_get_width() is a cache
+     * lookup and a miss is a read off the disk, which is not a thing to do
+     * per glyph per frame. Runs one past the title, over the blank that
+     * separates it from itself when it comes round. */
+    const short *caption_at;
+    int  caption_chars;
     int  font;
+
+    /* Which step of the caption's scroll this is -- one a beat, counted on a
+     * clock that only goes forward. Not now_ms: the grid's clock is steered
+     * toward the middle of the chunk the position report names, so it is
+     * allowed to end a frame behind the one before it. */
+    int  caption_step;
 
     /* The volume, 0 to 100, for the moment after the wheel has moved -- and
      * -1 the rest of the time. It takes the caption's room rather than

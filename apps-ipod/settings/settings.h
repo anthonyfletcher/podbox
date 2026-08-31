@@ -901,6 +901,7 @@ struct user_settings
        track, and remembering it would be remembering it for the wrong
        track. */
     int spike_caption;  /* 0 off, 1 title, 2 title and artist */
+    bool spike_caption_scroll;  /* ...and whether it travels or is cropped */
     int spike_offset;   /* ms the game is judged against the audio by */
 };
 

@@ -14,6 +14,21 @@
 /* Surfaces sit at four discrete levels; 0 is the ground. */
 #define SPK_LEVELS       4
 
+/* What a press buys, and the two halves of it are not the same number.
+ *
+ * The arc *rises* SPK_ARC_UP levels: that is what carries the body into a
+ * raised block at SPK_BLOCK_LEVEL, and what puts a diamond two levels up
+ * within reach of a press. But it *lands* no more than SPK_CLIMB_UP above
+ * where it left.
+ *
+ * They differ on purpose. A jump that could land wherever its arc reached
+ * made the middle of the field pointless -- from the ground it always took
+ * the highest surface within two, so a platform at level 1 was never the
+ * thing anybody stood on. Climbing one at a time is what gives each level a
+ * turn, and it is why a step needs none: the press is the whole ladder. */
+#define SPK_ARC_UP       2
+#define SPK_CLIMB_UP     1
+
 /* What the player is doing over the beat that has just begun. Each of them
  * covers exactly one cell per beat, which is the invariant the whole design
  * rests on: the scroll rate is the tempo, whatever the player does. */
@@ -147,9 +162,12 @@ bool spk_world_spring(int cell);
 
 /* The highest surface in a cell at or below max_level, or -1 for none.
  *
- * A step passes its own level as the ceiling and a jump passes two above
- * it, and that one difference is the whole climbing rule: only a jump gains
- * height. Both drop any distance, which is why sliding off an edge is not a
+ * A step passes its own level as the ceiling and a jump passes SPK_CLIMB_UP
+ * above it, and that one difference is the whole climbing rule: only a jump
+ * gains height, and only one level of it at a time. Note that this is not
+ * the height the arc reaches -- see SPK_ARC_UP.
+ *
+ * Both drop any distance, which is why sliding off an edge is not a
  * separate verb -- and why a surface out of reach is not a wall to be
  * stopped by but simply nothing to land on. The player walks off the edge
  * and falls, exactly as over a hole. */
@@ -167,6 +185,14 @@ int spk_world_respawn(int from);
 void spk_world_forget(void);
 
 void spk_state_start(struct spk_state *st, int cell);
+
+/* ...and the same, standing somewhere other than the ground.
+ *
+ * Nothing in the game needs it: a run opens at level 0 and a respawn returns
+ * there. It is for the validator, which cannot otherwise prove a phrase that
+ * is entered above the floor -- and once phrases do that, "every pattern is
+ * crossable" stops covering the most intricate ones in the library. */
+void spk_state_start_at(struct spk_state *st, int cell, int level);
 
 /* Cross a beat boundary: apply the motion that has finished and choose the
  * next. Anything but SPK_OK leaves the state standing where it was, with the
@@ -186,6 +212,18 @@ enum spk_outcome spk_state_peek(const struct spk_state *st);
  * ground, and false through the second half of a jump, where there was no
  * choice to make. Asked before the boundary is crossed; nothing mutates. */
 bool spk_state_avoided(const struct spk_state *st);
+
+/* Spend the marks the boundary just crossed left behind: a diamond taken, a
+ * creature stomped, a switch thrown.
+ *
+ * They are one-beat marks. The drawing plays each of them off the phase, so
+ * they last exactly as long as the beat they belong to and the next advance
+ * clears them -- but an advance that ends in a death returns before it gets
+ * that far, and no further boundary is coming to try again. Left set, they
+ * go on describing a beat that ended, and the phase cycling underneath them
+ * replays the animation on every beat of the death and of the skip after
+ * it. This is what the death calls instead. */
+void spk_state_end_beat(struct spk_state *st);
 
 /* Commit a jump to the boundary just crossed. False where one is already
  * under way, which is what collapses repeat presses inside one window. */

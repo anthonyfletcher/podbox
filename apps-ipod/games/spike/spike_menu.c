@@ -167,10 +167,11 @@ MENUITEM_FUNCTION(spk_info_item, 0, ID2P(LANG_SPIKE_INFO),
  * effect needs the field re-placed, which is why leaving the menu re-enters
  * the game rather than resuming it. */
 MENUITEM_SETTING(spk_caption_item, &global_settings.spike_caption, NULL);
+MENUITEM_SETTING(spk_scroll_item, &global_settings.spike_caption_scroll, NULL);
 
 MAKE_MENU(spike_menu, ID2P(LANG_SPIKE), NULL, Icon_NOICON,
-          &spk_scores_item, &spk_caption_item, &spk_offset_item,
-          &spk_tempo_item, &spk_info_item);
+          &spk_scores_item, &spk_caption_item, &spk_scroll_item,
+          &spk_offset_item, &spk_tempo_item, &spk_info_item);
 
 bool spike_menu_show(struct spk_menu *m)
 {

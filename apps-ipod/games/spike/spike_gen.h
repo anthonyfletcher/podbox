@@ -90,6 +90,16 @@ struct spk_pattern
 extern const struct spk_pattern spk_patterns[];
 extern const int spk_pattern_count;
 
+/* Whether a phrase can be walked into at that level: either it says so, or
+ * it carries a surface there at both ends. A phrase with a floor and a
+ * storey above it is two phrases, and which is played depends only on where
+ * the player arrives; entered above its own floor it leaves at that level.
+ *
+ * Public for the validator, which has to prove a phrase at every level the
+ * assembler might enter it at. A copy of the rule over there would be right
+ * the day it was written and wrong the day this one moved. */
+bool spk_pat_at(const struct spk_pattern *p, int level);
+
 /* Start a course at that cell. Everything before it is forgotten.
  *
  * 'cell' is the beat index the run picks the track up on -- track time over

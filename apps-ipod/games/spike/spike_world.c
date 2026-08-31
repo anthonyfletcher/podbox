@@ -337,14 +337,10 @@ void spk_world_forget(void)
     spk_marks_clear();
 }
 
-void spk_state_start(struct spk_state *st, int cell)
+void spk_state_start_at(struct spk_state *st, int cell, int level)
 {
     st->beat = cell;
-
-    /* Level 0, which is where a run opens and where a respawn returns to.
-     * The caller passes a cell with ground under it; spk_world_respawn()
-     * is what finds one. */
-    st->level = 0;
+    st->level = level;
     st->landed = false;
     st->got = false;
     st->got_level = 0;
@@ -354,6 +350,14 @@ void spk_state_start(struct spk_state *st, int cell)
     st->apex = 0;
     spk_marks_clear();
     spk_begin_move(st);
+}
+
+void spk_state_start(struct spk_state *st, int cell)
+{
+    /* Level 0, which is where a run opens and where a respawn returns to.
+     * The caller passes a cell with ground under it; spk_world_respawn() is
+     * what finds one. */
+    spk_state_start_at(st, cell, 0);
 }
 
 enum spk_outcome spk_state_peek(const struct spk_state *st)
@@ -487,6 +491,13 @@ bool spk_state_avoided(const struct spk_state *st)
     return spk_state_peek(&other) != SPK_OK;
 }
 
+void spk_state_end_beat(struct spk_state *st)
+{
+    st->got = false;
+    st->stomped = false;
+    st->threw = false;
+}
+
 bool spk_state_jump(struct spk_state *st)
 {
     if (st->motion != SPK_WALK)
@@ -494,8 +505,12 @@ bool spk_state_jump(struct spk_state *st)
 
     st->motion = SPK_ARC_RISE;
     st->from = st->level;
-    st->apex = st->level + 2;
-    st->to = spk_world_surface(st->beat + 2, st->apex);
+
+    /* The arc reaches SPK_ARC_UP; the landing is capped a level lower. A
+     * diamond at the apex is still collected on the way through -- what the
+     * lower cap takes away is the *standing* on it, not the reaching. */
+    st->apex = st->level + SPK_ARC_UP;
+    st->to = spk_world_surface(st->beat + 2, st->from + SPK_CLIMB_UP);
 
     return true;
 }

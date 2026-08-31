@@ -31,6 +31,7 @@
 #include "system.h"           /* TIME_AFTER, TIME_BEFORE */
 #include "lcd.h"
 #include "font.h"
+#include "rbunicode.h"    /* utf8decode */
 #include "kernel.h"
 #include "button.h"           /* button_hold */
 #include "backlight.h"      /* backlight_set_timeout(_plugged) */
@@ -201,6 +202,25 @@ enum spk_run
 static int  cap_font = FONT_UI;
 static long cap_checked = -1;       /* the second the track was last looked at */
 static char cap_text[160];          /* title, or title and artist joined */
+
+/* The caption's clock: the grid's forward movement and none of its
+ * corrections. spk_clock_tick() steers toward the middle of the reported
+ * chunk, so grid time can retreat a millisecond between frames -- which the
+ * field does not show and scrolling text does. Advanced by positive deltas
+ * only, so it still holds still when the clock does. */
+static unsigned long cap_ms;
+static unsigned long cap_grid;
+static int           cap_w;         /* the caption's width, in pixels */
+
+/* The caption with the blank that separates it from itself on the way round,
+ * and where each of its characters begins. The face is proportional, so a
+ * step is a character's own width and not a constant. */
+#define SPK_CAP_GAP_CH   6      /* spaces before it comes round again */
+#define SPK_CAP_CHARS  200      /* characters measured, title plus that gap */
+
+static char  cap_full[sizeof (cap_text) + SPK_CAP_GAP_CH + 1];
+static short cap_at[SPK_CAP_CHARS + 1];
+static int   cap_chars;
 
 
 /* The latched grid, and the octave the player asked for on top of it. The
@@ -560,6 +580,10 @@ static void spike_die(enum spk_death kind, long at, int scroll)
     death_scroll = scroll;
     pending_beat = -1;
 
+    /* The diamond taken and the creature stomped belong to the beat that has
+     * just ended, and no further boundary is coming to clear them. */
+    spk_state_end_beat(&world);
+
     /* The combo is the run's memory of playing in time, so a death has to
      * take it: keeping it would make surviving badly as good as playing
      * well, which is the one thing the scoring is there to separate.
@@ -763,10 +787,44 @@ static void spike_boundary(long grid_ms)
  * it -- which is also the whole of track-change detection here. A strcmp
  * against a live id3 costs less than a second copy of Song's path
  * comparison, and mp3entry is never held past this function. */
+/* Where each character of the caption begins, measured once when it changes.
+ *
+ * The gap that separates the title from itself is spaces on the same grid
+ * rather than a pixel constant, so every position in the whole cycle -- both
+ * copies and the blank between them -- lands on a character boundary. That
+ * is what lets the box be cut between characters wherever it happens to be
+ * when it is drawn. */
+static void spike_caption_measure(void)
+{
+    const unsigned char *p;
+    struct font *pf = font_get(cap_font);
+    int n = 0, x = 0;
+
+    snprintf(cap_full, sizeof (cap_full), "%s%*s", cap_text, SPK_CAP_GAP_CH, "");
+
+    cap_at[0] = 0;
+    cap_chars = 0;
+
+    if (pf == NULL)
+        return;
+
+    for (p = (const unsigned char *)cap_full; *p && n < SPK_CAP_CHARS; )
+    {
+        ucschar_t ucs;
+
+        p = utf8decode(p, &ucs);
+        x += font_get_width(pf, ucs);
+        cap_at[++n] = (short)x;
+    }
+
+    cap_chars = n;
+}
+
 static void spike_caption_update(long now)
 {
     struct mp3entry *id3;
     const char *title, *artist;
+    char next[sizeof (cap_text)];
     long second = now / 1000;
 
     if (global_settings.spike_caption == 0 || second == cap_checked)
@@ -788,10 +846,21 @@ static void spike_caption_update(long now)
      * has room for one. The dash is what stops a title ending in a name
      * from running into the artist. */
     if (global_settings.spike_caption > 1 && artist != NULL && *artist)
-        snprintf(cap_text, sizeof (cap_text), "%s - %s",
-                 title, artist);
+        snprintf(next, sizeof (next), "%s - %s", title, artist);
     else
-        strlcpy(cap_text, title, sizeof (cap_text));
+        strlcpy(next, title, sizeof (next));
+
+    /* Built into a scratch buffer and compared, because this runs every
+     * second and only a *changed* title should send the scroll back to the
+     * beginning. Rebuilding in place and resetting unconditionally is a
+     * caption that creeps for a second and snaps back for ever. */
+    if (strcmp(next, cap_text) != 0)
+    {
+        strlcpy(cap_text, next, sizeof (cap_text));
+        cap_ms = 0;
+        font_getstringsize(cap_text, &cap_w, NULL, cap_font);
+        spike_caption_measure();
+    }
 }
 
 /** The screen **/
@@ -818,7 +887,26 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
 
     /* The same string every frame, so the drawing can move it along. */
     spike_caption_update(grid_ms > 0 ? grid_ms : 0);
-    f->caption = global_settings.spike_caption > 0 ? cap_text : NULL;
+
+    {
+        unsigned long g = grid_ms > 0 ? (unsigned long)grid_ms : 0;
+
+        if (g > cap_grid)
+            cap_ms += g - cap_grid;
+        cap_grid = g;
+
+        /* Beats, not milliseconds: the caption steps a character a beat, and
+         * counting them here is where the period is known. Forward only,
+         * because the grid's clock is allowed to retreat toward the middle
+         * of the chunk the position report names. */
+        f->caption_step = beat_ms > 0 ? (int)(cap_ms / (unsigned long)beat_ms)
+                                      : 0;
+    }
+    f->caption = global_settings.spike_caption > 0 ? cap_full : NULL;
+    f->caption_w = cap_w;
+    f->caption_at = cap_at;
+    f->caption_chars = cap_chars;
+    f->caption_scroll = global_settings.spike_caption_scroll;
     f->font = cap_font;
 
     /* And the wheel's answer over the top of it, while it is still warm.
@@ -1075,7 +1163,12 @@ bool spike_screen(enum spike_mode mode)
      * frame. With no user font slot free it falls back to the UI face,
      * because a caption in the wrong face beats no caption. */
     cap_checked = -1;
+    cap_ms = 0;
+    cap_grid = 0;
     cap_text[0] = 0;
+    cap_full[0] = 0;
+    cap_w = 0;
+    cap_chars = 0;
     /* Loaded whatever the caption setting says: the score and the count-in
      * are in this face too, and only the caption is optional.
      *

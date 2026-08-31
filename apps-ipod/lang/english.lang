@@ -19875,6 +19875,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPIKE_CAPTION_SCROLL
+  desc: in the Spike menu, whether the track name travels or is cropped
+  user: core
+  <source>
+    *: "Scroll Now Playing"
+  </source>
+  <dest>
+    *: "Scroll Now Playing"
+  </dest>
+  <voice>
+    *: "Scroll Now Playing"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SPIKE_TEMPO
   desc: in the Spike menu, half or double the detected tempo
   user: core

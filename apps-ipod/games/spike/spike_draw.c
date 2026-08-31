@@ -189,8 +189,6 @@ static bool    full_flush = true;   /* the palette moved: send the lot once */
 #define SPK_CAP_EDGE     4      /* in from the left edge */
 #define SPK_CAP_GAP     14      /* ...and clear of the score's block */
 #define SPK_CAP_MIN     48      /* narrower than this and there is no room */
-#define SPK_CAP_WRAP    48      /* blank before the title comes round again */
-#define SPK_CAP_PXPS    26      /* pixels a second it travels */
 
 /* The volume read-out, in the caption's room. */
 #define SPK_VOL_H       14      /* the horn's mouth, top to bottom */
@@ -1325,45 +1323,79 @@ static void spk_draw_volume(const struct spk_frame *f, int room)
 static void spk_draw_caption(const struct spk_frame *f, int room)
 {
     struct viewport cv, *was;
-    int tw, th, period, off;
+    int tw, th, chars, period, n, off, span, i;
 
-    if (f->caption == NULL || !*f->caption || room < SPK_CAP_MIN)
+    if (f->caption == NULL || !*f->caption || f->caption_chars < 1)
         return;
 
+    /* The width was measured where the text is built: lcd_getstringsize()
+     * walks every glyph, and a cache miss on any of them is an lseek and a
+     * read off the disk. One glyph is enough for the height. */
     lcd_setfont(f->font);
-    lcd_getstringsize(f->caption, &tw, &th);
+    tw = f->caption_w;
+    lcd_getstringsize("0", NULL, &th);
+
+    chars = f->caption_chars;
+    period = f->caption_at[chars];
+
+    /* Where the box may end: the last character boundary that still fits.
+     * The face is proportional, so this is a walk over the measured grid
+     * rather than a division -- and it is the whole of "never slice a
+     * glyph", because the box's edge is the only thing that ever would. */
+    if (tw <= room || !f->caption_scroll)
+    {
+        n = 0;
+        off = 0;
+    }
+    else
+    {
+        n = f->caption_step % chars;
+        off = f->caption_at[n];
+    }
+
+    span = 0;
+    for (i = 0; i < chars; i++)
+    {
+        int k = (n + i) % chars;
+        int wide = f->caption_at[k + 1] - f->caption_at[k];
+
+        if (span + wide > room)
+            break;
+        span += wide;
+    }
+
+    if (span < SPK_CAP_MIN)
+        return;
 
     viewport_set_defaults(&cv, SCREEN_MAIN);
     cv.x = SPK_CAP_EDGE;
-    cv.width = room;
+    cv.width = span;
     cv.y = SPK_BAND_Y(th);
     cv.height = th;
+
+    /* The field's ink and paper, not the fallbacks a fresh viewport carries:
+     * the caption is part of the same picture and follows the album's
+     * palette with it. */
     if (colors_known)
     {
         cv.fg_pattern = was_ink;
         cv.bg_pattern = was_paper;
     }
+
     cv.font = f->font;
     was = lcd_set_viewport(&cv);
 
-    if (tw <= room)
-        lcd_putsxy(0, 0, f->caption);
-    else
-    {
-        /* One copy leaving to the left and the next arriving behind it, so
-         * it comes round rather than snapping back. */
-        period = tw + SPK_CAP_WRAP;
-        off = (int)((f->now_ms * SPK_CAP_PXPS / 1000) % (unsigned long)period);
+    /* Drawn from off the left edge: clip_viewport_rect() shifts the source
+     * across for a negative x. Both edges now fall between characters, so
+     * nothing is sliced -- the clipping only ever removes whole glyphs.
+     * lcd_putsxy_style_offset() would say this more directly and is declared
+     * in lcd.h, but nothing in the tree defines it. */
+    lcd_putsxy(-off, 0, f->caption);
 
-        /* Drawn from off the left edge: clip_viewport_rect() shifts the
-         * source across for a negative x, so a glyph half out of the box is
-         * half drawn rather than dropped. lcd_putsxy_style_offset() would
-         * say this more directly and is declared in lcd.h, but nothing in
-         * the tree defines it. */
-        lcd_putsxy(-off, 0, f->caption);
-        if (period - off < room)
-            lcd_putsxy(period - off, 0, f->caption);
-    }
+    /* ...and the copy coming round behind it, on the same grid, so the join
+     * is a character boundary like every other. */
+    if (period - off < span)
+        lcd_putsxy(period - off, 0, f->caption);
 
     lcd_set_viewport(was);
     lcd_setfont(FONT_SYSFIXED);
@@ -1402,7 +1434,7 @@ static void spk_font_centred(int font, int y, const char *str, bool bold)
 static void spk_draw_hud(const struct spk_frame *f)
 {
     char line[12];
-    int x, sw, sh;
+    int x, sw, sh, room;
 
     /* Leading zeros, so the number is the same width whatever it says and
      * the eye can read it without leaving the field. Seven digits: six was
@@ -1439,13 +1471,22 @@ static void spk_draw_hud(const struct spk_frame *f)
         spk_text(x, SPK_BAND_Y(spk_text_height(1)), line, 1, false);
     }
 
-    /* Whatever the score's block did not want, less a gap wide enough that
-     * the two never read as one line -- and the volume takes it while the
-     * wheel is still warm. */
+    /* The room on the left is *reserved*, not left over.
+     *
+     * The crown and the multiplier come and go with the run, and a box that
+     * changed width with them would re-measure and reflow the title every
+     * time the combo did -- which reads as the caption twitching rather than
+     * as a layout. Both are allowed for whether or not they are on screen,
+     * so the box is the same width from the first frame to the last. */
+    room = LCD_WIDTH - 4 - sw
+           - (spk_crown_width(SPK_HUD_SCALE) + 4 * SPK_HUD_SCALE)
+           - (spk_text_width("X99", 1) + 5 * SPK_HUD_SCALE)
+           - SPK_CAP_EDGE - SPK_CAP_GAP;
+
     if (f->volume >= 0)
-        spk_draw_volume(f, x - SPK_CAP_EDGE - SPK_CAP_GAP);
+        spk_draw_volume(f, room);
     else
-        spk_draw_caption(f, x - SPK_CAP_EDGE - SPK_CAP_GAP);
+        spk_draw_caption(f, room);
 
     /* And the rule that closes the band. It is the top of the block the
      * layout centres, so it is drawn where the field begins rather than at

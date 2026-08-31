@@ -45,118 +45,178 @@ const struct spk_pattern spk_patterns[] =
     { 4, 0, 0, 0, SPK_T_REST,
       { G, G, G, G } },
 
+    { 8, 0, 0, 0, SPK_T_REST | SPK_T_TEACH,
+      { G, G|P2, G, G|P2, G, G|P2, G, G } },
+
+    { 4, 0, 0, 0, SPK_T_REST | SPK_T_DIAMOND,
+      { G, G, G|P1|DI(1), G } },
+
     { 4, 0, 0, 0, SPK_T_REST | SPK_T_DIAMOND,
       { G, G|DI(0), G|DI(0), G } },
 
     { 8, 0, 0, 0, SPK_T_REST | SPK_T_DIAMOND,
       { G, G|DI(0), G, G, G|DI(0), G|DI(0), G, G } },
 
-    { 4, 0, 0, 0, SPK_T_REST | SPK_T_DIAMOND,
-      { G, G, G|P1|DI(1), G } },
+    { 8, 0, 0, 1, SPK_T_DIAMOND,
+      { G, G, G|DI(2), G, G, G|DI(2), G, G } },
 
-    { 8, 0, 0, 0, SPK_T_REST,
-      { G, G|P2, G, G|P2, G, G|P2, G, G } },
+    { 8, 0, 0, 2, SPK_T_DIAMOND,
+      { G, G|DI(2), G|DI(0), G|DI(2), G|DI(0), G|DI(2), G|DI(0), G } },
+
+    { 8, 0, 0, 2, SPK_T_DIAMOND | SPK_T_TEACH,
+      { G, G, G|P1, G|P1, G|P2, G|P2|DI(2), G, G } },
+
+    { 8, 0, 0, 2, SPK_T_DIAMOND,
+      { G, G, G|P1|DI(1), G|P2, G|P1|DI(1), G, G|DI(0), G } },
+
+    { 8, 0, 0, 2, SPK_T_DIAMOND,
+      { G, G, G|P1, G, G|P2|DI(2), G, G|P3|DI(3), G } },
+
+    { 8, 0, 0, 2, SPK_T_DIAMOND,
+      { G, G|P2|DI(0), G|P2|DI(2), G|P2|DI(0), G|P2|DI(2), G|P2|DI(0),
+        G|P2|DI(0), G } },
+
+    { 8, 0, 0, 2, SPK_T_DIAMOND,
+      { G, G, G|P1|DI(1), G, G|P2|DI(2), G|P1|DI(1), G|DI(0), G } },
+
+    { 8, 0, 0, 3, SPK_T_DIAMOND,
+      { G, G|P1, G|P1, G|P2, G|P2, G|P3|DI(3), G|P3|DI(3), G } },
+
+    { 8, 0, 0, 4, SPK_T_DIAMOND,
+      { G, G|P1, G|P1, G|P2, G|P2|DI(2), __, G|P3|DI(3), G } },
+
+    { 4, 0, 0, 1, SPK_T_GAP | SPK_T_TEACH,
+      { G, G, __, G } },
 
     { 4, 0, 0, 1, SPK_T_GAP,
-      { G, G, __, G } },
+      { G, __, G, G } },
 
     { 4, 0, 0, 1, SPK_T_GAP | SPK_T_DIAMOND,
       { G|DI(0), G, __, G|DI(0) } },
 
-    { 4, 0, 0, 2, SPK_T_GAP,
-      { G, __, G, G } },
-
-    { 8, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G|P1, G|P2, G|P3, G|P3|DI(3), G|P3|DI(3), G|P3, G } },
-
     { 8, 0, 0, 2, SPK_T_GAP,
       { G, G, __, G, G, __, G, G } },
-
-    { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, __, G|DI(0), __, G, G, G, G } },
-
-    { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, __, G|DI(0), __, G|DI(0), __, G, G } },
 
     { 8, 0, 0, 2, SPK_T_GAP | SPK_T_DIAMOND,
       { G, G, __, G|DI(0), __, G, G, G } },
 
     { 8, 0, 0, 2, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, G|DI(0), __, G, G, __, G } },
+      { G, G|DI(0), G, __, G|DI(0), G, __, G } },
 
     { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G|P1, G|P2|DI(2), G, __, G, G, G } },
+      { G, __, G|DI(0), __, G|DI(0), __, G, G } },
+
+    { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, G|P1, G, G|P2|DI(2), __, G|P2, G|P2|DI(2), G } },
+
+    { 8, 0, 0, 4, SPK_T_BAIT | SPK_T_GAP | SPK_T_DIAMOND,
+      { G, G|DI(2), G, G|DI(2), __, G, G, G } },
 
     { 8, 0, 0, 2, SPK_T_GAP | SPK_T_DIAMOND,
       { G, G, P1, P1|DI(1), P1, G, G, G } },
 
-    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, P1|DI(1), P1|DI(1), __, P1|DI(1), G, G } },
+    { 8, 0, 0, 3, SPK_T_DIAMOND,
+      { G, G, G|P1|DI(1), G|P1, G|P2|DI(2), P2|DI(2), G|P1, G } },
 
     { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, P2, P1, P1, P2, P2|DI(2), G } },
-
-    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, P1, P1|P2, __, P2|DI(2), P2|P3, P3|DI(3), G } },
-
-    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, P1, P2|DI(2), P2, P2|DI(2), __, G, G } },
-
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
-      { G, P1, P1|P2|DI(2), __, P2|DI(2), P3, P3, __, P2|DI(2), __, P1,
-        G } },
-
-    { 4, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G|P1, G|P2|DI(2), G } },
-
-    { 8, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G, G|P1|DI(1), G|P2, G|P1|DI(1), G, G|DI(0), G } },
+      { G, G, P1|DI(1), P1, P1, P2|DI(2), P2, G } },
 
     { 8, 0, 0, 3, SPK_T_GAP | SPK_T_DIAMOND,
       { G, P1, P1|DI(1), P1|DI(1), __, G, G, G } },
 
     { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, G, P1|DI(1), P1|DI(1), __, P1|DI(1), G, G } },
+
+    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G, P1|DI(1), P1, P1|DI(2), __, G, G } },
+
+    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, P1, P1, __, P2|DI(2), P2, P3|DI(3), G } },
+
+    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, P1, P1|DI(1), P2, P2|DI(2), __, G, G } },
+
+    { 8, 0, 0, 5, SPK_T_GAP | SPK_T_DIAMOND,
       { G, P1, P1|DI(1), P1|DI(1), G, __, G, G } },
 
-    { 8, 0, 0, 3, SPK_T_DIAMOND,
-      { G, G, G|P1|DI(1), G|P1, G|P2|DI(2), P2|DI(2), G|P1, G } },
+    { 12, 0, 0, 6, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, P1, P1|DI(1), __, P2|DI(2), P3, P3|DI(3), __, P2|DI(2), __,
+        P1|DI(1), G } },
 
-    { 4, 0, 0, 2, SPK_T_CREATURE,
+    { 12, 0, 0, 6, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, __, P1|DI(1), P1|DI(1), __, P2, P3|DI(3), P2, P2|DI(2), __,
+        P1|DI(1), G } },
+
+    { 4, 0, 0, 2, SPK_T_CREATURE | SPK_T_TEACH,
       { G, G, G|CR(0), G } },
 
     { 4, 0, 0, 2, SPK_T_CREATURE | SPK_T_DIAMOND,
       { G, G|DI(2), G|CR(0), G } },
 
-    { 8, 0, 0, 3, SPK_T_CREATURE | SPK_T_GAP,
-      { G, G, G|CR(0), __, G|CR(0), G, G|P1|DI(1), G } },
-
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G, G|P1, G|P2, G|P2, G|P2|CR(2), G|P3|DI(0), G|P3, G|P3,
-        G|P3|CR(3), G|P2, G|P1|CR(1), G } },
+    { 8, 0, 0, 2, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND,
+      { G, G|DI(2), G|CR(0), __, G|DI(0), G, G, G } },
 
     { 4, 0, 0, 3, SPK_T_CREATURE | SPK_T_GAP,
       { G, G, __, G|CR(0) } },
 
-    { 8, 0, 0, 4, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G, G, G|CR(0), G|DI(0), G|CR(0), __, G, G } },
+    { 8, 0, 0, 3, SPK_T_CREATURE | SPK_T_GAP,
+      { G, G, G|CR(0), __, G|CR(0), G, G|P1|DI(1), G } },
 
-    { 8, 0, 0, 3, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
+    { 8, 0, 0, 3, SPK_T_CREATURE | SPK_T_DIAMOND,
       { G, G|DI(2), G|CR(0), G|DI(2), G, G|CR(0), G|DI(0), G } },
 
-    { 8, 0, 0, 2, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND,
-      { G, G, G|CR(0), __, G|DI(0), G, G, G } },
+    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G, G|P1|DI(1), G, G|P2|DI(2), G, G|P3|DI(3), G|P3|DI(0),
+        G|P3|CR(3), G|P2, G|P1|CR(1), G } },
+
+    /* The spike, taught against the habit it breaks. Pressing a beat early
+       lands on its head and is fatal; not pressing at all walks into it
+       and is fatal; the one press that works clears the cell entirely. It
+       is the stomp's own verb aimed one cell further. */
+    { 4, 0, 0, 5, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_TEACH | SPK_T_SPIKED,
+      { G, G|DI(0), G|CR2(0), G } },
+
+    { 8, 0, 0, 5, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPIKED,
+      { G, G|DI(0), G|CR2(0), G|DI(0), __, G|DI(0), G, G } },
+
+    { 8, 0, 0, 5, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPIKED,
+      { G, G|CR2(0), G, G|DI(0), G|CR(0), __, G, G } },
+
+    { 4, 0, 0, 6, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G|DI(2), G|CR2(0), G } },
+
+    { 8, 0, 0, 3, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPIKED,
+      { G, G|DI(2), G|CR2(0), G, G|DI(2), G|CR2(0), G|DI(0), G } },
+
+    { 8, 0, 0, 6, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPIKED,
+      { G, G|DI(2), G|CR(0), G, G|DI(2), G|CR2(0), G|DI(0), G } },
+
+    { 8, 0, 0, 6, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPIKED,
+      { G, G, G|CR(0), G|DI(0), G|CR2(0), G, __, G } },
+
+    { 8, 0, 0, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_SPIKED,
+      { G, G, G|P1, G|CR2(0), P2, __, P3, G } },
+
+    { 8, 0, 0, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_SPIKED,
+      { G, G, G|P1, G, G|P2, G|CR2(0), P3, G } },
+
+    { 4, 0, 0, 2, SPK_T_BLOCK,
+      { G, G, G, G|BL(6) } },
 
     { 4, 0, 0, 2, SPK_T_BLOCK | SPK_T_TEACH,
       { G, G|BL(3), G, G } },
 
     { 4, 0, 0, 2, SPK_T_BLOCK,
-      { G, G, G, G|BL(6) } },
-
-    { 4, 0, 0, 2, SPK_T_BLOCK,
       { G, G|BL(9), G, G } },
+
+    { 4, 0, 0, 2, SPK_T_BLOCK | SPK_T_GAP,
+      { G, G|BL(3), __, G } },
 
     { 4, 0, 0, 2, SPK_T_BLOCK,
       { G, G, G|BL(12), G } },
+
+    { 8, 0, 0, 3, SPK_T_BLOCK,
+      { G, G|BL(9), G, G, G|BL(12), G, G, G } },
 
     { 8, 0, 0, 3, SPK_T_BLOCK,
       { G, G|BL(3), G, G|BL(3), G, G|BL(3), G, G } },
@@ -164,129 +224,260 @@ const struct spk_pattern spk_patterns[] =
     { 8, 0, 0, 4, SPK_T_BLOCK,
       { G, G|BL(3), G, G|BL(6), G, G|BL(12), G, G } },
 
-    { 12, 0, 0, 4, SPK_T_BLOCK,
+    { 12, 0, 0, 5, SPK_T_BLOCK,
       { G, G|BL(3), G, G|BL(6), G, G|BL(12), G, G|BL(3), G, G|BL(6), G,
         G|BL(12) } },
 
-    { 8, 0, 0, 3, SPK_T_BLOCK,
-      { G, G|BL(9), G, G, G|BL(12), G, G, G } },
-
-    { 4, 0, 0, 2, SPK_T_BLOCK | SPK_T_GAP,
-      { G, G|BL(3), __, G } },
-
-    { 8, 0, 0, 4, SPK_T_BLOCK | SPK_T_CREATURE,
-      { G, G|BL(3), G, G, G|CR(0), G, G, G } },
-
-    { 8, 0, 0, 4, SPK_T_CREATURE | SPK_T_BLOCK | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G|P1, G|P2|DI(0), G|P3|BL(12), G|P3|DI(0), G|P3|CR(0),
-        G|P3|DI(0), G, G } },
-
-    { 12, 0, 0, 4, SPK_T_CREATURE | SPK_T_BLOCK | SPK_T_DIAMOND,
-      { G|P1, G|P2|DI(0), G|P3|BL(6), G|P3|DI(0), G|P3|BL(3), G|P3|DI(0),
-        G|P3|BL(6), G|P3|DI(0), G|P3|BL(3), G|P3|DI(0), G, G } },
+    { 4, 0, 0, 2, SPK_T_GAP | SPK_T_SWITCH | SPK_T_TEACH,
+      { G, G|SW(0), G|DI(0)|SWG, G } },
 
     { 8, 0, 0, 2, SPK_T_SWITCH | SPK_T_DIAMOND,
       { G, G, G|SW(0), G, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G|P1|SWP, G } },
 
+    { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP | SPK_T_DIAMOND,
+      { G, G, G|SW(0), __, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G, G } },
+
+    { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_DIAMOND,
+      { G, G, G|SW(0), G, G|P1|SWP, G|P1|SWP, G|P2|DI(2)|SWP,
+        G|P2|DI(2)|SWP } },
+
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_DIAMOND | SPK_T_GAP,
       { G, G, G|SW(0), G, G|P1|DI(1)|SWP, G|P1|SWP, __, G } },
 
-    { 4, 0, 0, 2, SPK_T_GAP | SPK_T_SWITCH | SPK_T_TEACH,
-      { G, G|SW(0), G|SWG, G } },
-
-    { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP,
-      { G, G, G|SW(0), G, G|SWG, G|DI(0)|SWG, G|SWG, G } },
-
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, __, G|SWG, G|DI(0)|SWG, G|SWG,
-        G|DI(0)|SWG, G|SWG, __, G } },
-
-    { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH,
-      { G, G, G|SW(0), G, G|P1, G|P2|DI(0)|SWX, G|P2|DI(0),
-        G|P2|DI(0)|SWX, G|P2|DI(0), G|P2|DI(0)|SWX, G|P2, G } },
-
-    { 16, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G, G|P1, G|P2|DI(0), G|P2, G|P2, G|P2, G|P2, G|P2, G|P2, G|P2,
-        G|P2|DI(0)|CR(2), G|P2|DI(0), G|P2|DI(0)|CR(2), G|P2|DI(0),
-        G|P2|DI(0)|CR(2), G|DI(0) } },
-
-    { 16, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G, G|P1, G|P2|DI(0), G|P3, G|P3, G|P3, G|P3, G|P3, G|P3, G|P3,
-        G|P3|DI(3)|CR(0), G|P3|DI(3), G|P3|DI(3)|CR(0), G|P3|DI(3),
-        G|P3|DI(3)|CR(0), G|DI(0) } },
-
-    { 16, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
-      { G, G|P1, G|P2|DI(0), G|P3, G|P3, G|P3, G|P3, G|P3, G|P3,
-        G|P3|DI(3)|BL(3), G|P3|DI(3), G|P3|DI(3)|BL(3), G|P3|DI(3),
-        G|P3|DI(3)|BL(3), G|P3|DI(3), G|DI(0) } },
-
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G|P1, G|P2, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
-        G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
-        G } },
-
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH,
-      { G, G, G|SW(0), G, G|P1|SWP, G|P2|SWP, G|P2|DI(2)|SWP,
-        G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|SWP, G } },
+    { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
+      { G, G, G|SW(0), __, G|P1|SWP, G|P1|SWP, G|P2|DI(2), G|P2|DI(2),
+        G|P2|DI(2), G|P2|DI(2), G|P2|DI(2), G } },
 
     { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
       { G, G|DI(0), G|SW(0), G, G|DI(0)|SWG, G, G|DI(0)|SWG, G,
         G|DI(0)|SWG, G, G|DI(0)|SWG, G } },
 
-    { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, G|P1|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP,
-        G|P3|SWP, G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G|P2|DI(2)|SWP,
-        G|P2|DI(2)|SWP } },
+    { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH,
+      { G, G, G|SW(0), G|P1, G|P1, G|P2|DI(0)|SWX, G|P2|DI(0),
+        G|P3|DI(0)|SWX, G|P3|DI(0), G|P3|DI(0)|SWX, G, G } },
 
-    { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, G|SW(0), __, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G, G } },
+    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
+      { G, G|DI(0), G|SW(0), G, G|P1|SWP, G, G|P2|DI(2)|SWP, G,
+        G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G|P2|DI(2)|SWP, G } },
 
-    { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), __, G|P1|SWP, G|P2, G|P2|DI(2), G|P2|DI(2),
-        G|P2|DI(2), G|P2|DI(2), G|P2|DI(2), G } },
+    { 12, 0, 0, 5, SPK_T_GAP | SPK_T_SWITCH,
+      { G, G, G|SW(0), __, G|P1|SWP, __, G|P2|DI(2)|SWP, __,
+        G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G } },
 
-    { 8, 0, 0, 2, SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP,
-        G } },
+    { 8, 0, 0, 5, SPK_T_SWITCH | SPK_T_GAP,
+      { G, G, G|SW(0), G, G|SWG, G|DI(0)|SWG, G|SWG, G } },
 
-    { 8, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G|DI(2), G|DI(0), G|DI(2), G|DI(0), G|DI(2), G|DI(0), G } },
+    { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
+      { G, G, G|SW(0), G|P1|SWX, G|P1|SWX, G|P2|DI(0)|SWX,
+        G|P2|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
+        G|P3|DI(0)|SWX, G } },
 
-    { 8, 0, 0, 2, SPK_T_BAIT | SPK_T_DIAMOND,
-      { G, G|P2|DI(0), G|P2|DI(2), G|P2|DI(0), G|P2|DI(2), G|P2|DI(0),
-        G|P2|DI(0), G } },
+    { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
+      { G, G, G|SW(0), G|P1|SWG, G|P1|SWG, G|P2|SWG, G|P2|DI(2)|SWG,
+        G|P3|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G } },
 
-    { 8, 0, 0, 4, SPK_T_BAIT | SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G|DI(2), G, G|DI(2), __, G, G, G } },
+    { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
+      { G, G|DI(0), G|SW(0), G, __, G|SWG, G|DI(0)|SWG, G|SWG,
+        G|DI(0)|SWG, G|SWG, __, G } },
 
-    { 8, 0, 0, 1, SPK_T_DIAMOND,
-      { G, G, G|DI(2), G, G, G|DI(2), G, G } },
+    { 4, 0, 0, 3, SPK_T_DIAMOND | SPK_T_SPRING,
+      { G, G, G|SPR, G|DI(3) } },
 
-    { 8, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G, G|P1|DI(1), G|P2, G|P2|DI(2), G|P1|DI(1), G|DI(0), G } },
+    { 8, 0, 0, 4, SPK_T_DIAMOND | SPK_T_SPRING,
+      { G, G, G|SPR, G, G|P3|DI(3), G|P3|DI(3), G|P3|DI(3), G } },
 
-    /* The spring, taught by leaving no other way across. The hole at 2
-       makes the press compulsory and the only landing is the spring at 3,
-       so the launch cannot be missed -- and the diamond it collects sits
-       at the top level, where no press from the ground reaches. That is
-       the whole lesson: what a spring is for. */
-    { 8, 0, 0, 5, SPK_T_SPRING | SPK_T_TEACH | SPK_T_DIAMOND | SPK_T_GAP,
+    { 8, 0, 0, 4, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_SPRING,
       { G, G, __, G|SPR, G|DI(3), G, G, G } },
 
-    /* And what the height is for: the launch comes down on the top
-       surface, walks the length of it and steps off. No press from the
-       ground reaches level 3 -- two levels is all one buys -- so a phrase
-       shaped like this is the only way the top of the field is ever stood
-       on. */
+    { 8, 0, 0, 5, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_SPRING,
+      { G, G, G|SPR, DI(3), G|SPR, DI(3), G, G } },
+
+    { 12, 0, 0, 5, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_SPRING,
+      { G, G, G|SPR, __, P3|DI(3), P3|DI(3), G|SPR, __, P3|DI(3),
+        P3|DI(3), G, G } },
+
+    { 8, 0, 0, 5, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPRING,
+      { G, G|DI(0), G|SPR, DI(3), G, __, G|SPR, G|DI(3) } },
+
     { 8, 0, 0, 5, SPK_T_SPRING | SPK_T_DIAMOND | SPK_T_GAP,
       { G, G, __, G|SPR, G, G|P3, G|P3|DI(3), G } },
 
-    /* The spike, taught against the habit it breaks. Pressing a beat early
-       lands on its head and is fatal; not pressing at all walks into it
-       and is fatal; the one press that works clears the cell entirely. It
-       is the stomp's own verb aimed one cell further. */
-    { 8, 0, 0, 6, SPK_T_SPIKED | SPK_T_CREATURE | SPK_T_TEACH,
-      { G, G, G|CR2(0), G, G, G, G, G } }
+    { 12, 0, 0, 6, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPRING,
+      { G, G|DI(2), G|SPR, G, G|P3|CR(3), G|SPR, G, G|P3, G|P3|DI(3),
+        G|P3|DI(3), G, G } },
+
+    { 12, 0, 0, 6, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPRING,
+      { G, G|DI(0), G|SPR, G, G|P3|DI(3), G|P3|DI(3), G|SPR, G|P3|DI(3),
+        G|P3|CR(3), G|P3|DI(3), G, G } },
+
+    /* Moves the player to level 3 for level 3 phrases */
+    { 4, 0, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { G, G, P1, P1|DI(1) } },
+
+    { 4, 1, 1, 4, SPK_T_REST | SPK_T_GAP | SPK_T_DIAMOND,
+      { P1, P1|DI(1), P1|DI(1), P1 } },
+
+    { 4, 1, 1, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND,
+      { P1, P1|CR(1), P1, P1 } },
+
+    { 4, 1, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { P1, P1|DI(1), __, P1|DI(1) } },
+
+    { 8, 1, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { P1, __, P1|DI(1), __, P1|DI(1), __, P1, P1 } },
+
+    { 8, 1, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
+      { P1, P1|DI(1), P2, P2|DI(2), P1, P1|DI(1), P1, P1 } },
+
+    { 8, 1, 1, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPIKED,
+      { P1, P1, P1|CR(1), P1|DI(1), G|P2, G|P2|CR2(0), G|P1, P1 } },
+
+    { 8, 1, 1, 4, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P1|DI(1), G, G|BL(3), G, G, G|BL(3), G, P1|DI(1) } },
+
+    { 8, 1, 1, 4, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P1|DI(1), G, G|SPR, G, G|P2|DI(2), G|P2|DI(2), G|P2|DI(2), P1 } },
+
+    { 8, 2, 2, 4, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P2|DI(2), P1, G|SPR, G, G|P3|DI(3), G|P1|P3|DI(3), G|P3|DI(3),
+        P2 } },
+
+    /* Moves the player from level 1 to level 2 for level 2 phrases */
+    { 4, 1, 2, 5, SPK_T_GAP,
+      { P1, P1, P2, P2|DI(2) } },
+
+    /* Moves the player to level 2 for level 2 phrases */
+    { 8, 0, 2, 5, SPK_T_GAP,
+      { G, G, G, G, P1, P1, P2, P2 } },
+
+    { 4, 2, 2, 5, SPK_T_REST | SPK_T_GAP | SPK_T_DIAMOND,
+      { P2, P2|DI(2), P2|DI(2), P2 } },
+
+    { 4, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_CREATURE,
+      { P2, P2|DI(2), P2|CR(2), P2 } },
+
+    { 4, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND | SPK_T_SPIKED,
+      { P2, P2, P2|CR2(2), P2 } },
+
+    { 4, 2, 2, 5, SPK_T_GAP | SPK_T_SPRING,
+      { P2, G|SPR, __, P2 } },
+
+    { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
+      { P2, __, P2|DI(2), __, P2|DI(2), __, P2, P2 } },
+
+    { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
+      { P2, G|SPR, __, G|P3|DI(3), P3|DI(3), P1|P3|DI(3), __, P2 } },
+
+    { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
+      { P2, __, P2|DI(2), __, P3, P2|DI(2), __, P2 } },
+
+    { 8, 2, 2, 4, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { G|P2, G|P2|DI(2), P3, G|P3|DI(3), G|P3|DI(3)|BL(3), G|P3,
+        G|P2|DI(2), G|P2 } },
+
+    { 12, 2, 2, 5, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P2|DI(2), P1, G, G|BL(3), G, G|BL(3), G, G, P1, P1|DI(1), P2,
+        P2|DI(2) } },
+
+    { 8, 2, 1, 5, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P2|DI(2), P1, G, G|BL(3), G, G, P1, P1 } },
+
+    /* Moves the player from level 2 to level 1 for level 1 phrases */
+    { 4, 2, 1, 5, SPK_T_GAP,
+      { P2|DI(2), P2|DI(2), P1, P1 } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 2, 3, 6, SPK_T_GAP,
+      { P2, P2, P3, P3 } },
+
+    /* Moves the player to level 3 for level 3 phrases */
+    { 8, 0, 3, 6, SPK_T_GAP,
+      { G, G, P1, P1, P2, P2, P3, P3 } },
+
+    /* Moves the player to level 3 for level 3 phrases */
+    { 8, 0, 3, 6, SPK_T_GAP | SPK_T_SPRING,
+      { G, G, G|SPR, __, P3, P3, P3, P3 } },
+
+    /* Moves the player to level 3 for level 3 phrases */
+    { 8, 0, 2, 6, SPK_T_GAP | SPK_T_SWITCH,
+      { G, G, G|SW(0), G, P1|SWP, P1|SWP, P2|SWP, P2|SWP } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 3, 3, 6, SPK_T_REST | SPK_T_GAP | SPK_T_DIAMOND,
+      { P3, P3|DI(3), P3|DI(3), P3 } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE,
+      { P3, P3, P3|CR(3), P3 } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 3, 3, 6, SPK_T_GAP | SPK_T_SPIKED,
+      { P3, P3, P3|CR2(3), P3 } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE,
+      { P3, __, P3|CR(3), P3 } },
+
+    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    { 4, 3, 3, 6, SPK_T_GAP | SPK_T_SPRING,
+      { P3, G|SPR, __, P3 } },
+
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
+      { P3, __, P3|SW(3), __, P3|SWP, __, P3|SWP, P3|SWP } },
+
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
+      { P3, G|SPR, __, P3, P3, P3|SW(3), __, P3|SWP } },
+
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
+      { P3, P3, P3|SW(3), G|SPR, __, P3|SWP, P3|SWP, P3|SWP } },
+
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT
+                  | SPK_T_SPRING,
+      { P3, G, G|CR(0), G, G|DI(0), G|SPR, __, P3 } },
+
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPRING,
+      { P3, G, G|SW(0), G|DI(0), G, G|SPR, __, P3|SWP } },
+
+    { 16, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_BLOCK | SPK_T_DIAMOND,
+      { P3, P2, P1, G, G|CR(0), G, G|BL(6), G, G|CR(0), G, P1, P1, P2,
+        P2|DI(2), P3, P3|DI(3) } },
+
+    { 16, 3, 2, 6, SPK_T_GAP | SPK_T_BLOCK | SPK_T_DIAMOND | SPK_T_SPIKED,
+      { P3, P2, P1, G, G|BL(3), G, G|CR2(0), G, G|BL(3), G, G|CR2(0), G,
+        P1, P1, P2, P2 } },
+
+    { 16, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE | SPK_T_BLOCK | SPK_T_DIAMOND
+                   | SPK_T_BAIT,
+      { P3, P2, P1, G, G|BL(3), G|DI(0), G|CR(0), G|DI(0), G|SW(0), G,
+        P1|SWP, P1|DI(1)|SWP, P2|SWP, P2|DI(2)|SWP, P3|SWP, P3|DI(3)|SWP } },
+
+    /* Moves the player from level 3 to level 2 for level 2 phrases */
+    { 4, 3, 2, 5, SPK_T_GAP,
+      { P3, P3, P2, P2 } },
+
+    { 4, 3, 0, 6, SPK_T_REST,
+      { P3, P2|DI(2), P1, G } },
+
+    { 4, 2, 0, 5, SPK_T_REST,
+      { P2, P2|DI(2), P1, G } },
+
+    { 4, 1, 0, 4, SPK_T_REST,
+      { P1, P1|DI(1), G, G } },
+
+    { 16, 0, 0, 5, SPK_T_BLOCK | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G, G|P1, G, G|P2|DI(0), G, G|P3|DI(3), G|P3|DI(3), G|P3|DI(3),
+        G|P3|DI(3)|BL(3), G|P3|DI(3), G|P3|DI(3)|BL(3), G|P3|DI(3),
+        G|P3|DI(3)|BL(3), G|P3|DI(3), G|DI(0) } },
+
+    { 16, 0, 0, 5, SPK_T_BLOCK | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G, G|P1, G, G|P2|DI(2), G, G|P3|DI(0), G|P3|DI(3)|BL(3),
+        G|P3|DI(0), G|P3|BL(12), G|P3|DI(0), G|P3|BL(3), G|P3|DI(0),
+        G|P3|BL(12), G|P3|DI(0), G } },
+
+    { 16, 0, 0, 5, SPK_T_BLOCK | SPK_T_DIAMOND | SPK_T_BAIT,
+      { G, G, G|P1, G, G|P2|DI(2), G, G|P3|DI(0), G|P3|DI(3)|BL(6),
+        G|P3|DI(0), G|P3|BL(12), G|P3|DI(0), G|P3|BL(6), G|P3|DI(0),
+        G|P3|BL(12), G|P3|DI(0), G } }
 };
 
 const int spk_pattern_count =
@@ -349,6 +540,7 @@ static int          base;                   /* first cell still in the ring */
  * it is as fixed as the song is. */
 #define SPK_TIER_CELLS   32      /* beats before the course is allowed to harden */
 #define SPK_TIER_TOP     6       /* ...and the hardest it reaches */
+#define SPK_TIER_LAST    256     /* ...but the last step costs this many */
 
 /* A rest every so often, on the grid rather than on a count of phrases:
  * players need somewhere to breathe and the respawn needs a target it can
@@ -423,6 +615,18 @@ static int spk_tier_at(int cell)
 {
     int t = 1 + cell / SPK_TIER_CELLS;
 
+    /* The last step is held back past its turn on the ramp. Its phrases stop
+     * testing one thing at a time, and on an even ramp a track arrives there
+     * before it is half over and then stays. SPK_TIER_LAST is a multiple of
+     * SPK_TIER_CELLS, so the teaching window still lines up with the band it
+     * opens.
+     *
+     * A rising bar still buys the tier above the ramp's, so between the two
+     * counts the top tier is what a track climbs to and falls back from
+     * rather than what it sits at. */
+    if (t >= SPK_TIER_TOP && cell < SPK_TIER_LAST)
+        t = SPK_TIER_TOP - 1;
+
     return t > SPK_TIER_TOP ? SPK_TIER_TOP : t;
 }
 
@@ -456,6 +660,28 @@ static unsigned short spk_gen_favoured(void)
  * the frame loop shares. */
 static int candidates[ARRAYLEN(spk_patterns)];
 
+/* Whether a phrase can be walked into at that level.
+ *
+ * Either it says so, or it carries a surface there at both ends -- a phrase
+ * with a floor and a storey above it is two phrases, and which one is played
+ * depends only on where the player arrives. Entered above its own floor it
+ * leaves at that level too, so the join holds either way.
+ *
+ * Derived from the cells rather than declared, because a flag beside them
+ * would be a second thing to keep in step with the first. Read from the mask
+ * and not from what a switch has done: the entry and the exit are properties
+ * of the phrase, and a switch is thrown inside it. */
+bool spk_pat_at(const struct spk_pattern *p, int level)
+{
+    unsigned int bit = 1u << level;
+
+    if ((int)p->entry == level)
+        return true;
+
+    return (p->cells[0] & SPK_C_MASK & bit)
+           && (p->cells[p->length - 1] & SPK_C_MASK & bit);
+}
+
 static const struct spk_pattern *spk_gen_pick(int entry)
 {
     int n = 0, i;
@@ -485,7 +711,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
     {
         for (i = 0; i < spk_pattern_count; i++)
             if ((spk_patterns[i].tags & SPK_T_REST)
-                && spk_patterns[i].entry == (unsigned char)entry)
+                && spk_pat_at(&spk_patterns[i], entry))
                 candidates[n++] = i;
     }
 
@@ -496,7 +722,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
     {
         for (i = 0; i < spk_pattern_count; i++)
             if ((spk_patterns[i].tags & SPK_T_TEACH)
-                && spk_patterns[i].entry == (unsigned char)entry
+                && spk_pat_at(&spk_patterns[i], entry)
                 && (int)spk_patterns[i].difficulty == tier)
                 candidates[n++] = i;
     }
@@ -507,7 +733,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
         {
             const struct spk_pattern *p = &spk_patterns[i];
 
-            if (p->entry != (unsigned char)entry)
+            if (!spk_pat_at(p, entry))
                 continue;
             if (p->difficulty > (unsigned char)tier)
                 continue;
@@ -565,10 +791,15 @@ static const struct spk_pattern *spk_gen_pick(int entry)
 
 static void spk_gen_extend(void)
 {
-    const struct spk_pattern *p = spk_gen_pick(last_exit);
+    int at = last_exit;
+    const struct spk_pattern *p = spk_gen_pick(at);
     int i;
 
-    last_exit = p->exit;
+    /* A phrase entered above its own floor is left at the level it was
+     * entered at. One entered where it says it should be leaves where it
+     * says -- and so does the bare ground the wait walks on, which matches
+     * nothing and is handed back regardless. */
+    last_exit = ((int)p->entry != at && spk_pat_at(p, at)) ? at : p->exit;
     for (i = 0; i < p->length; i++)
     {
         int cell = filled + i;

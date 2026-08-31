@@ -341,6 +341,7 @@ static const struct tag_row tag_rows[] = {
 { "show shutdown message", TAG_ADVANCED|TAG_SYSTEM,                           "shutdown splash" },
 { "clear settings on hold",TAG_ADVANCED|TAG_SYSTEM,              "reset recovery" },
 { "spike caption",       TAG_APPEARANCE,                         "spike game now playing track artist" },
+{ "spike caption scroll",TAG_APPEARANCE,                         "spike game now playing scroll crop" },
 { "spike audio offset",  TAG_ADVANCED|TAG_SOUND,                 "spike game latency calibration timing" },
 { "show debug menu",     TAG_ADVANCED|TAG_SYSTEM,                "debug" },
 { "settings mode",       TAG_SYSTEM,                             "basic advanced" },

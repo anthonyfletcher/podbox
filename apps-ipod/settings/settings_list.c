@@ -1961,6 +1961,8 @@ const struct settings_list settings[] = {
                    "off,title,title and artist", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_SPIKE_CAPTION_TITLE),
                    ID2P(LANG_SPIKE_CAPTION_BOTH)),
+    OFFON_SETTING(0, spike_caption_scroll, LANG_SPIKE_CAPTION_SCROLL, false,
+                  "spike caption scroll", NULL),
     INT_SETTING(0, spike_offset, LANG_SPIKE_OFFSET, -50, "spike audio offset",
                 UNIT_MS, -SPK_OFFSET_MAX, SPK_OFFSET_MAX, SPK_OFFSET_STEP,
                 NULL, NULL, NULL),
