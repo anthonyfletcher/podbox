@@ -792,14 +792,24 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                  * used for Nero's gapless hack */
                 uint8_t chapters   = 0;
                 uint64_t timestamp = 0;
+                off_t chapter_pos = lseek(fd, 0, SEEK_CUR);
 
-                lseek(fd, 8, SEEK_CUR);
-                read_uint8(fd, &chapters);
+                /* size is unsigned: a box shorter than its own nine-byte
+                 * header wraps it, and the loop below then seeks by ~4GB.
+                 * Both reads have to be checked for the same reason. */
+                if (chapter_pos < 0 || size < 9
+                    || lseek(fd, 8, SEEK_CUR) != chapter_pos + 8
+                    || read_uint8(fd, &chapters) != 1) {
+                    break;
+                }
                 size -= 9;
 
-                /* the first chapter will be used as the lead_trim */
+                /* the first chapter will be used as the lead_trim. A chapter
+                 * record is a timestamp and a length byte, so nine bytes. */
                 if (chapters > 0) {
-                    read_uint64be(fd, &timestamp);
+                    if (size < 9 || read_uint64be(fd, &timestamp) != 8) {
+                        break;
+                    }
                     id3->lead_trim = (timestamp * id3->frequency) / 10000000;
                     size -= 8;
                 }

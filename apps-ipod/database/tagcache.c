@@ -1486,8 +1486,12 @@ static bool check_clauses(struct tagcache_search *tcs,
                 if (clause->tag == tag_filename
                     || clause->tag == tag_virt_basename)
                 {
-                    retrieve(tcs, IF_DIRCACHE(tcs->idx_id,) idx, clause->tag,
-                             buf, bufsz);
+                    if (!retrieve(tcs, IF_DIRCACHE(tcs->idx_id,) idx,
+                                  clause->tag, buf, bufsz))
+                    {
+                        tcs->failed = true;
+                        return false;
+                    }
                 }
                 else
                 {
@@ -1526,12 +1530,14 @@ static bool check_clauses(struct tagcache_search *tcs,
                         break;
                     case e_ENTRY_SIZEMISMATCH:
                         logf("read error #15");
+                        tcs->failed = true;
                         return false;
                     case e_TAG_TOOLONG:
                         logf("too long tag #6");
                         return false;
                     case e_TAG_SIZEMISMATCH:
                         logf("read error #16");
+                        tcs->failed = true;
                         return false;
                     default:
                         logf("unknown_error");
@@ -1645,7 +1651,14 @@ static bool build_lookup_list(struct tagcache_search *tcs)
 
             /* Check for conditions. */
             if (!check_clauses(tcs, idx, tcs->clause, tcs->clause_count))
+            {
+                if (tcs->failed)
+                {
+                    tcrc_buffer_unlock();
+                    return false;
+                }
                 continue;
+            }
             /* Add to the seek list if not already in uniq buffer (doesn't yield)*/
             if (!add_uniqbuf(tcs, idx->tag_seek[tcs->type]))
                 continue;
@@ -1669,17 +1682,38 @@ static bool build_lookup_list(struct tagcache_search *tcs)
     {
         struct master_header tcmh;
         tcs->masterfd = open_master_fd(&tcmh, false);
+        if (tcs->masterfd < 0)
+        {
+            tcs->failed = true;
+            return false;
+        }
+        tcs->master_entry_count = tcmh.tch.entry_count;
     }
 
-    lseek(tcs->masterfd, tcs->seek_pos * sizeof(struct index_entry) +
-            sizeof(struct master_header), SEEK_SET);
+    if (lseek(tcs->masterfd, tcs->seek_pos * sizeof(struct index_entry) +
+              sizeof(struct master_header), SEEK_SET) < 0)
+    {
+        tcs->failed = true;
+        return false;
+    }
 
-    while (read_index_entries(tcs->masterfd, &entry, 1) == sizeof(struct index_entry))
+    /* Bounded by the count the master header declares, so that a read
+     * returning short is a truncated file rather than the end of one. Ending
+     * the loop on the read instead cannot tell those apart, and answers a
+     * partial list as though it were the whole answer. */
+    while (tcs->seek_pos < tcs->master_entry_count)
     {
         struct tagcache_seeklist_entry *seeklist;
 
         if (tcs->seek_list_count == SEEK_LIST_SIZE)
             break ;
+
+        if (read_index_entries(tcs->masterfd, &entry, 1)
+                != sizeof(struct index_entry))
+        {
+            tcs->failed = true;
+            return false;
+        }
 
         i = tcs->seek_pos;
         tcs->seek_pos++;
@@ -1700,7 +1734,11 @@ static bool build_lookup_list(struct tagcache_search *tcs)
 
         /* Check for conditions. */
         if (!check_clauses(tcs, &entry, tcs->clause, tcs->clause_count))
+        {
+            if (tcs->failed)
+                return false;
             continue;
+        }
 
         /* Add to the seek list if not already in uniq buffer. */
         if (!add_uniqbuf(tcs, entry.tag_seek[tcs->type]))
@@ -1801,6 +1839,8 @@ bool tagcache_search(struct tagcache_search *tcs, int tag)
         tcs->masterfd = open_master_fd(&master_hdr, true);
         if (tcs->masterfd < 0)
             return false;
+
+        tcs->master_entry_count = master_hdr.tch.entry_count;
 
         if (!TAGCACHE_IS_NUMERIC(tcs->type))
         {

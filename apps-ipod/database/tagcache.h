@@ -149,8 +149,10 @@ struct tagcache_search {
     int seek_pos;
     long position;
     int entry_count;
+    int master_entry_count; /* Index entries the master header claims */
     bool valid;
     bool initialized;
+    bool failed;         /* A read failed: results so far are incomplete */
     uint32_t *unique_list;
     int unique_list_capacity;
     int unique_list_count;
