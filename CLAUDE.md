@@ -448,9 +448,12 @@ hand-built zip with every **Explain** entry silently empty looks finished.
 - `tools/check-settings-docs.sh` — whether `settings-help.txt` and
   `settings-guide.md` still describe the settings that exist. See **Adding,
   Removing or Renaming a Setting** above
-- `tools/voice.pl` — voice file generator (TTS). Paths point at `apps-ipod/` but
-  voice builds are unverified here; `VOICE_VERSION` no longer resolves because
-  `talk.h` moved, so `rockbox-info.txt` reports an empty `Voice format:`
+- `tools/voice.pl` — voice file generator (TTS). Paths point at `apps-ipod/`.
+  Voice builds are still unexercised here: no TTS engine or encoder is
+  installed on the build server, so `make voice` has never run. The pipeline
+  either side of that is wired — `rockbox-info.txt` reports `Voice format: 400`
+  again, and `configure` exports `COREAPPSDIR` so both `voice.pl` and
+  `mkinfo.pl` find the application layer
 **Theme Lens lives outside the tree**, in the git-ignored `.build/theme-lens/`
 — the skin reader, linter and previewer. `python serve.py <theme folder>` (or
 double-click `ThemeLens.cmd`) edits that folder live; `ctl.py` drives a running
