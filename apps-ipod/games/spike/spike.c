@@ -51,6 +51,7 @@
 #include "widgets/yesno.h"
 #include "screens/playback/wps.h"   /* wps_do_playpause, DEFAULT_SKIP_THRESH */
 #include "system/volume.h"   /* adjust_volume */
+#include "sound.h"           /* sound_min, sound_max */
 #include "games/spike/spike.h"
 #include "games/spike/spike_score.h"
 #include "games/spike/spike_bar.h"
@@ -180,7 +181,27 @@ enum spk_run
  * land late against what is heard -- measured at about -118ms by tapping,
  * of which some is the analyser's phase and some is a player's habit of
  * anticipating -- and -50 is where it started feeling right in play. */
-static int  offset_ms = -50;
+/* Calibration, and it belongs to the player rather than to the run: it is a
+ * setting so that it survives the session as well as the screen. */
+#define spk_offset()  (global_settings.spike_offset)
+
+/* The caption's own state: what it last said, and the font it says it in.
+ *
+ * The strings are copies. mp3entry is live -- a buflib allocation can blank
+ * it under a function that is holding it -- so nothing here is a pointer
+ * into it, and the title is what tells us the track has moved rather than a
+ * second change-detector beside the one Song already keeps. */
+#define SPK_CAP_FONT   ROCKBOX_DIR "/fonts/24-seven-fifteen.fnt"
+
+/* How long the volume holds the caption's room. Long enough to read after
+ * the last of a run of clicks, short enough that a brush of the wheel does
+ * not hide the track for the rest of the phrase. */
+#define SPK_VOL_TICKS  (HZ * 3 / 2)
+
+static int  cap_font = FONT_UI;
+static long cap_checked = -1;       /* the second the track was last looked at */
+static char cap_text[160];          /* title, or title and artist joined */
+
 
 /* The latched grid, and the octave the player asked for on top of it. The
  * shift is kept across entries with the offset, for the same reason. */
@@ -269,7 +290,7 @@ static void spike_set_paused(bool pause)
  * latch, and the half/double toggle. */
 static void spike_anchor(long at)
 {
-    anchor_ms = at - offset_ms - (long)(cur_beat + 1) * beat_ms;
+    anchor_ms = at - spk_offset() - (long)(cur_beat + 1) * beat_ms;
 }
 
 static int spike_shifted(int ms)
@@ -342,7 +363,7 @@ static bool spike_latch_tempo(void)
      * different levels. The generator takes it out of the cell before
      * deciding anything, so they are the same phrases in the same order,
      * offset by up to three cells and by nothing else. */
-    bar_rot = spk_bar_downbeat(anchor_ms + offset_ms, beat_ms);
+    bar_rot = spk_bar_downbeat(anchor_ms + spk_offset(), beat_ms);
     spk_gen_set_bar(bar_rot < 0 ? 0 : bar_rot);
 
     return true;
@@ -378,7 +399,7 @@ static bool spike_track_changed(void)
  * move later by the same amount. */
 static long spike_now(void)
 {
-    return (long)spk_clock_ms() - anchor_ms - offset_ms;
+    return (long)spk_clock_ms() - anchor_ms - spk_offset();
 }
 
 /* Back to listening, without stopping. Everything the audio invalidates goes
@@ -410,7 +431,7 @@ static void spike_listen(int cell)
      * a track change is a scroll that jumps back part of a cell for no
      * reason the player can hear. Anchoring on the grid time the last frame
      * had keeps both. */
-    anchor_ms = (long)spk_clock_ms() - offset_ms - last_grid;
+    anchor_ms = (long)spk_clock_ms() - spk_offset() - last_grid;
 
     /* Flat first, then the cells: patterns are laid the moment one is asked
      * for, and starting the player is what asks. Setting the mode afterwards
@@ -439,7 +460,7 @@ static void spike_reset_run(void)
     beat_ms = spike_shifted(SPK_BEAT_TARGET);
     spk_draw_reset();
 
-    anchor_ms = (long)spk_clock_ms() - offset_ms;
+    anchor_ms = (long)spk_clock_ms() - spk_offset();
     last_grid = 0;
     cur_beat = 0;
     death_kind = SPK_DEATH_LEDGE;
@@ -734,6 +755,45 @@ static void spike_boundary(long grid_ms)
 }
 
 
+/* What the caption says. Built here and drawn by the frame, which is what
+ * lets it scroll: the drawing sees the same string every frame and moves it
+ * along, rather than being handed a new one.
+ *
+ * Rebuilt at most once a second, and only when the title has changed under
+ * it -- which is also the whole of track-change detection here. A strcmp
+ * against a live id3 costs less than a second copy of Song's path
+ * comparison, and mp3entry is never held past this function. */
+static void spike_caption_update(long now)
+{
+    struct mp3entry *id3;
+    const char *title, *artist;
+    long second = now / 1000;
+
+    if (global_settings.spike_caption == 0 || second == cap_checked)
+        return;
+
+    cap_checked = second;
+
+    id3 = audio_current_track();
+    if (id3 == NULL)
+        return;
+
+    title = id3->title != NULL ? id3->title : id3->path;
+    artist = id3->artist;
+
+    if (title == NULL)
+        title = "";
+
+    /* Joined rather than stacked: one line reads as one thing, and the band
+     * has room for one. The dash is what stops a title ending in a name
+     * from running into the artist. */
+    if (global_settings.spike_caption > 1 && artist != NULL && *artist)
+        snprintf(cap_text, sizeof (cap_text), "%s - %s",
+                 title, artist);
+    else
+        strlcpy(cap_text, title, sizeof (cap_text));
+}
+
 /** The screen **/
 
 static void spike_fill_frame(struct spk_frame *f, long grid_ms)
@@ -755,6 +815,29 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
      * first run says nothing: there is no record to be past. */
     f->crowned = best_score > 0 && score > best_score;
     f->waiting = run_state == SPK_RUN_COUNT;
+
+    /* The same string every frame, so the drawing can move it along. */
+    spike_caption_update(grid_ms > 0 ? grid_ms : 0);
+    f->caption = global_settings.spike_caption > 0 ? cap_text : NULL;
+    f->font = cap_font;
+
+    /* And the wheel's answer over the top of it, while it is still warm.
+     *
+     * setvol() stamps global_status.last_volume_change and the skin engine
+     * already reads it for the same purpose, so there is no second clock
+     * here to keep -- and a change made from anywhere else shows too. Wall
+     * time rather than the grid: a paused player still turns it up. */
+    f->volume = -1;
+    if (global_status.last_volume_change
+        && TIME_BEFORE(current_tick,
+                       global_status.last_volume_change + SPK_VOL_TICKS))
+    {
+        int lo = sound_min(SOUND_VOLUME);
+        int hi = sound_max(SOUND_VOLUME);
+
+        if (hi > lo)
+            f->volume = (global_status.volume - lo) * 100 / (hi - lo);
+    }
 
     f->death_kind = death_kind;
     if (run_state == SPK_RUN_DEAD)
@@ -869,7 +952,7 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
     struct spk_menu m;
     bool root;
 
-    m.offset_ms = &offset_ms;
+    m.offset_ms = &global_settings.spike_offset;
     m.shift = &tempo_shift;
     m.beat_ms = beat_ms;
     m.bpm = tempo_bpm;
@@ -982,6 +1065,29 @@ bool spike_screen(enum spike_mode mode)
     lcd_update();
     spike_backlight(true);
 
+    /* The caption's font, and the room it needs. Seven Fifteen is a pixel
+     * face at this size, so it sits beside the score's block glyphs rather
+     * than beside an anti-aliased UI over line art -- and it carries the
+     * character set a track name actually needs.
+     *
+     * A glyph cache, not a resident font: a miss is a disk read, which is
+     * the second reason the caption is drawn once a second and not once a
+     * frame. With no user font slot free it falls back to the UI face,
+     * because a caption in the wrong face beats no caption. */
+    cap_checked = -1;
+    cap_text[0] = 0;
+    /* Loaded whatever the caption setting says: the score and the count-in
+     * are in this face too, and only the caption is optional.
+     *
+     * font_load() caps the buffer at MAX_FONT_SIZE, and this face carries
+     * Noto's repertoire -- its offset table alone is past that, so the plain
+     * call fails every time and the band comes up in the UI font. Loaded the
+     * way the UI font itself is: no fixed ceiling, and the user's own glyph
+     * budget. */
+    cap_font = font_load_ex(SPK_CAP_FONT, 0, global_settings.glyphs_to_cache);
+    if (cap_font < 0)
+        cap_font = FONT_UI;
+
     press_total = 0;
     press_count = 0;
     press_last = 0;
@@ -1052,7 +1158,7 @@ bool spike_screen(enum spike_mode mode)
             /* Timestamped against the clock rather than against the frame:
              * the loop wakes on the button, so a press is judged where it
              * fell and not where the next frame happened to be. */
-            spike_press((long)spk_clock_now() - anchor_ms - offset_ms);
+            spike_press((long)spk_clock_now() - anchor_ms - spk_offset());
         }
 
         /* The WPS's controls, carried over: a run is the WPS with a game
@@ -1358,6 +1464,7 @@ bool spike_screen(enum spike_mode mode)
         mark = current_tick;
         spk_draw_flush();
         flush_ticks += current_tick - mark;
+
     }
 
     beat_analyse_stop();
@@ -1397,6 +1504,12 @@ bool spike_screen(enum spike_mode mode)
     if (boosted)
         cpu_boost(false);
     spike_backlight(false);
+
+    if (cap_font != FONT_UI)
+    {
+        font_unload(cap_font);
+        cap_font = FONT_UI;
+    }
     lcd_setfont(FONT_UI);
     viewportmanager_theme_undo(SCREEN_MAIN, true);
     pop_current_activity();

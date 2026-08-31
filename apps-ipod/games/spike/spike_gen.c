@@ -10,11 +10,8 @@
  ****************************************************************************/
 
 #include "config.h"
+#include "system.h"           /* ARRAYLEN */
 #include "games/spike/spike_gen.h"
-
-/* Candidates one pick may consider: the whole library, since at the top
- * tier every pattern can qualify at once. */
-#define SPK_CAND_MAX  64
 
 /** The library **/
 
@@ -28,9 +25,11 @@
 #define CR(n)   (SPK_C_CRF | ((unsigned)(n) << SPK_C_CR_SH))
 #define BL(m)   (SPK_C_BLF | ((unsigned)(m) << SPK_C_BL_SH))
 #define SW(n)   (SPK_C_SWF | ((unsigned)(n) << SPK_C_SW_SH))
-#define SP      SPK_C_SPF
-#define SF      SPK_C_SFF
-#define SX      SPK_C_SXF
+#define SWP     (SPK_SW_PLAT   << SPK_C_SWM_SH)
+#define SWG     (SPK_SW_GROUND << SPK_C_SWM_SH)
+#define SWX     (SPK_SW_SWAP   << SPK_C_SWM_SH)
+#define CR2(n)  (CR(n) | SPK_C_SPK)
+#define SPR     SPK_C_SPR
 
 /* Every one of these enters and leaves at level 0. A pattern that climbs
  * comes back down inside itself, which is a restriction the entry and exit
@@ -187,24 +186,24 @@ const struct spk_pattern spk_patterns[] =
         G|P3|BL(6), G|P3|DI(0), G|P3|BL(3), G|P3|DI(0), G, G } },
 
     { 8, 0, 0, 2, SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G, G|P1|DI(1)|SP, G|P1|DI(1)|SP, G|P1|SP, G } },
+      { G, G, G|SW(0), G, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G|P1|SWP, G } },
 
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_DIAMOND | SPK_T_GAP,
-      { G, G, G|SW(0), G, G|P1|DI(1)|SP, G|P1|SP, __, G } },
+      { G, G, G|SW(0), G, G|P1|DI(1)|SWP, G|P1|SWP, __, G } },
 
     { 4, 0, 0, 2, SPK_T_GAP | SPK_T_SWITCH | SPK_T_TEACH,
-      { G, G|SW(0), G|SP|SF, G } },
+      { G, G|SW(0), G|SWG, G } },
 
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP,
-      { G, G, G|SW(0), G, G|SP|SF, G|DI(0)|SP|SF, G|SP|SF, G } },
+      { G, G, G|SW(0), G, G|SWG, G|DI(0)|SWG, G|SWG, G } },
 
     { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, SP|SF, G|SP|SF, G|DI(0)|SP|SF, G|SP|SF,
-        G|DI(0)|SP|SF, G|SP|SF, SP|SF, G } },
+      { G, G|DI(0), G|SW(0), G, __, G|SWG, G|DI(0)|SWG, G|SWG,
+        G|DI(0)|SWG, G|SWG, __, G } },
 
     { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH,
-      { G, G, G|SW(0), G, G|P1, G|P2|DI(0)|SX, G|P2|DI(0), G|P2|DI(0)|SX,
-        G|P2|DI(0), G|P2|DI(0)|SX, G|P2, G } },
+      { G, G, G|SW(0), G, G|P1, G|P2|DI(0)|SWX, G|P2|DI(0),
+        G|P2|DI(0)|SWX, G|P2|DI(0), G|P2|DI(0)|SWX, G|P2, G } },
 
     { 16, 0, 0, 4, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT,
       { G, G|P1, G|P2|DI(0), G|P2, G|P2, G|P2, G|P2, G|P2, G|P2, G|P2,
@@ -222,31 +221,33 @@ const struct spk_pattern spk_patterns[] =
         G|P3|DI(3)|BL(3), G|P3|DI(3), G|DI(0) } },
 
     { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G|P1, G|P2, G|P3|DI(0)|SX, G|P3|DI(0)|SX,
-        G|P3|DI(0)|SX, G|P3|DI(0)|SX, G|P3|DI(0)|SX, G|P3|DI(0)|SX, G } },
+      { G, G, G|SW(0), G|P1, G|P2, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
+        G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
+        G } },
 
     { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH,
-      { G, G, G|SW(0), G, G|P1|SP, G|P2|SP, G|P2|DI(2)|SP, G|P2|DI(2)|SP,
-        G|P2|DI(2)|SP, G|P2|DI(2)|SP, G|P2|SP, G } },
+      { G, G, G|SW(0), G, G|P1|SWP, G|P2|SWP, G|P2|DI(2)|SWP,
+        G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|SWP, G } },
 
     { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, G|DI(0)|SP|SF, G, G|DI(0)|SP|SF, G,
-        G|DI(0)|SP|SF, G, G|DI(0)|SP|SF, G } },
+      { G, G|DI(0), G|SW(0), G, G|DI(0)|SWG, G, G|DI(0)|SWG, G,
+        G|DI(0)|SWG, G, G|DI(0)|SWG, G } },
 
     { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, G|P1|SP, G|P2|DI(2)|SP, G|P2|DI(2)|SP,
-        G|P3|SP, G|P3|DI(3)|SP, G|P3|DI(3)|SP, G|P2|DI(2)|SP,
-        G|P2|DI(2)|SP } },
+      { G, G|DI(0), G|SW(0), G, G|P1|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP,
+        G|P3|SWP, G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G|P2|DI(2)|SWP,
+        G|P2|DI(2)|SWP } },
 
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, G|SW(0), __, G|P1|DI(1)|SP, G|P1|DI(1)|SP, G, G } },
+      { G, G, G|SW(0), __, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G, G } },
 
     { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), __, G|P1|SP, G|P2, G|P2|DI(2), G|P2|DI(2),
+      { G, G, G|SW(0), __, G|P1|SWP, G|P2, G|P2|DI(2), G|P2|DI(2),
         G|P2|DI(2), G|P2|DI(2), G|P2|DI(2), G } },
 
     { 8, 0, 0, 2, SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G, G|P2|DI(2)|SP, G|P2|DI(2)|SP, G|P2|DI(2)|SP, G } },
+      { G, G, G|SW(0), G, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP, G|P2|DI(2)|SWP,
+        G } },
 
     { 8, 0, 0, 2, SPK_T_DIAMOND,
       { G, G|DI(2), G|DI(0), G|DI(2), G|DI(0), G|DI(2), G|DI(0), G } },
@@ -262,7 +263,30 @@ const struct spk_pattern spk_patterns[] =
       { G, G, G|DI(2), G, G, G|DI(2), G, G } },
 
     { 8, 0, 0, 2, SPK_T_DIAMOND,
-      { G, G, G|P1|DI(1), G|P2, G|P2|DI(2), G|P1|DI(1), G|DI(0), G } }
+      { G, G, G|P1|DI(1), G|P2, G|P2|DI(2), G|P1|DI(1), G|DI(0), G } },
+
+    /* The spring, taught by leaving no other way across. The hole at 2
+       makes the press compulsory and the only landing is the spring at 3,
+       so the launch cannot be missed -- and the diamond it collects sits
+       at the top level, where no press from the ground reaches. That is
+       the whole lesson: what a spring is for. */
+    { 8, 0, 0, 5, SPK_T_SPRING | SPK_T_TEACH | SPK_T_DIAMOND | SPK_T_GAP,
+      { G, G, __, G|SPR, G|DI(3), G, G, G } },
+
+    /* And what the height is for: the launch comes down on the top
+       surface, walks the length of it and steps off. No press from the
+       ground reaches level 3 -- two levels is all one buys -- so a phrase
+       shaped like this is the only way the top of the field is ever stood
+       on. */
+    { 8, 0, 0, 5, SPK_T_SPRING | SPK_T_DIAMOND | SPK_T_GAP,
+      { G, G, __, G|SPR, G, G|P3, G|P3|DI(3), G } },
+
+    /* The spike, taught against the habit it breaks. Pressing a beat early
+       lands on its head and is fatal; not pressing at all walks into it
+       and is fatal; the one press that works clears the cell entirely. It
+       is the stomp's own verb aimed one cell further. */
+    { 8, 0, 0, 6, SPK_T_SPIKED | SPK_T_CREATURE | SPK_T_TEACH,
+      { G, G, G|CR2(0), G, G, G, G, G } }
 };
 
 const int spk_pattern_count =
@@ -290,9 +314,11 @@ static const struct spk_pattern spk_bare =
 #undef CR
 #undef BL
 #undef SW
-#undef SP
-#undef SF
-#undef SX
+#undef SWP
+#undef SWG
+#undef SWX
+#undef CR2
+#undef SPR
 
 
 /** The ring **/
@@ -322,7 +348,7 @@ static int          base;                   /* first cell still in the ring */
  * course at the same cell index. It is latched once and never revisited, so
  * it is as fixed as the song is. */
 #define SPK_TIER_CELLS   32      /* beats before the course is allowed to harden */
-#define SPK_TIER_TOP     4       /* ...and the hardest it reaches */
+#define SPK_TIER_TOP     6       /* ...and the hardest it reaches */
 
 /* A rest every so often, on the grid rather than on a count of phrases:
  * players need somewhere to breathe and the respawn needs a target it can
@@ -423,9 +449,15 @@ static unsigned short spk_gen_favoured(void)
     return 0;
 }
 
+/* Candidates one pick may consider: the whole library, because at the top
+ * tier every pattern qualifies at once. Sized from the table so that adding
+ * a pattern cannot silently put it out of reach, and static because the
+ * generator is single-threaded and this grows with the library on a stack
+ * the frame loop shares. */
+static int candidates[ARRAYLEN(spk_patterns)];
+
 static const struct spk_pattern *spk_gen_pick(int entry)
 {
-    int candidates[SPK_CAND_MAX];
     int n = 0, i;
     int at = spk_gen_at(filled);
     int tier = spk_tier_at(at);
@@ -451,7 +483,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
 
     if (owed)
     {
-        for (i = 0; i < spk_pattern_count && n < SPK_CAND_MAX; i++)
+        for (i = 0; i < spk_pattern_count; i++)
             if ((spk_patterns[i].tags & SPK_T_REST)
                 && spk_patterns[i].entry == (unsigned char)entry)
                 candidates[n++] = i;
@@ -462,7 +494,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
      * everything else here, so it happens at the same place every time. */
     if (n == 0 && tier > 1 && (at % SPK_TIER_CELLS) < SPK_PAT_MAX)
     {
-        for (i = 0; i < spk_pattern_count && n < SPK_CAND_MAX; i++)
+        for (i = 0; i < spk_pattern_count; i++)
             if ((spk_patterns[i].tags & SPK_T_TEACH)
                 && spk_patterns[i].entry == (unsigned char)entry
                 && (int)spk_patterns[i].difficulty == tier)
@@ -471,7 +503,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
 
     if (n == 0)
     {
-        for (i = 0; i < spk_pattern_count && n < SPK_CAND_MAX; i++)
+        for (i = 0; i < spk_pattern_count; i++)
         {
             const struct spk_pattern *p = &spk_patterns[i];
 

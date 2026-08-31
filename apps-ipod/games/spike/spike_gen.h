@@ -37,16 +37,24 @@
 #define SPK_C_CRF    0x0400u     /* a creature, level in 11-12 */
 #define SPK_C_BLF    0x2000u     /* a rising block, pattern in 14-17 */
 #define SPK_C_SWF    0x040000u   /* a switch, level in 19-20 */
-#define SPK_C_SPF    0x200000u   /* platforms waiting on a switch */
-#define SPK_C_SFF    0x400000u   /* ...and the floor of the cell with them */
-#define SPK_C_SXF    0x800000u   /* the switch swaps the floor for the
-                                   platforms: one or the other, never both.
-                                   Exclusive with the two above. */
+#define SPK_C_SWM    0x600000u   /* what its switch does here, in 21-22 */
+#define SPK_C_SPK    0x800000u   /* the creature here has a spike on its head */
+#define SPK_C_SPR   0x1000000u   /* a spring, on the ground and nowhere else */
 
 #define SPK_C_DI_SH  8
 #define SPK_C_CR_SH  11
 #define SPK_C_BL_SH  14
 #define SPK_C_SW_SH  19
+#define SPK_C_SWM_SH 21
+
+/* What a switch does to a cell that waits on it. Exactly one of these, which
+ * is why it is a field and not a flag each: a cell whose platforms wait and
+ * whose floor is traded away at the same time is not a thing, and an encoding
+ * that can say it is an encoding that has to be policed in prose. */
+#define SPK_SW_NONE     0u
+#define SPK_SW_PLAT     1u   /* the platforms wait; the floor stays */
+#define SPK_SW_GROUND   2u   /* the ground waits; the platforms stand */
+#define SPK_SW_SWAP     3u   /* one for the other, never both */
 
 /* What a pattern is about, so the music can ask for one of a kind. */
 #define SPK_T_REST       0x01
@@ -57,6 +65,8 @@
 #define SPK_T_DIAMOND    0x20
 #define SPK_T_BAIT       0x40
 #define SPK_T_TEACH      0x80
+#define SPK_T_SPRING     0x0100
+#define SPK_T_SPIKED     0x0200
 
 /* Sixteen is four bars at the grid's own tempo, which is about as long as a
  * phrase can be and still be read as one shape rather than as a stretch of
@@ -67,10 +77,10 @@
 
 struct spk_pattern
 {
-    unsigned char  length;      /* 4, 8 or 16 */
+    unsigned char  length;      /* a multiple of four, up to SPK_PAT_MAX */
     unsigned char  entry;       /* level the player is on arriving */
     unsigned char  exit;        /* ...and on leaving */
-    unsigned char  difficulty;  /* 0-4 */
+    unsigned char  difficulty;  /* 0 to SPK_TIER_TOP */
     unsigned short tags;
     unsigned int   cells[SPK_PAT_MAX];
 };

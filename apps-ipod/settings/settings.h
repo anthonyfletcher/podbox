@@ -894,6 +894,14 @@ struct user_settings
     bool clear_settings_on_hold;
     int playback_log; /* 0=off, 1=generic (ROCKBOX_DIR/playback.log),
                          2=Audioscrobbler (/.scrobbler.log) */
+
+    /* Spike. The caption is a display preference and the offset is
+       calibration: both belong to the player rather than to the run, which
+       is why they are here and the tempo shift is not -- that one is per
+       track, and remembering it would be remembering it for the wrong
+       track. */
+    int spike_caption;  /* 0 off, 1 title, 2 title and artist */
+    int spike_offset;   /* ms the game is judged against the audio by */
 };
 
 /* global settings */

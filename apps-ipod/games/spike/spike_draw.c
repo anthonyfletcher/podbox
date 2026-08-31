@@ -23,6 +23,7 @@
 #include <string.h>
 #include "config.h"
 #include "lcd.h"
+#include "draw/viewport.h"
 #include "font.h"
 #include "settings/settings.h"          /* global_settings fg/bg */
 #include "skin/skin_albumart_color.h"    /* dynamic_colors_resolve */
@@ -87,6 +88,25 @@
  * pressed flat. And the height a waiting platform's ghost line sits at. */
 #define SPK_SW_W         9
 #define SPK_SW_UP        6
+
+/* A spring: a cap on a zigzag.
+ *
+ * The cap keeps still -- one whose height moves on the beat is one a landing
+ * cannot meet, and standing on it is the whole point of it. The coil keeps
+ * the beat instead, by mirroring rather than by moving: the same trick the
+ * platforms' hatching plays, and for the same reason. A thing can be on the
+ * beat without going anywhere. */
+#define SPK_SPR_W        7       /* half-width of the cap */
+#define SPK_SPR_CAP      3       /* ...and its thickness */
+#define SPK_SPR_TALL     14      /* the cap above the ground, at rest */
+#define SPK_SPR_LOW      4       /* ...squashed under the arrival */
+#define SPK_SPR_KICK     19      /* ...and thrown past rest, launching */
+#define SPK_SPR_ZIG      3       /* diagonals under the cap */
+
+/* The spike on a creature's head: tall enough to read at a glance, because
+ * mistaking it for an ordinary creature costs the run. */
+#define SPK_SPK_W        5
+#define SPK_SPK_H        8
 
 /* The hook that turns down at each side of a gap, and the shorter tick at
  * every other cell boundary. The hook is what makes a gap countable rather
@@ -162,6 +182,55 @@ static fb_data aa_accent[SPK_AA_STEPS + 1];
 
 static const fb_data *aa_ramp = aa_ink;
 static bool    full_flush = true;   /* the palette moved: send the lot once */
+
+/* The caption's room and pace. The gap is what keeps it from reading as one
+ * line with the score; the wrap is the clear space before it comes round
+ * again, and without it a long title looks like it stutters. */
+#define SPK_CAP_EDGE     4      /* in from the left edge */
+#define SPK_CAP_GAP     14      /* ...and clear of the score's block */
+#define SPK_CAP_MIN     48      /* narrower than this and there is no room */
+#define SPK_CAP_WRAP    48      /* blank before the title comes round again */
+#define SPK_CAP_PXPS    26      /* pixels a second it travels */
+
+/* The volume read-out, in the caption's room. */
+#define SPK_VOL_H       14      /* the horn's mouth, top to bottom */
+#define SPK_VOL_BOX      5      /* the driver's width */
+#define SPK_VOL_FLARE    5      /* ...and the horn's */
+#define SPK_VOL_CONE    (SPK_VOL_BOX + SPK_VOL_FLARE)
+#define SPK_VOL_LIP      4      /* the throat, in from top and bottom */
+#define SPK_VOL_GAP      6      /* between the cone and the bar */
+#define SPK_VOL_INSET    2      /* the fill sits inside the trough */
+#define SPK_VOL_MIN     24      /* narrower than this and there is no bar */
+
+/* The pair the whole screen is drawn in, kept because a viewport installed
+ * afterwards comes up in FG_FALLBACK/BG_FALLBACK and has to be told. */
+static unsigned was_ink, was_paper;
+static bool     colors_known;
+
+/* The complement of a colour, at the same lightness: subtract each channel
+ * from the sum of the largest and smallest, which is a half turn of the hue
+ * wheel with the saturation and the lightness left where they were. No
+ * contrast target is applied on top, because forcing one whitens every
+ * accent -- see the dynamic-colour work.
+ *
+ * A grey has no hue to turn, and comes back as itself. The theme's selection
+ * colour stands in there: a theme picks it to be seen against its own
+ * background, which is exactly the job. */
+static unsigned spk_complement(unsigned c)
+{
+    int r = RGB_UNPACK_RED(c), g = RGB_UNPACK_GREEN(c);
+    int b = RGB_UNPACK_BLUE(c);
+    int hi = r > g ? (r > b ? r : b) : (g > b ? g : b);
+    int lo = r < g ? (r < b ? r : b) : (g < b ? g : b);
+
+    if (hi - lo < 24)
+        return dynamic_colors_resolve(global_settings.lss_color);
+
+    return LCD_RGBPACK(hi + lo - r, hi + lo - g, hi + lo - b);
+}
+
+
+
 static short   aa_key[SPK_AA_STEPS + 1];
 static bool    aa_ordered;      /* the ramp's ends differ, so it has an order */
 static bool    aa_rising;       /* ...and which way it runs */
@@ -203,7 +272,7 @@ static void spk_aa_put(int x, int y, int cover)
     fb_data *p;
     int k = cover >> 4;
 
-    if (k <= 0 || x < 0 || y < SPK_FIELD_TOP
+    if (k <= 0 || x < 0 || y < SPK_HUD_H
         || x >= LCD_WIDTH || y >= SPK_UPDATE_H)
         return;
 
@@ -492,7 +561,8 @@ static void spk_draw_leg(int xl, int xr, int ytop, int xtip, int ybot)
     }
 }
 
-static void spk_draw_creature(const struct spk_frame *f, int x, int level)
+static void spk_draw_creature(const struct spk_frame *f, int x, int level,
+                              bool spiked)
 {
     int cx = x + SPK_CELL_PX / 2;
     int base = SPK_GROUND_Y - SPK_LEVEL_PX * level;
@@ -509,6 +579,70 @@ static void spk_draw_creature(const struct spk_frame *f, int x, int level)
 
     spk_draw_leg(cx - SPK_CR_BOT, cx - SPK_CR_HIP, hip, cx - foot, base);
     spk_draw_leg(cx + SPK_CR_HIP, cx + SPK_CR_BOT, hip, cx + foot, base);
+
+    /* Landing on this one is fatal, so it is drawn on the surface a landing
+     * would touch: the one place the player is already looking when the
+     * press is decided. */
+    if (spiked)
+    {
+        int top = hip - SPK_CR_BODY;
+
+        spk_line(cx - SPK_SPK_W, top, cx, top - SPK_SPK_H);
+        spk_line(cx + SPK_SPK_W, top, cx, top - SPK_SPK_H);
+    }
+}
+
+/* How high the cap is, for the instant being drawn.
+ *
+ * The body reads this too, so the two cannot disagree about where the plate
+ * is -- which is the whole of standing on one. Squashed by the arrival, then
+ * thrown past its own rest height: the kick is what launches the body rather
+ * than the arc simply beginning, and three rows is what makes it visible at
+ * thirty frames a second. */
+static int spk_spring_top(const struct spk_frame *f, int cell)
+{
+    if (f->st->motion != SPK_ARC_SPRING || cell != f->st->beat)
+        return SPK_SPR_TALL;
+
+    switch ((f->phase * SPK_ROWS_PER_BEAT) / SPK_PHASE)
+    {
+    case 0:  return SPK_SPR_LOW;
+    case 1:  return (SPK_SPR_LOW + SPK_SPR_TALL) / 2;
+    case 2:  return SPK_SPR_KICK;
+    default: return SPK_SPR_TALL;
+    }
+}
+
+/* A spring, always on the ground. The zigzag is a run of segments rather
+ * than a coil, for the reason everything else here is straight lines: a
+ * curve at this size is a smudge. */
+static void spk_draw_spring(const struct spk_frame *f, int x, int cell)
+{
+    int cx = x + SPK_CELL_PX / 2;
+    int h = spk_spring_top(f, cell);
+    int top = SPK_GROUND_Y - h;
+    int lean = f->strong ? 0 : 1;
+    int i;
+
+    /* The cap carries the weight, so it is drawn heavier than the coil under
+     * it: at the same thickness it reads as one more turn of the zigzag
+     * rather than as the top of it. */
+    lcd_fillrect(cx - SPK_SPR_W, top, 2 * SPK_SPR_W, SPK_SPR_CAP);
+
+    /* Anti-aliased, like every other diagonal here. A stepped zigzag beside
+     * a smooth triangle is the one shape that says the drawing is unfinished
+     * -- the aliasing is read as the object, not as the renderer. */
+    spk_aa_use(aa_ink);
+
+    for (i = 0; i < SPK_SPR_ZIG; i++)
+    {
+        int span = h - SPK_SPR_CAP;
+        int y0 = top + SPK_SPR_CAP + (span * i) / SPK_SPR_ZIG;
+        int y1 = top + SPK_SPR_CAP + (span * (i + 1)) / SPK_SPR_ZIG;
+        int x0 = ((i ^ lean) & 1) ? cx + SPK_SPR_W : cx - SPK_SPR_W;
+
+        spk_aa_line(x0, y0, 2 * cx - x0, y1);
+    }
 }
 
 /* What is left of a diamond that has been eaten: the four edges coming
@@ -758,8 +892,11 @@ static void spk_draw_world(const struct spk_frame *f)
         if (spk_world_blocks(cell))
             spk_draw_block(f, x, cell, 0);
 
+        if (spk_world_spring(cell))
+            spk_draw_spring(f, x, cell);
+
         if (spk_world_creature(cell, &level))
-            spk_draw_creature(f, x, level);
+            spk_draw_creature(f, x, level, spk_world_spiked(cell));
         else if (f->st->stomped && cell == f->st->beat)
             spk_draw_stomp(f, f->st->level < 0 ? 0 : f->st->level);
     }
@@ -789,8 +926,23 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
              * never reached. Merging the three contact deaths into one lost
              * this, and the body then played the recoil on the ground with
              * nothing near it. */
-            if (f->st->motion == SPK_ARC_RISE)
+            if (f->st->motion == SPK_ARC_RISE)   /* never a spring: it clears */
                 p->y_offset = (int8_t)(p->y_offset - SPK_BLOCK_LIFT);
+
+            /* And a descent that came down on a spike happened on the head
+             * it came down on, not on the floor it never reached. st->level
+             * is -1 all the way through an arc, so without this the recoil
+             * snaps to the ground with nothing near it -- the same fault as
+             * the block above, from the other end of the arc. */
+            else if (st->motion == SPK_ARC_FALL && st->to >= 0)
+            {
+                int cl;
+
+                if (spk_world_creature(st->beat + 1, &cl) && cl == st->to)
+                    return (st->to << 8) + SPK_CR_HEAD8;
+
+                return st->to << 8;
+            }
         }
         else
             spk_pose_fall(p, f->death_phase, f->death_kind == SPK_DEATH_AIR,
@@ -802,6 +954,7 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
     switch (st->motion)
     {
     case SPK_ARC_RISE:
+    case SPK_ARC_SPRING:
     case SPK_ARC_FALL:
     {
         /* Two clocks run through a jump, and they are not the same one.
@@ -849,13 +1002,28 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
                 over = SPK_CR_HEAD8;
             else if (spk_world_switch(st->beat + 1, &cl) && cl == st->to)
                 over = (SPK_SW_UP * 256) / SPK_LEVEL_PX;
+            else if (st->to == 0 && spk_world_spring(st->beat + 1))
+                over = (SPK_SPR_TALL * 256) / SPK_LEVEL_PX;
 
             if (over)
-                return spk_arc_level(st->from, st->to, u_world)
+                return spk_arc_level(st->from, st->to, u_world, st->apex)
                        + (over * f->phase) / SPK_PHASE;
         }
 
-        return spk_arc_level(st->from, st->to, u_world);
+        /* Off a spring he rides the cap down and up until the arc lifts him
+         * clear of it, which is what makes a launch read as being thrown
+         * rather than as a jump that happens to start on a spring. Taking
+         * the higher of the two needs no blend and cannot step: the moment
+         * the arc passes the cap it simply wins. */
+        if (st->motion == SPK_ARC_SPRING)
+        {
+            int arc = spk_arc_level(st->from, st->to, u_world, st->apex);
+            int cap = (spk_spring_top(f, st->beat) * 256) / SPK_LEVEL_PX;
+
+            return arc > cap ? arc : cap;
+        }
+
+        return spk_arc_level(st->from, st->to, u_world, st->apex);
     }
 
     case SPK_WALK:
@@ -892,7 +1060,7 @@ static void spk_trail_hold(const struct spk_frame *f, long world8, int u)
          * between dashes is a world distance directly. */
         trail[trail_n].world8 = world8 - (long)(i * SPK_TRAIL_STEP * 2);
         trail[trail_n].y =
-            (short)(spk_level_y(spk_arc_level(st->from, st->to, back)) - 6);
+            (short)(spk_level_y(spk_arc_level(st->from, st->to, back, st->apex)) - 6);
         trail_n++;
     }
 }
@@ -945,7 +1113,8 @@ static void spk_trail_step(const struct spk_frame *f)
             return;
         }
 
-        if (st->motion == SPK_ARC_RISE || st->motion == SPK_ARC_FALL)
+        if (st->motion == SPK_ARC_RISE || st->motion == SPK_ARC_FALL
+            || st->motion == SPK_ARC_SPRING)
         {
             int u = spk_ease(f->phase) >> 1;
 
@@ -1069,29 +1238,219 @@ static void spk_centred(int y, const char *s, int scale, bool bold)
     spk_text((LCD_WIDTH - spk_text_width(s, scale)) / 2, y, s, scale, bold);
 }
 
+/* What the wheel just did, in the room the track's name usually has.
+ *
+ * A cone and a bar. The trough is white on a dark paper and black on a light
+ * one -- not the ink, which is the album's and can be any lightness, so a
+ * trough in it can vanish against the ground it sits on. The fill is the
+ * complement, which is the one colour on this screen guaranteed to be seen
+ * against both. */
+static void spk_draw_volume(const struct spk_frame *f, int room)
+{
+    int h = SPK_VOL_H;
+    int y = SPK_BAND_Y(h);
+    int cx = SPK_CAP_EDGE;
+    int bx, bw, fill, i;
+    unsigned trough, level;
+    bool light;
+
+    if (room < SPK_VOL_MIN)
+        return;
+
+    /* The driver, and the horn flaring out of it -- filled column by column
+     * so the two are one solid shape. Drawn as an outline it is a block with
+     * a bracket floating beside it, and the hole in the middle is what stops
+     * it reading as a speaker at all. */
+    lcd_fillrect(cx, y + SPK_VOL_LIP, SPK_VOL_BOX, h - 2 * SPK_VOL_LIP);
+
+    for (i = 0; i <= SPK_VOL_FLARE; i++)
+    {
+        int top = SPK_VOL_LIP - SPK_VOL_LIP * i / SPK_VOL_FLARE;
+
+        lcd_fillrect(cx + SPK_VOL_BOX + i, y + top, 1, h - 2 * top);
+    }
+
+    bx = cx + SPK_VOL_CONE + SPK_VOL_GAP;
+    bw = room - (bx - SPK_CAP_EDGE);
+    if (bw < SPK_VOL_MIN)
+        return;
+
+    /* Black and white, and nothing from the palette.
+     *
+     * The trough takes whichever of the two stands against the paper, and
+     * the level takes the other -- so the level is guaranteed to be seen
+     * against the trough, and the trough against the ground it sits on. Two
+     * colours chosen by one decision, and no way for them to collide.
+     *
+     * The complement was the obvious thing to reach for and is the wrong
+     * one: it is a rotation of the ink's hue at the ink's own lightness, so
+     * against a trough picked for contrast it can land anywhere, including
+     * on top of it.
+     *
+     * Lightness, not hue -- RGB_UNPACK_* weighted the way the eye weights
+     * them. */
+    light = ((RGB_UNPACK_RED(was_paper) * 77
+              + RGB_UNPACK_GREEN(was_paper) * 150
+              + RGB_UNPACK_BLUE(was_paper) * 29) >> 8) >= 128;
+
+    trough = light ? LCD_BLACK : LCD_WHITE;
+    level  = light ? LCD_WHITE : LCD_BLACK;
+
+    lcd_set_foreground(trough);
+    lcd_fillrect(bx, y + h / 4, bw, h - h / 2);
+
+    fill = f->volume <= 0 ? 0 : (bw - 2 * SPK_VOL_INSET) * f->volume / 100;
+    if (fill > 0)
+    {
+        lcd_set_foreground(level);
+        lcd_fillrect(bx + SPK_VOL_INSET, y + h / 4 + SPK_VOL_INSET,
+                     fill, h - h / 2 - 2 * SPK_VOL_INSET);
+    }
+
+    lcd_set_foreground(was_ink);
+}
+
+/* The track, along the left of the score's band.
+ *
+ * Scrolled by hand rather than through lcd_puts_scroll(). That engine
+ * repaints on its own thread at its own cadence, into a viewport it keeps a
+ * pointer to -- and this band is cleared and redrawn thirty times a second
+ * over a viewport that lives on spk_draw_frame()'s stack. The two would
+ * fight over the same rows, and the pointer would dangle the moment the
+ * frame returned.
+ *
+ * Done here it costs one line of text a frame and nothing at all to send:
+ * these rows are already in every flush. It runs on grid time, so it holds
+ * still when the field does. */
+static void spk_draw_caption(const struct spk_frame *f, int room)
+{
+    struct viewport cv, *was;
+    int tw, th, period, off;
+
+    if (f->caption == NULL || !*f->caption || room < SPK_CAP_MIN)
+        return;
+
+    lcd_setfont(f->font);
+    lcd_getstringsize(f->caption, &tw, &th);
+
+    viewport_set_defaults(&cv, SCREEN_MAIN);
+    cv.x = SPK_CAP_EDGE;
+    cv.width = room;
+    cv.y = SPK_BAND_Y(th);
+    cv.height = th;
+    if (colors_known)
+    {
+        cv.fg_pattern = was_ink;
+        cv.bg_pattern = was_paper;
+    }
+    cv.font = f->font;
+    was = lcd_set_viewport(&cv);
+
+    if (tw <= room)
+        lcd_putsxy(0, 0, f->caption);
+    else
+    {
+        /* One copy leaving to the left and the next arriving behind it, so
+         * it comes round rather than snapping back. */
+        period = tw + SPK_CAP_WRAP;
+        off = (int)((f->now_ms * SPK_CAP_PXPS / 1000) % (unsigned long)period);
+
+        /* Drawn from off the left edge: clip_viewport_rect() shifts the
+         * source across for a negative x, so a glyph half out of the box is
+         * half drawn rather than dropped. lcd_putsxy_style_offset() would
+         * say this more directly and is declared in lcd.h, but nothing in
+         * the tree defines it. */
+        lcd_putsxy(-off, 0, f->caption);
+        if (period - off < room)
+            lcd_putsxy(period - off, 0, f->caption);
+    }
+
+    lcd_set_viewport(was);
+    lcd_setfont(FONT_SYSFIXED);
+}
+
+/* Centred in the real font, thickened on the beat by drawing it over itself
+ * -- the same widening the block glyphs do, one pixel each side so the word
+ * grows about its own centre rather than sliding.
+ *
+ * Trap: this has to be DRMODE_FG. The alpha blitter's SOLID case is
+ * `blend_two_colors(bg, fg, alpha)` -- it blends between the two *patterns*
+ * and not with the framebuffer, so every glyph paints its whole box and the
+ * copy at x wipes the copies at x-1 and x+1. FG blends against the
+ * destination and leaves a transparent pixel alone, which is the only mode
+ * under which a word can be drawn over itself at all. */
+static void spk_font_centred(int font, int y, const char *str, bool bold)
+{
+    int w, h, x;
+
+    lcd_setfont(font);
+    lcd_getstringsize(str, &w, &h);
+    x = (LCD_WIDTH - w) / 2;
+
+    lcd_set_drawmode(DRMODE_FG);
+
+    if (bold)
+    {
+        lcd_putsxy(x - 1, y, str);
+        lcd_putsxy(x + 1, y, str);
+    }
+
+    lcd_putsxy(x, y, str);
+    lcd_set_drawmode(DRMODE_SOLID);
+}
+
 static void spk_draw_hud(const struct spk_frame *f)
 {
     char line[12];
-    int x;
+    int x, sw, sh;
 
     /* Leading zeros, so the number is the same width whatever it says and
-     * the eye can read it without leaving the field. */
-    snprintf(line, sizeof (line), "%06d",
-             (int)(f->score > 999999 ? 999999 : f->score));
-    x = LCD_WIDTH - 4 - spk_text_width(line, SPK_HUD_SCALE);
-    spk_text(x, SPK_HUD_Y, line, SPK_HUD_SCALE, false);
+     * the eye can read it without leaving the field. Seven digits: six was
+     * a ceiling a good Run could actually meet, and a score that stops
+     * counting is worse than one that is a digit wider.
+     *
+     * In the caption's face rather than the block glyphs. The face is
+     * monospaced, so leading zeros still hold the number still, and one
+     * typeface across the band beats two. */
+    snprintf(line, sizeof (line), "%07d",
+             (int)(f->score > 9999999 ? 9999999 : f->score));
+
+    lcd_setfont(f->font);
+    lcd_getstringsize(line, &sw, &sh);
+    x = LCD_WIDTH - 4 - sw;
+    lcd_putsxy(x, SPK_BAND_Y(sh), line);
+    lcd_setfont(FONT_SYSFIXED);
 
     /* Past the best, said where the score is and while it is happening. */
     if (f->crowned)
-        spk_crown(x - spk_crown_width(SPK_HUD_SCALE) - 4 * SPK_HUD_SCALE,
-                  SPK_HUD_Y, SPK_HUD_SCALE);
+    {
+        x -= spk_crown_width(SPK_HUD_SCALE) + 4 * SPK_HUD_SCALE;
+        spk_crown(x, SPK_BAND_Y(7 * SPK_HUD_SCALE), SPK_HUD_SCALE);
+    }
 
+    /* Beside the score rather than under it, and left in the block glyphs at
+     * scale 1: it is a note about the score, not a second number competing
+     * with it, and the face has one size only so a run of it here would be
+     * exactly as loud as the score. */
     if (f->multiplier > 1)
     {
         snprintf(line, sizeof (line), "X%d", f->multiplier);
-        spk_text(LCD_WIDTH - 4 - spk_text_width(line, 1),
-                SPK_HUD_Y + spk_text_height(SPK_HUD_SCALE) + 2, line, 1, false);
+        x -= spk_text_width(line, 1) + 5 * SPK_HUD_SCALE;
+        spk_text(x, SPK_BAND_Y(spk_text_height(1)), line, 1, false);
     }
+
+    /* Whatever the score's block did not want, less a gap wide enough that
+     * the two never read as one line -- and the volume takes it while the
+     * wheel is still warm. */
+    if (f->volume >= 0)
+        spk_draw_volume(f, x - SPK_CAP_EDGE - SPK_CAP_GAP);
+    else
+        spk_draw_caption(f, x - SPK_CAP_EDGE - SPK_CAP_GAP);
+
+    /* And the rule that closes the band. It is the top of the block the
+     * layout centres, so it is drawn where the field begins rather than at
+     * some distance chosen to look right. */
+    spk_hline(SPK_RULE_INSET, LCD_WIDTH - 1 - SPK_RULE_INSET, SPK_HUD_H);
 
     if (f->waiting)
     {
@@ -1102,71 +1461,85 @@ static void spk_draw_hud(const struct spk_frame *f)
          * And nothing else. What the tracker is making of it -- beats
          * waited, confidence, windows analysed -- is on the menu, which is
          * where a number a player cannot act on belongs. */
-        spk_centred(SPK_FIELD_TOP + 30, "WAITING FOR THE", 2, false);
-        spk_centred(SPK_FIELD_TOP + 52, "BEAT", 3, f->phase < SPK_PHASE / 2);
+        spk_font_centred(f->font, SPK_HUD_H + 30,
+                         "Waiting for the", false);
+        spk_font_centred(f->font, SPK_HUD_H + 56,
+                         "beat", f->phase < SPK_PHASE / 2);
+        lcd_setfont(FONT_SYSFIXED);
     }
 }
 
 
 /** The frame **/
 
-/* The complement of a colour, at the same lightness: subtract each channel
- * from the sum of the largest and smallest, which is a half turn of the hue
- * wheel with the saturation and the lightness left where they were. No
- * contrast target is applied on top, because forcing one whitens every
- * accent -- see the dynamic-colour work.
- *
- * A grey has no hue to turn, and comes back as itself. The theme's selection
- * colour stands in there: a theme picks it to be seen against its own
- * background, which is exactly the job. */
-static unsigned spk_complement(unsigned c)
-{
-    int r = RGB_UNPACK_RED(c), g = RGB_UNPACK_GREEN(c);
-    int b = RGB_UNPACK_BLUE(c);
-    int hi = r > g ? (r > b ? r : b) : (g > b ? g : b);
-    int lo = r < g ? (r < b ? r : b) : (g < b ? g : b);
-
-    if (hi - lo < 24)
-        return dynamic_colors_resolve(global_settings.lss_color);
-
-    return LCD_RGBPACK(hi + lo - r, hi + lo - g, hi + lo - b);
-}
-
 /* The field takes the theme's two colours, and takes them through the
  * dynamic-colour resolver -- so with the setting on it is the album's
  * palette and with it off it is the theme's, and neither case is special
  * here. Asked every frame because the palette moves with the track, and
  * extraction is a no-op until it does. */
-static void spk_draw_colors(void)
+/* Work out the pair, and say nothing to the LCD about it: the caller decides
+ * which viewport they land on, and a fresh viewport comes up in the
+ * fallbacks whatever was set before it. */
+static void spk_resolve_colors(void)
 {
-    static unsigned was_ink, was_paper;
     unsigned ink, paper;
 
     dynamic_colors_check_extraction(-1);
     ink = dynamic_colors_resolve(global_settings.fg_color);
     paper = dynamic_colors_resolve(global_settings.bg_color);
 
-    lcd_set_foreground(ink);
-    lcd_set_background(paper);
-
-    if (ink == was_ink && paper == was_paper)
+    if (colors_known && ink == was_ink && paper == was_paper)
         return;
 
+    colors_known = true;
     was_ink = ink;
     was_paper = paper;
     spk_ramp(aa_ink, paper, ink);
     spk_ramp(aa_accent, paper, spk_complement(ink));
 
-    /* The strip below the field is background and is not flushed with it, so
-     * a palette that changes underneath it would leave the old one there. */
+    /* The whole panel is in these two colours, and the strips above and
+     * below the field are only ever reached by a full clear -- so a palette
+     * that moved has to repaint all of it, not just the rows the field is
+     * flushed in. */
     full_flush = true;
+}
+
+/* ...and for a screen that draws straight into the default viewport rather
+ * than installing one of its own. */
+static void spk_draw_colors(void)
+{
+    spk_resolve_colors();
+    lcd_set_foreground(was_ink);
+    lcd_set_background(was_paper);
 }
 
 void spk_draw_frame(const struct spk_frame *f)
 {
-    spk_draw_colors();
+    struct viewport vp;
+
+    spk_resolve_colors();
+
+    /* Ordinarily the field's own rows and no others: the caption is drawn on
+     * the frames that change it and has to survive the ones that do not, and
+     * clearing the whole panel every frame is what would stop it.
+     *
+     * On a frame that will be sent in full -- the first one, a palette that
+     * moved, a menu that drew over everything -- the clear covers the whole
+     * panel instead. The strips above and below the field are in the paper
+     * colour too, and nothing else ever reaches them.
+     *
+     * The colours go on the viewport rather than through lcd_set_foreground:
+     * a fresh viewport comes up in FG_FALLBACK/BG_FALLBACK, so anything set
+     * on the one it replaces is thrown away with it. */
+    viewport_set_defaults(&vp, SCREEN_MAIN);
+    vp.y = 0;
+    vp.height = full_flush ? LCD_HEIGHT : SPK_UPDATE_H;
+    vp.fg_pattern = was_ink;
+    vp.bg_pattern = was_paper;
+    lcd_set_viewport(&vp);
+
     lcd_set_drawmode(DRMODE_SOLID);
-    lcd_clear_display();
+    lcd_clear_viewport();
 
     spk_draw_world(f);
 
@@ -1180,6 +1553,8 @@ void spk_draw_frame(const struct spk_frame *f)
         spk_draw_player(f);
 
     spk_draw_hud(f);
+
+    lcd_set_viewport(NULL);
 }
 
 void spk_draw_flush(void)
@@ -1191,7 +1566,8 @@ void spk_draw_flush(void)
         return;
     }
 
-    lcd_update_rect(0, 0, LCD_WIDTH, SPK_UPDATE_H);
+    lcd_update_rect(0, SPK_UPDATE_TOP, LCD_WIDTH,
+                    SPK_UPDATE_H - SPK_UPDATE_TOP);
 }
 
 /* The end of a run. One number the size of the field it was won on, what

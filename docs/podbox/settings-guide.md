@@ -523,6 +523,17 @@ renders differently depending on what was loaded before it.
 That covers everything in Appearance, plus the artwork rows, the carousel's
 geometry, the scrolling settings and the dialog chrome.
 
+### Spike
+
+Reached from the game's own menu, on held Menu, rather than from Settings --
+but kept here like everything else, so they survive leaving the game and
+survive the session.
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Now Playing | Names the track under Spike's field, with the time remaining beside it. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off | |
+| Audio Offset | How far ahead of the sound the game judges a press. Raise it if your presses feel late when they sounded on the beat, lower it if they feel early. It corrects the delay below the player's own buffer -- headphones and the codec -- so it is worth setting once and leaving. | -50 ms | **Adv** |
+
 **What you set by hand is not lost.** Changes made through the settings screens
 while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
 straight after the theme, so they survive the reset. *Forget My Changes*, at the

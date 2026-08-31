@@ -79,11 +79,12 @@ void spk_pose_jump(struct spk_pose *out, int phase, bool land_strong);
 void spk_pose_fall(struct spk_pose *out, int phase, bool from_air,
                   bool strong);
 
-/* Level of the player during a step and during a jump, 8.8 fixed so the
- * caller can place it between two surfaces. A jump's apex is always two
- * levels above the take-off, whatever the drop on the far side. */
+/* Level of the player during a step and during an airborne move, 8.8 fixed
+ * so the caller can place it between two surfaces. The curve peaks on
+ * 'apex' whatever the drop on the far side -- two levels above the take-off
+ * for a press, the top surface off a spring. */
 int spk_walk_level(int from, int to, int phase);
-int spk_arc_level(int from, int to, int phase);
+int spk_arc_level(int from, int to, int phase, int apex);
 
 /* The three vertices of the triangle, base centred on (bx, by). */
 void spk_pose_points(const struct spk_pose *p, int bx, int by, int pt[3][2]);

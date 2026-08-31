@@ -161,9 +161,16 @@ MENUITEM_FUNCTION(spk_tempo_item, 0, ID2P(LANG_SPIKE_TEMPO),
 MENUITEM_FUNCTION(spk_info_item, 0, ID2P(LANG_SPIKE_INFO),
                   spk_info_screen, NULL, Icon_NOICON);
 
+/* The one row here that is a real setting rather than a screen of its own:
+ * it is a display preference and has to survive the session, so it lives in
+ * settings_list.c and is reached from here like everything else. Taking
+ * effect needs the field re-placed, which is why leaving the menu re-enters
+ * the game rather than resuming it. */
+MENUITEM_SETTING(spk_caption_item, &global_settings.spike_caption, NULL);
+
 MAKE_MENU(spike_menu, ID2P(LANG_SPIKE), NULL, Icon_NOICON,
-          &spk_scores_item, &spk_offset_item, &spk_tempo_item,
-          &spk_info_item);
+          &spk_scores_item, &spk_caption_item, &spk_offset_item,
+          &spk_tempo_item, &spk_info_item);
 
 bool spike_menu_show(struct spk_menu *m)
 {

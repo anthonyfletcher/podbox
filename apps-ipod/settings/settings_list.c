@@ -40,6 +40,7 @@
 #include "backlight.h"
 #include "sound.h"
 #include "settings.h"
+#include "games/spike/spike_menu.h"  /* SPK_OFFSET_MAX/STEP */
 #include "rbpaths.h"
 #include "settings_list.h"
 #include "usb.h"
@@ -1956,6 +1957,13 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, playback_log, LANG_LOGGING, 1, "play log",
                    "off,on,last.fm", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUDIOSCROBBLER)),
+    CHOICE_SETTING(0, spike_caption, LANG_SPIKE_CAPTION, 0, "spike caption",
+                   "off,title,title and artist", NULL, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_SPIKE_CAPTION_TITLE),
+                   ID2P(LANG_SPIKE_CAPTION_BOTH)),
+    INT_SETTING(0, spike_offset, LANG_SPIKE_OFFSET, -50, "spike audio offset",
+                UNIT_MS, -SPK_OFFSET_MAX, SPK_OFFSET_MAX, SPK_OFFSET_STEP,
+                NULL, NULL, NULL),
 };
 
 const int nb_settings = sizeof(settings)/sizeof(*settings);

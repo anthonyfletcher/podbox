@@ -340,6 +340,8 @@ static const struct tag_row tag_rows[] = {
 { "start in screen",     TAG_SYSTEM|TAG_APPEARANCE,              "start screen boot" },
 { "show shutdown message", TAG_ADVANCED|TAG_SYSTEM,                           "shutdown splash" },
 { "clear settings on hold",TAG_ADVANCED|TAG_SYSTEM,              "reset recovery" },
+{ "spike caption",       TAG_APPEARANCE,                         "spike game now playing track artist" },
+{ "spike audio offset",  TAG_ADVANCED|TAG_SOUND,                 "spike game latency calibration timing" },
 { "show debug menu",     TAG_ADVANCED|TAG_SYSTEM,                "debug" },
 { "settings mode",       TAG_SYSTEM,                             "basic advanced" },
 { "time format",         TAG_SYSTEM,                             "clock 12 24 hour" },

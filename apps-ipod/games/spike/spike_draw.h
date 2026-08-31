@@ -33,9 +33,29 @@
 #define SPK_BODY_PX      44
 #define SPK_FIELD_H      (SPK_LEVEL_PX * (SPK_LEVELS + 1) + SPK_BODY_PX)
 
-/* ...and it sits in the middle of the panel, with the band the floor leaves
- * below it matched by the band above that carries the score. */
-#define SPK_HUD_H        ((LCD_HEIGHT - SPK_FIELD_H - 8) / 2)
+/* ...and it sits in the middle of the panel: the rule under the score down to
+ * the ground line is SPK_FIELD_H, and that block is what is centred, so the
+ * band above the rule and the band below the floor come out equal.
+ *
+ * The score and the caption share the band above the rule rather than taking
+ * rows of their own, so the field is where it is whatever the caption is
+ * doing. */
+#define SPK_BAND_H       ((LCD_HEIGHT - SPK_FIELD_H) / 2)
+
+/* ...and then the whole picture is dropped by this much.
+ *
+ * Arithmetically the block is already centred; optically it is not, because
+ * the band above the rule carries the score and the caption while the one
+ * below the floor carries nothing, and a full band reads smaller than an
+ * empty one of the same height. Ten pixels is what it takes to look level.
+ * The drop moves everything together, so nothing inside the band moves
+ * against anything else. */
+#define SPK_HUD_DROP     10
+#define SPK_HUD_H        (SPK_BAND_H + SPK_HUD_DROP)
+#define SPK_RULE_INSET   4      /* the rule stops where the score does */
+
+/* Where something that tall sits in the band above the rule. */
+#define SPK_BAND_Y(h)    (SPK_HUD_DROP + (SPK_BAND_H - (h)) / 2)
 #define SPK_GROUND_Y     (SPK_HUD_H + SPK_FIELD_H)
 #define SPK_HUD_SCALE    2
 #define SPK_HUD_Y        ((SPK_HUD_H - 7 * SPK_HUD_SCALE) / 2)
@@ -47,11 +67,18 @@
 #define SPK_PLAYER_COL   2
 #define SPK_PLAYER_X     (SPK_PLAYER_COL * SPK_CELL_PX + SPK_CELL_PX / 2)
 
-/* Flushed every frame: down to the bottom of the hooks and no further. The
+/* Flushed every frame: from the drop down to the bottom of the hooks, and no
+ * further either way. Anchoring the top at zero would send the rows the drop
+ * left empty, which is the whole of what the drop would otherwise cost --
+ * the picture moved, it did not grow.
+ *
+ * The
  * strip below that is background and stays background, so sending it thirty
  * times a second buys nothing -- the one time it has to go is when the
  * palette changes underneath it, which spk_draw_flush() handles. */
+#define SPK_UPDATE_TOP   SPK_HUD_DROP
 #define SPK_UPDATE_H     (SPK_GROUND_Y + 8)
+
 
 /* Two deaths, and they are the only two things that can happen: the ground
  * was not there, or something solid was. Which obstacle it was does not need
@@ -82,6 +109,27 @@ struct spk_frame
     int  multiplier;
 
     bool waiting;        /* no tempo yet: the run has not begun */
+
+    /* The face the whole band is set in -- the score, the count-in and the
+     * caption. Not the block glyphs: those are digits and capitals, and a
+     * track name is neither.
+     *
+     * The caption is NULL when the setting is off; the font is loaded either
+     * way, because the score is in it whatever the caption is doing.
+     *
+     * Scrolled here rather than by the scroll engine: that thread repaints
+     * on its own schedule into a viewport it keeps a pointer to, and this
+     * band is cleared and redrawn thirty times a second over a viewport that
+     * lives on a stack frame. */
+    const char *caption;
+    int  font;
+
+    /* The volume, 0 to 100, for the moment after the wheel has moved -- and
+     * -1 the rest of the time. It takes the caption's room rather than
+     * finding room of its own: the wheel is easy to brush and the answer to
+     * "what did I just do" is wanted for a second, where the track's name is
+     * wanted for as long as nothing else is happening. */
+    int  volume;
 
     /* The run is past the best there has been. Said on the field, while it
      * is happening, rather than at the end: a player leaving the game is on

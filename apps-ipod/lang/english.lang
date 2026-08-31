@@ -19847,6 +19847,48 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SPIKE_CAPTION
+  desc: in the Spike menu, whether the track is named under the field
+  user: core
+  <source>
+    *: "Now Playing"
+  </source>
+  <dest>
+    *: "Now Playing"
+  </dest>
+  <voice>
+    *: "Now Playing"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_TITLE
+  desc: in the Spike menu, the caption shows the title alone
+  user: core
+  <source>
+    *: "Title"
+  </source>
+  <dest>
+    *: "Title"
+  </dest>
+  <voice>
+    *: "Title"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_BOTH
+  desc: in the Spike menu, the caption shows the title and the artist
+  user: core
+  <source>
+    *: "Title and Artist"
+  </source>
+  <dest>
+    *: "Title and Artist"
+  </dest>
+  <voice>
+    *: "Title and Artist"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SPIKE_TEMPO
   desc: in the Spike menu, half or double the detected tempo
   user: core

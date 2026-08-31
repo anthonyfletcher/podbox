@@ -21,7 +21,8 @@ enum spk_motion
 {
     SPK_WALK,        /* one cell, from -> to */
     SPK_ARC_RISE,    /* first beat of a jump, airborne over the next cell */
-    SPK_ARC_FALL     /* second beat, ending on the landing */
+    SPK_ARC_FALL,    /* second beat, ending on the landing */
+    SPK_ARC_SPRING   /* a rise off a spring: the same beat, three levels */
 };
 
 /* How a beat boundary ended. Four ways to die and they are all different,
@@ -44,11 +45,23 @@ struct spk_state
     int  from;      /* level the motion starts at */
     int  to;        /* level it ends at, or -1 for nothing to land on */
 
+    /* The height an airborne move reaches, settled when it is committed and
+     * read for the whole two beats of it -- a press reaches two above the
+     * take-off and a spring reaches the top surface, and the falling half
+     * has no other way to know which of the two it is falling out of. */
+    int  apex;
+
     bool landed;    /* the boundary just crossed ended a jump */
     bool got;       /* ...collected a diamond */
     bool threw;     /* ...came down on a switch */
     int  got_level; /* ...and from what level, for the drawing */
     bool stomped;   /* ...came down on a creature */
+
+    /* Set by the arrival that found a spring and cleared by the move that
+     * begins off it, both inside one call. It is in the state rather than a
+     * local because the two are a beat's arrival and a beat's departure, and
+     * only the state crosses between them. */
+    bool sprung;
 };
 
 /* Surface bits of a cell, one per level. The course is assembled ahead of
@@ -111,6 +124,26 @@ bool spk_world_switch_on(int cell);
  * further back than the field is drawn. */
 bool spk_world_diamond(int cell, int *level);
 bool spk_world_creature(int cell, int *level);
+
+/* A creature with a spike on its head, which is fatal from above as well as
+ * from the side. Everything else in the course teaches that a press is the
+ * way out of trouble; the rising block turns that around once, and this
+ * turns it around again -- the only way past is the jump that clears the
+ * cell entirely, which is the stomp's own verb aimed one cell further.
+ *
+ * Asked only where there is a creature: it says which kind, not whether. */
+bool spk_world_spiked(int cell);
+
+/* A spring, and it is only ever on the ground.
+ *
+ * Landed on from above it launches, and walked over it does nothing -- the
+ * switch's rule, for the same reason: a thing that must be gone to. The
+ * launch reaches the top surface, which is a height no press from level 0
+ * can reach, so a spring is how the top of the field is used at all.
+ *
+ * Missing one costs nothing. It is a reward and not a hazard, which is why
+ * it is absent from spk_state_avoided() -- nothing was avoided. */
+bool spk_world_spring(int cell);
 
 /* The highest surface in a cell at or below max_level, or -1 for none.
  *

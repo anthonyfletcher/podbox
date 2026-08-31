@@ -421,7 +421,7 @@ int spk_walk_level(int from, int to, int phase)
     return (from << 8) + (to - from) * f;
 }
 
-int spk_arc_level(int from, int to, int phase)
+int spk_arc_level(int from, int to, int phase, int apex)
 {
     int lin, bell, amp;
 
@@ -432,10 +432,11 @@ int spk_arc_level(int from, int to, int phase)
     lin = (from << 8) + (to - from) * phase;
     bell = (4 * phase * (SPK_PHASE - phase)) >> 8;
 
-    /* Chosen so the peak is always two levels above the take-off, whatever
-     * the drop on the far side -- which is what makes "rises to level+2" a
-     * rule the player can rely on rather than a description of one case. */
-    amp = (2 << 8) - ((to - from) << 7);
+    /* Chosen so the peak lands on 'apex' whatever the drop on the far side
+     * -- which is what makes "rises to level+2" a rule the player can rely
+     * on rather than a description of one case, and what lets a spring
+     * reach the top surface through the same curve. */
+    amp = ((apex - from) << 8) - ((to - from) << 7);
 
     return lin + ((amp * bell) >> 8);
 }
