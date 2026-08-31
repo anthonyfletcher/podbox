@@ -281,98 +281,71 @@ so `.text` reads as thousands of differing bytes with no instruction changed.
 
 ## Five local changes the Mikey remote rests on (`b217a55059`)
 
-The driver is upstream's; the five changes around it are not, and none of them
-is visible from the commit. Each is load-bearing -- drop any one and the remote
-still compiles, is still reachable from the debug menu, and does nothing. A
-merge can revert all five silently.
+The driver is upstream's; these five are not, and none is visible from the
+commit. Drop any one and the remote still compiles, is still reachable from the
+debug menu, and does nothing. A merge can revert all five silently.
 
-1. **`HAVE_MULTIMEDIA_KEYS` is not tied to USB iAP.** Upstream defines it only
-   under `USB_ENABLE_IAP`, which `PODBOX_NO_USB_IAP` suppresses; the define
-   means "this target can produce multimedia key codes", and the remote is a
-   second producer with nothing to do with iAP. The gate is
-   `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`, and it sits *outside* the
-   `HAVE_USBSTACK` block for the same reason.
-2. **The multimedia handler block lives in `default_event_handler_ex()`**
-   (`apps-ipod/system/shutdown.c`); upstream keeps it in `apps/misc.c`. It is
-   upstream's whole block, not just the three cases this driver can reach --
-   `wps.c` switches on `BUTTON_MULTIMEDIA_STOP` and `menu.c` on
-   `BUTTON_MULTIMEDIA_PLAYPAUSE`, and neither is reachable without it.
-3. **`TARGET_EXTRA_THREADS` is 2**, one each for the iAP serial link and the
-   remote's poller; upstream's `ipod6g.h` has no such define and the commit
-   adds a thread without bumping any count. `BASETHREADS` is 17 here
-   (`HAVE_HARDWARE_CLICK`), so `__threads` should measure 19 entries. Short by
-   one, `create_thread()` returns NULL and neither caller checks -- the
-   feature is then simply absent.
-4. **`firmware/SOURCES` keeps its `#ifdef HAVE_MIKEY_REMOTE`** around
-   `mikey-6g.c`, which upstream does not have. It is a no-op while the feature
-   is on, and it is what makes holding the feature out again a one-line change
-   in `export/config.h` rather than a driver compiled in with nothing calling
-   it.
-5. **`mikey_init()` is gated on `rec_hw_ver`.** Upstream starts the polling
-   thread on every 6G and lets it discover by NAK that there is no chip.
-   Version 0 boards cannot have one (below), so the thread is not created at
-   all there -- no I2C traffic, and one fewer thread. `gpio_init()` runs
-   inside `system_init()` and `mikey_init()` from `button_init()`, so the
-   version is known by then.
+1. **`HAVE_MULTIMEDIA_KEYS` is gated `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`**,
+   outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone, which
+   `PODBOX_NO_USB_IAP` suppresses; the remote is a second producer of those
+   codes.
+2. **The multimedia handler block is in `default_event_handler_ex()`**
+   (`system/shutdown.c`), not `apps/misc.c`, and it is upstream's whole block:
+   `wps.c` and `menu.c` switch on cases this driver cannot reach, and neither
+   works without it.
+3. **`TARGET_EXTRA_THREADS` is 2**, for the iAP serial link and the remote's
+   poller. Upstream has no such define and adds a thread without bumping any
+   count; short by one, `create_thread()` returns NULL, neither caller checks,
+   and the feature is simply absent. `BASETHREADS` is 17, so `__threads` should
+   measure 19.
+4. **`firmware/SOURCES` guards `mikey-6g.c` with `#ifdef HAVE_MIKEY_REMOTE`.**
+   A no-op while the feature is on, and what keeps holding it out again to one
+   line in `export/config.h`.
+5. **`mikey_init()` returns early on `rec_hw_ver == 0`**, where no chip exists,
+   rather than probing until its retry budget is spent. Safe because
+   `gpio_init()` runs in `system_init()` and `mikey_init()` from
+   `button_init()`.
 
-What the driver actually reports is narrower than the tag list suggests: a
-centre **click** (there is no hold or long-press -- the chip reports the
-release up to 1.8s late once its event engine naps, so press duration is
-unusable) and the two volume buttons as held levels. No next or previous. The
-volume buttons repeat because the button tick sees a sustained level and
-generates `BUTTON_REPEAT` itself, which is what upstream's
-`…VOLUME_UP|BUTTON_REPEAT` cases are for.
+### Which 6G units have it
 
-Two properties worth knowing before reporting a fault. The remote is **not**
-gated by the hold switch, matching the OF, so it keeps working while the player
-is locked. And multimedia keys are excluded from the backlight trigger
-(`apps-ipod/input/action.c`), so a press does not wake the screen.
-
-The polling thread reads two I2C registers every 20ms for as long as anything
-occupies the jack, and cannot back off: the volume edge events are only
-readable for about 100ms each. That is a permanent 50Hz transaction pair for
-the length of a listening session, and the first place to look if this feature
-turns out to cost runtime.
-
-### Which 6G units can have it at all
-
-Only some. The inline remote is a set of resistances switched onto the mic
-line, and half the Classics have no mic line. `gpio-s5l8702.c` reads the board
-strap on GPIO E7 into `rec_hw_ver` and carries the table:
+The remote is resistances switched onto the mic line, and half the Classics
+have no mic line. `gpio-s5l8702.c` reads the board strap on GPIO E7:
 
 | `rec_hw_ver` | Models | Jack mic | Mikey |
 | --- | --- | --- | --- |
 | 0 | 80GB, 160GB fat | no | absent |
 | 1 | 120GB, 160GB slim | yes | present |
 
-**Read it from the player** rather than guessing at the model: Debug -> View HW
-info shows `capture HW type` on its first page, and the mikey row on the second
-repeats it as `hw=` beside a live probe. `probe rc=1` is the address NAK that a
-version 0 board gives -- `i2c_rd()` sets the register pointer with a write
-first, so the missing-device code is 1 and not the 3 the read path would give.
+**Read it from the player, not from the model.** Debug -> View HW info shows
+`capture HW type`, and the mikey row on the next page repeats it as `hw=`
+beside a live probe. `probe rc=1` is the address NAK a version 0 board gives --
+`i2c_rd()` sets the register pointer with a write first, so the missing-device
+code is 1, not the 3 the read path would give.
 
-The only 6G here is version 0, which is why this feature ships unverified. What
-*is* verified on it is that it costs nothing: `mikey_init()` returns before
-`create_thread()`, so there is no thread and no bus traffic.
+The only 6G here is version 0, so the feature ships unverified. What is
+verified is that it costs nothing there: no thread, no bus traffic.
 
-### Why this cannot work on `ipodvideo`
+### Not on the 5G
 
-**The 5G has no microphone input on the headphone jack**, and an Apple inline
-remote is a set of resistances switched onto the mic line -- with no mic pin
-there is nothing to sense.
+No mic pin on the jack, so there is nothing to sense (`INPUT_SRC_CAPS` in
+`ipodvideo.h` is line-in and radio, both dock-connector accessories). Mikey is
+an Apple part on the 6G's I2C bus; the 5G is a PP5022 with a WM8758. Its
+dock-connector remotes work over serial iAP instead, through
+`remote_control_rx()` in `button-clickwheel.c`.
 
-| | `INPUT_SRC_CAPS` |
-| --- | --- |
-| `ipod6g.h` | `SRC_CAP_MIC \| SRC_CAP_LINEIN` |
-| `ipodvideo.h` | `SRC_CAP_LINEIN \| SRC_CAP_FMRADIO` |
+### What it reports, before reporting a fault
 
-The 5G's line-in and radio sources are both dock-connector accessories; its jack
-is audio-out only. Mikey is an Apple part on the 6G's I2C bus and the 5G is a
-PP5022 with a WM8758, which has no such device.
+A centre **click** only -- no hold or long-press, because the chip reports the
+release up to 1.8s late once its event engine naps -- and the two volume
+buttons as held levels, which the button tick turns into `BUTTON_REPEAT`. No
+next or previous. It is **not** gated by the hold switch, matching the OF, and
+multimedia keys are excluded from the backlight trigger (`input/action.c`), so
+a press does not wake the screen.
 
-The 5G is not without a remote: it defines `IPOD_ACCESSORY_PROTOCOL`
-(`ipodvideo.h`) and `button-clickwheel.c` already ORs in
-`remote_control_rx()`, so dock-connector remotes work there over serial iAP.
+The poller reads two I2C registers every 20ms for as long as anything occupies
+the jack and cannot back off -- the volume edge events are readable for only
+about 100ms each. That is a permanent 50Hz transaction pair for a listening
+session, and the first place to look if this costs runtime.
 
 ## USB audio is off
 
