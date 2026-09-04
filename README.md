@@ -60,14 +60,14 @@ be accessed from the "what's playing" screen by pressing `select+play`.
 
 ## Spike
 
-https://github.com/user-attachments/assets/05af8d6b-33a6-4882-a8aa-bca1fbabdb54
+https://github.com/user-attachments/assets/684a3e2d-61a1-45a5-b3f9-b477de0ec924
 
 Play Spike while listening to your music. The game analyses each track's rhythm 
-and generates unique levels that move with the beat. Challenge yourself to play 
-through an entire album or tackle tracks individually to set new high scores.
+and generates unique levels that move with the beat. Challenge yourself to set new 
+high scores as the difficulty ramps up over time.
 
-Launch Spike from the context menu (hold <code>Select</code>) on the Now Playing 
-screen, or while a track is highlighted in the music browser.
+Launch Spike from the context menu (hold <code>Select</code> then click 
+<code>Play with Spike</code>) on the Now Playing screen.
 
 ## Playback report
 
