@@ -75,8 +75,20 @@ void beat_trace(uint8_t (*at)(unsigned int), unsigned int n,
 
 /* How close to the peak a half-lag must score to be preferred over it, in
  * sixteenths. Too low and a genuinely slow track is doubled; too high and
- * the backbeat wins. */
-#define BEAT_OCTAVE_FRAC 16
+ * the backbeat wins.
+ *
+ * Twelve, and the number is the rig's rather than an intuition. At sixteen
+ * the test reads "only if the half is at least as strong as the peak", which
+ * a real faster level rarely is -- it is spread over twice as many events --
+ * so eight of ~/bttest's sixty-three cases lock an octave slow. Twelve
+ * recovers five of them and no other verdict moves. The curve is flat from
+ * eleven down and the six-eight cases start to degrade there, so this is the
+ * far end of the safe part of it rather than the peak of the score.
+ *
+ * The step-down is judged on r[], which carries the tempo prior. Judging it
+ * on the raw correlation instead scores identically, case for case: the
+ * weighting is not what decides this. */
+#define BEAT_OCTAVE_FRAC 12
 
 /* Below this the tempo is not believed and nothing is projected.
  *
@@ -479,7 +491,8 @@ static void beat_decide(void)
         return;
     }
 
-    /* Step down while half the chosen lag scores nearly as well.
+    /* Step down by two thirds once, then by half for as long as the half
+     * scores nearly as well.
      *
      * Autocorrelation peaks at every multiple of the true period, so a
      * backbeat snare gives a genuinely strong correlation at two beats and a
@@ -487,13 +500,30 @@ static void beat_decide(void)
      * from a real slower tempo is that the faster level is still almost as
      * strong.
      *
-     * Trap: the low band is not a better arbiter than this, however much a
-     * kick drum sounds like one. Onsets there on an ordinary mix are not a
-     * clean enough pattern to say which level the bar sits at. The metrical
-     * errors that survive -- half time on one track, three-against-two on
-     * another -- are the honest limit here. */
+     * The two-thirds step is the same argument for the other way a period is
+     * overcounted: a triplet subdivision and a three-against-two accent both
+     * put a strong peak at one and a half beats, and a listener taps the beat
+     * underneath it. It runs *before* the halving so that what the halving
+     * sees is the level this chose, and only once -- nothing in music stacks
+     * two of them.
+     *
+     * Trap: the low band is not a better arbiter than either of these,
+     * however much a kick drum sounds like one. Onsets there on an ordinary
+     * mix are not a clean enough pattern to say which level the bar sits at.
+     *
+     * What is left on the rig is six-eight, and it is left on purpose: it is
+     * tapped at one and a half beats, so the rule that recovers
+     * three-against-two is pointed the wrong way for it, and the two cannot
+     * be told apart from the envelope. Ten of sixty-three, against seventeen
+     * before either step was tuned. */
     {
-        unsigned int half = best_lag / 2;
+        unsigned int third = (best_lag * 2) / 3;
+        unsigned int half;
+
+        if (third >= BEAT_LAG_MIN && r[third] * 16 >= best * BEAT_OCTAVE_FRAC)
+            best_lag = third;
+
+        half = best_lag / 2;
 
         while (half >= BEAT_LAG_MIN &&
                r[half] * 16 >= best * BEAT_OCTAVE_FRAC)
