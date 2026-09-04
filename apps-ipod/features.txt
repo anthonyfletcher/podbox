@@ -133,6 +133,10 @@ wheel_acceleration
 lineout_poweroff
 #endif
 
+#if defined(HAVE_MIKEY_REMOTE)
+mikey_remote
+#endif
+
 
 #if defined(HAVE_TOUCHPAD_DEADZONE)
 touchpad_deadzone

@@ -35,9 +35,12 @@ void mikey_set_mic_capture(bool enable);
 
 /* Inline-remote button support. mikey_init() starts a polling thread;
  * mikey_button_read() returns the current button mask (multimedia key
- * codes, handled globally by default_event_handler: PLAYPAUSE for the
- * center click, VOLUME_UP/DOWN for volume; BUTTON_NONE if nothing
- * pressed) and is safe to call from the button tick. */
+ * codes, handled globally by default_event_handler: PLAYPAUSE, NEXT or
+ * PREV for the centre button, VOLUME_UP/DOWN for volume; BUTTON_NONE if
+ * nothing pressed) and is safe to call from the button tick. Whether the centre
+ * button's clicks are counted into next/previous is set from the
+ * application layer, so mikey_set_track_skip() is declared in button.h
+ * with the codes it produces. */
 void mikey_init(void);
 int  mikey_button_read(void);
 

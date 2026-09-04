@@ -220,7 +220,7 @@ Two rules, both earned:
 | 2026-08-04 | `a467bfc55f` | FS#13972 improve rbutil SAPI5 stability | **Adopted (in part)** | The `tools/sapi_voice.vbs` half, which this fork has never modified. The `utils/rbutilqt/` half is N/A. Voice builds are unverified here either way, so tracking upstream is the cheaper default. |
 | 2026-08-05 | `20c763ff89` | FS#13970 lcd_drawline() different depending on drawing direction | **Adopted** | With `dcdb539ca5`, as one net port. A line rasterised differently depending on which end it was given, so drawing it right-to-left did not land on the same pixels as left-to-right. |
 | 2026-08-05 | `dcdb539ca5` | FS#13970 lcd_drawline() … try#2 | **Adopted** | A rewrite of `20c763ff89`, not an addition — take the pair or neither. `lcd-bitmap-common.c` is `#include`d rather than compiled, and on this target only by `lcd-16bit.c`. |
-| 2026-08-05 | `b217a55059` | ipod6g: add inline earphone remote support | **Adopted (in part)** | Taken 2026-08-22. Decodes the three-button remote on Apple's earphones via the jack "Mikey" controller (I2C bus 0, 0x72): a 342-line `mikey-6g.c` plus `mikey-target.h`, wired through `button-clickwheel.c`, `button.h`, `config/ipod6g.h`, `debug-s5l8702.c`, `audio-6g.c` and `firmware/SOURCES`. Five local changes around it are not upstream's -- see *Five local changes the Mikey remote rests on* below. **Untested, and untestable here**: the 6G available is capture hardware version 0, which has no jack microphone and no Mikey on the bus, so `0x72` never answers. `mikey_init()` returns before creating its thread on those units, making the feature inert rather than merely idle. Two halves do not ship either: `mikey_set_mic_capture()`, recording being off here, and the `manual/` hunk. The 5G is untouched and was proved so -- `.text` and `.data` byte-identical across the change, `.rodata` differing in six bytes, all inside `rbversion`. |
+| 2026-08-05 | `b217a55059` | ipod6g: add inline earphone remote support | **Adopted (in part)** | Taken 2026-08-22, working on a 7G since 2026-09-04. Decodes the remote on Apple's earphones through the jack "Mikey" controller (I2C bus 0, 0x72): `mikey-6g.c` and `mikey-target.h`, wired through `button-clickwheel.c`, `button.h`, `config/ipod6g.h`, `debug-s5l8702.c`, `audio-6g.c` and `firmware/SOURCES`. Five local changes hold it up -- see *What the Mikey remote rests on* below. Two halves do not ship: `mikey_set_mic_capture()`, recording being off here, and the `manual/` hunk. The 5G is untouched and cannot have it -- no mic pin on its jack for a remote to switch resistances onto. |
 | 2026-08-05 | `290b06c869` | plugins/fft: do not starve other threads | **N/A** | No plugin system. |
 | 2026-08-05 | `20f4f9539a` | hiby: usb dac: fix crackling from sample rate mismatch | **N/A** | Other target, hosted. |
 | 2026-08-06 | `2d2b03d314` | build: bundle the main .map files into the zip | **Declined** | ~4MB of text into a zip that is `/MIR`-synced onto the device, so it costs that much of the user's disk on every sync, permanently. It also buys nothing here: resolving a panic address goes through `nm` on the crashing build's `rockbox.elf`, which the release does not ship either. The merge took it and it was deleted again; `tools/buildzip.pl` now carries a comment where the block was, so the next sync conflicts there rather than restoring it silently. |
@@ -279,73 +279,31 @@ both targets were built either side of the merge and compared object by object,
 sections instead is misleading here: those 24 bytes shift every later address,
 so `.text` reads as thousands of differing bytes with no instruction changed.
 
-## Five local changes the Mikey remote rests on (`b217a55059`)
+## What the Mikey remote rests on (`b217a55059`)
 
-The driver is upstream's; these five are not, and none is visible from the
-commit. Drop any one and the remote still compiles, is still reachable from the
-debug menu, and does nothing. A merge can revert all five silently.
+The driver is upstream's. Five things around it are not, none is visible from
+the commit, and dropping any one leaves a remote that still compiles, is still
+reachable from the debug menu, and does nothing. A merge can revert all five
+silently.
 
-1. **`HAVE_MULTIMEDIA_KEYS` is gated `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`**,
-   outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone, which
-   `PODBOX_NO_USB_IAP` suppresses; the remote is a second producer of those
-   codes.
-2. **The multimedia handler block is in `default_event_handler_ex()`**
-   (`system/shutdown.c`), not `apps/misc.c`, and it is upstream's whole block:
-   `wps.c` and `menu.c` switch on cases this driver cannot reach, and neither
-   works without it.
-3. **`TARGET_EXTRA_THREADS` is 2**, for the iAP serial link and the remote's
-   poller. Upstream has no such define and adds a thread without bumping any
-   count; short by one, `create_thread()` returns NULL, neither caller checks,
-   and the feature is simply absent. `BASETHREADS` is 17, so `__threads` should
-   measure 19.
-4. **`firmware/SOURCES` guards `mikey-6g.c` with `#ifdef HAVE_MIKEY_REMOTE`.**
-   A no-op while the feature is on, and what keeps holding it out again to one
-   line in `export/config.h`.
-5. **`mikey_init()` returns early on `rec_hw_ver == 0`**, where no chip exists,
-   rather than probing until its retry budget is spent. Safe because
-   `gpio_init()` runs in `system_init()` and `mikey_init()` from
-   `button_init()`.
+- **`HAVE_MULTIMEDIA_KEYS` gated `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`**,
+  outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone, which
+  `PODBOX_NO_USB_IAP` suppresses.
+- **`TARGET_EXTRA_THREADS` is 2**, for the iAP serial link and the poller.
+  Short by one, `create_thread()` returns NULL, neither caller checks, and the
+  feature is absent with nothing said.
+- **`firmware/SOURCES` guards `mikey-6g.c` with `#ifdef HAVE_MIKEY_REMOTE`.**
+  A no-op while the feature is on, and what keeps holding it out again to one
+  line in `export/config.h`.
+- **`mikey_init()` returns early on `rec_hw_ver == 0`** -- the 80GB and fat
+  160GB, which have no jack microphone line and carry no Mikey to answer.
+- **The multimedia handler block lives in `default_event_handler_ex()`**
+  (`system/shutdown.c`), not `apps/misc.c`, and it is upstream's whole block:
+  `wps.c` and `menu.c` switch on cases this driver cannot reach, and neither
+  works without it.
 
-### Which 6G units have it
-
-The remote is resistances switched onto the mic line, and half the Classics
-have no mic line. `gpio-s5l8702.c` reads the board strap on GPIO E7:
-
-| `rec_hw_ver` | Models | Jack mic | Mikey |
-| --- | --- | --- | --- |
-| 0 | 80GB, 160GB fat | no | absent |
-| 1 | 120GB, 160GB slim | yes | present |
-
-**Read it from the player, not from the model.** Debug -> View HW info shows
-`capture HW type`, and the mikey row on the next page repeats it as `hw=`
-beside a live probe. `probe rc=1` is the address NAK a version 0 board gives --
-`i2c_rd()` sets the register pointer with a write first, so the missing-device
-code is 1, not the 3 the read path would give.
-
-The only 6G here is version 0, so the feature ships unverified. What is
-verified is that it costs nothing there: no thread, no bus traffic.
-
-### Not on the 5G
-
-No mic pin on the jack, so there is nothing to sense (`INPUT_SRC_CAPS` in
-`ipodvideo.h` is line-in and radio, both dock-connector accessories). Mikey is
-an Apple part on the 6G's I2C bus; the 5G is a PP5022 with a WM8758. Its
-dock-connector remotes work over serial iAP instead, through
-`remote_control_rx()` in `button-clickwheel.c`.
-
-### What it reports, before reporting a fault
-
-A centre **click** only -- no hold or long-press, because the chip reports the
-release up to 1.8s late once its event engine naps -- and the two volume
-buttons as held levels, which the button tick turns into `BUTTON_REPEAT`. No
-next or previous. It is **not** gated by the hold switch, matching the OF, and
-multimedia keys are excluded from the backlight trigger (`input/action.c`), so
-a press does not wake the screen.
-
-The poller reads two I2C registers every 20ms for as long as anything occupies
-the jack and cannot back off -- the volume edge events are readable for only
-about 100ms each. That is a permanent 50Hz transaction pair for a listening
-session, and the first place to look if this costs runtime.
+`upstream-divergence.md` carries all but the last as rows of its own, together
+with the fork's centre-button multi-click and the setting that governs it.
 
 ## USB audio is off
 

@@ -1052,6 +1052,14 @@ constant drain if nothing is attached.
 Enables the dock's line output, which bypasses the volume control and feeds an
 amplifier at a fixed level.
 
+[remote track skip]
+Two clicks on the earphone remote's centre button skip to the next track, and
+three go back to the previous one. The cost is that a single click waits about
+a third of a second to see whether another is coming, so play/pause responds
+that much later.
+
+Off, every click is play/pause and acts at once.
+
 [usb mode]
 What a USB connection does: present the disk to the computer, or charge only.
 Charge only is useful with a car or a plug that would otherwise interrupt

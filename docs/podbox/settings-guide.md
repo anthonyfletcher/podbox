@@ -473,6 +473,7 @@ shadow to colour.
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
 | Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
+| Remote Track Skip | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
 
 ### System — Keyclick
 

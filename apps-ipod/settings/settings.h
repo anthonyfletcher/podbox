@@ -825,6 +825,9 @@ struct user_settings
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
     bool lineout_active;
+#ifdef HAVE_MIKEY_REMOTE
+    bool remote_track_skip; /* inline earphone remote: count centre clicks */
+#endif
 
     bool prevent_skip;
 

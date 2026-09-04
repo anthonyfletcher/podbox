@@ -358,6 +358,7 @@ static const struct tag_row tag_rows[] = {
 { "serial bitrate",      TAG_ADVANCED|TAG_SYSTEM,                "accessory serial dock" },
 { "accessory power supply", TAG_ADVANCED|TAG_SYSTEM,             "accessory dock power" },
 { "lineout",             TAG_ADVANCED|TAG_SYSTEM,                "line out dock" },
+{ "remote track skip",   TAG_SYSTEM|TAG_PLAYBACK,                "remote earphone headphone double triple click next previous skip" },
 { "usb mode",            TAG_USB|TAG_SYSTEM,                     "usb mass storage" },
 { "usb hid",             TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "usb hid keyboard remote" },
 { "usb keypad mode",     TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "usb hid keypad" },

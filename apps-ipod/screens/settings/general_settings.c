@@ -30,6 +30,7 @@
 #include "widgets/yesno.h"
 #include "speech/talk.h"
 #include "powermgmt.h"
+#include "button.h"
 #include "audio/playback.h"
 #include "screens/playback/quick_screen.h"
 #include "dircache.h"
@@ -344,6 +345,22 @@ MAKE_MENU(car_adapter_mode_menu, ID2P(LANG_CAR_ADAPTER_MODE), 0, Icon_NOICON,
 MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate, NULL);
 MENUITEM_SETTING(accessory_supply, &global_settings.accessory_supply, NULL);
 MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
+#ifdef HAVE_MIKEY_REMOTE
+/* Hidden where the board has no Mikey to read a remote with -- the same
+ * units whose poller never starts. */
+static int remote_track_skip_callback(int action,
+                                      const struct menu_item_ex *this_item,
+                                      struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !mikey_supported())
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_SETTING(remote_track_skip, &global_settings.remote_track_skip,
+                 remote_track_skip_callback);
+#endif
 MENUITEM_SETTING(usb_hid, &global_settings.usb_hid, NULL);
 MENUITEM_SETTING(usb_keypad_mode, &global_settings.usb_keypad_mode, NULL);
 #ifdef USB_ENABLE_AUDIO
@@ -381,9 +398,13 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 #endif
          );
 
-/* The dock connector's other pins. */
+/* The dock connector's other pins, and the headphone jack's remote. */
 MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
-            &serial_bitrate, &accessory_supply, &lineout_onoff);
+            &serial_bitrate, &accessory_supply, &lineout_onoff
+#ifdef HAVE_MIKEY_REMOTE
+            , &remote_track_skip
+#endif
+         );
 
 /* system_menu itself is built at the foot of this file, once the menus it
    gathers -- Startup/Shutdown, Language & Text -- have been defined. */

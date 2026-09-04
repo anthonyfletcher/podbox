@@ -39,6 +39,9 @@
  *                   0x04 vol+ press, 0x08 vol+ release,
  *                   0x01 vol- press, 0x02 vol- release.
  *                   0x30 is the accessory-ID event (no button meaning).
+ *   reg6            centre-button edge events, latched for ~30ms:
+ *                   0x01 press, 0x02 release. The driver reads the reg4
+ *                   level instead, which carries the same edges.
  * The remote itself signals volume as static DC loads on the mic line and
  * identifies via a one-time ultrasonic chirp (the same scheme David Carne
  * documented for the shuffle 3G remote); Mikey does that level and chirp
@@ -82,8 +85,34 @@ extern int rec_hw_ver;   /* capture hardware version, gpio-s5l8702.c */
  * as a fixed-length click at the rise; there is no hold/long-press. A
  * release must be seen for several consecutive polls before a new rise
  * counts, so bounce or an I2C NAK can't double-fire a click. */
-#define MIKEY_CENTER_PULSE_POLLS  3     /* reported click length, 60ms */
-#define MIKEY_CENTER_OFF_POLLS    3     /* release debounce, 60ms */
+#define MIKEY_CENTER_PULSE_POLLS  3     /* reported click length */
+/* Release debounce. The two clicks of a double land about 90ms apart, so
+ * this has to stay well under that or the second rise is swallowed. */
+#define MIKEY_CENTER_OFF_POLLS    2
+
+/* Multi-click, as Apple's remote does it: two clicks are next track,
+ * three previous. Telling those apart from a single click means holding
+ * the report back until the window closes with no further click, so
+ * play/pause costs that much latency. The "Remote Track Skip" setting
+ * chooses between that and reporting every click at once.
+ *
+ * In ticks rather than polls: a poll is a sleep plus three or four I2C
+ * transfers, which measures nearer 30ms than the 20ms the sleep asks
+ * for, and the window is a human interval either way. */
+#define MIKEY_MULTI_WINDOW  (HZ*36/100)  /* 360ms to the next click */
+#define MIKEY_MULTI_MAX     3            /* clicks past this are ignored */
+
+static volatile bool track_skip = false;
+
+void mikey_set_track_skip(bool enable)
+{
+    track_skip = enable;
+}
+
+bool mikey_supported(void)
+{
+    return rec_hw_ver != 0;
+}
 
 unsigned char mikey_read(int address)
 {
@@ -180,8 +209,15 @@ struct mikey_decode {
     bool center_down;    /* debounced "press already reported" */
     int center_off;      /* consecutive released polls */
     int center_pulse;    /* click pulse countdown */
+    int pulse_btn;       /* what that pulse reports */
+    int clicks;          /* clicks counted so far in the open window */
+    long click_tick;     /* when the last of them was seen */
 };
 
+/* The edge state only. A re-arm or a stray NAK drops this, because both
+ * can flicker reg4 -- but neither means the finger left the button, so
+ * the click state below survives them. Wiping it there loses the second
+ * half of a double click, which reports as a plain play/pause. */
 static void mikey_decode_reset(struct mikey_decode *d)
 {
     d->armed = false;
@@ -191,7 +227,15 @@ static void mikey_decode_reset(struct mikey_decode *d)
     d->up_suppressed = d->dn_suppressed = false;
     d->center_down = false;
     d->center_off = MIKEY_CENTER_OFF_POLLS;
+}
+
+/* The click state, dropped only when the jack empties. */
+static void mikey_clicks_reset(struct mikey_decode *d)
+{
     d->center_pulse = 0;
+    d->pulse_btn = BUTTON_NONE;
+    d->clicks = 0;
+    d->click_tick = 0;
 }
 
 /* Apply the phantom-load failsafe to one volume button's edge bits:
@@ -238,11 +282,24 @@ static int mikey_decode_poll(struct mikey_decode *d,
     if (!raw)
         d->armed = true;
 
-    /* click-only: emit a fixed pulse at each debounced rise */
+    /* click-only: a fixed pulse at each debounced rise, either at once or
+     * once the window has closed on the number of clicks it collected */
     if (raw && d->armed)
     {
         if (!d->center_down && d->center_off >= MIKEY_CENTER_OFF_POLLS)
-            d->center_pulse = MIKEY_CENTER_PULSE_POLLS;
+        {
+            if (track_skip)
+            {
+                if (d->clicks < MIKEY_MULTI_MAX)
+                    d->clicks++;
+                d->click_tick = current_tick;
+            }
+            else
+            {
+                d->pulse_btn = BUTTON_MULTIMEDIA_PLAYPAUSE;
+                d->center_pulse = MIKEY_CENTER_PULSE_POLLS;
+            }
+        }
         d->center_down = true;
         d->center_off = 0;
     }
@@ -254,17 +311,30 @@ static int mikey_decode_poll(struct mikey_decode *d,
             d->center_down = false;
     }
 
-    bool center = false;
+    /* Window closed. A count of one is a plain play/pause, which is also
+     * where a stray count lands if the setting is turned off mid-sequence. */
+    if (d->clicks > 0
+        && TIME_AFTER(current_tick, d->click_tick + MIKEY_MULTI_WINDOW))
+    {
+        d->pulse_btn = d->clicks >= 3 ? BUTTON_MULTIMEDIA_PREV
+                     : d->clicks == 2 ? BUTTON_MULTIMEDIA_NEXT
+                                      : BUTTON_MULTIMEDIA_PLAYPAUSE;
+        d->center_pulse = MIKEY_CENTER_PULSE_POLLS;
+        d->clicks = 0;
+    }
+
+    int center = BUTTON_NONE;
     if (d->center_pulse > 0)
     {
-        center = true;
+        center = d->pulse_btn;
         d->center_pulse--;
     }
 
     /* All buttons report as multimedia keys: handled globally by
-     * default_event_handler on every screen, so volume and play/pause
-     * work in menus, WPS and plugins alike, matching the OF. */
-    return (center    ? BUTTON_MULTIMEDIA_PLAYPAUSE   : 0)
+     * default_event_handler on every screen, so volume, play/pause and
+     * the track skips work in menus, WPS and games alike, matching the
+     * OF. */
+    return center
          | (d->vol_up ? BUTTON_MULTIMEDIA_VOLUME_UP   : 0)
          | (d->vol_dn ? BUTTON_MULTIMEDIA_VOLUME_DOWN : 0);
 }
@@ -283,6 +353,7 @@ static void mikey_thread(void)
     struct mikey_decode decode;
 
     mikey_decode_reset(&decode);
+    mikey_clicks_reset(&decode);
 
     while (1)
     {
@@ -293,6 +364,7 @@ static void mikey_thread(void)
             powered = false;
             naks = 0;
             mikey_decode_reset(&decode);
+            mikey_clicks_reset(&decode);
             mikey_btn = BUTTON_NONE;
             sleep(HZ/2);   /* nothing to poll, check back at leisure */
             continue;
@@ -301,7 +373,7 @@ static void mikey_thread(void)
         /* Re-arm when the mode readback disagrees (first pass, chip reset
          * on jack removal, or the recording path rewrote it). Arming can
          * flicker reg4 and emits a spurious accessory-ID event, so drop
-         * the state and settle for one poll. */
+         * the edge state and settle for one poll. */
         unsigned char mode;
         if (i2c_read(0, MIKEY_ADDR, MIKEY_REG_MODE, 1, &mode) != 0)
         {

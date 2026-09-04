@@ -944,6 +944,10 @@ const struct settings_list settings[] = {
                   true, "accessory power supply", accessory_supply_set),
     OFFON_SETTING(0, lineout_active, LANG_LINEOUT,
                   true, "lineout", lineout_set),
+#ifdef HAVE_MIKEY_REMOTE
+    OFFON_SETTING(0, remote_track_skip, LANG_REMOTE_TRACK_SKIP,
+                  true, "remote track skip", mikey_set_track_skip),
+#endif
 
 
     OFFON_SETTING(0, bl_filter_first_keypress,

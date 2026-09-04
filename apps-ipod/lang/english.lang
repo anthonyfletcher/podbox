@@ -19972,3 +19972,20 @@
     *: "Resume"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_REMOTE_TRACK_SKIP
+  desc: in the accessories settings menu
+  user: core
+  <source>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </source>
+  <dest>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </dest>
+  <voice>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </voice>
+</phrase>

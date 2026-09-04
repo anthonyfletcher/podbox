@@ -21,6 +21,7 @@
 #include "power.h"
 #include "serial.h"
 #include "piezo.h"
+#include "button.h"
 #include "iap.h"
 #include "audio.h"
 #include "rolo.h"
@@ -44,6 +45,22 @@ void serial_setup(void)
 void piezo_init(void)
 {
 }
+
+#ifdef HAVE_MIKEY_REMOTE
+/* No headphone jack to read a remote from. settings_apply() sets this on
+ * every boot and the settings menu asks whether the board has one, so both
+ * have to exist even where nothing polls anything. The sim says yes, so the
+ * row is there to look at. */
+void mikey_set_track_skip(bool enable)
+{
+    (void)enable;
+}
+
+bool mikey_supported(void)
+{
+    return true;
+}
+#endif
 
 /* The keyclick beep. misc.c calls this when keyclick_hardware is set; the
  * sim's own SOUND_KEYCLICK path covers the audible half. */

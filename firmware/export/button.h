@@ -118,6 +118,22 @@ int button_apply_acceleration(const unsigned int data);
                                      BUTTON_MULTIMEDIA_VOLUME_UP| \
                                      BUTTON_MULTIMEDIA_VOLUME_DOWN)
 
+#ifdef HAVE_MIKEY_REMOTE
+/* The inline earphone remote's centre button. On, two clicks report
+ * BUTTON_MULTIMEDIA_NEXT and three BUTTON_MULTIMEDIA_PREV, and a single
+ * click waits out the multi-click window before reporting PLAYPAUSE; off,
+ * every click reports PLAYPAUSE at once. Declared here rather than in
+ * mikey-target.h because the caller is settings_apply(). */
+void mikey_set_track_skip(bool enable);
+
+/* Whether this board can have a remote at all. False on capture hardware
+ * version 0 -- the 80GB and fat 160GB -- which has no jack microphone line
+ * and carries no Mikey on the bus, so the poller is never even started
+ * there. Answers from boot, unlike mikey_present(), which cannot latch
+ * until something occupies the jack. */
+bool mikey_supported(void);
+#endif
+
 #ifdef HAVE_TOUCHSCREEN
 long touchscreen_last_touch(void);
 

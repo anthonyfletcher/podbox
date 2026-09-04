@@ -301,7 +301,10 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 
 ## Behind the scenes
 
-- Upstream "mikey chip" support for remote control earbuds (untested on this build)
+- Inline earphone remote support (iPod classic 120GB - Late 2008 and
+  iPod classic 160GB - Late 2009 thin version only)
+  - Click for play/pause, two clicks for the next track, three for the previous one, and the volume buttons
+  - `Settings > System > Accessories > Remote Track Skip` turns the multi-click feature off, which makes play/pause react quicker
 - Improved consistency of the `Back` and `Menu` button in menus
 - Art for use in the UI is cached for quick access to enable a fluid experience
   - `Settings > Library > Art Cache` for settings

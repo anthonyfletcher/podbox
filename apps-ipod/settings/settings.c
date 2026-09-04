@@ -69,6 +69,7 @@
 #include "lang.h"
 #include "speech/language.h"
 #include "powermgmt.h"
+#include "button.h"
 #include "widgets/keyboard.h"
 #include "version.h"
 #include "rbunicode.h"
@@ -1217,6 +1218,9 @@ void settings_apply(bool read_disk)
         set_sleeptimer_duration(global_settings.sleeptimer_duration);
     set_keypress_restarts_sleep_timer(
         global_settings.keypress_restarts_sleeptimer);
+#ifdef HAVE_MIKEY_REMOTE
+    mikey_set_track_skip(global_settings.remote_track_skip);
+#endif
 
 #if BATTERY_CAPACITY_INC > 0
     /* only call if it's really exchangable */
