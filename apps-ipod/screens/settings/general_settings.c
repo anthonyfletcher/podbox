@@ -857,7 +857,7 @@ extern const struct menu_item_ex timedate_item, manage_settings;
    each is opened from would scatter them across two branches. Listed under
    Appearance and under Library, as the same item. */
 MAKE_MENU(viewers_menu, ID2P(LANG_VIEWERS), 0, Icon_NOICON,
-          &text_viewer_menu, &lyric_viewer_menu);
+          &text_viewer_menu, &lyric_viewer_menu, &spun_menu);
 
 static struct browse_folder_info langs = { LANG_DIR, SHOW_LNG };
 

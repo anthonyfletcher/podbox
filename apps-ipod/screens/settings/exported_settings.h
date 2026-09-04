@@ -24,6 +24,7 @@ extern const struct menu_item_ex
         , art_cache_menu            /* album_covers_settings.c */
         , text_viewer_menu          /* text_viewer_settings.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
+        , spun_menu                 /* spun_settings.c */
         , wps_settings              /* general_settings.c -- shown under
                                        Playback, defined beside the browser and
                                        hotkey settings it shares a screen

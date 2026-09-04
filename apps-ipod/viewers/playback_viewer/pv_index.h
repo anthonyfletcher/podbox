@@ -38,6 +38,10 @@ struct pv_index_id
     unsigned long day_size;    /* sizeof(struct pv_day)  */
     unsigned long totals_size; /* sizeof(struct pv_totals) */
     unsigned long state_size;  /* sizeof(struct pv_badge_state) */
+    /* Which calendar year the tables were scored for. An index holds one
+     * year, so asking for another is a mismatch and a rebuild -- which is
+     * right: the year figures in it are for a year nobody asked about. */
+    unsigned long year;
 };
 
 /* Open the saved index and check it describes this log at this moment.

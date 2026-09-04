@@ -81,10 +81,15 @@ void pv_badges_feed(struct pv_badge_state *st, unsigned long ts, bool valid_ts,
 
         /* The profile reads the tables as they stand, which is why this must
          * be fed after they are updated: it wants this play included. */
-        a = pv_stats_find(PV_T_ARTIST, artist);
+        a = pv_stats_find(PV_T_ARTIST, artist, PV_ROW_NONE);
         if (a && a->count > st->top_artist)
             st->top_artist = a->count;
-        a = pv_stats_find(PV_T_TITLE, title);
+
+        /* Scoped to that artist, so two different songs sharing a title are
+         * two firsts rather than one -- which is what this counter always
+         * meant to say. */
+        a = pv_stats_find(PV_T_TITLE, title,
+                          pv_stats_index(PV_T_ARTIST, a));
         if (a && a->count == 1)
             st->uniq++;         /* first time this title has been heard */
 

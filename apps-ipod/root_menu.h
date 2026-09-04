@@ -94,7 +94,8 @@ enum {
     /* Documents and Images: the flat lists (screens/browse/browser_flat.c). */
     GO_TO_DOCUMENTS,
     GO_TO_IMAGES,
-    /* Spun: the playback-log statistics deck (viewers/playback_viewer/). */
+    /* The Playback Report: listening statistics from the playback log
+     * (viewers/playback_viewer/). */
     GO_TO_SPUN,
     /* The guests the library credits (screens/browse/featured_artists.c).
      * Reached only from the Music menu's built-in row, so it has no root-menu

@@ -19301,21 +19301,21 @@
 </phrase>
 <phrase>
   id: LANG_SPUN
-  desc: root menu item for the playback-log statistics deck
+  desc: root menu item for the playback-log statistics screen
   user: core
   <source>
-    *: "Spun"
+    *: "Playback Report"
   </source>
   <dest>
-    *: "Spun"
+    *: "Playback Report"
   </dest>
   <voice>
-    *: "Spun"
+    *: "Playback Report"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PV_NO_LOG
-  desc: Spun found no playback log to read
+  desc: the Playback Report found no playback log to read
   user: core
   <source>
     *: "No listening history yet. Turn on Settings > Playback > Logging."
@@ -19329,7 +19329,7 @@
 </phrase>
 <phrase>
   id: LANG_PV_NO_MEMORY
-  desc: Spun could not get enough working memory to crunch the log
+  desc: the Playback Report could not get enough working memory for the log
   user: core
   <source>
     *: "Not enough memory to read the log"
@@ -19342,8 +19342,22 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_PV_NOT_IN_LIBRARY
+  desc: the Playback Report could not find the artist, album or song a card names
+  user: core
+  <source>
+    *: "Not in your library under that name"
+  </source>
+  <dest>
+    *: "Not in your library under that name"
+  </dest>
+  <voice>
+    *: "Not in your library"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_PV_SAVE_CARD
-  desc: Spun menu item, saves a picture of the card on screen
+  desc: Playback Report menu item, saves a picture of the card on screen
   user: core
   <source>
     *: "Save Current Card"
@@ -19357,7 +19371,7 @@
 </phrase>
 <phrase>
   id: LANG_PV_SAVE_ALL
-  desc: Spun menu item, saves a picture of every card in the deck
+  desc: Playback Report menu item, saves a picture of every card
   user: core
   <source>
     *: "Save All Cards"
@@ -19970,6 +19984,146 @@
   </dest>
   <voice>
     *: "Resume"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ARTWORK
+  desc: in Settings > Library > Viewers > Playback Report, whether cards show album art
+  user: core
+  <source>
+    *: "Artwork"
+  </source>
+  <dest>
+    *: "Artwork"
+  </dest>
+  <voice>
+    *: "Artwork"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_TOP_COUNT
+  desc: in Settings > Library > Viewers > Playback Report, how many rows a top-ten section shows
+  user: core
+  <source>
+    *: "Top Rows"
+  </source>
+  <dest>
+    *: "Top Rows"
+  </dest>
+  <voice>
+    *: "Top Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_BADGE_ORDER
+  desc: in Settings > Library > Viewers > Playback Report, how achievements are sorted
+  user: core
+  <source>
+    *: "Achievement Order"
+  </source>
+  <dest>
+    *: "Achievement Order"
+  </dest>
+  <voice>
+    *: "Achievement Order"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_BY
+  desc: in Settings > Library > Viewers > Playback Report, what the top lists are ordered on
+  user: core
+  <source>
+    *: "Ranked By"
+  </source>
+  <dest>
+    *: "Ranked By"
+  </dest>
+  <voice>
+    *: "Ranked By"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_PLAYS
+  desc: Ranked By option: order the top lists by number of plays
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "Plays"
+  </dest>
+  <voice>
+    *: "Plays"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_MINUTES
+  desc: Ranked By option: order the top lists by time listened
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "Minutes"
+  </dest>
+  <voice>
+    *: "Minutes"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_TABLE
+  desc: Achievement Order option: the order the achievement table is written in
+  user: core
+  <source>
+    *: "As Listed"
+  </source>
+  <dest>
+    *: "As Listed"
+  </dest>
+  <voice>
+    *: "As Listed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_EARNED
+  desc: Achievement Order option: the ones already won come first
+  user: core
+  <source>
+    *: "Earned First"
+  </source>
+  <dest>
+    *: "Earned First"
+  </dest>
+  <voice>
+    *: "Earned First"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_RECENT
+  desc: Achievement Order option: most recently won first
+  user: core
+  <source>
+    *: "Newest First"
+  </source>
+  <dest>
+    *: "Newest First"
+  </dest>
+  <voice>
+    *: "Newest First"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_CLOSEST
+  desc: Achievement Order option: the ones nearest to being won first
+  user: core
+  <source>
+    *: "Closest First"
+  </source>
+  <dest>
+    *: "Closest First"
+  </dest>
+  <voice>
+    *: "Closest First"
   </voice>
 </phrase>
 <phrase>

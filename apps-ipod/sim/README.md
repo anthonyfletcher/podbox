@@ -53,7 +53,7 @@ PP GPIO registers directly), the wheel and IAP screens likewise, `dbg_cpufreq`
 behind `HAVE_ADJUSTABLE_CPU_FREQ`, and the 6G SysCfg/bootflash pair behind
 `!SIMULATOR`. What is left is everything portable: **Skin Engine RAM usage**,
 Screendump, View OS stacks, View buflib allocs, the dircache and database
-screens, Spun stats and the metadata log.
+screens and the metadata log.
 
 Guarding a screen's menu entry alone is not enough here. Upstream can do that
 because an unreferenced `static` is discarded silently; this fork's warnings

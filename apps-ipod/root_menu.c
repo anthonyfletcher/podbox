@@ -59,6 +59,7 @@
 #include "files/filetypes.h"
 #include "viewers/text_viewer/text_viewer.h"
 #include "viewers/playback_viewer/playback_viewer.h"
+#include "viewers/playback_viewer/pv_row.h"
 #include "disk.h"
 #include "sound.h"
 
@@ -725,10 +726,16 @@ static int images_scrn(void* param)
     return browser_flat(true);
 }
 
+/* Spun. The row, not the deck the row grew out of -- the deck is still built
+ * and is reachable from the debug menu.
+ *
+ * It has to be a root-menu screen to work at all now that a card can be
+ * played: GO_TO_WPS is zero, and a menu action signals "I am finished" by
+ * returning non-zero, so nothing below the root menu can ask for the WPS. */
 static int playback_viewer_scrn(void* param)
 {
     (void)param;
-    return playback_viewer_screen();
+    return pv_row_screen();
 }
 
 /* These are all static const'd from apps/menus/ *.c

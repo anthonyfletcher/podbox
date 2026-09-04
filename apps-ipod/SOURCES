@@ -55,6 +55,9 @@ metadata/art_cache.c
 /* -- the interface, by altitude --------------------------------------- */
 
 draw/bmp.c
+draw/card_paint.c
+draw/card_row.c
+draw/card_text.c
 draw/icon.c
 draw/icon_bitmaps.c
 draw/img_filter.c
@@ -165,6 +168,7 @@ screens/settings/common_settings.c
 screens/settings/settings_walk.c
 screens/settings/settings_search.c
 screens/settings/settings_changed.c
+screens/settings/spun_settings.c
 screens/settings/settings_help.c
 screens/settings/playback_settings.c
 screens/settings/playlist_settings.c
@@ -208,22 +212,27 @@ viewers/text_viewer/ts_text.c
 viewers/text_viewer/ts_zip.c
 viewers/text_viewer/ts_zipdoc.c
 
-/* Playback-log viewer -- listening statistics, presented in the UI as "Spun".
- * pv_log.c reads the rotated log family the core writes, pv_names.c turns
- * each logged path into an artist, album and title, and pv_stats.c folds the
- * result into the aggregates the cards are drawn from. */
-viewers/playback_viewer/playback_viewer.c
-viewers/playback_viewer/pv_art.c
+/* Playback-log viewer -- listening statistics, shown in the UI as the
+ * "Playback Report". pv_log.c reads the rotated log family the core writes,
+ * pv_names.c turns each logged path into an artist, album and title, and
+ * pv_stats.c folds the result into the aggregates the cards are drawn from.
+ * pv_tiles.c decides which cards a section holds and pv_row.c is the screen.
+ *
+ * Seven more files sit beside these unbuilt: playback_viewer.c, pv_art.c,
+ * pv_badges_ui.c, pv_cards.c, pv_export.c, pv_paint.c and pv_year.c. They are
+ * the full-screen card deck the row replaced, kept in the tree and out of the
+ * binary -- nothing reaches them, and linking them would cost 24K of code and
+ * 4.6K of RAM that no screen can use. Adding the seven names back here is the
+ * whole of what bringing the deck back needs; expect them to have drifted,
+ * since nothing compiles them. */
 viewers/playback_viewer/pv_badges.c
-viewers/playback_viewer/pv_badges_ui.c
-viewers/playback_viewer/pv_cards.c
-viewers/playback_viewer/pv_export.c
 viewers/playback_viewer/pv_index.c
 viewers/playback_viewer/pv_log.c
 viewers/playback_viewer/pv_names.c
-viewers/playback_viewer/pv_paint.c
+viewers/playback_viewer/pv_play.c
+viewers/playback_viewer/pv_row.c
 viewers/playback_viewer/pv_stats.c
-viewers/playback_viewer/pv_year.c
+viewers/playback_viewer/pv_tiles.c
 
 /* Core-linked image viewer, ported from the imageviewer plugin. Colour
  * targets only -- the greylib paths of the original are gone. Reuses the core

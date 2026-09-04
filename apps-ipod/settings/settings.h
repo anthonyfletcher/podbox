@@ -800,6 +800,11 @@ struct user_settings
     int lyric_anim;               /* 0 off, else the slide in ms */
     bool lyric_highlight;         /* light words as they are sung */
     bool lyric_backlight;         /* hold the backlight on */
+    /* Spun (apps-ipod/viewers/playback_viewer). */
+    bool spun_artwork;            /* draw sleeves on the cards that have one */
+    int  spun_top_count;          /* rows a top-N section shows */
+    int  spun_badge_order;        /* how the achievements are sorted */
+    int  spun_rank_by;            /* 0 plays, 1 minutes listened */
     unsigned char kbd_file[MAX_FILENAME+1];  /* last keyboard */
     int  backlight_timeout;  /* backlight off timeout:  -1=never,
                                 0=always, or time in seconds */

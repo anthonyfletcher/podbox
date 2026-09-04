@@ -29,7 +29,14 @@
 #define PV_INDEX_TMP  ROCKBOX_DIR "/pv_index.new"
 
 #define PV_INDEX_MAGIC   0x50564931UL   /* "PVI1" */
-#define PV_INDEX_VERSION 1
+/* Bumped whenever the model's CONTENT changes shape, not just its layout.
+ *
+ * The size check below catches a changed struct; it cannot catch a changed
+ * meaning. When pv_names stopped reading a leading track number as an artist,
+ * every field kept its type and a saved index went on serving the old, wrong
+ * rows -- so the fix looked like no fix at all. A naming or aggregation change
+ * belongs here. */
+#define PV_INDEX_VERSION 2
 
 /* Bytes of the log kept verbatim, ending at the watermark. */
 #define PV_INDEX_TAIL 64

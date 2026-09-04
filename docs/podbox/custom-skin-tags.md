@@ -843,7 +843,7 @@ are only ever appended to, never renumbered.
 | 1 main menu | 10 quickscreen | 19 shortcuts | 28 images |
 | 2 while playing | 11 *reserved* | 20 track info | 29 search |
 | 3 *unused* | 12 option chooser | 21 USB | 30 lyrics |
-| 4 *unused* | 13 playlist catalogue | 22 album covers | 31 Spun |
+| 4 *unused* | 13 playlist catalogue | 22 album covers | 31 playback report |
 | 5 playlist viewer | 14 *unused* | 23 text viewer | 32 settings search |
 | 6 settings | 15 context menu | 24 image viewer | 33 featured artists |
 | 7 files | 16 system screen | 25 folder picker | |

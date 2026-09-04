@@ -3598,6 +3598,11 @@ int playlist_set_current(struct playlist_info* playlist)
         return result;
     }
 
+    /* The second path that replaces the current playlist -- the playlist
+     * viewer's -- so the flag is cleared here as well as in playlist_create().
+     * What built the old playlist says nothing about this one. */
+    current_playlist_from_artist = false;
+
     dc_thread_stop(&current_playlist);
     playlist_write_lock(&current_playlist);
 

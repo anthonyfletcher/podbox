@@ -124,7 +124,7 @@ int playback_viewer_screen(void)
     bufsz -= PV_ART_BYTES;
 
     splash(0, ID2P(LANG_WAIT));
-    r = pv_stats_build(buf, bufsz, &totals);
+    r = pv_stats_build(buf, bufsz, &totals, PV_YEAR_ALL);
 
     if (r != PV_BUILD_OK)
     {

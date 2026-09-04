@@ -48,6 +48,13 @@ done
 # overwrites or deletes it resets the player.
 cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/default-config.cfg"
 
+# Faces the firmware itself needs, which is not the same as the ones a theme
+# brings. Every other font on the player arrives inside scrim's folder above,
+# so a theme that stopped using one would take it off the device and the core
+# that named it would fall back to the system font without saying so.
+mkdir -p "$STAGE/.rockbox/fonts"
+cp "$ROOT/apps-ipod/fonts/"*.fnt "$STAGE/.rockbox/fonts/"
+
 # The house style a theme is loaded on top of. Loading a theme resets every
 # setting describing the look, and without this the reset lands on upstream's
 # compiled defaults instead of the fork's -- so a theme that names no iconset

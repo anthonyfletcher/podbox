@@ -427,7 +427,80 @@ static const char *find_dash_sep(const char *s)
  *   /x/Artist - 01 Title.mp3          -> "Artist", "Title"
  *   /x/Velvet Antenna/02. Peel.mp4    -> "Velvet Antenna", "Peel"
  */
-static void path_to_meta(const char *path, char *artist, char *title)
+/* Whether the field before a " - " is a track number rather than a name.
+ *
+ * "05 - Respect.flac" is a track and a title, not an artist and a title.
+ * Reading it the other way makes an artist called "05" that collects every
+ * fifth track on the player into one row -- which then ranks on the total and
+ * arrives in the top ten as a card with a number where a name should be.
+ * Measured against a real 10,000-play log, eight of the top eighteen artists
+ * were track numbers.
+ *
+ * Four digits rather than three, because a leading number that long is a year
+ * and not a name either. An artist genuinely called "112" loses, and still
+ * gets the right name from its folder. */
+static bool is_tracknum(const char *s, int n)
+{
+    if (n < 1 || n > 4)
+        return false;
+    for (int i = 0; i < n; i++)
+        if (s[i] < '0' || s[i] > '9')
+            return false;
+    return true;
+}
+
+/* Artist and album from the folders holding the file.
+ *
+ * Two above the file, not one. A ripped library is
+ * <root>/<library>/<artist>/<album>/<track>, so the folder immediately above
+ * a track is its ALBUM -- taking that as the artist made "1989 (Taylor's
+ * Version)" the second most played artist on the same log. The album folder
+ * is worth keeping too: without it a path-resolved entry has no album at all
+ * and the model falls back to naming the album after the artist.
+ *
+ * A shallower path has no grandparent to take, and there the folder above is
+ * the artist. */
+static void folders_to_meta(const char *path, char *artist, char *album)
+{
+    /* The last three separators, kept as a sliding window rather than an
+     * array of the first so many. Only the tail of a path says anything: the
+     * three here bracket the album folder, the artist folder and the file,
+     * and a window has no depth past which it starts answering with folders
+     * from near the root.
+     *
+     * strlcpy's size counts the terminator, so the gap between two
+     * separators is exactly the room the name between them needs. */
+    const char *sl[3] = { NULL, NULL, NULL };
+    int n = 0;
+
+    for (const char *p = path; *p; p++)
+        if (*p == '/')
+        {
+            sl[0] = sl[1];
+            sl[1] = sl[2];
+            sl[2] = p;
+            n++;
+        }
+
+    if (n >= 4)
+    {
+        strlcpy(artist, sl[0] + 1,
+                (size_t)(sl[1] - sl[0]) < PV_NAME_MAX
+                    ? (size_t)(sl[1] - sl[0]) : PV_NAME_MAX);
+        strlcpy(album, sl[1] + 1,
+                (size_t)(sl[2] - sl[1]) < PV_NAME_MAX
+                    ? (size_t)(sl[2] - sl[1]) : PV_NAME_MAX);
+    }
+    else if (n >= 2)
+    {
+        strlcpy(artist, sl[1] + 1,
+                (size_t)(sl[2] - sl[1]) < PV_NAME_MAX
+                    ? (size_t)(sl[2] - sl[1]) : PV_NAME_MAX);
+    }
+}
+
+static void path_to_meta(const char *path, char *artist, char *title,
+                         char *album)
 {
     const char *last  = strrchr(path, '/');
     const char *fname = last ? last + 1 : path;
@@ -441,7 +514,7 @@ static void path_to_meta(const char *path, char *artist, char *title)
         *dot = '\0';
 
     sep1 = find_dash_sep(stem);
-    if (sep1)
+    if (sep1 && !is_tracknum(stem, (int)(sep1 - stem)))
     {
         const char *sep2;
         char *after1, *tsrc, *as;
@@ -464,23 +537,10 @@ static void path_to_meta(const char *path, char *artist, char *title)
     }
     else
     {
-        if (last && last != path)
-        {
-            const char *ps = last - 1;
-            int i = 0;
-
-            while (ps > path && *ps != '/')
-                ps--;
-            if (*ps == '/')
-                ps++;
-            while (ps < last && i < PV_NAME_MAX - 1)
-                artist[i++] = *ps++;
-            artist[i] = '\0';
-        }
-        else
-        {
-            artist[0] = '\0';
-        }
+        /* No name in the filename, so the folders carry it. strip_tracknum()
+         * takes "05 - " off the front of the title on its own -- a space, a
+         * dash and a space are all in the set it eats. */
+        folders_to_meta(path, artist, album);
         strlcpy(title, strip_tracknum(stem), PV_NAME_MAX);
     }
 
@@ -522,6 +582,6 @@ enum pv_name_src pv_names_resolve(const char *path, char *artist,
         }
     }
 
-    path_to_meta(path, artist, title);
+    path_to_meta(path, artist, title, album);
     return PV_NAME_PATH;
 }

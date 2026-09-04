@@ -68,6 +68,36 @@ static bool overflowed;
  * Derived from the log's own span at the end of a build. */
 static unsigned long redis_cutoff;
 
+/* The year being reported, and the seconds it spans. PV_YEAR_ALL leaves the
+ * range wide open, which is how a caller asks for the whole log. */
+static int  cur_year;
+static unsigned long year_lo, year_hi;
+
+/* The whole log's figures, whatever year is being shown. The badge engine is
+ * scored against these and the year switch offers from them. */
+static struct pv_totals lifetime;
+
+static bool in_year(const struct pv_entry *e)
+{
+    if (cur_year == PV_YEAR_ALL)
+        return true;
+    /* An entry with no usable date belongs to no year. It still counts
+     * towards the lifetime figures, and towards the badges. */
+    if (!e->valid_ts)
+        return false;
+    return e->ts >= year_lo && e->ts < year_hi;
+}
+
+static bool day_in_year(long day)
+{
+    unsigned long ts;
+
+    if (cur_year == PV_YEAR_ALL)
+        return true;
+    ts = (unsigned long)day * 86400UL;
+    return ts >= year_lo && ts < year_hi;
+}
+
 /* The badge engine's chronological state, built as the log is read and
  * carried in the index so an extend continues it rather than restarting. */
 static struct pv_badge_state badge_state;
@@ -104,10 +134,35 @@ static bool htable_init(struct pv_htable *t, int cap)
     return true;
 }
 
-/* Find or create. NULL only when the table is full -- which is a real
- * outcome, not an impossible one: the caller records it so an undercount is
- * visible rather than silent. */
-static struct pv_agg *htable_get(struct pv_htable *t, const char *name)
+/* A row's identity: its stored name and the artist it belongs to.
+ *
+ * One function because three places need the same answer -- insert, lookup,
+ * and the rebuild after an index load -- and a scope mixed into two of them
+ * would file rows where the third cannot find them. */
+static unsigned int agg_hash(const char *stored, int artist)
+{
+    return fnv1a_str(stored) ^ ((unsigned)artist * 0x9E3779B9u);
+}
+
+/* Which of a row's two links names a row of 'parent'. */
+static int link_of(const struct pv_agg *a, enum pv_table parent)
+{
+    return (parent == PV_T_ALBUM) ? a->album : a->artist;
+}
+
+static int row_index(const struct pv_htable *t, const struct pv_agg *a)
+{
+    return a ? (int)(a - t->items) : PV_ROW_NONE;
+}
+
+/* Find or create, within an artist. NULL only when the table is full --
+ * which is a real outcome, not an impossible one: the caller records it so an
+ * undercount is visible rather than silent.
+ *
+ * 'artist' is PV_ROW_NONE for the artist table itself, and for a title or an
+ * album whose artist row could not be made. */
+static struct pv_agg *htable_get(struct pv_htable *t, const char *name,
+                                 int artist)
 {
     /* Hash and compare the STORED form. A longer name hashed in full would
      * never match its own truncated entry, and would make a new row on every
@@ -117,13 +172,13 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name)
     int i;
 
     strlcpy(key, name, sizeof(key));
-    h = fnv1a_str(key);
+    h = agg_hash(key, artist);
     i = (int)(h & (unsigned)t->mask);
 
     while (t->slots[i])
     {
         struct pv_agg *a = &t->items[t->slots[i] - 1];
-        if (strcmp(a->name, key) == 0)
+        if (a->artist == artist && strcmp(a->name, key) == 0)
             return a;
         i = (i + 1) & t->mask;
     }
@@ -136,6 +191,10 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name)
 
     struct pv_agg *a = &t->items[t->n];
     strlcpy(a->name, key, sizeof(a->name));
+    /* The buffer arrives zeroed, so both links have to be set: zero is row 0,
+     * not "no row". */
+    a->artist = artist;
+    a->album  = PV_ROW_NONE;
     t->slots[i] = t->n + 1;
     t->n++;
     return a;
@@ -167,6 +226,7 @@ static void day_add(long day, unsigned secs, unsigned long offset)
         days[day_n].day = day;
         days[day_n].count = 1;
         days[day_n].secs = secs;
+        days[day_n].skips = 0;
         /* The first entry seen for this day, which is where a later reader
          * should start looking for it. */
         days[day_n].offset = offset;
@@ -179,6 +239,29 @@ static void day_add(long day, unsigned secs, unsigned long offset)
 }
 
 #ifdef HAVE_ALBUMART
+/* A skip on a day that was also listened to.
+ *
+ * Deliberately does not create a day: see struct pv_day. The cost is that
+ * skips on a day with no completed play are not counted anywhere per-day,
+ * which is a day spent skipping everything and nothing else. */
+static void day_skip(long day)
+{
+    if (day_n && days[day_n - 1].day == day)
+    {
+        days[day_n - 1].skips++;
+        return;
+    }
+
+    for (int i = 0; i < day_n; i++)
+    {
+        if (days[i].day == day)
+        {
+            days[i].skips++;
+            return;
+        }
+    }
+}
+
 /* The artwork cache's key for the folder holding 'path', or for that folder's
  * parent when 'up' is set -- which under an <artist>/<album>/<track> layout is
  * the artist's own folder, and is exactly how art_cache generates its keys
@@ -233,7 +316,8 @@ static void htable_reindex(struct pv_htable *t)
     memset(t->slots, 0, (size_t)(t->mask + 1) * sizeof(int));
     for (int i = 0; i < t->n; i++)
     {
-        int s = (int)(fnv1a_str(t->items[i].name) & (unsigned)t->mask);
+        int s = (int)(agg_hash(t->items[i].name, t->items[i].artist)
+                      & (unsigned)t->mask);
         while (t->slots[s])
             s = (s + 1) & t->mask;
         t->slots[s] = i + 1;
@@ -247,6 +331,7 @@ static void index_identity(struct pv_index_id *id, enum pv_source src)
     id->day_size    = sizeof(struct pv_day);
     id->totals_size = sizeof(struct pv_totals);
     id->state_size  = sizeof(struct pv_badge_state);
+    id->year        = (unsigned long)cur_year;
 }
 
 /* Read a saved index into the tables, which the caller has already sized.
@@ -263,6 +348,7 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
         return false;
 
     if (!pv_index_read(&saved, sizeof(saved))
+        || !pv_index_read(&lifetime, sizeof(lifetime))
         || !pv_index_read(&n_artist, sizeof(n_artist))
         || !pv_index_read(&n_title, sizeof(n_title))
         || !pv_index_read(&n_album, sizeof(n_album))
@@ -352,6 +438,7 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
         return;
 
     if (pv_index_write(out, sizeof(*out))
+        && pv_index_write(&lifetime, sizeof(lifetime))
         && pv_index_write(&t_artist.n, sizeof(t_artist.n))
         && pv_index_write(&t_title.n, sizeof(t_title.n))
         && pv_index_write(&t_album.n, sizeof(t_album.n))
@@ -375,8 +462,9 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     char artist[PV_NAME_MAX], title[PV_NAME_MAX], album[PV_NAME_MAX];
     enum pv_name_src src;
     unsigned elapsed;
-    bool night;
-    struct pv_agg *a;
+    bool night, year;
+    struct pv_agg *ar = NULL, *al = NULL, *ti = NULL;
+    int ar_idx = PV_ROW_NONE, al_idx = PV_ROW_NONE;
 
     if (e->artist)
     {
@@ -398,6 +486,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     }
 
     elapsed = (unsigned)(e->elapsed_ms / 1000);
+    year = in_year(e);
 
     /* Counted here rather than from the reader's return value, so that a pass
      * over only the new tail of the log adds to what was loaded instead of
@@ -405,9 +494,13 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
      * reason -- extending is the same arithmetic as building, applied to
      * fewer entries. */
     t->lines++;
+    lifetime.lines++;
 
     if (!e->valid_ts)
+    {
         t->unset_clock++;
+        lifetime.unset_clock++;
+    }
 
     /* Keep the first few properly-named entries, so "the names are real" is
      * something that can be seen rather than inferred from a counter. */
@@ -419,70 +512,165 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
         t->samples++;
     }
 
+    /* The three rows this entry belongs to, made in order: an album is
+     * identified within its artist and a title within both, so each has to
+     * exist before the next can name it. Only for entries that played or were
+     * skipped -- a browsing tap should leave no row behind. */
+    if (e->listened || e->skipped)
+    {
+        /* Only for a name there is. A row with an empty name is not an
+         * unnamed artist, it is no artist: it collects the plays of every
+         * entry whose name could not be resolved, ranks on the total and
+         * arrives in the top ten as a card with nothing on it. Leaving the
+         * row out instead gives ar_idx = PV_ROW_NONE, which is what the
+         * header already means by "the artist could not be recorded". */
+        if (artist[0])
+        {
+            ar = htable_get(&t_artist, artist, PV_ROW_NONE);
+            ar_idx = row_index(&t_artist, ar);
+        }
+        if (album[0] || artist[0])
+        {
+            al = htable_get(&t_album, album[0] ? album : artist, ar_idx);
+            al_idx = row_index(&t_album, al);
+        }
+        if (title[0])
+        {
+            ti = htable_get(&t_title, title, ar_idx);
+            if (ti)
+                ti->album = al_idx;
+        }
+    }
+
     if (e->listened)
     {
-        t->plays++;
-        t->seconds += elapsed;
+        lifetime.plays++;
+        lifetime.seconds += elapsed;
 
         night = e->valid_ts && (e->ts % 86400UL) / 3600UL < 5;
         if (night)
-            t->night++;
+            lifetime.night++;
 
-        a = htable_get(&t_artist, artist);
-        if (a)
+        if (year)
         {
-            a->count++;
-            a->seconds += elapsed;
+            t->plays++;
+            t->seconds += elapsed;
             if (night)
-                a->night++;
+                t->night++;
+        }
+
+        if (ar)
+        {
+            ar->count++;
+            ar->seconds += elapsed;
+            if (night)
+                ar->night++;
+            if (year)
+            {
+                ar->y_count++;
+                ar->y_seconds += elapsed;
+            }
 #ifdef HAVE_ALBUMART
-            if (a->art_hash == 0 && e->path && e->path[0])
-                a->art_hash = folder_hash(e->path, true);
+            if (ar->art_hash == 0 && e->path && e->path[0])
+                ar->art_hash = folder_hash(e->path, true);
 #endif
         }
 
-        a = htable_get(&t_title, title);
-        if (a)
+        if (ti)
         {
-            a->count++;
-            a->seconds += elapsed;
+            ti->count++;
+            ti->seconds += elapsed;
             if (night)
-                a->night++;
-            if (e->valid_ts && e->ts > a->last_ts)
-                a->last_ts = e->ts;
+                ti->night++;
+            if (year)
+            {
+                ti->y_count++;
+                ti->y_seconds += elapsed;
+            }
+            if (e->valid_ts && e->ts > ti->last_ts)
+                ti->last_ts = e->ts;
+#ifdef HAVE_ALBUMART
+            /* A song's picture is its album's, which is the folder the file
+             * itself sits in -- the same key the album row takes. */
+            if (ti->art_hash == 0 && e->path && e->path[0])
+                ti->art_hash = folder_hash(e->path, false);
+#endif
         }
 
-        a = htable_get(&t_album, album[0] ? album : artist);
-        if (a)
+        if (al)
         {
-            a->count++;
-            a->seconds += elapsed;
+            al->count++;
+            al->seconds += elapsed;
+            if (year)
+            {
+                al->y_count++;
+                al->y_seconds += elapsed;
+            }
 #ifdef HAVE_ALBUMART
-            if (a->art_hash == 0 && e->path && e->path[0])
-                a->art_hash = folder_hash(e->path, false);
+            if (al->art_hash == 0 && e->path && e->path[0])
+                al->art_hash = folder_hash(e->path, false);
 #endif
         }
 
         if (e->valid_ts)
         {
-            if (!t->ts_min || e->ts < t->ts_min)
-                t->ts_min = e->ts;
-            if (e->ts > t->ts_max)
-                t->ts_max = e->ts;
-            t->hour_hist[(e->ts % 86400UL) / 3600UL]++;
+            if (!lifetime.ts_min || e->ts < lifetime.ts_min)
+                lifetime.ts_min = e->ts;
+            if (e->ts > lifetime.ts_max)
+                lifetime.ts_max = e->ts;
+
+            lifetime.hour_hist[(e->ts % 86400UL) / 3600UL]++;
+
+            if (year)
+            {
+                if (!t->ts_min || e->ts < t->ts_min)
+                    t->ts_min = e->ts;
+                if (e->ts > t->ts_max)
+                    t->ts_max = e->ts;
+                t->hour_hist[(e->ts % 86400UL) / 3600UL]++;
+            }
+
+            /* The day array is the whole log, always: the badge engine walks
+             * it for streak and active-day thresholds, and those are for a
+             * lifetime. Every day figure the tiles want is filtered out of it
+             * by date instead, which costs nothing to store. */
             day_add((long)(e->ts / 86400UL), elapsed, e->offset);
         }
     }
     else if (e->skipped)
     {
-        t->skips++;
-        a = htable_get(&t_title, title);
-        if (a)
-            a->skips++;
+        /* Counted on all three rows, not just the title: an artist's skips
+         * and an album's are figures the tiles ask for, and neither can be
+         * recovered from the titles once the pass is over. */
+        lifetime.skips++;
+        if (year)
+            t->skips++;
+        if (ti)
+        {
+            ti->skips++;
+            if (year)
+                ti->y_skips++;
+        }
+        if (ar)
+        {
+            ar->skips++;
+            if (year)
+                ar->y_skips++;
+        }
+        if (al)
+        {
+            al->skips++;
+            if (year)
+                al->y_skips++;
+        }
+        if (e->valid_ts)
+            day_skip((long)(e->ts / 86400UL));
     }
     else
     {
-        t->taps++;
+        lifetime.taps++;
+        if (year)
+            t->taps++;
         return;         /* a browsing tap is not a play and not a skip */
     }
 
@@ -513,41 +701,111 @@ static void days_sort(void)
     }
 }
 
-static int longest_streak(void)
+/* Where the longest run of consecutive listening days sits in the array,
+ * within the year being shown. The length itself comes from derive(), which
+ * has to compute it anyway; this is for the tile that names the dates. */
+static int streak_run(int *from_i, int *to_i)
 {
-    int best = 0, run = 0;
+    int best = 0, run = 0, start = 0, best_start = 0, best_end = -1;
+    long prev = 0;
+    bool have = false;
 
     for (int i = 0; i < day_n; i++)
     {
-        run = (i > 0 && days[i].day == days[i - 1].day + 1) ? run + 1 : 1;
+        long d = days[i].day;
+
+        if (!day_in_year(d))
+            continue;
+
+        if (have && d == prev + 1)
+        {
+            run++;
+        }
+        else
+        {
+            run = 1;
+            start = i;
+        }
+        prev = d;
+        have = true;
+
         if (run > best)
+        {
             best = run;
+            best_start = start;
+            best_end = i;
+        }
     }
+
+    if (from_i)
+        *from_i = best_start;
+    if (to_i)
+        *to_i = best_end;
     return best;
 }
 
 /* A week's listening is the sum of its days', so it costs one pass over the
  * day array rather than a bin of its own during the read. */
-static void best_week(struct pv_totals *t)
+/* The figures that come from the tables and the day array rather than from
+ * counting entries as they arrive.
+ *
+ * Run twice: once over the year, for what the tiles read, and once over
+ * everything, for what the badges are scored against. One function because
+ * the two must agree about what a streak or a heaviest week is, and two
+ * walks with the same job drift. */
+static void derive(struct pv_totals *o, bool year_only)
 {
-    long cur_week = 0;
+    long prev = 0, cur_week = 0;
     unsigned cur_secs = 0;
+    int run = 0;
+    bool have_day = false, have_week = false;
+
+    o->titles = o->artists = o->albums = 0;
+    o->days = 0;
+    o->streak = 0;
+    o->best_week_secs = 0;
+    o->best_week_day = 0;
+
+    for (int i = 0; i < t_title.n; i++)
+        if (year_only ? t_title.items[i].y_count : t_title.items[i].count)
+            o->titles++;
+    for (int i = 0; i < t_artist.n; i++)
+        if (year_only ? t_artist.items[i].y_count : t_artist.items[i].count)
+            o->artists++;
+    for (int i = 0; i < t_album.n; i++)
+        if (year_only ? t_album.items[i].y_count : t_album.items[i].count)
+            o->albums++;
 
     for (int i = 0; i < day_n; i++)
     {
-        long w = WEEK_OF_DAY(days[i].day);
+        long d = days[i].day;
+        long w;
 
-        if (i == 0 || w != cur_week)
+        if (year_only && !day_in_year(d))
+            continue;
+
+        o->days++;
+
+        /* Against the last day KEPT, not the last day in the array: a year
+         * boundary must break a streak rather than be stepped over. */
+        run = (have_day && d == prev + 1) ? run + 1 : 1;
+        if (run > o->streak)
+            o->streak = run;
+        prev = d;
+        have_day = true;
+
+        w = WEEK_OF_DAY(d);
+        if (!have_week || w != cur_week)
         {
             cur_week = w;
             cur_secs = 0;
+            have_week = true;
         }
         cur_secs += days[i].secs;
-
-        if ((long)cur_secs > t->best_week_secs)
+        if ((long)cur_secs > o->best_week_secs)
         {
-            t->best_week_secs = (long)cur_secs;
-            t->best_week_day  = WEEK_START_DAY(w);
+            o->best_week_secs = (long)cur_secs;
+            o->best_week_day  = WEEK_START_DAY(w);
         }
     }
 }
@@ -611,16 +869,40 @@ static struct pv_htable *table_of(enum pv_table which)
 /* What a row scores under a given order. Zero or less means it does not
  * belong in that list at all -- a track with no skips has no business on the
  * skip card, and saying "0" there would be worse than saying nothing. */
+/* Ranking is what the tiles read, so it scores the year rather than the
+ * lifetime. Night is the exception the rows do not carry twice: it is only
+ * ever asked for alongside the year's own night total, and a night play
+ * outside the year cannot reach a row the year did not touch. */
+static bool rank_time;
+
+void pv_stats_rank_by_time(bool on)
+{
+    rank_time = on;
+}
+
+long pv_stats_weight(const struct pv_agg *a)
+{
+    if (!a)
+        return 0;
+    /* Seconds rather than minutes: a row played twice for forty seconds each
+     * would weigh zero in whole minutes, and zero is how the ranker says
+     * "leave this row out". */
+    return rank_time ? (long)a->y_seconds : a->y_count;
+}
+
+/* Skips and night plays stay counts in either mode. A skip has no listening
+ * time worth ranking by, and a night play is a time of day rather than a
+ * duration -- neither has a minutes reading to offer. */
 static int agg_metric(const struct pv_agg *a, enum pv_rank rank)
 {
     switch (rank)
     {
-    case PV_RANK_SKIPS: return a->skips;
-    case PV_RANK_LOYAL: return (a->skips == 0) ? a->count : 0;
+    case PV_RANK_SKIPS: return a->y_skips;
+    case PV_RANK_LOYAL: return (a->y_skips == 0) ? (int)pv_stats_weight(a) : 0;
     case PV_RANK_REDIS: return (a->last_ts && a->last_ts <= redis_cutoff)
-                               ? a->count : 0;
-    case PV_RANK_NIGHT: return a->night;
-    default:            return a->count;
+                               ? (int)pv_stats_weight(a) : 0;
+    case PV_RANK_NIGHT: return a->y_count ? a->night : 0;
+    default:            return (int)pv_stats_weight(a);
     }
 }
 
@@ -683,7 +965,8 @@ const struct pv_agg *pv_stats_rows(enum pv_table which, int *count)
     return t->items;
 }
 
-const struct pv_agg *pv_stats_find(enum pv_table which, const char *name)
+const struct pv_agg *pv_stats_find(enum pv_table which, const char *name,
+                                   int artist)
 {
     struct pv_htable *t = table_of(which);
     char key[PV_NAME_MAX];
@@ -693,20 +976,228 @@ const struct pv_agg *pv_stats_find(enum pv_table which, const char *name)
     if (!t->items || !t->slots)
         return NULL;
 
+    /* An artist row is scoped to nothing, so asking for one with a scope
+     * would look in the wrong place rather than simply miss. */
+    if (which == PV_T_ARTIST)
+        artist = PV_ROW_NONE;
+
     /* The stored form, as htable_get() uses -- a longer name would hash
      * differently from its own truncated row and never be found. */
     strlcpy(key, name, sizeof(key));
-    h = fnv1a_str(key);
+    h = agg_hash(key, artist);
     i = (int)(h & (unsigned)t->mask);
 
     while (t->slots[i])
     {
         struct pv_agg *a = &t->items[t->slots[i] - 1];
-        if (strcmp(a->name, key) == 0)
+        if (a->artist == artist && strcmp(a->name, key) == 0)
             return a;
         i = (i + 1) & t->mask;
     }
     return NULL;
+}
+
+int pv_stats_index(enum pv_table which, const struct pv_agg *row)
+{
+    struct pv_htable *t = table_of(which);
+    int idx;
+
+    if (!row || !t->items)
+        return PV_ROW_NONE;
+
+    idx = (int)(row - t->items);
+    return (idx >= 0 && idx < t->n) ? idx : PV_ROW_NONE;
+}
+
+const struct pv_agg *pv_stats_row(enum pv_table which, int idx)
+{
+    struct pv_htable *t = table_of(which);
+
+    if (!t->items || idx < 0 || idx >= t->n)
+        return NULL;
+
+    return &t->items[idx];
+}
+
+/* Both of these walk the child table rather than index into it. The tables
+ * are keyed by identity, not by parent, so there is no list of an artist's
+ * songs to follow -- and building one would cost a row's worth of memory to
+ * answer a question asked about ten rows. */
+int pv_stats_child_count(enum pv_table child, enum pv_table parent, int idx)
+{
+    struct pv_htable *t = table_of(child);
+    int n = 0;
+
+    if (idx < 0 || !t->items)
+        return 0;
+
+    for (int i = 0; i < t->n; i++)
+    {
+        /* Played, not merely seen: this figure sits beside a play count, and
+         * a song only ever skipped was never listened to. */
+        if (t->items[i].y_count > 0 && link_of(&t->items[i], parent) == idx)
+            n++;
+    }
+
+    return n;
+}
+
+const struct pv_agg *pv_stats_best_child(enum pv_table child,
+                                         enum pv_table parent, int idx)
+{
+    struct pv_htable *t = table_of(child);
+    const struct pv_agg *best = NULL;
+
+    if (idx < 0 || !t->items)
+        return NULL;
+
+    for (int i = 0; i < t->n; i++)
+    {
+        const struct pv_agg *a = &t->items[i];
+
+        if (a->y_count <= 0 || link_of(a, parent) != idx)
+            continue;
+        if (!best || pv_stats_weight(a) > pv_stats_weight(best))
+            best = a;
+    }
+
+    return best;
+}
+
+/* A week is a range of the day array, which is sorted, so every figure below
+ * is a walk of it and nothing is kept as the log is read. */
+
+/* The first and last day of the year being shown, as indices into the
+ * lifetime day array. -1 when the year has nothing in it. */
+static int first_year_day(void)
+{
+    for (int i = 0; i < day_n; i++)
+        if (day_in_year(days[i].day))
+            return i;
+    return -1;
+}
+
+static int last_year_day(void)
+{
+    for (int i = day_n - 1; i >= 0; i--)
+        if (day_in_year(days[i].day))
+            return i;
+    return -1;
+}
+
+int pv_stats_week_count(void)
+{
+    int a = first_year_day(), b = last_year_day();
+
+    if (a < 0 || b < 0)
+        return 0;
+
+    return (int)(WEEK_OF_DAY(days[b].day) - WEEK_OF_DAY(days[a].day)) + 1;
+}
+
+bool pv_stats_week(int i, struct pv_week *out)
+{
+    long start;
+
+    if (!out || i < 0 || i >= pv_stats_week_count())
+        return false;
+
+    start = WEEK_START_DAY(WEEK_OF_DAY(days[first_year_day()].day) + i);
+
+    memset(out, 0, sizeof(*out));
+    out->start_day = start;
+    out->best_day = -1;
+
+    for (int d = 0; d < day_n; d++)
+    {
+        int slot;
+
+        if (days[d].day < start)
+            continue;
+        if (days[d].day >= start + 7)
+            break;      /* sorted, so the week is one contiguous run */
+
+        /* A week can straddle 1 January, and the days on the far side of it
+         * belong to the other year. */
+        if (!day_in_year(days[d].day))
+            continue;
+
+        slot = (int)(days[d].day - start);
+        out->day_secs[slot] = days[d].secs;
+        out->secs  += days[d].secs;
+        out->plays += days[d].count;
+        out->skips += days[d].skips;
+
+        if (out->best_day < 0
+            || days[d].secs > out->day_secs[out->best_day])
+            out->best_day = slot;
+    }
+
+    return true;
+}
+
+int pv_stats_active_weeks(void)
+{
+    long prev = 0;
+    int n = 0;
+    bool have = false;
+
+    for (int i = 0; i < day_n; i++)
+    {
+        long w;
+
+        if (!day_in_year(days[i].day))
+            continue;
+
+        w = WEEK_OF_DAY(days[i].day);
+        if (!have || w != prev)
+        {
+            n++;
+            prev = w;
+            have = true;
+        }
+    }
+
+    return n;
+}
+
+bool pv_stats_longest_day(struct pv_day *out)
+{
+    int best = -1;
+
+    for (int i = 0; i < day_n; i++)
+    {
+        if (!day_in_year(days[i].day))
+            continue;
+        if (best < 0 || days[i].secs > days[best].secs)
+            best = i;
+    }
+
+    if (best < 0)
+        return false;
+    if (out)
+        *out = days[best];
+    return true;
+}
+
+bool pv_stats_streak_span(long *from_day, long *to_day, unsigned *secs)
+{
+    unsigned s = 0;
+    int a, b;
+
+    if (streak_run(&a, &b) <= 0)
+        return false;
+
+    for (int i = a; i <= b; i++)
+        s += days[i].secs;
+
+    if (from_day)
+        *from_day = days[a].day;
+    if (to_day)
+        *to_day = days[b].day;
+    if (secs)
+        *secs = s;
+    return true;
 }
 
 const struct pv_day *pv_stats_days(int *count)
@@ -884,21 +1375,13 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     /* Titles with no play at all are skip-only rows: real entries, and part
      * of the table, but not something the deck would ever call a track you
      * listened to. Count what was actually heard. */
-    out->titles = 0;
-    for (int i = 0; i < t_title.n; i++)
-    {
-        if (t_title.items[i].count > 0)
-            out->titles++;
-    }
-    out->artists = t_artist.n;
-    out->albums  = t_album.n;
-
     long t_post = current_tick;
 
     days_sort();
-    out->days   = day_n;
-    out->streak = longest_streak();
-    best_week(out);
+
+    /* Twice: the year for the tiles, everything for the badges. */
+    derive(out, true);
+    derive(&lifetime, false);
 
     /* "Not heard in a while" is a third of however long the log covers,
      * held between two and six weeks. A fixed window would mean the
@@ -921,7 +1404,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     out->ms_post = (current_tick - t_post) * 1000 / HZ;
     out->overflowed = overflowed;
 
-    out->badges_unlocked = pv_badges_eval(&badge_state, out);
+    /* Scored against the whole log, never the year: a badge earned in one
+     * year does not stop being earned in the next. */
+    out->badges_unlocked = pv_badges_eval(&badge_state, &lifetime);
     out->badges_total = pv_badges_count();
 
     /* Saved here rather than the moment the log was read, so the file holds a
@@ -934,10 +1419,54 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     return PV_BUILD_OK;
 }
 
+const struct pv_totals *pv_stats_lifetime(void)
+{
+    return &lifetime;
+}
+
+int pv_stats_year(void)
+{
+    return cur_year;
+}
+
+void pv_stats_year_span(int *first, int *last)
+{
+    int y, m, d;
+
+    if (first)
+        *first = 0;
+    if (last)
+        *last = 0;
+
+    if (!lifetime.ts_min || !lifetime.ts_max)
+        return;
+
+    pv_civil_from_days((long)(lifetime.ts_min / 86400UL), &y, &m, &d);
+    if (first)
+        *first = y;
+    pv_civil_from_days((long)(lifetime.ts_max / 86400UL), &y, &m, &d);
+    if (last)
+        *last = y;
+}
+
 enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
-                                    struct pv_totals *out)
+                                    struct pv_totals *out, int year)
 {
     enum pv_build_result r;
+
+    cur_year = year;
+    if (year == PV_YEAR_ALL)
+    {
+        year_lo = 0;
+        year_hi = ~0UL;
+    }
+    else
+    {
+        year_lo = (unsigned long)pv_days_from_civil(year, 1, 1) * 86400UL;
+        year_hi = (unsigned long)pv_days_from_civil(year + 1, 1, 1) * 86400UL;
+    }
+
+    memset(&lifetime, 0, sizeof(lifetime));
 
     /* Reading a megabyte and hashing ten thousand entries is exactly the
      * bounded, user-is-waiting work the core boosts for everywhere else it

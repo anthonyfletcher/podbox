@@ -69,13 +69,12 @@ through an entire album or tackle tracks individually to set new high scores.
 Launch Spike from the context menu (hold <code>Select</code>) on the Now Playing 
 screen, or while a track is highlighted in the music browser.
 
-## Spun embedded
+## Playback report
 
-<img src="docs/podbox/images/ss_grid_spun.png" alt="Screenshot"/>
+<img src="docs/podbox/images/ss_grid_playback_report.png" alt="Screenshot"/>
 
-A modified version of Spun is embedded which reads your playback log (whether it's the
-default logging or last.fm logging) and presents a summary of your year in music.  Hold
-Menu to save the cards to your iPod.  See [here](https://github.com/majorsiebe/Stats_for_iPod) for more information.
+Derived from Spun (see [here](https://github.com/majorsiebe/Stats_for_iPod)), playback report reads your playback log (whether it's the
+default logging or last.fm logging) and provides insights into your listening habits.
 
 ---
 
@@ -103,6 +102,12 @@ the whole update.
 > [Rockbox installation guide](https://www.rockbox.org/manual.shtml) for your
 > model first. If you are already running Rockbox or RockPod, unzipping is all
 > you need.
+
+## First run
+
+When you first load PodBox it will be building your music and art database which will
+affect performance initially (particularly on the 5G).  You can check progress of the 
+background tasks by going to `System > Background tasks`.
 
 # Setting up your music library
 
@@ -257,6 +262,18 @@ your position.
   - In auto mode the art will be shown depending on how you arrived at playing the track. If
 you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
  Album > Track` the album art would show.
+
+## Playback report
+
+- A scrolling row of cards built from your log -  In numbers, Week by week, Top artists, Top songs, Top albums,
+Skips and Achievements - plus Newly unlocked, when you have earned something
+since you last looked
+  - The wheel scrolls along a section, `Left`/`Right` change section
+  - `Select` opens a card and folds the detail out behind it - the figures, who a
+song is by, the album it came from
+  - `Play` on an artist, album or song card plays it
+  - Hold `Menu` for the year picker and the settings.  The report covers one
+  calendar year at a time, or all time
 
 ## Files/Documents/Images
 

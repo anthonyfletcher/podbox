@@ -343,6 +343,38 @@ A short beep when skipping tracks, as feedback that the press registered.
 The sample rate the output runs at. Auto follows the file and is right almost
 always; forcing a rate resamples everything.
 
+[spun artwork]
+Whether the report's cards show album and artist sleeves. A card without one
+draws a pattern instead, which is part of the design rather than a stand-in,
+so this is a choice of look and not a downgrade.
+
+It also decides how the report spends its memory. The pictures are the largest
+fixed claim it makes, so turning them off gives that back to the statistics: on
+a very large library, more of it fits and fewer rows are dropped. Because that
+division is settled as the report opens, changing this from inside it reads the
+log again -- the same pause a change of year costs.
+
+[spun top count]
+How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is
+enough to see a shape without walking a long way; five is a podium and
+twenty-five is a survey.
+
+[spun badge order]
+How the Achievements section is arranged. As Listed keeps the order the
+achievements were written in, which groups related ones together. Earned First
+puts what you have won at the front, Newest First orders those by when, and
+Closest First leads with whatever you are nearest to winning.
+
+[spun rank by]
+What the Top Artists, Top Songs and Top Albums sections are ordered on. Plays
+counts how often you started something. Minutes counts how long you listened
+to it.
+
+The two disagree more than you would expect. Plays favours short tracks and a
+song you keep restarting; minutes favours albums you sit through and anything
+long. Skips and night plays are counted either way, because neither has a
+listening time to rank by.
+
 [spike caption]
 Names the track under Spike's field, with the time remaining beside it. The
 field rises to make room, so the game is a little smaller with this on. Off

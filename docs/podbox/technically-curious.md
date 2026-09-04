@@ -23,7 +23,7 @@
 - **No plugin system.** The handful of plugins worth keeping became ordinary core
   screens: the text and image viewers, properties, playing time, credits. Two
   more were written as core screens from the start — the lyrics viewer and the
-  Spun listening-statistics deck. If you miss Doom you need help.
+  Playback Report listening statistics. If you miss Doom you need help.
 
 **The application layer is a different tree.** `apps-ipod/` replaces Rockbox's
 `apps/`: reorganised by purpose to make development easier, and every file
