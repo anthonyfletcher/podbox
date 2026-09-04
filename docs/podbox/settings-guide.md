@@ -517,6 +517,19 @@ shadow to colour.
 
 ---
 
+## Spike
+
+Held Menu inside the game, not Settings — but they are settings like any
+other, so they survive leaving the game and survive the session.
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Now Playing | Names the track under Spike's field, with the time remaining beside it. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off | |
+| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding, which is what keeps it readable on this screen. Off is the calmer choice while you are playing, and shows as much of the name as fits. | Off | |
+| Audio Offset | How far ahead of the sound the game judges a press. Raise it if your presses feel late when they sounded on the beat, lower it if they feel early. It corrects the delay below the player's own buffer -- headphones and the codec -- so it is worth setting once and leaving. | -50 ms | **Adv** |
+
+---
+
 ## Settings a theme resets
 
 Loading a theme returns every setting that describes the look to its default
