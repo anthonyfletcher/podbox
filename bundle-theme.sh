@@ -54,6 +54,9 @@ cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/default-config.cfg"
 # that named it would fall back to the system font without saying so.
 mkdir -p "$STAGE/.rockbox/fonts"
 cp "$ROOT/apps-ipod/fonts/"*.fnt "$STAGE/.rockbox/fonts/"
+# The licence texts go with them for the same reason: scrim ships copies of
+# both, so dropping it would take the only copy on the player with it.
+cp "$ROOT/apps-ipod/fonts/"LICENSE-*.txt "$STAGE/.rockbox/fonts/"
 
 # The house style a theme is loaded on top of. Loading a theme resets every
 # setting describing the look, and without this the reset lands on upstream's

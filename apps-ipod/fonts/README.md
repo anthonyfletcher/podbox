@@ -32,3 +32,17 @@ above, and for one more: that face's codepoint table is generated from a
 folder that is not in this tree either, so an entry in it can only ever be
 checked against the screen -- which is exactly where a wrong icon looks
 plausible.
+
+## Licences
+
+Both faces are drawn from someone else's work, so the full licence text of
+each sits beside them here and `bundle-theme.sh` puts it on the player with
+the fonts. Scrim carries the same two texts, but a theme is not a dependency:
+these have to stand on their own.
+
+- Material Design Icons (`24-spun-badges`)
+  - Created by Google (https://fonts.google.com/icons)
+  - Apache License Version 2.0 — `LICENSE-Material-Design-Icons.txt`
+- Noto Serif (`NN-noto-serif-figures`)
+  - Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
+  - SIL Open Font License, Version 1.1 — `LICENSE-Noto.txt`
