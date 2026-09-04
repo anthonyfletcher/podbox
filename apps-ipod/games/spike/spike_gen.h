@@ -40,12 +40,14 @@
 #define SPK_C_SWM    0x600000u   /* what its switch does here, in 21-22 */
 #define SPK_C_SPK    0x800000u   /* the creature here has a spike on its head */
 #define SPK_C_SPR   0x1000000u   /* a spring, on the ground and nowhere else */
+#define SPK_C_FLY   0x2000000u   /* a flyer meets the player here, level 26-27 */
 
 #define SPK_C_DI_SH  8
 #define SPK_C_CR_SH  11
 #define SPK_C_BL_SH  14
 #define SPK_C_SW_SH  19
 #define SPK_C_SWM_SH 21
+#define SPK_C_FL_SH  26
 
 /* What a switch does to a cell that waits on it. Exactly one of these, which
  * is why it is a field and not a flag each: a cell whose platforms wait and
@@ -55,6 +57,22 @@
 #define SPK_SW_PLAT     1u   /* the platforms wait; the floor stays */
 #define SPK_SW_GROUND   2u   /* the ground waits; the platforms stand */
 #define SPK_SW_SWAP     3u   /* one for the other, never both */
+
+/* The one thing on the field that is not where it is drawn.
+ *
+ * A flyer is authored in the cell it *meets the player in*, and it is at that
+ * cell on the beat that cell's index names -- which is the rule every other
+ * obstacle already follows, and the whole reason a moving one costs the rules
+ * nothing at all. Where it is before then is arithmetic: it closes a cell a
+ * beat and so does the player, so at beat b it is at cell 2M - b, and the two
+ * of them are in the same place only at b = M.
+ *
+ * Two consequences the author has to hold in mind, because nothing checks
+ * them. It closes at two cells a beat *on screen*, so it is only in view for
+ * about three beats before it arrives -- that is the obstacle. And it flies
+ * in over the cells after its own, so it wants three clear of platforms at
+ * its level behind it, and it should sit at least three cells from the end
+ * of its phrase or it arrives over cells the phrase does not own. */
 
 /* What a pattern is about, so the music can ask for one of a kind. */
 #define SPK_T_REST       0x01
@@ -122,10 +140,29 @@ void spk_gen_reset(int cell);
  * patterns inside one frame. */
 void spk_gen_set_flat(bool flat);
 
-/* The track's tempo, mixed into every choice, so that two songs do not lay
- * the same course at the same cell index. Latched once with the tempo and
- * never revisited, which is what keeps it as fixed as the song is. */
-void spk_gen_set_seed(int seed);
+/* The grid's period, in milliseconds. The only thing about the song the
+ * generator is told, latched once with the tempo and never revisited, which
+ * is what keeps it as fixed as the song is.
+ *
+ * It does two jobs and both are the tempo's. It seeds the phrase hash, so
+ * two songs do not lay the same course at the same cell index. And it moves
+ * the difficulty ceiling, because a cell is a beat: the period is the whole
+ * of the time a player has to read the cell in front of them, so the same
+ * phrase is a harder phrase on a quick track. */
+void spk_gen_set_tempo(int beat_ms);
+
+/* How far the run has come, and the cell that was true at. The difficulty
+ * ramp is measured against this and not against the track's own beat count:
+ * a track is three and a half minutes, which is not long enough to learn a
+ * game in, and keyed to the track every song handed the player the opening
+ * again. The run is the arc.
+ *
+ * Two numbers rather than one because the cell numbering moves at every
+ * track change, and the pair is what survives that. Restated at each
+ * boundary, and spk_gen_reset() zeroes it -- a caller that never sets it
+ * gets a ramp measured from wherever it reset, which is what the harnesses
+ * want. */
+void spk_gen_set_run(long beats, int cell);
 
 /* Which residue of four the music's downbeat falls on, so that phrases begin
  * where bars do. Zero where it was never found.

@@ -61,7 +61,6 @@
 #include "games/spike/spike_gen.h"
 #include "games/spike/spike_menu.h"
 #include "games/spike/spike_music.h"
-#include "games/spike/spike_text.h"
 #include "games/spike/spike_pose.h"
 #include "games/spike/spike_world.h"
 
@@ -69,8 +68,16 @@
  * to the next one, which is usually fatal -- that is the game. */
 #define SPK_WINDOW_MS        110
 
-/* The beats a death costs. */
-#define SPK_SKIP_BEATS       4
+/* How far ahead of the death the run looks for somewhere to put the player
+ * back, and so how long the coming-back takes.
+ *
+ * Three, because that is what the drop needs and the drop is what those beats
+ * are for: two of falling and one of standing on the cell while the world
+ * carries it home. The hunt walks on from there if it has to -- it wants
+ * somewhere to stand with two clear beats after it -- so the field can run on
+ * longer, but never for nothing. Four beats of empty scrolling before any of
+ * this existed read as the game thinking. */
+#define SPK_DROP_BEATS       3
 
 /* Beats of slack on the end of the outro test. The assembler is asked
  * whether the pattern it is *about* to lay would still be under the player
@@ -105,9 +112,14 @@
 #define SPK_STOPPED_TICKS   (HZ / 2)
 
 /* The results screen has no music to keep time with -- the playlist may
- * have ended -- so its gymnastics run on wall time at the grid's own
- * target tempo. */
-#define SPK_RESULT_BEAT     (HZ / 2)
+ * have ended -- so its gymnastics run on wall time.
+ *
+ * Slower than the grid's own tempo, and deliberately. A move a beat at a
+ * hundred and twenty is the right speed for hopping over things and too fast
+ * to watch a body turn: the tuck spin gets through two full revolutions, and
+ * at half a second nothing in the move reads except that it happened. Nothing
+ * here is being timed, so the routine takes the time the moves want. */
+#define SPK_RESULT_BEAT     (HZ * 4 / 5)
 
 /* What things are worth, and what a death costs.
  *
@@ -165,13 +177,16 @@
 #define SPK_SHIFT_MIN        (-1)
 #define SPK_SHIFT_MAX        1
 
-enum spk_run
+/* Where the run is. Named for the state and not for the run, because
+ * `spk_run` is the run itself -- what it came to, over in spike_score.h --
+ * and a tag is a tag whether a struct or an enum wears it. */
+enum spk_run_state
 {
     SPK_RUN_COUNT,       /* walking on, and waiting for a tempo */
     SPK_RUN_PLAY,
     SPK_RUN_DEAD,        /* one beat, frozen, playing the death */
-    SPK_RUN_SKIP,        /* dimmed, on the way to a respawn */
-    SPK_RUN_OVER         /* the mode says this run has ended */
+    SPK_RUN_SKIP,        /* gone, and then falling back in */
+    SPK_RUN_OVER         /* playback has stopped: there is no more of it */
 };
 
 /* Kept across entries so a calibration survives leaving the screen. It is
@@ -233,8 +248,7 @@ static int  bar_rot;            /* the downbeat's residue of four, -1 unknown */
 
 static long anchor_ms;              /* grid time zero, in clock terms */
 static int  cur_beat;
-static enum spike_mode play_mode;
-static enum spk_run run_state;
+static enum spk_run_state run_state;
 static long run_beats;              /* how far the run has come */
 static long stopped_at;             /* tick playback was first seen stopped */
 static bool run_began;              /* ...and whether it ever did */
@@ -244,6 +258,7 @@ static int  death_scroll;       /* ...and where the scroll had got to */
 static long last_grid;          /* grid time as of the last frame */
 static int  listened;           /* beats spent waiting for a tempo */
 static int  respawn_cell;
+static int  respawn_level;      /* ...and the surface to come back on */
 
 static struct spk_state world;
 
@@ -263,12 +278,23 @@ static long press_total;
 static int  press_count;
 static int  press_last;
 
-/* What this run has to beat, read once on the way in. Run's is one number
- * for the player; Song's belongs to the track, so the path is taken at
- * entry -- in Song the track cannot change without ending the attempt. */
+/* What this run has to beat, read once on the way in: the file is not
+ * touched again until the run ends. */
 static long best_score;
-static long best_beats;
-static char best_path[MAX_PATH];
+
+/* What the run will be remembered by, gathered as it goes. The track names
+ * are not here -- they are written to the log as each one starts, because a
+ * run is however many tracks the player has patience for and sixty paths is
+ * most of what the game costs.
+ *
+ * The tempo is summed rather than averaged as it goes, so the mean is a mean
+ * of the tracks that found one and not of the run's wall time. */
+static struct spk_run run_stats;
+static long run_start_tick;
+static long bpm_total;
+static int  bpm_tracks;
+static bool bpm_counted;            /* ...and whether this track is in it */
+static char cur_path[MAX_PATH];     /* the track the log last recorded */
 
 
 /** The screen furniture **/
@@ -354,7 +380,22 @@ static bool spike_latch_tempo(void)
 
     /* The course is the song's, and this is the only thing about the song
      * the generator is told. Latched with the tempo and never revisited. */
-    spk_gen_set_seed(beat_ms);
+    spk_gen_set_tempo(beat_ms);
+
+    /* And the run's tempo is the mean of the tracks that found one. A track
+     * the tracker never locked contributes nothing rather than a zero.
+     *
+     * Once a track, not once a latch: a seek, a rebuffer or a stall reseeds
+     * the clock and comes back through here on the same song, and counting
+     * each of those would weight a track by how unsettled its playback was.
+     * spike_note_track() clears the flag when the path actually changes, and
+     * it runs at the top of the boundary that reaches this. */
+    if (!bpm_counted)
+    {
+        bpm_total += tempo_bpm;
+        bpm_tracks++;
+        bpm_counted = true;
+    }
 
     /* Nothing reads the tracker again. The tempo is latched for the run by
      * §0.5, so the analyser has done its whole job here -- and it is by far
@@ -392,25 +433,30 @@ static bool spike_latch_tempo(void)
 
 /** The grid **/
 
-/* Whether the track under a Song attempt is still the one it was against.
+/* The track that is playing, logged where it is not the one that was.
  *
- * The clock says the audio moved; only the path says it moved to something
- * else. Ending an attempt is the one thing here that cannot be undone, so
- * it is worth a second opinion -- everything that can jog the clock without
- * changing the track (a rebuffer, a stall the game was not running through)
- * stops being able to end a run.
+ * Written as it starts rather than kept: the run's own numbers are five, and
+ * everything else it will be remembered by is a track name, which belongs in
+ * a file. Asked once a beat, which is often enough that nothing is missed
+ * and cheap enough not to matter.
  *
- * With no path to compare -- a database row whose file was never opened --
- * the clock is all there is, which is where this started. */
-static bool spike_track_changed(void)
+ * Keyed on the path and not the title, because the path is what a track is:
+ * two tracks can share a name, and a seek must not read as a change. */
+static void spike_note_track(void)
 {
     struct mp3entry *id3 = audio_current_track();
+    const char *title;
 
-    if (best_path[0] == '\0')
-        return true;
+    if (id3 == NULL || id3->path[0] == 0
+        || strcmp(id3->path, cur_path) == 0)
+        return;
 
-    return id3 == NULL || id3->path == NULL
-           || strcmp(id3->path, best_path) != 0;
+    strlcpy(cur_path, id3->path, sizeof (cur_path));
+    bpm_counted = false;
+
+    title = id3->title != NULL && *id3->title ? id3->title : id3->path;
+    spk_score_played(title, id3->genre_string);
+    run_stats.tracks++;
 }
 
 /* Grid time, which is clock time with the run's origin and the output delay
@@ -465,6 +511,7 @@ static void spike_listen(int cell)
      * ends the line -- so a world left in one sits there for the whole wait,
      * looping the pose it was in and never reaching another boundary. */
     spk_gen_reset(cell);
+    spk_gen_set_run(run_beats, cell);
     spk_gen_set_flat(true);
     spk_state_start(&world, cell);
     phrase_at = spk_gen_pattern_start(cell);
@@ -586,19 +633,11 @@ static void spike_die(enum spk_death kind, long at, int scroll)
 
     /* The combo is the run's memory of playing in time, so a death has to
      * take it: keeping it would make surviving badly as good as playing
-     * well, which is the one thing the scoring is there to separate.
-     *
-     * Song pays no points, because the death already costs it the rest of
-     * the track. There is one life a track, so what dying takes is every
-     * point that was still to come -- charging 1000 on top would charge the
-     * same death twice. */
+     * well, which is the one thing the scoring is there to separate. */
     combo = 0;
-    if (play_mode == SPIKE_MODE_RUN)
-    {
-        score -= SPK_PTS_DEATH;
-        if (score < 0)
-            score = 0;
-    }
+    score -= SPK_PTS_DEATH;
+    if (score < 0)
+        score = 0;
 
     /* And nothing else. A death costs points and the combo; it does not
      * touch the course. The course belongs to the song, and a player who
@@ -612,6 +651,24 @@ static void spike_die(enum spk_death kind, long at, int scroll)
  * clock that has jumped is a seek, and is handled as one. */
 static void spike_boundary(long grid_ms)
 {
+    /* Once a beat, which is often enough to catch every track and cheap
+     * enough to do from here rather than from a clock of its own. */
+    spike_note_track();
+
+    /* And the envelope, on every boundary rather than only the ones the
+     * player is alive for. The mixer reports a peak *since the last call*,
+     * so a beat that skips the reading makes the next one a peak over two --
+     * a death and the bar it stands still for would come back reading loud
+     * for having been missed. Handed to the assembler before anything asks
+     * it for a cell. */
+    {
+        struct spk_mood mood;
+
+        spk_music_beat();
+        spk_music_get(&mood);
+        spk_gen_set_mood(mood.energy, mood.flux, mood.trend);
+    }
+
     switch (run_state)
     {
     case SPK_RUN_COUNT:
@@ -643,6 +700,7 @@ static void spike_boundary(long grid_ms)
             int cell = (int)(spk_clock_ms() / (unsigned long)beat_ms);
 
             spk_gen_reset(cell);
+            spk_gen_set_run(run_beats, cell);
             spk_gen_set_flat(true);
             spk_state_start(&world, cell);
 
@@ -678,11 +736,17 @@ static void spike_boundary(long grid_ms)
         enum spk_outcome out = spk_state_advance(&world);
         int mult;
 
-        /* What Run reports beside the score, because "how long did you
-         * last" is the question that mode is asking and a score alone does
-         * not answer it. Counted here rather than from the cell index: the
-         * cell is the track's beat count and restarts with every track. */
+        /* How far the run has come, which is what it is measured by beside
+         * the score: "how long did you last" is a question a score alone
+         * does not answer. Counted here rather than from the cell index --
+         * the cell is the track's beat count and restarts with every one. */
         run_beats++;
+
+        /* The ramp is measured against the run and not against the track, so
+         * the assembler is told where the run has got to as well as where
+         * the cells are. Restated every beat because the cell numbering
+         * moves at every track change and the pair is what survives one. */
+        spk_gen_set_run(run_beats, world.beat);
 
         /* A contact has already fired, mid-beat, at the moment the two
          * met -- see the touch test in the loop. Reaching the boundary with
@@ -716,20 +780,6 @@ static void spike_boundary(long grid_ms)
             phrase_at = spk_gen_pattern_start(world.beat);
         }
 
-        /* The bar just heard, handed to the assembler before it is asked
-         * for any more cells. It runs a phrase or two ahead of the field,
-         * so what a phrase is chosen on is the music of a phrase or two
-         * ago -- which §9.4 says is exactly right: a pattern is committed
-         * long before it is reached, and no forward view into the audio
-         * could reach that far anyway. */
-        {
-            struct spk_mood mood;
-
-            spk_music_beat();
-            spk_music_get(&mood);
-            spk_gen_set_mood(mood.energy, mood.flux, mood.trend);
-        }
-
         mult = spike_multiplier();
 
         if (avoided)
@@ -757,6 +807,7 @@ static void spike_boundary(long grid_ms)
          * part-way through a beat. The loop ends it. */
         break;
 
+
     case SPK_RUN_OVER:
         /* It crosses no boundary: the loop stops counting them the moment
          * the run leaves the player's hands. */
@@ -766,7 +817,11 @@ static void spike_boundary(long grid_ms)
         world.beat++;
         if (world.beat >= respawn_cell)
         {
-            spk_state_start(&world, world.beat);
+            /* On the surface the hunt found, which is not always the ground:
+             * phrases are entered at the level they are left at, so a run at
+             * height stays there for as long as the library keeps offering
+             * phrases up there. */
+            spk_state_respawn(&world, world.beat, respawn_level);
 
             /* The run rejoins part-way through a phrase, so the phrase it
              * lands in was never crossed and cannot be cleared. */
@@ -874,6 +929,33 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
 
     f->st = &world;
     f->phase = (int)((sub * SPK_PHASE) / beat_ms);
+    f->drop_cells = -1;
+    f->drop_fall = 0;
+    f->drop_level = 0;
+
+    /* Coming back, which is the last few beats of the skip: the body falls
+     * onto the cell the run restarts from and then rides it home. Drawn
+     * against that cell rather than against its own column, so what brings it
+     * in is the scroll that is moving anyway.
+     *
+     * The fall is the beats before the last one and the ride is the last, so
+     * it is on its feet by the time it arrives and the walk takes over with
+     * nothing to catch up. */
+    if (run_state == SPK_RUN_SKIP)
+    {
+        int togo = respawn_cell - world.beat;
+
+        if (togo > 0 && togo <= SPK_DROP_BEATS)
+        {
+            long span = (long)(SPK_DROP_BEATS - 1) * SPK_PHASE;
+            long done = (long)(SPK_DROP_BEATS - togo) * SPK_PHASE + f->phase;
+
+            f->drop_cells = togo;
+            f->drop_level = respawn_level;
+            f->drop_fall = span > 0 && done < span
+                           ? (int)((done * SPK_PHASE) / span) : SPK_PHASE;
+        }
+    }
     f->now_ms = grid_ms > 0 ? (unsigned long)grid_ms : 0;
     f->strong = (cur_beat & 1) == 0;
     f->skipping = run_state == SPK_RUN_SKIP;
@@ -928,6 +1010,10 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
     }
 
     f->death_kind = death_kind;
+
+    /* The hold is the death's last frame, held: the age runs on past the
+     * beat and the clamp keeps it on the final pose, which is the body
+     * lying where it stopped. */
     if (run_state == SPK_RUN_DEAD)
     {
         long age = (grid_ms - death_at) * SPK_PHASE / beat_ms;
@@ -943,8 +1029,7 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
 }
 
 /* Leaving costs a run, so it is asked rather than taken -- Menu is one
- * button away from the jump and a run is twenty minutes of work. Run only:
- * Song is a track, and the attempt it discards is a minute at most.
+ * button away from the jump and a run is an evening's work.
  *
  * The dialog draws through the skin engine, so the game's display state is
  * handed back for it exactly as it is for the menu. */
@@ -1002,7 +1087,7 @@ static bool spike_paused(bool by_hold)
          * from the jump. */
         if (button == ACTION_SPIKE_EXIT)
         {
-            if (play_mode != SPIKE_MODE_RUN || spike_confirm_exit())
+            if (spike_confirm_exit())
             {
                 quit = true;
                 break;
@@ -1019,6 +1104,13 @@ static bool spike_paused(bool by_hold)
     }
 
     spike_set_paused(false);
+
+    /* The clock is carried by the ticks between position reports, and
+     * nothing here has been ticking it: left alone, the whole of the pause
+     * arrives on the next tick as one jump, the grid reads it as the audio
+     * having moved, and the run is restarted for having been paused. Track
+     * time did not move, so nothing but the stamps has to. */
+    spk_clock_resume();
     spk_draw_full_flush();
 
     return quit;
@@ -1042,6 +1134,7 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
 
     m.offset_ms = &global_settings.spike_offset;
     m.shift = &tempo_shift;
+    m.font = cap_font;
     m.beat_ms = beat_ms;
     m.bpm = tempo_bpm;
     m.bar = bar_rot;
@@ -1082,6 +1175,7 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
     viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
     lcd_set_backdrop(NULL);
     lcd_setfont(FONT_SYSFIXED);
+    spk_clock_resume();
     spk_draw_full_flush();
 
     /* Half, as latched, double. The grid moves with it, anchored so the
@@ -1099,20 +1193,40 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
     return root;
 }
 
-/* The end of a run, held until the player is done looking at it. Its own
+/* What a run came to, held until the player is done looking at it. Its own
  * loop, because it has nothing in common with the game's: no grid, no
- * clock, and one thing moving. */
-static void spike_result_screen(const struct spk_result *r)
+ * clock, and one thing moving.
+ *
+ * The wheel walks the track list. How many rows fit is the drawing's
+ * answer -- it depends on the face they are set in -- so the loop asks for
+ * a frame before it knows how far one press moves. */
+static void spike_summary_screen(struct spk_summary *s)
 {
+    /* The routine is picked a move at a time rather than cycled, so two
+     * looks at the same screen are not the same performance. It starts on
+     * the forward somersault, which is the one that most plainly says the
+     * body is pleased with itself. */
+    long last_beat = current_tick / SPK_RESULT_BEAT;
+    int move = 0;
+
+    s->first = 0;
+    s->shown = 0;
+
     while (1)
     {
         long t = current_tick;
+        long beat = t / SPK_RESULT_BEAT;
         int phase = (int)((t % SPK_RESULT_BEAT) * SPK_PHASE
                           / SPK_RESULT_BEAT);
-        int move = (int)((t / SPK_RESULT_BEAT) & 3);
         int button;
 
-        spk_draw_result(r, phase, move);
+        if (beat != last_beat)
+        {
+            move = spk_pose_idle_next(move);
+            last_beat = beat;
+        }
+
+        spk_draw_summary(s, phase, move);
 
         button = get_action(CONTEXT_SPIKE, HZ / 20);
 
@@ -1120,11 +1234,41 @@ static void spike_result_screen(const struct spk_result *r)
             || button == ACTION_SPIKE_PAUSE)
             break;
 
-        default_event_handler(button);
+        if (button == ACTION_SPIKE_UP && s->first > 0)
+            s->first--;
+        else if (button == ACTION_SPIKE_DOWN
+                 && s->first + s->shown < s->rows)
+            s->first++;
+        else
+            default_event_handler(button);
     }
 }
 
-bool spike_screen(enum spike_mode mode)
+/* The record, on the same screen a finished run is shown on -- because that
+ * is what it is: a run that ended some other evening. Reached from the
+ * game's own menu, which is why the face the names are set in is handed in
+ * rather than loaded: the game has it open. */
+void spike_best_screen(int font)
+{
+    struct spk_summary s;
+
+    if (!spk_score_best(&s.run))
+    {
+        splash(HZ, "No runs yet");
+        return;
+    }
+
+    s.best = 0;
+    s.crowned = true;
+    s.record = true;
+    s.font = font;
+    s.log = SPK_LOG_BEST;
+    s.rows = spk_score_tracks(SPK_LOG_BEST);
+
+    spike_summary_screen(&s);
+}
+
+bool spike_screen(void)
 {
     struct viewport vp;
     long next_frame, rate_due, mark;
@@ -1184,7 +1328,6 @@ bool spike_screen(enum spike_mode mode)
     press_total = 0;
     press_count = 0;
     press_last = 0;
-    play_mode = mode;
 
     /* Paused counts as playing -- PLAY_PAUSED is AUDIO_STATUS_PLAY with the
      * pause bit beside it -- so the check above lets a paused player in, and
@@ -1198,25 +1341,28 @@ bool spike_screen(enum spike_mode mode)
 
     /* Read once, on the way in: the file is not touched again until the run
      * ends, and never while one is running. */
-    best_path[0] = '\0';
-    if (mode == SPIKE_MODE_RUN)
-        spk_score_run(&best_score, &best_beats);
-    else
     {
-        struct mp3entry *id3 = audio_current_track();
+        struct spk_run was;
 
-        if (id3 != NULL && id3->path != NULL)
-            strlcpy(best_path, id3->path, sizeof (best_path));
-
-        best_score = spk_score_track(best_path);
-        best_beats = 0;
+        spk_score_best(&was);
+        best_score = was.score;
     }
 
-    /* Both modes pick the music up where it is. A run is played against the
-     * music that is on, not against a track from the top, and the scoring
-     * already answers the objection that entering late is an easier run:
-     * a death costs 1000, so nothing is won by meeting less course. Only a
-     * death seeks, and only in Song. */
+    /* And the log starts empty. The last run's has been looked at by now --
+     * its results screen was the last thing it did -- and a run that beat
+     * the record left the record a copy of its own. */
+    spk_score_begin();
+    memset(&run_stats, 0, sizeof (run_stats));
+    run_start_tick = current_tick;
+    bpm_total = 0;
+    bpm_tracks = 0;
+    bpm_counted = false;
+    cur_path[0] = '\0';
+
+    /* A run picks the music up where it is. It is played against the music
+     * that is on, not against a track from the top, and the scoring already
+     * answers the objection that entering late meets less course: a death
+     * costs 1000. Nothing seeks. */
     spk_clock_reset();
     spike_reset_run();
 
@@ -1239,7 +1385,7 @@ bool spike_screen(enum spike_mode mode)
         {
             /* The music is still playing here, so the run carries on
              * behind the question and the clock stays the run's. */
-            if (mode != SPIKE_MODE_RUN || spike_confirm_exit())
+            if (spike_confirm_exit())
                 break;
 
             next_frame = current_tick + frame_ticks;
@@ -1256,21 +1402,16 @@ bool spike_screen(enum spike_mode mode)
 
         /* The WPS's controls, carried over: a run is the WPS with a game
          * over it, and the player should not have to leave to turn the
-         * music down. The wheel is the volume while the field is moving and
-         * the offset slider on the pause overlay, which is a screen that is
-         * already stopped.
-         *
-         * Song has no skip. Skipping is safe by construction in Run -- a
-         * track change is spike_listen() and is seamless -- but a track
-         * Song did not play to the end is an attempt abandoned rather than
-         * one finished, and there is nothing to report for it. */
+         * music down. The wheel is the volume while the field is moving,
+         * and the skips are the skips -- a track change is spike_listen()
+         * and the run walks straight over it. */
         if (button == ACTION_SPIKE_UP)
             adjust_volume(1);
         else if (button == ACTION_SPIKE_DOWN)
             adjust_volume(-1);
-        else if (button == ACTION_SPIKE_NEXT && mode == SPIKE_MODE_RUN)
+        else if (button == ACTION_SPIKE_NEXT)
             audio_next();
-        else if (button == ACTION_SPIKE_PREV && mode == SPIKE_MODE_RUN)
+        else if (button == ACTION_SPIKE_PREV)
         {
             /* The WPS's rule, unchanged: near the top of a track it goes
              * back one, and after that it goes back to the top. */
@@ -1394,27 +1535,10 @@ bool spike_screen(enum spike_mode mode)
             {
                 clock_lost = true;
 
-                /* Nothing seeks in Song, so this is the track ending under
-                 * the player and the attempt is finished -- won or not,
-                 * there is no more of it.
-                 *
-                 * Only once there is a run to end, though. Song is entered
-                 * on a track that has just been started, and the position
-                 * report takes a moment to leave whatever was playing
-                 * before: the first thing the clock sees is a jump
-                 * backwards into the new track, which is the same signal a
-                 * track change gives. Before the tempo latches nothing has
-                 * been attempted, so that is the audio settling into the
-                 * track rather than leaving it. */
-                if (play_mode == SPIKE_MODE_SONG
-                    && run_state != SPK_RUN_COUNT
-                    && spike_track_changed())
-                    run_state = SPK_RUN_OVER;
-
                 /* Not a new game. The world keeps its cell, its ground and
                  * its walk; only the tempo has to be found again. */
-                else if (run_state == SPK_RUN_PLAY
-                         || run_state == SPK_RUN_COUNT)
+                if (run_state == SPK_RUN_PLAY
+                    || run_state == SPK_RUN_COUNT)
                     spike_listen(world.beat);
                 else
                     spike_reset_run();
@@ -1521,31 +1645,29 @@ bool spike_screen(enum spike_mode mode)
             spk_gen_set_flat(spk_gen_next_cell() + SPK_OUTRO_SLACK >= ends_at);
         }
 
-        /* And a beat after it began, whenever that was, the run moves on
-         * without the player in it -- or, in Song, without the attempt. */
+        /* And a beat after it began, whatever the frame rate made of it,
+         * the run moves on to find somewhere to put the player back. */
         if (run_state == SPK_RUN_DEAD && grid_ms - death_at >= beat_ms)
         {
-            /* Song has one life a track. Broken off here rather than at the
-             * top of the next frame so that the last thing drawn is the end
-             * of the death, and the results screen replaces it directly. */
-            if (play_mode == SPIKE_MODE_SONG)
-            {
-                run_state = SPK_RUN_OVER;
-                break;
-            }
-            else
-            {
-                run_state = SPK_RUN_SKIP;
+            run_state = SPK_RUN_SKIP;
 
-                /* Before the respawn is hunted for, not after. A switch
-                 * thrown on the line that has just ended goes off with it,
-                 * and a cell whose floor was only there because of it is
-                 * not ground to come back to -- picked while the switch
-                 * still counted, the respawn lands the player in a hole. */
-                spk_world_forget();
-                respawn_cell = spk_world_respawn(world.beat + SPK_SKIP_BEATS);
-                world.beat++;
-            }
+            /* Clear the marks before hunting for somewhere to come back to,
+             * not after. A switch thrown on the line that has just ended
+             * goes off with it, and a cell whose floor was only there
+             * because of it is not ground to come back to -- picked while
+             * the switch still counted, the respawn lands the player in a
+             * hole. */
+            spk_world_forget();
+
+            /* The death's own beat is spent here, and it is spent before the
+             * hunt starts rather than after it. The frame counts the drop as
+             * SPK_DROP_BEATS cells short of the respawn, so hunting from the
+             * beat the death was on leaves the count one short for ever: the
+             * fall is drawn from its halfway point and takes one beat instead
+             * of two. */
+            world.beat++;
+            respawn_cell = spk_world_respawn(world.beat + SPK_DROP_BEATS,
+                                             &respawn_level);
         }
 
         spike_fill_frame(&frame, grid_ms);
@@ -1564,34 +1686,40 @@ bool spike_screen(enum spike_mode mode)
 
     /* What the run was worth, and whether it is kept.
      *
-     * Run keeps whatever it reached, because leaving is one of the two ways
-     * a run ends and a good one should not be lost by walking away from it.
-     * Song keeps an attempt that ended on its own -- a death or the end of
-     * the track, which are its only two endings. What it does not keep is
-     * one abandoned with MENU: a score banked by quitting at a good moment
-     * is not an attempt at anything.
+     * Whatever it reached is kept however it ended, because leaving is one
+     * of the two ways a run ends and a good one should not be lost by
+     * walking away from it. A run that never found a tempo never began, and
+     * has nothing to report: no score, no distance, and a screen over it
+     * would be a screen about nothing.
      *
-     * The screen is shown on the same terms. A player pressing MENU is on
+     * The screen is *shown* on narrower terms. A player pressing MENU is on
      * their way somewhere and a results screen in the way is not a reward,
      * which is what the crown on the field is for -- said while it is
      * happening. */
-    /* A run that never found a tempo never began, and has nothing to
-     * report: no score, no distance, and a results screen over it would be
-     * a screen about nothing. */
-    if (run_began && (run_state == SPK_RUN_OVER || mode == SPIKE_MODE_RUN))
+    if (run_began)
     {
-        struct spk_result r;
+        struct spk_summary sum;
 
-        r.score = score;
-        r.best = best_score;
-        r.beats = run_beats;
-        r.run = mode == SPIKE_MODE_RUN;
-        r.crowned = mode == SPIKE_MODE_RUN
-                    ? spk_score_put_run(score, run_beats)
-                    : spk_score_put_track(best_path, score);
+        run_stats.score = score;
+        run_stats.beats = run_beats;
+        run_stats.secs = (current_tick - run_start_tick) / HZ;
+        run_stats.bpm10 = bpm_tracks
+                          ? (int)(bpm_total * 10 / bpm_tracks) : 0;
+
+        sum.run = run_stats;
+        sum.best = best_score;
+        sum.crowned = spk_score_end(&run_stats);
+        sum.record = false;
+        sum.font = cap_font;
+
+        /* The run's own log either way: beating the record copies it, and
+         * the copy is what the record's screen reads. This one is about the
+         * run that has just ended. */
+        sum.log = SPK_LOG_RUN;
+        sum.rows = spk_score_tracks(SPK_LOG_RUN);
 
         if (run_state == SPK_RUN_OVER)
-            spike_result_screen(&r);
+            spike_summary_screen(&sum);
     }
 
     if (boosted)
@@ -1608,14 +1736,4 @@ bool spike_screen(enum spike_mode mode)
     pop_current_activity();
 
     return false;
-}
-
-bool spike_run_screen(void)
-{
-    return spike_screen(SPIKE_MODE_RUN);
-}
-
-bool spike_song_screen(void)
-{
-    return spike_screen(SPIKE_MODE_SONG);
 }

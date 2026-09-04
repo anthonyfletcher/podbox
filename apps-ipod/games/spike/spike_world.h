@@ -130,6 +130,31 @@ bool spk_world_block_up(int cell, int beat);
  * run: one cell of missing floor is one cell to jump, so the price of
  * missing that switch is the press it would have saved. */
 bool spk_world_has_switch(int cell, int *level);
+
+/* Whether the animal in that cell was a flyer, whatever has since become of
+ * it. spk_world_flyer() answers about one that is still coming and goes
+ * quiet the moment it is stomped, which is what stops it flying out from
+ * under its own burst; the drawing still has to know which animal the burst
+ * belongs to. */
+bool spk_world_flew(int cell);
+
+/* A flyer, and the level it meets the player at.
+ *
+ * It is somewhere to stand as well as something to avoid, for the one beat
+ * it is there: a jump that comes down on its flank stomps it and lands on
+ * it, over a hole as readily as over ground. A step never finds one -- a
+ * step into it meets the spike.
+ * Read like every other cell
+ * question -- it is at this cell on this cell's own beat, and the arithmetic
+ * that puts it further right before then is the drawing's business.
+ *
+ * The rule is the plain creature's, and it follows from the picture: it
+ * comes at the player on its side with the spike on its head leading, so the
+ * spike is what a walk meets and the flank is what a landing meets. Fatal
+ * head-on, stomped from above. Two ways past it, then -- the jump across the
+ * cell, and the jump onto it, which is worth five diamonds and has to be
+ * committed a cell earlier. */
+bool spk_world_flyer(int cell, int *level);
 bool spk_world_switch(int cell, int *level);
 bool spk_world_switched(int cell);
 bool spk_world_switch_on(int cell);
@@ -173,9 +198,24 @@ bool spk_world_spring(int cell);
  * and falls, exactly as over a hole. */
 int spk_world_surface(int cell, int max_level);
 
-/* First cell at or after 'from' standing on ground with two clear beats
- * after it and nothing in them, which is what a respawn needs. */
-int spk_world_respawn(int from);
+/* First cell at or after 'from' with somewhere to stand, two clear beats of
+ * walking after it and nothing in them, which is what a respawn needs.
+ * 'level' comes back as the surface to stand on -- the lowest the cell has,
+ * which is the line the course is running along.
+ *
+ * Not the ground: phrases are entered at the level they are left at, so a
+ * run at height stays there until the library brings it down, and a respawn
+ * that waited for level nought left the player off the field for all of it. */
+int spk_world_respawn(int from, int *level);
+
+/* Stand the player on the surface a respawn found, and throw the pad that
+ * surface may be standing on: nobody was on the field to land on it, and the
+ * hunt above chose the cell on the promise that somebody had.
+ *
+ * It does not forget what the line before it did, because the caller has
+ * already had to -- spk_world_forget() is what it has to call before it can
+ * ask where to come back to at all. */
+void spk_state_respawn(struct spk_state *st, int cell, int level);
 
 /* Forget what the line that has just ended did: diamonds taken, creatures
  * stomped, and the switch it threw. spk_state_start() does this as well; this
@@ -186,12 +226,14 @@ void spk_world_forget(void);
 
 void spk_state_start(struct spk_state *st, int cell);
 
-/* ...and the same, standing somewhere other than the ground.
+/* ...and the same, standing somewhere other than the ground, and forgetting
+ * what the line before it did.
  *
- * Nothing in the game needs it: a run opens at level 0 and a respawn returns
- * there. It is for the validator, which cannot otherwise prove a phrase that
- * is entered above the floor -- and once phrases do that, "every pattern is
- * crossable" stops covering the most intricate ones in the library. */
+ * The validator is the caller: it cannot otherwise prove a phrase that is
+ * entered above the floor, and once phrases do that, "every pattern is
+ * crossable" stops covering the most intricate ones in the library. A
+ * respawn stands above the floor as well and takes spk_state_respawn(),
+ * which settles the marks itself. */
 void spk_state_start_at(struct spk_state *st, int cell, int level);
 
 /* Cross a beat boundary: apply the motion that has finished and choose the

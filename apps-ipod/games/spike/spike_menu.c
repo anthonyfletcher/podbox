@@ -22,41 +22,40 @@
 #include "widgets/list.h"
 #include "root_menu.h"              /* GO_TO_ROOT */
 #include "system/activity.h"
+#include "draw/viewport.h"          /* viewportmanager_theme_enable */
+#include "lcd.h"
+#include "font.h"                   /* FONT_UI, FONT_SYSFIXED */
+#include "games/spike/spike.h"
 #include "games/spike/spike_bar.h"
 #include "games/spike/spike_menu.h"
-#include "games/spike/spike_score.h"
 
 /* What the caller lends the menu for as long as it is open. Two of them are
  * written back through; the rest are read-outs. */
 static struct spk_menu *state;
 
 
-/** High scores **/
+/** The best run **/
 
-static const char *spk_score_name(int selected, void *data, char *buffer,
-                                  size_t buffer_len)
-{
-    (void)data;
-
-    spk_score_row(selected, buffer, (int)buffer_len);
-
-    return buffer;
-}
-
+/* Not a list, because a run is not a row: it is a score, four numbers about
+ * how it was got, and the tracks it was played over. The game draws that
+ * screen by hand for the same reason it draws the field by hand.
+ *
+ * So the display state goes back the way the game handed it over -- the
+ * theme off, the backdrop gone, the fixed font -- and comes back again for
+ * the menu underneath. This is the mirror of what spike.c does around
+ * do_menu(). */
 static int spk_scores_screen(void)
 {
-    struct simplelist_info info;
+    struct viewport vp;
 
-    simplelist_info_init(&info, str(LANG_SPIKE_SCORES), spk_score_rows(),
-                         NULL);
-    info.get_name = spk_score_name;
+    viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
+    lcd_set_backdrop(NULL);
+    lcd_setfont(FONT_SYSFIXED);
 
-    /* Zero whatever it says. simplelist_show_list() reports "left for the
-     * root" for a plain MENU *and* for a USB attach, and Menu here means
-     * one screen back and nothing more -- passing that on took the player
-     * out of the game entirely. USB still leaves, through do_menu, which
-     * can tell the two apart. */
-    simplelist_show_list(&info);
+    spike_best_screen(state->font);
+
+    lcd_setfont(FONT_UI);
+    viewportmanager_theme_undo(SCREEN_MAIN, true);
 
     return 0;
 }

@@ -2098,7 +2098,7 @@ static const struct {
         { "Spun: re-arm crowns", dbg_pv_rearm },
         { "Featured artists", dbg_featured },
         { "Beat analysis", beat_debug_screen },
-        { "Spike", spike_run_screen },
+        { "Spike", spike_screen },
         { "Beat tap", spike_tap_screen },
 #ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },

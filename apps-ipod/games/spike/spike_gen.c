@@ -30,6 +30,7 @@
 #define SWX     (SPK_SW_SWAP   << SPK_C_SWM_SH)
 #define CR2(n)  (CR(n) | SPK_C_SPK)
 #define SPR     SPK_C_SPR
+#define FLY(n)  (SPK_C_FLY | ((unsigned)(n) << SPK_C_FL_SH))
 
 /* Every one of these enters and leaves at level 0. A pattern that climbs
  * comes back down inside itself, which is a restriction the entry and exit
@@ -46,7 +47,7 @@ const struct spk_pattern spk_patterns[] =
       { G, G, G, G } },
 
     { 8, 0, 0, 0, SPK_T_REST | SPK_T_TEACH,
-      { G, G|P2, G, G|P2, G, G|P2, G, G } },
+      { G, G|P2, G|FLY(3), G|P2, G, G|P2, G, G } },
 
     { 4, 0, 0, 0, SPK_T_REST | SPK_T_DIAMOND,
       { G, G, G|P1|DI(1), G } },
@@ -95,7 +96,7 @@ const struct spk_pattern spk_patterns[] =
       { G|DI(0), G, __, G|DI(0) } },
 
     { 8, 0, 0, 2, SPK_T_GAP,
-      { G, G, __, G, G, __, G, G } },
+      { G, G|FLY(3), __, G, G|FLY(3), __, G, G } },
 
     { 8, 0, 0, 2, SPK_T_GAP | SPK_T_DIAMOND,
       { G, G, __, G|DI(0), __, G, G, G } },
@@ -177,7 +178,7 @@ const struct spk_pattern spk_patterns[] =
       { G, G|DI(0), G|CR2(0), G } },
 
     { 8, 0, 0, 5, SPK_T_GAP | SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_SPIKED,
-      { G, G|DI(0), G|CR2(0), G|DI(0), __, G|DI(0), G, G } },
+      { G, G|DI(0)|FLY(3), G|CR2(0), G|DI(0), __, G|DI(0), G, G } },
 
     { 8, 0, 0, 5, SPK_T_CREATURE | SPK_T_DIAMOND | SPK_T_BAIT | SPK_T_SPIKED,
       { G, G|CR2(0), G, G|DI(0), G|CR(0), __, G, G } },
@@ -235,7 +236,7 @@ const struct spk_pattern spk_patterns[] =
       { G, G, G|SW(0), G, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G|P1|SWP, G } },
 
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_GAP | SPK_T_DIAMOND,
-      { G, G, G|SW(0), __, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G, G } },
+      { G, G, G|SW(0), __, G|P1|SWP, G|P1|DI(1)|SWP, G|P1|DI(1)|SWP, G } },
 
     { 8, 0, 0, 3, SPK_T_SWITCH | SPK_T_DIAMOND,
       { G, G, G|SW(0), G, G|P1|SWP, G|P1|SWP, G|P2|DI(2)|SWP,
@@ -253,12 +254,12 @@ const struct spk_pattern spk_patterns[] =
         G|DI(0)|SWG, G, G|DI(0)|SWG, G } },
 
     { 12, 0, 0, 3, SPK_T_GAP | SPK_T_SWITCH,
-      { G, G, G|SW(0), G|P1, G|P1, G|P2|DI(0)|SWX, G|P2|DI(0),
-        G|P3|DI(0)|SWX, G|P3|DI(0), G|P3|DI(0)|SWX, G, G } },
+      { G, G, G|SW(0), G|DI(0)|SWG, G, G|DI(0)|SWG, G, G|DI(0)|SWG, G,
+        G|DI(0)|SWG, G, G } },
 
     { 12, 0, 0, 4, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
-      { G, G|DI(0), G|SW(0), G, G|P1|SWP, G, G|P2|DI(2)|SWP, G,
-        G|P3|DI(3)|SWP, G|P3|DI(3)|SWP, G|P2|DI(2)|SWP, G } },
+      { G, G|DI(0), G|SW(0), G, G|P1|SWP, G, G|P2|DI(2)|SWP,
+        G|P2|DI(2)|SWP, G|P3|SWP, G|P3|DI(3)|SWP, G|P2|DI(2)|SWP, G } },
 
     { 12, 0, 0, 5, SPK_T_GAP | SPK_T_SWITCH,
       { G, G, G|SW(0), __, G|P1|SWP, __, G|P2|DI(2)|SWP, __,
@@ -268,13 +269,14 @@ const struct spk_pattern spk_patterns[] =
       { G, G, G|SW(0), G, G|SWG, G|DI(0)|SWG, G|SWG, G } },
 
     { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G|P1|SWX, G|P1|SWX, G|P2|DI(0)|SWX,
-        G|P2|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
-        G|P3|DI(0)|SWX, G } },
+      { G, G, G|SW(0), G|P1|SWX, G|SWG, G|P2|DI(0)|SWX, G|DI(0)|SWG,
+        G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX, G|P3|DI(0)|SWX,
+        G } },
 
     { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_DIAMOND,
-      { G, G, G|SW(0), G|P1|SWG, G|P1|SWG, G|P2|SWG, G|P2|DI(2)|SWG,
-        G|P3|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G } },
+      { G, G, G|SW(0), G|P1|SWG, G|SWG, G|P2|DI(2)|SWG, G|SWG,
+        G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG, G|P3|DI(3)|SWG,
+        G } },
 
     { 12, 0, 0, 6, SPK_T_GAP | SPK_T_SWITCH | SPK_T_BAIT,
       { G, G|DI(0), G|SW(0), G, __, G|SWG, G|DI(0)|SWG, G|SWG,
@@ -310,6 +312,38 @@ const struct spk_pattern spk_patterns[] =
       { G, G|DI(0), G|SPR, G, G|P3|DI(3), G|P3|DI(3), G|SPR, G|P3|DI(3),
         G|P3|CR(3), G|P3|DI(3), G, G } },
 
+    /* The flyer, which is the only thing on the field that arrives rather
+       than waits. It is authored in the cell it *meets the player in*, and
+       the three cells after it are the lane it flies down -- so it sits at
+       least three from the end of its phrase, and those cells carry
+       nothing in the storey above it for its body to be drawn through.
+       Taught on flat ground with nothing else to read. It comes on its
+       side with the spike leading, so what a walk meets is the spike and
+       what a descent meets is its flank: a press one cell out clears the
+       cell it is about to be in, and a press two cells out comes down on
+       it and is worth five diamonds. Both lines are there from the first
+       phrase, and the greedy one has to be committed while it is still
+       four cells away. */
+    { 8, 0, 0, 4, SPK_T_CREATURE | SPK_T_TEACH,
+      { G, G, G, G, G|FLY(0), G, G, G } },
+
+    { 8, 0, 0, 4, SPK_T_CREATURE | SPK_T_DIAMOND,
+      { G, G, G|DI(0), G|FLY(0), G, G, G|DI(0), G } },
+
+    { 12, 0, 0, 5, SPK_T_CREATURE,
+      { G, G, G, G, G|FLY(0), G, G|FLY(0), G, G, G, G, G } },
+
+    { 12, 0, 0, 5, SPK_T_CREATURE | SPK_T_GAP,
+      { G, G, G, __, G, G|FLY(0), G, G, G, G, G, G } },
+
+    { 12, 0, 0, 6, SPK_T_CREATURE | SPK_T_GAP,
+      { G, G, G|SW(0), G, G|P1|SWP, G|FLY(0), G|P2|SWP, G,
+        G|P3|FLY(0)|SWP, G|P3|SWP, G|P3|SWP, G } },
+
+    { 12, 0, 0, 6, SPK_T_CREATURE | SPK_T_GAP,
+      { G, G, G|SPR, G|FLY(2), G|P2, G|P2|FLY(0), G|SPR, G|FLY(2),
+        G|P2|FLY(0), G|P2, G, G } },
+
     /* Moves the player to level 3 for level 3 phrases */
     { 4, 0, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
       { G, G, P1, P1|DI(1) } },
@@ -342,6 +376,12 @@ const struct spk_pattern spk_patterns[] =
       { P2|DI(2), P1, G|SPR, G, G|P3|DI(3), G|P1|P3|DI(3), G|P3|DI(3),
         P2 } },
 
+    /* And one down a platform run. No ground anywhere in it, so it cannot
+       be walked under: entered at level 1 it is the same question at
+       height. */
+    { 8, 1, 1, 5, SPK_T_CREATURE | SPK_T_DIAMOND,
+      { P1, P1, P1|DI(1), P1|FLY(1), P1, P1, P1, P1 } },
+
     /* Moves the player from level 1 to level 2 for level 2 phrases */
     { 4, 1, 2, 5, SPK_T_GAP,
       { P1, P1, P2, P2|DI(2) } },
@@ -365,8 +405,14 @@ const struct spk_pattern spk_patterns[] =
     { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
       { P2, __, P2|DI(2), __, P2|DI(2), __, P2, P2 } },
 
+    { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
+      { P3, __, P3, __, FLY(3), __, P3, P3 } },
+
     { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
       { P2, G|SPR, __, G|P3|DI(3), P3|DI(3), P1|P3|DI(3), __, P2 } },
+
+    { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
+      { P2, G|SPR, G|SPR, P3|DI(3), __, P3|DI(3), __, P2 } },
 
     { 8, 2, 2, 5, SPK_T_GAP | SPK_T_DIAMOND,
       { P2, __, P2|DI(2), __, P3, P2|DI(2), __, P2 } },
@@ -423,7 +469,7 @@ const struct spk_pattern spk_patterns[] =
       { P3, G|SPR, __, P3 } },
 
     { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
-      { P3, __, P3|SW(3), __, P3|SWP, __, P3|SWP, P3|SWP } },
+      { P3, __, P3|SW(3), __, P3|FLY(1)|SWP, __, P3|SWP, P3|SWP } },
 
     { 8, 3, 3, 6, SPK_T_GAP | SPK_T_DIAMOND,
       { P3, G|SPR, __, P3, P3, P3|SW(3), __, P3|SWP } },
@@ -524,23 +570,43 @@ static int          ring_start[SPK_RING];    /* first cell of its pattern */
 static int          filled;                 /* cells assembled so far */
 static int          base;                   /* first cell still in the ring */
 
-/* The whole of what a phrase is chosen by, and every term is a function of
- * the cell it starts on.
+/* Which phrase a cell gets is a function of the cell, and nothing here
+ * remembers how the player is doing: a death costs points and the combo and
+ * touches the course not at all, so a phrase that killed someone is met
+ * again until they get past it.
  *
- * That is the design and not an implementation detail. A course that depends
- * on how the player is doing is not a level: it cannot be learnt, replaying
- * it is not replaying anything, and two scores on the same song are not
- * comparable. So difficulty ramps with the *track's* own beat count, a death
- * costs points and nothing else, and nothing here remembers what came
- * before -- the map from cell to phrase is fixed for a song and the run is
- * laid over it wherever it happens to start.
+ * What a phrase is chosen *from* is three things, and two of them are the
+ * music's. The RUN's own arc sets a ceiling that climbs as the evening goes
+ * on -- keyed to the run and not to the track, because three and a half
+ * minutes is not long enough to learn a game in and every song was handing
+ * the player the opening again. The TEMPO moves that ceiling, because a cell
+ * is a beat and a quick grid gives less time to read one. And the BAR just
+ * heard decides where under it the course actually sits, so the level rises
+ * and falls with the music rather than settling at whatever the run has
+ * unlocked.
  *
- * The tempo is mixed in as a seed so that two songs do not lay the same
- * course at the same cell index. It is latched once and never revisited, so
- * it is as fixed as the song is. */
+ * The trade is deliberate: two runs over one song are no longer the same
+ * level. What is kept is that the phrase a cell gets is still a function of
+ * the cell, so the course is learnable -- it is the ceiling over it, and
+ * where the music sits under that, which move. */
 #define SPK_TIER_CELLS   32      /* beats before the course is allowed to harden */
 #define SPK_TIER_TOP     6       /* ...and the hardest it reaches */
 #define SPK_TIER_LAST    256     /* ...but the last step costs this many */
+
+/* The two ends of the grid's own range, where the tempo moves the ceiling.
+ *
+ * A cell is a beat, so the same phrase is a harder phrase on a quick grid:
+ * the reading time a player gets for the cell in front of them is the period
+ * itself. Wide bands with a gap between them, the same shape the mood's own
+ * conditions have, so most tracks fall in the middle and move nothing.
+ *
+ * Set against what the octave map can actually produce, which since the
+ * playable floor went in is about 430 to 840 rather than 350 to 700. They
+ * are the grid's ends and not the music's: a 160 BPM track played at half
+ * time has 750 ms a cell, and 750 ms a cell is what the player is reading
+ * whatever the song is doing. */
+#define SPK_TEMPO_FAST   500
+#define SPK_TEMPO_SLOW   720
 
 /* A rest every so often, on the grid rather than on a count of phrases:
  * players need somewhere to breathe and the respawn needs a target it can
@@ -564,8 +630,11 @@ static int          base;                   /* first cell still in the ring */
 #define SPK_MOOD_RISE    15      /* this bar against the one before */
 #define SPK_MOOD_DROP    (-30)
 
-static int  tier_seed;          /* the track's tempo, mixed into every pick */
+static int  grid_ms;            /* the grid's period: the seed, and the band */
+static long run_beats;          /* how far the run had come at run_cell... */
+static int  run_cell;           /* ...which is that cell, rotation out */
 static int  last_pick = -1;     /* the phrase before, which is not offered */
+static int  last_band;         /* ...and the highest band that has opened */
 static int  last_start;         /* ...and where it began, for the rest count */
 static bool flat;               /* rests only, for as long as it is set */
 static int  last_exit;          /* level the pattern before left the player on */
@@ -595,9 +664,6 @@ static unsigned long spk_gen_hash(unsigned long n)
     return n;
 }
 
-/* §10's ramp, against the track's beat count. A song opens on gaps and
- * nothing else and has everything by the time it is half a minute in,
- * whatever the player has been doing. */
 /* Where the assembler is, with the bar rotation taken out.
  *
  * Every choice below is a function of this and never of the cell index, and
@@ -611,23 +677,100 @@ static int spk_gen_at(int cell)
     return cell - bar_rot;
 }
 
-static int spk_tier_at(int cell)
+/* How far the run has come at a cell. The two are the same count offset by
+ * a constant -- the run's beats advance one a cell like everything else --
+ * and the pair is re-stated wherever the cell numbering moves under it,
+ * which is at every track change. Both sides have the rotation taken out,
+ * so it cancels and the downbeat still moves nothing but the boundaries. */
+static int spk_run_at(int at)
 {
-    int t = 1 + cell / SPK_TIER_CELLS;
+    long n = run_beats + (at - run_cell);
 
-    /* The last step is held back past its turn on the ramp. Its phrases stop
-     * testing one thing at a time, and on an even ramp a track arrives there
-     * before it is half over and then stays. SPK_TIER_LAST is a multiple of
-     * SPK_TIER_CELLS, so the teaching window still lines up with the band it
-     * opens.
-     *
-     * A rising bar still buys the tier above the ramp's, so between the two
-     * counts the top tier is what a track climbs to and falls back from
-     * rather than what it sits at. */
-    if (t >= SPK_TIER_TOP && cell < SPK_TIER_LAST)
-        t = SPK_TIER_TOP - 1;
+    return n < 0 ? 0 : (int)n;
+}
+
+/* §10's ramp: the hardest the run has earned so far. A step every
+ * SPK_TIER_CELLS beats, with the last step held back past its turn because
+ * its phrases stop testing one thing at a time. SPK_TIER_LAST is a multiple
+ * of SPK_TIER_CELLS, so the teaching window still lines up with the band it
+ * opens. */
+static int spk_ramp_at(int beats)
+{
+    int t = 1 + beats / SPK_TIER_CELLS;
+
+    if (t >= SPK_TIER_TOP && beats < SPK_TIER_LAST)
+        return SPK_TIER_TOP - 1;
 
     return t > SPK_TIER_TOP ? SPK_TIER_TOP : t;
+}
+
+/* ...and the ceiling, which is the ramp with the tempo's own word on it. A
+ * quick grid takes a tier off and a slow one adds one back, because the
+ * period is the whole of the time a player has to read the cell in front of
+ * them. */
+static int spk_ceiling_at(int beats)
+{
+    int t = spk_ramp_at(beats);
+
+    if (grid_ms > 0 && grid_ms <= SPK_TEMPO_FAST)
+        t--;
+    else if (grid_ms >= SPK_TEMPO_SLOW)
+        t++;
+
+    return t < 1 ? 1 : t > SPK_TIER_TOP ? SPK_TIER_TOP : t;
+}
+
+/* Where the bar just heard puts the course under that ceiling.
+ *
+ * This is what stops a run that has reached the top from staying there. The
+ * ceiling says what the evening has unlocked; the music says how much of it
+ * this passage is asking for. Read from the same four conditions the phrase
+ * preference is read from, so there is one vocabulary for what the music is
+ * doing and one set of thresholds to move.
+ *
+ * A neutral bar sits ONE below the ceiling.
+ *
+ * Two was the first answer and it does not survive contact: the tempo band
+ * subtracts as well, so a 461 ms grid and an ordinary bar came to three
+ * below, and a quiet one to four. Measured over four thousand cells that is
+ * a course which never lays a phrase above difficulty three -- and since
+ * every phrase that climbs off the ground is difficulty four or more, a whole
+ * run never leaves level nought. Two subtractions that each looked modest
+ * multiplied into a game with one storey.
+ *
+ * So one, and the top is reached by any bar that is loud or moving. The
+ * distinction between loud and loud-and-moving is paid for elsewhere -- in
+ * which *kind* of phrase is preferred, which spk_gen_favoured() decides --
+ * rather than by holding the ceiling out of reach.
+ *
+ * Everything here is a threshold on a measured number, so the bands are wide
+ * and most bars fall in the gaps between them and move nothing. */
+static int spk_tier_at(int beats)
+{
+    int top = spk_ceiling_at(beats);
+    int tier = top - 1;
+
+    if (mood_energy >= SPK_MOOD_HIGH)
+        tier++;
+    if (mood_flux >= SPK_MOOD_BUSY)
+        tier++;
+    if (mood_energy <= SPK_MOOD_LOW)
+        tier--;
+    if (mood_flux <= SPK_MOOD_CALM)
+        tier--;
+
+    /* The music leans on the ceiling and does not lift it: what a run has
+     * unlocked by this point in it is the run's to say. */
+    if (tier > top)
+        tier = top;
+
+    /* One tier over it for a bar rising against the one before, and no more.
+     * The one place the music does lift the ceiling, because a passage
+     * arriving is the one musical event a player hears as a promise. */
+    if (mood_trend >= SPK_MOOD_RISE && tier < SPK_TIER_TOP)
+        tier++;
+
+    return tier < 1 ? 1 : tier;
 }
 
 /* §9.3's table, as tags to prefer. Zero where the music is saying nothing
@@ -652,6 +795,19 @@ static unsigned short spk_gen_favoured(void)
 
     return 0;
 }
+
+/* How far below the tier a phrase may still be laid.
+ *
+ * The tier is a ceiling, so without a floor the easiest phrases in the
+ * library stay eligible for ever -- a quarter of a measured course was
+ * difficulty nought, which is a bare rest, and a switch over a single cell
+ * with a diamond on it turns up in the twentieth minute exactly as often as
+ * in the first. Two, so a band still holds three difficulties and the course
+ * has somewhere to breathe without going back to the beginning.
+ *
+ * The forced rest is not subject to it: that is a breather placed on the
+ * grid on purpose, and the respawn needs somewhere it can always find. */
+#define SPK_TIER_SPREAD  2
 
 /* Candidates one pick may consider: the whole library, because at the top
  * tier every pattern qualifies at once. Sized from the table so that adding
@@ -686,7 +842,9 @@ static const struct spk_pattern *spk_gen_pick(int entry)
 {
     int n = 0, i;
     int at = spk_gen_at(filled);
-    int tier = spk_tier_at(at);
+    int came = spk_run_at(at);
+    int tier = spk_tier_at(came);
+    int band = spk_ceiling_at(came);
     bool owed = at / SPK_REST_CELLS
                 != spk_gen_at(last_start) / SPK_REST_CELLS;
 
@@ -695,11 +853,6 @@ static const struct spk_pattern *spk_gen_pick(int entry)
      * player hears as an instruction. */
     if (mood_trend <= SPK_MOOD_DROP)
         owed = true;
-
-    /* Rising against the bar before buys one tier, and no more -- the ramp
-     * still decides what a song has unlocked by this point in it. */
-    if (mood_trend >= SPK_MOOD_RISE && tier < SPK_TIER_TOP)
-        tier++;
 
     /* The run has not started, or has stopped offering anything: bare
      * ground, so that nothing can be scored on it and nothing on it moves
@@ -715,27 +868,61 @@ static const struct spk_pattern *spk_gen_pick(int entry)
                 candidates[n++] = i;
     }
 
-    /* The phrase a tier band opens on teaches what the band unlocked, where
-     * the library has something that teaches it. On the grid, like
-     * everything else here, so it happens at the same place every time. */
-    if (n == 0 && tier > 1 && (at % SPK_TIER_CELLS) < SPK_PAT_MAX)
+    /* The phrase a band opens on teaches what the band unlocked, where the
+     * library has something that teaches it.
+     *
+     * Once, at the opening, and that is the whole of the rule. Trap: widening
+     * it to a window -- the first half of a band, say -- lays the teaching
+     * phrase four times in a row at four cells to a phrase, and the *same* one
+     * every time, because a band holds at most one at its own difficulty. It
+     * reads as the course getting stuck.
+     *
+     * Against the ceiling and not against the music's place under it: what
+     * the band has just unlocked is the thing to teach, and a calm bar at
+     * that moment would otherwise teach whatever it had already seen. */
+    if (n == 0 && band > last_band)
     {
-        for (i = 0; i < spk_pattern_count; i++)
+        for (i = 0; i < spk_pattern_count && band > 1; i++)
             if ((spk_patterns[i].tags & SPK_T_TEACH)
                 && spk_pat_at(&spk_patterns[i], entry)
-                && (int)spk_patterns[i].difficulty == tier)
+                && (int)spk_patterns[i].difficulty == band)
                 candidates[n++] = i;
+
+        /* Taught or not, the band has been met: a band with nothing to teach
+         * at its own difficulty must not go on asking every phrase. Inside
+         * the test rather than after it, because a rest owed on the same cell
+         * fills the candidates first and this never runs -- marking the band
+         * met out there spends the opening on a phrase that teaches nothing
+         * and loses the lesson instead of deferring it. A breakdown forces a
+         * rest on any cell it likes, so the two do collide. */
+        last_band = band;
     }
 
-    if (n == 0)
+    /* The band, then the band without its floor, then the level alone.
+     *
+     * Trap: the band is a preference and the entry level is not. Nothing in
+     * the library enters above the ground under difficulty four, and the tier
+     * falls as well as climbs -- a quiet, calm bar under a fast grid comes to
+     * three below the top -- so a player standing at level two can be handed a
+     * band the library has nothing in at their height. With no candidate the
+     * pick falls back on pattern zero, four cells of bare ground, and the run
+     * drops off the platform it was walking for no reason it can see. A phrase
+     * a tier too hard is the smaller of the two, and only above the ground:
+     * at level nought that fallback is a phrase the player can stand on. */
+    for (int pass = 0; pass < 3 && n == 0; pass++)
     {
+        if (pass == 2 && entry == 0)
+            break;
+
         for (i = 0; i < spk_pattern_count; i++)
         {
             const struct spk_pattern *p = &spk_patterns[i];
 
             if (!spk_pat_at(p, entry))
                 continue;
-            if (p->difficulty > (unsigned char)tier)
+            if (pass < 2 && p->difficulty > (unsigned char)tier)
+                continue;
+            if (pass == 0 && (int)p->difficulty < tier - SPK_TIER_SPREAD)
                 continue;
 
             candidates[n++] = i;
@@ -781,7 +968,7 @@ static const struct spk_pattern *spk_gen_pick(int entry)
         return &spk_patterns[0];
 
     i = candidates[spk_gen_hash((unsigned long)at
-                               + (unsigned long)tier_seed * 2654435761ul)
+                               + (unsigned long)grid_ms * 2654435761ul)
                    % (unsigned long)n];
     last_pick = i;
     last_start = filled;
@@ -840,6 +1027,27 @@ void spk_gen_reset(int cell)
 
     base = filled;
     last_start = filled;
+
+    /* The run's count is restated here as well, because the cell numbering
+     * has just moved: a reset is a track change or a latch, and the cells
+     * either side of one are the new track's. Left alone, the ramp would
+     * read the difference between two tracks' beat counts as progress. The
+     * caller says how far the run has actually come. */
+    run_beats = 0;
+    run_cell = spk_gen_at(filled);
+}
+
+void spk_gen_set_run(long beats, int cell)
+{
+    /* A run at nought beats is a new run, and every band is still to be
+     * opened. Kept here rather than in spk_gen_reset(), which also runs at
+     * every track change: the ramp carries across one of those, and so must
+     * the memory of which bands have already been taught. */
+    if (beats == 0)
+        last_band = 0;
+
+    run_beats = beats;
+    run_cell = spk_gen_at(cell);
 }
 
 void spk_gen_set_mood(int energy, int flux, int trend)
@@ -859,9 +1067,9 @@ int spk_gen_bar(void)
     return bar_rot;
 }
 
-void spk_gen_set_seed(int seed)
+void spk_gen_set_tempo(int beat_ms)
 {
-    tier_seed = seed;
+    grid_ms = beat_ms;
 }
 
 void spk_gen_set_flat(bool on)

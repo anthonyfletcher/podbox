@@ -85,6 +85,11 @@ bool spk_world_switched(int cell)
     return (spk_gen_cell(cell) & SPK_C_SWM) != 0;
 }
 
+bool spk_world_flew(int cell)
+{
+    return (spk_gen_cell(cell) & SPK_C_FLY) != 0;
+}
+
 bool spk_world_has_switch(int cell, int *level)
 {
     unsigned int e = spk_gen_cell(cell);
@@ -183,6 +188,21 @@ bool spk_world_creature(int cell, int *level)
     return true;
 }
 
+bool spk_world_flyer(int cell, int *level)
+{
+    unsigned int e = spk_gen_cell(cell);
+
+    /* Gone once it has been stomped, and it shares the creature's mark
+     * because a cell holds one animal or the other. Without this it goes on
+     * flying out from under the burst that is drawn where it was. */
+    if (!(e & SPK_C_FLY) || spk_marked(cell, SPK_M_CREATURE))
+        return false;
+
+    *level = (int)((e >> SPK_C_FL_SH) & 3u);
+
+    return true;
+}
+
 /* A spike on the creature's head. Asked only where there is a creature, so
  * it does not repeat the creature's own test: what it answers is which kind
  * of creature, not whether there is one. */
@@ -226,35 +246,148 @@ int spk_world_surface(int cell, int max_level)
     return -1;
 }
 
-int spk_world_respawn(int from)
+/* What a cell offers a respawn.
+ *
+ * Its own phrase's pad counts as thrown, because the dead player throws it
+ * on the way back in -- a phrase that trades its floor in for a press has no
+ * floor at all while nobody is on the field, and judged honestly the whole
+ * phrase would be passed over. A later phrase's does not count: nobody will
+ * have been there.
+ *
+ * Asked, never applied. The world's memory of what this line has done is the
+ * caller's to change, and the caller does it in one place -- after the
+ * player is standing, because starting one forgets the marks. */
+static unsigned int spk_respawn_live(int cell, int phrase)
+{
+    unsigned int e = spk_gen_cell(cell);
+
+    return spk_live_with(e, spk_gen_pattern_start(cell) == phrase
+                            || spk_world_switch_on(cell));
+}
+
+/* Throw the pad in that cell's phrase, if it has one, exactly as landing on
+ * it would. For the respawn and nothing else: a pad is thrown by being
+ * landed on, and a dead player has nobody to land on it, so a phrase that
+ * trades its floor in for a press would have no floor to come back to. */
+static void spk_world_throw(int cell)
+{
+    int start = spk_gen_pattern_start(cell);
+    int i, level;
+
+    for (i = 0; i < SPK_PAT_MAX; i++)
+    {
+        if (spk_gen_pattern_start(start + i) != start)
+            break;
+
+        if (spk_world_switch(start + i, &level))
+        {
+            spk_mark(start + i, SPK_M_SWITCH);
+            switch_pattern = start;
+            return;
+        }
+    }
+}
+
+int spk_world_respawn(int from, int *level)
 {
     int cell;
 
-    /* Ground, and two beats of it after, so the player has somewhere to
-     * stand and a beat to read the board before anything can kill them --
-     * which means nothing standing in those cells either. Bounded because
-     * the generator will happily supply cells for ever. */
+    /* Somewhere to stand, and two beats of walking after it, so the player
+     * has a beat to read the board before anything can kill them -- which
+     * means nothing standing in those cells either. Bounded because the
+     * generator will happily supply cells for ever.
+     *
+     * A surface, not the ground. Phrases are entered at the level they are
+     * left at, so a run at height stays at height for as long as the library
+     * keeps offering phrases up there -- and a respawn that insisted on
+     * level nought waited for all of them, with the player gone from the
+     * field the whole time.
+     *
+     * The lowest surface the cell has, because that is the line the course
+     * is running along; the ones over it are what the course offers, and
+     * coming back onto one of those is coming back onto a detour. */
     for (cell = from; cell < from + 64; cell++)
     {
-        int i, level;
+        int phrase = spk_gen_pattern_start(cell);
+        unsigned int mask = spk_respawn_live(cell, phrase);
+        int i, at, stood, ignored;
+
+        for (at = 0; at < SPK_LEVELS; at++)
+            if (mask & (1u << at))
+                break;
+
+        if (at >= SPK_LEVELS)
+            continue;
+
+        /* Walked rather than sampled: a step takes the highest surface at or
+         * below the one it left, so a line that drops away is still a line,
+         * and the cell after a drop has to be judged from where the drop
+         * put the player. */
+        stood = at;
 
         for (i = 0; i < 3; i++)
         {
-            if (spk_world_surface(cell + i, 0) != 0
-                || spk_world_creature(cell + i, &level)
+            unsigned int live = spk_respawn_live(cell + i, phrase);
+            int next = -1, l;
+
+            for (l = stood; l >= 0; l--)
+            {
+                if (live & (1u << l))
+                {
+                    next = l;
+                    break;
+                }
+            }
+
+            if (next < 0 || spk_world_creature(cell + i, &ignored)
+                || spk_world_flyer(cell + i, &ignored)
                 || spk_world_blocks(cell + i))
                 break;
+
+            stood = next;
         }
 
         if (i == 3)
+        {
+            *level = at;
             return cell;
+        }
     }
 
+    *level = 0;
     return from;
 }
 
 
 /** The player **/
+
+/* The highest thing a jump could come down on: the cell's own surface, or a
+ * flyer riding over it.
+ *
+ * A flyer is a landing as well as a hazard. Coming down on its flank stomps
+ * it, and that is as true over a hole as over ground -- so a line can be
+ * jumped across a gap on the animals crossing it, which is the one thing on
+ * the field that is somewhere to stand only for the beat it is there.
+ *
+ * Only a jump ever asks. A step is judged by spk_world_surface() alone,
+ * because a step into a flyer meets the spike on its head and the run ends;
+ * what makes the difference is coming down from above, and only a jump does.
+ * And only where it is *higher* than the surface, which is the same rule
+ * spk_world_surface() follows for everything else: you land on the topmost
+ * thing within reach. */
+static int spk_landing(int cell, int ceiling)
+{
+    int at = spk_world_surface(cell, ceiling);
+    int cl;
+
+    if (ceiling > SPK_LEVELS - 1)
+        ceiling = SPK_LEVELS - 1;
+
+    if (spk_world_flyer(cell, &cl) && cl <= ceiling && cl > at)
+        return cl;
+
+    return at;
+}
 
 /* Choose the step that covers the beat now beginning. A jump committed
  * inside the input window replaces it before it is ever applied, which is
@@ -277,7 +410,7 @@ static void spk_begin_move(struct spk_state *st)
         st->sprung = false;
         st->motion = SPK_ARC_SPRING;
         st->apex = SPK_LEVELS - 1;
-        st->to = spk_world_surface(st->beat + 2, st->apex);
+        st->to = spk_landing(st->beat + 2, st->apex);
         return;
     }
 
@@ -300,6 +433,20 @@ static enum spk_outcome spk_state_arrive(struct spk_state *st, int level,
          * it has a spike on its head, which makes both fatal and leaves the
          * jump clear across the cell as the only way past. */
         if (!from_above || spk_world_spiked(st->beat))
+            return SPK_HIT;
+
+        spk_mark(st->beat, SPK_M_CREATURE);
+        st->stomped = true;
+    }
+
+    /* The flyer arrives on the same beat the player does, which is what
+     * makes a moving obstacle a cell question like any other. It is on its
+     * side with the spike leading, so it kills the way it is pointing and is
+     * killed the way it is not: walk into the spike and the run ends, come
+     * down on its flank and it is stomped like anything else. */
+    if (!over && spk_world_flyer(st->beat, &cl) && cl == level)
+    {
+        if (!from_above)
             return SPK_HIT;
 
         spk_mark(st->beat, SPK_M_CREATURE);
@@ -337,7 +484,12 @@ void spk_world_forget(void)
     spk_marks_clear();
 }
 
-void spk_state_start_at(struct spk_state *st, int cell, int level)
+/* Stand the player somewhere and choose the move out of it. Split from the
+ * two entry points because what the marks say has to be settled *before* the
+ * move is chosen -- the surface the next cell offers is a function of them,
+ * and a first move chosen against the wrong answer walks into a hole that is
+ * about to be filled in. */
+static void spk_state_place(struct spk_state *st, int cell, int level)
 {
     st->beat = cell;
     st->level = level;
@@ -348,14 +500,28 @@ void spk_state_start_at(struct spk_state *st, int cell, int level)
     st->threw = false;
     st->sprung = false;
     st->apex = 0;
-    spk_marks_clear();
     spk_begin_move(st);
+}
+
+void spk_state_start_at(struct spk_state *st, int cell, int level)
+{
+    spk_marks_clear();
+    spk_state_place(st, cell, level);
+}
+
+void spk_state_respawn(struct spk_state *st, int cell, int level)
+{
+    /* The marks are the caller's here: it has had to ask the world questions
+     * between the death and this, and spk_world_forget() is where it said so.
+     * What this adds is the pad, thrown on the player's behalf. */
+    spk_world_throw(cell);
+    spk_state_place(st, cell, level);
 }
 
 void spk_state_start(struct spk_state *st, int cell)
 {
-    /* Level 0, which is where a run opens and where a respawn returns to.
-     * The caller passes a cell with ground under it; spk_world_respawn() is
+    /* Level 0, which is where a run opens. The caller passes a cell with
+     * ground under it; spk_world_respawn() is
      * what finds one. */
     spk_state_start_at(st, cell, 0);
 }
@@ -381,6 +547,17 @@ enum spk_outcome spk_state_peek(const struct spk_state *st)
             bool above = st->motion == SPK_ARC_FALL || st->from > st->to;
 
             if (!above || spk_world_spiked(st->beat + 1))
+                return SPK_HIT;
+        }
+
+        /* And the flyer, on the same terms: it is coming head-first, so what
+         * a step walks into is the spike and what a descent comes down on is
+         * its side. */
+        if (spk_world_flyer(st->beat + 1, &cl) && cl == st->to)
+        {
+            bool above = st->motion == SPK_ARC_FALL || st->from > st->to;
+
+            if (!above)
                 return SPK_HIT;
         }
     }
@@ -510,7 +687,7 @@ bool spk_state_jump(struct spk_state *st)
      * diamond at the apex is still collected on the way through -- what the
      * lower cap takes away is the *standing* on it, not the reaching. */
     st->apex = st->level + SPK_ARC_UP;
-    st->to = spk_world_surface(st->beat + 2, st->from + SPK_CLIMB_UP);
+    st->to = spk_landing(st->beat + 2, st->from + SPK_CLIMB_UP);
 
     return true;
 }

@@ -54,16 +54,36 @@ int spk_ease(int phase);
  * A jump takes the foot it is going to land on rather than the one under the
  * beat it is in, because the end of the turn tilts onto it: the touchdown is
  * then continuous, and there are exactly two of them. */
-/* Four one-beat gymnastic moves on a bar-long cycle, 'move' being the beat's
- * place in it: somersault, tuck spin, up into a handstand, out of it. Moves
- * two and three are a pair and have to stay adjacent.
+/* One-beat gymnastic moves, 'move' choosing which. In order: forward
+ * somersault, tuck spin, up into a handstand, out of it, back somersault, a
+ * jack, up onto one corner, off it, a reach, a bow, a sway, two bounces.
  *
- * Nothing calls this yet. It was the wait-for-a-tempo pose and is not any
- * more -- the triangle walks through the wait now, because breaking off a
- * gymnastic move to start walking is a jolt at the one moment the player is
- * being asked to feel a tempo. It is kept for the high-score screen, which
- * is where a body with nothing to do and something to celebrate belongs. */
+ * Four of the twelve never leave the floor. That is the point of them: a
+ * routine of nothing but tricks reads as one long trick, and the moves that
+ * only stretch or lean are what give the ones that turn something to be
+ * different from.
+ *
+ * Pairs have to stay adjacent -- two and three are one move, and so are six
+ * and seven. The first of each ends held in a position the second starts
+ * from, and separating them leaves a body that snaps out of a handstand
+ * without coming down.
+ *
+ * Every move otherwise starts and ends square and on the floor, so any two
+ * can follow each other in any order. A move that turns finishes on a whole
+ * circle for the same reason, whichever way round it went.
+ *
+ * The wait for a tempo does not use these: the triangle walks through it,
+ * because breaking off a gymnastic move to start walking is a jolt at the
+ * one moment the player is being asked to feel a tempo. This is the
+ * high-score screen's, which is where a body with nothing to do and
+ * something to celebrate belongs. */
+#define SPK_IDLE_MOVES   12
 void spk_pose_idle(struct spk_pose *out, int phase, int move);
+
+/* Which move to do after 'prev'. Random, except that it will not repeat and
+ * will not strand half of a pair -- the table knows which of its moves end
+ * held, so the choosing belongs with it rather than with the screen. */
+int spk_pose_idle_next(int prev);
 
 void spk_pose_hop(struct spk_pose *out, int phase, bool strong);
 /* 'ride' is how far above the surface the body arrives, in pixels: the
@@ -75,6 +95,9 @@ void spk_pose_land(struct spk_pose *out, int phase, bool strong, int ride);
  * into. There is only one of these because there is only one thing that
  * happened: the body met something that was not going to move. */
 void spk_pose_ouch(struct spk_pose *out, int phase);
+/* Coming down out of the sky onto the cell a run restarts from. Shape only:
+ * how high it started is the caller's, since it depends on the level. */
+void spk_pose_drop(struct spk_pose *out, int phase, bool strong);
 void spk_pose_jump(struct spk_pose *out, int phase, bool land_strong);
 void spk_pose_fall(struct spk_pose *out, int phase, bool from_air,
                   bool strong);

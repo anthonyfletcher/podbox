@@ -24,6 +24,11 @@ struct spk_menu
     int *shift;
     bool tempo_changed;         /* ...and the grid has to be re-anchored */
 
+    /* The face the record's track names are set in. The game has it open;
+     * loading a second copy for a screen behind a menu row would be a disk
+     * read for something the caller is already holding. */
+    int font;
+
     int beat_ms;
     int bpm;                    /* the track's, 0 where it never locked */
     int bar;                    /* the downbeat's place in four, -1 unknown */

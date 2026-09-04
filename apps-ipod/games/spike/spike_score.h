@@ -1,7 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Interface to spike_score.c: what the best has been.
+ * Interface to spike_score.c: the best run there has been, and the tracks
+ * it was played over.
  ****************************************************************************/
 
 #ifndef SPIKE_SCORE_H
@@ -9,39 +10,58 @@
 
 #include <stdbool.h>
 
-/* Track bests kept. The file is held in score order, so this drops the
- * lowest -- which is the right rule for a table that is read as a ranking,
- * and it means the file itself is the leaderboard rather than something a
- * screen has to sort. */
-#define SPK_SCORE_TRACKS    64
+/* Tracks a run lists. A long run is an evening, and the list is read rather
+ * than counted, so it stops rather than growing without a bound. The count
+ * in the header keeps rising past it. */
+#define SPK_LOG_MAX      200
 
-/* One screenful, and how much of a track's name it can show. */
-#define SPK_SCORE_PAGE      12
-#define SPK_SCORE_NAME      44
+/* Room a name and a genre are given on the way to the file. The screen shows
+ * about thirty characters of a name, so this is generous and the truncation
+ * is never what the reader sees. */
+#define SPK_NAME_MAX     64
+#define SPK_GENRE_MAX    32
 
-/* The best run there has been, and how far it went. Zero where there has
- * been none. */
-void spk_score_run(long *score, long *beats);
+/* What a run was worth. One record, because there is one kind of run: the
+ * numbers are gathered as it goes and the track list is written as it goes,
+ * so nothing here is held in RAM for the length of an evening. */
+struct spk_run
+{
+    long score;
+    long beats;
+    long secs;          /* how long it lasted */
+    int  tracks;        /* ...and over how many */
+    int  bpm10;         /* mean track tempo, in tenths */
+};
 
-/* The best against one track, by its path. Zero where there has been none;
- * zero as well for a track with no path, which is what a database browse
- * hands over until the file is opened. */
-long spk_score_track(const char *path);
+/* Which list a reader wants: the run that has just ended, or the record. The
+ * two are the same file until a run beats the record and the log becomes
+ * one. */
+enum spk_log
+{
+    SPK_LOG_RUN,
+    SPK_LOG_BEST
+};
 
-/* Record one, and say whether it beat what was there. A run that did not
- * beat it writes nothing, so the file is only touched when something
- * happened. */
-bool spk_score_put_run(long score, long beats);
-bool spk_score_put_track(const char *path, long score);
+/* The record. False where there has been none, in which case the numbers
+ * are zeroed. */
+bool spk_score_best(struct spk_run *out);
 
-/* The table as a list: row 0 is the run, and the tracks are ranked under it.
- * Rows are formatted here rather than by the screen, because what a row is
- * -- rank, score, and the track's own name without its directory or its
- * extension -- is a property of the table and not of how it is drawn.
- *
- * A page is cached, so walking the list draws one file read per screenful
- * rather than one per row. */
-int spk_score_rows(void);
-void spk_score_row(int n, char *buf, int size);
+/* A run beginning: whatever the last one logged is dropped. */
+void spk_score_begin(void);
+
+/* One track, as it starts playing. Written straight to the log rather than
+ * kept, because a run is however many tracks the player has patience for
+ * and the numbers are the only part of it worth holding. */
+void spk_score_played(const char *name, const char *genre);
+
+/* The run just ended. True where it beat the record, in which case its log
+ * has become the record's. */
+bool spk_score_end(const struct spk_run *r);
+
+/* The list, for the screen. A page is cached, so scrolling costs one file
+ * read a screenful rather than one a row. */
+int spk_score_tracks(enum spk_log which);
+void spk_score_track(enum spk_log which, int n, char *name, int nsize,
+                     char *genre, int gsize);
 
 #endif /* SPIKE_SCORE_H */

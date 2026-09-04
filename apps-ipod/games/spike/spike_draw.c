@@ -29,7 +29,8 @@
 #include "skin/skin_albumart_color.h"    /* dynamic_colors_resolve */
 #include "games/spike/spike_draw.h"
 #include "games/spike/spike_pose.h"
-#include "games/spike/spike_text.h"
+#include "draw/screen_access.h"
+#include "draw/scrollbar.h"
 
 /* Cells drawn either side of the ten on screen, so a cell entering or
  * leaving is complete before it is clipped. */
@@ -107,6 +108,40 @@
  * mistaking it for an ordinary creature costs the run. */
 #define SPK_SPK_W        5
 #define SPK_SPK_H        8
+
+/* How far above its landing the body starts, and the shape of the fall.
+ *
+ * Held inside the field: the drop begins under the rule rather than off the
+ * top of the panel, because the soft edges are clipped to the field and a
+ * body that starts above it arrives as a line of severed pixels. Squared, so
+ * it accelerates -- a fall at a constant speed reads as being lowered. */
+#define SPK_DROP_H      110
+
+/* The extra flattening it lands with, on top of the landing pose's own. That
+ * pose is written for an ordinary hop and this is a fall out of the sky, so
+ * it wants more of the same thing rather than a different shape -- and only
+ * over the first rows, while the body is still absorbing it. */
+#define SPK_DROP_SQUASH   3
+
+/* The flyer: the same animal on its side, head into the wind.
+ *
+ * Turned a quarter turn, the legs trail behind it and kick it along instead
+ * of carrying it, and the spike on its head leads -- which is the whole of
+ * why it kills what it runs into and is killed by what comes down on it.
+ * Nothing about the shape changes; only which way is up for it.
+ *
+ * SPK_FLY_MID is the centre line, above the surface it flies over. Set so
+ * the body fills the band a standing player's own body occupies -- they meet
+ * head on, and it has to look like it. The relaxed kick splays a leg a pixel
+ * past the floor line, which reads as flying low. */
+#define SPK_FLY_MID     13
+#define SPK_FLY_LONG    (SPK_SPK_H + SPK_CR_BODY + SPK_CR_UP)
+
+/* ...and the beats either side of its arrival that it is drawn for. It and
+ * the player close at two cells a beat and the field shows seven ahead, so
+ * three and a half beats is the whole of the warning there can be -- this
+ * only has to be past that. */
+#define SPK_FLY_LEAD     4
 
 /* The hook that turns down at each side of a gap, and the shorter tick at
  * every other cell boundary. The hook is what makes a gap countable rather
@@ -190,6 +225,28 @@ static bool    full_flush = true;   /* the palette moved: send the lot once */
 #define SPK_CAP_GAP     14      /* ...and clear of the score's block */
 #define SPK_CAP_MIN     48      /* narrower than this and there is no room */
 
+/* The crown and the multiplier, which are both notes about the score and so
+ * stand beside it.
+ *
+ * In the score's own face, not the block glyphs: the multiplier is a second
+ * number in a line of numbers, and a different typeface for it reads as a
+ * different piece of software. That is also what makes it legible: the block
+ * glyphs are unreadable at the seven pixels there is room for beside the
+ * score, and the twenty-one they need puts the multiplier out on the field,
+ * legible and belonging to nothing. The crown takes the scale that matches
+ * the face.
+ *
+ * Fixed slots rather than a row that reflows. Each comes and goes with the
+ * run, and a pair that shuffled along as the other appeared would read as
+ * the band twitching. The multiplier is two characters at every value it can
+ * take and the face is monospaced, so its slot is a constant width -- what
+ * the title gives up for them it gives up once. */
+#define SPK_TAG_GAP      6
+
+/* The crown, against a line of type: shorter than the face's own height,
+ * which includes the room a descender wants and a crown does not. */
+#define SPK_CROWN_H(th)  ((th) * 5 / 8)
+
 /* The volume read-out, in the caption's room. */
 #define SPK_VOL_H       14      /* the horn's mouth, top to bottom */
 #define SPK_VOL_BOX      5      /* the driver's width */
@@ -265,13 +322,20 @@ static void spk_aa_use(const fb_data *ramp)
     aa_ordered = aa_key[SPK_AA_STEPS] != aa_key[0];
 }
 
+/* The rows a soft edge may land on. The field's own drawing is held to the
+ * field, so an anti-aliased line cannot spill into the band the score sits
+ * in or the strip below the floor; the summary screen owns the whole panel
+ * and says so. Each screen states its own bounds on the way in, so neither
+ * depends on the other having tidied up. */
+static int aa_top = SPK_HUD_H;
+static int aa_bot = SPK_UPDATE_H;
+
 static void spk_aa_put(int x, int y, int cover)
 {
     fb_data *p;
     int k = cover >> 4;
 
-    if (k <= 0 || x < 0 || y < SPK_HUD_H
-        || x >= LCD_WIDTH || y >= SPK_UPDATE_H)
+    if (k <= 0 || x < 0 || y < aa_top || x >= LCD_WIDTH || y >= aa_bot)
         return;
 
     if (k > SPK_AA_STEPS)
@@ -568,7 +632,8 @@ static void spk_draw_creature(const struct spk_frame *f, int x, int level,
     /* Up on one beat and down on the next, which is a step rather than a
      * sweep -- the same two-frame pulse the hatch and the diamonds keep, so
      * the whole field moves on one beat instead of four things each being
-     * smooth on their own. */
+     * smooth on their own. The body bobs *because the legs did something*,
+     * which is why the slab is never simply translated. */
     int lift = f->strong ? SPK_CR_UP : SPK_CR_DOWN;
     int foot = f->strong ? SPK_CR_FOOT_IN : SPK_CR_FOOT_OUT;
     int hip = base - lift;
@@ -588,6 +653,99 @@ static void spk_draw_creature(const struct spk_frame *f, int x, int level,
         spk_line(cx - SPK_SPK_W, top, cx, top - SPK_SPK_H);
         spk_line(cx + SPK_SPK_W, top, cx, top - SPK_SPK_H);
     }
+}
+
+/* The shell and a leg, turned a quarter turn: the same two drawings about
+ * swapped axes, spans down the screen instead of across. Written out rather
+ * than folded into the standing pair behind an axis flag -- the flag would
+ * be read on every span of every leg to say something that is decided once,
+ * and the shapes are five lines each. */
+static void spk_draw_shell_side(int nose, int mid, int depth, int half_lead,
+                                int half_tail)
+{
+    int tail = nose + depth - SPK_INK;
+
+    spk_vline(nose, mid - half_lead, mid + half_lead);
+    spk_vline(tail, mid - half_tail, mid + half_tail);
+    spk_line(nose, mid - half_lead, tail, mid - half_tail);
+    spk_line(nose, mid + half_lead - SPK_INK, tail, mid + half_tail - SPK_INK);
+}
+
+static void spk_draw_leg_side(int ytop, int ybot, int xhip, int ytip,
+                              int xtip)
+{
+    int w = xtip - xhip;
+    int x;
+
+    if (w <= 0)
+        return;
+
+    spk_aa_use(aa_ink);
+
+    for (x = 0; x <= w; x++)
+    {
+        int a = (ytop << 8) + ((ytip - ytop) * (x << 8)) / w;
+        int b = (ybot << 8) + ((ytip - ybot) * (x << 8)) / w;
+
+        spk_aa_vspan(xhip + x, a < b ? a : b, a < b ? b : a);
+    }
+}
+
+/* ...and the animal it makes, kicking twice as often because it is covering
+ * twice the ground: it closes a cell a beat against a world already
+ * scrolling one, so on the panel it comes at the player at two. The
+ * half-beat flip carries straight on across the beat, so the kicks are even
+ * rather than paired.
+ *
+ * Straight legs are the thrust and splayed ones the recovery, which is the
+ * standing creature's own two frames read sideways -- the legs snap back
+ * together and long, then fold and spread. Nothing was written for it. */
+static void spk_draw_flyer(const struct spk_frame *f, int x, int level)
+{
+    int cx = x + SPK_CELL_PX / 2;
+    int mid = SPK_GROUND_Y - SPK_LEVEL_PX * level - SPK_FLY_MID;
+    bool kick = f->strong != (f->phase >= SPK_PHASE / 2);
+    int lift = kick ? SPK_CR_UP : SPK_CR_DOWN;
+    int foot = kick ? SPK_CR_FOOT_IN : SPK_CR_FOOT_OUT;
+    int nose = cx - SPK_FLY_LONG / 2 + SPK_SPK_H;
+    int hip = nose + SPK_CR_BODY;
+
+    spk_draw_shell_side(nose, mid, SPK_CR_BODY, SPK_CR_TOP, SPK_CR_BOT);
+
+    spk_draw_leg_side(mid - SPK_CR_BOT, mid - SPK_CR_HIP, hip, mid - foot,
+                      hip + lift);
+    spk_draw_leg_side(mid + SPK_CR_HIP, mid + SPK_CR_BOT, hip, mid + foot,
+                      hip + lift);
+
+    /* The spike, out in front, which is the thing a walk runs into. */
+    spk_line(nose, mid - SPK_SPK_W, nose - SPK_SPK_H, mid);
+    spk_line(nose, mid + SPK_SPK_W, nose - SPK_SPK_H, mid);
+}
+
+/* Where the flyer is now, read backwards from the column being drawn.
+ *
+ * It meets the player in the cell it is authored in, on that cell's own
+ * beat; before then it is one cell further right for every beat still to
+ * come. So the cell at column c holds it when M = (c + b) / 2 -- a whole
+ * number only every other column, and always one for the flyer itself,
+ * since c + b = 2M by construction.
+ *
+ * Bounded either side so it flies in rather than appearing, and carries on
+ * past rather than vanishing where it missed. */
+static bool spk_flyer_at(const struct spk_frame *f, int cell, int *level)
+{
+    int b = f->st->beat;
+    int m;
+
+    if (((cell + b) & 1) != 0)
+        return false;
+
+    m = (cell + b) / 2;
+
+    if (m - b > SPK_FLY_LEAD || b - m > SPK_FLY_LEAD)
+        return false;
+
+    return spk_world_flyer(m, level);
 }
 
 /* How high the cap is, for the instant being drawn.
@@ -701,7 +859,46 @@ static void spk_draw_eaten(const struct spk_frame *f, int x, int level)
  * so by the third frame the creature being squashed is most of a cell away
  * from the body squashing it. It is an impact, not a corpse -- it lasts a
  * sixth of a beat and it belongs where the impact was. */
-static void spk_draw_stomp(const struct spk_frame *f, int level)
+/* The two animals are crushed from where each of them was, and arrive at the
+ * same thing: a slab four deep lying on the surface, 44 across, which then
+ * comes apart. That is the whole of what they share and it is the part that
+ * matters -- by the burst neither of them is a shape any more.
+ *
+ * SPK_STOMP_SPAN and SPK_STOMP_FLAT are that slab. The walker starts standing
+ * on the surface and is driven down through its own legs; the flyer is on its
+ * side a body's height above it, and is driven *out of the air* first -- it
+ * has nothing under it to be crushed against until it reaches the floor. */
+#define SPK_STOMP_SPAN   22      /* half the slab, across */
+#define SPK_STOMP_FLAT    4      /* ...and how deep it ends up */
+#define SPK_STOMP_SPLAY  26      /* how far the walker's feet are thrown */
+
+static void spk_draw_stomp_side(int base, int row)
+{
+    int cx = SPK_PLAYER_X;
+
+    /* Down, and flat, and spread the way it was already going. The spike
+     * stays out in front the whole way: it is the last part of the shape
+     * that is still recognisable, and it is pointing where it was headed. */
+    int mid = base - SPK_FLY_MID
+              + ((SPK_FLY_MID - SPK_STOMP_FLAT / 2 - 1) * row) / 3;
+    int half = SPK_CR_TOP - ((SPK_CR_TOP - SPK_STOMP_FLAT / 2) * row) / 3;
+    int reach = SPK_CR_BODY / 2
+                + ((SPK_STOMP_SPAN - SPK_CR_BODY / 2) * row) / 3;
+    int lift = SPK_CR_UP - ((SPK_CR_UP - 3) * row) / 3;
+    int foot = SPK_CR_FOOT_IN + ((half - SPK_CR_FOOT_IN) * row) / 3;
+
+    spk_draw_shell_side(cx - reach, mid, 2 * reach, half, half);
+
+    spk_draw_leg_side(mid - half, mid - half / 2, cx + reach, mid - foot,
+                      cx + reach + lift);
+    spk_draw_leg_side(mid + half / 2, mid + half, cx + reach, mid + foot,
+                      cx + reach + lift);
+
+    spk_line(cx - reach, mid - half, cx - reach - SPK_SPK_H, mid);
+    spk_line(cx - reach, mid + half, cx - reach - SPK_SPK_H, mid);
+}
+
+static void spk_draw_stomp(const struct spk_frame *f, int level, bool flying)
 {
     int cx = SPK_PLAYER_X;
     int base = SPK_GROUND_Y - SPK_LEVEL_PX * level;
@@ -713,19 +910,29 @@ static void spk_draw_stomp(const struct spk_frame *f, int level)
 
     if (row < 4)
     {
-        int top = base - stand + ((stand - 5) * row) / 3;
-        int depth = SPK_CR_BODY - ((SPK_CR_BODY - 4) * row) / 3;
-        int half = SPK_CR_TOP + ((22 - SPK_CR_TOP) * row) / 3;
-        int foot = SPK_CR_FOOT_IN + ((26 - SPK_CR_FOOT_IN) * row) / 3;
-        int hip = top + depth;
+        if (flying)
+            spk_draw_stomp_side(base, row);
+        else
+        {
+            int top = base - stand + ((stand - 5) * row) / 3;
+            int depth = SPK_CR_BODY
+                        - ((SPK_CR_BODY - SPK_STOMP_FLAT) * row) / 3;
+            int half = SPK_CR_TOP
+                       + ((SPK_STOMP_SPAN - SPK_CR_TOP) * row) / 3;
+            int foot = SPK_CR_FOOT_IN
+                       + ((SPK_STOMP_SPLAY - SPK_CR_FOOT_IN) * row) / 3;
+            int hip = top + depth;
 
-        spk_draw_shell(cx, top, depth, half, half - 2);
-        spk_draw_leg(cx - SPK_CR_BOT, cx - SPK_CR_HIP, hip, cx - foot, base);
-        spk_draw_leg(cx + SPK_CR_HIP, cx + SPK_CR_BOT, hip, cx + foot, base);
+            spk_draw_shell(cx, top, depth, half, half - 2);
+            spk_draw_leg(cx - SPK_CR_BOT, cx - SPK_CR_HIP, hip,
+                         cx - foot, base);
+            spk_draw_leg(cx + SPK_CR_HIP, cx + SPK_CR_BOT, hip,
+                         cx + foot, base);
+        }
 
-        /* Clear of the body standing on it, or it is not a burst. */
         /* Out past the body, or it is drawn under the player and is not a
-         * burst at all. */
+         * burst at all. Both animals get it: by here neither of them is a
+         * shape any more, and what is being said is the same thing. */
         if (row >= 2)
         {
             spk_line(cx - 20, base - 8, cx - 31, base - 18);
@@ -896,7 +1103,15 @@ static void spk_draw_world(const struct spk_frame *f)
         if (spk_world_creature(cell, &level))
             spk_draw_creature(f, x, level, spk_world_spiked(cell));
         else if (f->st->stomped && cell == f->st->beat)
-            spk_draw_stomp(f, f->st->level < 0 ? 0 : f->st->level);
+            spk_draw_stomp(f, f->st->level < 0 ? 0 : f->st->level,
+                           spk_world_flew(cell));
+
+        /* One more cell's worth of scroll under it, which is the whole of
+         * its movement: the column it is drawn in steps left a cell a beat
+         * on its own, and this carries it the second one. Both are the same
+         * eased scroll, so it closes on the beat rather than near it. */
+        if (spk_flyer_at(f, cell, &level))
+            spk_draw_flyer(f, x - scroll, level);
     }
 }
 
@@ -996,7 +1211,11 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
             /* The arc has to finish on top of whatever is being landed on,
              * or the landing pose lifts the body onto it afterwards and the
              * impact arrives before the contact. */
-            if (spk_world_creature(st->beat + 1, &cl) && cl == st->to)
+            /* A flyer is stomped on its side, whose top edge is a pixel
+             * under a standing creature's head -- near enough that the two
+             * ride down on the same number. */
+            if ((spk_world_creature(st->beat + 1, &cl) && cl == st->to)
+                || (spk_world_flyer(st->beat + 1, &cl) && cl == st->to))
                 over = SPK_CR_HEAD8;
             else if (spk_world_switch(st->beat + 1, &cl) && cl == st->to)
                 over = (SPK_SW_UP * 256) / SPK_LEVEL_PX;
@@ -1034,6 +1253,37 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
             spk_pose_hop(p, f->phase, f->strong);
         return spk_walk_level(st->from, st->to, f->phase);
     }
+}
+
+/* The drop's two numbers, shared because the body falls on this curve and
+ * its tail is drawn from the same one: a ladder that does not match what the
+ * body did is the thing that makes a fall look drawn rather than fallen.
+ *
+ * 'high' is how far up it starts: the room over that level, capped. */
+static int spk_drop_high(int level)
+{
+    int room = spk_level_y(level << 8) - SPK_FIELD_TOP - SPK_BODY_PX;
+
+    return room < 0 ? 0 : room > SPK_DROP_H ? SPK_DROP_H : room;
+}
+
+static int spk_drop_lift(int high, int t)
+{
+    if (t <= 0)
+        return high;
+    if (t >= SPK_PHASE)
+        return 0;
+
+    /* Already moving when it comes into view. The body is a beat further up
+     * than the field is tall when the fall starts, so what gets drawn is the
+     * fast end of a longer one -- which is the curve below, a squared fall
+     * read from its second beat rather than its first.
+     *
+     * Trap: starting it from rest instead puts a ninth of the distance in
+     * the first third of the time, and on a two-beat drop that is a third of
+     * a second of a triangle hanging in the air. */
+    return high - (high * t * (t + 2 * SPK_PHASE))
+                  / (3 * SPK_PHASE * SPK_PHASE);
 }
 
 /* Where the tail is, for the instant being drawn: five points back along
@@ -1096,9 +1346,63 @@ static void spk_trail_drop(const struct spk_frame *f, int level)
     }
 }
 
+/* The streak a drop-in comes down in: the tail the jump and the death
+ * already leave, taken off the drop's own curve. Every dash is a place the
+ * body genuinely was, which is why they spread out towards the bottom --
+ * a ladder of even rungs says nothing about how fast it is going.
+ *
+ * The column is fixed, at the cell being returned to, so the streak stays in
+ * the air it fell through while the field scrolls past it. */
+static void spk_trail_plunge(const struct spk_frame *f)
+{
+    long world8 = ((long)f->st->beat + f->drop_cells) << 8;
+    int high = spk_drop_high(f->drop_level);
+    int base = spk_level_y(f->drop_level << 8);
+    struct spk_pose now;
+    int top, i;
+
+    trail_n = 0;
+    trail_falling = false;
+
+    /* Dashes below the apex are inside the body rather than behind it: near
+     * the top of the fall it covers less in one step than it is tall, and a
+     * mark there reads as drawn on the triangle. Dropping them thins the
+     * streak while the fall is slow and lets it out as it speeds up, which
+     * is the right way round for a body picking up speed. */
+    spk_pose_drop(&now, f->drop_fall, f->strong);
+    top = base - spk_drop_lift(high, f->drop_fall) - now.height;
+
+    for (i = 1; i <= SPK_TRAIL; i++)
+    {
+        int back = f->drop_fall - i * SPK_FALL_STEP;
+        int y;
+
+        if (back < 0)
+            break;
+
+        y = base - spk_drop_lift(high, back) - 6;
+
+        if (y > top)
+            continue;
+
+        trail[trail_n].world8 = world8;
+        trail[trail_n].y = (short)y;
+        trail_n++;
+    }
+}
+
 static void spk_trail_step(const struct spk_frame *f)
 {
     const struct spk_state *st = f->st;
+
+    /* The only tail there is while the run is skipping. Once it lands the
+     * streak is let go with everything else, and hangs in the air a moment
+     * before it drifts down. */
+    if (f->drop_cells >= 0 && f->drop_fall < SPK_PHASE)
+    {
+        spk_trail_plunge(f);
+        return;
+    }
 
     if (!f->skipping)
     {
@@ -1182,6 +1486,59 @@ static void spk_trail_draw(const struct spk_frame *f)
     }
 }
 
+/* Coming back after a death: falling onto the cell the run restarts from,
+ * then standing on it while the world carries it back to its own column.
+ *
+ * Drawn against that cell and not against the player's column, which is what
+ * makes it drift: a cell's x is its distance from the player plus the scroll,
+ * and both of those close as the field moves. By the beat it arrives the two
+ * are the same place, and the walk takes over with nothing to catch up. */
+static void spk_draw_drop(const struct spk_frame *f)
+{
+    struct spk_pose p;
+    int surface = spk_level_y(f->drop_level << 8);
+    int high = spk_drop_high(f->drop_level);
+    int t = f->drop_fall;
+    int x = SPK_PLAYER_X + f->drop_cells * SPK_CELL_PX - spk_scroll(f);
+    int pt[3][2];
+    int i;
+
+    if (t < SPK_PHASE)
+    {
+        /* The pose carries no height of its own -- spk_pose_fall() does, in
+         * its later rows, and it is written for a body leaving the screen,
+         * so the two together put this one through the floor. Here the
+         * height is the caller's and the pose is the shape it falls in. */
+        spk_pose_drop(&p, t, f->strong);
+        surface -= spk_drop_lift(high, t);
+    }
+    else
+    {
+        spk_pose_land(&p, f->phase, f->strong, 0);
+
+        /* Flatter than a hop lands, and only while it is still absorbing
+         * it: it has come down the height of the field. */
+        if (f->phase < SPK_PHASE / 4)
+        {
+            int give = SPK_DROP_SQUASH
+                       - (SPK_DROP_SQUASH * f->phase * 4) / SPK_PHASE;
+
+            p.half_width = (int8_t)(p.half_width + give);
+            p.height = (int8_t)(p.height - give);
+        }
+    }
+
+    spk_pose_points(&p, x, surface, pt);
+
+    spk_aa_use(aa_ink);
+    for (i = 0; i < 3; i++)
+    {
+        int j = (i + 1) % 3;
+
+        spk_aa_line(pt[i][0], pt[i][1], pt[j][0], pt[j][1]);
+    }
+}
+
 static void spk_draw_player(const struct spk_frame *f)
 {
     struct spk_pose p;
@@ -1231,9 +1588,47 @@ static void spk_draw_player(const struct spk_frame *f)
 
 /** The chrome **/
 
-static void spk_centred(int y, const char *s, int scale, bool bold)
+/* The crown, drawn rather than blitted, and square: h is its side.
+ *
+ * The block-glyph crown is a seven-pixel bitmap scaled up, and both places
+ * it appears now set their score in the caption face -- beside which it
+ * reads as a different era of the same screen. This one is lines, taken to
+ * the height of the digits it stands next to.
+ *
+ * Three peaks and a band, which is the least a crown can be and still not be
+ * a chess piece. The bitmap needs a gap and a bar under it to say as much,
+ * because at seven pixels the peaks alone are ambiguous; at this size they
+ * are not.
+ *
+ * The caller sets the ramp, since the two callers use different ones. */
+static void spk_crown_drawn(int x, int y, int h)
 {
-    spk_text((LCD_WIDTH - spk_text_width(s, scale)) / 2, y, s, scale, bold);
+    /* Everything is an offset either side of a centre, so the two halves are
+     * the same by construction. Placing the points across a span instead
+     * puts the apex half a pixel off it -- the width is odd as often as not
+     * -- and half a pixel is a whole one on a peak four high. */
+    int half = h / 2;
+    int cx = x + half;
+    int dip = y + h * 2 / 5;         /* where the notches bottom out */
+    int pt[7][2];
+    int i;
+
+    pt[0][0] = cx - half;     pt[0][1] = y + h / 4;
+    pt[1][0] = cx - half / 2; pt[1][1] = dip;
+    pt[2][0] = cx;            pt[2][1] = y;
+    pt[3][0] = cx + half / 2; pt[3][1] = dip;
+    pt[4][0] = cx + half;     pt[4][1] = y + h / 4;
+    pt[5][0] = cx + half;     pt[5][1] = y + h;
+    pt[6][0] = cx - half;     pt[6][1] = y + h;
+
+    for (i = 0; i < 7; i++)
+    {
+        int j = (i + 1) % 7;
+
+        spk_aa_line(pt[i][0], pt[i][1], pt[j][0], pt[j][1]);
+    }
+
+    spk_aa_line(cx - half, y + h * 3 / 4, cx + half, y + h * 3 / 4);
 }
 
 /* What the wheel just did, in the room the track's name usually has.
@@ -1434,7 +1829,7 @@ static void spk_font_centred(int font, int y, const char *str, bool bold)
 static void spk_draw_hud(const struct spk_frame *f)
 {
     char line[12];
-    int x, sw, sh, room;
+    int x, sw, sh, mw, ch, room;
 
     /* Leading zeros, so the number is the same width whatever it says and
      * the eye can read it without leaving the field. Seven digits: six was
@@ -1449,39 +1844,46 @@ static void spk_draw_hud(const struct spk_frame *f)
 
     lcd_setfont(f->font);
     lcd_getstringsize(line, &sw, &sh);
+    lcd_getstringsize("X8", &mw, NULL);
+
+    ch = SPK_CROWN_H(sh);
+
     x = LCD_WIDTH - 4 - sw;
     lcd_putsxy(x, SPK_BAND_Y(sh), line);
-    lcd_setfont(FONT_SYSFIXED);
 
-    /* Past the best, said where the score is and while it is happening. */
+    /* Past the best, said while it is happening rather than at the end, and
+     * hard against the score because that is what it is about. */
+    x -= SPK_TAG_GAP + ch;
     if (f->crowned)
     {
-        x -= spk_crown_width(SPK_HUD_SCALE) + 4 * SPK_HUD_SCALE;
-        spk_crown(x, SPK_BAND_Y(7 * SPK_HUD_SCALE), SPK_HUD_SCALE);
+        int was_top = aa_top;
+
+        /* The plotter is set to the field's rows for the whole frame, and
+         * the band is above them: without this the crown is clipped away to
+         * the couple of rows that reach into the field, which is a mark the
+         * player cannot read and cannot place. */
+        aa_top = 0;
+        spk_aa_use(aa_ink);
+        spk_crown_drawn(x, SPK_BAND_Y(ch), ch);
+        aa_top = was_top;
     }
 
-    /* Beside the score rather than under it, and left in the block glyphs at
-     * scale 1: it is a note about the score, not a second number competing
-     * with it, and the face has one size only so a run of it here would be
-     * exactly as loud as the score. */
+    /* ...and the multiplier outside it, on the score's own baseline so the
+     * two read as one line rather than as two things that happen to be near
+     * each other. */
+    x -= SPK_TAG_GAP + mw;
     if (f->multiplier > 1)
     {
         snprintf(line, sizeof (line), "X%d", f->multiplier);
-        x -= spk_text_width(line, 1) + 5 * SPK_HUD_SCALE;
-        spk_text(x, SPK_BAND_Y(spk_text_height(1)), line, 1, false);
+        lcd_putsxy(x, SPK_BAND_Y(sh), line);
     }
 
-    /* The room on the left is *reserved*, not left over.
-     *
-     * The crown and the multiplier come and go with the run, and a box that
-     * changed width with them would re-measure and reflow the title every
-     * time the combo did -- which reads as the caption twitching rather than
-     * as a layout. Both are allowed for whether or not they are on screen,
-     * so the box is the same width from the first frame to the last. */
-    room = LCD_WIDTH - 4 - sw
-           - (spk_crown_width(SPK_HUD_SCALE) + 4 * SPK_HUD_SCALE)
-           - (spk_text_width("X99", 1) + 5 * SPK_HUD_SCALE)
-           - SPK_CAP_EDGE - SPK_CAP_GAP;
+    lcd_setfont(FONT_SYSFIXED);
+
+    /* What is left is the title's, and it is left over rather than reserved
+     * -- x has already walked past both slots whether or not they were
+     * filled. */
+    room = x - SPK_CAP_EDGE - SPK_CAP_GAP;
 
     if (f->volume >= 0)
         spk_draw_volume(f, room);
@@ -1490,8 +1892,10 @@ static void spk_draw_hud(const struct spk_frame *f)
 
     /* And the rule that closes the band. It is the top of the block the
      * layout centres, so it is drawn where the field begins rather than at
-     * some distance chosen to look right. */
-    spk_hline(SPK_RULE_INSET, LCD_WIDTH - 1 - SPK_RULE_INSET, SPK_HUD_H);
+     * some distance chosen to look right -- and edge to edge, because the
+     * floor at the bottom of the same block is, and two rules bounding one
+     * picture have to agree about where the picture stops. */
+    spk_hline(0, LCD_WIDTH - 1, SPK_HUD_H);
 
     if (f->waiting)
     {
@@ -1558,6 +1962,9 @@ void spk_draw_frame(const struct spk_frame *f)
 {
     struct viewport vp;
 
+    aa_top = SPK_HUD_H;
+    aa_bot = SPK_UPDATE_H;
+
     spk_resolve_colors();
 
     /* Ordinarily the field's own rows and no others: the caption is drawn on
@@ -1587,10 +1994,13 @@ void spk_draw_frame(const struct spk_frame *f)
     spk_trail_step(f);
     spk_trail_draw(f);
 
-    /* Nothing to draw during the skip: the run is not the player's for
+    /* Nothing to draw for most of the skip: the run is not the player's for
      * those beats, and an absent triangle says so more plainly than any
-     * treatment of a present one. */
-    if (!f->skipping)
+     * treatment of a present one. The end of it is the body coming back,
+     * which is drawn against the cell it is coming back to. */
+    if (f->drop_cells >= 0)
+        spk_draw_drop(f);
+    else if (!f->skipping)
         spk_draw_player(f);
 
     spk_draw_hud(f);
@@ -1611,56 +2021,186 @@ void spk_draw_flush(void)
                     SPK_UPDATE_H - SPK_UPDATE_TOP);
 }
 
-/* The end of a run. One number the size of the field it was won on, what
- * it had to beat under it, and the body turning somersaults beside it --
- * the gymnastics that were cut from the wait, kept for the one moment there
- * is something to celebrate and nothing to time. */
-void spk_draw_result(const struct spk_result *r, int phase, int move)
+
+/** The summary **/
+
+/* Where the parts of a finished run sit. The label, the score and the two
+ * number lines are a fixed block; the list takes whatever is left between
+ * them and the floor the body turns somersaults on, which is why the number
+ * of rows is answered rather than declared. */
+#define SPK_SUM_EDGE      8     /* the margin everything is set against */
+#define SPK_SUM_GAP       4     /* between the rows of the top part */
+#define SPK_SUM_LIST_Y   10     /* the rule, to the first name under it */
+#define SPK_SUM_GENRE   104     /* the genre's column, on the right */
+#define SPK_SUM_LIST_BOT (LCD_HEIGHT - SPK_SUM_EDGE)
+
+/* The column the body somersaults in: against the right edge, and as wide as
+ * the turn can get so the words beside it never have to allow for it.
+ *
+ * It stands on the rule that divides the screen. There is already a line
+ * under it, and a second one would read as a shelf. */
+#define SPK_SUM_BODY_W   (SPK_BODY_PX + 4)
+#define SPK_SUM_BODY_X   (LCD_WIDTH - SPK_SUM_EDGE - SPK_SUM_BODY_W / 2)
+#define SPK_SUM_WORDS_R  (LCD_WIDTH - SPK_SUM_EDGE - SPK_SUM_BODY_W)
+
+/* The list's scrollbar, in the right margin. It is drawn whether or not
+ * there is anything to scroll: a column that comes and goes moves every name
+ * beside it, which is a worse thing to look at than a full bar. */
+#define SPK_SUM_BAR_W     4
+#define SPK_SUM_BAR_X    (LCD_WIDTH - SPK_SUM_EDGE - SPK_SUM_BAR_W)
+#define SPK_SUM_LIST_R   (SPK_SUM_BAR_X - 6)
+
+/* One row of the top part, clipped to the words' half of the screen so a
+ * long one runs out rather than into the body. */
+static void spk_sum_left(int x, int y, int th, int font, const char *s)
+{
+    struct viewport cv, *was;
+
+    viewport_set_defaults(&cv, SCREEN_MAIN);
+    cv.x = x;
+    cv.width = SPK_SUM_WORDS_R - x;
+    cv.y = y;
+    cv.height = th;
+    cv.fg_pattern = was_ink;
+    cv.bg_pattern = was_paper;
+    cv.font = font;
+
+    was = lcd_set_viewport(&cv);
+    lcd_putsxy(0, 0, s);
+    lcd_set_viewport(was);
+    lcd_setfont(FONT_SYSFIXED);
+}
+
+/* One track: its name, and its genre after it in a muted ink.
+ *
+ * Muted rather than the accent, which is a hue away from the ink and shouts
+ * for a label that is only there to place the track. Two thirds of the way
+ * up the ink's own ramp reads as secondary at any pair of colours a theme
+ * can set, which a second hue does not.
+ *
+ * Each column is a viewport, because a name is as long as it likes and the
+ * only exact way to stop one is to give it a box. */
+static void spk_sum_track(int y, int th, int font, const char *name,
+                          const char *genre)
+{
+    struct viewport cv, *was;
+    int gw = 0;
+
+    if (genre[0] != '\0')
+    {
+        lcd_setfont(font);
+        lcd_getstringsize(genre, &gw, NULL);
+        if (gw > SPK_SUM_GENRE)
+            gw = SPK_SUM_GENRE;
+    }
+
+    viewport_set_defaults(&cv, SCREEN_MAIN);
+    cv.x = SPK_SUM_EDGE;
+    cv.width = SPK_SUM_LIST_R - SPK_SUM_EDGE - (gw ? gw + SPK_SUM_EDGE : 0);
+    cv.y = y;
+    cv.height = th;
+    cv.fg_pattern = was_ink;
+    cv.bg_pattern = was_paper;
+    cv.font = font;
+
+    was = lcd_set_viewport(&cv);
+    lcd_putsxy(0, 0, name);
+
+    if (gw > 0)
+    {
+        cv.x = SPK_SUM_LIST_R - gw;
+        cv.width = gw;
+        cv.fg_pattern = aa_ink[SPK_AA_STEPS * 5 / 8];
+        lcd_set_viewport(&cv);
+        lcd_putsxy(0, 0, genre);
+    }
+
+    lcd_set_viewport(was);
+    lcd_setfont(FONT_SYSFIXED);
+}
+
+/* The end of a run, and the record, which are the same screen: what the run
+ * came to across the top, the tracks it was played over under a rule, and
+ * the body turning somersaults on the rule between them -- the gymnastics
+ * that were cut from the wait, kept for the one moment there is something to
+ * celebrate and nothing to time.
+ *
+ * The words are set in the caption face rather than the block glyphs, which
+ * are the field's voice and belong to a screen that is moving. Nothing here
+ * is a fixed row height as a result: the face is loaded at run time, so
+ * every row is measured and stepped from the one above it. */
+void spk_draw_summary(struct spk_summary *s, int phase, int move)
 {
     struct spk_pose p;
-    char line[16];
+    char line[48];
+    char name[SPK_NAME_MAX], genre[SPK_GENRE_MAX];
     int pt[3][2];
-    int w, x, i;
+    int x, y, i, th, ch, top, rows, rule;
+
+    aa_top = 0;
+    aa_bot = LCD_HEIGHT;
 
     spk_draw_colors();
     lcd_set_drawmode(DRMODE_SOLID);
     lcd_clear_display();
 
-    spk_centred(28, r->run ? "RUN OVER" : "TRACK OVER", 2, false);
+    lcd_setfont(s->font);
+    lcd_getstringsize("0", NULL, &th);
+    lcd_setfont(FONT_SYSFIXED);
 
-    /* The crown leads the score and is part of the same block, so a run
-     * that beat the best is a wider thing on the screen and not merely a
+    y = SPK_SUM_EDGE;
+
+    spk_sum_left(SPK_SUM_EDGE, y, th, s->font,
+                 s->record ? "BEST RUN" : "RUN OVER");
+    y += th + SPK_SUM_GAP;
+
+    /* The crown leads the score and is part of the same line, so a run that
+     * beat the best is a wider thing on the screen and not merely a
      * differently annotated one. */
-    snprintf(line, sizeof (line), "%06d",
-             (int)(r->score > 999999 ? 999999 : r->score));
+    snprintf(line, sizeof (line), "%ld",
+             s->run.score > 9999999 ? 9999999 : s->run.score);
 
-    w = spk_text_width(line, 3);
-    if (r->crowned)
-        w += spk_crown_width(3) + 6;
+    x = SPK_SUM_EDGE;
+    ch = SPK_CROWN_H(th);
 
-    x = (LCD_WIDTH - w) / 2;
-
-    if (r->crowned)
+    if (s->crowned)
     {
-        spk_crown(x, 58, 3);
-        x += spk_crown_width(3) + 6;
+        spk_aa_use(aa_ink);
+        spk_crown_drawn(x, y + (th - ch) / 2, ch);
+        x += ch + SPK_TAG_GAP;
     }
 
-    spk_text(x, 58, line, 3, false);
+    spk_sum_left(x, y, th, s->font, line);
+    y += th + SPK_SUM_GAP;
 
-    snprintf(line, sizeof (line), "BEST %ld", r->best);
-    spk_centred(96, line, 1, false);
+    /* What it came to. Minutes are the player's measure of a run and beats
+     * are the game's, and neither answers for the other -- a slow track is
+     * fewer beats for the same evening. */
+    snprintf(line, sizeof (line), "%ldM%02ld  %ld BEATS", s->run.secs / 60,
+             s->run.secs % 60, s->run.beats);
+    spk_sum_left(SPK_SUM_EDGE, y, th, s->font, line);
+    y += th;
 
-    if (r->run)
+    snprintf(line, sizeof (line), "%d TRACKS  %d BPM", s->run.tracks,
+             (s->run.bpm10 + 5) / 10);
+    spk_sum_left(SPK_SUM_EDGE, y, th, s->font, line);
+    y += th;
+
+    /* Only where there is still something to beat. A run that beat it wears
+     * the crown, and the record has nothing above it. */
+    if (!s->crowned && s->best > 0)
     {
-        snprintf(line, sizeof (line), "%ld BEATS", r->beats);
-        spk_centred(110, line, 1, false);
+        snprintf(line, sizeof (line), "BEST %ld", s->best);
+        spk_sum_left(SPK_SUM_EDGE, y, th, s->font, line);
+        y += th;
     }
 
-    /* Standing on the same line the field's floor was on, so the body has
-     * not moved between the last frame of the run and this one. */
+    rule = y + SPK_SUM_GAP;
+    spk_hline(0, LCD_WIDTH - 1, rule);
+
+    /* Standing on it, with nothing left to dodge. */
     spk_pose_idle(&p, phase, move);
-    spk_pose_points(&p, LCD_WIDTH / 2, SPK_GROUND_Y, pt);
+    spk_pose_points(&p, SPK_SUM_BODY_X, rule, pt);
 
     spk_aa_use(aa_ink);
     for (i = 0; i < 3; i++)
@@ -1670,7 +2210,33 @@ void spk_draw_result(const struct spk_result *r, int phase, int move)
         spk_aa_line(pt[i][0], pt[i][1], pt[j][0], pt[j][1]);
     }
 
-    spk_hline(0, LCD_WIDTH - 1, SPK_GROUND_Y);
+    /* And the tracks under it. How many fit is a property of the face they
+     * are set in, so it is measured here and handed back to the caller that
+     * does the scrolling. */
+    top = rule + SPK_SUM_LIST_Y;
+    rows = th > 0 ? (SPK_SUM_LIST_BOT - top) / th : 0;
+    if (rows < 0)
+        rows = 0;
+
+    s->shown = rows;
+
+    if (s->first > s->rows - rows)
+        s->first = s->rows - rows;
+    if (s->first < 0)
+        s->first = 0;
+
+    for (i = 0; i < rows && s->first + i < s->rows; i++)
+    {
+        spk_score_track(s->log, s->first + i, name, sizeof (name),
+                        genre, sizeof (genre));
+        spk_sum_track(top + i * th, th, s->font, name, genre);
+    }
+
+    if (rows > 0)
+        gui_scrollbar_draw(&screens[SCREEN_MAIN], SPK_SUM_BAR_X, top,
+                           SPK_SUM_BAR_W, rows * th,
+                           s->rows < rows ? rows : s->rows,
+                           s->first, s->first + rows, VERTICAL);
 
     lcd_update();
 }

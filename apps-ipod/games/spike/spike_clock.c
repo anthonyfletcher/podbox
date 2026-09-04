@@ -75,6 +75,23 @@ void spk_clock_reset(void)
     report_tick = current_tick;
 }
 
+/* The clock is carried by the ticks between reports, so a caller that stops
+ * calling it -- a pause splash, a menu -- leaves the whole of that time
+ * waiting to be added on the next tick. It is added as one lump, and
+ * everything cut from the clock reads it as the audio having moved: the
+ * grid jumps by however long the menu was open, which is a run restarted
+ * for having looked at it.
+ *
+ * The position itself needs no correction. The audio was stopped, so track
+ * time did not move; only the two stamps that say when the clock was last
+ * carried have to come forward. */
+void spk_clock_resume(void)
+{
+    clock_tick = current_tick;
+    report_ms = spk_audio_ms();
+    report_tick = current_tick;
+}
+
 /* The report has stopped and the music has not.
  *
  * The clamps hold the clock within a chunk of what playback last said, which
@@ -224,6 +241,21 @@ int spk_octave(unsigned int track_ms)
             best = ms;
         }
     }
+
+    /* ...and then a floor, because the nearest power of two is not always a
+     * playable one. Nearest sends a 170 BPM track to its own beat -- a third
+     * of a second a cell -- and, for the same reason from the other end, a 75
+     * BPM track to double time at 400 ms. Both are the same fault: the target
+     * is in the middle of the range and half of what lands near it lands on
+     * the fast side of playable. Below the floor, take the beat above.
+     *
+     * Only a grid that was usable to begin with is slowed down. An estimate
+     * the octave map could not bring into range is not a fast track, it is a
+     * bad estimate, and doubling it would launder one into the other -- a 300
+     * BPM reading would arrive as a perfectly reasonable 400 ms grid instead
+     * of being rejected. */
+    if (best >= SPK_BEAT_MIN && best < SPK_BEAT_FAST)
+        best *= 2;
 
     return best;
 }

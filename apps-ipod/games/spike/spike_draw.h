@@ -10,6 +10,7 @@
 #define SPIKE_DRAW_H
 
 #include <stdbool.h>
+#include "games/spike/spike_score.h"
 #include "games/spike/spike_world.h"
 
 /* Ten cells across the panel, exactly. Twenty pixels a level separates them
@@ -52,13 +53,10 @@
  * against anything else. */
 #define SPK_HUD_DROP     10
 #define SPK_HUD_H        (SPK_BAND_H + SPK_HUD_DROP)
-#define SPK_RULE_INSET   4      /* the rule stops where the score does */
 
 /* Where something that tall sits in the band above the rule. */
 #define SPK_BAND_Y(h)    (SPK_HUD_DROP + (SPK_BAND_H - (h)) / 2)
 #define SPK_GROUND_Y     (SPK_HUD_H + SPK_FIELD_H)
-#define SPK_HUD_SCALE    2
-#define SPK_HUD_Y        ((SPK_HUD_H - 7 * SPK_HUD_SCALE) / 2)
 #define SPK_FIELD_TOP    SPK_HUD_H
 
 /* The player's column, which leaves seven cells of preview ahead of it. It
@@ -104,6 +102,22 @@ struct spk_frame
     int  death_scroll;   /* where the scroll stopped, in 256ths of a cell */
     enum spk_death death_kind;
     bool skipping;       /* the beats between a death and a respawn */
+
+    /* Coming back: the body falls out of the sky onto the cell it is going to
+     * restart from, and then stands on it while the world carries it home.
+     *
+     * It is drawn against a *cell* rather than against its own column for
+     * those beats, which is the whole of the idea -- the cell is ahead of the
+     * player's column and the scroll walks it back, so the body arrives where
+     * it is going to be and the field brings it in. Nothing else on the
+     * screen has to change for that: a cell's own x already moves.
+     *
+     * 'drop_cells' is how many cells right of home it is, and -1 when none of
+     * this is happening. 'drop_fall' runs 0 to SPK_PHASE through the fall and
+     * stays there once it is down. */
+    int  drop_cells;
+    int  drop_fall;
+    int  drop_level;
 
     long score;
     int  multiplier;
@@ -157,16 +171,27 @@ struct spk_frame
     bool crowned;
 };
 
-/* What the end of a run reports. Both modes answer with a score; only Run
- * answers with a distance, because "how long did you last" is the question
- * that mode asks and a score alone does not answer it. */
-struct spk_result
+/* A finished run, and the screen that shows one.
+ *
+ * One shape for two callers, because the run that has just ended and the
+ * record are the same kind of thing -- the record is a run that ended some
+ * other evening. What differs is which track list is under it and whether
+ * there is anything left to beat. */
+struct spk_summary
 {
-    long score;
+    struct spk_run run;
     long best;           /* what it had to beat, before this run */
-    long beats;
     bool crowned;        /* ...and did */
-    bool run;            /* Run rather than Song */
+    bool record;         /* the record rather than a run just ended */
+
+    /* The face the track names are set in: the block glyphs are digits and
+     * capitals, which a track name is not. */
+    int  font;
+
+    enum spk_log log;    /* which list the tracks are read from */
+    int  rows;           /* tracks in it */
+    int  first;          /* the top one shown */
+    int  shown;          /* ...and how many fitted, answered by the draw */
 };
 
 /* Drawing and flushing are separate calls so a caller can time them
@@ -184,10 +209,13 @@ void spk_draw_reset(void);
  * outside those -- the menu -- has to say so or its last rows stay. */
 void spk_draw_full_flush(void);
 
-/* The end of a run: the score, what it beat, and a body with nothing left
- * to do turning somersaults beside it. 'phase' and 'move' drive the
- * gymnastics and come off wall time -- the music may have stopped, and this
- * screen is not on the grid. */
-void spk_draw_result(const struct spk_result *r, int phase, int move);
+/* The end of a run, or the record: the score, what it came to, the tracks it
+ * was played over, and a body with nothing left to do turning somersaults
+ * under them. 'phase' and 'move' drive the gymnastics and come off wall
+ * time -- the music may have stopped, and this screen is not on the grid.
+ *
+ * 'shown' comes back filled in, because how many rows fit is a question
+ * about the face the list is set in and the caller does the scrolling. */
+void spk_draw_summary(struct spk_summary *s, int phase, int move);
 
 #endif /* SPIKE_DRAW_H */

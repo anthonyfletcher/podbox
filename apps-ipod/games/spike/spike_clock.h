@@ -11,18 +11,35 @@
 #include <stdbool.h>
 
 /* What the grid aims for, and the range an octave shift of a real tempo can
- * actually land in. Choosing the shift that minimises the distance to the
- * target always lands within a factor of root two of it, so the bounds
- * cannot be reached from any plausible tempo -- they are here to report a
- * tempo estimate that was never usable, not to fix one. Clamping instead
- * would leave the grid at a tempo that is not an integer ratio of the
- * track's, and it would then drift out of time in silence. */
+ * actually land in. The bounds are here to report a tempo estimate that was
+ * never usable, not to fix one: clamping instead would leave the grid at a
+ * tempo that is not an integer ratio of the track's, and it would then drift
+ * out of time in silence.
+ *
+ * SPK_BEAT_FAST is the floor under the grid itself, and it is a playability
+ * number rather than a musical one. A cell is a beat and the period is the
+ * whole of the time a player has to read the cell in front of them and
+ * decide -- at a third of a second there is not enough of it, and the game
+ * stops being about reading the course. Anything quicker takes the beat
+ * above instead, which is the same music at half the speed.
+ *
+ * Which is why the maximum is 840 and not 720: a grid slowed to stay off the
+ * floor can reach twice the floor, and rejecting it there would fail the
+ * fast tracks this exists to rescue. */
 #define SPK_BEAT_TARGET      500
+#define SPK_BEAT_FAST        420
 #define SPK_BEAT_MIN         330
-#define SPK_BEAT_MAX         720
+#define SPK_BEAT_MAX         840
 
 /* Seed the clock at the play position. */
 void spk_clock_reset(void);
+
+/* Take the clock up again after the caller stopped ticking it -- a pause, a
+ * menu -- without moving it. The position it holds is still the right one:
+ * the audio was stopped, so track time did not move either. What has to be
+ * forgotten is the wall time that passed, which the next tick would
+ * otherwise add to the clock as though the music had played through it. */
+void spk_clock_resume(void);
 
 /* Carry the clock to now and let the audio steer it. False where playback
  * moved underneath -- a seek, a skip or a track change -- in which case it

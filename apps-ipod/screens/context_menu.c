@@ -256,16 +256,11 @@ MENUITEM_FUNCTION(reshuffle_item, 0, ID2P(LANG_SHUFFLE_PLAYLIST),
 MENUITEM_FUNCTION(playing_time_item, 0, ID2P(LANG_PLAYING_TIME),
                   playing_time, NULL, Icon_NOICON);
 
-/* Run takes the playlist as it finds it, so it belongs on the WPS: what it
- * is played against is what is already playing. Song is a track, and is on
- * the browser's menu with the rest of the things one does to a track.
- *
- * Both rows say the same thing, because from where the player is standing
- * they are the same thing: play what is in front of me with Spike. Which
- * mode that means follows from which menu they opened. */
+/* The game takes the playlist as it finds it, so it belongs on the WPS and
+ * nowhere else: what it is played against is what is already playing. */
 static int spike_run(void)
 {
-    spike_screen(SPIKE_MODE_RUN);
+    spike_screen();
     return ONPLAY_OK;
 }
 
@@ -1210,76 +1205,6 @@ int sort_playlists_callback(int action,
 
 MENUITEM_SETTING(sort_playlists, &global_settings.sort_playlists, sort_playlists_callback);
 
-/* Spike against the selected track. The track has to be playing before the
- * game has a clock, so it replaces the playlist and is started here.
- *
- * Written out rather than handed to add_to_playlist(), and the reason is
- * the one thing that made this not work at all: **Keep Current Track On
- * Replace Playlist**. With that on and something already playing, the
- * replace keeps the playing track and never calls playlist_start() -- so
- * the game came up against whatever was already on rather than against the
- * track that was chosen. Here the chosen track is the whole point, so the
- * setting does not apply.
- *
- * op_playlist_insert_selected() is still the way in, because it is what
- * knows that a database row has no path until one is looked up.
- *
- * playlist_start() posts to the audio thread rather than starting playback
- * itself, so the game would find nothing playing and refuse. Waited for
- * rather than assumed, and bounded so a track that will not open lands back
- * in the browser instead of here. */
-static int spike_song(void)
-{
-    int i;
-
-    if (!warn_on_pl_erase())
-        return ONPLAY_OK;
-
-    splash(0, ID2P(LANG_WAIT));
-
-    playlist_create(NULL, NULL);
-    op_playlist_insert_selected(PLAYLIST_INSERT, false);
-
-    if (playlist_amount() <= 0)
-        return ONPLAY_OK;
-
-    /* One track, so never shuffled: shuffling one thing is the same thing
-     * and clearing the flag would be a setting changed behind the player. */
-    playlist_start(0, 0, 0);
-    playlist_set_modified(NULL, true);
-    playlist_set_from_artist(selected_file.context == CONTEXT_ID3DB &&
-                             browser_db_current_under_artist_level());
-
-    for (i = 0; i < 30 && !(audio_status() & AUDIO_STATUS_PLAY); i++)
-        sleep(HZ / 10);
-
-    spike_screen(SPIKE_MODE_SONG);
-
-    context_menu_result = ONPLAY_START_PLAY;
-
-    return ONPLAY_OK;
-}
-
-/* One track, so only where one is selected. In the database browser a track
- * row carries FILE_ATTR_AUDIO with the path still unread, which is the same
- * test. */
-static int spike_song_callback(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-
-    if (action == ACTION_REQUEST_MENUITEM
-        && (selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
-        return ACTION_EXIT_MENUITEM;
-
-    return action;
-}
-
-MENUITEM_FUNCTION(spike_song_item, 0, ID2P(LANG_SPIKE_PLAY),
-                  spike_song, spike_song_callback, Icon_NOICON);
-
 MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
                   view_playlist,
                   context_menu_callback, Icon_NOICON);
@@ -1288,7 +1213,6 @@ MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
 MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            context_menu_callback, Icon_file_view_menu,
            &view_playlist_item, &browser_playlist_menu, &cat_playlist_menu,
-           &spike_song_item,
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,

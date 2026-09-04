@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "fixedpoint.h"
+#include <stdlib.h>
 #include "games/spike/spike_pose.h"
 
 /* Rows in every table, so one shift turns a phase into an index. */
@@ -86,6 +87,8 @@ static const struct spk_pose hop_table[SPK_ROWS] =
     { -2, 11, 20, 0,  12,   0 , 0 }   /* coil for the next hop */
 };
 
+
+
 /* The warm-up, four beats of it, one move a beat: a forward somersault, a
  * tuck spin of two turns, up into a handstand, and out of it again. The last
  * two are a pair and have to stay adjacent -- move 3 begins inverted on the
@@ -94,7 +97,7 @@ static const struct spk_pose hop_table[SPK_ROWS] =
  * Rotation runs past 360 where a move turns more than once. fp14_sin() takes
  * degrees modulo a turn, so nothing has to be normalised here and the table
  * can say what it means. */
-static const struct spk_pose idle_table[SPK_ROWS * 4] =
+static const struct spk_pose idle_table[SPK_ROWS * SPK_IDLE_MOVES] =
 {
     /* 0: forward somersault */
     {  0, 12, 18,   0, 0,   0 , 0 },
@@ -168,7 +171,179 @@ static const struct spk_pose idle_table[SPK_ROWS * 4] =
     {  0, 10, 22, 360, 0,   0 , 0 },
     {  0, 10, 22, 360, 0,   0 , 0 },
     {  0, 10, 22, 360, 0,   0 , 0 },
-    {  0, 11, 20, 360, 0,   0 , 0 }
+    {  0, 11, 20, 360, 0,   0 , 0 },
+
+    /* 4: back somersault. Which way a triangle turns is legible -- the apex
+       leads it -- and this one goes higher and hangs longer than the
+       forward one, so the two are not each other's mirror. */
+    {  0, 12, 18,    0, 0,   0 , 0 },
+    {  0,  8, 26,    0, 0,  -5 , 0 },
+    {  0, 10, 22,  -35, 0, -12 , 0 },
+    {  0, 10, 22,  -70, 0, -17 , 0 },
+    {  0, 10, 22, -105, 0, -19 , 0 },
+    {  0, 10, 22, -145, 0, -20 , 0 },
+    {  0, 10, 22, -185, 0, -20 , 0 },
+    {  0, 10, 22, -225, 0, -18 , 0 },
+    {  0, 10, 22, -265, 0, -14 , 0 },
+    {  0, 10, 22, -310, 0,  -8 , 0 },
+    {  0, 10, 22, -340, 0,  -3 , 0 },
+    {  0, 13, 17, -360, 0,   0 , 0 },
+    {  0, 11, 21, -360, 0,   0 , 0 },
+    {  0, 10, 22, -360, 0,   0 , 0 },
+    {  0, 10, 22, -360, 0,   0 , 0 },
+    {  0, 11, 20, -360, 0,   0 , 0 },
+
+    /* 5: a jack. No turn at all: up, folded flat at the top, snapped open
+       and down. The one move made entirely of squash and stretch, which is
+       why it earns a place -- after three turns in a row the shape stops
+       being read at all. */
+    {  0, 12, 18,   0, 0,   0 , 0 },  /* coil */
+    {  0,  7, 28,   0, 0,  -6 , 0 },  /* up, stretched */
+    {  0,  8, 26,   0, 0, -14 , 0 },
+    {  0, 14, 14,   0, 0, -19 , 0 },  /* the fold */
+    {  0, 17, 11,   0, 0, -20 , 0 },  /* flat at the top */
+    {  0, 15, 13,   0, 0, -20 , 0 },
+    {  0,  8, 26,   0, 0, -18 , 0 },  /* snapped open */
+    {  0,  7, 28,   0, 0, -13 , 0 },
+    {  0,  8, 26,   0, 0,  -7 , 0 },
+    {  0, 10, 22,   0, 0,  -2 , 0 },
+    {  0, 13, 17,   0, 0,   0 , 0 },  /* land */
+    {  0, 11, 21,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 11, 20,   0, 0,   0 , 0 },
+
+    /* 6: up onto one corner, and held there.
+       The only move that uses base_tilt, and what makes it read as a
+       balance rather than a lean is that the tilt pivots on the corner it
+       is going over -- so the body rises onto that point instead of leaning
+       past it. The last rows are not still: a balance that does not correct
+       is a body resting on something. */
+    {  0, 12, 18,   0,  0,   0 , 0 },
+    {  0, 11, 20,   0,  8,   0 , 0 },
+    {  0, 10, 22,   0, 20,   0 , 0 },
+    {  0, 10, 22,   0, 34,   0 , 0 },
+    {  0, 10, 22,   0, 46,   0 , 0 },
+    {  0, 10, 22,   0, 55,   0 , 0 },
+    {  0, 10, 22,   0, 60,   0 , 0 },  /* up on it */
+    {  0, 10, 22,   0, 62,   0 , 0 },
+    {  0, 10, 22,   0, 59,   0 , 0 },  /* ...and correcting */
+    {  0, 10, 23,   0, 63,   0 , 0 },
+    {  0, 10, 21,   0, 58,   0 , 0 },
+    {  0, 10, 22,   0, 62,   0 , 0 },
+    {  0, 10, 23,   0, 59,   0 , 0 },
+    {  0, 10, 22,   0, 63,   0 , 0 },
+    {  0, 10, 21,   0, 60,   0 , 0 },
+    {  0, 10, 22,   0, 62,   0 , 0 },
+
+    /* 7: and off it, rocking through the other corner.
+       The tilt crosses zero, which moves the pivot to the far corner, so
+       the body rocks from one point to the other rather than swinging about
+       a fixed one. The overshoot is what makes it a dismount rather than a
+       body being lowered. */
+    {  0, 10, 22,   0, 62,   0 , 0 },
+    {  0, 10, 22,   0, 55,   0 , 0 },
+    {  0, 10, 22,   0, 40,   0 , 0 },
+    {  0,  9, 24,   0, 22,  -3 , 0 },
+    {  0, 13, 17,   0,  0,   0 , 0 },  /* flat, and hard */
+    {  0, 11, 20,   0, -9,   0 , 0 },  /* over the far corner */
+    {  0, 10, 22,   0,-15,   0 , 0 },
+    {  0, 10, 22,   0, -9,   0 , 0 },
+    {  0, 10, 22,   0,  6,   0 , 0 },  /* and back, smaller each time */
+    {  0, 10, 22,   0, -4,   0 , 0 },
+    {  0, 10, 22,   0,  2,   0 , 0 },
+    {  0, 10, 22,   0, -1,   0 , 0 },
+    {  0, 10, 22,   0,  0,   0 , 0 },
+    {  0, 10, 22,   0,  0,   0 , 0 },
+    {  0, 10, 22,   0,  0,   0 , 0 },
+    {  0, 11, 20,   0,  0,   0 , 0 },
+
+    /* 8: a reach. The jack folds the body flat; this is the same idea the
+       other way up, and it is the only move that never leaves the floor --
+       a stretch rather than a trick, which is what stops the routine
+       reading as eleven ways of jumping. */
+    {  0, 12, 18,   0, 0,   0 , 0 },
+    {  0, 11, 20,   0, 0,   0 , 0 },
+    {  0, 10, 23,   0, 0,   0 , 0 },  /* lengthening */
+    {  0,  9, 26,   0, 0,  -1 , 0 },
+    {  0,  8, 29,   0, 0,  -2 , 0 },
+    {  0,  7, 32,   0, 0,  -3 , 0 },
+    {  0,  6, 34,   0, 0,  -3 , 0 },
+    {  0,  6, 35,   0, 0,  -3 , 0 },  /* at full stretch */
+    {  0,  6, 35,   0, 0,  -3 , 0 },
+    {  0,  6, 34,   0, 0,  -3 , 0 },
+    {  0,  7, 32,   0, 0,  -2 , 0 },  /* and back down */
+    {  0,  8, 29,   0, 0,  -1 , 0 },
+    {  0,  9, 26,   0, 0,   0 , 0 },
+    {  0, 10, 23,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 11, 20,   0, 0,   0 , 0 },
+
+    /* 9: a bow. apex_dx alone carries it: the apex goes out past the leading
+       corner while the base stays flat on the floor, which is a body folding
+       forward.
+       Trap: base_tilt is the wrong lever here. It rotates the whole triangle
+       about a corner, so the base comes off the ground and what the body
+       does is topple. Nothing on this screen bends, and a lean that keeps
+       its feet down is the nearest thing to it. */
+    {  0, 12, 18,   0, 0,   0 , 0 },
+    {  2, 11, 20,   0, 0,   0 , 0 },
+    {  5, 11, 20,   0, 0,   0 , 0 },
+    {  9, 11, 19,   0, 0,   0 , 0 },
+    { 13, 12, 17,   0, 0,   0 , 0 },
+    { 16, 12, 15,   0, 0,   0 , 0 },
+    { 18, 13, 13,   0, 0,   0 , 0 },  /* down */
+    { 18, 13, 13,   0, 0,   0 , 0 },  /* and held there */
+    { 16, 12, 15,   0, 0,   0 , 0 },
+    { 13, 12, 17,   0, 0,   0 , 0 },
+    {  9, 11, 19,   0, 0,   0 , 0 },
+    {  5, 11, 20,   0, 0,   0 , 0 },
+    {  2, 11, 21,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 11, 20,   0, 0,   0 , 0 },
+
+    /* 10: a sway, corner to corner. The same tilt the balance uses and a
+       third of the angle, which reads as limbering up rather than as an
+       attempt at anything -- and the pivot changing feet in the middle is
+       what makes it a sway and not a wobble. */
+    {  0, 11, 20,   0,   0,   0 , 0 },
+    {  0, 10, 22,   0,  10,   0 , 0 },
+    {  0, 10, 22,   0,  20,   0 , 0 },
+    {  0, 10, 22,   0,  24,   0 , 0 },  /* over one corner */
+    {  0, 10, 22,   0,  20,   0 , 0 },
+    {  0, 10, 22,   0,   8,   0 , 0 },
+    {  0, 11, 20,   0,   0,   0 , 0 },  /* through the middle */
+    {  0, 10, 22,   0, -10,   0 , 0 },
+    {  0, 10, 22,   0, -20,   0 , 0 },
+    {  0, 10, 22,   0, -24,   0 , 0 },  /* and the other */
+    {  0, 10, 22,   0, -20,   0 , 0 },
+    {  0, 10, 22,   0,  -8,   0 , 0 },
+    {  0, 11, 20,   0,   0,   0 , 0 },
+    {  0, 10, 22,   0,   0,   0 , 0 },
+    {  0, 10, 22,   0,   0,   0 , 0 },
+    {  0, 11, 20,   0,   0,   0 , 0 },
+
+    /* 11: two bounces, the second higher. A move that lands in the middle
+       of itself, which none of the others do -- the beat gets an accent
+       inside it rather than only at its ends. */
+    { -2, 12, 18,   0, 0,   0 , 0 },
+    {  0,  9, 25,   0, 0,  -5 , 0 },
+    {  0, 10, 22,   0, 0,  -8 , 0 },  /* the first, small */
+    {  0, 10, 22,   0, 0,  -6 , 0 },
+    {  0, 12, 19,   0, 0,   0 , 0 },  /* down */
+    { -2, 13, 17,   0, 0,   0 , 0 },  /* and straight back up */
+    {  0,  8, 27,   0, 0,  -7 , 0 },
+    {  0, 10, 22,   0, 0, -13 , 0 },
+    {  0, 10, 22,   0, 0, -15 , 0 },  /* the second, higher */
+    {  0, 10, 22,   0, 0, -13 , 0 },
+    {  0, 10, 22,   0, 0,  -8 , 0 },
+    {  0,  9, 24,   0, 0,  -3 , 0 },
+    {  0, 13, 17,   0, 0,   0 , 0 },  /* land */
+    {  0, 11, 21,   0, 0,   0 , 0 },
+    {  0, 10, 22,   0, 0,   0 , 0 },
+    {  0, 11, 20,   0, 0,   0 , 0 }
 };
 
 /* The jump, over both of its beats: crouch, launch, one full turn with the
@@ -310,6 +485,43 @@ static const struct spk_pose fall_table[SPK_ROWS] =
 };
 
 
+/* Dropped in from the sky after a death, which is a different move from
+ * falling to one: this body is going to land, and all of it is the
+ * anticipation of that.
+ *
+ * The height belongs to the caller -- it depends which level is being
+ * returned to -- so y_offset stays at nought and the table is shape alone.
+ * The shape is speed: it comes into view already thin -- the fall starts a
+ * beat above the top of the field -- holds there through the fast middle,
+ * and gathers back to square over the last rows so the landing has something
+ * to squash from.
+ *
+ * The turn unwinds to nothing by the last row for the same reason the tilt
+ * arrives at the land table's: the next pose is a landing, and a handover
+ * that jumps is worse than no turn at all. This is why §12.5's objection to
+ * a spiralling fall does not apply here -- that one is a death with no foot
+ * to pivot on and no frame to resolve into. */
+static const struct spk_pose drop_table[SPK_ROWS] =
+{
+    {  0,  9, 25, -26,  0, 0, 0 },  /* in already moving, already stretched */
+    {  0,  8, 27, -24,  0, 0, 0 },
+    {  0,  8, 28, -22,  0, 0, 0 },
+    {  0,  7, 29, -20,  0, 0, 0 },
+    {  0,  7, 30, -18,  0, 0, 0 },  /* terminal: thin and long */
+    {  0,  7, 30, -16,  0, 0, 0 },
+    {  0,  7, 30, -14,  0, 0, 0 },
+    {  0,  7, 30, -12,  0, 0, 0 },
+    {  0,  7, 29, -10,  0, 0, 0 },
+    {  0,  8, 28,  -8,  0, 0, 0 },
+    {  0,  8, 27,  -7,  2, 0, 0 },  /* the ground is close */
+    {  0,  9, 26,  -5,  5, 0, 0 },
+    {  0,  9, 25,  -4,  8, 0, 0 },
+    {  0, 10, 24,  -2, 11, 0, 0 },  /* squaring up, finding the foot */
+    {  0, 10, 23,  -1, 15, 0, 0 },
+    {  0, 11, 22,   0, 18, 0, 0 }   /* braced on it */
+};
+
+
 /** Reading a table **/
 
 static int spk_row(int phase, int rows)
@@ -333,7 +545,34 @@ static int8_t spk_foot(int tilt, bool strong)
 
 void spk_pose_idle(struct spk_pose *out, int phase, int move)
 {
-    *out = idle_table[(move & 3) * SPK_ROWS + spk_row(phase, SPK_ROWS)];
+    *out = idle_table[((unsigned)move % SPK_IDLE_MOVES) * SPK_ROWS
+                      + spk_row(phase, SPK_ROWS)];
+}
+
+/* A move that finishes held rather than square, and so names the one that
+ * has to follow it. */
+static bool spk_idle_held(int move)
+{
+    return move == 2 || move == 6;
+}
+
+int spk_pose_idle_next(int prev)
+{
+    int n;
+
+    /* Nothing to choose: a body held in a handstand comes down out of it. */
+    if (spk_idle_held(prev))
+        return prev + 1;
+
+    /* Rejection rather than a mapping, because only three of the twelve are
+     * ever refused and a mapping would have to be kept in step with the
+     * table by hand. A dismount is refused for having nothing to dismount
+     * from, and a repeat for reading as a stutter rather than a choice. */
+    do
+        n = rand() % SPK_IDLE_MOVES;
+    while (n == prev || spk_idle_held(n - 1));
+
+    return n;
 }
 
 void spk_pose_hop(struct spk_pose *out, int phase, bool strong)
@@ -374,6 +613,12 @@ void spk_pose_land(struct spk_pose *out, int phase, bool strong, int ride)
 
         out->y_offset = (int8_t)(-pop + (pop * (row - 4)) / 3);
     }
+}
+
+void spk_pose_drop(struct spk_pose *out, int phase, bool strong)
+{
+    *out = drop_table[spk_row(phase, SPK_ROWS)];
+    out->base_tilt = spk_foot(out->base_tilt, strong);
 }
 
 void spk_pose_jump(struct spk_pose *out, int phase, bool land_strong)
