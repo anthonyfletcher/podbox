@@ -27,6 +27,7 @@
 #include "rbunicode.h"       /* utf8decode, utf8seek */
 #include "diacritic.h"       /* is_diacritic */
 #include "draw/scrollbar.h"
+#include "skin/skin_albumart_color.h"  /* dynamic_colors_resolve */
 #include "system/shutdown.h"
 #include "screens/playback/track_info.h"
 #include "text_box.h"         /* view_text prototype */
@@ -177,15 +178,45 @@ static void draw_text(struct view_info *info)
     int max_show, line;
     struct screen* display = &screens[SCREEN_MAIN];
 
-    /* clear screen */
-    display->clear_display();
+    /* The colours this page is painted in, taken fresh every draw.
+     *
+     * Trap: the settings hold the theme's own pair, and what is on screen is
+     * whatever the album art has made of them -- viewport_set_fullscreen()
+     * copies the settings straight through, so a view built from it paints
+     * itself in the static theme while the list it was opened from is
+     * dynamic. Resolving is a no-op when the feature is off or no palette has
+     * been extracted, so it is unconditional.
+     *
+     * Every draw rather than once in init_view(), because the album the
+     * palette comes from can change while the page is still up. */
+    unsigned fg = dynamic_colors_resolve(global_settings.fg_color);
+    unsigned bg = dynamic_colors_resolve(global_settings.bg_color);
 
-    /* display title. */
+    /* The ground and the title, through a viewport of this screen's own.
+     * clear_display() and the NULL viewport are the *firmware's* default
+     * viewport, which carries neither pair and would leave the page a
+     * different colour from the text on it. */
+    struct viewport all;
+
+    /* buffer and flags before the call, not after: viewport_set_fullscreen()
+     * hands straight to lcd_init_viewport(), which reads vp->buffer->elems --
+     * on an uninitialised stack viewport that is a garbage pointer and a data
+     * abort. Same order as viewport_set_defaults(). */
+    all.buffer = NULL;                  /* the default framebuffer */
+    all.flags  = VP_DEFAULT_FLAGS;
+    viewport_set_fullscreen(&all, SCREEN_MAIN);
+    all.fg_pattern = fg;
+    all.bg_pattern = bg;
+    display->set_viewport(&all);
+    display->clear_viewport();
+
     if(info->title)
-    {
-        display->set_viewport(NULL);
         display->puts(0, 0, info->title);
-    }
+
+    info->vp.fg_pattern = fg;
+    info->vp.bg_pattern = bg;
+    info->scrollbar_vp.fg_pattern = fg;
+    info->scrollbar_vp.bg_pattern = bg;
 
     max_show = MIN(info->line_count - info->line, info->display_lines);
     text = info->text + info->start;
