@@ -69,6 +69,7 @@
 #include "playlist/save_screen.h"
 #include "playlist/catalog.h"
 #include "screens/browse/browser_db.h"
+#include "screens/browse/listen_progress.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
 #include "draw/viewport.h"
@@ -909,6 +910,24 @@ MENUITEM_FUNCTION_W_PARAM(properties_item, 0, ID2P(LANG_PROPERTIES),
 MENUITEM_FUNCTION_W_PARAM(track_info_item, 0, ID2P(LANG_MENU_SHOW_ID3_INFO),
                   context_menu_properties, NULL,
                   clipboard_callback, Icon_NOICON);
+
+/* The activity dance and the side-channel are context_menu_properties()'s, and
+ * for its reasons: a screen opened from here must not be drawn inside the
+ * context menu's activity, and do_menu() discards this function's own return
+ * value. There is no prepare_database_sel() because nothing here works from a
+ * path -- the screen asks the browser which row is selected. */
+static bool context_menu_listen_progress(void)
+{
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity_without_refresh();
+
+    if (listen_progress_show() == GO_TO_ROOT)
+        context_menu_result = ONPLAY_MAINMENU;
+    return false;
+}
+MENUITEM_FUNCTION(listen_progress_item, 0, ID2P(LANG_LISTEN_PROGRESS),
+                  context_menu_listen_progress,
+                  clipboard_callback, Icon_NOICON);
 static bool context_menu_add_to_shortcuts(void)
 {
     /* A directory shortcut browses into it; a file shortcut runs the file
@@ -1015,6 +1034,9 @@ static int clipboard_callback(int action,
                 if (this_item == &track_info_item ||
                     this_item == &reveal_item)
                     return action;
+                if (this_item == &listen_progress_item)
+                    return browser_db_current_scope() != BROWSER_DB_SCOPE_NONE
+                         ? action : ACTION_EXIT_MENUITEM;
                 return ACTION_EXIT_MENUITEM;
             }
             if (this_item == &clipboard_paste_item)
@@ -1216,6 +1238,7 @@ MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,
+           &listen_progress_item,
            &reveal_item,
            &set_backdrop_item,
            &add_to_faves_item, &set_as_dir_menu, &file_menu, &sort_playlists,

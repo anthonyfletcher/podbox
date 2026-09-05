@@ -81,6 +81,59 @@ bool browser_db_get_album_dir(struct browser_context* c, int item,
 bool browser_db_get_artist_dir(struct browser_context* c, int item,
                             char *buf, int buflen);
 int browser_db_get_icon(struct browser_context* c);
+
+/* What the selected row of the current browse names, for a caller that wants
+ * to ask the database about it rather than browse into it. NONE for a track
+ * row, a special row, or a level grouped by anything else. */
+enum browser_db_scope {
+    BROWSER_DB_SCOPE_NONE = 0,
+    BROWSER_DB_SCOPE_ALBUM,
+    BROWSER_DB_SCOPE_ARTIST
+};
+enum browser_db_scope browser_db_current_scope(void);
+
+/* The selected row's name, as it reads on screen. */
+char *browser_db_current_entry_name(char *buf, size_t bufsize);
+
+/* Levels a browse can be deep, which is the ceiling on the filters below. */
+#define BROWSER_DB_MAX_TAGS 5
+
+/* What scopes a tagcache search to the selected row: every grouping level
+ * above it, then the row itself.
+ *
+ * Captured into the caller's own struct rather than applied straight to a
+ * search, because reading the row can page a fresh chunk of the browse level
+ * in -- and that borrows the app buffer, which a screen wanting this has
+ * usually claimed. Capture before claiming, apply as often as needed after.
+ *
+ * The clauses live in here for the reason a search's do: tagcache holds them
+ * by pointer until the search finishes.
+ *
+ * The ancestor levels are not decoration. A tag's seek names a string rather
+ * than a thing, so two albums called "Greatest Hits" share one album seek and
+ * it is the artist level above that tells them apart.
+ *
+ * The menu's own clauses are deliberately left out. They say which tracks the
+ * browse is showing -- "Never played tracks" shows an album's unheard half --
+ * and a caller here is asking about the album, not about the view of it. */
+struct browser_db_filters {
+    enum browser_db_scope scope;
+    int count;                        /* levels in the arrays below */
+    int tag[BROWSER_DB_MAX_TAGS];
+    int seek[BROWSER_DB_MAX_TAGS];
+    struct tagcache_search_clause numeric[BROWSER_DB_MAX_TAGS];
+};
+
+/* The selected row's scope. False, leaving *out empty, when there is no such
+ * row -- i.e. whenever browser_db_current_scope() is NONE. */
+bool browser_db_current_filters(struct browser_db_filters *out);
+
+/* Narrow 'tcs' by them. False when tagcache would not take them all, which
+ * leaves the search wider than asked for: a browse deeper than tagcache allows
+ * filters, and a caller that has to report rather than count. */
+bool browser_db_add_filters(struct tagcache_search *tcs,
+                            struct browser_db_filters *f);
+
 /* Arms a one-shot jump: the next time browser_db_load() sees a fresh root load
  * (dirlevel 0, TABLE_ROOT), it enters the root menu's row whose first tag
  * matches 'tag' (e.g. tag_album), looked up by tag identity rather than

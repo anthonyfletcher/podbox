@@ -38,6 +38,7 @@ metadata/book_resume.c
 screens/browse/browser_db.c
 screens/browse/album_charts.c
 screens/browse/featured_artists.c
+screens/browse/listen_progress.c
 #endif
 
 playlist/catalog.c

@@ -1159,6 +1159,13 @@ than merely incomplete.
 Refreshes the album and artist lists that Album Covers, Artist Portraits and the
 listening charts read. Fixes a browser that disagrees with the database.
 
+[action: Listening Progress]
+How much of the album or artist you are standing on has been heard, and which of its tracks have not. An artist lists
+their albums with a figure each; opening one of those shows the tracks still unplayed.
+
+The figures are the database's own play counts, so this needs Gather Runtime Data switched on and knows nothing about
+plays from before it was.
+
 [action: Update Art Cache]
 Generates thumbnails for artwork that does not have one yet.
 

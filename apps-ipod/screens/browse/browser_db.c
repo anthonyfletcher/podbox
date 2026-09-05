@@ -245,7 +245,7 @@ static bool featured_artists_available(void)
 #define UNIQBUF_SIZE (64*1024)
 static uint32_t uniqbuf[UNIQBUF_SIZE / sizeof(uint32_t)];
 
-#define MAX_TAGS 5
+#define MAX_TAGS BROWSER_DB_MAX_TAGS
 #define MAX_MENU_ID_SIZE 32
 
 #define RELOAD_BROWSER_DB (-1024)
@@ -4749,6 +4749,86 @@ bool browser_db_get_artist_dir(struct browser_context* c, int item,
     if (!browser_db_is_artist_list(c) || item < c->special_entry_count)
         return false;
     return browser_db_get_track_dir(c, item, buf, buflen, 1);
+}
+
+/* ---- scoping a search to the selected row ------------------------------- */
+
+enum browser_db_scope browser_db_current_scope(void)
+{
+    if (!tc || !csi || tc->selected_item < tc->special_entry_count)
+        return BROWSER_DB_SCOPE_NONE;
+    if (browser_db_is_album_list(tc))
+        return BROWSER_DB_SCOPE_ALBUM;
+    if (browser_db_is_artist_list(tc))
+        return BROWSER_DB_SCOPE_ARTIST;
+    return BROWSER_DB_SCOPE_NONE;
+}
+
+char *browser_db_current_entry_name(char *buf, size_t bufsize)
+{
+    if (!tc)
+    {
+        if (bufsize > 0)
+            buf[0] = '\0';
+        return buf;
+    }
+    return browser_db_get_entry_name(tc, tc->selected_item, buf, bufsize);
+}
+
+bool browser_db_current_filters(struct browser_db_filters *out)
+{
+    struct tagentry *entry;
+    int level, i;
+
+    memset(out, 0, sizeof(*out));
+    out->scope = browser_db_current_scope();
+    if (out->scope == BROWSER_DB_SCOPE_NONE)
+        return false;
+
+    /* The one read of the browse row, and the reason a caller captures this
+     * before borrowing memory: paging a chunk in borrows the app buffer. */
+    entry = browser_db_get_entry(tc, tc->selected_item);
+    if (!entry)
+    {
+        out->scope = BROWSER_DB_SCOPE_NONE;
+        return false;
+    }
+
+    level = tc->currextra;
+    for (i = 0; i < level && i < MAX_TAGS - 1; i++)
+    {
+        out->tag[i] = csi->tagorder[i];
+        out->seek[i] = csi->result_seek[i];
+    }
+
+    /* The row itself last, so the levels read top to bottom. */
+    out->tag[i] = csi->tagorder[level];
+    out->seek[i] = entry->extraseek;
+    out->count = i + 1;
+    return true;
+}
+
+bool browser_db_add_filters(struct tagcache_search *tcs,
+                            struct browser_db_filters *f)
+{
+    bool ok = true;
+
+    for (int i = 0; i < f->count; i++)
+    {
+        if (TAGCACHE_IS_NUMERIC(f->tag[i]))
+        {
+            memset(&f->numeric[i], 0, sizeof(f->numeric[i]));
+            f->numeric[i].tag = f->tag[i];
+            f->numeric[i].type = clause_is;
+            f->numeric[i].numeric = true;
+            f->numeric[i].numeric_data = f->seek[i];
+            ok = tagcache_search_add_clause(tcs, &f->numeric[i]) && ok;
+        }
+        else
+            ok = tagcache_search_add_filter(tcs, f->tag[i], f->seek[i]) && ok;
+    }
+
+    return ok;
 }
 
 int browser_db_get_attr(struct browser_context* c)

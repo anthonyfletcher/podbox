@@ -20143,3 +20143,45 @@
     mikey_remote: "Remote Track Skip"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS
+  desc: context menu row on an album or artist: how much of it has been heard
+  user: core
+  <source>
+    *: "Listening Progress"
+  </source>
+  <dest>
+    *: "Listening Progress"
+  </dest>
+  <voice>
+    *: "Listening Progress"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_SUMMARY
+  desc: top row of the Listening Progress screen: percent, played, total
+  user: core
+  <source>
+    *: "%d%% - %d of %d tracks"
+  </source>
+  <dest>
+    *: "%d%% - %d of %d tracks"
+  </dest>
+  <voice>
+    *: "Listening progress"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_ALBUM
+  desc: album row on the Listening Progress screen: name, percent, tracks unheard
+  user: core
+  <source>
+    *: "%s - %d%% (%d left)"
+  </source>
+  <dest>
+    *: "%s - %d%% (%d left)"
+  </dest>
+  <voice>
+    *: "Album"
+  </voice>
+</phrase>
