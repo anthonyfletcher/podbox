@@ -34,7 +34,9 @@
  * is one afternoon's mood rather than a habit. */
 #define PV_TYPE_FLOOR 100
 
-/* Week tiers, matching the year card's ladder (see pv_year.c). */
+/* What a week has to hold before it counts as active, and the two tiers
+ * above that. Seconds, so a week of short tracks and a week of long ones
+ * are asked the same question. */
 #define PV_WEEK_ACTIVE_SECS (30 * 60)
 #define PV_WEEK_SUPER_SECS  (1440 * 60)
 #define PV_WEEK_ULTRA_SECS  (2880 * 60)

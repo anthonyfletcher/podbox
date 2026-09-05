@@ -218,13 +218,8 @@ viewers/text_viewer/ts_zipdoc.c
  * pv_stats.c folds the result into the aggregates the cards are drawn from.
  * pv_tiles.c decides which cards a section holds and pv_row.c is the screen.
  *
- * Seven more files sit beside these unbuilt: playback_viewer.c, pv_art.c,
- * pv_badges_ui.c, pv_cards.c, pv_export.c, pv_paint.c and pv_year.c. They are
- * the full-screen card deck the row replaced, kept in the tree and out of the
- * binary -- nothing reaches them, and linking them would cost 24K of code and
- * 4.6K of RAM that no screen can use. Adding the seven names back here is the
- * whole of what bringing the deck back needs; expect them to have drifted,
- * since nothing compiles them. */
+ * A card is drawn by draw/card_paint.c, which the row shares with the host
+ * renderer in .build/cardrender. */
 viewers/playback_viewer/pv_badges.c
 viewers/playback_viewer/pv_index.c
 viewers/playback_viewer/pv_log.c
