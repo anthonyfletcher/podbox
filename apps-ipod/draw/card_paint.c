@@ -229,14 +229,19 @@ void card_paint_ink(unsigned base, struct card_ink *ink)
 
 /* --------------------------------------------------------- the palette */
 
-/* Twelve, all mid-lightness and high chroma -- several light enough to need
- * dark text, which is the case card_paint_ink() has to get right.
+/* Twelve, deep rather than bright, and all of one lightness -- a hundred and
+ * twenty to a hundred and eighty, which is a band and not a point. Only the
+ * hue changes as the row scrolls, which is what keeps twelve strong colours
+ * from being a circus. The band is also what lets the ink rule above have no
+ * exceptions: a near-white of any hue in it reads with margin, the weakest
+ * pairing at 4.1 to 1, so no card ever needs the other kind of ink.
  *
- * Bright, and all of one lightness -- ninety to a hundred and forty, which is
- * a band and not a point. Only the hue changes as the row scrolls, which is
- * what keeps twelve strong colours from being a circus. The band is also what
- * lets the ink rule above have no exceptions: a near-white of any hue in it
- * reads, so no card ever needs the other kind of ink.
+ * Trap: the hues are NOT evenly spaced, and must not be evened up. Nothing
+ * sits between about 50 and 130 degrees, because sRGB's most chromatic
+ * colours there are also its lightest: a hue in that band held down to this
+ * lightness is khaki, and lifting it out of khaki puts it past where the ink
+ * reads. Twelve even stops around the wheel is a colour wheel rather than a
+ * palette, and the two an even ring drops in that band are khaki.
  *
  * Listed in the order a scroller meets them, and that order is the point: no
  * two neighbours are near each other on the wheel. Sorting them by hue and
@@ -253,18 +258,18 @@ void card_paint_ink(unsigned base, struct card_ink *ink)
 
 static const unsigned palette[N_PALETTE] =
 {
-    LCD_RGBPACK( 24, 156, 140),   /* teal    */
-    LCD_RGBPACK(224,  84,  68),   /* coral   */
-    LCD_RGBPACK( 68,  84, 200),   /* indigo  */
-    LCD_RGBPACK(186, 138,  28),   /* gold    */
-    LCD_RGBPACK(140,  76, 216),   /* violet  */
-    LCD_RGBPACK( 56, 162,  76),   /* green   */
-    LCD_RGBPACK(206,  44,  84),   /* crimson */
-    LCD_RGBPACK( 36, 132, 190),   /* blue    */
-    LCD_RGBPACK(222, 104,  32),   /* orange  */
-    LCD_RGBPACK(216,  74, 144),   /* pink    */
-    LCD_RGBPACK(122, 158,  40),   /* olive   */
-    LCD_RGBPACK(100,  66, 186),   /* purple  */
+    LCD_RGBPACK(  0, 121, 115),   /* teal      */
+    LCD_RGBPACK(165,  77,  90),   /* brick     */
+    LCD_RGBPACK( 74,  97, 181),   /* indigo    */
+    LCD_RGBPACK( 49, 125,  66),   /* forest    */
+    LCD_RGBPACK(148,  73, 140),   /* plum      */
+    LCD_RGBPACK(165,  85,  57),   /* rust      */
+    LCD_RGBPACK(  0, 117, 140),   /* petrol    */
+    LCD_RGBPACK(107,  85, 173),   /* iris      */
+    LCD_RGBPACK(  0, 125,  90),   /* viridian  */
+    LCD_RGBPACK(165,  73, 115),   /* mulberry  */
+    LCD_RGBPACK(  0, 109, 181),   /* lapis     */
+    LCD_RGBPACK(165,  77,  74),   /* terracotta */
 };
 
 /* A card does not choose its colour; it is assigned one.
@@ -412,19 +417,26 @@ struct gen_def
  * colours decides whether it reads as a texture or as a sunburst shouting
  * over the card. Far apart shouts; too close is a flat wash with a card's
  * worth of nothing on it. A few steps -- enough to see the wedges, not enough
- * to count them from across the room. */
+ * to count them from across the room.
+ *
+ * The four are placed where the day is -- rust, brass, plum, navy -- and
+ * ordered by lightness as well as by hue: noon is the lightest of the four
+ * and night the darkest, so the set reads as a day in a photograph of the
+ * screen, where the bars are too small to count. That ordering is the reason
+ * the mud rule the palette above obeys does not apply here. Noon IS the
+ * yellow one. */
 static const struct gen_def gens[CARD_GEN_COUNT] =
 {
     { false, 1, { LCD_RGBPACK(  8,   8,  12), 0, 0 } },        /* NONE */
-    { false, 2, { LCD_RGBPACK(206,  78,  52),
-                  LCD_RGBPACK(226, 122,  62), 0 } },            /* SUNRISE */
-    { true,  2, { LCD_RGBPACK(188, 138,  32),
-                  LCD_RGBPACK(212, 172,  62), 0 } },            /* NOON */
-    { false, 3, { LCD_RGBPACK(190,  78, 112),
-                  LCD_RGBPACK(140,  76, 156),
-                  LCD_RGBPACK(214, 108,  92) } },               /* DUSK */
-    { true,  2, { LCD_RGBPACK( 58,  84, 160),
-                  LCD_RGBPACK( 36,  50, 106), 0 } },            /* NIGHT */
+    { false, 2, { LCD_RGBPACK(165,  60,  49),
+                  LCD_RGBPACK(189,  93,  16), 0 } },            /* SUNRISE */
+    { true,  2, { LCD_RGBPACK(173, 117,   0),
+                  LCD_RGBPACK(181, 158,  49), 0 } },            /* NOON */
+    { false, 3, { LCD_RGBPACK(148,  69, 107),
+                  LCD_RGBPACK(107,  65, 123),
+                  LCD_RGBPACK(181,  81,  57) } },               /* DUSK */
+    { true,  2, { LCD_RGBPACK( 49,  73, 132),
+                  LCD_RGBPACK( 33,  44,  99), 0 } },            /* NIGHT */
 };
 
 unsigned card_paint_gen_base(enum card_gen gen)
