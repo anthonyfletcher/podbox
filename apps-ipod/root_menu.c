@@ -488,6 +488,14 @@ static int browser(void* param)
              * returning GO_TO_PREVIOUS resolves back to exactly that. */
             if (ret_val == GO_TO_ROOT)
                 ret_val = GO_TO_PREVIOUS;
+
+            /* Both the ways back to Album covers are GO_TO_PREVIOUS by now,
+             * so anything else is the user leaving this track list for good --
+             * playing a track, which goes to the WPS. Album covers' resume
+             * signal describes the track list, and outranks the playing track
+             * on the next open whenever that comes, so it goes with it. */
+            if (ret_val != GO_TO_PREVIOUS)
+                album_covers_cancel_resume();
         break;
     }
     return ret_val;

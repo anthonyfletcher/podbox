@@ -268,43 +268,65 @@ static int jmp_idx_next(void)
     return carousel_idx.album_ct - 1;
 }
 
+/* The display index of the album the track described by `id3` belongs to, or
+ * the last album viewed if it belongs to none.
+ *
+ * The index files an album under its *album artist*: build_artist_index()
+ * (database/db_summary.c) enumerates tag_albumartist, and tagcache stores a
+ * missing one as UNTAGGED. A track with no albumartist tag therefore belongs
+ * to an album filed under that literal, and looking for its track artist
+ * instead finds nothing.
+ *
+ * Both names are matched case-insensitively, because tagcache deduplicates
+ * unique tags that way and keeps whichever spelling it met first -- so the
+ * index's spelling of an album need not be the one in the file playing.
+ *
+ * The album alone is the fallback, for the albums no one artist name
+ * describes: a compilation whose tracks carry different album artists still
+ * gets a single index entry, under the first of them. The index holds one
+ * entry per distinct album name, so this can only land on the wrong album
+ * where two of them share a name.
+ */
 static int id3_get_index(struct mp3entry *id3)
 {
-    char* current_artist = UNTAGGED;
-    char* current_album  = UNTAGGED;
+    const char *want_album  = UNTAGGED;
+    const char *want_artist = UNTAGGED;
+    int by_album = -1;
+    int i;
 
-    if(id3)
+    if (id3)
     {
-        /* we could be looking for the artist in either field */
-        if(id3->albumartist)
-            current_artist = id3->albumartist;
-        else if(id3->artist)
-            current_artist = id3->artist;
-
-        if (id3->album && strlen(id3->album) > 0)
-            current_album = id3->album;
-
-        /* splashf(1000, "%s, %s", current_album, current_artist); */
-
-        int i;
-        int album_idx, artist_idx;
+        if (id3->album && id3->album[0])
+            want_album = id3->album;
+        if (id3->albumartist && id3->albumartist[0])
+            want_artist = id3->albumartist;
 
         for (i = 0; i < carousel_idx.album_ct; i++ )
         {
-            album_idx = carousel_idx.album_index[i].name_idx;
-            artist_idx = carousel_idx.album_index[i].artist_idx;
+            int album_idx  = carousel_idx.album_index[i].name_idx;
+            int artist_idx = carousel_idx.album_index[i].artist_idx;
 
             /* An album whose artist never resolved carries -1, which is a
              * real state -- the duplicate pass writes it. Reading the blob at
              * that offset walks off its front. */
-            if(artist_idx >= 0 &&
-               !strcmp(carousel_idx.album_names + album_idx, current_album) &&
-                !strcasecmp(carousel_idx.artist_names + artist_idx,
-                            current_artist))
+            if (artist_idx < 0)
+                continue;
+
+            if (strcasecmp(carousel_idx.album_names + album_idx, want_album))
+                continue;
+
+            if (!strcasecmp(carousel_idx.artist_names + artist_idx,
+                            want_artist))
                 return i;
+
+            if (by_album < 0)
+                by_album = i;
         }
 
+        if (by_album >= 0)
+            return by_album;
     }
+
     splash(HZ * 2, "Album not found");
     return pf_cfg.last_album;
 }
@@ -661,14 +683,22 @@ static int album_enter(int index)
     long album_seek = carousel_idx.album_index[index].seek;
 
     pf_cfg.last_album = index;
-    pf_resume_album_index = index;
-    pf_resume_last_album = true;
 
     if (global_settings.album_covers_on_select == ON_SELECT_PLAY_ALBUM)
     {
         db_summary_play_album_on_exit(&carousel_idx.album_index[index]);
         return CAROUSEL_PLAY_ALBUM;
     }
+
+    /* The drill-in only. The token says "the track list on screen is this
+     * album's, and backing out of it comes straight back here", which playing
+     * does not: that leaves for the WPS with no track list to return from, and
+     * a token left armed there is honoured by whichever carousel open comes
+     * next -- landing on this album however long afterwards, and whatever is
+     * playing by then. album_covers_cancel_resume() covers the track list
+     * being left any other way. */
+    pf_resume_album_index = index;
+    pf_resume_last_album = true;
 
     browser_db_enter_album_tracks_on_next_load(album_seek, album);
     return GO_TO_ALBUM_COVERS_TRACKS;
@@ -769,6 +799,11 @@ static void album_prepare(void)
         pf_cfg.cache_version = CACHE_VERSION;
         pf_config_save();
     }
+}
+
+void album_covers_cancel_resume(void)
+{
+    pf_resume_last_album = false;
 }
 
 int album_covers(const char *selected_file)

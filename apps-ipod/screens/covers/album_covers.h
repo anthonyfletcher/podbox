@@ -70,6 +70,12 @@ enum carousel_background_values {
  * playing track's album, or wherever was last viewed. */
 int album_covers(const char *selected_file);
 
+/* Drop the "come back to the album whose track list you just opened" signal
+ * album_enter() arms. For whoever ends that track list somewhere other than
+ * back at the carousel: the signal outranks the playing track on the next
+ * open, so left standing it lands the carousel on a stale album. */
+void album_covers_cancel_resume(void);
+
 /* The same carousel over the album-artist list, showing artist photos
  * (<artist>/folder.jpg). Selecting an artist opens that album-artist's album
  * listing in the database browser. selected_file is currently unused (always
