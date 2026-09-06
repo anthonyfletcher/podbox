@@ -351,6 +351,13 @@ __pycache__
 # refuses to run unless the tree is clean.
 /dist/
 
+# What tools/soundscan/Makefile builds. The `/dist/` above is anchored to the
+# root and does not reach this one, and the native binary has no extension for
+# `*.exe` to catch -- so both are named here. Left behind they dirty the tree,
+# which is enough on its own to stop release.sh.
+/tools/soundscan/dist/
+/tools/soundscan/soundscan
+
 # Editor and assistant tooling -- local to whoever checked the tree out
 /.idea/
 /.claude/
