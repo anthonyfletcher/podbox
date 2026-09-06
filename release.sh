@@ -338,6 +338,21 @@ for target in $SIM_TARGETS; do
     ssh "$SERVER" "cd '$REMOTE_DIR' && PATH=\$HOME/bin:\$PATH ./build-sim.sh $target win"
 done
 
+# The desktop tool links against the Windows simulator, which is built after
+# the firmware -- so bundle-tools.sh inside build-hw.sh had no simulator to
+# build it from and shipped nothing. Added here instead, into zips that
+# already exist, which is what every bundle script does anyway.
+#
+# Under --no-sim there is no simulator and so no tool, and the check below
+# stops asking for one rather than failing a release that was never going to
+# have it.
+TOOL_WANT=
+for target in $SIM_TARGETS; do
+    say "Adding the analysis tool to $target"
+    ssh "$SERVER" "cd '$REMOTE_DIR' && ./bundle-tools.sh build-hw-$target"
+    TOOL_WANT=.rockbox/tools/soundscan.exe
+done
+
 # ----------------------------------------------------------------- verify ---
 # A themeless zip installs happily and leaves the player looking broken, so each
 # entry below is a file only a bundle script writes -- one that silently did
@@ -359,7 +374,7 @@ for target in $TARGETS; do
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
                     .rockbox/fonts/LICENSE-Noto.txt \
-                    .rockbox/tools/soundscan.exe \
+                    $TOOL_WANT \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
