@@ -2,9 +2,16 @@
 # Put the desktop analysis tool into a rockbox.zip produced by `make zip`.
 #
 # soundscan.exe ships as .rockbox/tools/soundscan.exe together with the codecs
-# it loads, so the tool travels with the player it analyses and cannot drift
-# out of step with the firmware that reads what it writes -- the index format
-# is shared between them and neither checks the other's version.
+# it loads, which are the player's own decoders built for the host: the tool
+# has to measure with the same code the player does or the numbers it writes
+# would not mean what the player reads. Without that directory beside it the
+# tool loads no decoder at all and reports every track as unreadable.
+#
+# Shipping it here rather than as its own download is for the convenience of
+# finding it already on the disk. It is not a correctness requirement -- the
+# index header carries a version and a record size, and a player that reads
+# one it does not recognise says there is no index rather than misreading it,
+# so a tool out of step with the firmware is caught rather than silent.
 #
 # It is a Windows binary and needs a Windows simulator build to link against,
 # which not every machine has. A missing tool is reported and skipped rather

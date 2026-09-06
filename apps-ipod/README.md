@@ -83,9 +83,9 @@ that belongs to no single domain.
 
 | Directory | Contents |
 |---|---|
-| `audio/` | The playback pipeline: playback, pcmbuf, buffering, codecs, the codec and audio threads, voice, beep, A-B repeat, and the peak/spectrum meters (they sample PCM; nothing calls them). |
-| `database/` | The tag database itself: tagcache. The database *browser* is `screens/browse/browser_db.c` — a screen backend, not a data layer. |
-| `playlist/` | Playlists in memory and on disk, plus the playlist viewer and catalog. |
+| `audio/` | The playback pipeline: playback, pcmbuf, buffering, codecs, the codec and audio threads, voice, beep, A-B repeat, and the peak/spectrum meters (they sample PCM; nothing calls them). Also the sound analysis, which is the other way round -- it drives a codec itself, over a file nobody is listening to: `track_decode`, `beat_hops`, `beat_track`, `beat_probe`, `chroma`. |
+| `database/` | The tag databases themselves: tagcache, and the sound index the Playlist Engine matches on (`sound_index`, `sound_mix`, `sound_mood`). The database *browser* is `screens/browse/browser_db.c` — a screen backend, not a data layer. |
+| `playlist/` | Playlists in memory and on disk, plus the playlist viewer, the catalog, and the mood and journey pickers. |
 | `metadata/` | Per-track data: album art, the art cache (album **and** artist), cuesheets, multi-file ID3 aggregation. |
 | `files/` | The disk seen as files rather than as music: what each extension opens, file operations, the flat document and image indexes, path lists. |
 
@@ -96,7 +96,7 @@ Ordered by how much they own, as above:
 | Directory | Rule |
 |---|---|
 | `draw/` | Stateless drawing. Knows pixels; knows nothing about features. viewport, line, scrollbar, round_rect, progress_bar, icon, bmp, resize, jpeg decode, screen_access. |
-| `widgets/` | Reusable controls. Called by someone else, hand control back. list, dialog, yesno, splash, option_select, colour picker, folder select, keyboard, menu, text_box. |
+| `widgets/` | Reusable controls. Called by someone else, hand control back. list, dialog, dialog_prose, yesno, splash, option_select, colour picker, folder select, keyboard, menu, text_box. |
 | `screens/` | Full screens. Navigated *to*; run their own loop until the user leaves. |
 | `viewers/` | File-format applications: their own model, view and input. `text_viewer/` (streaming document engine), `image_viewer/`, `lyric_viewer/`, `playback_viewer/` (the Playback Report), properties, playing_time, and the text reel behind the credits and About pages. |
 | `games/` | Games. One directory each: `spike/`. A game owns the screen and the whole keymap the way a viewer owns a file format, and runs on a clock of its own rather than on user input, which is why it is not a `screens/` entry. |
