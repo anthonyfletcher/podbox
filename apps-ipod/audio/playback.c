@@ -49,6 +49,7 @@
 #include "buffering.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
+#include "database/sound_mix.h"
 #include "ab_repeat.h"
 #include "pcm_mixer.h"
 #include "pcmbuf.h"
@@ -2944,6 +2945,11 @@ static void audio_finalise_track_change(void)
         /* Fallthrough */
     case TRACK_SKIP_AUTO_END_PLAYLIST:
     default:            /* Invalid */
+        /* The playlist ran out on its own, which is not the same as somebody
+         * stopping it -- only this path may be continued from. Nothing more
+         * than a flag: building a playlist reads the whole sound index and
+         * walks the database, and this is the audio thread. */
+        sound_mix_playlist_ended();
         filling = STATE_ENDED;
         audio_stop_playback(true);
         return;

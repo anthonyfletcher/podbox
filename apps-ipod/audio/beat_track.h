@@ -35,6 +35,12 @@ void beat_track_onset(unsigned long ms);
 
 void beat_track_get(struct beat_track *beat);
 
+/* How full the onset envelope is, 0-100. The tempo is read out of that
+ * envelope, so an estimate taken below 100 rests on less history than the
+ * search was tuned for and is the less steady for it. A caller keeping a
+ * tempo rather than following one should wait for a full envelope. */
+unsigned int beat_track_fill(void);
+
 /* Track time of the nth beat at or after 'from_ms', and its position in the
  * bar. Returns false when there is no lock to project from. Beats are
  * projected rather than waited for, which is what lets a caller act on a

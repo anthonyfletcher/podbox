@@ -45,7 +45,26 @@
  * without a second mechanism. No extension maps to it, so filetype_get_attr()
  * never produces it and only browser_disk_load() ever sets it. */
 #define FILE_ATTR_SEARCH 0x1800
+/* The other two synthetic rows, on the playlist catalogue only: a playlist
+ * built from how the music sounds is a playlist, so it is offered where the
+ * saved ones are rather than in a menu of its own. Same reasoning as the row
+ * above -- no extension maps to either. */
+#define FILE_ATTR_MOODS    0x1900
+#define FILE_ATTR_JOURNEYS 0x1a00
 #define FILE_ATTR_MASK  0xFF00 /* which bits tree.c uses for file types */
+
+/* The rows the browser invents rather than reads off the disk. They name an
+ * action, not a file, so a picker must not hand one back as the chosen file
+ * and the context menu has nothing to act on. Takes an already-masked value.
+ *
+ * The catalogue is always BROWSE_SELECTONLY, so a row missing from here is
+ * returned as a filename the moment it is selected -- which looks exactly
+ * like a row that does nothing. */
+static inline bool file_attr_is_row(int masked)
+{
+    return masked == FILE_ATTR_SEARCH || masked == FILE_ATTR_MOODS ||
+           masked == FILE_ATTR_JOURNEYS;
+}
 
 long filetype_get_voiceclip(int attr);
 

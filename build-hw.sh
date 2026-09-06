@@ -29,3 +29,4 @@ make zip
 ../bundle-theme.sh
 ../bundle-help.sh
 ../bundle-trim.sh
+../bundle-tools.sh

@@ -44,6 +44,7 @@
 #include "system/format_time.h"
 #include "system/volume.h"
 #include "pathfuncs.h"
+#include "screens/system/sound_scan.h"
 
 
 /** Tagcache menu **/
@@ -159,13 +160,62 @@ MAINT_ITEM(maint_rescan_files,   3, LANG_RESCAN_FILES);
 MAINT_ITEM(maint_rebuild_db,     4, LANG_REBUILD_DB);
 MAINT_ITEM(maint_rebuild_cache,  5, LANG_REBUILD_CACHE);
 
+/* The sound analysis is not one of the table rows above: those queue a
+ * background task and return, and this holds the player for as long as it
+ * runs. It is also the only pair here that can be absent -- there is nothing
+ * to update until the engine has been switched on. */
+static int maint_sound_update(void)
+{
+    sound_scan_screen(false);
+    return 0;
+}
+
+static int maint_sound_rebuild(void)
+{
+    sound_scan_screen(true);
+    return 0;
+}
+
+static int maint_sound_callback(int action,
+                                const struct menu_item_ex *this_item,
+                                struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM && !global_settings.playlist_engine)
+        return ACTION_EXIT_MENUITEM;
+
+    return action;
+}
+
+MENUITEM_FUNCTION(maint_update_sound, 0, ID2P(LANG_UPDATE_SOUND),
+                  maint_sound_update, maint_sound_callback, Icon_NOICON);
+MENUITEM_FUNCTION(maint_rebuild_sound, 0, ID2P(LANG_REBUILD_SOUND),
+                  maint_sound_rebuild, maint_sound_callback, Icon_NOICON);
+
 MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
             &maint_update_db,
             &maint_update_index,
             &maint_update_cache,
             &maint_rescan_files,
+            &maint_update_sound,
             &maint_rebuild_db,
-            &maint_rebuild_cache);
+            &maint_rebuild_cache,
+            &maint_rebuild_sound);
+
+/** Playlist Engine **/
+
+MENUITEM_SETTING(playlist_engine, &global_settings.playlist_engine, NULL);
+MENUITEM_SETTING(track_playlist, &global_settings.track_playlist, NULL);
+MENUITEM_SETTING(analysis_depth, &global_settings.analysis_depth, NULL);
+MENUITEM_SETTING(mood_playlist, &global_settings.mood_playlist, NULL);
+MENUITEM_SETTING(mix_length, &global_settings.mix_length, NULL);
+MENUITEM_SETTING(continue_playing, &global_settings.continue_playing, NULL);
+
+MAKE_MENU(playlist_engine_menu, ID2P(LANG_PLAYLIST_ENGINE), 0, Icon_Playlist,
+            &playlist_engine, &analysis_depth, &mix_length,
+            &track_playlist, &mood_playlist, &continue_playing);
 
 /** File view menu **/
 MENUITEM_SETTING(sort_case, &global_settings.sort_case, NULL);
@@ -880,6 +930,7 @@ MAKE_MENU(library_menu, ID2P(LANG_LIBRARY), 0, Icon_Playlist,
           &album_covers_menu,
           &tagcache_menu,
           &art_cache_menu,
+          &playlist_engine_menu,
           &viewers_menu,
           &maintenance_menu);
 

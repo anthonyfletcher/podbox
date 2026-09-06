@@ -47,6 +47,8 @@
 #include "mp3data.h"
 #include "metadata.h"
 #include "games/spike/spike.h"
+#include "database/sound_mix.h"
+#include "database/sound_index.h"
 #include "screens/playback/track_info.h"
 #include "widgets/text_box.h"
 #include "screens/browse/browser.h"
@@ -267,6 +269,135 @@ static int spike_run(void)
 
 MENUITEM_FUNCTION(spike_run_item, 0, ID2P(LANG_SPIKE_PLAY),
                   spike_run, NULL, Icon_NOICON);
+
+/* Whether a mix could be built from what is selected. Deliberately stops
+ * short of looking the track up: a database row carries no path, and reading
+ * one spins the disk -- which this must not do, because it runs every time the
+ * menu is drawn. */
+static bool mix_seed_available(void)
+{
+    struct mp3entry *id3;
+
+    if (selected_file.context == CONTEXT_WPS)
+    {
+        id3 = audio_current_track();
+        return id3 != NULL && id3->path[0] != '\0';
+    }
+
+    if ((selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
+        return false;
+
+    return selected_file.context == CONTEXT_ID3DB ||
+           selected_file.path != NULL;
+}
+
+/* The track a mix is built around, copied into the caller's buffer. Copied
+ * rather than pointed at: the mix creates a playlist, and the playing track's
+ * id3 is the live entry rather than a copy of one. */
+static const char *mix_seed_path(char *buf, size_t bufsize)
+{
+    struct mp3entry *id3;
+
+    if (selected_file.context == CONTEXT_WPS)
+    {
+        id3 = audio_current_track();
+        if (id3 == NULL || id3->path[0] == '\0')
+            return NULL;
+
+        strmemccpy(buf, id3->path, bufsize);
+        return buf;
+    }
+
+    if ((selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
+        return NULL;
+
+    /* A database row names an entry, not a file. The filename behind it is
+     * read here rather than in the callback above, so the disk wakes only for
+     * somebody who has actually chosen this. */
+    if (selected_file.context == CONTEXT_ID3DB)
+    {
+        return browser_db_get_filename(browser_get_context(), buf,
+                                       (int)bufsize) < 0 ? NULL : buf;
+    }
+
+    if (selected_file.path == NULL)
+        return NULL;
+
+    strmemccpy(buf, selected_file.path, bufsize);
+
+    return buf;
+}
+
+static int sound_mix_run(void)
+{
+    char seed[MAX_PATH];
+    int added;
+
+    splash(0, ID2P(LANG_WAIT));
+
+    if (mix_seed_path(seed, sizeof (seed)) == NULL)
+    {
+        splash(HZ * 2, ID2P(LANG_SOUND_MIX_NO_TRACK));
+        return ONPLAY_OK;
+    }
+
+    added = sound_mix_from_track(seed, global_settings.mix_length);
+
+    if (added > 0)
+    {
+        context_menu_result = ONPLAY_START_PLAY;
+        return ONPLAY_OK;
+    }
+
+    /* Each of these sends the reader somewhere different -- to the analysis
+     * screen, to a wider library, or to nothing they can act on -- so they do
+     * not collapse into one message. */
+    switch (added)
+    {
+        case SOUND_MIX_NO_INDEX:
+            splash(HZ * 2, ID2P(LANG_SOUND_MIX_NO_INDEX));
+            break;
+        case SOUND_MIX_NO_RECORD:
+            splash(HZ * 2, ID2P(LANG_SOUND_MIX_NO_RECORD));
+            break;
+        case SOUND_MIX_NO_DB:
+            splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+            break;
+        case SOUND_MIX_NO_PLAYLIST:
+            splash(HZ * 2, ID2P(LANG_SOUND_MIX_FAILED));
+            break;
+        case SOUND_MIX_CANCELLED:
+            break;
+        default:
+            splash(HZ, ID2P(LANG_SOUND_MIX_NONE));
+            break;
+    }
+
+    return ONPLAY_OK;
+}
+
+/* Hidden rather than shown failing. The setting comes first: somebody who has
+ * turned the engine off has said they do not want this, and an index left on
+ * disk from before is not consent to keep offering it. */
+static int sound_mix_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        if (!global_settings.playlist_engine || !mix_seed_available() ||
+            !tagcache_is_usable() || !sound_index_exists())
+            return ACTION_EXIT_MENUITEM;
+    }
+
+    return action;
+}
+
+MENUITEM_FUNCTION(sound_mix_item, 0, ID2P(LANG_SOUND_MIX),
+                  sound_mix_run, sound_mix_callback, Icon_Audio);
 MAKE_ONPLAYMENU( wps_playlist_menu, ID2P(LANG_CURRENT_PLAYLIST),
                  NULL, Icon_Playlist,
                  &wps_view_cur_playlist_item, &playlist_save_item,
@@ -1203,6 +1334,7 @@ MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &rating_item,
            &bookmark_menu,
            &view_cue_item,
+           &sound_mix_item,
            &spike_run_item,
            &context_item_1,
            &context_item_2,
@@ -1235,6 +1367,7 @@ MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
 MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            context_menu_callback, Icon_file_view_menu,
            &view_playlist_item, &browser_playlist_menu, &cat_playlist_menu,
+           &sound_mix_item,
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,

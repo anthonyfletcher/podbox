@@ -541,6 +541,63 @@ first instead.
 Records play counts, ratings and when each track was last played. What the
 listening statistics are built from.
 
+[playlist engine]
+Measures how each track actually sounds -- its tempo, loudness, tonal balance
+and key -- so a playlist can be built from a song rather than from its tags.
+Switching this on starts the analysis, which asks before it begins.
+
+The analysis needs the charger and takes hours on a full library. Switching it
+off hides the feature and leaves what has been measured on disk, so switching
+it back on costs nothing.
+
+[analysis depth]
+How much of each track the analysis listens to. Thorough takes forty seconds.
+Quick stops as soon as the tempo has settled, around eleven, which is roughly
+three and a half times faster.
+
+Quick is faster than it is accurate. The tempo settling is what stops it, and
+that ends the measurement of loudness, tonal balance and key along with it --
+measured against a full window it disagreed about the closest track two times
+in three. Use it if a full analysis on the player is too long to sit through;
+the desktop tool does a whole library thoroughly in minutes.
+
+Changing this does not re-measure anything. Rebuild Sound Analysis does.
+
+[continue playing]
+Keeps the music going when a playlist runs out, by adding more tracks that
+sound like what has been playing and carrying on into them. Works for any
+playlist -- an album, a saved one, a folder, or one the engine built.
+
+A playlist the engine built is continued on its own terms: a mood keeps aiming
+at that mood rather than drifting away from it one extension at a time.
+Anything else is continued from the track that just finished.
+
+Nothing already in the playlist is added again.
+
+[generated playlist length]
+How many tracks Play Similar, a mood or a journey puts in the playlist. Forty
+is about an evening.
+
+A journey spreads its change across whatever length is set, so a short one
+moves between its two moods in fewer steps rather than covering less ground.
+
+[mood playlist]
+How much a mood or a journey varies between runs. Predictable gives the same
+playlist every time, until the library changes. Weekly gives the same one all
+week and a new one next week. Variable picks between the nearest few at each
+step, so every run differs.
+
+Moods and journeys are on the Playlists screen, above the saved playlists.
+
+[track playlist]
+How much Play Similar varies between runs. Predictable gives the same playlist
+every time from the same song, until the library changes. Weekly gives the
+same one all week and a new one next week. Variable picks between the nearest
+few at each step, so every run differs.
+
+None of them reach further out for the difference -- the playlist is drawn
+from the same neighbourhood either way.
+
 [database scan paths]
 Restricts scanning to chosen folders, so spoken-word or sample libraries stay
 out of the music database.
@@ -1172,6 +1229,21 @@ Generates thumbnails for artwork that does not have one yet.
 The cache stops once it has covered everything it knew about, so artwork added
 to folders it has already been through -- artist photographs especially -- is
 never picked up on its own. This is how you ask.
+
+[action: Update Sound Analysis]
+Measures tracks the sound analysis has not covered yet, and retries any it
+previously could not read. The fix for new music that Play Similar does not
+offer.
+
+Needs the charger, and holds the player while it runs. Only appears once
+Playlist Engine is switched on.
+
+[action: Rebuild Sound Analysis]
+Throws the sound analysis away and measures every track again.
+
+Hours on a full library, and rarely what you want -- Update Sound Analysis
+covers new music on its own. Worth it only if the measurements themselves look
+wrong.
 
 [action: Rebuild Art Cache]
 Deletes every thumbnail and generates them all again from the original images.

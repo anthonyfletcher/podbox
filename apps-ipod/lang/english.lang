@@ -316,13 +316,13 @@
   desc: confirm action
   user: core
   <source>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </source>
   <dest>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </dest>
   <voice>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </voice>
 </phrase>
 <phrase>
@@ -20183,5 +20183,593 @@
   </dest>
   <voice>
     *: "Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX
+  desc: in the context menus, plays tracks that sound like the selected one
+  user: core
+  <source>
+    *: "Play Similar"
+  </source>
+  <dest>
+    *: "Play Similar"
+  </dest>
+  <voice>
+    *: "Play similar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NONE
+  desc: shown when nothing in the library sounds near enough to build a mix
+  user: core
+  <source>
+    *: "Nothing similar found"
+  </source>
+  <dest>
+    *: "Nothing similar found"
+  </dest>
+  <voice>
+    *: "Nothing similar found"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_INDEX
+  desc: Play Similar, when there is no analysis index to read
+  user: core
+  <source>
+    *: "The library has not been analysed"
+  </source>
+  <dest>
+    *: "The library has not been analysed"
+  </dest>
+  <voice>
+    *: "The library has not been analysed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_RECORD
+  desc: Play Similar, when the index holds nothing for the selected track
+  user: core
+  <source>
+    *: "This track has not been analysed"
+  </source>
+  <dest>
+    *: "This track has not been analysed"
+  </dest>
+  <voice>
+    *: "This track has not been analysed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_FAILED
+  desc: Play Similar, when tracks were chosen but the playlist could not be built
+  user: core
+  <source>
+    *: "Could not build the playlist"
+  </source>
+  <dest>
+    *: "Could not build the playlist"
+  </dest>
+  <voice>
+    *: "Could not build the playlist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_TRACK
+  desc: Play Similar, when the selected row could not be resolved to a file
+  user: core
+  <source>
+    *: "Could not identify the track"
+  </source>
+  <dest>
+    *: "Could not identify the track"
+  </dest>
+  <voice>
+    *: "Could not identify the track"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYLIST_ENGINE
+  desc: in Library, switches the sound analysis and the playlists built from it on
+  user: core
+  <source>
+    *: "Playlist Engine"
+  </source>
+  <dest>
+    *: "Playlist Engine"
+  </dest>
+  <voice>
+    *: "Playlist engine"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_PLAYLIST
+  desc: in Library - Playlist Engine, how a playlist built from a track is chosen
+  user: core
+  <source>
+    *: "Track Playlist"
+  </source>
+  <dest>
+    *: "Track Playlist"
+  </dest>
+  <voice>
+    *: "Track playlist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_PREDICTABLE
+  desc: variation option: the same list until the library changes
+  user: core
+  <source>
+    *: "Predictable"
+  </source>
+  <dest>
+    *: "Predictable"
+  </dest>
+  <voice>
+    *: "Predictable"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_VARIABLE
+  desc: variation option: a different list every run, from the same neighbourhood
+  user: core
+  <source>
+    *: "Variable"
+  </source>
+  <dest>
+    *: "Variable"
+  </dest>
+  <voice>
+    *: "Variable"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_SOUND
+  desc: in Library - Maintenance, measures tracks the analysis has not covered
+  user: core
+  <source>
+    *: "Update Sound Analysis"
+  </source>
+  <dest>
+    *: "Update Sound Analysis"
+  </dest>
+  <voice>
+    *: "Update sound analysis"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_SOUND
+  desc: in Library - Maintenance, measures the whole library again
+  user: core
+  <source>
+    *: "Rebuild Sound Analysis"
+  </source>
+  <dest>
+    *: "Rebuild Sound Analysis"
+  </dest>
+  <voice>
+    *: "Rebuild sound analysis"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_WEEKLY
+  desc: variation option: the same list for a week, then a new one
+  user: core
+  <source>
+    *: "Weekly"
+  </source>
+  <dest>
+    *: "Weekly"
+  </dest>
+  <voice>
+    *: "Weekly"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_DEPTH
+  desc: in Library - Playlist Engine, how much of each track the analysis listens to
+  user: core
+  <source>
+    *: "Analysis Depth"
+  </source>
+  <dest>
+    *: "Analysis Depth"
+  </dest>
+  <voice>
+    *: "Analysis depth"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_THOROUGH
+  desc: Analysis Depth option: listen to the whole window
+  user: core
+  <source>
+    *: "Thorough"
+  </source>
+  <dest>
+    *: "Thorough"
+  </dest>
+  <voice>
+    *: "Thorough"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_QUICK
+  desc: Analysis Depth option: stop once the tempo has settled
+  user: core
+  <source>
+    *: "Quick"
+  </source>
+  <dest>
+    *: "Quick"
+  </dest>
+  <voice>
+    *: "Quick"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOODS
+  desc: row on the Playlists screen: playlists built from a mood
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Moods"
+  </dest>
+  <voice>
+    *: "Moods"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEYS
+  desc: row on the Playlists screen: playlists that travel between two moods
+  user: core
+  <source>
+    *: "Journeys"
+  </source>
+  <dest>
+    *: "Journeys"
+  </dest>
+  <voice>
+    *: "Journeys"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PLAYLIST
+  desc: in Library - Playlist Engine, how much a mood or journey varies between runs
+  user: core
+  <source>
+    *: "Mood Playlist"
+  </source>
+  <dest>
+    *: "Mood Playlist"
+  </dest>
+  <voice>
+    *: "Mood Playlist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_CALM
+  desc: mood name: quiet, sparse and unhurried
+  user: core
+  <source>
+    *: "Calm"
+  </source>
+  <dest>
+    *: "Calm"
+  </dest>
+  <voice>
+    *: "Calm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_ENERGETIC
+  desc: mood name: loud, busy and driving
+  user: core
+  <source>
+    *: "Energetic"
+  </source>
+  <dest>
+    *: "Energetic"
+  </dest>
+  <voice>
+    *: "Energetic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DARK
+  desc: mood name: minor, little treble, weighted low
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Dark"
+  </dest>
+  <voice>
+    *: "Dark"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_BRIGHT
+  desc: mood name: major, treble-forward and clear
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Bright"
+  </dest>
+  <voice>
+    *: "Bright"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_WARM
+  desc: mood name: mid and low heavy, treble pulled back
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Warm"
+  </dest>
+  <voice>
+    *: "Warm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_RAW
+  desc: mood name: unpolished, narrow and transient-heavy
+  user: core
+  <source>
+    *: "Raw"
+  </source>
+  <dest>
+    *: "Raw"
+  </dest>
+  <voice>
+    *: "Raw"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_LUSH
+  desc: mood name: wide, clear and harmonically rich
+  user: core
+  <source>
+    *: "Lush"
+  </source>
+  <dest>
+    *: "Lush"
+  </dest>
+  <voice>
+    *: "Lush"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PUNCHY
+  desc: mood name: strong transients and wide dynamics
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Punchy"
+  </dest>
+  <voice>
+    *: "Punchy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SMOOTH
+  desc: mood name: few transients, little harmonic movement
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Smooth"
+  </dest>
+  <voice>
+    *: "Smooth"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SPARSE
+  desc: mood name: few events, dynamic
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Sparse"
+  </dest>
+  <voice>
+    *: "Sparse"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DENSE
+  desc: mood name: many events, compressed
+  user: core
+  <source>
+    *: "Dense"
+  </source>
+  <dest>
+    *: "Dense"
+  </dest>
+  <voice>
+    *: "Dense"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_HYPNOTIC
+  desc: mood name: steady tempo, little harmonic movement
+  user: core
+  <source>
+    *: "Hypnotic"
+  </source>
+  <dest>
+    *: "Hypnotic"
+  </dest>
+  <voice>
+    *: "Hypnotic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SLOW
+  desc: mood name: slow, where the tempo is trusted
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Slow"
+  </dest>
+  <voice>
+    *: "Slow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_FAST
+  desc: mood name: fast, where the tempo is trusted
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Fast"
+  </dest>
+  <voice>
+    *: "Fast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_MELANCHOLY
+  desc: mood name: minor, slow and quiet
+  user: core
+  <source>
+    *: "Melancholy"
+  </source>
+  <dest>
+    *: "Melancholy"
+  </dest>
+  <voice>
+    *: "Melancholy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_UPLIFTING
+  desc: mood name: major, fast and bright
+  user: core
+  <source>
+    *: "Uplifting"
+  </source>
+  <dest>
+    *: "Uplifting"
+  </dest>
+  <voice>
+    *: "Uplifting"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_CALM_ENERGETIC
+  desc: journey name
+  user: core
+  <source>
+    *: "Calm to Energetic"
+  </source>
+  <dest>
+    *: "Calm to Energetic"
+  </dest>
+  <voice>
+    *: "Calm to Energetic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_DARK_BRIGHT
+  desc: journey name
+  user: core
+  <source>
+    *: "Dark to Bright"
+  </source>
+  <dest>
+    *: "Dark to Bright"
+  </dest>
+  <voice>
+    *: "Dark to Bright"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SPARSE_DENSE
+  desc: journey name
+  user: core
+  <source>
+    *: "Sparse to Dense"
+  </source>
+  <dest>
+    *: "Sparse to Dense"
+  </dest>
+  <voice>
+    *: "Sparse to Dense"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SLOW_FAST
+  desc: journey name
+  user: core
+  <source>
+    *: "Slow to Fast"
+  </source>
+  <dest>
+    *: "Slow to Fast"
+  </dest>
+  <voice>
+    *: "Slow to Fast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_MELANCHOLY_UPLIFTING
+  desc: journey name
+  user: core
+  <source>
+    *: "Melancholy to Uplifting"
+  </source>
+  <dest>
+    *: "Melancholy to Uplifting"
+  </dest>
+  <voice>
+    *: "Melancholy to Uplifting"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_LENGTH
+  desc: in Library - Playlist Engine, how many tracks a generated playlist holds
+  user: core
+  <source>
+    *: "Playlist Length"
+  </source>
+  <dest>
+    *: "Playlist Length"
+  </dest>
+  <voice>
+    *: "Playlist length"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_PLAYING
+  desc: in Library - Playlist Engine, keep playing after a playlist runs out
+  user: core
+  <source>
+    *: "Continue Playing"
+  </source>
+  <dest>
+    *: "Continue Playing"
+  </dest>
+  <voice>
+    *: "Continue playing"
   </voice>
 </phrase>

@@ -37,6 +37,8 @@
 #include "core_alloc.h"
 #include "settings/settings.h"
 #include "files/filetypes.h"
+#include "database/sound_index.h"
+#include "playlist/mood_screen.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
 #include "lang.h"
@@ -349,19 +351,45 @@ int browser_disk_load(struct browser_context* c, const char* tempdir)
     if (!tempdir && c->dirlevel == 0 && c->browse
         && (c->browse->flags & BROWSE_SEARCH_ROW))
     {
-        struct entry* dptr = browser_get_entry_at(c, 0);
-        const char *label = str(LANG_DB_SEARCH);
-        int len = strlen(label);
+        struct { int attr; int lang; } rows[3];
+        int nrows = 0, n;
 
-        if (dptr && len < c->cache.name_buffer_size)
+        rows[nrows].attr = FILE_ATTR_SEARCH;
+        rows[nrows++].lang = LANG_DB_SEARCH;
+
+        /* The playlist catalogue gets two more, because what they build is a
+         * playlist and this is where the playlists are. Only with an engine
+         * switched on and an index to read: without both they would open on
+         * an apology. */
+        if (*c->dirfilter == SHOW_M3U && global_settings.playlist_engine
+            && sound_index_exists())
         {
-            dptr->attr = FILE_ATTR_SEARCH;
+            rows[nrows].attr = FILE_ATTR_MOODS;
+            rows[nrows++].lang = LANG_MOODS;
+            rows[nrows].attr = FILE_ATTR_JOURNEYS;
+            rows[nrows++].lang = LANG_JOURNEYS;
+        }
+
+        for (n = 0; n < nrows; n++)
+        {
+            struct entry* dptr = browser_get_entry_at(c, files_in_dir);
+            const char *label = str(rows[n].lang);
+            int len = strlen(label);
+
+            if (!dptr
+                || name_buffer_used + len + 1 > c->cache.name_buffer_size)
+            {
+                break;
+            }
+
+            dptr->attr = rows[n].attr;
             dptr->time_write = 0;
-            dptr->name = core_get_data(c->cache.name_buffer_handle);
+            dptr->name = (char *)core_get_data(c->cache.name_buffer_handle)
+                         + name_buffer_used;
             strcpy(dptr->name, label);
-            name_buffer_used = len + 1;
-            files_in_dir = 1;
-            c->special_entry_count = 1;
+            name_buffer_used += len + 1;
+            files_in_dir++;
+            c->special_entry_count++;
         }
     }
 
@@ -639,6 +667,15 @@ int browser_disk_enter(struct browser_context* c)
             case FILE_ATTR_SEARCH:
                 return (*c->dirfilter == SHOW_M3U) ? GO_TO_PLAYLIST_SEARCH
                                                    : GO_TO_FILE_SEARCH;
+
+            /* Returned rather than broken out of, for the reason given on the
+             * Search row above: the catalogue is one of the browses the tail
+             * of this function would otherwise send to the root. */
+            case FILE_ATTR_MOODS:
+            case FILE_ATTR_JOURNEYS:
+                return mood_screen_pick((file_attr & FILE_ATTR_MASK)
+                                        == FILE_ATTR_JOURNEYS)
+                       ? GO_TO_WPS : GO_TO_PREVIOUS;
 
             case FILE_ATTR_M3U:
                 play = browser_disk_play_playlist(buf, c->currdir, file->name);

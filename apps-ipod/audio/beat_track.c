@@ -753,6 +753,11 @@ void beat_track_push(int flux_sum, unsigned long ms, unsigned int sampr)
 
 /** Output **/
 
+unsigned int beat_track_fill(void)
+{
+    return (unsigned int)((env_count * 100) / BEAT_ENV_LEN);
+}
+
 void beat_track_get(struct beat_track *beat)
 {
     beat->locked     = locked;

@@ -76,6 +76,17 @@ Launch Spike from the context menu (hold <code>Select</code> then click
 Derived from Spun (see [here](https://github.com/majorsiebe/Stats_for_iPod)), playback report reads your playback log (whether it's the
 default logging or last.fm logging) and provides insights into your listening habits.
 
+
+## Playlist engine
+
+<img src="docs/podbox/images/ss_grid_playlist_engine.png" alt="Screenshot"/>
+
+PodBox can analyse your library and measures how each track actually sounds --
+its tempo, loudness, tonal balance, key and how busy it is -- then builds
+a playlist of tracks that work together.  
+
+Read more below - full details [here](docs/podbox/playlist-engine.md)
+
 ---
 
 # Installation
@@ -220,6 +231,8 @@ they can be installed in any order and on their own.
   - Change via `Settings > Library > Music > Edit Music Menu`
 - Trim noise from track and album names (like featuring information)
   - Off by default.  Turn the feature on by going to `Settings > Library > Music > Trim Titles`
+- View listening progress against albums and artists
+  - Hold `Select` on an Album or Artist and select `Listening Progress`
 
 ## Featured Artists
 
@@ -262,6 +275,21 @@ your position.
   - In auto mode the art will be shown depending on how you arrived at playing the track. If
 you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
  Album > Track` the album art would show.
+
+## Playlist engine
+
+- Create a playlist of tracks similar to one you like by holding `Select` on the
+  track and selecting `Play Similar` from the context menu.
+- Play tracks based on Moods -- Calm, Energetic, Dark, Warm, Punchy, Hypnotic and  
+  ten more are available by going to `Playlists > Moods`
+- Play tracks that take you from one mood to another by going to `Playlists > Journeys`.
+- Turn on the Continue Playing setting to keep the music going when any playlist runs 
+  out -- an album, a saved playlist, or a dynamic one -- by extending it with more of the
+  same.  Turn it on by going to `Settings > Library > Playlist Engine > Continue Playing`.
+- Turn on the playlist engine by going to `Settings > Library > Playlist Engine > Enabled`, 
+  which starts the analysis. It takes a while on the player, so a Windows tool that does the same
+  job much faster ships inside the firmware at `.rockbox/tools/` called `soundscan.exe`.
+- Read more [here](docs/podbox/playlist-engine.md).
 
 ## Playback report
 
@@ -318,7 +346,7 @@ song is by, the album it came from
 
 ## Behind the scenes
 
-- Inline earphone remote support (iPod classic 120GB - Late 2008 and
+- Upstream's inline earphone remote support (iPod classic 120GB - Late 2008 and
   iPod classic 160GB - Late 2009 thin version only)
   - Click for play/pause, two clicks for the next track, three for the previous one, and the volume buttons
   - `Settings > System > Accessories > Remote Track Skip` turns the multi-click feature off, which makes play/pause react quicker

@@ -64,6 +64,9 @@
 #include "database/db_summary.h"   /* db_summary_invalidate */
 #include "metadata/tag_trim.h"     /* tag_trim_init */
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
+#include "screens/system/sound_scan.h"  /* sound_scan_screen */
+#include "database/sound_index.h"       /* sound_index_exists */
+#include "database/sound_mix.h"         /* SOUND_MIX_MAX */
 
 #include "audio/voice_thread.h"
 
@@ -637,6 +640,17 @@ static void segregate_audiobooks_callback(bool segregate)
 {
     root_menu_set_audiobooks_row(segregate);
     db_summary_invalidate();
+}
+
+/* Switching the engine on is how the analysis gets started. Nothing can be
+ * matched against until it has run, so a setting that only set a flag would
+ * appear to do nothing for as long as it took somebody to find Maintenance.
+ * An index already on disk is left alone; the scan screen asks before it
+ * starts, and can be declined. */
+static void playlist_engine_callback(bool on)
+{
+    if (on && !sound_index_exists())
+        sound_scan_screen(false);
 }
 
 /* The pattern file is read at startup, so switching this on is also how an
@@ -1260,6 +1274,29 @@ const struct settings_list settings[] = {
 
     OFFON_SETTING(0, runtimedb, LANG_RUNTIMEDB_ACTIVE, true,
                   "gather runtime data", NULL),
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, playlist_engine,
+                  LANG_ACTION_ENABLED, false, "playlist engine",
+                  playlist_engine_callback),
+    OFFON_SETTING(0, continue_playing, LANG_CONTINUE_PLAYING, false,
+                  "continue playing", NULL),
+    CHOICE_SETTING(0, analysis_depth, LANG_ANALYSIS_DEPTH,
+                   ANALYSIS_THOROUGH, "analysis depth", "thorough,quick",
+                   NULL, 2,
+                   ID2P(LANG_ANALYSIS_THOROUGH), ID2P(LANG_ANALYSIS_QUICK)),
+    INT_SETTING(0, mix_length, LANG_MIX_LENGTH, 40, "generated playlist length",
+                UNIT_INT, 5, SOUND_MIX_MAX, 5, NULL, NULL, NULL),
+    CHOICE_SETTING(0, mood_playlist, LANG_MOOD_PLAYLIST,
+                   MIX_VARY_WEEKLY, "mood playlist",
+                   "predictable,weekly,variable", NULL, 3,
+                   ID2P(LANG_MIX_PREDICTABLE),
+                   ID2P(LANG_MIX_WEEKLY),
+                   ID2P(LANG_MIX_VARIABLE)),
+    CHOICE_SETTING(0, track_playlist, LANG_TRACK_PLAYLIST,
+                   MIX_VARY_PREDICTABLE, "track playlist",
+                   "predictable,weekly,variable", NULL, 3,
+                   ID2P(LANG_MIX_PREDICTABLE),
+                   ID2P(LANG_MIX_WEEKLY),
+                   ID2P(LANG_MIX_VARIABLE)),
     TEXT_SETTING(0, tagcache_scan_paths, "database scan paths",
                  DEFAULT_TAGCACHE_SCAN_PATHS, NULL, NULL),
     TEXT_SETTING(0, tagcache_db_path, "database path",

@@ -56,6 +56,22 @@ struct opt_items {
 /* The values are assigned to the enums so that they correspond to */
 /* setting values in settings_list.c                               */
 
+/* How much a generated playlist varies between runs. Shared by every playlist
+   the engine builds, so the words mean one thing throughout. */
+/* How much of each track the analysis listens to. Quick stops as soon as the
+   tempo has settled, which is most of the time saved and most of the accuracy
+   lost: it ends the sampling of loudness, timbre and key as well. */
+enum {
+    ANALYSIS_THOROUGH = 0,
+    ANALYSIS_QUICK,
+};
+
+enum {
+    MIX_VARY_PREDICTABLE = 0,   /* the same list until the library changes */
+    MIX_VARY_WEEKLY,            /* the same list for a week, then a new one */
+    MIX_VARY_VARIABLE,          /* a new list every time */
+};
+
 /* Shared by all bookmark parameters */
 enum {
     BOOKMARK_NO = 0,
@@ -600,6 +616,16 @@ struct user_settings
     bool runtimedb;           /* runtime database active? */
     unsigned char tagcache_scan_paths[MAX_PATHLIST+1];
     unsigned char tagcache_db_path[MAX_PATHNAME+1];
+
+    /* The sound analysis, and the playlists built from it. Off until somebody
+       turns it on: it is worth nothing until a scan has run, and the scan is
+       a night's work. */
+    bool playlist_engine;
+    int track_playlist;       /* MIX_VARY_* */
+    int analysis_depth;       /* ANALYSIS_* */
+    int mood_playlist;        /* MIX_VARY_* */
+    int mix_length;           /* tracks in a generated playlist */
+    bool continue_playing;    /* extend a playlist that runs out */
 
     unsigned char backdrop_file[MAX_PATHNAME+1];  /* backdrop bitmap file */
 

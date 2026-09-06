@@ -59,8 +59,13 @@ before it starts. All of them queue work for the background and return at once.
 | Update Index | Refreshes the album and artist lists the carousels and charts read. |
 | Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
 | Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
+| Update Sound Analysis | Measures tracks the sound analysis has not covered, and retries any it could not read. Needs the charger, and holds the player while it runs. |
 | Rebuild Database | Discards the database and reads every file again. Slow. |
 | Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
+| Rebuild Sound Analysis | Measures every track again. Hours on a full library. |
+
+The two Sound Analysis rows appear only once **Playlist Engine** is on, and
+unlike the rest they hold the player rather than queueing work.
 
 ---
 
@@ -286,6 +291,17 @@ before it starts. All of them queue work for the background and return at once.
 | Gather Runtime Data | Records play counts, ratings and when each track was last played. What the listening statistics are built from. | on | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. | / | **Adv** |
 | Write Debug Log | Writes scan progress to a log file. For working out why a track is missing from the database. | off | **Adv** |
+
+### Library — Playlist Engine
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Enabled | Measures how each track actually sounds -- its tempo, loudness, tonal balance and key -- so a playlist can be built from a song rather than from its tags. Switching this on starts the analysis, which asks before it begins. The analysis needs the charger and takes hours on a full library. Switching it off hides the feature and leaves what has been measured on disk, so switching it back on costs nothing. | off | |
+| Analysis Depth | How much of each track the analysis listens to. Thorough takes forty seconds. Quick stops as soon as the tempo has settled, around eleven, which is roughly three and a half times faster. Quick is faster than it is accurate. The tempo settling is what stops it, and that ends the measurement of loudness, tonal balance and key along with it -- measured against a full window it disagreed about the closest track two times in three. Use it if a full analysis on the player is too long to sit through; the desktop tool does a whole library thoroughly in minutes. Changing this does not re-measure anything. Rebuild Sound Analysis does. | thorough | |
+| Playlist Length | How many tracks Play Similar, a mood or a journey puts in the playlist. Forty is about an evening. A journey spreads its change across whatever length is set, so a short one moves between its two moods in fewer steps rather than covering less ground. | 40 | |
+| Track Playlist | How much Play Similar varies between runs. Predictable gives the same playlist every time from the same song, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. None of them reach further out for the difference -- the playlist is drawn from the same neighbourhood either way. | predictable | |
+| Mood Playlist | How much a mood or a journey varies between runs. Predictable gives the same playlist every time, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. Moods and journeys are on the Playlists screen, above the saved playlists. | weekly | |
+| Continue Playing | Keeps the music going when a playlist runs out, by adding more tracks that sound like what has been playing and carrying on into them. Works for any playlist -- an album, a saved one, a folder, or one the engine built. A playlist the engine built is continued on its own terms: a mood keeps aiming at that mood rather than drifting away from it one extension at a time. Anything else is continued from the track that just finished. Nothing already in the playlist is added again. | off | |
 
 ### Library — Art Cache
 

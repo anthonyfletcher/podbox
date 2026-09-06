@@ -101,6 +101,7 @@
 #include "lcd.h"
 #include "kernel.h"
 #include "settings/settings.h"
+#include "database/sound_mix.h"
 #include "audio/play_status.h"
 #include "system/applimits.h"
 #include "core_alloc.h"
@@ -2078,6 +2079,9 @@ bool playlist_is_from_artist(void)
  */
 int playlist_create(const char *dir, const char *file)
 {
+    /* Whatever built the last playlist does not describe this one. */
+    sound_mix_forget();
+
     struct playlist_info* playlist = &current_playlist;
     int status = 0;
 

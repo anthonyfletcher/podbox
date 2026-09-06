@@ -44,6 +44,7 @@
 #include "screens/playback/wps.h"
 #include "screens/bookmark.h"
 #include "playlist/playlist.h"
+#include "database/sound_mix.h"
 #include "playlist/viewer.h"
 #include "playlist/catalog.h"
 #include "screens/settings/exported_settings.h"
@@ -1696,6 +1697,16 @@ void root_menu(void)
 
     while (true)
     {
+        /* A playlist that ran out, extended here rather than where it ended:
+         * this is the UI thread, and the work is seconds of disk. Silent
+         * either way -- nobody is looking at the screen when the music
+         * stops. */
+        if (sound_mix_continue_due()
+            && sound_mix_continue(global_settings.mix_length) > 0)
+        {
+            next_screen = GO_TO_WPS;
+        }
+
         switch (next_screen)
         {
             case MENU_ATTACHED_USB:

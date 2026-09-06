@@ -216,6 +216,14 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
             return (*local_tc->dirfilter == SHOW_M3U) ? Icon_Playlist
                                                       : Icon_Folder;
 
+        /* The Moods and Journeys rows are not file types either. They open a
+         * list, so they take the icon the catalogue's other list-opening row
+         * takes -- which is also what the themes that draw a chevron key it
+         * on. Scrim and Scrim_p override the glyph by name. */
+        if ((entry->attr & FILE_ATTR_MASK) == FILE_ATTR_MOODS
+            || (entry->attr & FILE_ATTR_MASK) == FILE_ATTR_JOURNEYS)
+            return Icon_Playlist;
+
         return filetype_get_icon(entry->attr);
     }
 }
@@ -1085,11 +1093,11 @@ static int dirbrowse(void)
                     struct entry *entry =
                                 get_valid_entry(__func__, &tc, tc.selected_item);
                     short attr = entry->attr;
-                    /* The Search row is not a file to hand back: a picker
-                     * would return it as the chosen one. It falls through to
-                     * the enter dispatch, which opens the box. */
+                    /* An invented row is not a file to hand back: a picker
+                     * would return it as the chosen one. They fall through to
+                     * the enter dispatch, which is what acts on them. */
                     if(!(attr & ATTR_DIRECTORY)
-                       && (attr & FILE_ATTR_MASK) != FILE_ATTR_SEARCH)
+                       && !file_attr_is_row(attr & FILE_ATTR_MASK))
                     {
                         tc.browse->flags |= BROWSE_SELECTED;
                         get_current_file(tc.browse->buf, tc.browse->bufsize);
@@ -1225,8 +1233,9 @@ static int dirbrowse(void)
                  * delete, rename and add-to-playlist against a path that does
                  * not exist. */
                 if (!id3db && numentries
-                    && (get_valid_entry(__func__, &tc, tc.selected_item)->attr
-                        & FILE_ATTR_MASK) == FILE_ATTR_SEARCH)
+                    && file_attr_is_row(
+                        get_valid_entry(__func__, &tc, tc.selected_item)->attr
+                        & FILE_ATTR_MASK))
                     break;
 
                 if(!numentries)

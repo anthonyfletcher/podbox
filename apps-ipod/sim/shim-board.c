@@ -19,6 +19,7 @@
 #include "adc.h"
 #include "i2c.h"
 #include "power.h"
+#include "powermgmt.h"
 #include "serial.h"
 #include "piezo.h"
 #include "button.h"
@@ -34,8 +35,15 @@ void adc_init(void)
 {
 }
 
+/* A simulator runs on whatever the host is plugged into, and has no battery
+ * to flatten. Saying so matters because work that refuses to start on battery
+ * -- the library sound analysis -- would otherwise refuse here, where the
+ * reason for the rule does not exist. powermgmt-sim.c only ever sets this
+ * when its simulated battery runs down, so without this it reads NO_CHARGER
+ * from startup. */
 void power_init(void)
 {
+    charger_input_state = CHARGER_PLUGGED;
 }
 
 void serial_setup(void)

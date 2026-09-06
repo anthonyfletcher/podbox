@@ -31,6 +31,10 @@ audio/audio_path.c
 #ifdef HAVE_TAGCACHE
 database/tagcache.c
 database/db_summary.c
+database/sound_index.c
+database/sound_mix.c
+database/sound_mood.c
+playlist/mood_screen.c
 database/db_featured.c
 database/db_featured_parse.c
 database/db_spoken.c
@@ -80,6 +84,7 @@ draw/jpeg_idct_arm.S
 #endif
 
 widgets/dialog.c
+widgets/dialog_prose.c
 widgets/edit_line.c
 widgets/keyboard.c
 widgets/list.c
@@ -90,7 +95,11 @@ widgets/option_select.c
 audio/peak_meter.c
 audio/spectrum_meter.c
 audio/beat_analyse.c
+audio/beat_hops.c
+audio/beat_probe.c
+audio/chroma.c
 audio/beat_track.c
+audio/track_decode.c
 widgets/search_dialog.c
 widgets/splash.c
 widgets/text_box.c
@@ -117,6 +126,8 @@ screens/system/db_search.c
 screens/system/file_search.c
 screens/system/playlist_search.c
 screens/system/beat_debug.c
+screens/system/probe_debug.c
+screens/system/sound_scan.c
 screens/system/debug_menu.c
 files/file_ops.c
 files/file_index.c

@@ -359,6 +359,7 @@ for target in $TARGETS; do
                     .rockbox/docs/settings-help.txt \
                     .rockbox/trim.config \
                     .rockbox/fonts/LICENSE-Noto.txt \
+                    .rockbox/tools/soundscan.exe \
                     .rockbox/rockbox.ipod; do
             unzip -l '$zip' | grep -q \"\$want\" ||
                 { echo \"$target zip is missing \$want\" >&2; exit 1; }
