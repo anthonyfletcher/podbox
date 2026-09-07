@@ -516,6 +516,13 @@ static void beat_decide(void)
      * three-against-two is pointed the wrong way for it, and the two cannot
      * be told apart from the envelope. Ten of sixty-three, against seventeen
      * before either step was tuned. */
+    /* Both tests are against the original peak, including the halving that
+     * follows a two-thirds step. The two do compound -- on five of the rig's
+     * sixty-three -- so which score the halving answers to is a real choice,
+     * and the peak is the stricter of the two: r[third] is at most the peak,
+     * so judging against it instead only lowers the bar. It moves no verdict
+     * on the rig either way, and the stricter reference is the one that
+     * cannot run away down the octaves. */
     {
         unsigned int third = (best_lag * 2) / 3;
         unsigned int half;
