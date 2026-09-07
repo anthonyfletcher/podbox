@@ -129,19 +129,23 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out)
  * separates records the tempo cannot: two tracks at 120 BPM can be a folk
  * ballad and a techno record, and only the band balance says which.
  *
+ * Crest and width carry the production era, which nothing else here reads: a
+ * dynamic narrow record and a compressed wide one sit decades apart however
+ * alike the rest of their numbers are.
+ *
  * Weights are in tenths so they can be integers. */
 static const struct { size_t off; int w; } mix_weights[] = {
     { offsetof(struct sound_axes, loud),    10 },
     { offsetof(struct sound_axes, bright),  10 },
     { offsetof(struct sound_axes, low),      8 },
     { offsetof(struct sound_axes, dens),     8 },
+    { offsetof(struct sound_axes, crest),    8 },
     { offsetof(struct sound_axes, tempo),    7 },
     { offsetof(struct sound_axes, peak),     6 },
+    { offsetof(struct sound_axes, width),    6 },
     { offsetof(struct sound_axes, mid),      5 },
     { offsetof(struct sound_axes, clarity),  5 },
     { offsetof(struct sound_axes, change),   4 },
-    { offsetof(struct sound_axes, crest),    4 },
-    { offsetof(struct sound_axes, width),    3 },
 };
 
 #define MIX_AXES (sizeof (mix_weights) / sizeof (mix_weights[0]))
@@ -205,16 +209,23 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b)
     if (a->mode >= 0 && b->mode >= 0 && a->mode != b->mode)
         d += 60;
 
-    /* Soft, both of them. A hard genre filter would make this a genre
-     * browser, which the database already does better. */
+    /* Soft. A hard genre filter would make this a genre browser, which the
+     * database already does better. */
     if (a->genre != 0 && a->genre == b->genre)
         d -= 50;
 
+    /* Era, convex and reaching half a century. A decade between two records
+     * is a pleasant surprise and costs almost nothing; fifty years is a
+     * different collection. A linear term saturating at 25 charges both the
+     * same. */
     if (a->year && b->year)
     {
         int gap = a->year > b->year ? a->year - b->year : b->year - a->year;
 
-        d += 30 * (gap > 25 ? 25 : gap) / 25;
+        if (gap > 50)
+            gap = 50;
+
+        d += 90 * gap * gap / (50 * 50);
     }
 
     return d < 0 ? 0 : d;
