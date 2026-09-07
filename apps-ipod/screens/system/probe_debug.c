@@ -197,18 +197,18 @@ bool probe_debug_screen(void)
         simplelist_addline("boost %d  cmds %u", st.boost, st.commands);
     }
 
-    /* Round-trip one record through the index, which is the whole of stage
-     * three exercised.
+    /* What the measurement becomes in a record, and what the index already
+     * says about this track. Both read-only: this screen writes nothing.
      *
-     * Trap: this writes a one-record file over db_sound.dat, so opening this
-     * screen discards whatever the library scan measured. That was free when
-     * nothing built a real index; it is not now, and the round-trip needs
-     * somewhere else to live before this row is safe to open on a player that
-     * has been scanned.
+     * The packing is the part worth seeing, because it is lossy -- the fields
+     * are narrowed and capped on the way in, and a reading that looks right
+     * above can still arrive at the index wrong.
      *
-     * Never prunes: one record is no evidence about the rest of a library. */
+     * No byte comparison against the stored record is offered: it would need
+     * the file's mtime and size, which the scan supplies and this does not,
+     * so every track would report a difference in fields nothing measured. */
     {
-        struct sound_record rec, back;
+        struct sound_record rec, have;
         struct sound_index_reader rd;
         uint64_t key = sound_index_key(path);
 
@@ -216,33 +216,29 @@ bool probe_debug_screen(void)
                          year, &s, rc);
 
         simplelist_addline(" ");
+        simplelist_addline("record %d bytes  flags %02x",
+                           (int)sizeof (rec), rec.flags);
+        simplelist_addline("  %dms  %ddb  crest %d  yr %d  %ds",
+                           rec.period_ms, rec.loudness_db10 / 10,
+                           rec.crest_db, rec.year, rec.analysed_s);
+        simplelist_addline("  lvl %d/%d/%d  rate %d/%d/%d",
+                           rec.level[0], rec.level[1], rec.level[2],
+                           rec.rate10[0], rec.rate10[1], rec.rate10[2]);
 
-        if (sound_index_begin(1, true) == SOUND_OK &&
-            sound_index_add(&rec) &&
-            sound_index_finish(false) == SOUND_OK &&
-            sound_index_reader_open(&rd) == SOUND_OK)
+        if (sound_index_reader_open(&rd) == SOUND_OK)
         {
-            if (sound_index_find(&rd, key, &back))
-            {
-                simplelist_addline("index ok: %d rec, %d bytes", rd.count,
-                                   (int)sizeof (rec));
-                simplelist_addline("  back %dms  %ddb  yr %d  flags %02x",
-                                   back.period_ms, back.loudness_db10 / 10,
-                                   back.year, back.flags);
-                simplelist_addline("  %s",
-                                   memcmp(&rec, &back, sizeof (rec)) == 0
-                                   ? "identical" : "DIFFERS");
-            }
+            if (sound_index_find(&rd, key, &have))
+                simplelist_addline("in index: %dms  %ddb  flags %02x",
+                                   have.period_ms, have.loudness_db10 / 10,
+                                   have.flags);
             else
-            {
-                simplelist_addline("index: record LOST");
-            }
+                simplelist_addline("in index: this track is not in it");
 
             sound_index_reader_close(&rd);
         }
         else
         {
-            simplelist_addline("index: write FAILED");
+            simplelist_addline("in index: there is no index");
         }
     }
 
