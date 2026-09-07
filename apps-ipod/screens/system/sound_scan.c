@@ -535,7 +535,11 @@ bool sound_scan_screen(bool rebuild)
     ss_stop = ss_unplugged = false;
     strlcpy(ss_now, "", sizeof (ss_now));
 
-    ss_handle = core_alloc(SS_WINDOW_BYTES);
+    /* Immovable. The window's address is handed to track_decode.c, which
+     * holds it for the length of a decode -- tens of seconds inside a codec,
+     * with a file read behind every callback. A movable block is one core
+     * allocation anywhere from moving out from under that. */
+    ss_handle = core_alloc_ex(SS_WINDOW_BYTES, &buflib_ops_locked);
     if (ss_handle <= 0)
     {
         usb_set_mode(global_settings.usb_mode);
