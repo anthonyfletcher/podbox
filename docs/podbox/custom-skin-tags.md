@@ -839,15 +839,16 @@ are only ever appended to, never renumbered.
 
 | | | | |
 |---|---|---|---|
-| 0 unknown | 9 *unused* | 18 bookmarks | 27 documents |
-| 1 main menu | 10 quickscreen | 19 shortcuts | 28 images |
-| 2 while playing | 11 *reserved* | 20 track info | 29 search |
-| 3 *unused* | 12 option chooser | 21 USB | 30 lyrics |
-| 4 *unused* | 13 playlist catalogue | 22 album covers | 31 playback report |
-| 5 playlist viewer | 14 *unused* | 23 text viewer | 32 settings search |
-| 6 settings | 15 context menu | 24 image viewer | 33 featured artists |
-| 7 files | 16 system screen | 25 folder picker | |
-| 8 database | 17 time and date | 26 album charts | |
+| 0 unknown | 10 quickscreen | 20 track info | 30 lyrics |
+| 1 main menu | 11 *reserved* | 21 USB | 31 playback report |
+| 2 while playing | 12 option chooser | 22 album covers | 32 settings search |
+| 3 *unused* | 13 playlist catalogue | 23 text viewer | 33 featured artists |
+| 4 *unused* | 14 *unused* | 24 image viewer | 34 Spike |
+| 5 playlist viewer | 15 context menu | 25 folder picker | 35 file search |
+| 6 settings | 16 system screen | 26 album charts | 36 playlist search |
+| 7 files | 17 time and date | 27 documents | 37 listening progress |
+| 8 database | 18 bookmarks | 28 images | |
+| 9 *unused* | 19 shortcuts | 29 search | |
 
 The gaps are real and stay: 3 and 4 are recording and radio, 9 and 14 the plugin
 browser and a running plugin, 11 the pitch screen. None of them can happen here.

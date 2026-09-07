@@ -363,8 +363,9 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
         /* Multimedia keys bypass the action system entirely -- action.c lets
          * them through as raw button codes, so every screen reaches them here
          * through its default case. The 6G's inline earphone remote produces
-         * only PLAYPAUSE and the two volume codes; the rest are for a dock or
-         * head unit over iAP. */
+         * PLAYPAUSE, the two volume codes, and -- with Remote Track Skip on --
+         * NEXT and PREV from two and three clicks of its centre button. STOP
+         * is a dock or head unit over iAP. */
         case BUTTON_MULTIMEDIA_PLAYPAUSE:
         {
             int status = audio_status();
