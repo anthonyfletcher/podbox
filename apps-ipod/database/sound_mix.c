@@ -453,6 +453,12 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     if (sound_index_reader_open(&r) != SOUND_OK)
         return SOUND_MIX_NO_INDEX;
 
+    /* Boosted across both passes, not just the database walk. Pass one is the
+     * expensive half: a seek and a read per record, and a scoring with an
+     * integer square root in it, done once per step of the goal -- which for
+     * a journey is a hundred times over every record in the index. */
+    cpu_boost(true);
+
     /* Pass one: every record, scored against every step of the goal. A
      * journey keeps a few candidates for each point along it rather than the
      * best overall, or the middle of the run would be filled with whatever
@@ -498,13 +504,14 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
         i += held[s];
 
     if (i == 0)
+    {
+        cpu_boost(false);
         return 0;
+    }
 
     /* Pass two: the database, for what is behind those keys. A record carries
      * no path, so this walk is the only way back to one -- and the only place
      * a candidate's artist and length can be read. */
-    cpu_boost(true);
-
     if (!tagcache_search(&tcs, tag_filename))
     {
         cpu_boost(false);
