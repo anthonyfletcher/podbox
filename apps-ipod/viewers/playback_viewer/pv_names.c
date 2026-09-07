@@ -458,8 +458,10 @@ static bool is_tracknum(const char *s, int n)
  * is worth keeping too: without it a path-resolved entry has no album at all
  * and the model falls back to naming the album after the artist.
  *
- * A shallower path has no grandparent to take, and there the folder above is
- * the artist. */
+ * A path with one folder in it has no grandparent to take, and there the
+ * folder above is the artist. One with none leaves both empty, which the
+ * caller answers with "(unknown)" -- so both are cleared here rather than
+ * left to whatever the caller's buffer held. */
 static void folders_to_meta(const char *path, char *artist, char *album)
 {
     /* The last three separators, kept as a sliding window rather than an
@@ -473,6 +475,8 @@ static void folders_to_meta(const char *path, char *artist, char *album)
     const char *sl[3] = { NULL, NULL, NULL };
     int n = 0;
 
+    artist[0] = album[0] = '\0';
+
     for (const char *p = path; *p; p++)
         if (*p == '/')
         {
@@ -482,7 +486,13 @@ static void folders_to_meta(const char *path, char *artist, char *album)
             n++;
         }
 
-    if (n >= 4)
+    /* Three, not four. sl[] holds the last three separators whatever the
+     * depth, so /Artist/Album/track.mp3 -- a library at the volume root --
+     * brackets the same way a deeper one does, with the leading slash as
+     * sl[0]. Asking for four sends that path to the branch below, which then
+     * names the ALBUM folder as the artist: the very reading this exists to
+     * stop, one directory shallower. */
+    if (n >= 3)
     {
         strlcpy(artist, sl[0] + 1,
                 (size_t)(sl[1] - sl[0]) < PV_NAME_MAX
