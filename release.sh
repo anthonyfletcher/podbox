@@ -135,6 +135,15 @@ say "Checking the tree"
 [ -z "$(git status --porcelain)" ] ||
     die "working tree is not clean -- commit or stash first, so the zips match the tag"
 
+# The settings and the two documents that describe them, which nothing else
+# runs. A mismatch ships a setting whose Explain entry is empty or a guide
+# describing a player that no longer exists -- neither of which shows up in a
+# build, a zip check or on the device. Here rather than in build-hw.sh: a
+# half-written feature has every right to be undocumented while it is being
+# written, and a release has none.
+sh tools/check-settings-docs.sh ||
+    die "settings and their documents disagree -- see the lines above"
+
 UPSTREAM=$(git rev-parse --abbrev-ref '@{u}' 2>/dev/null) ||
     die "this branch has no upstream; push it before releasing"
 [ "$(git rev-parse HEAD)" = "$(git rev-parse '@{u}')" ] ||
