@@ -241,6 +241,32 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b)
  * further out. */
 #define MIX_VARY_CHOICE 3
 
+/* How far from the goal a track may sit and still be offered.
+ *
+ * Without a ceiling the nearest 'want' tracks win however far away they are,
+ * so a mood always returns a full playlist: on a library with a dozen calm
+ * records, Calm returns those twelve and then the twenty-eight next least
+ * frantic things in the collection. The complaint that follows is not that
+ * the ranking is wrong -- it is right -- but that the tail of the list was
+ * never an example of the mood.
+ *
+ * A score is the weighted RMS distance per axis on the 0-1000 scale, and the
+ * axes are absolute rather than normalised across the library (sound_mix.h),
+ * so the number means the same thing on every player. A track picked at
+ * random sits somewhere around 300 to 400 from any given goal, which is what
+ * fixes this: past 300 a candidate is no longer distinguishable from chance,
+ * and a shorter playlist is the honest answer.
+ *
+ * Short, not empty. Everything nearer than this is still offered, in order,
+ * and a mood with nothing inside it at all falls through to the caller's
+ * "nothing near enough" -- which sound_mix.h has always promised and nothing
+ * ever produced.
+ *
+ * This is the one number here derived rather than measured. It wants an ear
+ * on a real library: too high and the tail comes back, too low and a mood
+ * that does exist reports that it does not. */
+#define MIX_MAX_DISTANCE 300
+
 /* Tracks shorter than this are not offered. They are intros, interludes and
  * segues -- they measure as real tracks and arrive as real matches, and a
  * playlist of them is not what anybody asked for. Read from the database
@@ -492,7 +518,7 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
         {
             int d = goal_score(g, &ta, s);
 
-            if (d >= 0)
+            if (d >= 0 && d <= MIX_MAX_DISTANCE)
                 held[s] = mix_insert(cand + s * bucket, held[s], bucket,
                                      rec.key, d);
         }

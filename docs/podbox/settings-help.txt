@@ -575,8 +575,12 @@ Anything else is continued from the track that just finished.
 Nothing already in the playlist is added again.
 
 [generated playlist length]
-How many tracks Play Similar, a mood or a journey puts in the playlist. Forty
+The most tracks Play Similar, a mood or a journey puts in the playlist. Forty
 is about an evening.
+
+It is a limit rather than a target. Only tracks that really do sound like what
+was asked for are used, so a mood your library holds little of gives a short
+playlist rather than a long one filled out with whatever was nearest.
 
 A journey spreads its change across whatever length is set, so a short one
 moves between its two moods in fewer steps rather than covering less ground.

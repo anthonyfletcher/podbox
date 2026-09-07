@@ -61,6 +61,10 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
  * The seed plays first and the rest follow in order of how near they are to
  * it, no more than two from any one artist.
  *
+ * 'want' is a ceiling, not a quota. Only tracks actually near the goal are
+ * offered, so a library holding few of them gives a short playlist rather
+ * than a long one padded with whatever was left -- see MIX_MAX_DISTANCE.
+ *
  * Returns the number of tracks playing, 0 if nothing near enough survived, or
  * one of the codes above.
  *
