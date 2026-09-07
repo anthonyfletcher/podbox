@@ -142,12 +142,19 @@ static const char ss_depth_explain[] =
 /* Asked once the run has been agreed rather than before it: this is a
  * question about how long to spend, which only matters to somebody who has
  * decided to spend it. Remembered, so the answer also settles what a later
- * update does. */
+ * update does.
+ *
+ * It opens on whatever the setting of the same name currently says. The
+ * Playlist Engine menu carries that setting too, so a dialog that always
+ * opened on Thorough would offer somebody who had chosen Quick the opposite
+ * of their own answer, and overwrite it if they took the highlighted one. */
 static void ss_ask_depth(void)
 {
+    bool thorough = global_settings.analysis_depth != ANALYSIS_QUICK;
+
     global_settings.analysis_depth =
         dialog_prose_confirm("Analysis depth", ss_depth_explain,
-                             "Thorough", "Quick")
+                             "Thorough", "Quick", thorough)
         ? ANALYSIS_THOROUGH : ANALYSIS_QUICK;
 
     settings_save();
@@ -473,7 +480,7 @@ static bool ss_gate(bool *fresh)
     }
 
     if (!dialog_prose_confirm("Analyse library", ss_explain,
-                              "Start", "Not now"))
+                              "Start", "Not now", true))
     {
         return false;
     }

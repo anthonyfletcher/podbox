@@ -264,7 +264,8 @@ static const struct dialog_callbacks prose_cb =
 
 bool dialog_prose_confirm(const char *title, const char *body,
                           const char *accept_label,
-                          const char *cancel_label)
+                          const char *cancel_label,
+                          bool accept_default)
 {
     struct dialog d;
     struct prose p;
@@ -273,7 +274,7 @@ bool dialog_prose_confirm(const char *title, const char *body,
     p.body   = body;
     p.accept = accept_label;
     p.cancel = cancel_label;
-    p.sel    = 1;               /* accept, once the buttons are reached */
+    p.sel    = accept_default ? 1 : 0;  /* once the buttons are reached */
 
     dialog_init(&d, CONTEXT_STD, title, NULL, &prose_cb, &p);
 

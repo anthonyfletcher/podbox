@@ -20,9 +20,15 @@
  * 'body' is one string; blank lines in it separate paragraphs. It is wrapped
  * to the box, and a marker appears while there is more below.
  *
+ * 'accept_default' is which of the two is highlighted once the buttons take
+ * focus. True for a question whose obvious answer is yes; false where the
+ * dialog stands for a setting that is currently the other value, because a
+ * dialog opening on what the setting is not reads as a proposal to change it.
+ *
  * True if the user accepted. */
 bool dialog_prose_confirm(const char *title, const char *body,
                           const char *accept_label,
-                          const char *cancel_label);
+                          const char *cancel_label,
+                          bool accept_default);
 
 #endif /* _GUI_DIALOG_PROSE_H_ */
