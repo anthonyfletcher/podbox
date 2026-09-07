@@ -706,7 +706,12 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    if (sound_index_finish() != SOUND_OK)
+    /* Never prunes. Dropping a record needs proof that the walk reached every
+     * track there is, and this walk is over folders rather than over the
+     * database: it has no count to check itself against, and a directory it
+     * could not open is a subtree that silently was not visited. The player's
+     * own scan does the pruning; this tool only ever adds and replaces. */
+    if (sound_index_finish(false) != SOUND_OK)
     {
         printf("Could not write the index.\n");
         return 1;

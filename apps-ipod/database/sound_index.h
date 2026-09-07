@@ -160,8 +160,27 @@ bool sound_index_add(const struct sound_record *r);
 /* Records written into the working file so far, across resumes. */
 int sound_index_count(void);
 
-/* Sort by key and put the finished index in place. */
-int sound_index_finish(void);
+/* Say that the run reached this track, whatever it then decided to do about
+ * it -- measured, already current, or too short to measure. It is the reaching
+ * that matters: it is what sound_index_finish(true) keeps a record for.
+ *
+ * A key with no record yet needs no call; adding one counts as reaching it. */
+void sound_index_seen(uint64_t key);
+
+/* Sort by key and put the finished index in place.
+ *
+ * 'prune' drops every record sound_index_seen() was not called for, which is
+ * how a track that has left the player stops occupying the index -- and stops
+ * taking a candidate slot from a track that is still there.
+ *
+ * Pass it ONLY on proof that the walk reached every track in the library, and
+ * proof means a count, not the walk having ended: tagcache_get_next() returns
+ * false at the end of a walk and also when the database becomes unreadable
+ * underneath one, and the two are indistinguishable from here. A caller that
+ * cannot count what it should have seen passes false and leaves the index
+ * alone; that is the safe answer and it is why the desktop tool, which walks
+ * folders rather than the database, never prunes. */
+int sound_index_finish(bool prune);
 
 /* Stop, keeping the working file so the next run resumes from it. */
 void sound_index_close(void);

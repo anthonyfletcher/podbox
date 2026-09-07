@@ -91,6 +91,8 @@
 static int           ss_handle;
 
 static int           ss_total;
+static int           ss_live;      /* Of those, not flagged deleted. 0 =
+                                      could not be counted */
 static int           ss_done;      /* Measured this run */
 static int           ss_skipped;   /* Already current */
 static int           ss_failed;
@@ -510,6 +512,7 @@ bool sound_scan_screen(bool rebuild)
     struct tagcache_search tcs;
     char path[MAX_PATH];
     bool fresh = rebuild;
+    bool complete;
     int written;
     int rc;
 
@@ -536,6 +539,19 @@ bool sound_scan_screen(bool rebuild)
     }
 
     ss_total = tagcache_get_stat()->total_entries;
+
+    /* What the walk will actually yield, which is the total less the entries
+     * flagged deleted -- taken here, beside the total it is derived from,
+     * rather than at the end where a deletion made meanwhile would move it.
+     * Zero where they cannot be counted; see the pruning decision below. */
+    {
+        struct tagcache_marks marks;
+
+        tagcache_get_marks(&marks);
+        ss_live = marks.deleted_ct >= 0 && marks.deleted_ct <= ss_total
+                  ? ss_total - marks.deleted_ct : 0;
+    }
+
     ss_done = ss_skipped = ss_failed = 0;
     ss_work = 0;
     ss_audio_ms = 0;
@@ -597,6 +613,12 @@ bool sound_scan_screen(bool rebuild)
          * fire in the middle of the run. */
         reset_poweroff_timer();
 
+        /* Before the length test below, not after it. What this marks is that
+         * the track still exists, which is true of one too short to measure;
+         * marking only the measured ones would prune every short track's
+         * record on the first run that finished. */
+        sound_index_seen(sound_index_key(path));
+
         length_ms = (unsigned long)tagcache_get_numeric(&tcs, tag_length);
         mtime = (uint32_t)tagcache_get_numeric(&tcs, tag_mtime);
         year = (int)tagcache_get_numeric(&tcs, tag_year);
@@ -644,6 +666,25 @@ bool sound_scan_screen(bool rebuild)
      * index's table, and the count goes with it. */
     written = sound_index_count();
 
+    /* Whether the walk reached every track the database holds, which is what
+     * lets finish() drop the records of tracks that have left the player.
+     *
+     * A count rather than "the loop ended": tagcache_get_next() returns false
+     * at the end of a walk and also when a read fails or the database goes
+     * unreadable underneath one, and taking the second for the first throws
+     * away the measurements of everything it had not reached yet.
+     *
+     * Counted against the live entries, not total_entries. delete_entry()
+     * flags an entry and leaves the count alone (tagcache.c says so), and the
+     * walk skips what it flagged -- so on any library a track has ever left,
+     * comparing against the total can never be satisfied, and the pruning
+     * would silently never happen on exactly the libraries that need it.
+     *
+     * ss_live is zero where the deleted entries cannot be counted, which is
+     * off the ramcache. Nothing is pruned then; that is the safe answer to
+     * not knowing. */
+    complete = ss_live > 0 && ss_done + ss_skipped >= ss_live;
+
     /* Losing the charger is no longer an ending -- the run waits for it and
      * carries on -- so there are two: the user stopped, or it finished. */
     if (ss_stop)
@@ -651,7 +692,7 @@ bool sound_scan_screen(bool rebuild)
         sound_index_close();
         splashf(HZ * 4, "Stopped. %d of %d done", written, ss_total);
     }
-    else if (sound_index_finish() == SOUND_OK)
+    else if (sound_index_finish(complete) == SOUND_OK)
     {
         splashf(HZ * 4, "Done. %d measured, %d unreadable",
                 written, ss_failed);

@@ -198,8 +198,15 @@ bool probe_debug_screen(void)
     }
 
     /* Round-trip one record through the index, which is the whole of stage
-     * three exercised. It writes a one-record file over any real index --
-     * there is no library scan yet to lose. */
+     * three exercised.
+     *
+     * Trap: this writes a one-record file over db_sound.dat, so opening this
+     * screen discards whatever the library scan measured. That was free when
+     * nothing built a real index; it is not now, and the round-trip needs
+     * somewhere else to live before this row is safe to open on a player that
+     * has been scanned.
+     *
+     * Never prunes: one record is no evidence about the rest of a library. */
     {
         struct sound_record rec, back;
         struct sound_index_reader rd;
@@ -212,7 +219,7 @@ bool probe_debug_screen(void)
 
         if (sound_index_begin(1, true) == SOUND_OK &&
             sound_index_add(&rec) &&
-            sound_index_finish() == SOUND_OK &&
+            sound_index_finish(false) == SOUND_OK &&
             sound_index_reader_open(&rd) == SOUND_OK)
         {
             if (sound_index_find(&rd, key, &back))

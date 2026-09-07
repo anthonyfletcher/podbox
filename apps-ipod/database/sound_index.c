@@ -70,6 +70,7 @@ struct key_entry
     uint32_t mtime;
     uint32_t size;
     uint32_t ordinal;   /* Position in the working file */
+    uint8_t  seen;      /* The run reached this track. See sound_index_seen() */
 };
 
 static int          part_fd = -1;
@@ -343,6 +344,7 @@ static bool seed_from_finished(void)
         t[table_used].mtime = r.mtime;
         t[table_used].size = r.size;
         t[table_used].ordinal = (uint32_t)table_used;
+        t[table_used].seen = 0;
         table_used++;
     }
 
@@ -402,6 +404,7 @@ static bool load_part(bool seed)
         t[table_used].mtime = r.mtime;
         t[table_used].size = r.size;
         t[table_used].ordinal = (uint32_t)table_used;
+        t[table_used].seen = 0;
         table_used++;
     }
 
@@ -495,6 +498,15 @@ static int find_entry(uint64_t key)
     return -1;
 }
 
+void sound_index_seen(uint64_t key)
+{
+    struct key_entry *t = table();
+    int i = find_entry(key);
+
+    if (t != NULL && i >= 0)
+        t[i].seen = 1;
+}
+
 bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size)
 {
     struct key_entry *t = table();
@@ -547,6 +559,7 @@ bool sound_index_add(const struct sound_record *r)
 
         t[at].mtime = r->mtime;
         t[at].size = r->size;
+        t[at].seen = 1;
 
         /* The key set is unchanged, so a sorted table stays sorted and the
          * count in the header still describes the file. */
@@ -570,6 +583,7 @@ bool sound_index_add(const struct sound_record *r)
     t[table_used].mtime = r->mtime;
     t[table_used].size = r->size;
     t[table_used].ordinal = (uint32_t)table_used;
+    t[table_used].seen = 1;
     table_used++;
     table_sorted = false;
 
@@ -595,12 +609,13 @@ int sound_index_count(void)
     return table_used;
 }
 
-int sound_index_finish(void)
+int sound_index_finish(bool prune)
 {
     struct sound_header h;
     struct sound_record r;
     struct key_entry *t = table();
     int out_fd;
+    int kept = 0;
     int i;
 
     if (part_fd < 0 || t == NULL)
@@ -616,7 +631,10 @@ int sound_index_finish(void)
     if (out_fd < 0)
         return SOUND_ERR_IO;
 
-    header_init(&h, (uint32_t)table_used);
+    /* Written twice: the count is not known until the loop below has decided
+     * what to keep, and a placeholder holds the records' offset while it
+     * does. */
+    header_init(&h, 0);
     if (write(out_fd, &h, sizeof (h)) != (ssize_t)sizeof (h))
     {
         close(out_fd);
@@ -633,6 +651,12 @@ int sound_index_finish(void)
         off_t at = (off_t)sizeof (h)
                    + (off_t)t[i].ordinal * (off_t)sizeof (r);
 
+        /* A record the run never reached is a track that has left the
+         * player. Dropped only where the caller can prove the walk saw every
+         * track there is -- see the header. */
+        if (prune && !t[i].seen)
+            continue;
+
         if (lseek(part_fd, at, SEEK_SET) != at ||
             read(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r) ||
             write(out_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
@@ -641,6 +665,17 @@ int sound_index_finish(void)
             remove(SOUND_FILE ".new");
             return SOUND_ERR_IO;
         }
+
+        kept++;
+    }
+
+    header_init(&h, (uint32_t)kept);
+    if (lseek(out_fd, 0, SEEK_SET) != 0 ||
+        write(out_fd, &h, sizeof (h)) != (ssize_t)sizeof (h))
+    {
+        close(out_fd);
+        remove(SOUND_FILE ".new");
+        return SOUND_ERR_IO;
     }
 
     fsync(out_fd);
