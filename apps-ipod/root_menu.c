@@ -1700,12 +1700,15 @@ void root_menu(void)
         /* A playlist that ran out, extended here rather than where it ended:
          * this is the UI thread, and the work is seconds of disk. Silent
          * either way -- nobody is looking at the screen when the music
-         * stops. */
-        if (sound_mix_continue_due()
-            && sound_mix_continue(global_settings.mix_length) > 0)
-        {
-            next_screen = GO_TO_WPS;
-        }
+         * stops.
+         *
+         * The music resumes and the screen does not move. The flag can be
+         * minutes old by the time control reaches here -- a playlist ending
+         * while somebody browses is only noticed when they leave the browser
+         * -- so sending them to the playing screen would take over a press
+         * that was going somewhere else. */
+        if (sound_mix_continue_due())
+            sound_mix_continue(global_settings.mix_length);
 
         switch (next_screen)
         {
