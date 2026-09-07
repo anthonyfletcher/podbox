@@ -290,9 +290,15 @@ static int mikey_decode_poll(struct mikey_decode *d,
         {
             if (track_skip)
             {
+                /* The deadline moves only on a click that counts. A fourth
+                 * cannot change the verdict, so refreshing the window for it
+                 * would let sustained clicking hold the window open for as
+                 * long as it went on and report nothing at all. */
                 if (d->clicks < MIKEY_MULTI_MAX)
+                {
                     d->clicks++;
-                d->click_tick = current_tick;
+                    d->click_tick = current_tick;
+                }
             }
             else
             {
