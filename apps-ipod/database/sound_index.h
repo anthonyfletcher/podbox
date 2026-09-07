@@ -131,7 +131,9 @@ void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,
 /* Open the scan's working file and learn what is already in it.
  *
  * 'capacity' is how many tracks the caller expects to write, used to size the
- * table of what is done. 'fresh' discards any working file rather than
+ * table of what is done -- whatever an existing index carries in is added to
+ * it here, so the caller counts only its own library and never has to know
+ * what is already on disk. 'fresh' discards any working file rather than
  * resuming it -- which is the *only* way to start over, because an unfinished
  * file otherwise always resumes. A scan that took eight hours and stopped at
  * ninety percent must not be restartable only from the beginning.
@@ -144,10 +146,15 @@ int sound_index_begin(int capacity, bool fresh);
  * cannot disagree about it. Pass 0 for an mtime that is not known. */
 bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size);
 
-/* Append one record. False if it could not be written, in which case the file
- * is left exactly as it was: records have no markers and a reader steps
- * through them at a fixed stride, so half a record would put every record
- * after it at the wrong offset with nothing to resynchronise from. */
+/* Add one record, replacing any the file already holds for the same key.
+ * Replacing rather than appending is what stops an update leaving two
+ * readings of a re-measured track, one of which the reader would then pick
+ * between arbitrarily.
+ *
+ * False if it could not be written, in which case the file is left exactly as
+ * it was: records have no markers and a reader steps through them at a fixed
+ * stride, so half a record would put every record after it at the wrong
+ * offset with nothing to resynchronise from. */
 bool sound_index_add(const struct sound_record *r);
 
 /* Records written into the working file so far, across resumes. */

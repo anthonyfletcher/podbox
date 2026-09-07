@@ -231,6 +231,38 @@ static bool header_ok(const struct sound_header *h)
            h->record_bytes == sizeof (struct sound_record);
 }
 
+/* Records in one of our files, or 0 for a file that is absent or not ours.
+ *
+ * Bounded by what the file can hold rather than trusted: the count is
+ * rewritten per record, so a run cut off mid-write leaves one that claims
+ * more than is there (load_part() says the same of it), and this number sizes
+ * an allocation. */
+static int file_count(const char *path)
+{
+    struct sound_header h;
+    int fd = open(path, O_RDONLY);
+    off_t room;
+    int n = 0;
+
+    if (fd < 0)
+        return 0;
+
+    room = lseek(fd, 0, SEEK_END) - (off_t)sizeof (h);
+    if (room < 0)
+        room = 0;
+    room /= (off_t)sizeof (struct sound_record);
+
+    if (lseek(fd, 0, SEEK_SET) == 0 &&
+        read(fd, &h, sizeof (h)) == (ssize_t)sizeof (h) && header_ok(&h))
+    {
+        n = (off_t)h.count < room ? (int)h.count : (int)room;
+    }
+
+    close(fd);
+
+    return n;
+}
+
 
 /** The working file **/
 
@@ -265,6 +297,7 @@ static bool seed_from_finished(void)
     struct sound_record r;
     struct key_entry *t = table();
     int fd = open(SOUND_FILE, O_RDONLY);
+    uint64_t last_key = 0;
     unsigned int i;
 
     if (fd < 0)
@@ -293,6 +326,15 @@ static bool seed_from_finished(void)
          * keeping. */
         if (r.flags & SOUND_F_FAILED)
             continue;
+
+        /* An index written before add() replaced in place can hold a track
+         * twice. The file is sorted by key, so the pair is adjacent and one
+         * comparison repairs it as the index is carried forward. Which of the
+         * two survives does not matter: if it is the stale one, its mtime and
+         * size say so and the track is measured again. */
+        if (r.key == last_key)
+            continue;
+        last_key = r.key;
 
         if (write(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
             break;
@@ -379,9 +421,37 @@ int sound_index_begin(int capacity, bool fresh)
     if (fresh)
         remove(SOUND_PART);
 
+    /* Room for what is carried in as well as for what will be measured.
+     *
+     * The caller sizes this from the library, but an index outlives the
+     * tracks in it -- nothing drops a record when a file leaves the player --
+     * so after enough coming and going it holds more records than the
+     * database holds tracks. Sized to the library alone, the seed silently
+     * discards the overflow, the table is full from the first track, and
+     * every add() for the rest of the run is refused: a scan that decodes for
+     * hours, stores none of it and then reports Done. */
+    if (!fresh)
+    {
+        int carried = file_count(SOUND_PART);
+
+        capacity += carried > 0 ? carried : file_count(SOUND_FILE);
+    }
+
     table_handle = core_alloc((size_t)capacity * sizeof (struct key_entry));
     if (table_handle <= 0)
         return SOUND_ERR_MEM;
+
+    /* Pinned, not merely allocated. Every function below takes table() once
+     * and then indexes it across reads and writes of the working file, so a
+     * block free to move on somebody else's allocation would leave those
+     * writing through a stale pointer.
+     *
+     * Pinned rather than allocated with buflib_ops_locked, because this file
+     * is also compiled into tools/soundscan, whose core_alloc_ex() is a
+     * link-satisfying stub that always fails -- the tool would build cleanly
+     * and then find no memory. Its core_pin() is a no-op, which is the right
+     * answer for a malloc-backed allocator. */
+    core_pin(table_handle);
 
     table_max = capacity;
     table_used = 0;
@@ -390,6 +460,7 @@ int sound_index_begin(int capacity, bool fresh)
     part_fd = open(SOUND_PART, O_RDWR | O_CREAT, 0666);
     if (part_fd < 0)
     {
+        core_unpin(table_handle);
         core_free(table_handle);
         table_handle = 0;
         return SOUND_ERR_IO;
@@ -404,23 +475,33 @@ int sound_index_begin(int capacity, bool fresh)
     return SOUND_OK;
 }
 
-bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size)
+/* Where this key already sits in the table, or -1.
+ *
+ * Linear, and that is not an oversight: it is asked once per track against a
+ * table of at most a few tens of thousands, beside a decode that takes
+ * seconds. Keeping it sorted across appends would cost more than it saves. */
+static int find_entry(uint64_t key)
 {
     struct key_entry *t = table();
     int i;
 
     if (t == NULL)
-        return false;
+        return -1;
 
-    /* Linear, and that is not an oversight: this is asked once per track
-     * against a table of at most a few tens of thousands, beside a decode
-     * that takes seconds. Keeping it sorted across appends would cost more
-     * than it saves. */
     for (i = 0; i < table_used; i++)
-    {
-        if (t[i].key != key)
-            continue;
+        if (t[i].key == key)
+            return i;
 
+    return -1;
+}
+
+bool sound_index_done(uint64_t key, uint32_t mtime, uint32_t size)
+{
+    struct key_entry *t = table();
+    int i = find_entry(key);
+
+    if (t != NULL && i >= 0)
+    {
         if (t[i].size != size)
             return false;
 
@@ -441,8 +522,38 @@ bool sound_index_add(const struct sound_record *r)
     struct sound_header h;
     struct key_entry *t = table();
     off_t before;
+    int at;
 
-    if (part_fd < 0 || t == NULL || table_used >= table_max)
+    if (part_fd < 0 || t == NULL)
+        return false;
+
+    /* A key already in the table is overwritten where it lies rather than
+     * appended after itself. An update seeds from the finished index and then
+     * re-measures whatever has changed, so without this the file ends up
+     * holding both readings of that track -- and since finish() sorts by key
+     * and the reader binary searches, which of the two answers is arbitrary.
+     * The new measurement can simply lose. */
+    at = find_entry(r->key);
+    if (at >= 0)
+    {
+        off_t where = (off_t)sizeof (h)
+                      + (off_t)t[at].ordinal * (off_t)sizeof (*r);
+
+        if (lseek(part_fd, where, SEEK_SET) != where ||
+            write(part_fd, r, sizeof (*r)) != (ssize_t)sizeof (*r))
+        {
+            return false;
+        }
+
+        t[at].mtime = r->mtime;
+        t[at].size = r->size;
+
+        /* The key set is unchanged, so a sorted table stays sorted and the
+         * count in the header still describes the file. */
+        return true;
+    }
+
+    if (table_used >= table_max)
         return false;
 
     before = lseek(part_fd, 0, SEEK_END);
@@ -557,6 +668,7 @@ void sound_index_close(void)
 
     if (table_handle > 0)
     {
+        core_unpin(table_handle);
         core_free(table_handle);
         table_handle = 0;
     }
