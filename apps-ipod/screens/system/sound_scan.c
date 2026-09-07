@@ -514,7 +514,10 @@ bool sound_scan_screen(bool rebuild)
     /* Charge without mounting, for the length of the run. A cable found on a
      * desk is nearly always power, and a scan that gets a quarter of the way
      * through and then hands the disk to a laptop has lost the run for the
-     * sake of a connection nobody asked for. Restored on the way out. */
+     * sake of a connection nobody asked for. Restored on every way out,
+     * including the setup failures below: a mode left behind is a player that
+     * charges from a computer and never appears on it, with nothing on screen
+     * to say why and a reboot the only way back. */
     usb_set_mode(USB_MODE_CHARGE);
 
     /* Nothing else clears what the explanation dialog left behind: the run
@@ -535,6 +538,7 @@ bool sound_scan_screen(bool rebuild)
     ss_handle = core_alloc(SS_WINDOW_BYTES);
     if (ss_handle <= 0)
     {
+        usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Not enough memory");
         return true;
     }
@@ -543,6 +547,7 @@ bool sound_scan_screen(bool rebuild)
     if (rc != SOUND_OK)
     {
         core_free(ss_handle);
+        usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Could not open the index");
         return true;
     }
@@ -565,6 +570,7 @@ bool sound_scan_screen(bool rebuild)
     {
         sound_index_close();
         core_free(ss_handle);
+        usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Database busy");
         return true;
     }
