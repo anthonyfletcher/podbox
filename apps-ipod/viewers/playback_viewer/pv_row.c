@@ -604,7 +604,7 @@ static void draw_arrow(int cx, int cy, int dir, unsigned col)
     lcd_set_drawmode(DRMODE_SOLID);
     lcd_set_foreground(col);
     for (int i = 0; i < ARROW_W; i++)
-        lcd_vline(cx + dir * (ARROW_W - 1 - i) / 1, cy - i, cy + i);
+        lcd_vline(cx + dir * (ARROW_W - 1 - i), cy - i, cy + i);
 }
 
 /* A year as text, for a title that has to say either a year or "All time". */
