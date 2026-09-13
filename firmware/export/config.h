@@ -1415,7 +1415,7 @@ Lyre prototype 1 */
  *
  * To re-enable: delete PODBOX_NO_USB_IAP below. Nothing else is needed --
  * the driver, its SOURCES entries and the descriptors are all already present. */
-#define PODBOX_NO_USB_IAP
+// #define PODBOX_NO_USB_IAP
 
 #if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) \
     && USB_VENDOR_ID == 0x05ac && !defined(PODBOX_NO_USB_IAP)
