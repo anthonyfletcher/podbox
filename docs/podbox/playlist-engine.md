@@ -40,19 +40,53 @@ player is too long to sit through.
 
 ## What a match is
 
-Every record becomes eleven numbers on a fixed 0–1000 scale, and two tracks
-are compared by weighted distance across them. Level and tonal balance carry
-the most weight.   Same genre pulls two tracks together a little; a wide gap in
-year pushes them apart a little; disagreeing about major versus minor costs
-more. None of those decide a match on their own.
+Every record becomes fourteen numbers on a fixed 0–1000 scale, and two tracks
+are compared by weighted distance across them.
 
-Two rules shape the result rather than the matching:
+**Tonal balance carries the most weight**, and it is balance rather than
+level: each of the three bands is measured against how loud the track is, so
+"bright" means more treble than the loudness would predict and not simply
+loud. The **note content** is next — the twelve pitch classes of one track
+against the other's, which is what "the same notes" means without having to
+name a key. Then tempo, stereo width, how compressed the master is, how much
+is happening, how much the level moves across the track and how well the tempo
+keeps time.
+
+Same genre pulls two tracks together a little; a wide gap in year pushes them
+apart a little; disagreeing about major versus minor costs a little. None of
+those decide a match on their own. Genre is read as the first genre named, so
+*Rock*, *Rock/Alternative* and *Rock; Indie* count as the same one.
+
+Three rules shape the result rather than the matching:
 
 - No more than **two tracks by one artist**, and at least **three tracks
   between them** — so an artist is spread through the list instead of clumped
-  in it, and a playlist is not a reshuffle of the album it started from.
+  in it, and a playlist is not a reshuffle of the album it started from. The
+  artist is the one in the track's tags, so a compilation or a folder of
+  singles is spread out the same way an artist folder is.
 - Tracks under 90 seconds are left out. They are intros, interludes and
   segues; they measure as real tracks and would arrive as real matches.
+- A track that measures the same as the one you asked about **and runs for the
+  same length** is a second copy of it, and is left out.
+
+**A playlist is as long as the library can fill honestly.** Only tracks
+genuinely near the goal are offered, so asking for forty and getting twelve
+means twelve is what there was. Measuring more of the library is what makes
+these longer, not asking for more.
+
+## The running order
+
+The order is a walk, not a ranking.
+
+Ranking the matches by how near they are to the goal is not an order anybody
+listens in: the two nearest tracks to a goal can sit on opposite sides of it
+and still end up next to each other. So each position is filled by weighing
+two things — how near a track is to what was asked for, and how near it is to
+the track that will play before it — with a limit on how far the energy may
+jump between neighbours.
+
+For a journey that limit applies within each step of the run, so the change
+still travels from one mood to the other; it is the joins that get smoother.
 
 ## The three ways in
 
@@ -72,7 +106,7 @@ consider only tracks whose tempo the analysis trusts.
 A journey travels from one mood to another across the playlist. Each position
 in the run is filled from the tracks nearest that point along the way, so the
 change is heard gradually rather than as a join in the middle. Slow → Fast
-climbs steadily from around 78 BPM to around 133.
+climbs steadily from around 78 BPM to around 133. No track appears twice.
 
 ## Settings
 
@@ -89,10 +123,11 @@ All under **Settings → Library → Playlist Engine**.
 
 **Predictable**, **Weekly** and **Variable** mean the same thing throughout.
 Predictable gives the same playlist every time until the library changes;
-Weekly gives the same one all week and a new one next week; Variable picks
-between the nearest few at each step, so every run differs. None of them reach
-further out for the difference — the playlist is drawn from the same
-neighbourhood either way.
+Weekly gives the same one all week and a new one next week; Variable chooses
+at random between the candidates at each position, weighted so the nearest
+usually wins. None of them reach further out for the difference — the playlist
+is drawn from the same neighbourhood either way, and what changes is which of
+that neighbourhood you get.
 
 ## Continue Playing
 
@@ -106,7 +141,9 @@ Anything else is continued from the track that just finished. A journey
 continues in the mood it *ended* in, because it has arrived; walking its path
 again would send you back to the beginning.
 
-Nothing already in the playlist is added again.
+Nothing already in the playlist is added again, and a track you skipped out
+of in its first twenty seconds is not offered again for the rest of that
+playlist.
 
 ## Keeping it current
 

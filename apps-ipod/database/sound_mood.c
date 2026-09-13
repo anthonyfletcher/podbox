@@ -59,38 +59,76 @@ struct mood_def
 #define A_CLARITY offsetof(struct sound_axes, clarity)
 #define A_CHANGE  offsetof(struct sound_axes, change)
 #define A_TEMPO   offsetof(struct sound_axes, tempo)
+#define A_SPEED   offsetof(struct sound_axes, speed)
 
 /* Trap: the crest axis is inverted against its name. It is SOUND_AX minus the
  * measured crest factor, so a high value here is a compressed track and a low
  * one is a dynamic one. Dense wants it high; Calm and Punchy want it low. */
 
+/* Trap: A_TEMPO is measured linearly here and circularly in
+ * sound_mix_distance(). The axis wraps at 140 BPM, so between two tracks the
+ * short way round is the true distance -- one read at 141 and one at 139 are
+ * the same tempo either side of the fold. A target is not a track, so the
+ * moods below read it linearly.
+ *
+ * That leaves the fold itself, which A_TEMPO still carries: a 160 BPM record
+ * is tapped at 80 and reads as slow however the distance is measured. The two
+ * moods that name a speed outright use A_SPEED for exactly that reason; the
+ * rest name a feel, where the tapped reading is the right one. */
+
+/* Trap: A_LOW, A_MID and A_BRIGHT are spectral balance, not band level --
+ * each is its band against the track's own loudness (band_rel() in
+ * sound_mix.c). So a low A_BRIGHT names a track with less treble than its
+ * loudness would predict, which is what "dark" means, and not simply a quiet
+ * one.
+ *
+ * Those three, and A_WIDTH, A_CLARITY and A_PEAK with them, are now derived
+ * against a 3439-record index rather than the 90-record one the table was
+ * written on. Eleven targets sat above that library's ninetieth percentile --
+ * Dark's A_LOW at the 97th, Bright's A_BRIGHT at the 96th -- which is the
+ * failure named at the top of this file: nothing can approach such a target,
+ * so it penalises every candidate about equally and the mood stops choosing
+ * on its own headline axis. Each was brought to the 85th or 90th percentile
+ * of the measured distribution, keeping the order the table was written with,
+ * and the three sitting below the tenth went to the fifteenth. */
+
+/* A_SPEED here, and not because Calm is about tempo.
+ *
+ * The other four axes all read an acoustic recording as calm whatever it is
+ * playing: onset density counts transients, and brushed drums and a walking
+ * bass produce few, so a hard-swinging 129 BPM big band measured sparser than
+ * a slow pop ballad. Mingus's "Boogie Stop Shuffle" scored 90 against Calm
+ * while Taylor Swift's "epiphany" scored 105 -- the frantic track ranked
+ * ahead of the quiet one. A speed term is what the other axes cannot supply,
+ * and it only constrains the tracks that have a trusted tempo. */
 static const struct mood_axis mx_calm[] = {
     { A_LOUD, 420, 10 }, { A_DENS, 200, 10 }, { A_PEAK, 180, 8 },
-    { A_CREST, 300, 4 }, { A_BRIGHT, 250, 4 } };
+    { A_SPEED, 250, 8 },
+    { A_CREST, 300, 4 }, { A_BRIGHT, 220, 4 } };
 static const struct mood_axis mx_energetic[] = {
-    { A_LOUD, 840, 10 }, { A_DENS, 810, 10 }, { A_BRIGHT, 700, 6 },
+    { A_LOUD, 840, 10 }, { A_DENS, 810, 10 }, { A_BRIGHT, 541, 6 },
     { A_TEMPO, 760, 6 }, { A_CREST, 800, 4 } };
 static const struct mood_axis mx_dark[] = {
-    { A_BRIGHT, 90, 10 }, { A_LOW, 850, 6 }, { A_CLARITY, 250, 5 },
+    { A_BRIGHT, 60, 10 }, { A_LOW, 571, 6 }, { A_CLARITY, 250, 5 },
     { A_LOUD, 650, 3 } };
 static const struct mood_axis mx_bright[] = {
-    { A_BRIGHT, 750, 10 }, { A_CLARITY, 700, 5 }, { A_MID, 790, 4 },
+    { A_BRIGHT, 583, 10 }, { A_CLARITY, 658, 5 }, { A_MID, 530, 4 },
     { A_LOUD, 750, 3 } };
 static const struct mood_axis mx_warm[] = {
-    { A_BRIGHT, 140, 10 }, { A_MID, 800, 8 }, { A_LOW, 830, 8 },
+    { A_BRIGHT, 110, 10 }, { A_MID, 550, 8 }, { A_LOW, 535, 8 },
     { A_LOUD, 650, 3 } };
 static const struct mood_axis mx_raw[] = {
-    { A_CLARITY, 190, 10 }, { A_PEAK, 680, 7 }, { A_WIDTH, 40, 6 },
+    { A_CLARITY, 229, 10 }, { A_PEAK, 590, 7 }, { A_WIDTH, 65, 6 },
     { A_CREST, 750, 3 } };
 static const struct mood_axis mx_lush[] = {
-    { A_WIDTH, 680, 9 }, { A_CLARITY, 760, 8 }, { A_CHANGE, 650, 6 },
+    { A_WIDTH, 510, 9 }, { A_CLARITY, 658, 8 }, { A_CHANGE, 650, 6 },
     { A_CREST, 350, 3 } };
 static const struct mood_axis mx_punchy[] = {
-    { A_PEAK, 690, 10 }, { A_CREST, 300, 7 }, { A_DENS, 700, 5 },
+    { A_PEAK, 600, 10 }, { A_CREST, 300, 7 }, { A_DENS, 700, 5 },
     { A_LOUD, 800, 4 } };
 static const struct mood_axis mx_smooth[] = {
-    { A_PEAK, 170, 10 }, { A_CHANGE, 350, 6 }, { A_CREST, 480, 4 },
-    { A_BRIGHT, 350, 3 } };
+    { A_PEAK, 208, 10 }, { A_CHANGE, 350, 6 }, { A_CREST, 480, 4 },
+    { A_BRIGHT, 330, 3 } };
 static const struct mood_axis mx_sparse[] = {
     { A_DENS, 200, 10 }, { A_CHANGE, 340, 6 }, { A_CREST, 300, 6 },
     { A_LOUD, 500, 4 } };
@@ -100,15 +138,24 @@ static const struct mood_axis mx_dense[] = {
 static const struct mood_axis mx_hypnotic[] = {
     { A_CHANGE, 330, 9 }, { A_DENS, 560, 5 }, { A_TEMPO, 540, 6 },
     { A_PEAK, 300, 4 } };
+/* The two that name a speed rather than a feel, and the only two on A_SPEED.
+ *
+ * Measured over a 3400-track library: with these on the folded axis, 151 of
+ * the 199 tracks Slow returned were 140 BPM or faster, because folding halves
+ * them into the slow half of the range. Unfolded, a target is a tempo.
+ *
+ * The targets are that library's tenth and ninetieth percentiles -- about 80
+ * and 160 BPM on a 60-180 scale -- rather than the ends of the axis, so each
+ * names music that exists rather than a corner nothing reaches. */
 static const struct mood_axis mx_slow[] = {
-    { A_TEMPO, 90, 10 }, { A_DENS, 300, 3 } };
+    { A_SPEED, 165, 10 }, { A_DENS, 300, 3 } };
 static const struct mood_axis mx_fast[] = {
-    { A_TEMPO, 910, 10 }, { A_DENS, 750, 3 } };
+    { A_SPEED, 835, 10 }, { A_DENS, 750, 3 } };
 static const struct mood_axis mx_melancholy[] = {
-    { A_TEMPO, 200, 7 }, { A_LOUD, 500, 6 }, { A_BRIGHT, 200, 5 },
+    { A_TEMPO, 200, 7 }, { A_LOUD, 500, 6 }, { A_BRIGHT, 170, 5 },
     { A_DENS, 300, 5 } };
 static const struct mood_axis mx_uplifting[] = {
-    { A_TEMPO, 800, 7 }, { A_BRIGHT, 720, 7 }, { A_LOUD, 800, 5 },
+    { A_TEMPO, 800, 7 }, { A_BRIGHT, 560, 7 }, { A_LOUD, 800, 5 },
     { A_DENS, 750, 5 } };
 
 #define MOOD(name, lang_id, want_mode, want_tempo)                          \
@@ -195,15 +242,30 @@ int sound_mood_score(const struct sound_axes *a, int mood)
     d = (int)mood_root(sum * SOUND_AX / total_w);
 
     /* A mood that names a mode wants it. Disagreeing is a real difference and
-     * costs heavily; not knowing is not evidence either way and costs a
-     * little, so a committed match is preferred without shutting out the
-     * undecided share of a library. */
+     * costs; not knowing is not evidence either way and costs a little, so a
+     * committed match is preferred without shutting out the undecided share
+     * of a library.
+     *
+     * The penalty has to stay under MIX_MAX_DISTANCE or it stops being a
+     * preference: a cost larger than the ceiling puts every disagreeing
+     * track outside it whatever the rest of its numbers say, which makes
+     * Dark "minor tracks only" and this comment a description of something
+     * else. At 80 against a ceiling of 180 a major track can still reach
+     * Dark, but only from inside 100 -- which is the intent stated above.
+     *
+     * Trap: a mood is the one place the pitch content is not also measured
+     * directly. sound_mix_distance() has a harmony axis for what the mode
+     * stands in for; a mood has no second track, so it skips that axis and
+     * the mode is all it has. Measured on a 90-record index, the four
+     * mode-named moods return one disagreeing track between them where at
+     * 200 they returned none. That is the cost of the ceiling being a
+     * ceiling. */
     if (m->mode >= 0)
     {
         if (a->mode < 0)
-            d += 60;
+            d += 25;
         else if (a->mode != m->mode)
-            d += 200;
+            d += 80;
     }
 
     return d;
@@ -319,9 +381,9 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
         if (mode >= 0)
         {
             if (a->mode < 0)
-                d += 60;
+                d += 25;
             else if (a->mode != mode)
-                d += 200;
+                d += 80;
         }
     }
 

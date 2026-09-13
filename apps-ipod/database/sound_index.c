@@ -143,14 +143,47 @@ uint64_t sound_index_key(const char *path)
 
 uint32_t sound_index_genre_key(const char *genre)
 {
+    char first[32];
+    unsigned int n = 0;
+
     if (genre == NULL || *genre == '\0')
         return 0;
+
+    /* The first genre named, not the whole field.
+     *
+     * "Rock", "Rock/Alternative", "Rock; Indie" and "Rock, Indie Rock" are
+     * one genre with a qualifier, and taggers disagree about the separator,
+     * the spacing and the order. Hashed whole, the same music arrives under
+     * half a dozen keys and the same-genre term in sound_mix_distance()
+     * never fires on a library tagged by more than one tool. Cut at the
+     * first separator and the qualifier stops mattering. Case is folded by
+     * fnv64_lower() below.
+     *
+     * Trap: this changes the key a genre hashes to, so records written
+     * before it do not group with records written after it. The layout is
+     * unchanged, so the version is not moved and no rescan is forced -- what
+     * a stale record loses is the genre term, which is soft, and it comes
+     * back when the track is next measured. */
+    while (n + 1 < sizeof (first) && genre[n] != '\0'
+           && genre[n] != '/' && genre[n] != ';' && genre[n] != ',')
+    {
+        n++;
+    }
+
+    while (n > 0 && genre[n - 1] == ' ')
+        n--;
+
+    if (n == 0)
+        return 0;
+
+    memcpy(first, genre, n);
+    first[n] = '\0';
 
     /* Folded to 32 bits from the same 64-bit hash rather than a separate
      * 32-bit one, so there is a single definition of "the same string" here.
      * A few hundred genres over 32 bits collide about once in fifty thousand
      * libraries, which is a mis-grouped genre and not a lost measurement. */
-    return (uint32_t)(fnv64_lower(genre) >> 32);
+    return (uint32_t)(fnv64_lower(first) >> 32);
 }
 
 static uint8_t cap8(unsigned int v)

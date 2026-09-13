@@ -78,6 +78,7 @@
 #include "playlist/viewer.h"
 #include "wps.h"
 #include "skin/statusbar_skinned.h"
+#include "database/sound_mix.h"
 #include "skin/wps_internals.h"
 
 #ifdef USB_ENABLE_AUDIO
@@ -877,6 +878,12 @@ long gui_wps_show(void)
                    OR if skip length set, hop by predetermined amount. */
             case ACTION_WPS_SKIPNEXT:
                 last_right = current_tick;
+
+                /* Left this early into it, on a playlist the engine built:
+                   whatever the numbers said, this one was not a match. */
+                if (state->id3 != NULL)
+                    sound_mix_skipped(state->id3->path,
+                                      state->id3->elapsed);
 
                 /* if we're in A/B repeat mode and the current position is
                    before the A marker, jump to the A marker... */

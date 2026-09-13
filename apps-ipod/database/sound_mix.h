@@ -13,7 +13,13 @@
 
 /* Tracks a mix may hold. The candidate arrays are three times this and the
  * running order one of them, so it is what the engine costs in static memory
- * -- about eight kilobytes here. */
+ * -- 38 KB, measured on the iPod Video build.
+ *
+ * Most of that is one struct sound_axes per candidate, which the chain rule
+ * in sound_mix.c needs: it scores each candidate against the track before it
+ * as well as against the goal, so every candidate's coordinates have to
+ * survive the first pass. Re-reading them from the index instead would mean
+ * three hundred scattered reads per slot filled. */
 #define SOUND_MIX_MAX  100
 
 /* The scale every axis is put on. Wide enough that a squared difference keeps
@@ -34,12 +40,45 @@
  * library, or a track's coordinates would move when music was added. */
 struct sound_axes
 {
-    int loud, dens, bright, low, mid, crest, width, peak, clarity, change;
+    int loud, crest, width, peak, clarity, change, dens;
+
+    /* Spectral balance rather than band level: each is its band against the
+     * track's own loudness, which is what separates it from loudness at all
+     * -- see band_rel() in sound_mix.c. A high 'bright' is a track with more
+     * treble than its loudness predicts, not simply a loud one. */
+    int bright, low, mid;
+
+    int dynamics;       /* How far the level moved across the window */
+    int steady;         /* How well the tempo held. -1 without a lock */
     int tempo;          /* -1 where the tracker never settled on one */
+
+    /* The same reading unfolded: how fast the track actually is, rather than
+     * where it sits inside an octave.
+     *
+     * Both are kept because they answer different questions. Two tracks match
+     * on 'tempo' when they are tapped alike, which is what a track-to-track
+     * mix wants -- 87 and 174 BPM feel the same underneath. A mood named
+     * after a speed wants this one instead, or it calls a 160 BPM record slow
+     * for folding to 80. -1 on the same terms as 'tempo'. */
+    int speed;
     int mode;           /* -1 where the pitch content did not commit */
     uint32_t genre;
     int year;
-    int energy;         /* The one summary figure, for display and sorting */
+
+    /* The one summary figure. Nothing displays it; what reads it is the
+     * chain rule, which caps how far it may move between neighbours. */
+    int energy;
+
+    /* Pitch content, for the harmony axis.
+     *
+     * Not an axis above, because harmony has no value for one track on its
+     * own: it is the angle between two tracks' note content. So what is kept
+     * here is the input, and the axis exists only inside
+     * sound_mix_distance(). 'pitch_norm' is taken once here because the
+     * first pass scores every record in the index -- a square root per pair
+     * would be a square root per record. */
+    uint8_t  pitch[12];
+    uint16_t pitch_norm;
 };
 
 void sound_mix_axes(const struct sound_record *r, struct sound_axes *out);
@@ -93,6 +132,15 @@ int sound_mix_continue(int want);
 /* Forget what built the current playlist. Called where a playlist is created,
  * which is the moment the terms behind the old one stop applying. */
 void sound_mix_forget(void);
+
+/* The listener skipped out of a track this early into it.
+ *
+ * Only useful on a playlist the engine built, and only for as long as that
+ * playlist lasts -- a continuation already refuses everything the playlist
+ * holds, so what this adds is that a track skipped out of stays refused after
+ * the playlist has grown past the history a continuation can see. Call it
+ * with any track; it decides for itself whether the skip means anything. */
+void sound_mix_skipped(const char *path, unsigned long elapsed_ms);
 
 /* A playlist has run out. Called from the audio thread, so it does no more
  * than set a flag. */
