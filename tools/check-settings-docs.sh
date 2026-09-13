@@ -35,6 +35,17 @@ done
 # check 2's regexp cannot tell from a cfg name. None of these want a stanza.
 KNOWN_UNDOCUMENTED='^(Announce Battery Level|No Backlight On Selected Actions|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order|usb-dac)$'
 
+# Byte order throughout, because sort and comm have to agree about what "in
+# order" means. Under a UTF-8 locale sort collates "usb hid", "usb keypad
+# mode" and "usb mode" with the space ignored, while comm compares bytes --
+# so comm is handed a file it considers unsorted, says so, and then reports
+# differences that are not there. It did exactly that to those three
+# settings, which have had stanzas all along. The checks that already pinned
+# this per command were right; the rest inherited whatever the machine had,
+# which is why this passes on one and fails on another.
+LC_ALL=C
+export LC_ALL
+
 tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT
 
