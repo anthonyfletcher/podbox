@@ -202,6 +202,7 @@ struct sound_index_reader
 {
     int fd;
     int count;
+    int next;       /* Record the file position already sits at, or -1 */
 };
 
 int  sound_index_reader_open(struct sound_index_reader *r);

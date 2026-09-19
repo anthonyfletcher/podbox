@@ -78,6 +78,9 @@ static int          table_handle;
 static int          table_used;
 static int          table_max;
 static bool         table_sorted;   /* Of the first table_used entries */
+static int          table_sorted_upto; /* Entries [0, this) ascend by key.
+                                          What find_entry() may binary
+                                          search; the rest it scans. */
 
 
 /** Keys **/
@@ -305,6 +308,32 @@ static struct key_entry *table(void)
     return table_handle > 0 ? core_get_data(table_handle) : NULL;
 }
 
+/* How much of the table is in ascending key order, found in one pass.
+ *
+ * Both load paths leave a sorted run at the front: seed_from_finished()
+ * copies a file that is sorted by key, and a working file is that same seed
+ * with this run's appends after it. Nothing records where the join is, so it
+ * is measured rather than assumed -- and an interrupted run whose tail is
+ * partly ordered anyway gets the benefit of however much of it is.
+ *
+ * Strictly ascending, so a duplicate key ends the run rather than being
+ * searched for in a region a binary search would not find it in. */
+static void table_measure_sorted(void)
+{
+    struct key_entry *t = table();
+
+    table_sorted_upto = table_used > 0 ? 1 : 0;
+
+    if (t == NULL)
+        return;
+
+    while (table_sorted_upto < table_used &&
+           t[table_sorted_upto].key > t[table_sorted_upto - 1].key)
+    {
+        table_sorted_upto++;
+    }
+}
+
 static int key_cmp(const void *a, const void *b)
 {
     const struct key_entry *x = a;
@@ -388,6 +417,7 @@ static bool seed_from_finished(void)
     write(part_fd, &h, sizeof (h));
 
     table_sorted = false;
+    table_measure_sorted();
 
     return true;
 }
@@ -424,6 +454,7 @@ static bool load_part(bool seed)
         ftruncate(part_fd, sizeof (h));
         table_used = 0;
         table_sorted = true;
+        table_sorted_upto = 0;
 
         return seed ? seed_from_finished() : true;
     }
@@ -445,6 +476,7 @@ static bool load_part(bool seed)
      * mid-write. What was read is sound; the header is corrected on the next
      * add, and until then only the table is consulted. */
     table_sorted = false;
+    table_measure_sorted();
 
     return true;
 }
@@ -492,6 +524,7 @@ int sound_index_begin(int capacity, bool fresh)
     table_max = capacity;
     table_used = 0;
     table_sorted = true;
+    table_sorted_upto = 0;
 
     part_fd = open(SOUND_PART, O_RDWR | O_CREAT, 0666);
     if (part_fd < 0)
@@ -513,18 +546,35 @@ int sound_index_begin(int capacity, bool fresh)
 
 /* Where this key already sits in the table, or -1.
  *
- * Linear, and that is not an oversight: it is asked once per track against a
- * table of at most a few tens of thousands, beside a decode that takes
- * seconds. Keeping it sorted across appends would cost more than it saves. */
+ * Binary search over the sorted run, then a linear scan of whatever was
+ * appended after it. This is asked two to three times per track by the scan
+ * -- twice before it decides whether to decode at all -- so a linear search
+ * of the whole table makes a run that skips every track cost O(n^2) in the
+ * size of the library, which for twenty thousand tracks is the entire cost
+ * of the run. The tail is only what this run has measured. */
 static int find_entry(uint64_t key)
 {
     struct key_entry *t = table();
+    int lo = 0, hi = table_sorted_upto - 1;
     int i;
 
     if (t == NULL)
         return -1;
 
-    for (i = 0; i < table_used; i++)
+    while (lo <= hi)
+    {
+        int mid = lo + (hi - lo) / 2;
+
+        if (t[mid].key == key)
+            return mid;
+
+        if (t[mid].key < key)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+
+    for (i = table_sorted_upto; i < table_used; i++)
         if (t[i].key == key)
             return i;
 
@@ -743,6 +793,7 @@ void sound_index_close(void)
 
     table_used = 0;
     table_max = 0;
+    table_sorted_upto = 0;
 }
 
 bool sound_index_partial(int *done)
@@ -779,6 +830,8 @@ int sound_index_reader_open(struct sound_index_reader *r)
 {
     struct sound_header h;
 
+    r->next = -1;
+
     r->fd = open(SOUND_FILE, O_RDONLY);
     if (r->fd < 0)
         return SOUND_ERR_NONE;
@@ -791,6 +844,7 @@ int sound_index_reader_open(struct sound_index_reader *r)
     }
 
     r->count = (int)h.count;
+    r->next = 0;    /* The header read above left it at record zero */
 
     return SOUND_OK;
 }
@@ -802,23 +856,44 @@ void sound_index_reader_close(struct sound_index_reader *r)
 
     r->fd = -1;
     r->count = 0;
+    r->next = -1;
 }
 
 bool sound_index_read(struct sound_index_reader *r, int n,
                       struct sound_record *out)
 {
-    off_t at;
-
     if (r->fd < 0 || n < 0 || n >= r->count)
         return false;
 
-    at = (off_t)sizeof (struct sound_header)
-         + (off_t)n * (off_t)sizeof (*out);
+    /* Seek only when the file is not already there. A whole-index walk asks
+     * for record after record, and an absolute seek resolves the offset
+     * against the cluster chain every time -- so on the walk that reads every
+     * record the seek costs more than the sixty-four bytes do. The binary
+     * search in sound_index_find() still seeks, which is the case the offset
+     * is for. */
+    if (n != r->next)
+    {
+        off_t at = (off_t)sizeof (struct sound_header)
+                   + (off_t)n * (off_t)sizeof (*out);
 
-    if (lseek(r->fd, at, SEEK_SET) != at)
+        if (lseek(r->fd, at, SEEK_SET) != at)
+        {
+            r->next = -1;
+            return false;
+        }
+
+        r->next = n;
+    }
+
+    if (read(r->fd, out, sizeof (*out)) != (ssize_t)sizeof (*out))
+    {
+        r->next = -1;
         return false;
+    }
 
-    return read(r->fd, out, sizeof (*out)) == (ssize_t)sizeof (*out);
+    r->next = n + 1;
+
+    return true;
 }
 
 bool sound_index_find(struct sound_index_reader *r, uint64_t key,
