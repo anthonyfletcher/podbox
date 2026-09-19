@@ -138,7 +138,7 @@ builds two**, both ARM and both 320x240. The wider target trees under
 
 This tree is a custom build for **iPod Classic 6G/7G** and **iPod Video 5G/5.5G**. Changes may diverge from upstream Rockbox to suit these targets. The two iPods share the same 320x240 LCD and most app-layer code, but have different SoCs, USB controllers, and board-level drivers:
 
-- **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. Full feature set including MFi digital audio, SSD power management.
+- **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. SSD power management, and the inline earphone remote. USB iAP is **off** here and on for the 5G — see below.
 - **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes). USB audio is **off**, as it is on the 6G — see `PODBOX_NO_USB_AUDIO` below.
 
 USB audio is **off** on both targets: `config.h` defines `PODBOX_NO_USB_AUDIO`.
