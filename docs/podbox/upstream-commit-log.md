@@ -88,12 +88,12 @@ Two rules, both earned:
 
 | Date | Upstream | Summary | Status | Note |
 | --- | --- | --- | --- | --- |
-| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`. Permanently inert — see *USB iAP and serial iAP* below — but harmless, and the count is then right by construction. |
-| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Declined** | USB iAP is off by policy and staying off — see *USB iAP and serial iAP* below. Every `iap_on_*` is an empty inline stub, so this is ~36 lines across 5 files compiling to nothing. |
+| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`, so the slot is live on `ipodvideo` and absent on `ipod6g` — see *USB iAP and serial iAP* below. The count is right by construction either way. |
+| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Adopted** | Prerequisite of USB iAP on `ipodvideo`. Supplies the `iap_on_*` call sites; without them an accessory hears about the first track and nothing after it. The touchscreen hunk has no home here, and `usb_core.c` already reaches `notify_event` through the `usb_cdrv_iap` pointer. |
 | 2026-02-05 | `7eeb4e4302` | firmware: refactor CACHEALIGN_BITS/SIZE | **Adopted** | Compile-blocking after the rebase. |
-| 2026-02-12 | `76d63246c5` | playback: don't hardcode pcm sink in audio_set_playback_frequency | **Adopted (in part)** | Only the compile-blocking parts were taken. Nothing in `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, which is correct for a single-sink build — see *USB iAP and serial iAP* below. |
-| 2026-02-13 | `f343168051` | settings_list: apply playback freq changes only when sink is builtin | **Declined** | Guards against a non-builtin PCM sink. There is only ever one sink here — see *USB iAP and serial iAP* below — so the guard can never change a decision. |
-| 2026-02-13 | `f87ff3a9b2` | playback: support non-builtin sinks in audio_guess_frequency | **Adopted (in part)** | Compile-blocking parts only. `audio_guess_frequency()` (`playback.c`) is still the sink-unaware switch on 44100/48000, which is all a single-sink build needs. |
+| 2026-02-12 | `76d63246c5` | playback: don't hardcode pcm sink in audio_set_playback_frequency | **Adopted** | Completed when USB iAP went on for `ipodvideo`: `audio_set_playback_frequency()` walks the sink's own rate list instead of a compiled-in 44.1/48 pair. |
+| 2026-02-13 | `f343168051` | settings_list: apply playback freq changes only when sink is builtin | **Adopted** | There are two sinks on `ipodvideo` now, so the guard decides something: the setting drives the builtin sink and leaves an attached accessory's rate alone. |
+| 2026-02-13 | `f87ff3a9b2` | playback: support non-builtin sinks in audio_guess_frequency | **Adopted** | Completed with `76d63246c5`. `audio_guess_frequency()` matches the track against the sink's rate list rather than a hardcoded 44100/48000 switch. |
 | 2026-02-18 | `c199d9a369` | playback: fix single mode leaking next track before pausing | **Adopted** | Taken as upstream's *net* state, not this commit — upstream amended it since. The decision now happens when the change is scheduled. |
 | 2026-02-19 | `3373ed6744` | playback: fix single mode with auto frequency switch | **Adopted** | With the above, as one net port. |
 | 2026-02-21 | `017dd72ff3` | plugins: convert all plugins to mixer API | **N/A** | No plugin system. |
@@ -133,7 +133,7 @@ Two rules, both earned:
 | 2026-05-03 | `42841d493f` | gui: inbuilt statusbar: defer viewport update | **Adopted** | Refresh campaign, net state. |
 | 2026-05-03 | `6d699f08f4` | imageviewer: fix incomplete previous commits | **N/A** | Its substance is hiding upstream's `"resizing %d*%d"` overlay behind `hide_info`. This viewer never draws that: `image_viewer.c` puts up a `splash_progress()` dialog over the previous image or name splash instead, suppressed during slideshows. The rest is `hide_info` menu plumbing, declined with `f4dc4d89dc`. |
 | 2026-05-03 | `7e6ae1e0d8` | echoplayer: enable plugins | **N/A** | Other target, no plugins. |
-| 2026-05-04 | `1d5aa53321` | playback: don't switch to a sampr the sink doesn't support | **Declined** | As `f343168051` — the builtin sink supports both 44.1 and 48 kHz, so the fallback it adds is unreachable. See *USB iAP* below. |
+| 2026-05-04 | `1d5aa53321` | playback: don't switch to a sampr the sink doesn't support | **Adopted** | With `f343168051`. An iAP accessory advertises its own rates and need not have the one the mismatch rule picks, so the fallback to the sink's default is reachable now. |
 | 2026-05-04 | `89d24f3bd4` | list: fix GUI_EVENT_THEME_CHANGED timing | **Adopted** | Also removed a write through an `int*` to a `long` that only existed to pass a variable back to itself via the event system. |
 | 2026-05-06 | `20194cb606` | gui: wps: render SBS and WPS in one batch | **Adopted** | Refresh campaign, net state. |
 | 2026-05-06 | `7aca1d46b8` | quickscreen: fix flickering for GUI_EVENT_NEED_UI_UPDATE | **Adopted** | Only portable after the update-model swap. Viewports moved into `struct gui_quickscreen` so the callback paints directly. |
@@ -225,7 +225,7 @@ Two rules, both earned:
 | 2026-08-05 | `20f4f9539a` | hiby: usb dac: fix crackling from sample rate mismatch | **N/A** | Other target, hosted. |
 | 2026-08-06 | `2d2b03d314` | build: bundle the main .map files into the zip | **Declined** | ~4MB of text into a zip that is `/MIR`-synced onto the device, so it costs that much of the user's disk on every sync, permanently. It also buys nothing here: resolving a panic address goes through `nm` on the crashing build's `rockbox.elf`, which the release does not ship either. The merge took it and it was deleted again; `tools/buildzip.pl` now carries a comment where the block was, so the next sync conflicts there rather than restoring it silently. |
 | 2026-07-30 | `4f65dfa649` `eecd4ec98b` `842492d77b` | hiby: r1_patcher pack/unpack split, SD hotplug, macOS | **N/A** | `tools/r1_patcher/r1_patcher.sh`, a shell script for another target. |
-| 2026-07-31 | `21d48d5ae3` | iap: improve `IAPGeneralCommandID_RequestIPodName` | **Adopted (in part)** | Serial iAP answered a dock or head unit with the literal `"ROCKBOX"`; it now sends the first line of `/.rockbox/playername.txt`, falling back to `"Rockbox"`. Two deviations. `read_line()` and `open_utf8()` come from `system/strutil.h` here rather than `misc.h`. And upstream sends a zero-length name when that first line is empty: `read_line()` returns bytes consumed, so a lone newline reads as success -- the fork tests the string instead, and keeps the default. The commit's `libiap` half is USB iAP, which `PODBOX_NO_USB_IAP` compiles out. |
+| 2026-07-31 | `21d48d5ae3` | iap: improve `IAPGeneralCommandID_RequestIPodName` | **Adopted (in part)** | Serial iAP answered a dock or head unit with the literal `"ROCKBOX"`; it now sends the first line of `/.rockbox/playername.txt`, falling back to `"Rockbox"`. Two deviations. `read_line()` and `open_utf8()` come from `system/strutil.h` here rather than `misc.h`. And upstream sends a zero-length name when that first line is empty: `read_line()` returns bytes consumed, so a lone newline reads as success -- the fork tests the string instead, and keeps the default. The commit's `libiap` half is USB iAP, built on `ipodvideo`; the vendored copy already reads `playername.txt` the same way (`libiap/iap.c`), so there was nothing to port. |
 | 2026-08-02 | `49600dd77c` | filebrowse.lua sort by type; `.bmp`, `.mod` as known filetypes | **Declined** | The `apps/filetypes.c` half maps `bmp` to `FILE_ATTR_BMP`, the backdrop type. `files/filetypes.c` maps it to `FILE_ATTR_IMG` so the core image viewer opens it, which is what that table's viewer section exists for. `FILE_ATTR_MOD` is the firmware-file type and is already registered as `BOOTFILE_EXT` (`.ipod`); a literal `.mod` means nothing on either player. The rest is the lua tree. |
 | 2026-08-07 | `85c1ff8667` | build scripts: make reproducible builds possible | **Adopted (in part)** | `SOURCE_DATE_EPOCH` now feeds `BUILDDATE` (`tools/configure`) and the version string (`tools/version.sh`), `wpsbuild.pl` sorts its skin hash, and both zips add `-X`. Taken for a reason of this fork's own: **`RBVERSION` embeds the build date**, which is why two builds of one tree on different days differ and comparisons have to be made object by object. With the variable exported, `rockbox.bin` is comparable directly. The `apps/lang/lang.make` hunk is mirrored into `apps-ipod/lang/lang.make`, the copy that builds. The `REPRODUCIBLE_ZIP` branches call `strip-nondeterminism`, which the build server does not have -- they are inert unless the variable is set. |
 | 2026-08-07 | `f44bf5c66d` `0db3308e43` | translation updates (russian) | **N/A** | `russian.lang` only -- no `english.lang` hunk, so no ID movement. See *Why the translation commits are N/A* below. |
@@ -288,7 +288,8 @@ silently.
 
 - **`HAVE_MULTIMEDIA_KEYS` gated `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`**,
   outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone, which
-  `PODBOX_NO_USB_IAP` suppresses.
+  `PODBOX_NO_USB_IAP` suppresses on this target — `ipodvideo` reaches the
+  define through USB iAP instead.
 - **`TARGET_EXTRA_THREADS` is 2**, for the iAP serial link and the poller.
   Short by one, `create_thread()` returns NULL, neither caller checks, and the
   feature is absent with nothing said.
@@ -372,7 +373,7 @@ selectively does not want a merge available. Diff the two checkouts instead.
 | 2026-07-30 | `8dcef26` | revert PictureFlow layout tweaks and the Themify 2 font swap | **Adopted** | The revert is part of the same net. |
 | 2026-07-30 | `e844e56` | update Themify 2 to the latest upstream release | **Declined** | This fork's Themify_2 is a rewrite in its own skin language; re-importing the release would discard it. The `.fnt` → `.fnticons` rename is RockPod's own convention — icon fonts live in `wps/Themify_2/` here, with editable sources in `iconsources/`. The licence half is closed: each theme ships the full text of its fonts' terms beside them, as `.rockbox/fonts/LICENSE-*.txt`, so a theme handed out on its own carries its own paperwork. |
 | 2026-07-30 | `b8bd8d6` / `2f9e202` / `e1d9acc` | Themify 2 fonts and menu centring | **Declined** | With `e844e56`. |
-| 2026-07-31 | `a64efb6` | iap: fix a 4GB memmove and a buffer-full check that inverted | **Adopted (in part)** | Taken: the `(iap_rxlen-2)` underflow in `iap_getc()`, which wraps to ~4G once the buffer fills to within one byte and then admits every frame past the end of the region. Live here because this copy carries the `iap_rxlen` decrement — it is inert in a tree that only increments. Not taken: the negative-`memmove` fix, reachable only when `iap_reset_buffers()` runs from the USB thread, which `PODBOX_NO_USB_IAP` compiles out; and the corrupt-length guard, already `RX_BUFLEN+2` here. |
+| 2026-07-31 | `a64efb6` | iap: fix a 4GB memmove and a buffer-full check that inverted | **Adopted (in part)** | Taken: the `(iap_rxlen-2)` underflow in `iap_getc()`, which wraps to ~4G once the buffer fills to within one byte and then admits every frame past the end of the region. Live here because this copy carries the `iap_rxlen` decrement — it is inert in a tree that only increments. Not taken: the negative-`memmove` fix and the corrupt-length guard, already `RX_BUFLEN+2` here. Turning USB iAP on did not make the first reachable — the two transports keep separate buffers, and nothing outside `apps-ipod/iap/iap-core.c` calls `iap_reset_buffers()`. |
 | 2026-07-31 | `77fe839` | iap: fix a panic on long track tags and an unbounded database loop | **Adopted** | `strlcpy()` returns `strlen(src)`, not what it copied, and that went to `iap_send_pkt()` as a length — a stack over-read past 66 characters and `panicf()` beyond ~124. `RetrieveCategorizedDatabaseRecords` bounded `start_index + read_count`, which wraps on the spec's own count of -1, and only for two of seven categories. Deviation: the rewrite bounds the start and clamps the count rather than adding them, since PodBox's guards were shaped differently from RockPod's pre-fix ones. |
 | 2026-07-31 | `53bdc10` | iap: stop an accessory locking the device up via audio_skip() | **Adopted** | `audio_skip()` walks an out-of-range offset back one track at a time under `id3_mutex` without yielding. Also taken from this commit: the volume clamp and the `GetNumPlayingTracks` fall-through. Extended beyond it — the Simple Remote track index command (`iap-lingo3.c`) has the same unchecked `audio_skip()` and is fixed here too, and RockPod has not fixed it. |
 | 2026-07-31 | `99b21cd` | iap: enlarge the thread stack | **Adopted** ★ | 6KB against a ~6.5KB measured worst case, abutting the RX buffer with no gap, and only `stack[0]` is canary-checked — so the overflow corrupts packets silently rather than panicking. Now `DEFAULT_STACK_SIZE*12`, `0x3000` in the linked image. |
@@ -395,9 +396,10 @@ clone reads as "nothing new" whether or not that is true.
 154 files, +54,025/-2,426: MFi R46 lifecycles, EI 1.13 browsing over a tagcache
 or iTunesDB snapshot, and a host-side test rig.
 
-**The feature it exists for cannot run here.** EI browsing is Extended
-Interface lingo over USB iAP, which `PODBOX_NO_USB_IAP` compiles out, and there
-is no accessory to test against. `iap-db.c` (4910 lines), `iap-media.c` (2516),
+**Still declined, now on size rather than reach.** EI browsing is Extended
+Interface lingo over USB iAP, which `ipodvideo` builds, so the original
+reason — the transport is compiled out — has lapsed. There is still no
+accessory to test 154 files and +54,025 lines against. `iap-db.c` (4910 lines), `iap-media.c` (2516),
 the artwork and chapter readers and the test rig are **Declined**, with the API
 added elsewhere to serve them.
 
@@ -430,20 +432,23 @@ it.
 | | Serial iAP | USB iAP |
 | --- | --- | --- |
 | Switch | `IPOD_ACCESSORY_PROTOCOL` | `USB_ENABLE_IAP` |
-| State | **On**, both targets | **Off**, both targets |
+| State | **On**, both targets | **On** `ipodvideo`, **off** `ipod6g` |
 | Code | `apps-ipod/iap/` | `firmware/usbstack/iap/` (vendored [libiap](https://github.com/mojyack/libiap)) |
 | Wire | UART pins on the dock connector | USB, HID-framed |
 | Carries | Commands only | Commands **and digital audio** |
 
-So an upstream `iap:` commit is triaged by which column it touches. Serial iAP
-is live and built, and its commits are ported by hand like any other
-`apps-ipod/` work. USB iAP is compiled out by `PODBOX_NO_USB_IAP`, so commits
-touching only it are Declined — including the several above declined on the
-grounds that there is only ever one PCM sink, which is a consequence of that
-switch rather than a separate judgement.
+So an upstream `iap:` commit is triaged by which column it touches. Both are
+built on `ipodvideo`, so a commit touching either is ported by hand like any
+other work here. A commit that touches USB iAP alone is still Declined for
+`ipod6g`'s sake only if it would cost that target something; otherwise it
+lands, guarded by `USB_ENABLE_IAP` as upstream wrote it.
 
-**Why USB iAP is off, and what re-enabling would require, is a property of the
-tree rather than of any commit: see *USB iAP stays off* in
+The rows above that turn on there being one PCM sink were revisited when iAP
+went on: `ipodvideo` has two, so `fad99773e3`, `76d63246c5`, `f87ff3a9b2`,
+`1d5aa53321` and `f343168051` are all adopted in full now.
+
+**Which target has USB iAP, and what enabling it cost, is a property of the
+tree rather than of any commit: see *USB iAP is on for ipodvideo* in
 [`upstream-divergence.md`](upstream-divergence.md).** Upstream ties
 `HAVE_MULTIMEDIA_KEYS` to that same switch; the inline earphone remote
 (`b217a55059`) is a second producer of those codes, so the gate here names

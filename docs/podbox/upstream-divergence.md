@@ -79,7 +79,7 @@ commit*, where this one answers *why a given file differs*.
 | `powermgmt.c` | New `charge_finished`, debounced 8 samples off `charging_state()` and held until unplug; the 99 % cap now needs it as well as `charge_state` | The change above answered two questions with one variable and got the second wrong. Curve selection wants debounced charger *presence*; the "< 100 % until charging is finished" cap wants "is charge still going in?", which `charge_state` cannot say — it reads `CHARGING` from plug-in to unplug, so **a full battery never showed 100 %**. Splitting them keeps the oscillation fix and releases the cap. Other targets never set the flag, so they keep upstream's behaviour exactly. |
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined for non-bootloader 6G builds (upstream defines it only inside the disabled bootloader block) | The 6G keeps a serial log. **`export/logf.h` is no longer touched:** `MAX_LOGF_SIZE` had been raised 16 KiB → 256 KiB, which on this target is a 256 KiB always-resident `logfbuffer` in `.bss` — jointly the largest object in `rockbox.elf`. Restored to upstream's 16 KiB, so that header is byte-identical again and the buffer costs what upstream intends. Note `logf()` here is a real `vsnprintf`, not `do {} while(0)`, and `apps/playback.c` and `apps/codecs.c` arm `LOGF_ENABLE` *upstream* — so the 6G's audio path does log on every buffering and codec event. Nothing of this reaches the 5G, which leaves `ROCKBOX_HAS_LOGF` undefined. |
 | `SOURCES` | `target/arm/s5l8702/ipod6g/mikey-6g.c` wrapped in `#ifdef HAVE_MIKEY_REMOTE` | Upstream lists the file unguarded, `ipod6g.h` always defining the gate. This is the one hook upstream did not guard, and it is what keeps holding the inline earphone remote out again a one-line change in `export/config.h`: without it the driver compiles regardless, alone, against a gate nothing else honours. A no-op while the feature is on. |
-| `export/config.h` | `HAVE_MULTIMEDIA_KEYS` gated on `USB_ENABLE_IAP \|\| HAVE_MIKEY_REMOTE`, and moved out of the `HAVE_USBSTACK` block | The define means "this target can produce multimedia key codes". Upstream has one producer, a dock or head unit over USB iAP, and so writes the gate as USB iAP alone inside the USB block. The 6G's inline earphone remote (`b217a55059`) is a second producer with nothing to do with USB, and `PODBOX_NO_USB_IAP` turns the first one off here -- left as upstream has it, the remote would be a driver whose key codes nothing reads. |
+| `export/config.h` | `HAVE_MULTIMEDIA_KEYS` gated on `USB_ENABLE_IAP \|\| HAVE_MIKEY_REMOTE`, and moved out of the `HAVE_USBSTACK` block | The define means "this target can produce multimedia key codes". Upstream has one producer, a dock or head unit over USB iAP, and so writes the gate as USB iAP alone inside the USB block. The 6G's inline earphone remote (`b217a55059`) is a second producer with nothing to do with USB, and `PODBOX_NO_USB_IAP` turns the first one off on that target -- left as upstream has it, the 6G's remote would be a driver whose key codes nothing reads. `ipodvideo` reaches the same define through USB iAP, which is the producer upstream had in mind. |
 | `export/rbpaths.h` | New `DEFAULTCONFIGFILE`, `.rockbox/default-config.cfg` | The build ships a first-boot config, and it must not be `config.cfg` — that file is the player's, so an install overwriting it resets the player's settings. The firmware reads this one only when no `config.cfg` exists. |
 | `drivers/lcd-16bit-common.c`, `export/lcd.h` | New `lcd_blendrect(x, y, w, h, opacity)` and `LCD_BLEND_OPAQUE`, beside `lcd_fillrect` | Fills with the foreground colour blended against what is already there, for the skin engine's `%dr` opacity argument (`custom-skin-tags.md`). The blending itself is upstream's — it reuses `blend_two_colors()`, the primitive the antialiased font path already runs on. What is new is a rectangle case, where colour and opacity are both loop-invariant and the 4bpp alpha stream disappears. Guarded by `HAVE_LCD_COLOR && !DISABLE_ALPHA_BITMAP`, matching the code it sits in. **It is only useful drawn into the backdrop buffer** — see the note at the function, and §5 of `.specifications/COMPOSITED_BACKDROP_LAYER.md` for why. |
 | `drivers/lcd-color-common.c`, `export/lcd.h` | New `lcd_alpha_bitmap_part_img()`, and `export/lcd.h` now declares it and `lcd_alpha_bitmap_part()` | Draws an image through a 4bpp alpha mask with a stride per plane, which is what an anti-aliased corner radius on `%dr`, `%Cl` and `%La` needs — the mask is generated per radius and is not the image's own size, so `lcd_bmp_part()` cannot serve. The blitter itself is upstream's antialiased-font path; both declarations were previously private to the drivers. Guarded by `HAVE_LCD_COLOR && !DISABLE_ALPHA_BITMAP`. |
@@ -248,7 +248,7 @@ future decline is not in that position, it needs a row here.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `export/config.h` | New `PODBOX_NO_USB_IAP`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. There is no dock or accessory here to test iAP against, and shipping an untestable subsystem invites unreproducible bug reports. **Settled 2026-07-29: this stays off permanently** — see below. Upstream also gates `HAVE_MULTIMEDIA_KEYS` on it; that gate names the inline earphone remote as well here, and has a row of its own above. |
+| `export/config.h` | `PODBOX_NO_USB_IAP` under `#ifdef IPOD_6G`, ANDed into upstream's `USB_ENABLE_IAP` gate | Upstream's gate is generic (Apple vendor ID + interrupt + isochronous endpoints) and both targets satisfy it. `ipodvideo` has it; `ipod6g` does not, because the second configuration and its isochronous endpoint are exercised on ARC and not on DesignWare — see below. Upstream also gates `HAVE_MULTIMEDIA_KEYS` on it; that gate names the inline earphone remote as well here, and has a row of its own above. |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | DAP-only fork; no recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | There is no plugin system. The name survives for the core scratch buffer (`apps-ipod/system/app_buffer.c`) that core screens allocate from. |
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` defined | Serial logging on by default for this target; upstream defines it only inside the disabled bootloader block. The log itself has never been read off hardware. `MAX_LOGF_SIZE` is upstream's 16 KiB — see the `export/logf.h` note in the core table for why it was put back. |
@@ -264,28 +264,35 @@ future decline is not in that position, it needs a row here.
 > detail. Off is not a judgement on the code, and the work to make the
 > allocation safe is in the tree for whoever picks it up.
 
-### USB iAP stays off — decided, not deferred
+### USB iAP is on for ipodvideo, off for ipod6g
 
-`PODBOX_NO_USB_IAP` is a policy decision, not a hardware limitation. Both
-targets satisfy upstream's gate, and RockPod shipped MFi digital audio on the
-6G, so the feature is genuinely applicable. It is off because:
+`PODBOX_NO_USB_IAP` survives under `#ifdef IPOD_6G`. Upstream's gate is generic
+(Apple vendor ID plus interrupt and isochronous endpoints) and both targets
+satisfy it, so holding one back takes a define.
 
-- **The application layer is not written for a second PCM sink.** Enabling it
-  defines `PCM_SINK_IAP`, taking `PCM_SINK_NUM` from 1 to 2. Nothing in
-  `apps-ipod/` calls `pcm_current_sink()` or `pcm_sink_caps()`, and
-  `audio_guess_frequency()` (`apps-ipod/audio/playback.c`) is sink-unaware.
-  Upstream's fixes for that (`f343168051`, `1d5aa53321`) are declined in
-  `upstream-commit-log.md` *because* there is only one sink — so re-enabling
-  makes them prerequisites rather than dead rows.
-- **The payoff is narrow.** Digital audio out to an MFi dock or DAC. Ordinary
-  docks and car AUX take analogue off the line-out pins and need no protocol.
-- **It has never run on a 5G.** The prior art is 6G/DesignWare; the 5G is ARC.
-  `USB_ENABLE_AUDIO` is already on there and untested, so enabling this too
-  would stack two unproven USB features on one controller.
+**Why the 5G has it.** The ARC controller applied SET_ADDRESS the instant the
+host asked, so the status ZLP went out from the new address while the host was
+still listening at zero; enumeration died there, four SET_ADDRESS attempts and
+no SET_CONFIGURATION. The driver now defers the write until the EP0 IN status
+stage completes. That work is ARC's alone, and it is what makes the feature
+reachable at all.
 
-The comment at the `PODBOX_NO_USB_IAP` define says re-enabling needs "nothing
-else". True of the build — it compiles — but not of the behaviour, per the
-first point.
+**Why the 6G does not.** Enabling iAP adds a second USB configuration carrying
+an isochronous IN endpoint. On DesignWare none of that is exercised, and the
+6G's storage mode is worth more than an accessory protocol no dock here can
+test. Delete the define to try it.
+
+**What it cost in the app layer.** Enabling iAP defines `PCM_SINK_IAP`, taking
+`PCM_SINK_NUM` from 1 to 2, and turns seven `iap_on_*` notifications from
+empty inlines into real externs. Five upstream commits had been declined or
+half-taken on single-sink grounds and are now adopted in full — `fad99773e3`
+for the notification call sites, `76d63246c5`, `f87ff3a9b2` and `1d5aa53321`
+for asking the sink which rates it has, `f343168051` to stop the playback
+frequency setting reaching across to a sink it does not own. See
+`upstream-commit-log.md`.
+
+**Still untested.** There is no dock or accessory here, so the protocol itself
+has never run on either player. What is verified is enumeration on a 5G.
 
 **Serial iAP is unaffected and stays on.** It is a different transport
 (`IPOD_ACCESSORY_PROTOCOL`, UART pins on the dock connector), implemented in
@@ -444,6 +451,6 @@ These look like omissions and are not:
 | --- | --- |
 | `apps/` | Untouched upstream mirror, kept so merges apply cleanly. `apps-ipod/` is ours; do not edit `apps/`. |
 | `usbstack/usb_audio.c` | Upstream's is sink-only (host → player) and reaches both targets. RockPod's added a source mode that only worked on the 6G. |
-| `usbstack/iap/` | Upstream's vendored libiap. RockPod's `usb_iap_hid.c` and its transport indirection served a USB MFi/dock-DAC feature this fork no longer carries. Compiled out entirely by `PODBOX_NO_USB_IAP`, which is now a settled decision — kept upstream-identical so it stays mergeable rather than because it builds. |
+| `usbstack/iap/` | Upstream's vendored libiap, kept upstream-identical so it stays mergeable. Built on `ipodvideo`, compiled out on `ipod6g` by `PODBOX_NO_USB_IAP`. RockPod's `usb_iap_hid.c` and its transport indirection are still absent; this fork uses upstream's USB transport as it stands. |
 | `target/arm/s5l8702/usb-designware.c` | RockPod's isochronous plumbing was written for the above and calls `usb_audio_source_streaming()`, which no longer exists. |
 | `target/arm/s5l8702/pcm-s5l8702.c` | RockPod's per-start/stop I2S clock gating is **deferred, not rejected**. Upstream's `pcm_sink` refactor removed the functions it patched and the replacements nest, so a naive port would gate the clock on every buffer. That nesting is the whole difficulty; a 6G is available to measure the result on. |
