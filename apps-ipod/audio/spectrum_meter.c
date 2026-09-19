@@ -49,13 +49,17 @@ const int spectrum_band_freq_hz[SPECTRUM_MAX_BANDS] =
  * and the mono one averages them. */
 static int spectrum_level[2][SPECTRUM_MAX_BANDS];
 
+/* One Goertzel coefficient per band, and the rate they were built for. */
+static long band_coeff[SPECTRUM_MAX_BANDS];
+static int  coeff_rate;
+
 /* Instant attack, exponential release (divide the gap by 2^shift each
  * update) -- mirrors typical VU meter ballistics. */
 #define SPECTRUM_RELEASE_SHIFT 3
 
 /* Rough perceptual (log-like) compression range: ln(raw magnitude) below
  * SPECTRUM_LOG_MIN maps to level 0, above SPECTRUM_LOG_MAX maps to level
- * 100. Now that spectrum_goertzel_magnitude() normalizes back to an amplitude-
+ * 100. Now that spectrum_goertzel_at() normalizes back to an amplitude-
  * comparable scale (0-32767ish), these are calibrated against that range:
  * ln(50)=~4 (near-silent noise floor) and ln(20000)=~10 (a hot but not
  * necessarily full-scale signal reaches 100, giving some headroom rather
@@ -64,12 +68,13 @@ static int spectrum_level[2][SPECTRUM_MAX_BANDS];
 #define SPECTRUM_LOG_MIN (4L << 16)
 #define SPECTRUM_LOG_MAX (10L << 16)
 
-/* Goertzel magnitude of 'freq_hz' within 'count' samples taken every
- * 'stride' entries of 'samples', for a mixer output rate of 'samplerate'
- * Hz. The stride is what lets one channel of an interleaved stereo buffer
- * be filtered where it lies, with no de-interleaving copy. Fixed point
- * throughout, with the filter coefficient 2*cos(2*pi*freq_hz/samplerate)
- * held in Q29.
+/* The filter coefficient 2*cos(2*pi*freq_hz/samplerate) in Q29.
+ *
+ * Split out from the filter below because it costs more than the samples do:
+ * a 64-bit divide and a 31-iteration CORDIC, about a thousand cycles on the
+ * 5G's ARM7TDMI, against ten a sample. It depends only on the frequency and
+ * the rate, so a caller with a fixed set of bands builds its table once when
+ * the rate changes and hands the answer to spectrum_goertzel_at().
  *
  * The precision is load-bearing, so resist simplifying it back to a
  * coarser angle: cos() flattens out near 0 Hz, so a small error in the
@@ -80,19 +85,28 @@ static int spectrum_level[2][SPECTRUM_MAX_BANDS];
  * Q29 rather than more because it is the highest that keeps 2*cos inside
  * 32 bits, so both operands of the inner multiply stay the width they
  * were at Q14 and only the product needs 64. */
-int spectrum_goertzel_magnitude(const int16_t *samples, int count, int stride,
-                              int freq_hz, int samplerate)
+long spectrum_goertzel_coeff(int freq_hz, int samplerate)
 {
     unsigned long phase = (unsigned long)
                           (((uint64_t)freq_hz << 32) / samplerate);
-    long cos_s31, coeff_q29;
-    long q1 = 0, q2 = 0;
-    long long mag_sq;
-    int i;
+    long cos_s31;
 
     /* fp_sincos() returns cos in s0.31, i.e. 2*cos already in Q30. */
     fp_sincos(phase, &cos_s31);
-    coeff_q29 = cos_s31 >> 1;
+
+    return cos_s31 >> 1;
+}
+
+/* Goertzel magnitude at a precomputed coefficient, within 'count' samples
+ * taken every 'stride' entries of 'samples'. The stride is what lets one
+ * channel of an interleaved stereo buffer be filtered where it lies, with
+ * no de-interleaving copy. */
+int spectrum_goertzel_at(const int16_t *samples, int count, int stride,
+                         long coeff_q29)
+{
+    long q1 = 0, q2 = 0;
+    long long mag_sq;
+    int i;
 
     for (i = 0; i < count; i++)
     {
@@ -131,7 +145,7 @@ int spectrum_scale_to_level(int raw)
     if (raw <= 0)
         return 0;
     /* raw can reach ~46000 for a loud on-frequency signal (see
-     * spectrum_goertzel_magnitude's mag_sq clamp); "raw << 16" must stay inside
+     * spectrum_goertzel_at's mag_sq clamp); "raw << 16" must stay inside
      * signed 32-bit range for fp16_log's Q16 input. */
     if (raw > 32767)
         raw = 32767;
@@ -188,16 +202,29 @@ void spectrum_meter_peek(void)
         return;
     }
 
+    /* Both channels filter the same eight frequencies at the same rate, so
+     * the coefficients are built once for the pair rather than per channel
+     * inside the loop, where half of them would be a second identical set. */
+    if (samplerate != coeff_rate)
+    {
+        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+            band_coeff[band] =
+                spectrum_goertzel_coeff(spectrum_band_freq_hz[band],
+                                        samplerate);
+        coeff_rate = samplerate;
+    }
+
     /* 'count' is frames, so the buffer holds two interleaved int16 per frame
-     * and channel N is every second sample starting at offset N. */
+     * and channel N is every second sample starting at offset N. A mono
+     * mixer would make this a 256-sample overread; the guard above counts on
+     * mixer_channel_get_buffer() reporting stereo frames. */
     for (channel = 0; channel < 2; channel++)
     {
         for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
         {
-            int raw = spectrum_goertzel_magnitude(pcm + channel,
-                                                  SPECTRUM_BLOCK_SIZE, 2,
-                                                  spectrum_band_freq_hz[band],
-                                                  samplerate);
+            int raw = spectrum_goertzel_at(pcm + channel,
+                                           SPECTRUM_BLOCK_SIZE, 2,
+                                           band_coeff[band]);
 
             approach_level(channel, band, spectrum_scale_to_level(raw));
         }

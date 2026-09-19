@@ -110,6 +110,12 @@ static unsigned long hop_ms_1;      /* ...of the one before it, which is the
 static int           mag_prev[SPECTRUM_MAX_BANDS];
 static bool          have_mag_prev;
 
+/* One Goertzel coefficient per band, rebuilt only when the rate changes.
+ * Eight windows run every hop and the coefficient costs a hundred times what
+ * a sample does, so computing it per window was most of the setup cost of
+ * the whole bank. */
+static long          band_coeff[SPECTRUM_MAX_BANDS];
+
 static int           flux_1[BEAT_GROUPS];  /* One hop back */
 static int           flux_2[BEAT_GROUPS];  /* Two hops back */
 static int32_t       flux_mean[BEAT_GROUPS];
@@ -179,12 +185,28 @@ void beat_hops_set_pos(unsigned long ms)
     base_stamped = true;
 }
 
+/* Rebuild the band coefficients for the current rate. Rate zero is "not
+ * announced yet", which every feed path already refuses to analyse at, so
+ * there is nothing to build and dividing by it would be the fault. */
+static void beat_build_coeffs(void)
+{
+    int band;
+
+    if (samplerate == 0)
+        return;
+
+    for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+        band_coeff[band] = spectrum_goertzel_coeff(spectrum_band_freq_hz[band],
+                                                   (int)samplerate);
+}
+
 void beat_hops_set_rate(unsigned int sampr)
 {
     if (sampr == samplerate)
         return;
 
     samplerate = sampr;
+    beat_build_coeffs();
     beat_hops_resync();
 }
 
@@ -204,6 +226,7 @@ void beat_hops_reset(unsigned int sampr)
     history_count = 0;
     stat_windows = 0;
     samplerate = sampr;
+    beat_build_coeffs();
 
     beat_track_reset();
     beat_hops_resync();
@@ -417,9 +440,8 @@ static void beat_run_hop(void)
 
         for (band = group_tune[g].first; band < group_tune[g].end; band++)
         {
-            mag[band] = spectrum_goertzel_magnitude(
-                            src, group_tune[g].window, 1,
-                            spectrum_band_freq_hz[band], samplerate);
+            mag[band] = spectrum_goertzel_at(src, group_tune[g].window, 1,
+                                             band_coeff[band]);
 
             if (mag[band] > peak)
                 peak = mag[band];

@@ -33,13 +33,20 @@ int spectrum_meter_get_bar(int bar, int nbars);
  * layout reads the two banks apart so its halves differ with the mix. */
 int spectrum_meter_get_bar_channel(int bar, int nbars, int channel);
 
-/* Goertzel magnitude of 'freq_hz' within 'count' samples taken every
- * 'stride' entries of 'samples', for an output rate of 'samplerate' Hz. The
- * stride filters one channel of an interleaved buffer where it lies, with
- * no de-interleaving copy. Roughly amplitude-scaled: a loud on-frequency
- * signal reaches ~46000. */
-int spectrum_goertzel_magnitude(const int16_t *samples, int count, int stride,
-                                int freq_hz, int samplerate);
+/* The Q29 filter coefficient for one frequency at one rate.
+ *
+ * About a thousand cycles on the 5G -- a 64-bit divide and a CORDIC -- so a
+ * caller filtering a fixed set of frequencies builds a table of these once
+ * when the rate changes and passes them to spectrum_goertzel_at(), rather
+ * than paying it again for every window. */
+long spectrum_goertzel_coeff(int freq_hz, int samplerate);
+
+/* Goertzel magnitude at a precomputed coefficient, within 'count' samples
+ * taken every 'stride' entries of 'samples'. The stride filters one channel
+ * of an interleaved buffer where it lies, with no de-interleaving copy.
+ * Roughly amplitude-scaled: a loud on-frequency signal reaches ~46000. */
+int spectrum_goertzel_at(const int16_t *samples, int count, int stride,
+                         long coeff_q29);
 
 /* Compress a raw magnitude to a 0-100 display level, log-like, so quiet
  * passages still move instead of only the loudest band lighting up. */

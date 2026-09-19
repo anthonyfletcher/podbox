@@ -47,7 +47,7 @@ static const int ch_window[CH_OCTAVES] = { CH_BUF, CH_BUF / 2, CH_BUF / 4 };
 
 /* Equal temperament from A4 = 440, starting at C4. Whole hertz: the error is
  * a tenth of a percent against a semitone spacing of six, and
- * spectrum_goertzel_magnitude() takes an integer frequency anyway. */
+ * spectrum_goertzel_coeff() takes an integer frequency anyway. */
 static const int ch_note_hz[12] = {
     262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494
 };
@@ -61,6 +61,13 @@ static const int16_t prof_major[12] = {
 static const int16_t prof_minor[12] = {
     633, 268, 352, 538, 260, 353, 254, 475, 398, 269, 334, 317
 };
+
+/* One Goertzel coefficient per note per octave, rebuilt when the rate
+ * changes. A note above the Nyquist limit has no entry and chroma_frame()
+ * skips it there; the coefficient costs about as much as the 256-sample
+ * window it would be used on, so building the thirty-six once a track
+ * rather than once a frame is most of what a frame costs. */
+static long          note_coeff[CH_OCTAVES][12];
 
 static unsigned int  rate;          /* Decimated */
 static int           decim;         /* Source samples per decimated one */
@@ -83,9 +90,12 @@ static unsigned int  frames;
 
 void chroma_reset(unsigned int samplerate)
 {
+    int pc, oct;
+
     memset(buf, 0, sizeof (buf));
     memset(acc, 0, sizeof (acc));
     memset(prev, 0, sizeof (prev));
+    memset(note_coeff, 0, sizeof (note_coeff));
 
     decim = samplerate / CH_TARGET_HZ;
     if (decim < 1)
@@ -95,6 +105,17 @@ void chroma_reset(unsigned int samplerate)
     hop = rate / CH_RATE_HZ;
     if (hop < CH_BUF)
         hop = CH_BUF;
+
+    for (oct = 0; oct < CH_OCTAVES; oct++)
+    {
+        for (pc = 0; pc < 12; pc++)
+        {
+            int f = ch_note_hz[pc] << oct;
+
+            if (rate > 0 && f * 2 < (int)rate)
+                note_coeff[oct][pc] = spectrum_goertzel_coeff(f, (int)rate);
+        }
+    }
 
     decim_acc = 0;
     decim_n = 0;
@@ -128,8 +149,8 @@ static void chroma_frame(void)
             if (f * 2 >= (int)rate)
                 continue;
 
-            v[pc] += (uint32_t)spectrum_goertzel_magnitude(src, n, 1, f,
-                                                           (int)rate);
+            v[pc] += (uint32_t)spectrum_goertzel_at(src, n, 1,
+                                                    note_coeff[oct][pc]);
         }
     }
 
