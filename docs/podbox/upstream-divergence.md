@@ -270,12 +270,16 @@ future decline is not in that position, it needs a row here.
 (Apple vendor ID plus interrupt and isochronous endpoints) and both targets
 satisfy it, so holding one back takes a define.
 
-**Why the 5G has it.** The ARC controller applied SET_ADDRESS the instant the
-host asked, so the status ZLP went out from the new address while the host was
-still listening at zero; enumeration died there, four SET_ADDRESS attempts and
-no SET_CONFIGURATION. The driver now defers the write until the EP0 IN status
-stage completes. That work is ARC's alone, and it is what makes the feature
-reachable at all.
+**Why the 5G has it.** `usb_core_control_request_handler()` primes the status
+ZLP and then calls `usb_drv_set_address()`, so an ARC controller that writes
+`REG_DEVICEADDR` immediately sends that ZLP from the new address while the
+host is still addressing zero, and enumeration cannot get past SET_ADDRESS.
+The driver now defers the write until the EP0 IN status stage completes. That
+work is ARC's alone, and it is what makes the feature reachable at all. The
+controller has a hardware equivalent -- USBADRA, bit 24 of the same register,
+documented for this IP block at
+`target/arm/imx233/regs/imx233/usbctrl.h` -- which would do it in one line;
+the software path is what is tested, so it is what ships.
 
 **Why the 6G does not.** Enabling iAP adds a second USB configuration carrying
 an isochronous IN endpoint. On DesignWare none of that is exercised, and the
@@ -291,8 +295,11 @@ for asking the sink which rates it has, `f343168051` to stop the playback
 frequency setting reaching across to a sink it does not own. See
 `upstream-commit-log.md`.
 
-**Still untested.** There is no dock or accessory here, so the protocol itself
-has never run on either player. What is verified is enumeration on a 5G.
+**How far this is tested.** The two targets build, and the seven `iap_on_*`
+notifications resolve to real symbols in the `ipodvideo` binary. Beyond that:
+the SET_ADDRESS change came in tested by its author, and nothing here records
+what was run. There is no dock or accessory, so the protocol itself has never
+run on either player.
 
 **Serial iAP is unaffected and stays on.** It is a different transport
 (`IPOD_ACCESSORY_PROTOCOL`, UART pins on the dock connector), implemented in
