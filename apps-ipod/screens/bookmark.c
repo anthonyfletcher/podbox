@@ -56,6 +56,7 @@
 #include "system/app_buffer.h"
 #include "file.h"
 #include "pathfuncs.h"
+#include "iap-usb.h"
 #include "playlist/save_screen.h"
 
 /*#define LOGF_ENABLE*/
@@ -1116,7 +1117,9 @@ static bool play_bookmark(const char* bookmark)
     if (parse_bookmark(fnamebuf, sizeof(fnamebuf), bookmark, &resume_info, true))
     {
         global_settings.repeat_mode = resume_info.repeat_mode;
+        iap_on_repeat_state(global_settings.repeat_mode);
         global_settings.playlist_shuffle = resume_info.shuffle;
+        iap_on_shuffle_state(global_settings.playlist_shuffle);
         if (!warn_on_pl_erase())
             return false;
         bool success = bookmark_play(global_temp_buffer, resume_info.resume_index,

@@ -54,6 +54,8 @@
 #include "pcm_mixer.h"
 #include "pcmbuf.h"
 #include "audio_thread.h"
+#include "pcm_sink.h"
+#include "iap-usb.h"
 #include "playback.h"
 #include "storage.h"
 #include "system/app_util.h"
@@ -1502,6 +1504,7 @@ static void audio_playlist_track_change(void)
     {
         send_track_event(PLAYBACK_EVENT_TRACK_CHANGE,
                          track_event_flags, id3);
+        iap_on_track_playback_index(playlist_get_display_index() - 1, false);
     }
 
     position_key = pcmbuf_get_position_key();
@@ -2535,6 +2538,7 @@ static int audio_finish_load_track(struct track_info *infop)
            by the time PLAYBACK_EVENT_TRACK_CHANGE is sent */
         send_track_event(PLAYBACK_EVENT_CUR_TRACK_READY, 0,
                          id3_get(PLAYING_ID3));
+        iap_on_track_playback_index(playlist_get_display_index() - 1, true);
     }
 
     /* Try to buffer a codec for the track */
@@ -2971,6 +2975,7 @@ static void audio_finalise_track_change(void)
         if (pause_on_track_change || single_mode_do_pause(info.id3_hid))
         {
             play_status = PLAY_PAUSED;
+            iap_on_play_status(play_status);
             pcmbuf_pause(true);
             pause_on_track_change = false;
         }
@@ -3306,6 +3311,7 @@ static void audio_start_playback(const struct audio_resume_info *resume_info,
 
         /* Update our state */
         play_status = PLAY_PLAYING;
+        iap_on_play_status(play_status);
     }
 
     /* Codec's position should be available as soon as it knows it */
@@ -3410,6 +3416,7 @@ static void audio_stop_playback(bool allow_fade)
     /* Update our state */
     ff_rw_mode = false;
     play_status = PLAY_STOPPED;
+    iap_on_play_status(play_status);
 
     wipe_track_metadata(true);
     clear_last_folder_album_art();
@@ -3430,6 +3437,7 @@ static void audio_on_pause(bool pause)
         return;
 
     play_status = pause ? PLAY_PAUSED : PLAY_PLAYING;
+    iap_on_play_status(play_status);
 
     if (!pause && codec_skip_pending)
     {
@@ -4066,6 +4074,7 @@ void audio_pcmbuf_position_callback(unsigned long elapsed, off_t offset,
         struct mp3entry *id3 = id3_get(PLAYING_ID3);
         id3->elapsed = elapsed;
         id3->offset = offset;
+        iap_on_track_time_position(elapsed);
     }
 }
 
@@ -4482,15 +4491,28 @@ void audio_set_crossfade(int enable)
 
 static unsigned long audio_guess_frequency(struct mp3entry *id3)
 {
-    switch (id3->frequency)
+    const struct pcm_sink_caps *caps = pcm_current_sink_caps();
+    bool have_44 = false;
+    bool have_48 = false;
+
+    for (size_t i = 0; i < caps->num_samprs; i++)
     {
-    case 44100:
-        return SAMPR_44;
-    case 48000:
-        return SAMPR_48;
-    default:
-        return (id3->frequency % 4000) ? SAMPR_44 : SAMPR_48;
+        if (caps->samprs[i] == SAMPR_44)
+            have_44 = true;
+        if (caps->samprs[i] == SAMPR_48)
+            have_48 = true;
+        if (id3->frequency == caps->samprs[i])
+            return id3->frequency;
     }
+
+    /* A sink need not offer the rate the mismatch rule picks -- an iAP
+     * accessory advertises its own list -- so fall through to whatever it
+     * calls default rather than setting a rate it cannot play. */
+    unsigned long fallback = (id3->frequency % 4000) ? SAMPR_44 : SAMPR_48;
+    if ((fallback == SAMPR_44 && have_44) || (fallback == SAMPR_48 && have_48))
+        return fallback;
+
+    return caps->samprs[caps->default_freq];
 }
 
 static bool audio_auto_change_frequency(struct mp3entry *id3, bool play)
@@ -4514,18 +4536,16 @@ static bool audio_auto_change_frequency(struct mp3entry *id3, bool play)
 void audio_set_playback_frequency(unsigned int sample_rate_hz)
 {
     /* sample_rate_hz == 0 is "automatic", and also a sentinel */
-    static const unsigned int play_sampr[] = {SAMPR_44, SAMPR_48, 0 };
-    const unsigned int *p_sampr = play_sampr;
+    const struct pcm_sink_caps *caps = pcm_current_sink_caps();
     unsigned int sampr = 0;
 
-    while (*p_sampr != 0)
+    for (size_t i = 0; i < caps->num_samprs; i++)
     {
-        if (*p_sampr == sample_rate_hz)
+        if (caps->samprs[i] == sample_rate_hz)
         {
-            sampr = *p_sampr;
+            sampr = caps->samprs[i];
             break;
         }
-        p_sampr++;
     }
 
     if (sampr == 0)

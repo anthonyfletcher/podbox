@@ -39,6 +39,9 @@
 #include "button.h"
 #include "backlight.h"
 #include "sound.h"
+#include "pcm_sink.h"
+#include "pcm.h"
+#include "iap-usb.h"
 #include "settings.h"
 #include "games/spike/spike_menu.h"  /* SPK_OFFSET_MAX/STEP */
 #include "rbpaths.h"
@@ -621,7 +624,10 @@ static int32_t getlang_freq_unit_0_is_auto(int value, int unit)
 
 static void playback_frequency_callback(int sample_rate_hz)
 {
-    audio_set_playback_frequency(sample_rate_hz);
+    /* An accessory sink owns its own rate; the setting drives the builtin
+     * one only. */
+    if (pcm_current_sink() == PCM_SINK_BUILTIN)
+        audio_set_playback_frequency(sample_rate_hz);
 }
 
 static void albumart_callback(int mode)
@@ -703,6 +709,7 @@ static void shuffle_playlist_callback(bool shuffle)
             }
         }
     }
+    iap_on_shuffle_state(shuffle);
 }
 
 static void repeat_mode_callback(int repeat)
@@ -711,7 +718,7 @@ static void repeat_mode_callback(int repeat)
     {
         audio_flush_and_reload_tracks();
     }
-    (void)repeat;
+    iap_on_repeat_state(repeat);
 }
 
 static void treesort_callback(int value)

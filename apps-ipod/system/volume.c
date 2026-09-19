@@ -23,6 +23,7 @@
 #include "kernel.h"
 #include "settings/settings.h"
 #include "speech/talk.h"
+#include "iap-usb.h"
 #include "volume.h"
 
 /* check range, set volume and save settings */
@@ -39,6 +40,7 @@ void setvol(void)
         volume = global_settings.volume_limit;
 
     sound_set_volume(volume);
+    iap_on_volume(volume);
     global_status.last_volume_change = current_tick;
     status_save(false);
 }
