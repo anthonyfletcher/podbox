@@ -27,18 +27,24 @@
 #include "fixedpoint.h"
 #include "spectrum_meter.h"
 
-/* Samples per channel analyzed per update. Small enough to stay cheap,
- * large enough to resolve the lowest band frequency reasonably. */
+/* Samples per channel analysed per update, and the longer window the two
+ * lowest bands are read over. A window shorter than one cycle of the
+ * frequency it is tuned to does not measure that frequency at all -- it
+ * follows the fragment's envelope and rises on anything loud. One cycle of
+ * 60Hz is 735 samples, so the bass bands need 1024 (23ms, 43Hz resolution)
+ * where 400Hz and up are comfortable inside 256: at 256 a 150Hz tone drives
+ * the 60Hz band to two thirds of its own band's deflection, at 1024 to a
+ * tenth of that. */
 #define SPECTRUM_BLOCK_SIZE 256
+#define SPECTRUM_LOW_BLOCK  1024
+
+/* How many entries of the band table below take the long window. */
+#define SPECTRUM_LOW_BANDS  2
 
 /* Band center frequencies, log-spaced ~60Hz-12kHz (bass to treble).
  * bar_to_band() picks evenly-spaced entries from this table when fewer
- * than SPECTRUM_MAX_BANDS bars are requested.
- *
- * These are analysed exactly, but a SPECTRUM_BLOCK_SIZE window resolves
- * samplerate/SPECTRUM_BLOCK_SIZE (~172Hz at 44.1kHz), so the lowest bands
- * sit well inside one resolution cell and read partly as each other. They
- * are distinct, not independent; separating them needs a longer block. */
+ * than SPECTRUM_MAX_BANDS bars are requested. The first SPECTRUM_LOW_BANDS
+ * of them are the ones too low to resolve in a single block. */
 const int spectrum_band_freq_hz[SPECTRUM_MAX_BANDS] =
 {
     60, 150, 400, 1000, 2500, 4000, 7000, 12000
@@ -187,6 +193,7 @@ void spectrum_meter_peek(void)
     const int16_t *pcm = mixer_channel_get_buffer(PCM_MIXER_CHAN_PLAYBACK, &count);
     int samplerate = mixer_get_frequency();
     int channel, band;
+    bool low_ready;
 
     if (!pcm || count < SPECTRUM_BLOCK_SIZE || samplerate <= 0)
     {
@@ -214,16 +221,44 @@ void spectrum_meter_peek(void)
         coeff_rate = samplerate;
     }
 
+    /* mixer_channel_get_buffer() hands back whatever is left of the chunk
+     * being played, so 'count' differs every tick: a full chunk is 2048
+     * frames and the peek lands at an arbitrary point inside it. The long
+     * window is there about half the time, and the low bands hold their last
+     * level on the ticks it is not. Reading them over a short window instead
+     * is the envelope follower the long window exists to avoid, and
+     * alternating between the two shows as jitter in the bars rather than as
+     * anything in the music.
+     *
+     * Trap: retaining samples across peeks does not get round it. A peek
+     * runs every tick while the play cursor advances 441 frames, so two
+     * consecutive views are not adjacent audio -- stitching them leaves a
+     * gap and a phase jump at every join, and no window length recovers a
+     * frequency from that. */
+    low_ready = (count >= SPECTRUM_LOW_BLOCK);
+
     /* 'count' is frames, so the buffer holds two interleaved int16 per frame
      * and channel N is every second sample starting at offset N. A mono
      * mixer would make this a 256-sample overread; the guard above counts on
      * mixer_channel_get_buffer() reporting stereo frames. */
     for (channel = 0; channel < 2; channel++)
     {
-        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
+        for (band = SPECTRUM_LOW_BANDS; band < SPECTRUM_MAX_BANDS; band++)
         {
             int raw = spectrum_goertzel_at(pcm + channel,
                                            SPECTRUM_BLOCK_SIZE, 2,
+                                           band_coeff[band]);
+
+            approach_level(channel, band, spectrum_scale_to_level(raw));
+        }
+
+        if (!low_ready)
+            continue;
+
+        for (band = 0; band < SPECTRUM_LOW_BANDS; band++)
+        {
+            int raw = spectrum_goertzel_at(pcm + channel,
+                                           SPECTRUM_LOW_BLOCK, 2,
                                            band_coeff[band]);
 
             approach_level(channel, band, spectrum_scale_to_level(raw));

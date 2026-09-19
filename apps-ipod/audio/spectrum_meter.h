@@ -12,16 +12,19 @@
 #define SPECTRUM_FPS 10
 #define SPECTRUM_MAX_BANDS 8
 
-/* Band centre frequencies, log-spaced ~60Hz to 12kHz, lowest first. A
- * SPECTRUM_BLOCK_SIZE window resolves samplerate/256 (~172Hz at 44.1kHz),
- * so the two lowest entries sit inside one resolution cell and read partly
- * as each other: distinct, but not independent. */
+/* Band centre frequencies, log-spaced ~60Hz to 12kHz, lowest first. The two
+ * lowest are read over a longer window than the rest, which is what makes
+ * them independent of each other -- see spectrum_meter_peek(). */
 extern const int spectrum_band_freq_hz[SPECTRUM_MAX_BANDS];
 
-/* Recomputes all band levels from the current playback PCM buffer. Meant
- * to be called every tick from skin_wait_for_action(), the same way
- * peak_meter_peek() is. Cheap no-op if too little fresh audio data is
- * available since the last call. */
+/* Recomputes band levels from the current playback PCM buffer. Meant to be
+ * called every tick from skin_wait_for_action(), the same way
+ * peak_meter_peek() is.
+ *
+ * The two lowest bands need four times as many frames as the rest and the
+ * mixer does not always have them, so they update on roughly half the calls
+ * and hold their level in between. Everything falls toward silence when
+ * there is too little audio for even a short window. */
 void spectrum_meter_peek(void);
 
 /* Returns a 0-100 smoothed level for bar 'bar' (0-based) out of 'nbars'
