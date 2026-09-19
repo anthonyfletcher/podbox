@@ -147,7 +147,13 @@ configures the isochronous endpoint, the 6G is never enumerated as an audio
 device. Delete the define to re-enable; the comment there says what else the
 setting needs back.
 
-USB iAP is separately **off** on both targets: `config.h` defines `PODBOX_NO_USB_IAP`, which suppresses the otherwise-automatic `USB_ENABLE_IAP`. Delete that define to re-enable; nothing else is needed.
+USB iAP is separately **on for `ipodvideo` only**. The `USB_ENABLE_IAP` gate
+matches both players, so `config.h` defines `PODBOX_NO_USB_IAP` under
+`IPOD_6G` to hold it off there — enabling it adds a second USB configuration
+carrying an isochronous IN endpoint, and that path is exercised on the ARC
+controller, not on DesignWare. Delete that define to enable it on the 6G;
+nothing else is needed. No dock or accessory is available here, so the
+protocol itself is untested on either player.
 
 ## Build Commands
 
