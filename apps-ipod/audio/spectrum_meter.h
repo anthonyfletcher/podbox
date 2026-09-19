@@ -45,8 +45,8 @@ long spectrum_goertzel_coeff(int freq_hz, int samplerate);
  * taken every 'stride' entries of 'samples'. The stride filters one channel
  * of an interleaved buffer where it lies, with no de-interleaving copy.
  * Roughly amplitude-scaled: a loud on-frequency signal reaches ~46000. */
-int spectrum_goertzel_at(const int16_t *samples, int count, int stride,
-                         long coeff_q29);
+int ICODE_ATTR spectrum_goertzel_at(const int16_t *samples, int count,
+                                    int stride, long coeff_q29);
 
 /* Compress a raw magnitude to a 0-100 display level, log-like, so quiet
  * passages still move instead of only the loudest band lighting up. */
