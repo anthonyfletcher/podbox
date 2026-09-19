@@ -1722,8 +1722,12 @@ bool spike_screen(void)
             spike_summary_screen(&sum);
     }
 
+    /* Braced because cpu_boost() is defined to nothing without adjustable
+     * CPU frequency, which leaves this an empty body on the simulator. */
     if (boosted)
+    {
         cpu_boost(false);
+    }
     spike_backlight(false);
 
     if (cap_font != FONT_UI)

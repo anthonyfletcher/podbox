@@ -317,7 +317,7 @@ static int boot_chunks_done(enum boot_stage stage)
 {
     int chunks = 0;
 
-    for (int i = 0; i < stage; i++)
+    for (enum boot_stage i = 0; i < stage; i++)
         chunks += boot_stage_chunks(i);
 
     return chunks;
