@@ -889,6 +889,14 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     {
         int bestd = -1;
 
+        /* Scheduling is cooperative and this pass is boosted, so without
+         * this it holds the CPU for the whole library: the UI stops and the
+         * codec stops refilling, which is heard. Every sector's worth of
+         * records rather than every record, so the yield lands where the
+         * read does and costs nothing in between. */
+        if ((i & 63) == 0)
+            yield();
+
         if (!sound_index_read(&r, i, &rec))
             break;
 
@@ -947,6 +955,10 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     {
         uint64_t key = sound_index_key(buf);
         long len = tagcache_get_numeric(&tcs, tag_length);
+
+        /* The same reason as pass one: a boosted walk of the whole database
+         * with nothing else able to run. */
+        yield();
 
         /* The seed's own row, for the two things only the database holds: who
          * it is by, which the artist rules space the playlist against, and

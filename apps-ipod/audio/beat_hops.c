@@ -475,9 +475,13 @@ static void beat_run_hop(void)
              * reads 128 and section 4.1's accent -- half again above that
              * peak -- reads 192. Scaling so the peak itself read full would
              * saturate nearly every onset, since an onset only fires by
-             * standing near the peak in the first place. */
+             * standing near the peak in the first place.
+             *
+             * 32 bits is enough: a flux is at most three bands of a
+             * magnitude the Goertzel clamps to 46340, so 139020 is the
+             * ceiling and 128 times that is a thirteenth of an int. */
             int peak = flux_peak[g] > 0 ? (int)flux_peak[g] : 1;
-            int strength = (int)(((int64_t)flux_1[g] * 128) / peak);
+            int strength = (flux_1[g] * 128) / peak;
 
             beat_mark_onset(g, hop_ms_1,
                                 strength > 255 ? 255 : strength);
