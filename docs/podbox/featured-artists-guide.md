@@ -26,8 +26,10 @@ their row goes to those instead.
 
 ## What counts as a credit
 
-The words it looks for are **feat.**, **ft.**, **featuring** and **w/**, in
-any capitalisation. 
+The words it looks for are **feat.**, **ft.**, **featuring**, **duet with**,
+**w/** and **f/**, in any capitalisation. A colon works where the dot does, so
+**feat:** counts too. *Duet* on its own does not — it would read *(Duet
+Version)* as a guest called Version.
 
 Where the credit ends depends on the brackets:
 
@@ -36,6 +38,8 @@ Where the credit ends depends on the brackets:
 | `Song (feat. Ann Vey)` | Ann Vey |
 | `Song (feat. Ann Vey) [Remastered]` | Ann Vey |
 | `Song feat. Ann Vey (Live)` | Ann Vey |
+| `Song (duet with Ann Vey)` | Ann Vey |
+| `Ann Vey f/ Kites` | Kites |
 
 A bracket ends a credit whether it opens or closes one, which is what keeps
 *(Live)* and *[Remastered]* out of somebody's name.

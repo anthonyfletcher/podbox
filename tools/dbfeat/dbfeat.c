@@ -75,6 +75,12 @@ static const struct testcase cases[] = {
 { "Song ft Guest One",               { "Guest One", NULL }, NULL },
 { "Song featuring Guest One",        { "Guest One", NULL }, NULL },
 { "Song w/ Guest One",               { "Guest One", NULL }, NULL },
+{ "Song f/ Guest One",               { "Guest One", NULL }, NULL },
+{ "Song (feat: Guest One)",          { "Guest One", NULL }, NULL },
+{ "Song (ft:Guest One)",             { "Guest One", NULL }, NULL },
+{ "Song (duet with Guest One)",      { "Guest One", NULL }, NULL },
+{ "Song (Duet With Guest One)",      { "Guest One", NULL }, NULL },
+{ "Song duet w/ Guest One",          { "Guest One", NULL }, NULL },
 { "Song (feat.Guest One)",           { "Guest One", NULL }, NULL },
 { "feat. Guest One",                 { "Guest One", NULL }, NULL },
 { "Artist A feat. Artist B",         { "Artist B",  NULL }, NULL },
@@ -86,6 +92,8 @@ static const struct testcase cases[] = {
 { "Aftermath",                       { NULL }, NULL },
 { "Song with a Broken Heart",        { NULL }, NULL },
 { "Song w/o Vocals",                 { NULL }, NULL },
+{ "Song (Duet Version)",             { NULL }, NULL },
+{ "Half/Life",                       { NULL }, NULL },
 { "",                                { NULL }, NULL },
 
 /* --- bracket scope ----------------------------------------------- */

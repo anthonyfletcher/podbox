@@ -83,19 +83,23 @@ static bool word_is(const char *p, const char *end, const char *word, int len)
 /* What introduces a guest list, longest first so "featuring" is never read as
  * "feat" followed by rubbish. A marker must start a word, and one wanting a
  * separator must also end one -- otherwise "defeat" and "Feather" both match.
- * "w/" brings its own separator with it.
+ * "w/" and "f/" bring their own separator with them.
  *
  * "with" is deliberately absent. "Song with a Broken Heart" is a title, not a
- * credit, and there is no test that tells the two apart. */
+ * credit, and there is no test that tells the two apart. Bare "duet" is absent
+ * for the same reason -- it would credit "Version" out of "(Duet Version)" --
+ * so the marker is the pair of words. */
 static const struct {
     const char *text;
     int len;
     bool needs_sep;
 } markers[] = {
+    { "duet with", 9, true  },
     { "featuring", 9, true  },
     { "feat",      4, true  },
     { "ft",        2, true  },
     { "w/",        2, false },
+    { "f/",        2, false },
 };
 
 #define MARKER_COUNT ((int)(sizeof(markers) / sizeof(markers[0])))
@@ -128,7 +132,7 @@ static const char *find_marker(const char *s)
                     continue;
                 return after;
             }
-            if (*after == '.')
+            if (*after == '.' || *after == ':')
                 return after + 1;
             if (is_space_byte(*after))
                 return after;
