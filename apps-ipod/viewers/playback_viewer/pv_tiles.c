@@ -68,9 +68,9 @@ enum { PV_BADGE_ORDER_TABLE = 0, PV_BADGE_ORDER_EARNED,
  * wrong entry here draws the wrong picture rather than failing, so check one
  * against the generator's folder rather than against the screen.
  *
- * It also arrives inside the theme rather than beside the binary:
- * bundle-theme.sh copies Scrim's fonts folder wholesale, so a theme that
- * stops using this face takes Spun's icons with it. */
+ * It also lives inside the theme rather than beside the binary, so
+ * bundle-theme.sh names it in CORE_FONTS: a theme that stops carrying the
+ * face fails the build there rather than taking Spun's icons with it. */
 
 /* Glyphs of 24-spun-badges.fnt, which the badge tiles use for their plate.
  *

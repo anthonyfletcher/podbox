@@ -49,14 +49,27 @@ done
 cp "$ROOT/themes/default-config.cfg" "$STAGE/.rockbox/default-config.cfg"
 
 # Faces the firmware itself needs, which is not the same as the ones a theme
-# brings. Every other font on the player arrives inside scrim's folder above,
-# so a theme that stopped using one would take it off the device and the core
-# that named it would fall back to the system font without saying so.
+# brings.
 mkdir -p "$STAGE/.rockbox/fonts"
 cp "$ROOT/apps-ipod/fonts/"*.fnt "$STAGE/.rockbox/fonts/"
-# The licence texts go with them for the same reason: scrim ships copies of
-# both, so dropping it would take the only copy on the player with it.
+# The licence texts go with them: scrim ships copies of both, so a theme
+# change that dropped them would take the only copy on the player with it.
 cp "$ROOT/apps-ipod/fonts/"LICENSE-*.txt "$STAGE/.rockbox/fonts/"
+
+# The other faces the core names by path live in scrim's folder rather than
+# beside the binary, so each is named here as well as arriving with the theme
+# above: shipped only as part of scrim, one would leave the device the moment
+# the theme stopped using it, and the screen that named it falls back to the
+# system font without saying so. The check makes that a build failure instead.
+CORE_FONTS="26-noto-sans-medium.fnt 18-noto-sans-bold.fnt 18-noto-sans.fnt
+            24x24-icons.fnt 24-seven-fifteen.fnt"
+for font in $CORE_FONTS; do
+    if [ ! -f "$ROOT/themes/scrim/.rockbox/fonts/$font" ]; then
+        echo "bundle-theme.sh: the core loads $font; scrim dropped it" >&2
+        exit 1
+    fi
+    cp "$ROOT/themes/scrim/.rockbox/fonts/$font" "$STAGE/.rockbox/fonts/"
+done
 
 # The house style a theme is loaded on top of. Loading a theme resets every
 # setting describing the look, and without this the reset lands on upstream's
