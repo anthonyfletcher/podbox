@@ -349,7 +349,7 @@ static void props_band_text(char *buf, size_t len, int id, bool say_it)
 }
 
 /* The tempo, against both tolerances rather than one -- see
- * SOUND_TEMPO_MATCH_MS and SOUND_TEMPO_PHASE_MS in sound_index.h.
+ * SOUND_TEMPO_MATCH_PER_MILLE and SOUND_TEMPO_PHASE_MS in sound_index.h.
  *
  * The number is shown whenever there is one: it is the only thing on this
  * screen a listener can check against their own foot. The two bounds decide

@@ -86,22 +86,23 @@ struct sound_record
 #define SOUND_F_NO_MODE  0x10  /* Pitch content did not settle on a mode --
                                   common, and not a fault. See chroma.h */
 
-/* How far the tempo may wander and still be usable, as milliseconds of
- * tempo_spread. Two numbers, because the two things that read a tempo do not
- * want the same answer out of one.
+/* How far the tempo may wander and still be usable. Two bounds in two units,
+ * because each is dominated by something different.
  *
- * Matching and the moods compare tempi and name speeds. A few BPM out moves
- * one of fourteen axes by a fraction of the match ceiling, so the tolerance
- * is the 95th percentile of the measured spread: it admits every track that
- * locks bar the few whose tempo genuinely travels, and the worst it lets
- * through is about 6 BPM at 120.
+ * Matching and the moods ask how far the beat moves against itself, so their
+ * bound is a share of the period: 30ms of wander at a 1200ms beat is 2.5% and
+ * musically tight, 22ms at a 340ms beat is 6.5% and audibly loose. Measured
+ * over a 3464-record index it admits the same share of the library as the
+ * absolute equivalent, 89.2% against 88.6%, but spreads it evenly instead of
+ * refusing slow music -- 98% of 40-60 BPM tracks against 87%.
  *
- * Anything that has to stay in step with the beat takes the tighter one
- * instead. A 26ms error at 120 BPM has walked a whole beat inside twenty of
- * them, so the matching tolerance is useless to play along to however good it
- * is to choose with. */
-#define SOUND_TEMPO_MATCH_MS  26
-#define SOUND_TEMPO_PHASE_MS  10
+ * The phase bound is milliseconds because that far in the spread is the
+ * tracker's own time resolution rather than the music: absolute it is flat
+ * across the tempo range, relative it slopes from 87% to 58%. Anything that
+ * must hold beat phase takes it -- a 5% error has walked a whole beat inside
+ * twenty of them, so the matching tolerance is no use to play along to. */
+#define SOUND_TEMPO_MATCH_PER_MILLE  52   /* of the beat period */
+#define SOUND_TEMPO_PHASE_MS         10
 
 /* Errors, matching db_summary's convention. */
 #define SOUND_OK          0
