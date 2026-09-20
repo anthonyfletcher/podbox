@@ -34,9 +34,14 @@ struct track_sound
                                      correlation ratio in the tens, not a
                                      probability, and beat_track applies its
                                      own floor already */
-    unsigned int  tempo_spread;   /* Slowest locked period minus the fastest.
-                                     Small on a track that keeps time and
-                                     large on one that does not */
+    unsigned int  tempo_spread;   /* Across the run of readings that agree
+                                     with one another, the slowest period
+                                     minus the fastest: small on a track that
+                                     keeps time, large on one that does not.
+                                     A reading that disagrees begins the run
+                                     again, so this describes the period
+                                     reported above rather than the search
+                                     for it */
 
     /* ---- level ---- */
 

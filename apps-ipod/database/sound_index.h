@@ -44,7 +44,13 @@ struct sound_record
     uint16_t period_ms;      /* 0 = never locked. Raw, unfolded */
     int16_t  loudness_db10;  /* dBFS x10 */
     uint8_t  confidence;
-    uint8_t  tempo_spread;   /* ms between the slowest and fastest, capped */
+    uint8_t  tempo_spread;   /* ms across the agreeing run, capped -- see
+                                struct track_sound. Trap: a record written
+                                before this measured the whole window and
+                                reads several times wider, so an update,
+                                which leaves existing records alone, gives
+                                an index where the field means two different
+                                things. Rebuild instead */
     uint8_t  crest_db;       /* Peak over RMS, whole dB */
     uint8_t  width;
     uint8_t  level_spread;

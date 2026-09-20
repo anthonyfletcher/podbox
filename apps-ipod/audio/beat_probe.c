@@ -225,16 +225,31 @@ static void bp_take_tempo(unsigned long track_ms)
     period_ms = bt.period_ms;
     confidence = bt.confidence;
 
-    if (period_lo == 0 || bt.period_ms < period_lo)
-        period_lo = bt.period_ms;
-    if (bt.period_ms > period_hi)
-        period_hi = bt.period_ms;
-
+    /* The spread belongs to the run of readings that agree, and starts again
+     * with each new run. What it has to answer is whether the period being
+     * reported describes the track -- and the reported period is the current
+     * run's, so readings from before it are not evidence about it.
+     *
+     * Trap: accumulating from the first lock instead measures the tracker's
+     * convergence, and any octave flip on the way, rather than the track's
+     * steadiness. That reads as instability on tracks that have none: of the
+     * 657 records pinned at the 255ms cap on a 3464-track index, 656 were
+     * also settled -- which is to say they had held one period within
+     * BP_AGREE_PCT for BP_HOLD_MS, something a genuine half-beat spread
+     * cannot coexist with. */
     if (hold_period == 0 ||
         BP_DIFF(bt.period_ms, hold_period) * 100 > hold_period * BP_AGREE_PCT)
     {
         hold_period = bt.period_ms;
         hold_since_ms = track_ms;
+        period_lo = period_hi = bt.period_ms;
+    }
+    else
+    {
+        if (bt.period_ms < period_lo)
+            period_lo = bt.period_ms;
+        if (bt.period_ms > period_hi)
+            period_hi = bt.period_ms;
     }
 
     if (beat_track_fill() >= BP_FILL_PCT &&

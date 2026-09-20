@@ -168,10 +168,17 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out)
      * field spans 9 to 23. */
     out->dynamics = nrm(r->level_spread, 8, 24);
 
-    /* Tempo only where the tracker held still for it. Measured across 3400
-     * tracks, 94% of locked readings sit inside 10ms of spread; the rest are
-     * tracks it never settled on, and a number taken from one of those is
-     * worse than no number at all. */
+    /* Tempo only where the tracker held still for it. Measured over 200
+     * tracks sampled across a 3470-track library, 187 lock and 74% of those
+     * sit inside 10ms of spread, the widest reading 46ms -- so the gate keeps
+     * three quarters of what locks and refuses the readings that describe no
+     * one tempo.
+     *
+     * Trap: the threshold is absolute where the spread it tests is not
+     * relative to the beat period, which reads like a bias against fast
+     * tracks. It is not one. Across 40 to 180 BPM the trust rate is flat,
+     * and a relative gate admitting the same share of the library is the
+     * worse of the two at the fast end. */
     bpm = r->period_ms ? 60000 / r->period_ms : 0;
 
     /* Trusted on the same terms, and then read two ways. Folded, for anything
@@ -196,7 +203,8 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out)
     /* How well it held, which is worth knowing exactly where the tempo is
      * not: the spread that puts the axis above out of use is this axis's
      * signal. Absent only where there was no lock, since the spread then
-     * describes nothing. A third of a real library reads unsteady. */
+     * describes nothing. The 40 rounds the 98th percentile of the measured
+     * spread outwards, as the band endpoints above do. */
     out->steady = r->period_ms ? AX - nrm(r->tempo_spread, 0, 40) : -1;
 
     /* Available on about three fifths of a real library. Absent is not the
