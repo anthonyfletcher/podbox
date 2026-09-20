@@ -9,10 +9,11 @@
  * The playback log records paths and nothing else, so the names have to come
  * from somewhere. Two sources, in order of how much they know:
  *
- *   The database. Every file the tagcache knows is resolved once into
- *   {path hash -> artist, album, title}, strings pooled, and that map is
- *   saved keyed to the database's entry count so later runs skip the sweep.
- *   This is the only source that can name an ALBUM at all.
+ *   The database. Every file the tagcache knows -- or as many of them as the
+ *   buffer holds -- is resolved once into {path hash -> artist, album,
+ *   title}, strings pooled, and that map is saved keyed to the database's
+ *   entry count so later runs skip the sweep. This is the only source that
+ *   can name an ALBUM at all.
  *
  *   The filename. For files the database does not know, "Artist - Album - NN
  *   Title.ext" is unpicked, falling back to the parent folder when the name
@@ -47,6 +48,18 @@
 /* Longest metadata string read out of the database. Anything past this is
  * truncated, which is what the aggregates would do to it anyway. */
 #define META_MAX 160
+
+/* Pool bytes an entry is sized for. What one costs is about the length of a
+ * title, since the artist and the album it shares with its neighbours are
+ * interned once between them.
+ *
+ * POOL_MIN is the least a map is worth building at: at that size a fully
+ * tagged library runs the pool out towards the end of the sweep and the
+ * entries past that point fall back to the filename, which still leaves most
+ * of the library named. POOL_PER_ENTRY is what such a library actually uses,
+ * and more than that would only take room the aggregate tables can use. */
+#define POOL_MIN        24
+#define POOL_PER_ENTRY  40
 
 struct map_entry
 {
@@ -235,6 +248,14 @@ static bool map_load(void)
     return ok;
 }
 
+/* Forget the saved map, so the next open sweeps the database again. For when
+ * the names in it are wrong rather than merely stale: a retagged library
+ * keeps its entry count, which is all map_load() checks. */
+void pv_names_discard(void)
+{
+    remove(PV_MAP_PATH);
+}
+
 /* One pass over every file the database knows. Seeky on a spinning disk, so
  * it only ever runs when the saved map does not match. */
 static void map_sweep(void)
@@ -263,7 +284,7 @@ static void map_sweep(void)
         map_n++;
 
         if ((map_n & 63) == 0)
-            splashf(0, "Reading the database (%d/%d)", map_n, map_db_entries);
+            splashf(0, "Reading the database (%d/%d)", map_n, map_cap);
     }
 
     tagcache_search_finish(&tcs);
@@ -274,6 +295,7 @@ size_t pv_names_init(void *buf, size_t bufsz)
     struct tagcache_stat *stat;
     char *base = buf;
     size_t used = 0;
+    size_t budget, index_bytes, slack;
     int slots;
 
     map = NULL;
@@ -290,32 +312,73 @@ size_t pv_names_init(void *buf, size_t bufsz)
         return 0;               /* no database: filenames it is */
 
     map_db_entries = stat->total_entries;
-    map_cap = map_db_entries;
-    slots = next_pow2(map_cap * 2);
 
-    /* 24 bytes an entry covers an artist, an album and a title for a
-     * typically-named library, with the repeats deduped away. Offsets are
-     * full ints rather than 16-bit: a pool capped at 64 KB loses every name
-     * past that point, and the screen then falls back to guesswork from the
-     * filename without saying it has. */
-    map_pool_cap = (unsigned)map_cap * 24;
+    /* Half the buffer, counting the sweep's scratch, since that is the high
+     * water mark even though it is not charged. The aggregate tables have the
+     * rest, and squeezing those further to name a few more entries is not a
+     * trade worth making. */
+    budget = bufsz / 2;
+
+    /* The largest map that budget holds, rather than none at all. A map
+     * covering part of the library names that part from its tags; no map at
+     * all names none of it, and says nothing about it, because folder
+     * guesswork looks like an answer. The sweep stops at map_cap, so what a
+     * truncated map lacks is the tail of the database and nothing else.
+     *
+     * Searched by index size, which is a power of two and is paid for whole.
+     * An index of 's' slots serves at most s/2 entries -- the load factor the
+     * rest of this file is written to -- while what is left of the budget
+     * after it serves however many can still afford a pool. Those two limits
+     * move against each other, so every size is tried and the best kept.
+     *
+     * Trap: deriving the size from the entry count instead stops at whichever
+     * index the library asks for, and a large library on a small buffer asks
+     * for one that exhausts the budget on its own. That reads as no room for
+     * a map when the room for a smaller one is right there. */
+    map_cap = 0;
+    slots = 0;
+    index_bytes = 0;
+    for (int s = next_pow2(map_db_entries * 2); s >= 2; s >>= 1)
+    {
+        size_t idx = (size_t)s * (sizeof(int) + sizeof(unsigned int));
+        int fit;
+
+        if (idx >= budget)
+            continue;
+
+        fit = (int)((budget - idx) / (sizeof(struct map_entry) + POOL_MIN));
+        if (fit > s / 2)
+            fit = s / 2;
+        if (fit > map_db_entries)
+            fit = map_db_entries;
+
+        if (fit > map_cap)
+        {
+            map_cap = fit;
+            slots = s;
+            index_bytes = idx;
+        }
+    }
+
+    if (map_cap <= 0)
+        return 0;               /* no room for a map: filenames it is */
+
+    /* Whatever the entries and their index leave goes to the pool, capped at
+     * what a library can use. Slack is better spent here than handed back to
+     * the tables: an entry whose name did not fit in the pool is an entry the
+     * map may as well not hold, and a pool that runs out mid-sweep takes
+     * every entry after it as well. */
+    slack = budget - (size_t)map_cap * sizeof(struct map_entry) - index_bytes;
+    map_pool_cap = (unsigned)map_cap * POOL_PER_ENTRY;
     if (map_pool_cap < 4096)
-        map_pool_cap = 4096;
+        map_pool_cap = 4096;    /* a small library still gets a pool */
+    if (map_pool_cap > slack)
+        map_pool_cap = (unsigned)slack;
 
     /* What survives this call, and is charged to the caller. */
     used = (size_t)map_cap * sizeof(struct map_entry)
          + (size_t)slots * sizeof(int)          /* entry index */
          + map_pool_cap;
-
-    /* Half the buffer at most, counting the sweep's scratch, since that is
-     * the high-water mark even though it is not charged. Past that the
-     * aggregates would be squeezed into uselessness, and filename guesswork
-     * over a full set of tables beats perfect names over a truncated one. */
-    if (used + (size_t)slots * sizeof(unsigned int) > bufsz / 2)
-    {
-        map_cap = 0;
-        return 0;
-    }
 
     map       = (struct map_entry *)base;
     map_slots = (int *)(base + (size_t)map_cap * sizeof(struct map_entry));

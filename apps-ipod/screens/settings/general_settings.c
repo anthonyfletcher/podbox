@@ -45,6 +45,8 @@
 #include "system/volume.h"
 #include "pathfuncs.h"
 #include "screens/system/sound_scan.h"
+#include "viewers/playback_viewer/pv_index.h"  /* the Playback Report's two */
+#include "viewers/playback_viewer/pv_names.h"  /* caches, cleared together */
 
 
 /** Tagcache menu **/
@@ -194,12 +196,37 @@ MENUITEM_FUNCTION(maint_update_sound, 0, ID2P(LANG_UPDATE_SOUND),
 MENUITEM_FUNCTION(maint_rebuild_sound, 0, ID2P(LANG_REBUILD_SOUND),
                   maint_sound_rebuild, maint_sound_callback, Icon_NOICON);
 
+/* Neither a table row nor a background task: this deletes the two files the
+ * Playback Report caches and leaves the screen to rebuild them the next time
+ * it opens, which is where the work is and why the splash promises it rather
+ * than reporting it.
+ *
+ * Both files, because they only make sense as a pair. The index holds the rows
+ * the log added up to and the name map holds the names those rows were built
+ * from, so clearing either one alone rebuilds the same rows from the same
+ * names -- which is exactly the case this row exists for, a library whose tags
+ * have changed under a cache that cannot tell. */
+static int maint_report_rebuild(void)
+{
+    if (yesno_pop_confirm(ID2P(LANG_REBUILD_REPORT)))
+    {
+        pv_index_discard();
+        pv_names_discard();
+        splash(HZ, ID2P(LANG_REBUILD_REPORT_SPLASH));
+    }
+    return 0;
+}
+
+MENUITEM_FUNCTION(maint_rebuild_report, 0, ID2P(LANG_REBUILD_REPORT),
+                  maint_report_rebuild, NULL, Icon_NOICON);
+
 MAKE_MENU(maintenance_menu, ID2P(LANG_LIBRARY_MAINTENANCE), 0, Icon_NOICON,
             &maint_update_db,
             &maint_update_index,
             &maint_update_cache,
             &maint_rescan_files,
             &maint_update_sound,
+            &maint_rebuild_report,
             &maint_rebuild_db,
             &maint_rebuild_cache,
             &maint_rebuild_sound);

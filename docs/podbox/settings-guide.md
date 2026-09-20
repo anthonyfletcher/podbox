@@ -60,12 +60,15 @@ before it starts. All of them queue work for the background and return at once.
 | Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned. |
 | Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
 | Update Sound Analysis | Measures tracks the sound analysis has not covered, and retries any it could not read. Needs the charger, and holds the player while it runs. |
+| Rebuild Playback Report | Discards the report's saved figures and the track names it resolved, so it reads the log and the database again. For a library whose tags have changed under it. |
 | Rebuild Database | Discards the database and reads every file again. Slow. |
 | Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
 | Rebuild Sound Analysis | Measures every track again. Hours on a full library. |
 
 The two Sound Analysis rows appear only once **Playlist Engine** is on, and
-unlike the rest they hold the player rather than queueing work.
+unlike the rest they hold the player rather than queueing work. **Rebuild
+Playback Report** queues nothing either: it clears two cached files, and the
+report rebuilds them itself the next time you open it.
 
 ---
 

@@ -19608,6 +19608,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_REBUILD_REPORT
+  desc: maintenance action, discard the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuild Playback Report"
+  </source>
+  <dest>
+    *: "Rebuild Playback Report"
+  </dest>
+  <voice>
+    *: "Rebuild playback report"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT_SPLASH
+  desc: splash after clearing the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuilds next time it opens"
+  </source>
+  <dest>
+    *: "Rebuilds next time it opens"
+  </dest>
+  <voice>
+    *: "Rebuilds next time it opens"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SETTINGS_MODE_STANDARD
   desc: settings mode showing everything except the advanced rows
   user: core

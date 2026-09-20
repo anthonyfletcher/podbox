@@ -24,9 +24,16 @@
  * one does not match it, so this is usually a single file read. A sweep puts
  * a progress splash up, because on a spinning disk it is not quick.
  *
- * Returns 0 when there is no usable database, which is not an error: every
- * path then resolves by filename guesswork instead. */
+ * The map is sized to the buffer it is given and covers as much of the
+ * database as fits, the sweep stopping there. Returns 0 when there is no
+ * usable database, or no room for even a partial map, which is not an error:
+ * every path then resolves by filename guesswork instead. */
 size_t pv_names_init(void *buf, size_t bufsz);
+
+/* Delete the saved map, so the next pv_names_init() sweeps the database
+ * again. The map is keyed to the database's entry count alone, so retagging
+ * files in place leaves it stale and this is the only way to clear it. */
+void pv_names_discard(void);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a
  * device with a database ever comes back PV_NAME_DB, the logged paths and
