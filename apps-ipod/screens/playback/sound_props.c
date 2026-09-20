@@ -348,16 +348,21 @@ static void props_band_text(char *buf, size_t len, int id, bool say_it)
         talk_id(id, true);
 }
 
-/* The tempo, which is three answers rather than one.
+/* The tempo, against both tolerances rather than one -- see
+ * SOUND_TEMPO_MATCH_MS and SOUND_TEMPO_PHASE_MS in sound_index.h.
  *
- * A reading the analysis does not trust is still shown, marked as unsteady:
- * the number is usually right, and it is the only thing here a listener can
- * check against their own foot. What the trust gate decides is whether the
- * engine may match on it -- see 'tempo' in sound_mix.h -- and that is a
- * stricter question than whether it is worth printing. */
+ * The number is shown whenever there is one: it is the only thing on this
+ * screen a listener can check against their own foot. The two bounds decide
+ * what is said around it. Whether the tempo may be named at all is the
+ * looser question and the engine has already answered it, so that is read
+ * off the axis rather than tested a second time here. Whether it holds
+ * firmly enough to call steady is the tighter one, and a tempo can be well
+ * worth matching on while being no use to set a metronome by -- which is
+ * most live playing, and nearly all jazz. */
 static void props_pace(char *buf, size_t len, bool say_it)
 {
-    int bpm;
+    int bpm, id;
+    bool named, tight;
 
     if (props_rec.period_ms == 0)
     {
@@ -366,31 +371,31 @@ static void props_pace(char *buf, size_t len, bool say_it)
     }
 
     bpm = 60000 / props_rec.period_ms;
+    named = props_ax.tempo >= 0;
+    tight = props_rec.tempo_spread <= SOUND_TEMPO_PHASE_MS;
+    id = band_of(bd_pace, bpm);
 
-    if (props_ax.tempo >= 0)
-    {
-        int id = band_of(bd_pace, bpm);
-
+    if (named)
         snprintf(buf, len, "%s, %d %s", str(id), bpm, str(LANG_SOUND_BPM));
+    else
+        snprintf(buf, len, "%d %s", bpm, str(LANG_SOUND_BPM));
 
-        if (say_it)
-        {
-            talk_id(id, true);
-            talk_number(bpm, true);
-            talk_id(LANG_SOUND_BPM, true);
-        }
-
-        return;
+    if (!tight)
+    {
+        strlcat(buf, ", ", len);
+        strlcat(buf, str(LANG_SOUND_PACE_UNSTEADY), len);
     }
-
-    snprintf(buf, len, "%d %s, %s", bpm, str(LANG_SOUND_BPM),
-             str(LANG_SOUND_PACE_UNSTEADY));
 
     if (say_it)
     {
+        if (named)
+            talk_id(id, true);
+
         talk_number(bpm, true);
         talk_id(LANG_SOUND_BPM, true);
-        talk_id(LANG_SOUND_PACE_UNSTEADY, true);
+
+        if (!tight)
+            talk_id(LANG_SOUND_PACE_UNSTEADY, true);
     }
 }
 

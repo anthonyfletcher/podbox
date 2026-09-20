@@ -129,10 +129,11 @@ not near the top of a range nothing reaches. So the same track can be
 
 Two lines tell you something the rest of the engine acts on:
 
-- **Pace** shows a tempo the analysis does not trust as *unsteady*. The
-  number is usually right; what the mark means is that *Slow*, *Fast* and
-  *Hypnotic* will skip this track, because a tempo they cannot rely on is
-  worse to them than none.
+- **Pace** marks a tempo that wanders as *unsteady*. The number is still
+  close, but the beat moves too much to set a metronome by -- which is most
+  live playing and nearly all jazz. A tempo that travels further than that
+  loses its speed word as well, and that is the point where *Slow*, *Fast*
+  and *Hypnotic* stop offering the track at all.
 - **Key** reads *Unclear* where the pitch content never settled on major or
   minor. That is common and is not a fault -- about two fifths of a library
   reads that way.
