@@ -168,17 +168,17 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out)
      * field spans 9 to 23. */
     out->dynamics = nrm(r->level_spread, 8, 24);
 
-    /* Tempo only where the tracker held still for it. Measured over 200
-     * tracks sampled across a 3470-track library, 187 lock and 74% of those
-     * sit inside 10ms of spread, the widest reading 46ms -- so the gate keeps
-     * three quarters of what locks and refuses the readings that describe no
-     * one tempo.
+    /* Tempo only where the tracker held still enough for these axes to mean
+     * something, which is SOUND_TEMPO_MATCH_MS rather than the tighter bound
+     * beside it -- see sound_index.h. Measured over 200 tracks sampled across
+     * a 3470-track library, 187 lock, 95% of those sit inside it, and the
+     * widest reading of all is 46ms.
      *
      * Trap: the threshold is absolute where the spread it tests is not
      * relative to the beat period, which reads like a bias against fast
-     * tracks. It is not one. Across 40 to 180 BPM the trust rate is flat,
-     * and a relative gate admitting the same share of the library is the
-     * worse of the two at the fast end. */
+     * tracks. It is not one -- the trust rate is flat across 40 to 180 BPM,
+     * and a relative gate admitting the same share is the worse of the two at
+     * the fast end. */
     bpm = r->period_ms ? 60000 / r->period_ms : 0;
 
     /* Trusted on the same terms, and then read two ways. Folded, for anything
@@ -190,7 +190,7 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out)
      * The two are not interchangeable, and the range each is normalised over
      * says why: folding compresses the whole library into one octave, so
      * 60-180 BPM measured across 3400 tracks becomes 70-140 tapped. */
-    if (bpm > 0 && r->tempo_spread <= 10)
+    if (bpm > 0 && r->tempo_spread <= SOUND_TEMPO_MATCH_MS)
     {
         out->tempo = nrm(fold_bpm(bpm), 70, 140);
         out->speed = nrm(bpm, 60, 180);

@@ -86,6 +86,23 @@ struct sound_record
 #define SOUND_F_NO_MODE  0x10  /* Pitch content did not settle on a mode --
                                   common, and not a fault. See chroma.h */
 
+/* How far the tempo may wander and still be usable, as milliseconds of
+ * tempo_spread. Two numbers, because the two things that read a tempo do not
+ * want the same answer out of one.
+ *
+ * Matching and the moods compare tempi and name speeds. A few BPM out moves
+ * one of fourteen axes by a fraction of the match ceiling, so the tolerance
+ * is the 95th percentile of the measured spread: it admits every track that
+ * locks bar the few whose tempo genuinely travels, and the worst it lets
+ * through is about 6 BPM at 120.
+ *
+ * Anything that has to stay in step with the beat takes the tighter one
+ * instead. A 26ms error at 120 BPM has walked a whole beat inside twenty of
+ * them, so the matching tolerance is useless to play along to however good it
+ * is to choose with. */
+#define SOUND_TEMPO_MATCH_MS  26
+#define SOUND_TEMPO_PHASE_MS  10
+
 /* Errors, matching db_summary's convention. */
 #define SOUND_OK          0
 #define SOUND_ERR_IO     -1
