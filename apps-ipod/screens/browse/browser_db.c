@@ -3118,9 +3118,9 @@ static int browser_db_find_root_entry_by_tag(int tag)
  * without ever entering/displaying the grouping level itself.
  *
  * Deliberately does NOT touch dirlevel/table_history/extra_history the way
- * browser_db_enter() would (leaves dirlevel at 0, wherever rockbox_browse()'s
- * own reset left it) -- apps/tree.c's dirbrowse() only treats BACK as "exit
- * the browse" when dirlevel == 0; at any deeper level it instead pops one
+ * browser_db_enter() would (leaves dirlevel at the 0 the caller entered with)
+ * -- apps/tree.c's dirbrowse() only treats BACK as "exit the browse" when
+ * dirlevel == 0; at any deeper level it instead pops one
  * level via browser_db_exit() and keeps browsing. Bumping dirlevel to 1 (tried
  * first) meant BACK from an album's tracks landed on the root Music menu
  * first, needing a second BACK to actually leave -- not the single-press
@@ -3370,11 +3370,17 @@ int browser_db_load(struct browser_context* c)
     }
 
     /* A shortcut (e.g. root_menu.c's Artists/Albums/Genres entries) armed a
-     * jump straight into a specific tag's browse table. This must happen
-     * here, on the first load of a fresh root, rather than before
-     * rockbox_browse() is called -- rockbox_browse() unconditionally resets
-     * dirlevel/selected_item to 0 for any ID3-DB entry (tree.c), which would
-     * silently discard a dirlevel bump made any earlier. */
+     * jump straight into a specific tag's browse table. It is applied here,
+     * on the first load of a fresh root, rather than before rockbox_browse()
+     * is called: the row it names is matched against a loaded root, and
+     * load_root_for_shortcut() below is what produces one.
+     *
+     * Both conditions on it are load-bearing. rockbox_browse() resets nothing
+     * for an ID3-DB browse -- set_current_file() returns immediately for
+     * SHOW_ID3DB -- so dirlevel and currtable arrive holding whatever the last
+     * browse left, dirlevel the file tree's own depth. An entry point that
+     * arms a shortcut puts both back at the root itself, or the jump is
+     * dropped here and load_root() draws the Music menu in its place. */
     /* The submenu form of the same thing, for a root row that opens a nested
      * menu ("Playback History ==> runtime") rather than browsing a tag. One
      * plain hop: select the row and enter it, exactly as pressing it would. */

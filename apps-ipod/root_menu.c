@@ -324,18 +324,20 @@ static int browser(void* param)
              * last_db_dirlevel/selection resume memory. Looked up by tag
              * identity (not position) so it survives tagnavi.config
              * reordering, and armed for browser_db_load() to apply on its next
-             * fresh root load -- rockbox_browse() (called below)
-             * unconditionally resets dirlevel/selected_item to 0 for any
-             * ID3-DB entry, but NOT currtable/currextra, so those must be
-             * forced back to the root here or browser_db_load() will just keep
-             * showing whatever table was last displayed and the armed
-             * shortcut below will never see a fresh root load to apply on.
+             * fresh root load. Both halves of that fresh root are forced
+             * here: rockbox_browse() resets nothing for an ID3-DB browse, so
+             * dirlevel and currtable arrive holding whatever the last browse
+             * left -- dirlevel the file tree's own depth, which
+             * last_ft_dirlevel carries across this one. A shortcut is applied
+             * only at TABLE_ROOT and dirlevel 0, so without both of these the
+             * jump is dropped and the Music menu root is drawn in its place.
              *
              * A row is one of two kinds: a tag browse, or a submenu such as
              * Playback History. A submenu has a unique id to arm with; a tag
              * browse is armed by its label, because the tag alone does not
              * identify it -- "Album" and "Recently Added" both browse
              * tag_album first, and arming by tag sent both to the former. */
+            tc->dirlevel = 0;
             tc->currtable = 0;
             if (target_menu)
                 browser_db_enter_menu_on_next_load(target_menu);
@@ -355,7 +357,9 @@ static int browser(void* param)
             /* browser_db_enter_album_tracks_on_next_load() was already armed by
              * album_covers.c's SELECT handler before it returned this code --
              * just need the standard ID3DB browse boilerplate here, same as
-             * the TAGNAVI_CASE block above. */
+             * the TAGNAVI_CASE block above -- including the reset to a fresh
+             * root, which is what the armed jump is applied on. */
+            tc->dirlevel = 0;
             tc->currtable = 0;
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         break;
