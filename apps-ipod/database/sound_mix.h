@@ -86,6 +86,13 @@ void sound_mix_axes(const struct sound_record *r, struct sound_axes *out);
 /* How unlike each other two tracks are, 0 (identical) upwards. */
 int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
 
+/* The ceiling on that distance: past it a candidate is not offered. Declared
+ * here rather than kept private to sound_mix.c because the read-out in
+ * screens/playback/sound_props.c names the moods a track would be offered
+ * by, and that claim holds only while it asks with the same number. The
+ * derivation is above the mix weights. */
+#define MIX_MAX_DISTANCE 180
+
 /* Why a mix could not be built. Separated because what to do about each is
  * different: an unmeasured track wants a scan, an empty result wants a wider
  * library, and a database that is busy wants a moment. */

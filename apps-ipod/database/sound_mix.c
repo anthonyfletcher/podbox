@@ -478,7 +478,6 @@ static const uint16_t mix_exp[40] = {
  * Ninety records of eight albums is a small and narrow sample, and the
  * absolute number wants re-deriving against a library of thousands. The rule
  * does not. */
-#define MIX_MAX_DISTANCE 180
 
 /* Tracks shorter than this are not offered. They are intros, interludes and
  * segues -- they measure as real tracks and arrive as real matches, and a

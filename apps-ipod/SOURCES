@@ -136,6 +136,7 @@ files/path_list.c
 screens/system/runtime_info.c
 screens/shortcuts.c
 screens/system/time_set.c
+screens/playback/sound_props.c
 screens/playback/track_info.c
 screens/playback/wps.c
 

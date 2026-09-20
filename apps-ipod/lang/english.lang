@@ -20773,3 +20773,871 @@
     *: "Continue playing"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SOUND_PROPERTIES
+  desc: in Track Info, the row opening the sound read-out, and its screen title
+  user: core
+  <source>
+    *: "Sound"
+  </source>
+  <dest>
+    *: "Sound"
+  </dest>
+  <voice>
+    *: "Sound"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOODS
+  desc: sound read-out: the moods this track would be offered by
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Moods"
+  </dest>
+  <voice>
+    *: "Moods"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_NEAREST_MOOD
+  desc: sound read-out: shown instead of Moods when no mood is near enough
+  user: core
+  <source>
+    *: "Nearest Mood"
+  </source>
+  <dest>
+    *: "Nearest Mood"
+  </dest>
+  <voice>
+    *: "Nearest mood"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY
+  desc: sound read-out: how much the track drives
+  user: core
+  <source>
+    *: "Energy"
+  </source>
+  <dest>
+    *: "Energy"
+  </dest>
+  <voice>
+    *: "Energy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE
+  desc: sound read-out: tempo
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "Pace"
+  </dest>
+  <voice>
+    *: "Pace"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE
+  desc: sound read-out: the balance between treble, mid and bass
+  user: core
+  <source>
+    *: "Tone"
+  </source>
+  <dest>
+    *: "Tone"
+  </dest>
+  <voice>
+    *: "Tone"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY
+  desc: sound read-out: how much is happening
+  user: core
+  <source>
+    *: "Activity"
+  </source>
+  <dest>
+    *: "Activity"
+  </dest>
+  <voice>
+    *: "Activity"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK
+  desc: sound read-out: how sharply the sound hits
+  user: core
+  <source>
+    *: "Attack"
+  </source>
+  <dest>
+    *: "Attack"
+  </dest>
+  <voice>
+    *: "Attack"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE
+  desc: sound read-out: how clearly pitched the sound is
+  user: core
+  <source>
+    *: "Texture"
+  </source>
+  <dest>
+    *: "Texture"
+  </dest>
+  <voice>
+    *: "Texture"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE
+  desc: sound read-out: stereo width
+  user: core
+  <source>
+    *: "Space"
+  </source>
+  <dest>
+    *: "Space"
+  </dest>
+  <voice>
+    *: "Space"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER
+  desc: sound read-out: how compressed the master is
+  user: core
+  <source>
+    *: "Master"
+  </source>
+  <dest>
+    *: "Master"
+  </dest>
+  <voice>
+    *: "Master"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT
+  desc: sound read-out: how much the harmony moves
+  user: core
+  <source>
+    *: "Movement"
+  </source>
+  <dest>
+    *: "Movement"
+  </dest>
+  <voice>
+    *: "Movement"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY
+  desc: sound read-out: musical key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Key"
+  </dest>
+  <voice>
+    *: "Key"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_BPM
+  desc: sound read-out: beats per minute, after the number
+  user: core
+  <source>
+    *: "BPM"
+  </source>
+  <dest>
+    *: "BPM"
+  </dest>
+  <voice>
+    *: "B P M"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_LOW
+  desc: sound read-out, energy: bottom quarter of the library
+  user: core
+  <source>
+    *: "Low"
+  </source>
+  <dest>
+    *: "Low"
+  </dest>
+  <voice>
+    *: "Low"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_MODERATE
+  desc: sound read-out, energy: second quarter of the library
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Moderate"
+  </dest>
+  <voice>
+    *: "Moderate"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_HIGH
+  desc: sound read-out, energy: third quarter of the library
+  user: core
+  <source>
+    *: "High"
+  </source>
+  <dest>
+    *: "High"
+  </dest>
+  <voice>
+    *: "High"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_VERY_HIGH
+  desc: sound read-out, energy: top quarter of the library
+  user: core
+  <source>
+    *: "Very high"
+  </source>
+  <dest>
+    *: "Very high"
+  </dest>
+  <voice>
+    *: "Very high"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_SLOW
+  desc: sound read-out, pace: under 70 BPM
+  user: core
+  <source>
+    *: "Very slow"
+  </source>
+  <dest>
+    *: "Very slow"
+  </dest>
+  <voice>
+    *: "Very slow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_SLOW
+  desc: sound read-out, pace: 70 to 89 BPM
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Slow"
+  </dest>
+  <voice>
+    *: "Slow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_RELAXED
+  desc: sound read-out, pace: 90 to 109 BPM
+  user: core
+  <source>
+    *: "Relaxed"
+  </source>
+  <dest>
+    *: "Relaxed"
+  </dest>
+  <voice>
+    *: "Relaxed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_MODERATE
+  desc: sound read-out, pace: 110 to 129 BPM
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Moderate"
+  </dest>
+  <voice>
+    *: "Moderate"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_BRISK
+  desc: sound read-out, pace: 130 to 149 BPM
+  user: core
+  <source>
+    *: "Brisk"
+  </source>
+  <dest>
+    *: "Brisk"
+  </dest>
+  <voice>
+    *: "Brisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_FAST
+  desc: sound read-out, pace: 150 to 169 BPM
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Fast"
+  </dest>
+  <voice>
+    *: "Fast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_FAST
+  desc: sound read-out, pace: 170 BPM and over
+  user: core
+  <source>
+    *: "Very fast"
+  </source>
+  <dest>
+    *: "Very fast"
+  </dest>
+  <voice>
+    *: "Very fast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_UNSTEADY
+  desc: sound read-out, pace: follows the tempo where it is not trusted
+  user: core
+  <source>
+    *: "unsteady"
+  </source>
+  <dest>
+    *: "unsteady"
+  </dest>
+  <voice>
+    *: "unsteady"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_NONE
+  desc: sound read-out, pace: the analysis found no beat at all
+  user: core
+  <source>
+    *: "No steady beat"
+  </source>
+  <dest>
+    *: "No steady beat"
+  </dest>
+  <voice>
+    *: "No steady beat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_DARK
+  desc: sound read-out, tone: much less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Dark"
+  </dest>
+  <voice>
+    *: "Dark"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_WARM
+  desc: sound read-out, tone: less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Warm"
+  </dest>
+  <voice>
+    *: "Warm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BALANCED
+  desc: sound read-out, tone: treble about where the loudness predicts
+  user: core
+  <source>
+    *: "Balanced"
+  </source>
+  <dest>
+    *: "Balanced"
+  </dest>
+  <voice>
+    *: "Balanced"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BRIGHT
+  desc: sound read-out, tone: more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Bright"
+  </dest>
+  <voice>
+    *: "Bright"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_VERY_BRIGHT
+  desc: sound read-out, tone: much more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Very bright"
+  </source>
+  <dest>
+    *: "Very bright"
+  </dest>
+  <voice>
+    *: "Very bright"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BASS_LED
+  desc: sound read-out, tone: appended where the low band leads
+  user: core
+  <source>
+    *: "bass-forward"
+  </source>
+  <dest>
+    *: "bass-forward"
+  </dest>
+  <voice>
+    *: "bass forward"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_MID_LED
+  desc: sound read-out, tone: appended where the middle band leads
+  user: core
+  <source>
+    *: "mid-forward"
+  </source>
+  <dest>
+    *: "mid-forward"
+  </dest>
+  <voice>
+    *: "mid forward"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_SPARSE
+  desc: sound read-out, activity: few onsets
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Sparse"
+  </dest>
+  <voice>
+    *: "Sparse"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_OPEN
+  desc: sound read-out, activity: below average onsets
+  user: core
+  <source>
+    *: "Open"
+  </source>
+  <dest>
+    *: "Open"
+  </dest>
+  <voice>
+    *: "Open"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_BUSY
+  desc: sound read-out, activity: above average onsets
+  user: core
+  <source>
+    *: "Busy"
+  </source>
+  <dest>
+    *: "Busy"
+  </dest>
+  <voice>
+    *: "Busy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_VERY_BUSY
+  desc: sound read-out, activity: many onsets
+  user: core
+  <source>
+    *: "Very busy"
+  </source>
+  <dest>
+    *: "Very busy"
+  </dest>
+  <voice>
+    *: "Very busy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_SMOOTH
+  desc: sound read-out, attack: very little transient
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Smooth"
+  </dest>
+  <voice>
+    *: "Smooth"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_EVEN
+  desc: sound read-out, attack: below average transient
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Even"
+  </dest>
+  <voice>
+    *: "Even"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_PUNCHY
+  desc: sound read-out, attack: above average transient
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Punchy"
+  </dest>
+  <voice>
+    *: "Punchy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_VERY_PUNCHY
+  desc: sound read-out, attack: sharp transient
+  user: core
+  <source>
+    *: "Very punchy"
+  </source>
+  <dest>
+    *: "Very punchy"
+  </dest>
+  <voice>
+    *: "Very punchy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_NOISY
+  desc: sound read-out, texture: little clear pitch
+  user: core
+  <source>
+    *: "Noisy"
+  </source>
+  <dest>
+    *: "Noisy"
+  </dest>
+  <voice>
+    *: "Noisy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_BLENDED
+  desc: sound read-out, texture: below average pitch clarity
+  user: core
+  <source>
+    *: "Blended"
+  </source>
+  <dest>
+    *: "Blended"
+  </dest>
+  <voice>
+    *: "Blended"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_CLEAR
+  desc: sound read-out, texture: above average pitch clarity
+  user: core
+  <source>
+    *: "Clear"
+  </source>
+  <dest>
+    *: "Clear"
+  </dest>
+  <voice>
+    *: "Clear"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_VERY_CLEAR
+  desc: sound read-out, texture: strongly pitched
+  user: core
+  <source>
+    *: "Very clear"
+  </source>
+  <dest>
+    *: "Very clear"
+  </dest>
+  <voice>
+    *: "Very clear"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_MONO
+  desc: sound read-out, space: almost no stereo difference
+  user: core
+  <source>
+    *: "Almost mono"
+  </source>
+  <dest>
+    *: "Almost mono"
+  </dest>
+  <voice>
+    *: "Almost mono"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_NARROW
+  desc: sound read-out, space: below average stereo width
+  user: core
+  <source>
+    *: "Narrow"
+  </source>
+  <dest>
+    *: "Narrow"
+  </dest>
+  <voice>
+    *: "Narrow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_WIDE
+  desc: sound read-out, space: above average stereo width
+  user: core
+  <source>
+    *: "Wide"
+  </source>
+  <dest>
+    *: "Wide"
+  </dest>
+  <voice>
+    *: "Wide"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_VERY_WIDE
+  desc: sound read-out, space: very wide stereo
+  user: core
+  <source>
+    *: "Very wide"
+  </source>
+  <dest>
+    *: "Very wide"
+  </dest>
+  <voice>
+    *: "Very wide"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_DYNAMIC
+  desc: sound read-out, master: a large gap between peak and average
+  user: core
+  <source>
+    *: "Very dynamic"
+  </source>
+  <dest>
+    *: "Very dynamic"
+  </dest>
+  <voice>
+    *: "Very dynamic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_DYNAMIC
+  desc: sound read-out, master: an above average gap between peak and average
+  user: core
+  <source>
+    *: "Dynamic"
+  </source>
+  <dest>
+    *: "Dynamic"
+  </dest>
+  <voice>
+    *: "Dynamic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_EVEN
+  desc: sound read-out, master: an average gap between peak and average
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Even"
+  </dest>
+  <voice>
+    *: "Even"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_COMPRESSED
+  desc: sound read-out, master: a small gap between peak and average
+  user: core
+  <source>
+    *: "Compressed"
+  </source>
+  <dest>
+    *: "Compressed"
+  </dest>
+  <voice>
+    *: "Compressed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_COMPRESSED
+  desc: sound read-out, master: almost no gap between peak and average
+  user: core
+  <source>
+    *: "Very compressed"
+  </source>
+  <dest>
+    *: "Very compressed"
+  </dest>
+  <voice>
+    *: "Very compressed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_STATIC
+  desc: sound read-out, movement: the harmony barely moves
+  user: core
+  <source>
+    *: "Static"
+  </source>
+  <dest>
+    *: "Static"
+  </dest>
+  <voice>
+    *: "Static"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_GENTLE
+  desc: sound read-out, movement: the harmony moves a little
+  user: core
+  <source>
+    *: "Gentle"
+  </source>
+  <dest>
+    *: "Gentle"
+  </dest>
+  <voice>
+    *: "Gentle"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_SHIFTING
+  desc: sound read-out, movement: the harmony moves often
+  user: core
+  <source>
+    *: "Shifting"
+  </source>
+  <dest>
+    *: "Shifting"
+  </dest>
+  <voice>
+    *: "Shifting"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_RESTLESS
+  desc: sound read-out, movement: the harmony moves constantly
+  user: core
+  <source>
+    *: "Restless"
+  </source>
+  <dest>
+    *: "Restless"
+  </dest>
+  <voice>
+    *: "Restless"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MAJOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "major"
+  </source>
+  <dest>
+    *: "major"
+  </dest>
+  <voice>
+    *: "major"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MINOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "minor"
+  </source>
+  <dest>
+    *: "minor"
+  </dest>
+  <voice>
+    *: "minor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_UNCLEAR
+  desc: sound read-out, key: the pitch content did not commit to one
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Unclear"
+  </dest>
+  <voice>
+    *: "Unclear"
+  </voice>
+</phrase>

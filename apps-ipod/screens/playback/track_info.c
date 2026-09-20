@@ -32,6 +32,7 @@
 #include "system/app_util.h"
 #include "system/format_time.h"
 #include "system/shutdown.h"
+#include "sound_props.h"
 #include "track_info.h"
 
 static const int id3_headers[]=
@@ -47,6 +48,7 @@ static const int id3_headers[]=
     LANG_ID3_TRACKNUM,
     LANG_ID3_COMMENT,
     LANG_ID3_GENRE,
+    LANG_SOUND_PROPERTIES,
     LANG_ID3_YEAR,
     LANG_ID3_LENGTH,
     LANG_ID3_PLAYLIST,
@@ -258,6 +260,17 @@ static const char * id3_get_or_speak_info(int selected_item, void* data,
             case LANG_ID3_GENRE:
                 val = id3->genre_string;
                 if(say_it && val)
+                    talk_spell(val, true);
+                break;
+            case LANG_SOUND_PROPERTIES:
+                /* One track only. A summary over several is not a
+                 * description of any of them, and the read-out behind the
+                 * row reads a single record. */
+                if (info->track_ct > 1 || id3->path[0] == 0 ||
+                    !sound_props_summary(id3->path, buffer, buffer_len))
+                    return NULL;
+                val = buffer;
+                if(say_it)
                     talk_spell(val, true);
                 break;
             case LANG_ID3_YEAR: {
@@ -513,6 +526,21 @@ refresh_info:
                 /* A row mid-scroll keeps animating under the text view. */
                 gui_synclist_scroll_stop(&id3_lists);
                 int header_id = id3_headers[info.info_id[id3_lists.selected_item]];
+                /* Its own screen, not the field view: the row is a summary
+                 * of eleven lines rather than one value too long to fit. */
+                if (header_id == LANG_SOUND_PROPERTIES)
+                {
+                    if (sound_props_screen(id3->path))
+                    {
+                        ret = true;
+                        break;
+                    }
+                    gui_synclist_set_title(&id3_lists, str(LANG_TRACK_INFO),
+                                           NOICON);
+                    gui_synclist_draw(&id3_lists);
+                    continue;
+                }
+
                 char* title_and_text[2];
                 title_and_text[0] = str(header_id);
 

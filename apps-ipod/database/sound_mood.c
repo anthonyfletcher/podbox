@@ -181,6 +181,14 @@ static const struct mood_def moods[MOOD_COUNT] = {
     [MOOD_UPLIFTING]  = MOOD(uplifting,  LANG_MOOD_UPLIFTING,   0, false),
 };
 
+int sound_mood_name(int mood)
+{
+    if (mood < 0 || mood >= MOOD_COUNT)
+        return LANG_MOOD_CALM;
+
+    return moods[mood].lang;
+}
+
 static uint32_t mood_root(uint32_t v)
 {
     uint32_t r = 0;

@@ -17,6 +17,10 @@ enum {
     MOOD_UPLIFTING, MOOD_COUNT
 };
 
+/* The name of a mood, as a lang id. The table is here, so a screen that names
+ * moods reads it rather than keeping a second copy in menu order. */
+int sound_mood_name(int mood);
+
 /* How unlike the mood a track is, 0 upwards, on the same scale as the
  * track-to-track distance. Negative where the mood cannot judge the track at
  * all -- Slow and Fast have nothing to say about a track whose tempo the

@@ -108,6 +108,38 @@ in the run is filled from the tracks nearest that point along the way, so the
 change is heard gradually rather than as a join in the middle. Slow → Fast
 climbs steadily from around 78 BPM to around 133. No track appears twice.
 
+## What a track sounds like
+
+Track Info gains a **Sound** row for any track the analysis has covered,
+and opening it reads the measurements back in words.
+
+The top line is the moods the track sits in -- the same test a mood playlist
+uses, so those are the moods it would be offered by. A track can sit in
+none, and then the line names the nearest one instead of claiming it is in
+it.
+
+Below that, one line each for energy, pace, tone, how much is happening, how
+sharply it attacks, how clearly pitched it is, stereo width, how compressed
+the master is, how much the harmony moves, and the key.
+
+The words are relative to the music on the player rather than to the scale
+behind them: **Bright** means brighter than three quarters of what you own,
+not near the top of a range nothing reaches. So the same track can be
+*Bright* on one library and *Balanced* on another, and both are true.
+
+Two lines tell you something the rest of the engine acts on:
+
+- **Pace** shows a tempo the analysis does not trust as *unsteady*. The
+  number is usually right; what the mark means is that *Slow*, *Fast* and
+  *Hypnotic* will skip this track, because a tempo they cannot rely on is
+  worse to them than none.
+- **Key** reads *Unclear* where the pitch content never settled on major or
+  minor. That is common and is not a fault -- about two fifths of a library
+  reads that way.
+
+The row is only there with the engine on and the track measured; a track the
+scan has not reached yet has no row rather than an empty one.
+
 ## Settings
 
 All under **Settings → Library → Playlist Engine**.
