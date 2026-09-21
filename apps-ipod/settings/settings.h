@@ -536,6 +536,7 @@ struct user_settings
                            artist, composer, work, or genre */
     bool party_mode;    /* party mode - unstoppable music */
     bool cuesheet;
+    bool chapter_marks; /* read chapter marks out of the file itself */
     bool car_adapter_mode; /* 0=off 1=on */
     int car_adapter_mode_delay; /* delay before resume,  in seconds*/
     int start_in_screen;

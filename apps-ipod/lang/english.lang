@@ -1851,6 +1851,48 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_CHAPTER_MARKS
+  desc: chapter marks option
+  user: core
+  <source>
+    *: "Chapter Marks"
+  </source>
+  <dest>
+    *: "Chapter Marks"
+  </dest>
+  <voice>
+    *: "Chapter Marks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BROWSE_CHAPTERS
+  desc: context menu entry for a book's chapter list
+  user: core
+  <source>
+    *: "Browse Chapters"
+  </source>
+  <dest>
+    *: "Browse Chapters"
+  </dest>
+  <voice>
+    *: "Browse Chapters"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER
+  desc: spoken before a chapter number
+  user: core
+  <source>
+    *: "Chapter"
+  </source>
+  <dest>
+    *: "Chapter"
+  </dest>
+  <voice>
+    *: "Chapter"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_HEADPHONE_UNPLUG
   desc: in settings_menu.
   user: core

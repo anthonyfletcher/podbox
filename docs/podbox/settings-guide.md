@@ -153,6 +153,7 @@ report rebuilds them itself the next time you open it.
 | Single Mode | Stops after the current track, album, artist, genre or playlist instead of carrying on. Useful for falling asleep to one record. | off |  |
 | Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | off | **Adv** |
+| Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long .m4b shows its chapter names, skips between them and marks them on the progress bar. Only .m4b files are looked at, and a book of more than 99 chapters lists the first 99 of them. | off | **Adv** |
 | Auto-Change Directory | At the end of a folder, move to the next one rather than stopping. Random picks one at random instead. | off |  |
 | Constrain Auto-Change | When playback moves on to the next folder by itself, keeps that move inside the folder you started in -- so an album that runs on goes to its sibling rather than wandering off into the rest of the library. | off | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | track | **Adv** |

@@ -40,6 +40,11 @@ struct cuesheet {
 
     int curr_track_idx;
     struct cue_track_info *curr_track;
+
+    /* Set when the entries came from the file's own chapter marks rather
+       than a cuesheet. The browser then lists one row per entry, the way a
+       track list reads, since a chapter has no performer of its own. */
+    bool chapters;
 };
 
 struct cuesheet_file {

@@ -62,7 +62,7 @@ long audio_filebufused(void);
 void audio_pre_ff_rewind(void);
 void audio_skip(int direction);
 
-void audio_set_cuesheet(bool enable);
+void audio_set_cuesheet(void);
 void audio_set_crossfade(int enable);
 void audio_set_playback_frequency(unsigned int sample_rate_hz);
 void set_albumart_mode(int setting);

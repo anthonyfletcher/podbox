@@ -429,7 +429,10 @@ static const char* list_get_name_cb(int selected_item,
 {
     struct cuesheet *cue = (struct cuesheet *)data;
 
-    if (selected_item & 1)
+    if (cue->chapters)
+        snprintf(buffer, buffer_len, "%02d. %s", selected_item+1,
+                 cue->tracks[selected_item].title);
+    else if (selected_item & 1)
         strmemccpy(buffer, cue->tracks[selected_item/2].title, buffer_len);
     else
         snprintf(buffer, buffer_len, "%02d. %s", selected_item/2+1,
@@ -443,9 +446,19 @@ static const char* list_get_name_cb(int selected_item,
 static int cuesheet_list_voice_cb(int list_index, void *data)
 {
     struct cuesheet *cue = (struct cuesheet *)data;
-    int index = list_index / 2;
+    int index = cue->chapters ? list_index : list_index / 2;
     const char *nameptr;
     size_t dirlen;
+
+    if (cue->chapters)
+    {
+        /* A chapter has no directory of talk clips to draw on, so its name
+           is spelled rather than looked up. */
+        talk_id(LANG_CHAPTER, true);
+        talk_number(index + 1, true);
+        talk_spell(cue->tracks[index].title, true);
+        return 0;
+    }
 
     talk_id(LANG_PLAYTIME_TRACK, true);
     talk_number(index + 1, true);
@@ -469,17 +482,25 @@ void browse_cuesheet(struct cuesheet *cue)
     char title[MAX_PATH];
     int len;
 
+    /* A cuesheet track carries a performer above its title; a chapter does
+       not, so it takes a single row the way a track list reads. */
+    int rows = cue->chapters ? 1 : 2;
+
     struct cuesheet_file cue_file;
     struct mp3entry *id3 = audio_current_track();
 
-    len = snprintf(title, sizeof(title), "%s: %s", cue->performer, cue->title);
+    if (*cue->performer)
+        len = snprintf(title, sizeof(title), "%s: %s", cue->performer,
+                       cue->title);
+    else
+        len = snprintf(title, sizeof(title), "%s", cue->title);
 
     if ((unsigned) len > sizeof(title))
         title[sizeof(title) - 2] = '~'; /* give indication of truncation */
 
 
-    gui_synclist_init(&lists, list_get_name_cb, cue, false, 2, NULL);
-    gui_synclist_set_nb_items(&lists, 2*cue->track_count);
+    gui_synclist_init(&lists, list_get_name_cb, cue, false, rows, NULL);
+    gui_synclist_set_nb_items(&lists, rows*cue->track_count);
     gui_synclist_set_title(&lists, title, 0);
 
     if (global_settings.talk_menu)
@@ -488,7 +509,7 @@ void browse_cuesheet(struct cuesheet *cue)
     if (id3)
     {
         gui_synclist_select_item(&lists,
-                                 2*cue_find_current_track(cue, id3->elapsed));
+                                 rows*cue_find_current_track(cue, id3->elapsed));
     }
 
     /* The loop below redraws at the top of every pass, so the opening frame is
@@ -509,14 +530,24 @@ void browse_cuesheet(struct cuesheet *cue)
             {
                 bool startit = true;
                 unsigned long elapsed =
-                    cue->tracks[gui_synclist_get_sel_pos(&lists)/2].offset;
+                    cue->tracks[gui_synclist_get_sel_pos(&lists)/rows].offset;
 
                 id3 = audio_current_track();
                 if (id3 && *id3->path)
                 {
-                    look_for_cuesheet_file(id3, &cue_file);
-                    if (!strcmp(cue->path, cue_file.path))
-                        startit = false;
+                    if (cue->chapters)
+                    {
+                        /* A chapter list belongs to the one file it was
+                           read from: seek within that file when it is the
+                           one playing, and start it otherwise. */
+                        startit = strcmp(id3->path, cue->file) != 0;
+                    }
+                    else
+                    {
+                        look_for_cuesheet_file(id3, &cue_file);
+                        if (!strcmp(cue->path, cue_file.path))
+                            startit = false;
+                    }
                 }
 
                 if (!startit)

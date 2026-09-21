@@ -1695,6 +1695,8 @@ const struct settings_list settings[] = {
                    ID2P(LANG_SET_BOOL_YES), ID2P(LANG_FORCE)),
     OFFON_SETTING(F_BANFROMQS,cuesheet,LANG_CUESHEET_ENABLE,false,"cuesheet support",
                   NULL),
+    OFFON_SETTING(F_BANFROMQS,chapter_marks,LANG_CHAPTER_MARKS,false,
+                  "chapter marks", NULL),
     TABLE_SETTING_LIST(F_TIME_SETTING | F_ALLOW_ARBITRARY_VALS, skip_length,
                   LANG_SKIP_LENGTH, 0, "skip length",
                   "outro,track",

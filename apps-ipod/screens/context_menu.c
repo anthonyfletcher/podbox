@@ -874,13 +874,34 @@ static int view_cue_item_callback(int action,
     struct mp3entry* id3 = audio_current_track();
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (!selected_file.path || !id3 || !id3->cuesheet)
+        if (!selected_file.path || !id3 || !id3->cuesheet
+            || id3->cuesheet->chapters)
             return ACTION_EXIT_MENUITEM;
     }
     return action;
 }
 MENUITEM_FUNCTION(view_cue_item, 0, ID2P(LANG_BROWSE_CUESHEET),
                   view_cue, view_cue_item_callback, Icon_NOICON);
+
+/* The same screen under the name it earns when the entries came from the
+   file's own chapter marks. The two rows are mutually exclusive. */
+static int view_chapters_item_callback(int action,
+                                       const struct menu_item_ex *this_item,
+                                       struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    struct mp3entry* id3 = audio_current_track();
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        if (!selected_file.path || !id3 || !id3->cuesheet
+            || !id3->cuesheet->chapters)
+            return ACTION_EXIT_MENUITEM;
+    }
+    return action;
+}
+MENUITEM_FUNCTION(view_chapters_item, 0, ID2P(LANG_BROWSE_CHAPTERS),
+                  view_cue, view_chapters_item_callback, Icon_NOICON);
 
 
 static int browse_id3_wrapper(void)
@@ -1334,6 +1355,7 @@ MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &rating_item,
            &bookmark_menu,
            &view_cue_item,
+           &view_chapters_item,
            &sound_mix_item,
            &spike_run_item,
            &context_item_1,

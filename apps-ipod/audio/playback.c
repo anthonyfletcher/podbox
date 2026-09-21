@@ -46,6 +46,7 @@
 #include "metadata.h"
 #include "rbpaths.h"
 #include "metadata/cuesheet.h"
+#include "metadata/mp4_chapters.h"
 #include "buffering.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
@@ -874,12 +875,20 @@ static void track_list_clear(unsigned int action)
 
 /** Audio buffer **/
 
+/* Whether a struct cuesheet has to be carried alongside the playing track.
+   Chapter marks are read into the same buffer as a cuesheet, so either
+   setting calls for it. */
+static bool need_cuesheet_buffer(void)
+{
+    return global_settings.cuesheet || global_settings.chapter_marks;
+}
+
 /* What size is needed for the scratch buffer? */
 static size_t scratch_mem_size(void)
 {
     size_t size = sizeof (struct audio_scratch_memory);
 
-    if (global_settings.cuesheet)
+    if (need_cuesheet_buffer())
         size += sizeof (struct cuesheet);
 
     return size;
@@ -895,7 +904,7 @@ static void scratch_mem_init(void *mem)
     ci.id3 = id3_get(CODEC_ID3);
     audio_scratch_memory->curr_cue = NULL;
 
-    if (global_settings.cuesheet)
+    if (need_cuesheet_buffer())
     {
         audio_scratch_memory->curr_cue =
             SKIPBYTES((struct cuesheet *)audio_scratch_memory,
@@ -1929,8 +1938,8 @@ static bool audio_start_codec(bool auto_skip)
 
 /** Audio thread **/
 
-/* Load and parse a cuesheet for the file - returns false if the buffer
-   is full */
+/* Load and parse a cuesheet, or the file's own chapter marks, for the file -
+   returns false if the buffer is full */
 static bool audio_load_cuesheet(struct track_info *infop,
                                 struct mp3entry *track_id3)
 {
@@ -1943,8 +1952,14 @@ static bool audio_load_cuesheet(struct track_info *infop,
            avoid reloading attempt */
         int hid = ERR_UNSUPPORTED_TYPE;
         struct cuesheet_file cue_file;
+        bool has_cue = global_settings.cuesheet
+                       && look_for_cuesheet_file(track_id3, &cue_file);
+        /* A cuesheet beside the file wins: it was written for this track,
+           where the chapter marks are whatever the encoder left behind. */
+        bool has_chapters = !has_cue && global_settings.chapter_marks
+                            && mp4_chapters_possible(track_id3->path);
 
-        if (look_for_cuesheet_file(track_id3, &cue_file))
+        if (has_cue || has_chapters)
         {
             hid = bufalloc(NULL, sizeof (struct cuesheet), TYPE_CUESHEET);
 
@@ -1953,7 +1968,10 @@ static bool audio_load_cuesheet(struct track_info *infop,
                 void *cuesheet = NULL;
                 bufgetdata(hid, sizeof (struct cuesheet), &cuesheet);
 
-                if (parse_cuesheet(&cue_file, (struct cuesheet *)cuesheet))
+                if (has_cue
+                    ? parse_cuesheet(&cue_file, (struct cuesheet *)cuesheet)
+                    : parse_mp4_chapters(track_id3,
+                                         (struct cuesheet *)cuesheet))
                 {
                     /* Indicate cuesheet is present (while track remains
                        buffered) */
@@ -4456,9 +4474,10 @@ long audio_filebufused(void)
 
 /* Enable or disable cuesheet support and allocate/don't allocate the
    extra associated resources */
-void audio_set_cuesheet(bool enable)
+void audio_set_cuesheet(void)
 {
-    if (play_status == PLAY_STOPPED || !enable != !get_current_cuesheet())
+    if (play_status == PLAY_STOPPED
+        || need_cuesheet_buffer() != !!get_current_cuesheet())
     {
         LOGFQUEUE("audio >| audio Q_AUDIO_REMAKE_AUDIO_BUFFER");
         audio_queue_send(Q_AUDIO_REMAKE_AUDIO_BUFFER, 0);

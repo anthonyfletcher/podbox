@@ -123,20 +123,26 @@ MENUITEM_SETTING(next_folder, &global_settings.next_folder, NULL);
 MENUITEM_SETTING(constrain_next_folder,
                  &global_settings.constrain_next_folder, NULL);
 
-static int cuesheet_callback(int action,
-                             const struct menu_item_ex *this_item,
-                             struct gui_synclist *this_list)
+/* Both settings are served by the one struct cuesheet carried alongside the
+   track, so either being switched is what decides whether the buffer has to
+   be remade. */
+static int cuesheet_buffer_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list)
 {
     (void)this_item;
     (void)this_list;
     switch (action)
     {
         case ACTION_EXIT_MENUITEM: /* on exit */
-            audio_set_cuesheet(global_settings.cuesheet);
+            audio_set_cuesheet();
     }
     return action;
 }
-MENUITEM_SETTING(cuesheet, &global_settings.cuesheet, cuesheet_callback);
+MENUITEM_SETTING(cuesheet, &global_settings.cuesheet,
+                 cuesheet_buffer_callback);
+MENUITEM_SETTING(chapter_marks, &global_settings.chapter_marks,
+                 cuesheet_buffer_callback);
 
 MENUITEM_SETTING(unplug_mode, &global_settings.unplug_mode, NULL);
 MENUITEM_SETTING(unplug_autoresume, &global_settings.unplug_autoresume, NULL);
@@ -164,7 +170,7 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
 
           &replaygain_settings_menu, &beep,
 
-          &next_folder, &constrain_next_folder, &cuesheet
+          &next_folder, &constrain_next_folder, &cuesheet, &chapter_marks
          ,&unplug_menu
          ,&skip_length, &prevent_skip
           ,&rewind_across_tracks

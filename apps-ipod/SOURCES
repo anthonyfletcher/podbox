@@ -50,6 +50,7 @@ playlist/playlist.c
 playlist/viewer.c
 
 metadata/cuesheet.c
+metadata/mp4_chapters.c
 metadata/mul_id3.c
 metadata/tag_trim.c
 #ifdef HAVE_ALBUMART
