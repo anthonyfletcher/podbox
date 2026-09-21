@@ -26,10 +26,11 @@ enum database_sort_albums {
 };
 
 /* The parent an album list hangs under, which is what decides its order.
- * The level above is the whole identity, so Genre and Year both reach albums
- * through an artist level and share DB_ALBUM_CTX_ARTIST with it. A parent
- * that is none of these -- anything a tagnavi_user.config invents -- has no
- * slot and takes database_sort_albums_by. */
+ * The level above is the whole identity, so every menu grouping by the same
+ * artist tag shares one slot: Genre, Year and the history lists all land in
+ * DB_ALBUM_CTX_ALBUMARTIST alongside the Album Artist row. A parent that is
+ * none of these -- anything a tagnavi_user.config invents -- has no slot and
+ * takes database_sort_albums_by. */
 enum db_album_sort_ctx {
     DB_ALBUM_CTX_ROOT = 0,      /* an album list with no level above it */
     DB_ALBUM_CTX_ARTIST,

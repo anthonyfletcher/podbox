@@ -1418,14 +1418,15 @@ Default follows Other Lists, so this row only needs setting when you want this
 one list to differ.
 
 [action: Artist]
-The order for the album list inside an artist. Genre and Year reach albums
-through an artist too, so they follow this row as well.
+The order for the album list inside an artist.
 
 Year here reads as a discography in release order, which is usually what an
 artist's albums want.
 
 [action: Album Artist]
-The order for the album list inside an album artist.
+The order for the album list inside an album artist. Genre, Year and the
+Playback History artist lists group by album artist too, so they follow this
+row as well.
 
 [action: Composer]
 The order for the album list inside a composer.

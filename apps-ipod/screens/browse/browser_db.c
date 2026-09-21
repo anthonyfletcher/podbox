@@ -4633,8 +4633,9 @@ bool browser_db_is_spoken_list(struct browser_context* c)
 
 /* True when this browse level is listing artists -- the rows that can carry
  * artist art, and so the ones worth a taller row. Covers every tag the default
- * menus group artists by: canonicalartist (the "Artist" menu and the artist
- * sublevels under Genre/Year), plus album-artist and plain artist. */
+ * menus group artists by: album-artist (the "Album Artist" menu and the
+ * artist sublevels under Genre and Year), canonicalartist (the "Artist" menu)
+ * and plain artist. */
 bool browser_db_is_artist_list(struct browser_context* c)
 {
     int tag;

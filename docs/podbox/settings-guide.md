@@ -248,8 +248,8 @@ report rebuilds them itself the next time you open it.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Sort Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
-| Sort Albums By ▸ Artist | The order for the album list inside an artist. Genre and Year reach albums through an artist too, so they follow this row as well. | default |  |
-| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. | default |  |
+| Sort Albums By ▸ Artist | The order for the album list inside an artist. | default |  |
+| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. | default |  |
 | Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
 | Sort Albums By ▸ Other Lists | The order for every album list that has no row of its own under Album Sort Order: by name, or by release year with either end first. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
 | Featured Artists | Reads guest credits out of your tags -- the "feat. Somebody" in a track title or artist -- and lets you browse by them, so a singer with no album of their own still turns up. On, Music gains a Featured Artists row and an artist's album list gains one for the records they only guest on; the credits are worked out once per boot, at the first entry to Music. Needs the database loaded to RAM. A name with a comma or an ampersand in it, like Tyler, The Creator, reads as two people unless the player has an album under it. Put such names one per line in /.rockbox/known_artists.txt and they are treated as whole; the file is read when the credits are worked out, so a boot or a database update applies it. | off |  |
