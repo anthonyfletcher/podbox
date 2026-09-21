@@ -109,6 +109,13 @@
  * than body text on a flat fill. */
 #define ART_MIN_RATIO     300
 
+/* How far a carried tint has to stay from the accent, in hundredths, so that
+ * it still reads as a dimmed version of it rather than as the same colour.
+ * Every album in the sample keeps more separation than this on the theme's own
+ * pair, so it is a floor reached only where a narrow album pair leaves no
+ * choice, not a figure anything is aimed at. */
+#define TINT_MIN_SEPARATION 115
+
 /* Transformed colours remembered between palette changes. A skin uses a
  * handful, so this sits well clear of what one asks for. */
 #define XFORM_CACHE_SIZE  16
@@ -1210,6 +1217,51 @@ static int transform_rotation(void)
     return xform_rotation;
 }
 
+/* Remake a tint of the theme's own pair on the album's. This is what carries
+ * the greys, the muted panel fills and the half-tone separators.
+ *
+ * Placed by the contrast it carried rather than at the same fraction along the
+ * pair. A theme's pair spans whatever it spans -- black to white is 21:1 -- and
+ * the album's can be a fraction of that, so a grey three quarters of the way
+ * along the one is nowhere near as legible three quarters of the way along the
+ * other. `t` is therefore a starting point, and the colour walks on toward the
+ * accent until it carries the contrast it had against the theme's background,
+ * or the accent's own bar, whichever asks for less. A deliberately quiet fill
+ * asks for little and does not move.
+ *
+ * The walk stops short of the accent, because a tint has a job the accent
+ * cannot do for it: a list's unselected rows read as unselected by being
+ * dimmer than the selected one. A narrow album pair cannot give a tint both
+ * the contrast and the separation, and arriving at the accent would quietly
+ * spend all of the second on the first.
+ *
+ * Trap: this walks the segment between the two colours instead of calling
+ * color_fit_contrast(), which moves brightness in either direction and off the
+ * segment entirely. Asked for more contrast than the light end of a dark pair
+ * can give, it answers with black -- which turns a dim row invisible rather
+ * than dim. Staying between the pair cannot do that: the furthest it can go is
+ * the accent, and it stops before even that. */
+static unsigned int carry_on_axis(int t, int had)
+{
+    int target = MIN(had, MIN_RATIO);
+    unsigned int out = color_blend(cache.dominant, cache.accent, t);
+
+    while (t < 256 && color_contrast(out, cache.dominant) < target)
+    {
+        unsigned int next;
+        int step = MIN(t + 4, 256);
+
+        next = color_blend(cache.dominant, cache.accent, step);
+        if (color_contrast(next, cache.accent) < TINT_MIN_SEPARATION)
+            break;
+
+        t = step;
+        out = next;
+    }
+
+    return out;
+}
+
 /* Carry a colour the theme named, but which is neither its foreground nor its
  * background, onto the album's palette. */
 static unsigned int transform_literal(unsigned int c)
@@ -1219,11 +1271,8 @@ static unsigned int transform_literal(unsigned int c)
 
     t = axis_position(c, &distance);
 
-    /* A tint of the theme's own pair is not a colour in its own right, so it
-     * is remade at the same place along the new pair. This is what carries the
-     * greys, the muted panel fills and the half-tone separators. */
     if (distance <= AXIS_TOLERANCE)
-        return color_blend(cache.dominant, cache.accent, t);
+        return carry_on_axis(t, color_contrast(c, cache.theme_bg));
 
     color_get_hsv(c, &h, &s, &v);
     out = color_from_hsv(h + transform_rotation(), s, v);
