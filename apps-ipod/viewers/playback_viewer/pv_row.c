@@ -782,6 +782,45 @@ static int year_menu(int cur, bool *to_root, bool *reload)
     return hi - pick;
 }
 
+/* One model build, priming the index first when the artwork slice would
+ * otherwise crowd the name map out of the buffer.
+ *
+ * Names are resolved once, during the pass that reads the log, and written into
+ * the index rows -- so a pass made with the whole region to work in fixes every
+ * later open, which reads those rows back. Nothing is drawn until all of this
+ * has finished, which is what makes the order free to choose: the artwork slice
+ * is idle for the whole of the one pass that needs the room, and on a 512 KB
+ * buffer it is the difference between mapping a part of the library and mapping
+ * all of it.
+ *
+ * Only when the index does not already cover the log. When it does, the build
+ * below reads its rows and resolves nothing, so there is no pass to protect and
+ * the priming would be a second reading of the same file. On a buffer wide
+ * enough for the map and the sleeves at once it is one extra read of the index
+ * the pass just wrote -- a fraction of that pass, and only on the opens that
+ * have one to make.
+ *
+ * The priming pass runs over the whole buffer, artwork slice included, so
+ * whatever sleeves were cached in there are gone by the time it returns and
+ * art_init() has to say so. */
+static enum pv_build_result build_model(void *buf, size_t bufsz, bool art_on,
+                                        struct pv_totals *out, int year)
+{
+    if (art_on && !pv_stats_index_covers(year))
+    {
+        struct pv_totals prime;
+
+        /* Its result needs no handling of its own: the build below repeats it
+         * from the index it wrote, and fails the same way for the same reason
+         * if it failed here. That is where the screen hears about it. */
+        pv_stats_build(buf, bufsz, &prime, year);
+        art_init(buf);
+    }
+
+    return pv_stats_build((char *)buf + (art_on ? ART_BYTES : 0),
+                          bufsz - (art_on ? ART_BYTES : 0), out, year);
+}
+
 /* One visit. Sets *again when a setting has changed that divides the working
  * memory differently: the model is built inside that division, so the only
  * honest way to apply it is to start over. */
@@ -789,8 +828,8 @@ static int row_session(bool *again)
 {
     struct pv_totals totals;
     enum pv_build_result r;
-    void *buf, *stats_buf;
-    size_t bufsz, stats_sz;
+    void *buf;
+    size_t bufsz;
     unsigned long prev;
     int ret = GO_TO_PREVIOUS;
     int year;
@@ -804,7 +843,9 @@ static int row_session(bool *again)
 
     /* Two consumers share this, and dividing it is the screen's job because
      * the screen is the only thing that knows both exist. The artwork takes a
-     * fixed slice off the front; the model sizes itself to what is left.
+     * fixed slice off the front; the model sizes itself to what is left --
+     * except for the pass that resolves names, which runs before the slice is
+     * in use and is given all of it. See build_model().
      *
      * With artwork switched off the slice is not taken at all, which is the
      * second reason that setting exists: it is the largest fixed claim Spun
@@ -818,8 +859,6 @@ static int row_session(bool *again)
      * model. */
     art_on = global_settings.spun_artwork && bufsz > (size_t)ART_BYTES;
     art_init(art_on ? buf : NULL);
-    stats_buf = (char *)buf + (art_on ? ART_BYTES : 0);
-    stats_sz  = bufsz - (art_on ? ART_BYTES : 0);
 
     /* The year Spun opens on comes from the clock, not from the log.
      *
@@ -837,7 +876,7 @@ static int row_session(bool *again)
     }
 
     splash(0, ID2P(LANG_WAIT));
-    r = pv_stats_build(stats_buf, stats_sz, &totals, year);
+    r = build_model(buf, bufsz, art_on, &totals, year);
 
     if (r != PV_BUILD_OK)
     {
@@ -1051,8 +1090,7 @@ static int row_session(bool *again)
                         {
                             splash(0, ID2P(LANG_WAIT));
                             year = y2;
-                            pv_stats_build(stats_buf, stats_sz, &totals,
-                                           year);
+                            build_model(buf, bufsz, art_on, &totals, year);
                             memset(art_key, 0, sizeof(art_key));
                             memset(hue_key, 0, sizeof(hue_key));
                         }

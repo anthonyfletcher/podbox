@@ -27,8 +27,13 @@
  * The map is sized to the buffer it is given and covers as much of the
  * database as fits, the sweep stopping there. Returns 0 when there is no
  * usable database, or no room for even a partial map, which is not an error:
- * every path then resolves by filename guesswork instead. */
-size_t pv_names_init(void *buf, size_t bufsz);
+ * every path then resolves by filename guesswork instead.
+ *
+ * 'may_sweep' false means build from the saved map or not at all. For a caller
+ * that wants names if they are cheap and will not hold the screen for minutes
+ * of seeking to get them -- a saved map too big for the buffer on offer reads
+ * as no map, rather than as a reason to build one. */
+size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep);
 
 /* Delete the saved map, so the next pv_names_init() sweeps the database
  * again. The map is keyed to the database's entry count alone, so retagging

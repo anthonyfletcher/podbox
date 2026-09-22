@@ -34,6 +34,7 @@
 #include "config.h"
 #include "system/hash.h"
 #include "kernel.h"      /* current_tick, HZ */
+#include "database/tagcache.h"   /* the library's size, for the table caps */
 #include "system.h"      /* cpu_boost */
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
@@ -324,14 +325,37 @@ static void htable_reindex(struct pv_htable *t)
     }
 }
 
-static void index_identity(struct pv_index_id *id, enum pv_source src)
+static void index_identity(struct pv_index_id *id, enum pv_source src,
+                           int year)
 {
     id->source      = (unsigned long)src;
     id->agg_size    = sizeof(struct pv_agg);
     id->day_size    = sizeof(struct pv_day);
     id->totals_size = sizeof(struct pv_totals);
     id->state_size  = sizeof(struct pv_badge_state);
-    id->year        = (unsigned long)cur_year;
+    id->year        = (unsigned long)year;
+}
+
+/* Whether a saved index accounts for the whole log, which is the same question
+ * as whether anything has to be named: rows come back from the index with
+ * their names in them, so a log with no unindexed tail needs no name map at
+ * all. One open and a header read, against a map that can cost a sweep of the
+ * database and takes room the aggregate tables would rather have.
+ *
+ * False whenever the answer is not plainly yes -- no index, one that does not
+ * describe this log, or one that stops short of the end of it. */
+static bool index_covers_log(enum pv_source src, int year)
+{
+    struct pv_index_id id;
+    unsigned long log_size = pv_log_size(src);
+    unsigned long covered = 0;
+
+    index_identity(&id, src, year);
+    if (!pv_index_read_begin(&id, log_size, &covered))
+        return false;
+
+    pv_index_read_end();
+    return covered >= log_size;
 }
 
 /* Read a saved index into the tables, which the caller has already sized.
@@ -343,7 +367,7 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
     struct pv_totals saved;
     int n_artist, n_title, n_album, n_days;
 
-    index_identity(&id, out->source);
+    index_identity(&id, out->source, cur_year);
     if (!pv_index_read_begin(&id, log_size, covered))
         return false;
 
@@ -433,7 +457,7 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
 {
     struct pv_index_id id;
 
-    index_identity(&id, out->source);
+    index_identity(&id, out->source, cur_year);
     if (!pv_index_write_begin(&id, covered, out->source))
         return;
 
@@ -1207,10 +1231,28 @@ const struct pv_day *pv_stats_days(int *count)
     return days;
 }
 
+/* Build the name map above the tables, for the run that skipped it and then
+ * found the index unusable after all.
+ *
+ * It gets what the tables left rather than the share it would have had, which
+ * is a smaller map than a full pass deserves -- and still the better answer on
+ * the one path that reaches here, where the alternative is folder guesswork
+ * for every entry in the log. Safe above the tables because 'days' is the last
+ * thing abuf_alloc() hands out; nothing claims arena space after this. */
+static void names_init_late(struct pv_totals *out, bool may_sweep)
+{
+    long t0 = current_tick;
+
+    pv_names_init(abuf + abuf_used, abuf_sz - abuf_used, may_sweep);
+    out->ms_names = (current_tick - t0) * 1000 / HZ;
+    pv_names_info(&out->db_entries, &out->db_mapped, &out->names_swept);
+}
+
 static enum pv_build_result build_body(void *buf, size_t bufsz,
                                        struct pv_totals *out)
 {
     size_t names_used;
+    bool names_skipped = false;
     int cap_title, cap_artist, cap_album;
     long lines;
     unsigned long save_covered = 0;
@@ -1232,23 +1274,42 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     if (out->source == PV_SRC_NONE)
         return PV_BUILD_NO_LOG;
 
-    /* The name map claims the bottom of the buffer; the tables live above it
-     * and never move, so the two never have to know about each other. */
-    if (out->source == PV_SRC_PLAYBACK)
-    {
-        long t0 = current_tick;
-
-        names_used = pv_names_init(buf, bufsz);
-        out->ms_names = (current_tick - t0) * 1000 / HZ;
-        pv_names_info(&out->db_entries, &out->db_mapped, &out->names_swept);
-    }
-    else
+    /* The name map claims the bottom of the buffer when there is one to
+     * build; the tables live above it and never move, so the two never have
+     * to know about each other. */
+    if (out->source != PV_SRC_PLAYBACK)
     {
         /* Not merely zero for tidiness: pv_names_info() would otherwise hand
          * back whatever a previous crunch left behind, which would both
          * misreport on screen and mis-size the tables below. */
         names_used = 0;
         out->db_entries = out->db_mapped = 0;
+    }
+    else if (index_covers_log(out->source, cur_year))
+    {
+        /* Every row is about to come back from the index with its name in it,
+         * so the map has nothing left to resolve and the tables can have the
+         * whole region. On a 512 KB buffer that is the difference between a
+         * full track table and half of one.
+         *
+         * The library's own size still sizes those tables, so a run that
+         * skips the map divides the buffer the same way as one that builds
+         * it -- which is what keeps the caps from coming out smaller than the
+         * row counts the index is about to ask for. */
+        struct tagcache_stat *stat = tagcache_get_stat();
+
+        names_used = 0;
+        names_skipped = true;
+        out->db_mapped = 0;
+        out->db_entries = (stat && stat->ready) ? stat->total_entries : 0;
+    }
+    else
+    {
+        long t0 = current_tick;
+
+        names_used = pv_names_init(buf, bufsz, true);
+        out->ms_names = (current_tick - t0) * 1000 / HZ;
+        pv_names_info(&out->db_entries, &out->db_mapped, &out->names_swept);
     }
 
     abuf      = (char *)buf + names_used;
@@ -1331,6 +1392,15 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     out->cap_albums  = cap_album;
     out->ms_alloc = (current_tick - t_alloc) * 1000 / HZ;
 
+    /* The tables have theirs, so a map in what is left above them costs them
+     * nothing -- and the week drill-down resolves names with it, live, long
+     * after this function has returned. Saved map only: a sweep here would run
+     * on every open, for names that only that one tile reads. A buffer with
+     * nothing spare simply has no map, which is what the drill-down already
+     * answers with folder names for. */
+    if (names_skipped)
+        names_init_late(out, false);
+
     {
         long t0 = current_tick;
         unsigned long log_size = pv_log_size(out->source);
@@ -1349,6 +1419,10 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         if (index_load(out, log_size, &covered))
         {
             out->from_index = true;
+            /* A log that grew between the coverage check and here leaves a
+             * tail to read, and entries in it have to be named. */
+            if (names_skipped && covered < log_size && !out->db_mapped)
+                names_init_late(out, true);
             lines = (covered < log_size)
                   ? pv_log_read_range(out->source, covered, 0, entry_cb, out)
                   : 0;
@@ -1361,6 +1435,12 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         }
         else
         {
+            /* The index the coverage check found does not load after all --
+             * most often its row counts do not fit tables sized like these.
+             * The whole log is replayed instead, so the names are needed
+             * after all. */
+            if (names_skipped && !out->db_mapped)
+                names_init_late(out, true);
             lines = pv_log_read(out->source, entry_cb, out);
             out->ms_read = (current_tick - t0) * 1000 / HZ;
             save_wanted = (lines >= 0);
@@ -1447,6 +1527,15 @@ void pv_stats_year_span(int *first, int *last)
     pv_civil_from_days((long)(lifetime.ts_max / 86400UL), &y, &m, &d);
     if (last)
         *last = y;
+}
+
+bool pv_stats_index_covers(int year)
+{
+    enum pv_source src = pv_log_pick_source();
+
+    /* No log at all is not an uncovered log: there is no pass to find room
+     * for, and the build will say so for itself. */
+    return src == PV_SRC_NONE || index_covers_log(src, year);
 }
 
 enum pv_build_result pv_stats_build(void *buf, size_t bufsz,

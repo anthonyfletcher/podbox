@@ -204,6 +204,13 @@ enum pv_build_result
 enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
                                     struct pv_totals *out, int year);
 
+/* Whether a saved index already accounts for the whole log, so that the next
+ * pv_stats_build() reads its rows instead of resolving any name.
+ *
+ * Asked by whoever divides the buffer: a build with names to resolve wants as
+ * much of it as it can have, and one without has no use for the room. */
+bool pv_stats_index_covers(int year);
+
 /* The same figures over the whole log, whatever year was asked for. This is
  * what the badges were scored against, and what the year switch offers from;
  * a tile wants 'out' instead. */

@@ -290,7 +290,7 @@ static void map_sweep(void)
     tagcache_search_finish(&tcs);
 }
 
-size_t pv_names_init(void *buf, size_t bufsz)
+size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
 {
     struct tagcache_stat *stat;
     char *base = buf;
@@ -398,6 +398,18 @@ size_t pv_names_init(void *buf, size_t bufsz)
     map_swept = false;
     if (!map_load())
     {
+        /* A caller that only wanted the saved map takes no for an answer. The
+         * sweep is minutes of seeking for a map it has already said it will
+         * not wait for, and the saved one is refused as often for being too
+         * big for this buffer as for being stale -- so this is the ordinary
+         * outcome of asking, not a failure. */
+        if (!may_sweep)
+        {
+            map = NULL;
+            map_cap = 0;
+            return 0;
+        }
+
         map_n = 0;
         map_pool_used = 1;
         map_sweep();
