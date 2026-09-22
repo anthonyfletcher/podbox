@@ -36,8 +36,9 @@
 size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep);
 
 /* Delete the saved map, so the next pv_names_init() sweeps the database
- * again. The map is keyed to the database's entry count alone, so retagging
- * files in place leaves it stale and this is the only way to clear it. */
+ * again. The map is keyed to the database's entry count and the room it was
+ * built in, neither of which notices a file retagged in place, so this is the
+ * only way to clear one that has gone stale that way. */
 void pv_names_discard(void);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a

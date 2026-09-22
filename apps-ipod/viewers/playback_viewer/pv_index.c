@@ -36,7 +36,7 @@
  * every field kept its type and a saved index went on serving the old, wrong
  * rows -- so the fix looked like no fix at all. A naming or aggregation change
  * belongs here. */
-#define PV_INDEX_VERSION 2
+#define PV_INDEX_VERSION 3
 
 /* Bytes of the log kept verbatim, ending at the watermark. */
 #define PV_INDEX_TAIL 64

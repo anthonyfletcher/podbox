@@ -12,8 +12,8 @@
  *   The database. Every file the tagcache knows -- or as many of them as the
  *   buffer holds -- is resolved once into {path hash -> artist, album,
  *   title}, strings pooled, and that map is saved keyed to the database's
- *   entry count so later runs skip the sweep. This is the only source that
- *   can name an ALBUM at all.
+ *   entry count and the room it was built in, so later runs skip the sweep.
+ *   This is the only source that can name an ALBUM at all.
  *
  *   The filename. For files the database does not know, "Artist - Album - NN
  *   Title.ext" is unpicked, falling back to the parent folder when the name
@@ -43,7 +43,7 @@
 /* Saved map. The header carries the database entry count it was built
  * against; anything else and the map is rebuilt rather than trusted. */
 #define PV_MAP_PATH  ROCKBOX_DIR "/pv_names.dat"
-#define PV_MAP_MAGIC 0x50564e31UL   /* "PVN1" */
+#define PV_MAP_MAGIC 0x50564e32UL   /* "PVN2" */
 
 /* Longest metadata string read out of the database. Anything past this is
  * truncated, which is what the aggregates would do to it anyway. */
@@ -188,7 +188,7 @@ static const struct map_entry *map_get(const char *path)
  * disk buys one of those on the next open for nothing. */
 static void map_save(void)
 {
-    unsigned long hdr[4];
+    unsigned long hdr[5];
     size_t map_bytes;
     bool ok;
     int fd = open(PV_MAP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
@@ -200,6 +200,10 @@ static void map_save(void)
     hdr[1] = (unsigned long)map_db_entries;
     hdr[2] = (unsigned long)map_n;
     hdr[3] = map_pool_used;
+    /* What the sweep was allowed to hold, which is not the same as what it
+     * found: a map stopped by the buffer is short of the library through no
+     * fault of the database, and only this says so. */
+    hdr[4] = (unsigned long)map_cap;
     map_bytes = (size_t)map_n * sizeof(struct map_entry);
 
     ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
@@ -211,10 +215,16 @@ static void map_save(void)
         remove(PV_MAP_PATH);
 }
 
-/* True if the saved map matches the database as it stands and was read whole. */
+/* True if the saved map matches the database as it stands and was read whole.
+ *
+ * Trap: a map is also refused when it was swept under a tighter cap than this
+ * run has room for. Its entry count is a count of what it holds, so a map
+ * truncated by a small buffer looks every bit as whole as a complete one --
+ * and accepting it means a run with the room to name the whole library goes on
+ * naming the same fraction of it, with the rest coming from folders. */
 static bool map_load(void)
 {
-    unsigned long hdr[4];
+    unsigned long hdr[5];
     int fd = open(PV_MAP_PATH, O_RDONLY);
     bool ok = false;
 
@@ -225,7 +235,8 @@ static bool map_load(void)
         && hdr[0] == PV_MAP_MAGIC
         && (int)hdr[1] == map_db_entries
         && (int)hdr[2] > 0 && (int)hdr[2] <= map_cap
-        && hdr[3] > 0 && hdr[3] <= map_pool_cap)
+        && hdr[3] > 0 && hdr[3] <= map_pool_cap
+        && (int)hdr[4] >= map_cap)
     {
         int n = (int)hdr[2];
         size_t bytes = (size_t)n * sizeof(struct map_entry);
