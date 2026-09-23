@@ -254,6 +254,14 @@ from the Music menu and carousels
   - Audiobooks should have a genre of "audiobook", "spoken word", "book", or "podcast".
 - Audiobooks automatically receive a "resume" function - you don't need to bookmark
 your position.
+- Books held in a single file show their chapters. Opening one lists its chapters the
+way a book split across files lists its tracks - with the same `Resume` row at the top -
+and skip, the progress bar and the Now Playing screen all follow the chapter you are in
+  - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`
+  - Reads the chapter marks written into `.m4b` books and the chapter frames written
+into `.mp3` ones
+  - Also available while playing - hold `Select` on the Now Playing screen and choose
+`Browse Chapters`
 
 ## Album Covers/Artist Profiles
 

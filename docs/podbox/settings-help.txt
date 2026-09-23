@@ -306,10 +306,10 @@ Reads .cue files, so an album ripped as one long file still shows track names
 and can be skipped through.
 
 [chapter marks]
-Reads the chapter list an audiobook carries inside it, so one long .m4b shows
-its chapter names, skips between them and marks them on the progress bar. Only
-.m4b files are looked at, and a book of more than 99 chapters lists the first
-99 of them.
+Reads the chapter list an audiobook carries inside it, so one long file shows
+its chapter names, skips between them and marks them on the progress bar. It
+reads .m4b files and .mp3 files with chapter frames, and a book of more than 99
+chapters lists the first 99 of them.
 
 [folder navigation]
 At the end of a folder, move to the next one rather than stopping. Random picks

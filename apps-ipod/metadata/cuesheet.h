@@ -45,6 +45,11 @@ struct cuesheet {
        than a cuesheet. The browser then lists one row per entry, the way a
        track list reads, since a chapter has no performer of its own. */
     bool chapters;
+
+    /* Set to open the list with a Resume row, the way a multi-file book's
+       track list does. Only a book reached from the shelf has one: a book
+       already playing is where it was left. */
+    bool resume_row;
 };
 
 struct cuesheet_file {
@@ -63,8 +68,19 @@ bool parse_cuesheet(struct cuesheet_file *cue_file, struct cuesheet *cue);
 /* reads a cuesheet to find the audio track associated to it */
 bool get_trackname_from_cuesheet(char *filename, char *buf);
 
-/* display a cuesheet struct */
-void browse_cuesheet(struct cuesheet *cue);
+/* What browse_cuesheet() was left on. */
+enum cue_browse_result {
+    CUE_BROWSE_NONE = 0,   /* backed out of */
+    CUE_BROWSE_PLAYED,     /* a chapter of the playing book was seeked to */
+    CUE_BROWSE_RESUME,     /* the Resume row was chosen; the caller acts */
+    CUE_BROWSE_START,      /* start the book at curr_track; the caller acts,
+                              because how a book is played depends on how it
+                              was reached and this screen does not know */
+};
+
+/* Display a cuesheet struct. Anything but NONE is the caller's cue to close
+   the menu behind it and show the WPS. */
+enum cue_browse_result browse_cuesheet(struct cuesheet *cue);
 
 /* display a cuesheet file after parsing and loading it to the plugin buffer */
 bool display_cuesheet_content(char* filename);

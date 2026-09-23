@@ -430,8 +430,21 @@ static const char* list_get_name_cb(int selected_item,
     struct cuesheet *cue = (struct cuesheet *)data;
 
     if (cue->chapters)
-        snprintf(buffer, buffer_len, "%02d. %s", selected_item+1,
-                 cue->tracks[selected_item].title);
+    {
+        int i = selected_item;
+
+        if (cue->resume_row)
+        {
+            if (i == 0)
+            {
+                strmemccpy(buffer, str(LANG_BOOK_RESUME), buffer_len);
+                return buffer;
+            }
+            i--;
+        }
+
+        snprintf(buffer, buffer_len, "%02d. %s", i+1, cue->tracks[i].title);
+    }
     else if (selected_item & 1)
         strmemccpy(buffer, cue->tracks[selected_item/2].title, buffer_len);
     else
@@ -452,6 +465,16 @@ static int cuesheet_list_voice_cb(int list_index, void *data)
 
     if (cue->chapters)
     {
+        if (cue->resume_row)
+        {
+            if (list_index == 0)
+            {
+                talk_id(LANG_BOOK_RESUME, true);
+                return 0;
+            }
+            index--;
+        }
+
         /* A chapter has no directory of talk clips to draw on, so its name
            is spelled rather than looked up. */
         talk_id(LANG_CHAPTER, true);
@@ -474,11 +497,16 @@ static int cuesheet_list_voice_cb(int list_index, void *data)
     return 0;
 }
 
-void browse_cuesheet(struct cuesheet *cue)
+enum cue_browse_result browse_cuesheet(struct cuesheet *cue)
 {
     struct gui_synclist lists;
     int action;
     bool done = false;
+    enum cue_browse_result chose = CUE_BROWSE_NONE;
+
+    /* The Resume row sits above the chapters, so every row below it is one
+       further down than its chapter. */
+    int first = cue->resume_row ? 1 : 0;
     char title[MAX_PATH];
     int len;
 
@@ -500,13 +528,18 @@ void browse_cuesheet(struct cuesheet *cue)
 
 
     gui_synclist_init(&lists, list_get_name_cb, cue, false, rows, NULL);
-    gui_synclist_set_nb_items(&lists, rows*cue->track_count);
+    gui_synclist_set_nb_items(&lists, rows*cue->track_count + first);
     gui_synclist_set_title(&lists, title, 0);
 
     if (global_settings.talk_menu)
         gui_synclist_set_voice_callback(&lists, cuesheet_list_voice_cb);
 
-    if (id3)
+    /* A book opened from the shelf starts on its Resume row, which is the
+       gesture that carries on where it was left. Otherwise the list opens on
+       the chapter playing now. */
+    if (cue->resume_row)
+        gui_synclist_select_item(&lists, 0);
+    else if (id3)
     {
         gui_synclist_select_item(&lists,
                                  rows*cue_find_current_track(cue, id3->elapsed));
@@ -529,8 +562,17 @@ void browse_cuesheet(struct cuesheet *cue)
             case ACTION_STD_OK:
             {
                 bool startit = true;
-                unsigned long elapsed =
-                    cue->tracks[gui_synclist_get_sel_pos(&lists)/rows].offset;
+                int sel = gui_synclist_get_sel_pos(&lists);
+                unsigned long elapsed;
+
+                if (cue->resume_row && sel == 0)
+                {
+                    chose = CUE_BROWSE_RESUME;
+                    done = true;
+                    break;
+                }
+
+                elapsed = cue->tracks[(sel - first)/rows].offset;
 
                 id3 = audio_current_track();
                 if (id3 && *id3->path)
@@ -553,7 +595,33 @@ void browse_cuesheet(struct cuesheet *cue)
                 if (!startit)
                     startit = !seek(elapsed);
 
-                if (!startit || !*cue->file)
+                /* A chapter is a place in one file, so the list has done its
+                   job the moment the seek lands -- or the book starts. Either
+                   way it closes and leaves the player showing where it went. */
+                if (!startit)
+                {
+                    if (cue->chapters)
+                    {
+                        chose = CUE_BROWSE_PLAYED;
+                        done = true;
+                    }
+                    break;
+                }
+
+                /* The book is not the one playing. A cuesheet names a file
+                   in a directory and can be started from here; a book opened
+                   from the shelf has its playlist built out of the database,
+                   so only the caller knows how to start it. */
+                if (cue->chapters)
+                {
+                    cue->curr_track_idx = (sel - first)/rows;
+                    cue->curr_track = cue->tracks + cue->curr_track_idx;
+                    chose = CUE_BROWSE_START;
+                    done = true;
+                    break;
+                }
+
+                if (!*cue->file)
                     break;
 
                 strmemccpy(cue_path_buf, cue->file, sizeof(cue_path_buf));
@@ -577,6 +645,8 @@ void browse_cuesheet(struct cuesheet *cue)
                 break;
         }
     }
+
+    return chose;
 }
 
 bool display_cuesheet_content(char* filename)

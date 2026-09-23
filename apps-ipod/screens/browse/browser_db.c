@@ -62,6 +62,8 @@
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
+#include "metadata/cuesheet.h"      /* the chapter list screen */
+#include "metadata/chapters.h"      /* reading a book's chapter marks */
 #include "screens/browse/featured_artists.h"
 #include "screens/system/db_search.h"   /* db_search_arm_scope */
 #include "browser_db.h"
@@ -3696,19 +3698,9 @@ static bool single_track_path(struct browser_context* c, int seek,
  * which leaves playing the book as the only gesture there is -- so that is
  * the one that resumes it. The track has to match as well as the name: two
  * books can share an album tag, and the position belongs to a file. */
-static int play_single_track(const char *path, const char *book)
+static int start_single_track(const char *path, unsigned long elapsed,
+                              unsigned long offset)
 {
-    struct book_resume pos;
-    unsigned long elapsed = 0, offset = 0;
-
-    if (book != NULL
-        && (book_resume_get(book, &pos) || book_resume_get(path, &pos))
-        && strcmp(pos.track, path) == 0)
-    {
-        elapsed = pos.elapsed;
-        offset = pos.offset;
-    }
-
     if (playlist_create(NULL, NULL) < 0)
         return 0;
     if (playlist_insert_track(NULL, path, PLAYLIST_INSERT_LAST, false, true) < 0)
@@ -3716,6 +3708,64 @@ static int play_single_track(const char *path, const char *book)
 
     playlist_start(0, elapsed, offset);
     return GO_TO_WPS;
+}
+
+/* Where 'book' was left, or the start of it. */
+static bool single_track_resume(const char *path, const char *book,
+                                struct book_resume *pos)
+{
+    return book != NULL
+           && (book_resume_get(book, pos) || book_resume_get(path, pos))
+           && strcmp(pos->track, path) == 0;
+}
+
+static int play_single_track(const char *path, const char *book)
+{
+    struct book_resume pos;
+
+    if (single_track_resume(path, book, &pos))
+        return start_single_track(path, pos.elapsed, pos.offset);
+
+    return start_single_track(path, 0, 0);
+}
+
+/* A book held in one file opens on its chapters, the way a book held in
+ * several opens on its tracks, and with the same Resume row at the head of
+ * the list. A book with no chapter marks has nothing to list, so it plays
+ * where it left off as it always did.
+ *
+ * The chapters are read here rather than taken from the playing track: this
+ * book is not playing, and reading them is what the screen is for.
+ */
+static int open_single_book(const char *path, const char *book,
+                            const char *name)
+{
+    struct book_resume pos;
+    struct cuesheet *cue;
+    size_t bufsize = 0;
+
+    if (!global_settings.chapter_marks || !chapters_possible(path))
+        return play_single_track(path, book);
+
+    cue = (struct cuesheet *)app_get_buffer(&bufsize, "chapters");
+
+    if (cue == NULL || bufsize < sizeof (struct cuesheet)
+        || !parse_chapters_path(path, name, NULL, cue))
+        return play_single_track(path, book);
+
+    cue->resume_row = single_track_resume(path, book, &pos);
+
+    switch (browse_cuesheet(cue))
+    {
+        case CUE_BROWSE_RESUME:
+            return start_single_track(path, pos.elapsed, pos.offset);
+
+        case CUE_BROWSE_START:
+            return start_single_track(path, cue->curr_track->offset, 0);
+
+        default:
+            return 0;
+    }
 }
 
 int browser_db_enter(struct browser_context* c, bool is_visible)
@@ -3831,17 +3881,24 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     {
         char path[MAX_PATH];
         char book[BOOK_KEY_MAX];
+        char name[BOOK_KEY_MAX];
         bool spoken = global_settings.segregate_audiobooks
                       && csi_mentions_spoken();
         bool one;
 
         book[0] = '\0';
+        name[0] = '\0';
 
         core_pin(browser_db_handle);
         one = single_track_path(c, seek, path, sizeof(path));
+        /* The row's name titles the chapter list whatever the row is; only a
+         * book carries it as a key as well, since that is what a position is
+         * remembered under. */
+        if (one)
+            strmemccpy(name, (const char *)P2STR((unsigned char *)dptr->name),
+                       sizeof(name));
         if (one && spoken)
-            strmemccpy(book, (const char *)P2STR((unsigned char *)dptr->name),
-                       sizeof(book));
+            strmemccpy(book, name, sizeof(book));
         core_unpin(browser_db_handle);
 
         if (one)
@@ -3853,7 +3910,8 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             }
             if (!warn_on_pl_erase())
                 return 0;
-            return play_single_track(path, book[0] ? book : NULL);
+            return open_single_book(path, book[0] ? book : NULL,
+                                    name[0] ? name : NULL);
         }
     }
 

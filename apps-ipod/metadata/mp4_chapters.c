@@ -29,7 +29,7 @@
  *   - a track's ids, and the sample tables of the chapter track
  *   - one timed-text sample
  *   - the Apple chapter track
- *   - parse_mp4_chapters()
+ *   - read_mp4_chapters()
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -39,10 +39,11 @@
 #include "system.h"
 #include "metadata.h"
 #include "metadata_common.h"
-#include "string-extra.h"
+#include "string-extra.h"     /* strcasecmp */
 #include "rbunicode.h"
 #include "logf.h"
 #include "cuesheet.h"
+#include "chapters.h"
 #include "mp4_chapters.h"
 
 #define MP4_chap FOURCC('c', 'h', 'a', 'p')
@@ -70,9 +71,6 @@
 
 /* chpl timestamps are in units of 100ns. */
 #define CHPL_TICKS_PER_MS 10000
-
-/* Fewer entries than this is not a chapter list. */
-#define MIN_CHAPTERS 2
 
 /* Where a sample table's entries begin, and how many there are. */
 struct table {
@@ -541,13 +539,13 @@ bool mp4_chapters_possible(const char *path)
     return ext && !strcasecmp(ext, ".m4b");
 }
 
-bool parse_mp4_chapters(struct mp3entry *id3, struct cuesheet *cue)
+int read_mp4_chapters(const char *path, struct cuesheet *cue)
 {
     off_t file_end, moov_start, moov_end, udta_end;
     int found = 0;
     int fd;
 
-    fd = open(id3->path, O_RDONLY, 0644);
+    fd = open(path, O_RDONLY, 0644);
     if (fd < 0)
         return false;
 
@@ -557,12 +555,10 @@ bool parse_mp4_chapters(struct mp3entry *id3, struct cuesheet *cue)
         || !find_box(fd, MP4_moov, file_end, &moov_end))
     {
         close(fd);
-        return false;
+        return 0;
     }
 
     moov_start = lseek(fd, 0, SEEK_CUR);
-
-    memset(cue, 0, sizeof(struct cuesheet));
 
     if (moov_start >= 0)
     {
@@ -576,24 +572,7 @@ bool parse_mp4_chapters(struct mp3entry *id3, struct cuesheet *cue)
     close(fd);
 
     if (found < MIN_CHAPTERS)
-    {
-        logf("no chapters in %s", id3->path);
-        return false;
-    }
+        logf("no chapters in %s", path);
 
-    cue->track_count = found;
-    cue->chapters = true;
-    cue->curr_track = cue->tracks;
-    strmemccpy(cue->path, id3->path, MAX_PATH);
-    strmemccpy(cue->file, id3->path, MAX_PATH);
-
-    if (id3->albumartist)
-        strmemccpy(cue->performer, id3->albumartist, sizeof(cue->performer));
-    else if (id3->artist)
-        strmemccpy(cue->performer, id3->artist, sizeof(cue->performer));
-
-    if (id3->album)
-        strmemccpy(cue->title, id3->album, sizeof(cue->title));
-
-    return true;
+    return found;
 }

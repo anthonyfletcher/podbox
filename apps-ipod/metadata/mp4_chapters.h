@@ -11,10 +11,10 @@
 #include "metadata.h"
 #include "cuesheet.h"
 
-/* whether "path" names a file that could carry chapter marks */
+/* whether "path" names a file that could carry MP4 chapter marks */
 bool mp4_chapters_possible(const char *path);
 
-/* read the chapter list out of the file "id3" describes into "cue" */
-bool parse_mp4_chapters(struct mp3entry *id3, struct cuesheet *cue);
+/* fill "cue"'s entries from the file's chapter list, returning how many */
+int read_mp4_chapters(const char *path, struct cuesheet *cue);
 
 #endif

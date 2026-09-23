@@ -46,7 +46,7 @@
 #include "metadata.h"
 #include "rbpaths.h"
 #include "metadata/cuesheet.h"
-#include "metadata/mp4_chapters.h"
+#include "metadata/chapters.h"
 #include "buffering.h"
 #include "speech/talk.h"
 #include "playlist/playlist.h"
@@ -1957,7 +1957,7 @@ static bool audio_load_cuesheet(struct track_info *infop,
         /* A cuesheet beside the file wins: it was written for this track,
            where the chapter marks are whatever the encoder left behind. */
         bool has_chapters = !has_cue && global_settings.chapter_marks
-                            && mp4_chapters_possible(track_id3->path);
+                            && chapters_possible(track_id3->path);
 
         if (has_cue || has_chapters)
         {
@@ -1970,8 +1970,8 @@ static bool audio_load_cuesheet(struct track_info *infop,
 
                 if (has_cue
                     ? parse_cuesheet(&cue_file, (struct cuesheet *)cuesheet)
-                    : parse_mp4_chapters(track_id3,
-                                         (struct cuesheet *)cuesheet))
+                    : parse_chapters(track_id3,
+                                     (struct cuesheet *)cuesheet))
                 {
                     /* Indicate cuesheet is present (while track remains
                        buffered) */

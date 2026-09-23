@@ -861,7 +861,9 @@ static bool view_cue(void)
     struct mp3entry* id3 = audio_current_track();
     if (id3 && id3->cuesheet)
     {
-        browse_cuesheet(id3->cuesheet);
+        /* True closes the menu, which only the chapter row asks for -- it
+           carries MENU_FUNC_CHECK_RETVAL and the cuesheet row does not. */
+        return browse_cuesheet(id3->cuesheet) != CUE_BROWSE_NONE;
     }
     return false;
 }
@@ -900,7 +902,8 @@ static int view_chapters_item_callback(int action,
     }
     return action;
 }
-MENUITEM_FUNCTION(view_chapters_item, 0, ID2P(LANG_BROWSE_CHAPTERS),
+MENUITEM_FUNCTION(view_chapters_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_BROWSE_CHAPTERS),
                   view_cue, view_chapters_item_callback, Icon_NOICON);
 
 
