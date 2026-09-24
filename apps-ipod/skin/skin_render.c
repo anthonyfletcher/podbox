@@ -1353,6 +1353,19 @@ bool skin_render_viewport(struct skin_element* viewport, struct gui_wps *gwps,
     return info.drew;
 }
 
+/* The WPS's full-screen clear copies the backdrop, so it has to wait for the
+ * %VB viewports ahead of it to redraw the buffer. Trap: the .sbs shares that
+ * buffer (backdrops are matched by name) and draws into it while the WPS is
+ * away, so clearing first puts the .sbs's layer on the WPS. */
+static void clear_wps_screen(struct screen *display)
+{
+    struct viewport *first_vp = display->set_viewport_ex(NULL, 0);
+    unsigned saved_bg = first_vp->bg_pattern;
+    first_vp->bg_pattern = dynamic_colors_resolve(saved_bg);
+    display->clear_viewport();
+    first_vp->bg_pattern = saved_bg;
+}
+
 void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
 {
     const int vp_is_appearing = (VP_DRAW_WASHIDDEN|VP_DRAW_HIDEABLE);
@@ -1377,6 +1390,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         return;
 
     /* Framebuffer is likely dirty */
+    bool screen_clear_owed = false;
     if ((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL)
     {
         /* A full refresh repaints the ground between the viewports as well as
@@ -1390,16 +1404,10 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         {
             bool dirty = (first_vp->flags & VP_FLAG_VP_SET_CLEAN)
                           == VP_FLAG_VP_DIRTY;
-            unsigned resolved_bg =
-                dynamic_colors_resolve(first_vp->bg_pattern);
-            if (dirty || resolved_bg != first_vp->bg_pattern
-                || dynamic_colors_screen_clear_needed())
-            {
-                unsigned saved_bg = first_vp->bg_pattern;
-                first_vp->bg_pattern = resolved_bg;
-                display->clear_viewport();
-                first_vp->bg_pattern = saved_bg;
-            }
+            screen_clear_owed = dirty
+                || dynamic_colors_resolve(first_vp->bg_pattern)
+                   != first_vp->bg_pattern
+                || dynamic_colors_screen_clear_needed();
         }
     }
 
@@ -1461,6 +1469,13 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         {
             skin_backdrop_set_buffer(-1, skin_viewport);
             skin_backdrop_show(data->backdrop_id);
+            /* A skipped default viewport has refresh_mode 0 and draws
+             * nothing, so it does not count as the first foreground one. */
+            if (screen_clear_owed && refresh_mode)
+            {
+                clear_wps_screen(display);
+                screen_clear_owed = false;
+            }
         }
 
         /* dont redraw the viewport if its disabled */
@@ -1516,6 +1531,8 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     }
     skin_backdrop_set_buffer(-1, skin_viewport);
     skin_backdrop_show(data->backdrop_id);
+    if (screen_clear_owed)
+        clear_wps_screen(display);
 
     if (backdrop_flipped &&
         (old_refresh_mode&SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL)
