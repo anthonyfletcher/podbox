@@ -25,7 +25,8 @@
  * Parts, in order:
  *   - handle and counter state, the thread stack
  *   - ring arithmetic helpers and buffer occupancy
- *   - the handle list: allocate, find, link/unlink, and move during compaction
+ *   - the handle list: allocate, find, link/unlink, and move during compaction,
+ *     and the link check that stops a damaged list being followed
  *   - filling: reading a file into a handle, shrinking, and the fill policy
  *   - the public buf* API: open, close, seek, read (see buffering.h)
  *   - handle queries, watermark settings, and the buffering thread itself
@@ -39,6 +40,9 @@
 #include "panic.h"
 #include "debug.h"
 #include "file.h"
+#include "rbpaths.h"
+#include "timefuncs.h"
+#include "version.h"
 #include "system/appevents.h"
 #include "metadata.h"
 #include "draw/bmp.h"
@@ -146,6 +150,19 @@ static struct mutex llist_mutex SHAREDBSS_ATTR;
 
 #define MRU_HANDLE(m) \
     container_of((m), struct memory_handle, mrunode)
+
+/* The first bad link found in either list, kept for the log that
+ * buffering_reset() writes. Once found, nothing follows either list again
+ * until that reset abandons them. */
+static struct
+{
+    bool found;
+    const char *walk;                   /* Which walk found it */
+    int step;                           /* How many links it had followed */
+    uintptr_t link;                     /* The bad link */
+    const struct memory_handle *from;   /* Handle holding it, NULL = head */
+    int handles;                        /* num_handles at the time */
+} damage;
 
 static struct data_counters
 {
@@ -291,7 +308,77 @@ tail=> -----------------------------------+
 MRU cache is similar except new handles are added at the head and the most-
 recently-accessed handle is always moved to the head (if not already there).
 
+A handle header lives in the ring, so a write that overruns into one leaves a
+link pointing anywhere. Every walk checks a link before following it; the
+first bad one is recorded and playback rebuilds the buffer, rather than the
+walk faulting on it.
+
 */
+
+/* Whether h can be a handle: inside the buffer, aligned, with room for the
+ * header. add_handle() and move_handle() never let a header wrap. */
+static bool handle_at(const struct memory_handle *h)
+{
+    uintptr_t off = (uintptr_t)h - (uintptr_t)buffer;
+
+    return off <= buffer_len - sizeof(*h) &&
+           off % alignof(struct memory_handle) == 0;
+}
+
+static void note_damage(const char *walk, int step, const void *link,
+                        const struct memory_handle *from)
+{
+    if (damage.found)
+        return;
+
+    damage.found   = true;
+    damage.walk    = walk;
+    damage.step    = step;
+    damage.link    = (uintptr_t)link;
+    damage.from    = from;
+    damage.handles = num_handles;
+
+    logf("buffering: bad link %p in %s walk", link, walk);
+    audio_buffer_damaged();
+}
+
+/* Check the link a walk is about to follow. step is how many links the walk
+ * has followed including this one, or 0 for a walk that cannot bound it. */
+static bool link_ok(const char *walk, int step, const struct memory_handle *h,
+                    const struct memory_handle *from)
+{
+    if (handle_at(h) && step <= num_handles)
+        return true;
+
+    note_damage(walk, step, h, from);
+    return false;
+}
+
+/* Whether all four of h's links are either NULL or a handle -- checked before
+ * anything writes through them. */
+static bool links_ok(const char *walk, const struct memory_handle *h)
+{
+    const struct lld_node *n[4] = {
+        h->hnode.prev, h->hnode.next, h->mrunode.prev, h->mrunode.next,
+    };
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (!n[i])
+            continue;
+
+        const struct memory_handle *t = i < 2 ?
+            HLIST_HANDLE((struct lld_node *)n[i]) :
+            MRU_HANDLE((struct lld_node *)n[i]);
+
+        if (!handle_at(t)) {
+            note_damage(walk, 0, n[i], h);
+            return false;
+        }
+    }
+
+    return true;
+}
 
 static int next_handle_id(void)
 {
@@ -353,7 +440,7 @@ add_handle(unsigned int flags, size_t data_size, const char *path,
            size_t *data_out)
 {
     /* Gives each handle a unique id */
-    if (num_handles >= BUF_MAX_HANDLES)
+    if (num_handles >= BUF_MAX_HANDLES || damage.found)
         return NULL;
 
     size_t ridx = 0, widx = 0;
@@ -363,6 +450,14 @@ add_handle(unsigned int flags, size_t data_size, const char *path,
     if (first) {
         /* Buffer is not empty */
         struct memory_handle *last = HLIST_LAST;
+
+        /* link_handle() writes through both of these */
+        if (!link_ok("add", 0, first, NULL) ||
+            !link_ok("add", 0, last, NULL) ||
+            (mru_cache.head &&
+             !link_ok("add", 0, MRU_HANDLE(mru_cache.head), NULL)))
+            return NULL;
+
         ridx = ringbuf_offset(first);
         widx = last->data;
         cur_total = last->filesize - last->start;
@@ -431,18 +526,33 @@ add_handle(unsigned int flags, size_t data_size, const char *path,
 }
 
 /* Return a pointer to the memory handle of given ID.
-   NULL if the handle wasn't found */
+   NULL if the handle wasn't found, and for every ID once a list is damaged:
+   callers already treat that as a handle closed under them. */
 static struct memory_handle * find_handle(int handle_id)
 {
     struct memory_handle *h = NULL;
+    struct memory_handle *from = NULL;
     struct lld_node *mru = mru_cache.head;
     struct lld_node *m = mru;
+    int step = 0;
 
-    while (m && MRU_HANDLE(m)->id != handle_id) {
+    if (damage.found)
+        return NULL;
+
+    while (m) {
+        if (!link_ok("find", ++step, MRU_HANDLE(m), from))
+            return NULL;
+        if (MRU_HANDLE(m)->id == handle_id)
+            break;
+        from = MRU_HANDLE(m);
         m = m->next;
     }
 
     if (m) {
+        /* Moving it to the front writes through its neighbours */
+        if (!links_ok("find", MRU_HANDLE(m)))
+            return NULL;
+
         if (m != mru) {
             lld_remove(&mru_cache, m);
             lld_insert_first(&mru_cache, m);
@@ -468,7 +578,7 @@ static bool move_handle(struct memory_handle **h, size_t *delta,
 {
     struct memory_handle *src;
 
-    if (h == NULL || (src = *h) == NULL)
+    if (h == NULL || (src = *h) == NULL || !links_ok("move", src))
         return false;
 
     size_t size_to_move = src->size + data_size;
@@ -599,9 +709,19 @@ static int update_data_counters(struct data_counters *dc)
     int num = num_handles;
     struct memory_handle *m = find_handle(base_handle_id);
     bool is_useful = m == NULL;
+    struct memory_handle *from = NULL;
+    int step = 0;
 
-    for (m = HLIST_FIRST; m; m = HLIST_NEXT(m))
+    /* A damaged list counts as empty, which stops the thread filling */
+    m = damage.found ? NULL : HLIST_FIRST;
+
+    for (; m; from = m, m = HLIST_NEXT(m))
     {
+        if (!link_ok("count", ++step, m, from)) {
+            buffered = remaining = useful = 0;
+            break;
+        }
+
         off_t pos = m->pos;
         off_t end = m->end;
 
@@ -823,16 +943,21 @@ static bool fill_buffer(void)
     logf("fill_buffer()");
     mutex_lock(&llist_mutex);
 
-    struct memory_handle *m = shrink_handle(HLIST_FIRST);
+    struct memory_handle *m = damage.found ? NULL : shrink_handle(HLIST_FIRST);
 
     mutex_unlock(&llist_mutex);
 
+    /* Unlocked, so a handle can close under this walk and num_handles cannot
+     * bound it: each link is checked for place only. */
     while (queue_empty(&buffering_queue) && m) {
         if (m->end < m->filesize && !buffer_handle(m->id, 0)) {
             m = NULL;
             break;
         }
+        struct memory_handle *from = m;
         m = HLIST_NEXT(m);
+        if (m && !link_ok("fill", 0, m, from))
+            m = NULL;
     }
 
     if (m) {
@@ -1583,7 +1708,13 @@ static void shrink_buffer(void)
 
     mutex_lock(&llist_mutex);
 
-    for (struct memory_handle *h = HLIST_LAST; h; h = HLIST_PREV(h)) {
+    struct memory_handle *from = NULL;
+    int step = 0;
+
+    for (struct memory_handle *h = damage.found ? NULL : HLIST_LAST; h;
+         from = h, h = HLIST_PREV(h)) {
+        if (!link_ok("shrink", ++step, h, from))
+            break;
         h = shrink_handle(h);
     }
 
@@ -1703,6 +1834,64 @@ void INIT_ATTR buffering_init(void)
                             buffering_thread_id);
 }
 
+/* Write the damage to the log and close what can still be reached, leaving
+ * the lists for buffering_reset() to re-init: unlinking would follow the bad
+ * link. The handle holding that link keeps its descriptor, since its fd is as
+ * suspect as the link, so one file can stay open until reboot. The damage
+ * stays recorded until the re-init: closing the log can yield, and the
+ * buffering thread must not walk these lists meanwhile. */
+static void drop_damaged_lists(void)
+{
+    struct tm *tm = get_time();
+    int log = open(ROCKBOX_DIR "/buffer-damage.log",
+                   O_WRONLY | O_CREAT | O_APPEND, 0666);
+
+    mutex_lock(&llist_mutex);
+
+    if (log >= 0)
+        fdprintf(log, "%04d-%02d-%02d %02d:%02d:%02d %s\n"
+                 "  %s walk, step %d: link %08lx from handle at %ld,"
+                 " %d handles, buffer %lu\n",
+                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+                 tm->tm_hour, tm->tm_min, tm->tm_sec, rbversion,
+                 damage.walk, damage.step, (unsigned long)damage.link,
+                 damage.from ? (long)ringbuf_offset(damage.from) : -1L,
+                 damage.handles, (unsigned long)buffer_len);
+
+    /* Buffer order first, and logged: a header overrun by the data before it
+     * shows as that handle's widx running past the next handle's offset. */
+    for (int mru = 0; mru < 2; mru++) {
+        struct lld_node *n = mru ? mru_cache.head : handle_list.head;
+        int step = 0;
+
+        while (n) {
+            struct memory_handle *h = mru ? MRU_HANDLE(n) : HLIST_HANDLE(n);
+
+            if (!handle_at(h) || ++step > damage.handles)
+                break;
+
+            if (!mru && log >= 0)
+                fdprintf(log, "  handle %d type %d at %lu size %lu"
+                         " data %lu widx %lu file %ld-%ld of %ld %.64s\n",
+                         h->id, (int)h->type,
+                         (unsigned long)ringbuf_offset(h),
+                         (unsigned long)h->size, (unsigned long)h->data,
+                         (unsigned long)h->widx, (long)h->start,
+                         (long)h->end, (long)h->filesize, h->path);
+
+            if (h != damage.from && h->fd >= 0 && h->fd < MAX_OPEN_FILES)
+                close_fd(&h->fd);
+
+            n = mru ? h->mrunode.next : h->hnode.next;
+        }
+    }
+
+    mutex_unlock(&llist_mutex);
+
+    if (log >= 0)
+        close(log);
+}
+
 /* Initialise the buffering subsystem */
 bool buffering_reset(char *buf, size_t buflen)
 {
@@ -1723,10 +1912,14 @@ bool buffering_reset(char *buf, size_t buflen)
 
     send_event(BUFFER_EVENT_BUFFER_RESET, NULL);
 
-    /* If handles weren't closed above, just do it */
-    struct memory_handle *h;
-    while ((h = HLIST_FIRST)) {
-        bufclose(h->id);
+    if (damage.found) {
+        drop_damaged_lists();
+    } else {
+        /* If handles weren't closed above, just do it */
+        struct memory_handle *h;
+        while ((h = HLIST_FIRST)) {
+            bufclose(h->id);
+        }
     }
 
     buffer = buf;
@@ -1738,6 +1931,7 @@ bool buffering_reset(char *buf, size_t buflen)
 
     num_handles = 0;
     base_handle_id = -1;
+    memset(&damage, 0, sizeof(damage));
 
     /* Set the high watermark as 75% full...or 25% empty :)
        This is the greatest fullness that will trigger low-buffer events

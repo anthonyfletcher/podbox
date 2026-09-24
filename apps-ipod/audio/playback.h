@@ -68,6 +68,9 @@ void audio_set_playback_frequency(unsigned int sample_rate_hz);
 void set_albumart_mode(int setting);
 
 size_t audio_get_filebuflen(void);
+/* From buffering, which has found a damaged handle list: rebuild the buffer.
+   Safe from any thread and with the list lock held -- it only posts. */
+void audio_buffer_damaged(void);
 
 unsigned int playback_status(void);
 

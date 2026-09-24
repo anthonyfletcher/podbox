@@ -4009,6 +4009,15 @@ static void buffer_event_rebuffer_callback(unsigned short id, void *ev_data)
     (void)ev_data;
 }
 
+/* Something overwrote a handle header. Rebuild the buffer and carry on from
+ * the same place in the track; stopped, this only marks it for rebuilding
+ * before the next play. */
+void audio_buffer_damaged(void)
+{
+    LOGFQUEUE("buffering > audio Q_AUDIO_REMAKE_AUDIO_BUFFER: damaged");
+    audio_queue_post(Q_AUDIO_REMAKE_AUDIO_BUFFER, 0);
+}
+
 /* A handle has completed buffering and all required data is available */
 static void buffer_event_finished_callback(unsigned short id, void *ev_data)
 {
