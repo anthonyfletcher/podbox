@@ -669,6 +669,24 @@ static int parse_spectrumbars(struct skin_element *element,
         sb->gap = (sb->bars > 1 || sb->radiate) ? 1 : 0;
     if (sb->gap < 0)
         sb->gap = 0;
+    /* Peak caps. The thickness is what switches them on, so a theme can have
+     * the falling marker without having to pick a colour for it -- and the
+     * colour after it stays reachable either way. No upper clamp: the
+     * viewport height is not settled here, so the renderer fits it. */
+    sb->peak_h = 0;
+    sb->peak_colour = 0;
+    sb->peak_tinted = false;
+    if (element->params_count > 4 && !isdefault(get_param(element, 4)))
+        sb->peak_h = get_param(element, 4)->data.number;
+    if (sb->peak_h < 0)
+        sb->peak_h = 0;
+    if (element->params_count > 5 && !isdefault(get_param(element, 5)))
+    {
+        if (!parse_color(curr_screen, get_param_text(element, 5),
+                         &sb->peak_colour))
+            return -1;
+        sb->peak_tinted = true;
+    }
     return 0;
 }
 

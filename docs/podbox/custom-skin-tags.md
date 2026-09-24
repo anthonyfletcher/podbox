@@ -274,7 +274,7 @@ zero yield 0). `a` and `b` may be numbers or tags.
 
 ## Widgets and indicators
 
-### `%Sb(bars[, align[, radius[, gap]]])` — spectrum analyser
+### `%Sb(bars[, align[, radius[, gap[, peak[, peakcolour]]]]])` — spectrum analyser
 
 Draws an audio spectrum analyser filling the current viewport. `bars` is the
 number of bands, 1–8 (values outside that range are clamped).
@@ -300,6 +300,23 @@ every `%Sb` written before the argument existed gets; `0` butts the bars
 together into a solid block. The bars share out whatever width is left after the
 gaps, so a wider gap means narrower bars rather than a narrower meter.
 
+`peak` gives each bar a falling peak cap, `peak` pixels thick. Left out, or 0,
+there are no caps. The cap marks the highest the bar has reached lately: it
+rides the bar up, holds there for half a second, then floats down, gathering
+speed as it falls, until the bar catches it again. 2 or 3 pixels suits most
+meters; a cap taller than the viewport is trimmed to fit.
+
+`peakcolour` is what the caps are drawn in, as `rrggbb` or any of the colour
+forms `%Vf` takes. Left out they use the viewport foreground, the same as the
+bars — still visible, because a falling cap floats in a gap above its bar, but
+without the contrast a colour gives. Like every other skin colour it follows
+the dynamic-colour palette; write it `!rrggbb` to pin it.
+
+Caps work under every alignment. A centred or radiating bar grows from the
+midline in both directions, so it gets two caps, mirrored — and a rounded bar's
+caps are rounded to match, the radius fitted to the cap the same way it is
+fitted to a short bar.
+
 Arguments are positional, so reaching a later one means writing the earlier
 ones. Give them as `-` to keep the default:
 
@@ -309,6 +326,9 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(5, center, 2)
 %V(20,40,120,60,-)%Sb(8, -, -, 0)     # no gaps, square corners, from the bottom
 %V(20,40,160,60,-)%Sb(6, radiate, 2)  # 12 columns opening out from the middle
+%V(20,40,120,60,-)%Sb(8, -, 3, 1, 2)  # 2px caps, in the viewport foreground
+%V(20,40,120,60,-)%Sb(8, -, 3, 1, 2, FF6600)   # the same caps, in orange
+%V(20,40,120,60,-)%Sb(5, center, 1, -, 3, 80D0FF)  # centred, a cap each end
 ```
 
 ### `%La(offset[, nowrap][, radius][, filters])` — list-item album art

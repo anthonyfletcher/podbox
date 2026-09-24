@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "config.h"
+#include "kernel.h"
 #include "pcm.h"
 #include "pcm_mixer.h"
 #include "fixedpoint.h"
@@ -62,6 +63,22 @@ static int  coeff_rate;
 /* Instant attack, exponential release (divide the gap by 2^shift each
  * update) -- mirrors typical VU meter ballistics. */
 #define SPECTRUM_RELEASE_SHIFT 3
+
+/* The peak cap each band carries: its recent maximum, held for a moment and
+ * then released downward, gathering speed the longer it falls.
+ *
+ * Kept in Q4 rather than whole levels because the fall is paced by the tick,
+ * a hundred a second, and most of it is a fraction of a level per tick. In
+ * whole levels the slowest fall the arithmetic can express is one a tick,
+ * which crosses the full scale in a second flat and reads as a drop rather
+ * than a float. Whole levels come back out at the getters. */
+#define SPECTRUM_PEAK_HOLD      (HZ / 2)  /* ticks held at a new maximum */
+#define SPECTRUM_PEAK_ACCEL     1         /* Q4 added to the fall each tick */
+#define SPECTRUM_PEAK_FALL_MAX  16        /* Q4 a tick, about a level */
+
+static int spectrum_peak[2][SPECTRUM_MAX_BANDS];      /* Q4 level */
+static int spectrum_peak_hold[2][SPECTRUM_MAX_BANDS]; /* ticks left to hold */
+static int spectrum_peak_fall[2][SPECTRUM_MAX_BANDS]; /* Q4 a tick */
 
 /* Rough perceptual (log-like) compression range: ln(raw magnitude) below
  * SPECTRUM_LOG_MIN maps to level 0, above SPECTRUM_LOG_MAX maps to level
@@ -167,9 +184,14 @@ int spectrum_scale_to_level(int raw)
     return level;
 }
 
-/* Move one band toward `level`: instant attack, exponential release. */
-static void approach_level(int channel, int band, int level)
+/* Move one band toward `level`: the bar attacks instantly and releases
+ * exponentially, the cap above it holds at each new maximum and then falls
+ * faster the longer it has been falling. */
+static void advance_band(int channel, int band, int level)
 {
+    int *peak = &spectrum_peak[channel][band];
+    int shown_q4;
+
     if (level > spectrum_level[channel][band])
         spectrum_level[channel][band] = level; /* instant attack */
     else if (spectrum_level[channel][band] > level)
@@ -184,6 +206,30 @@ static void approach_level(int channel, int band, int level)
         if (decay < 1)
             decay = 1;
         spectrum_level[channel][band] -= decay;
+    }
+
+    /* The cap chases the level the bar is *drawn* at, not the raw target it
+     * is heading for. During a release those differ, and measuring against
+     * the target would let the cap sink inside the bar it marks. */
+    shown_q4 = spectrum_level[channel][band] << 4;
+
+    if (shown_q4 >= *peak)
+    {
+        *peak = shown_q4;
+        spectrum_peak_hold[channel][band] = SPECTRUM_PEAK_HOLD;
+        spectrum_peak_fall[channel][band] = 0;
+    }
+    else if (spectrum_peak_hold[channel][band] > 0)
+        spectrum_peak_hold[channel][band]--;
+    else
+    {
+        int *fall = &spectrum_peak_fall[channel][band];
+
+        if (*fall < SPECTRUM_PEAK_FALL_MAX)
+            *fall += SPECTRUM_PEAK_ACCEL;
+        *peak -= *fall;
+        if (*peak < shown_q4)
+            *peak = shown_q4;
     }
 }
 
@@ -205,7 +251,7 @@ void spectrum_meter_peek(void)
          * turns out to be momentary costs a unit or two of height. */
         for (channel = 0; channel < 2; channel++)
             for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
-                approach_level(channel, band, 0);
+                advance_band(channel, band, 0);
         return;
     }
 
@@ -249,7 +295,7 @@ void spectrum_meter_peek(void)
                                            SPECTRUM_BLOCK_SIZE, 2,
                                            band_coeff[band]);
 
-            approach_level(channel, band, spectrum_scale_to_level(raw));
+            advance_band(channel, band, spectrum_scale_to_level(raw));
         }
 
         if (!low_ready)
@@ -261,7 +307,7 @@ void spectrum_meter_peek(void)
                                            SPECTRUM_LOW_BLOCK, 2,
                                            band_coeff[band]);
 
-            approach_level(channel, band, spectrum_scale_to_level(raw));
+            advance_band(channel, band, spectrum_scale_to_level(raw));
         }
     }
 }
@@ -304,4 +350,25 @@ int spectrum_meter_get_bar_channel(int bar, int nbars, int channel)
         return 0;
 
     return spectrum_level[channel][band];
+}
+
+int spectrum_meter_get_peak(int bar, int nbars)
+{
+    int band = bar_to_band(bar, nbars);
+
+    if (band < 0)
+        return 0;
+
+    /* Two Q4 banks averaged and brought back to whole levels in one step. */
+    return (spectrum_peak[0][band] + spectrum_peak[1][band]) / 32;
+}
+
+int spectrum_meter_get_peak_channel(int bar, int nbars, int channel)
+{
+    int band = bar_to_band(bar, nbars);
+
+    if (band < 0 || channel < 0 || channel > 1)
+        return 0;
+
+    return spectrum_peak[channel][band] >> 4;
 }

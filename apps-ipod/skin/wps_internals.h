@@ -379,13 +379,20 @@ struct listitem {
     uint32_t filter_hash;
 };
 
-/* %Sb(bars[,align[,radius]]): how many bars to split the band table into,
- * whether they grow from the viewport floor or from its middle, and the
- * corner radius of each bar (0 for square). */
+/* %Sb(bars[,align[,radius[,gap[,peak[,peakcolour]]]]]): how many bars to split
+ * the band table into, whether they grow from the viewport floor or from its
+ * middle, the corner radius of each bar (0 for square), and the falling peak
+ * cap each bar carries. */
 struct spectrum_bars {
     int16_t bars;
     int16_t radius;
     int16_t gap;        /* pixels between bars; 1 unless the skin said otherwise */
+    int16_t peak_h;     /* cap thickness in pixels; 0 draws no caps */
+    /* The cap's own colour, and whether the skin named one. Absent it keeps
+     * the viewport foreground, so a cap is visible by the gap it floats in
+     * rather than by contrast. */
+    unsigned peak_colour;
+    bool peak_tinted;
     bool center_aligned;
     bool radiate;       /* one bank per channel, opening out from the middle */
 };

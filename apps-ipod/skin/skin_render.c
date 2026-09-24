@@ -669,10 +669,20 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                  * whole token pass completes. */
                 gwps->display->clear_viewport();
 
+                /* The cap thickness is fitted here rather than at parse
+                 * time, where the viewport it has to fit inside is not
+                 * settled yet. */
+                int cap_h = sb->peak_h > vp_h ? vp_h : sb->peak_h;
+                unsigned bar_fg = gwps->display->get_foreground();
+                unsigned cap_fg = bar_fg;
+
+                if (cap_h > 0 && sb->peak_tinted)
+                    cap_fg = dynamic_colors_resolve(sb->peak_colour);
+
                 gwps->display->set_drawmode(DRMODE_SOLID);
                 for (i = 0; i < cols; i++)
                 {
-                    int level;
+                    int level, peak;
                     int bar_h;
 
                     if (sb->radiate)
@@ -686,9 +696,14 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
 
                         level = spectrum_meter_get_bar_channel(band, sb->bars,
                                                                right ? 1 : 0);
+                        peak = spectrum_meter_get_peak_channel(band, sb->bars,
+                                                               right ? 1 : 0);
                     }
                     else
+                    {
                         level = spectrum_meter_get_bar(i, sb->bars);
+                        peak = spectrum_meter_get_peak(i, sb->bars);
+                    }
 
                     bar_h = (level * vp_h) / 100;
                     int x = i * (bar_w + gap);
@@ -709,6 +724,38 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                      * the bar and falls back to a plain fillrect. */
                     fill_round_rect(gwps->display, x, y, bar_w, bar_h,
                                     sb->radius);
+
+                    if (cap_h > 0)
+                    {
+                        /* How far the cap stands off the baseline, never
+                         * less than the cap itself so it stays whole when
+                         * the band is silent. */
+                        int reach = (peak * vp_h) / 100;
+
+                        if (reach < cap_h)
+                            reach = cap_h;
+                        if (cap_fg != bar_fg)
+                            gwps->display->set_foreground(cap_fg);
+                        if (sb->center_aligned)
+                        {
+                            /* Two moving edges, so two caps. They overlap
+                             * rather than crossing once the bar is shorter
+                             * than both of them, which draws as the solid
+                             * block that height should look like. */
+                            int top = (vp_h - reach) / 2;
+
+                            fill_round_rect(gwps->display, x, top,
+                                            bar_w, cap_h, sb->radius);
+                            fill_round_rect(gwps->display,
+                                            x, top + reach - cap_h,
+                                            bar_w, cap_h, sb->radius);
+                        }
+                        else
+                            fill_round_rect(gwps->display, x, vp_h - reach,
+                                            bar_w, cap_h, sb->radius);
+                        if (cap_fg != bar_fg)
+                            gwps->display->set_foreground(bar_fg);
+                    }
                 }
             }
             break;

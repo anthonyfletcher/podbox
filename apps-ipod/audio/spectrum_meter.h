@@ -36,6 +36,13 @@ int spectrum_meter_get_bar(int bar, int nbars);
  * layout reads the two banks apart so its halves differ with the mix. */
 int spectrum_meter_get_bar_channel(int bar, int nbars, int channel);
 
+/* The peak cap for the same bar: the highest level it has reached lately,
+ * held for half a second and then released downward at an accelerating
+ * rate. Never reads below the level the bar is drawn at, so a cap always
+ * marks its own bar or sits above it. */
+int spectrum_meter_get_peak(int bar, int nbars);
+int spectrum_meter_get_peak_channel(int bar, int nbars, int channel);
+
 /* The Q29 filter coefficient for one frequency at one rate.
  *
  * About a thousand cycles on the 5G -- a 64-bit divide and a CORDIC -- so a
