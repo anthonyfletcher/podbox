@@ -29,7 +29,7 @@
 %?ps<%?mm<%dr(286,2,32,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)>|%?mm<|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)>>
 #
 # Bottom band
-%dr(0,215,320,85,000000,-,10,6)
+%dr(0,165,320,90,000000,-,8,6)
 #
 # Progress tint
 %dr(50,226,220,3,!ffffff,-,6)
@@ -53,12 +53,12 @@
 # white text still reads over a white cover.
 #
 # - Track title
-%V(15,162,290,28,2)%Vt(000000,0,0,4,10)
+%V(15,171,290,28,2)%Vt(000000,0,0,4,10)
 %s%ac%it
 #
 # - Sub-line: artist, album, artist-album, album-artist or
 #   playlist_name, per scrim.preferences
-%Vf(ffffff)%V(15,187,290,20,-)%Vt(000000,0,0,4,10)
+%Vf(ffffff)%V(15,196,290,20,-)%Vt(000000,0,0,4,10)
 %s%ac%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist)<%ia|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,playlist_name)<%pn|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist-album)<%?ia<%ia%?id< - |>|>%id|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,album-artist)<%?id<%id%?ia< - |>|>%ia|%id>>>>
 #
 # Progress
