@@ -2426,6 +2426,85 @@ static bool slide_x_range(struct slide_data *slide, int *x0, int *x1)
     return lo < hi;
 }
 
+/* Slides are drawn in tiles: PF_TILE_W columns -- one 16-byte cache line of a
+ * row -- a band of PF_TILE_ROWS rows at a time. The PP502x cache is 4-way with
+ * 128 sets of 16-byte lines, so rows 16 apart share a set and only 64 rows of
+ * one column can be cached at once. Drawn a whole column at a time, a cover
+ * column (up to 160 rows) evicts its own lines before the next column, which
+ * shares every one of them, comes to write to them; tiled, each line is fetched
+ * once for all eight, and a pixel costs ~20% less on the 5G. */
+#define PF_TILE_W    8
+#define PF_TILE_ROWS 32
+
+/* One column of a tile, from the middle row outward: upward or downward. */
+struct pf_col
+{
+    const pix_t *src;   /* the source column */
+    pix_t *px;          /* next pixel to write */
+    int p;              /* source row, fixed point */
+    int dp;             /* step in p per row: -dy upward, +dy downward */
+    int n;              /* rows left to write */
+};
+
+/* Draw one half, upper or lower, of a tile's columns a band at a time. `step`
+ * is the framebuffer stride in the half's direction. Returns the pixels
+ * written. */
+static int draw_tile_half(struct pf_col *cols, int ncols, int step, int alpha,
+                          unsigned int fa, unsigned int frb, unsigned int fg)
+{
+    int total = 0;
+    bool more = true;
+
+    while (more)
+    {
+        more = false;
+        for (int c = 0; c < ncols; c++)
+        {
+            struct pf_col *k = &cols[c];
+            const pix_t *src = k->src;
+            pix_t *pixel = k->px;
+            int p = k->p, dp = k->dp;
+            int n = MIN(k->n, PF_TILE_ROWS);
+
+            if (n <= 0)
+                continue;
+            k->n -= n;
+            more |= (k->n > 0);
+            total += n;
+            if (alpha == 256) {
+                while (n--) {
+                    *pixel = src[((unsigned)p) >> PFREAL_SHIFT];
+                    p += dp;
+                    pixel += step;
+                }
+            } else {
+                while (n--) {
+                    *pixel = fade_color(src[((unsigned)p) >> PFREAL_SHIFT],
+                                        fa, frb, fg);
+                    p += dp;
+                    pixel += step;
+                }
+            }
+            k->p = p;
+            k->px = pixel;
+        }
+    }
+    return total;
+}
+
+static void draw_tile(struct pf_col *up, struct pf_col *lo, int ncols,
+                      int alpha, unsigned int fa, unsigned int frb,
+                      unsigned int fg)
+{
+    int px = draw_tile_half(up, ncols, -BUFFER_WIDTH, alpha, fa, frb, fg)
+           + draw_tile_half(lo, ncols, BUFFER_WIDTH, alpha, fa, frb, fg);
+#if PF_SHOW_STATS
+    pf_px += px;
+#else
+    (void)px;
+#endif
+}
+
 /* Draw only columns in [x_from, x_to). The projection still has to walk every
  * column -- its state is carried forward one step at a time -- but a culled
  * column costs two divisions instead of a column of pixels. */
@@ -2516,13 +2595,18 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
 
     /* Walked a column at a time, which is the order the source is stored in
      * (art_sizes.h keeps the coverflow thumbnails column-major for exactly
-     * this) and keeps p, dy and both pointers in registers.
+     * this), and drawn a tile at a time -- see PF_TILE_W. Each column is
+     * collected as its projection is worked out, and a tile is drawn once its
+     * last column is in.
      *
-     * Trap for anyone eyeing the 640-byte stride on the stores: writing along
-     * rows instead is ~20% *slower*. The per-column state moves from registers
-     * into arrays, and the four extra array accesses a pixel cost more than the
-     * stores save. This loop is limited by its arithmetic, not its access
-     * pattern. */
+     * Trap: writing along rows instead is ~20% slower than even the untiled
+     * column walk: the column-major source is then read across its stride,
+     * and the misses move from the stores onto the loads. */
+    struct pf_col tile_up[PF_TILE_W], tile_lo[PF_TILE_W];
+    int ncols = 0;
+
+#define LCDADDR(x, y) (&buffer[(y)*BUFFER_WIDTH + (x)])
+
     for (x = xi; x < w; x++) {
         /* Rounding in the reverse projection above can leave xs a fraction
          * below the slide's left edge. The cast is unsigned, so that would
@@ -2541,59 +2625,29 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
             goto next_column;   /* hidden: keep the projection, skip the pixels */
 
         const pix_t *ptr = &src[column * sh];
+        /* The rows each half draws: upward from the middle row while p stays
+         * at or above plim, downward while it stays below plo. */
+        int plim = MAX(0, p_start_upper - (half_height-1) * dy);
+        int plo = MIN(sh * PFREAL_ONE, p_start_lower + lower_half * dy);
+        struct pf_col *u = &tile_up[ncols], *l = &tile_lo[ncols];
 
-#define PIXELSTEP_Y   BUFFER_WIDTH
-#define LCDADDR(x, y) (&buffer[(y)*BUFFER_WIDTH + (x)])
+        u->src = l->src = ptr;
+        u->p = p_start_upper;
+        u->dp = -dy;
+        u->px = LCDADDR(x, half_height - 1);
+        u->n = (p_start_upper >= plim) ? (p_start_upper - plim) / dy + 1 : 0;
+        l->p = p_start_lower;
+        l->dp = dy;
+        l->px = LCDADDR(x, half_height);
+        l->n = (plo > p_start_lower) ? (plo - p_start_lower + dy - 1) / dy : 0;
 
-        int p = p_start_upper;
-        int plim = MAX(0, p - (half_height-1) * dy);
-        pix_t *pixel = LCDADDR(x, half_height-1 );
-#if PF_SHOW_STATS
-        const pix_t *px_from = pixel;
-#endif
-
-        if (alpha == 256) {
-            while (p >= plim) {
-                *pixel = ptr[((unsigned)p) >> PFREAL_SHIFT];
-                p -= dy;
-                pixel -= PIXELSTEP_Y;
-            }
-        } else {
-            while (p >= plim) {
-                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT],
-                                    fa, frb, fg);
-                p -= dy;
-                pixel -= PIXELSTEP_Y;
-            }
+        /* A tile ends where a cache line does, not after PF_TILE_W columns
+         * counted from wherever the slide happens to start. */
+        if (++ncols == PF_TILE_W || (x & (PF_TILE_W - 1)) == PF_TILE_W - 1)
+        {
+            draw_tile(tile_up, tile_lo, ncols, alpha, fa, frb, fg);
+            ncols = 0;
         }
-#if PF_SHOW_STATS
-        pf_px += (px_from - pixel) / PIXELSTEP_Y;
-#endif
-        p = p_start_lower;
-        plim = MIN(sh * PFREAL_ONE, p + lower_half * dy);
-        pixel = LCDADDR(x, half_height );
-#if PF_SHOW_STATS
-        px_from = pixel;
-#endif
-
-        if (alpha == 256) {
-            while (p < plim) {
-                *pixel = ptr[((unsigned)p) >> PFREAL_SHIFT];
-                p += dy;
-                pixel += PIXELSTEP_Y;
-            }
-        } else {
-            while (p < plim) {
-                *pixel = fade_color(ptr[((unsigned)p) >> PFREAL_SHIFT],
-                                    fa, frb, fg);
-                p += dy;
-                pixel += PIXELSTEP_Y;
-            }
-        }
-
-#if PF_SHOW_STATS
-        pf_px += (pixel - px_from) / PIXELSTEP_Y;
-#endif
 
 next_column:
         if (perspective)
@@ -2605,6 +2659,8 @@ next_column:
             xs += PFREAL_ONE;
 
     }
+    if (ncols > 0)
+        draw_tile(tile_up, tile_lo, ncols, alpha, fa, frb, fg);
     /* let the music play... */
 #if PF_SHOW_STATS
     {
