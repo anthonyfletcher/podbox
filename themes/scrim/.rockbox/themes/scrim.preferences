@@ -7,5 +7,26 @@
 #-- Sub Line --#
 # The line under the track title in the music player. Applies to both
 # scrim and scrim_p; reload the theme after changing it.
-# Possible Values: artist, album, playlist_name
+# Possible Values: artist, album, artist-album, album-artist, playlist_name
 sub-line mode: artist
+#
+#-- Auto-hide --#
+# Hide the track title, sub-line, progress, times and status icons in scrim
+# after this many seconds without a button press or wheel turn; any input
+# brings them back. scrim only; reload the theme after changing it.
+# Possible Values: off, 5, 10, 30
+auto-hide: off
+#
+#-- Play-Pause Icon --#
+# What the play/pause icon shows: current shows the state (play while
+# playing), next shows what pressing Play will do (pause while playing).
+# scrim only; scrim_p shows large pause bars over the cover instead.
+# Reload the theme after changing it.
+# Possible Values: current, next
+play-pause icon: current
+#
+#-- Spectrum Peaks --#
+# Falling peak caps on the spectrum analyser in scrim.
+# scrim only; reload the theme after changing it.
+# Possible Values: on, off
+spectrum peaks: on
