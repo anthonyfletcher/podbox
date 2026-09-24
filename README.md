@@ -271,6 +271,8 @@ into `.mp3` ones
   - `Settings > Library > Carousel > On Album Select`
 - Display the covers/profiles in a flat top-down mode
   - `Settings > Library > Carousel > View Mode`
+- Spin to a random album or artist
+  - Hold `Play`
 
 ## What's playing
 

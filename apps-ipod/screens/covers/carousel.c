@@ -38,6 +38,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>           /* rand, for the random pick */
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -108,6 +109,7 @@ static fb_data *lcd_fb;
 #define PF_TRACKLIST (LAST_ACTION_PLACEHOLDER + 2)
 #define PF_SORTING_NEXT (LAST_ACTION_PLACEHOLDER + 3)
 #define PF_SORTING_PREV (LAST_ACTION_PLACEHOLDER + 4)
+#define PF_RANDOM (LAST_ACTION_PLACEHOLDER + 5)
 
 /* Both this fork's targets are CONFIG_KEYPAD == IPOD_4G_PAD (confirmed via
  * firmware/export/config/ipod6g.h and ipodvideo.h), so only that keypad's
@@ -133,6 +135,9 @@ const struct button_mapping pf_context_buttons[] =
     {PF_QUIT,         BUTTON_MENU|BUTTON_REL,     BUTTON_MENU},
     {PF_SORTING_NEXT, BUTTON_SELECT|BUTTON_MENU,  BUTTON_NONE},
     {PF_SORTING_PREV, BUTTON_SELECT|BUTTON_PLAY,  BUTTON_NONE},
+    /* Once per hold: later repeats carry a REPEAT prebutton, so they fall
+     * through to CONTEXT_TREE, which claims them. */
+    {PF_RANDOM,       BUTTON_PLAY|BUTTON_REPEAT,  BUTTON_PLAY},
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_TREE)
 };
 const struct button_mapping *pf_contexts[] =
@@ -460,6 +465,18 @@ static bool pf_flat_moving;
 /* Whether the arriving cover has taken the top of the stack from the one it is
  * replacing. See flat_animate(). */
 static bool pf_flat_handover;
+
+/* Random pick (held PLAY): how many recent picks it avoids, and how far short
+ * of the pick the scroll starts -- the spin is a cut to there and a scroll the
+ * rest of the way, so it takes the same time in a library of any size. */
+#define PF_RANDOM_HISTORY 8
+#define PF_RANDOM_SPIN    12
+/* The recent picks as slide indices, newest first. An index means nothing once
+ * the order changes, so they are forgotten on a re-sort, a rebuild and a
+ * switch to the other carousel. */
+static int pf_random_recent[PF_RANDOM_HISTORY];
+static int pf_random_count;
+static const struct carousel_model *pf_random_model;
 
 static struct pf_slide_cache pf_sldcache;
 
@@ -2738,8 +2755,11 @@ void carousel_reload(int (*compare)(const void *, const void *))
     end_pf_thread(); /* stop loading of covers */
 
     if (compare)
+    {
         qsort(carousel_idx.album_index, carousel_idx.album_ct,
               sizeof(struct album_data), compare);
+        pf_random_count = 0;
+    }
 
     /* Empty cache and restart cover loading thread */
     buflib_init(&buf_ctx, (void *)carousel_idx.buf, carousel_idx.buf_sz);
@@ -2809,6 +2829,56 @@ static void show_next_slide(void)
     } else {
         target = fmin(center_index + 2, number_of_slides - 1);
     }
+}
+
+static bool random_was_recent(int index, int depth)
+{
+    for (int i = 0; i < depth; i++)
+        if (pf_random_recent[i] == index)
+            return true;
+    return false;
+}
+
+/* Spin to a random slide, never the current one or a recent pick. With few
+ * slides the history shrinks, so there is always one left to choose. */
+static void show_random_slide(void)
+{
+    int n = number_of_slides;
+    int depth, pick, from, i;
+
+    if (n < 2)
+        return;
+    if (pf_random_model != model)
+    {
+        pf_random_model = model;
+        pf_random_count = 0;
+    }
+
+    return_to_idle_state();
+
+    depth = MIN(pf_random_count, n - 2);
+    srand(current_tick);
+    do
+        pick = rand() % n;
+    while (pick == center_index || random_was_recent(pick, depth));
+
+    for (i = PF_RANDOM_HISTORY - 1; i > 0; i--)
+        pf_random_recent[i] = pf_random_recent[i - 1];
+    pf_random_recent[0] = pick;
+    if (pf_random_count < PF_RANDOM_HISTORY)
+        pf_random_count++;
+
+    from = (pick > center_index) ? MAX(center_index, pick - PF_RANDOM_SPIN)
+                                 : MIN(center_index, pick + PF_RANDOM_SPIN);
+    if (from != center_index)
+        set_current_slide(from);
+    target = pick;
+
+    /* Paced as a fast flick, so the flat view snaps the covers going past and
+     * deals the last few, rather than dealing every one at a browsing pace. */
+    pf_flat_last_input = current_tick;
+    pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
+    start_animation();
 }
 
 /* A flat pile hides everything but its top card, so only four covers are ever
@@ -3270,8 +3340,8 @@ static void update_scroll_animation(void)
     anim_frac = num - adv * HZ;
 
     /* Clamping dt bounds the time step, not the distance. speed reaches
-     * 133120 and target is never more than two slides away, so one long
-     * frame could sail past it: the direction test at the end of this
+     * 133120 and target is usually no more than two slides away, so one
+     * long frame could sail past it: the direction test at the end of this
      * function would throw the flip into reverse, and center_index would
      * meanwhile leave 0..number_of_slides-1, which album_covers.c's
      * draw_album_text() uses to index carousel_idx.album_index[] without a
@@ -3681,6 +3751,7 @@ static bool init(void)
 /* carousel_reinit: full teardown + rebuild of the engine. */
 bool carousel_reinit(void)
 {
+    pf_random_count = 0;
     cleanup();
     return init();
 }
@@ -4153,6 +4224,9 @@ static int album_covers_loop(void)
             break;
         case PF_SORTING_PREV:
             model->sort_prev();
+            break;
+        case PF_RANDOM:
+            show_random_slide();
             break;
         case PF_JMP:
         {
