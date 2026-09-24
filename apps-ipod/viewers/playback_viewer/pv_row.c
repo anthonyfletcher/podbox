@@ -102,16 +102,20 @@ static bool         art_ok[ART_SLOTS];
 /* Hues, kept apart from the pictures and for far longer.
  *
  * Two things follow from keeping the answer rather than the pixels. A card's
- * colour does not change when its picture is evicted -- five slots hold a
+ * colour does not change when its picture is evicted -- six slots hold a
  * screenful, and a row scrolled far evicts everything behind it, which would
  * otherwise make a card revert to its assigned colour on the way back. And
  * the same sleeve is the same colour in every section, without a second read.
  *
- * Direct-mapped, and the key is checked: a collision costs one picture its
- * remembered hue, never gives it another picture's. */
-#define HUE_CACHE 64
-static unsigned     hue_key[HUE_CACHE];
-static short        hue_val[HUE_CACHE];
+ * Trap: this has to hold every sleeve a scroll can pass, not a screenful. A
+ * lost hue shows as the card changing colour in front of the reader, because
+ * the card is coloured before its picture is read back. Four ways a set, so
+ * two sleeves landing on one set do not throw each other out; a full set
+ * drops the one stored longest ago. Six bytes an entry. */
+#define HUE_SETS    256
+#define HUE_WAYS      4
+static unsigned     hue_key[HUE_SETS][HUE_WAYS];
+static short        hue_val[HUE_SETS][HUE_WAYS];
 static unsigned     art_used[ART_SLOTS];
 static unsigned     art_tick;
 static int          art_size_idx = -1;    /* the 300px, scaled down */
@@ -227,6 +231,25 @@ static void art_want_add(unsigned key)
     art_want[art_want_n++] = key;
 }
 
+/* Remember a picture's hue at the front of its set, the rest moving back one
+ * and the last falling off. A key already held is moved rather than copied. */
+static void hue_store(unsigned key, int hue)
+{
+    unsigned *set = hue_key[key % HUE_SETS];
+    short *val = hue_val[key % HUE_SETS];
+    int w = 0;
+
+    while (w < HUE_WAYS - 1 && set[w] != key)
+        w++;
+    for (; w > 0; w--)
+    {
+        set[w] = set[w - 1];
+        val[w] = val[w - 1];
+    }
+    set[0] = key;
+    val[0] = (short)hue;
+}
+
 static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
 {
 #ifdef HAVE_ALBUMART
@@ -288,10 +311,9 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
         return NULL;
 
     art_ok[lru] = true;
-    hue_key[key % HUE_CACHE] = key;
-    hue_val[key % HUE_CACHE] =
-        (short)card_paint_dominant_hue(art_mem + (size_t)lru * ART_PX * ART_PX,
-                                       ART_PX, ART_PX, ART_PX);
+    hue_store(key,
+              card_paint_dominant_hue(art_mem + (size_t)lru * ART_PX * ART_PX,
+                                      ART_PX, ART_PX, ART_PX));
     *stride = ART_PX;
     *w = *h = ART_PX;
     return art_mem + (size_t)lru * ART_PX * ART_PX;
@@ -303,14 +325,17 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
 
 /* What colour a card carrying this picture should be.
  *
- * Answered from the remembered hue, never by loading: the compositor makes
- * sure a visible card's picture is in hand before it resolves the card, which
- * is the whole of what keeps a colour from arriving a frame late. */
+ * Answered from the remembered hue, never by loading: a card is coloured
+ * before its picture is read, so a sleeve seen for the first time keeps its
+ * assigned colour until the read lands. */
 static int art_tint(unsigned key)
 {
-    int i = (int)(key % HUE_CACHE);
+    const unsigned *set = hue_key[key % HUE_SETS];
 
-    return hue_key[i] == key ? hue_val[i] : -1;
+    for (int w = 0; w < HUE_WAYS; w++)
+        if (set[w] == key)
+            return hue_val[key % HUE_SETS][w];
+    return -1;
 }
 
 /* -------------------------------------------------------------- the fonts */
