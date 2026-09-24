@@ -342,6 +342,10 @@ int get_action_statuscode(int *button);
    BUTTON_NONE or flagged with SYS_EVENT */
 intptr_t get_action_data(void);
 
+/* returns current_tick as of the last action that is not BUTTON_NONE or
+   flagged with SYS_EVENT -- the time of the last button or wheel input */
+long get_action_tick(void);
+
 
 /*******************************************************
 * action_wait_for_release will not allow

@@ -939,6 +939,11 @@ intptr_t get_action_data(void)
     return action_last.data;
 }
 
+long get_action_tick(void)
+{
+    return action_last.tick;
+}
+
 int get_action_statuscode(int *button)
 {
     int ret = 0;

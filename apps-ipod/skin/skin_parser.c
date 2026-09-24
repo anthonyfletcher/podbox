@@ -1210,6 +1210,7 @@ static int parse_timeout_tag(struct skin_element *element,
             case SKIN_TOKEN_BUTTON_VOLUME:
             case SKIN_TOKEN_TRACK_STARTING:
             case SKIN_TOKEN_TRACK_ENDING:
+            case SKIN_TOKEN_LASTTOUCH:
                 val = 10;
                 break;
             default:
@@ -2496,6 +2497,7 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_BUTTON_VOLUME:
                 case SKIN_TOKEN_TRACK_STARTING:
                 case SKIN_TOKEN_TRACK_ENDING:
+                case SKIN_TOKEN_LASTTOUCH:
                     function = parse_timeout_tag;
                     break;
                 case SKIN_TOKEN_LIST_ITEM_TEXT:

@@ -655,6 +655,7 @@ long gui_wps_show(void)
             skin_request_full_update(WPS);
             update = true;
             gwps_enter_wps(theme_enabled);
+            skin_restart_input_timer();
             theme_enabled = true;
         }
         else

@@ -763,6 +763,11 @@ after the reveal.
   blending happens at the glyph edges. Every font shipped with Themify_2 is
   antialiased; one you convert yourself with `convbdf` is not.
 - **Eight tints per viewport**; beyond that the extras are dropped.
+- **A conditional in a `%VB` viewport that changes branch repaints the whole
+  skin**, because what the old branch drew there cannot be taken back out any
+  other way. That is free for something that changes with the track or after a
+  timeout, and a full repaint every time for something that changes every
+  second.
 - **Gradients and opacity do not combine.** Give both an `end_colour` and an
   opacity and the tint uses the start colour.
 - **A tint costs far more per pixel than a plain fill**, because it reads the
@@ -900,6 +905,24 @@ takes the screen and leaves it blank.
 The tags report the settings and nothing else; the wheel and the four buttons
 keep their usual meanings. Draw the four positions where the buttons are — top,
 bottom, left, right — or the screen stops explaining itself.
+
+---
+
+## Changed behaviour: `%Tl` means any recent input
+
+`%Tl(seconds)` is upstream's "touched recently" tag. With no touchscreen here it
+answers for the buttons and the click wheel instead: true for `seconds` after
+the last press or wheel turn, 10 if you leave the argument out. Opening the
+music player restarts the count, so a screen slow to open does not arrive
+idle. Use it to clear things away while the player is left alone:
+
+```
+%?Tl(10)<%Vd(Panel)|>         # show the Panel viewports until 10 s idle
+```
+
+It takes the seconds only. Upstream's touch-region form has nothing to refer to
+here. The input that brings things back still does its usual job, so on the
+music player a wheel turn changes the volume as it wakes the screen.
 
 ---
 

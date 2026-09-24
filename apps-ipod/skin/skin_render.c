@@ -129,6 +129,11 @@ static void skin_render_playlistviewer(struct playlistviewer* viewer,
 
 static char* skin_buffer;
 
+/* A conditional in a backdrop viewport changed branch during a partial
+ * refresh. What the old branch drew there cannot be taken back out -- the
+ * foreground has already copied it -- so skin_render() repaints everything. */
+static bool backdrop_flipped;
+
 static inline struct skin_element*
 get_child(OFFSETTYPE(struct skin_element**) children, int child)
 {
@@ -999,7 +1004,11 @@ static bool skin_render_line(struct skin_element* line, struct skin_draw_info *i
                     {
                         /* we are in a false branch of a %?aa<true> conditional */
                         if (last_value == 0)
+                        {
                             do_tags_in_hidden_conditional(get_child(child->children, 0), info);
+                            if (info->skin_vp->output_to_backdrop_buffer)
+                                backdrop_flipped = true;
+                        }
                         break;
                     }
                 }
@@ -1021,6 +1030,9 @@ static bool skin_render_line(struct skin_element* line, struct skin_draw_info *i
                 {
                     info->refresh_type = SKIN_REFRESH_ALL;
                     info->force_redraw = true;
+                    if (last_value >= 0 &&
+                        info->skin_vp->output_to_backdrop_buffer)
+                        backdrop_flipped = true;
                 }
 
                 if (func(se_child, info))
@@ -1352,6 +1364,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     char *label;
 
     int old_refresh_mode = refresh_mode;
+    backdrop_flipped = false;
     skin_buffer = get_skin_buffer(gwps->data);
     /* No buffer means the skin is unloaded -- settings_apply_skins() frees
      * every skin before reloading, and `tree` still holds its offset until
@@ -1503,6 +1516,13 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
     }
     skin_backdrop_set_buffer(-1, skin_viewport);
     skin_backdrop_show(data->backdrop_id);
+
+    if (backdrop_flipped &&
+        (old_refresh_mode&SKIN_REFRESH_ALL) != SKIN_REFRESH_ALL)
+    {
+        skin_render(gwps, SKIN_REFRESH_ALL);
+        return;
+    }
 
     if (((refresh_mode&SKIN_REFRESH_ALL) == SKIN_REFRESH_ALL))
     {

@@ -84,6 +84,15 @@
 
 #define NOINLINE __attribute__ ((noinline))
 
+/* When the screen last opened: %Tl counts from this or the last input,
+ * whichever is later, so a screen slow to open does not arrive idle. */
+static long input_timer_start;
+
+void skin_restart_input_timer(void)
+{
+    input_timer_start = current_tick;
+}
+
 static const char* get_codectype(const struct mp3entry* id3)
 {
     if (id3 && id3->codectype < AFMT_NUM_CODECS) {
@@ -1937,9 +1946,14 @@ const char *get_token_value(struct gui_wps *gwps,
                 return "v";
             return NULL;
         case SKIN_TOKEN_LASTTOUCH:
-            {
-            }
+        {
+            long last = get_action_tick();
+            if (TIME_AFTER(input_timer_start, last))
+                last = input_timer_start;
+            if (TIME_BEFORE(current_tick, last + token->value.i))
+                return "t";
             return NULL;
+        }
         case SKIN_TOKEN_HAVE_TOUCH:
             return NULL;
 
