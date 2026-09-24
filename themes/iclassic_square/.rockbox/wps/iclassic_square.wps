@@ -1,0 +1,86 @@
+#-----------------------------------------------#
+#iclassic_square
+#(CC-BY-SA 3.0) by Humberto Santana
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,24x24-icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+%Fl(4,16-noto-sans-bold.fnt)
+%Fl(5,16-noto-sans.fnt)
+#
+#Background layer
+#
+#- Title bar
+%V(0,0,-,-,-)%VB%Vb(ffffff)%Vf(000000)
+%dr(0,0,320,23,f5f5f5,c8c8c8)
+%dr(0,23,320,1,707070)
+#
+#- Progress track. Here, not %Vb: %pb clears to the backdrop
+%dr(60,214,200,6,c8c8c8)
+%dr(60,220,200,6,b8b8b8)
+#
+#- Cover or grey tile, and the reflection fade. Same size as the .sbs cover
+%?C<|%dr(8,32,150,150,d8d8d8,a0a0a0)>
+%dr(8,184,150,22,e4e4e4,ffffff)
+%Cl(8,32,150,150,c,c)%Cd
+#
+#Foreground layer
+#
+#- Volume or progress. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%?mv(2)<%Vd(Volume)|%Vd(Progress)>
+#
+#- Title
+%V(6,3,190,19,4)%Vf(000000)
+%Sx(Now Playing)
+#
+#- Status icons
+%V(198,0,120,23,2)%Vf(000000)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Grey tile's note
+%V(71,95,24,24,2)%Vf(ffffff)
+%?C<|b>
+#
+#Track
+#
+#- Title, artist, album
+%V(170,36,146,22,3)%Vf(000000)
+%s%?it<%it|%fn>
+%V(170,60,146,20,4)%Vf(888888)
+%s%?ia<%ia|%?d(2)<%d(2)|>>
+%V(170,80,146,20,5)%Vf(888888)
+%s%?id<%id|%?d(1)<%d(1)|>>
+#
+#- Rating
+%V(170,102,146,24,2)%Vf(888888)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+#
+#- Playlist position
+%V(170,128,146,20,5)%Vf(888888)
+%pp %Sx(of) %pe
+#
+#Progress, in two tones
+%Vl(Progress,2,210,52,20,4)%Vf(000000)
+%ar%pc
+%Vl(Progress,60,214,200,6,-)%Vf(5ea8f0)
+%pb(0,0,-,-,noborder)
+%Vl(Progress,60,220,200,6,-)%Vf(2a7fd6)
+%pb(0,0,-,-,noborder)
+%Vl(Progress,266,210,52,20,4)%Vf(000000)
+%al-%pr
+#
+#Volume
+%Vl(Volume,32,208,24,24,2)%Vf(000000)
+N
+%Vl(Volume,60,214,200,6,-)%Vf(5ea8f0)
+%pv(0,0,-,-,noborder)
+%Vl(Volume,60,220,200,6,-)%Vf(2a7fd6)
+%pv(0,0,-,-,noborder)
+%Vl(Volume,264,208,24,24,2)%Vf(000000)
+O

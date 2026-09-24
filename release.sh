@@ -74,7 +74,7 @@ THEMES_RELEASE=Themes
 # Named rather than globbed, for the same reason bundle-theme.sh names its one
 # -- a `git merge rockbox/master` must not start publishing stock themes that
 # were never converted.
-EXTRA_THEMES="themify_2 obsede_2 bony"
+EXTRA_THEMES="themify_2 obsede_2 bony iclassic_square"
 
 # Published asset names. The build directory's own name means nothing to
 # somebody choosing a download.

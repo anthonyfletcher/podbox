@@ -23,3 +23,9 @@ firmware instead.
 <img src="bony/ss_2.png"/>
 
 [Click for more information](bony/README.md)
+
+## iclassic_square
+
+<img src="iclassic_square/ss_1.png"/>
+
+[Click for more information](iclassic_square/README.md)
