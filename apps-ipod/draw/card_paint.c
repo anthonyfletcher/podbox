@@ -205,7 +205,9 @@ void card_paint_ink(unsigned base, struct card_ink *ink)
     unsigned lift;
 
     color_get_hsv(base, &h, &sat, &val);
-    lift = color_from_hsv(h, 30, 255);
+    /* A grey card's own hue is a trace, and a near-white carrying it reads
+     * as tinted glass. Slate takes a plainer white. */
+    lift = color_from_hsv(h, sat < 128 ? 10 : 30, 255);
 
     ink->bg     = base;
     ink->text   = lift;
@@ -227,50 +229,77 @@ void card_paint_ink(unsigned base, struct card_ink *ink)
     ink->pat    = mix(base, lift, 110);
 }
 
+/* A card given an accent of its own wears it on everything that is not text:
+ * the bar, the progress fill, the plate and the pattern. The plate and the
+ * pattern are mixed toward it rather than filled with it, so they stay
+ * shades of the card. */
+static void ink_accent(struct card_ink *ink, unsigned a)
+{
+    if (!a)
+        return;
+    ink->accent = a;
+    ink->plate  = mix(ink->bg, a, 120);
+    ink->pat    = mix(ink->bg, a, 90);
+}
+
 /* --------------------------------------------------------- the palette */
 
-/* Twelve, deep rather than bright, and all of one lightness -- a hundred and
- * twenty to a hundred and eighty, which is a band and not a point. Only the
- * hue changes as the row scrolls, which is what keeps twelve strong colours
- * from being a circus. The band is also what lets the ink rule above have no
- * exceptions: a near-white of any hue in it reads with margin, the weakest
- * pairing at 4.1 to 1, so no card ever needs the other kind of ink.
- *
- * Trap: the hues are NOT evenly spaced, and must not be evened up. Nothing
- * sits between about 50 and 130 degrees, because sRGB's most chromatic
- * colours there are also its lightest: a hue in that band held down to this
- * lightness is khaki, and lifting it out of khaki puts it past where the ink
- * reads. Twelve even stops around the wheel is a colour wheel rather than a
- * palette, and the two an even ring drops in that band are khaki.
- *
- * Listed in the order a scroller meets them, and that order is the point: no
- * two neighbours are near each other on the wheel. Sorting them by hue and
- * relying on a stride to break it up is the same thing done where nobody can
- * check it. */
-#define N_PALETTE 12
+/* The ground: four slates, close enough to read as one surface and far
+ * enough apart that two neighbours still part without a gap between them.
+ * Blue-grey rather than grey, so the accents sit on something that is a
+ * colour, not on an absence of one. */
+#define N_SLATE 4
 
-/* One. The table below is already IN the order a scroller sees, so a stride
- * has nothing left to scramble -- and a stride over a table ordered any other
- * way makes the sequence impossible to reason about: three cards that look
- * alike are three entries five apart, which is not something you can see by
- * reading the list. Order the list instead. */
-#define PALETTE_STRIDE 1
-
-static const unsigned palette[N_PALETTE] =
+static const unsigned slate[N_SLATE] =
 {
-    LCD_RGBPACK(  0, 121, 115),   /* teal      */
-    LCD_RGBPACK(165,  77,  90),   /* brick     */
-    LCD_RGBPACK( 74,  97, 181),   /* indigo    */
-    LCD_RGBPACK( 49, 125,  66),   /* forest    */
-    LCD_RGBPACK(148,  73, 140),   /* plum      */
-    LCD_RGBPACK(165,  85,  57),   /* rust      */
-    LCD_RGBPACK(  0, 117, 140),   /* petrol    */
-    LCD_RGBPACK(107,  85, 173),   /* iris      */
-    LCD_RGBPACK(  0, 125,  90),   /* viridian  */
-    LCD_RGBPACK(165,  73, 115),   /* mulberry  */
-    LCD_RGBPACK(  0, 109, 181),   /* lapis     */
-    LCD_RGBPACK(165,  77,  74),   /* terracotta */
+    LCD_RGBPACK( 36,  42,  54),
+    LCD_RGBPACK( 46,  54,  68),
+    LCD_RGBPACK( 30,  34,  44),
+    LCD_RGBPACK( 54,  62,  78),
 };
+
+/* One accent a section, in the order sections are numbered, and no two
+ * neighbours near each other on the wheel. Each is as light as the ink rule above lets it be: an
+ * accent is also a whole card where a card is lit, and keeps its near-white
+ * text at CARD_INK_FLOOR or better there.
+ *
+ * Trap: amber is the only yellow, and it has to stay this deep. sRGB's most
+ * chromatic colours between about 50 and 130 degrees are also its lightest,
+ * so a hue there held down to where the ink reads is khaki. The eight share
+ * the rest of the wheel, about thirty-five degrees apart. */
+#define N_ACCENT 8
+
+static const unsigned accent[N_ACCENT] =
+{
+    LCD_RGBPACK(196,  56,  48),   /* coral   */
+    LCD_RGBPACK(  0, 124, 116),   /* teal    */
+    LCD_RGBPACK(120,  72, 210),   /* violet  */
+    LCD_RGBPACK(166,  88,   0),   /* amber   */
+    LCD_RGBPACK(  0, 106, 190),   /* azure   */
+    LCD_RGBPACK(184,  40, 128),   /* magenta */
+    LCD_RGBPACK( 28, 122,  66),   /* green   */
+    LCD_RGBPACK( 72,  82, 210),   /* indigo  */
+};
+
+/* Every fifth summary tile, from the first: often enough that a section's
+ * colour is never out of sight for long, rarely enough that it still marks
+ * something. */
+#define ACCENT_EVERY 5
+
+unsigned card_paint_slate(int idx)
+{
+    return slate[(unsigned)idx % N_SLATE];
+}
+
+unsigned card_paint_accent(int section)
+{
+    return accent[(unsigned)section % N_ACCENT];
+}
+
+bool card_paint_accent_slot(int idx)
+{
+    return idx % ACCENT_EVERY == 0;
+}
 
 /* A card does not choose its colour; it is assigned one.
  *
@@ -291,12 +320,6 @@ unsigned card_paint_step(unsigned base, int depth)
      * three. A step sized for a run of ten leaves four cards nobody can tell
      * apart. */
     return mix(base, LCD_RGBPACK(16, 16, 20), 26 + depth * 22);
-}
-
-unsigned card_paint_palette(int idx, int depth)
-{
-    return card_paint_step(palette[(idx * PALETTE_STRIDE) % N_PALETTE],
-                           depth);
 }
 
 /* ------------------------------------------------------ derived colour */
@@ -354,151 +377,185 @@ int card_paint_dominant_hue(const fb_data *px, int stride, int w, int h)
     return best * (360 / HUE_BINS) + (360 / HUE_BINS) / 2;
 }
 
+/* The least contrast a card's text may have against the card, in tenths:
+ * 4.1 to 1. The palette meets it by design; a derived tint is darkened until
+ * it does. */
+#define CARD_INK_FLOOR 41
+
+/* Each channel's share of relative luminance, sRGB-decoded, in 1/65536ths --
+ * indexed by the channel's RGB565 bits, which is every value the panel has. */
+static const unsigned short lum_r[32] =
+{
+        0,    34,    72,   127,   212,   309,   428,   570,
+      759,   954,  1176,  1425,  1738,  2049,  2389,  2760,
+     3215,  3654,  4126,  4632,  5242,  5822,  6438,  7090,
+     7868,  8600,  9369, 10177, 11134, 12026, 12959, 13933,
+};
+static const unsigned short lum_g[64] =
+{
+        0,    57,   114,   172,   243,   328,   428,   544,
+      677,   827,   995,  1181,  1385,  1610,  1854,  2118,
+     2478,  2789,  3123,  3478,  3857,  4258,  4682,  5131,
+     5603,  6100,  6621,  7168,  7740,  8338,  8962,  9612,
+    10463, 11174, 11912, 12679, 13473, 14295, 15146, 16026,
+    16935, 17873, 18841, 19839, 20867, 21926, 23015, 24135,
+    25579, 26769, 27992, 29246, 30532, 31851, 33203, 34587,
+    36004, 37455, 38939, 40457, 42009, 43596, 45216, 46871,
+};
+static const unsigned short lum_b[32] =
+{
+        0,    11,    25,    43,    72,   105,   145,   194,
+      258,   324,   399,   484,   590,   696,   811,   937,
+     1092,  1241,  1401,  1573,  1780,  1977,  2186,  2408,
+     2672,  2920,  3182,  3456,  3781,  4084,  4401,  4732,
+};
+
+static long luminance(unsigned c)
+{
+    return (long)lum_r[RGB_UNPACK_RED(c) >> 3]
+         + lum_g[RGB_UNPACK_GREEN(c) >> 2]
+         + lum_b[RGB_UNPACK_BLUE(c) >> 3];
+}
+
+/* Whether a card of this colour keeps its text at the floor. The ink is
+ * lighter than any card, so the ratio is text over ground, each with the
+ * 0.05 flare term (3277 in these units) added. */
+static bool ink_reads(unsigned base)
+{
+    struct card_ink ink;
+
+    card_paint_ink(base, &ink);
+    return 10 * (luminance(ink.text) + 3277)
+           >= CARD_INK_FLOOR * (luminance(base) + 3277);
+}
+
 unsigned card_paint_tint(int hue)
 {
     static int pal_s, pal_v;
+    unsigned c;
+    int v;
 
     if (hue < 0)
         return 0;
 
-    /* The palette's own register, measured from it rather than written down,
-     * so editing a colour above cannot leave a derived tile in a family the
+    /* The accents' own register, measured from them rather than written
+     * down, so editing an accent above cannot leave a sleeve's in a family the
      * designed ones have left. */
     if (pal_v == 0)
     {
         long sum_s = 0, sum_v = 0;
 
-        for (int i = 0; i < N_PALETTE; i++)
+        for (int i = 0; i < N_ACCENT; i++)
         {
             int h, s, v;
 
-            color_get_hsv(palette[i], &h, &s, &v);
+            color_get_hsv(accent[i], &h, &s, &v);
             sum_s += s;
             sum_v += v;
         }
-        pal_s = (int)(sum_s / N_PALETTE);
-        pal_v = (int)(sum_v / N_PALETTE);
+        pal_s = (int)(sum_s / N_ACCENT);
+        pal_v = (int)(sum_v / N_ACCENT);
     }
 
-    return color_from_hsv(hue, pal_s, pal_v);
+    /* Trap: one brightness is not one lightness. At the same brightness a
+     * yellow or green is far lighter than a blue, and text on it falls well
+     * under the floor -- so the brightness comes down per hue until the text
+     * reads. Still a function of the hue alone, so a sleeve keeps one colour
+     * everywhere. */
+    for (v = pal_v; ; v -= 4)
+    {
+        c = color_from_hsv(hue, pal_s, v);
+        if (v <= 4 || ink_reads(c))
+            return c;
+    }
 }
 
 /* ------------------------------------------------------- the generators */
 
-/* Twelve wedges, so two, three, four or six colours all divide it evenly and
- * no generator ends with two neighbouring wedges the same. */
-#define GEN_WEDGES 12
+/* Five bands a sky, and the share of the card's height each takes, top down.
+ * The top three are dark enough for the card's ink to read on, and together
+ * they cover the title and the line under it; the bright two sit behind the
+ * chart, whose bars are what stands on the horizon. */
+#define SKY_BANDS 5
 
-/* The tangent of each interior wedge boundary, Q10, at fifteen degrees apart
- * from -75 to +75. The two outermost boundaries are vertical -- an infinite
- * tangent -- and are the rect's own edges, so they are not in the table.
- *
- * Boundaries rather than angles because the fill is per row: at a row 'dy'
- * from the origin a boundary sits at ox + dy * tan, so a row is a run of
- * spans that tile it exactly. Deciding a wedge per pixel instead would want
- * an arctangent, and drawing wedges as triangles would leave a seam between
- * each pair. */
-static const int gen_tan[GEN_WEDGES] =
+static const unsigned char sky_pc[SKY_BANDS] = { 30, 18, 16, 17, 19 };
+
+/* Each sky starts in the slate the row is made of and ends in a horizon of
+ * the palette's own accents, so the four are the row's colours and not a
+ * second scheme. Amber, teal and coral are sunrise, noon and dusk; night
+ * starts darker than any slate and ends in violet. */
+static const unsigned sky[CARD_GEN_COUNT][SKY_BANDS] =
 {
-    0, -3821, -1774, -1024, -591, -274, 0, 274, 591, 1024, 1774, 3821
+    [CARD_GEN_SUNRISE] = {
+        LCD_RGBPACK( 36,  42,  54), LCD_RGBPACK( 46,  50,  66),
+        LCD_RGBPACK( 72,  64,  80), LCD_RGBPACK(140,  96,  50),
+        LCD_RGBPACK(166,  88,   0) },
+    [CARD_GEN_NOON] = {
+        LCD_RGBPACK( 36,  42,  54), LCD_RGBPACK( 36,  54,  66),
+        LCD_RGBPACK( 30,  72,  82), LCD_RGBPACK( 10, 100, 104),
+        LCD_RGBPACK(  0, 124, 116) },
+    [CARD_GEN_DUSK] = {
+        LCD_RGBPACK( 36,  42,  54), LCD_RGBPACK( 54,  42,  60),
+        LCD_RGBPACK( 92,  46,  60), LCD_RGBPACK(150,  52,  52),
+        LCD_RGBPACK(196,  56,  48) },
+    [CARD_GEN_NIGHT] = {
+        LCD_RGBPACK( 22,  26,  36), LCD_RGBPACK( 28,  32,  46),
+        LCD_RGBPACK( 40,  38,  64), LCD_RGBPACK( 64,  48, 110),
+        LCD_RGBPACK( 90,  60, 160) },
 };
 
-struct gen_def
-{
-    bool from_top;
-    int  n;
-    unsigned col[3];
-};
+/* Night's stars, as thousandths of the card across and down. Between the
+ * text and the chart, which is the only part of the sky left showing. */
+#define N_STARS 9
 
-/* The colours inside one burst sit CLOSE together, unlike the palette's
- * twelve which sit far apart.
- *
- * A burst is twelve wedges of the same picture, so the gap between its
- * colours decides whether it reads as a texture or as a sunburst shouting
- * over the card. Far apart shouts; too close is a flat wash with a card's
- * worth of nothing on it. A few steps -- enough to see the wedges, not enough
- * to count them from across the room.
- *
- * The four are placed where the day is -- rust, brass, plum, navy -- and
- * ordered by lightness as well as by hue: noon is the lightest of the four
- * and night the darkest, so the set reads as a day in a photograph of the
- * screen, where the bars are too small to count. That ordering is the reason
- * the mud rule the palette above obeys does not apply here. Noon IS the
- * yellow one. */
-static const struct gen_def gens[CARD_GEN_COUNT] =
-{
-    { false, 1, { LCD_RGBPACK(  8,   8,  12), 0, 0 } },        /* NONE */
-    { false, 2, { LCD_RGBPACK(165,  60,  49),
-                  LCD_RGBPACK(189,  93,  16), 0 } },            /* SUNRISE */
-    { true,  2, { LCD_RGBPACK(173, 117,   0),
-                  LCD_RGBPACK(181, 158,  49), 0 } },            /* NOON */
-    { false, 3, { LCD_RGBPACK(148,  69, 107),
-                  LCD_RGBPACK(107,  65, 123),
-                  LCD_RGBPACK(181,  81,  57) } },               /* DUSK */
-    { true,  2, { LCD_RGBPACK( 49,  73, 132),
-                  LCD_RGBPACK( 33,  44,  99), 0 } },            /* NIGHT */
-};
+static const short star_x[N_STARS] =
+    { 740, 135, 540, 915, 310, 665,  85, 830, 455 };
+static const short star_y[N_STARS] =
+    { 400, 430, 470, 500, 520, 560, 590, 620, 650 };
 
 unsigned card_paint_gen_base(enum card_gen gen)
 {
     if (gen <= CARD_GEN_NONE || gen >= CARD_GEN_COUNT)
         return LCD_RGBPACK(8, 8, 12);
-    return gens[gen].col[0];
+    return sky[gen][0];
 }
 
 unsigned card_paint_gen_ink(enum card_gen gen)
 {
     struct card_ink ink;
 
-    /* The same rule as any other card: the near-white of its own hue. A
-     * burst is one colour spread over twelve wedges, so its first colour is
-     * the one the whole card is made of. */
+    /* The same rule as any other card, taken from the top band, which is
+     * where the text is. */
     card_paint_ink(card_paint_gen_base(gen), &ink);
     return ink.text;
 }
 
 void card_paint_gen(enum card_gen gen, int x, int y, int w, int h)
 {
-    const struct gen_def *g;
-    int ox = x + w / 2;
-    int oy;
+    int top = y;
 
     if (gen <= CARD_GEN_NONE || gen >= CARD_GEN_COUNT || w <= 0 || h <= 0)
         return;
 
-    g = &gens[gen];
-    oy = g->from_top ? y : y + h;
-
     lcd_set_drawmode(DRMODE_SOLID);
 
-    for (int row = y; row < y + h; row++)
+    /* The last band takes whatever the rounding left, so the sky always
+     * reaches the card's foot. */
+    for (int i = 0; i < SKY_BANDS; i++)
     {
-        /* Distance from the origin edge, never zero: the row the origin sits
-         * on would put every boundary in one place and paint the whole row
-         * in the last wedge's colour. */
-        int dy = g->from_top ? (row - oy + 1) : (oy - row);
-        int prev = x;
+        int bh = (i == SKY_BANDS - 1) ? y + h - top : h * sky_pc[i] / 100;
 
-        if (dy < 1)
-            dy = 1;
+        lcd_set_foreground(sky[gen][i]);
+        lcd_fillrect(x, top, w, bh);
+        top += bh;
+    }
 
-        for (int i = 1; i <= GEN_WEDGES; i++)
-        {
-            int bx = (i == GEN_WEDGES) ? x + w
-                                       : ox + dy * gen_tan[i] / 1024;
-
-            if (bx < x)
-                bx = x;
-            if (bx > x + w)
-                bx = x + w;
-
-            if (bx > prev)
-            {
-                lcd_set_foreground(g->col[(i - 1) % g->n]);
-                lcd_fillrect(prev, row, bx - prev, 1);
-            }
-            prev = bx;
-        }
+    if (gen == CARD_GEN_NIGHT)
+    {
+        lcd_set_foreground(LCD_RGBPACK(210, 214, 240));
+        for (int i = 0; i < N_STARS; i++)
+            lcd_fillrect(x + w * star_x[i] / 1000, y + h * star_y[i] / 1000,
+                         1, 1);
     }
 }
 
@@ -728,7 +785,7 @@ void card_paint_clear(struct card_content *c)
 {
     memset(c, 0, sizeof(*c));
     c->prog = -1;
-    c->base = palette[0];
+    c->base = slate[0];
 }
 
 static int text_w_for(int card_w)
@@ -874,21 +931,20 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
     lcd_set_foreground(ink.bg);
     lcd_fillrect(ox, 0, w, h);
 
-    /* A chart tile's art is a generator over the whole card, with the series
-     * drawn on it -- which is what the tile schedule asks for, and why the
-     * ink comes from the colourway rather than from the card: the two colours
-     * of one burst are near enough in lightness that a card-level choice
-     * would be wrong for half of them. */
+    /* A chart tile's art is a sky over the whole card, with the series drawn
+     * on it -- which is what the tile schedule asks for, and why the ink
+     * comes from the sky rather than from the card. */
     if (c->gen != CARD_GEN_NONE)
     {
         card_paint_gen(c->gen, ox, 0, w, h);
-        /* Everything on the card now derives from the burst rather than from
-         * the colour it was assigned -- that colour is under the burst and
-         * invisible, so a plate or an accent taken from it is a shade of
-         * something nobody can see. */
+        /* Everything on the card now derives from the sky rather than from
+         * the colour it was assigned -- that colour is under the sky and
+         * invisible, so a plate taken from it is a shade of something nobody
+         * can see. */
         card_paint_ink(card_paint_gen_base(c->gen), &ink);
         ink.text = ink.dim = card_paint_gen_ink(c->gen);
     }
+    ink_accent(&ink, c->accent);
 
     tfh = font_get(font_card)->height;
     if (c->prog >= 0)
@@ -1042,7 +1098,8 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
         int gap = body_top ? CARD_PAD : 0;
 
         card_paint_grid(ox, body_top + gap, w, body_bot - body_top - gap,
-                        c->level, c->n_level, c->grid_rows, ink.bg, ink.text);
+                        c->level, c->n_level, c->grid_rows, ink.bg,
+                        c->accent ? ink.accent : ink.text);
         body_bot = body_top;    /* the grid is the body */
     }
 
@@ -1056,9 +1113,9 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
         int n = c->n_series;
         int band = c->series_h ? c->series_h : h / 3;
 
-        /* Black, whatever the card is. Against a burst they read as cut out
-         * of it, which is the one place the screen's own background shows
-         * through the design rather than around it. */
+        /* Black, whatever the card is. Against a sky they read as a skyline
+         * cut out of it, which is the one place the screen's own background
+         * shows through the design rather than around it. */
         lcd_set_drawmode(DRMODE_SOLID);
         lcd_set_foreground(LCD_RGBPACK(16, 16, 20));
         for (int i = 0; i < n; i++)
@@ -1151,6 +1208,7 @@ void card_paint_spine(const struct card_content *c, int w, int h)
     struct card_ink ink;
 
     card_paint_ink(c->base, &ink);
+    ink_accent(&ink, c->accent);
     lcd_set_drawmode(DRMODE_SOLID);
     lcd_set_foreground(ink.bg);
     lcd_fillrect(0, 0, w, h);

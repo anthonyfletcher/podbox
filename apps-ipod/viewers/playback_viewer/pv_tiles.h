@@ -53,20 +53,20 @@ int                  pv_tiles_count(void);
 const short         *pv_tiles_widths(void);
 const unsigned char *pv_tiles_flags(void);
 
-/* Where a card carrying artwork gets its colour from: the hue of the picture
+/* Where a card carrying artwork gets its accent from: the hue of the picture
  * behind 'key', in degrees, or -1 when there is none to be had.
  *
  * A callback because the pictures belong to the screen and the colours belong
  * to the cards, and neither should have to know about the other. Answered
  * from what is already loaded rather than by loading: a colour is wanted for
  * every card on screen and a load is a file read, so a card whose picture has
- * not arrived keeps its assigned colour and takes the derived one in the same
- * frame the picture itself appears. */
+ * not arrived keeps its section's accent and takes the derived one in the
+ * same frame the picture itself appears. */
 typedef int (*pv_tint_fn)(unsigned key);
 void pv_tiles_set_tint(pv_tint_fn fn);
 
 /* Which picture card 'idx' follows, or 0 for a card that follows none. A
- * sub-card answers with its parent's, because it wears its parent's colour.
+ * sub-card answers with its parent's, because it wears its parent's accent.
  *
  * For a caller that has to make sure a picture is in hand BEFORE it resolves
  * the card, which is the order the colour above depends on. */

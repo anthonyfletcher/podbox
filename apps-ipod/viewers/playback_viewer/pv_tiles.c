@@ -143,23 +143,27 @@ static unsigned char tile_id[TILE_MAX];
 static short         tile_arg[TILE_MAX];
 static short         tile_w[TILE_MAX];
 static unsigned char tile_flags[TILE_MAX];
-/* The colour a card was assigned before any picture had a say, and how far
- * into a run it sits. Kept apart rather than as one finished colour, because
- * a derived tint replaces the first and is then stepped by the second -- tint
- * an already-stepped colour and a sub-card is stepped twice. */
-static unsigned      tile_root[TILE_MAX];
+/* Where a card's run sits in the section -- which slate it is, and whether
+ * it is the section's accent -- and how far into the run the card is. Kept
+ * apart rather than as one finished colour, because the colour is decided
+ * each time the card is resolved and only then stepped. */
+static short         tile_pos[TILE_MAX];
 static unsigned char tile_depth[TILE_MAX];
-/* The picture this card's colour follows. A sub-card carries its parent's, so
- * an open run stays in the family the picture put it in. */
+/* Whether the card is its section's accent all over rather than slate: the
+ * section's first card, a card titling a list, and summary tiles at the
+ * accent's rhythm. A sub-card follows its parent. */
+static bool          tile_lit[TILE_MAX];
+/* The picture this card's accent follows, and whether its run is a picture's
+ * at all. A sub-card carries its parent's, so an open run stays in the family
+ * the picture put it in. Apart, because a picture card with no artwork cached
+ * has no key and is still a picture card. */
 static unsigned      tile_art[TILE_MAX];
+static bool          tile_pic[TILE_MAX];
 static int           tile_n;
 
-/* Where in the palette this section starts.
- *
- * Without it every section opens on the same colour and reads as the same
- * page with different words on it. Seven is coprime with twelve, so the eight
- * sections all start somewhere different. */
-static int           tile_hue0;
+/* Which section this is, for its accent. Without one every section opens on
+ * the same colour and reads as the same page with different words on it. */
+static int           tile_sec;
 
 static pv_tint_fn tint_fn;
 
@@ -370,13 +374,17 @@ static void remeasure(int i)
         while (p > 0 && (tile_flags[p] & CARD_ROW_SUB))
             p--;
         tile_art[i] = tile_art[p];
+        tile_pic[i] = tile_pic[p];
     }
     else
+    {
         tile_art[i] = c.art_key;
+        tile_pic[i] = c.art;
+    }
 }
 
 static int add(enum tile_id id, int arg, unsigned char flags, int depth,
-               int parent)
+               int parent, bool lit)
 {
     int i = tile_n;
 
@@ -386,19 +394,32 @@ static int add(enum tile_id id, int arg, unsigned char flags, int depth,
     tile_id[i]    = (unsigned char)id;
     tile_arg[i]   = (short)arg;
     tile_flags[i] = flags;
-    tile_root[i]  = card_paint_palette(tile_hue0 + parent, 0);
+    tile_pos[i]   = (short)parent;
+    tile_lit[i]   = (flags & CARD_ROW_SUB) ? tile_lit[parent] : lit;
     tile_depth[i] = (unsigned char)depth;
     tile_art[i]   = 0;
+    tile_pic[i]   = false;
     tile_n++;
 
     remeasure(i);
     return i;
 }
 
-/* A plain tile: no run under it, its own colour. */
+/* A plain tile: no run under it, its own colour.
+ *
+ * Summary tiles are the only cards lit at the accent's rhythm. A card in a
+ * list of weeks or badges is lit only as its section's first, because an
+ * accent every few of dozens of cards of one kind marks nothing but its
+ * position. */
 static void tile(enum tile_id id, int arg)
 {
-    add(id, arg, 0, 0, tile_n);
+    add(id, arg, 0, 0, tile_n, card_paint_accent_slot(tile_n));
+}
+
+/* A plain tile that heads the list after it. */
+static void heading(enum tile_id id, int arg)
+{
+    add(id, arg, 0, 0, tile_n, true);
 }
 
 /* A tile that owns the run of sub-cards started immediately after it. The
@@ -406,12 +427,12 @@ static void tile(enum tile_id id, int arg)
  * run reads as one block in one family. */
 static int parent(enum tile_id id, int arg)
 {
-    return add(id, arg, CARD_ROW_PARENT, 0, tile_n);
+    return add(id, arg, CARD_ROW_PARENT, 0, tile_n, tile_n == 0);
 }
 
 static void sub(enum tile_id id, int arg, int par, int depth)
 {
-    add(id, arg, CARD_ROW_SUB, depth, par);
+    add(id, arg, CARD_ROW_SUB, depth, par, false);
 }
 
 static void build_numbers(const struct pv_totals *t)
@@ -439,7 +460,7 @@ static void build_weeks(void)
     p = parent(T_STREAK, 0);
     sub(T_SUBSTREAK, 0, p, 1);
 
-    tile(T_CALTITLE, 0);
+    heading(T_CALTITLE, 0);
 
     for (int i = 0; i < weeks && tile_n + 3 <= TILE_MAX; i++)
     {
@@ -477,7 +498,7 @@ static void build_skips(const struct pv_totals *t)
         tile(T_SKIPPERCENT, 0);
 
     build_top(T_TOPSKIP, T_SUBSKIP, T_NONE, n_skip);
-    tile(T_SKIPNEVER, 0);
+    heading(T_SKIPNEVER, 0);
     build_top(T_TOPLOYAL, T_SUBLOYAL, T_NONE, n_loyal);
 }
 
@@ -600,7 +621,7 @@ int pv_tiles_build(enum pv_sec sec, const struct pv_totals *t)
     int want;
 
     tile_n = 0;
-    tile_hue0 = (int)sec * 7;
+    tile_sec = (int)sec;
     totals = t;
 
     want = global_settings.spun_top_count;
@@ -827,7 +848,7 @@ void pv_tiles_open(int idx)
 
 /* --------------------------------------------------------- the resolver */
 
-/* The four charts are told apart by their colourway as much as by their bars,
+/* The four charts are told apart by their skies as much as by their bars,
  * so each names its own rather than taking the card's. */
 static const struct
 {
@@ -1034,18 +1055,25 @@ void pv_tiles_content(int idx, struct card_content *out)
     id  = (enum tile_id)tile_id[idx];
     arg = tile_arg[idx];
 
-    /* A card carrying artwork takes the hue of the picture and the lightness
-     * and saturation of the colour it was assigned, then the step its place
-     * in a run calls for. Until the picture is loaded there is no hue to be
-     * had and the assigned colour stands. */
-    out->base = tile_root[idx];
-    if (tint_fn && tile_art[idx])
+    /* Slate with the section's accent, or the accent itself where the card
+     * is lit, then the step its place in a run calls for. A picture's run is
+     * always slate -- the picture is colour enough -- and wears the picture's
+     * own hue as its accent. Until the picture is loaded there is no hue to
+     * be had and the section's accent stands. */
+    if (tile_pic[idx] || !tile_lit[idx])
     {
-        unsigned t = card_paint_tint(tint_fn(tile_art[idx]));
+        out->base   = card_paint_slate(tile_pos[idx]);
+        out->accent = card_paint_accent(tile_sec);
+        if (tint_fn && tile_art[idx])
+        {
+            unsigned t = card_paint_tint(tint_fn(tile_art[idx]));
 
-        if (t)
-            out->base = t;
+            if (t)
+                out->accent = t;
+        }
     }
+    else
+        out->base = card_paint_accent(tile_sec);
     out->base = card_paint_step(out->base, tile_depth[idx]);
 
     card_paint_ink(out->base, &ink);
@@ -1098,6 +1126,10 @@ void pv_tiles_content(int idx, struct card_content *out)
 
         chart_series(arg);
         out->gen      = quarter[arg].gen;
+        /* The sky covers whatever colour the card was given, so the accent
+         * is set outright: all four carry their section's, wherever they
+         * fall. */
+        out->accent   = card_paint_accent(tile_sec);
         out->series   = series;
         out->n_series = 6;
         out->title    = quarter[arg].name;

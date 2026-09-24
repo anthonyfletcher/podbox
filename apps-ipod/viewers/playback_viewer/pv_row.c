@@ -102,14 +102,14 @@ static bool         art_ok[ART_SLOTS];
 /* Hues, kept apart from the pictures and for far longer.
  *
  * Two things follow from keeping the answer rather than the pixels. A card's
- * colour does not change when its picture is evicted -- six slots hold a
+ * accent does not change when its picture is evicted -- six slots hold a
  * screenful, and a row scrolled far evicts everything behind it, which would
- * otherwise make a card revert to its assigned colour on the way back. And
+ * otherwise make a card revert to its section's accent on the way back. And
  * the same sleeve is the same colour in every section, without a second read.
  *
  * Trap: this has to hold every sleeve a scroll can pass, not a screenful. A
- * lost hue shows as the card changing colour in front of the reader, because
- * the card is coloured before its picture is read back. Four ways a set, so
+ * lost hue shows as the card's accent changing in front of the reader,
+ * because the card is coloured before its picture is read back. Four ways a set, so
  * two sleeves landing on one set do not throw each other out; a full set
  * drops the one stored longest ago. Six bytes an entry. */
 #define HUE_SETS    256
@@ -323,11 +323,11 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
 #endif
 }
 
-/* What colour a card carrying this picture should be.
+/* What accent a card carrying this picture should wear.
  *
  * Answered from the remembered hue, never by loading: a card is coloured
  * before its picture is read, so a sleeve seen for the first time keeps its
- * assigned colour until the read lands. */
+ * section's accent until the read lands. */
 static int art_tint(unsigned key)
 {
     const unsigned *set = hue_key[key % HUE_SETS];
@@ -526,7 +526,7 @@ static void composite(void)
 
     /* Pictures first, cards second.
      *
-     * A card's colour is derived from its picture (pv_tiles.h), and the card
+     * A card's accent is derived from its picture (pv_tiles.h), and the card
      * is resolved before it is drawn -- so a picture fetched during the draw
      * arrives one frame too late to colour the card that asked for it. Worse
      * at rest than in motion: the loop blocks until a button arrives, so

@@ -113,24 +113,26 @@
  *
  * Not a placeholder for a missing picture: a generator is what those tiles
  * are meant to look like. The four time-of-day charts are told apart by
- * theirs as much as by their bars, which is why each carries its own
- * colourway rather than taking the card's. */
+ * their skies as much as by their bars, which is why each carries its own
+ * colours rather than taking the card's. */
 enum card_gen
 {
     CARD_GEN_NONE = 0,
-    CARD_GEN_SUNRISE,   /* from the bottom -- red and orange */
-    CARD_GEN_NOON,      /* from the top -- yellow and off-white */
-    CARD_GEN_DUSK,      /* from the bottom -- orange, pink and purple */
-    CARD_GEN_NIGHT,     /* from the top -- blue and deep blue */
+    CARD_GEN_SUNRISE,   /* slate down to an amber horizon */
+    CARD_GEN_NOON,      /* slate down to teal */
+    CARD_GEN_DUSK,      /* slate down to coral */
+    CARD_GEN_NIGHT,     /* near-black down to violet, with stars */
     CARD_GEN_COUNT
 };
 
-/* Fill a rect with a burst. Flat wedges, hard edges, no gradient: the palette
- * is flat, so a wash would be the only soft thing on screen. */
+/* Fill a rect with a sky: flat bands, darkest at the top where a card's text
+ * sits and brightest at the foot, where a chart's bars stand against it as a
+ * skyline. Hard edges, no gradient: the palette is flat, so a wash would be
+ * the only soft thing on screen. */
 void card_paint_gen(enum card_gen gen, int x, int y, int w, int h);
 
 /* The repeating patterns, for a tile whose artwork is simply missing -- an
- * artist or an album with no picture. Unlike a burst these carry no colours
+ * artist or an album with no picture. Unlike a sky these carry no colours
  * of their own: they are drawn in the card's own pair, so a patterned tile
  * still belongs to the row it sits in.
  *
@@ -164,17 +166,16 @@ void card_paint_grid(int x, int y, int w, int h,
                      const unsigned char *level, int n, int rows,
                      unsigned base, unsigned ink);
 
-/* What reads over that generator. A colourway carries its own answer because
- * the two colours of one are near enough in lightness that a card-level
- * choice would be wrong for half of them. */
+/* What reads over that sky: the ink of its top band, which is where the text
+ * sits. */
 unsigned card_paint_gen_ink(enum card_gen gen);
 
-/* The colour a burst is mostly made of.
+/* A sky's top band.
  *
- * A card wearing one takes its accent and its plate from this rather than
- * from the colour it was assigned: the assigned colour is under the burst and
- * invisible, so anything derived from it lands on the card as a shade of
- * something that is not there. */
+ * A card wearing one takes its ink from this rather than from the colour it
+ * was assigned: the assigned colour is under the sky and invisible, so
+ * anything derived from it lands on the card as a shade of something that is
+ * not there. */
 unsigned card_paint_gen_base(enum card_gen gen);
 
 /* Where a card's artwork comes from.
@@ -217,7 +218,11 @@ struct card_kv
 struct card_content
 {
     unsigned base;              /* the colour the row assigned this card */
-    enum card_gen gen;          /* a burst over the whole card, or NONE */
+    /* The colour of its bar, progress fill, plate and pattern, or 0 to derive
+     * them from 'base'. A slate card carries its section's accent here, or
+     * its sleeve's. */
+    unsigned accent;
+    enum card_gen gen;          /* a sky over the whole card, or NONE */
 
     /* The plate: a number, or a glyph from the theme's icon font. Either
      * fills it; a card with neither has no plate. */
@@ -303,15 +308,20 @@ int  card_paint_figure_font(void);
 int  card_paint_value_font(void);
 int  card_paint_icon_font(void);
 
-/* The colour a card at position 'idx' is assigned, and the step a sub-card
- * 'depth' places into a run takes from its parent's.
+/* The palette: a slate ground and one accent per section.
  *
- * A card does not choose its colour, so this is not a slot: the row owner
- * calls it while building and puts the answer in 'base'. */
-unsigned card_paint_palette(int idx, int depth);
+ * Most cards are slate, in a few close tones so neighbours still part, and
+ * carry their section's accent on the bar, the plate and the progress fill.
+ * A lit card is the accent itself, all over; which cards are lit is the row
+ * owner's call, and the accent slot is the rhythm to light a run of summary
+ * tiles at. A card does not choose its colour: the row owner asks these
+ * while building and puts the answers in 'base' and 'accent'. */
+unsigned card_paint_slate(int idx);
+unsigned card_paint_accent(int section);
+bool     card_paint_accent_slot(int idx);
 
-/* That step on its own, for a run whose parent's colour did not come from the
- * palette at all. */
+/* The step a sub-card 'depth' places into a run takes from its parent's
+ * colour. */
 unsigned card_paint_step(unsigned base, int depth);
 
 /* The hue a picture is mostly made of, in degrees, or -1 for one that has
@@ -326,19 +336,18 @@ unsigned card_paint_step(unsigned base, int depth);
  * frame. */
 int card_paint_dominant_hue(const fb_data *px, int stride, int w, int h);
 
-/* A card carrying artwork takes the hue of the picture and the lightness and
- * saturation of the palette itself. Returns 0 for a picture with no hue.
+/* A card carrying artwork stays slate and takes its accent from the picture:
+ * the picture's hue at the lightness and saturation of the accents
+ * themselves, darkened where that hue needs it for text to read on it.
+ * Returns 0 for a picture with no hue.
  *
  * Keeping the picture's own dominant colour is what produces the muddy
- * near-blacks and blown-out neons that make a derived palette look unrelated
- * to the designed one. Keeping only its hue is what makes a derived tile look
- * like a member of the same family as a painted one.
+ * near-blacks and blown-out neons that make a derived colour look unrelated
+ * to the designed ones. Keeping only its hue is what makes a sleeve's accent
+ * look like a member of the same family as a section's.
  *
- * The hue is the ONLY thing that varies, and that is the point: an album is
- * the same colour wherever it appears. Take the lightness and saturation from
- * the card's own assigned colour instead and the same sleeve is olive in Top
- * artists and mustard in Top songs, because the two cards sit at different
- * positions in the row. */
+ * The hue is the ONLY input, and that is the point: an album is the same
+ * colour wherever it appears. */
 unsigned card_paint_tint(int hue);
 
 /* What reads over a colour -- white or near-black, whichever is further from
