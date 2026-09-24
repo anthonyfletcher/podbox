@@ -2305,14 +2305,20 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      *
      * The label cannot be the artist's name. A special row's name has to
      * outlive the entry, which is why these all point at static strings
-     * rather than into the entries arena. */
-    if (featured_row_count(level) > 0)
+     * rather than into the entries arena.
+     *
+     * The tag test keeps it off <All tracks>, whose `level` was stepped back
+     * to the album level above and so passes featured_row_count(). The -1 is
+     * the Resume row's: insert_all_playlist() drops the row rather than
+     * playing whichever track the database indexed first, which would shift
+     * every selection onto the row before it. */
+    if (tag == tag_album && featured_row_count(level) > 0)
     {
         if (offset <= sidx)
         {
             dptr->newtable = TABLE_FEATURED_TRACKS;
             dptr->name = ID2P(LANG_FEATURED_IN);
-            dptr->extraseek = 0;
+            dptr->extraseek = -1;
             dptr->customaction = ONPLAY_NO_CUSTOMACTION;
             dptr->idx_id = 0;
             dptr++;
@@ -3809,6 +3815,15 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         return GO_TO_WPS;
     }
 
+    /* Ahead of the <Random> test for the same reason: this row's seek is -1
+     * too. Still the album level here, so this is the artist whose list the
+     * row was drawn on. */
+    if (dptr->newtable == TABLE_FEATURED_TRACKS)
+    {
+        featured_artists_arm(current_title[c->currextra]);
+        return GO_TO_FEATURED_TRACKS;
+    }
+
     seek = dptr->extraseek;
     if (seek == -1) /* <Random> menu item was selected */
     {
@@ -3860,14 +3875,6 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
 
     if (newextra == TABLE_FEATURED_ARTISTS)
         return GO_TO_FEATURED_ARTISTS;
-
-    if (newextra == TABLE_FEATURED_TRACKS)
-    {
-        /* Still the album level here, so this is the artist whose list the
-         * row was drawn on. */
-        featured_artists_arm(current_title[c->currextra]);
-        return GO_TO_FEATURED_TRACKS;
-    }
 
     /* A book held in one file is an album of one track, and descending into
      * it opens a list holding only itself. Play it instead.
