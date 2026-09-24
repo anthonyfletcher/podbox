@@ -49,6 +49,7 @@
 #include "playlist/playlist.h"
 #include "widgets/menu.h"
 #include "skin/skin_engine.h"
+#include "skin/statusbar_skinned.h"
 #include "settings/settings.h"
 #include "debug.h"
 #include "storage.h"
@@ -807,7 +808,16 @@ static int update_dir(void)
             else if (artist)
                 tall_rows = global_settings.db_artistart;
         }
-        db_showing_art = tall_rows;
+        /* A skin can pick its UI viewport by %?Ld, and the status bar only
+         * renders after the list has drawn -- so the list would open in the
+         * previous shape and stay there until something redrew it. Settle the
+         * bar first, so the draw below takes the viewport it chose. */
+        if (tall_rows != db_showing_art)
+        {
+            db_showing_art = tall_rows;
+            FOR_NB_SCREENS(i)
+                sb_skin_settle(i);
+        }
         gui_synclist_set_albumart_callback(list,
                                     tall_rows ? browser_get_albumart : NULL);
         /* Uniform tall rows so a cover fits (special rows included); 0 = the

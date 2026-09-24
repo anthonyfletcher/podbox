@@ -160,6 +160,26 @@ struct viewport *sb_skin_get_info_vp(enum screen_type screen)
     return &vp->vp;
 }
 
+/* Render the bar now, and take any UI viewport switch that render made, for a
+ * screen about to draw into it. Left to sb_skin_get_info_vp(), the switch
+ * happens inside that screen's own draw: the theme toggle drops the %Lb row
+ * config, only a later render sets it again, and the screen has drawn unskinned
+ * by then. */
+void sb_skin_settle(enum screen_type screen)
+{
+    if (!viewportmanager_theme_enabled(screen))
+        return;
+    sb_skin_update(screen, true);
+    if (oldinfovp_label[screen] &&
+        (oldinfovp_label[screen] != infovp_label[screen]))
+    {
+        oldinfovp_label[screen] = infovp_label[screen];
+        viewportmanager_theme_enable(screen, false, NULL);
+        viewportmanager_theme_undo(screen, true);
+        sb_skin_update(screen, true);
+    }
+}
+
 bool sb_skin_draws_quickscreen(enum screen_type screen)
 {
     struct wps_data *data = skin_get_gwps(CUSTOM_STATUSBAR, screen)->data;
