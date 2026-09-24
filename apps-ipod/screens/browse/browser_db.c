@@ -4380,6 +4380,22 @@ static bool goto_allsubentries(int newtable)
     {
         browser_db_enter(tc, false);
         browser_db_load(tc);
+
+        /* Past the synthetic rows before the next descent is judged.
+         *
+         * browser_db_enter() leaves an invisible descent sitting on row 0,
+         * and row 0 is <Random> or <All tracks> on any level that has them.
+         * That matters because this loop decides whether descending again is
+         * safe by reading the selected row's newtable, while
+         * browser_db_enter() handed <Random> acts on a *different* row -- a
+         * randomly chosen sibling, whose own newtable is what it then obeys.
+         * A track picked that way takes the branch that starts playback, so
+         * without this a caller that only wanted to read an album's tracks
+         * plays one instead. */
+        if (tc->selected_item < tc->special_entry_count &&
+            tc->filesindir > tc->special_entry_count)
+            tc->selected_item = tc->special_entry_count;
+
         newtable = browser_db_get_entry(tc, tc->selected_item)->newtable;
         i++;
     }
