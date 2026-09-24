@@ -49,9 +49,11 @@
 #include "games/spike/spike.h"
 #include "database/sound_mix.h"
 #include "database/sound_index.h"
+#include "screens/playback/sound_props.h"
 #include "screens/playback/track_info.h"
 #include "widgets/text_box.h"
 #include "screens/browse/browser.h"
+#include "powermgmt.h"
 #include "settings/settings.h"
 #include "playlist/viewer.h"
 #include "speech/talk.h"
@@ -274,6 +276,8 @@ MENUITEM_FUNCTION(spike_run_item, 0, ID2P(LANG_SPIKE_PLAY),
  * short of looking the track up: a database row carries no path, and reading
  * one spins the disk -- which this must not do, because it runs every time the
  * menu is drawn. */
+static bool sound_album_selectable(void);
+
 static bool mix_seed_available(void)
 {
     struct mp3entry *id3;
@@ -283,6 +287,12 @@ static bool mix_seed_available(void)
         id3 = audio_current_track();
         return id3 != NULL && id3->path[0] != '\0';
     }
+
+    /* An album's mean is a goal like any other -- see sound_mix_from_album().
+     * Read on the same terms the read-out reads it, artist rows included:
+     * sound_album_selectable() says why they are not offered. */
+    if (selected_file.attr & ATTR_DIRECTORY)
+        return sound_album_selectable();
 
     if ((selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
         return false;
@@ -328,12 +338,88 @@ static const char *mix_seed_path(char *buf, size_t bufsize)
     return buf;
 }
 
+static int sound_mix_report(int added);
+
+/* Whether the selection is an album whose tracks can be read.
+ *
+ * In the database, album rows only. browser_db_subentries_do_action() reaches
+ * a row's tracks by descending to them, and it enumerates the one level it
+ * lands on -- which from an artist row is that artist's first album, reported
+ * as though it were the artist. A genre row is wrong the same way. Both would
+ * answer confidently about music they had not read. */
+static bool sound_album_selectable(void)
+{
+    if (!(selected_file.attr & ATTR_DIRECTORY))
+        return false;
+
+    if (selected_file.context == CONTEXT_ID3DB)
+        return browser_db_is_album_list(browser_get_context());
+
+    return selected_file.path != NULL;
+}
+
+/* Every track of the selected album, handed to the read-out's accumulator.
+ *
+ * True carries the enumeration on. There is no failure this can have -- a
+ * track the index holds nothing for is simply not counted, and a synthetic
+ * row arrives as NULL and is ignored -- and returning false would abandon the
+ * rest of the album over one of them. */
+static bool sound_album_add_cb(const char *file_name)
+{
+    sound_props_album_add(file_name);
+    return true;
+}
+
+/* begin() and an add() per track, from whichever browser the selection came
+ * from, leaving the run open for the finishing calls. */
+static void sound_album_collect(void)
+{
+    if (selected_file.context == CONTEXT_ID3DB)
+    {
+        struct tagcache_search tcs;
+        char buf[MAX_PATH];
+
+        /* The buffer is the caller's because this one sits underneath
+         * splash_progress() and the callback -- see the note on
+         * browser_db_subentries_do_action(). */
+        sound_props_album_begin();
+        browser_db_subentries_do_action(&tcs, sound_album_add_cb,
+                                        buf, sizeof (buf));
+    }
+    else
+        sound_props_album_walk(selected_file.path);
+}
+
+/* Gather the album the selection names and hand back its mean. The walk is
+ * the read-out's; this only takes the answer out rather than showing it. */
+static bool sound_album_gather(struct sound_axes *mean, char *one, size_t len)
+{
+    sound_album_collect();
+
+    return sound_props_album_result(mean, one, len);
+}
+
 static int sound_mix_run(void)
 {
     char seed[MAX_PATH];
     int added;
 
     splash(0, ID2P(LANG_WAIT));
+
+    if (selected_file.attr & ATTR_DIRECTORY)
+    {
+        struct sound_axes mean;
+
+        if (!sound_album_gather(&mean, seed, sizeof (seed)))
+        {
+            splash(HZ * 2, ID2P(LANG_SOUND_ALBUM_NONE));
+            return ONPLAY_OK;
+        }
+
+        added = sound_mix_from_album(&mean, seed,
+                                     global_settings.mix_length);
+        return sound_mix_report(added);
+    }
 
     if (mix_seed_path(seed, sizeof (seed)) == NULL)
     {
@@ -343,15 +429,22 @@ static int sound_mix_run(void)
 
     added = sound_mix_from_track(seed, global_settings.mix_length);
 
+    return sound_mix_report(added);
+}
+
+/* What came of a build, said once for all three seeds.
+ *
+ * Each of these sends the reader somewhere different -- to the analysis
+ * screen, to a wider library, or to nothing they can act on -- so they do not
+ * collapse into one message. */
+static int sound_mix_report(int added)
+{
     if (added > 0)
     {
         context_menu_result = ONPLAY_START_PLAY;
         return ONPLAY_OK;
     }
 
-    /* Each of these sends the reader somewhere different -- to the analysis
-     * screen, to a wider library, or to nothing they can act on -- so they do
-     * not collapse into one message. */
     switch (added)
     {
         case SOUND_MIX_NO_INDEX:
@@ -398,6 +491,119 @@ static int sound_mix_callback(int action,
 
 MENUITEM_FUNCTION(sound_mix_item, 0, ID2P(LANG_SOUND_MIX),
                   sound_mix_run, sound_mix_callback, Icon_Audio);
+
+/* Seconds of music a track is taken to be, for turning the time left on the
+ * sleep timer into a number of tracks.
+ *
+ * A guess, and the only one in the feature. Filling to a duration exactly
+ * means reading every chosen track's length, and the walk that turns keys
+ * back into filenames is built around not reading what it does not have to. */
+#define WINDDOWN_TRACK_SECS  240
+
+/* A wind-down is seeded, which is why it is here beside Play Similar and not
+ * on the Playlists screen with the Moods and Journeys. Those pick both ends
+ * for you and start from nothing; this one starts from the track chosen, so
+ * it wants a track to have been chosen. */
+static int winddown_run(void)
+{
+    char seed[MAX_PATH];
+    int left = get_sleep_timer();
+    int want = global_settings.mix_length;
+
+    /* A running timer decides the length outright, and Playlist Length does
+     * not cap it: a wind-down that stops before the player does has not wound
+     * anything down. With no timer the usual length is the honest answer --
+     * there is nothing counting down to fit. */
+    if (left > 0)
+    {
+        want = (left + WINDDOWN_TRACK_SECS / 2) / WINDDOWN_TRACK_SECS;
+
+        if (want < 2)
+            want = 2;
+    }
+
+    splash(0, ID2P(LANG_WAIT));
+
+    if (mix_seed_path(seed, sizeof (seed)) == NULL)
+    {
+        splash(HZ * 2, ID2P(LANG_SOUND_MIX_NO_TRACK));
+        return ONPLAY_OK;
+    }
+
+    return sound_mix_report(sound_mix_winddown(seed, want));
+}
+
+/* Tracks only. An album's mean is a point rather than a track, and the near
+ * end of a journey has to be a mood -- see sound_mix_winddown(). */
+static int winddown_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        if (!global_settings.playlist_engine || !sound_index_exists() ||
+            !tagcache_is_usable() ||
+            (selected_file.attr & ATTR_DIRECTORY) || !mix_seed_available())
+            return ACTION_EXIT_MENUITEM;
+    }
+
+    return action;
+}
+
+MENUITEM_FUNCTION(winddown_item, 0, ID2P(LANG_WINDDOWN),
+                  winddown_run, winddown_callback, Icon_Audio);
+
+/* The read-out over a set of tracks: a folder in the file browser, a row's
+ * subentries in the database. The gathering is sound_album_gather()'s, which
+ * Play Similar uses too; this one shows the answer rather than aiming at it. */
+static int sound_album_run(void)
+{
+    splash(0, ID2P(LANG_WAIT));
+
+    sound_album_collect();
+
+    if (!sound_props_album_ready())
+    {
+        splash(HZ * 2, ID2P(LANG_SOUND_ALBUM_NONE));
+        return ONPLAY_OK;
+    }
+
+    /* The read-out can be left for the root menu, and this menu goes with it
+     * rather than redrawing underneath. */
+    return sound_props_album_screen() ? ONPLAY_MAINMENU : ONPLAY_OK;
+}
+
+/* Trap: ATTR_DIRECTORY does not mean "a folder on disk". The database browser
+ * sets it on every row that is not a track -- artist, album and genre alike
+ * (browser_db.c:4909) -- and under CONTEXT_ID3DB the path beside it is that
+ * row's display name with a slash put in front, which opendir() cannot open.
+ * So the two contexts are told apart and read their tracks differently,
+ * rather than one path being made to serve both. */
+static int sound_album_callback(int action,
+                                const struct menu_item_ex *this_item,
+                                struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        if (!global_settings.playlist_engine || !sound_index_exists() ||
+            !sound_album_selectable())
+            return ACTION_EXIT_MENUITEM;
+    }
+
+    return action;
+}
+
+/* MENU_FUNC_CHECK_RETVAL, or do_menu() discards what the row returns and the
+ * read-out being left for the root menu goes no further than this row. */
+MENUITEM_FUNCTION(sound_album_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_SOUND_ALBUM),
+                  sound_album_run, sound_album_callback, Icon_Audio);
 MAKE_ONPLAYMENU( wps_playlist_menu, ID2P(LANG_CURRENT_PLAYLIST),
                  NULL, Icon_Playlist,
                  &wps_view_cur_playlist_item, &playlist_save_item,
@@ -1360,6 +1566,7 @@ MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &view_cue_item,
            &view_chapters_item,
            &sound_mix_item,
+           &winddown_item,
            &spike_run_item,
            &context_item_1,
            &context_item_2,
@@ -1392,7 +1599,7 @@ MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
 MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            context_menu_callback, Icon_file_view_menu,
            &view_playlist_item, &browser_playlist_menu, &cat_playlist_menu,
-           &sound_mix_item,
+           &sound_mix_item, &winddown_item, &sound_album_item,
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,

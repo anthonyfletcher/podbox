@@ -2765,10 +2765,16 @@ bool playlist_dynamic_only(void)
 }
 
 /*
- * Move track at index to new_index.  Tracks between the two are shifted
- * appropriately.  Returns 0 on success and -1 on failure.
+ * One move, with the lock already held and the audio left alone.  Both
+ * arguments are indices into indices[]; where the track lands is read off
+ * new_index in display terms, which is what rotate_index() below is for.
+ *
+ * Split out so that playlist_reorder() can make a run of these under one lock
+ * and one reload.  Doing them through playlist_move() instead would flush and
+ * rebuffer the audio once per track.
  */
-int playlist_move(struct playlist_info* playlist, int index, int new_index)
+static int move_track_unlocked(struct playlist_info* playlist, int index,
+                               int new_index)
 {
     int result = -1;
     bool queue;
@@ -2780,18 +2786,6 @@ int playlist_move(struct playlist_info* playlist, int index, int new_index)
     int idx_to; /* display index of the position we're moving to */
     bool displace_current = false;
     char filename[MAX_PATH];
-
-    if (!playlist)
-        playlist = &current_playlist;
-
-    dc_thread_stop(playlist);
-    playlist_write_lock(playlist);
-
-    if (check_control(playlist) < 0)
-    {
-        notify_control_access_error();
-        goto out;
-    }
 
     if (index == new_index)
         goto out;
@@ -2893,6 +2887,31 @@ int playlist_move(struct playlist_info* playlist, int index, int new_index)
     }
 
 out:
+    return result;
+}
+
+/*
+ * Move track at index to new_index.  Tracks between the two are shifted
+ * appropriately.  Returns 0 on success and -1 on failure.
+ */
+int playlist_move(struct playlist_info* playlist, int index, int new_index)
+{
+    int result;
+
+    if (!playlist)
+        playlist = &current_playlist;
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    if (check_control(playlist) < 0)
+    {
+        notify_control_access_error();
+        result = -1;
+    }
+    else
+        result = move_track_unlocked(playlist, index, new_index);
+
     playlist_write_unlock(playlist);
     dc_thread_start(playlist, true);
 
@@ -2900,6 +2919,101 @@ out:
         audio_flush_and_reload_tracks();
 
     return result;
+}
+
+/*
+ * Put the playlist in the order given: order[p] is the indices[] position of
+ * the track wanted at display position p, as playlist_get_track_info() reports
+ * that position before any of this runs.
+ *
+ * Tracked in display positions rather than in indices[] positions, because
+ * those are what a move means: move_track_unlocked() reads its destination
+ * through rotate_index(), and first_index moves underneath the run as tracks
+ * are removed and re-added. A position is converted back only at the call.
+ *
+ * Each step takes the wanted track from wherever it now sits down to position
+ * p, which shifts everything in [p, from-1] up by one -- and nothing below p,
+ * which is what makes one pass enough. An entry is never moved from above the
+ * run into it, so 'from' is never less than p.
+ *
+ * Returns the number of tracks moved, or -1.  The order is checked for being
+ * a permutation first: a malformed one would otherwise rearrange the playlist
+ * into something that is neither the old order nor the new.
+ */
+int playlist_reorder(struct playlist_info* playlist, const int16_t *order,
+                     int n)
+{
+    static int16_t at[PLAYLIST_REORDER_MAX];  /* display position, by order[] */
+    static uint8_t seen[PLAYLIST_REORDER_MAX];
+    int result = 0;
+    int moved = 0;
+    int p, j;
+
+    if (!playlist)
+        playlist = &current_playlist;
+
+    if (n < 2 || n > PLAYLIST_REORDER_MAX)
+        return -1;
+
+    memset(seen, 0, sizeof (seen));
+
+    for (p = 0; p < n; p++)
+    {
+        if (order[p] < 0 || order[p] >= n || seen[order[p]])
+            return -1;
+
+        seen[order[p]] = 1;
+    }
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    if (playlist->amount != n)
+        result = -1;                 /* it changed under the caller */
+    else if (check_control(playlist) < 0)
+    {
+        notify_control_access_error();
+        result = -1;
+    }
+    else
+    {
+        for (j = 0; j < n; j++)
+            at[j] = (int16_t)rotate_index(playlist, j);
+
+        for (p = 0; p < n; p++)
+        {
+            int k = order[p];
+            int from = at[k];
+
+            if (from == p)
+                continue;
+
+            if (move_track_unlocked(playlist,
+                                    (from + playlist->first_index)
+                                        % playlist->amount,
+                                    (p + playlist->first_index)
+                                        % playlist->amount) < 0)
+            {
+                result = -1;
+                break;
+            }
+
+            for (j = 0; j < n; j++)
+                if (at[j] >= p && at[j] < from)
+                    at[j]++;
+
+            at[k] = (int16_t)p;
+            moved++;
+        }
+    }
+
+    playlist_write_unlock(playlist);
+    dc_thread_start(playlist, true);
+
+    if (moved > 0 && playlist->started && (audio_status() & AUDIO_STATUS_PLAY))
+        audio_flush_and_reload_tracks();
+
+    return result < 0 ? -1 : moved;
 }
 
 /* returns full path of playlist (minus extension) */

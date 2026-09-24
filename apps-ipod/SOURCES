@@ -34,6 +34,7 @@ database/db_summary.c
 database/sound_index.c
 database/sound_mix.c
 database/sound_mood.c
+database/sound_cal.c
 playlist/mood_screen.c
 database/db_featured.c
 database/db_featured_parse.c
@@ -131,6 +132,7 @@ screens/system/playlist_search.c
 screens/system/beat_debug.c
 screens/system/probe_debug.c
 screens/system/sound_scan.c
+screens/system/sound_library.c
 screens/system/debug_menu.c
 files/file_ops.c
 files/file_index.c

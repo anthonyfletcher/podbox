@@ -36,6 +36,7 @@
  *   - the candidate pool, the sampling and the artist rules
  *   - the goal, the two passes and the chain
  *   - continuing a playlist that has run out
+ *   - putting a set the listener already chose into an order
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -391,6 +392,16 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b)
  * albums, and every one the artist rules turn down has to be replaced by the
  * next nearest. */
 #define MIX_CAND       (SOUND_MIX_MAX * 3)
+
+/* Every candidate's coordinates, held across a whole build because the chain
+ * scores each one against the track before it as well as against the goal.
+ * This is the engine's static cost almost entirely -- see sound_mix.h.
+ *
+ * At file scope so that reordering a playlist can borrow the front of it
+ * rather than asking for a second array of its own. Safe because both are
+ * foreground work reached from a screen: neither can start while the other
+ * is running. */
+static struct sound_axes cand_ax[MIX_CAND];
 
 /* Tracks one artist may contribute, and how many must separate two of them.
  * The cap stops a mix being a reshuffle of one album; the gap stops the two
@@ -830,7 +841,6 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
                      const char *seed_path, int want, int vary, bool append)
 {
     static struct pick cand[MIX_CAND];
-    static struct sound_axes cand_ax[MIX_CAND];
     static int cost[MIX_CAND];         /* the chain cost, this slot */
     static int16_t elig[MIX_CAND];     /* which candidates passed the rules */
     static uint8_t take[MIX_CAND];
@@ -1368,4 +1378,274 @@ int sound_mix_continue(int want)
                      g.seed != NULL ? global_settings.track_playlist
                                     : global_settings.mood_playlist,
                      true);
+}
+
+
+/** Putting a set the listener already chose into an order **/
+
+int sound_mix_chain(const struct sound_axes *ax, const uint8_t *have,
+                    int n, int start, int16_t *order)
+{
+    uint8_t taken[SOUND_MIX_MAX];
+    int chosen = 0;
+    int prev = -1;
+    int i;
+
+    if (n <= 0 || n > SOUND_MIX_MAX)
+        return 0;
+
+    memset(taken, 0, sizeof (taken));
+
+    /* The chain begins where the caller says, and that is the track already
+     * playing wherever there is one: putting a playlist in order must not
+     * change what is coming out of the headphones. It goes first whether or
+     * not it was measured -- an unmeasured one simply leaves the second
+     * choice with nothing to be near. */
+    if (start >= 0 && start < n)
+    {
+        order[chosen++] = (int16_t)start;
+        taken[start] = 1;
+
+        if (have[start])
+            prev = start;
+    }
+
+    while (chosen < n)
+    {
+        int cap = MIX_ENERGY_STEP;
+        int best = -1, best_d = 0;
+
+        for (;;)
+        {
+            for (i = 0; i < n; i++)
+            {
+                int d;
+
+                if (taken[i] || !have[i])
+                    continue;
+
+                if (prev >= 0 && cap > 0)
+                {
+                    int de = ax[i].energy - ax[prev].energy;
+
+                    if ((de < 0 ? -de : de) > cap)
+                        continue;
+                }
+
+                d = prev >= 0 ? sound_mix_distance(&ax[prev], &ax[i]) : 0;
+
+                if (best < 0 || d < best_d)
+                {
+                    best = i;
+                    best_d = d;
+                }
+            }
+
+            if (best >= 0 || cap == 0)
+                break;
+
+            /* A step nobody can take shortens the step rather than the
+             * chain. mix_build() relaxes the cap the same way and for a
+             * weaker reason: there a refused candidate can be left out, here
+             * every track is going to be played whatever the cap says. */
+            cap = 0;
+        }
+
+        if (best < 0)
+            break;
+
+        order[chosen++] = (int16_t)best;
+        taken[best] = 1;
+        prev = best;
+    }
+
+    /* Anything the chain could not place -- no record, or a record the index
+     * holds nothing usable in -- keeps the order it arrived in, at the end.
+     * Dropping it is not available: this puts a playlist in order, it does
+     * not edit one. */
+    for (i = 0; i < n && chosen < n; i++)
+        if (!taken[i])
+            order[chosen++] = (int16_t)i;
+
+    return chosen;
+}
+
+int sound_mix_reorder(struct playlist_info *playlist)
+{
+    static uint8_t  have[SOUND_MIX_MAX];
+    static int16_t  order[SOUND_MIX_MAX];
+    struct sound_index_reader r;
+    struct sound_record rec;
+    struct playlist_track_info info;
+    int n = playlist_amount_ex(playlist);
+    int missing = 0;
+    int start = -1;
+    int playing;
+    int i;
+
+    /* Only the playlist now playing has a track to lead with, and only it can
+     * be asked -- playlist_get_display_index() answers for that one and takes
+     * no other. A saved playlist opened in the viewer starts from its own
+     * first track instead. */
+    playing = playlist == NULL ? playlist_get_display_index() - 1 : -1;
+
+    if (n < 2)
+        return 0;
+
+    /* Refused rather than reordered in part. Half a playlist put in order
+     * still has the join in it, and the join is the whole of what this
+     * removes. */
+    if (n > SOUND_MIX_MAX)
+        return SOUND_MIX_TOO_LONG;
+
+    if (!sound_index_exists())
+        return SOUND_MIX_NO_INDEX;
+
+    if (sound_index_reader_open(&r) != SOUND_OK)
+        return SOUND_MIX_NO_INDEX;
+
+    for (i = 0; i < n; i++)
+    {
+        have[i] = 0;
+
+        if (playlist_get_track_info(playlist, i, &info) < 0)
+            continue;
+
+        /* Everything here is in indices[] positions, which is what
+         * playlist_reorder() takes; the playing track is known by its display
+         * position, so it is matched here rather than converted. */
+        if (playing >= 0 && info.display_index - 1 == playing)
+            start = i;
+
+        if (sound_index_find(&r, sound_index_key(info.filename), &rec) &&
+            sound_record_usable(&rec))
+        {
+            sound_mix_axes(&rec, &cand_ax[i]);
+            have[i] = 1;
+        }
+        else
+            missing++;
+    }
+
+    sound_index_reader_close(&r);
+
+    if (missing >= n)
+        return SOUND_MIX_NO_RECORD;
+
+    /* The chain leads with the track playing, which is the same seat a
+     * shuffle gives it and the only arrangement in which putting a playlist
+     * in order does not change what is coming out of the headphones. */
+    if (sound_mix_chain(cand_ax, have, n, start, order) != n)
+        return SOUND_MIX_NO_PLAYLIST;
+
+    if (playlist_reorder(playlist, order, n) < 0)
+        return SOUND_MIX_NO_PLAYLIST;
+
+    sound_mix_forget();
+
+    return missing;
+}
+
+int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
+                         int want)
+{
+    struct mix_goal g;
+
+    if (want < 1)
+        want = 1;
+    if (want > SOUND_MIX_MAX)
+        want = SOUND_MIX_MAX;
+
+    g.seed = mean;
+    g.mood_from = -1;
+    g.mood_to = -1;
+    g.steps = 1;
+
+    /* No key to exclude: a mean is not a track, so there is no one record the
+     * mix must leave out. The album's own tracks stay eligible and are held
+     * down by the artist rules instead -- seed_path is one of them, so
+     * mix_artist_ok() keeps that artist out of the opening run and caps how
+     * many of them the playlist can hold. That is the limit an album seed
+     * needs, and it is the one that already exists. */
+    return mix_build(&g, 0, one_track, want,
+                     global_settings.track_playlist, false);
+}
+
+int sound_mix_winddown(const char *path, int want)
+{
+    struct sound_index_reader r;
+    struct sound_record rec;
+    struct sound_axes a;
+    struct mix_goal g;
+    int from = -1;
+    int best = 0;
+    int m;
+
+    /* Where the music is now, named as one of the moods.
+     *
+     * The near end has to be a mood and cannot be the track itself: a journey
+     * interpolates the two ends' targets and weights, not their scores -- see
+     * sound_mood_score_between(), which says what blending scores instead
+     * would produce. The nearest mood is where the track already sits, so the
+     * run starts from music like what is playing whatever that is. */
+    if (path == NULL)
+        return SOUND_MIX_NO_RECORD;
+
+    if (sound_index_reader_open(&r) == SOUND_OK)
+    {
+        if (sound_index_find(&r, sound_index_key(path), &rec) &&
+            sound_record_usable(&rec))
+        {
+            sound_mix_axes(&rec, &a);
+
+            for (m = 0; m < MOOD_COUNT; m++)
+            {
+                int d = sound_mood_score(&a, m);
+
+                /* Negative is a mood that cannot judge this track at all,
+                 * which is not the same as a distant one. */
+                if (d < 0)
+                    continue;
+
+                if (from < 0 || d < best)
+                {
+                    from = m;
+                    best = d;
+                }
+            }
+        }
+
+        sound_index_reader_close(&r);
+    }
+
+    /* A track the index has nothing usable for is reported rather than
+     * quietly turned into a plain Calm playlist. The seed was chosen, so
+     * answering about different music is worse than saying so. */
+    if (from < 0)
+        return SOUND_MIX_NO_RECORD;
+
+    if (want < 2)
+        want = 2;
+    if (want > SOUND_MIX_MAX)
+        want = SOUND_MIX_MAX;
+
+    /* Built here rather than handed to sound_mix_journey(), for the seed.
+     *
+     * The track plays first and is kept out of the running, the way Play
+     * Similar treats the track it was asked about -- winding down *from* a
+     * track that never appears is not what was asked for. mix_build() takes
+     * that from seed_path and seed_key, which is separate from g.seed: the
+     * goal stays the journey, or scoring would collapse to distance from the
+     * one track and there would be no traversal at all.
+     *
+     * Calm already leaves mood_from equal to mood_to, which goal_score()
+     * reads as a plain Calm mood -- the same answer without a run-up, and
+     * without a second path through here to write it. */
+    g.seed = NULL;
+    g.mood_from = from;
+    g.mood_to = MOOD_CALM;
+    g.steps = from == MOOD_CALM ? 1 : want;
+
+    return mix_build(&g, sound_index_key(path), path, want,
+                     global_settings.mood_playlist, false);
 }

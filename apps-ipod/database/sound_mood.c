@@ -27,15 +27,36 @@
 #include "config.h"
 #include "system.h"
 #include "lang.h"
+#include "database/sound_cal.h"
 #include "database/sound_mood.h"
 
 /* An axis a mood cares about, where it wants that axis, and how much it
  * matters against the mood's other axes. Weights are in tenths, as they are
- * for the track-to-track match. */
+ * for the track-to-track match.
+ *
+ * A target is a place in the library plus a tuning: 'pct' picks the place,
+ * 'adj' is how far off it the listening put the number, and 'target' is the
+ * two added up on the 3,439-record library these were fitted to -- which is
+ * what stands where there is no calibration to ask.
+ *
+ * The tuning is kept separately because the targets were chosen by ear and
+ * only *sit near* percentile points; they were never placed at them. Replacing
+ * each with its nearest point discards that work, and measurably: on the very
+ * library they were fitted to it moved mood membership by up to 23%. Carrying
+ * the offset over instead reproduces every tuned number exactly there, and
+ * moves it by however much another library's distribution differs.
+ *
+ * Speed and tempo are calibrated along with the rest, which is the one place
+ * this disagrees with the read-out. A mood *selects* where the read-out
+ * *describes*: Pace saying 90 BPM must mean 90 BPM whatever else is on the
+ * player, but Slow that returns nothing on a fast library has failed at the
+ * only thing it does. */
 struct mood_axis
 {
-    size_t   off;      /* into struct sound_axes */
-    int16_t  target;   /* 0 - SOUND_AX */
+    uint8_t  cal;      /* CAL_*, which names the axis and its percentiles */
+    int16_t  target;   /* 0 - SOUND_AX, the fallback */
+    uint16_t pct;      /* per mille of this axis's distribution */
+    int16_t  adj;      /* the tuning, in axis units off that point */
     uint8_t  weight;
 };
 
@@ -48,18 +69,18 @@ struct mood_def
     bool    needs_tempo;  /* judged only where the tempo is trusted */
 };
 
-#define A_LOUD    offsetof(struct sound_axes, loud)
-#define A_DENS    offsetof(struct sound_axes, dens)
-#define A_BRIGHT  offsetof(struct sound_axes, bright)
-#define A_LOW     offsetof(struct sound_axes, low)
-#define A_MID     offsetof(struct sound_axes, mid)
-#define A_CREST   offsetof(struct sound_axes, crest)
-#define A_WIDTH   offsetof(struct sound_axes, width)
-#define A_PEAK    offsetof(struct sound_axes, peak)
-#define A_CLARITY offsetof(struct sound_axes, clarity)
-#define A_CHANGE  offsetof(struct sound_axes, change)
-#define A_TEMPO   offsetof(struct sound_axes, tempo)
-#define A_SPEED   offsetof(struct sound_axes, speed)
+#define A_LOUD    CAL_LOUD
+#define A_DENS    CAL_DENS
+#define A_BRIGHT  CAL_BRIGHT
+#define A_LOW     CAL_LOW
+#define A_MID     CAL_MID
+#define A_CREST   CAL_CREST
+#define A_WIDTH   CAL_WIDTH
+#define A_PEAK    CAL_PEAK
+#define A_CLARITY CAL_CLARITY
+#define A_CHANGE  CAL_CHANGE
+#define A_TEMPO   CAL_TEMPO
+#define A_SPEED   CAL_SPEED
 
 /* Trap: the crest axis is inverted against its name. It is SOUND_AX minus the
  * measured crest factor, so a high value here is a compressed track and a low
@@ -102,42 +123,43 @@ struct mood_def
  * ahead of the quiet one. A speed term is what the other axes cannot supply,
  * and it only constrains the tracks that have a trusted tempo. */
 static const struct mood_axis mx_calm[] = {
-    { A_LOUD, 420, 10 }, { A_DENS, 200, 10 }, { A_PEAK, 180, 8 },
-    { A_SPEED, 250, 8 },
-    { A_CREST, 300, 4 }, { A_BRIGHT, 220, 4 } };
+    { A_LOUD, 420, 76, 3, 10 }, { A_DENS, 200, 78, 5, 10 },
+    { A_PEAK, 180, 82, 14, 8 }, { A_SPEED, 250, 135, 4, 8 },
+    { A_CREST, 300, 97, -7, 4 }, { A_BRIGHT, 220, 417, -16, 4 } };
 static const struct mood_axis mx_energetic[] = {
-    { A_LOUD, 840, 10 }, { A_DENS, 810, 10 }, { A_BRIGHT, 541, 6 },
-    { A_TEMPO, 760, 6 }, { A_CREST, 800, 4 } };
+    { A_LOUD, 840, 903, 1, 10 }, { A_DENS, 810, 896, 5, 10 },
+    { A_BRIGHT, 541, 837, 13, 6 }, { A_TEMPO, 760, 796, -4, 6 },
+    { A_CREST, 800, 737, -7, 4 } };
 static const struct mood_axis mx_dark[] = {
-    { A_BRIGHT, 60, 10 }, { A_LOW, 571, 6 }, { A_CLARITY, 250, 5 },
-    { A_LOUD, 650, 3 } };
+    { A_BRIGHT, 60, 162, 10, 10 }, { A_LOW, 571, 878, 10, 6 },
+    { A_CLARITY, 250, 167, 4, 5 }, { A_LOUD, 650, 333, 2, 3 } };
 static const struct mood_axis mx_bright[] = {
-    { A_BRIGHT, 583, 10 }, { A_CLARITY, 658, 5 }, { A_MID, 530, 4 },
-    { A_LOUD, 750, 3 } };
+    { A_BRIGHT, 583, 875, 22, 10 }, { A_CLARITY, 658, 843, 11, 5 },
+    { A_MID, 530, 849, -13, 4 }, { A_LOUD, 750, 594, 3, 3 } };
 static const struct mood_axis mx_warm[] = {
-    { A_BRIGHT, 110, 10 }, { A_MID, 550, 8 }, { A_LOW, 535, 8 },
-    { A_LOUD, 650, 3 } };
+    { A_BRIGHT, 110, 215, 7, 10 }, { A_MID, 550, 849, 7, 8 },
+    { A_LOW, 535, 829, 6, 8 }, { A_LOUD, 650, 333, 2, 3 } };
 static const struct mood_axis mx_raw[] = {
-    { A_CLARITY, 229, 10 }, { A_PEAK, 590, 7 }, { A_WIDTH, 65, 6 },
-    { A_CREST, 750, 3 } };
+    { A_CLARITY, 229, 147, -6, 10 }, { A_PEAK, 590, 838, -6, 7 },
+    { A_WIDTH, 65, 146, 0, 6 }, { A_CREST, 750, 580, 2, 3 } };
 static const struct mood_axis mx_lush[] = {
-    { A_WIDTH, 510, 9 }, { A_CLARITY, 658, 8 }, { A_CHANGE, 650, 6 },
-    { A_CREST, 350, 3 } };
+    { A_WIDTH, 510, 845, 10, 9 }, { A_CLARITY, 658, 843, 11, 8 },
+    { A_CHANGE, 650, 878, 5, 6 }, { A_CREST, 350, 159, -57, 3 } };
 static const struct mood_axis mx_punchy[] = {
-    { A_PEAK, 600, 10 }, { A_CREST, 300, 7 }, { A_DENS, 700, 5 },
-    { A_LOUD, 800, 4 } };
+    { A_PEAK, 600, 838, 4, 10 }, { A_CREST, 300, 97, -7, 7 },
+    { A_DENS, 700, 737, 3, 5 }, { A_LOUD, 800, 773, 4, 4 } };
 static const struct mood_axis mx_smooth[] = {
-    { A_PEAK, 208, 10 }, { A_CHANGE, 350, 6 }, { A_CREST, 480, 4 },
-    { A_BRIGHT, 330, 3 } };
+    { A_PEAK, 208, 139, -6, 10 }, { A_CHANGE, 350, 84, 10, 6 },
+    { A_CREST, 480, 241, 53, 4 }, { A_BRIGHT, 330, 560, 39, 3 } };
 static const struct mood_axis mx_sparse[] = {
-    { A_DENS, 200, 10 }, { A_CHANGE, 340, 6 }, { A_CREST, 300, 6 },
-    { A_LOUD, 500, 4 } };
+    { A_DENS, 200, 78, 5, 10 }, { A_CHANGE, 340, 84, 0, 6 },
+    { A_CREST, 300, 97, -7, 6 }, { A_LOUD, 500, 129, 1, 4 } };
 static const struct mood_axis mx_dense[] = {
-    { A_DENS, 830, 10 }, { A_CHANGE, 660, 6 }, { A_CREST, 870, 6 },
-    { A_LOUD, 830, 4 } };
+    { A_DENS, 830, 919, 0, 10 }, { A_CHANGE, 660, 902, 7, 6 },
+    { A_CREST, 870, 878, -29, 6 }, { A_LOUD, 830, 883, -2, 4 } };
 static const struct mood_axis mx_hypnotic[] = {
-    { A_CHANGE, 330, 9 }, { A_DENS, 560, 5 }, { A_TEMPO, 540, 6 },
-    { A_PEAK, 300, 4 } };
+    { A_CHANGE, 330, 61, 10, 9 }, { A_DENS, 560, 507, -1, 5 },
+    { A_TEMPO, 540, 538, 3, 6 }, { A_PEAK, 300, 325, 1, 4 } };
 /* The two that name a speed rather than a feel, and the only two on A_SPEED.
  *
  * Measured over a 3400-track library: with these on the folded axis, 151 of
@@ -148,15 +170,15 @@ static const struct mood_axis mx_hypnotic[] = {
  * and 160 BPM on a 60-180 scale -- rather than the ends of the axis, so each
  * names music that exists rather than a corner nothing reaches. */
 static const struct mood_axis mx_slow[] = {
-    { A_SPEED, 165, 10 }, { A_DENS, 300, 3 } };
+    { A_SPEED, 165, 88, 4, 10 }, { A_DENS, 300, 151, 8, 3 } };
 static const struct mood_axis mx_fast[] = {
-    { A_SPEED, 835, 10 }, { A_DENS, 750, 3 } };
+    { A_SPEED, 835, 902, -1, 10 }, { A_DENS, 750, 829, -1, 3 } };
 static const struct mood_axis mx_melancholy[] = {
-    { A_TEMPO, 200, 7 }, { A_LOUD, 500, 6 }, { A_BRIGHT, 170, 5 },
-    { A_DENS, 300, 5 } };
+    { A_TEMPO, 200, 186, 6, 7 }, { A_LOUD, 500, 129, 1, 6 },
+    { A_BRIGHT, 170, 349, -33, 5 }, { A_DENS, 300, 151, 8, 5 } };
 static const struct mood_axis mx_uplifting[] = {
-    { A_TEMPO, 800, 7 }, { A_BRIGHT, 560, 7 }, { A_LOUD, 800, 5 },
-    { A_DENS, 750, 5 } };
+    { A_TEMPO, 800, 815, 7, 7 }, { A_BRIGHT, 560, 875, -1, 7 },
+    { A_LOUD, 800, 773, 4, 5 }, { A_DENS, 750, 829, -1, 5 } };
 
 #define MOOD(name, lang_id, want_mode, want_tempo)                          \
     { lang_id, mx_##name,                                                   \
@@ -214,6 +236,24 @@ static uint32_t mood_root(uint32_t v)
     return r;
 }
 
+/* Where this mood wants the axis on the library in front of it, or where it
+ * wanted it on the library it was fitted to.
+ *
+ * sound_cal_ensure() is the scorers' business rather than this one's: it can
+ * cost a pass over the index, and here it would be reached once per axis per
+ * candidate. */
+static int mood_target(const struct mood_axis *x)
+{
+    int cal = sound_cal_at(x->cal, x->pct);
+
+    if (cal < 0)
+        return x->target;
+
+    cal += x->adj;
+
+    return cal < 0 ? 0 : (cal > SOUND_AX ? SOUND_AX : cal);
+}
+
 int sound_mood_score(const struct sound_axes *a, int mood)
 {
     const struct mood_def *m;
@@ -225,6 +265,8 @@ int sound_mood_score(const struct sound_axes *a, int mood)
     if (mood < 0 || mood >= MOOD_COUNT)
         return -1;
 
+    sound_cal_ensure();
+
     m = &moods[mood];
 
     if (m->needs_tempo && a->tempo < 0)
@@ -232,14 +274,15 @@ int sound_mood_score(const struct sound_axes *a, int mood)
 
     for (i = 0; i < m->count; i++)
     {
-        int v = *(const int *)((const char *)a + m->axes[i].off);
+        int v = *(const int *)((const char *)a +
+                        sound_cal_offset(m->axes[i].cal));
 
         /* An axis the analysis could not read is skipped, and its weight with
          * it, exactly as the track-to-track match does. */
         if (v < 0)
             continue;
 
-        d = v - m->axes[i].target;
+        d = v - mood_target(&m->axes[i]);
         sum += (uint32_t)(d * d / SOUND_AX) * m->axes[i].weight;
         total_w += m->axes[i].weight;
     }
@@ -281,16 +324,16 @@ int sound_mood_score(const struct sound_axes *a, int mood)
 
 /* What a mood wants of one axis, or a weight of zero where it does not
  * mention the axis at all. */
-static void mood_axis_at(const struct mood_def *m, size_t off,
+static void mood_axis_at(const struct mood_def *m, int cal,
                          int *target, int *weight)
 {
     unsigned int i;
 
     for (i = 0; i < m->count; i++)
     {
-        if (m->axes[i].off == off)
+        if (m->axes[i].cal == cal)
         {
-            *target = m->axes[i].target;
+            *target = mood_target(&m->axes[i]);
             *weight = m->axes[i].weight;
             return;
         }
@@ -314,6 +357,8 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
     if (from == to)
         return sound_mood_score(a, from);
 
+    sound_cal_ensure();
+
     ma = &moods[from];
     mb = &moods[to];
 
@@ -325,21 +370,21 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
      * than a list with the shared axes counted twice. */
     for (i = 0; i < (unsigned)(ma->count + mb->count); i++)
     {
-        size_t off;
+        int cal;
         int ta = 0, wa = 0, tb = 0, wb = 0;
         int target, weight, v;
 
         if (i < ma->count)
         {
-            off = ma->axes[i].off;
+            cal = ma->axes[i].cal;
         }
         else
         {
-            off = mb->axes[i - ma->count].off;
+            cal = mb->axes[i - ma->count].cal;
 
             for (j = 0; j < ma->count; j++)
             {
-                if (ma->axes[j].off == off)
+                if (ma->axes[j].cal == cal)
                     break;
             }
 
@@ -347,8 +392,8 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
                 continue;
         }
 
-        mood_axis_at(ma, off, &ta, &wa);
-        mood_axis_at(mb, off, &tb, &wb);
+        mood_axis_at(ma, cal, &ta, &wa);
+        mood_axis_at(mb, cal, &tb, &wb);
 
         /* An axis only one mood names keeps that mood's target throughout,
          * so the fading weight is the whole of the change. Interpolating
@@ -365,7 +410,7 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
         if (weight <= 0)
             continue;
 
-        v = *(const int *)((const char *)a + off);
+        v = *(const int *)((const char *)a + sound_cal_offset(cal));
 
         if (v < 0)
             continue;

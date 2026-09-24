@@ -48,6 +48,7 @@
 #include "settings/settings.h"
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
+#include "database/sound_cal.h"
 #include "database/sound_index.h"
 #include "database/tagcache.h"
 #include "screens/system/sound_scan.h"
@@ -694,6 +695,12 @@ bool sound_scan_screen(bool rebuild)
     }
     else if (sound_index_finish(complete) == SOUND_OK)
     {
+        /* Here rather than on first use, where sound_cal_ensure() would
+         * otherwise reach it: this is a screen the user is already waiting
+         * on, and a pass over the index it has just written is a second
+         * against the hours behind it. */
+        sound_cal_update();
+
         splashf(HZ * 4, "Done. %d measured, %d unreadable",
                 written, ss_failed);
     }

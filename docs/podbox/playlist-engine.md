@@ -88,11 +88,16 @@ jump between neighbours.
 For a journey that limit applies within each step of the run, so the change
 still travels from one mood to the other; it is the joins that get smoother.
 
-## The three ways in
+## The four ways in
 
 **Play Similar** is on the context menu of any track — in the file browser, in
 the database, or on the playing screen. The track you chose plays first and
 the rest follow in order of how near they are to it.
+
+It is also on an album: on a folder in the file browser, and on an album row
+in the database. There the playlist is built around the album as a whole
+rather than around one of its tracks, and the album itself is held to a couple
+of tracks so that it does not simply play itself back to you.
 
 **Moods** and **Journeys** are at the top of the **Playlists** screen, above
 your saved playlists.
@@ -107,6 +112,15 @@ A journey travels from one mood to another across the playlist. Each position
 in the run is filled from the tracks nearest that point along the way, so the
 change is heard gradually rather than as a join in the middle. Slow → Fast
 climbs steadily from around 78 BPM to around 133. No track appears twice.
+
+**Wind Down** is on the context menu of a track, beside Play Similar, because
+like a mix it is built around the track you chose. That track plays first and
+the run gets calmer from there, starting from where it already sits rather
+than from a mood you pick — so this is the one that descends, where the five
+journeys above all climb.
+
+With a sleep timer running it is as long as the time left on it, so the music
+and the player stop together. Without one it is the usual Playlist Length.
 
 ## What a track sounds like
 

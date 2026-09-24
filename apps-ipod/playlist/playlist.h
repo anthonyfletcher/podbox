@@ -166,6 +166,15 @@ bool playlist_entries_iterate(const char *filename,
 void playlist_skip_entry(struct playlist_info *playlist, int steps);
 int playlist_delete(struct playlist_info* playlist, int index);
 int playlist_move(struct playlist_info* playlist, int index, int new_index);
+
+/* The longest playlist playlist_reorder() will take. The caller holds one
+ * struct sound_axes per track to work the order out (see sound_mix_chain()),
+ * so the ceiling is really that array's; it is stated here because this is
+ * where a playlist is refused for being over it. */
+#define PLAYLIST_REORDER_MAX  100
+
+int playlist_reorder(struct playlist_info* playlist, const int16_t *order,
+                     int n);
 int playlist_randomise(struct playlist_info* playlist, unsigned int seed,
                        bool start_current);
 int playlist_sort(struct playlist_info* playlist, bool start_current);

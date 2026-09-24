@@ -608,6 +608,19 @@ few at each step, so every run differs.
 None of them reach further out for the difference -- the playlist is drawn
 from the same neighbourhood either way.
 
+[action: Library Sound]
+What the analysis found across the whole library: how many tracks it has
+measured, how many it reached but could not read, and how many of those
+settled on a tempo or a key.
+
+The tempo count is the one to look at when Slow, Fast or Hypnotic offer fewer
+tracks than expected -- those three only consider tracks whose tempo the
+analysis trusts, and on most libraries that is well short of all of them.
+
+The last row says which music a track's Sound screen is comparing it against:
+your own library once enough of it has been measured, the built-in numbers
+until then.
+
 [database scan paths]
 Restricts scanning to chosen folders, so spoken-word or sample libraries stay
 out of the music database.

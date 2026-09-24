@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include "database/sound_index.h"
 
+struct playlist_info;
+
 /* Tracks a mix may hold. The candidate arrays are three times this and the
  * running order one of them, so it is what the engine costs in static memory
  * -- 38 KB, measured on the iPod Video build.
@@ -102,6 +104,7 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
 #define SOUND_MIX_NO_PLAYLIST  -4   /* Tracks were chosen, none reached the
                                        playlist */
 #define SOUND_MIX_CANCELLED    -5   /* The erase warning was declined */
+#define SOUND_MIX_TOO_LONG     -6   /* More tracks than a reorder can hold */
 
 /* Build a playlist of tracks that sound like the one at 'path', and start it.
  * The seed plays first and the rest follow in order of how near they are to
@@ -121,6 +124,20 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
  * reached from the playing screen must not stop the music to answer. */
 int sound_mix_from_track(const char *path, int want);
 
+/* The same, around the mean of an album rather than one track -- see
+ * sound_props_album_result(), which is where that mean comes from.
+ *
+ * 'one_track' is any track of the album. It is not a seed and does not play
+ * first; it is there so the artist rules know whose album this is, which is
+ * what keeps the album itself from filling the playlist it seeded.
+ *
+ * Measured over a 3,439-track library, an album mean sits nearer its closest
+ * foreign track than a track seed does -- median 51 against 58, and a much
+ * tighter spread (p90 70 against 99). A mean is not a thin place to aim at:
+ * averaging pulls it toward where music actually is. */
+int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
+                         int want);
+
 /* Build a playlist of tracks that sit in one mood, and start it. Same rules
  * as above except that there is no seed, so nothing plays first. */
 int sound_mix_from_mood(int mood, int want);
@@ -130,11 +147,57 @@ int sound_mix_from_mood(int mood, int want);
  * way, so the change is heard across the playlist rather than at a join. */
 int sound_mix_journey(int from, int to, int want);
 
+/* A journey that ends calm, starting from where 'path' already sits.
+ *
+ * That track plays first and does not come round again, as it does for a mix
+ * built from a track -- winding down *from* something means starting there.
+ * What it does not do is set the goal: the near end of the journey is the
+ * track's nearest *mood*, because a journey moves between two moods' targets
+ * and a track is not one of those.
+ *
+ * A track already nearest Calm has no run-up to make and gives a plain Calm
+ * playlist, still led by itself. One the index has nothing usable for is
+ * refused rather than answered about some other music. */
+int sound_mix_winddown(const char *path, int want);
+
 /* Extend the playlist now playing with more of the same, and play on from the
  * first added track. Appends rather than replaces, and refuses anything the
  * playlist already holds -- without which a continuation returns tracks that
  * played minutes ago. Returns the number added, or one of the codes above. */
 int sound_mix_continue(int want);
+
+/* Put a set of tracks the listener already chose into an order where
+ * neighbours sound alike, writing positions 0..n-1 into 'order'.
+ *
+ * Deliberately not mix_build(). That scores candidates against a goal,
+ * applies the artist rules and samples for variety, and none of the three
+ * belongs here: there is no goal, since the set is fixed and nothing is being
+ * chosen from it; the artist rules would overrule a choice the listener made;
+ * and sampling is variety in selection, where this selects nothing. What the
+ * two share is the measure -- sound_mix_distance() and the cap on the energy
+ * step between neighbours.
+ *
+ * 'ax' and 'have' are one entry per track, 'have' saying whether that entry's
+ * axes mean anything. 'start' is the position that must come first, or -1 for
+ * none: a playlist being reordered under a playing track passes that track's
+ * position, since putting it in order must not change what is playing.
+ *
+ * Anything with no usable record keeps the order it arrived in, at the end.
+ * Returns how many positions were written, which is 'n' unless 'n' is out of
+ * range -- at most SOUND_MIX_MAX, because the caller has to hold one
+ * struct sound_axes per track for the whole pass and re-reading them from the
+ * index instead would be a seek per pair. */
+int sound_mix_chain(const struct sound_axes *ax, const uint8_t *have,
+                    int n, int start, int16_t *order);
+
+/* Put one playlist into that order, in place. NULL is the playlist now
+ * playing, and then the track playing leads it.
+ *
+ * Returns how many of its tracks the index had nothing for -- 0 where every
+ * one was placed by how it sounds -- or one of the codes above.
+ * SOUND_MIX_TOO_LONG where the playlist is longer than SOUND_MIX_MAX, which
+ * is refused rather than reordered in part. */
+int sound_mix_reorder(struct playlist_info *playlist);
 
 /* Forget what built the current playlist. Called where a playlist is created,
  * which is the moment the terms behind the old one stop applying. */

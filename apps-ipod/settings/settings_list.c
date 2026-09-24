@@ -69,6 +69,7 @@
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
 #include "screens/system/sound_scan.h"  /* sound_scan_screen */
 #include "database/sound_index.h"       /* sound_index_exists */
+#include "database/tagcache.h"          /* tagcache_is_usable */
 #include "database/sound_mix.h"         /* SOUND_MIX_MAX */
 
 #include "audio/voice_thread.h"
@@ -652,10 +653,19 @@ static void segregate_audiobooks_callback(bool segregate)
  * matched against until it has run, so a setting that only set a flag would
  * appear to do nothing for as long as it took somebody to find Maintenance.
  * An index already on disk is left alone; the scan screen asks before it
- * starts, and can be declined. */
+ * starts, and can be declined.
+ *
+ * Trap: the database test is load-bearing here and is not the scan screen's
+ * own. F_CB_ON_SELECT_ONLY is honoured by the menu and not by settings.c's
+ * cfg reader, which runs this callback for every boot that loads "playlist
+ * engine: on" -- and settings_load() runs ahead of init_tagcache(). Without
+ * the test, a player whose analysis has not run yet opens the scan screen
+ * during boot and splashes at a database that is not up, on every boot until
+ * one does. With it, the three conditions together are simply "there is work
+ * this screen could do". */
 static void playlist_engine_callback(bool on)
 {
-    if (on && !sound_index_exists())
+    if (on && !sound_index_exists() && tagcache_is_usable())
         sound_scan_screen(false);
 }
 

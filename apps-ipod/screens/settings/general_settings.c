@@ -44,7 +44,9 @@
 #include "system/format_time.h"
 #include "system/volume.h"
 #include "pathfuncs.h"
+#include "screens/system/sound_library.h"
 #include "screens/system/sound_scan.h"
+#include "database/sound_index.h"
 #include "viewers/playback_viewer/pv_index.h"  /* the Playback Report's two */
 #include "viewers/playback_viewer/pv_names.h"  /* caches, cleared together */
 
@@ -240,9 +242,35 @@ MENUITEM_SETTING(mood_playlist, &global_settings.mood_playlist, NULL);
 MENUITEM_SETTING(mix_length, &global_settings.mix_length, NULL);
 MENUITEM_SETTING(continue_playing, &global_settings.continue_playing, NULL);
 
+/* A report rather than a setting, so it sits after the settings and not among
+ * them. It is offered only with an index to read: the rows are counts over
+ * one, and a screen that can only say nothing is worse than no screen. */
+static int sound_library_run(void)
+{
+    return sound_library_screen() ? MENU_ATTACHED_USB : 0;
+}
+
+static int sound_library_callback(int action,
+                                  const struct menu_item_ex *this_item,
+                                  struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM &&
+        (!global_settings.playlist_engine || !sound_index_exists()))
+        return ACTION_EXIT_MENUITEM;
+
+    return action;
+}
+
+MENUITEM_FUNCTION(sound_library_item, 0, ID2P(LANG_SOUND_LIBRARY),
+                  sound_library_run, sound_library_callback, Icon_NOICON);
+
 MAKE_MENU(playlist_engine_menu, ID2P(LANG_PLAYLIST_ENGINE), 0, Icon_Playlist,
             &playlist_engine, &analysis_depth, &mix_length,
-            &track_playlist, &mood_playlist, &continue_playing);
+            &track_playlist, &mood_playlist, &continue_playing,
+            &sound_library_item);
 
 /** File view menu **/
 MENUITEM_SETTING(sort_case, &global_settings.sort_case, NULL);

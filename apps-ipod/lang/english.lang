@@ -20508,6 +20508,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_WINDDOWN
+  desc: on a track context menu, builds a playlist that gets calmer and plays it
+  user: core
+  <source>
+    *: "Wind Down"
+  </source>
+  <dest>
+    *: "Wind Down"
+  </dest>
+  <voice>
+    *: "Wind Down"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_MOOD_PLAYLIST
   desc: in Library - Playlist Engine, how much a mood or journey varies between runs
   user: core
@@ -21709,5 +21723,187 @@
   </dest>
   <voice>
     *: "Unclear"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIBRARY
+  desc: on the Playlist Engine menu, the row opening the library read-out, and its screen title
+  user: core
+  <source>
+    *: "Library Sound"
+  </source>
+  <dest>
+    *: "Library Sound"
+  </dest>
+  <voice>
+    *: "Library Sound"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MEASURED
+  desc: library read-out: tracks the analysis has measured, of the tracks there are
+  user: core
+  <source>
+    *: "Measured"
+  </source>
+  <dest>
+    *: "Measured"
+  </dest>
+  <voice>
+    *: "Measured"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNREADABLE
+  desc: library read-out: tracks the analysis reached but could not decode
+  user: core
+  <source>
+    *: "Unreadable"
+  </source>
+  <dest>
+    *: "Unreadable"
+  </dest>
+  <voice>
+    *: "Unreadable"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_TEMPO
+  desc: library read-out: measured tracks whose tempo the engine trusts
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "Tempo"
+  </dest>
+  <voice>
+    *: "Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEY
+  desc: library read-out: measured tracks that settled on a key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Key"
+  </dest>
+  <voice>
+    *: "Key"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_COMPARED
+  desc: library read-out: which music the per-track sound words are measured against
+  user: core
+  <source>
+    *: "Compared To"
+  </source>
+  <dest>
+    *: "Compared To"
+  </dest>
+  <voice>
+    *: "Compared To"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OWN
+  desc: library read-out, Compared To: the words are this library's own percentiles
+  user: core
+  <source>
+    *: "Your library"
+  </source>
+  <dest>
+    *: "Your library"
+  </dest>
+  <voice>
+    *: "Your library"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_SHIPPED
+  desc: library read-out, Compared To: too few measured tracks, so the built-in numbers stand
+  user: core
+  <source>
+    *: "Built-in defaults"
+  </source>
+  <dest>
+    *: "Built-in defaults"
+  </dest>
+  <voice>
+    *: "Built-in defaults"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER
+  desc: in the playlist viewer's context menu, puts the playlist in an order where neighbouring tracks sound alike
+  user: core
+  <source>
+    *: "Order by Sound"
+  </source>
+  <dest>
+    *: "Order by Sound"
+  </dest>
+  <voice>
+    *: "Order by Sound"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_LONG
+  desc: Order by Sound: the playlist holds more tracks than one pass can order
+  user: core
+  <source>
+    *: "Too many tracks to order"
+  </source>
+  <dest>
+    *: "Too many tracks to order"
+  </dest>
+  <voice>
+    *: "Too many tracks to order"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_SOME
+  desc: Order by Sound: done, but this many tracks had no measurement and went to the end
+  user: core
+  <source>
+    *: "Ordered. %d not measured"
+  </source>
+  <dest>
+    *: "Ordered. %d not measured"
+  </dest>
+  <voice>
+    *: "Ordered"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM
+  desc: on a folder's context menu, the row opening the sound read-out for the whole folder, and its screen title
+  user: core
+  <source>
+    *: "Album Sound"
+  </source>
+  <dest>
+    *: "Album Sound"
+  </dest>
+  <voice>
+    *: "Album Sound"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM_NONE
+  desc: Album Sound: nothing in this folder has been measured yet
+  user: core
+  <source>
+    *: "Nothing here has been analysed"
+  </source>
+  <dest>
+    *: "Nothing here has been analysed"
+  </dest>
+  <voice>
+    *: "Nothing here has been analysed"
   </voice>
 </phrase>

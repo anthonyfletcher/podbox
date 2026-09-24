@@ -38,6 +38,7 @@
 
 #include "viewer.h"
 #include "catalog.h"
+#include "database/sound_mix.h"
 #include "draw/icon.h"
 #include "widgets/list.h"
 #include "widgets/splash.h"
@@ -666,7 +667,8 @@ static enum pv_context_result context_menu(int index)
                         ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
                         ID2P(LANG_REMOVE), ID2P(LANG_MOVE),
                         ID2P(LANG_MENU_SHOW_ID3_INFO),
-                        ID2P(LANG_SHUFFLE), ID2P(LANG_SAVE),
+                        ID2P(LANG_SHUFFLE), ID2P(LANG_SOUND_REORDER),
+                        ID2P(LANG_SAVE),
                         ID2P(LANG_PLAYLISTVIEWER_SETTINGS)
                         );
     /* Report as a context menu while it is up, the way every other one does
@@ -716,10 +718,35 @@ static enum pv_context_result context_menu(int index)
                 viewer.selected_track = 0;
                 return PV_CONTEXT_MODIFIED;
             case 6:
+            {
+                /* Not offered a confirmation the way Shuffle is: the tracks
+                 * are the same tracks afterwards, and the one playing is
+                 * still playing. */
+                int miss = sound_mix_reorder(viewer.playlist);
+
+                if (miss < 0)
+                {
+                    /* Chosen into a variable first: ID2P() does not
+                     * parenthesise what it is given, so a conditional handed
+                     * to it binds to the addition inside instead. */
+                    int id = miss == SOUND_MIX_TOO_LONG
+                             ? LANG_SOUND_REORDER_LONG
+                             : LANG_SOUND_MIX_NO_INDEX;
+
+                    splash(HZ * 2, ID2P(id));
+                }
+                else if (miss > 0)
+                    splashf(HZ * 2, (const char *)str(LANG_SOUND_REORDER_SOME),
+                            miss);
+
+                viewer.selected_track = 0;
+                return PV_CONTEXT_MODIFIED;
+            }
+            case 7:
                 save_playlist_screen(viewer.playlist);
                 /* playlist indices of current playlist may have changed */
                 return viewer.playlist ? PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
-            case 7:
+            case 8:
             {
                 /* playlist viewer settings. Reported as a context menu for the
                  * same reason as the one above: reached from a context menu, and
