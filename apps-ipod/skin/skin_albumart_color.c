@@ -35,7 +35,8 @@
  *
  * Parts, in order:
  *   - luminance, contrast and blending helpers
- *   - extract_colors(): sampling the bitmap and choosing the palette
+ *   - pick_accent() and extract_colors(): sampling the bitmap and choosing
+ *     the palette
  *   - the %Cl filter chain, applied in place once per art change
  *   - track-change hook, the boot seed, theme colour save/restore, and the
  *     once-per-render check that drives both jobs
@@ -271,6 +272,98 @@ static void average_bucket(const fb_data *pixels, int total_pixels, int stride,
     *out_b = count ? (int)(sum_b / count) : 0;
 }
 
+/* The accent against a given dominant: the best-scored bucket clearing
+ * MIN_RATIO against it, brought up to that ratio if nothing clears it. */
+static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
+                        int dom_bucket, int32_t dom_rl, int dom_lum,
+                        int *out_r, int *out_g, int *out_b)
+{
+    int i;
+
+    int accent_bucket = -1;
+    unsigned int accent_score = 0;
+
+    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+    {
+        if (histogram[i] == 0 || i == dom_bucket)
+            continue;
+
+        int r4 = (i >> 8) & 0xF;
+        int g4 = (i >> 4) & 0xF;
+        int b4 = i & 0xF;
+
+        /* Approximate 8-bit values from 4-bit */
+        int r8 = (r4 << 4) | r4;
+        int g8 = (g4 << 4) | g4;
+        int b8 = (b4 << 4) | b4;
+        if (contrast_ratio(dom_rl, rel_luminance(r8, g8, b8)) >= MIN_RATIO)
+        {
+            /* Score by count weighted by saturation */
+            int max_c = MAX(MAX(r4, g4), b4);
+            int min_c = MIN(MIN(r4, g4), b4);
+            int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
+            unsigned int score = (unsigned int)histogram[i]
+                               * (sat + SATURATION_BASE) / SATURATION_BASE;
+
+            if (score > accent_score)
+            {
+                accent_score = score;
+                accent_bucket = i;
+            }
+        }
+    }
+
+    int acc_r, acc_g, acc_b;
+    if (accent_bucket >= 0)
+    {
+        average_bucket(pixels, total_pixels, stride, accent_bucket,
+                       &acc_r, &acc_g, &acc_b);
+    }
+    else
+    {
+        /* Hard fallback: dark dominant -> white text, light -> black */
+        if (dom_lum < 128)
+        {
+            acc_r = 255; acc_g = 255; acc_b = 255;
+        }
+        else
+        {
+            acc_r = 0; acc_g = 0; acc_b = 0;
+        }
+    }
+
+    /* Readability enforcement. First try to keep the accent's hue by scaling
+     * its channels toward a target luminance; then check the result, because
+     * that scaling can fail silently -- each channel clamps at 255
+     * independently, so a saturated one leaves the colour short of the target
+     * and shifts its hue. If it is still short, legibility wins over hue. */
+    if (contrast_ratio(dom_rl, rel_luminance(acc_r, acc_g, acc_b)) < MIN_RATIO)
+    {
+        int acc_lum = compute_luminance(acc_r, acc_g, acc_b);
+        int target_lum = (dom_lum < 128) ? MIN(dom_lum + 128, 255)
+                                         : MAX(dom_lum - 128, 0);
+
+        if (acc_lum > 0)
+        {
+            int scale = (target_lum * 256) / acc_lum;
+            acc_r = MIN((acc_r * scale) >> 8, 255);
+            acc_g = MIN((acc_g * scale) >> 8, 255);
+            acc_b = MIN((acc_b * scale) >> 8, 255);
+        }
+        else
+        {
+            acc_r = acc_g = acc_b = target_lum;
+        }
+
+        if (contrast_ratio(dom_rl, rel_luminance(acc_r, acc_g, acc_b)) < MIN_RATIO)
+            acc_r = acc_g = acc_b = (dom_lum < 128) ? 255 : 0;
+    }
+
+    *out_r = acc_r;
+    *out_g = acc_g;
+    *out_b = acc_b;
+}
+
 static void extract_colors(const struct bitmap *bmp)
 {
     if (!bmp->data || bmp->width <= 0 || bmp->height <= 0)
@@ -367,90 +460,11 @@ static void extract_colors(const struct bitmap *bmp)
     int dom_lum = compute_luminance(dom_r, dom_g, dom_b);
     int32_t dom_rl = rel_luminance(dom_r, dom_g, dom_b);
 
-    /* Find accent: best-scored bucket with sufficient contrast */
-    int accent_bucket = -1;
-    unsigned int accent_score = 0;
-
-    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
-    {
-        if (histogram[i] == 0 || i == best_bucket)
-            continue;
-
-        int r4 = (i >> 8) & 0xF;
-        int g4 = (i >> 4) & 0xF;
-        int b4 = i & 0xF;
-
-        /* Approximate 8-bit values from 4-bit */
-        int r8 = (r4 << 4) | r4;
-        int g8 = (g4 << 4) | g4;
-        int b8 = (b4 << 4) | b4;
-        if (contrast_ratio(dom_rl, rel_luminance(r8, g8, b8)) >= MIN_RATIO)
-        {
-            /* Score by count weighted by saturation */
-            int max_c = MAX(MAX(r4, g4), b4);
-            int min_c = MIN(MIN(r4, g4), b4);
-            int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
-            unsigned int score = (unsigned int)histogram[i]
-                               * (sat + SATURATION_BASE) / SATURATION_BASE;
-
-            if (score > accent_score)
-            {
-                accent_score = score;
-                accent_bucket = i;
-            }
-        }
-    }
-
     int acc_r, acc_g, acc_b;
-    unsigned int accent;
-    if (accent_bucket >= 0)
-    {
-        average_bucket(pixels, total_pixels, stride, accent_bucket,
-                       &acc_r, &acc_g, &acc_b);
-        accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
-    }
-    else
-    {
-        /* Hard fallback: dark dominant -> white text, light -> black */
-        if (dom_lum < 128)
-        {
-            acc_r = 255; acc_g = 255; acc_b = 255;
-        }
-        else
-        {
-            acc_r = 0; acc_g = 0; acc_b = 0;
-        }
-        accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
-    }
 
-    /* Readability enforcement. First try to keep the accent's hue by scaling
-     * its channels toward a target luminance; then check the result, because
-     * that scaling can fail silently -- each channel clamps at 255
-     * independently, so a saturated one leaves the colour short of the target
-     * and shifts its hue. If it is still short, legibility wins over hue. */
-    if (contrast_ratio(dom_rl, rel_luminance(acc_r, acc_g, acc_b)) < MIN_RATIO)
-    {
-        int acc_lum = compute_luminance(acc_r, acc_g, acc_b);
-        int target_lum = (dom_lum < 128) ? MIN(dom_lum + 128, 255)
-                                         : MAX(dom_lum - 128, 0);
-
-        if (acc_lum > 0)
-        {
-            int scale = (target_lum * 256) / acc_lum;
-            acc_r = MIN((acc_r * scale) >> 8, 255);
-            acc_g = MIN((acc_g * scale) >> 8, 255);
-            acc_b = MIN((acc_b * scale) >> 8, 255);
-        }
-        else
-        {
-            acc_r = acc_g = acc_b = target_lum;
-        }
-
-        if (contrast_ratio(dom_rl, rel_luminance(acc_r, acc_g, acc_b)) < MIN_RATIO)
-            acc_r = acc_g = acc_b = (dom_lum < 128) ? 255 : 0;
-
-        accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
-    }
+    pick_accent(pixels, total_pixels, stride, best_bucket, dom_rl, dom_lum,
+                &acc_r, &acc_g, &acc_b);
+    unsigned int accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
 
     /* The dominant is not the only thing the accent is read against: a theme
      * that paints over the artwork puts the accent straight on the picture,
@@ -465,12 +479,51 @@ static void extract_colors(const struct bitmap *bmp)
      * The replacement settles for ACCENT_MIN_RATIO against the dominant
      * rather than MIN_RATIO, because nothing clears 6:1 above a mid-luminance
      * dominant: the pair that produced a dark accent is the pair with no
-     * light answer. The dark accent stands when even white fails both bars --
-     * a bright dominant over dark art asks for two opposite colours and can
-     * have only one. */
-    if (compute_luminance(acc_r, acc_g, acc_b) < 128 &&
+     * light answer.
+     *
+     * A dominant too bright for even white to clear that bar -- a light logo
+     * on a black sleeve, since the dominant search skips near-black -- is
+     * replaced instead, by the picture's most populous bucket no brighter than
+     * its mean. Trap: searching the old dominant for a rescue there finds only
+     * a mid-grey between it and the art, and a panel blended from the two
+     * lands on that grey. */
+    bool dark_unread = compute_luminance(acc_r, acc_g, acc_b) < 128 &&
         contrast_ratio(art_rl, rel_luminance(acc_r, acc_g, acc_b))
-            < ART_MIN_RATIO)
+            < ART_MIN_RATIO;
+
+    if (dark_unread && contrast_ratio(dom_rl, rel_luminance(255, 255, 255))
+                           < ACCENT_MIN_RATIO)
+    {
+        int dark_bucket = -1;
+        uint16_t dark_count = 0;
+
+        for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+        {
+            int r4 = (i >> 8) & 0xF;
+            int g4 = (i >> 4) & 0xF;
+            int b4 = i & 0xF;
+
+            if (histogram[i] > dark_count &&
+                compute_luminance(r4 * 17, g4 * 17, b4 * 17) <= art_lum)
+            {
+                dark_count = histogram[i];
+                dark_bucket = i;
+            }
+        }
+
+        if (dark_bucket >= 0)
+        {
+            average_bucket(pixels, total_pixels, stride, dark_bucket,
+                           &dom_r, &dom_g, &dom_b);
+            dominant = LCD_RGBPACK(dom_r, dom_g, dom_b);
+            dom_lum = compute_luminance(dom_r, dom_g, dom_b);
+            dom_rl = rel_luminance(dom_r, dom_g, dom_b);
+            pick_accent(pixels, total_pixels, stride, dark_bucket, dom_rl,
+                        dom_lum, &acc_r, &acc_g, &acc_b);
+            accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
+        }
+    }
+    else if (dark_unread)
     {
         int rescue_bucket = -1;
         unsigned int rescue_score = 0;
@@ -512,9 +565,7 @@ static void extract_colors(const struct bitmap *bmp)
                            &acc_r, &acc_g, &acc_b);
             accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
         }
-        else if (contrast_ratio(dom_rl, rel_luminance(255, 255, 255))
-                     >= ACCENT_MIN_RATIO &&
-                 contrast_ratio(art_rl, rel_luminance(255, 255, 255))
+        else if (contrast_ratio(art_rl, rel_luminance(255, 255, 255))
                      >= ART_MIN_RATIO)
         {
             accent = LCD_RGBPACK(255, 255, 255);
