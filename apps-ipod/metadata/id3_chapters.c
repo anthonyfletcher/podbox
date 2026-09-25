@@ -123,13 +123,17 @@ static void read_frame_text(int fd, off_t end, char *out, size_t out_size)
             size_t skip = (le || (want >= 2 && raw[0] == 0xfe
                                   && raw[1] == 0xff)) ? 2 : 0;
 
-            *utf16decode(raw + skip, (unsigned char *)out, (want - skip) / 2,
+            int units = chapter_utf16_units(raw + skip,
+                                            (int)(want - skip) / 2, le);
+
+            *utf16decode(raw + skip, (unsigned char *)out, units,
                          out_size - 1, le) = '\0';
             break;
         }
 
         case 0x02:  /* UTF-16, big endian, with no mark */
-            *utf16decode(raw, (unsigned char *)out, want / 2,
+            *utf16decode(raw, (unsigned char *)out,
+                         chapter_utf16_units(raw, (int)want / 2, false),
                          out_size - 1, false) = '\0';
             break;
 

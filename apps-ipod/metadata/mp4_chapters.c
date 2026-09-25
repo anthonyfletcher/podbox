@@ -66,8 +66,10 @@
 /* A chpl record is a 64-bit timestamp, a length byte and the title. */
 #define CHPL_RECORD_MIN 9
 
-/* Its count is preceded by a version, its flags and a reserved word. */
-#define CHPL_HEADER     9
+/* Its count is preceded by a version and its flags, and by a reserved word
+ * as well when the version is not 0. */
+#define CHPL_FLAGS      3
+#define CHPL_RESERVED   4
 
 /* chpl timestamps are in units of 100ns. */
 #define CHPL_TICKS_PER_MS 10000
@@ -157,11 +159,12 @@ static bool read_u64_at(int fd, off_t pos, uint64_t *out)
 static int read_chpl(int fd, off_t udta_end, struct cuesheet *cue)
 {
     off_t chpl_end;
-    uint8_t count = 0;
+    uint8_t version = 0, count = 0;
     int i, found = 0;
 
     if (!find_box(fd, MP4_chpl, udta_end, &chpl_end)
-        || lseek(fd, CHPL_HEADER - 1, SEEK_CUR) < 0
+        || read_uint8(fd, &version) != 1
+        || lseek(fd, CHPL_FLAGS + (version ? CHPL_RESERVED : 0), SEEK_CUR) < 0
         || read_uint8(fd, &count) != 1)
         return 0;
 
@@ -404,11 +407,12 @@ static void read_sample_title(int fd, off_t pos, uint32_t size,
     if (want >= 2 &&((raw[0] == 0xff && raw[1] == 0xfe)
                      || (raw[0] == 0xfe && raw[1] == 0xff)))
     {
+        bool le = raw[0] == 0xff;
         unsigned char *end = utf16decode(raw + 2,
                                          (unsigned char *)track->title,
-                                         (want - 2) / 2,
-                                         sizeof(track->title) - 1,
-                                         raw[0] == 0xff);
+                                         chapter_utf16_units(raw + 2,
+                                                   (int)(want - 2) / 2, le),
+                                         sizeof(track->title) - 1, le);
         *end = '\0';
         return;
     }
@@ -464,7 +468,10 @@ static int read_sample_titles(int fd, const struct sample_tables *st,
         {
             uint32_t per;
 
+            /* A chunk of no samples is malformed, and following a run of
+             * them costs a seek per chunk to the end of the table. */
             if (!samples_per_chunk(fd, &st->stsc, chunk + 1, &cursor, &per)
+                || per == 0
                 || !chunk_offset(fd, st, chunk, &pos))
                 return found;
 

@@ -26,4 +26,9 @@ bool parse_chapters(struct mp3entry *id3, struct cuesheet *cue);
 bool parse_chapters_path(const char *path, const char *book,
                          const char *author, struct cuesheet *cue);
 
+/* How many of the "units" 16-bit units at "utf16" to hand utf16decode():
+   fewer when the last would open a surrogate pair, which it completes from
+   the two bytes past the end of the name. */
+int chapter_utf16_units(const unsigned char *utf16, int units, bool le);
+
 #endif

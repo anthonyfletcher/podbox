@@ -59,6 +59,24 @@ bool parse_chapters_path(const char *path, const char *book,
     return true;
 }
 
+int chapter_utf16_units(const unsigned char *utf16, int units, bool le)
+{
+    int i = 0;
+
+    /* The same test utf16decode() makes on each unit's high byte. */
+    while (i < units)
+    {
+        unsigned char hi = utf16[2 * i + (le ? 1 : 0)];
+        int step = (hi >= 0xD8 && hi < 0xE0) ? 2 : 1;
+
+        if (i + step > units)
+            break;
+        i += step;
+    }
+
+    return i;
+}
+
 bool parse_chapters(struct mp3entry *id3, struct cuesheet *cue)
 {
     const char *author = id3->albumartist ? id3->albumartist : id3->artist;
