@@ -1360,8 +1360,9 @@ static unsigned int transform_cached(unsigned int c)
     out = transform_literal(c);
 
     /* A skin with more distinct colours than the table holds simply stops
-     * caching. The transform is a few dozen integer operations on a miss, which
-     * is not a reason to grow it. */
+     * caching, and pays the transform on every resolve of the rest: up to 64
+     * blend steps with two contrast divides each for a colour on the album's
+     * axis (carry_on_axis()). Grow the table before a skin needs more. */
     if (xform_entries < XFORM_CACHE_SIZE)
     {
         xform_cache[xform_entries].in  = c;

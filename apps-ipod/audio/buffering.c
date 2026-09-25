@@ -949,8 +949,10 @@ static bool fill_buffer(void)
     mutex_unlock(&llist_mutex);
 
     /* Unlocked, so a handle can close under this walk and num_handles cannot
-     * bound it: each link is checked for place only. */
-    while (queue_empty(&buffering_queue) && m) {
+     * bound it: each link is checked for place only. Damage found anywhere
+     * stops it too, since buffer_handle() then returns at once without
+     * yielding and a loop in the list would spin here for good. */
+    while (queue_empty(&buffering_queue) && m && !damage.found) {
         if (m->end < m->filesize && !buffer_handle(m->id, 0)) {
             m = NULL;
             break;
