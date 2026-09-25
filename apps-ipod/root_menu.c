@@ -1658,6 +1658,10 @@ static int root_menu_setup_screens(void)
        load_screen() would call through. */
     if (new_screen >= NUM_ITEMS)
         new_screen = GO_TO_ROOT;
+    /* A game is not a place to wake up in: a quiz switched off mid-round
+       reopens on the Music menu it was started from, not on a new game. */
+    else if (new_screen == GO_TO_MUSIC_QUIZ)
+        new_screen = GO_TO_DBBROWSER;
     else if (new_screen == GO_TO_PLUGIN)
     {
         if (global_status.last_screen == GO_TO_SHORTCUTMENU)

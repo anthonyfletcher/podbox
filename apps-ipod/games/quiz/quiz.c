@@ -516,16 +516,21 @@ static void screen_give_back(void)
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 }
 
-/* A yes/no over the quiz, drawn with the theme's dialog. */
-static bool ask(int lang_id)
+/* A yes/no over the quiz, drawn with the theme's dialog. YESNO_USB means the
+ * dialog has already been through a USB connection of its own. */
+static enum yesno_res ask(int lang_id)
 {
-    bool yes;
+    const char *lines[] = { (const char *)str(lang_id) };
+    const struct text_message message = { lines, 1 };
+    enum yesno_res res;
 
     viewportmanager_theme_undo(SCREEN_MAIN, true);
     lcd_setfont(FONT_UI);
-    yes = yesno_pop(str(lang_id));
+    res = gui_syncyesno_run(&message, NULL, NULL);
+    FOR_NB_SCREENS(i)
+        screens[i].clear_viewport();
     screen_take();
-    return yes;
+    return res;
 }
 
 /* ------------------------------------------------------------------ *
@@ -650,7 +655,9 @@ static enum round_end play_round(int round, int *score)
                     pause_tick = current_tick;
                     audio_pause();
                 }
-                if (ask(LANG_QUIZ_LEAVE))
+                /* Out after a USB connection too: the quiz cannot carry on
+                 * over a library the host may have changed. */
+                if (ask(LANG_QUIZ_LEAVE) != YESNO_NO)
                 {
                     audio_stop();
                     return ROUND_LEAVE;
