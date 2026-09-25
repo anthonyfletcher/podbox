@@ -62,13 +62,18 @@
 #
 #- Selected row: a bright bar with dark text
 #
-#- Plain row
+#- Plain row, the full width where there is no chevron
+%Vl(Rows,0,0,160,24,3)%Vy
+%?La<|%?and(%or(%if(%cs,!=,6),%and(%if(%LI,!=,19),%if(%LI,!=,0),%if(%LI,!=,2),%if(%LI,!=,4),%if(%LI,!=,7),%if(%LI,!=,10),%if(%LI,!=,22),%if(%LI,!=,24),%if(%LI,!=,25),%if(%LI,!=,26),%if(%LI,!=,29),%if(%LI,!=,30))),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%LI,!=,1)),%or(%if(%cs,!=,13),%if(%LI,!=,2)))<%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+#
+#- Plain row beside a chevron. Only one of the two draws a
+#  given row, so neither clears the other's text
 %Vl(Rows,0,0,136,24,3)%Vy
-%?La<|%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
 #
 #- Plain row chevron
 %Vl(Rows,136,0,24,24,2)%Vy
-%?La<|%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<Þ| >>
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>Þ>>
 #
 #- Art row special icon. Must stay above the cover
 %Vl(Rows,10,11,24,24,2)
