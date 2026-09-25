@@ -988,6 +988,9 @@ usbstack/iap/notification.c
 usbstack/iap/platform.c
 usbstack/usb_iap.c
 #endif
+#ifdef HAVE_USB_HOST
+usbstack/usb_host.c
+#endif
 #ifdef HAVE_USB_HOST_AUDIO
 usbstack/usb_host_audio.c
 #endif

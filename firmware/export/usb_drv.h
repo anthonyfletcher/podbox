@@ -149,8 +149,10 @@ struct usb_drv_host_status {
         uint32_t val;
     } regs[4];
 };
-/* What enumerating the device found. usb_drv_host_poll() runs it once, after
- * the reset that enables the port. */
+/* What enumerating the device found. usb_drv_host_poll() runs
+ * usb_host_enumerate() once, after the reset that enables the port. The
+ * enumeration itself is shared (usbstack/usb_host.c), over
+ * usb_drv_host_control(). */
 struct usb_drv_host_enum {
     int result;             /* 0 not run, 1 done, -1 failed at step */
     const char *step;       /* the request that failed */
@@ -162,12 +164,16 @@ struct usb_drv_host_enum {
     char manufacturer[32];
     char product[32];
 };
-const struct usb_drv_host_enum *usb_drv_host_get_enum(void);
+const struct usb_drv_host_enum *usb_host_get_enum(void);
+void usb_host_enumerate(void);
+void usb_host_enum_clear(void);
 
-/* A control transfer to endpoint 0 of the enumerated device. Returns the
- * data-stage byte count, or -1. ARC only. */
+/* A control transfer to endpoint 0 of a high-speed device. Returns the
+ * data-stage byte count, or -1; usb_drv_host_last_status() then holds the
+ * controller's raw status for the stage that failed. */
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len);
+uint32_t usb_drv_host_last_status(void);
 
 /* An isochronous OUT stream with an optional feedback IN endpoint. fill()
  * runs from the tick interrupt and writes frames sample frames to dst; the

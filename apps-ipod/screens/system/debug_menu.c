@@ -1636,7 +1636,7 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Line: %s", lines[st.line & 3]);
     simplelist_addline("Resets: %d", st.resets);
 
-    const struct usb_drv_host_enum *e = usb_drv_host_get_enum();
+    const struct usb_drv_host_enum *e = usb_host_get_enum();
 #ifdef HAVE_USB_HOST_AUDIO
     if (e->result == 1)
         usb_host_probe_dac_lines();

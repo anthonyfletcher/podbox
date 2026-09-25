@@ -328,7 +328,7 @@ static bool find_setting(const struct usb_drv_host_enum *e,
 
 bool usb_host_audio_start(void)
 {
-    const struct usb_drv_host_enum *e = usb_drv_host_get_enum();
+    const struct usb_drv_host_enum *e = usb_host_get_enum();
     struct as_setting as;
     struct usb_drv_host_iso iso;
 

@@ -599,7 +599,7 @@ static void usb_dac_auto_step(void)
     }
 
     usb_drv_host_poll(&st);
-    e = usb_drv_host_get_enum();
+    e = usb_host_get_enum();
     if(e->result == 1)
     {
         bool ok = usb_host_audio_start();

@@ -572,12 +572,11 @@ struct host_dma {
 
 static struct host_dma host_dma_mem;
 static struct host_dma *hd;
-static struct usb_drv_host_enum host_enum;
-static uint8_t host_cfg[sizeof host_dma_mem.data];
+static uint32_t host_last_status;
 
-const struct usb_drv_host_enum *usb_drv_host_get_enum(void)
+uint32_t usb_drv_host_last_status(void)
 {
-    return &host_enum;
+    return host_last_status;
 }
 
 static void qtd_fill(struct ehci_qtd *qtd, void *next, void *alt,
@@ -595,7 +594,8 @@ static void qtd_fill(struct ehci_qtd *qtd, void *next, void *alt,
 
 /* One control transfer to endpoint 0 of a high-speed device, on an async
  * schedule holding one queue head. Returns the data-stage byte count, or
- * -1 with host_enum.token set from the qTD that halted or never finished. */
+ * -1 with host_last_status set from the qTD that halted or never
+ * finished. */
 static int host_control(int addr, int reqtype, int req, int value,
                         int index, int len)
 {
@@ -645,7 +645,7 @@ static int host_control(int addr, int reqtype, int req, int value,
     }
 
     if (n < 0)
-        host_enum.token = (setup->token & (QTD_ACTIVE | QTD_HALTED)) ?
+        host_last_status = (setup->token & (QTD_ACTIVE | QTD_HALTED)) ?
                           setup->token :
                           (len && (data->token & (QTD_ACTIVE | QTD_HALTED))) ?
                           data->token : status->token;
@@ -654,64 +654,6 @@ static int host_control(int addr, int reqtype, int req, int value,
     for (int t = 0; t < 100 && (REG_USBSTS & USBSTS_ASYNC_SCHEDULE); t++)
         udelay(100);
     return n;
-}
-
-static void host_get_string(int addr, int index, int langid, char *out,
-                            size_t size)
-{
-    int n;
-    size_t j = 0;
-
-    if (index == 0)
-        return;
-    n = host_control(addr, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
-                     (USB_DT_STRING << 8) | index, langid, 64);
-    /* UTF-16LE after a two-byte header; anything outside ASCII is '?' */
-    for (int i = 2; i + 1 < n && j + 1 < size; i += 2)
-        out[j++] = hd->data[i + 1] || hd->data[i] >= 0x80 ?
-                   '?' : hd->data[i];
-    out[j] = '\0';
-}
-
-/* Device descriptor at address 0, SET_ADDRESS 1, then the device and
- * configuration descriptors and two strings from the new address. */
-static void host_enumerate(void)
-{
-    struct usb_drv_host_enum *e = &host_enum;
-    int n, langid;
-
-#define STEP(name, cond) \
-    do { e->step = name; if (!(cond)) { e->result = -1; return; } } while (0)
-
-    n = host_control(0, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
-                     USB_DT_DEVICE << 8, 0, 18);
-    STEP("device @0", n >= 8);
-    n = host_control(0, USB_DIR_OUT, USB_REQ_SET_ADDRESS, 1, 0, 0);
-    STEP("set address", n == 0);
-    udelay(10000);
-    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
-                     USB_DT_DEVICE << 8, 0, 18);
-    STEP("device @1", n == 18);
-    memcpy(e->dev, hd->data, 18);
-    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
-                     USB_DT_CONFIG << 8, 0, 9);
-    STEP("config head", n == 9);
-    e->cfg_total = hd->data[2] | (hd->data[3] << 8);
-    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR, USB_DT_CONFIG << 8,
-                     0, MIN(e->cfg_total, (int)sizeof hd->data));
-    STEP("config", n > 0);
-    memcpy(host_cfg, hd->data, n);
-    e->cfg = host_cfg;
-    e->cfg_len = n;
-#undef STEP
-
-    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
-                     USB_DT_STRING << 8, 0, 4);
-    langid = n >= 4 ? hd->data[2] | (hd->data[3] << 8) : 0x0409;
-    host_get_string(1, e->dev[14], langid, e->manufacturer,
-                    sizeof e->manufacturer);
-    host_get_string(1, e->dev[15], langid, e->product, sizeof e->product);
-    e->result = 1;
 }
 
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
@@ -944,7 +886,9 @@ void usb_drv_host_start(void)
 {
     commit_discard_dcache();
     hd = UNCACHED_ADDR(&host_dma_mem);
-    memset(&host_enum, 0, sizeof host_enum);
+#ifdef HAVE_USB_HOST
+    usb_host_enum_clear();
+#endif
 
     usb_drv_int_enable(false);
     usb_drv_reset();
@@ -981,7 +925,9 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     {
         usb_drv_host_iso_stop();
         host_reset_done = false;
-        memset(&host_enum, 0, sizeof host_enum);
+#ifdef HAVE_USB_HOST
+        usb_host_enum_clear();
+#endif
     }
     else if (!host_reset_done)
     {
@@ -996,11 +942,13 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
             REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
         udelay(10000);
         portsc = REG_PORTSC1;
+#ifdef HAVE_USB_HOST
         if (portsc & PORTSCX_PORT_ENABLE)
         {
-            host_enumerate();
+            usb_host_enumerate();
             portsc = REG_PORTSC1;
         }
+#endif
     }
 
     st->host_mode = (REG_USBMODE & 3) == USBMODE_CTRL_MODE_HOST;

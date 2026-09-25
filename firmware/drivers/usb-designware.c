@@ -1439,13 +1439,125 @@ static bool host_active;
 static bool host_reset_done;
 static int host_resets;
 
-/* Enumeration here needs a host-channel driver; without one it is never
- * run, and the result stays "not run". */
-static const struct usb_drv_host_enum host_enum;
+/* Host channel registers */
+#define HCCHAR_MPS(x)       (x)
+#define HCCHAR_EPNUM(x)     ((x) << 11)
+#define HCCHAR_EPDIR_IN     (1 << 15)
+#define HCCHAR_EPTYPE(x)    ((x) << 18)     /* 0 control, 1 iso */
+#define HCCHAR_MC(x)        ((x) << 20)
+#define HCCHAR_DEVADDR(x)   ((x) << 22)
+#define HCCHAR_ODDFRM       (1 << 29)
+#define HCCHAR_CHDIS        (1 << 30)
+#define HCCHAR_CHENA        (1u << 31)
+#define HCTSIZ_PKTCNT(x)    ((x) << 19)
+#define HCTSIZ_PID(x)       ((x) << 29)
+#define PID_DATA0           0
+#define PID_DATA1           2
+#define PID_SETUP           3
+#define HCINT_XFERC         (1 << 0)
+#define HCINT_CHH           (1 << 1)
+#define HCINT_ALL           0x7ff
 
-const struct usb_drv_host_enum *usb_drv_host_get_enum(void)
+/* Host-mode FIFOs, in words, from the core's 0x820 */
+#define HOST_RXFIFO         0x300
+#define HOST_NPTXFIFO       0x100
+#define HOST_PTXFIFO        0x200
+
+/* Everything the core's DMA touches. The CPU reaches it only through its
+ * uncached alias; the core is given the plain address, which is physical.
+ * The type's alignment pads it to whole cache lines. */
+struct host_dw_dma {
+    struct usb_ctrlrequest setup;
+    uint8_t pad[24];
+    uint8_t data[1024];
+} __attribute__((aligned(32)));
+
+static struct host_dw_dma host_dw_mem;
+static struct host_dw_dma *hdw;
+static uint32_t host_last_status;
+
+#define HOST_PHYS(p) \
+    USB_DW_PHYSADDR((uint32_t)&host_dw_mem + \
+                    ((uint32_t)(p) - (uint32_t)hdw))
+
+uint32_t usb_drv_host_last_status(void)
 {
-    return &host_enum;
+    return host_last_status;
+}
+
+/* One stage of a control transfer on channel 0. In DMA mode the core
+ * retries NAKs itself and halts the channel when the stage ends, one way or
+ * the other; XFERC says it ended well. An IN stage is sized in whole
+ * packets and a short one ends it, so buf must hold len rounded up to 64.
+ * Returns the bytes moved, or -1 with host_last_status the channel's
+ * interrupt bits (bit 31 set if it never halted). */
+static int host_stage(int addr, int pid, bool in, void *buf, int len)
+{
+    const int mps = 64;
+    int pkts = len ? (len + mps - 1) / mps : 1;
+    int size = in ? pkts * mps : len;
+    uint32_t hcint = 0;
+
+    DWC_HCINT(0) = HCINT_ALL;
+    DWC_HCTSIZ(0) = size | HCTSIZ_PKTCNT(pkts) | HCTSIZ_PID(pid);
+    DWC_HCDMA(0) = HOST_PHYS(buf);
+    DWC_HCCHAR(0) = HCCHAR_MPS(mps) | HCCHAR_EPNUM(0) |
+                    (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(0) |
+                    HCCHAR_MC(1) | HCCHAR_DEVADDR(addr) | HCCHAR_CHENA;
+
+    for (int t = 0; t < 5000; t++)
+    {
+        hcint = DWC_HCINT(0);
+        if (hcint & HCINT_CHH)
+            break;
+        udelay(100);
+    }
+    if (!(hcint & HCINT_CHH))
+    {
+        DWC_HCCHAR(0) |= HCCHAR_CHDIS | HCCHAR_CHENA;
+        for (int t = 0; t < 100 && !(DWC_HCINT(0) & HCINT_CHH); t++)
+            udelay(100);
+        host_last_status = hcint | (1u << 31);
+        return -1;
+    }
+    if (!(hcint & HCINT_XFERC))
+    {
+        host_last_status = hcint;
+        return -1;
+    }
+    return in ? size - (int)(DWC_HCTSIZ(0) & 0x7ffff) : len;
+}
+
+int usb_drv_host_control(int addr, int reqtype, int req, int value,
+                         int index, void *data, int len)
+{
+    bool in = reqtype & USB_DIR_IN;
+    int n = 0;
+
+    if (!host_active || len > (int)sizeof hdw->data)
+        return -1;
+    hdw->setup.bRequestType = reqtype;
+    hdw->setup.bRequest = req;
+    hdw->setup.wValue = value;
+    hdw->setup.wIndex = index;
+    hdw->setup.wLength = len;
+    if (!in && len)
+        memcpy(hdw->data, data, len);
+
+    if (host_stage(addr, PID_SETUP, false, &hdw->setup, 8) != 8)
+        return -1;
+    if (len)
+    {
+        n = host_stage(addr, PID_DATA1, in, hdw->data, len);
+        if (n < 0)
+            return -1;
+    }
+    /* The status stage runs opposite to the data stage, and IN if none */
+    if (host_stage(addr, PID_DATA1, !(len && in), hdw->data, 0) < 0)
+        return -1;
+    if (in && n > 0)
+        memcpy(data, hdw->data, MIN(n, len));
+    return MIN(n, len);
 }
 
 void usb_drv_host_start(void)
@@ -1472,8 +1584,19 @@ void usb_drv_host_start(void)
     for (int i = 0; i < 100 && !(DWC_GINTSTS & CMOD); i++)
         udelay(1000);
 
-    DWC_GAHBCFG = 0;
+    commit_discard_dcache_range(&host_dw_mem, sizeof host_dw_mem);
+    hdw = USB_DW_UNCACHEDADDR(&host_dw_mem);
+#ifdef HAVE_USB_HOST
+    usb_host_enum_clear();
+#endif
+
+    /* DMA on, interrupts off: everything is polled */
+    DWC_GAHBCFG = HBSTLEN(usb_dw_config.ahb_burst_len) | DMAEN;
     DWC_GINTMSK = 0;
+    DWC_GRXFSIZ = HOST_RXFIFO;
+    DWC_TX0FSIZ = (HOST_NPTXFIFO << 16) | HOST_RXFIFO;
+    DWC_HPTXFSIZ = (HOST_PTXFIFO << 16) | (HOST_RXFIFO + HOST_NPTXFIFO);
+    usb_dw_flush_fifo(TXFFLSH | RXFFLSH, 0x10);
     DWC_HCFG = 0;       /* 30/60 MHz PHY clock, high speed allowed */
     DWC_HPRT = HPRT_PWR;
 
@@ -1502,7 +1625,12 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
 
     hprt = DWC_HPRT;
     if (!(hprt & HPRT_CONN_STS))
+    {
         host_reset_done = false;
+#ifdef HAVE_USB_HOST
+        usb_host_enum_clear();
+#endif
+    }
     else if (!host_reset_done)
     {
         /* 100 ms connect debounce, then a 60 ms root-port reset, which
@@ -1515,6 +1643,13 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
         DWC_HPRT = DWC_HPRT & ~(HPRT_WRITE_MASK | HPRT_RST);
         udelay(10000);
         hprt = DWC_HPRT;
+#ifdef HAVE_USB_HOST
+        if (hprt & HPRT_ENA)
+        {
+            usb_host_enumerate();
+            hprt = DWC_HPRT;
+        }
+#endif
     }
 
     st->host_mode = DWC_GINTSTS & CMOD;
