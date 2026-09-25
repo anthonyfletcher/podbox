@@ -103,8 +103,8 @@ struct spk_frame
     enum spk_death death_kind;
     bool skipping;       /* the beats between a death and a respawn */
 
-    /* Coming back: the body falls out of the sky onto the cell it is going to
-     * restart from, and then stands on it while the world carries it home.
+    /* Coming back: the body grows up out of the cell it is going to restart
+     * from, and then stands on it while the world carries it home.
      *
      * It is drawn against a *cell* rather than against its own column for
      * those beats, which is the whole of the idea -- the cell is ahead of the
@@ -113,10 +113,10 @@ struct spk_frame
      * screen has to change for that: a cell's own x already moves.
      *
      * 'drop_cells' is how many cells right of home it is, and -1 when none of
-     * this is happening. 'drop_fall' runs 0 to SPK_PHASE through the fall and
-     * stays there once it is down. */
+     * this is happening. 'drop_grow' runs 0 to SPK_PHASE through the growing
+     * and stays there once it is up. */
     int  drop_cells;
-    int  drop_fall;
+    int  drop_grow;
     int  drop_level;
 
     long score;

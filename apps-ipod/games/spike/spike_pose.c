@@ -485,40 +485,30 @@ static const struct spk_pose fall_table[SPK_ROWS] =
 };
 
 
-/* Dropped in from the sky after a death, which is a different move from
- * falling to one: this body is going to land, and all of it is the
- * anticipation of that.
- *
- * The height belongs to the caller -- it depends which level is being
- * returned to -- so y_offset stays at nought and the table is shape alone.
- * The shape is speed: it comes into view already thin -- the fall starts a
- * beat above the top of the field -- holds there through the fast middle,
- * and gathers back to square over the last rows so the landing has something
- * to squash from.
- *
- * The turn unwinds to nothing by the last row for the same reason the tilt
- * arrives at the land table's: the next pose is a landing, and a handover
- * that jumps is worse than no turn at all. This is why §12.5's objection to
- * a spiralling fall does not apply here -- that one is a death with no foot
- * to pivot on and no frame to resolve into. */
-static const struct spk_pose drop_table[SPK_ROWS] =
+/* Growing back up out of the cell after a death: a flat sliver on the
+ * surface that rises, fast and then slowing, into the squat the land table
+ * starts from. The land table's recovery is then the stretch up to full
+ * height, so the beat after this one finishes the move rather than starting
+ * another. The foot is found over the last rows for the same reason: the
+ * land table is on it from its first row. */
+static const struct spk_pose sprout_table[SPK_ROWS] =
 {
-    {  0,  9, 25, -26,  0, 0, 0 },  /* in already moving, already stretched */
-    {  0,  8, 27, -24,  0, 0, 0 },
-    {  0,  8, 28, -22,  0, 0, 0 },
-    {  0,  7, 29, -20,  0, 0, 0 },
-    {  0,  7, 30, -18,  0, 0, 0 },  /* terminal: thin and long */
-    {  0,  7, 30, -16,  0, 0, 0 },
-    {  0,  7, 30, -14,  0, 0, 0 },
-    {  0,  7, 30, -12,  0, 0, 0 },
-    {  0,  7, 29, -10,  0, 0, 0 },
-    {  0,  8, 28,  -8,  0, 0, 0 },
-    {  0,  8, 27,  -7,  2, 0, 0 },  /* the ground is close */
-    {  0,  9, 26,  -5,  5, 0, 0 },
-    {  0,  9, 25,  -4,  8, 0, 0 },
-    {  0, 10, 24,  -2, 11, 0, 0 },  /* squaring up, finding the foot */
-    {  0, 10, 23,  -1, 15, 0, 0 },
-    {  0, 11, 22,   0, 18, 0, 0 }   /* braced on it */
+    {  0, 14,  1, 0,  0, 0, 0 },    /* a sliver on the surface */
+    {  0, 14,  3, 0,  0, 0, 0 },
+    {  0, 14,  5, 0,  0, 0, 0 },
+    {  0, 14,  7, 0,  0, 0, 0 },
+    {  0, 14,  9, 0,  0, 0, 0 },
+    {  0, 14, 10, 0,  0, 0, 0 },
+    {  0, 14, 11, 0,  0, 0, 0 },
+    {  0, 14, 12, 0,  0, 0, 0 },
+    {  0, 14, 13, 0,  0, 0, 0 },
+    {  0, 14, 14, 0,  0, 0, 0 },
+    {  0, 13, 14, 0,  3, 0, 0 },    /* finding the foot */
+    {  0, 13, 15, 0,  6, 0, 0 },
+    {  0, 13, 15, 0,  9, 0, 0 },
+    {  0, 13, 16, 0, 12, 0, 0 },
+    {  0, 13, 16, 0, 15, 0, 0 },
+    {  0, 13, 16, 0, 18, 0, 0 }     /* the land table's first row */
 };
 
 
@@ -615,10 +605,10 @@ void spk_pose_land(struct spk_pose *out, int phase, bool strong, int ride)
     }
 }
 
-void spk_pose_drop(struct spk_pose *out, int phase, bool strong)
+void spk_pose_sprout(struct spk_pose *out, int phase, bool land_strong)
 {
-    *out = drop_table[spk_row(phase, SPK_ROWS)];
-    out->base_tilt = spk_foot(out->base_tilt, strong);
+    *out = sprout_table[spk_row(phase, SPK_ROWS)];
+    out->base_tilt = spk_foot(out->base_tilt, land_strong);
 }
 
 void spk_pose_jump(struct spk_pose *out, int phase, bool land_strong)

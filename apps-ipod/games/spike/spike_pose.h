@@ -95,9 +95,10 @@ void spk_pose_land(struct spk_pose *out, int phase, bool strong, int ride);
  * into. There is only one of these because there is only one thing that
  * happened: the body met something that was not going to move. */
 void spk_pose_ouch(struct spk_pose *out, int phase);
-/* Coming down out of the sky onto the cell a run restarts from. Shape only:
- * how high it started is the caller's, since it depends on the level. */
-void spk_pose_drop(struct spk_pose *out, int phase, bool strong);
+/* Growing up out of the cell a run restarts from, a flat sliver to the pose
+ * spk_pose_land() starts in. Like the jump, it takes the foot of the beat
+ * after, since it ends on it. */
+void spk_pose_sprout(struct spk_pose *out, int phase, bool land_strong);
 void spk_pose_jump(struct spk_pose *out, int phase, bool land_strong);
 void spk_pose_fall(struct spk_pose *out, int phase, bool from_air,
                   bool strong);

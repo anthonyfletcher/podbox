@@ -71,9 +71,8 @@
 /* How far ahead of the death the run looks for somewhere to put the player
  * back, and so how long the coming-back takes.
  *
- * Three, because that is what the drop needs and the drop is what those beats
- * are for: two of falling and one of standing on the cell while the world
- * carries it home. The hunt walks on from there if it has to -- it wants
+ * Three: one empty, one of growing up out of the cell and one of standing on
+ * it while the world carries it home. The hunt walks on from there if it has to -- it wants
  * somewhere to stand with two clear beats after it -- so the field can run on
  * longer, but never for nothing. Four beats of empty scrolling before any of
  * this existed read as the game thinking. */
@@ -930,30 +929,25 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
     f->st = &world;
     f->phase = (int)((sub * SPK_PHASE) / beat_ms);
     f->drop_cells = -1;
-    f->drop_fall = 0;
+    f->drop_grow = 0;
     f->drop_level = 0;
 
-    /* Coming back, which is the last few beats of the skip: the body falls
-     * onto the cell the run restarts from and then rides it home. Drawn
+    /* Coming back, which is the last two beats of the skip: the body grows up
+     * out of the cell the run restarts from and then rides it home. Drawn
      * against that cell rather than against its own column, so what brings it
      * in is the scroll that is moving anyway.
      *
-     * The fall is the beats before the last one and the ride is the last, so
-     * it is on its feet by the time it arrives and the walk takes over with
-     * nothing to catch up. */
+     * The ride is the last beat, so it is on its feet by the time it arrives
+     * and the walk takes over with nothing to catch up. */
     if (run_state == SPK_RUN_SKIP)
     {
         int togo = respawn_cell - world.beat;
 
-        if (togo > 0 && togo <= SPK_DROP_BEATS)
+        if (togo > 0 && togo <= 2)
         {
-            long span = (long)(SPK_DROP_BEATS - 1) * SPK_PHASE;
-            long done = (long)(SPK_DROP_BEATS - togo) * SPK_PHASE + f->phase;
-
             f->drop_cells = togo;
             f->drop_level = respawn_level;
-            f->drop_fall = span > 0 && done < span
-                           ? (int)((done * SPK_PHASE) / span) : SPK_PHASE;
+            f->drop_grow = togo == 2 ? f->phase : SPK_PHASE;
         }
     }
     f->now_ms = grid_ms > 0 ? (unsigned long)grid_ms : 0;
@@ -1660,11 +1654,8 @@ bool spike_screen(void)
             spk_world_forget();
 
             /* The death's own beat is spent here, and it is spent before the
-             * hunt starts rather than after it. The frame counts the drop as
-             * SPK_DROP_BEATS cells short of the respawn, so hunting from the
-             * beat the death was on leaves the count one short for ever: the
-             * fall is drawn from its halfway point and takes one beat instead
-             * of two. */
+             * hunt starts rather than after it. Hunting from the beat the
+             * death was on leaves the gap a beat short of SPK_DROP_BEATS. */
             world.beat++;
             respawn_cell = spk_world_respawn(world.beat + SPK_DROP_BEATS,
                                              &respawn_level);

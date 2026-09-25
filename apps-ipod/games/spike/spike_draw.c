@@ -109,20 +109,6 @@
 #define SPK_SPK_W        5
 #define SPK_SPK_H        8
 
-/* How far above its landing the body starts, and the shape of the fall.
- *
- * Held inside the field: the drop begins under the rule rather than off the
- * top of the panel, because the soft edges are clipped to the field and a
- * body that starts above it arrives as a line of severed pixels. Squared, so
- * it accelerates -- a fall at a constant speed reads as being lowered. */
-#define SPK_DROP_H      110
-
-/* The extra flattening it lands with, on top of the landing pose's own. That
- * pose is written for an ordinary hop and this is a fall out of the sky, so
- * it wants more of the same thing rather than a different shape -- and only
- * over the first rows, while the body is still absorbing it. */
-#define SPK_DROP_SQUASH   3
-
 /* The flyer: the same animal on its side, head into the wind.
  *
  * Turned a quarter turn, the legs trail behind it and kick it along instead
@@ -1255,37 +1241,6 @@ static int spk_player_pose(const struct spk_frame *f, struct spk_pose *p)
     }
 }
 
-/* The drop's two numbers, shared because the body falls on this curve and
- * its tail is drawn from the same one: a ladder that does not match what the
- * body did is the thing that makes a fall look drawn rather than fallen.
- *
- * 'high' is how far up it starts: the room over that level, capped. */
-static int spk_drop_high(int level)
-{
-    int room = spk_level_y(level << 8) - SPK_FIELD_TOP - SPK_BODY_PX;
-
-    return room < 0 ? 0 : room > SPK_DROP_H ? SPK_DROP_H : room;
-}
-
-static int spk_drop_lift(int high, int t)
-{
-    if (t <= 0)
-        return high;
-    if (t >= SPK_PHASE)
-        return 0;
-
-    /* Already moving when it comes into view. The body is a beat further up
-     * than the field is tall when the fall starts, so what gets drawn is the
-     * fast end of a longer one -- which is the curve below, a squared fall
-     * read from its second beat rather than its first.
-     *
-     * Trap: starting it from rest instead puts a ninth of the distance in
-     * the first third of the time, and on a two-beat drop that is a third of
-     * a second of a triangle hanging in the air. */
-    return high - (high * t * (t + 2 * SPK_PHASE))
-                  / (3 * SPK_PHASE * SPK_PHASE);
-}
-
 /* Where the tail is, for the instant being drawn: five points back along
  * the arc, each turned into a world position so it stays where it was left
  * rather than following the body. */
@@ -1346,63 +1301,9 @@ static void spk_trail_drop(const struct spk_frame *f, int level)
     }
 }
 
-/* The streak a drop-in comes down in: the tail the jump and the death
- * already leave, taken off the drop's own curve. Every dash is a place the
- * body genuinely was, which is why they spread out towards the bottom --
- * a ladder of even rungs says nothing about how fast it is going.
- *
- * The column is fixed, at the cell being returned to, so the streak stays in
- * the air it fell through while the field scrolls past it. */
-static void spk_trail_plunge(const struct spk_frame *f)
-{
-    long world8 = ((long)f->st->beat + f->drop_cells) << 8;
-    int high = spk_drop_high(f->drop_level);
-    int base = spk_level_y(f->drop_level << 8);
-    struct spk_pose now;
-    int top, i;
-
-    trail_n = 0;
-    trail_falling = false;
-
-    /* Dashes below the apex are inside the body rather than behind it: near
-     * the top of the fall it covers less in one step than it is tall, and a
-     * mark there reads as drawn on the triangle. Dropping them thins the
-     * streak while the fall is slow and lets it out as it speeds up, which
-     * is the right way round for a body picking up speed. */
-    spk_pose_drop(&now, f->drop_fall, f->strong);
-    top = base - spk_drop_lift(high, f->drop_fall) - now.height;
-
-    for (i = 1; i <= SPK_TRAIL; i++)
-    {
-        int back = f->drop_fall - i * SPK_FALL_STEP;
-        int y;
-
-        if (back < 0)
-            break;
-
-        y = base - spk_drop_lift(high, back) - 6;
-
-        if (y > top)
-            continue;
-
-        trail[trail_n].world8 = world8;
-        trail[trail_n].y = (short)y;
-        trail_n++;
-    }
-}
-
 static void spk_trail_step(const struct spk_frame *f)
 {
     const struct spk_state *st = f->st;
-
-    /* The only tail there is while the run is skipping. Once it lands the
-     * streak is let go with everything else, and hangs in the air a moment
-     * before it drifts down. */
-    if (f->drop_cells >= 0 && f->drop_fall < SPK_PHASE)
-    {
-        spk_trail_plunge(f);
-        return;
-    }
 
     if (!f->skipping)
     {
@@ -1486,8 +1387,9 @@ static void spk_trail_draw(const struct spk_frame *f)
     }
 }
 
-/* Coming back after a death: falling onto the cell the run restarts from,
- * then standing on it while the world carries it back to its own column.
+/* Coming back after a death: growing up out of the cell the run restarts
+ * from, then standing on it while the world carries it back to its own
+ * column.
  *
  * Drawn against that cell and not against the player's column, which is what
  * makes it drift: a cell's x is its distance from the player plus the scroll,
@@ -1497,36 +1399,14 @@ static void spk_draw_drop(const struct spk_frame *f)
 {
     struct spk_pose p;
     int surface = spk_level_y(f->drop_level << 8);
-    int high = spk_drop_high(f->drop_level);
-    int t = f->drop_fall;
     int x = SPK_PLAYER_X + f->drop_cells * SPK_CELL_PX - spk_scroll(f);
     int pt[3][2];
     int i;
 
-    if (t < SPK_PHASE)
-    {
-        /* The pose carries no height of its own -- spk_pose_fall() does, in
-         * its later rows, and it is written for a body leaving the screen,
-         * so the two together put this one through the floor. Here the
-         * height is the caller's and the pose is the shape it falls in. */
-        spk_pose_drop(&p, t, f->strong);
-        surface -= spk_drop_lift(high, t);
-    }
+    if (f->drop_grow < SPK_PHASE)
+        spk_pose_sprout(&p, f->drop_grow, !f->strong);
     else
-    {
         spk_pose_land(&p, f->phase, f->strong, 0);
-
-        /* Flatter than a hop lands, and only while it is still absorbing
-         * it: it has come down the height of the field. */
-        if (f->phase < SPK_PHASE / 4)
-        {
-            int give = SPK_DROP_SQUASH
-                       - (SPK_DROP_SQUASH * f->phase * 4) / SPK_PHASE;
-
-            p.half_width = (int8_t)(p.half_width + give);
-            p.height = (int8_t)(p.height - give);
-        }
-    }
 
     spk_pose_points(&p, x, surface, pt);
 
