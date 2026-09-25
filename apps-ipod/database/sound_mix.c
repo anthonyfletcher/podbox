@@ -836,7 +836,9 @@ static bool mix_artist_ok(const struct pick *cand, const int *order,
 /* The whole of building one, whatever it is being built from.
  *
  * 'skip_key' is the seed's own record, which must not match itself, and
- * 'seed_path' is the track that plays first. Both are empty for a mood. */
+ * 'seed_path' is a track by the seed's artist, for the artist rules. It plays
+ * first only when it is the seed itself -- when 'skip_key' is set. Both are
+ * empty for a mood. */
 static int mix_build(const struct mix_goal *g, uint64_t skip_key,
                      const char *seed_path, int want, int vary, bool append)
 {
@@ -1155,8 +1157,9 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     }
 
     /* The seed goes first, so a mix starts with what it was asked about. A
-     * mood has nothing to start from and begins at its own first choice. */
-    if (!append && seed_path != NULL
+     * mood or an album's mean is not a track and begins at its own first
+     * choice. */
+    if (!append && seed_path != NULL && skip_key != 0
         && playlist_insert_context_add(&context, seed_path) >= 0)
     {
         added++;
@@ -1180,7 +1183,7 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
 
     /* Tracks were chosen and none of them could be read back, which is a
      * different fault from finding nothing near enough. */
-    if (added <= (!append && seed_path != NULL ? 1 : 0))
+    if (added <= (!append && seed_path != NULL && skip_key != 0 ? 1 : 0))
         return SOUND_MIX_NO_PLAYLIST;
 
     /* What built this, so a continuation can carry on in the same terms

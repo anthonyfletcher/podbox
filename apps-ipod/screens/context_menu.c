@@ -376,12 +376,13 @@ static void sound_album_collect(void)
 {
     if (selected_file.context == CONTEXT_ID3DB)
     {
-        struct tagcache_search tcs;
-        char buf[MAX_PATH];
+        /* Static, as properties.c's are: this sits under Play Similar's own
+         * frame, and browser_db_subentries_do_action() is deep enough below
+         * it already. The buffer is the caller's because that function sits
+         * underneath splash_progress() and the callback. */
+        static struct tagcache_search tcs;
+        static char buf[MAX_PATH];
 
-        /* The buffer is the caller's because this one sits underneath
-         * splash_progress() and the callback -- see the note on
-         * browser_db_subentries_do_action(). */
         sound_props_album_begin();
         browser_db_subentries_do_action(&tcs, sound_album_add_cb,
                                         buf, sizeof (buf));
