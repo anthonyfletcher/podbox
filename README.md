@@ -24,7 +24,6 @@ artist rows. Two carousels are available from the main menu — **Album Covers**
 and **Artist Portraits** — and you can go straight from a cover into that album,
 or from an artist into their albums.
 
-
 ## Instant search
 
 <img src="docs/podbox/images/ss_grid_fast_search.png" alt="Screenshot"/>
@@ -58,24 +57,12 @@ there's an improved text viewer that handles more file formats (including txt, l
 fb2, epub, docx, pdf, md, html and rtf).  There's also a new lyric viewer that can
 be accessed from the "what's playing" screen by pressing `select+play`.
 
-## Spike
-
-https://github.com/user-attachments/assets/684a3e2d-61a1-45a5-b3f9-b477de0ec924
-
-Play Spike while listening to your music. The game analyses each track's rhythm 
-and generates unique levels that move with the beat. Challenge yourself to set new 
-high scores as the difficulty ramps up over time.
-
-Launch Spike from the context menu (hold <code>Select</code> then click 
-<code>Play with Spike</code>) on the Now Playing screen.
-
 ## Playback report
 
 <img src="docs/podbox/images/ss_grid_playback_report.png" alt="Screenshot"/>
 
 Derived from Spun (see [here](https://github.com/majorsiebe/Stats_for_iPod)), playback report reads your playback log (whether it's the
 default logging or last.fm logging) and provides insights into your listening habits.
-
 
 ## Playlist engine
 
@@ -85,7 +72,21 @@ PodBox can analyse your library and measures how each track actually sounds --
 its tempo, loudness, tonal balance, key and how busy it is -- then builds
 a playlist of tracks that work together.  
 
-Read more below - full details [here](docs/podbox/playlist-engine.md)
+## Games
+
+<img src="docs/podbox/images/ss_grid_games.png" alt="Screenshot"/>
+
+Play Spike while listening to your music. The game analyses each track's rhythm
+and generates unique levels that move with the beat. Challenge yourself to set new
+high scores as the difficulty ramps up over time.
+
+Launch Spike from the context menu (hold <code>Select</code> then click
+<code>Play with Spike</code>) on the Now Playing screen.  [Video](docs/podbox/videos/spike_game.mp4)
+
+See how well you know your library - a clip plays from partway through a song and you
+pick its title from five options before the points drain away.
+
+Find it at the bottom of the Music menu (`Music > Quiz`).
 
 ---
 
@@ -174,6 +175,14 @@ To be able to access lyrics your lyrics should be:
 with a different extension e.g. `Artist/Album/01 Track.lrc`
 - stored as either a .lrc, .lrc8 or .snc file
 
+## Playlist Engine
+
+To use the playlist engine, you first need to analyse your library.  This is best done from a Windows
+machine.  
+- Run `soundscan.exe` from `.rockbox/tools/` whilst your iPod is attached to your PC.  This will analyse
+ each track and store the findings in an index. 
+- Turn on the playlist engine by going to `Settings > Library > Playlist Engine > Enabled`
+
 # Installing themes
 
 PodBox will support all Rockbox themes, however without modification they will **not** support dynamic
@@ -187,6 +196,9 @@ the [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Them
 - [themify 2](themes/themify_2/README.md)
 - [obsede 2](themes/obsede_2/README.md)
 - [bony](themes/bony/README.md)
+- [iclassic square](themes/iclassic_square/README.md)
+- [iclassic square dark](themes/iclassic_square_dark/README.md)
+- [jive](themes/jive/README.md)
 
 All PodBox themes attempt to support as many languages as possible.
 
@@ -233,6 +245,9 @@ they can be installed in any order and on their own.
   - Off by default.  Turn the feature on by going to `Settings > Library > Music > Trim Titles`
 - View listening progress against albums and artists
   - Hold `Select` on an Album or Artist and select `Listening Progress`
+- Play the Music Quiz
+  - `Music > Quiz`
+  - Turn it off in `Settings > Library > Music > Edit Music Menu`
 
 ## Featured Artists
 
@@ -251,12 +266,14 @@ they can be installed in any order and on their own.
 - Audiobooks can be segregated from Music into their own root menu and are excluded
 from the Music menu and carousels
   - Off by default.  Turn the feature on by going to `Settings > Library > Music > Segregate Audiobooks`
-  - Audiobooks should have a genre of "audiobook", "spoken word", "book", or "podcast".
+  - Audiobooks should have a genre of "audiobook", "spoken word", "book", "podcast" or "podcasts".
 - Audiobooks automatically receive a "resume" function - you don't need to bookmark
 your position.
-- Books held in a single file show their chapters. Opening one lists its chapters the
-way a book split across files lists its tracks - with the same `Resume` row at the top -
-and skip, the progress bar and the Now Playing screen all follow the chapter you are in
+- See which books you have finished, not started or are part-way through
+  - Scroll up above the first book in `Audiobooks > Book` for `Finished`, `Not Started`
+  and `In Progress`
+  - Choosing a book plays it, from where you left off if you have started it
+- Books held in a single file show their chapters.
   - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`
   - Reads the chapter marks written into `.m4b` books and the chapter frames written
 into `.mp3` ones
@@ -290,9 +307,21 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 
 - Create a playlist of tracks similar to one you like by holding `Select` on the
   track and selecting `Play Similar` from the context menu.
+  - Also on an album or a folder, which builds the playlist around the album as a whole
 - Play tracks based on Moods -- Calm, Energetic, Dark, Warm, Punchy, Hypnotic and  
   ten more are available by going to `Playlists > Moods`
 - Play tracks that take you from one mood to another by going to `Playlists > Journeys`.
+- Wind down from a track you choose, with each track calmer than the last
+  - Hold `Select` on the track and select `Wind Down`
+  - With a sleep timer running, the playlist lasts as long as the time left on it
+- Put a playlist in an order where each track leads into the next
+  - Hold `Select` in the playlist viewer and select `Order by Sound`
+- See what a track sounds like, in words -- its moods, energy, pace, tone, key and more
+  - Hold `Select` on the track, select `Track Info` and open the `Sound` row
+- See what an album or folder sounds like as a whole
+  - Hold `Select` on the album or folder and select `Album Sound`
+- See what the analysis found across your whole library, and how much of it is measured
+  - `Settings > Library > Playlist Engine > Library Sound`
 - Turn on the Continue Playing setting to keep the music going when any playlist runs 
   out -- an album, a saved playlist, or a dynamic one -- by extending it with more of the
   same.  Turn it on by going to `Settings > Library > Playlist Engine > Continue Playing`.
@@ -421,6 +450,12 @@ Built on the work of:
 - Bony
   - Based on BONES created by: Chuck Lardo
   - License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/deed.en)
+- iClassic Square and iClassic Square Dark
+  - Created by: Humberto Santana
+  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
+- Jive
+  - Created by: James Stevenson
+  - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
 ### Fonts
 

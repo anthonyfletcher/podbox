@@ -667,8 +667,9 @@ Books also keep their place. Pausing, stopping, switching the player off or
 starting something else writes down where a book had got to, and opening that
 book again under Audiobooks puts a Resume row at the top of its chapter list.
 Choosing a chapter instead plays that chapter from its start. A book held in a
-single file has a chapter list only when Chapter Marks reads one out of it;
-otherwise playing it resumes it. The last sixty-four books are remembered.
+single file has a chapter list only when Chapter Marks reads one out of it and
+Cuesheet Support finds no cuesheet for it; otherwise playing it resumes it.
+The last sixty-four books are remembered.
 Above the first book on the list sit [Finished], [Not Started] and [In
 Progress], which sort the books by how far into them you are and play the one
 you choose; podcasts are in none of them.
