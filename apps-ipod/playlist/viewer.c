@@ -729,9 +729,23 @@ static enum pv_context_result context_menu(int index)
                     /* Chosen into a variable first: ID2P() does not
                      * parenthesise what it is given, so a conditional handed
                      * to it binds to the addition inside instead. */
-                    int id = miss == SOUND_MIX_TOO_LONG
-                             ? LANG_SOUND_REORDER_LONG
-                             : LANG_SOUND_MIX_NO_INDEX;
+                    int id;
+
+                    switch (miss)
+                    {
+                        case SOUND_MIX_TOO_LONG:
+                            id = LANG_SOUND_REORDER_LONG;
+                            break;
+                        case SOUND_MIX_NO_RECORD:
+                            id = LANG_SOUND_REORDER_NONE;
+                            break;
+                        case SOUND_MIX_NO_PLAYLIST:
+                            id = LANG_SOUND_REORDER_FAILED;
+                            break;
+                        default:
+                            id = LANG_SOUND_MIX_NO_INDEX;
+                            break;
+                    }
 
                     splash(HZ * 2, ID2P(id));
                 }

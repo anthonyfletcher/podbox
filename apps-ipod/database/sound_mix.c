@@ -1279,6 +1279,35 @@ void sound_mix_forget(void)
     n_skipped = 0;
 }
 
+static struct
+{
+    struct mix_goal   goal;
+    struct sound_axes axes;
+    bool              have;
+    uint64_t          skipped[MIX_SKIPPED];
+    int               n_skipped;
+} aside;
+
+void sound_mix_set_aside(void)
+{
+    aside.goal = remembered;
+    aside.axes = remembered_axes;
+    aside.have = have_remembered;
+    memcpy(aside.skipped, skipped, sizeof (skipped));
+    aside.n_skipped = n_skipped;
+}
+
+void sound_mix_bring_back(void)
+{
+    /* goal.seed, where set, points at remembered_axes, restored with it. */
+    remembered = aside.goal;
+    remembered_axes = aside.axes;
+    have_remembered = aside.have;
+    memcpy(skipped, aside.skipped, sizeof (skipped));
+    n_skipped = aside.n_skipped;
+    continue_due = false;
+}
+
 void sound_mix_skipped(const char *path, unsigned long elapsed_ms)
 {
     if (!have_remembered || path == NULL || elapsed_ms >= MIX_SKIP_MS)
@@ -1544,7 +1573,10 @@ int sound_mix_reorder(struct playlist_info *playlist)
     if (playlist_reorder(playlist, order, n) < 0)
         return SOUND_MIX_NO_PLAYLIST;
 
-    sound_mix_forget();
+    /* A saved playlist is not the one a mix built, so reordering it leaves
+     * what the playing one remembers alone. */
+    if (playlist == NULL)
+        sound_mix_forget();
 
     return missing;
 }

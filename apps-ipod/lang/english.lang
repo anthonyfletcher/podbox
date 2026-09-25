@@ -21880,6 +21880,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SOUND_REORDER_NONE
+  desc: Order by Sound: none of the playlist's tracks has been measured
+  user: core
+  <source>
+    *: "None of these tracks has been analysed"
+  </source>
+  <dest>
+    *: "None of these tracks has been analysed"
+  </dest>
+  <voice>
+    *: "None of these tracks has been analysed"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_FAILED
+  desc: Order by Sound: the playlist could not be put in the new order
+  user: core
+  <source>
+    *: "Could not reorder the playlist"
+  </source>
+  <dest>
+    *: "Could not reorder the playlist"
+  </dest>
+  <voice>
+    *: "Could not reorder the playlist"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SOUND_ALBUM
   desc: on a folder's context menu, the row opening the sound read-out for the whole folder, and its screen title
   user: core

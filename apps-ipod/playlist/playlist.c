@@ -2140,10 +2140,16 @@ int playlist_create(const char *dir, const char *file)
     return status;
 }
 
+/* What the in-memory state says about the playlist set aside. */
+static bool aside_from_artist;
+
 bool playlist_set_aside(void)
 {
     struct playlist_info* playlist = &current_playlist;
     bool had;
+
+    sound_mix_set_aside();
+    aside_from_artist = current_playlist_from_artist;
 
     dc_thread_stop(playlist);
     playlist_write_lock(playlist);
@@ -2177,6 +2183,9 @@ bool playlist_bring_back(void)
 
     playlist_write_unlock(playlist);
     dc_thread_start(playlist, false);
+
+    sound_mix_bring_back();
+    current_playlist_from_artist = aside_from_artist;
     return had;
 }
 

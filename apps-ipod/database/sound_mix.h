@@ -203,6 +203,12 @@ int sound_mix_reorder(struct playlist_info *playlist);
  * which is the moment the terms behind the old one stop applying. */
 void sound_mix_forget(void);
 
+/* Keep what built the current playlist while a throwaway one plays, and put
+ * it back afterwards -- see playlist_set_aside(). A continuation the
+ * throwaway's end asked for is dropped on the way back. */
+void sound_mix_set_aside(void);
+void sound_mix_bring_back(void);
+
 /* The listener skipped out of a track this early into it.
  *
  * Only useful on a playlist the engine built, and only for as long as that
