@@ -524,8 +524,202 @@ static bool host_active;
 static bool host_reset_done;
 static int host_resets;
 
+/* EHCI 1.0 section 3.5: queue element transfer descriptor */
+struct ehci_qtd {
+    uint32_t next;
+    uint32_t alt_next;
+    uint32_t token;
+    uint32_t buf[5];
+};
+
+/* EHCI 1.0 section 3.6: queue head, padded to 64 bytes */
+struct ehci_qh {
+    uint32_t link;
+    uint32_t chars;
+    uint32_t caps;
+    uint32_t current;
+    struct ehci_qtd overlay;
+    uint32_t pad[4];
+};
+
+#define EHCI_T          (1 << 0)
+#define EHCI_TYP_QH     (1 << 1)
+#define QTD_HALTED      (1 << 6)
+#define QTD_ACTIVE      (1 << 7)
+#define QTD_PID_OUT     (0 << 8)
+#define QTD_PID_IN      (1 << 8)
+#define QTD_PID_SETUP   (2 << 8)
+#define QTD_CERR3       (3 << 10)
+#define QTD_IOC         (1 << 15)
+#define QTD_BYTES(n)    ((n) << 16)
+#define QTD_TOGGLE      (1u << 31)
+#define QH_EPS_HIGH     (2 << 12)
+#define QH_DTC          (1 << 14)
+#define QH_HEAD         (1 << 15)
+#define QH_MPS(n)       ((n) << 16)
+#define QH_MULT1        (1u << 30)
+
+/* Everything the controller reads or writes. It is only ever touched
+ * through its uncached alias, which is also the address the controller
+ * takes; the type's alignment pads it to whole cache lines, so no
+ * neighbour's write-back can land on it. */
+struct host_dma {
+    struct ehci_qh qh;
+    struct ehci_qtd qtd[3];
+    struct usb_ctrlrequest setup;
+    uint8_t data[1024];
+} __attribute__((aligned(32)));
+
+static struct host_dma host_dma_mem;
+static struct host_dma *hd;
+static struct usb_drv_host_enum host_enum;
+static uint8_t host_cfg[sizeof host_dma_mem.data];
+
+const struct usb_drv_host_enum *usb_drv_host_get_enum(void)
+{
+    return &host_enum;
+}
+
+static void qtd_fill(struct ehci_qtd *qtd, void *next, void *alt,
+                     uint32_t token, void *buf)
+{
+    uint32_t a = (uint32_t)buf;
+
+    qtd->next = next ? (uint32_t)next : EHCI_T;
+    qtd->alt_next = alt ? (uint32_t)alt : EHCI_T;
+    qtd->token = token;
+    qtd->buf[0] = a;
+    for (int i = 1; i < 5; i++)
+        qtd->buf[i] = (a & ~0xfff) + i * 0x1000;
+}
+
+/* One control transfer to endpoint 0 of a high-speed device, on an async
+ * schedule holding one queue head. Returns the data-stage byte count, or
+ * -1 with host_enum.token set from the qTD that halted or never finished. */
+static int host_control(int addr, int reqtype, int req, int value,
+                        int index, int len)
+{
+    struct ehci_qtd *setup = &hd->qtd[0];
+    struct ehci_qtd *data = &hd->qtd[1];
+    struct ehci_qtd *status = &hd->qtd[2];
+    bool in = reqtype & USB_DIR_IN;
+    uint32_t token = QTD_ACTIVE | QTD_CERR3;
+    int n = -1;
+
+    hd->setup.bRequestType = reqtype;
+    hd->setup.bRequest = req;
+    hd->setup.wValue = value;
+    hd->setup.wIndex = index;
+    hd->setup.wLength = len;
+
+    /* The status stage runs opposite to the data stage, and IN if there is
+     * none. A short IN packet skips to it through alt_next. */
+    qtd_fill(status, NULL, NULL, token | QTD_IOC | QTD_TOGGLE |
+             ((len && in) ? QTD_PID_OUT : QTD_PID_IN), NULL);
+    qtd_fill(data, status, status, token | QTD_TOGGLE | QTD_BYTES(len) |
+             (in ? QTD_PID_IN : QTD_PID_OUT), hd->data);
+    qtd_fill(setup, len ? data : status, NULL,
+             token | QTD_PID_SETUP | QTD_BYTES(8), &hd->setup);
+
+    hd->qh.link = (uint32_t)&hd->qh | EHCI_TYP_QH;
+    hd->qh.chars = addr | QH_EPS_HIGH | QH_DTC | QH_HEAD | QH_MPS(64);
+    hd->qh.caps = QH_MULT1;
+    hd->qh.current = 0;
+    hd->qh.overlay.next = (uint32_t)setup;
+    hd->qh.overlay.alt_next = EHCI_T;
+    hd->qh.overlay.token = 0;
+
+    REG_ENDPOINTLISTADDR = (uint32_t)&hd->qh;
+    REG_USBCMD |= USBCMD_ASYNC_SCHEDULE_EN;
+
+    for (int t = 0; t < 5000; t++)
+    {
+        udelay(100);
+        if ((setup->token | data->token | status->token) & QTD_HALTED)
+            break;
+        if (!(status->token & QTD_ACTIVE))
+        {
+            n = len - ((data->token >> 16) & 0x7fff);
+            break;
+        }
+    }
+
+    if (n < 0)
+        host_enum.token = (setup->token & (QTD_ACTIVE | QTD_HALTED)) ?
+                          setup->token :
+                          (len && (data->token & (QTD_ACTIVE | QTD_HALTED))) ?
+                          data->token : status->token;
+
+    REG_USBCMD &= ~USBCMD_ASYNC_SCHEDULE_EN;
+    for (int t = 0; t < 100 && (REG_USBSTS & USBSTS_ASYNC_SCHEDULE); t++)
+        udelay(100);
+    return n;
+}
+
+static void host_get_string(int addr, int index, int langid, char *out,
+                            size_t size)
+{
+    int n;
+    size_t j = 0;
+
+    if (index == 0)
+        return;
+    n = host_control(addr, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
+                     (USB_DT_STRING << 8) | index, langid, 64);
+    /* UTF-16LE after a two-byte header; anything outside ASCII is '?' */
+    for (int i = 2; i + 1 < n && j + 1 < size; i += 2)
+        out[j++] = hd->data[i + 1] || hd->data[i] >= 0x80 ?
+                   '?' : hd->data[i];
+    out[j] = '\0';
+}
+
+/* Device descriptor at address 0, SET_ADDRESS 1, then the device and
+ * configuration descriptors and two strings from the new address. */
+static void host_enumerate(void)
+{
+    struct usb_drv_host_enum *e = &host_enum;
+    int n, langid;
+
+#define STEP(name, cond) \
+    do { e->step = name; if (!(cond)) { e->result = -1; return; } } while (0)
+
+    n = host_control(0, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
+                     USB_DT_DEVICE << 8, 0, 18);
+    STEP("device @0", n >= 8);
+    n = host_control(0, USB_DIR_OUT, USB_REQ_SET_ADDRESS, 1, 0, 0);
+    STEP("set address", n == 0);
+    udelay(10000);
+    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
+                     USB_DT_DEVICE << 8, 0, 18);
+    STEP("device @1", n == 18);
+    memcpy(e->dev, hd->data, 18);
+    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
+                     USB_DT_CONFIG << 8, 0, 9);
+    STEP("config head", n == 9);
+    e->cfg_total = hd->data[2] | (hd->data[3] << 8);
+    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR, USB_DT_CONFIG << 8,
+                     0, MIN(e->cfg_total, (int)sizeof hd->data));
+    STEP("config", n > 0);
+    memcpy(host_cfg, hd->data, n);
+    e->cfg = host_cfg;
+    e->cfg_len = n;
+#undef STEP
+
+    n = host_control(1, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
+                     USB_DT_STRING << 8, 0, 4);
+    langid = n >= 4 ? hd->data[2] | (hd->data[3] << 8) : 0x0409;
+    host_get_string(1, e->dev[14], langid, e->manufacturer,
+                    sizeof e->manufacturer);
+    host_get_string(1, e->dev[15], langid, e->product, sizeof e->product);
+    e->result = 1;
+}
+
 void usb_drv_host_start(void)
 {
+    commit_discard_dcache();
+    hd = UNCACHED_ADDR(&host_dma_mem);
+    memset(&host_enum, 0, sizeof host_enum);
+
     usb_drv_int_enable(false);
     usb_drv_reset();
     REG_USBMODE = USBMODE_CTRL_MODE_HOST;
@@ -557,7 +751,10 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
 
     portsc = REG_PORTSC1;
     if (!(portsc & PORTSCX_CURRENT_CONNECT_STATUS))
+    {
         host_reset_done = false;
+        memset(&host_enum, 0, sizeof host_enum);
+    }
     else if (!host_reset_done)
     {
         /* 100 ms connect debounce, then a 60 ms root-port reset. The
@@ -571,6 +768,11 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
             REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
         udelay(10000);
         portsc = REG_PORTSC1;
+        if (portsc & PORTSCX_PORT_ENABLE)
+        {
+            host_enumerate();
+            portsc = REG_PORTSC1;
+        }
     }
 
     st->host_mode = (REG_USBMODE & 3) == USBMODE_CTRL_MODE_HOST;

@@ -149,6 +149,20 @@ struct usb_drv_host_status {
         uint32_t val;
     } regs[4];
 };
+/* What enumerating the device found. usb_drv_host_poll() runs it once, after
+ * the reset that enables the port. */
+struct usb_drv_host_enum {
+    int result;             /* 0 not run, 1 done, -1 failed at step */
+    const char *step;       /* the request that failed */
+    uint32_t token;         /* its transfer status, raw */
+    uint8_t dev[18];
+    int cfg_total;          /* wTotalLength; cfg_len is less if truncated */
+    int cfg_len;
+    const uint8_t *cfg;
+    char manufacturer[32];
+    char product[32];
+};
+const struct usb_drv_host_enum *usb_drv_host_get_enum(void);
 void usb_drv_host_start(void);
 void usb_drv_host_stop(void);
 void usb_drv_host_poll(struct usb_drv_host_status *st);

@@ -1439,6 +1439,15 @@ static bool host_active;
 static bool host_reset_done;
 static int host_resets;
 
+/* Enumeration here needs a host-channel driver; without one it is never
+ * run, and the result stays "not run". */
+static const struct usb_drv_host_enum host_enum;
+
+const struct usb_drv_host_enum *usb_drv_host_get_enum(void)
+{
+    return &host_enum;
+}
+
 void usb_drv_host_start(void)
 {
 #ifndef USB_DW_TURNAROUND

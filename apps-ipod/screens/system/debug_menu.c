@@ -1514,6 +1514,51 @@ static bool dbg_usb_info(void)
     return simplelist_show_list(&info);
 }
 
+/* The enumerated device, one line per interface setting with its endpoints
+ * on the same line. Endpoints read as address, type and max packet size;
+ * "fb" marks an isochronous feedback endpoint. */
+static void usb_host_probe_descriptors(const struct usb_drv_host_enum *e)
+{
+    static const char * const types[] = { "ctl", "iso", "bulk", "int" };
+    const uint8_t *d = e->dev;
+    char line[128];
+    int len = 0;
+
+    simplelist_addline("ID %02x%02x:%02x%02x  USB %x.%02x  ep0 %d",
+                       d[9], d[8], d[11], d[10], d[3], d[2], d[7]);
+    simplelist_addline("Maker: %s", e->manufacturer);
+    simplelist_addline("Product: %s", e->product);
+    simplelist_addline("Class %02x/%02x/%02x  configs %d",
+                       d[4], d[5], d[6], d[17]);
+    simplelist_addline("Config: %d of %d bytes, %d ifaces",
+                       e->cfg_len, e->cfg_total,
+                       e->cfg_len > 4 ? e->cfg[4] : 0);
+
+    for (int i = 0; i + 2 <= e->cfg_len && e->cfg[i] >= 2; i += e->cfg[i])
+    {
+        const uint8_t *c = &e->cfg[i];
+        if (i + c[0] > e->cfg_len)
+            break;
+        if (c[1] == USB_DT_INTERFACE && c[0] >= 9)
+        {
+            if (len)
+                simplelist_addline("%s", line);
+            len = snprintf(line, sizeof line, "IF%d.%d %02x/%02x/%02x",
+                           c[2], c[3], c[5], c[6], c[7]);
+        }
+        else if (c[1] == USB_DT_ENDPOINT && c[0] >= 7 && len &&
+                 len < (int)sizeof line)
+        {
+            len += snprintf(line + len, sizeof line - len, " %02x %s%s %d",
+                            c[2], types[c[3] & 3],
+                            ((c[3] >> 4) & 3) == 1 ? "fb" : "",
+                            (c[4] | (c[5] << 8)) & 0x7ff);
+        }
+    }
+    if (len)
+        simplelist_addline("%s", line);
+}
+
 /* The USB host probe: the controller turned round to be a host, and what
  * its root port sees. The port belongs to the probe from entry to exit, so
  * a cable does not start USB mode while this screen is open. */
@@ -1538,9 +1583,19 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Speed: %s", st.speed);
     simplelist_addline("Line: %s", lines[st.line & 3]);
     simplelist_addline("Resets: %d", st.resets);
-    for (int i = 0; i < st.nregs; i++)
-        simplelist_addline("%s: %08lx", st.regs[i].name,
-                           (unsigned long)st.regs[i].val);
+
+    const struct usb_drv_host_enum *e = usb_drv_host_get_enum();
+    if (e->result == 1)
+        usb_host_probe_descriptors(e);
+    else
+    {
+        if (e->result < 0)
+            simplelist_addline("Enumerate FAILED: %s (%08lx)", e->step,
+                               (unsigned long)e->token);
+        for (int i = 0; i < st.nregs; i++)
+            simplelist_addline("%s: %08lx", st.regs[i].name,
+                               (unsigned long)st.regs[i].val);
+    }
     return btn == ACTION_NONE ? ACTION_REDRAW : btn;
 }
 
