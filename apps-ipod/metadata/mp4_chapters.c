@@ -401,7 +401,7 @@ static void read_sample_title(int fd, off_t pos, uint32_t size,
     if (read(fd, raw, want) != (ssize_t)want)
         return;
 
-    if (want > 2 && ((raw[0] == 0xff && raw[1] == 0xfe)
+    if (want >= 2 &&((raw[0] == 0xff && raw[1] == 0xfe)
                      || (raw[0] == 0xfe && raw[1] == 0xff)))
     {
         unsigned char *end = utf16decode(raw + 2,
