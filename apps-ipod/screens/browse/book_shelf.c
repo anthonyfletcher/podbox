@@ -580,6 +580,7 @@ static int queue_book(struct playlist_insert_context *ctx)
     struct book_track *list;
     size_t list_sz;
     int cap, found = 0, added = 0, start = 0;
+    bool matched = false;
 
     if (!tagcache_search(&tcs, tag_filename))
         return -1;
@@ -605,7 +606,10 @@ static int queue_book(struct playlist_insert_context *ctx)
         if (playlist_insert_context_add(ctx, path) < 0)
             break;
         if (chosen.track[0] && !strcmp(path, chosen.track))
+        {
             start = chosen.after ? added + 1 : added;
+            matched = true;
+        }
         added++;
     }
 
@@ -613,6 +617,13 @@ static int queue_book(struct playlist_insert_context *ctx)
 
     if (added == 0)
         return -1;
+    /* The saved track is gone -- renamed or moved -- so its position belongs
+     * to nothing here. The book starts at its first chapter, from the top. */
+    if (!matched)
+    {
+        chosen.elapsed = 0;
+        chosen.offset = 0;
+    }
     /* The last chapter ended and the book is not finished -- it can only be
      * a book whose chapters were not all played. Start it again. */
     return start < added ? start : 0;

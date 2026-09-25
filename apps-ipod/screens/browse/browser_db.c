@@ -3788,8 +3788,10 @@ static int play_single_track(const char *path, const char *book)
  */
 static bool has_cuesheet(const char *path)
 {
-    struct mp3entry id3;
-    struct cuesheet_file cue_file;
+    /* Static: an mp3entry is nearly 3 KB, and this sits under
+     * browser_db_enter()'s own path buffer on the 8 KB main stack. */
+    static struct mp3entry id3;
+    static struct cuesheet_file cue_file;
 
     return global_settings.cuesheet
            && get_metadata(&id3, -1, path)
@@ -3822,6 +3824,9 @@ static int open_single_book(const char *path, const char *book,
 
         case CUE_BROWSE_START:
             return start_single_track(path, cue->curr_track->offset, 0);
+
+        case CUE_BROWSE_PLAYED:
+            return GO_TO_WPS;
 
         default:
             return 0;
@@ -3944,8 +3949,12 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
      * before the dirlevel and history bookkeeping, so coming back from the
      * WPS lands on this list exactly as it was. The clauses being read live
      * in the browser_db buffer, which is movable and not yet pinned this far
-     * up the function. */
-    if (c->currtable == TABLE_NAVIBROWSE && newextra == TABLE_NAVIBROWSE)
+     * up the function.
+     *
+     * A hidden descent is reading the tracks, not opening the book, so it
+     * takes the ordinary path down to the one-track list. */
+    if (is_visible && c->currtable == TABLE_NAVIBROWSE
+        && newextra == TABLE_NAVIBROWSE)
     {
         char path[MAX_PATH];
         char book[BOOK_KEY_MAX];
@@ -4434,20 +4443,24 @@ static bool goto_allsubentries(int newtable)
         browser_db_enter(tc, false);
         browser_db_load(tc);
 
-        /* Past the synthetic rows before the next descent is judged.
-         *
-         * browser_db_enter() leaves an invisible descent sitting on row 0,
-         * and row 0 is <Random> or <All tracks> on any level that has them.
-         * That matters because this loop decides whether descending again is
-         * safe by reading the selected row's newtable, while
-         * browser_db_enter() handed <Random> acts on a *different* row -- a
-         * randomly chosen sibling, whose own newtable is what it then obeys.
-         * A track picked that way takes the branch that starts playback, so
-         * without this a caller that only wanted to read an album's tracks
-         * plays one instead. */
-        if (tc->selected_item < tc->special_entry_count &&
-            tc->filesindir > tc->special_entry_count)
-            tc->selected_item = tc->special_entry_count;
+        /* The next descent goes through <All tracks> where the level has it,
+         * and through the first real row where it does not -- never through
+         * another special row. browser_db_load() has already moved the cursor
+         * past all of them, <All tracks> included, and taking the first real
+         * row there reaches only the first album. <Random> acts on a random
+         * sibling rather than the row this loop judges, and a track picked
+         * that way plays; [Resume] plays too. */
+        int pick = tc->special_entry_count;
+        for (int j = 0; j < tc->special_entry_count; j++)
+        {
+            if (browser_db_get_entry(tc, j)->newtable == TABLE_ALLSUBENTRIES)
+            {
+                pick = j;
+                break;
+            }
+        }
+        if (pick < tc->filesindir)
+            tc->selected_item = pick;
 
         newtable = browser_db_get_entry(tc, tc->selected_item)->newtable;
         i++;
