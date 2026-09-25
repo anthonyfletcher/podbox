@@ -163,6 +163,37 @@ struct usb_drv_host_enum {
     char product[32];
 };
 const struct usb_drv_host_enum *usb_drv_host_get_enum(void);
+
+/* A control transfer to endpoint 0 of the enumerated device. Returns the
+ * data-stage byte count, or -1. ARC only. */
+int usb_drv_host_control(int addr, int reqtype, int req, int value,
+                         int index, void *data, int len);
+
+/* An isochronous OUT stream with an optional feedback IN endpoint. fill()
+ * runs from the tick interrupt and writes frames sample frames to dst; the
+ * count per microframe follows the feedback, or nominal without it. ARC
+ * only. */
+struct usb_drv_host_iso {
+    int addr;
+    int ep_out, mps_out, interval_out;  /* interval in microframes, 1-8 */
+    int ep_fb, mps_fb, interval_fb;     /* ep_fb 0: no feedback */
+    int frame_bytes;                    /* one sample frame, all channels */
+    uint32_t nominal;                   /* samples per microframe, 16.16 */
+    void (*fill)(uint8_t *dst, int frames);
+};
+struct usb_drv_host_iso_stats {
+    bool running;
+    uint32_t feedback;      /* in use, samples per microframe, 16.16 */
+    uint32_t fb_raw;        /* last value received */
+    unsigned fb_ok, fb_bad;
+    unsigned frames;        /* 1 ms frames queued */
+    unsigned underruns;     /* times the refill fell behind the controller */
+    unsigned errors;        /* transactions completed with an error bit */
+};
+bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso);
+void usb_drv_host_iso_stop(void);
+void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st);
+
 void usb_drv_host_start(void);
 void usb_drv_host_stop(void);
 void usb_drv_host_poll(struct usb_drv_host_status *st);

@@ -97,11 +97,13 @@
 
 /* Both headers describe the USB stack, which only exists where it is built --
  * usb_drv.h declares an array sized by USB_NUM_ENDPOINTS, and a simulator has
- * no endpoints to count. (Nothing in this file names a usb_drv_* symbol; the
- * include looks vestigial.) */
+ * no endpoints to count. The USB screens use the usb_drv_* host probe. */
 #ifdef HAVE_USBSTACK
 #include "usb_core.h"
 #include "usb_drv.h"
+#endif
+#if defined(HAVE_USBSTACK) && CONFIG_USBOTG == USBOTG_ARC
+#include "usb_host_audio.h"
 #endif
 #ifdef USB_ENABLE_AUDIO
 #include "../usbstack/usb_audio.h"
@@ -1559,6 +1561,32 @@ static void usb_host_probe_descriptors(const struct usb_drv_host_enum *e)
         simplelist_addline("%s", line);
 }
 
+#if CONFIG_USBOTG == USBOTG_ARC
+/* The test tone. Feedback is the DAC's own rate, as it reports it. */
+static void usb_host_probe_tone_lines(void)
+{
+    const struct usb_host_audio_status *a = usb_host_audio_get_status();
+    struct usb_drv_host_iso_stats iso;
+
+    usb_drv_host_iso_get_stats(&iso);
+    simplelist_addline("Tone (SELECT): %s%s", a->state,
+                       !iso.running && !strcmp(a->state, "playing") ?
+                       ", stream stopped" : "");
+    if (a->alt == 0)
+        return;
+    simplelist_addline("  IF%d.%d %dch %d/%d bit, clock %d", a->iface, a->alt,
+                       a->channels, a->bits, a->subslot * 8, a->clock);
+    simplelist_addline("  Rate: set %lu, reads %lu",
+                       (unsigned long)a->rate_set,
+                       (unsigned long)a->rate_read);
+    simplelist_addline("  Feedback: %lu Hz (%u ok, %u bad) %08lx",
+                       (unsigned long)(((uint64_t)iso.feedback * 8000) >> 16),
+                       iso.fb_ok, iso.fb_bad, (unsigned long)iso.fb_raw);
+    simplelist_addline("  Frames %u, underruns %u, errors %u",
+                       iso.frames, iso.underruns, iso.errors);
+}
+#endif
+
 /* The USB host probe: the controller turned round to be a host, and what
  * its root port sees. The port belongs to the probe from entry to exit, so
  * a cable does not start USB mode while this screen is open. */
@@ -1567,6 +1595,20 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     static const char * const lines[] = { "SE0", "J", "K", "SE1" };
     struct usb_drv_host_status st;
     (void)lists;
+
+#if CONFIG_USBOTG == USBOTG_ARC
+    /* SELECT starts and stops the test tone rather than leaving */
+    if (btn == ACTION_STD_OK)
+    {
+        struct usb_drv_host_iso_stats iso;
+        usb_drv_host_iso_get_stats(&iso);
+        if (iso.running)
+            usb_host_audio_stop();
+        else
+            usb_host_audio_start();
+        btn = ACTION_REDRAW;
+    }
+#endif
 
     usb_drv_host_poll(&st);
     simplelist_reset_lines();
@@ -1585,6 +1627,10 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Resets: %d", st.resets);
 
     const struct usb_drv_host_enum *e = usb_drv_host_get_enum();
+#if CONFIG_USBOTG == USBOTG_ARC
+    if (e->result == 1)
+        usb_host_probe_tone_lines();
+#endif
     if (e->result == 1)
         usb_host_probe_descriptors(e);
     else
@@ -1610,6 +1656,9 @@ static bool dbg_usb_host_probe(void)
     info.scroll_all = true;
     info.timeout = HZ/2;
     ret = simplelist_show_list(&info);
+#if CONFIG_USBOTG == USBOTG_ARC
+    usb_host_audio_stop();
+#endif
     usb_set_host_probe(false);
     return ret;
 }

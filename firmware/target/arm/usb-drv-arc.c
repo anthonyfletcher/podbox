@@ -714,6 +714,211 @@ static void host_enumerate(void)
     e->result = 1;
 }
 
+int usb_drv_host_control(int addr, int reqtype, int req, int value,
+                         int index, void *data, int len)
+{
+    int n;
+
+    if (!host_active || len > (int)sizeof hd->data)
+        return -1;
+    if (!(reqtype & USB_DIR_IN))
+        memcpy(hd->data, data, len);
+    n = host_control(addr, reqtype, req, value, index, len);
+    if (n > 0 && (reqtype & USB_DIR_IN))
+        memcpy(data, hd->data, n);
+    return n;
+}
+
+/* EHCI 1.0 section 3.3: isochronous transfer descriptor, one 1 ms frame of
+ * one endpoint, one transaction slot per microframe. */
+struct ehci_itd {
+    uint32_t next;
+    uint32_t trans[8];
+    uint32_t page[7];
+};
+
+#define ITD_ACTIVE      (1u << 31)
+#define ITD_ERRORS      (7u << 28)
+#define ITD_LEN(n)      ((n) << 16)
+#define ITD_DIR_IN      (1 << 11)
+
+/* The periodic schedule. Every frame-list entry for frame f leads to the
+ * feedback iTD then the OUT iTD of slot f % ISO_SLOTS. The refill keeps
+ * between 2 and ISO_AHEAD frames queued, so it never rewrites the slot the
+ * controller is on. Each slot's buffer lies inside one 4 KB page, so every
+ * transaction uses page pointer 0. */
+#define ISO_SLOTS       32
+#define ISO_AHEAD       24
+#define ISO_SLOT_BYTES  512
+
+struct host_iso_dma {
+    uint32_t framelist[1024];
+    struct ehci_itd out[ISO_SLOTS];
+    struct ehci_itd fb[ISO_SLOTS];
+    uint8_t buf[ISO_SLOTS][ISO_SLOT_BYTES];
+    uint32_t fbbuf[ISO_SLOTS];
+} __attribute__((aligned(4096)));
+
+static struct host_iso_dma host_iso_mem;
+static struct host_iso_dma *iso_dma;
+static struct usb_drv_host_iso iso_cfg;
+static struct usb_drv_host_iso_stats iso_stats;
+static unsigned int iso_next;          /* next frame to fill */
+static uint32_t iso_acc;               /* fractional samples, 16.16 */
+static bool iso_fb_armed[ISO_SLOTS];
+
+static void itd_init(struct ehci_itd *itd, void *buf, int ep, int dir,
+                     int mps)
+{
+    memset(itd, 0, sizeof *itd);
+    itd->next = EHCI_T;
+    itd->page[0] = ((uint32_t)buf & ~0xfff) | (ep << 8) | iso_cfg.addr;
+    itd->page[1] = dir | mps;
+    itd->page[2] = 1;       /* one transaction per microframe */
+}
+
+/* A feedback value is 16.16 samples per microframe. One more than an
+ * eighth away from nominal is taken as noise, not a rate. */
+static void iso_take_feedback(int slot)
+{
+    uint32_t t = iso_dma->fb[slot].trans[0];
+    uint32_t v, nom = iso_cfg.nominal;
+
+    iso_fb_armed[slot] = false;
+    if (t & (ITD_ACTIVE | ITD_ERRORS))
+    {
+        iso_stats.errors += !!(t & ITD_ERRORS);
+        return;
+    }
+    if (((t >> 16) & 0xfff) < 3)
+        return;
+    v = iso_dma->fbbuf[slot];
+    iso_stats.fb_raw = v;
+    if (v > nom - nom / 8 && v < nom + nom / 8)
+    {
+        iso_stats.feedback = v;
+        iso_stats.fb_ok++;
+    }
+    else
+        iso_stats.fb_bad++;
+}
+
+static void iso_fill_slot(int slot, unsigned int frame)
+{
+    struct ehci_itd *o = &iso_dma->out[slot];
+    struct ehci_itd *f = &iso_dma->fb[slot];
+    uint8_t *buf = iso_dma->buf[slot];
+    uint32_t base = (uint32_t)buf & 0xfff;
+    int step = iso_cfg.interval_out;
+    int max = MIN(iso_cfg.mps_out, ISO_SLOT_BYTES / (8 / step)) /
+              iso_cfg.frame_bytes;
+    int off = 0;
+
+    for (int m = 0; m < 8; m++)
+    {
+        if (o->trans[m] & ITD_ERRORS)
+            iso_stats.errors++;
+        o->trans[m] = 0;
+    }
+    if (iso_fb_armed[slot])
+        iso_take_feedback(slot);
+
+    for (int m = 0; m < 8; m += step)
+    {
+        int n, bytes;
+
+        iso_acc += iso_stats.feedback * step;
+        n = MIN((int)(iso_acc >> 16), max);
+        iso_acc &= 0xffff;
+        bytes = n * iso_cfg.frame_bytes;
+        iso_cfg.fill(buf + off, n);
+        o->trans[m] = ITD_ACTIVE | ITD_LEN(bytes) | (base + off);
+        off += bytes;
+    }
+
+    if (iso_cfg.ep_fb &&
+        frame % MAX(1, iso_cfg.interval_fb / 8) == 0)
+    {
+        f->trans[0] = ITD_ACTIVE | ITD_LEN(iso_cfg.mps_fb) |
+                      ((uint32_t)&iso_dma->fbbuf[slot] & 0xfff);
+        iso_fb_armed[slot] = true;
+    }
+}
+
+static void iso_tick(void)
+{
+    unsigned int cur = (REG_FRINDEX >> 3) & 1023;
+    unsigned int ahead = (iso_next - cur) & 1023;
+
+    if (ahead < 2 || ahead > ISO_AHEAD)
+    {
+        if (ahead < 2 || ahead > 512)
+        {
+            iso_stats.underruns++;
+            iso_next = (cur + 4) & 1023;
+        }
+        else
+            return;
+    }
+    while (((iso_next - cur) & 1023) < ISO_AHEAD)
+    {
+        iso_fill_slot(iso_next % ISO_SLOTS, iso_next);
+        iso_next = (iso_next + 1) & 1023;
+        iso_stats.frames++;
+    }
+}
+
+bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
+{
+    if (!host_active || iso_stats.running || iso->frame_bytes <= 0 ||
+        iso->interval_out < 1 || iso->interval_out > 8)
+        return false;
+
+    iso_dma = UNCACHED_ADDR(&host_iso_mem);
+    iso_cfg = *iso;
+    memset(&iso_stats, 0, sizeof iso_stats);
+    memset(iso_fb_armed, 0, sizeof iso_fb_armed);
+    iso_stats.feedback = iso->nominal;
+    iso_acc = 0;
+
+    for (int s = 0; s < ISO_SLOTS; s++)
+    {
+        itd_init(&iso_dma->out[s], iso_dma->buf[s], iso->ep_out, 0,
+                 iso->mps_out);
+        itd_init(&iso_dma->fb[s], &iso_dma->fbbuf[s], iso->ep_fb & 0xf,
+                 ITD_DIR_IN, iso->mps_fb);
+        iso_dma->fb[s].next = (uint32_t)&iso_dma->out[s];
+    }
+    for (int i = 0; i < 1024; i++)
+        iso_dma->framelist[i] = (uint32_t)&iso_dma->fb[i % ISO_SLOTS];
+
+    REG_DEVICEADDR = (uint32_t)iso_dma->framelist;    /* PERIODICLISTBASE */
+    iso_next = (((REG_FRINDEX >> 3) + 4) & 1023);
+    iso_tick();
+    REG_USBCMD |= USBCMD_PERIODIC_SCHEDULE_EN;
+    for (int t = 0; t < 100 && !(REG_USBSTS & USBSTS_PERIODIC_SCHEDULE); t++)
+        udelay(100);
+    iso_stats.running = true;
+    tick_add_task(iso_tick);
+    return true;
+}
+
+void usb_drv_host_iso_stop(void)
+{
+    if (!iso_stats.running)
+        return;
+    tick_remove_task(iso_tick);
+    iso_stats.running = false;
+    REG_USBCMD &= ~USBCMD_PERIODIC_SCHEDULE_EN;
+    for (int t = 0; t < 100 && (REG_USBSTS & USBSTS_PERIODIC_SCHEDULE); t++)
+        udelay(100);
+}
+
+void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)
+{
+    *st = iso_stats;
+}
+
 void usb_drv_host_start(void)
 {
     commit_discard_dcache();
@@ -733,6 +938,7 @@ void usb_drv_host_start(void)
 
 void usb_drv_host_stop(void)
 {
+    usb_drv_host_iso_stop();
     host_active = false;
     REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_POWER);
     REG_USBCMD &= ~USBCMD_RUN;
@@ -752,6 +958,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     portsc = REG_PORTSC1;
     if (!(portsc & PORTSCX_CURRENT_CONNECT_STATUS))
     {
+        usb_drv_host_iso_stop();
         host_reset_done = false;
         memset(&host_enum, 0, sizeof host_enum);
     }
