@@ -19,10 +19,11 @@
 /* Playback to a USB Audio Class 2 DAC that the host probe has enumerated at
  * address 1, as a PCM sink. Starting reads the class descriptors, chooses a
  * 16-bit PCM streaming setting, selects it and starts an isochronous stream,
- * then switches the mixer to this sink. The stream's fill runs from the tick
- * interrupt: it copies the mixer's buffers out, scaled by the volume setting,
- * asks the PCM core for the next buffer when one runs dry, and sends silence
- * while nothing plays. The DAC's clock follows the sink's sample rate.
+ * then switches the mixer to this sink. The stream's fill runs from the
+ * stream's interrupt: it copies the mixer's buffers out, scaled by the
+ * volume setting, asks the PCM core for the next buffer when one runs dry,
+ * and sends silence while nothing plays. The DAC's clock follows the sink's
+ * sample rate.
  *
  * Volume is the player's own, applied to the samples and capped at 0 dB;
  * the DAC's own volume is left where it is. Balance and the tone controls,
@@ -111,7 +112,7 @@ static int volume_cb(int value)
     return value;
 }
 
-/* Tick interrupt: skipped while the PCM core holds the lock, and the one
+/* Stream interrupt: skipped while the PCM core holds the lock, and the one
  * place the volume is read. */
 static bool sink_begin(void)
 {
@@ -130,7 +131,7 @@ static bool sink_begin(void)
     return true;
 }
 
-/* Tick interrupt: stereo 16-bit from the mixer into the DAC's subslots,
+/* Stream interrupt: stereo 16-bit from the mixer into the DAC's subslots,
  * sample at the top of each little-endian subslot. */
 static void sink_fill(uint8_t *dst, int frames)
 {
@@ -204,7 +205,7 @@ static void sink_stop(void)
     restore_irq(oldlevel);
 }
 
-/* Tick interrupt, the DAC unplugged: the USB thread shuts the probe down,
+/* Stream interrupt, the DAC unplugged: the USB thread shuts the probe down,
  * which stops this sink and returns playback to the headphone socket. */
 static void sink_lost(void)
 {

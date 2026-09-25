@@ -1426,13 +1426,10 @@ Lyre prototype 1 */
 #define USB_ENABLE_IAP
 #endif
 
-/* USB host mode: the host probe's enumeration, on both controllers. Audio
- * to a USB Audio Class 2 DAC, as a PCM sink, needs the isochronous stream,
- * which only the ARC controller has. */
+/* USB host mode: the host probe, and audio to a USB Audio Class 2 DAC as a
+ * PCM sink, on both controllers. */
 #if CONFIG_USBOTG == USBOTG_ARC || CONFIG_USBOTG == USBOTG_DESIGNWARE
 #define HAVE_USB_HOST
-#endif
-#if CONFIG_USBOTG == USBOTG_ARC
 #define HAVE_USB_HOST_AUDIO
 #endif
 

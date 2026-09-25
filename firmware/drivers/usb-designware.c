@@ -35,6 +35,7 @@
 #include "usb_drv.h"
 #include "usb_ch9.h"
 #include "usb_core.h"
+#include "timer.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -1560,6 +1561,220 @@ int usb_drv_host_control(int addr, int reqtype, int req, int value,
     return MIN(n, len);
 }
 
+/* The isochronous stream. This core in buffer DMA mode has no schedule of
+ * its own: a periodic channel carries one packet, in the (micro)frame its
+ * ODDFRM bit names, and must be set up again for the next. So a 2 kHz timer
+ * interrupt does that. Each OUT packet carries the samples owed since the
+ * last one, counted from the core's own microframe counter, so the rate
+ * follows USB time however the timer jitters. Feedback is read on a second
+ * channel at its endpoint's interval. */
+#define ISO_RATE        2000            /* packet setups per second */
+#define ISO_CH_OUT      1
+#define ISO_CH_FB       2
+#define ISO_BUF_BYTES   512
+#define HCINT_FRMOR     (1 << 9)
+#define HFNUM_UFRAMES   0x3fff
+
+struct host_dw_iso_dma {
+    uint8_t buf[2][ISO_BUF_BYTES];
+    uint32_t fb[8];
+} __attribute__((aligned(32)));
+
+static struct host_dw_iso_dma host_dw_iso_mem;
+static struct host_dw_iso_dma *iso_dma;
+static struct usb_drv_host_iso iso_cfg;
+static struct usb_drv_host_iso_stats iso_stats;
+static uint32_t iso_acc;                /* samples owed, 16.16 */
+static unsigned int iso_last_uframe;
+static int iso_buf, iso_bytes;          /* the packet on the OUT channel */
+static bool iso_out_busy, iso_fb_busy;
+static int iso_fb_every, iso_fb_count;
+
+#define ISO_PHYS(p) \
+    USB_DW_PHYSADDR((uint32_t)&host_dw_iso_mem + \
+                    ((uint32_t)(p) - (uint32_t)iso_dma))
+
+static void iso_arm(int ch, bool in, int ep, int mps, void *buf, int bytes)
+{
+    DWC_HCINT(ch) = HCINT_ALL;
+    DWC_HCTSIZ(ch) = bytes | HCTSIZ_PKTCNT(1) | HCTSIZ_PID(PID_DATA0);
+    DWC_HCDMA(ch) = ISO_PHYS(buf);
+    /* the next microframe: ODDFRM names the parity it must have */
+    DWC_HCCHAR(ch) = HCCHAR_MPS(mps) | HCCHAR_EPNUM(ep) |
+                     (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(1) |
+                     HCCHAR_MC(1) | HCCHAR_DEVADDR(iso_cfg.addr) |
+                     ((DWC_HFNUM & 1) ? 0 : HCCHAR_ODDFRM) | HCCHAR_CHENA;
+}
+
+static void iso_halt(int ch)
+{
+    if (!(DWC_HCCHAR(ch) & HCCHAR_CHENA))
+        return;
+    DWC_HCCHAR(ch) |= HCCHAR_CHDIS | HCCHAR_CHENA;
+    for (int t = 0; t < 20 && !(DWC_HCINT(ch) & HCINT_CHH); t++)
+        udelay(100);
+}
+
+/* A feedback value is 16.16 samples per microframe. One more than an
+ * eighth away from nominal is taken as noise, not a rate. */
+static void iso_take_feedback(uint32_t v)
+{
+    uint32_t nom = iso_cfg.nominal;
+
+    iso_stats.fb_raw = v;
+    if (v > nom - nom / 8 && v < nom + nom / 8)
+    {
+        iso_stats.feedback = v;
+        iso_stats.fb_ok++;
+    }
+    else
+        iso_stats.fb_bad++;
+}
+
+static void iso_feedback(void)
+{
+    uint32_t hcint;
+
+    if (iso_fb_busy)
+    {
+        hcint = DWC_HCINT(ISO_CH_FB);
+        if (!(hcint & HCINT_CHH))
+            return;
+        iso_fb_busy = false;
+        if (hcint & HCINT_XFERC)
+        {
+            int got = iso_cfg.mps_fb - (int)(DWC_HCTSIZ(ISO_CH_FB) & 0x7ffff);
+            if (got >= 3)
+                iso_take_feedback(iso_dma->fb[0]);
+        }
+        else if (!(hcint & HCINT_FRMOR))
+            iso_stats.errors++;
+    }
+    if (++iso_fb_count >= iso_fb_every)
+    {
+        iso_fb_count = 0;
+        iso_dma->fb[0] = 0;
+        iso_arm(ISO_CH_FB, true, iso_cfg.ep_fb & 0xf, iso_cfg.mps_fb,
+                iso_dma->fb, iso_cfg.mps_fb);
+        iso_fb_busy = true;
+    }
+}
+
+/* Timer interrupt */
+static void iso_timer(void)
+{
+    uint32_t hcint;
+    unsigned int now, delta;
+    int max, n;
+
+    if (!(DWC_HPRT & HPRT_CONN_STS))
+    {
+        if (!iso_stats.lost)
+        {
+            iso_stats.lost = true;
+            if (iso_cfg.lost)
+                iso_cfg.lost();
+        }
+        return;
+    }
+    if (iso_cfg.ep_fb)
+        iso_feedback();
+
+    if (iso_out_busy)
+    {
+        hcint = DWC_HCINT(ISO_CH_OUT);
+        if (!(hcint & HCINT_CHH))
+            return;                     /* not sent yet */
+        iso_out_busy = false;
+        if (hcint & HCINT_FRMOR)
+        {
+            /* set up too late for its microframe: send it again */
+            iso_arm(ISO_CH_OUT, false, iso_cfg.ep_out, iso_cfg.mps_out,
+                    iso_dma->buf[iso_buf], iso_bytes);
+            iso_out_busy = true;
+            return;
+        }
+        if (!(hcint & HCINT_XFERC))
+            iso_stats.errors++;
+    }
+
+    if (iso_cfg.begin && !iso_cfg.begin())
+        return;
+
+    now = DWC_HFNUM & HFNUM_UFRAMES;
+    delta = (now - iso_last_uframe) & HFNUM_UFRAMES;
+    iso_last_uframe = now;
+    iso_acc += iso_stats.feedback * MIN(delta, 64u);
+
+    max = MIN(iso_cfg.mps_out, ISO_BUF_BYTES) / iso_cfg.frame_bytes;
+    n = iso_acc >> 16;
+    if (n > max)
+    {
+        n = max;
+        iso_stats.underruns++;
+        /* never owe more than a few packets' worth */
+        if (iso_acc >> 16 > (uint32_t)max * 4)
+            iso_acc = (uint32_t)max * 4 << 16;
+    }
+    iso_acc -= (uint32_t)n << 16;
+
+    iso_buf ^= 1;
+    iso_bytes = n * iso_cfg.frame_bytes;
+    iso_cfg.fill(iso_dma->buf[iso_buf], n);
+    iso_arm(ISO_CH_OUT, false, iso_cfg.ep_out, iso_cfg.mps_out,
+            iso_dma->buf[iso_buf], iso_bytes);
+    iso_out_busy = true;
+    iso_stats.frames++;
+}
+
+bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
+{
+    if (!host_active || iso_stats.running || iso->frame_bytes <= 0)
+        return false;
+
+    commit_discard_dcache_range(&host_dw_iso_mem, sizeof host_dw_iso_mem);
+    iso_dma = USB_DW_UNCACHEDADDR(&host_dw_iso_mem);
+    iso_cfg = *iso;
+    memset(&iso_stats, 0, sizeof iso_stats);
+    iso_stats.feedback = iso->nominal;
+    iso_acc = 0;
+    iso_out_busy = iso_fb_busy = false;
+    iso_fb_every = MAX(1, iso->interval_fb * ISO_RATE / 8000);
+    iso_fb_count = iso_fb_every;
+    iso_last_uframe = DWC_HFNUM & HFNUM_UFRAMES;
+
+    iso_stats.running = true;
+    if (!timer_register(1, NULL, TIMER_FREQ / ISO_RATE, iso_timer))
+    {
+        iso_stats.running = false;
+        return false;
+    }
+    return true;
+}
+
+void usb_drv_host_iso_stop(void)
+{
+    if (!iso_stats.running)
+        return;
+    timer_unregister();
+    iso_stats.running = false;
+    iso_halt(ISO_CH_OUT);
+    iso_halt(ISO_CH_FB);
+}
+
+void usb_drv_host_iso_set_nominal(uint32_t nominal)
+{
+    int oldlevel = disable_irq_save();
+    iso_cfg.nominal = nominal;
+    iso_stats.feedback = nominal;
+    restore_irq(oldlevel);
+}
+
+void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)
+{
+    *st = iso_stats;
+}
+
 void usb_drv_host_start(void)
 {
 #ifndef USB_DW_TURNAROUND
@@ -1607,6 +1822,7 @@ void usb_drv_host_start(void)
 
 void usb_drv_host_stop(void)
 {
+    usb_drv_host_iso_stop();
     host_active = false;
     DWC_HPRT = 0;
     DWC_GUSBCFG &= ~FHMOD;
@@ -1626,6 +1842,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     hprt = DWC_HPRT;
     if (!(hprt & HPRT_CONN_STS))
     {
+        usb_drv_host_iso_stop();
         host_reset_done = false;
 #ifdef HAVE_USB_HOST
         usb_host_enum_clear();
