@@ -74,6 +74,12 @@ void audio_buffer_damaged(void);
 
 unsigned int playback_status(void);
 
+/* While set, nothing that plays is recorded as having played: no playcount,
+   resume point, playback log or scrobble. For playback that is not listening
+   -- the Music Quiz's clips. Set and cleared with playback stopped. */
+void audio_set_unrecorded(bool unrecorded);
+bool audio_is_unrecorded(void);
+
 struct mp3entry* get_temp_mp3entry(struct mp3entry *free);
 
 void allocate_playback_log(void);

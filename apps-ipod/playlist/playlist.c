@@ -166,6 +166,9 @@ extern void wps_playlist_percent_prepare(void);
 
 #define PLAYLIST_COMMAND_SIZE (MAX_PATH+12)
 
+/* Where playlist_set_aside() keeps the control file. */
+#define PLAYLIST_ASIDE_FILE PLAYLIST_CONTROL_FILE ".aside"
+
 /*
     Each playlist index has a flag associated with it which identifies what
     type of track it is.  These flags are stored in the 4 high order bits of
@@ -1957,6 +1960,14 @@ void playlist_init(void)
     on_disk_playlist.control_fd = -1;
     playlist->max_playlist_size = global_settings.max_files_in_playlist;
 
+    /* A playlist set aside and never brought back: the power went while the
+     * throwaway one was current. Before anything resumes. */
+    if (file_exists(PLAYLIST_ASIDE_FILE))
+    {
+        remove(PLAYLIST_CONTROL_FILE);
+        rename(PLAYLIST_ASIDE_FILE, PLAYLIST_CONTROL_FILE);
+    }
+
     handle = core_alloc_ex(playlist->max_playlist_size * sizeof(*playlist->indices), &ops);
     playlist->indices = core_get_data(handle);
 
@@ -2127,6 +2138,46 @@ int playlist_create(const char *dir, const char *file)
     dc_thread_start(playlist, true);
 
     return status;
+}
+
+bool playlist_set_aside(void)
+{
+    struct playlist_info* playlist = &current_playlist;
+    bool had;
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    /* Closes the control file without starting another, so the throwaway's
+     * playlist_create() finds none to rename out of its way. */
+    empty_playlist_unlocked(playlist, true);
+
+    remove(PLAYLIST_ASIDE_FILE);
+    had = file_exists(PLAYLIST_CONTROL_FILE)
+          && rename(PLAYLIST_CONTROL_FILE, PLAYLIST_ASIDE_FILE) >= 0;
+
+    playlist_write_unlock(playlist);
+    dc_thread_start(playlist, false);
+    return had;
+}
+
+bool playlist_bring_back(void)
+{
+    struct playlist_info* playlist = &current_playlist;
+    bool had;
+
+    dc_thread_stop(playlist);
+    playlist_write_lock(playlist);
+
+    empty_playlist_unlocked(playlist, true);
+
+    remove(PLAYLIST_CONTROL_FILE);
+    had = file_exists(PLAYLIST_ASIDE_FILE)
+          && rename(PLAYLIST_ASIDE_FILE, PLAYLIST_CONTROL_FILE) >= 0;
+
+    playlist_write_unlock(playlist);
+    dc_thread_start(playlist, false);
+    return had;
 }
 
 /* Returns false if 'steps' is out of bounds, else true */

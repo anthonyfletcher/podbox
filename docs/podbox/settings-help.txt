@@ -658,8 +658,9 @@ its own genre.
 The genre tag is the whole of the evidence. A genre counts if it has
 "audiobook", "audio book" or "spoken word" anywhere in it, so Audiobooks,
 Audiobook/Fiction and Spoken Word & Poetry all match; and it counts if it is
-exactly "book", "books", "spoken", "speech", "podcast", "non-music" or
-"nonmusic", which are too short to go looking for inside longer names.
+exactly "book", "books", "spoken", "speech", "podcast", "podcasts",
+"non-music" or "nonmusic", which are too short to go looking for inside
+longer names.
 Capitals make no difference.
 
 Books also keep their place. Pausing, stopping, switching the player off or
@@ -667,7 +668,10 @@ starting something else writes down where a book had got to, and opening that
 book again under Audiobooks puts a Resume row at the top of its chapter list.
 Choosing a chapter instead plays that chapter from its start. A book held in a
 single file has a chapter list only when Chapter Marks reads one out of it;
-otherwise playing it resumes it. The last sixteen books are remembered.
+otherwise playing it resumes it. The last sixty-four books are remembered.
+Above the first book on the list sit [Finished], [Not Started] and [In
+Progress], which sort the books by how far into them you are and play the one
+you choose; podcasts are in none of them.
 
 Nothing else is read. Track length and title look much the same on a book, a
 live set and a long classical movement, so a book tagged as music browses as

@@ -58,8 +58,32 @@ static const char * const exact_names[] = {
     "non-music",
     "nonmusic",
     "podcast",
+    "podcasts",
     NULL
 };
+
+/* Spoken word, but not a book: the shelf's states leave these out. */
+static const char * const podcast_names[] = {
+    "podcast",
+    "podcasts",
+    NULL
+};
+
+bool db_spoken_is_podcast_genre(const char *genre)
+{
+    int i;
+
+    if (!genre)
+        return false;
+
+    for (i = 0; podcast_names[i]; i++)
+    {
+        if (!strcasecmp(genre, podcast_names[i]))
+            return true;
+    }
+
+    return false;
+}
 
 bool db_spoken_is_spoken_genre(const char *genre)
 {

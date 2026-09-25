@@ -60,7 +60,9 @@ enum current_activity {
     ACTIVITY_SPIKE,
     ACTIVITY_FILE_SEARCH,
     ACTIVITY_PLAYLIST_SEARCH,
-    ACTIVITY_LISTENPROGRESS
+    ACTIVITY_LISTENPROGRESS,
+    ACTIVITY_BOOKSHELF,
+    ACTIVITY_MUSICQUIZ
 };
 
 /* custom string representation of activity */

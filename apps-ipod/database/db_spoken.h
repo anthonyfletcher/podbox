@@ -13,6 +13,10 @@
  * is the whole of the evidence -- nothing here reads the database. */
 bool db_spoken_is_spoken_genre(const char *genre);
 
+/* Whether 'genre' names a podcast -- spoken word, but a show rather than a
+ * book, so it has no end to have been finished. Exact match, ASCII folding. */
+bool db_spoken_is_podcast_genre(const char *genre);
+
 /* Read the library's genres and keep the seeks of the spoken-word ones.
  * False if the database could not be read, in which case the table is empty
  * and the caller should try again rather than record this as done.

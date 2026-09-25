@@ -1135,6 +1135,10 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_FEATURED_ARTISTS);
                     case GO_TO_FEATURED_TRACKS:
                         return exit_to_new_screen(GO_TO_FEATURED_TRACKS);
+                    case GO_TO_BOOK_SHELF:
+                        return exit_to_new_screen(GO_TO_BOOK_SHELF);
+                    case GO_TO_MUSIC_QUIZ:
+                        return exit_to_new_screen(GO_TO_MUSIC_QUIZ);
                     /* The file browser's and the catalogue's own Search rows
                      * (the FILE_ATTR_SEARCH case in browser_disk_enter()). */
                     case GO_TO_FILE_SEARCH:

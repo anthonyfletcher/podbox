@@ -55,6 +55,7 @@
 #include "browser.h"
 #include "root_menu.h"   /* GO_TO_* codes the synthetic rows return */
 #include "album_charts.h"
+#include "book_shelf.h"
 #include "input/action.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
@@ -145,6 +146,8 @@ enum table {
     TABLE_FEATURED_ARTISTS,
     TABLE_FEATURED_TRACKS,
     TABLE_BOOK_RESUME,
+    TABLE_BOOK_SHELF,
+    TABLE_MUSIC_QUIZ,
 };
 
 static const struct id3_to_search_mapping {
@@ -217,6 +220,7 @@ static const struct builtin_row {
       TABLE_ALBUM_CHARTS, ARTIST_CHART_FORGOTTEN,       NULL },
     { "featured_artists", LANG_FEATURED_ARTISTS, TABLE_FEATURED_ARTISTS, 0,
       featured_artists_available },
+    { "quiz", LANG_QUIZ, TABLE_MUSIC_QUIZ, 0, NULL },
 };
 
 /* The search screen scans the tag files, which off disk is a seek and a read
@@ -343,11 +347,9 @@ static int selected_item_history[MAX_DIR_LEVELS];
 static int table_history[MAX_DIR_LEVELS];
 static int extra_history[MAX_DIR_LEVELS];
 
-/* Set when a level is entered fresh (no restored position), and resolved at the
- * end of browser_db_load() once the special-row count for that level is known.
- * pending_top_item then carries the wanted top row out to the browser's list
- * sync; -1 means no preference. See browser_db_load(). */
-static bool position_past_specials;
+/* The top row a load wants shown, carried out to the browser's list sync; -1
+ * means no preference. Set at the end of browser_db_load() once the level's
+ * special-row count is known. */
 static int pending_top_item = -1;
 
 /* Whether the root menu's first drawn row is Search. Set by load_root(), read
@@ -2023,6 +2025,23 @@ static struct book_resume resume_pos;
 static bool resume_row;             /* the level being shown has the row */
 static bool resume_armed;           /* the next playlist starts at it */
 
+/* Whether the level being shown is the Audiobooks menu's list of books, which
+ * opens on the shelf's three rows (book_shelf.c) in place of <All tracks> and
+ * <Random>: a book is listened to in order and from where it was left, and
+ * where each one was left is what those rows sort by. The list of books is
+ * the album level at the top of a menu that asks for spoken word -- under
+ * Author the albums are a level down, and keep the usual rows. */
+static bool shelf_rows;
+
+static const struct {
+    int lang_id;
+    enum book_shelf kind;
+} shelf_row[] = {
+    { LANG_BOOK_SHELF_ROW_FINISHED, BOOK_SHELF_FINISHED },
+    { LANG_BOOK_SHELF_ROW_NEW,      BOOK_SHELF_NOT_STARTED },
+    { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
+};
+
 /* The book a track list is under -- its album, which is what the shelf
  * browses books by -- or NULL where this is not one. */
 static const char *level_book(struct browser_context *c, int level, int tag)
@@ -2090,7 +2109,11 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * own. Only the first page can carry the row, and the pages after it
      * keep the answer this one wrote. */
     if (offset == 0)
+    {
         resume_row = book_resume_row(c, level, tag);
+        shelf_rows = global_settings.segregate_audiobooks && level == 0
+                     && tag == tag_album && csi_mentions_spoken();
+    }
 
     /* Before the search: the table is built by searches of its own, which
      * cannot run inside this one. A table that would not build -- another
@@ -2266,7 +2289,28 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         sidx++;
     }
 
-    if (tag != tag_title && tag != tag_filename)
+    if (shelf_rows)
+    {
+        for (unsigned s = 0; s < ARRAYLEN(shelf_row); s++)
+        {
+            if (offset <= sidx)
+            {
+                /* The list the row opens rides in extraseek, as the chart
+                 * rows' do. */
+                dptr->newtable = TABLE_BOOK_SHELF;
+                dptr->name = ID2P(shelf_row[s].lang_id);
+                dptr->extraseek = shelf_row[s].kind;
+                dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+                dptr->idx_id = 0;
+                dptr++;
+                current_entry_count++;
+                c->special_entry_count++;
+            }
+            sidx++;
+        }
+    }
+
+    if (tag != tag_title && tag != tag_filename && !shelf_rows)
     {
         if (offset <= sidx)
         {
@@ -2283,7 +2327,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     }
     /* <Random> everywhere except over spoken word: playing a book's
      * chapters in a scrambled order is not something to offer. */
-    if (tag != tag_filename && !(tag == tag_title && csi_mentions_spoken()))
+    if (tag != tag_filename && !shelf_rows
+        && !(tag == tag_title && csi_mentions_spoken()))
     {
         if (offset <= sidx)
         {
@@ -2300,8 +2345,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     }
     /* [Featured In], on an artist's album list only -- see
      * featured_row_count(). It goes last of the three: putting it first would
-     * renumber the other two, and position_past_specials scrolls a freshly
-     * entered level past its special rows by counting them.
+     * renumber the other two, and browser_db_load() scrolls a level past its
+     * special rows by counting them.
      *
      * The label cannot be the artist's name. A special row's name has to
      * outlive the entry, which is why these all point at static strings
@@ -2937,17 +2982,11 @@ static int shortcut_base_level = -1;
  * top skips browser_db_exit(), which is what used to put currtable back --
  * leaving it pointing at the shortcut's listing for the next Music entry to
  * inherit. Recording the level instead keeps dirlevel, currtable and currextra
- * agreeing with each other, which everything else here assumes.
- *
- * It also asks for the <All tracks>/<Random> rows to be scrolled past.
- * browser_db_enter() arms that itself, but only on a visible descent, and a
- * shortcut enters with is_visible false -- so this was the one way into a list
- * that opened sitting on a special row. */
+ * agreeing with each other, which everything else here assumes. */
 static void enter_as_root_shortcut(struct browser_context *c)
 {
     shortcut_base_level = c->dirlevel;
     c->selected_item = 0;
-    position_past_specials = true;
 }
 
 bool browser_db_back_exits(const struct browser_context *c)
@@ -3158,9 +3197,6 @@ static bool enter_album_tracks_directly(struct browser_context *c, long album_se
     c->currtable = TABLE_NAVIBROWSE;
     c->currextra = 1;
     c->selected_item = 0;
-    /* Open on the first real track, not <All tracks>/<Random> -- same as a
-     * normal descent (see position_past_specials in browser_db_load()). */
-    position_past_specials = true;
     strmemccpy(current_title[c->currextra], album_title,
                sizeof(current_title[0]));
     return true;
@@ -3190,9 +3226,6 @@ static bool enter_artist_albums_directly(struct browser_context *c,
     c->currtable = TABLE_NAVIBROWSE;
     c->currextra = 1;
     c->selected_item = 0;
-    /* Open on the first real album, not <All tracks> -- same as a normal
-     * descent (see position_past_specials in browser_db_load()). */
-    position_past_specials = true;
     strmemccpy(current_title[c->currextra], artist_title,
                sizeof(current_title[0]));
     return true;
@@ -3356,6 +3389,17 @@ int browser_db_get_main_menu_tag_row_count(void)
         }
     }
     return count;
+}
+
+/* Whether row 'i' is the one standing for everything with no value for the
+ * level's tag. */
+static bool entry_is_untagged(struct browser_context *c, int i)
+{
+    struct tagentry *e = browser_db_get_entry(c, i);
+
+    return e != NULL
+        && !strcmp((const char *)P2STR((unsigned char *)e->name),
+                   (const char *)str(LANG_TAGNAVI_UNTAGGED));
 }
 
 int browser_db_load(struct browser_context* c)
@@ -3564,41 +3608,38 @@ int browser_db_load(struct browser_context* c)
         pending_top_item = 1;
     }
 
-    /* A freshly entered level opens on its first real row rather than on
-     * <All tracks>/<Random>: those are shortcuts, not what the list is *for*,
-     * and landing on one meant an extra press on every descent. Deferred to
-     * here because special_entry_count is only known once the entries have been
-     * built. Restored positions (coming back up a level) are left alone. */
-    if (position_past_specials)
+    /* Every list shows with its special rows -- <All tracks>, <Random>, the
+     * book shelf's -- scrolled off the top and the cursor on a real row,
+     * however it was arrived at: opened, come back up to, or returned to from
+     * a screen one of those rows led to. They are shortcuts, not what the list
+     * is for, and a list that looked different depending on how it was reached
+     * read as a fault. A stored position on a special row is moved off it for
+     * the same reason. Deferred to here because special_entry_count is only
+     * known once the entries have been built.
+     *
+     * Except the cursor on a book already started: its Resume row is what the
+     * list is for, and moving off it would hide the only row that plays the
+     * book rather than a chapter of it. */
+    if (c->special_entry_count > 0 && count > c->special_entry_count)
     {
-        position_past_specials = false;
-        /* selected_item == 0 confirms this really is a list opening at the top
-         * rather than one restoring a stored position -- the request is armed
-         * one navigation earlier, so it must not act on a load that has since
-         * been given a real position to return to. */
-        /* Except on a book already started: its Resume row is what the list
-         * is for, and scrolling it away would hide the only row that plays
-         * the book rather than a chapter of it. */
-        if (!resume_row && c->selected_item == 0 && c->special_entry_count > 0 &&
-            count > c->special_entry_count)
-        {
-            c->selected_item = c->special_entry_count;
-            /* Also scroll them off the top, so the list reads as starting at
-             * the first real row. Consumed once by the browser's list sync. */
-            pending_top_item = c->special_entry_count;
-        }
-    }
-    else if (c->special_entry_count > 0
-             && c->selected_item >= c->special_entry_count)
-    {
-        /* Coming back to a level, on a row past the special ones. Ask for the
-         * same top row: the list keeps one row above the cursor of its own
-         * accord, so returning to the first album or two put <All tracks> back
-         * on screen even though the descent had scrolled it away -- the list
-         * looked different depending on how it was arrived at. The browser
-         * drops this request if the selection is too far down for it, in which
-         * case the special rows are off the top anyway. */
-        pending_top_item = c->special_entry_count;
+        int first = c->special_entry_count;
+
+        /* [Untagged] sorts to the head of a list of names, where it reads as
+         * one more special row, and goes with them. Asked only when the
+         * cursor would land on or above it: that row is on the page just
+         * loaded, where one lower down might not be. */
+        if (c->selected_item <= first && first + 1 < count
+            && entry_is_untagged(c, first))
+            first++;
+
+        if (c->selected_item < first && !resume_row)
+            c->selected_item = first;
+
+        /* Consumed once by the browser's list sync. It drops the request if
+         * the selection is too far down for it, in which case the special
+         * rows are off the top anyway. */
+        if (c->selected_item >= first)
+            pending_top_item = first;
     }
 
     return count;
@@ -3874,6 +3915,13 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
     }
     if (newextra == TABLE_RANDOM_ALBUM)
         return GO_TO_RANDOM_ALBUM;
+    if (newextra == TABLE_BOOK_SHELF)
+    {
+        book_shelf_arm(seek);
+        return GO_TO_BOOK_SHELF;
+    }
+    if (newextra == TABLE_MUSIC_QUIZ)
+        return GO_TO_MUSIC_QUIZ;
 
     if (newextra == TABLE_DB_SEARCH)
     {
@@ -3950,14 +3998,6 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             max_history_level = c->dirlevel + 1;
             if (max_history_level < MAX_DIR_LEVELS)
                 selected_item_history[max_history_level] = 0;
-            /* The level being entered has no stored position -- the line above
-             * just zeroed it. That, not the "no history" branch further down,
-             * is what a fresh descent looks like: max_history_level now equals
-             * the new dirlevel, so the selection is restored from this
-             * zeroed entry rather than defaulted. Ask the load to put the
-             * cursor past that level's special rows once their count is known
-             * (see browser_db_load()). */
-            position_past_specials = true;
         }
 
         selected_item_history[c->dirlevel]=c->selected_item;

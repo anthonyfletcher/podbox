@@ -44,6 +44,7 @@ screens/browse/browser_db.c
 screens/browse/album_charts.c
 screens/browse/featured_artists.c
 screens/browse/listen_progress.c
+screens/browse/book_shelf.c
 #endif
 
 playlist/catalog.c
@@ -176,6 +177,8 @@ games/spike/spike_score.c
 games/spike/spike_tap.c
 games/spike/spike_text.c
 games/spike/spike_world.c
+games/quiz/quiz.c
+games/quiz/quiz_pick.c
 
 screens/settings/display_settings.c
 screens/settings/eq_settings.c

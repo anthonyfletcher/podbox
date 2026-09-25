@@ -112,8 +112,11 @@ struct play_rec
  *   PFII -> PFIJ: the header gained the deleted count.
  *   PFIJ -> PFIK: artist_ct/album_ct are int32_t rather than uint16_t, which
  *                 moves every field after them. They have to be: a 16-bit
- *                 count wraps silently past 65535 albums. */
-#define INDEX_HDR "PFIK"
+ *                 count wraps silently past 65535 albums.
+ *   PFIK -> PFIL: no layout change. "podcasts" became a spoken genre, and an
+ *                 index written before that still lists those albums as
+ *                 music -- a change of meaning the layout checks cannot see. */
+#define INDEX_HDR "PFIL"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 

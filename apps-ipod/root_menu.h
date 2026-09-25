@@ -113,6 +113,13 @@ enum {
      * the catalogue rather than to the root. */
     GO_TO_FILE_SEARCH,
     GO_TO_PLAYLIST_SEARCH,
+    /* One of the Audiobooks shelf's three states, chosen by book_shelf_arm()
+     * (screens/browse/book_shelf.c). Reached only from that menu's built-in
+     * rows, so it has no root-menu entry. */
+    GO_TO_BOOK_SHELF,
+    /* The Music Quiz (games/quiz/). Reached from the Music menu's built-in
+     * row, so it has no root-menu entry of its own. */
+    GO_TO_MUSIC_QUIZ,
 };
 extern struct menu_item_ex root_menu_;
 

@@ -97,6 +97,7 @@ enum {
     CONTEXT_USB_HID_MODE_BROWSER,
     CONTEXT_USB_HID_MODE_MOUSE,
     CONTEXT_SPIKE, /* uses the ACTION_SPIKE_ defines below */
+    CONTEXT_MUSIC_QUIZ, /* uses the ACTION_QUIZ_ defines below */
     LAST_CONTEXT_PLACEHOLDER,
 };
 
@@ -303,6 +304,13 @@ enum {
     ACTION_SPIKE_NEXT,
     ACTION_SPIKE_PREV,
     ACTION_SPIKE_OPTIONS,
+
+    /* The Music Quiz. */
+    ACTION_QUIZ_UP,
+    ACTION_QUIZ_DOWN,
+    ACTION_QUIZ_PICK,
+    ACTION_QUIZ_PAUSE,
+    ACTION_QUIZ_LEAVE,
 
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };

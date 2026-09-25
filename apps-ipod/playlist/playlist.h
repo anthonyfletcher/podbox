@@ -110,6 +110,14 @@ void playlist_init(void) INIT_ATTR;
 void playlist_shutdown(void);
 int playlist_create(const char *dir, const char *file);
 int playlist_resume(void);
+/* Put the current playlist's control file to one side, leaving no current
+   playlist, so a throwaway one can be built and played without losing it.
+   Playback must be stopped. False if there was nothing to set aside.
+   playlist_bring_back() discards the throwaway and restores it, ready for
+   playlist_resume(); true if there was one to restore. A power cut between
+   the two is undone by playlist_init() at the next boot. */
+bool playlist_set_aside(void);
+bool playlist_bring_back(void);
 int playlist_shuffle(int random_seed, int start_index);
 unsigned int playlist_get_filename_crc32(struct playlist_info *playlist,
                                          int index);

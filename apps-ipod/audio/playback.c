@@ -1489,11 +1489,30 @@ static void send_track_event(unsigned int id, unsigned int flags,
     send_event(id, &(struct track_event){ .flags = flags, .id3 = id3 });
 }
 
+/* See audio_set_unrecorded(). Read on the audio thread, written by the UI
+ * thread only while playback is stopped. */
+static volatile bool unrecorded = false;
+
+void audio_set_unrecorded(bool on)
+{
+    unrecorded = on;
+}
+
+bool audio_is_unrecorded(void)
+{
+    return unrecorded;
+}
+
 /* Announce the end of playing the current track */
 static void audio_playlist_track_finish(void)
 {
     struct mp3entry *ply_id3 = id3_get(PLAYING_ID3);
     struct mp3entry *id3 = valid_mp3entry(ply_id3);
+
+    /* The finish event is what counts a play and writes the autoresume
+     * point; the log is the scrobbler's and the Playback Report's. */
+    if (unrecorded)
+        return;
 
     playlist_update_resume_info(filling == STATE_ENDED ? NULL : id3);
     if (id3)
@@ -1518,7 +1537,8 @@ static void audio_playlist_track_change(void)
 
     position_key = pcmbuf_get_position_key();
 
-    playlist_update_resume_info(id3);
+    if (!unrecorded)
+        playlist_update_resume_info(id3);
 }
 
 /* Change the data for the next track and send the event */

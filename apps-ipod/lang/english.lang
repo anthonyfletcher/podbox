@@ -21907,3 +21907,395 @@
     *: "Nothing here has been analysed"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_BOOKS_IN_PROGRESS
+  desc: Audiobooks menu: the books started and not finished
+  user: core
+  <source>
+    *: "In progress"
+  </source>
+  <dest>
+    *: "In progress"
+  </dest>
+  <voice>
+    *: "In progress"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_NOT_STARTED
+  desc: Audiobooks menu: the books nothing of which has been played
+  user: core
+  <source>
+    *: "Not started"
+  </source>
+  <dest>
+    *: "Not started"
+  </dest>
+  <voice>
+    *: "Not started"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_FINISHED
+  desc: Audiobooks menu: the books played through to the end
+  user: core
+  <source>
+    *: "Finished"
+  </source>
+  <dest>
+    *: "Finished"
+  </dest>
+  <voice>
+    *: "Finished"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW
+  desc: a row of the Audiobooks In progress list: book name, percent heard
+  user: core
+  <source>
+    *: "%s - %d%%"
+  </source>
+  <dest>
+    *: "%s - %d%%"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_EMPTY
+  desc: splash when an Audiobooks In progress, Not started or Finished list is empty
+  user: core
+  <source>
+    *: "No books here"
+  </source>
+  <dest>
+    *: "No books here"
+  </dest>
+  <voice>
+    *: "No books here"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_QUIZ
+  desc: main menu: the Music Quiz, a name-that-track game
+  user: core
+  <source>
+    *: "Music Quiz"
+  </source>
+  <dest>
+    *: "Music Quiz"
+  </dest>
+  <voice>
+    *: "Music Quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_STOP_PLAYBACK
+  desc: Music Quiz: asked before stopping what is playing
+  user: core
+  <source>
+    *: "Stop playback?"
+  </source>
+  <dest>
+    *: "Stop playback?"
+  </dest>
+  <voice>
+    *: "Stop playback?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE
+  desc: Music Quiz: asked on Menu during a round
+  user: core
+  <source>
+    *: "Leave the quiz?"
+  </source>
+  <dest>
+    *: "Leave the quiz?"
+  </dest>
+  <voice>
+    *: "Leave the quiz?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TOO_FEW
+  desc: Music Quiz: the library has too few tracks to make ten rounds
+  user: core
+  <source>
+    *: "Not enough music for a quiz"
+  </source>
+  <dest>
+    *: "Not enough music for a quiz"
+  </dest>
+  <voice>
+    *: "Not enough music for a quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_BEST
+  desc: Music Quiz: the best score so far, under a result that did not beat it
+  user: core
+  <source>
+    *: "Best %d"
+  </source>
+  <dest>
+    *: "Best %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_NEW_BEST
+  desc: Music Quiz result: the score beats the best so far
+  user: core
+  <source>
+    *: "New best"
+  </source>
+  <dest>
+    *: "New best"
+  </dest>
+  <voice>
+    *: "New best"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LISTENING
+  desc: Music Quiz: before the clip can be heard; nothing drains yet
+  user: core
+  <source>
+    *: "Listening..."
+  </source>
+  <dest>
+    *: "Listening..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_RIGHT
+  desc: Music Quiz: the title picked was the track's
+  user: core
+  <source>
+    *: "Right"
+  </source>
+  <dest>
+    *: "Right"
+  </dest>
+  <voice>
+    *: "Right"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_WRONG
+  desc: Music Quiz: the title picked was not the track's
+  user: core
+  <source>
+    *: "Not that one"
+  </source>
+  <dest>
+    *: "Not that one"
+  </dest>
+  <voice>
+    *: "Not that one"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TIMES_UP
+  desc: Music Quiz: the round ran out before a title was picked
+  user: core
+  <source>
+    *: "Time's up"
+  </source>
+  <dest>
+    *: "Time's up"
+  </dest>
+  <voice>
+    *: "Time's up"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED
+  desc: Music Quiz: the round is paused
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "Paused"
+  </dest>
+  <voice>
+    *: "Paused"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED_HINT
+  desc: Music Quiz: under Paused, how to carry on
+  user: core
+  <source>
+    *: "Press Play to resume"
+  </source>
+  <dest>
+    *: "Press Play to resume"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_OUT_OF
+  desc: Music Quiz result: beside the score, the most it could have been
+  user: core
+  <source>
+    *: "of %d"
+  </source>
+  <dest>
+    *: "of %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_EASIER
+  desc: Music Quiz result: under the first round's tile
+  user: core
+  <source>
+    *: "easier"
+  </source>
+  <dest>
+    *: "easier"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_HARDER
+  desc: Music Quiz result: under the last round's tile
+  user: core
+  <source>
+    *: "harder"
+  </source>
+  <dest>
+    *: "harder"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_SELECT
+  desc: Music Quiz result: the name of the key that plays again
+  user: core
+  <source>
+    *: "Select"
+  </source>
+  <dest>
+    *: "Select"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PLAY_AGAIN
+  desc: Music Quiz result: what the Select key does
+  user: core
+  <source>
+    *: "play again"
+  </source>
+  <dest>
+    *: "play again"
+  </dest>
+  <voice>
+    *: "Play again"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_MENU
+  desc: Music Quiz result: the name of the key that leaves
+  user: core
+  <source>
+    *: "Menu"
+  </source>
+  <dest>
+    *: "Menu"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE_HINT
+  desc: Music Quiz result: what the Menu key does
+  user: core
+  <source>
+    *: "leave"
+  </source>
+  <dest>
+    *: "leave"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ
+  desc: Music menu: the row that starts the Music Quiz
+  user: core
+  <source>
+    *: "Quiz"
+  </source>
+  <dest>
+    *: "Quiz"
+  </dest>
+  <voice>
+    *: "Quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_PROGRESS
+  desc: top of the Audiobooks Book list: the books started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[In Progress]"
+  </dest>
+  <voice>
+    *: "In progress"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_NEW
+  desc: top of the Audiobooks Book list: the books not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[Not Started]"
+  </dest>
+  <voice>
+    *: "Not started"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_FINISHED
+  desc: top of the Audiobooks Book list: the books finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[Finished]"
+  </dest>
+  <voice>
+    *: "Finished"
+  </voice>
+</phrase>

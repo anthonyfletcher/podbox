@@ -54,6 +54,8 @@
 #include "screens/system/file_search.h"
 #include "dircache.h"                 /* whether the file search has a source */
 #include "screens/browse/album_charts.h"
+#include "screens/browse/book_shelf.h"
+#include "games/quiz/quiz.h"
 #include "screens/browse/featured_artists.h"
 #include "screens/browse/browser_flat.h"
 #include "speech/language.h"
@@ -724,6 +726,14 @@ static int random_album_scrn(void* param)
     return album_random();
 }
 
+static int book_shelf_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return book_shelf_run();
+}
+
 /* No database wait for these two: their list comes from the file index, which
  * walks the disk itself and knows nothing about the tag database. */
 static int documents_scrn(void* param)
@@ -747,6 +757,14 @@ static int playback_viewer_scrn(void* param)
 {
     (void)param;
     return pv_row_screen();
+}
+
+static int music_quiz_scrn(void* param)
+{
+    (void)param;
+    if (!wait_for_tagcache_ready())
+        return GO_TO_PREVIOUS;
+    return music_quiz_screen();
 }
 
 /* These are all static const'd from apps/menus/ *.c
@@ -797,6 +815,7 @@ static const struct root_items items[] = {
     [GO_TO_LASTDOC] = { lastdoc_scrn, NULL, &text_viewer_menu },
     [GO_TO_ALBUM_CHARTS] = { album_charts_scrn, NULL, &tagcache_menu },
     [GO_TO_RANDOM_ALBUM] = { random_album_scrn, NULL, &tagcache_menu },
+    [GO_TO_BOOK_SHELF] = { book_shelf_scrn, NULL, &tagcache_menu },
     [GO_TO_DB_SEARCH] = { db_search_scrn, NULL, &tagcache_menu },
     [GO_TO_FILE_SEARCH] = { file_search_scrn, NULL, &file_menu },
     [GO_TO_FEATURED_ARTISTS] = { featured_artists_scrn, NULL, &music_menu },
@@ -804,6 +823,7 @@ static const struct root_items items[] = {
     [GO_TO_DOCUMENTS] = { documents_scrn, NULL, &text_viewer_menu },
     [GO_TO_IMAGES] = { images_scrn, NULL, NULL },
     [GO_TO_SPUN] = { playback_viewer_scrn, NULL, NULL },
+    [GO_TO_MUSIC_QUIZ] = { music_quiz_scrn, NULL, &tagcache_menu },
     [GO_TO_ALBUM_COVERS_TRACKS] = { browser, (void*)GO_TO_ALBUM_COVERS_TRACKS, &tagcache_menu },
 /* One reserved slot per tagnavi.config root-menu tag-browse row (see
  * GO_TO_TAGNAVI_FIRST in root_menu.h); all share the same dispatch function

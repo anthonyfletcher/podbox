@@ -909,8 +909,8 @@ are only ever appended to, never renumbered.
 | 5 playlist viewer | 15 context menu | 25 folder picker | 35 file search |
 | 6 settings | 16 system screen | 26 album charts | 36 playlist search |
 | 7 files | 17 time and date | 27 documents | 37 listening progress |
-| 8 database | 18 bookmarks | 28 images | |
-| 9 *unused* | 19 shortcuts | 29 search | |
+| 8 database | 18 bookmarks | 28 images | 38 book shelf |
+| 9 *unused* | 19 shortcuts | 29 search | 39 music quiz |
 
 The gaps are real and stay: 3 and 4 are recording and radio, 9 and 14 the plugin
 browser and a running plugin, 11 the pitch screen. None of them can happen here.

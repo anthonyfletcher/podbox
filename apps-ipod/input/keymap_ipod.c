@@ -84,6 +84,24 @@ static const struct button_mapping button_context_spike[]  = {
     LAST_ITEM_IN_LIST
 }; /* button_context_spike */
 
+/* No cascade, for Spike's reason: a turn of the wheel is the highlight here
+   and must not fall through to the volume. The answer is taken on the
+   release, so a held SELECT cannot answer twice. */
+static const struct button_mapping button_context_music_quiz[]  = {
+    { ACTION_QUIZ_PICK,  BUTTON_SELECT|BUTTON_REL,         BUTTON_SELECT },
+    { ACTION_NONE,       BUTTON_SELECT|BUTTON_REPEAT,      BUTTON_NONE },
+    { ACTION_QUIZ_PAUSE, BUTTON_PLAY|BUTTON_REL,           BUTTON_PLAY },
+    { ACTION_NONE,       BUTTON_PLAY|BUTTON_REPEAT,        BUTTON_NONE },
+    { ACTION_QUIZ_LEAVE, BUTTON_MENU|BUTTON_REL,           BUTTON_MENU },
+    { ACTION_NONE,       BUTTON_MENU|BUTTON_REPEAT,        BUTTON_NONE },
+    { ACTION_QUIZ_UP,    BUTTON_SCROLL_BACK,               BUTTON_NONE },
+    { ACTION_QUIZ_UP,    BUTTON_SCROLL_BACK|BUTTON_REPEAT, BUTTON_NONE },
+    { ACTION_QUIZ_DOWN,  BUTTON_SCROLL_FWD,                BUTTON_NONE },
+    { ACTION_QUIZ_DOWN,  BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },
+
+    LAST_ITEM_IN_LIST
+}; /* button_context_music_quiz */
+
 static const struct button_mapping button_context_tree[]  = {
     { ACTION_TREE_WPS,          BUTTON_PLAY|BUTTON_REL,      BUTTON_PLAY },
     /* Held PLAY does nothing here either. This context serves the main menu as
@@ -436,6 +454,9 @@ const struct button_mapping* get_context_mapping(int context)
 
         case CONTEXT_SPIKE:
             return button_context_spike;
+
+        case CONTEXT_MUSIC_QUIZ:
+            return button_context_music_quiz;
 
         case CONTEXT_SETTINGS_TIME:
         case CONTEXT_SETTINGS_COLOURCHOOSER:
