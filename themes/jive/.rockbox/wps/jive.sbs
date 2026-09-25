@@ -49,12 +49,14 @@
 #- Hidden list for the quick screen
 %Vi(qsblank,0,0,1,1,-)
 #
-#- Play state, hold and busy
+#- Play state and hold
 %V(8,4,24,24,3)%Vf(ffffff)
 %?mp<|A|B|G|F>
 %V(32,4,24,24,3)%Vf(ffffff)
 %?mh<À|%?mr<À|>>
-%V(56,4,24,24,3)%Vf(ffffff)
+#
+#- Busy, beside the battery
+%V(262,4,24,24,3)%Vf(ffffff)
 %?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
 #
 #- Title: the clock on the main menu
