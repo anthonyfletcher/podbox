@@ -22327,3 +22327,54 @@
     *: "Finished"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_USB_DAC_OUTPUT
+  desc: in the System > USB menu
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "USB DAC Output"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB DAC Output"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "U S B DAC output"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_ON
+  desc: splash: playback has moved to a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through USB DAC"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Playing through USB DAC"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Playing through U S B DAC"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OFF
+  desc: splash: playback has moved back from a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </voice>
+</phrase>

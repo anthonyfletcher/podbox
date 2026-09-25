@@ -1190,6 +1190,14 @@ buttons can drive playback there.
 What the buttons send while acting as a USB device: media keys, a mouse, or
 presentation controls.
 
+[usb dac output]
+On Auto, a USB DAC plugged into the dock connector takes over playback, and
+unplugging it hands playback back to the headphone socket. It is checked for
+only when no computer answers the cable within two seconds.
+
+The DAC needs its own power, such as a USB-C splitter with a charger in it.
+Off leaves every cable to the computer and charging.
+
 [talk menu]
 Speaks menu entries aloud. Needs a voice file on the player.
 

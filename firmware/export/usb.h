@@ -120,6 +120,9 @@ enum
     USB_NOTIFY_BUS_RESET,    /* Event */
     USB_NOTIFY_CLASS_DRIVER, /* Event - notify_event() of specified class driver */
     USB_HOST_PROBE,          /* Event - data: port to the host probe or back */
+#ifdef HAVE_USB_HOST_AUDIO
+    USB_HOST_AUTO,           /* Event - the next step of looking for a DAC */
+#endif
 #endif
 #ifdef USB_FIREWIRE_HANDLING
     USB_REQUEST_REBOOT,      /* Event */
@@ -269,6 +272,11 @@ const struct usb_insert_record *usb_get_insert_record(void);
 /* Give the port to the USB host probe (true) or back to the device stack.
  * While the probe has it, cable insertion and removal are ignored. */
 void usb_set_host_probe(bool on);
+#endif
+#ifdef HAVE_USB_HOST_AUDIO
+/* Whether a cable that no computer answers is tried as a USB DAC:
+ * 0 off, 1 auto */
+void usb_set_dac_output(int mode);
 #endif
 #endif /* !BOOTLOADER */
 #ifdef USB_STATUS_BY_EVENT

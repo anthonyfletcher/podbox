@@ -359,6 +359,15 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
         case SYS_PHONE_UNPLUGGED:
             hp_unplug_change(false);
             return SYS_PHONE_UNPLUGGED;
+#ifdef HAVE_USB_HOST_AUDIO
+        case SYS_USB_DAC_ON:
+            splash(HZ, ID2P(LANG_USB_DAC_ON));
+            return SYS_USB_DAC_ON;
+
+        case SYS_USB_DAC_OFF:
+            splash(HZ, ID2P(LANG_USB_DAC_OFF));
+            return SYS_USB_DAC_OFF;
+#endif
 #ifdef HAVE_MULTIMEDIA_KEYS
         /* Multimedia keys bypass the action system entirely -- action.c lets
          * them through as raw button codes, so every screen reaches them here

@@ -39,6 +39,7 @@
 #include "usb_core.h"
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
+#include "usb_drv.h"
 #include "usb_host_audio.h"
 #endif
 #include "logf.h"
@@ -129,6 +130,19 @@ static int usb_audio = 0;
 static bool usb_host_present = false;
 /* The host probe owns the controller: cable events are not acted on. */
 static bool usb_host_probe_on = false;
+#ifdef HAVE_USB_HOST_AUDIO
+/* Looking for a DAC. A cable that no computer has reset the bus on within
+ * USB_DAC_WAIT gets one try as a host: poll for a device, and play to it if
+ * it is USB audio, else give the port back. Once per insertion -- any end
+ * of host mode counts as the try, so only a real extraction re-arms it. */
+#define USB_DAC_WAIT        (2*HZ)
+#define USB_DAC_POLL        (HZ/10)
+#define USB_DAC_MAX_POLLS   15
+static bool usb_dac_auto = true;
+static bool usb_dac_tried = false;
+static int usb_dac_polls = 0;           /* >0 while a try is polling */
+static struct timeout usb_dac_tmo;
+#endif
 static int usb_num_acks_to_expect = 0;
 static uint32_t usb_broadcast_seqnum = 0x80000000;
 
@@ -498,6 +512,76 @@ void usb_set_host_probe(bool on)
 {
     queue_post(&usb_queue, USB_HOST_PROBE, on);
 }
+
+static void usb_host_probe_switch(bool on)
+{
+    if(on == usb_host_probe_on)
+        return;
+    usb_host_probe_on = on;
+    if(on)
+    {
+        usb_extract();
+        usb_host_probe_enable(true);
+        return;
+    }
+
+#ifdef HAVE_USB_HOST_AUDIO
+    usb_host_audio_stop();
+    usb_dac_tried = true;
+    usb_dac_polls = 0;
+#endif
+    usb_host_probe_enable(false);
+    /* Insertions were dropped meanwhile; replay the cable. */
+    queue_post(&usb_queue, usb_detect(), 0);
+}
+#endif
+
+#ifdef HAVE_USB_HOST_AUDIO
+void usb_set_dac_output(int mode)
+{
+    usb_dac_auto = mode != 0;
+}
+
+static int usb_dac_tmo_cb(struct timeout *tmo)
+{
+    (void)tmo;
+    queue_post(&usb_queue, USB_HOST_AUTO, 0);
+    return 0;
+}
+
+/* The first step is the USB_DAC_WAIT timer: a computer, or a car or dock
+ * that reads the player as a disk or over iAP, has reset the bus by then.
+ * Each later step is one poll of the port, which resets and enumerates a
+ * device as soon as one connects. */
+static void usb_dac_auto_step(void)
+{
+    const struct usb_drv_host_enum *e;
+    struct usb_drv_host_status st;
+
+    if(usb_dac_polls == 0)
+    {
+        if(!usb_dac_auto || usb_dac_tried || usb_host_probe_on ||
+           usb_state != USB_INSERTED || usb_record.bus_resets > 0)
+            return;
+        usb_host_probe_switch(true);
+        usb_dac_polls = 1;
+    }
+
+    usb_drv_host_poll(&st);
+    e = usb_drv_host_get_enum();
+    if(e->result == 1 && usb_host_audio_start())
+    {
+        usb_dac_polls = 0;
+        return;
+    }
+    if(e->result != 0 || ++usb_dac_polls > USB_DAC_MAX_POLLS ||
+       usb_detect() == USB_EXTRACTED)
+    {
+        usb_host_probe_switch(false);
+        return;
+    }
+    timeout_register(&usb_dac_tmo, usb_dac_tmo_cb, USB_DAC_POLL, 0);
+}
 #endif
 
 /*--- General driver code ---*/
@@ -585,6 +669,11 @@ static void NORETURN_ATTR usb_thread(void)
             usb_state = USB_INSERTED;
             usb_set_host_present(true);
 #endif
+#ifdef HAVE_USB_HOST_AUDIO
+            if(usb_dac_auto && !usb_dac_tried)
+                timeout_register(&usb_dac_tmo, usb_dac_tmo_cb,
+                                 USB_DAC_WAIT, 0);
+#endif
             break;
             /* USB_INSERTED */
 
@@ -611,29 +700,21 @@ static void NORETURN_ATTR usb_thread(void)
             /* SYS_USB_CONNECTED_ACK */
 
         case USB_EXTRACTED:
+#ifdef HAVE_USB_HOST_AUDIO
+            usb_dac_tried = false;
+#endif
             usb_extract();
             break;
             /* USB_EXTRACTED: */
 
 #if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
         case USB_HOST_PROBE:
-            if((bool)ev.data == usb_host_probe_on)
-                break;
-            usb_host_probe_on = ev.data;
-            if(usb_host_probe_on)
-            {
-                usb_extract();
-                usb_host_probe_enable(true);
-            }
-            else
-            {
-#ifdef HAVE_USB_HOST_AUDIO
-                usb_host_audio_stop();
+            usb_host_probe_switch(ev.data);
+            break;
 #endif
-                usb_host_probe_enable(false);
-                /* Insertions were dropped meanwhile; replay the cable. */
-                queue_post(&usb_queue, usb_detect(), 0);
-            }
+#ifdef HAVE_USB_HOST_AUDIO
+        case USB_HOST_AUTO:
+            usb_dac_auto_step();
             break;
 #endif
 

@@ -1353,6 +1353,9 @@ void settings_apply(bool read_disk)
 
 
     usb_set_mode(global_settings.usb_mode);
+#ifdef HAVE_USB_HOST_AUDIO
+    usb_set_dac_output(global_settings.usb_dac_output);
+#endif
 
     /* already called with THEME_STATUSBAR in settings_apply_skins() */
     CHART(">viewportmanager_theme_changed");

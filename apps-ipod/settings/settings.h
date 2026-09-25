@@ -870,6 +870,9 @@ struct user_settings
 
     bool usb_hid;
     int usb_keypad_mode;
+#ifdef HAVE_USB_HOST_AUDIO
+    int usb_dac_output;         /* 0 off, 1 auto */
+#endif
 
 #ifdef USB_ENABLE_AUDIO
     int usb_audio;

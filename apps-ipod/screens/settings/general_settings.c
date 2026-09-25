@@ -468,6 +468,9 @@ MENUITEM_SETTING(remote_track_skip, &global_settings.remote_track_skip,
 #endif
 MENUITEM_SETTING(usb_hid, &global_settings.usb_hid, NULL);
 MENUITEM_SETTING(usb_keypad_mode, &global_settings.usb_keypad_mode, NULL);
+#ifdef HAVE_USB_HOST_AUDIO
+MENUITEM_SETTING(usb_dac_output, &global_settings.usb_dac_output, NULL);
+#endif
 #ifdef USB_ENABLE_AUDIO
 /* The receive buffers are claimed at boot, from this setting -- the driver
  * cannot claim them itself, because doing that from the USB thread wedges the
@@ -500,6 +503,9 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
             &usb_keypad_mode,
 #ifdef USB_ENABLE_AUDIO
             &usb_audio,
+#endif
+#ifdef HAVE_USB_HOST_AUDIO
+            &usb_dac_output,
 #endif
          );
 

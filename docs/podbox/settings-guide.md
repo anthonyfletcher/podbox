@@ -490,6 +490,7 @@ shadow to colour.
 | USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only is useful with a car or a plug that would otherwise interrupt playback. | mass storage |  |
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
+| USB DAC Output | On Auto, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is checked for only when no computer answers the cable within two seconds. The DAC needs its own power, such as a USB-C splitter with a charger in it. Off leaves every cable to the computer and charging. | auto |  |
 
 ### System — Accessories
 

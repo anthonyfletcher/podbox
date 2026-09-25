@@ -31,6 +31,7 @@
 #include <string.h>
 #include "system.h"
 #include "fixedpoint.h"
+#include "kernel.h"
 #include "pcm-internal.h"
 #include "pcm_mixer.h"
 #include "pcm_sampr.h"
@@ -371,6 +372,7 @@ bool usb_host_audio_start(void)
 #undef STEP
 
     status.state = "on";
+    queue_broadcast(SYS_USB_DAC_ON, 0);
     return true;
 }
 
@@ -380,6 +382,7 @@ bool usb_host_audio_start(void)
 void usb_host_audio_stop(void)
 {
     struct usb_drv_host_iso_stats st;
+    bool was_on = !strcmp(status.state, "on");
 
     if (pcm_current_sink() == PCM_SINK_USB_HOST)
         mixer_switch_sink(PCM_SINK_BUILTIN);
@@ -393,6 +396,8 @@ void usb_host_audio_stop(void)
                                  NULL, 0);
     }
     status.state = "off";
+    if (was_on)
+        queue_broadcast(SYS_USB_DAC_OFF, 0);
 }
 
 const struct usb_host_audio_status *usb_host_audio_get_status(void)
