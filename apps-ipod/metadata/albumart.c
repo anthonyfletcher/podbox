@@ -93,8 +93,10 @@ static bool try_exts(char *path, int len)
  *  ./<trackname><size>.{jpeg,jpg,bmp}
  *  ./<albumname><size>.{jpeg,jpg,bmp}
  *  ./cover<size>.bmp
+ *  ./folder.jpg
  *  ../<albumname><size>.{jpeg,jpg,bmp}
  *  ../cover<size>.{jpeg,jpg,bmp}
+ *  ../folder.jpg
  *  ROCKBOX_DIR/albumart/<artist>-<albumname><size>.{jpeg,jpg,bmp}
  * <size> is the value of the size_string parameter, <trackname> and
  * <albumname> are read from the ID3 metadata.
@@ -220,6 +222,12 @@ bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
                 pathlen = snprintf(path, sizeof(path),
                                 "%scover%s." EXT, dir, size_string);
                 found = try_exts(path, pathlen);
+            }
+
+            if (!found && !*size_string)
+            {
+                snprintf(path, sizeof(path), "%sfolder.jpg", dir);
+                found = file_exists(path);
             }
         }
         if (found)
