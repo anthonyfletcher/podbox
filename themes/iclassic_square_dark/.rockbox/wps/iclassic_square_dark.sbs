@@ -1,0 +1,127 @@
+#-----------------------------------------------#
+#iclassic_square_dark
+#(CC-BY-SA 3.0) by Humberto Santana
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#Colours: bright and dark are the album's lighter and darker
+#colour, white and black with none. Every other colour is
+#pinned with !, so it stays as written.
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,24x24-icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+%Fl(4,16-noto-sans-bold.fnt)
+%Fl(5,16-noto-sans.fnt)
+#
+#Background layer
+#
+#- Title bar and list rule
+%V(0,0,-,-,-)%VB%Vb(!000000)%Vf(!ffffff)
+%dr(0,0,320,23,!2c2c2c,!141414)
+%dr(0,23,320,1,!505050)
+%dr(160,24,1,216,!303030)
+#
+#Foreground layer
+#
+#- Empty pane: its clear repaints the margins after Cover Flow
+%Vl(Pane,160,24,160,216,-)
+#
+#- Cover or grey tile. Not in %VB, which nothing here copies to screen
+%Vl(Pane,166,30,150,150,2)%Vy%Vg(!3a3a3a,!202020,!909090)
+%?C<|%ac%Vs(gradient)b>
+%Cl(0,0,150,150,c,c)%Cd
+#
+#- Screen switches. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%Vd(Chrome)
+%?if(%cs,=,10)<%Vd(QuickBg)%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
+%?if(%cs,=,22)<|%Vd(Pane)>
+#
+#Rows: plain 24, art 46
+%Lb(Rows,160,24,-,46)
+#
+#Set up list
+%Vi(list,0,24,160,216,3)%Vb(!000000)%Vf(!ffffff)
+#
+#- Hidden list for the quick screen
+%Vi(qsblank,0,0,1,1,-)
+#
+%V(318,239,1,1,-)%Vb(!000000)%Vf(!ffffff)%?if(%cs,=,10)<%VI(qsblank)|%VI(list)>
+#
+#- Title
+%Vl(Chrome,6,3,196,19,4)%Vf(!ffffff)
+%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%s%Lt>>
+#
+#- Status icons
+%Vl(Chrome,222,0,96,23,2)%Vf(!ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Selected row: a bright bar with dark text
+#
+#- Plain row
+%Vl(Rows,0,0,136,24,3)%Vy
+%?La<|%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>
+#
+#- Plain row chevron
+%Vl(Rows,136,0,24,24,2)%Vy
+%?La<|%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<Þ| >>
+#
+#- Art row special icon. Must stay above the cover
+%Vl(Rows,10,11,24,24,2)
+%?La<%?Lc<%Vf(bright)|%Vf(!ffffff)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
+#
+#- Art row cover
+%Vl(Rows,1,1,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx([Finished])),%if(%LT,!=,%Sx([Not Started])),%if(%LT,!=,%Sx([In Progress])))<%La>
+#
+#- Art row text
+%Vl(Rows,46,0,114,46,3)%Vy
+%?La<%?Lc<%Vg(bright,bright,dark)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
+#
+#Now-playing pane
+%Vl(Pane,166,184,150,22,3)%Vf(!ffffff)
+%s%?it<%it|%fn>
+%Vl(Pane,166,206,150,20,4)%Vf(!909090)
+%s%?ia<%ia|%?d(2)<%d(2)|>>
+#
+#Quick screen
+#
+#- Background
+%Vl(QuickBg,0,24,160,216,-)
+%dr(0,0,160,216,!000000)
+#
+#- Up
+%Vl(QuickT,4,30,24,24,2)%Vf(bright)
+Ý
+%Vl(QuickT,32,30,124,20,4)%Vf(!909090)
+%s%QT
+%Vl(QuickT,32,50,124,22,3)%Vf(!ffffff)
+%s%Qt
+#
+#- Left
+%Vl(QuickL,4,82,24,24,2)%Vf(bright)
+à
+%Vl(QuickL,32,82,124,20,4)%Vf(!909090)
+%s%QL
+%Vl(QuickL,32,102,124,22,3)%Vf(!ffffff)
+%s%Ql
+#
+#- Right
+%Vl(QuickR,4,134,24,24,2)%Vf(bright)
+Þ
+%Vl(QuickR,32,134,124,20,4)%Vf(!909090)
+%s%QR
+%Vl(QuickR,32,154,124,22,3)%Vf(!ffffff)
+%s%Qr
+#
+#- Down
+%Vl(QuickB,4,186,24,24,2)%Vf(bright)
+ß
+%Vl(QuickB,32,186,124,20,4)%Vf(!909090)
+%s%QB
+%Vl(QuickB,32,206,124,22,3)%Vf(!ffffff)
+%s%Qb
