@@ -130,8 +130,9 @@ static void skin_render_playlistviewer(struct playlistviewer* viewer,
 static char* skin_buffer;
 
 /* A conditional in a backdrop viewport changed branch during a partial
- * refresh. What the old branch drew there cannot be taken back out -- the
- * foreground has already copied it -- so skin_render() repaints everything. */
+ * refresh, or a backdrop viewport was hidden or shown. What was drawn there
+ * cannot be taken back out -- the foreground has already copied it -- so
+ * skin_render() repaints everything. */
 static bool backdrop_flipped;
 
 static inline struct skin_element*
@@ -905,6 +906,7 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
                             {
                                 skin_backdrop_set_buffer(-1, skin_viewport);
                                 skin_backdrop_show(data->backdrop_id);
+                                backdrop_flipped = true;
                             }
                             skin_viewport->hidden_flags |= VP_DRAW_HIDDEN;
                         }
@@ -1492,6 +1494,8 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         {
             vp_refresh_mode = SKIN_REFRESH_ALL;
             skin_viewport->hidden_flags = VP_DRAW_HIDEABLE;
+            if (skin_viewport->output_to_backdrop_buffer)
+                backdrop_flipped = true;
         }
 
         display->set_viewport_ex(&skin_viewport->vp, VP_FLAG_VP_SET_CLEAN);

@@ -654,8 +654,9 @@ long gui_wps_show(void)
             sb_skin_set_update_delay(0);
             skin_request_full_update(WPS);
             update = true;
-            gwps_enter_wps(theme_enabled);
+            /* Ahead of the first frame, which judges %Tl too. */
             skin_restart_input_timer();
+            gwps_enter_wps(theme_enabled);
             theme_enabled = true;
         }
         else
