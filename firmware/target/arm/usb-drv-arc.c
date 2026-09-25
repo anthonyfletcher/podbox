@@ -850,6 +850,16 @@ static void iso_tick(void)
     unsigned int cur = (REG_FRINDEX >> 3) & 1023;
     unsigned int ahead = (iso_next - cur) & 1023;
 
+    if (!(REG_PORTSC1 & PORTSCX_CURRENT_CONNECT_STATUS))
+    {
+        if (!iso_stats.lost)
+        {
+            iso_stats.lost = true;
+            if (iso_cfg.lost)
+                iso_cfg.lost();
+        }
+        return;
+    }
     if (iso_cfg.begin && !iso_cfg.begin())
         return;
 

@@ -38,6 +38,9 @@
 #ifdef HAVE_USBSTACK
 #include "usb_core.h"
 #endif
+#ifdef HAVE_USB_HOST_AUDIO
+#include "usb_host_audio.h"
+#endif
 #include "logf.h"
 #include "screendump.h"
 #include "powermgmt.h"
@@ -624,6 +627,9 @@ static void NORETURN_ATTR usb_thread(void)
             }
             else
             {
+#ifdef HAVE_USB_HOST_AUDIO
+                usb_host_audio_stop();
+#endif
                 usb_host_probe_enable(false);
                 /* Insertions were dropped meanwhile; replay the cable. */
                 queue_post(&usb_queue, usb_detect(), 0);

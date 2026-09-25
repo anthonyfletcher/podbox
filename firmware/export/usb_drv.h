@@ -172,8 +172,9 @@ int usb_drv_host_control(int addr, int reqtype, int req, int value,
 /* An isochronous OUT stream with an optional feedback IN endpoint. fill()
  * runs from the tick interrupt and writes frames sample frames to dst; the
  * count per microframe follows the feedback, or nominal without it. begin(),
- * if given, runs first each tick and returning false skips that refill. ARC
- * only. */
+ * if given, runs first each tick and returning false skips that refill.
+ * lost(), if given, runs once from the tick when the device disconnects;
+ * the stream stops refilling but stays running until stopped. ARC only. */
 struct usb_drv_host_iso {
     int addr;
     int ep_out, mps_out, interval_out;  /* interval in microframes, 1-8 */
@@ -182,9 +183,11 @@ struct usb_drv_host_iso {
     uint32_t nominal;                   /* samples per microframe, 16.16 */
     bool (*begin)(void);
     void (*fill)(uint8_t *dst, int frames);
+    void (*lost)(void);
 };
 struct usb_drv_host_iso_stats {
     bool running;
+    bool lost;              /* the device disconnected */
     uint32_t feedback;      /* in use, samples per microframe, 16.16 */
     uint32_t fb_raw;        /* last value received */
     unsigned fb_ok, fb_bad;

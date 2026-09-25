@@ -36,6 +36,7 @@
 #include "pcm_sampr.h"
 #include "pcm_sink.h"
 #include "sound.h"
+#include "usb.h"
 #include "usb_ch9.h"
 #include "usb_drv.h"
 #include "usb_host_audio.h"
@@ -202,6 +203,13 @@ static void sink_stop(void)
     restore_irq(oldlevel);
 }
 
+/* Tick interrupt, the DAC unplugged: the USB thread shuts the probe down,
+ * which stops this sink and returns playback to the headphone socket. */
+static void sink_lost(void)
+{
+    usb_set_host_probe(false);
+}
+
 static void sink_nop(void)
 {
 }
@@ -354,6 +362,7 @@ bool usb_host_audio_start(void)
     iso.nominal = nominal(samprs[DEFAULT_FREQ]);
     iso.begin = sink_begin;
     iso.fill = sink_fill;
+    iso.lost = sink_lost;
     locked = 0;
     gain = 0;
     sink_stop();
@@ -367,7 +376,7 @@ bool usb_host_audio_start(void)
 
 /* Playback goes back to the headphone socket first, so the mixer never
  * feeds a stream that has stopped. The interface is only released while
- * the stream still ran: a DAC already unplugged cannot answer. */
+ * the DAC is still there to answer. */
 void usb_host_audio_stop(void)
 {
     struct usb_drv_host_iso_stats st;
@@ -378,8 +387,10 @@ void usb_host_audio_stop(void)
     if (st.running)
     {
         usb_drv_host_iso_stop();
-        usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
-                             USB_REQ_SET_INTERFACE, 0, status.iface, NULL, 0);
+        if (!st.lost)
+            usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
+                                 USB_REQ_SET_INTERFACE, 0, status.iface,
+                                 NULL, 0);
     }
     status.state = "off";
 }

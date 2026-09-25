@@ -1661,7 +1661,11 @@ static bool dbg_usb_host_probe(void)
     info.timeout = HZ/2;
     ret = simplelist_show_list(&info);
 #ifdef HAVE_USB_HOST_AUDIO
-    usb_host_audio_stop();
+    /* Playback to the DAC outlives the screen, so the rest of the player
+     * can be used: the port stays a host until SELECT here turns the
+     * output off or the DAC is unplugged. */
+    if (!strcmp(usb_host_audio_get_status()->state, "on"))
+        return ret;
 #endif
     usb_set_host_probe(false);
     return ret;
