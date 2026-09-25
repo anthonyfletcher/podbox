@@ -3738,11 +3738,23 @@ static int play_single_track(const char *path, const char *book)
 /* A book held in one file opens on its chapters, the way a book held in
  * several opens on its tracks, and with the same Resume row at the head of
  * the list. A book with no chapter marks has nothing to list, so it plays
- * where it left off as it always did.
+ * where it left off as it always did. Nor does a book with a cuesheet, which
+ * playback reads in place of the chapter marks: a list of the marks would
+ * name chapters the player then does not use.
  *
  * The chapters are read here rather than taken from the playing track: this
  * book is not playing, and reading them is what the screen is for.
  */
+static bool has_cuesheet(const char *path)
+{
+    struct mp3entry id3;
+    struct cuesheet_file cue_file;
+
+    return global_settings.cuesheet
+           && get_metadata(&id3, -1, path)
+           && look_for_cuesheet_file(&id3, &cue_file);
+}
+
 static int open_single_book(const char *path, const char *book,
                             const char *name)
 {
@@ -3750,7 +3762,8 @@ static int open_single_book(const char *path, const char *book,
     struct cuesheet *cue;
     size_t bufsize = 0;
 
-    if (!global_settings.chapter_marks || !chapters_possible(path))
+    if (!global_settings.chapter_marks || !chapters_possible(path)
+        || has_cuesheet(path))
         return play_single_track(path, book);
 
     cue = (struct cuesheet *)app_get_buffer(&bufsize, "chapters");
