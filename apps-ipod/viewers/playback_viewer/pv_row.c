@@ -833,12 +833,10 @@ static enum pv_build_result build_model(void *buf, size_t bufsz, bool art_on,
 {
     if (art_on && !pv_stats_index_covers(year))
     {
-        struct pv_totals prime;
-
         /* Its result needs no handling of its own: the build below repeats it
          * from the index it wrote, and fails the same way for the same reason
          * if it failed here. That is where the screen hears about it. */
-        pv_stats_build(buf, bufsz, &prime, year);
+        pv_stats_prime(buf, bufsz, bufsz - ART_BYTES, year);
         art_init(buf);
     }
 

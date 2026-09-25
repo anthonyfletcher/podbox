@@ -107,6 +107,9 @@ static struct pv_badge_state badge_state;
 static char  *abuf;
 static size_t abuf_sz, abuf_used;
 
+/* Non-zero during pv_stats_prime(): the most the tables may have. */
+static size_t prime_tables;
+
 static void *abuf_alloc(size_t n)
 {
     void *p;
@@ -1316,6 +1319,11 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     abuf_sz   = bufsz - names_used;
     abuf_used = 0;
 
+    /* A priming pass sizes its tables no larger than the build after it will,
+     * or that build cannot load the index this one writes. */
+    if (prime_tables && abuf_sz > prime_tables)
+        abuf_sz = prime_tables;
+
     /* Size the tables to the library rather than to a guess. The database
      * knows how many files there are, and a track table can never need more
      * rows than that; artists and albums are a fraction of it. Guessing
@@ -1430,8 +1438,11 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
 
             /* Rewrite only once the unindexed tail is worth the write, which
              * costs as much as the read. Below that it is cheaper to replay
-             * the same few kilobytes next time than to save them. */
-            save_wanted = (log_size - covered >= PV_INDEX_REWRITE_AT);
+             * the same few kilobytes next time than to save them -- except
+             * from a priming pass, whose whole purpose is the index it leaves
+             * behind. */
+            save_wanted = prime_tables
+                       || (log_size - covered >= PV_INDEX_REWRITE_AT);
         }
         else
         {
@@ -1570,6 +1581,19 @@ enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
     cpu_boost(false);
 #endif
+
+    return r;
+}
+
+enum pv_build_result pv_stats_prime(void *buf, size_t bufsz,
+                                    size_t tables_max, int year)
+{
+    struct pv_totals scratch;
+    enum pv_build_result r;
+
+    prime_tables = tables_max;
+    r = pv_stats_build(buf, bufsz, &scratch, year);
+    prime_tables = 0;
 
     return r;
 }

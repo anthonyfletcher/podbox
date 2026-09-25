@@ -211,6 +211,14 @@ enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
  * much of it as it can have, and one without has no use for the room. */
 bool pv_stats_index_covers(int year);
 
+/* A build made only for the index it saves, for a caller that is about to
+ * build again in less room. The name map gets the whole of 'buf' and the
+ * tables at most 'tables_max', the room the second build will give them. The
+ * index is always written, so that build finds it covering the log and needs
+ * no map of its own. */
+enum pv_build_result pv_stats_prime(void *buf, size_t bufsz,
+                                    size_t tables_max, int year);
+
 /* The same figures over the whole log, whatever year was asked for. This is
  * what the badges were scored against, and what the year switch offers from;
  * a tile wants 'out' instead. */
