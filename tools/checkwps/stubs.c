@@ -30,6 +30,8 @@
 #include "config.h"
 #include "file.h"
 #include "lcd.h"
+#include "pcm_sink.h"
+#include "pcm.h"
 #include "font.h"
 #include "buflib.h"
 #include "debug.h"
@@ -310,6 +312,10 @@ const char *eq_precut_format(char *buffer, size_t buffer_size, int value,
 }
 
 void iap_bitrate_set(int ratenum) { (void)ratenum; }
+#ifdef USB_ENABLE_IAP
+void iap_on_repeat_state(int state) { (void)state; }
+void iap_on_shuffle_state(bool state) { (void)state; }
+#endif
 void lcd_bidir_scroll(int threshold) { (void)threshold; }
 void lcd_scroll_delay(int ms) { (void)ms; }
 void lcd_scroll_speed(int speed) { (void)speed; }
@@ -319,6 +325,7 @@ void lineout_set(bool on) { (void)on; }
 #ifdef HAVE_MIKEY_REMOTE
 void mikey_set_track_skip(bool on) { (void)on; }
 #endif
+enum pcm_sink_ids pcm_current_sink(void) { return PCM_SINK_BUILTIN; }
 void peak_meter_set_clip_hold(int time) { (void)time; }
 void playback_update_aa_dims(void) { }
 struct playlist_info *playlist_get_current(void) { return NULL; }
@@ -364,8 +371,11 @@ void set_battery_capacity(int capacity) { (void)capacity; }
 void set_keypress_restarts_sleep_timer(bool enable) { (void)enable; }
 void set_poweroff_timeout(int timeout) { (void)timeout; }
 int  sound_max(int setting) { (void)setting; return 0; }
+bool sound_index_exists(void) { return false; }
+bool sound_scan_screen(bool rebuild) { (void)rebuild; return false; }
 void sound_set_channels(int value) { (void)value; }
 void tag_trim_init(void) { }
+bool tagcache_is_usable(void) { return false; }
 
 int talk_time_intervals(long time, int unit_idx, bool enqueue)
 {
