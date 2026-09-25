@@ -154,6 +154,11 @@ static bool parse_line(char *line, struct book_resume *pos)
 
 bool book_resume_get(const char *book, struct book_resume *pos)
 {
+    return book_resume_find(book, pos) && !pos->ended;
+}
+
+bool book_resume_find(const char *book, struct book_resume *pos)
+{
     char line[BOOK_LINE_MAX];
     int fd;
     bool found = false;
@@ -170,7 +175,7 @@ bool book_resume_get(const char *book, struct book_resume *pos)
         if (!line_is_book(line, book))
             continue;
 
-        found = parse_line(line, pos) && !pos->ended;
+        found = parse_line(line, pos);
         break;
     }
 
@@ -355,13 +360,21 @@ void book_resume_save(void)
 
     if (ended_pending)
     {
+        /* Copied out before anything yields: rewrite() opens files, and the
+         * audio thread may note the next ended track meanwhile. That one
+         * sets the flag again for the next save. */
+        static char ended_book[BOOK_KEY_MAX];
+        static char ended_path[MAX_PATH];
+        unsigned long ended_length = ended_track.length;
+
+        strmemccpy(ended_book, ended_track.book, sizeof (ended_book));
+        strmemccpy(ended_path, ended_track.track, sizeof (ended_path));
         ended_pending = false;
 
         /* A chapter that ended into the next one of the same book is not the
          * book ending: the save below puts the book where it is now. */
-        if (id3 == NULL || strcmp(book, ended_track.book) != 0)
-            rewrite(ended_track.book, ended_track.track, -1,
-                    ended_track.length, 0, true);
+        if (id3 == NULL || strcmp(book, ended_book) != 0)
+            rewrite(ended_book, ended_path, -1, ended_length, 0, true);
     }
 
     if (id3 != NULL)

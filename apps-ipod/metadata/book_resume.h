@@ -50,6 +50,9 @@ void book_resume_save(void);
  * resume. */
 bool book_resume_get(const char *book, struct book_resume *pos);
 
+/* The same, ended or not: pos->ended says which. */
+bool book_resume_find(const char *book, struct book_resume *pos);
+
 /* Every saved book, most recently played first, ended ones included. 'fn'
  * returns false to stop early. */
 typedef bool (*book_resume_fn)(const char *book,

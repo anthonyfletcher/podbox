@@ -194,6 +194,43 @@ static struct tagcache_search_clause spoken_clause = {
     .str = NULL,
 };
 
+bool book_shelf_is_last_track(const char *book, const char *path)
+{
+    struct tagcache_search tcs;
+    static char file[MAX_PATH];
+    static char text[TAGCACHE_BUFSZ];
+    uint32_t last = 0, mine = 0;
+    bool seen = false, found = false;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return false;
+
+    tagcache_search_add_clause(&tcs, &spoken_clause);
+
+    while (tagcache_get_next(&tcs, file, sizeof(file)))
+    {
+        uint32_t key;
+
+        if (!tagcache_retrieve(&tcs, tcs.idx_id, tag_album, text, sizeof(text))
+            || strcmp(text, book))
+            continue;
+
+        key = track_key(&tcs);
+        if (!seen || key >= last)
+            last = key;
+        seen = true;
+
+        if (!found && !strcmp(file, path))
+        {
+            mine = key;
+            found = true;
+        }
+    }
+
+    tagcache_search_finish(&tcs);
+    return found && mine == last;
+}
+
 static int compare_names(const void *a_v, const void *b_v)
 {
     const struct shelf_book *a = a_v;

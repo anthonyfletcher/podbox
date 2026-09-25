@@ -2059,11 +2059,18 @@ static const char *level_book(struct browser_context *c, int level, int tag)
 }
 
 /* Whether this level opens with a Resume row. */
+/* A book whose saved chapter played to its end is resumed from the chapter
+ * after it, as the shelf does, unless that was its last: then it is finished
+ * and there is nothing to resume. */
 static bool book_resume_row(struct browser_context *c, int level, int tag)
 {
     const char *book = level_book(c, level, tag);
 
-    return book != NULL && book_resume_get(book, &resume_pos);
+    if (book == NULL || !book_resume_find(book, &resume_pos))
+        return false;
+
+    return !resume_pos.ended
+        || !book_shelf_is_last_track(book, resume_pos.track);
 }
 
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
@@ -4663,6 +4670,15 @@ static int browser_db_play_folder(struct browser_context* c)
         int index = playlist_track_index(resume_pos.track, resume_pos.index);
 
         resume_armed = false;
+
+        if (index >= 0 && resume_pos.ended)
+        {
+            index++;
+            resume_pos.elapsed = 0;
+            resume_pos.offset = 0;
+            if (index >= playlist_amount())
+                index = -1;
+        }
 
         if (index >= 0)
         {
