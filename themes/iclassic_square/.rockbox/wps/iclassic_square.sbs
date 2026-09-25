@@ -58,7 +58,7 @@
 #
 #- Plain row
 %Vl(Rows,0,0,136,24,3)%Vy
-%?La<|%?Lc<%Vf(186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>
+%?La<|%?Lc<%Vf(186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>
 #
 #- Plain row chevron
 %Vl(Rows,136,0,24,24,2)%Vy
@@ -66,15 +66,15 @@
 #
 #- Art row special icon. Must stay above the cover
 %Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(186dbd)|%Vf(000000)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
+%?La<%?Lc<%Vf(186dbd)|%Vf(000000)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
 #
 #- Art row cover
 %Vl(Rows,1,1,44,44,-)
-%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La>
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx([Finished])),%if(%LT,!=,%Sx([Not Started])),%if(%LT,!=,%Sx([In Progress])))<%La>
 #
 #- Art row text
 %Vl(Rows,46,0,114,46,3)%Vy
-%?La<%?Lc<%Vf(186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
+%?La<%?Lc<%Vf(186dbd)%Vs(invert)|%Vf(000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
 #
 #Now-playing pane
 %Vl(Pane,166,184,150,22,3)%Vf(000000)
