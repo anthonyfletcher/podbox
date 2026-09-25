@@ -216,6 +216,12 @@ static uint32_t cal_pass(void)
             if (v > SOUND_AX)
                 v = SOUND_AX;
 
+            /* A full bucket takes no more, and the track goes uncounted on
+             * this axis so cal_n stays the histogram's own total. It takes
+             * 65,535 tracks inside four units of one another. */
+            if (cal_hist[ax][v >> CAL_SHIFT] == UINT16_MAX)
+                continue;
+
             cal_hist[ax][v >> CAL_SHIFT]++;
             cal_n[ax]++;
         }
@@ -284,6 +290,33 @@ static bool cal_fingerprint(uint32_t *count, uint64_t *first, uint64_t *last)
     return ok;
 }
 
+/* Each axis either refused (all -1) or a rising ladder inside the scale, as
+ * cal_ladder() leaves them. Anything else is a damaged file. */
+static bool cal_sane(void)
+{
+    int ax, p;
+
+    for (ax = 0; ax < CAL_AXES; ax++)
+    {
+        if (cal_val[ax][0] == -1)
+        {
+            for (p = 1; p < CAL_PCOUNT; p++)
+                if (cal_val[ax][p] != -1)
+                    return false;
+            continue;
+        }
+
+        for (p = 0; p < CAL_PCOUNT; p++)
+        {
+            if (cal_val[ax][p] < 0 || cal_val[ax][p] > SOUND_AX
+                || (p > 0 && cal_val[ax][p] < cal_val[ax][p - 1]))
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool cal_read(uint32_t count, uint64_t first, uint64_t last)
 {
     struct cal_header h;
@@ -297,7 +330,8 @@ static bool cal_read(uint32_t count, uint64_t first, uint64_t last)
         h.magic == CAL_MAGIC && h.version == CAL_VER &&
         h.axes == CAL_AXES && h.pcts == CAL_PCOUNT &&
         h.count == count && h.first_key == first && h.last_key == last &&
-        read(fd, cal_val, sizeof (cal_val)) == (ssize_t)sizeof (cal_val))
+        read(fd, cal_val, sizeof (cal_val)) == (ssize_t)sizeof (cal_val) &&
+        cal_sane())
     {
         ok = true;
     }
