@@ -152,11 +152,12 @@ static struct mutex llist_mutex SHAREDBSS_ATTR;
     container_of((m), struct memory_handle, mrunode)
 
 /* The first bad link found in either list, kept for the log that
- * buffering_reset() writes. Once found, nothing follows either list again
- * until that reset abandons them. */
+ * buffering_drop_damage() writes. Once found, nothing follows either list
+ * again until buffering_reset() abandons them. */
 static struct
 {
     bool found;
+    bool dropped;                       /* logged and closed already */
     const char *walk;                   /* Which walk found it */
     int step;                           /* How many links it had followed */
     uintptr_t link;                     /* The bad link */
@@ -1892,6 +1893,14 @@ static void drop_damaged_lists(void)
         close(log);
 }
 
+void buffering_drop_damage(void)
+{
+    if (damage.found && !damage.dropped) {
+        drop_damaged_lists();
+        damage.dropped = true;
+    }
+}
+
 /* Initialise the buffering subsystem */
 bool buffering_reset(char *buf, size_t buflen)
 {
@@ -1912,9 +1921,10 @@ bool buffering_reset(char *buf, size_t buflen)
 
     send_event(BUFFER_EVENT_BUFFER_RESET, NULL);
 
-    if (damage.found) {
-        drop_damaged_lists();
-    } else {
+    /* Damaged lists are not walked here: the buffer they lived in has been
+     * freed or laid out again by now. buffering_drop_damage() closed what it
+     * could while that memory was still theirs. */
+    if (!damage.found) {
         /* If handles weren't closed above, just do it */
         struct memory_handle *h;
         while ((h = HLIST_FIRST)) {

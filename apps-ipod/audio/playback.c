@@ -1094,6 +1094,7 @@ static int shrink_callback(int handle, unsigned hints, void* start, size_t old_s
     else
         audio_queue_send(Q_AUDIO_STOP, 1);
     voice_stop();
+    buffering_drop_damage();
 
     /* we should be free to change the buffer now */
     if (give_up)
@@ -1132,6 +1133,8 @@ static struct buflib_callbacks ops = {
 
 static void audio_reset_buffer(void)
 {
+    buffering_drop_damage();
+
     if (audiobuf_handle > 0)
     {
         core_free(audiobuf_handle);

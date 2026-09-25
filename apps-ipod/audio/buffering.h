@@ -42,6 +42,11 @@ void buffering_init(void) INIT_ATTR;
 /* Reset the buffering system */
 bool buffering_reset(char *buf, size_t buflen);
 
+/* Log a damaged handle list and close the files it still reaches. Playback
+ * calls this before it frees or re-lays the audio buffer, since the handle
+ * headers live in it. Does nothing when there is no damage. */
+void buffering_drop_damage(void);
+
 
 /***************************************************************************
  * MAIN BUFFERING API CALLS
