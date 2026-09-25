@@ -466,7 +466,7 @@ static int read_sample_titles(int fd, const struct sample_tables *st,
 
         while (left == 0)
         {
-            uint32_t per;
+            uint32_t per = 0;
 
             /* A chunk of no samples is malformed, and following a run of
              * them costs a seek per chunk to the end of the table. */
