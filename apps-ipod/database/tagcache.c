@@ -2368,6 +2368,11 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     has_grouping = id3.grouping != NULL
         && strlen(id3.grouping) > 0;
 
+    /* No album artist is the artist's own album, so every view grouped by
+     * album artist finds the track under its artist, not under <Untagged>. */
+    if (has_artist && (id3.albumartist == NULL || id3.albumartist[0] == '\0'))
+        id3.albumartist = id3.artist;
+
     ADD_TAG(entry, tag_filename, &path);
     ADD_TAG(entry, tag_title, &id3.title);
     ADD_TAG(entry, tag_artist, &id3.artist);
