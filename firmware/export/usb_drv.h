@@ -112,6 +112,22 @@ int usb_drv_port_speed(void);
 void usb_drv_cancel_all_transfers(void);
 void usb_drv_set_test_mode(int mode);
 bool usb_drv_connected(void);
+
+/* The controller's own capability registers, raw, and whether they say it
+ * can be a USB host. Read once in usb_drv_init(), the only time the
+ * controller is known to be clocked, so nregs is 0 until the first cable
+ * insertion since boot. */
+struct usb_drv_hw_info {
+    int nregs;
+    bool host_capable;
+    int host_units;         /* ARC: root ports; DesignWare: host channels */
+    struct {
+        const char *name;
+        uint32_t val;
+    } regs[4];
+};
+const struct usb_drv_hw_info *usb_drv_get_hw_info(void);
+
 #ifdef USB_HAS_ISOCHRONOUS
 /* returns the last received frame number (the 11-bit number contained in the last SOF):
  * - full-speed: the host sends one SOF every 1ms (so 1000 SOF/s)

@@ -1392,9 +1392,37 @@ void usb_attach(void)
 {
 }
 
+static struct usb_drv_hw_info hw_info;
+
+const struct usb_drv_hw_info *usb_drv_get_hw_info(void)
+{
+    return &hw_info;
+}
+
+/* GHWCFG2 bits 2:0 are the core's OTG mode: 0-2 are OTG (either role),
+ * 3-4 device only, 5-6 host only. Bits 17:14 are host channels - 1. */
+static void usb_dw_read_hw_info(void)
+{
+    uint32_t mode;
+
+    hw_info.regs[0].name = "GSNPSID";
+    hw_info.regs[0].val = DWC_GSNPSID;
+    hw_info.regs[1].name = "GHWCFG2";
+    hw_info.regs[1].val = DWC_GHWCFG2;
+    hw_info.regs[2].name = "GHWCFG3";
+    hw_info.regs[2].val = DWC_GHWCFG3;
+    hw_info.regs[3].name = "GHWCFG4";
+    hw_info.regs[3].val = DWC_GHWCFG4;
+    mode = hw_info.regs[1].val & 7;
+    hw_info.host_capable = mode <= 2 || mode == 5 || mode == 6;
+    hw_info.host_units = ((hw_info.regs[1].val >> 14) & 0xf) + 1;
+    hw_info.nregs = 4;
+}
+
 void usb_drv_init(void)
 {
     usb_dw_init();
+    usb_dw_read_hw_info();
 }
 
 void usb_drv_exit(void)

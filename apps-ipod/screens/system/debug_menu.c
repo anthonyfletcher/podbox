@@ -1450,6 +1450,19 @@ static int usb_info_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Charge only: %s", r->power_only ? "YES" : "no");
     simplelist_addline("Host present: %s", usb_host_is_present() ? "Yes" : "No");
 
+    const struct usb_drv_hw_info *hw = usb_drv_get_hw_info();
+    simplelist_setline("Controller:");
+    if (hw->nregs == 0)
+        simplelist_addline("  not read yet (plug in once)");
+    else
+    {
+        simplelist_addline("  can be host: %s (%d)",
+                           hw->host_capable ? "YES" : "no", hw->host_units);
+        for (int i = 0; i < hw->nregs; i++)
+            simplelist_addline("  %s: %08lx", hw->regs[i].name,
+                               (unsigned long)hw->regs[i].val);
+    }
+
     simplelist_setline("Enumeration:");
     simplelist_addline("  bus resets: %d", r->bus_resets);
     simplelist_addline("  setups: %d (last req %02x)",

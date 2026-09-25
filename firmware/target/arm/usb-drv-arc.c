@@ -488,9 +488,34 @@ static void init_endpoint(int ep, int type, int mps) {
 }
 
 
+static struct usb_drv_hw_info hw_info;
+
+const struct usb_drv_hw_info *usb_drv_get_hw_info(void)
+{
+    return &hw_info;
+}
+
+/* HWHOST bit 0 is host capability; bits 3:1 are the root port count - 1. */
+static void read_hw_info(void)
+{
+    hw_info.regs[0].name = "ID";
+    hw_info.regs[0].val = REG_ID;
+    hw_info.regs[1].name = "HWGENERAL";
+    hw_info.regs[1].val = REG_HWGENERAL;
+    hw_info.regs[2].name = "HWHOST";
+    hw_info.regs[2].val = REG_HWHOST;
+    hw_info.regs[3].name = "HWDEVICE";
+    hw_info.regs[3].val = REG_HWDEVICE;
+    hw_info.host_capable = hw_info.regs[2].val & 1;
+    hw_info.host_units = ((hw_info.regs[2].val >> 1) & 7) + 1;
+    hw_info.nregs = 4;
+}
+
 /* manual: 32.14.1 Device Controller Initialization */
 void usb_drv_init(void)
 {
+    read_hw_info();
+
     /* USB core decides */
     usb_drv_reset();
 
