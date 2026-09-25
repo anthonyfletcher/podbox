@@ -277,6 +277,15 @@ void usb_set_host_probe(bool on);
 /* Whether a cable that no computer answers is tried as a USB DAC:
  * 0 off, 1 auto */
 void usb_set_dac_output(int mode);
+
+/* Diagnostic only: what the automatic DAC check last decided, and why */
+struct usb_dac_auto_record {
+    const char *step;
+    long tick;
+    int bus_resets;         /* counted when the wait ended */
+    int polls;
+};
+const struct usb_dac_auto_record *usb_get_dac_auto_record(void);
 #endif
 #endif /* !BOOTLOADER */
 #ifdef USB_STATUS_BY_EVENT

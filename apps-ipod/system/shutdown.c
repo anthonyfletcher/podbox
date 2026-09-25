@@ -361,11 +361,11 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             return SYS_PHONE_UNPLUGGED;
 #ifdef HAVE_USB_HOST_AUDIO
         case SYS_USB_DAC_ON:
-            splash(HZ, ID2P(LANG_USB_DAC_ON));
+            splash(HZ*2, ID2P(LANG_USB_DAC_ON));
             return SYS_USB_DAC_ON;
 
         case SYS_USB_DAC_OFF:
-            splash(HZ, ID2P(LANG_USB_DAC_OFF));
+            splash(HZ*2, ID2P(LANG_USB_DAC_OFF));
             return SYS_USB_DAC_OFF;
 #endif
 #ifdef HAVE_MULTIMEDIA_KEYS

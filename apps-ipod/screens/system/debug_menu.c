@@ -1501,6 +1501,12 @@ static int usb_info_callback(int btn, struct gui_synclist *lists)
     }
     simplelist_addline("Storage given up: %s",
                        r->storage_handed_over ? "Yes" : "No");
+#ifdef HAVE_USB_HOST_AUDIO
+    const struct usb_dac_auto_record *d = usb_get_dac_auto_record();
+    simplelist_addline("DAC auto: %s", d->step);
+    simplelist_addline("  at %ld tick, resets %d, polls %d",
+                       d->tick, d->bus_resets, d->polls);
+#endif
     simplelist_addline("Now: %ld tick", current_tick);
 
     return btn;

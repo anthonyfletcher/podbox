@@ -131,7 +131,7 @@ static bool usb_host_present = false;
 /* The host probe owns the controller: cable events are not acted on. */
 static bool usb_host_probe_on = false;
 #ifdef HAVE_USB_HOST_AUDIO
-/* Looking for a DAC. A cable that no computer has reset the bus on within
+/* Looking for a DAC. A cable that no computer has spoken on within
  * USB_DAC_WAIT gets one try as a host: poll for a device, and play to it if
  * it is USB audio, else give the port back. Once per insertion -- any end
  * of host mode counts as the try, so only a real extraction re-arms it. */
@@ -142,6 +142,14 @@ static bool usb_dac_auto = true;
 static bool usb_dac_tried = false;
 static int usb_dac_polls = 0;           /* >0 while a try is polling */
 static struct timeout usb_dac_tmo;
+static struct usb_dac_auto_record usb_dac_rec = { .step = "no cable yet" };
+
+static void usb_dac_note(const char *step)
+{
+    usb_dac_rec.step = step;
+    usb_dac_rec.tick = current_tick;
+    usb_dac_rec.polls = usb_dac_polls;
+}
 #endif
 static int usb_num_acks_to_expect = 0;
 static uint32_t usb_broadcast_seqnum = 0x80000000;
@@ -542,6 +550,11 @@ void usb_set_dac_output(int mode)
     usb_dac_auto = mode != 0;
 }
 
+const struct usb_dac_auto_record *usb_get_dac_auto_record(void)
+{
+    return &usb_dac_rec;
+}
+
 static int usb_dac_tmo_cb(struct timeout *tmo)
 {
     (void)tmo;
@@ -549,10 +562,12 @@ static int usb_dac_tmo_cb(struct timeout *tmo)
     return 0;
 }
 
-/* The first step is the USB_DAC_WAIT timer: a computer, or a car or dock
- * that reads the player as a disk or over iAP, has reset the bus by then.
- * Each later step is one poll of the port, which resets and enumerates a
- * device as soon as one connects. */
+/* The first step is the USB_DAC_WAIT timer. A computer, or a car or dock
+ * that reads the player as a disk or over iAP, has sent a request by then,
+ * which under USB_DETECT_BY_REQUEST moves the state on from USB_POWERED; a
+ * bus reset with no request yet counts as a computer too. Each later step
+ * is one poll of the port, which resets and enumerates a device as soon as
+ * one connects. */
 static void usb_dac_auto_step(void)
 {
     const struct usb_drv_host_enum *e;
@@ -560,27 +575,55 @@ static void usb_dac_auto_step(void)
 
     if(usb_dac_polls == 0)
     {
-        if(!usb_dac_auto || usb_dac_tried || usb_host_probe_on ||
-           usb_state != USB_INSERTED || usb_record.bus_resets > 0)
+        usb_dac_rec.bus_resets = usb_record.bus_resets;
+        if(!usb_dac_auto)
+            usb_dac_note("skipped: setting off");
+        else if(usb_dac_tried)
+            usb_dac_note("skipped: tried this cable");
+        else if(usb_host_probe_on)
+            usb_dac_note("skipped: probe screen open");
+        else if(usb_state == USB_INSERTED)
+            usb_dac_note("skipped: a host answered");
+        else if(usb_state != USB_POWERED)
+            usb_dac_note("skipped: cable out");
+        else if(usb_record.bus_resets > 0)
+            usb_dac_note("skipped: bus reset (computer)");
+        else
+        {
+            usb_host_probe_switch(true);
+            usb_dac_polls = 1;
+            usb_dac_note("polling");
+        }
+        if(usb_dac_polls == 0)
             return;
-        usb_host_probe_switch(true);
-        usb_dac_polls = 1;
     }
 
     usb_drv_host_poll(&st);
     e = usb_drv_host_get_enum();
-    if(e->result == 1 && usb_host_audio_start())
+    if(e->result == 1)
     {
-        usb_dac_polls = 0;
+        bool ok = usb_host_audio_start();
+        usb_dac_note(ok ? "started" : usb_host_audio_get_status()->state);
+        if(ok)
+        {
+            usb_dac_polls = 0;
+            return;
+        }
+    }
+    else if(e->result < 0)
+        usb_dac_note(e->step);
+    else if(usb_dac_polls >= USB_DAC_MAX_POLLS)
+        usb_dac_note("no device");
+    else if(usb_detect() == USB_EXTRACTED)
+        usb_dac_note("cable out");
+    else
+    {
+        usb_dac_polls++;
+        usb_dac_note("polling");
+        timeout_register(&usb_dac_tmo, usb_dac_tmo_cb, USB_DAC_POLL, 0);
         return;
     }
-    if(e->result != 0 || ++usb_dac_polls > USB_DAC_MAX_POLLS ||
-       usb_detect() == USB_EXTRACTED)
-    {
-        usb_host_probe_switch(false);
-        return;
-    }
-    timeout_register(&usb_dac_tmo, usb_dac_tmo_cb, USB_DAC_POLL, 0);
+    usb_host_probe_switch(false);
 }
 #endif
 
@@ -671,8 +714,11 @@ static void NORETURN_ATTR usb_thread(void)
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
             if(usb_dac_auto && !usb_dac_tried)
+            {
                 timeout_register(&usb_dac_tmo, usb_dac_tmo_cb,
                                  USB_DAC_WAIT, 0);
+                usb_dac_note("waiting for a bus reset");
+            }
 #endif
             break;
             /* USB_INSERTED */
