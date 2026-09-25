@@ -1210,8 +1210,10 @@ static int parse_timeout_tag(struct skin_element *element,
             case SKIN_TOKEN_BUTTON_VOLUME:
             case SKIN_TOKEN_TRACK_STARTING:
             case SKIN_TOKEN_TRACK_ENDING:
-            case SKIN_TOKEN_LASTTOUCH:
                 val = 10;
+                break;
+            case SKIN_TOKEN_LASTTOUCH:
+                val = 100;      /* 10 s: tenths, as a D parameter parses */
                 break;
             default:
                 break;
