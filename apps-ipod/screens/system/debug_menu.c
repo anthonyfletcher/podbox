@@ -102,7 +102,7 @@
 #include "usb_core.h"
 #include "usb_drv.h"
 #endif
-#if defined(HAVE_USBSTACK) && CONFIG_USBOTG == USBOTG_ARC
+#ifdef HAVE_USB_HOST_AUDIO
 #include "usb_host_audio.h"
 #endif
 #ifdef USB_ENABLE_AUDIO
@@ -1561,17 +1561,15 @@ static void usb_host_probe_descriptors(const struct usb_drv_host_enum *e)
         simplelist_addline("%s", line);
 }
 
-#if CONFIG_USBOTG == USBOTG_ARC
-/* The test tone. Feedback is the DAC's own rate, as it reports it. */
-static void usb_host_probe_tone_lines(void)
+#ifdef HAVE_USB_HOST_AUDIO
+/* Playback to the DAC. Feedback is the DAC's own rate, as it reports it. */
+static void usb_host_probe_dac_lines(void)
 {
     const struct usb_host_audio_status *a = usb_host_audio_get_status();
     struct usb_drv_host_iso_stats iso;
 
     usb_drv_host_iso_get_stats(&iso);
-    simplelist_addline("Tone (SELECT): %s%s", a->state,
-                       !iso.running && !strcmp(a->state, "playing") ?
-                       ", stream stopped" : "");
+    simplelist_addline("DAC output (SELECT): %s", a->state);
     if (a->alt == 0)
         return;
     simplelist_addline("  IF%d.%d %dch %d/%d bit, clock %d", a->iface, a->alt,
@@ -1579,6 +1577,7 @@ static void usb_host_probe_tone_lines(void)
     simplelist_addline("  Rate: set %lu, reads %lu",
                        (unsigned long)a->rate_set,
                        (unsigned long)a->rate_read);
+    simplelist_addline("  Volume: %d dB", a->gain_cb / 10);
     simplelist_addline("  Feedback: %lu Hz (%u ok, %u bad) %08lx",
                        (unsigned long)(((uint64_t)iso.feedback * 8000) >> 16),
                        iso.fb_ok, iso.fb_bad, (unsigned long)iso.fb_raw);
@@ -1596,18 +1595,23 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     struct usb_drv_host_status st;
     (void)lists;
 
-#if CONFIG_USBOTG == USBOTG_ARC
-    /* SELECT starts and stops the test tone rather than leaving */
-    if (btn == ACTION_STD_OK)
+#ifdef HAVE_USB_HOST_AUDIO
+    /* SELECT moves playback to the DAC and back, rather than leaving. A
+     * stream the driver ended, the DAC unplugged, sends playback back too. */
+    bool dac_on = !strcmp(usb_host_audio_get_status()->state, "on");
+    struct usb_drv_host_iso_stats iso;
+    usb_drv_host_iso_get_stats(&iso);
+    if (dac_on && !iso.running)
+        usb_host_audio_stop();
+    else if (btn == ACTION_STD_OK)
     {
-        struct usb_drv_host_iso_stats iso;
-        usb_drv_host_iso_get_stats(&iso);
-        if (iso.running)
+        if (dac_on)
             usb_host_audio_stop();
         else
             usb_host_audio_start();
-        btn = ACTION_REDRAW;
     }
+    if (btn == ACTION_STD_OK)
+        btn = ACTION_REDRAW;
 #endif
 
     usb_drv_host_poll(&st);
@@ -1627,9 +1631,9 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Resets: %d", st.resets);
 
     const struct usb_drv_host_enum *e = usb_drv_host_get_enum();
-#if CONFIG_USBOTG == USBOTG_ARC
+#ifdef HAVE_USB_HOST_AUDIO
     if (e->result == 1)
-        usb_host_probe_tone_lines();
+        usb_host_probe_dac_lines();
 #endif
     if (e->result == 1)
         usb_host_probe_descriptors(e);
@@ -1656,7 +1660,7 @@ static bool dbg_usb_host_probe(void)
     info.scroll_all = true;
     info.timeout = HZ/2;
     ret = simplelist_show_list(&info);
-#if CONFIG_USBOTG == USBOTG_ARC
+#ifdef HAVE_USB_HOST_AUDIO
     usb_host_audio_stop();
 #endif
     usb_set_host_probe(false);

@@ -850,6 +850,9 @@ static void iso_tick(void)
     unsigned int cur = (REG_FRINDEX >> 3) & 1023;
     unsigned int ahead = (iso_next - cur) & 1023;
 
+    if (iso_cfg.begin && !iso_cfg.begin())
+        return;
+
     if (ahead < 2 || ahead > ISO_AHEAD)
     {
         if (ahead < 2 || ahead > 512)
@@ -912,6 +915,14 @@ void usb_drv_host_iso_stop(void)
     REG_USBCMD &= ~USBCMD_PERIODIC_SCHEDULE_EN;
     for (int t = 0; t < 100 && (REG_USBSTS & USBSTS_PERIODIC_SCHEDULE); t++)
         udelay(100);
+}
+
+void usb_drv_host_iso_set_nominal(uint32_t nominal)
+{
+    int oldlevel = disable_irq_save();
+    iso_cfg.nominal = nominal;
+    iso_stats.feedback = nominal;
+    restore_irq(oldlevel);
 }
 
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)

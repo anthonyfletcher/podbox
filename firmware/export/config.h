@@ -1426,6 +1426,12 @@ Lyre prototype 1 */
 #define USB_ENABLE_IAP
 #endif
 
+/* USB host audio: the player as host to a USB Audio Class 2 DAC, which then
+ * becomes a PCM sink. Only the ARC controller has host code. */
+#if CONFIG_USBOTG == USBOTG_ARC
+#define HAVE_USB_HOST_AUDIO
+#endif
+
 #endif /* BOOTLOADER */
 
 #endif /* HAVE_USBSTACK */

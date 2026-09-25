@@ -988,7 +988,7 @@ usbstack/iap/notification.c
 usbstack/iap/platform.c
 usbstack/usb_iap.c
 #endif
-#if CONFIG_USBOTG == USBOTG_ARC && !defined(BOOTLOADER)
+#ifdef HAVE_USB_HOST_AUDIO
 usbstack/usb_host_audio.c
 #endif
 #if CONFIG_USBOTG == USBOTG_M66591

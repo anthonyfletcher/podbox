@@ -171,7 +171,8 @@ int usb_drv_host_control(int addr, int reqtype, int req, int value,
 
 /* An isochronous OUT stream with an optional feedback IN endpoint. fill()
  * runs from the tick interrupt and writes frames sample frames to dst; the
- * count per microframe follows the feedback, or nominal without it. ARC
+ * count per microframe follows the feedback, or nominal without it. begin(),
+ * if given, runs first each tick and returning false skips that refill. ARC
  * only. */
 struct usb_drv_host_iso {
     int addr;
@@ -179,6 +180,7 @@ struct usb_drv_host_iso {
     int ep_fb, mps_fb, interval_fb;     /* ep_fb 0: no feedback */
     int frame_bytes;                    /* one sample frame, all channels */
     uint32_t nominal;                   /* samples per microframe, 16.16 */
+    bool (*begin)(void);
     void (*fill)(uint8_t *dst, int frames);
 };
 struct usb_drv_host_iso_stats {
@@ -192,6 +194,8 @@ struct usb_drv_host_iso_stats {
 };
 bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso);
 void usb_drv_host_iso_stop(void);
+/* A new sample rate: feedback restarts from this 16.16 nominal. */
+void usb_drv_host_iso_set_nominal(uint32_t nominal);
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st);
 
 void usb_drv_host_start(void);

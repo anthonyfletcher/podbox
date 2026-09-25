@@ -62,6 +62,9 @@ enum pcm_sink_ids {
 #ifdef USB_ENABLE_IAP
     PCM_SINK_IAP,
 #endif
+#ifdef HAVE_USB_HOST_AUDIO
+    PCM_SINK_USB_HOST,
+#endif
     PCM_SINK_NUM
 };
 

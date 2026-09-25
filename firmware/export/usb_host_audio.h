@@ -21,13 +21,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* A 1 kHz test tone to a USB Audio Class 2 DAC on the host probe's port. */
+/* Playback to a USB Audio Class 2 DAC on the host probe's port, as the
+ * PCM_SINK_USB_HOST sink. Start moves playback to the DAC, stop moves it
+ * back to the headphone socket. */
 struct usb_host_audio_status {
-    const char *state;      /* "idle", "playing", or the step that failed */
+    const char *state;      /* "off", "on", or the step that failed */
     int iface, alt;         /* the streaming interface setting in use */
     int ac_iface, clock;    /* where the sample rate is set */
     int channels, subslot, bits;
     uint32_t rate_set, rate_read;
+    int gain_cb;            /* volume applied, centibels */
 };
 
 bool usb_host_audio_start(void);
