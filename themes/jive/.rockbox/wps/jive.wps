@@ -1,0 +1,81 @@
+#-----------------------------------------------#
+#jive
+#by James Stevenson
+#-----------------------------------------------#
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,14-noto-sans-medium.fnt)
+%Fl(3,24x24-icons.fnt)
+%Fl(4,jive-ring.fnt)
+%Fl(5,16-noto-sans-medium.fnt)
+#
+#Background layer
+#
+#- Side panel. One viewport: a second full-screen %VB would clear this
+#  one away
+%V(0,0,-,-,-)%VB%Vb(3a3a3a)%Vf(ffffff)
+%dr(0,0,320,240,3a3a3a)
+%dr(214,12,89,182,555555,-,-,8)
+%dr(214,38,89,1,4a4a4a)
+%dr(214,127,89,1,4a4a4a)
+%dr(214,157,89,1,4a4a4a)
+%dr(242,173,54,4,333333,-,-,2)
+#
+#- Ring track. Its line clears to %Vb, the panel colour
+%V(227,42,62,62,4)%VB%Vb(555555)%Vf(313131)
+0
+#
+#Foreground layer
+#
+#- Cover. Here rather than in %VB, so its rounded corners blend over the
+#  background instead of over a cleared rect
+%V(16,13,180,180,-)
+%Cl(0,0,180,180,c,c,-,6)%Cd
+#
+#- Screen switches. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%?ps<%Vd(Modes)|%?bs<%Vd(Modes)|%?mm<%Vd(Clock)|%Vd(Modes)|%Vd(Modes)|%Vd(Modes)|%Vd(Modes)>>>
+#
+#- Top strip: the clock, or repeat, shuffle and the sleep timer while
+#  any of them is on
+%Vl(Clock,219,19,56,16,2)%Vf(ffffff)
+%al%cl:%cM %cP
+%Vl(Modes,216,13,58,24,3)%Vf(ffffff)
+%al%?mm<|K|L|K|K>%?ps<H|>%?bs<Æ|>
+%V(276,13,24,24,3)%Vf(ffffff)
+%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Progress ring, 36 frames
+%V(227,42,62,62,4)%Vf(ffffff)
+%?px<A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z|a|b|c|d|e|f|g|h|i|j>
+#
+#- Play state, or the lock while held. Inside the ring's square, which a
+#  ring frame clears whole, so the line also flips on every frame (the
+#  empty %?px) and redraws after it in the same pass
+%V(246,61,24,24,3)%Vf(ffffff)
+%?mh<À|%?mr<À|%?mp<C|A|B|G|F>>>%?px<|||||||||||||||||||||||||||||||||||>
+#
+#- Elapsed and total, under the ring
+%V(219,108,40,16,2)%Vf(ffffff)
+%al%pc
+%V(259,108,39,16,2)%Vf(ffffff)
+%ar%pt
+#
+#- Playlist position
+%V(216,135,85,16,2)%Vf(ffffff)
+%acTrack %pp / %pe
+#
+#- Volume
+%V(216,163,24,24,3)%Vf(ffffff)
+%?pv<M|N|O|O>
+%V(242,173,54,4,-)%Vf(ffffff)
+%pv(0,0,-,-,noborder)
+#
+#Track: title, then artist alternating with album and year
+%V(16,200,288,18,5)%Vf(ffffff)
+%al%s%?it<%it|%fn>
+%V(16,219,288,18,5)%Vf(92ccee)
+%al%t(5)%s%?ia<%ia|%?d(2)<%d(2)|>>;%al%t(5)%s%?id<%id|%?d(1)<%d(1)|>>%?iy< · %iy|>

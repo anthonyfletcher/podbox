@@ -29,3 +29,9 @@ firmware instead.
 <img src="iclassic_square/ss_1.png"/>
 
 [Click for more information](iclassic_square/README.md)
+
+## jive
+
+<img src="jive/ss_1.png"/>
+
+[Click for more information](jive/README.md)

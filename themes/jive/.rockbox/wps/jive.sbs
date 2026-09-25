@@ -1,0 +1,139 @@
+#-----------------------------------------------#
+#jive
+#by James Stevenson
+#-----------------------------------------------#
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(3,24x24-icons.fnt)
+%Fl(4,16-noto-sans-medium.fnt)
+%Fl(5,20-noto-sans-medium.fnt)
+#
+#Background layer
+#
+#- Title bar
+%V(0,0,-,-,-)%VB%Vb(3a3a3a)%Vf(ffffff)
+%dr(0,0,320,240,3a3a3a)
+%dr(5,3,310,26,555555,-,-,6)
+#
+#- Quick screen panels, one per assigned setting
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%dr(8,38,148,86,555555,-,-,8)>%?if(%QT,!=,ERR)<%dr(164,38,148,86,555555,-,-,8)>%?if(%QR,!=,ERR)<%dr(8,132,148,86,555555,-,-,8)>%?if(%QB,!=,ERR)<%dr(164,132,148,86,555555,-,-,8)>>
+#
+#Foreground layer
+#
+#- Empty strip over the title bar: its clear repaints what a keyboard or
+#  Cover Flow left there, which nothing else here covers
+%V(0,0,320,32,-)
+#
+#- Screen switches. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%?if(%cs,=,22)<%VI(covers)|%?if(%cs,=,10)<%VI(qsblank)|%?Ld<%VI(mainlarge)|%?mp<%VI(mainlarge)|%VI(main)|%VI(main)>>>>
+%?or(%if(%cs,=,22),%if(%cs,=,10),%Ld)<|%?mp<|%?C<%Vd(Art)%Vd(Track)|%Vd(TrackLeft)>|%?C<%Vd(Art)%Vd(Track)|%Vd(TrackLeft)>>>
+%?if(%cs,=,10)<%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
+#
+#Rows: plain 24, art 46. Art is drawn at 44, the size the art cache holds
+%Lb(Rows,304,24,-,46)
+#
+#- List, above the now-playing bar
+%Vi(main,8,32,304,168,5)%Vb(3a3a3a)%Vf(ffffff)
+#
+#- List, when nothing is playing or the list draws art: four art rows
+#  need the now-playing bar's room
+%Vi(mainlarge,8,32,304,208,5)%Vb(3a3a3a)%Vf(ffffff)
+#
+#- Cover Flow takes the top edge and fills the rest itself
+%Vi(covers,0,30,320,210,-)
+#
+#- Hidden list for the quick screen
+%Vi(qsblank,0,0,1,1,-)
+#
+#- Play state, hold and busy
+%V(8,4,24,24,3)%Vf(ffffff)
+%?mp<|A|B|G|F>
+%V(32,4,24,24,3)%Vf(ffffff)
+%?mh<À|%?mr<À|>>
+%V(56,4,24,24,3)%Vf(ffffff)
+%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+#
+#- Title: the clock on the main menu
+%V(84,7,152,18,4)%Vf(ffffff)
+%ac%s%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<%?cf<%cH:%cM|%cl:%cM %cP>|%Lt>>
+#
+#- Battery
+%V(288,4,24,24,3)%Vf(ffffff)
+%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Plain row. The selector is the inverted line, whose text is cut out
+#  of the bar to the backdrop, so the bar has to be light. Keep it in
+#  step with the .cfg
+%Vl(Rows,0,0,304,24,5)%Vy
+%?La<|%?and(%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%?Lc<%Vf(c8c8c8)%Vs(invert)|%Vf(ffffff)%Vb(3a3a3a)>%s %LT>>
+#
+#- Plain special row: icon, then the name without its brackets. The
+#  plain row above draws nothing for these, so the two never clear each
+#  other
+%Vl(Rows,0,0,30,24,3)%Vy
+%?La<|%?or(%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Resume])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([By album])))<%?Lc<%Vf(c8c8c8)%Vs(invert)|%Vf(ffffff)%Vb(3a3a3a)> %sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>>
+%Vl(Rows,30,0,274,24,5)%Vy
+%?La<|%?or(%if(%LT,=,%Sx([All Tracks])),%if(%LT,=,%Sx([Random])),%if(%LT,=,%Sx([Resume])),%if(%LT,=,%Sx([Featured In])),%if(%LT,=,%Sx([Untagged])),%if(%LT,=,%Sx([By album])))<%?Lc<%Vf(c8c8c8)%Vs(invert)|%Vf(ffffff)%Vb(3a3a3a)>%s%sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)>>
+#
+#- Art row special icon, standing in for a cover. Must stay above the
+#  cover's viewport, whose blit repairs anything cleared beneath it
+%Vl(Rows,11,11,24,24,3)%Vf(ffffff)
+%?La<%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d)>
+#
+#- Art row cover. Special rows have none
+%Vl(Rows,1,1,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])))<%La(0,-,4)>
+#
+#- Art row text
+%Vl(Rows,48,0,256,46,5)%Vy
+%?La<%?Lc<%Vf(c8c8c8)%Vs(invert)|%Vf(ffffff)%Vb(3a3a3a)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%LT)|>
+#
+#Now-playing bar: the track moves left when there is no cover
+%Vl(Art,12,-36,30,30,-)
+%Cl(0,0,30,30,c,c,-,3)%Cd
+%Vl(Track,50,-29,-11,18,4)%Vf(ffffff)
+%s%al%?ia<%ia - |>%?it<%it|%fn>
+%Vl(TrackLeft,11,-29,-11,18,4)%Vf(ffffff)
+%s%al%?ia<%ia - |>%?it<%it|%fn>
+#
+#Quick screen: arrow and name, then the setting's icon and value
+#
+%Vl(QuickL,16,46,24,24,3)%Vf(ffffff)
+à
+%Vl(QuickL,46,49,102,18,4)%Vf(b0b0b0)
+%s%QL
+%Vl(QuickL,16,90,24,24,3)%Vf(ffffff)
+%sel(%QL,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Ql,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickL,46,91,102,22,5)%Vf(ffffff)
+%s%Ql
+#
+%Vl(QuickT,172,46,24,24,3)%Vf(ffffff)
+Ý
+%Vl(QuickT,202,49,102,18,4)%Vf(b0b0b0)
+%s%QT
+%Vl(QuickT,172,90,24,24,3)%Vf(ffffff)
+%sel(%QT,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qt,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickT,202,91,102,22,5)%Vf(ffffff)
+%s%Qt
+#
+%Vl(QuickR,16,140,24,24,3)%Vf(ffffff)
+Þ
+%Vl(QuickR,46,143,102,18,4)%Vf(b0b0b0)
+%s%QR
+%Vl(QuickR,16,184,24,24,3)%Vf(ffffff)
+%sel(%QR,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qr,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickR,46,185,102,22,5)%Vf(ffffff)
+%s%Qr
+#
+%Vl(QuickB,172,140,24,24,3)%Vf(ffffff)
+ß
+%Vl(QuickB,202,143,102,18,4)%Vf(b0b0b0)
+%s%QB
+%Vl(QuickB,172,184,24,24,3)%Vf(ffffff)
+%sel(%QB,%Sx(Shuffle),H,%Sx(Repeat),J,%Sx(Volume),O,%Sx(Brightness),Å,%Sx(Backlight),Ë,%Sx(Equalizer),P,%Sx(Enable EQ),P,%Sx(Bass),R,%Sx(Treble),R,%Sx(Balance),R,%Sx(Stereo Width),R,%Sx(Crossfeed),R,%Sx(Replaygain Type),R,%Sx(Pre-amp),R,%Sx(Show Track Info),©,%sel(%Qb,%Sx(Yes),É,%Sx(No),É,%Sx(On),É,%Sx(Off),É,Í))
+%Vl(QuickB,202,185,102,22,5)%Vf(ffffff)
+%s%Qb
