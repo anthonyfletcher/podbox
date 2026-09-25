@@ -119,6 +119,7 @@ enum
     USB_NOTIFY_SET_CONFIG,   /* Event */
     USB_NOTIFY_BUS_RESET,    /* Event */
     USB_NOTIFY_CLASS_DRIVER, /* Event - notify_event() of specified class driver */
+    USB_HOST_PROBE,          /* Event - data: port to the host probe or back */
 #endif
 #ifdef USB_FIREWIRE_HANDLING
     USB_REQUEST_REBOOT,      /* Event */
@@ -185,6 +186,10 @@ struct usb_transfer_completion_event_data;
 void usb_init(void) INIT_ATTR;
 /* target must implement this to enable/disable the usb transceiver/core */
 void usb_enable(bool on);
+#ifdef HAVE_USBSTACK
+/* target: clock the controller for the host probe, and start or stop it */
+void usb_host_probe_enable(bool on);
+#endif
 /* called after host has been detected */
 void usb_attach(void);
 /* enable usb detection monitoring; before this function is called, all usb
@@ -260,6 +265,11 @@ enum usb_waypoint
 
 void usb_record_waypoint(enum usb_waypoint w, int a, int b);
 const struct usb_insert_record *usb_get_insert_record(void);
+#ifdef HAVE_USBSTACK
+/* Give the port to the USB host probe (true) or back to the device stack.
+ * While the probe has it, cable insertion and removal are ignored. */
+void usb_set_host_probe(bool on);
+#endif
 #endif /* !BOOTLOADER */
 #ifdef USB_STATUS_BY_EVENT
 /* Notify USB insertion state (USB_INSERTED or USB_EXTRACTED) */

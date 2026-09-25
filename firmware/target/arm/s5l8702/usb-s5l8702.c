@@ -110,6 +110,13 @@ void usb_enable(bool on)
 #endif
 }
 
+/* The driver clocks the core itself, as usb_drv_init() does. */
+void usb_host_probe_enable(bool on)
+{
+    if (on) usb_drv_host_start();
+    else usb_drv_host_stop();
+}
+
 int usb_detect(void)
 {
     return usb_status;

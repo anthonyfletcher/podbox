@@ -1513,6 +1513,51 @@ static bool dbg_usb_info(void)
     info.timeout = HZ/2;
     return simplelist_show_list(&info);
 }
+
+/* The USB host probe: the controller turned round to be a host, and what
+ * its root port sees. The port belongs to the probe from entry to exit, so
+ * a cable does not start USB mode while this screen is open. */
+static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
+{
+    static const char * const lines[] = { "SE0", "J", "K", "SE1" };
+    struct usb_drv_host_status st;
+    (void)lists;
+
+    usb_drv_host_poll(&st);
+    simplelist_reset_lines();
+    if (!st.active)
+    {
+        simplelist_addline("Starting...");
+        return btn == ACTION_NONE ? ACTION_REDRAW : btn;
+    }
+
+    simplelist_addline("Host mode: %s", st.host_mode ? "Yes" : "NO");
+    simplelist_addline("VBUS: %s", st.vbus ? "Yes" : "no");
+    simplelist_addline("Connected: %s", st.connected ? "YES" : "no");
+    simplelist_addline("Enabled: %s", st.enabled ? "YES" : "no");
+    simplelist_addline("Speed: %s", st.speed);
+    simplelist_addline("Line: %s", lines[st.line & 3]);
+    simplelist_addline("Resets: %d", st.resets);
+    for (int i = 0; i < st.nregs; i++)
+        simplelist_addline("%s: %08lx", st.regs[i].name,
+                           (unsigned long)st.regs[i].val);
+    return btn == ACTION_NONE ? ACTION_REDRAW : btn;
+}
+
+static bool dbg_usb_host_probe(void)
+{
+    struct simplelist_info info;
+    bool ret;
+
+    usb_set_host_probe(true);
+    simplelist_info_init(&info, "USB Host Probe", 0, NULL);
+    info.action_callback = usb_host_probe_callback;
+    info.scroll_all = true;
+    info.timeout = HZ/2;
+    ret = simplelist_show_list(&info);
+    usb_set_host_probe(false);
+    return ret;
+}
 #endif /* HAVE_USBSTACK */
 
 /* Put every earned badge back to unannounced, so the next report opens on the
@@ -2020,6 +2065,7 @@ static const struct {
         { "Beat tap", spike_tap_screen },
 #ifdef HAVE_USBSTACK
         { "View USB info", dbg_usb_info },
+        { "USB host probe", dbg_usb_host_probe },
 #endif
         { "View buffering thread", dbg_buffering_thread },
 #ifdef PM_DEBUG

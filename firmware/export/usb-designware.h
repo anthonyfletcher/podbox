@@ -48,6 +48,7 @@
 
 #define DWC_GUSBCFG         (*((REG32_PTR_T)(OTGBASE + 0x0c)))
     #define FDMOD           (1<<30)
+    #define FHMOD           (1<<29)
     #define TRDT(x)         ((x)<<10)
     #define DDRSEL          (1<<7)
     #define PHSEL           (1<<6)

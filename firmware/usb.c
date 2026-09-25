@@ -124,6 +124,8 @@ static bool usb_serial = false;
 static int usb_audio = 0;
 #endif
 static bool usb_host_present = false;
+/* The host probe owns the controller: cable events are not acted on. */
+static bool usb_host_probe_on = false;
 static int usb_num_acks_to_expect = 0;
 static uint32_t usb_broadcast_seqnum = 0x80000000;
 
@@ -469,6 +471,32 @@ static void usb_set_host_present(bool present)
     usb_configure_drivers(USB_INSERTED);
 }
 
+static void usb_extract(void)
+{
+    if(usb_state == USB_EXTRACTED)
+        return;
+
+    if(usb_state == USB_POWERED || usb_state == USB_INSERTED)
+        usb_stack_enable(false);
+
+#ifdef IPOD_ACCESSORY_PROTOCOL
+    iap_reset_state(IF_IAP_MP(0));
+#endif
+
+    usb_state = USB_EXTRACTED;
+#ifndef BOOTLOADER
+    send_event(SYS_EVENT_USB_EXTRACTED, NULL);
+#endif
+    usb_set_host_present(false);
+}
+
+#if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
+void usb_set_host_probe(bool on)
+{
+    queue_post(&usb_queue, USB_HOST_PROBE, on);
+}
+#endif
+
 /*--- General driver code ---*/
 static void NORETURN_ATTR usb_thread(void)
 {
@@ -508,7 +536,7 @@ static void NORETURN_ATTR usb_thread(void)
 #endif /* HAVE_USBSTACK */
 
         case USB_INSERTED:
-            if(usb_state != USB_EXTRACTED)
+            if(usb_state != USB_EXTRACTED || usb_host_probe_on)
                 break;
 
             if(usb_do_screendump())
@@ -580,23 +608,28 @@ static void NORETURN_ATTR usb_thread(void)
             /* SYS_USB_CONNECTED_ACK */
 
         case USB_EXTRACTED:
-            if(usb_state == USB_EXTRACTED)
-                break;
-
-            if(usb_state == USB_POWERED || usb_state == USB_INSERTED)
-                usb_stack_enable(false);
-
-#ifdef IPOD_ACCESSORY_PROTOCOL
-            iap_reset_state(IF_IAP_MP(0));
-#endif
-
-            usb_state = USB_EXTRACTED;
-#ifndef BOOTLOADER
-            send_event(SYS_EVENT_USB_EXTRACTED, NULL);
-#endif
-            usb_set_host_present(false);
+            usb_extract();
             break;
             /* USB_EXTRACTED: */
+
+#if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
+        case USB_HOST_PROBE:
+            if((bool)ev.data == usb_host_probe_on)
+                break;
+            usb_host_probe_on = ev.data;
+            if(usb_host_probe_on)
+            {
+                usb_extract();
+                usb_host_probe_enable(true);
+            }
+            else
+            {
+                usb_host_probe_enable(false);
+                /* Insertions were dropped meanwhile; replay the cable. */
+                queue_post(&usb_queue, usb_detect(), 0);
+            }
+            break;
+#endif
 
         /*** Miscellaneous USB thread duties ***/
 

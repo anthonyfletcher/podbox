@@ -128,6 +128,31 @@ struct usb_drv_hw_info {
 };
 const struct usb_drv_hw_info *usb_drv_get_hw_info(void);
 
+/* The host probe: the controller as a USB host, root port status only, no
+ * transfers. The target's usb_host_probe_enable() clocks the controller and
+ * calls the driver's start and stop; only the USB thread calls it, and only
+ * with the device stack disabled. usb_drv_host_poll() may be called from any
+ * thread; it resets a newly connected device once, busy-waiting through the
+ * reset so the probe cannot be stopped under it. */
+struct usb_drv_host_status {
+    bool active;
+    bool host_mode;         /* the controller reports itself a host */
+    bool vbus;
+    bool connected;
+    bool enabled;
+    int line;               /* 0 SE0, 1 J, 2 K, 3 SE1 */
+    const char *speed;
+    int resets;
+    int nregs;
+    struct {
+        const char *name;
+        uint32_t val;
+    } regs[4];
+};
+void usb_drv_host_start(void);
+void usb_drv_host_stop(void);
+void usb_drv_host_poll(struct usb_drv_host_status *st);
+
 #ifdef USB_HAS_ISOCHRONOUS
 /* returns the last received frame number (the 11-bit number contained in the last SOF):
  * - full-speed: the host sends one SOF every 1ms (so 1000 SOF/s)

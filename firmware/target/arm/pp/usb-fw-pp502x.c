@@ -188,6 +188,20 @@ void usb_enable(bool on)
     }
 }
 
+void usb_host_probe_enable(bool on)
+{
+    if (on) {
+        DEV_EN |= DEV_USB0;
+        DEV_EN |= DEV_USB1;
+        DEV_INIT2 |= INIT_USB;
+        usb_drv_host_start();
+    }
+    else {
+        usb_drv_host_stop();
+        usb_reset_controller();
+    }
+}
+
 void usb_attach(void)
 {
 }

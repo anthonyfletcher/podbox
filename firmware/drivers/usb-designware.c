@@ -1425,6 +1425,107 @@ void usb_drv_init(void)
     usb_dw_read_hw_info();
 }
 
+/* Host probe. HPRT's change bits clear when written as 1, and so does its
+ * enable bit, so every write masks all four. Interrupts stay off: the
+ * device-mode handler must never see a host-mode core. */
+#define HPRT_CONN_STS   (1<<0)
+#define HPRT_ENA        (1<<2)
+#define HPRT_RST        (1<<8)
+#define HPRT_PWR        (1<<12)
+#define HPRT_WRITE_MASK ((1<<1)|(1<<2)|(1<<3)|(1<<5))
+#define GOTGCTL_SESVLD  ((1<<18)|(1<<19))
+
+static bool host_active;
+static bool host_reset_done;
+static int host_resets;
+
+void usb_drv_host_start(void)
+{
+#ifndef USB_DW_TURNAROUND
+    int USB_DW_TURNAROUND =
+        (usb_dw_config.phytype == DWC_PHYTYPE_UTMI_16) ? 5 : 9;
+#endif
+    uint32_t gusbcfg = usb_dw_config.phytype | TRDT(USB_DW_TURNAROUND) |
+                       USB_DW_TOUTCAL;
+
+    usb_dw_target_disable_irq();
+    usb_dw_target_enable_clocks();
+    DWC_PCGCCTL = 0;
+
+    /* PHY type before the core reset, force-host after it */
+    DWC_GUSBCFG = gusbcfg;
+    udelay(100);
+    usb_dw_wait_for_ahb_idle();
+    DWC_GRSTCTL = CSRST;
+    while (DWC_GRSTCTL & CSRST);
+    usb_dw_wait_for_ahb_idle();
+    DWC_GUSBCFG = gusbcfg | FHMOD;
+    for (int i = 0; i < 100 && !(DWC_GINTSTS & CMOD); i++)
+        udelay(1000);
+
+    DWC_GAHBCFG = 0;
+    DWC_GINTMSK = 0;
+    DWC_HCFG = 0;       /* 30/60 MHz PHY clock, high speed allowed */
+    DWC_HPRT = HPRT_PWR;
+
+    host_reset_done = false;
+    host_resets = 0;
+    host_active = true;
+}
+
+void usb_drv_host_stop(void)
+{
+    host_active = false;
+    DWC_HPRT = 0;
+    DWC_GUSBCFG &= ~FHMOD;
+    DWC_PCGCCTL = 1;
+    usb_dw_target_disable_clocks();
+}
+
+void usb_drv_host_poll(struct usb_drv_host_status *st)
+{
+    static const char * const speeds[] = { "high", "full", "low", "?" };
+    uint32_t hprt;
+
+    st->active = host_active;
+    if (!host_active)
+        return;
+
+    hprt = DWC_HPRT;
+    if (!(hprt & HPRT_CONN_STS))
+        host_reset_done = false;
+    else if (!host_reset_done)
+    {
+        /* 100 ms connect debounce, then a 60 ms root-port reset, which
+         * this core leaves to software to end. */
+        host_reset_done = true;
+        host_resets++;
+        udelay(100000);
+        DWC_HPRT = (DWC_HPRT & ~HPRT_WRITE_MASK) | HPRT_RST;
+        udelay(60000);
+        DWC_HPRT = DWC_HPRT & ~(HPRT_WRITE_MASK | HPRT_RST);
+        udelay(10000);
+        hprt = DWC_HPRT;
+    }
+
+    st->host_mode = DWC_GINTSTS & CMOD;
+    st->vbus = DWC_GOTGCTL & GOTGCTL_SESVLD;
+    st->connected = hprt & HPRT_CONN_STS;
+    st->enabled = hprt & HPRT_ENA;
+    st->line = (hprt >> 10) & 3;
+    st->speed = st->enabled ? speeds[(hprt >> 17) & 3] : "-";
+    st->resets = host_resets;
+    st->regs[0].name = "HPRT";
+    st->regs[0].val = hprt;
+    st->regs[1].name = "GOTGCTL";
+    st->regs[1].val = DWC_GOTGCTL;
+    st->regs[2].name = "GINTSTS";
+    st->regs[2].val = DWC_GINTSTS;
+    st->regs[3].name = "GUSBCFG";
+    st->regs[3].val = DWC_GUSBCFG;
+    st->nregs = 4;
+}
+
 void usb_drv_exit(void)
 {
     usb_dw_exit();

@@ -511,6 +511,86 @@ static void read_hw_info(void)
     hw_info.nregs = 4;
 }
 
+/* Host probe. The controller is an EHCI host with one root port and no
+ * transaction translator, so only high-speed devices are expected to
+ * enable. PORTSC1's change bits clear when written as 1, and writing PE as
+ * 1 does nothing, so every write masks all four. */
+#define PORTSCX_WRITE_MASK (PORTSCX_CONNECT_STATUS_CHANGE | \
+                            PORTSCX_PORT_ENABLE | \
+                            PORTSCX_PORT_EN_DIS_CHANGE | \
+                            PORTSCX_OVER_CURRENT_CHG)
+
+static bool host_active;
+static bool host_reset_done;
+static int host_resets;
+
+void usb_drv_host_start(void)
+{
+    usb_drv_int_enable(false);
+    usb_drv_reset();
+    REG_USBMODE = USBMODE_CTRL_MODE_HOST;
+    REG_USBINTR = 0;
+    REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) | PORTSCX_PORT_POWER;
+    REG_USBCMD |= USBCMD_RUN;
+    host_reset_done = false;
+    host_resets = 0;
+    host_active = true;
+}
+
+void usb_drv_host_stop(void)
+{
+    host_active = false;
+    REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_POWER);
+    REG_USBCMD &= ~USBCMD_RUN;
+    REG_USBCMD |= USBCMD_CTRL_RESET;
+    while (REG_USBCMD & USBCMD_CTRL_RESET);
+}
+
+void usb_drv_host_poll(struct usb_drv_host_status *st)
+{
+    static const char * const speeds[] = { "full", "low", "high", "?" };
+    unsigned int portsc;
+
+    st->active = host_active;
+    if (!host_active)
+        return;
+
+    portsc = REG_PORTSC1;
+    if (!(portsc & PORTSCX_CURRENT_CONNECT_STATUS))
+        host_reset_done = false;
+    else if (!host_reset_done)
+    {
+        /* 100 ms connect debounce, then a 60 ms root-port reset. The
+         * controller may time the reset itself; if not, end it here. */
+        host_reset_done = true;
+        host_resets++;
+        udelay(100000);
+        REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) | PORTSCX_PORT_RESET;
+        udelay(60000);
+        if (REG_PORTSC1 & PORTSCX_PORT_RESET)
+            REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
+        udelay(10000);
+        portsc = REG_PORTSC1;
+    }
+
+    st->host_mode = (REG_USBMODE & 3) == USBMODE_CTRL_MODE_HOST;
+    st->vbus = REG_OTGSC & (OTGSC_A_VBUS_VALID | OTGSC_B_SESSION_VALID);
+    st->connected = portsc & PORTSCX_CURRENT_CONNECT_STATUS;
+    st->enabled = portsc & PORTSCX_PORT_ENABLE;
+    st->line = (portsc >> 10) & 3;
+    st->speed = st->enabled ? speeds[(portsc >> 26) & 3] : "-";
+    st->resets = host_resets;
+    st->regs[0].name = "PORTSC1";
+    st->regs[0].val = portsc;
+    st->regs[1].name = "OTGSC";
+    st->regs[1].val = REG_OTGSC;
+    st->regs[2].name = "USBSTS";
+    st->regs[2].val = REG_USBSTS;
+    st->regs[3].name = "USBMODE";
+    st->regs[3].val = REG_USBMODE;
+    st->nregs = 4;
+}
+
 /* manual: 32.14.1 Device Controller Initialization */
 void usb_drv_init(void)
 {
