@@ -25,8 +25,22 @@ int hex_to_rgb(const char* hex, int* color);
  * viewport's foreground (%Vg's text, %dr's fill) inherit it from there. */
 #define COLOR_FIXED (1u << 24)
 
+/* Set on a colour a skin wrote as the word `bright` or `dark`: the lighter or
+ * the darker of the album's two colours, whichever that is. The bits below
+ * hold white or black, which is what the colour is with no palette, and
+ * dynamic_colors_resolve() strips the flag as it does COLOR_FIXED. */
+#define COLOR_BRIGHT (1u << 25)
+#define COLOR_DARK   (1u << 26)
+
+/* A palette word's shade, `bright.75`: the percentage of its brightness to
+ * keep, mixed toward black. Held as the percentage plus one in the bits
+ * between the colour and the flags, so zero means no suffix. */
+#define COLOR_SHADE_SHIFT 16
+#define COLOR_SHADE_MASK  (0x7fu << COLOR_SHADE_SHIFT)
+
 /* Parse a colour for the given screen, accepting the forms theme files and
- * skins use, plus a leading '!' for COLOR_FIXED. Returns true if text held a
+ * skins use, plus a leading '!' for COLOR_FIXED and the words `bright` and
+ * `dark`, each with an optional `.NN` shade. Returns true if text held a
  * usable colour. */
 bool parse_color(enum screen_type screen, char *text, int *value);
 

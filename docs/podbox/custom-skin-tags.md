@@ -856,6 +856,43 @@ same colour; nothing is being remapped either way.
 
 ---
 
+## Palette colours, `bright` and `dark`
+
+Any colour argument that takes `rrggbb` also takes the word `bright` or `dark`:
+the lighter or the darker of the two colours dynamic colours take from the
+album.
+
+```
+%Vf(bright)                   # progress bar over black: always the light one
+%Vg(bright,bright,dark)       # selection bar, with text that reads on it
+%dr(0,0,-,20,dark)            # a panel behind light text
+```
+
+The two are picked to contrast with each other, so `dark` on `bright` is
+always readable, and `bright` always shows on a dark theme. Which of them is
+the album's main colour depends on the album. A pale sleeve's main colour is
+`bright`, and a dark one's is `dark`.
+
+With no album colours — nothing played yet, or **Dynamic Colours** off —
+`bright` is white and `dark` is black.
+
+Add `.NN` for a shade: the colour at `NN` percent of its brightness, mixed
+toward black, from `0` to `100`. It is how a second tone of the same colour is
+written, such as the lower half of a glossy bar:
+
+```
+%Vl(Bar,60,214,200,6,-)%Vf(bright)       # upper half
+%pb(0,0,-,-,noborder)
+%Vl(Bar,60,220,200,6,-)%Vf(bright.75)    # lower half, a quarter darker
+%pb(0,0,-,-,noborder)
+```
+
+The shade applies with no album colours too: `bright.75` is then a light grey.
+
+Like `!`, the words are skin-only; a `.cfg` does not take them.
+
+---
+
 ## Changed behaviour: `%cs` screen numbers
 
 `%cs` reports which screen is on, as a number, and this build has screens

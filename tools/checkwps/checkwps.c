@@ -339,10 +339,22 @@ static const char *colour_origin(unsigned int actual, unsigned int baseline)
 
 /* Colours are held packed for the display -- RGB565 on both targets -- so a
  * raw print is unrecognisable next to the rrggbb a skin author wrote. Unpack
- * back to 24-bit, and mark a colour the skin pinned with '!'. */
+ * back to 24-bit, and mark a colour the skin pinned with '!'. A palette word
+ * prints as the word. */
 static const char *colour_text(unsigned int c, char *buf, int len)
 {
     bool fixed = (c & COLOR_FIXED) != 0;
+    unsigned int shade = (c & COLOR_SHADE_MASK) >> COLOR_SHADE_SHIFT;
+
+    if (c & (COLOR_BRIGHT | COLOR_DARK))
+    {
+        const char *word = (c & COLOR_BRIGHT) ? "bright" : "dark";
+
+        if (!shade)
+            return word;
+        snprintf(buf, len, "%s.%u", word, shade - 1);
+        return buf;
+    }
 
     c &= ~COLOR_FIXED;
     snprintf(buf, len, "%s%02x%02x%02x", fixed ? "!" : "",

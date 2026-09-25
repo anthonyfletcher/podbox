@@ -1398,15 +1398,47 @@ static unsigned int resolve_mapped(unsigned int original,
     return transform_cached(original);
 }
 
+/* `bright` and `dark`: the lighter and darker of the pair, or the white and
+ * black the parser left in the colour bits when there is no palette. The
+ * accent is picked for contrast against the dominant, so one of the pair is
+ * always the light one and the other the dark one. */
+static unsigned int resolve_palette_word(unsigned int original, bool palette)
+{
+    unsigned int black = LCD_RGBPACK(0, 0, 0);
+    unsigned int shade = (original & COLOR_SHADE_MASK) >> COLOR_SHADE_SHIFT;
+    unsigned int out = original & ~(COLOR_BRIGHT | COLOR_DARK |
+                                    COLOR_SHADE_MASK);
+
+    if (palette)
+    {
+        bool accent_lighter = color_contrast(cache.accent, black) >
+                              color_contrast(cache.dominant, black);
+
+        if (original & COLOR_BRIGHT)
+            out = accent_lighter ? cache.accent : cache.dominant;
+        else
+            out = accent_lighter ? cache.dominant : cache.accent;
+    }
+
+    if (shade)
+        out = color_blend(black, out, ((shade - 1) * 256) / 100);
+    return out;
+}
+
 unsigned int dynamic_colors_resolve(unsigned int original)
 {
+    bool palette = global_settings.dynamic_colors && cache.valid;
+
     /* Before the checks below, not after: the flag has to come off whether or
      * not there is a palette to resolve against, since this is the only place
      * that knows about it and the value goes on to the display from here. */
     if (original & COLOR_FIXED)
         return original & ~COLOR_FIXED;
 
-    if (!global_settings.dynamic_colors || !cache.valid)
+    if (original & (COLOR_BRIGHT | COLOR_DARK))
+        return resolve_palette_word(original, palette);
+
+    if (!palette)
         return original;
 
     return resolve_mapped(original, cache.accent, cache.dominant);

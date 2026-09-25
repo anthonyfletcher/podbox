@@ -221,6 +221,40 @@ bool parse_color(enum screen_type screen, char *text, int *value)
     if (screens[screen].depth > 2)
     {
         bool fixed = false;
+        const char *shade = NULL;
+
+        if (strncasecmp(text, "bright", 6) == 0 &&
+            (text[6] == '\0' || text[6] == '.'))
+        {
+            *value = LCD_RGBPACK(255, 255, 255) | COLOR_BRIGHT;
+            shade = text + 6;
+        }
+        else if (strncasecmp(text, "dark", 4) == 0 &&
+                 (text[4] == '\0' || text[4] == '.'))
+        {
+            *value = LCD_RGBPACK(0, 0, 0) | COLOR_DARK;
+            shade = text + 4;
+        }
+
+        if (shade)
+        {
+            int pct = 0;
+
+            if (*shade == '\0')
+                return true;
+            if (!isdigit((unsigned char)shade[1]))
+                return false;
+            for (shade++; isdigit((unsigned char)*shade); shade++)
+            {
+                pct = pct * 10 + (*shade - '0');
+                if (pct > 100)
+                    return false;
+            }
+            if (*shade != '\0')
+                return false;
+            *value |= (unsigned)(pct + 1) << COLOR_SHADE_SHIFT;
+            return true;
+        }
 
         /* '!' before the digits pins the colour: the album palette carries
          * every other literal over, and this is how a skin says not to. */

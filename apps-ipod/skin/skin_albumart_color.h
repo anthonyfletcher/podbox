@@ -19,7 +19,8 @@ void dynamic_colors_init(void);
  * Otherwise return the original color unchanged.
  *
  * Also where COLOR_FIXED (draw/color.h) comes off, so a colour a skin wrote
- * with a leading '!' passes through untouched. Every skin colour reaches the
+ * with a leading '!' passes through untouched, and where `bright` and `dark`
+ * become the lighter and darker of the palette, or white and black without one. Every skin colour reaches the
  * display through here, which is what makes one strip enough. */
 unsigned int dynamic_colors_resolve(unsigned int original);
 
