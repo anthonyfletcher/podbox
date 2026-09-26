@@ -1190,6 +1190,14 @@ buttons can drive playback there.
 What the buttons send while acting as a USB device: media keys, a mouse, or
 presentation controls.
 
+[usb-dac]
+Lets a computer play through the player: it shows up as a sound card, and what
+the computer plays comes out of the headphone socket. The computer's volume
+control sets the player's.
+
+Always, or only in one USB mode. Takes effect at the next restart, and while on
+it keeps about 130K of memory back from playback.
+
 [usb dac output]
 On Auto, a USB DAC plugged into the dock connector takes over playback, and
 unplugging it hands playback back to the headphone socket. It is checked for

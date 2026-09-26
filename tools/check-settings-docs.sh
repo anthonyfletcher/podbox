@@ -31,9 +31,8 @@ for f in "$HELP" "$GUIDE" "$LIST" "$TAGS" "$PHRASES"; do
 done
 
 # Settings with no menu row of their own, plus three lang description strings
-# and usb-dac, which PODBOX_NO_USB_AUDIO compiles out (config.h says why).
 # check 2's regexp cannot tell from a cfg name. None of these want a stanza.
-KNOWN_UNDOCUMENTED='^(Announce Battery Level|No Backlight On Selected Actions|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order|usb-dac)$'
+KNOWN_UNDOCUMENTED='^(Announce Battery Level|No Backlight On Selected Actions|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order)$'
 
 # Byte order throughout, because sort and comm have to agree about what "in
 # order" means. Under a UTF-8 locale sort collates "usb hid", "usb keypad
