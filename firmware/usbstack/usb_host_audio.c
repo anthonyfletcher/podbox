@@ -334,7 +334,13 @@ bool usb_host_audio_start(void)
     struct usb_drv_host_iso iso;
 
 #define STEP(name, cond) \
-    do { if (!(cond)) { status.state = name; return false; } } while (0)
+    do { \
+        if (!(cond)) { \
+            status.state = name; \
+            status.ctrl_status = usb_drv_host_last_status(); \
+            return false; \
+        } \
+    } while (0)
 
     usb_host_audio_stop();
     STEP("no device", e->result == 1);

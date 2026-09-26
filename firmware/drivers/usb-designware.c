@@ -1451,13 +1451,18 @@ static int host_resets;
 #define HCCHAR_CHDIS        (1 << 30)
 #define HCCHAR_CHENA        (1u << 31)
 #define HCTSIZ_PKTCNT(x)    ((x) << 19)
+#define HCTSIZ_PKTS_LEFT(v) (((v) >> 19) & 0x3ff)
 #define HCTSIZ_PID(x)       ((x) << 29)
+#define HCTSIZ_DOPNG        (1u << 31)
 #define PID_DATA0           0
 #define PID_DATA1           2
 #define PID_SETUP           3
 #define HCINT_XFERC         (1 << 0)
 #define HCINT_CHH           (1 << 1)
 #define HCINT_ALL           0x7ff
+/* AHB error, STALL, transaction, babble, frame overrun, data toggle */
+#define HCINT_ERRORS        ((1 << 2) | (1 << 3) | (1 << 7) | (1 << 8) | \
+                             (1 << 9) | (1 << 10))
 
 /* Host-mode FIFOs, in words, from the core's 0x820 */
 #define HOST_RXFIFO         0x300
@@ -1486,12 +1491,15 @@ uint32_t usb_drv_host_last_status(void)
     return host_last_status;
 }
 
-/* One stage of a control transfer on channel 0. In DMA mode the core
- * retries NAKs itself and halts the channel when the stage ends, one way or
- * the other; XFERC says it ended well. An IN stage is sized in whole
- * packets and a short one ends it, so buf must hold len rounded up to 64.
- * Returns the bytes moved, or -1 with host_last_status the channel's
- * interrupt bits (bit 31 set if it never halted). */
+/* One stage of a control transfer on channel 0. The channel halts when the
+ * stage ends, one way or the other. XFERC says it ended well, and so does a
+ * halt with no packets left: a high-speed OUT answered NYET, "taken, not
+ * ready for more", halts without XFERC. A halt on NAK or NYET with packets
+ * still to go is sent again, pinging first if it is a high-speed OUT. An IN
+ * stage is sized in whole packets and a short one ends it, so buf must hold
+ * len rounded up to 64. Returns the bytes moved, or -1 with
+ * host_last_status the channel's interrupt bits (bit 31 set if it never
+ * halted). */
 static int host_stage(int addr, int pid, bool in, void *buf, int len)
 {
     const int mps = 64;
@@ -1499,34 +1507,41 @@ static int host_stage(int addr, int pid, bool in, void *buf, int len)
     int size = in ? pkts * mps : len;
     uint32_t hcint = 0;
 
-    DWC_HCINT(0) = HCINT_ALL;
-    DWC_HCTSIZ(0) = size | HCTSIZ_PKTCNT(pkts) | HCTSIZ_PID(pid);
-    DWC_HCDMA(0) = HOST_PHYS(buf);
-    DWC_HCCHAR(0) = HCCHAR_MPS(mps) | HCCHAR_EPNUM(0) |
-                    (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(0) |
-                    HCCHAR_MC(1) | HCCHAR_DEVADDR(addr) | HCCHAR_CHENA;
+    for (int attempt = 0; attempt < 10; attempt++)
+    {
+        DWC_HCINT(0) = HCINT_ALL;
+        DWC_HCTSIZ(0) = size | HCTSIZ_PKTCNT(pkts) | HCTSIZ_PID(pid) |
+                        (attempt && !in ? HCTSIZ_DOPNG : 0);
+        DWC_HCDMA(0) = HOST_PHYS(buf);
+        DWC_HCCHAR(0) = HCCHAR_MPS(mps) | HCCHAR_EPNUM(0) |
+                        (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(0) |
+                        HCCHAR_MC(1) | HCCHAR_DEVADDR(addr) | HCCHAR_CHENA;
 
-    for (int t = 0; t < 5000; t++)
-    {
-        hcint = DWC_HCINT(0);
-        if (hcint & HCINT_CHH)
-            break;
-        udelay(100);
-    }
-    if (!(hcint & HCINT_CHH))
-    {
-        DWC_HCCHAR(0) |= HCCHAR_CHDIS | HCCHAR_CHENA;
-        for (int t = 0; t < 100 && !(DWC_HCINT(0) & HCINT_CHH); t++)
+        for (int t = 0; t < 5000; t++)
+        {
+            hcint = DWC_HCINT(0);
+            if (hcint & HCINT_CHH)
+                break;
             udelay(100);
-        host_last_status = hcint | (1u << 31);
-        return -1;
+        }
+        if (!(hcint & HCINT_CHH))
+        {
+            DWC_HCCHAR(0) |= HCCHAR_CHDIS | HCCHAR_CHENA;
+            for (int t = 0; t < 100 && !(DWC_HCINT(0) & HCINT_CHH); t++)
+                udelay(100);
+            host_last_status = hcint | (1u << 31);
+            return -1;
+        }
+        if ((hcint & HCINT_XFERC) ||
+            (!(hcint & HCINT_ERRORS) &&
+             HCTSIZ_PKTS_LEFT(DWC_HCTSIZ(0)) == 0))
+            return in ? size - (int)(DWC_HCTSIZ(0) & 0x7ffff) : len;
+        if (hcint & HCINT_ERRORS)
+            break;
+        udelay(1000);
     }
-    if (!(hcint & HCINT_XFERC))
-    {
-        host_last_status = hcint;
-        return -1;
-    }
-    return in ? size - (int)(DWC_HCTSIZ(0) & 0x7ffff) : len;
+    host_last_status = hcint;
+    return -1;
 }
 
 int usb_drv_host_control(int addr, int reqtype, int req, int value,

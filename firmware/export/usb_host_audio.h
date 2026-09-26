@@ -30,6 +30,7 @@ struct usb_host_audio_status {
     int ac_iface, clock;    /* where the sample rate is set */
     int channels, subslot, bits;
     uint32_t rate_set, rate_read;
+    uint32_t ctrl_status;   /* controller status of a failed step, raw */
     int gain_cb;            /* volume applied, centibels */
 };
 

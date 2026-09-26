@@ -1576,6 +1576,9 @@ static void usb_host_probe_dac_lines(void)
 
     usb_drv_host_iso_get_stats(&iso);
     simplelist_addline("DAC output (SELECT): %s", a->state);
+    if (strcmp(a->state, "on") && strcmp(a->state, "off"))
+        simplelist_addline("  control status %08lx",
+                           (unsigned long)a->ctrl_status);
     if (a->alt == 0)
         return;
     simplelist_addline("  IF%d.%d %dch %d/%d bit, clock %d", a->iface, a->alt,
