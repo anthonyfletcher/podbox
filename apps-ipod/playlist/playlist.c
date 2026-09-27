@@ -3396,7 +3396,7 @@ int playlist_resume(void)
     }
     playlist->control_created = true;
 
-    control_file_size = filesize(playlist->control_fd);
+    control_file_size = ffilesize(playlist->control_fd);
     if (control_file_size <= 0)
     {
         notify_control_access_error();

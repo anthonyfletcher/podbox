@@ -45,7 +45,7 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
     if (fd < 0)
         return false;
 
-    size = filesize(fd);
+    size = ffilesize(fd);
     if (size <= 0)
     {
         close(fd);

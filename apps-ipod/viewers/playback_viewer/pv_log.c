@@ -161,7 +161,7 @@ static bool rd_open_at(enum pv_source src, unsigned long offset)
         if (fd < 0)
             break;          /* numbered run ended; the live log is next */
 
-        sz = (unsigned long)filesize(fd);
+        sz = (unsigned long)ffilesize(fd);
         if (left < sz)
         {
             lseek(fd, (off_t)left, SEEK_SET);
@@ -347,7 +347,7 @@ unsigned long pv_log_size(enum pv_source src)
         fd = open(PV_SCROBBLER_PATH, O_RDONLY);
         if (fd < 0)
             return 0;
-        total = (unsigned long)filesize(fd);
+        total = (unsigned long)ffilesize(fd);
         close(fd);
         return total;
     }
@@ -358,14 +358,14 @@ unsigned long pv_log_size(enum pv_source src)
         fd = open(path, O_RDONLY);
         if (fd < 0)
             break;
-        total += (unsigned long)filesize(fd);
+        total += (unsigned long)ffilesize(fd);
         close(fd);
     }
 
     fd = open(PV_LOG_PATH, O_RDONLY);
     if (fd >= 0)
     {
-        total += (unsigned long)filesize(fd);
+        total += (unsigned long)ffilesize(fd);
         close(fd);
     }
     return total;

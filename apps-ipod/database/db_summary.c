@@ -780,7 +780,7 @@ void db_summary_log_play(const char *album, const char *albumartist,
      *
      * So put the file back the way it was and drop this play instead. Losing
      * one play is not worth noticing; losing the alignment is permanent. */
-    before = filesize(fd);
+    before = ffilesize(fd);
     if (write(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
     {
         if (before >= 0)
@@ -793,7 +793,7 @@ void db_summary_log_play(const char *album, const char *albumartist,
      * beats replaying it on every read. Cheap to say so: a build that finds
      * only plays changed carries every album's figures across bar the ones
      * named here. */
-    if (filesize(fd) > (long)(PLAY_LOG_MAX * sizeof(rec)))
+    if (ffilesize(fd) > (long)(PLAY_LOG_MAX * sizeof(rec)))
         bg_task_update(&db_summary_task);
 
     close(fd);
@@ -818,7 +818,7 @@ static int open_play_log(void)
     if (fd < 0)
         return -1;
 
-    size = filesize(fd);
+    size = ffilesize(fd);
     if (size < 0 || (size % (off_t)sizeof(struct play_rec)) != 0)
     {
         close(fd);
@@ -1641,7 +1641,7 @@ static int load_artist_index(struct db_summary_t *target,
     if (fr < 0)
         return ERROR_NO_ARTISTS;
 
-    if ((unsigned long)filesize(fr) <= sizeof(data)
+    if ((unsigned long)ffilesize(fr) <= sizeof(data)
         || read(fr, &data, sizeof(data)) != sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
         || !header_fits(&data, bsz)
@@ -1743,7 +1743,7 @@ static int load_album_index(void){
     int album_idx, artist_idx;
 
     if (fr >= 0){
-        const unsigned long fsize = filesize(fr);
+        const unsigned long fsize = ffilesize(fr);
         if (fsize > sizeof(data))
         {
             if (read(fr, &data, sizeof(data)) == sizeof(data) &&
@@ -2235,7 +2235,7 @@ static int reader_start(struct db_summary_reader *r)
     if (fd < 0)
         return ERROR_NO_ALBUMS;
 
-    fsize = filesize(fd);
+    fsize = ffilesize(fd);
     if (fsize <= (off_t)sizeof(data)
         || read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
@@ -2358,7 +2358,7 @@ int db_summary_read_year_table(struct db_summary_year *out, int max)
     ret = ERROR_NO_ALBUMS;
     if (read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
-        || !header_fits(&data, (size_t)filesize(fd))
+        || !header_fits(&data, (size_t)ffilesize(fd))
         || data.album_ct == 0 || data.album_ct > max)
         goto done;
 

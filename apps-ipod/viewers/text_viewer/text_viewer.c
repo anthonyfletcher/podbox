@@ -415,7 +415,7 @@ static bool tv_slow_open(const char *file)
     fd = open(file, O_RDONLY);
     if (fd < 0)
         return false;
-    size = filesize(fd);
+    size = ffilesize(fd);
     close(fd);
 
     return size > TV_WINDOW_SIZE;
@@ -673,7 +673,7 @@ static bool tv_open(const char *file)
     if (ts_io_core(&io, &tv.file, file) != TS_OK)
         return false;
 
-    /* Through the vtable rather than filesize(): coreio_size() restores the
+    /* Through the vtable rather than ffilesize(): coreio_size() restores the
      * descriptor's position and keeps its cached copy honest. */
     tv.file_size = io.size(io.ctx);
 

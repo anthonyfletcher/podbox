@@ -1114,7 +1114,7 @@ static int _talk_file(const char* filename,
     {
         return 0;
     }
-    size = filesize(fd);
+    size = ffilesize(fd);
 
     if (size > 0)
     {

@@ -158,7 +158,7 @@ static void file_failed(const char *path)
 
     if (fd >= 0)
     {
-        off_t n = filesize(fd);
+        off_t n = ffilesize(fd);
 
         sz = n > 0 ? (uint32_t)n : 0;
         close(fd);

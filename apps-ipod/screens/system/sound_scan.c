@@ -321,7 +321,7 @@ static uint32_t ss_file_size(const char *path)
     if (fd < 0)
         return 0;
 
-    n = filesize(fd);
+    n = ffilesize(fd);
     close(fd);
 
     return n > 0 ? (uint32_t)n : 0;

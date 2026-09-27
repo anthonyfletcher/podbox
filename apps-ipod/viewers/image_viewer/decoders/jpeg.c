@@ -139,7 +139,7 @@ static int load_image(char *filename, struct image_info *info,
     }
     else
     {
-        file_size = filesize(fd);
+        file_size = ffilesize(fd);
     }
 
     /* allocate JPEG buffer */

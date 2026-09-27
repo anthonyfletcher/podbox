@@ -366,7 +366,7 @@ int track_decode_run(const char *path,
      * outside it -- so a codec parsing the container reads past the end of
      * its own audio and gets a short answer that reads as EOF. Playback hands
      * the codec buf_filesize() for the same reason. */
-    file_len    = filesize(fd);
+    file_len    = ffilesize(fd);
     if (file_len <= 0)
     {
         close(fd);
