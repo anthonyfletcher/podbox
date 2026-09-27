@@ -16,9 +16,9 @@
  * current, which is a card's own bitmap when the cache is calling and the
  * band when it is not.
  *
- * That is what lets the same painter run on a host with no device
- * (.build/cardrender), so a change to how a card looks can be looked at
- * without building firmware for it. */
+ * That is what lets the same painter run on a host with no device, so a
+ * change to how a card looks can be looked at without building firmware
+ * for it. */
 
 
 /* The head block: a bar at the card's top left, and on some cards a plate

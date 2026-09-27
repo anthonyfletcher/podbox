@@ -483,10 +483,11 @@ have it.
 
 ## Debugging a Skin
 
-**Read `.specifications/claude-skin-helper.md` before reading the skin engine.**
-It is the resolution model -- what decides a viewport's colours, font and
-rectangle, and the cross-file coupling that a skin file itself does not show.
-`.specifications/skin-tag-reference.md` is the companion, one entry per tag.
+**Load the `skin-debugging` skill before reading the skin engine.** It is the
+resolution model -- what decides a viewport's colours, font and rectangle, and
+the cross-file coupling that a skin file itself does not show -- with the tag
+reference, one entry per tag, beside it. It lives in the git-ignored
+`.claude/skills/`, so a fresh clone does not have it.
 
 Most skin questions are "what did the parser decide", and three tools answer
 that without reading C. Cheapest first:

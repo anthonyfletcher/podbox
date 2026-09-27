@@ -163,7 +163,7 @@ silently builds upstream's `apps/`. The output is `rockboxui`, and `configure`
 creates a `simdisk/` beside it to stand in for the player's storage.
 
 `ipod6g` works the same way. Both need SDL2 and a host compiler, so this happens
-on the build server — see `.specifications/BUILD_SERVER.md`.
+on the build server.
 
 A **Windows** build cross-compiles from the same server:
 

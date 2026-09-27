@@ -239,8 +239,7 @@ viewers/text_viewer/ts_zipdoc.c
  * pv_stats.c folds the result into the aggregates the cards are drawn from.
  * pv_tiles.c decides which cards a section holds and pv_row.c is the screen.
  *
- * A card is drawn by draw/card_paint.c, which the row shares with the host
- * renderer in .build/cardrender. */
+ * A card is drawn by draw/card_paint.c. */
 viewers/playback_viewer/pv_badges.c
 viewers/playback_viewer/pv_index.c
 viewers/playback_viewer/pv_log.c
