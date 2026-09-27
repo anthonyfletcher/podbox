@@ -46,6 +46,7 @@
 #include "settings.h"
 #include "debug.h"
 #include "usb.h"
+#include "iap.h"
 #include "backlight.h"
 #include "audio.h"
 #include "speech/lang_override.h"
@@ -1357,6 +1358,10 @@ void settings_apply(bool read_disk)
      * setting is changed -- while on, HID takes the endpoint a 5G's sound
      * card needs in mass-storage mode. */
     usb_set_hid(global_settings.usb_hid);
+    iap_enable(global_settings.iap_enabled);
+#ifdef USB_ENABLE_IAP
+    usb_set_iap(global_settings.iap_enabled);
+#endif
 #ifdef HAVE_USB_HOST_AUDIO
     usb_set_dac_output(global_settings.usb_dac_output);
 #endif

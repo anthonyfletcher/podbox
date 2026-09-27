@@ -854,6 +854,7 @@ struct user_settings
 
 
 
+    bool iap_enabled; /* answer iAP accessories, serial and USB */
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
     bool lineout_active;

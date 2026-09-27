@@ -631,6 +631,16 @@ static void playback_frequency_callback(int sample_rate_hz)
         audio_set_playback_frequency(sample_rate_hz);
 }
 
+/* One switch for both transports: the dock connector's serial line and the
+ * USB accessory configuration. */
+static void iap_enabled_set(bool enable)
+{
+    iap_enable(enable);
+#ifdef USB_ENABLE_IAP
+    usb_set_iap(enable);
+#endif
+}
+
 static void albumart_callback(int mode)
 {
     set_albumart_mode(mode);
@@ -967,6 +977,8 @@ const struct settings_list settings[] = {
     INT_SETTING_NOWRAP(0, car_adapter_mode_delay, LANG_CAR_ADAPTER_MODE_DELAY,
                 5, "delay before resume", UNIT_SEC, 5, 30, 5,
                 NULL, NULL, NULL),
+    OFFON_SETTING(0, iap_enabled, LANG_ACCESSORY_PROTOCOL,
+                  true, "accessory protocol", iap_enabled_set),
     CHOICE_SETTING(0, serial_bitrate, LANG_SERIAL_BITRATE, 0, "serial bitrate",
                    "auto,9600,19200,38400,57600", iap_bitrate_set, 5, ID2P(LANG_SERIAL_BITRATE_AUTO),
            ID2P(LANG_SERIAL_BITRATE_9600),ID2P(LANG_SERIAL_BITRATE_19200),

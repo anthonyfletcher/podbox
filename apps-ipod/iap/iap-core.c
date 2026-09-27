@@ -88,6 +88,7 @@
 
 static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
+static bool iap_enabled = true;
 /* This is set to true if a SYS_POWEROFF message is received,
  * signalling impending power off
  */
@@ -559,6 +560,19 @@ static void iap_malloc(void)
     iap_running = true;
 }
 
+/* Off, the serial line is ignored and an attached accessory forgotten */
+void iap_enable(bool enable)
+{
+    iap_enabled = enable;
+    if (!enable)
+    {
+        frame_state.state = ST_SYNC;
+        iap_remotebtn = BUTTON_NONE;
+        if (iap_started)
+            iap_reset_device(&device);
+    }
+}
+
 void iap_bitrate_set(const int ratenum)
 {
     switch(ratenum)
@@ -665,7 +679,7 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
      * the serial driver would lock its autobaud detection onto the
      * default bitrate before any real traffic was seen.
      */
-    if (!iap_setupflag)
+    if (!iap_setupflag || !iap_enabled)
         return true;
 
     /* Check the time since the last packet arrived. */
@@ -845,7 +859,7 @@ void iap_periodic(void)
 {
     static int count;
 
-    if(!iap_setupflag) return;
+    if(!iap_setupflag || !iap_enabled) return;
 
     /* Handle pending authentication tasks */
     switch (device.auth.state)
@@ -1383,7 +1397,7 @@ void iap_handlepkt(void)
     int level;
     int length;
 
-    if(!iap_setupflag) return;
+    if(!iap_setupflag || !iap_enabled) return;
     if(!iap_running) return;
 
     /* The number of queued IAP_EV_MSG_RCVD events does not reliably

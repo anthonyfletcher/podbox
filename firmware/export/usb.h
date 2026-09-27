@@ -366,6 +366,10 @@ void usb_firewire_connect_event(void);
 /* enable or disable the HID driver */
 void usb_set_hid(bool enable);
 #endif
+#ifdef USB_ENABLE_IAP
+/* enable or disable USB iAP, from the next connection */
+void usb_set_iap(bool enable);
+#endif
 
 #ifdef USB_ENABLE_SERIAL
 void usb_set_serial(bool enable);

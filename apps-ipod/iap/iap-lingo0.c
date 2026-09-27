@@ -582,6 +582,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                 device.auth.state = AUST_INIT;
             } else {
                 device.accinfo = ACCST_INIT;
+                queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
             }
 
             cmd_ok(cmd);
@@ -815,6 +816,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
 
             iap_send_tx();
             device.auth.state = AUST_AUTH;
+            queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
 #if CONFIG_TUNER
             if (radio_present == 1)
             {

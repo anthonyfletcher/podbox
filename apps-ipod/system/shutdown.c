@@ -368,6 +368,10 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             splash(HZ*2, ID2P(LANG_USB_DAC_OFF));
             return SYS_USB_DAC_OFF;
 #endif
+        /* An iAP accessory -- a dock, a car kit -- has identified itself */
+        case SYS_ACCESSORY_CONNECTED:
+            splash(HZ, ID2P(LANG_ACCESSORY_CONNECTED));
+            return SYS_ACCESSORY_CONNECTED;
 #ifdef HAVE_MULTIMEDIA_KEYS
         /* Multimedia keys bypass the action system entirely -- action.c lets
          * them through as raw button codes, so every screen reaches them here

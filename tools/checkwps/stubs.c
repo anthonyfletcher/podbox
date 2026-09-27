@@ -312,6 +312,7 @@ const char *eq_precut_format(char *buffer, size_t buffer_size, int value,
 }
 
 void iap_bitrate_set(int ratenum) { (void)ratenum; }
+void iap_enable(bool enable) { (void)enable; }
 #ifdef USB_ENABLE_IAP
 void iap_on_repeat_state(int state) { (void)state; }
 void iap_on_shuffle_state(bool state) { (void)state; }
@@ -389,6 +390,7 @@ int talk_value_decimal(long n, int unit, int decimals, bool enqueue)
 
 void usb_set_audio(int value) { (void)value; }
 void usb_set_hid(bool enable) { (void)enable; }
+void usb_set_iap(bool enable) { (void)enable; }
 void usb_set_mode(int mode) { (void)mode; }
 void voice_set_mixer_level(int percent) { (void)percent; }
 

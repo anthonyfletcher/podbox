@@ -366,6 +366,7 @@ static const struct tag_row tag_rows[] = {
 { "keyclick",            TAG_ADVANCED|TAG_SYSTEM,                "keyclick click" },
 { "hardware keyclick",   TAG_ADVANCED|TAG_SYSTEM,                "keyclick click speaker" },
 { "keyclick repeats",    TAG_ADVANCED|TAG_SYSTEM,                "keyclick click" },
+{ "accessory protocol",  TAG_ADVANCED|TAG_SYSTEM,                "accessory dock iap car remote protocol" },
 { "serial bitrate",      TAG_ADVANCED|TAG_SYSTEM,                "accessory serial dock" },
 { "accessory power supply", TAG_ADVANCED|TAG_SYSTEM,             "accessory dock power" },
 { "lineout",             TAG_ADVANCED|TAG_SYSTEM,                "line out dock" },
@@ -398,8 +399,9 @@ static const struct tag_row tag_rows[] = {
  * settings_tags_validate() has to exist to find one.
  *
  * Resolving to NULL is not always a fault: settings compiled in per target
- * (the backlight fades and the USB DAC are iPod Video only) leave their row
- * unresolved on the other build, and that is the row doing its job. */
+ * (the backlight fades are iPod Video only, Remote Track Skip Classic only)
+ * leave their row unresolved on the other build, and that is the row doing
+ * its job. */
 static const struct settings_list *row_setting[ARRAYLEN(tag_rows)];
 static bool resolved;
 

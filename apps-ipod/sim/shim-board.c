@@ -153,8 +153,8 @@ int rolo_load(const char *file)
 }
 
 /* Accessory protocol. apps-ipod/iap/ drops out of SOURCES without
- * IPOD_ACCESSORY_PROTOCOL, but main.c and settings_list.c still reach for
- * these two. */
+ * IPOD_ACCESSORY_PROTOCOL, but main.c and the settings still reach for
+ * these three. */
 void iap_setup(int ratenum)
 {
     (void)ratenum;
@@ -163,6 +163,11 @@ void iap_setup(int ratenum)
 void iap_bitrate_set(int ratenum)
 {
     (void)ratenum;
+}
+
+void iap_enable(bool enable)
+{
+    (void)enable;
 }
 
 #endif /* SIMULATOR */

@@ -22440,3 +22440,31 @@
     usb_host_audio: "No U S B DAC found"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ACCESSORY_PROTOCOL
+  desc: in accessories settings: answer iAP docks and car kits
+  user: core
+  <source>
+    *: "Accessory Protocol"
+  </source>
+  <dest>
+    *: "Accessory Protocol"
+  </dest>
+  <voice>
+    *: "Accessory Protocol"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_CONNECTED
+  desc: splash: an iAP accessory has identified itself
+  user: core
+  <source>
+    *: "Accessory connected"
+  </source>
+  <dest>
+    *: "Accessory connected"
+  </dest>
+  <voice>
+    *: "Accessory connected"
+  </voice>
+</phrase>

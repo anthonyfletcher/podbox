@@ -198,16 +198,15 @@ MENUITEM_FUNCTION(maint_update_sound, 0, ID2P(LANG_UPDATE_SOUND),
 MENUITEM_FUNCTION(maint_rebuild_sound, 0, ID2P(LANG_REBUILD_SOUND),
                   maint_sound_rebuild, maint_sound_callback, Icon_NOICON);
 
-/* Neither a table row nor a background task: this deletes the two files the
+/* Neither a table row nor a background task: this deletes the files the
  * Playback Report caches and leaves the screen to rebuild them the next time
  * it opens, which is where the work is and why the splash promises it rather
  * than reporting it.
  *
- * Both files, because they only make sense as a pair. The index holds the rows
- * the log added up to and the name map holds the names those rows were built
- * from, so clearing either one alone rebuilds the same rows from the same
- * names -- which is exactly the case this row exists for, a library whose tags
- * have changed under a cache that cannot tell. */
+ * All of them, because they only make sense together. The index holds the rows
+ * the log added up to, and the name map and moved-folder table hold the names
+ * those rows were built from, so clearing only some rebuilds the same rows from
+ * the same names. */
 static int maint_report_rebuild(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_REPORT)))
@@ -447,6 +446,7 @@ MENUITEM_SETTING(car_adapter_mode, &global_settings.car_adapter_mode, NULL);
 MENUITEM_SETTING(car_adapter_mode_delay, &global_settings.car_adapter_mode_delay, NULL);
 MAKE_MENU(car_adapter_mode_menu, ID2P(LANG_CAR_ADAPTER_MODE), 0, Icon_NOICON,
            &car_adapter_mode, &car_adapter_mode_delay);
+MENUITEM_SETTING(iap_enabled, &global_settings.iap_enabled, NULL);
 MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate, NULL);
 MENUITEM_SETTING(accessory_supply, &global_settings.accessory_supply, NULL);
 MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
@@ -549,7 +549,7 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 
 /* The dock connector's other pins, and the headphone jack's remote. */
 MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
-            &serial_bitrate, &accessory_supply, &lineout_onoff
+            &iap_enabled, &serial_bitrate, &accessory_supply, &lineout_onoff
 #ifdef HAVE_MIKEY_REMOTE
             , &remote_track_skip
 #endif

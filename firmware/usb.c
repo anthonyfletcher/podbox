@@ -128,6 +128,9 @@ static bool usb_serial = false;
 #ifdef USB_ENABLE_AUDIO
 static int usb_audio = 0;
 #endif
+#ifdef USB_ENABLE_IAP
+static bool usb_iap = true;
+#endif
 static bool usb_host_present = false;
 /* The host probe owns the controller: cable events are not acted on. */
 static bool usb_host_probe_on = false;
@@ -322,7 +325,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio != 0);
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
-        usb_core_enable_driver(USB_DRIVER_IAP, true);
+        usb_core_enable_driver(USB_DRIVER_IAP, usb_iap);
 #endif
 #ifdef USB_ENABLE_CHARGING_ONLY
         usb_core_enable_driver(USB_DRIVER_CHARGING_ONLY, false);
@@ -1212,6 +1215,17 @@ void usb_set_hid(bool enable)
     usb_core_enable_driver(USB_DRIVER_HID, usb_hid);
 }
 #endif /* USB_ENABLE_HID */
+
+#ifdef USB_ENABLE_IAP
+/* Takes effect at the next connection: the driver is only ever switched on
+ * with the cable inserted, so turning it on here would offer it charge-only. */
+void usb_set_iap(bool enable)
+{
+    usb_iap = enable;
+    if (!enable)
+        usb_core_enable_driver(USB_DRIVER_IAP, false);
+}
+#endif /* USB_ENABLE_IAP */
 
 #ifdef USB_ENABLE_SERIAL
 void usb_set_serial(bool enable)

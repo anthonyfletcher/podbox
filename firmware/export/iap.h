@@ -37,6 +37,7 @@
 extern bool iap_getc(IF_IAP_MP(int port,) unsigned char x);
 extern void iap_setup(int ratenum);
 extern void iap_bitrate_set(int ratenum);
+extern void iap_enable(bool enable);
 extern void iap_periodic(void);
 extern void iap_handlepkt(void);
 extern void iap_send_pkt(const unsigned char * data, int len);
