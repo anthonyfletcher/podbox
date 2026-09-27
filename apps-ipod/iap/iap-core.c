@@ -219,14 +219,40 @@ static struct state_t {
 };
 
 /* What the framer has seen, for Debug IAP. Written from the serial ISR. */
+#define RX_HISTORY 8
 static struct {
     unsigned long good;         /* frames that passed their checksum */
     unsigned long bad_check;    /* frames that failed it */
     unsigned long bad_len;      /* frames dropped for their length */
     unsigned long timeouts;     /* frames abandoned mid-way by the gap timer */
     unsigned int last_bad_len;
-    unsigned char last[6];      /* first bytes of the last good frame */
+    /* First bytes of the last RX_HISTORY distinct frames, newest at
+     * [next - 1]. A button release and a held button's repeats are left out,
+     * so a press stays on screen after it is let go. */
+    unsigned char last[RX_HISTORY][8];
+    unsigned int last_len[RX_HISTORY];
+    unsigned int next;
 } rx_stats;
+
+static void rx_stats_keep(const unsigned char *frame, unsigned int len)
+{
+    unsigned int n = MIN(len, sizeof(rx_stats.last[0]));
+    unsigned int prev = (rx_stats.next + RX_HISTORY - 1) % RX_HISTORY;
+    unsigned int i;
+
+    /* Simple Remote ContextButtonStatus with no bit set is a release */
+    if (len >= 2 && frame[0] == 0x02 && frame[1] == 0x00) {
+        for (i = 2; i < len && frame[i] == 0; i++);
+        if (i == len)
+            return;
+    }
+    if (rx_stats.last_len[prev] == n && !memcmp(rx_stats.last[prev], frame, n))
+        return;
+
+    memcpy(rx_stats.last[rx_stats.next], frame, n);
+    rx_stats.last_len[rx_stats.next] = n;
+    rx_stats.next = (rx_stats.next + 1) % RX_HISTORY;
+}
 
 enum interface_state interface_state = IST_STANDARD;
 
@@ -753,8 +779,7 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
         if ((s->check & 0xFF) == 0) {
             /* done, received a valid frame */
             rx_stats.good++;
-            memcpy(rx_stats.last, iap_rxnext - s->len,
-                   MIN(s->len, sizeof(rx_stats.last)));
+            rx_stats_keep(iap_rxnext - s->len, s->len);
             iap_rxlen -= (s->len + 2);
             iap_rxpayload = iap_rxnext;
             queue_post(&iap_queue, IAP_EV_MSG_RCVD, 0);
@@ -1550,9 +1575,18 @@ bool dbg_iap(void)
                   rx_stats.bad_check, rx_stats.timeouts);
         lcd_putsf(0, 6, "bad len: %lu (last %u)", rx_stats.bad_len,
                   rx_stats.last_bad_len);
-        lcd_putsf(0, 7, "last: %02x %02x %02x %02x %02x %02x",
-                  rx_stats.last[0], rx_stats.last[1], rx_stats.last[2],
-                  rx_stats.last[3], rx_stats.last[4], rx_stats.last[5]);
+        lcd_puts(0, 7, "last frames, newest first:");
+        for (int i = 0; i < RX_HISTORY; i++)
+        {
+            unsigned int k = (rx_stats.next + RX_HISTORY - 1 - i) % RX_HISTORY;
+            char line[3 * sizeof(rx_stats.last[0]) + 1];
+            char *p = line;
+
+            *p = '\0';
+            for (unsigned int b = 0; b < rx_stats.last_len[k]; b++)
+                p += snprintf(p, 4, "%02x ", rx_stats.last[k][b]);
+            lcd_puts(0, 8 + i, line);
+        }
 
         // frame_state.state
         // serial state
