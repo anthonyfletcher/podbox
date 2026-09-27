@@ -1020,6 +1020,11 @@ void usb_drv_init(void)
 
     usb_drv_int_enable(true);
 
+    /* Interrupt within a microframe of a completion. The reset default holds
+     * interrupts for eight, which re-arms an isochronous endpoint too late
+     * for the next packet about one frame in eight. */
+    REG_USBCMD = (REG_USBCMD & ~USBCMD_ITC) | USBCMD_ITC_1_MICRO_FRM;
+
     /* go go go */
     REG_USBCMD |= USBCMD_RUN;
 
@@ -1407,7 +1412,7 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
     int pipe = ep_num * 2 + (send ? 1 : 0);
     unsigned int mask = pipe2mask[pipe];
     struct queue_head* qh = &qh_array[pipe];
-    static long last_tick;
+    uint32_t start;
     struct transfer_descriptor *new_td, *cur_td, *prev_td;
 
     int oldlevel = disable_irq_save();
@@ -1448,14 +1453,16 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
         goto pt_error;
     }
 
-    last_tick = current_tick;
+    /* Interrupts are off here, so current_tick stands still: the timeout
+     * has to come from the hardware timer. */
+    start = USEC_TIMER;
     while ((REG_ENDPTPRIME & mask)) {
         if (REG_USBSTS & USBSTS_RESET) {
             rc = -1;
             goto pt_error;
         }
 
-        if (TIME_AFTER(current_tick, last_tick + HZ/4)) {
+        if ((uint32_t)USEC_TIMER - start > 250000) {
             logf("prime timeout");
             rc = -2;
             goto pt_error;

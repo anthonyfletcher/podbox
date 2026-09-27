@@ -16914,15 +16914,15 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC Active"
+    usbdac: "USB Sound Card Active"
   </source>
   <dest>
     *: none
-    usbdac: "USB-DAC Active"
+    usbdac: "USB Sound Card Active"
   </dest>
   <voice>
     *: none
-    usbdac: "USB-DAC Active"
+    usbdac: "USB Sound Card Active"
   </voice>
 </phrase>
 <phrase>

@@ -788,6 +788,10 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
 
     switch(type) {
         case USB_DT_DEVICE:
+#if defined(USB_ENABLE_AUDIO) && defined(USB_PRODUCT_ID_AUDIO)
+            device_descriptor.idProduct = drivers[USB_DRIVER_AUDIO]->enabled ?
+                USB_PRODUCT_ID_AUDIO : USB_PRODUCT_ID;
+#endif
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);
             break;

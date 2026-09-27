@@ -2518,7 +2518,7 @@ static const struct {
         {"Dump Log File", log_viewer_dump },
 #endif
 #if defined(USB_ENABLE_AUDIO)
-        {"USB-DAC", dbg_usb_audio},
+        {"USB Sound Card", dbg_usb_audio},
 #endif
 #ifdef CPU_BOOST_LOGGING
         {"Show cpu_boost log",cpu_boost_log},

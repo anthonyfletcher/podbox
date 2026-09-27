@@ -241,6 +241,11 @@
 #define HAVE_USB_HID_MOUSE
 #define USB_VENDOR_ID 0x05AC
 #define USB_PRODUCT_ID 0x1261
+/* While the USB sound card is on. iTunes' Apple Mobile Device driver claims
+ * 0x1261 by hardware ID, outranking Windows' composite driver, and passes on
+ * only the disk interface -- so Windows never sees the audio function. The
+ * 5G's ID is not in its list. */
+#define USB_PRODUCT_ID_AUDIO 0x1209
 #define USB_DEVBSS_ATTR __attribute__((aligned(32)))
 #define HAVE_BOOTLOADER_USB_MODE
 #ifdef BOOTLOADER
