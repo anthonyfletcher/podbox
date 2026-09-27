@@ -1098,6 +1098,8 @@ actually stopped touching it.
 [usb charging]
 Whether the player charges from a USB connection. Force charges even from a
 port that does not advertise enough current, which not every port tolerates.
+On an iPod Classic, Force also tops up a nearly full battery from a plain
+charger, which it otherwise leaves alone.
 
 [car adapter mode]
 Pauses when external power is cut and resumes when it returns, so the player

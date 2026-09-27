@@ -531,6 +531,14 @@ static void usb_host_probe_switch(bool on)
     {
         usb_extract();
         usb_host_probe_enable(true);
+#ifdef HAVE_USB_CHARGING_ENABLE
+        /* The player never powers the port, so 5V on it now is a
+         * charger's. usb_extract() dropped the charge current to 100 mA
+         * with the device stack, and on the 6G that also stops the battery
+         * charging: commit to 500, as a computer's configuration would. */
+        if(usb_detect() != USB_EXTRACTED)
+            usb_charging_maxcurrent_change(500);
+#endif
         return;
     }
 

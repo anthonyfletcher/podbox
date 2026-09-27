@@ -101,11 +101,19 @@ bool ide_powered()
 
 #if CONFIG_CHARGING
 
+/* The current the USB side has committed to: 500 from a computer that
+ * configured the player, from USB Charging = Force with no computer, or from
+ * a charger feeding a USB DAC. power_input_status() trusts such a source
+ * without probing it. */
+static int usb_committed_ma;
+
 #ifdef HAVE_USB_CHARGING_ENABLE
 void usb_charging_maxcurrent_change(int maxcurrent)
 {
     bool suspend_charging = (maxcurrent < 100);
     bool fast_charging = (maxcurrent >= 500);
+
+    usb_committed_ma = maxcurrent;
 
     /* This GPIO is connected to the LTC4066's SUSP pin */
     /* Setting it high prevents any power being drawn over USB */
@@ -204,7 +212,7 @@ unsigned int power_input_status(void)
                 timeout_cancel(&chrg_monitor_tmo);
                 monitoring = false;
             }
-            if (!usb_charger_detected)
+            if (!usb_charger_detected && usb_committed_ma < 500)
                 GPIOCMD = 0xc010e | 1;  /* C1 HIGH: block */
         }
         /* BL off + charger detected: C1 stays LOW, charging

@@ -451,7 +451,7 @@ shadow to colour.
 | Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
 | Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
 | Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
-| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. | force |  |
+| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
 | Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
 
 ### Battery & Power — Sleep Timer
