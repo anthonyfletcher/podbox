@@ -383,12 +383,39 @@ song is by, the album it came from
 - View a description of each setting from the setting menu
   - Hold `Select` to open the context menu then select `Explain`
 
+## Connectivity
+
+What the iPod can connect to, and how. The USB settings are under
+`Settings > System > USB`, the dock ones under `Settings > System > Accessories`.
+
+- Your iPod can act like a sound card for a computer - the computer plays through 
+the iPod, out of its headphone socket, using the iPod DAC, and the computer's volume 
+control sets the level
+  - `USB > USB Sound Card` - off by default
+- Your iPod can output to a USB DAC - the iPod sends its audio digitally over USB to a
+  headphone amp or DAC, which does the conversion instead of the iPod.
+  - `USB > USB DAC Output > Start Automatically` - on by default - or `Turn On`
+    for a DAC with its own power supply that doesn't power the iPod
+  - The iPod supplies no power over USB, so the DAC needs its own supply or you can use a
+    USB splitter with a charger connected
+  - Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
+    kHz will not, and neither will a DAC behind a hub
+- Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
+  digitally, over the USB pins of the dock connector, and turns it into
+  S/PDIF (optical or coax) for an amplifier
+  - On by default, through `Accessories > Accessory Protocol`
+  - Needs `USB > USB Mode` set to Mass Storage, which is the default; in Charge
+    Only the dock finds nothing to play
+  - Remote support improved to match click-wheel actions
+- You can control your iPod using the earphone remote (only supported on iPod classic 
+120GB - Late 2008 and 160GB - Late 2009 thin version only)
+  - Click for play/pause, two clicks for the next track, three for the previous
+    one, and the volume buttons
+  - Always on. The multi-click skips are `Accessories > Remote Track Skip`, on
+    by default; turning it off makes play/pause react quicker
+
 ## Behind the scenes
 
-- Upstream's inline earphone remote support (iPod classic 120GB - Late 2008 and
-  iPod classic 160GB - Late 2009 thin version only)
-  - Click for play/pause, two clicks for the next track, three for the previous one, and the volume buttons
-  - `Settings > System > Accessories > Remote Track Skip` turns the multi-click feature off, which makes play/pause react quicker
 - Improved consistency of the `Back` and `Menu` button in menus
 - Art for use in the UI is cached for quick access to enable a fluid experience
   - `Settings > Library > Art Cache` for settings

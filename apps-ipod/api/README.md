@@ -42,8 +42,7 @@ The list covers files this fork compiles. Other targets' sources include these
 same headers and are ignored here, for the same reason `list.h` is (below).
 
 `playback.h` and `playlist.h` are reached only through `USB_ENABLE_IAP`, which
-is `ipodvideo` only — a 6G build compiles neither includer, and both stubs go
-unused there.
+both targets build.
 
 ## Slashed paths
 

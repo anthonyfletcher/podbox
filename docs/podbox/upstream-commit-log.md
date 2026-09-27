@@ -16,7 +16,7 @@ file.
 | Tree | Baseline | What it means |
 | --- | --- | --- |
 | **`apps-ipod/`** — the application layer | **`dd21a1d1d9`** — 2026-02-10 | The rebase did **not** update this tree. It came from [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind upstream. |
-| `firmware/`, `lib/`, `tools/`, `apps/`, and everything else | **`2d2b03d314`** — merged 2026-08-08 | The last upstream commit merged in. Everything at or before it is **inherited**; no action, ever. It supersedes the `24c3779146` rebase point of 2026-07-24, and moves again with each merge. |
+| `firmware/`, `lib/`, `tools/`, `apps/`, and everything else | **`636ae404f7`** — merged 2026-09-27 | The last upstream commit merged in. Everything at or before it is **inherited**; no action, ever. It supersedes the `24c3779146` rebase point of 2026-07-24, and moves again with each merge. |
 
 **`apps-ipod/` therefore has two parents, not one.** Rockbox is upstream of
 everything, but RockPod is upstream of this directory specifically, and it has
@@ -59,6 +59,7 @@ plugins became core screens here.
 | **Superseded** | Both parents fixed the same thing and PodBox took the other one. The row says which, so the unused fix is not later mistaken for a gap. |
 | **N/A** | Touches a target, or a subsystem, that PodBox does not build. |
 | **Open** | Applies, discretionary, not yet decided. |
+| **Postponed** | Applies, and deliberately left for later. The row says what taking it would involve. |
 | **Pending** | Applies, wanted, not yet done. Actionable. |
 | **Inherited** | Arrived via a baseline. No action. |
 
@@ -88,8 +89,8 @@ Two rules, both earned:
 
 | Date | Upstream | Summary | Status | Note |
 | --- | --- | --- | --- | --- |
-| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`, so the slot is live on `ipodvideo` and absent on `ipod6g` — see *USB iAP and serial iAP* below. The count is right by construction either way. |
-| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Adopted** | Prerequisite of USB iAP on `ipodvideo`. Supplies the `iap_on_*` call sites; without them an accessory hears about the first track and nothing after it. The touchscreen hunk has no home here, and `usb_core.c` already reaches `notify_event` through the `usb_cdrv_iap` pointer. |
+| 2025-11-21 | `c2e1094383` | playback: reserve an aa slot for iap | **Adopted** | `MAX_MULTIPLE_AA` +1 under `USB_ENABLE_IAP`, which both targets build — see *USB iAP and serial iAP* below. |
+| 2025-12-12 | `fad99773e3` | send iap status change notifications | **Adopted** | Prerequisite of USB iAP. Supplies the `iap_on_*` call sites; without them an accessory hears about the first track and nothing after it. The touchscreen hunk has no home here, and `usb_core.c` already reaches `notify_event` through the `usb_cdrv_iap` pointer. |
 | 2026-02-05 | `7eeb4e4302` | firmware: refactor CACHEALIGN_BITS/SIZE | **Adopted** | Compile-blocking after the rebase. |
 | 2026-02-12 | `76d63246c5` | playback: don't hardcode pcm sink in audio_set_playback_frequency | **Adopted** | Completed when USB iAP went on for `ipodvideo`: `audio_set_playback_frequency()` walks the sink's own rate list instead of a compiled-in 44.1/48 pair. |
 | 2026-02-13 | `f343168051` | settings_list: apply playback freq changes only when sink is builtin | **Adopted** | There are two sinks on `ipodvideo` now, so the guard decides something: the setting drives the builtin sink and leaves an attached accessory's rate alone. |
@@ -225,7 +226,7 @@ Two rules, both earned:
 | 2026-08-05 | `20f4f9539a` | hiby: usb dac: fix crackling from sample rate mismatch | **N/A** | Other target, hosted. |
 | 2026-08-06 | `2d2b03d314` | build: bundle the main .map files into the zip | **Declined** | ~4MB of text into a zip that is `/MIR`-synced onto the device, so it costs that much of the user's disk on every sync, permanently. It also buys nothing here: resolving a panic address goes through `nm` on the crashing build's `rockbox.elf`, which the release does not ship either. The merge took it and it was deleted again; `tools/buildzip.pl` now carries a comment where the block was, so the next sync conflicts there rather than restoring it silently. |
 | 2026-07-30 | `4f65dfa649` `eecd4ec98b` `842492d77b` | hiby: r1_patcher pack/unpack split, SD hotplug, macOS | **N/A** | `tools/r1_patcher/r1_patcher.sh`, a shell script for another target. |
-| 2026-07-31 | `21d48d5ae3` | iap: improve `IAPGeneralCommandID_RequestIPodName` | **Adopted (in part)** | Serial iAP answered a dock or head unit with the literal `"ROCKBOX"`; it now sends the first line of `/.rockbox/playername.txt`, falling back to `"Rockbox"`. Two deviations. `read_line()` and `open_utf8()` come from `system/strutil.h` here rather than `misc.h`. And upstream sends a zero-length name when that first line is empty: `read_line()` returns bytes consumed, so a lone newline reads as success -- the fork tests the string instead, and keeps the default. The commit's `libiap` half is USB iAP, built on `ipodvideo`. The vendored copy reads `playername.txt` too, but without the empty-first-line guard: `read_line()` overwrites the `"Rockbox"` default before returning, so an empty first line sends a zero-length name over USB where serial keeps the default. Left as upstream has it — `libiap` is vendored verbatim so it stays mergeable — and recorded here rather than fixed. |
+| 2026-07-31 | `21d48d5ae3` | iap: improve `IAPGeneralCommandID_RequestIPodName` | **Adopted (in part)** | Serial iAP answered a dock or head unit with the literal `"ROCKBOX"`; it now sends the first line of `/.rockbox/playername.txt`, falling back to `"Rockbox"`. Two deviations. `read_line()` and `open_utf8()` come from `system/strutil.h` here rather than `misc.h`. And upstream sends a zero-length name when that first line is empty: `read_line()` returns bytes consumed, so a lone newline reads as success -- the fork tests the string instead, and keeps the default. The commit's `libiap` half is USB iAP, built on both targets. The vendored copy reads `playername.txt` too, but without the empty-first-line guard: `read_line()` overwrites the `"Rockbox"` default before returning, so an empty first line sends a zero-length name over USB where serial keeps the default. Left as upstream has it — `libiap` is vendored verbatim so it stays mergeable — and recorded here rather than fixed. |
 | 2026-08-02 | `49600dd77c` | filebrowse.lua sort by type; `.bmp`, `.mod` as known filetypes | **Declined** | The `apps/filetypes.c` half maps `bmp` to `FILE_ATTR_BMP`, the backdrop type. `files/filetypes.c` maps it to `FILE_ATTR_IMG` so the core image viewer opens it, which is what that table's viewer section exists for. `FILE_ATTR_MOD` is the firmware-file type and is already registered as `BOOTFILE_EXT` (`.ipod`); a literal `.mod` means nothing on either player. The rest is the lua tree. |
 | 2026-08-07 | `85c1ff8667` | build scripts: make reproducible builds possible | **Adopted (in part)** | `SOURCE_DATE_EPOCH` now feeds `BUILDDATE` (`tools/configure`) and the version string (`tools/version.sh`), `wpsbuild.pl` sorts its skin hash, and both zips add `-X`. Taken for a reason of this fork's own: **`RBVERSION` embeds the build date**, which is why two builds of one tree on different days differ and comparisons have to be made object by object. With the variable exported, `rockbox.bin` is comparable directly. The `apps/lang/lang.make` hunk is mirrored into `apps-ipod/lang/lang.make`, the copy that builds. The `REPRODUCIBLE_ZIP` branches call `strip-nondeterminism`, which the build server does not have -- they are inert unless the variable is set. |
 | 2026-08-07 | `f44bf5c66d` `0db3308e43` | translation updates (russian) | **N/A** | `russian.lang` only -- no `english.lang` hunk, so no ID movement. See *Why the translation commits are N/A* below. |
@@ -236,7 +237,7 @@ Two rules, both earned:
 | 2026-08-09 | `ef20bc4c78` | usb: keep the USB Serial setting across connects | **N/A** | Same gate as `6ad1fd074a`. The `apps/debug_menu.c` half has nothing to land on either -- `apps-ipod/` has no `toggle_usb_serial()`. |
 | 2026-08-11 | `444c9ce4bd` | manual: add touchscreen settings section | **N/A** | `manual/` is not built, and there is no touchscreen. |
 | 2026-08-11 | `51d7d56803` `459c5e7937` | ap80max: new hosted port, then moved to the 'unstable' list | **N/A** | Other target. **Conflicts in `wps/WPSLIST`**: it adds five AP80MAX lines to blocks this fork deleted whole. Resolution is ours -- the file lists only `rockbox_default_icons` and `rockbox_failsafe`, and the shipped theme is bundled by `bundle-theme.sh`. |
-| 2026-08-11 | `fd8d6f10a1` | synopsys-dwmac: bugfixes | **Adopted** | With `b616047311`, as one net port -- that commit exists to correct this one. `usb-designware.c` is the **6G's** USB OTG driver and this fork has never modified it, so both arrive with the merge: a non-zero multi-count for periodic INs in dedicated-FIFO mode, ISO frame polarity, and high-speed ISO max packet 1023 -> 1024. They move the USB DAC path, which `PODBOX_NO_USB_AUDIO` now compiles out -- see *USB audio is off* below. |
+| 2026-08-11 | `fd8d6f10a1` | synopsys-dwmac: bugfixes | **Adopted** | With `b616047311`, as one net port -- that commit exists to correct this one. `usb-designware.c` is the **6G's** USB OTG driver and both arrive with the merge: a non-zero multi-count for periodic INs in dedicated-FIFO mode, ISO frame polarity, and high-speed ISO max packet 1023 -> 1024. They are under the sound card, which works on the 6G with them. The driver has since gained this fork's host mode, so a later upstream change to it conflicts rather than landing silently. |
 | 2026-08-13 | `0ca22b9a71` `814747492c` `a89e1f999d` `c93c7bfdcb` `0e0982cb29` `7e53e85cb2` `9641d54fee` | touchscreen: flick detector and kinetic scrolling v2/v3, plus two build fixes | **N/A** | Backports, landed together. Every hunk is inside `HAVE_TOUCHSCREEN`, including the new `apps/gesture.c` (gated in `apps/SOURCES`) and the three `kinetic_scroll_*` settings. Neither player defines it. |
 | 2026-08-14 | `0b52c28933` | dircache: use alloca to avoid VLA in struct extension | **Adopted** | `firmware/common/dircache.c`, unmodified here, so it arrives with the merge. A clang accommodation; identical behaviour under gcc. |
 | 2026-08-14 | `9a7ffac2e4` `8f8a0e5230` | pcm_sink: per-sink swvol/hwvol selection | **Adopted** | Both targets get a new `.volume_type` member in their `builtin_pcm_sink` (`pcm-pp.c`, `pcm-s5l8702.c`), and `config.h` gains `WANT_SWVOL`/`WANT_SWVOL_32`. Neutral here by construction: neither target defines `HAVE_SW_VOLUME_CONTROL` or `PCM_NATIVE_BITDEPTH`, so `PCM_NATIVE_VOLUME_TYPE` resolves to `PCM_SINK_HWVOL`, which is what both already do. It still has to compile, and `firmware/SOURCES` swaps the `pcm_sw_volume.c` gate. |
@@ -267,9 +268,36 @@ Two rules, both earned:
 | 2026-08-28 | `8536d981a8` | checkwps: print the file name extension instead of "WPS" | **Adopted** | Two `printf`s take the extension already parsed by `check_filetype()`, so an `.sbs` failure stops saying *WPS parsing failure*. It also deletes `wps_screen`, which `50b13493d2` orphaned -- `tools/checkwps/checkwps.c` still declares and assigns it here. That file is a fork file, and it is the merge's only conflict: the `parsed OK` line sits at the head of a block this fork has extended with `--viewports` and the `.sbs` viewport carry-over. Taking upstream's line and keeping the block resolves it; the other two hunks merged on their own. |
 | 2026-08-28 | `70fd3e1f1e` | ipodcolor: fall back to UDMA 1 | **N/A** | `firmware/target/arm/pp/ata-target.h` is shared with `ipodvideo`, but the new term is `!defined(IPOD_COLOR)` and the 5G keeps `ATA_MAX_UDMA 2`. |
 | 2026-08-28 | `28e5a125ab` | configure: macos: fix checkwps error messages | **N/A** | The binutils-version probe is skipped on `Darwin` for the sdl-sim, sdl-app and checkwps types, replacing a precedence bug in the `[ ] \|\| [ ] && [ ]` chain. Guarded on `uname = Darwin`, which neither the development machine nor the build server is. `tools/configure` is a fork file but its nearest change is 450 lines away, so this merges clean. |
+| 2026-09-11 | `b7fe01393a` | usb-drv-arc: defer SET_ADDRESS until status completion | **Superseded** | The same fix this fork carried (`0f1436aea2`), reached upstream with a V-MODA VAMP VERZA on a 5.5G. Both are replaced by `841007dfa1`. |
+| 2026-09-20 | `841007dfa1` | usb: let controller drivers handle SET_ADDRESS requests | **Adopted** | Every controller driver answers SET_ADDRESS itself and reports the address through `usb_core_notify_set_address()`; `usb_drv_set_address()` is gone. Conflicted in `usb-drv-arc.c` against this fork's deferral, resolved to upstream's whole. The core's setup log no longer sees SET_ADDRESS as a request; `usb_core_set_address()` records it instead. **It broke a host that sends SET_ADDRESS first** -- the core assigned no interfaces and switched on no drivers, both keyed on seeing a request -- which is fixed here in `a0103fa46a` and not yet reported upstream. See *A host that sends `SET_ADDRESS` first* in `upstream-divergence.md`. |
+| 2026-09-20 | `9aa2d7fe94` `d1fab121f8` | usb: accept a replacement SETUP; usb arc: flush both EP0 directions when SETUP replaces a transfer | **Adopted** | A host abandoning a control transfer no longer leaves the core waiting on a stage that will never arrive. Merged clean into both drivers beside this fork's host mode. |
+| 2026-09-20 | `63978def70` `b1385d831e` | usb arc: discard stale transfers and audio work on bus reset; reset data toggles when clearing halt | **Adopted** | The first matters to the sound card and USB iAP on the 5G: a reset reported with a completion no longer refills audio from descriptors the reset invalidated. |
+| 2026-09-20 | `3bd18f5a44` | usb iap: correct sample rate descriptors and packet cadence | **Adopted** | USB iAP's audio source advertises only the 32, 44.1 and 48 kHz it implements, instead of nine rates the engine mostly refused, and the 44.1 kHz packet cadence wraps at ten packets -- a `uint8_t` wrap at 256 had sent extra samples every cycle. Both files are unmodified here. |
+| 2026-09-20 | `404e2c7626` | usb: validate configuration descriptor indices and failed drivers | **Adopted** | Omits a failed driver's descriptors. Fits this fork's `driver_to_leave_out()`, which marks the driver it leaves out as failed, so that driver is now also absent from the configuration descriptor. |
+| 2026-09-17 | `6958f6638e` `93b49594d5` | usb storage: report read-only drives as write protected; fix BOT residue, rejected commands and ATA IDENTIFY | **Adopted** | The first is inert (no `HAVE_STORAGE_READONLY` here). Conflicted beside this fork's unsupported-LUN sense code; both kept. |
+| 2026-09-21 | `2b664d6025` `e2ee665cce` | usb: preserve exclusive storage across repeated configuration; defer commands until the storage handover completes | **Adopted** | `usb_request_exclusive_storage()` now grants at once when no thread has to acknowledge. Conflicted in `usb.c` with this fork's insertion record, which stays first. |
+| 2026-09-03 | `3a57f2f721` `861e53095f` `98a55f623b` | Add "rbfs" prefix to native filesystem functions | **Adopted** | `filesize()` is renamed `ffilesize()`, because the prefix macro also renamed struct members called `filesize`. The 28 calls in `apps-ipod/` and `tools/soundscan/` follow (`e691390bec`); nothing else here was affected. |
+| 2026-09-23 | `bd615cf125` | Have audio_hard_stop() kill the PCM output path entirely | **Adopted** | Ported to `apps-ipod/audio/playback.c`. |
+| 2026-09-23 | `9101f35519` | ROLO: get rid of redundant call to audio_hard_stop() | **Adopted** | `firmware/rolo.c` now expects its caller to have stopped audio. Both callers here do: the file browser's firmware-file case and the reboot prompt in `system/shutdown.c`. |
+| 2026-09-09 | `f2985dc8a2` | option_get_valuestring: fix trailing whitespace for UNIT_INT | **Adopted** | Ported to `widgets/option_select.c`. |
+| 2026-09-04 | `569c2a53c8` `7e3782868c` | quickscreen: string size in the UI viewport's font; icon x-position off-by-one | **Adopted** | Ported to `screens/playback/quick_screen.c`, where both bugs were present. |
+| 2026-08-24 | `8eefac3638` `81cf120983` `1a37ac8568` `da207d6067` `10ec9bd530` | quickscreen: prevent out-of-bounds viewports, always refresh SBS when leaving, refactor quickscreen_fix_viewports | **Postponed** | One design across five commits, against a Quick Screen this fork has largely rewritten (380 of 526 lines differ). `8eefac3638` is the one with a user-visible fault: a theme whose UI viewport is tiny gives the side items negative widths, and clearing one can crash. Only a third-party theme could reach it -- the shipped ones carry the `%Q` tags, so the built-in layout does not draw. Port as a unit, in its own session. |
+| 2026-09-15 | `dc37bb1ba0` | tagtree: warn if tagnavi.config is missing instead of freezing | **Postponed** | The database browser here is `screens/browse/browser_db.c`, which loads `tagnavi.config` its own way and has no `tagtree_init()`. Whether a missing file freezes it has not been checked. |
+| 2026-08-27 | `d2ae775f0a` `27332d64ad` `76a2fdfc1f` | ipod6g: composite video output driver and setting | **Declined** | The setting is in `apps/` and is not ported, so nothing here can turn the output on -- but the driver reserves a 115,200-byte framebuffer, and `serial-6g.c` and `power-6g.c` call it behind `BOOTLOADER` alone, so it was linked into every 6G build: 112.5 KB of audio buffer for nothing. `HAVE_COMPOSITE_VIDEO_OUT` is commented out in `ipod6g.h`, and those two files now test it (`425eb10887`). The serial driver's 250 ms accessory debounce is not video code and stays. Taking it later means the define, the setting, and Apple's AV cable to test with. |
+| 2026-09-05 | `e0136bc7f4` `d27af08ff6` `29eef25ac7` | ipod6g: hardware H.264 video playback | **Declined** | The player is a plugin, and there is no plugin system. The VPU drivers still compile for the 6G, but nothing calls them and the link drops them: no symbol reaches `rockbox.elf`, so there is nothing to undefine. |
+| 2026-09-11 | `b18f5d6d65` `d514ee9282` `9e7b81f269` `f26c9557c2` `8eb6b05945` `31f2a27f1e` `08d3332edf` `0c4345475a` `ae223933bf` `9a972e7f51` `0918a068eb` `07557038b4` `ff762858c7` `7b4d1a7f75` `da9df96c30` `40fdf6ac11` `a51adaac4f` `93d564426b` `5a6935047e` `b12ef5e6f8` | opus: ARM kernels, IRAM placement on PP5022, decoder without the encoder | **Adopted** | `lib/rbcodec/codecs/libopus/`, unmodified here, so it arrives with the merge. Aimed at the 5G's PP5022 in particular; `opus.codec` is 15 KB smaller. |
+| 2026-09-05 | `064c165367` | libm4a: handle sparse chunk maps and video-first MP4 | **Adopted** | `lib/rbcodec/`, unmodified here. |
+| 2026-09-19 | `305acca1f0` `af9b65485b` | dsp: `.type` on ARM asm; build: `-mthumb-interwork` moved into configure | **Adopted** | Arrive with the merge; both targets build clean with them. |
+| 2026-09-08 | `190822f261` | firmware: limit system_memory_guard() to coldfire targets | **Adopted** | Removes the 6G's empty stub from `system-s5l8702.c`, which merged beside this fork's AHB boost. |
+| 2026-09-12 | `57a91121f6` `a7ab67f459` `2507be9af2` `1784c9b8a7` `45bd2b970b` `284af2aee8` `2ec4760117` `a3e93c496e` | plugin API and plugins: ACTIVITY_UNKNOWN hack, backlight_on_button_hold, keyremap, lastfm, disktidy, lua | **N/A** | No plugin system. |
+| 2026-09-19 | `34a18e7616` `76f8925d23` `e4c010be98` `1ad17c9b57` `66bc0728d5` `2adcfa08cf` `aed1945c5d` `b58c7505a0` `4dad9a0489` `9ee5873770` `01925dd5d0` `00829f2258` `413f17b8ce` `bd24fddb7e` `af2a3b74f4` `bdbbb753c5` | iPod Nano 3G port, its tools and its bootloader QR code | **N/A** | Other target. `bdbbb753c5` silences a warning in the 6G *bootloader*, which this fork does not build. |
+| 2026-08-31 | `e498c0171a` `94d422f1c4` `20fa5f017d` `c6abf3382a` `4e4198af7a` `5448dd99a3` `44e7c009ae` `d23a19dc2d` `387b36fab7` `f349e85154` `9d86c9b201` `8ad69d6649` `376db9bf5b` `4f54dbec79` | 3DS, iriver, as3525, iBasso, erosq, ingenic, sdmmc_host, HiBy, touchscreen | **N/A** | Other targets or subsystems neither player builds. |
+| 2026-09-08 | `dd164cadb1` `0a0b877dc2` `3e996ec73e` `6719578e29` `7f01029439` `cbaf66f372` `d43cc0e829` | jztool, ingenic usbboot, rbutil, theme editor | **N/A** | `utils/`. |
+| 2026-08-30 | `95e9d227aa` `420537c864` `cbd8b68e06` `be35fdfe1a` `636ae404f7` | manual, CREDITS, forum URL | **N/A** | `manual/` is not built. `docs/CREDITS` and the forum link merged clean. |
+| 2026-08-31 | `3664373ce7` `8e965d9159` `a70f30adf1` `54b26ac9f1` `a967c5a018` | translation updates | **N/A** | See *Why the translation commits are N/A* below. |
 
-Complete through `9cef2a3aef` (2026-08-29), merged as `d16a9c8b11`, which is
-also `rockbox/master`'s current tip, and every row in this table is settled.
+Complete through `636ae404f7` (2026-09-27), merged as `76df1a5859`. Rows marked
+**Postponed** above are the ones still to take.
 
 The claim that the rest reaches neither player was checked rather than asserted:
 both targets were built either side of the merge and compared object by object,
@@ -287,9 +315,8 @@ reachable from the debug menu, and does nothing. A merge can revert all five
 silently.
 
 - **`HAVE_MULTIMEDIA_KEYS` gated `USB_ENABLE_IAP || HAVE_MIKEY_REMOTE`**,
-  outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone, which
-  `PODBOX_NO_USB_IAP` suppresses on this target — `ipodvideo` reaches the
-  define through USB iAP instead.
+  outside the `HAVE_USBSTACK` block. Upstream ties it to USB iAP alone; the
+  inline remote is a second producer that does not depend on it.
 - **`TARGET_EXTRA_THREADS` is 2**, for the iAP serial link and the poller.
   Short by one, `create_thread()` returns NULL, neither caller checks, and the
   feature is absent with nothing said.
@@ -306,26 +333,12 @@ silently.
 `upstream-divergence.md` carries all but the last as rows of its own, together
 with the fork's centre-button multi-click and the setting that governs it.
 
-## USB audio is off
+## USB audio is on
 
-Both targets, by `PODBOX_NO_USB_AUDIO` in `config.h`. It was on until
-2026-08-31, when it was tried on each player for the first time:
-
-| | 5G (ARC) | 6G (DesignWare) |
-| --- | --- | --- |
-| Player | Hangs; needs a hard reset | Fine |
-| Driver init | Never completes | Completes, endpoints assigned |
-| Host | Binds a USB audio driver | Never enumerates the audio function |
-
-Two faults in two layers. The shared driver runs clean on the 6G, so the 5G
-hang is in ARC's isochronous endpoint path, which that target has no `logf` to
-investigate. The 6G's descriptors are refused in both the charge-only and the
-mass-storage composite.
-
-Off rather than declined: the buffer allocation was moved to boot along the
-way, which fixes a real hazard for whoever picks this up. Three upstream rows
-above touch it -- `fd8d6f10a1`, `b616047311` and `ea775fa501` -- and all three
-now land on code that does not compile.
+Both targets build upstream's `USB_ENABLE_AUDIO`, and the sound card plays from
+Windows on both players, in both USB modes. What it took is in the *sound card*
+section of `upstream-divergence.md`. `fd8d6f10a1` and `b616047311` above are
+part of what runs.
 
 ## Why the translation commits are N/A
 
@@ -396,10 +409,10 @@ clone reads as "nothing new" whether or not that is true.
 154 files, +54,025/-2,426: MFi R46 lifecycles, EI 1.13 browsing over a tagcache
 or iTunesDB snapshot, and a host-side test rig.
 
-**Still declined, now on size rather than reach.** EI browsing is Extended
-Interface lingo over USB iAP, which `ipodvideo` builds, so the original
-reason — the transport is compiled out — has lapsed. There is still no
-accessory to test 154 files and +54,025 lines against. `iap-db.c` (4910 lines), `iap-media.c` (2516),
+**Still declined, on size rather than reach.** EI browsing is Extended
+Interface lingo over USB iAP, which both targets build. The docks here — an
+Onkyo ND-S1 and DS-A3 — do not browse, so nothing tests 154 files and +54,025
+lines. `iap-db.c` (4910 lines), `iap-media.c` (2516),
 the artwork and chapter readers and the test rig are **Declined**, with the API
 added elsewhere to serve them.
 
@@ -412,9 +425,9 @@ Taken is the hardening underneath, judged against *this* tree -- RockPod's
 | `database/tagcache.c`, `.h` | **Adopted (in part)** | A read error was indistinguishable from "this entry does not match the clause", so a truncated index answered a short list as the whole one. `open_master_fd()` in `build_lookup_list()` was the one call of four not checking its return. The walk is bounded by `master_entry_count`, and a new `failed` flag carries a read error out of `check_clauses()`. Snapshot accessors declined. |
 | `usbstack/usb_storage.c` | **Adopted (independently)** | The host's LBA and count are scaled by the sector multiplier in 32-bit arithmetic, and `sector_t` is 32-bit here, so `sector + count` can wrap past the range test -- a request the device should refuse becomes an in-range access at the wrong offset, which on a write is silent corruption. One `set_transfer_range()` serves `READ_10`, `READ_16`, `WRITE_10` and `WRITE_16`. Written here, not ported: RockPod's also rewrites `READ_CAPACITY_16` and drops alignment reporting this tree has. |
 | `playlist/playlist.c` | **Adopted (in part)** | `get_track_filename()` read `utf8` and `amount` before taking the lock and `filename`/`dirlen` after releasing it; `playlist_get_track_info()` walked `indices[]` under no lock at all, from the viewer, the browser and four places in `iap/`, while the audio thread mutates them. The control file also ignored `fsync()` and both `lseek()`s -- the second records where a track's name starts, so a failed seek stored -1 there. Staged/snapshot API declined. |
-| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | Two frame checks in `iap_getc()`: a short-form length below 2 or above 0xFC, and a long-form below 0xFD, are malformed and drop the frame rather than reaching the lingo handlers. The rest does not separate. The lingo files' bulk is the IDPS transaction-ID model, and this copy has no IDPS state -- every rewritten bounds check is the same number with a `doff` of zero. `iap-core.c`'s bulk is a transport indirection so iAP can also run over USB, which is compiled out. `iap-lingo4.c` is the EI browsing itself. |
+| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | Two frame checks in `iap_getc()`: a short-form length below 2 or above 0xFC, or a long-form below 2, is malformed and drops the frame rather than reaching the lingo handlers. RockPod also drops a long-form frame below 0xFD; this copy does not, because the Onkyo DS-A3 sends its certificate sections that way and authentication stalls without them. The rest does not separate. The lingo files' bulk is the IDPS transaction-ID model, and this copy has no IDPS state -- every rewritten bounds check is the same number with a `doff` of zero. `iap-core.c`'s bulk is a transport indirection so iAP can also run over USB, which this fork does through upstream's libiap instead. `iap-lingo4.c` is the EI browsing itself. |
 | `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | Not a fix: `ATA_SSD_DEEP_SLEEP_TICKS`, `ata_clock_gated`, `ata_disk_is_iflash()` are an independent implementation of the SSD two-stage sleep this fork already ships. |
-| `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | Both are *Deliberately not changed* in `upstream-divergence.md`, and USB audio is now compiled out entirely. |
+| `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | RockPod's source mode and the isochronous plumbing it needs. The source here is USB iAP's configuration 2 instead; see *Deliberately not changed* in `upstream-divergence.md`. |
 
 Found while reading rather than ported: `handle_scsi()` took `lun` straight from
 the host's CBW and indexed `ejected[]` and `locked[]` with it, both `NUM_DRIVES`
@@ -427,29 +440,27 @@ long. It is bounded against `storage_num_drives()` now.
 Many rows above hinge on this, and commits titled `iap:` land on either side of
 it.
 
-**iAP is one protocol with two transports, and PodBox runs only one of them.**
+**iAP is one protocol with two transports, and PodBox runs both.**
 
 | | Serial iAP | USB iAP |
 | --- | --- | --- |
 | Switch | `IPOD_ACCESSORY_PROTOCOL` | `USB_ENABLE_IAP` |
-| State | **On**, both targets | **On** `ipodvideo`, **off** `ipod6g` |
+| State | **On**, both targets | **On**, both targets |
 | Code | `apps-ipod/iap/` | `firmware/usbstack/iap/` (vendored [libiap](https://github.com/mojyack/libiap)) |
 | Wire | UART pins on the dock connector | USB, HID-framed |
 | Carries | Commands only | Commands **and digital audio** |
 
 So an upstream `iap:` commit is triaged by which column it touches. Both are
-built on `ipodvideo`, so a commit touching either is ported by hand like any
-other work here. A commit that touches USB iAP alone is still Declined for
-`ipod6g`'s sake only if it would cost that target something; otherwise it
-lands, guarded by `USB_ENABLE_IAP` as upstream wrote it.
+built on both targets, so a commit touching either is ported by hand like any
+other work here, and USB iAP changes land guarded by `USB_ENABLE_IAP` as
+upstream wrote them.
 
 The rows above that turn on there being one PCM sink were revisited when iAP
-went on: `ipodvideo` has two, so `fad99773e3`, `76d63246c5`, `f87ff3a9b2`,
+went on: both targets have more than one, so `fad99773e3`, `76d63246c5`, `f87ff3a9b2`,
 `1d5aa53321` and `f343168051` are all adopted in full now.
 
-**Which target has USB iAP, and what enabling it cost, is a property of the
-tree rather than of any commit: see *USB iAP is on for ipodvideo* in
-[`upstream-divergence.md`](upstream-divergence.md).** Upstream ties
+**What USB iAP needed on each target is a property of the tree rather than of
+any commit: see *USB iAP* in [`upstream-divergence.md`](upstream-divergence.md).** Upstream ties
 `HAVE_MULTIMEDIA_KEYS` to that same switch; the inline earphone remote
 (`b217a55059`) is a second producer of those codes, so the gate here names
 both.

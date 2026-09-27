@@ -1159,6 +1159,11 @@ the headphones. Audible without anything plugged in.
 [keyclick repeats]
 Whether auto-repeat -- a held button -- clicks each time or only once.
 
+[accessory protocol]
+Answers docks, car kits and remotes that speak Apple's accessory protocol, over
+the dock connector or USB. Off, they get no reply: a dock charges but will not
+play or take its remote. Changes to USB take effect at the next connection.
+
 [serial bitrate]
 The speed of the dock connector's serial line. Auto suits every accessory that
 follows the standard.
@@ -1205,7 +1210,8 @@ place, as there is room for only one of the two beside the disk.
 [usb dac output]
 On, a USB DAC plugged into the dock connector takes over playback, and
 unplugging it hands playback back to the headphone socket. It is checked for
-only when no computer answers the cable within two seconds.
+only when no computer answers the cable within two seconds, and not while a
+dock is talking to the player over the dock connector.
 
 The check starts from a charger's power, such as a USB-C splitter with a
 charger in it. A DAC on its own supply with nothing else on the cable goes

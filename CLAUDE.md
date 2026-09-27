@@ -138,22 +138,25 @@ builds two**, both ARM and both 320x240. The wider target trees under
 
 This tree is a custom build for **iPod Classic 6G/7G** and **iPod Video 5G/5.5G**. Changes may diverge from upstream Rockbox to suit these targets. The two iPods share the same 320x240 LCD and most app-layer code, but have different SoCs, USB controllers, and board-level drivers:
 
-- **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. SSD power management, and the inline earphone remote. USB iAP is **off** here and on for the 5G — see below.
-- **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes). USB audio is **off**, as it is on the 6G — see `PODBOX_NO_USB_AUDIO` below.
+- **iPod Classic (6G/7G):** S5L8702 SoC, DesignWare USB OTG, CS42L55 codec. Config: `ipod6g`. SSD power management, and the inline earphone remote.
+- **iPod Video (5G/5.5G):** PP5022 SoC, ARC USB OTG, WM8758 codec. Config: `ipodvideo`. UI features (Cover Flow, dynamic colors, themes).
 
-USB audio is **off** on both targets: `config.h` defines `PODBOX_NO_USB_AUDIO`.
-Tested 2026-08-31 and neither player performed it — the 5G hangs when the host
-configures the isochronous endpoint, the 6G is never enumerated as an audio
-device. Delete the define to re-enable; the comment there says what else the
-setting needs back.
+Connectivity works on both players; `.specifications/interface-matrix.md`
+is the one-page state of it, and names the specification for each:
 
-USB iAP is separately **on for `ipodvideo` only**. The `USB_ENABLE_IAP` gate
-matches both players, so `config.h` defines `PODBOX_NO_USB_IAP` under
-`IPOD_6G` to hold it off there — enabling it adds a second USB configuration
-carrying an isochronous IN endpoint, and that path is exercised on the ARC
-controller, not on DesignWare. Delete that define to enable it on the 6G;
-nothing else is needed. No dock or accessory is available here, so the
-protocol itself is untested on either player.
+- **USB sound card** (a computer plays through the player) behind the **USB
+  Sound Card** setting, off by default. `.specifications/usb-audio.md`.
+- **USB DAC output** (the player as USB host, class 1 and 2 DACs). The player
+  supplies no VBUS. `.specifications/usb-host-mode.md`.
+- **USB iAP** through upstream's `USB_ENABLE_IAP` gate unchanged: an Onkyo
+  ND-S1 dock selects configuration 2 and plays the player's audio out over
+  S/PDIF. `.specifications/usb-audio-source.md`.
+- **Serial iAP** (`apps-ipod/iap/`): an Onkyo DS-A3 dock authenticates and its
+  remote drives the player.
+
+Both iAP transports sit behind one setting, **Accessory Protocol**, on by
+default. **Debug > USB log** and **Debug > Debug IAP** are the diagnostics;
+keep them.
 
 ## Build Commands
 

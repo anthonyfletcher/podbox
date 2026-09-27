@@ -496,12 +496,13 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is checked for only when no computer answers the cable within two seconds. The check starts from a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this instead. Off leaves every cable to the computer and charging. | on |  |
+| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is checked for only when no computer answers the cable within two seconds, and not while a dock is talking to the player over the dock connector. The check starts from a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this instead. Off leaves every cable to the computer and charging. | on |  |
 
 ### System — Accessories
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
 | Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
