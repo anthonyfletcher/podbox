@@ -638,6 +638,10 @@ static void usb_dac_auto_step(void)
             usb_dac_note("skipped: cable out");
         else if(usb_record.bus_resets > 0)
             usb_dac_note("skipped: bus reset (computer)");
+#ifdef IPOD_ACCESSORY_PROTOCOL
+        else if(iap_accessory_present())
+            usb_dac_note("skipped: serial accessory");
+#endif
         else
         {
             usb_host_probe_switch(true);
@@ -662,6 +666,10 @@ static void usb_dac_auto_step(void)
     }
     else if(e->result < 0)
         usb_dac_note(e->step);
+#ifdef IPOD_ACCESSORY_PROTOCOL
+    else if(iap_accessory_present())
+        usb_dac_note("stopped: serial accessory");
+#endif
     else if(usb_dac_polls >= USB_DAC_MAX_POLLS)
         usb_dac_note("no device");
     else if(usb_detect() == USB_EXTRACTED)

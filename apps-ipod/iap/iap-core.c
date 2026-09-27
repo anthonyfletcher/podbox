@@ -89,6 +89,7 @@
 static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
+static long last_frame_tick;     /* 0 until a frame passes its checksum */
 /* This is set to true if a SYS_POWEROFF message is received,
  * signalling impending power off
  */
@@ -560,6 +561,17 @@ static void iap_malloc(void)
     iap_running = true;
 }
 
+/* True while frames are arriving. The USB DAC search asks: a serial dock
+ * powers the USB pins as a charger would, and the search would otherwise
+ * take the port as a host and starve the serial line. Recent frames rather
+ * than the device state, which outlives an undocking on targets that
+ * cannot see the accessory leave. */
+bool iap_accessory_present(void)
+{
+    return last_frame_tick &&
+           TIME_BEFORE(current_tick, last_frame_tick + 5*HZ);
+}
+
 /* Off, the serial line is ignored and an attached accessory forgotten */
 void iap_enable(bool enable)
 {
@@ -793,6 +805,7 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
         if ((s->check & 0xFF) == 0) {
             /* done, received a valid frame */
             rx_stats.good++;
+            last_frame_tick = current_tick ? current_tick : 1;
             rx_stats_keep(iap_rxnext - s->len, s->len);
             iap_rxlen -= (s->len + 2);
             iap_rxpayload = iap_rxnext;
