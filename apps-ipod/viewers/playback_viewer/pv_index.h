@@ -42,6 +42,11 @@ struct pv_index_id
      * year, so asking for another is a mismatch and a rebuild -- which is
      * right: the year figures in it are for a year nobody asked about. */
     unsigned long year;
+    /* pv_names_identity(): the database and moved-folder table the rows were
+     * named from. The rows carry their names, so without this a play named
+     * from its folder -- because the database did not have the file yet, or
+     * had it somewhere else -- stays that way however the database changes. */
+    unsigned long names;
 };
 
 /* Open the saved index and check it describes this log at this moment.

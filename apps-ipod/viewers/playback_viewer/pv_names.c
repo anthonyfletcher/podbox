@@ -12,7 +12,8 @@
  *   The database. Every file the tagcache knows -- or as many of them as the
  *   buffer holds -- is resolved once into {path hash -> artist, album,
  *   title}, strings pooled, and that map is saved keyed to the database's
- *   entry count and the room it was built in, so later runs skip the sweep.
+ *   entry count and commit id and the room it was built in, so later runs
+ *   skip the sweep.
  *   This is the only source that can name an ALBUM at all.
  *
  *   The filename. For files the database does not know, "Artist - Album - NN
@@ -21,7 +22,11 @@
  *   under an <artist>/<album>/<track> layout -- a known and visible weakness,
  *   and the reason the database path exists.
  *
- * Both keys are the path exactly as logged, with no normalisation. That
+ * Between the two sits pv_moves.c: a file the database does not know at its
+ * logged path may be one whose folder has since moved, and pv_names_locate()
+ * gives the path it has now, which the database may well know.
+ *
+ * Both keys are the path exactly as located, with no normalisation. That
  * matters beyond this file: the artwork cache hashes the same string (see
  * aa_dirname() in metadata/art_cache.c), so artwork resolves exactly when
  * names do. If one silently misses, so does the other.
@@ -38,12 +43,15 @@
 #include "rbpaths.h"
 #include "database/tagcache.h"
 #include "widgets/splash.h"
+#include "pv_moves.h"
 #include "pv_names.h"
 
-/* Saved map. The header carries the database entry count it was built
- * against; anything else and the map is rebuilt rather than trusted. */
+/* Saved map. The header carries the database entry count and commit id it
+ * was built against; anything else and the map is rebuilt rather than
+ * trusted. The commit id is what notices a scan that moved or retagged files
+ * without changing how many there are. */
 #define PV_MAP_PATH  ROCKBOX_DIR "/pv_names.dat"
-#define PV_MAP_MAGIC 0x50564e32UL   /* "PVN2" */
+#define PV_MAP_MAGIC 0x50564e33UL   /* "PVN3" */
 
 /* Longest metadata string read out of the database. Anything past this is
  * truncated, which is what the aggregates would do to it anyway. */
@@ -75,7 +83,9 @@ static int   map_n, map_cap, map_mask;
 static char *map_pool;
 static unsigned map_pool_used, map_pool_cap;
 static int   map_db_entries;
+static long  map_db_commit;
 static bool  map_swept;      /* the map was rebuilt, not read back */
+static bool  map_full;       /* its sweep had room for the whole database */
 
 /* Index over the pool, so interning a string is a hash lookup rather than a
  * walk of everything interned so far. Without it the sweep is quadratic: a
@@ -188,7 +198,7 @@ static const struct map_entry *map_get(const char *path)
  * disk buys one of those on the next open for nothing. */
 static void map_save(void)
 {
-    unsigned long hdr[5];
+    unsigned long hdr[6];
     size_t map_bytes;
     bool ok;
     int fd = open(PV_MAP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
@@ -204,6 +214,7 @@ static void map_save(void)
      * found: a map stopped by the buffer is short of the library through no
      * fault of the database, and only this says so. */
     hdr[4] = (unsigned long)map_cap;
+    hdr[5] = (unsigned long)map_db_commit;
     map_bytes = (size_t)map_n * sizeof(struct map_entry);
 
     ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
@@ -224,7 +235,7 @@ static void map_save(void)
  * naming the same fraction of it, with the rest coming from folders. */
 static bool map_load(void)
 {
-    unsigned long hdr[5];
+    unsigned long hdr[6];
     int fd = open(PV_MAP_PATH, O_RDONLY);
     bool ok = false;
 
@@ -236,7 +247,8 @@ static bool map_load(void)
         && (int)hdr[1] == map_db_entries
         && (int)hdr[2] > 0 && (int)hdr[2] <= map_cap
         && hdr[3] > 0 && hdr[3] <= map_pool_cap
-        && (int)hdr[4] >= map_cap)
+        && (int)hdr[4] >= map_cap
+        && (long)hdr[5] == map_db_commit)
     {
         int n = (int)hdr[2];
         size_t bytes = (size_t)n * sizeof(struct map_entry);
@@ -246,6 +258,7 @@ static bool map_load(void)
         {
             map_n = n;
             map_pool_used = (unsigned)hdr[3];
+            map_full = (int)hdr[4] >= (int)hdr[1];
             map_index();
             ok = true;
         }
@@ -259,12 +272,41 @@ static bool map_load(void)
     return ok;
 }
 
-/* Forget the saved map, so the next open sweeps the database again. For when
- * the names in it are wrong rather than merely stale: a retagged library
- * keeps its entry count, which is all map_load() checks. */
+/* Forget the saved map, and the moved-folder table built with it, so the
+ * next open sweeps the database and matches folders again. */
 void pv_names_discard(void)
 {
     remove(PV_MAP_PATH);
+    pv_moves_discard();
+}
+
+/* The database as the saved map and moved-folder table are keyed to it: its
+ * entry count and commit id, or false when it is not there to ask. */
+static bool db_state(int *entries, long *commit)
+{
+    struct tagcache_stat *stat = tagcache_get_stat();
+    struct tagcache_marks marks;
+
+    if (!stat || !stat->ready || stat->total_entries <= 0)
+        return false;
+    tagcache_get_marks(&marks);
+    *entries = stat->total_entries;
+    *commit = marks.commitid;
+    return true;
+}
+
+unsigned long pv_names_identity(void)
+{
+    int entries;
+    long commit;
+    unsigned long key[3];
+
+    if (!db_state(&entries, &commit))
+        return 0;
+    key[0] = (unsigned long)entries;
+    key[1] = (unsigned long)commit;
+    key[2] = pv_moves_ident(entries, commit);
+    return fnv1a_bytes(key, sizeof(key));
 }
 
 /* One pass over every file the database knows. Seeky on a spinning disk, so
@@ -303,7 +345,6 @@ static void map_sweep(void)
 
 size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
 {
-    struct tagcache_stat *stat;
     char *base = buf;
     size_t used = 0;
     size_t budget, index_bytes, slack;
@@ -317,12 +358,14 @@ size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
     map_pool_used = 0;
     pool_slot_n = 0;
     map_db_entries = 0;
+    map_db_commit = 0;
+    pv_moves_forget();
 
-    stat = tagcache_get_stat();
-    if (!stat || !stat->ready || stat->total_entries <= 0)
+    if (!db_state(&map_db_entries, &map_db_commit))
+    {
+        map_db_entries = 0;
         return 0;               /* no database: filenames it is */
-
-    map_db_entries = stat->total_entries;
+    }
 
     /* Half the buffer, counting the sweep's scratch, since that is the high
      * water mark even though it is not charged. The aggregate tables have the
@@ -407,6 +450,7 @@ size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
     map_pool_used = 1;
 
     map_swept = false;
+    map_full = false;
     if (!map_load())
     {
         /* A caller that only wanted the saved map takes no for an answer. The
@@ -425,6 +469,7 @@ size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
         map_pool_used = 1;
         map_sweep();
         map_swept = true;
+        map_full = map_cap >= map_db_entries;
         if (map_n > 0)
         {
             map_index();
@@ -440,9 +485,18 @@ size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
 
     /* The pool index is scratch from here on. Say so by not counting it. */
     pool_slots = NULL;
+    used = (used + 3u) & ~(size_t)3u;
 
-    /* Round up so whatever the caller puts next stays 4-byte aligned. */
-    return (used + 3u) & ~(size_t)3u;
+    /* A sweep means the database changed, which is when folders move. The
+     * matching borrows everything above the map, which the caller has not
+     * claimed yet. */
+    if (map_swept && pv_moves_stale(map_db_entries, map_db_commit))
+        pv_moves_build(base + used, bufsz - used, map_db_entries,
+                       map_db_commit);
+    used += pv_moves_load(base + used, bufsz - used, map_db_entries,
+                          map_db_commit);
+
+    return used;
 }
 
 void pv_names_info(int *db_entries, int *mapped, bool *swept)
@@ -644,6 +698,21 @@ static void path_to_meta(const char *path, char *artist, char *title,
         strlcpy(artist, "(unknown)", PV_NAME_MAX);
     if (title[0] == '\0')
         strlcpy(title, fname, PV_NAME_MAX);
+}
+
+bool pv_names_complete(void)
+{
+    return map_db_entries == 0 || (map && map_full);
+}
+
+const char *pv_names_locate(const char *path)
+{
+    const char *moved;
+
+    if (!map || map_get(path))
+        return path;
+    moved = pv_moves_apply(path);
+    return moved ? moved : path;
 }
 
 /* The database's marker for a field the file does not carry. */

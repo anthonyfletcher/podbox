@@ -35,11 +35,26 @@
  * as no map, rather than as a reason to build one. */
 size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep);
 
-/* Delete the saved map, so the next pv_names_init() sweeps the database
- * again. The map is keyed to the database's entry count and the room it was
- * built in, neither of which notices a file retagged in place, so this is the
- * only way to clear one that has gone stale that way. */
+/* Delete the saved map and the moved-folder table, so the next
+ * pv_names_init() sweeps the database and matches folders again. */
 void pv_names_discard(void);
+
+/* A value that changes whenever the names a path resolves to could: the
+ * database's entry count and commit id, and the moved-folder table. 0 when
+ * there is no usable database. Cheap -- no map is read -- so a cache of
+ * resolved names can be checked against it before deciding to build one. */
+unsigned long pv_names_identity(void);
+
+/* Whether a path the map does not know is one the database does not know
+ * either: the map covers the whole database, or there is no database to
+ * cover. False when there is a database and no map, or only part of one. */
+bool pv_names_complete(void);
+
+/* Where a logged file is now. 'path' itself unless the map does not know it
+ * and its folder is one the moved-folder table has matched; then the path in
+ * the new folder, in a static buffer valid until the next call. Resolve names
+ * and artwork from what this returns, not from the logged path. */
+const char *pv_names_locate(const char *path);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a
  * device with a database ever comes back PV_NAME_DB, the logged paths and

@@ -739,7 +739,7 @@ static void wk_entry(const struct pv_entry *e, void *ctx)
     }
     else
     {
-        pv_names_resolve(e->path, artist, title, album);
+        pv_names_resolve(pv_names_locate(e->path), artist, title, album);
         wk_add(wk_art, &wk_art_n, artist);
         wk_add(wk_trk, &wk_trk_n, title);
     }

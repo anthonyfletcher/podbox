@@ -337,6 +337,20 @@ static void index_identity(struct pv_index_id *id, enum pv_source src,
     id->totals_size = sizeof(struct pv_totals);
     id->state_size  = sizeof(struct pv_badge_state);
     id->year        = (unsigned long)year;
+    id->names       = (src == PV_SRC_PLAYBACK) ? pv_names_identity() : 0;
+}
+
+/* Whether the database has said what it holds. While it is still loading, or
+ * mid-scan, a build names everything from folders -- and saving that would
+ * keep those names until the database next changes, long after it could have
+ * named them properly. */
+static bool names_settled(void)
+{
+    struct tagcache_stat *stat = tagcache_get_stat();
+
+    if (!stat)
+        return false;
+    return stat->ready || (stat->readyvalid && !tagcache_is_busy());
 }
 
 /* Whether a saved index accounts for the whole log, which is the same question
@@ -487,6 +501,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
 {
     struct pv_totals *t = ctx;
     char artist[PV_NAME_MAX], title[PV_NAME_MAX], album[PV_NAME_MAX];
+    const char *path = e->path;
     enum pv_name_src src;
     unsigned elapsed;
     bool night, year;
@@ -505,7 +520,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     }
     else
     {
-        src = pv_names_resolve(e->path, artist, title, album);
+        path = pv_names_locate(e->path);
+        src = pv_names_resolve(path, artist, title, album);
         if (src == PV_NAME_DB)
             t->from_db++;
         else
@@ -598,8 +614,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
                 ar->y_seconds += elapsed;
             }
 #ifdef HAVE_ALBUMART
-            if (ar->art_hash == 0 && e->path && e->path[0])
-                ar->art_hash = folder_hash(e->path, true);
+            if (ar->art_hash == 0 && path && path[0])
+                ar->art_hash = folder_hash(path, true);
 #endif
         }
 
@@ -619,8 +635,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
 #ifdef HAVE_ALBUMART
             /* A song's picture is its album's, which is the folder the file
              * itself sits in -- the same key the album row takes. */
-            if (ti->art_hash == 0 && e->path && e->path[0])
-                ti->art_hash = folder_hash(e->path, false);
+            if (ti->art_hash == 0 && path && path[0])
+                ti->art_hash = folder_hash(path, false);
 #endif
         }
 
@@ -634,8 +650,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
                 al->y_seconds += elapsed;
             }
 #ifdef HAVE_ALBUMART
-            if (al->art_hash == 0 && e->path && e->path[0])
-                al->art_hash = folder_hash(e->path, false);
+            if (al->art_hash == 0 && path && path[0])
+                al->art_hash = folder_hash(path, false);
 #endif
         }
 
@@ -1260,6 +1276,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     long lines;
     unsigned long save_covered = 0;
     bool save_wanted = false;
+    bool late_partial = false;
 
     memset(out, 0, sizeof(*out));
     overflowed = false;
@@ -1339,17 +1356,22 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         cap_album = 200;
 
     /* Give ground in order of what is least missed. The 5G has 512 KB of
-     * scratch against the 6G's 3 MB and can be a few kilobytes short on a
-     * large library, so what gets sacrificed matters: shrinking every table
-     * together costs the track table -- the one the deck is mostly made of --
-     * to buy room for artist rows a library will never fill.
+     * scratch against the 6G's 3 MB, so on a large library what gets
+     * sacrificed matters: shrinking every table together costs the track
+     * table -- the one the deck is mostly made of -- to buy room for artist
+     * rows a library will never fill.
      *
      * Days go first (1024 of them is nearly three years of daily listening,
-     * and they feed only the heatmap and the streak), then albums, then
-     * artists. The track table is cut last and only when nothing else is
-     * left, and a table that then fills up is reported rather than hidden. */
+     * and they feed only the heatmap and the streak), then albums down to 200
+     * rows, then artists down to 200. The track table is cut last and only
+     * when nothing else is left, and a table that then fills up is reported
+     * rather than hidden.
+     *
+     * Trap: halving albums and artists once each is not enough. At 16,000
+     * tracks they are still 300 KB between them, more than a 5G has left once
+     * the name map is in, and no size of track table then fits. */
     day_cap = 1500;
-    for (int step = 0; ; step++)
+    for (;;)
     {
         size_t need;
 
@@ -1364,14 +1386,14 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         if (need <= abuf_sz)
             break;
 
-        if (step == 0)
+        if (day_cap > 1024)
             day_cap = 1024;
-        else if (step == 1)
+        else if (day_cap > 512)
             day_cap = 512;
-        else if (step == 2 && cap_album > 200)
-            cap_album /= 2;
-        else if (step == 3 && cap_artist > 200)
-            cap_artist /= 2;
+        else if (cap_album > 200)
+            cap_album = cap_album / 2 > 200 ? cap_album / 2 : 200;
+        else if (cap_artist > 200)
+            cap_artist = cap_artist / 2 > 200 ? cap_artist / 2 : 200;
         else if (cap_title > 200)
             cap_title /= 2;
         else
@@ -1431,6 +1453,8 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
              * tail to read, and entries in it have to be named. */
             if (names_skipped && covered < log_size && !out->db_mapped)
                 names_init_late(out, true);
+            late_partial = names_skipped && covered < log_size
+                        && !pv_names_complete();
             lines = (covered < log_size)
                   ? pv_log_read_range(out->source, covered, 0, entry_cb, out)
                   : 0;
@@ -1452,6 +1476,12 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
              * after all. */
             if (names_skipped && !out->db_mapped)
                 names_init_late(out, true);
+            late_partial = names_skipped && !pv_names_complete();
+            /* This index sends every open down this same path, so it goes:
+             * the next open then gives the map the bottom of the buffer and
+             * writes an index that loads. */
+            if (late_partial)
+                pv_index_discard();
             lines = pv_log_read(out->source, entry_cb, out);
             out->ms_read = (current_tick - t0) * 1000 / HZ;
             save_wanted = (lines >= 0);
@@ -1459,6 +1489,14 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
 
         if (lines < 0)
             return PV_BUILD_NO_LOG;
+
+        /* Names are what the index cannot correct later, so it is not saved
+         * with names a full build would have got right: the database not yet
+         * able to say, or a map squeezed in above the tables that covers
+         * only part of it. */
+        if (out->source == PV_SRC_PLAYBACK
+            && (late_partial || !names_settled()))
+            save_wanted = false;
 
         save_covered = log_size;
     }

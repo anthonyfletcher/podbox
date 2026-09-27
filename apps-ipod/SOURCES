@@ -244,6 +244,7 @@ viewers/text_viewer/ts_zipdoc.c
 viewers/playback_viewer/pv_badges.c
 viewers/playback_viewer/pv_index.c
 viewers/playback_viewer/pv_log.c
+viewers/playback_viewer/pv_moves.c
 viewers/playback_viewer/pv_names.c
 viewers/playback_viewer/pv_play.c
 viewers/playback_viewer/pv_row.c

@@ -1308,13 +1308,14 @@ It reruns itself after a USB session, which is when files normally change, so
 this is for when they changed some other way.
 
 [action: Rebuild Playback Report]
-Discards the figures the Playback Report saved and the track names it resolved,
-so the next time it opens it reads the log and the database over again.
+Discards the figures the Playback Report saved, the track names it resolved and
+the moved folders it matched, so the next time it opens it reads the log and the
+database over again.
 
-Neither cache notices tags that changed underneath it, so a retagged album keeps
-the name it had, and one whose tags could not be read keeps the folder name it
-was given instead. Costs a few seconds on that next open and nothing else -- the
-log is the record, and the figures come back the same.
+The report does this by itself whenever the database is updated, and follows a
+folder you moved or renamed to where its files are now. So this is for names
+that still look wrong after an update. Costs a few seconds on that next open and
+nothing else -- the log is the record, and the figures come back the same.
 
 [action: Load Theme]
 Opens the list of installed themes. Choosing one applies the whole look at
