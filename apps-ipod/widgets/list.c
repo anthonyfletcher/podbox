@@ -816,7 +816,11 @@ bool gui_synclist_do_button(struct gui_synclist * lists, int *actionptr)
     int action = *actionptr;
     static bool pgleft_allow_cancel = false;
 
+    /* A step count comes only with a wheel event. A button -- an accessory
+     * remote's up and down -- carries none and moves one row. */
     int next_item_modifier = button_apply_acceleration(get_action_data());
+    if (next_item_modifier < 1)
+        next_item_modifier = 1;
 
     /* Disable the skin redraw callback */
     current_lists = NULL;
