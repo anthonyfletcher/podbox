@@ -106,7 +106,7 @@ void serial_setup(void)
 #include "kernel.h"
 #include "pmu-target.h"
 #include "iap.h"
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
 #include "videoout.h"
 #endif
 
@@ -119,7 +119,7 @@ static enum {
 static int bitrate = 0;
 static bool acc_plugged = false;
 static unsigned int acc_absent_ticks;
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
 static long videoout_identify_tick;
 static bool videoout_identified;
 static enum videoout_accessory videoout_accessory =
@@ -163,7 +163,7 @@ static void serial_acc_tick(void)
     if (acc_plugged != plugged)
     {
         acc_plugged = plugged;
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
         videoout_identify_tick = current_tick;
         videoout_identified = false;
         serial_videoout_publish(acc_plugged ?
@@ -188,7 +188,7 @@ static void serial_acc_tick(void)
         }
     }
 
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
     if (acc_plugged && !videoout_identified &&
         !TIME_BEFORE(current_tick,
                      videoout_identify_tick + VIDEOOUT_IDENTIFY_TICKS))

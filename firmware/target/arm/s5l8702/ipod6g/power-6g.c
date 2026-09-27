@@ -27,7 +27,7 @@
 #include "usb_core.h"   /* for usb_charging_maxcurrent_change */
 #include "backlight.h"
 #include "timeout.h"
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
 #include "videoout.h"
 #endif
 
@@ -35,7 +35,7 @@ static int idepowered;
 
 void power_off(void)
 {
-#ifndef BOOTLOADER
+#if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
     videoout_disable();
 #endif
 
