@@ -218,6 +218,16 @@ static struct state_t {
     .state = ST_SYNC
 };
 
+/* What the framer has seen, for Debug IAP. Written from the serial ISR. */
+static struct {
+    unsigned long good;         /* frames that passed their checksum */
+    unsigned long bad_check;    /* frames that failed it */
+    unsigned long bad_len;      /* frames dropped for their length */
+    unsigned long timeouts;     /* frames abandoned mid-way by the gap timer */
+    unsigned int last_bad_len;
+    unsigned char last[6];      /* first bytes of the last good frame */
+} rx_stats;
+
 enum interface_state interface_state = IST_STANDARD;
 
 struct device_t device;
@@ -637,6 +647,7 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
         /* Packet timeouts only make sense while not waiting for the
          * sync byte */
          s->state = ST_SYNC;
+         rx_stats.timeouts++;
          return iap_getc(IF_IAP_MP(port,) x);
     }
 
@@ -681,6 +692,8 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             if (x < 0x02 || x > 0xFC)
             {
                 s->state = ST_SYNC;
+                rx_stats.bad_len++;
+                rx_stats.last_bad_len = x;
                 break;
             }
             /* small packet.
@@ -692,6 +705,8 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             {
                 /* Packet too long for buffer */
                 s->state = ST_SYNC;
+                rx_stats.bad_len++;
+                rx_stats.last_bad_len = x;
                 break;
             }
             s->len = x;
@@ -716,6 +731,8 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
             || ((uint32_t)s->len + 2 > iap_rxlen)) {
             /* invalid length */
             s->state = ST_SYNC;
+            rx_stats.bad_len++;
+            rx_stats.last_bad_len = s->len;
             break;
         } else {
             s->state = ST_DATA;
@@ -735,11 +752,15 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
         s->check += x;
         if ((s->check & 0xFF) == 0) {
             /* done, received a valid frame */
+            rx_stats.good++;
+            memcpy(rx_stats.last, iap_rxnext - s->len,
+                   MIN(s->len, sizeof(rx_stats.last)));
             iap_rxlen -= (s->len + 2);
             iap_rxpayload = iap_rxnext;
             queue_post(&iap_queue, IAP_EV_MSG_RCVD, 0);
         } else {
             /* Invalid frame */
+            rx_stats.bad_check++;
         }
         s->state = ST_SYNC;
         break;
@@ -1523,6 +1544,15 @@ bool dbg_iap(void)
         lcd_putsf(0, 1, "lin: %08x", device.lingoes);
         lcd_putsf(0, 2, "notif: %08x", device.notifications);
         lcd_putsf(0, 3, "cap: %08x/%08x", device.capabilities, device.capabilities_queried);
+        lcd_putsf(0, 4, "cert: v%04x section %d of %d", device.auth.version,
+                  device.auth.next_section, device.auth.max_section);
+        lcd_putsf(0, 5, "rx: %lu bad sum: %lu timeout: %lu", rx_stats.good,
+                  rx_stats.bad_check, rx_stats.timeouts);
+        lcd_putsf(0, 6, "bad len: %lu (last %u)", rx_stats.bad_len,
+                  rx_stats.last_bad_len);
+        lcd_putsf(0, 7, "last: %02x %02x %02x %02x %02x %02x",
+                  rx_stats.last[0], rx_stats.last[1], rx_stats.last[2],
+                  rx_stats.last[3], rx_stats.last[4], rx_stats.last[5]);
 
         // frame_state.state
         // serial state
