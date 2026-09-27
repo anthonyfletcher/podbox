@@ -74,10 +74,10 @@ const char *settings_tag_name(uint16_t tag);
  * For a debug screen.
  *
  * Not a pass/fail count. Some settings are compiled in per target -- the
- * backlight fades and the USB DAC are iPod Video only -- so their rows
- * legitimately resolve to nothing on the other one. What the count is good for
- * is a typo or a setting renamed out from under the table, which shows up as a
- * row that resolves on neither. */
+ * backlight fades are iPod Video only, Remote Track Skip Classic only -- so
+ * their rows legitimately resolve to nothing on the other one. What the count
+ * is good for is a typo or a setting renamed out from under the table, which
+ * shows up as a row that resolves on neither. */
 int settings_tags_validate(void);
 
 #endif /* _SETTINGS_TAGS_H_ */

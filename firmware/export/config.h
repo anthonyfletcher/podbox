@@ -1398,8 +1398,8 @@ Lyre prototype 1 */
 #define USB_ENABLE_IAP
 #endif
 
-/* USB host mode: the host probe, and audio to a USB Audio Class 2 DAC as a
- * PCM sink, on both controllers. */
+/* USB host mode: the host probe, and audio to a USB Audio Class 1 or 2 DAC
+ * as a PCM sink, on both controllers. */
 #if CONFIG_USBOTG == USBOTG_ARC || CONFIG_USBOTG == USBOTG_DESIGNWARE
 #define HAVE_USB_HOST
 #define HAVE_USB_HOST_AUDIO
