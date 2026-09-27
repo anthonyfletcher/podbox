@@ -334,13 +334,15 @@ static const struct button_mapping remote_button_context_standard[]  = {
     { ACTION_STD_NEXT,          BUTTON_RC_DOWN,                  BUTTON_NONE },
     { ACTION_STD_NEXTREPEAT,    BUTTON_RC_DOWN|BUTTON_REPEAT,    BUTTON_NONE },
 
-    { ACTION_STD_PREV,      BUTTON_RC_LEFT,     BUTTON_NONE },
-    { ACTION_STD_NEXT,      BUTTON_RC_RIGHT,    BUTTON_NONE },
+    /* Left and right go back and open, as the wheel's own do */
+    { ACTION_STD_CANCEL,    BUTTON_RC_LEFT,     BUTTON_NONE },
+    { ACTION_STD_OK,        BUTTON_RC_RIGHT,    BUTTON_NONE },
     { ACTION_STD_CANCEL,    BUTTON_RC_STOP,     BUTTON_NONE },
     { ACTION_STD_OK,        BUTTON_RC_PLAY,     BUTTON_NONE },
 
     { ACTION_STD_MENU,          BUTTON_RC_MENU|BUTTON_REL,             BUTTON_RC_MENU },
     { ACTION_STD_QUICKSCREEN,   BUTTON_RC_MENU|BUTTON_REPEAT,          BUTTON_RC_MENU },
+    { ACTION_STD_OK,            BUTTON_RC_SELECT|BUTTON_REL,           BUTTON_RC_SELECT },
     { ACTION_STD_CONTEXT,       BUTTON_RC_SELECT|BUTTON_REPEAT,        BUTTON_RC_SELECT },
 
     LAST_ITEM_IN_LIST
