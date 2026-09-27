@@ -704,6 +704,12 @@ static int driver_to_leave_out(int config, int failed)
 
 static void allocate_interfaces_and_endpoints(void)
 {
+    int enabled = 0;
+    for(int i = 0; i < USB_NUM_DRIVERS; i++)
+        if(drivers[i]->enabled)
+            enabled |= 1 << i;
+    usb_log(USB_LOG_ALLOC, enabled, usb_state, 0, 0);
+
     if(usb_config != 0) {
         /* deinit currently used endpoints */
         init_deinit_endpoints(usb_config, false);
@@ -930,7 +936,16 @@ static void usb_core_set_address(uint8_t address)
     usb_record_waypoint(USB_WP_SET_ADDR, address, 0);
 #endif
     logf("usb_core: SET_ADR %d", address);
-    usb_log(USB_LOG_SET_ADDR, address, 0, 0, 0);
+    usb_log(USB_LOG_SET_ADDR, address, usb_state, 0, 0);
+    /* A host that addresses the device before any other request -- an iAP
+     * dock does -- would otherwise leave DEFAULT without the core having
+     * seen a request in it, and the interfaces and endpoints would never be
+     * assigned. */
+    if(usb_state == DEFAULT) {
+        set_serial_descriptor();
+        usb_core_set_serial_function_id();
+        allocate_interfaces_and_endpoints();
+    }
     usb_address = address;
     usb_state = ADDRESS;
 }

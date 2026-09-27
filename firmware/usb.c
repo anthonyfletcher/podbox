@@ -694,6 +694,16 @@ static void NORETURN_ATTR usb_thread(void)
 
 #ifdef HAVE_USBSTACK
         case USB_NOTIFY_SET_ADDR:
+#ifdef USB_DETECT_BY_REQUEST
+            /* The controller driver completes SET_ADDRESS itself, so for a
+             * host that sends it first this is the first sign of one. The
+             * drivers have to be on before the core assigns interfaces. */
+            if(usb_state > USB_EXTRACTED) {
+                usb_state = USB_INSERTED;
+                usb_set_host_present(true);
+            }
+#endif
+            /* fall through */
         case USB_NOTIFY_SET_CONFIG:
         case USB_NOTIFY_BUS_RESET:
         case USB_NOTIFY_CLASS_DRIVER:

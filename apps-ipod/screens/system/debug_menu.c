@@ -1640,7 +1640,13 @@ static void usb_log_format(const struct usb_log_entry *e, char *buf,
                          (unsigned long)e->c);
             break;
         case USB_LOG_SET_ADDR:
-            snprintf(p, size, "address %d", e->a);
+            snprintf(p, size, "address %d (was %s)", e->a,
+                     e->b == 0 ? "default" : e->b == 1 ? "addressed"
+                                                      : "configured");
+            break;
+        case USB_LOG_ALLOC:
+            snprintf(p, size, "assigning interfaces, drivers on %02x",
+                     e->a);
             break;
         case USB_LOG_SET_CONFIG:
             snprintf(p, size, "configuration %d (%s speed)", e->a,

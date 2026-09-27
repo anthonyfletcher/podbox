@@ -35,7 +35,7 @@ enum usb_log_type
                           * c = wValue | wIndex << 16,
                           * d = wLength | USB_LOG_SETUP_* << 16 */
     USB_LOG_RESPONSE,    /* a = USB_LOG_RESP_*, b = bRequest, c = bytes */
-    USB_LOG_SET_ADDR,    /* a = address */
+    USB_LOG_SET_ADDR,    /* a = address, b = core state before it */
     USB_LOG_SET_CONFIG,  /* a = configuration, b = high speed */
     USB_LOG_DRIVERS,     /* a = active mask, b = errored mask */
     USB_LOG_EP_ALLOC,    /* a = driver, b = endpoint or 0 for none,
@@ -72,6 +72,8 @@ enum usb_log_type
                           * b = parity, c = channel interrupts, d = HCTSIZ;
                           * a = 1, every 1000th: b = frames in it,
                           * c = packets sent, d = underruns | errors << 16 */
+    USB_LOG_ALLOC,       /* interfaces and endpoints being assigned:
+                          * a = enabled drivers, b = core state */
 };
 
 #define USB_LOG_SETUP_DROPPED  1 /* arrived during a bus reset; ignored */
