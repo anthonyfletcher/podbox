@@ -181,9 +181,7 @@ struct audio_resume_info
 static struct mutex id3_mutex SHAREDBSS_ATTR; /* (A,O)*/
 
 /** For album art support **/
-/* USB iAP asks for album art too, so it needs a slot of its own. Currently
- * no-op here -- config.h defines PODBOX_NO_USB_IAP -- but the count has
- * to be right if that is ever taken back out. */
+/* USB iAP asks for album art too, so it needs a slot of its own. */
 #if defined(USB_ENABLE_IAP)
 #define MAX_MULTIPLE_AA (SKINNABLE_SCREENS_COUNT + 1)
 #else

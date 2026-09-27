@@ -1394,24 +1394,7 @@ Lyre prototype 1 */
 #define USB_ENABLE_AUDIO
 #endif
 
-/* USB iAP is upstream's (the vendored libiap under usbstack/iap), and the gate
- * below matches either player -- both are Apple vendor ID with interrupt and
- * isochronous endpoints. It ships on for ipodvideo only. Enabling it adds a
- * second USB configuration carrying an isochronous IN endpoint, which is
- * exercised on the ARC controller and not on the DesignWare one; a 6G that
- * stopped enumerating as a disk would be a poor trade for a protocol no dock
- * or accessory here can test.
- *
- * To enable it on ipod6g: delete PODBOX_NO_USB_IAP below. Nothing else is
- * needed -- the driver, its SOURCES entries and the descriptors are all
- * present, and apps-ipod/api/ carries the two headers libiap includes by bare
- * name. */
-#ifdef IPOD_6G
-#define PODBOX_NO_USB_IAP
-#endif
-
-#if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) \
-    && USB_VENDOR_ID == 0x05ac && !defined(PODBOX_NO_USB_IAP)
+#if defined(USB_HAS_INTERRUPT) && defined(USB_HAS_ISOCHRONOUS) && USB_VENDOR_ID == 0x05ac
 #define USB_ENABLE_IAP
 #endif
 
