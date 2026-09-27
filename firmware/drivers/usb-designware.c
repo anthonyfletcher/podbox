@@ -35,6 +35,7 @@
 #include "usb_drv.h"
 #include "usb_ch9.h"
 #include "usb_core.h"
+#include "usb_log.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
 /*#define LOGF_ENABLE*/
@@ -681,6 +682,17 @@ static void usb_dw_reset_endpoints(void)
 #endif
 }
 
+/* Isochronous transfers logged per endpoint since it was set up: the first
+ * few starts, and errors, each up to ISO_LOG_MAX. */
+#define ISO_LOG_MAX 8
+static uint8_t iso_starts_logged[USB_NUM_ENDPOINTS][USB_DW_NUM_DIRS];
+static uint8_t iso_errors_logged[USB_NUM_ENDPOINTS][USB_DW_NUM_DIRS];
+
+static int usb_dw_log_ep(int epnum, enum usb_dw_epdir epdir)
+{
+    return epnum | (epdir == USB_DW_EPDIR_IN ? USB_DIR_IN : 0);
+}
+
 static void usb_dw_epstart(int epnum, enum usb_dw_epdir epdir,
                            void* buf, uint32_t size)
 {
@@ -744,6 +756,16 @@ static void usb_dw_epstart(int epnum, enum usb_dw_epdir epdir,
             DWC_EPCTL(epnum, epdir) |= EPENA | nak | SETD0PIDEF;
         else
             DWC_EPCTL(epnum, epdir) |= EPENA | nak | SETD1PIDOF;
+
+        /* The raw interrupt status carries the incomplete-isochronous bits,
+         * which are not enabled as interrupts. */
+        if (iso_starts_logged[epnum][epdir] < ISO_LOG_MAX)
+        {
+            iso_starts_logged[epnum][epdir]++;
+            usb_log(USB_LOG_ISO_XFER, usb_dw_log_ep(epnum, epdir),
+                    usb_drv_get_frame_number(), DWC_EPCTL(epnum, epdir),
+                    DWC_GINTSTS);
+        }
     }
     else
     {
@@ -875,6 +897,14 @@ static void usb_dw_handle_xfer_complete(int epnum, enum usb_dw_epdir epdir)
     dw_ep->status = 0;
 
   complete:
+    if (dw_ep->status != 0 && epnum != 0 &&
+        ((DWC_EPCTL(epnum, epdir) >> 18) & 0x3) == EPTYP_ISOCHRONOUS &&
+        iso_errors_logged[epnum][epdir] < ISO_LOG_MAX)
+    {
+        iso_errors_logged[epnum][epdir]++;
+        usb_log(USB_LOG_ISO_ERROR, usb_dw_log_ep(epnum, epdir), 0,
+                dw_ep->status, transferred);
+    }
     dw_ep->busy = false;
     semaphore_release(&dw_ep->complete);
 
@@ -1523,6 +1553,12 @@ static int host_stage(int addr, int pid, bool in, void *buf, int len)
                 break;
             udelay(100);
         }
+        if (attempt < 2 || (hcint & (HCINT_XFERC | HCINT_ERRORS)) ||
+            !(hcint & HCINT_CHH))
+            usb_log(USB_LOG_HOST_STAGE, addr,
+                    pid | in << 8 | MIN(attempt, 15) << 12,
+                    hcint | (hcint & HCINT_CHH ? 0 : 1u << 31),
+                    DWC_HCTSIZ(0));
         if (!(hcint & HCINT_CHH))
         {
             DWC_HCCHAR(0) |= HCCHAR_CHDIS | HCCHAR_CHENA;
@@ -1714,6 +1750,8 @@ static void iso_sof(void)
             return;                     /* still not sent: skip a turn */
         iso_out_armed[odd] = false;
         hcint = DWC_HCINT(ch);
+        if (iso_stats.frames < 8)
+            usb_log(USB_LOG_HOST_ISO, 0, odd, hcint, DWC_HCTSIZ(ch));
         if (hcint & HCINT_FRMOR)
             iso_stats.underruns++;      /* its microframe went empty */
         else if (!(hcint & HCINT_XFERC))
@@ -1734,6 +1772,9 @@ static void iso_sof(void)
             iso_dma->buf[odd], n * iso_cfg.frame_bytes);
     iso_out_armed[odd] = true;
     iso_stats.frames++;
+    if (iso_stats.frames % 1000 == 0)
+        usb_log(USB_LOG_HOST_ISO, 1, n, iso_stats.frames,
+                iso_stats.underruns | iso_stats.errors << 16);
 }
 
 bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
@@ -1989,6 +2030,10 @@ void usb_drv_ep_init(const struct usb_drv_ep_alloc_ctx* ctx, int ep)
     usb_dw_target_disable_irq();
     usb_dw_configure_ep(ctx, epnum, epdir, type, mps);
     usb_dw_target_enable_irq();
+
+    iso_starts_logged[epnum][epdir] = 0;
+    iso_errors_logged[epnum][epdir] = 0;
+    usb_log(USB_LOG_EP_INIT, ep, type, mps, DWC_EPCTL(epnum, epdir));
 
     dw_ep->active = true;
 }

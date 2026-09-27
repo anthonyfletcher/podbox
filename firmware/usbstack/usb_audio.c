@@ -42,6 +42,9 @@
 #include "core_alloc.h"
 #include "pcm_mixer.h"
 #include "dsp_core.h"
+#include "usb_log.h"
+#include "usb.h"
+#include "usb_audio.h"
 
 #define LOGF_ENABLE
 #include "logf.h"
@@ -404,6 +407,10 @@ static int frames_dropped = 0;
 /* for blocking normal playback */
 static bool usbaudio_active = false;
 
+/* The stream as the USB log reports it, once per STREAM_LOG_PACKETS packets */
+#define STREAM_LOG_PACKETS 1000
+static unsigned int st_packets, st_errors, st_min, st_max, st_feedbacks;
+
 /* Schematic view of the RX situation:
  * (in case NR_BUFFERS = 4)
  *
@@ -487,6 +494,7 @@ static void set_playback_sampling_frequency(unsigned long f)
 
     logf("usbaudio: set playback sampling frequency to %lu Hz for a requested %lu Hz",
         hw_freq_sampr[as_playback_freq_idx], f);
+    usb_log(USB_LOG_RATE, 0, 0, f, hw_freq_sampr[as_playback_freq_idx]);
 
     mixer_set_frequency(hw_freq_sampr[as_playback_freq_idx]);
 }
@@ -685,6 +693,8 @@ static void playback_audio_get_more(const void **start, size_t *size)
     if(rx_play_idx == rx_usb_idx)
     {
         logf("usbaudio: playback underflow");
+        if (!playback_audio_underflow)
+            usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_UNDERFLOW, 0, 0, 0);
         playback_audio_underflow = true;
         *start = NULL;
         *size = 0;
@@ -735,6 +745,11 @@ static void usb_audio_start_playback(void)
     samples_received = 0;
     samples_received_last = 0;
 
+    st_packets = st_errors = st_max = st_feedbacks = 0;
+    st_min = ~0u;
+    usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_START, 0,
+            hw_freq_sampr[as_playback_freq_idx], 0);
+
     // TODO: implement recording from the USB stream
 #if (INPUT_SRC_CAPS != 0)
     audio_set_input_source(AUDIO_SRC_PLAYBACK, SRCF_PLAYBACK);
@@ -750,6 +765,7 @@ static void usb_audio_start_playback(void)
 static void usb_audio_stop_playback(void)
 {
     logf("usbaudio: stop playback");
+    usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_STOP, 0, 0, 0);
     if(usb_audio_playing)
     {
         mixer_channel_stop(PCM_MIXER_CHAN_USBAUDIO);
@@ -766,6 +782,7 @@ static void usb_audio_stop_playback(void)
  */
 static int usb_audio_set_interface(int intf, int alt)
 {
+    usb_log(USB_LOG_ALT, intf, alt, 0, 0);
     if(intf == usb_interface)
     {
         if(alt != 0)
@@ -786,7 +803,10 @@ static int usb_audio_set_interface(int intf, int alt)
         usb_as_playback_intf_alt = alt;
 
         if(usb_as_playback_intf_alt == 1)
+        {
+            usb_log_sync();
             usb_audio_start_playback();
+        }
         else
             usb_audio_stop_playback();
         logf("usbaudio: use playback alternate %d", alt);
@@ -1191,6 +1211,7 @@ static int usb_audio_init_connection(void)
     if (!usb_audio_buffers_ready())
     {
         logf("usbaudio: no buffers, restart with the setting on");
+        usb_log(USB_LOG_AUDIO, USB_LOG_AUDIO_NO_BUFFERS, 0, 0, 0);
         return -1;
     }
 
@@ -1434,6 +1455,11 @@ static bool usb_audio_fast_transfer_complete(int ep, int dir, int status, int le
             encodeFBfixedpt(sendFf, samples_fb, usb_drv_port_speed());
             logf("usbaudio: frame %d fbval 0x%02X%02X%02X%02X", usb_drv_get_frame_number(), sendFf[3], sendFf[2], sendFf[1], sendFf[0]);
             usb_drv_send_nonblocking(EP_ISO_FEEDBACK_IN, sendFf, usb_drv_port_speed()?4:3);
+            if (st_feedbacks++ % 64 == 0)
+                usb_log(USB_LOG_FEEDBACK, 0, 0,
+                        sendFf[0] | sendFf[1] << 8 | sendFf[2] << 16 |
+                        (usb_drv_port_speed() ? (uint32_t)sendFf[3] << 24 : 0),
+                        usb_drv_port_speed() ? 4 : 3);
 
             // debug screen counters
             //

@@ -37,6 +37,7 @@
 #include "string.h"
 #ifdef HAVE_USBSTACK
 #include "usb_core.h"
+#include "usb_log.h"
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
 #include "usb_drv.h"
@@ -706,6 +707,9 @@ static void NORETURN_ATTR usb_thread(void)
             usb_record.power_only = false;
 #endif
             usb_record.acks_expected = -1;   /* no broadcast yet this session */
+#ifdef HAVE_USBSTACK
+            usb_log(USB_LOG_INSERT, usb_record.power_only, 0, 0, 0);
+#endif
 #endif
 
 #ifndef USB_DETECT_BY_REQUEST

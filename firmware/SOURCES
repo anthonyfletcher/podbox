@@ -959,6 +959,9 @@ target/arm/s5l8702/lcd-asm-s5l8702.S
 /* USB Stack */
 #if defined(HAVE_USBSTACK) && (!defined(BOOTLOADER) || defined(HAVE_BOOTLOADER_USB_MODE))
 usbstack/usb_core.c
+#ifndef BOOTLOADER
+usbstack/usb_log.c
+#endif
 #ifdef USB_ENABLE_STORAGE
 usbstack/usb_storage.c
 #endif

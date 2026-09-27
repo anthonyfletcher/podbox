@@ -28,6 +28,7 @@
 #include "kernel.h"
 #include "panic.h"
 #include "usb_drv.h"
+#include "usb_log.h"
 
 /*#define LOGF_ENABLE*/
 #include "logf.h"
@@ -452,6 +453,20 @@ void usb_drv_startup(void)
        ((type) == USB_ENDPOINT_XFER_INT ? "INTR" : "INVL"))))
 #endif
 
+/* Isochronous transfers logged per pipe since its endpoint was set up: the
+ * first few starts, and errors, each up to ISO_LOG_MAX. */
+#define ISO_LOG_MAX 8
+static uint8_t iso_starts_logged[USB_NUM_ENDPOINTS*2];
+static uint8_t iso_errors_logged[USB_NUM_ENDPOINTS*2];
+
+static bool pipe_is_iso(int ep_num, bool send)
+{
+    unsigned int ctrl = REG_ENDPTCTRL(ep_num);
+    int type = send ? (ctrl & EPCTRL_TX_TYPE) >> EPCTRL_TX_EP_TYPE_SHIFT
+                    : (ctrl & EPCTRL_RX_TYPE) >> EPCTRL_RX_EP_TYPE_SHIFT;
+    return ep_num != EP_CONTROL && type == USB_ENDPOINT_XFER_ISOC;
+}
+
 static void init_endpoint(int ep, int type, int mps) {
     const int ep_num = EP_NUM(ep);
     const int ep_dir = EP_DIR(ep);
@@ -485,6 +500,11 @@ static void init_endpoint(int ep, int type, int mps) {
         qh->max_pkt_length = mps << QH_MAX_PKT_LEN_POS | QH_ZLT_SEL;
 
     qh->dtd.next_td_ptr = QH_NEXT_TERMINATE;
+
+    int pipe = ep_num * 2 + (ep_dir == DIR_IN ? 1 : 0);
+    iso_starts_logged[pipe] = 0;
+    iso_errors_logged[pipe] = 0;
+    usb_log(USB_LOG_EP_INIT, ep, type, mps, qh->max_pkt_length);
 }
 
 
@@ -1461,6 +1481,13 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
         goto pt_error;
     }
 
+    if (pipe_is_iso(ep_num, send) && iso_starts_logged[pipe] < ISO_LOG_MAX) {
+        iso_starts_logged[pipe]++;
+        usb_log(USB_LOG_ISO_XFER, ep_num | (send ? USB_DIR_IN : 0),
+                usb_drv_get_frame_number(), REG_ENDPTSTATUS,
+                REG_ENDPTCTRL(ep_num));
+    }
+
     restore_irq(oldlevel);
 
     if (wait) {
@@ -1475,6 +1502,9 @@ static int prime_transfer(int ep_num, void* ptr, int len, bool send, bool wait)
     }
 
 pt_error:
+    if (rc < 0 && ep_num != EP_CONTROL)
+        usb_log(USB_LOG_XFER_FAIL, ep_num | (send ? USB_DIR_IN : 0), -rc,
+                REG_ENDPTPRIME, REG_ENDPTCTRL(ep_num));
     if(rc<0)
         restore_irq(oldlevel);
 
@@ -1595,6 +1625,13 @@ static void transfer_completed(void)
 
                 int length=0;
                 struct transfer_descriptor* td=&td_array[pipe*NUM_TDS_PER_EP];
+                if ((td->size_ioc_sts & DTD_ERROR_MASK) &&
+                    pipe_is_iso(ep, dir) &&
+                    iso_errors_logged[pipe] < ISO_LOG_MAX) {
+                    iso_errors_logged[pipe]++;
+                    usb_log(USB_LOG_ISO_ERROR, ep | (dir ? USB_DIR_IN : 0), 0,
+                            td->size_ioc_sts, 0);
+                }
                 while(td!=(struct transfer_descriptor*)DTD_NEXT_TERMINATE && td!=0)
                 {
                     /* It seems that the controller sets the pipe bit to one even if the TD

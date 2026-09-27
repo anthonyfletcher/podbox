@@ -29,6 +29,7 @@
 #include "usb_ch9.h"
 #include "usb_core.h"
 #include "usb_class_driver.h"
+#include "usb_log.h"
 
 #if defined(USB_ENABLE_STORAGE)
 #include "usb_storage.h"
@@ -724,6 +725,8 @@ retry:
         driver->first_interface = cstate->num_interfaces;
         cstate->num_interfaces = driver->set_first_interface(cstate->num_interfaces);
         driver->last_interface = cstate->num_interfaces;
+        usb_log(USB_LOG_INTERFACES, i, driver->first_interface,
+                driver->last_interface, 0);
     }
 }
 
@@ -882,6 +885,7 @@ static void usb_core_do_set_addr(uint8_t address)
     usb_record_waypoint(USB_WP_SET_ADDR, address, 0);
 #endif
     logf("usb_core: SET_ADR %d", address);
+    usb_log(USB_LOG_SET_ADDR, address, 0, 0, 0);
     usb_address = address;
     usb_state = ADDRESS;
 }
@@ -897,6 +901,7 @@ static int usb_core_do_set_config(uint8_t new_config)
     usb_record_waypoint(USB_WP_SET_CONFIG, new_config, 0);
 #endif
     logf("usb_core: SET_CONFIG %d to %d", usb_config, new_config);
+    usb_log(USB_LOG_SET_CONFIG, new_config, usb_drv_port_speed(), 0, 0);
 
     if(new_config > NUM_CONFIGS) {
         logf("usb_core: invalid config number");
@@ -930,6 +935,7 @@ static int usb_core_do_set_config(uint8_t new_config)
 
     /* activate new config */
     if(usb_config != 0) {
+        usb_log_sync();
         init_deinit_endpoints(usb_config, true);
         for(int i = 0; i < USB_NUM_DRIVERS; i++) {
             if(!is_active(drivers[i])) {
@@ -952,6 +958,7 @@ static int usb_core_do_set_config(uint8_t new_config)
 
 #ifndef BOOTLOADER
     usb_record_waypoint(USB_WP_DRIVERS, dbg_active, dbg_error);
+    usb_log(USB_LOG_DRIVERS, dbg_active, dbg_error, 0, 0);
     usb_record_waypoint(USB_WP_EXCLUSIVE, require_exclusive, 0);
 #endif
 
@@ -1214,6 +1221,7 @@ void usb_core_bus_reset(void)
      * reach usb_core_handle_notify() at all. */
     usb_record_waypoint(USB_WP_BUS_RESET, 0, 0);
 #endif
+    usb_log(USB_LOG_BUS_RESET, usb_drv_port_speed(), 0, 0, 0);
     logf("usb_core: bus reset");
     if(bus_reset_pending) {
         return;
@@ -1249,6 +1257,8 @@ static void process_setup_request(struct usb_ctrlrequest* req) {
     /* start control out data phase without usb thread interaction */
     if(req->wLength > sizeof(usb_control_data)) {
         logf("usb_core: control write too large %u > %u", req->wLength, sizeof(usb_control_data));
+        usb_log(USB_LOG_RESPONSE, USB_LOG_RESP_TOO_LONG, req->bRequest,
+                req->wLength, 0);
         usb_drv_stall(EP_CONTROL, true, false);
         return;
     }
@@ -1373,6 +1383,10 @@ void usb_core_setup_received(struct usb_ctrlrequest* req) {
      * "did the host talk to us at all" independently of what we did next. */
     usb_record_waypoint(USB_WP_SETUP, req->bRequest, 0);
 #endif
+    usb_log(USB_LOG_SETUP, req->bRequestType, req->bRequest,
+            req->wValue | (uint32_t)req->wIndex << 16,
+            req->wLength | (uint32_t)(bus_reset_pending ? USB_LOG_SETUP_DROPPED :
+                            ep0_state != EP0_READY ? USB_LOG_SETUP_QUEUED : 0) << 16);
     if(bus_reset_pending) {
         logf("usb_core: bus resetting tick=%lu", current_tick);
         return;
@@ -1389,6 +1403,8 @@ void usb_core_setup_received(struct usb_ctrlrequest* req) {
 
 void usb_core_control_response(enum usb_control_response response, const void* data, size_t size) {
     logf("usb_core: response ack=%d size=%u ep0_state=%d tick=%lu", response, size, ep0_state, current_tick);
+    usb_log(USB_LOG_RESPONSE, response == USB_CONTROL_STALL ? USB_LOG_RESP_STALL : USB_LOG_RESP_ACK,
+            handling_request.bRequest, size, 0);
 
     if((ep0_state == EP0_HANDLING_TX_CONTROL || ep0_state == EP0_HANDLING_RX_CONTROL) && check_for_new_setup()) {
         return;
