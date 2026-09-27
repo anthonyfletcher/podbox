@@ -18,13 +18,14 @@
 
 /* Enumerating the one device on the host probe's port, over whichever
  * controller's usb_drv_host_control(): the device descriptor at address 0,
- * SET_ADDRESS 1, then the device and configuration descriptors and the
- * maker and product strings from the new address. */
+ * SET_ADDRESS 1, then the device and configuration descriptors from the new
+ * address, SET_CONFIGURATION, and the maker and product strings. */
 
 #include <string.h>
 #include "system.h"
 #include "usb_ch9.h"
 #include "usb_drv.h"
+#include "usb_log.h"
 
 static struct usb_drv_host_enum host_enum;
 static uint8_t host_cfg[1024];
@@ -70,16 +71,23 @@ void usb_host_enumerate(void)
 
 #define STEP(name, cond) \
     do { \
+        bool ok = (cond); \
         e->step = name; \
-        if (!(cond)) { \
+        usb_log(USB_LOG_HOST_ENUM, ok, 0, (uintptr_t)name, \
+                usb_drv_host_last_status()); \
+        if (!ok) { \
             e->token = usb_drv_host_last_status(); \
             e->result = -1; \
             return; \
         } \
     } while (0)
 
+    usb_drv_host_set_ep0_mps(64);
     n = get_descriptor(0, USB_DT_DEVICE << 8, 0, e->dev, 18);
     STEP("device @0", n >= 8);
+    STEP("ep0 size", e->dev[7] == 8 || e->dev[7] == 16 || e->dev[7] == 32 ||
+                     e->dev[7] == 64);
+    usb_drv_host_set_ep0_mps(e->dev[7]);
     n = usb_drv_host_control(0, USB_DIR_OUT, USB_REQ_SET_ADDRESS, 1, 0,
                              NULL, 0);
     STEP("set address", n == 0);
@@ -94,6 +102,10 @@ void usb_host_enumerate(void)
     STEP("config", n > 0);
     e->cfg = host_cfg;
     e->cfg_len = n;
+    /* Interfaces can only be selected once the device is configured */
+    n = usb_drv_host_control(1, USB_DIR_OUT, USB_REQ_SET_CONFIGURATION,
+                             host_cfg[5], 0, NULL, 0);
+    STEP("set config", n == 0);
 #undef STEP
 
     n = get_descriptor(1, USB_DT_STRING << 8, 0, buf, 4);

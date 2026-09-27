@@ -1898,7 +1898,8 @@ static void usb_host_probe_dac_lines(void)
                            (unsigned long)a->ctrl_status);
     if (a->alt == 0)
         return;
-    simplelist_addline("  IF%d.%d %dch %d/%d bit, clock %d", a->iface, a->alt,
+    simplelist_addline("  UAC%d IF%d.%d %dch %d/%d bit, clock %d", a->uac,
+                       a->iface, a->alt,
                        a->channels, a->bits, a->subslot * 8, a->clock);
     simplelist_addline("  Rate: set %lu, reads %lu",
                        (unsigned long)a->rate_set,
@@ -1966,8 +1967,10 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     else
     {
         if (e->result < 0)
-            simplelist_addline("Enumerate FAILED: %s (%08lx)", e->step,
-                               (unsigned long)e->token);
+        {
+            simplelist_addline("Enumerate FAILED: %s", e->step);
+            simplelist_addline("  status %08lx", (unsigned long)e->token);
+        }
         for (int i = 0; i < st.nregs; i++)
             simplelist_addline("%s: %08lx", st.regs[i].name,
                                (unsigned long)st.regs[i].val);

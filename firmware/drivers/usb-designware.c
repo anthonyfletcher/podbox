@@ -1510,6 +1510,17 @@ struct host_dw_dma {
 static struct host_dw_dma host_dw_mem;
 static struct host_dw_dma *hdw;
 static uint32_t host_last_status;
+static int host_ep0_mps = 64;
+
+void usb_drv_host_set_ep0_mps(int mps)
+{
+    host_ep0_mps = mps;
+}
+
+bool usb_drv_host_high_speed(void)
+{
+    return ((DWC_HPRT >> 17) & 3) == 0;
+}
 
 #define HOST_PHYS(p) \
     USB_DW_PHYSADDR((uint32_t)&host_dw_mem + \
@@ -1531,16 +1542,20 @@ uint32_t usb_drv_host_last_status(void)
  * halted). */
 static int host_stage(int addr, int pid, bool in, void *buf, int len)
 {
-    const int mps = 64;
+    const int mps = host_ep0_mps;
+    /* PING is high speed only */
+    const bool high_speed = ((DWC_HPRT >> 17) & 3) == 0;
     int pkts = len ? (len + mps - 1) / mps : 1;
     int size = in ? pkts * mps : len;
     uint32_t hcint = 0;
 
-    for (int attempt = 0; attempt < 10; attempt++)
+    /* About a quarter of a second of NAKs: a DAC can refuse the rate's
+     * data stage for a while after its interface is selected */
+    for (int attempt = 0; attempt < 250; attempt++)
     {
         DWC_HCINT(0) = HCINT_ALL;
         DWC_HCTSIZ(0) = size | HCTSIZ_PKTCNT(pkts) | HCTSIZ_PID(pid) |
-                        (attempt && !in ? HCTSIZ_DOPNG : 0);
+                        (attempt && !in && high_speed ? HCTSIZ_DOPNG : 0);
         DWC_HCDMA(0) = HOST_PHYS(buf);
         DWC_HCCHAR(0) = HCCHAR_MPS(mps) | HCCHAR_EPNUM(0) |
                         (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(0) |
@@ -1905,22 +1920,32 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     else if (!host_reset_done)
     {
         /* 100 ms connect debounce, then a 60 ms root-port reset, which
-         * this core leaves to software to end. */
+         * this core leaves to software to end. A device that is not ready,
+         * or drops off the bus once while it starts, gets two more tries,
+         * each from a fresh reset. */
         host_reset_done = true;
-        host_resets++;
-        udelay(100000);
-        DWC_HPRT = (DWC_HPRT & ~HPRT_WRITE_MASK) | HPRT_RST;
-        udelay(60000);
-        DWC_HPRT = DWC_HPRT & ~(HPRT_WRITE_MASK | HPRT_RST);
-        udelay(10000);
-        hprt = DWC_HPRT;
-#ifdef HAVE_USB_HOST
-        if (hprt & HPRT_ENA)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            usb_host_enumerate();
+            host_resets++;
+            udelay(100000);
+            DWC_HPRT = (DWC_HPRT & ~HPRT_WRITE_MASK) | HPRT_RST;
+            udelay(60000);
+            DWC_HPRT = DWC_HPRT & ~(HPRT_WRITE_MASK | HPRT_RST);
+            udelay(20000);
             hprt = DWC_HPRT;
-        }
+            usb_log(USB_LOG_HOST_PORT, attempt, 0, hprt, DWC_HFIR);
+#ifdef HAVE_USB_HOST
+            if (hprt & HPRT_ENA)
+            {
+                usb_host_enumerate();
+                hprt = DWC_HPRT;
+                if (usb_host_get_enum()->result == 1)
+                    break;
+            }
+#else
+            break;
 #endif
+        }
     }
 
     st->host_mode = DWC_GINTSTS & CMOD;

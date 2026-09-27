@@ -573,7 +573,10 @@ struct ehci_qh {
 #define QTD_IOC         (1 << 15)
 #define QTD_BYTES(n)    ((n) << 16)
 #define QTD_TOGGLE      (1u << 31)
+#define QH_EPS_FULL     (0 << 12)
 #define QH_EPS_HIGH     (2 << 12)
+#define QH_CTRL_EP      (1 << 27)   /* control endpoint below high speed */
+#define QH_HUB_PORT(n)  ((n) << 23)
 #define QH_DTC          (1 << 14)
 #define QH_HEAD         (1 << 15)
 #define QH_MPS(n)       ((n) << 16)
@@ -593,6 +596,22 @@ struct host_dma {
 static struct host_dma host_dma_mem;
 static struct host_dma *hd;
 static uint32_t host_last_status;
+static int host_ep0_mps = 64;
+/* A full-speed device is reached through the controller's own transaction
+ * translator: hub address 0, and this port number. Some cores of this
+ * family count ports from 0 rather than 1, so the reset tries both and the
+ * one that enumerates is kept. */
+static int host_tt_port = 1;
+
+void usb_drv_host_set_ep0_mps(int mps)
+{
+    host_ep0_mps = mps;
+}
+
+bool usb_drv_host_high_speed(void)
+{
+    return (REG_PORTSC1 & PORTSCX_PORT_SPEED_MASK) == PORTSCX_PORT_SPEED_HIGH;
+}
 
 uint32_t usb_drv_host_last_status(void)
 {
@@ -642,8 +661,18 @@ static int host_control(int addr, int reqtype, int req, int value,
              token | QTD_PID_SETUP | QTD_BYTES(8), &hd->setup);
 
     hd->qh.link = (uint32_t)&hd->qh | EHCI_TYP_QH;
-    hd->qh.chars = addr | QH_EPS_HIGH | QH_DTC | QH_HEAD | QH_MPS(64);
-    hd->qh.caps = QH_MULT1;
+    if (usb_drv_host_high_speed())
+    {
+        hd->qh.chars = addr | QH_EPS_HIGH | QH_DTC | QH_HEAD |
+                       QH_MPS(host_ep0_mps);
+        hd->qh.caps = QH_MULT1;
+    }
+    else
+    {
+        hd->qh.chars = addr | QH_EPS_FULL | QH_DTC | QH_HEAD | QH_CTRL_EP |
+                       QH_MPS(host_ep0_mps);
+        hd->qh.caps = QH_MULT1 | QH_HUB_PORT(host_tt_port);
+    }
     hd->qh.current = 0;
     hd->qh.overlay.next = (uint32_t)setup;
     hd->qh.overlay.alt_next = EHCI_T;
@@ -669,6 +698,8 @@ static int host_control(int addr, int reqtype, int req, int value,
                           setup->token :
                           (len && (data->token & (QTD_ACTIVE | QTD_HALTED))) ?
                           data->token : status->token;
+    usb_log(USB_LOG_HOST_EHCI, addr, req | host_tt_port << 8,
+            n < 0 ? host_last_status : 0, (uint32_t)n);
 
     REG_USBCMD &= ~USBCMD_ASYNC_SCHEDULE_EN;
     for (int t = 0; t < 100 && (REG_USBSTS & USBSTS_ASYNC_SCHEDULE); t++)
@@ -704,6 +735,24 @@ struct ehci_itd {
 #define ITD_LEN(n)      ((n) << 16)
 #define ITD_DIR_IN      (1 << 11)
 
+/* EHCI 1.0 section 3.4: split isochronous transfer descriptor, one 1 ms
+ * frame of a full-speed endpoint behind a transaction translator. Padded to
+ * the 32 bytes the controller's alignment asks for. */
+struct ehci_sitd {
+    uint32_t next;
+    uint32_t ep;            /* port, hub, endpoint, address */
+    uint32_t uframe;        /* complete-split and start-split masks */
+    uint32_t results;       /* active, status, bytes left */
+    uint32_t buf[2];
+    uint32_t back;
+    uint32_t pad;
+};
+
+#define EHCI_TYP_SITD   (2 << 1)
+#define SITD_ACTIVE     (1 << 7)
+#define SITD_ERRORS     0x7c
+#define SITD_LEN(n)     ((n) << 16)
+
 /* The periodic schedule. Every frame-list entry for frame f leads to the
  * feedback iTD then the OUT iTD of slot f % ISO_SLOTS. The refill keeps
  * between 2 and ISO_AHEAD frames queued, so it never rewrites the slot the
@@ -715,6 +764,7 @@ struct ehci_itd {
 
 struct host_iso_dma {
     uint32_t framelist[1024];
+    struct ehci_sitd sout[ISO_SLOTS];
     struct ehci_itd out[ISO_SLOTS];
     struct ehci_itd fb[ISO_SLOTS];
     uint8_t buf[ISO_SLOTS][ISO_SLOT_BYTES];
@@ -726,6 +776,7 @@ static struct host_iso_dma *iso_dma;
 static struct usb_drv_host_iso iso_cfg;
 static struct usb_drv_host_iso_stats iso_stats;
 static unsigned int iso_next;          /* next frame to fill */
+static bool iso_full_speed;            /* siTDs, one packet a frame */
 static uint32_t iso_acc;               /* fractional samples, 16.16 */
 static bool iso_fb_armed[ISO_SLOTS];
 
@@ -763,6 +814,32 @@ static void iso_take_feedback(int slot)
     }
     else
         iso_stats.fb_bad++;
+}
+
+/* Full speed: one packet a frame, started with a single start-split in
+ * microframe 0 while it fits the translator's 188 bytes. Feedback is not
+ * read; the stream runs at the nominal rate. */
+static void iso_fill_sitd(int slot)
+{
+    struct ehci_sitd *s = &iso_dma->sout[slot];
+    uint8_t *buf = iso_dma->buf[slot];
+    int max = MIN(iso_cfg.mps_out, ISO_SLOT_BYTES) / iso_cfg.frame_bytes;
+    int n, bytes, splits;
+    uint32_t a = (uint32_t)buf;
+
+    if (s->results & SITD_ERRORS)
+        iso_stats.errors++;
+    iso_acc += iso_stats.feedback;
+    n = MIN((int)(iso_acc >> 16), max);
+    iso_acc &= 0xffff;
+    bytes = n * iso_cfg.frame_bytes;
+    iso_cfg.fill(buf, n);
+
+    splits = MAX(1, (bytes + 187) / 188);
+    s->uframe = (1 << splits) - 1;
+    s->buf[0] = a;
+    s->buf[1] = ((a + bytes) & ~0xfff) | (splits > 1 ? 1 << 3 : 0) | splits;
+    s->results = SITD_ACTIVE | SITD_LEN(bytes);
 }
 
 static void iso_fill_slot(int slot, unsigned int frame)
@@ -837,9 +914,15 @@ static void iso_tick(void)
     }
     while (((iso_next - cur) & 1023) < ISO_AHEAD)
     {
-        iso_fill_slot(iso_next % ISO_SLOTS, iso_next);
+        if (iso_full_speed)
+            iso_fill_sitd(iso_next % ISO_SLOTS);
+        else
+            iso_fill_slot(iso_next % ISO_SLOTS, iso_next);
         iso_next = (iso_next + 1) & 1023;
         iso_stats.frames++;
+        if (iso_stats.frames % 1000 == 0)
+            usb_log(USB_LOG_HOST_ISO, 1, 0, iso_stats.frames,
+                    iso_stats.underruns | iso_stats.errors << 16);
     }
 }
 
@@ -856,8 +939,16 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
     iso_stats.feedback = iso->nominal;
     iso_acc = 0;
 
+    iso_full_speed = !usb_drv_host_high_speed();
     for (int s = 0; s < ISO_SLOTS; s++)
     {
+        struct ehci_sitd *st = &iso_dma->sout[s];
+
+        memset(st, 0, sizeof *st);
+        st->next = EHCI_T;
+        st->ep = host_tt_port << 24 | (iso->ep_out & 0xf) << 8 |
+                 iso_cfg.addr;
+        st->back = EHCI_T;
         itd_init(&iso_dma->out[s], iso_dma->buf[s], iso->ep_out, 0,
                  iso->mps_out);
         itd_init(&iso_dma->fb[s], &iso_dma->fbbuf[s], iso->ep_fb & 0xf,
@@ -865,7 +956,9 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
         iso_dma->fb[s].next = (uint32_t)&iso_dma->out[s];
     }
     for (int i = 0; i < 1024; i++)
-        iso_dma->framelist[i] = (uint32_t)&iso_dma->fb[i % ISO_SLOTS];
+        iso_dma->framelist[i] = iso_full_speed ?
+            (uint32_t)&iso_dma->sout[i % ISO_SLOTS] | EHCI_TYP_SITD :
+            (uint32_t)&iso_dma->fb[i % ISO_SLOTS];
 
     REG_DEVICEADDR = (uint32_t)iso_dma->framelist;    /* PERIODICLISTBASE */
     iso_next = (((REG_FRINDEX >> 3) + 4) & 1023);
@@ -952,23 +1045,35 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     else if (!host_reset_done)
     {
         /* 100 ms connect debounce, then a 60 ms root-port reset. The
-         * controller may time the reset itself; if not, end it here. */
+         * controller may time the reset itself; if not, end it here. A
+         * device that is not ready gets two more tries from a fresh reset,
+         * and a full-speed one is tried at both translator port numbers. */
         host_reset_done = true;
-        host_resets++;
-        udelay(100000);
-        REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) | PORTSCX_PORT_RESET;
-        udelay(60000);
-        if (REG_PORTSC1 & PORTSCX_PORT_RESET)
-            REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
-        udelay(10000);
-        portsc = REG_PORTSC1;
-#ifdef HAVE_USB_HOST
-        if (portsc & PORTSCX_PORT_ENABLE)
+        for (int attempt = 0; attempt < 3; attempt++)
         {
-            usb_host_enumerate();
+            host_resets++;
+            host_tt_port = attempt == 1 ? 0 : 1;
+            udelay(100000);
+            REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) |
+                          PORTSCX_PORT_RESET;
+            udelay(60000);
+            if (REG_PORTSC1 & PORTSCX_PORT_RESET)
+                REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
+            udelay(20000);
             portsc = REG_PORTSC1;
-        }
+            usb_log(USB_LOG_HOST_PORT, attempt, 0, portsc, host_tt_port);
+#ifdef HAVE_USB_HOST
+            if (portsc & PORTSCX_PORT_ENABLE)
+            {
+                usb_host_enumerate();
+                portsc = REG_PORTSC1;
+                if (usb_host_get_enum()->result == 1)
+                    break;
+            }
+#else
+            break;
 #endif
+        }
     }
 
     st->host_mode = (REG_USBMODE & 3) == USBMODE_CTRL_MODE_HOST;

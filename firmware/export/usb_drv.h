@@ -174,6 +174,13 @@ void usb_host_enum_clear(void);
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len);
 uint32_t usb_drv_host_last_status(void);
+/* Endpoint 0's packet size for the transfers that follow: 64 until the
+ * device descriptor says otherwise. A full-speed device may use 8, and a
+ * size too large ends an IN stage at the device's first packet. */
+void usb_drv_host_set_ep0_mps(int mps);
+/* Whether the device on the port runs at high speed, whose isochronous
+ * service interval is the microframe; at full speed it is the frame. */
+bool usb_drv_host_high_speed(void);
 
 /* An isochronous OUT stream with an optional feedback IN endpoint. fill()
  * runs from an interrupt (the tick on ARC, start of microframe on
@@ -184,7 +191,7 @@ uint32_t usb_drv_host_last_status(void);
  * until stopped. */
 struct usb_drv_host_iso {
     int addr;
-    int ep_out, mps_out, interval_out;  /* interval in microframes, 1-8 */
+    int ep_out, mps_out, interval_out;  /* in (micro)frames, 1-8 */
     int ep_fb, mps_fb, interval_fb;     /* ep_fb 0: no feedback */
     int frame_bytes;                    /* one sample frame, all channels */
     uint32_t nominal;                   /* samples per microframe, 16.16 */

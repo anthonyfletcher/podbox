@@ -21,13 +21,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Playback to a USB Audio Class 2 DAC on the host probe's port, as the
- * PCM_SINK_USB_HOST sink. Start moves playback to the DAC, stop moves it
- * back to the headphone socket. */
+/* Playback to a USB Audio Class 1 or 2 DAC on the host probe's port, as
+ * the PCM_SINK_USB_HOST sink. Start moves playback to the DAC, stop moves
+ * it back to the headphone socket. */
 struct usb_host_audio_status {
     const char *state;      /* "off", "on", or the step that failed */
+    int uac;                /* audio class, 1 or 2 */
     int iface, alt;         /* the streaming interface setting in use */
-    int ac_iface, clock;    /* where the sample rate is set */
+    int ac_iface, clock;    /* where a class 2 rate is set */
+    int ep_rate;            /* where a class 1 rate is set, 0 if fixed */
     int channels, subslot, bits;
     uint32_t rate_set, rate_read;
     uint32_t ctrl_status;   /* controller status of a failed step, raw */
