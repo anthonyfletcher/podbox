@@ -374,7 +374,7 @@ static const struct tag_row tag_rows[] = {
 { "usb hid",             TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "usb hid keyboard remote" },
 { "usb keypad mode",     TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "usb hid keypad" },
 { "usb-dac",             TAG_ADVANCED|TAG_USB|TAG_SYSTEM|TAG_SOUND, "usb dac audio sound card computer" },
-{ "usb dac output",      TAG_USB|TAG_SYSTEM|TAG_PLAYBACK,        "usb dac audio dongle amp headphone output" },
+{ "usb dac output",      TAG_USB|TAG_SYSTEM|TAG_PLAYBACK,        "usb dac audio dongle amp headphone output start automatically" },
 
 /* --- voice --------------------------------------------------------------- */
 { "talk menu",           TAG_VOICE,                              "voice speak menus" },

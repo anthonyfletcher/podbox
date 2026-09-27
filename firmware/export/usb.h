@@ -122,6 +122,7 @@ enum
     USB_HOST_PROBE,          /* Event - data: port to the host probe or back */
 #ifdef HAVE_USB_HOST_AUDIO
     USB_HOST_AUTO,           /* Event - the next step of looking for a DAC */
+    USB_HOST_DAC,            /* Event - data: DAC output on now, or off */
 #endif
 #endif
 #ifdef USB_FIREWIRE_HANDLING
@@ -277,6 +278,14 @@ void usb_set_host_probe(bool on);
 /* Whether a cable that no computer answers is tried as a USB DAC:
  * 0 off, 1 auto */
 void usb_set_dac_output(int mode);
+
+/* Play through a USB DAC now, or stop: the automatic check's search without
+ * its conditions, for a DAC on its own power that puts no 5V on the cable
+ * to start one. Whether a search is still running, and whether playback is
+ * on a DAC. */
+void usb_set_dac_active(bool on);
+bool usb_dac_searching(void);
+bool usb_dac_playing(void);
 
 /* Diagnostic only: what the automatic DAC check last decided, and why */
 struct usb_dac_auto_record {

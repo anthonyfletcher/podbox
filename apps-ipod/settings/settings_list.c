@@ -1970,14 +1970,14 @@ const struct settings_list settings[] = {
             , ID2P(LANG_MOUSE_MODE)
     ), /* CHOICE_SETTING( usb_keypad_mode ) */
 #ifdef HAVE_USB_HOST_AUDIO
-    CHOICE_SETTING(0, usb_dac_output, LANG_USB_DAC_OUTPUT, 1,
+    CHOICE_SETTING(0, usb_dac_output, LANG_USB_DAC_AUTO, 1,
                    "usb dac output", "off,auto", usb_set_dac_output, 2,
-                   ID2P(LANG_OFF), ID2P(LANG_AUTO)),
+                   ID2P(LANG_OFF), ID2P(LANG_ON)),
 #endif
 
 #ifdef USB_ENABLE_AUDIO
-    CHOICE_SETTING(0, usb_audio, LANG_USB_DAC, 0, "usb-dac", "never,always,while_charge_only,while_mass_storage", usb_set_audio, 4,
-        ID2P(LANG_NEVER), ID2P(LANG_ALWAYS), ID2P(LANG_WHILE_USB_CHARGE_ONLY), ID2P(LANG_WHILE_MASS_STORAGE_USB_ONLY)),
+    CHOICE_SETTING(0, usb_audio, LANG_USB_DAC, 0, "usb-dac", "never,always", usb_set_audio, 2,
+        ID2P(LANG_OFF), ID2P(LANG_ON)),
 #endif
 
 

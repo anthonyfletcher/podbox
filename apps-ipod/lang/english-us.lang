@@ -16863,49 +16863,43 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </source>
   <dest>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </dest>
   <voice>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_USB_CHARGE_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </source>
   <dest>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </dest>
   <voice>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_MASS_STORAGE_USB_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </source>
   <dest>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </dest>
   <voice>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </voice>
 </phrase>
 <phrase>

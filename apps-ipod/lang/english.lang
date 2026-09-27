@@ -10502,49 +10502,43 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </source>
   <dest>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </dest>
   <voice>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_USB_CHARGE_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </source>
   <dest>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </dest>
   <voice>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_MASS_STORAGE_USB_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </source>
   <dest>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </dest>
   <voice>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </voice>
 </phrase>
 <phrase>
@@ -22376,5 +22370,73 @@
   <voice>
     *: none
     usb_host_audio: "Playing through headphones"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_AUTO
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Start Automatically"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Start Automatically"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Start automatically"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_ON
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn On"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Turn On"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Turn on"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_OFF
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn Off"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Turn Off"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Turn off"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_NOT_FOUND
+  desc: splash: Turn On found no USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "No USB DAC found"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "No USB DAC found"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "No U S B DAC found"
   </voice>
 </phrase>

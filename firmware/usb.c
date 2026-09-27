@@ -142,6 +142,7 @@ static bool usb_host_probe_on = false;
 static bool usb_dac_auto = true;
 static bool usb_dac_tried = false;
 static int usb_dac_polls = 0;           /* >0 while a try is polling */
+static volatile bool usb_dac_requested; /* Turn On posted, not yet taken */
 static struct timeout usb_dac_tmo;
 static struct usb_dac_auto_record usb_dac_rec = { .step = "no cable yet" };
 
@@ -559,6 +560,43 @@ void usb_set_dac_output(int mode)
     usb_dac_auto = mode != 0;
 }
 
+void usb_set_dac_active(bool on)
+{
+    if(on)
+        usb_dac_requested = true;
+    queue_post(&usb_queue, USB_HOST_DAC, on);
+}
+
+bool usb_dac_searching(void)
+{
+    return usb_dac_requested || usb_dac_polls > 0;
+}
+
+bool usb_dac_playing(void)
+{
+    return !strcmp(usb_host_audio_get_status()->state, "on");
+}
+
+static void usb_dac_auto_step(void);
+
+/* USB thread: Turn On starts the search at its polling step, past the
+ * checks that decide whether an unanswered cable is worth a try. */
+static void usb_dac_turn(bool on)
+{
+    if(on && !usb_host_probe_on)
+    {
+        usb_host_probe_switch(true);
+        usb_dac_polls = 1;
+        usb_dac_note("polling (turned on)");
+        usb_dac_requested = false;
+        usb_dac_auto_step();
+        return;
+    }
+    usb_dac_requested = false;
+    if(!on && usb_host_probe_on)
+        usb_host_probe_switch(false);
+}
+
 const struct usb_dac_auto_record *usb_get_dac_auto_record(void)
 {
     return &usb_dac_rec;
@@ -773,6 +811,9 @@ static void NORETURN_ATTR usb_thread(void)
 #ifdef HAVE_USB_HOST_AUDIO
         case USB_HOST_AUTO:
             usb_dac_auto_step();
+            break;
+        case USB_HOST_DAC:
+            usb_dac_turn(ev.data);
             break;
 #endif
 

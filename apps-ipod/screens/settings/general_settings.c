@@ -470,6 +470,44 @@ MENUITEM_SETTING(usb_hid, &global_settings.usb_hid, NULL);
 MENUITEM_SETTING(usb_keypad_mode, &global_settings.usb_keypad_mode, NULL);
 #ifdef HAVE_USB_HOST_AUDIO
 MENUITEM_SETTING(usb_dac_output, &global_settings.usb_dac_output, NULL);
+
+/* Turn On searches for up to about two seconds; the splash for a DAC found
+ * comes from the broadcast that playback moved. */
+static int usb_dac_toggle(void)
+{
+    long end;
+
+    if (usb_dac_playing())
+    {
+        usb_set_dac_active(false);
+        return 0;
+    }
+    usb_set_dac_active(true);
+    splash(0, ID2P(LANG_WAIT));
+    end = current_tick + 5*HZ;
+    while (usb_dac_searching() && TIME_BEFORE(current_tick, end))
+        sleep(HZ/10);
+    if (!usb_dac_playing())
+        splash(HZ*2, ID2P(LANG_USB_DAC_NOT_FOUND));
+    return 0;
+}
+
+static char *usb_dac_toggle_name(int selected_item, void *data,
+                                 char *buffer, size_t buffer_len)
+{
+    (void)selected_item;
+    (void)data;
+    (void)buffer;
+    (void)buffer_len;
+    return (char *)str(usb_dac_playing() ? LANG_USB_DAC_TURN_OFF
+                                         : LANG_USB_DAC_TURN_ON);
+}
+
+MENUITEM_FUNCTION_DYNTEXT(usb_dac_toggle_item, 0, usb_dac_toggle,
+                          usb_dac_toggle_name, NULL, NULL, NULL,
+                          Icon_NOICON);
+MAKE_MENU(usb_dac_menu, ID2P(LANG_USB_DAC_OUTPUT), 0, Icon_NOICON,
+          &usb_dac_output, &usb_dac_toggle_item);
 #endif
 #ifdef USB_ENABLE_AUDIO
 /* The receive buffers are claimed at boot, from this setting -- the driver
@@ -505,7 +543,7 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
             &usb_audio,
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
-            &usb_dac_output,
+            &usb_dac_menu,
 #endif
          );
 

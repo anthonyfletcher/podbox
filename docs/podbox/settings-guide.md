@@ -488,10 +488,15 @@ shadow to colour.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only is useful with a car or a plug that would otherwise interrupt playback. | mass storage |  |
-| USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. | off | **Adv** |
+| USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
-| USB-DAC | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Always, or only in one USB mode. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. | never | **Adv** |
-| USB DAC Output | On Auto, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is checked for only when no computer answers the cable within two seconds. The DAC needs its own power, such as a USB-C splitter with a charger in it. Off leaves every cable to the computer and charging. | auto |  |
+| USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
+
+### System — USB — USB DAC Output
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is checked for only when no computer answers the cable within two seconds. The check starts from a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this instead. Off leaves every cable to the computer and charging. | on |  |
 
 ### System — Accessories
 
