@@ -23,8 +23,8 @@
 #include "mips.h"
 #include "panic.h"
 #include "button.h"
-#include "gpio-x1000.h"
-#include "dma-x1000.h"
+#include "gpio-ingenic.h"
+#include "dma-ingenic.h"
 #include "irq-x1000.h"
 #include "clk-x1000.h"
 #include "boot-x1000.h"
@@ -194,13 +194,6 @@ void system_reboot(void)
     jz_write(WDT_DATA, X1000_EXCLK_FREQ / 1000);
     jz_write(WDT_ENABLE, 1);
     while(1);
-}
-
-int system_memory_guard(int mode)
-{
-    /* unused */
-    (void)mode;
-    return 0;
 }
 
 /* Simple delay API -- slow path functions */

@@ -227,6 +227,7 @@ void opus_custom_decoder_destroy(CELTDecoder *st)
 /* Special case for stereo with no downsampling and no accumulation. This is
    quite common and we can make it faster by processing both channels in the
    same loop, reducing overhead due to the dependency loop in the IIR filter. */
+#ifndef OVERRIDE_DEEMPH_STEREO
 static void deemphasis_stereo_simple(celt_sig *in[], opus_val16 *pcm, int N, const opus_val16 coef0,
       celt_sig *mem)
 {
@@ -252,6 +253,7 @@ static void deemphasis_stereo_simple(celt_sig *in[], opus_val16 *pcm, int N, con
    mem[0] = m0;
    mem[1] = m1;
 }
+#endif
 #endif
 
 #ifndef RESYNTH
@@ -357,10 +359,20 @@ void deemphasis(celt_sig *in[], opus_val16 *pcm, int N, int C, int downsample, c
    RESTORE_STACK;
 }
 
+#ifndef OVERRIDE_CELT_SAT
+/* Clamp n samples to +/-SIG_SAT in place. */
+static OPUS_INLINE void celt_sat(celt_sig *x, int n)
+{
+   int i;
+   for (i=0;i<n;i++)
+      x[i] = SATURATE(x[i], SIG_SAT);
+}
+#endif
+
 #ifndef RESYNTH
 static
 #endif
-void celt_synthesis(const CELTMode *mode, celt_norm *X, celt_sig * out_syn[],
+ICODE_ATTR_OPUS void celt_synthesis(const CELTMode *mode, celt_norm *X, celt_sig * out_syn[],
                     opus_val16 *oldBandE, int start, int effEnd, int C, int CC,
                     int isTransient, int LM, int downsample,
                     int silence, int arch)
@@ -432,8 +444,7 @@ void celt_synthesis(const CELTMode *mode, celt_norm *X, celt_sig * out_syn[],
    /* Saturate IMDCT output so that we can't overflow in the pitch postfilter
       or in the */
    c=0; do {
-      for (i=0;i<N;i++)
-         out_syn[c][i] = SATURATE(out_syn[c][i], SIG_SAT);
+      celt_sat(out_syn[c], N);
    } while (++c<CC);
    RESTORE_STACK;
 }
@@ -811,7 +822,7 @@ static void celt_decode_lost(CELTDecoder * OPUS_RESTRICT st, int N, int LM)
    RESTORE_STACK;
 }
 
-int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *data,
+ICODE_ATTR_OPUS int celt_decode_with_ec(CELTDecoder * OPUS_RESTRICT st, const unsigned char *data,
       int len, opus_val16 * OPUS_RESTRICT pcm, int frame_size, ec_dec *dec, int accum)
 {
    int c, i, N;

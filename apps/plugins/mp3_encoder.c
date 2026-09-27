@@ -906,7 +906,7 @@ static int wave_open(void)
      (cfg.samplerate != 44100) && (cfg.samplerate != 48000))    return -9;
 
   header_size = 0x28;
-  wav_size = rb->filesize(wavfile);
+  wav_size = rb->ffilesize(wavfile);
   rb->lseek(wavfile, header_size, SEEK_SET);
 
   return 0;
@@ -2593,7 +2593,7 @@ CONFIG_KEYPAD == MROBE500_PAD
 #define MP3ENC_DONE     BUTTON_START
 #define MP3ENC_SELECT   BUTTON_A
 
-#elif CONFIG_KEYPAD == CTRU_PAD
+#elif CONFIG_KEYPAD == N3DS_PAD
 #define MP3ENC_PREV     BUTTON_UP
 #define MP3ENC_NEXT     BUTTON_DOWN
 #define MP3ENC_DONE     BUTTON_POWER

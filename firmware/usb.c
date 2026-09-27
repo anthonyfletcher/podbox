@@ -794,6 +794,9 @@ static void NORETURN_ATTR usb_thread(void)
             if(usb_host_present && exclusive_storage_requested) {
                 usb_slave_mode(true);
                 exclusive_storage_enabled = true;
+#ifdef USB_ENABLE_STORAGE
+                usb_signal_class_notify(USB_DRIVER_MASS_STORAGE, 0);
+#endif
             }
             break;
             /* SYS_USB_CONNECTED_ACK */
@@ -1175,6 +1178,9 @@ bool usb_exclusive_storage(void)
 
 void usb_request_exclusive_storage(void)
 {
+    if(exclusive_storage_requested)
+        return;
+
     exclusive_storage_requested = true;
     usb_broadcast_seqnum += 1;
     usb_num_acks_to_expect = queue_broadcast(SYS_USB_CONNECTED, usb_broadcast_seqnum) - 1;
@@ -1183,6 +1189,13 @@ void usb_request_exclusive_storage(void)
     usb_record.acks_expected = usb_num_acks_to_expect;
     usb_record.broadcast_tick = current_tick;
 #endif
+    if(usb_num_acks_to_expect == 0 && usb_host_present) {
+        usb_slave_mode(true);
+        exclusive_storage_enabled = true;
+#ifdef USB_ENABLE_STORAGE
+        usb_signal_class_notify(USB_DRIVER_MASS_STORAGE, 0);
+#endif
+    }
 }
 
 void usb_release_exclusive_storage(void)
@@ -1192,6 +1205,7 @@ void usb_release_exclusive_storage(void)
         return;
     }
     exclusive_storage_requested = false;
+    usb_num_acks_to_expect = 0;
 
     if(exclusive_storage_enabled) {
         usb_slave_mode(false);

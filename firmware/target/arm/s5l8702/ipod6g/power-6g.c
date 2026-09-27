@@ -27,11 +27,18 @@
 #include "usb_core.h"   /* for usb_charging_maxcurrent_change */
 #include "backlight.h"
 #include "timeout.h"
+#ifndef BOOTLOADER
+#include "videoout.h"
+#endif
 
 static int idepowered;
 
 void power_off(void)
 {
+#ifndef BOOTLOADER
+    videoout_disable();
+#endif
+
     /* USB inserted or EXTON1 */
     pmu_set_wake_condition(
             PCF5063X_OOCWAKE_EXTON2 | PCF5063X_OOCWAKE_EXTON1);

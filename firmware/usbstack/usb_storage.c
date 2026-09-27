@@ -127,6 +127,7 @@
 #define SENSE_MEDIUM_ERROR          0x03
 #define SENSE_ILLEGAL_REQUEST       0x05
 #define SENSE_UNIT_ATTENTION        0x06
+#define SENSE_DATA_PROTECT          0x07
 
 #define ASC_MEDIUM_NOT_PRESENT      0x3a
 #define ASC_INVALID_FIELD_IN_CBD    0x24
@@ -136,6 +137,14 @@
 #define ASC_NOT_READY               0x04
 #define ASC_INVALID_COMMAND         0x20
 #define ASC_LOGICAL_UNIT_NOT_SUPPORTED 0x25
+#define ASC_WRITE_PROTECTED         0x27
+
+/* A drive whose driver can only read it is reported write protected */
+#ifdef HAVE_STORAGE_READONLY
+#define LUN_READONLY(lun)   storage_readonly(lun)
+#else
+#define LUN_READONLY(lun)   false
+#endif
 
 #define ASCQ_BECOMING_READY         0x01
 
@@ -297,6 +306,7 @@ static struct {
     unsigned char *data[2];
     unsigned char data_select;
     unsigned int last_result;
+    unsigned int data_residue;
 } cur_cmd;
 
 static struct {
@@ -308,6 +318,8 @@ static struct {
 
 static void handle_scsi(struct command_block_wrapper* cbw);
 static void send_csw(int status);
+static void reject_command(const struct command_block_wrapper *cbw);
+static void account_data_transfer(int dir, int status, int length);
 static void send_command_result(void *data,int size);
 static void send_command_failed_result(void);
 static void send_block_data(void *data,int size);
@@ -375,6 +387,7 @@ static unsigned char* ramdisk_buffer;
 
 static enum {
     WAITING_FOR_COMMAND,
+    WAITING_FOR_STORAGE,
     SENDING_BLOCKS,
     SENDING_RESULT,
     SENDING_FAILED_RESULT,
@@ -579,9 +592,15 @@ static void usb_storage_transfer_complete(int ep,int dir,int status,int length)
     struct tm tm;
 #endif
 
+
     logf("transfer result for ep %d/%d %X %d", ep,dir,status, length);
 
+    account_data_transfer(dir, status, length);
+
     switch(state) {
+        case WAITING_FOR_STORAGE:
+            /* The CBW is retained until usb_storage_notify_event(). */
+            break;
         case RECEIVING_BLOCKS:
             if(dir==USB_DIR_IN) {
                 logf("IN received in RECEIVING");
@@ -757,7 +776,10 @@ static void usb_storage_send_ata_identify(void)
     }
     cur_cmd.count = 0;
     cur_cmd.last_result = 0;
-    send_block_data(cur_cmd.data[0], 512);
+    /* IDENTIFY can be the first data command after SET_CONFIGURATION.
+     * cur_cmd.data[] belongs to previous READ/WRITE commands and may be
+     * unset, or refer to a buffer freed by a USB reset. */
+    send_block_data(tb.transfer_buffer, ATA_IDENTIFY_WORDS * 2);
 }
 #ifdef HAVE_ATA_SMART
 static void usb_storage_send_smart(uint8_t cmd)
@@ -793,6 +815,11 @@ static bool usb_storage_control_request(struct usb_ctrlrequest* req, uint8_t* re
 
         case USB_BULK_RESET_REQUEST:
             logf("ums: bulk reset");
+            if(state == WAITING_FOR_STORAGE) {
+                /* Discard the retained CBW on host reset and accept a new
+                 * one; do not replay the cancelled command when ready. */
+                usb_drv_recv_nonblocking(EP_OUT, cbw_buffer, MAX_CBW_SIZE);
+            }
             state = WAITING_FOR_COMMAND;
             /* UMS BOT 3.1 says The device shall preserve the value of its bulk
                data toggle bits and endpoint STALL conditions despite
@@ -845,7 +872,7 @@ static void send_and_read_next(void)
 }
 /****************************************************************************/
 
-static void handle_scsi(struct command_block_wrapper* cbw)
+static void handle_scsi_ready(struct command_block_wrapper* cbw)
 {
     struct storage_info info;
     unsigned int length = cbw->data_transfer_length;
@@ -910,6 +937,7 @@ static void handle_scsi(struct command_block_wrapper* cbw)
     uint32_t bsize = block_size*block_size_mult;
     sector_t bcount = block_count/block_size_mult;
 
+    cur_cmd.data_residue = letoh32(cbw->data_transfer_length);
     cur_cmd.tag = cbw->tag;
     cur_cmd.lun = lun;
     cur_cmd.cur_cmd = cbw->command_block[0];
@@ -917,13 +945,6 @@ static void handle_scsi(struct command_block_wrapper* cbw)
     switch (cbw->command_block[0]) {
         case SCSI_TEST_UNIT_READY:
             logf("scsi test_unit_ready %d",lun);
-            if(!usb_exclusive_storage()) {
-                send_csw(UMS_STATUS_FAIL);
-                cur_sense_data.sense_key=SENSE_NOT_READY;
-                cur_sense_data.asc=ASC_MEDIUM_NOT_PRESENT;
-                cur_sense_data.ascq=0;
-                break;
-            }
             if(lun_present) {
                 send_csw(UMS_STATUS_GOOD);
             }
@@ -1001,7 +1022,8 @@ static void handle_scsi(struct command_block_wrapper* cbw)
                     tb.ms_data_10->mode_data_length =
                         htobe16(sizeof(struct mode_sense_data_10)-2);
                     tb.ms_data_10->medium_type = 0;
-                    tb.ms_data_10->device_specific = 0;
+                    tb.ms_data_10->device_specific =
+                        LUN_READONLY(lun) ? 0x80 : 0;
                     tb.ms_data_10->reserved = 0;
                     tb.ms_data_10->longlba = 1;
                     tb.ms_data_10->block_descriptor_length =
@@ -1065,7 +1087,8 @@ static void handle_scsi(struct command_block_wrapper* cbw)
                     tb.ms_data_6->mode_data_length =
                         sizeof(struct mode_sense_data_6)-1;
                     tb.ms_data_6->medium_type = 0;
-                    tb.ms_data_6->device_specific = 0;
+                    tb.ms_data_6->device_specific =
+                        LUN_READONLY(lun) ? 0x80 : 0;
                     tb.ms_data_6->block_descriptor_length =
                         sizeof(struct mode_sense_bdesc_shortlba);
                     tb.ms_data_6->block_descriptor.density_code = 0;
@@ -1326,6 +1349,13 @@ static void handle_scsi(struct command_block_wrapper* cbw)
                 cur_sense_data.ascq=0;
                 break;
             }
+            if(LUN_READONLY(lun)) {
+                send_csw(UMS_STATUS_FAIL);
+                cur_sense_data.sense_key=SENSE_DATA_PROTECT;
+                cur_sense_data.asc=ASC_WRITE_PROTECTED;
+                cur_sense_data.ascq=0;
+                break;
+            }
             cur_cmd.data[0] = tb.transfer_buffer;
             cur_cmd.data[1] = &tb.transfer_buffer[WRITE_BUFFER_SIZE];
             cur_cmd.data_select=0;
@@ -1353,6 +1383,13 @@ static void handle_scsi(struct command_block_wrapper* cbw)
                 send_csw(UMS_STATUS_FAIL);
                 cur_sense_data.sense_key=SENSE_NOT_READY;
                 cur_sense_data.asc=ASC_MEDIUM_NOT_PRESENT;
+                cur_sense_data.ascq=0;
+                break;
+            }
+            if(LUN_READONLY(lun)) {
+                send_csw(UMS_STATUS_FAIL);
+                cur_sense_data.sense_key=SENSE_DATA_PROTECT;
+                cur_sense_data.asc=ASC_WRITE_PROTECTED;
                 cur_sense_data.ascq=0;
                 break;
             }
@@ -1393,7 +1430,9 @@ static void handle_scsi(struct command_block_wrapper* cbw)
             && (cbw->command_block[8]==0 || cbw->command_block[8]==0x0c)
 
             && cbw->command_block[9]==0)
-            receive_time();
+                receive_time();
+            else
+                reject_command(cbw);
             break;
 #endif /* CONFIG_RTC */
 
@@ -1441,12 +1480,61 @@ static void handle_scsi(struct command_block_wrapper* cbw)
 #endif /* STORAGE_ATA */
         default:
             logf("scsi unknown cmd %x",cbw->command_block[0x0]);
-            send_csw(UMS_STATUS_FAIL);
-            cur_sense_data.sense_key=SENSE_ILLEGAL_REQUEST;
-            cur_sense_data.asc=ASC_INVALID_COMMAND;
-            cur_sense_data.ascq=0;
+            reject_command(cbw);
             break;
     }
+}
+
+/* SET_CONFIGURATION now precedes the storage handover. Keep the first
+ * CBW pending until all Rockbox clients have acknowledged/unmounted. This
+ * avoids falsely reporting an absent disk to a fast host and, importantly,
+ * prevents READ/WRITE commands from racing Rockbox filesystem users. The
+ * OUT endpoint is not rearmed until this CBW has received its CSW. */
+static void handle_scsi(struct command_block_wrapper* cbw)
+{
+    if(!usb_exclusive_storage()) {
+        state = WAITING_FOR_STORAGE;
+        return;
+    }
+    handle_scsi_ready(cbw);
+}
+
+static void usb_storage_notify_event(intptr_t data)
+{
+    (void)data;
+    if(state == WAITING_FOR_STORAGE && usb_exclusive_storage())
+        handle_scsi((struct command_block_wrapper*)cbw_buffer);
+}
+
+/* Count data only, never the CBW or CSW. A short result must report the
+ * untransferred bytes instead of claiming that the whole request succeeded. */
+static void account_data_transfer(int dir, int status, int length)
+{
+    bool data_in = state == SENDING_RESULT || state == SENDING_FAILED_RESULT ||
+                   state == SENDING_BLOCKS;
+    bool data_out = state == RECEIVING_BLOCKS;
+#if CONFIG_RTC
+    data_out |= state == RECEIVING_TIME;
+#endif
+    if(status == 0 && length > 0 &&
+       ((data_in && dir == USB_DIR_IN) || (data_out && dir == USB_DIR_OUT)))
+        cur_cmd.data_residue -= MIN(cur_cmd.data_residue, (unsigned int)length);
+}
+
+/* BOT cases Hi/Dn and Ho/Dn still have a data phase. Sending the CSW as
+ * IN data makes the host wait for a second status that will never arrive. */
+static void reject_command(const struct command_block_wrapper *cbw)
+{
+    cur_sense_data.sense_key = SENSE_ILLEGAL_REQUEST;
+    cur_sense_data.asc = ASC_INVALID_COMMAND;
+    cur_sense_data.ascq = 0;
+    if(letoh32(cbw->data_transfer_length)) {
+        bool in = (cbw->flags & USB_DIR_IN) != 0;
+        /* Halt the data pipe first. The host clears it before reading CSW
+         * (BOT 6.7.2 case 4 / 6.7.3 case 9). Queue CSW behind that halt. */
+        usb_drv_stall(in ? EP_IN : EP_OUT, true, in);
+    }
+    send_csw(UMS_STATUS_FAIL);
 }
 
 static void send_block_data(void *data,int size)
@@ -1485,7 +1573,7 @@ static void send_csw(int status)
 {
     tb.csw->signature = htole32(CSW_SIGNATURE);
     tb.csw->tag = cur_cmd.tag;
-    tb.csw->data_residue = 0;
+    tb.csw->data_residue = htole32(cur_cmd.data_residue);
     tb.csw->status = status;
 
     usb_drv_send_nonblocking(EP_IN, tb.csw,
@@ -1548,6 +1636,7 @@ struct usb_class_driver usb_cdrv_storage = {
     .disconnect = usb_storage_disconnect,
     .transfer_complete = usb_storage_transfer_complete,
     .control_request = usb_storage_control_request,
+    .notify_event = usb_storage_notify_event,
 #ifdef HAVE_HOTSWAP
     .notify_hotswap = usb_storage_notify_hotswap,
 #endif

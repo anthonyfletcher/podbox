@@ -32,6 +32,9 @@
 #include "sound.h"
 #include "pcm_sink.h"
 #include "settings.h"
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+#include "videoout.h"
+#endif
 #include "rbpaths.h"
 #include "settings_list.h"
 #include "usb.h"
@@ -423,7 +426,7 @@ static const char graphic_numeric[] = "graphic,numeric";
 #  define DEFAULT_REC_MIC_GAIN 0
 #  define DEFAULT_REC_LEFT_GAIN 0
 #  define DEFAULT_REC_RIGHT_GAIN 0
-# elif defined(HAVE_WM8975)
+# elif defined(HAVE_WM8975) || defined(HAVE_WM1870)
 #  define DEFAULT_REC_MIC_GAIN 16
 #  define DEFAULT_REC_LEFT_GAIN 0
 #  define DEFAULT_REC_RIGHT_GAIN 0
@@ -1303,6 +1306,12 @@ const struct settings_list settings[] = {
 #ifdef HAVE_LCD_FLIP
     OFFON_SETTING(0, flip_display, LANG_FLIP_DISPLAY, false, "flip display",
                   NULL),
+#endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    CHOICE_SETTING(0, composite_video_output, LANG_COMPOSITE_VIDEO_OUTPUT,
+                   VIDEOOUT_OFF, "composite video output", "off,auto,on",
+                   settings_apply_videoout, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_AUTO), ID2P(LANG_ON)),
 #endif
     /* display */
      CHOICE_SETTING(F_TEMPVAR|F_THEMESETTING, cursor_style, LANG_INVERT_CURSOR,
@@ -2423,6 +2432,9 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, touch_mode, LANG_TOUCHSCREEN_MODE, DEFAULT_TOUCHSCREEN_MODE,
                    "touchscreen mode", "point,grid", NULL, 2,
                    ID2P(LANG_TOUCHSCREEN_POINT), ID2P(LANG_TOUCHSCREEN_GRID)),
+    CHOICE_SETTING(0, touch_enable_flick_shortcuts, LANG_TOUCHSCREEN_FLICK_SHORTCUTS, true,
+                   "touchscreen flick shortcuts", "off,on", NULL,
+                   2, ID2P(LANG_OFF), ID2P(LANG_ON)),
     CUSTOM_SETTING(0, ts_calibration_data, -1,
                     &default_calibration_parameters, "touchscreen calibration",
                     tsc_load_from_cfg, tsc_write_to_cfg,
