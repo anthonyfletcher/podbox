@@ -65,7 +65,6 @@ static void quickscreen_fix_viewports(struct gui_quickscreen *qs,
     int char_height, width, pad = 0;
     int left_width = 0, right_width = 0, vert_lines;
     unsigned char *s;
-    struct screen *display = &screens[screen];
     struct viewport *parent = &qs->parent[screen];
     struct viewport *vps = qs->vps[screen];
     struct viewport *vp_icons = &qs->vp_icons[screen];
@@ -113,12 +112,12 @@ static void quickscreen_fix_viewports(struct gui_quickscreen *qs,
     if (qs->items[QUICKSCREEN_LEFT])
     {
         s = P2STR(ID2P(qs->items[QUICKSCREEN_LEFT]->lang_id));
-        left_width = display->getstringsize(s, NULL, NULL);
+        left_width = font_getstringsize(s, NULL, NULL, parent->font);
     }
     if (qs->items[QUICKSCREEN_RIGHT])
     {
         s = P2STR(ID2P(qs->items[QUICKSCREEN_RIGHT]->lang_id));
-        right_width = display->getstringsize(s, NULL, NULL);
+        right_width = font_getstringsize(s, NULL, NULL, parent->font);
     }
 
     width = MAX(left_width, right_width);
@@ -272,12 +271,12 @@ static void gui_quickscreen_draw(struct gui_quickscreen *qs,
     if (qs->items[QUICKSCREEN_TOP] != NULL)
     {
         display->mono_bitmap(bitmap_icons_7x8[Icon_UpArrow],
-            (vp_icons->width/2) - 4, 0, 7, 8);
+            (vp_icons->width/2) - 3, 0, 7, 8);
     }
     if (qs->items[QUICKSCREEN_RIGHT] != NULL)
     {
         display->mono_bitmap(bitmap_icons_7x8[Icon_FastForward],
-            vp_icons->width - 8, (vp_icons->height/2) - 4, 7, 8);
+            vp_icons->width - 7, (vp_icons->height/2) - 4, 7, 8);
     }
     if (qs->items[QUICKSCREEN_LEFT] != NULL)
     {
@@ -287,7 +286,7 @@ static void gui_quickscreen_draw(struct gui_quickscreen *qs,
     if (qs->items[QUICKSCREEN_BOTTOM] != NULL)
     {
         display->mono_bitmap(bitmap_icons_7x8[Icon_DownArrow],
-            (vp_icons->width/2) - 4, vp_icons->height - 8, 7, 8);
+            (vp_icons->width/2) - 3, vp_icons->height - 8, 7, 8);
     }
 
     display->set_viewport(parent);

@@ -56,6 +56,7 @@
 #include "pcmbuf.h"
 #include "audio_thread.h"
 #include "pcm_sink.h"
+#include "pcm-internal.h"
 #include "iap-usb.h"
 #include "playback.h"
 #include "storage.h"
@@ -4265,6 +4266,9 @@ void audio_hard_stop(void)
     LOGFQUEUE("audio >| audio Q_AUDIO_STOP: 1");
     audio_queue_send(Q_AUDIO_STOP, 1);
     voice_stop();
+    /* Stopping the playback and voice paths does not idle the PCM sink,
+     * and a late callback must not fire during a ROLO */
+    pcm_play_stop();
     audiobuf_handle = core_free(audiobuf_handle);
 }
 
