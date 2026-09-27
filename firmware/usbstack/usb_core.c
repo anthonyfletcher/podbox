@@ -666,6 +666,41 @@ static bool usb_drv_ep_allocate(struct usb_drv_ep_alloc_ctx* ctx, int ep, int ty
 }
 #endif
 
+/* When a configuration cannot hold every enabled driver's endpoints, the
+ * lowest ranked driver holding endpoints there is left out: HID before the
+ * sound card before the disk. Unranked drivers rank lowest, and a tie leaves
+ * out the driver that did not fit. */
+static int driver_rank(int i)
+{
+    switch(i) {
+#ifdef USB_ENABLE_STORAGE
+    case USB_DRIVER_MASS_STORAGE: return 3;
+#endif
+#ifdef USB_ENABLE_AUDIO
+    case USB_DRIVER_AUDIO: return 2;
+#endif
+#ifdef USB_ENABLE_HID
+    case USB_DRIVER_HID: return 1;
+#endif
+    default: return 0;
+    }
+}
+
+static int driver_to_leave_out(int config, int failed)
+{
+    int out = failed;
+    for(int i = 0; i < USB_NUM_DRIVERS; i++) {
+        struct usb_class_driver* d = drivers[i];
+        if(!d->enabled || d->error || d->config != config || d->ep_allocs_size == 0) {
+            continue;
+        }
+        if(driver_rank(i) < driver_rank(out)) {
+            out = i;
+        }
+    }
+    return out;
+}
+
 static void allocate_interfaces_and_endpoints(void)
 {
     if(usb_config != 0) {
@@ -713,10 +748,15 @@ retry:
                 alloc->type[req->dir] = req->type;
                 break;
             }
+            usb_log(USB_LOG_EP_ALLOC, i, req->ep ? req->ep : (req->dir == DIR_IN ? USB_DIR_IN : 0),
+                    req->type, req->optional);
             if(req->ep == 0 && !req->optional) {
-                /* no matching ep found, retry allocation excluding this driver */
-                logf("usb_core: no endpoint allocated for driver %d", i);
-                driver->enabled = false;
+                /* no matching ep found, retry allocation without the lowest
+                 * ranked driver, which may be this one */
+                int out = driver_to_leave_out(driver->config, i);
+                logf("usb_core: no endpoint allocated for driver %d, leaving out %d", i, out);
+                usb_log(USB_LOG_DRV_DROPPED, out, 0, 0, 0);
+                drivers[out]->enabled = false;
                 goto retry;
             }
         }

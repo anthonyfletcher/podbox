@@ -293,7 +293,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
 #endif
 #ifdef USB_ENABLE_AUDIO
-        usb_core_enable_driver(USB_DRIVER_AUDIO, (usb_audio == 1) || (usb_audio == 2)); // while "always" or "only in charge-only mode"
+        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio != 0);
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
         usb_core_enable_driver(USB_DRIVER_IAP, false);
@@ -318,7 +318,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
 #endif
 #ifdef USB_ENABLE_AUDIO
-        usb_core_enable_driver(USB_DRIVER_AUDIO, (usb_audio == 1) || (usb_audio == 3)); // while "always" or "only in mass-storage mode"
+        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio != 0);
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
         usb_core_enable_driver(USB_DRIVER_IAP, true);

@@ -1184,7 +1184,8 @@ playback.
 
 [usb hid]
 Presents the player as a keyboard or remote control to the computer, so its
-buttons can drive playback there.
+buttons can drive playback there. On an iPod Video in mass-storage mode, USB
+Sound Card takes its place when both are on.
 
 [usb keypad mode]
 What the buttons send while acting as a USB device: media keys, a mouse, or

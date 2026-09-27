@@ -1353,6 +1353,10 @@ void settings_apply(bool read_disk)
 
 
     usb_set_mode(global_settings.usb_mode);
+    /* usb.c starts with HID on, and nothing else tells it otherwise until the
+     * setting is changed -- while on, HID takes the endpoint a 5G's sound
+     * card needs in mass-storage mode. */
+    usb_set_hid(global_settings.usb_hid);
 #ifdef HAVE_USB_HOST_AUDIO
     usb_set_dac_output(global_settings.usb_dac_output);
 #endif
