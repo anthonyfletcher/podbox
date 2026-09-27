@@ -29,6 +29,7 @@
  ****************************************************************************/
 #include <stdio.h>
 #include <string.h>
+#include "string-extra.h"
 #include <stdlib.h>
 #include "config.h"
 
@@ -79,6 +80,8 @@
 #include "wps.h"
 #include "skin/statusbar_skinned.h"
 #include "database/sound_mix.h"
+#include "database/tagcache.h"
+#include "metadata.h"
 #include "skin/wps_internals.h"
 
 #ifdef USB_ENABLE_AUDIO
@@ -331,6 +334,62 @@ static void change_dir(int direction)
     action_wait_for_release();
 }
 
+/* The album of the playlist entry steps away, "" when it has none. False at
+ * either end of the playlist. */
+static bool peek_album(int steps, char *album, size_t size)
+{
+    static struct mp3entry id3;
+    char buf[MAX_PATH];
+    const char *name = playlist_peek(steps, buf, sizeof(buf));
+
+    if (!name)
+        return false;
+    if (!tagcache_fill_tags(&id3, name) && !get_metadata(&id3, -1, name))
+        id3.album = NULL;
+    strlcpy(album, id3.album ? id3.album : "", size);
+    return true;
+}
+
+/* Skips by album tag rather than by folder, so it works however the
+ * playlist was built: forward to the first track of the next album, or back
+ * to the first track of the one before the current album. */
+static void change_album(int direction)
+{
+    struct wps_state *state = get_wps_state();
+    int amount = playlist_amount();
+    char current[MAX_PATH];
+    char album[MAX_PATH];
+    int steps = direction;
+
+    if (global_settings.prevent_skip || !state->id3)
+        return;
+    strlcpy(current, state->id3->album ? state->id3->album : "",
+            sizeof(current));
+
+    while (abs(steps) < amount)
+    {
+        if (!peek_album(steps, album, sizeof(album)))
+            return;
+        if (strcmp(album, current))
+            break;
+        steps += direction;
+    }
+    if (abs(steps) >= amount)
+        return;
+
+    if (direction < 0)
+    {
+        strlcpy(current, album, sizeof(current));
+        while (abs(steps - 1) < amount
+               && peek_album(steps - 1, album, sizeof(album))
+               && !strcmp(album, current))
+            steps--;
+    }
+
+    audio_skip(steps);
+    action_wait_for_release();
+}
+
 static void prev_track(unsigned long skip_thresh)
 {
     struct wps_state *state = get_wps_state();
@@ -562,6 +621,8 @@ static long do_party_mode(long action)
             case ACTION_WPS_SKIPNEXT:
             case ACTION_WPS_ABSETB_NEXTDIR:
             case ACTION_WPS_ABSETA_PREVDIR:
+            case ACTION_WPS_NEXT_ALBUM:
+            case ACTION_WPS_PREV_ALBUM:
             case ACTION_WPS_STOP:
                 return ACTION_NONE;
                 break;
@@ -920,6 +981,12 @@ long gui_wps_show(void)
                 {
                     change_dir(-1);
                 }
+                break;
+            case ACTION_WPS_NEXT_ALBUM:
+                change_album(1);
+                break;
+            case ACTION_WPS_PREV_ALBUM:
+                change_album(-1);
                 break;
             /* menu key functions */
             case ACTION_WPS_MENU:

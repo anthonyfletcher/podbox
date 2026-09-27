@@ -345,6 +345,16 @@ static const struct button_mapping remote_button_context_standard[]  = {
     { ACTION_STD_OK,            BUTTON_RC_SELECT|BUTTON_REL,           BUTTON_RC_SELECT },
     { ACTION_STD_CONTEXT,       BUTTON_RC_SELECT|BUTTON_REPEAT,        BUTTON_RC_SELECT },
 
+    /* The album and playlist buttons are both labelled "page" */
+    { ACTION_LISTTREE_PGUP,     BUTTON_RC_NEXT_ALBUM,                  BUTTON_NONE },
+    { ACTION_LISTTREE_PGUP,     BUTTON_RC_NEXT_ALBUM|BUTTON_REPEAT,    BUTTON_NONE },
+    { ACTION_LISTTREE_PGDOWN,   BUTTON_RC_PREV_ALBUM,                  BUTTON_NONE },
+    { ACTION_LISTTREE_PGDOWN,   BUTTON_RC_PREV_ALBUM|BUTTON_REPEAT,    BUTTON_NONE },
+    { ACTION_LISTTREE_PGUP,     BUTTON_RC_NEXT_PLAYLIST,               BUTTON_NONE },
+    { ACTION_LISTTREE_PGUP,     BUTTON_RC_NEXT_PLAYLIST|BUTTON_REPEAT, BUTTON_NONE },
+    { ACTION_LISTTREE_PGDOWN,   BUTTON_RC_PREV_PLAYLIST,               BUTTON_NONE },
+    { ACTION_LISTTREE_PGDOWN,   BUTTON_RC_PREV_PLAYLIST|BUTTON_REPEAT, BUTTON_NONE },
+
     LAST_ITEM_IN_LIST
 }; /* remote_button_context_standard */
 
@@ -367,7 +377,15 @@ static const struct button_mapping remote_button_context_wps[]  = {
     { ACTION_WPS_HOTKEY,    BUTTON_RC_SELECT|BUTTON_PLAY,          BUTTON_NONE },
     { ACTION_WPS_MENU,      BUTTON_RC_MENU|BUTTON_REL,             BUTTON_RC_MENU },
     { ACTION_WPS_QUICKSCREEN,   BUTTON_RC_MENU|BUTTON_REPEAT,      BUTTON_RC_MENU },
-
+    { ACTION_WPS_NEXT_ALBUM,    BUTTON_RC_NEXT_ALBUM,              BUTTON_NONE },
+    { ACTION_WPS_PREV_ALBUM,    BUTTON_RC_PREV_ALBUM,              BUTTON_NONE },
+    /* Claimed, so they do not fall through to the list paging below */
+    { ACTION_NONE,          BUTTON_RC_NEXT_ALBUM|BUTTON_REPEAT,    BUTTON_NONE },
+    { ACTION_NONE,          BUTTON_RC_PREV_ALBUM|BUTTON_REPEAT,    BUTTON_NONE },
+    { ACTION_NONE,          BUTTON_RC_NEXT_PLAYLIST,               BUTTON_NONE },
+    { ACTION_NONE,          BUTTON_RC_NEXT_PLAYLIST|BUTTON_REPEAT, BUTTON_NONE },
+    { ACTION_NONE,          BUTTON_RC_PREV_PLAYLIST,               BUTTON_NONE },
+    { ACTION_NONE,          BUTTON_RC_PREV_PLAYLIST|BUTTON_REPEAT, BUTTON_NONE },
 
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
 }; /* remote_button_context_wps */

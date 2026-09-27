@@ -125,6 +125,10 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     btn |= BUTTON_RC_RIGHT;
                 if(buf[2] & 16)
                     btn |= BUTTON_RC_LEFT;
+                if(buf[2] & 32)
+                    btn |= BUTTON_RC_NEXT_ALBUM;
+                if(buf[2] & 64)
+                    btn |= BUTTON_RC_PREV_ALBUM;
             }
             else if(len >= 4 && buf[3] != 0)
             {
@@ -148,6 +152,10 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     }
 #endif
                 }
+                if(buf[3] & 32) /* next playlist */
+                    btn |= BUTTON_RC_NEXT_PLAYLIST;
+                if(buf[3] & 64) /* previous playlist */
+                    btn |= BUTTON_RC_PREV_PLAYLIST;
                 if(buf[3] & 128) /* Shuffle */
                 {
                     if (!iap_btnshuffle)

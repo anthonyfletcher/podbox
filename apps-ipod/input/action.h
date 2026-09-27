@@ -312,6 +312,10 @@ enum {
     ACTION_QUIZ_PAUSE,
     ACTION_QUIZ_LEAVE,
 
+    /* An accessory remote's album buttons on the WPS. */
+    ACTION_WPS_NEXT_ALBUM,
+    ACTION_WPS_PREV_ALBUM,
+
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };
 
