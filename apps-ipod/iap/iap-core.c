@@ -709,8 +709,10 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
         s->check += x;
         s->len += x;
         /* Same underflow as the small-packet check above. A long-form
-         * frame shorter than 0xFD should have been sent short-form. */
-        if ((s->len < 0x00FD) || (s->len > 0xFFFA)
+         * frame shorter than 0xFD should have been sent short-form, but
+         * accessories send them, so only the lingo-and-command minimum is
+         * enforced. */
+        if ((s->len < 0x0002) || (s->len > 0xFFFA)
             || ((uint32_t)s->len + 2 > iap_rxlen)) {
             /* invalid length */
             s->state = ST_SYNC;
