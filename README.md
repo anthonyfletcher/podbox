@@ -383,37 +383,6 @@ song is by, the album it came from
 - View a description of each setting from the setting menu
   - Hold `Select` to open the context menu then select `Explain`
 
-## Connectivity
-
-What the iPod can connect to, and how. The USB settings are under
-`Settings > System > USB`, the dock ones under `Settings > System > Accessories`.
-
-- Your iPod can act like a sound card for a computer - the computer plays through 
-the iPod, out of its headphone socket, using the iPod DAC, and the computer's volume 
-control sets the level
-  - `USB > USB Sound Card` - off by default
-- Your iPod can output to a USB DAC - the iPod sends its audio digitally over USB to a
-  headphone amp or DAC, which does the conversion instead of the iPod.
-  - `USB > USB DAC Output > Start Automatically` - on by default - or `Turn On`
-    for a DAC with its own power supply that doesn't power the iPod
-  - The iPod supplies no power over USB, so the DAC needs its own supply or you can use a
-    USB splitter with a charger connected
-  - Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
-    kHz will not, and neither will a DAC behind a hub
-- Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
-  digitally, over the USB pins of the dock connector, and turns it into
-  S/PDIF (optical or coax) for an amplifier
-  - On by default, through `Accessories > Accessory Protocol`
-  - Needs `USB > USB Mode` set to Mass Storage, which is the default; in Charge
-    Only the dock finds nothing to play
-  - Remote support improved to match click-wheel actions
-- You can control your iPod using the earphone remote (only supported on iPod classic 
-120GB - Late 2008 and 160GB - Late 2009 thin version only)
-  - Click for play/pause, two clicks for the next track, three for the previous
-    one, and the volume buttons
-  - Always on. The multi-click skips are `Accessories > Remote Track Skip`, on
-    by default; turning it off makes play/pause react quicker
-
 ## Behind the scenes
 
 - Improved consistency of the `Back` and `Menu` button in menus
@@ -428,6 +397,47 @@ control sets the level
   - `Settings > Appearance > Colours` for settings
 - Additional theme tags to provide richer graphics and support easier theme development
   - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
+
+## Connectivity
+
+<img src="docs/podbox/images/conn_sound_card.svg" alt="The iPod as a USB sound card for a computer"/>
+
+- Your iPod can act like a sound card for a computer - the computer plays through 
+the iPod, out of its headphone socket, using the iPod DAC, and the computer's volume 
+control sets the level
+  - `USB > USB Sound Card` - off by default
+
+<img src="docs/podbox/images/conn_usb_dac.svg" alt="The iPod sending digital audio to a USB DAC, which is powered by its own supply or by an injector in the cable"/>
+
+- Your iPod can output to a USB DAC - the iPod sends its audio digitally over USB to a
+  headphone amp or DAC, which does the conversion instead of the iPod.
+  - `USB > USB DAC Output > Start Automatically` - on by default - or `Turn On`
+    for a DAC with its own power supply that doesn't power the iPod
+  - The iPod supplies no power over USB, so the DAC needs its own supply or you can use a
+    USB splitter with a charger connected
+  - Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
+    kHz will not, and neither will a DAC behind a hub
+
+<img src="docs/podbox/images/conn_spdif_dock.svg" alt="The iPod in a dock sending S/PDIF to an amplifier"/>
+
+- Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
+  digitally, over the USB pins of the dock connector, and turns it into
+  S/PDIF (optical or coax) for an amplifier
+  - On by default, through `Accessories > Accessory Protocol`
+  - Needs `USB > USB Mode` set to Mass Storage, which is the default; in Charge
+    Only the dock finds nothing to play
+  - Remote support improved to match click-wheel actions
+
+<img src="docs/podbox/images/conn_remote.svg" alt="Controlling the iPod from the earphone remote"/>
+
+- You can control your iPod using the earphone remote (only supported on iPod classic 
+120GB - Late 2008 and 160GB - Late 2009 thin version only)
+  - Click for play/pause, two clicks for the next track, three for the previous
+    one, and the volume buttons
+  - Always on. The multi-click skips are `Accessories > Remote Track Skip`, on
+    by default; turning it off makes play/pause react quicker
+
+
 
 ---
 

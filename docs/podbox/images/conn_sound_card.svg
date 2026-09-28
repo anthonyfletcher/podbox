@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 210" width="333" height="143" role="img" aria-label="The iPod as a USB sound card for a computer">
+<style>svg{--ink:#222;--body:#fff;--paper:#fbfaf6;--edge:#d8d4c8;--tone:#e4e4e4;--grey:#999;--grey2:#888;--grey3:#777;--accent:#1f6fb2;--power:#c46a00;--red:#c0392b}@media (prefers-color-scheme: dark){svg{--ink:#d4d4d4;--body:#2b2e34;--paper:#1c1e22;--edge:#3b3e44;--tone:#3d414a;--grey:#7c818a;--grey2:#6c717a;--grey3:#8c919a;--accent:#5aa2e0;--power:#e39a3c;--red:#e0605a}}</style>
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style='fill:var(--accent)'/></marker>
+<marker id="ph" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" style='fill:var(--power)'/></marker>
+</defs>
+<rect x="0.5" y="0.5" width="489" height="209" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
+<g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style='stroke:var(--ink)'>
+<path d='M166,120 C205,120 200,196 240,196 C268,196 272,188 272,166' stroke-width='5'/><path d='M166,120 C205,120 200,196 240,196 C268,196 272,188 272,166' stroke-width='2' style='stroke:var(--paper)'/><path d='M46,104 H166 l-26,30 v5 H20 v-5 z' style='fill:var(--body)'/>
+<path d='M166,104 l-26,30 v5 l26,-30 z' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M20,134 H140' stroke-width='1.5'/>
+<rect x='150' y='116' width='18' height='8' rx='1.5' stroke-width='1.6' style='fill:var(--body)'/>
+<path d='M52.1,108.5 h100' stroke-width='1' style='stroke:var(--grey2)'/><path d='M48.2,113.0 h100' stroke-width='1' style='stroke:var(--grey2)'/><path d='M44.3,117.5 h100' stroke-width='1' style='stroke:var(--grey2)'/><path d='M40.4,122.0 h100' stroke-width='1' style='stroke:var(--grey2)'/><path d='M65.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M79.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M93.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M107.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M121.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M135.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/><path d='M149.1,108.5 l-11.7,13.5' stroke-width='1' style='stroke:var(--grey2)'/>
+<path d='M73.8,125.0 h30 l-5.7,6.6 h-30 z' stroke-width='1.2' style='fill:var(--tone)'/>
+<rect x='46' y='20' width='120' height='84' rx='6' style='fill:var(--body)'/>
+<rect x='53' y='27' width='106' height='68' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
+<g transform='translate(76,50)' stroke-width='1.6'>
+<path d='M0,6 h6 l8,-7 v24 l-8,-7 h-6 z' style='fill:var(--body)'/>
+<path d='M19,4 q4,7 0,14 M24,0 q7,11 0,22' />
+<path d='M34,11 h26' stroke-width='3' style='stroke:var(--grey)'/>
+<path d='M34,11 h16' stroke-width='3'/>
+<circle cx='50' cy='11' r='5' style='fill:var(--body)'/>
+</g><g transform='translate(240,52)'>
+<rect width='64' height='106' rx='9' style='fill:var(--body)'/>
+<rect x='7' y='7' width='50' height='38' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M12,15 H40 M12,22 H46 M12,29 H36 M12,36 H43' stroke-width='2' style='stroke:var(--grey)'/>
+<circle cx='32' cy='76' r='21' style='fill:var(--body)'/>
+<circle cx='32' cy='76' r='7.5' style='fill:var(--body)'/>
+<path d='M28,90 l3,-2 v4 z M36,90 l-3,-2 v4 z' stroke='none' style='fill:var(--ink)'/>
+</g><path d='M267,164 h10 l-1,7 h-8 z' stroke-width='1.5' style='fill:var(--body)'/><rect x='260' y='158' width='24' height='8' rx='2' style='fill:var(--body)'/><path d='M290,44 C290,4 340,8 352,50 C362,86 356,160 390,160 C405,160 409,150 409,132' stroke-width='5'/><path d='M290,44 C290,4 340,8 352,50 C362,86 356,160 390,160 C405,160 409,150 409,132' stroke-width='2' style='stroke:var(--paper)'/><path d='M287,40 h6 l-1,-8 h-4 z' stroke-width='1.5' style='fill:var(--body)'/><rect x='285.5' y='39' width='9' height='13' rx='2' style='fill:var(--body)'/><path d='M410,108 C410,62 470,62 470,108' stroke-width='5'/>
+<path d='M410,108 C410,62 470,62 470,108' stroke-width='1.5' style='stroke:var(--paper)'/>
+<rect x='400' y='98' width='18' height='34' rx='8' style='fill:var(--body)'/>
+<rect x='462' y='98' width='18' height='34' rx='8' style='fill:var(--body)'/>
+<rect x='414' y='103' width='6' height='24' rx='3' stroke-width='1.5' style='fill:var(--tone)'/>
+<rect x='460' y='103' width='6' height='24' rx='3' stroke-width='1.5' style='fill:var(--tone)'/>
+</g>
+</svg>
