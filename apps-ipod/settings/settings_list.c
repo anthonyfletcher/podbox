@@ -1308,6 +1308,18 @@ const struct settings_list settings[] = {
                   playlist_engine_callback),
     OFFON_SETTING(0, continue_playing, LANG_CONTINUE_PLAYING, false,
                   "continue playing", NULL),
+    OFFON_SETTING(0, mix_starts_with_selected, LANG_MIX_STARTS_WITH_SELECTED,
+                  true, "mix starts with selected", NULL),
+    /* Year is off by default: it is the hard one, and the one that depends on
+     * the tags being right. */
+    OFFON_SETTING(F_BANFROMQS, quiz_title, LANG_QUIZ_KIND_TITLE, true,
+                  "quiz title", NULL),
+    OFFON_SETTING(F_BANFROMQS, quiz_artist, LANG_QUIZ_KIND_ARTIST, true,
+                  "quiz artist", NULL),
+    OFFON_SETTING(F_BANFROMQS, quiz_album, LANG_QUIZ_KIND_ALBUM, true,
+                  "quiz album", NULL),
+    OFFON_SETTING(F_BANFROMQS, quiz_year, LANG_QUIZ_KIND_YEAR, false,
+                  "quiz year", NULL),
     CHOICE_SETTING(0, analysis_depth, LANG_ANALYSIS_DEPTH,
                    ANALYSIS_THOROUGH, "analysis depth", "thorough,quick",
                    NULL, 2,
@@ -1536,6 +1548,10 @@ const struct settings_list settings[] = {
      * as it runs. */
     OFFON_SETTING(F_BANFROMQS, tagcache_autocommit, LANG_AUTOCOMMIT_ON_STARTUP,
                   true, "tagcache_autocommit", NULL),
+    /* Read at scan time only, so a change reaches the database at the next
+     * rebuild and not before. */
+    OFFON_SETTING(F_BANFROMQS, year_from_folder, LANG_YEAR_FROM_FOLDER,
+                  false, "year from folder", NULL),
     /* Database search. The row and letter counts are choices rather than int
      * settings so the steps are fixed and the config file holds the figure as
      * written. Both store the index; db_search.c turns it back into a count. */
@@ -1762,6 +1778,12 @@ const struct settings_list settings[] = {
      * F_THEMERESET so loading such a skin turns it back off. */
     OFFON_SETTING(F_THEMERESET, dynamic_colors, LANG_DYNAMIC_COLORS, false,
                   "dynamic colors", NULL),
+    /* A light theme sets `light` so an album never turns it dark. */
+    CHOICE_SETTING(F_THEMERESET, dynamic_colors_background,
+                   LANG_DYNAMIC_COLORS_BACKGROUND, DYNAMIC_BG_AUTO,
+                   "dynamic colors background", "auto,light,dark", NULL, 3,
+                   ID2P(LANG_AUTO), ID2P(LANG_DYNAMIC_COLORS_LIGHT),
+                   ID2P(LANG_DYNAMIC_COLORS_DARK)),
     /* Re-buffers the artwork on change, so the now-playing screen switches
      * picture without waiting for the next track. Dynamic colours need no
      * part in this: they are extracted from whatever bitmap was buffered. */
@@ -1854,6 +1876,8 @@ const struct settings_list settings[] = {
     INT_SETTING(F_BANFROMQS, database_album_sort_ctx, LANG_SORT_ALBUMS_BY, 0,
                 "database album sort contexts", UNIT_INT, 0, 0xff, 1,
                 NULL, NULL, NULL),
+    OFFON_SETTING(0, sort_ignore_articles, LANG_SORT_IGNORE_ARTICLES, false,
+                  "sort ignoring articles", NULL),
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
@@ -1900,8 +1924,12 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_background,
                   LANG_CAROUSEL_BACKGROUND,
                   1, "album covers background",
-                  "foreground,background", NULL, 2,
-                  ID2P(LANG_FOREGROUND_COLOR), ID2P(LANG_BACKGROUND_COLOR)),
+                  "foreground,background,custom", NULL, 3,
+                  ID2P(LANG_FOREGROUND_COLOR), ID2P(LANG_BACKGROUND_COLOR),
+                  ID2P(LANG_CAROUSEL_BG_CUSTOM)),
+    /* Set by the Custom Colour row in album_covers_settings.c. */
+    {F_T_INT|F_RGB|F_THEMESETTING, &global_settings.album_covers_custom_color,
+        -1, INT(0), "album covers background color", UNUSED},
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_statusbar,
                   LANG_STATUS_BAR,
                   false, "album covers statusbar", NULL),

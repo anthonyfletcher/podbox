@@ -235,25 +235,45 @@ bool parse_color(enum screen_type screen, char *text, int *value)
             *value = LCD_RGBPACK(0, 0, 0) | COLOR_DARK;
             shade = text + 4;
         }
+        else if (strncasecmp(text, "accent", 6) == 0 &&
+                 (text[6] == '\0' || text[6] == '.' || text[6] == ':'))
+        {
+            *value = COLOR_ACCENT | COLOR_THEME;
+            shade = text + 6;
+        }
+        else if (strncasecmp(text, "dominant", 8) == 0 &&
+                 (text[8] == '\0' || text[8] == '.' || text[8] == ':'))
+        {
+            *value = COLOR_DOMINANT | COLOR_THEME;
+            shade = text + 8;
+        }
 
         if (shade)
         {
-            int pct = 0;
-
-            if (*shade == '\0')
-                return true;
-            if (!isdigit((unsigned char)shade[1]))
-                return false;
-            for (shade++; isdigit((unsigned char)*shade); shade++)
+            if (*shade == '.')
             {
-                pct = pct * 10 + (*shade - '0');
-                if (pct > 100)
+                int pct = 0;
+
+                if (!isdigit((unsigned char)shade[1]))
                     return false;
+                for (shade++; isdigit((unsigned char)*shade); shade++)
+                {
+                    pct = pct * 10 + (*shade - '0');
+                    if (pct > 100)
+                        return false;
+                }
+                *value |= (unsigned)(pct + 1) << COLOR_SHADE_SHIFT;
             }
-            if (*shade != '\0')
-                return false;
-            *value |= (unsigned)(pct + 1) << COLOR_SHADE_SHIFT;
-            return true;
+            if (*shade == ':' && (*value & COLOR_THEME))
+            {
+                int fallback;
+
+                if (hex_to_rgb(shade + 1, &fallback) < 0 || shade[7] != '\0')
+                    return false;
+                *value = (*value & ~COLOR_THEME) | fallback;
+                return true;
+            }
+            return *shade == '\0';
         }
 
         /* '!' before the digits pins the colour: the album palette carries

@@ -659,6 +659,9 @@ static int get_clause(int *condition)
 #undef CLAUSE
 }
 
+/* True while build_firstletter_menu() parses its rows. */
+static bool parsing_firstletter;
+
 static bool read_clause(struct tagcache_search_clause *clause)
 {
     char buf[SEARCHSTR_SIZE];
@@ -669,6 +672,9 @@ static bool read_clause(struct tagcache_search_clause *clause)
 
     if (get_clause(&clause->type) <= 0)
         return false;
+
+    if (parsing_firstletter && tagcache_tag_skips_articles(clause->tag))
+        clause->type |= CLAUSE_SORT_NAME;
 
     if (get_token_str(buf, sizeof buf) < 0)
         return false;
@@ -1063,11 +1069,29 @@ static bool parse_search(struct menu_entry *entry, const char *str)
     return true;
 }
 
+/* Set before each sort. An artist or album list with no sort key of its own
+ * ahead of the name, or only the year one, sorts its names by
+ * tagcache_sort_name(); sort_prefix is then the key's length, and -1 means
+ * names compare as written. */
+static int sort_prefix;
+static bool sort_prefix_inverse;
+
 static int compare(const void *p1, const void *p2)
 {
     struct tagentry *e1 = (struct tagentry *)p1;
     struct tagentry *e2 = (struct tagentry *)p2;
-    return qsort_fn(e1->name, e2->name, MAX_PATH);
+    const char *a = e1->name, *b = e2->name;
+
+    if (sort_prefix >= 0)
+    {
+        int res = strncmp(a, b, sort_prefix);
+
+        if (res != 0)
+            return sort_prefix_inverse ? -res : res;
+        a = tagcache_sort_name(a + sort_prefix);
+        b = tagcache_sort_name(b + sort_prefix);
+    }
+    return qsort_fn(a, b, MAX_PATH);
 }
 
 static int compare_with_albums(const void *p1, const void *p2)
@@ -1075,8 +1099,9 @@ static int compare_with_albums(const void *p1, const void *p2)
     struct tagentry *e1 = (struct tagentry *)p1;
     struct tagentry *e2 = (struct tagentry *)p2;
     int sort_album_res = qsort_fn(
-        e1->album_name == NULL ? "" : e1->album_name,
-        e2->album_name == NULL ? "" : e2->album_name, MAX_PATH);
+        e1->album_name == NULL ? "" : tagcache_sort_name(e1->album_name),
+        e2->album_name == NULL ? "" : tagcache_sort_name(e2->album_name),
+        MAX_PATH);
     if (sort_album_res != 0)
     {
         /* If album name is different */
@@ -1491,7 +1516,9 @@ static int parse_line(int n, char *buf, void *parameters)
                     }
                     logf("A-Z Menu subitem: %s", data);
                     read_menu = false;
+                    parsing_firstletter = true;
                     build_firstletter_menu(data, sizeof(data));
+                    parsing_firstletter = false;
                     break;
                 }
                 read_menu = true;
@@ -2229,6 +2256,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         strip = 0;
     }
 
+    /* A top-level list arrives in the database's own order and is otherwise
+     * not sorted here, which is the order Sort Ignoring The/A/An
+     * has to change. */
+    if (global_settings.sort_ignore_articles && tagcache_tag_skips_articles(tag))
+        sort = true;
+
     /* Album lists ordered by year rather than name; see write_year_prefix().
      * The order is per context, so Artist's albums can run by year while the
      * root Albums list runs by name. The table is refused outright when the
@@ -2550,6 +2583,11 @@ entry_skip_formatter:
             qsort_fn = sort_inverse ? strnatcasecmp_n_inv : strnatcasecmp_n;
         else
             qsort_fn = sort_inverse ? strncasecmp_inv : strncasecmp;
+
+        sort_prefix = -1;
+        if (tagcache_tag_skips_articles(tag) && strip == year_prefix)
+            sort_prefix = year_prefix;
+        sort_prefix_inverse = sort_inverse;
 
         struct tagentry *entries = get_entries(c);
         qsort(&entries[c->special_entry_count],

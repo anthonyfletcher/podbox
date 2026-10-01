@@ -68,9 +68,9 @@
 #Progress, in two tones
 %Vl(Progress,2,210,52,20,4)%Vf(000000)
 %ar%pc
-%Vl(Progress,60,214,200,6,-)%Vf(5ea8f0)
+%Vl(Progress,60,214,200,6,-)%Vf(accent:5ea8f0)
 %pb(0,0,-,-,noborder)
-%Vl(Progress,60,220,200,6,-)%Vf(2a7fd6)
+%Vl(Progress,60,220,200,6,-)%Vf(accent.75:2a7fd6)
 %pb(0,0,-,-,noborder)
 %Vl(Progress,266,210,52,20,4)%Vf(000000)
 %al-%pr
@@ -78,9 +78,9 @@
 #Volume
 %Vl(Volume,32,208,24,24,2)%Vf(000000)
 N
-%Vl(Volume,60,214,200,6,-)%Vf(5ea8f0)
+%Vl(Volume,60,214,200,6,-)%Vf(accent:5ea8f0)
 %pv(0,0,-,-,noborder)
-%Vl(Volume,60,220,200,6,-)%Vf(2a7fd6)
+%Vl(Volume,60,220,200,6,-)%Vf(accent.75:2a7fd6)
 %pv(0,0,-,-,noborder)
 %Vl(Volume,264,208,24,24,2)%Vf(000000)
 O

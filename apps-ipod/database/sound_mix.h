@@ -107,8 +107,9 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
 #define SOUND_MIX_TOO_LONG     -6   /* More tracks than a reorder can hold */
 
 /* Build a playlist of tracks that sound like the one at 'path', and start it.
- * The seed plays first and the rest follow in order of how near they are to
- * it, no more than two from any one artist.
+ * The seed plays first, or with Start With Selected Track off is left out,
+ * and the rest follow in order of how near they are to it, no more than two
+ * from any one artist.
  *
  * 'want' is a ceiling, not a quota. Only tracks actually near the goal are
  * offered, so a library holding few of them gives a short playlist rather
@@ -151,6 +152,7 @@ int sound_mix_journey(int from, int to, int want);
  *
  * That track plays first and does not come round again, as it does for a mix
  * built from a track -- winding down *from* something means starting there.
+ * With Start With Selected Track off it is left out altogether.
  * What it does not do is set the goal: the near end of the journey is the
  * track's nearest *mood*, because a journey moves between two moods' targets
  * and a track is not one of those.

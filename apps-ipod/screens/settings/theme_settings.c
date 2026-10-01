@@ -485,6 +485,8 @@ MENUITEM_FUNCTION_W_PARAM(browse_themes, 0, ID2P(LANG_CUSTOM_THEME),
 MENUITEM_SETTING(cursor_style, &global_settings.cursor_style, NULL);
 MENUITEM_SETTING(sep_menu, &global_settings.list_separator_height, NULL);
 MENUITEM_SETTING(dynamic_colors, &global_settings.dynamic_colors, NULL);
+MENUITEM_SETTING(dynamic_colors_background,
+                 &global_settings.dynamic_colors_background, NULL);
 
 /* Art beside the rows in the database browser. Both come from the shared
  * thumbnail cache, so turning them off only stops them being drawn. They are
@@ -517,6 +519,7 @@ MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
             &lss_settings,
             &set_sep_col,
             &dynamic_colors,
+            &dynamic_colors_background,
             &dialog_colors,                /* Dialog Colour Mode */
             &set_dlg_box_shadow_col,
             &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,

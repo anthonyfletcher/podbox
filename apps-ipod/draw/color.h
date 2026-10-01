@@ -32,6 +32,15 @@ int hex_to_rgb(const char* hex, int* color);
 #define COLOR_BRIGHT (1u << 25)
 #define COLOR_DARK   (1u << 26)
 
+/* Set on a colour a skin wrote as the word `accent` or `dominant`: the album's
+ * text or background colour by role. `accent:5ea8f0` puts the colour used
+ * with no palette in the bits below; plain `accent` sets COLOR_THEME instead,
+ * which stands for the theme's own foreground (or, for `dominant`, its
+ * background). */
+#define COLOR_ACCENT   (1u << 27)
+#define COLOR_DOMINANT (1u << 28)
+#define COLOR_THEME    (1u << 29)
+
 /* A palette word's shade, `bright.75`: the percentage of its brightness to
  * keep, mixed toward black. Held as the percentage plus one in the bits
  * between the colour and the flags, so zero means no suffix. */
@@ -39,8 +48,9 @@ int hex_to_rgb(const char* hex, int* color);
 #define COLOR_SHADE_MASK  (0x7fu << COLOR_SHADE_SHIFT)
 
 /* Parse a colour for the given screen, accepting the forms theme files and
- * skins use, plus a leading '!' for COLOR_FIXED and the words `bright` and
- * `dark`, each with an optional `.NN` shade. Returns true if text held a
+ * skins use, plus a leading '!' for COLOR_FIXED and the words `bright`,
+ * `dark`, `accent` and `dominant`, each with an optional `.NN` shade; the last
+ * two also take a `:rrggbb` fallback after it. Returns true if text held a
  * usable colour. */
 bool parse_color(enum screen_type screen, char *text, int *value);
 

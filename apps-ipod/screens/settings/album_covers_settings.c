@@ -18,6 +18,7 @@
 #include "metadata/art_cache.h"
 #include "screens/system/art_health.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
+#include "widgets/color_picker.h"
 
 /* The settings each view mode owns are named for it and grouped together under
  * View Mode, and each is hidden while the other mode is selected -- a row that
@@ -66,7 +67,62 @@ MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort
 MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
 MENUITEM_SETTING(album_covers_year_sort_order, &global_settings.album_covers_year_sort_order, NULL);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
-MENUITEM_SETTING(album_covers_background, &global_settings.album_covers_background, NULL);
+/* Custom needs a colour, so moving to it opens the picker, and the Custom
+ * Colour row under it, shown only then, changes the colour afterwards. */
+static int pick_custom_colour(void)
+{
+    int old = global_settings.album_covers_custom_color;
+
+    if (set_color(str(LANG_CAROUSEL_CUSTOM_COLOR),
+                  (unsigned *)&global_settings.album_covers_custom_color,
+                  (unsigned)-1))
+        return MENU_ATTACHED_USB;
+
+    if (global_settings.album_covers_custom_color != old)
+    {
+        settings_mark_user_tweak(
+            find_setting(&global_settings.album_covers_custom_color));
+        settings_save();
+    }
+    return 0;
+}
+
+static int background_callback(int action,
+                               const struct menu_item_ex *this_item,
+                               struct gui_synclist *this_list)
+{
+    static int was;
+
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_ENTER_MENUITEM)
+        was = global_settings.album_covers_background;
+    else if (action == ACTION_EXIT_MENUITEM
+             && global_settings.album_covers_background == CAROUSEL_BG_CUSTOM
+             && was != CAROUSEL_BG_CUSTOM)
+        pick_custom_colour();
+    return action;
+}
+
+static int custom_colour_callback(int action,
+                                  const struct menu_item_ex *this_item,
+                                  struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.album_covers_background != CAROUSEL_BG_CUSTOM)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_SETTING(album_covers_background,
+                 &global_settings.album_covers_background, background_callback);
+MENUITEM_FUNCTION(album_covers_custom_color_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_CAROUSEL_CUSTOM_COLOR), pick_custom_colour,
+                  custom_colour_callback, Icon_NOICON);
 MENUITEM_SETTING(album_covers_statusbar, &global_settings.album_covers_statusbar, NULL);
 
 /* Rebuilding and updating the cache are not here any more: they sit with every
@@ -123,6 +179,7 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_show_album_name,
             &album_covers_show_year,
             &album_covers_background,
+            &album_covers_custom_color_item,
             &album_covers_statusbar,
             &album_covers_year_sort_order,
             &album_covers_sort_albums_by,

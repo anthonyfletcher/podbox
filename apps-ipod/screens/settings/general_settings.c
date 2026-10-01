@@ -82,6 +82,7 @@ MENUITEM_SETTING(tagcache_scan_on_startup,
 MENUITEM_SETTING(tagcache_autocommit,
                  &global_settings.tagcache_autocommit, NULL);
 MENUITEM_SETTING(runtimedb, &global_settings.runtimedb, NULL);
+MENUITEM_SETTING(year_from_folder, &global_settings.year_from_folder, NULL);
 
 MENUITEM_FUNCTION(tc_export, MENU_ADVANCED, ID2P(LANG_TAGCACHE_EXPORT),
                   browser_db_export,
@@ -98,7 +99,7 @@ MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_ram,
                 &tagcache_scan_on_startup, &tagcache_scan_on_eject,
                 &tagcache_autocommit,
-                &runtimedb, &tc_paths,
+                &runtimedb, &tc_paths, &year_from_folder,
                 &tc_export, &tc_import, &debug_log_tagcache
                 );
 
@@ -263,13 +264,15 @@ static int sound_library_callback(int action,
     return action;
 }
 
+MENUITEM_SETTING(mix_starts_with_selected,
+                 &global_settings.mix_starts_with_selected, NULL);
 MENUITEM_FUNCTION(sound_library_item, 0, ID2P(LANG_SOUND_LIBRARY),
                   sound_library_run, sound_library_callback, Icon_NOICON);
 
 MAKE_MENU(playlist_engine_menu, ID2P(LANG_PLAYLIST_ENGINE), 0, Icon_Playlist,
             &playlist_engine, &analysis_depth, &mix_length,
-            &track_playlist, &mood_playlist, &continue_playing,
-            &sound_library_item);
+            &track_playlist, &mood_playlist, &mix_starts_with_selected,
+            &continue_playing, &sound_library_item);
 
 /** File view menu **/
 MENUITEM_SETTING(sort_case, &global_settings.sort_case, NULL);
@@ -983,6 +986,8 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
           &album_sort_root, &album_sort_artist, &album_sort_albumartist,
           &album_sort_composer, &database_sort_albums_by
           );
+MENUITEM_SETTING(sort_ignore_articles, &global_settings.sort_ignore_articles,
+                 NULL);
 
 MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
@@ -991,9 +996,36 @@ MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
 MENUITEM_SETTING(trim_titles, &global_settings.trim_titles, NULL);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
+/* The Music Quiz's kinds of question. One always stays on: turning off the
+ * last is put back, since a quiz asking nothing cannot be played. */
+static int quiz_kind_callback(int action, const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_list;
+
+    if (action == ACTION_EXIT_MENUITEM
+        && !global_settings.quiz_title && !global_settings.quiz_artist
+        && !global_settings.quiz_album && !global_settings.quiz_year)
+    {
+        *(bool *)this_item->variable = true;
+        settings_save();
+        splash(HZ * 2, ID2P(LANG_QUIZ_ONE_KIND));
+    }
+    return action;
+}
+
+MENUITEM_SETTING(quiz_title, &global_settings.quiz_title, quiz_kind_callback);
+MENUITEM_SETTING(quiz_artist, &global_settings.quiz_artist,
+                 quiz_kind_callback);
+MENUITEM_SETTING(quiz_album, &global_settings.quiz_album, quiz_kind_callback);
+MENUITEM_SETTING(quiz_year, &global_settings.quiz_year, quiz_kind_callback);
+MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
+          &quiz_title, &quiz_artist, &quiz_album, &quiz_year);
+
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &album_sort_menu, &music_menu_config_item, &featured_artists,
-          &segregate_audiobooks, &trim_titles, &search_menu
+          &album_sort_menu, &sort_ignore_articles, &music_menu_config_item,
+          &featured_artists, &segregate_audiobooks, &trim_titles,
+          &search_menu, &quiz_menu
           );
 
 /** The branches built here **/

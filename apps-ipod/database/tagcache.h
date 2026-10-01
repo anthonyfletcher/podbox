@@ -72,6 +72,11 @@ enum clause { clause_none, clause_is, clause_is_not, clause_gt, clause_gteq,
 	clause_not_oneof, clause_not_begins_oneof, clause_not_ends_oneof, clause_not_contains_oneof,
     clause_logical_or };
 
+/* Or'd into a clause's type: the tag's text is matched as it sorts, past a
+ * leading "The ", "A " or "An " while that setting is on. The by-first-letter
+ * menus set it, so their letters agree with the order of the lists. */
+#define CLAUSE_SORT_NAME 0x100
+
 struct tagcache_stat {
     char db_path[MAX_PATHNAME+1];  /* Path to DB root directory */
 
@@ -171,6 +176,13 @@ struct tagcache_search {
 
 
 const char* tagcache_tag_to_str(int tag);
+
+/* The text an artist or album sorts by: past a leading "The ", "A " or "An "
+ * while Sort Ignoring The/A/An is on, otherwise the name itself. Only
+ * the order changes; a list still shows the whole name. */
+const char *tagcache_sort_name(const char *name);
+/* Whether lists of this tag sort by tagcache_sort_name(): artists and albums. */
+bool tagcache_tag_skips_articles(int tag);
 
 bool tagcache_find_index(struct tagcache_search *tcs, const char *filename);
 bool tagcache_check_clauses(struct tagcache_search *tcs,

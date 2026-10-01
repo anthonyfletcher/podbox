@@ -356,6 +356,19 @@ static const char *colour_text(unsigned int c, char *buf, int len)
         return buf;
     }
 
+    if (c & (COLOR_ACCENT | COLOR_DOMINANT))
+    {
+        const char *word = (c & COLOR_ACCENT) ? "accent" : "dominant";
+        int n = snprintf(buf, len, "%s", word);
+
+        if (shade && n < len)
+            n += snprintf(buf + n, len - n, ".%u", shade - 1);
+        if (!(c & COLOR_THEME) && n < len)
+            snprintf(buf + n, len - n, ":%02x%02x%02x", RGB_UNPACK_RED(c),
+                     RGB_UNPACK_GREEN(c), RGB_UNPACK_BLUE(c));
+        return buf;
+    }
+
     c &= ~COLOR_FIXED;
     snprintf(buf, len, "%s%02x%02x%02x", fixed ? "!" : "",
              RGB_UNPACK_RED(c), RGB_UNPACK_GREEN(c), RGB_UNPACK_BLUE(c));
@@ -391,7 +404,7 @@ static void dump_viewports(const char *name, struct wps_data *data,
         struct skin_viewport *svp = SKINOFFSETTOPTR(skin_buffer, vp->data);
         struct viewport base;
         const char *fg_from, *bg_from;
-        char flags[48], fg_text[10], bg_text[10];
+        char flags[48], fg_text[24], bg_text[24];
 
         if (!svp)
             break;

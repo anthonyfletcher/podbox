@@ -49,6 +49,7 @@
 
 
 #include <string.h>
+#include <stdlib.h>                  /* abs */
 #include "lcd.h"
 #include "settings/settings.h"
 #include "kernel.h"
@@ -131,6 +132,9 @@
 struct dynamic_colors_cache {
     unsigned int dominant;       /* bg color */
     unsigned int accent;         /* fg color */
+    unsigned int found_dominant; /* the pair as extracted, before */
+    unsigned int found_accent;   /*   Dynamic Colors Background turns it */
+    int orientation;             /* the DYNAMIC_BG_* those two were turned by */
     unsigned int theme_fg;       /* saved original theme fg */
     unsigned int theme_bg;       /* saved original theme bg */
     unsigned int theme_sep;      /* saved list separator color */
@@ -241,6 +245,31 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
     forget_transforms();
 }
 
+/* The extracted pair, as Dynamic Colors Background asks: as found, or turned so
+ * the background is the lighter or the darker of the two. Contrast is
+ * symmetric, so either way round keeps every guarantee extraction made about
+ * the pair; what Light gives up is the dark-accent rescue in extract_colors(),
+ * since the colour that then reads over the artwork is the darker one. */
+static void apply_oriented(void)
+{
+    unsigned int black = LCD_RGBPACK(0, 0, 0);
+    unsigned int accent = cache.found_accent;
+    unsigned int dominant = cache.found_dominant;
+    bool accent_lighter = color_contrast(accent, black) >
+                          color_contrast(dominant, black);
+    int orientation = global_settings.dynamic_colors_background;
+
+    if ((orientation == DYNAMIC_BG_LIGHT && accent_lighter) ||
+        (orientation == DYNAMIC_BG_DARK && !accent_lighter))
+    {
+        accent = cache.found_dominant;
+        dominant = cache.found_accent;
+    }
+
+    cache.orientation = orientation;
+    apply_colors(accent, dominant, false);
+}
+
 /* Mean full-precision colour of the sampled pixels a quantised bucket caught.
  * The histogram is 4 bits a channel, so the bucket index alone is not a colour
  * worth putting on screen. */
@@ -272,15 +301,136 @@ static void average_bucket(const fb_data *pixels, int total_pixels, int stride,
     *out_b = count ? (int)(sum_b / count) : 0;
 }
 
+/* Hues for the accent, pooled rather than taken a bucket at a time.
+ *
+ * A soft gradient -- an iridescent disc, a sky -- spreads one hue over dozens
+ * of neighbouring buckets with a handful of pixels each, so no single bucket
+ * outscores a flat patch a fraction of its size. Hues are pooled into 30-degree
+ * sectors and each sector is judged with its two neighbours. */
+#define HUE_SECTORS    12
+#define HUE_MIN_SPREAD 2        /* 4-bit steps between channels to be a hue */
+#define HUE_MIN_SHARE  32       /* a run needs 1/32 of the samples */
+#ifndef HUE_ACCENT_SAT
+#define HUE_ACCENT_SAT 160      /* 0..255: the least an accent taken this way has */
+#endif
+
+/* The bucket's hue sector, or -1 for a grey, dark or near-white one.
+ *
+ * Grey is judged by the channels' spread in 4-bit steps, not by saturation: a
+ * single step is quantisation, and near black it reads as 20% saturation or
+ * more, which would make the specks of print on a pale cover count as a
+ * colour. Two steps keeps a pale pastel such as fdd. */
+static int bucket_sector(int i)
+{
+    int r4 = (i >> 8) & 0xF;
+    int g4 = (i >> 4) & 0xF;
+    int b4 = i & 0xF;
+    int h, s, v;
+
+    if ((r4 < 4 && g4 < 4 && b4 < 4) || (r4 > 13 && g4 > 13 && b4 > 13))
+        return -1;
+    if (MAX(MAX(r4, g4), b4) - MIN(MIN(r4, g4), b4) < HUE_MIN_SPREAD)
+        return -1;
+
+    color_get_hsv(LCD_RGBPACK(r4 * 17, g4 * 17, b4 * 17), &h, &s, &v);
+    return h * HUE_SECTORS / 360;
+}
+
+/* The picture's strongest run of one hue other than the dominant's, as its
+ * best-scored bucket, or -1 when no run covers HUE_MIN_SHARE of the picture.
+ * A run centred within a sector of a coloured dominant does not count.
+ * *run_count is the winning run's sample count. */
+static int strongest_hue_bucket(int dom_bucket, unsigned int *run_count)
+{
+    static int8_t sector_of[HISTOGRAM_BUCKETS];   /* 4 KB; off the stack */
+    unsigned int sector_count[HUE_SECTORS] = { 0 };
+    unsigned int samples = 0;
+    int dom_sector = -1;
+    int best_run = -1;
+    unsigned int best_run_count = 0;
+    int i;
+
+    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+    {
+        samples += histogram[i];
+        sector_of[i] = histogram[i] ? bucket_sector(i) : -1;
+        if (sector_of[i] >= 0)
+            sector_count[sector_of[i]] += histogram[i];
+    }
+
+    if (dom_bucket >= 0)
+        dom_sector = sector_of[dom_bucket];
+
+    for (i = 0; i < HUE_SECTORS; i++)
+    {
+        unsigned int run = sector_count[(i + HUE_SECTORS - 1) % HUE_SECTORS]
+                         + sector_count[i]
+                         + sector_count[(i + 1) % HUE_SECTORS];
+        int apart = abs(i - dom_sector);
+
+        if (dom_sector >= 0 && MIN(apart, HUE_SECTORS - apart) <= 1)
+            continue;
+        if (run > best_run_count)
+        {
+            best_run_count = run;
+            best_run = i;
+        }
+    }
+
+    *run_count = best_run_count;
+    if (best_run < 0 || best_run_count * HUE_MIN_SHARE < samples)
+        return -1;
+
+    int bucket = -1;
+    unsigned int bucket_score = 0;
+
+    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+    {
+        int d = abs(sector_of[i] - best_run);
+
+        if (sector_of[i] < 0 || i == dom_bucket || MIN(d, HUE_SECTORS - d) > 1)
+            continue;
+
+        int r4 = (i >> 8) & 0xF;
+        int g4 = (i >> 4) & 0xF;
+        int b4 = i & 0xF;
+        int max_c = MAX(MAX(r4, g4), b4);
+        int min_c = MIN(MIN(r4, g4), b4);
+        int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
+        unsigned int score = (unsigned int)histogram[i]
+                           * (sat + SATURATION_BASE) / SATURATION_BASE;
+
+        if (score > bucket_score)
+        {
+            bucket_score = score;
+            bucket = i;
+        }
+    }
+
+    return bucket;
+}
+
 /* The accent against a given dominant: the best-scored bucket clearing
- * MIN_RATIO against it, brought up to that ratio if nothing clears it. */
+ * MIN_RATIO against it, brought up to that ratio if nothing clears it.
+ *
+ * Unless that bucket is a grey, or there is none, and one hue covers more of
+ * the picture than it does. On a light or pastel cover every colour is too
+ * close to the dominant to be text on it, so the only buckets clearing the bar
+ * are a few specks of black print; the hue the cover is actually made of is
+ * then darkened or lightened until it reads instead. A white title on a dark
+ * cover keeps its white unless one hue covers more of the cover than it does.
+ *
+ * A dark hue must also read against the picture as a whole ('art_rl'), which
+ * black print does and a mid-dark hue may not; failing that sends
+ * extract_colors() into its dark-accent rescue, which turns the palette over. */
 static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
                         int dom_bucket, int32_t dom_rl, int dom_lum,
-                        int *out_r, int *out_g, int *out_b)
+                        int32_t art_rl, int *out_r, int *out_g, int *out_b)
 {
     int i;
 
     int accent_bucket = -1;
+    int hue_bucket = -1;
     unsigned int accent_score = 0;
 
     for (i = 0; i < HISTOGRAM_BUCKETS; i++)
@@ -313,13 +463,66 @@ static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
         }
     }
 
+    unsigned int run_count = 0;
+
+    if (accent_bucket < 0 || bucket_sector(accent_bucket) < 0)
+    {
+        hue_bucket = strongest_hue_bucket(dom_bucket, &run_count);
+        if (accent_bucket >= 0 && run_count <= histogram[accent_bucket])
+            hue_bucket = -1;
+    }
+
     int acc_r, acc_g, acc_b;
-    if (accent_bucket >= 0)
+    if (hue_bucket >= 0)
+    {
+        int dom_r, dom_g, dom_b;
+        unsigned int fitted;
+
+        average_bucket(pixels, total_pixels, stride, dom_bucket,
+                       &dom_r, &dom_g, &dom_b);
+        average_bucket(pixels, total_pixels, stride, hue_bucket,
+                       &acc_r, &acc_g, &acc_b);
+
+        /* A pastel darkened to read comes out a dull brown-grey, where the
+         * eye expects the colour the pastel is a pale version of. Only where
+         * that still reads, though: a saturated colour cannot get as light
+         * or as dark, and one the fit gives up on for black or white is
+         * worse than the paler hue it replaced. */
+        unsigned int dominant = LCD_RGBPACK(dom_r, dom_g, dom_b);
+        unsigned int hued = LCD_RGBPACK(acc_r, acc_g, acc_b);
+        unsigned int white = LCD_RGBPACK(255, 255, 255);
+        unsigned int black = LCD_RGBPACK(0, 0, 0);
+        int h, s, v;
+
+        color_get_hsv(hued, &h, &s, &v);
+        fitted = white;
+        if (s < HUE_ACCENT_SAT)
+            fitted = color_fit_contrast(color_from_hsv(h, HUE_ACCENT_SAT, v),
+                                        dominant, MIN_RATIO);
+        if (fitted == white || fitted == black)
+            fitted = color_fit_contrast(hued, dominant, MIN_RATIO);
+
+        /* A hue that cannot read at any brightness has lost to the accent
+         * it was replacing, which is often an off-white or a near-black with
+         * some warmth in it rather than the plain one the fit falls back to. */
+        if ((fitted == white || fitted == black) && accent_bucket >= 0)
+            hue_bucket = -1;
+        acc_r = RGB_UNPACK_RED(fitted);
+        acc_g = RGB_UNPACK_GREEN(fitted);
+        acc_b = RGB_UNPACK_BLUE(fitted);
+
+        if (compute_luminance(acc_r, acc_g, acc_b) < 128 &&
+            contrast_ratio(art_rl, rel_luminance(acc_r, acc_g, acc_b))
+                < ART_MIN_RATIO)
+            hue_bucket = -1;
+    }
+
+    if (hue_bucket < 0 && accent_bucket >= 0)
     {
         average_bucket(pixels, total_pixels, stride, accent_bucket,
                        &acc_r, &acc_g, &acc_b);
     }
-    else
+    else if (hue_bucket < 0)
     {
         /* Hard fallback: dark dominant -> white text, light -> black */
         if (dom_lum < 128)
@@ -463,7 +666,7 @@ static void extract_colors(const struct bitmap *bmp)
     int acc_r, acc_g, acc_b;
 
     pick_accent(pixels, total_pixels, stride, best_bucket, dom_rl, dom_lum,
-                &acc_r, &acc_g, &acc_b);
+                art_rl, &acc_r, &acc_g, &acc_b);
     unsigned int accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
 
     /* The dominant is not the only thing the accent is read against: a theme
@@ -519,7 +722,7 @@ static void extract_colors(const struct bitmap *bmp)
             dom_lum = compute_luminance(dom_r, dom_g, dom_b);
             dom_rl = rel_luminance(dom_r, dom_g, dom_b);
             pick_accent(pixels, total_pixels, stride, dark_bucket, dom_rl,
-                        dom_lum, &acc_r, &acc_g, &acc_b);
+                        dom_lum, art_rl, &acc_r, &acc_g, &acc_b);
             accent = LCD_RGBPACK(acc_r, acc_g, acc_b);
         }
     }
@@ -572,7 +775,9 @@ static void extract_colors(const struct bitmap *bmp)
         }
     }
 
-    apply_colors(accent, dominant, false);
+    cache.found_accent = accent;
+    cache.found_dominant = dominant;
+    apply_oriented();
 }
 
 /* ---------------------------------------------------------------------- *
@@ -1151,6 +1356,12 @@ void dynamic_colors_check_extraction(int aa_slot)
     }
     cache.was_enabled = enabled;
 
+    /* Dynamic Colors Background changed: turn the pair already found, which
+     * needs no art and so works while stopped too. */
+    if (enabled && cache.valid &&
+        cache.orientation != global_settings.dynamic_colors_background)
+        apply_oriented();
+
     if (!needs_extraction)
         return;
     if (!enabled)
@@ -1409,15 +1620,31 @@ static unsigned int resolve_mapped(unsigned int original,
 /* `bright` and `dark`: the lighter and darker of the pair, or the white and
  * black the parser left in the colour bits when there is no palette. The
  * accent is picked for contrast against the dominant, so one of the pair is
- * always the light one and the other the dark one. */
+ * always the light one and the other the dark one.
+ *
+ * `accent` and `dominant` name one of the pair outright. With no palette they
+ * are the fallback the skin wrote, or the theme's foreground or background. */
 static unsigned int resolve_palette_word(unsigned int original, bool palette)
 {
     unsigned int black = LCD_RGBPACK(0, 0, 0);
     unsigned int shade = (original & COLOR_SHADE_MASK) >> COLOR_SHADE_SHIFT;
-    unsigned int out = original & ~(COLOR_BRIGHT | COLOR_DARK |
+    unsigned int out = original & ~(COLOR_BRIGHT | COLOR_DARK | COLOR_ACCENT |
+                                    COLOR_DOMINANT | COLOR_THEME |
                                     COLOR_SHADE_MASK);
 
-    if (palette)
+    if (original & (COLOR_ACCENT | COLOR_DOMINANT))
+    {
+        bool accent = original & COLOR_ACCENT;
+
+        if (palette)
+            out = accent ? cache.accent : cache.dominant;
+        else if (original & COLOR_THEME)
+            out = accent ? (unsigned)global_settings.fg_color
+                         : (unsigned)global_settings.bg_color;
+        else
+            return out;     /* the fallback is used as written, unshaded */
+    }
+    else if (palette)
     {
         bool accent_lighter = color_contrast(cache.accent, black) >
                               color_contrast(cache.dominant, black);
@@ -1443,7 +1670,7 @@ unsigned int dynamic_colors_resolve(unsigned int original)
     if (original & COLOR_FIXED)
         return original & ~COLOR_FIXED;
 
-    if (original & (COLOR_BRIGHT | COLOR_DARK))
+    if (original & (COLOR_BRIGHT | COLOR_DARK | COLOR_ACCENT | COLOR_DOMINANT))
         return resolve_palette_word(original, palette);
 
     if (!palette)

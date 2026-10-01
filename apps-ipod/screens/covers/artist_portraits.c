@@ -79,6 +79,18 @@ static int compare_artists_by_plays(const void *a_v, const void *b_v)
     return b->playcount - a->playcount;
 }
 
+/* By name past a leading article, for Sort Ignoring The/A/An. Off, the
+ * database's own order is already by name and nothing is sorted. */
+static int compare_artists_by_name(const void *a_v, const void *b_v)
+{
+    const struct artist_data *a = a_v;
+    const struct artist_data *b = b_v;
+
+    return strcasecmp(
+        tagcache_sort_name(carousel_idx.artist_names + a->name_idx),
+        tagcache_sort_name(carousel_idx.artist_names + b->name_idx));
+}
+
 static int artist_build_index(void)
 {
     struct tagcache_search tcs;   /* local; the engine's shared tcs stays private */
@@ -124,6 +136,9 @@ static int artist_build_index(void)
     if (by_plays)
         qsort(carousel_idx.artist_index, carousel_idx.artist_ct,
               sizeof(struct artist_data), compare_artists_by_plays);
+    else if (global_settings.sort_ignore_articles)
+        qsort(carousel_idx.artist_index, carousel_idx.artist_ct,
+              sizeof(struct artist_data), compare_artists_by_name);
 
     return SUCCESS;
 }
@@ -154,12 +169,18 @@ static int artist_enter(int index)
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
 
+/* The name an artist sorts by, which is what the letter jumps compare. */
+static const char *artist_sort_name(int index)
+{
+    return tagcache_sort_name(artist_name(index));
+}
+
 /* Jump to the next/previous artist whose name starts with a different letter. */
 static int artist_jump_next(void)
 {
-    char *current = artist_name(center_index);
+    const char *current = artist_sort_name(center_index);
     for (int i = center_index + 1; i < carousel_idx.artist_ct; i++)
-        if (strncmp(artist_name(i), current, 1))
+        if (strncmp(artist_sort_name(i), current, 1))
             return i;
     return carousel_idx.artist_ct - 1;
 }
@@ -169,14 +190,14 @@ static int artist_jump_next(void)
  * into these three lines, and for where the shape came from. */
 static int artist_jump_prev(void)
 {
-    char *current = artist_name(center_index);
+    const char *current = artist_sort_name(center_index);
     int i = center_index - 1;
 
     if (i > 0)
     {
-        if (strncmp(artist_name(i), current, 1))
-            current = artist_name(i);
-        while (i > 0 && strncmp(artist_name(i - 1), current, 1) == 0)
+        if (strncmp(artist_sort_name(i), current, 1))
+            current = artist_sort_name(i);
+        while (i > 0 && strncmp(artist_sort_name(i - 1), current, 1) == 0)
             i--;
         return i;
     }

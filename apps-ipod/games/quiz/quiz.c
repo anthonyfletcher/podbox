@@ -1,8 +1,9 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The Music Quiz: a track plays from partway in, five titles are listed, and
- * the points for the round drain away until one is picked.
+ * The Music Quiz: a track plays from partway in, five answers are listed --
+ * titles, artists, albums or years, as the round asks -- and the points for
+ * the round drain away until one is picked.
  *
  * The clips play through the ordinary playback engine, from a throwaway
  * playlist of the ten tracks. The user's own playlist is set aside for the
@@ -149,7 +150,7 @@ static void scores_save(void)
 #define ROW_INSET   8           /* the rows' */
 #define ROW_GAP     4
 #define PIP         8
-#define PIP_GAP     4
+#define PIP_GAP     3
 #define BAR_H       6
 #define POINTS_W    36          /* room for "+100" */
 #define TILE        24
@@ -241,15 +242,16 @@ static void icon_at(int x, int y, unsigned fg, const char *glyph)
         text_at(font_icon, x, y, fg, glyph);
 }
 
-/* 's' cut to 'maxw' pixels in the UI font, with "..." where it was cut. A
- * title is one line and there is nowhere for the rest of it to go. */
-static const char *fit(char *buf, size_t size, const char *s, int maxw)
+/* 's' cut to 'maxw' pixels in 'font', with "..." where it was cut. A title
+ * is one line and there is nowhere for the rest of it to go. */
+static const char *fit(int font, char *buf, size_t size, const char *s,
+                       int maxw)
 {
     size_t len = strlcpy(buf, s, size);
 
     if (len >= size)
         len = size - 1;
-    if (text_w(FONT_UI, buf) <= maxw)
+    if (text_w(font, buf) <= maxw)
         return buf;
 
     while (len > 0)
@@ -259,7 +261,7 @@ static const char *fit(char *buf, size_t size, const char *s, int maxw)
         while (len > 0 && ((unsigned char)s[len] & 0xc0) == 0x80);
 
         snprintf(buf, size, "%.*s...", (int)len, s);
-        if (text_w(FONT_UI, buf) <= maxw)
+        if (text_w(font, buf) <= maxw)
             break;
     }
     return buf;
@@ -293,11 +295,21 @@ static bool answered_right(const struct view *v)
     return v->mode == V_ANSWER && v->picked == v->r->right;
 }
 
-/* The ten rounds as squares, and the score. */
+/* What this round asks, then the ten rounds as squares, then the score. The
+ * squares sit against the widest score there can be, so they stay put as the
+ * score grows a digit, and the question has the rest of the line. */
 static void draw_head(const struct view *v)
 {
-    char buf[16];
+    static const int asks[QUIZ_KINDS] = {
+        [QUIZ_KIND_TITLE]  = LANG_QUIZ_KIND_TITLE,
+        [QUIZ_KIND_ARTIST] = LANG_QUIZ_KIND_ARTIST,
+        [QUIZ_KIND_ALBUM]  = LANG_QUIZ_KIND_ALBUM,
+        [QUIZ_KIND_YEAR]   = LANG_QUIZ_KIND_YEAR,
+    };
+    char buf[16], ask[48];
     int score = v->score + (answered_right(v) ? v->points : 0);
+    int pips_w = QUIZ_ROUNDS * (PIP + PIP_GAP) - PIP_GAP;
+    int pips_x = LCD_WIDTH - EDGE - text_w(bold(), "1000") - 8 - pips_w;
 
     fill(0, 0, LCD_WIDTH, timer_y, COL_BACK);
 
@@ -312,13 +324,17 @@ static void draw_head(const struct view *v)
         else if (i == v->round)
             colour = COL_TEXT;
 
-        fill(EDGE + i * (PIP + PIP_GAP), head_y + (font_h - PIP) / 2,
+        fill(pips_x + i * (PIP + PIP_GAP), head_y + (font_h - PIP) / 2,
              PIP, PIP, colour);
     }
 
     snprintf(buf, sizeof(buf), "%d", score);
     text_at(bold(), LCD_WIDTH - EDGE - text_w(bold(), buf), head_y,
             COL_TEXT, buf);
+
+    text_at(bold(), EDGE, head_y, COL_TEXT,
+            fit(bold(), ask, sizeof(ask), str(asks[v->r->kind]),
+                pips_x - 12 - EDGE));
 }
 
 /* The line under the squares: listening, the draining bar, or the verdict --
@@ -437,7 +453,7 @@ static void draw_rows(const struct view *v)
         }
 
         text_at(FONT_UI, EDGE + 8, y + (row_h - font_h) / 2, fg,
-                fit(buf, sizeof(buf), v->r->title[i], maxw));
+                fit(FONT_UI, buf, sizeof(buf), v->r->choice[i], maxw));
     }
 }
 

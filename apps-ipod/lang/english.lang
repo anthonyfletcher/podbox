@@ -5890,13 +5890,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "View Current Playlist"
+    *: "View Queue"
   </source>
   <dest>
-    *: "View Current Playlist"
+    *: "View Queue"
   </dest>
   <voice>
-    *: "View Current Playlist"
+    *: "View Queue"
   </voice>
 </phrase>
 <phrase>
@@ -5974,13 +5974,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </source>
   <dest>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </dest>
   <voice>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </voice>
 </phrase>
 <phrase>
@@ -6030,13 +6030,13 @@
   desc: in playlist options menu, option to warn when erasing dynamic playlist
   user: core
   <source>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </source>
   <dest>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </dest>
   <voice>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </voice>
 </phrase>
 <phrase>
@@ -6044,13 +6044,13 @@
   desc: prompt shown when about to erase a modified dynamic playlist
   user: core
   <source>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </source>
   <dest>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </dest>
   <voice>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </voice>
 </phrase>
 <phrase>
@@ -6260,13 +6260,13 @@
   desc: The verb/action Queue
   user: core
   <source>
-    *: "Queue"
+    *: "Play Once"
   </source>
   <dest>
-    *: "Queue"
+    *: "Play Once"
   </dest>
   <voice>
-    *: "Queue"
+    *: "Play Once"
   </voice>
 </phrase>
 <phrase>
@@ -6274,13 +6274,13 @@
   desc: in onplay menu.  queue a track/playlist into dynamic playlist.
   user: core
   <source>
-    *: "Queue Next"
+    *: "Play Once Next"
   </source>
   <dest>
-    *: "Queue Next"
+    *: "Play Once Next"
   </dest>
   <voice>
-    *: "Queue Next"
+    *: "Play Once Next"
   </voice>
 </phrase>
 <phrase>
@@ -6288,13 +6288,13 @@
   desc: in onplay menu.  queue a track/playlist at end of playlist.
   user: core
   <source>
-    *: "Queue Last"
+    *: "Play Once at End"
   </source>
   <dest>
-    *: "Queue Last"
+    *: "Play Once at End"
   </dest>
   <voice>
-    *: "Queue Last"
+    *: "Play Once at End"
   </voice>
 </phrase>
 <phrase>
@@ -6302,13 +6302,13 @@
   desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
   user: core
   <source>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </source>
   <dest>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </dest>
   <voice>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </voice>
 </phrase>
 <phrase>
@@ -6316,13 +6316,13 @@
   desc: splash number of tracks inserted
   user: core
   <source>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </source>
   <dest>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </dest>
   <voice>
-    *: "tracks inserted"
+    *: "tracks added"
   </voice>
 </phrase>
 <phrase>
@@ -6330,13 +6330,13 @@
   desc: splash number of tracks queued
   user: core
   <source>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </dest>
   <voice>
-    *: "tracks queued"
+    *: "tracks to play once"
   </voice>
 </phrase>
 <phrase>
@@ -10900,13 +10900,13 @@
   desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
   user: core
   <source>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </source>
   <dest>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </dest>
   <voice>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </voice>
 </phrase>
 <phrase>
@@ -11605,13 +11605,13 @@
   desc: Used when you need to say playlist, also voiced
   user: core
   <source>
-    *: "Current Playlist"
+    *: "Queue"
   </source>
   <dest>
-    *: "Current Playlist"
+    *: "Queue"
   </dest>
   <voice>
-    *: "Current Playlist"
+    *: "Queue"
   </voice>
 </phrase>
 <phrase>
@@ -15399,13 +15399,13 @@
   desc:
   user: core
   <source>
-    *: "Add"
+    *: "Add to Queue"
   </source>
   <dest>
-    *: "Add"
+    *: "Add to Queue"
   </dest>
   <voice>
-    *: "Add"
+    *: "Add to Queue"
   </voice>
 </phrase>
 <phrase>
@@ -15497,13 +15497,13 @@
   desc: in onplay menu
   user: core
   <source>
-    *: "Queue..."
+    *: "Play Once..."
   </source>
   <dest>
-    *: "Queue..."
+    *: "Play Once..."
   </dest>
   <voice>
-    *: "Queue"
+    *: "Play Once"
   </voice>
 </phrase>
 <phrase>
@@ -15511,13 +15511,13 @@
   desc: in Current Playlist settings
   user: core
   <source>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </dest>
   <voice>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </voice>
 </phrase>
 <phrase>
@@ -16027,13 +16027,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </source>
   <dest>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </dest>
   <voice>
-    *: "Playing Next"
+    *: "Add to Queue"
   </voice>
 </phrase>
 <phrase>
@@ -16055,13 +16055,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </source>
   <dest>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </dest>
   <voice>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </voice>
 </phrase>
 <phrase>
@@ -16069,13 +16069,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last"
+    *: "Add to End"
   </source>
   <dest>
-    *: "Play Last"
+    *: "Add to End"
   </dest>
   <voice>
-    *: "Play Last"
+    *: "Add to End"
   </voice>
 </phrase>
 <phrase>
@@ -16083,13 +16083,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </source>
   <dest>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </dest>
   <voice>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </voice>
 </phrase>
 <phrase>
@@ -16190,13 +16190,13 @@
   desc: Confirmation dialog
   user: core
   <source>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </dest>
   <voice>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </voice>
 </phrase>
 <phrase>
@@ -22466,5 +22466,210 @@
   </dest>
   <voice>
     *: "Accessory connected"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES
+  desc: in Music settings: sort artists and albums past a leading The, A or An
+  user: core
+  <source>
+    *: "Sort Ignoring The/A/An"
+  </source>
+  <dest>
+    *: "Sort Ignoring The/A/An"
+  </dest>
+  <voice>
+    *: "Sort Ignoring The/A/An"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_FROM_FOLDER
+  desc: in Database settings: take the year from a "YYYY - Album" folder name
+  user: core
+  <source>
+    *: "Year From Folder Name"
+  </source>
+  <dest>
+    *: "Year From Folder Name"
+  </dest>
+  <voice>
+    *: "Year From Folder Name"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_STARTS_WITH_SELECTED
+  desc: in Playlist Engine settings: Play Similar and Wind Down lead with the chosen track
+  user: core
+  <source>
+    *: "Start With Selected Track"
+  </source>
+  <dest>
+    *: "Start With Selected Track"
+  </dest>
+  <voice>
+    *: "Start With Selected Track"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BG_CUSTOM
+  desc: in Carousel settings: Carousel Background choice, a colour of your own
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Custom"
+  </dest>
+  <voice>
+    *: "Custom"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_CUSTOM_COLOR
+  desc: in Carousel settings: the colour Carousel Background uses when Custom
+  user: core
+  <source>
+    *: "Custom Colour"
+  </source>
+  <dest>
+    *: "Custom Colour"
+  </dest>
+  <voice>
+    *: "Custom Colour"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_BACKGROUND
+  desc: in Colours settings: which of the album's two colours is the background
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_LIGHT
+  desc: in Colours settings: Dynamic Colors Background choice, the lighter one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Light"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Light"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Light"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_DARK
+  desc: in Colours settings: Dynamic Colors Background choice, the darker one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dark"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dark"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dark"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_QUESTIONS
+  desc: in Music settings: the Music Quiz's kinds of question
+  user: core
+  <source>
+    *: "Quiz Questions"
+  </source>
+  <dest>
+    *: "Quiz Questions"
+  </dest>
+  <voice>
+    *: "Quiz Questions"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_TITLE
+  desc: Music Quiz: a round asking for the track's title; also its setting
+  user: core
+  <source>
+    *: "Name the Track"
+  </source>
+  <dest>
+    *: "Name the Track"
+  </dest>
+  <voice>
+    *: "Name the Track"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ARTIST
+  desc: Music Quiz: a round asking for the track's artist; also its setting
+  user: core
+  <source>
+    *: "Name the Artist"
+  </source>
+  <dest>
+    *: "Name the Artist"
+  </dest>
+  <voice>
+    *: "Name the Artist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ALBUM
+  desc: Music Quiz: a round asking for the track's album; also its setting
+  user: core
+  <source>
+    *: "Name the Album"
+  </source>
+  <dest>
+    *: "Name the Album"
+  </dest>
+  <voice>
+    *: "Name the Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_YEAR
+  desc: Music Quiz: a round asking for the track's year; also its setting
+  user: core
+  <source>
+    *: "Name the Year"
+  </source>
+  <dest>
+    *: "Name the Year"
+  </dest>
+  <voice>
+    *: "Name the Year"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_ONE_KIND
+  desc: splash: the last kind of quiz question cannot be turned off
+  user: core
+  <source>
+    *: "One kind of question has to stay on"
+  </source>
+  <dest>
+    *: "One kind of question has to stay on"
+  </dest>
+  <voice>
+    *: "One kind of question has to stay on"
   </voice>
 </phrase>

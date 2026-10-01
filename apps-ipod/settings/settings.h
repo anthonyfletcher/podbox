@@ -188,6 +188,15 @@ enum
     QUEUE_SHOW_IN_SUBMENU
 };
 
+/* dynamic_colors_background: which of the album's two colours is the
+ * background -- as extracted, the lighter, or the darker. */
+enum
+{
+    DYNAMIC_BG_AUTO = 0,
+    DYNAMIC_BG_LIGHT,
+    DYNAMIC_BG_DARK
+};
+
 enum
 {
     BROWSER_DEFAULT_FILES = 0,
@@ -598,6 +607,7 @@ struct user_settings
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */
     bool tagcache_scan_on_startup; /* also check for changes at boot? */
     bool tagcache_autocommit;    /* finish an interrupted commit without asking */
+    bool year_from_folder;       /* a "YYYY - " folder name replaces the year */
     /* Database search. The two counts are indices into evenly spaced choice
      * lists, not the values themselves. */
     int db_search_max_rows;      /* 0..7 -> 25..200 results, in steps of 25 */
@@ -627,6 +637,11 @@ struct user_settings
     int mood_playlist;        /* MIX_VARY_* */
     int mix_length;           /* tracks in a generated playlist */
     bool continue_playing;    /* extend a playlist that runs out */
+    bool mix_starts_with_selected; /* Play Similar/Wind Down lead with it */
+    bool quiz_title;          /* the Music Quiz's kinds of question */
+    bool quiz_artist;
+    bool quiz_album;
+    bool quiz_year;
 
     unsigned char backdrop_file[MAX_PATHNAME+1];  /* backdrop bitmap file */
 
@@ -637,6 +652,7 @@ struct user_settings
     int lst_color; /* color of the text for the selector */
     unsigned char colors_file[MAX_FILENAME+1];
     bool dynamic_colors; /* auto-color from album art */
+    int  dynamic_colors_background; /* DYNAMIC_BG_*: which of the pair it is */
 
     /* Filters applied to cached artwork as the carousel and the database
      * browser read it, one slot each, run in order. A theme-wide property
@@ -697,6 +713,7 @@ struct user_settings
     int  album_covers_year_sort_order;
     bool album_covers_show_year;
     int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
+    int  album_covers_custom_color; /* ...when that is CAROUSEL_BG_CUSTOM */
     bool album_covers_statusbar;  /* show it, or take the screen and cover it */
     /* CAROUSEL_FILTER_CFG_VALS indices, run in order, on the slides only. */
     int  album_covers_filter[CAROUSEL_FILTER_SLOTS];
@@ -721,6 +738,9 @@ struct user_settings
      * under, so Artist and Album Artist can order their albums differently
      * while everything else keeps one answer. See browser_db.h. */
     int  database_album_sort_ctx;
+    /* Artists and albums sort past a leading "The ", "A " or "An ", in the
+     * database browser and the carousel. See tagcache_sort_name(). */
+    bool sort_ignore_articles;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

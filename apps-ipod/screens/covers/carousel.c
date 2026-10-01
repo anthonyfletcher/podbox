@@ -59,6 +59,7 @@
 #include "lang.h"
 #include "widgets/splash.h"
 #include "draw/viewport.h"
+#include "draw/color.h"           /* color_contrast */
 #include "system/activity.h"
 #include "system/app_util.h"
 #include "system/shutdown.h"
@@ -173,6 +174,16 @@ static void pf_update_dynamic_colors(void)
 
     pf_bg_color = (pix_t)dynamic_colors_resolve(fill);
     pf_fg_color = (pix_t)dynamic_colors_resolve(text);
+    if (global_settings.album_covers_background == CAROUSEL_BG_CUSTOM)
+    {
+        unsigned custom = global_settings.album_covers_custom_color;
+        unsigned white = LCD_RGBPACK(255, 255, 255);
+        unsigned black = LCD_RGBPACK(0, 0, 0);
+
+        pf_bg_color = (pix_t)custom;
+        pf_fg_color = (pix_t)(color_contrast(white, custom) >=
+                              color_contrast(black, custom) ? white : black);
+    }
     pf_lss_color = (pix_t)dynamic_colors_resolve(global_settings.lss_color);
     pf_lse_color = (pix_t)dynamic_colors_resolve(global_settings.lse_color);
     pf_lst_color = (pix_t)dynamic_colors_resolve(global_settings.lst_color);

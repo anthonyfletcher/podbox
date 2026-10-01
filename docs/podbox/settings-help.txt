@@ -476,11 +476,13 @@ Leaves the playing track in place when a new selection replaces the queue, so
 the music does not stop mid-song.
 
 [show shuffled adding options]
-Adds "insert shuffled" entries to the playlist context menus.
+Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a
+folder or playlist.
 
 [show queue options]
-Adds the queueing entries -- which play once and are then dropped -- to the
-context menus.
+Adds the Play Once entries to the Add to Queue menu. A play-once track leaves
+the queue after it has played and is skipped when the queue repeats; the queue
+marks it with a +.
 
 [max files in playlist]
 The largest number of tracks a playlist may hold. Building very large lists is
@@ -569,6 +571,10 @@ the desktop tool does a whole library thoroughly in minutes.
 
 Changing this does not re-measure anything. Rebuild Sound Analysis does.
 
+[mix starts with selected]
+Whether Play Similar and Wind Down play the track you chose them from first.
+Off, it is left out, and the playlist starts with the nearest match to it.
+
 [continue playing]
 Keeps the music going when a playlist runs out, by adding more tracks that
 sound like what has been playing and carrying on into them. Works for any
@@ -627,12 +633,26 @@ out of the music database.
 
 Changing it is best followed by a rebuild, or entries from the old set linger.
 
+[year from folder]
+Takes the year from the track's folder when its name starts with one, as in
+"1998 - Album", instead of from the tags. For libraries where the tags hold each
+track's own release date and the folder holds the album's.
+
+It replaces the year in the Music lists, album sorting and the carousel; the
+now playing screen still shows the tag. Takes effect at the next rebuild.
+
 [database sort albums by]
 The order for every album list that has no row of its own under Album Sort
 Order: by name, or by release year with either end first.
 
 The four rows above it override this for the lists they name, so this is what
 the rest of the Music menu follows.
+
+[sort ignoring articles]
+Sorts artists and albums as if a leading "The", "A" or "An" were not there, so
+The Beatles sits among the Bs. The names still show in full.
+
+Applies to the Music lists, By First Letter and the carousel.
 
 [debug log tagcache]
 Writes scan progress to a log file. For working out why a track is missing from
@@ -648,6 +668,22 @@ one-letter searches return more than they are worth.
 
 [search order]
 Which of tracks, albums and artists is listed first in search results.
+
+[quiz title]
+Music Quiz rounds that play a clip and ask which track it is.
+
+[quiz artist]
+Music Quiz rounds that play a clip and ask who it is by. The wrong answers are
+artists that sound alike, or share the genre and decade, as the game goes on.
+
+[quiz album]
+Music Quiz rounds that play a clip and ask which album it is from. In the later
+rounds the wrong answers are the same artist's other albums.
+
+[quiz year]
+Music Quiz rounds that play a clip and ask what year it is from. Off by default:
+the answers start five years apart and end one apart, and they are only as
+right as the year tags.
 
 [segregate audiobooks]
 Keeps spoken word out of the music and gives it an Audiobooks row on the main
@@ -754,7 +790,11 @@ Whether the album name is drawn over the covers, and where.
 Adds the release year to the caption.
 
 [album covers background]
-Which theme colour fills the screen behind the covers.
+Which colour fills the screen behind the covers: one of the theme's, which
+follows Dynamic Colours, or Custom, a colour of your own that stays put.
+
+Choosing Custom opens a colour picker; Custom Colour below it changes the colour
+later. The captions turn black or white to read on it.
 
 [album covers statusbar]
 Draws the status bar over the carousel. Off gives the covers the whole screen.
@@ -882,6 +922,13 @@ over. A theme-author setting.
 Recolours the interface from the artwork of whatever is playing. A skin not
 written for it will look wrong, since it cannot know what its colours will
 become.
+
+[dynamic colors background]
+Which of the album's two colours becomes the background. Auto takes the one
+the artwork has most of; Light and Dark always take the lighter or the darker.
+
+Light keeps a light theme light whatever is playing; the text is then the
+darker colour, which may be harder to read where a skin draws it over the art.
 
 [dialog colours]
 How the confirmation and message boxes are coloured.
@@ -1363,6 +1410,10 @@ Removes the background image, leaving the background colour showing through.
 
 The backdrop comes back the next time a theme is loaded.
 
+[action: Custom Colour]
+The colour behind the carousel's covers while Background is Custom. Dynamic
+Colours leave it alone, and the captions turn black or white to read on it.
+
 [action: Foreground Colour]
 The default text colour for lists and menus.
 
@@ -1532,10 +1583,10 @@ Artist images are looked for beside the music and in the artist art folder.
 Builds a playlist from the folder you are in, including everything below it, and
 saves it in the playlist catalogue.
 
-[action: View Current Playlist]
+[action: View Queue]
 Opens what is queued to play now, where tracks can be moved or removed.
 
-[action: Save Current Playlist]
+[action: Save Queue as Playlist]
 Writes what is playing now to a playlist file, so that it survives being
 replaced by the next thing you play.
 

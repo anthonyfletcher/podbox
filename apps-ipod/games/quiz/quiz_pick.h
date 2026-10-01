@@ -12,12 +12,24 @@
 #define QUIZ_CHOICES    5
 #define QUIZ_TITLE_MAX  96
 
+/* What a round asks for. Each is a setting; a round takes one of those that
+ * are on and that its track has an answer for. */
+enum quiz_kind
+{
+    QUIZ_KIND_TITLE,
+    QUIZ_KIND_ARTIST,
+    QUIZ_KIND_ALBUM,
+    QUIZ_KIND_YEAR,
+    QUIZ_KINDS
+};
+
 struct quiz_round
 {
     char path[MAX_PATH];        /* the track that plays */
     unsigned long length;       /* ms */
-    char title[QUIZ_CHOICES][QUIZ_TITLE_MAX];
-    int right;                  /* which title[] is the track's */
+    enum quiz_kind kind;
+    char choice[QUIZ_CHOICES][QUIZ_TITLE_MAX];
+    int right;                  /* which choice[] is the track's */
 };
 
 #define QUIZ_PICK_OK        0
@@ -28,9 +40,11 @@ struct quiz_round
 /* Fill all QUIZ_ROUNDS of 'rounds'. A QUIZ_PICK_* code.
  *
  * Music only, never spoken word, and nothing under a minute and a half. The
- * wrong titles close in on the right one as the rounds go: by how they sound
+ * wrong answers close in on the right one as the rounds go: by how they sound
  * where the Sound Index has measured the track, by genre and decade where it
- * has not. */
+ * has not, and for a year by how many years apart. A kind that cannot make a
+ * round gives it to another kind that is on; QUIZ_PICK_TOO_FEW means none
+ * could. */
 int quiz_pick(struct quiz_round *rounds);
 
 #endif /* _QUIZ_PICK_H */

@@ -58,10 +58,12 @@ enum year_sort_order_values {
 
 /* Values for global_settings.album_covers_background: which of the theme's two
  * colours fills the carousel, the other drawing the captions. Both resolve
- * through dynamic colours. */
+ * through dynamic colours. A custom colour does not, and its captions are
+ * black or white, whichever reads. */
 enum carousel_background_values {
     CAROUSEL_BG_FOREGROUND = 0,  /* the status bar's colour */
-    CAROUSEL_BG_BACKGROUND       /* the same background as every other screen */
+    CAROUSEL_BG_BACKGROUND,      /* the same background as every other screen */
+    CAROUSEL_BG_CUSTOM           /* album_covers_custom_color */
 };
 
 /* selected_file: jump to this file's album on open (e.g. context_menu.c's

@@ -1156,14 +1156,15 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
         return SOUND_MIX_NO_PLAYLIST;
     }
 
-    /* The seed goes first, so a mix starts with what it was asked about. A
-     * mood or an album's mean is not a track and begins at its own first
-     * choice. */
-    if (!append && seed_path != NULL && skip_key != 0
-        && playlist_insert_context_add(&context, seed_path) >= 0)
-    {
+    /* The seed goes first, so a mix starts with what it was asked about,
+     * unless Start With Selected Track is off; either way it is not among the
+     * choices. A mood or an album's mean is not a track and begins at its own
+     * first choice. */
+    bool lead = !append && seed_path != NULL && skip_key != 0
+                && global_settings.mix_starts_with_selected;
+
+    if (lead && playlist_insert_context_add(&context, seed_path) >= 0)
         added++;
-    }
 
     for (i = 0; i < chosen; i++)
     {
@@ -1183,7 +1184,7 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
 
     /* Tracks were chosen and none of them could be read back, which is a
      * different fault from finding nothing near enough. */
-    if (added <= (!append && seed_path != NULL && skip_key != 0 ? 1 : 0))
+    if (added <= (lead ? 1 : 0))
         return SOUND_MIX_NO_PLAYLIST;
 
     /* What built this, so a continuation can carry on in the same terms

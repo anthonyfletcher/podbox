@@ -856,7 +856,7 @@ same colour; nothing is being remapped either way.
 
 ---
 
-## Palette colours, `bright` and `dark`
+## Palette colours: `bright`, `dark`, `accent` and `dominant`
 
 Any colour argument that takes `rrggbb` also takes the word `bright` or `dark`:
 the lighter or the darker of the two colours dynamic colours take from the
@@ -888,6 +888,23 @@ written, such as the lower half of a glossy bar:
 ```
 
 The shade applies with no album colours too: `bright.75` is then a light grey.
+
+`accent` and `dominant` name the album's two colours by role instead: `accent`
+is its text colour and `dominant` its background. Use them where the role
+matters more than which is lighter, such as a progress bar that should always
+be the album's highlight:
+
+```
+%Vl(Bar,60,214,200,6,-)%Vf(accent:5ea8f0)       # upper half
+%pb(0,0,-,-,noborder)
+%Vl(Bar,60,220,200,6,-)%Vf(accent.75:2a7fd6)    # lower half
+%pb(0,0,-,-,noborder)
+```
+
+After a `:` comes the colour to use with no album colours, exactly as written,
+so the skin looks as designed until something plays; the shade applies only to
+album colours. Without one, `accent` is the theme's foreground colour and
+`dominant` its background, shaded. The `.NN` shade goes before the `:`.
 
 Like `!`, the words are skin-only; a `.cfg` does not take them.
 

@@ -93,7 +93,8 @@
 
 /* Not theme-controlled: layout is fixed/proportional (see init()) and
  * colours come from the theme's normal fg/bg + the dynamic (album-art
- * derived) colour scheme, same as everywhere else.
+ * derived) colour scheme, same as everywhere else -- or, for the background,
+ * from Carousel Background's Custom colour, which the album never changes.
  *
  * It cannot be themed further while it draws the way it does. This screen
  * repaints its own pixels every frame, straight to the framebuffer, outside
@@ -192,12 +193,13 @@ static char* get_album_artist(const int slide_index)
 }
 
 
-static char* get_slide_name(const int slide_index, bool artist)
+/* The name a slide sorts by, which is what the letter jumps compare. */
+static const char* get_slide_name(const int slide_index, bool artist)
 {
     if (artist)
-        return get_album_artist(slide_index);
+        return tagcache_sort_name(get_album_artist(slide_index));
 
-    return get_album_name(slide_index);
+    return tagcache_sort_name(get_album_name(slide_index));
 }
 
 static int jmp_idx_prev(void)
@@ -231,7 +233,7 @@ static int jmp_idx_prev(void)
     else
     {
         bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
-        char *current_selection = get_slide_name(center_index, by_artist);
+        const char *current_selection = get_slide_name(center_index, by_artist);
         int i = center_index - 1;
 
         if (i > 0)
@@ -260,7 +262,7 @@ static int jmp_idx_next(void)
     else
     {
         bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
-        char *current_selection = get_slide_name(center_index, by_artist);
+        const char *current_selection = get_slide_name(center_index, by_artist);
         for (int i = center_index + 1; i < carousel_idx.album_ct; i++ )
             if(strncmp(get_slide_name(i, by_artist), current_selection, 1))
                 return i;
@@ -388,6 +390,20 @@ static unsigned int album_art_key(int slide_index)
  * nothing else: it reads settings this screen owns, and no other reader of the
  * index wants it. The charts rank the same albums their own way, and Random
  * album picks by number. */
+/* Two names in the order the setting asks for: by position in the name buffer,
+ * which the database wrote alphabetically, or by the names themselves past a
+ * leading article. A position outside the buffer keeps the positional order
+ * rather than being read. */
+static int name_order(const char *names, size_t len, uint32_t a, uint32_t b)
+{
+    if (a == b || !global_settings.sort_ignore_articles || a >= len || b >= len)
+        return (int)(a - b);
+
+    int res = strcasecmp(tagcache_sort_name(names + a),
+                         tagcache_sort_name(names + b));
+    return res != 0 ? res : (int)(a - b);
+}
+
 static int compare_albums(const void *a_v, const void *b_v)
 {
     uint32_t artist_a = ((struct album_data *)a_v)->artist_idx;
@@ -403,7 +419,8 @@ static int compare_albums(const void *a_v, const void *b_v)
     {
         case SORT_BY_ARTIST_AND_NAME:
             if (artist_a - artist_b == 0)
-                return (int)(album_a - album_b);
+                return name_order(carousel_idx.album_names,
+                                  carousel_idx.album_len, album_a, album_b);
             break;
         case SORT_BY_ARTIST_AND_YEAR:
             if (artist_a - artist_b == 0)
@@ -425,11 +442,13 @@ static int compare_albums(const void *a_v, const void *b_v)
             break;
         case SORT_BY_NAME:
             if (album_a - album_b != 0)
-                return (int)(album_a - album_b);
+                return name_order(carousel_idx.album_names,
+                                  carousel_idx.album_len, album_a, album_b);
             break;
     }
 
-    return (int)(artist_a - artist_b);
+    return name_order(carousel_idx.artist_names, carousel_idx.artist_len,
+                      artist_a, artist_b);
 }
 
 /* carousel_model.build_index for the album model: the whole index, into the

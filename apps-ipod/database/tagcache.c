@@ -1372,6 +1372,32 @@ inline static bool str_contains_oneof(const char *str, char *list)
 	return false;
 }
 
+/* An article is skipped only with something after it: "The The" sorts as
+ * "The", and a band called "A" stays under A. */
+const char *tagcache_sort_name(const char *name)
+{
+    static const char * const articles[] = { "the ", "a ", "an " };
+
+    if (!global_settings.sort_ignore_articles)
+        return name;
+
+    for (size_t i = 0; i < ARRAYLEN(articles); i++)
+    {
+        size_t len = strlen(articles[i]);
+
+        if (!strncasecmp(name, articles[i], len) && name[len] != '\0')
+            return name + len;
+    }
+
+    return name;
+}
+
+bool tagcache_tag_skips_articles(int tag)
+{
+    return tag == tag_artist || tag == tag_album || tag == tag_albumartist
+        || tag == tag_virt_canonicalartist;
+}
+
 static bool check_against_clause(long numeric, const char *str,
                                  const struct tagcache_search_clause *clause)
 {
@@ -1397,7 +1423,12 @@ static bool check_against_clause(long numeric, const char *str,
     }
     else
     {
-        switch (clause->type)
+        int type = clause->type & ~CLAUSE_SORT_NAME;
+
+        if (clause->type & CLAUSE_SORT_NAME)
+            str = tagcache_sort_name(str);
+
+        switch (type)
         {
             case clause_is:
                 return !strcasecmp(clause->str, str);
@@ -1431,12 +1462,12 @@ static bool check_against_clause(long numeric, const char *str,
                 /* Fall-Through */
             case clause_begins_oneof:
                 return str_begins_ends_oneof(str, clause->str,
-                                             clause->type == clause_begins_oneof);
+                                             type == clause_begins_oneof);
             case clause_not_ends_oneof:
                 /* Fall-Through */
             case clause_not_begins_oneof:
                 return !str_begins_ends_oneof(str, clause->str,
-                                            clause->type == clause_not_begins_oneof);
+                                            type == clause_not_begins_oneof);
 			case clause_contains_oneof:
 				return str_contains_oneof(str, clause->str);
 			case clause_not_contains_oneof:
@@ -1465,7 +1496,7 @@ static bool check_clauses(struct tagcache_search *tcs,
         struct tagcache_search_clause *clause = clauses[i];
 
         logf_clauses("%s clause %d %s %s [%ld] %s",
-            "Checking",  i, tag_type_str[clause->type],
+            "Checking",  i, tag_type_str[clause->type & ~CLAUSE_SORT_NAME],
             tags_str[clause->tag],  clause->numeric_data,
             (clause->numeric || clause->str == NULL) ? "[NUMERIC?]" : clause->str);
 
@@ -1562,7 +1593,7 @@ static bool check_clauses(struct tagcache_search *tcs,
         }
 
         logf_clauses("%s clause %d %s %s [%ld] %s",
-            "Found",  i, tag_type_str[clause->type],
+            "Found",  i, tag_type_str[clause->type & ~CLAUSE_SORT_NAME],
             tags_str[clause->tag],  clause->numeric_data,
             (clause->numeric || clause->str == NULL) ? "[NUMERIC?]" : clause->str);
     }
@@ -2256,6 +2287,33 @@ static int check_if_empty(char **tag)
  * idea, as it uses lots of stack and is called from a recursive function
  * (check_dir).
  */
+/* The year a track's own folder is named after, as in "1998 - Album", or 0:
+ * four digits from 1900 to 2099, then anything but a fifth digit. */
+static int folder_name_year(const char *path)
+{
+    const char *end = strrchr(path, '/');
+    const char *start = end;
+    int year = 0;
+
+    if (end == NULL)
+        return 0;
+    while (start > path && start[-1] != '/')
+        start--;
+    if (end - start < 4)
+        return 0;
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (!isdigit((unsigned char)start[i]))
+            return 0;
+        year = year * 10 + (start[i] - '0');
+    }
+    if (isdigit((unsigned char)start[4]))
+        return 0;
+
+    return (year >= 1900 && year <= 2099) ? year : 0;
+}
+
 static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
 {
     #define ADD_TAG(entry, tag, data) \
@@ -2356,6 +2414,13 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
 
     /* Numeric tags */
     entry.tag_offset[tag_year] = id3.year;
+    if (global_settings.year_from_folder)
+    {
+        int year = folder_name_year(path);
+
+        if (year > 0)
+            entry.tag_offset[tag_year] = year;
+    }
     entry.tag_offset[tag_discnumber] = id3.discnum;
     entry.tag_offset[tag_tracknumber] = id3.tracknum;
     entry.tag_offset[tag_length] = id3.length;

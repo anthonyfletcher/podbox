@@ -84,6 +84,7 @@
 #include "system/activity.h"
 #include "system/strutil.h"
 #include "system/app_util.h"
+#include "system/format_time.h"
 #include "system/shutdown.h"
 #include "storage.h"
 #include "string-extra.h"
@@ -557,6 +558,83 @@ static int winddown_callback(int action,
 MENUITEM_FUNCTION(winddown_item, 0, ID2P(LANG_WINDDOWN),
                   winddown_run, winddown_callback, Icon_Audio);
 
+/* Sleep Timer from the now-playing screen: a length to start it with, Sleep
+ * Timer Duration's own preselected, and Cancel first while one is running.
+ * Choosing a length starts the timer and leaves the setting as it was. */
+#define SLEEP_CHOICES_MAX 8     /* Cancel, the lengths, and the setting's */
+
+static int sleep_minutes[SLEEP_CHOICES_MAX];    /* 0 is Cancel */
+
+static const char *sleep_choice_name(int selected_item, void *data,
+                                     char *buffer, size_t buffer_len)
+{
+    (void)data;
+
+    if (sleep_minutes[selected_item] == 0)
+        return str(LANG_SLEEP_TIMER_CANCEL_CURRENT);
+    return format_sleeptimer(buffer, buffer_len, sleep_minutes[selected_item],
+                             NULL);
+}
+
+static int sleep_timer_run(void)
+{
+    static const int lengths[] = { 15, 30, 45, 60, 90, 120 };
+    int preferred = global_settings.sleeptimer_duration;
+    struct simplelist_info info;
+    bool placed = false;
+    int count = 0, choice = 0;
+
+    if (get_sleep_timer() > 0)
+        sleep_minutes[count++] = 0;
+
+    for (size_t i = 0; i < ARRAYLEN(lengths); i++)
+    {
+        if (!placed && preferred <= lengths[i])
+        {
+            choice = count;
+            if (preferred < lengths[i])
+                sleep_minutes[count++] = preferred;
+            placed = true;
+        }
+        sleep_minutes[count++] = lengths[i];
+    }
+    if (!placed)
+    {
+        choice = count;
+        sleep_minutes[count++] = preferred;
+    }
+
+    simplelist_info_init(&info, str(LANG_SLEEP_TIMER), count, NULL);
+    info.get_name = sleep_choice_name;
+    info.selection = choice;
+    if (simplelist_show_list(&info))
+        return ONPLAY_MAINMENU;
+
+    if (info.selection >= 0)
+        set_sleeptimer_duration(sleep_minutes[info.selection]);
+    return ONPLAY_OK;
+}
+
+/* "Sleep Timer", or with one running, the time it has left. */
+static char *sleep_timer_name(int selected_item, void *data,
+                              char *buffer, size_t buffer_len)
+{
+    int left = get_sleep_timer();
+    char time[10];
+
+    (void)selected_item;
+    (void)data;
+
+    if (left <= 0)
+        return (char *)str(LANG_SLEEP_TIMER);
+    snprintf(buffer, buffer_len, "%s (%s)", str(LANG_SLEEP_TIMER),
+             format_sleeptimer(time, sizeof(time), (left + 59) / 60, NULL));
+    return buffer;
+}
+
+MENUITEM_FUNCTION_DYNTEXT(sleep_timer_item, 0, sleep_timer_run,
+                          sleep_timer_name, NULL, NULL, NULL, Icon_NOICON);
+
 /* The read-out over a set of tracks: a folder in the file browser, a row's
  * subentries in the database. The gathering is sound_album_gather()'s, which
  * Play Similar uses too; this one shows the answer rather than aiming at it. */
@@ -793,10 +871,10 @@ MENUITEM_FUNCTION_W_PARAM(q_last_shuf_pl_item, 0, ID2P(LANG_QUEUE_LAST_SHUFFLED)
 /* queue submenu */
 MAKE_ONPLAYMENU(queue_menu, ID2P(LANG_QUEUE_MENU),
                 treeplaylist_callback, Icon_Playlist,
-                &q_first_pl_item,
                 &q_pl_item,
-                &q_shuf_pl_item,
                 &q_last_pl_item,
+                &q_first_pl_item,
+                &q_shuf_pl_item,
                 &q_last_shuf_pl_item);
 
 /* replace playlist */
@@ -812,16 +890,16 @@ MAKE_ONPLAYMENU(browser_playlist_menu, ID2P(LANG_PLAYING_NEXT),
                 treeplaylist_callback, Icon_Playlist,
 
                 /* insert */
-                &i_first_pl_item,
                 &i_pl_item,
                 &i_last_pl_item,
+                &i_first_pl_item,
                 &i_shuf_pl_item,
                 &i_last_shuf_pl_item,
 
                 /* queue */
-                &q_first_pl_item,
                 &q_pl_item,
                 &q_last_pl_item,
+                &q_first_pl_item,
                 &q_shuf_pl_item,
                 &q_last_shuf_pl_item,
 
@@ -1568,6 +1646,7 @@ MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &view_chapters_item,
            &sound_mix_item,
            &winddown_item,
+           &sleep_timer_item,
            &spike_run_item,
            &context_item_1,
            &context_item_2,
