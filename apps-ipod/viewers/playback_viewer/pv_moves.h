@@ -15,7 +15,7 @@ bool pv_moves_stale(int db_entries, long db_commit);
 
 /* Match the log's missing folders to where their files are now, and save the
  * table. Reads the whole playback log and walks the database's filenames
- * twice, so it belongs right after a name-map sweep and nowhere else.
+ * twice, so pv_names_init() runs it only when the saved table is stale.
  * 'scratch' is working memory only; nothing in it survives the call. */
 void pv_moves_build(void *scratch, size_t size, int db_entries,
                     long db_commit);
@@ -36,8 +36,7 @@ const char *pv_moves_apply(const char *path);
  * moved paths to be keyed to. 0 when there is no table for this database. */
 unsigned long pv_moves_ident(int db_entries, long db_commit);
 
-/* Delete the saved table. No folder is then treated as moved until the next
- * name-map sweep builds a new one. */
+/* Delete the saved table. The next pv_names_init() builds a new one. */
 void pv_moves_discard(void);
 
 #endif /* _PV_MOVES_H */

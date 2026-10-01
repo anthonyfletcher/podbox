@@ -22,7 +22,7 @@
  * the fork's own and answers to nothing. */
 struct sound_record
 {
-    uint64_t key;            /* sound_index_key() of the track's path */
+    uint64_t key;            /* path_key() of the track's path */
 
     /* What makes a record stale. Two of them, because neither is enough on
      * its own and because they are not equally available.
@@ -110,22 +110,6 @@ struct sound_record
 #define SOUND_ERR_MEM    -2
 #define SOUND_ERR_NONE   -3   /* No index, and this call does not build one */
 
-/* Keys.
- *
- * FNV-1a as system/hash.h defines it, but 64-bit and written here rather than
- * taken from there: that header says in as many words that nothing may write
- * its values to disk and expect a later build to reproduce them. These go to
- * disk and must survive a rebuild, so the arithmetic is pinned here and the
- * constants below are the standard ones. Do not "tidy" this into hash.h.
- *
- * Sixty-four bits, not thirty-two, because thirty-two collide about once in
- * every three hundred libraries of five thousand tracks -- rare enough to pass
- * testing and certain enough to happen, and the symptom is one track wearing
- * another's measurements for good.
- *
- * The path is folded to lower case on the way in. FAT does not distinguish
- * case, so the same file can come back differently cased and would otherwise
- * key to two different records. */
 /* Whether a record carries a measurement at all.
  *
  * A decode that failed is written anyway, so a broken file is not retried on
@@ -136,13 +120,7 @@ struct sound_record
  * flag, which is one bit of a rule with two halves. */
 bool sound_record_usable(const struct sound_record *r);
 
-/* The portion of a path the index keys by -- the same path with any volume
- * specifier removed, pointing into the caller's own string. Callers that
- * group tracks by where they sit need this too, or a path from one tagcache
- * call will not group with the same track's path from another. */
-const char *sound_index_path(const char *path);
-
-uint64_t sound_index_key(const char *path);
+/* The first genre a field names, folded and hashed to 32 bits. */
 uint32_t sound_index_genre_key(const char *genre);
 
 /* Fill a record from one measurement. */

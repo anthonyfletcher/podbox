@@ -49,6 +49,7 @@
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
 #include "database/sound_cal.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "database/tagcache.h"
 #include "screens/system/sound_scan.h"
@@ -334,7 +335,7 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
     struct track_sound s;
     struct sound_record rec;
     unsigned long start_ms, analysed = 0;
-    uint64_t key = sound_index_key(path);
+    uint64_t key = path_key(path);
     uint32_t size = ss_file_size(path);
     long t0;
     int rc;
@@ -618,7 +619,7 @@ bool sound_scan_screen(bool rebuild)
          * the track still exists, which is true of one too short to measure;
          * marking only the measured ones would prune every short track's
          * record on the first run that finished. */
-        sound_index_seen(sound_index_key(path));
+        sound_index_seen(path_key(path));
 
         length_ms = (unsigned long)tagcache_get_numeric(&tcs, tag_length);
         mtime = (uint32_t)tagcache_get_numeric(&tcs, tag_mtime);

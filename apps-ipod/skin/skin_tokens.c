@@ -224,6 +224,23 @@ void wps_playlist_percent_enable(void)
     plpct.enabled = true;
 }
 
+/* A track's length in whole minutes, from the database's path index. Only a
+ * track it lacks costs a file open below. */
+static bool plpct_db_minutes(const char *path, uint16_t *mins)
+{
+    long length_ms;
+    unsigned long secs;
+    int idx_id = tagcache_find_path(path);
+
+    if (idx_id < 0 || !tagcache_entry_numeric(idx_id, tag_length, &length_ms)
+        || length_ms <= 0)
+        return false;
+
+    secs = (unsigned long)length_ms / 1000;
+    *mins = MIN(MAX(1, (secs + 30) / 60), 65535ul);
+    return true;
+}
+
 void wps_playlist_percent_prepare(void)
 {
     if (!plpct.enabled)
@@ -259,6 +276,9 @@ void wps_playlist_percent_prepare(void)
         int slot = info.display_index - 1;
         if (slot < 0 || slot >= amount)
             goto abort;
+
+        if (plpct_db_minutes(info.filename, &plpct.track_mins[slot]))
+            continue;
 
 #if (CONFIG_STORAGE & STORAGE_ATA) /* Harddrive */
         int fd = open(info.filename, O_RDONLY);

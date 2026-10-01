@@ -21,6 +21,7 @@
 #include "buffering.h"
 #include "core_alloc.h"
 #include "metadata.h"
+#include "database/tagcache.h"
 #include "misc.h"
 #include "pcm_mixer.h"
 #include "pcm_sink.h"
@@ -276,7 +277,11 @@ static void get_trackinfo(const unsigned int track, struct mp3entry* id3) {
     if(playlist_next(0) != tracknum) {
         struct playlist_track_info info;
         playlist_get_track_info(NULL, tracknum, &info);
-        get_metadata(id3, -1, info.filename);
+        /* The database first: a dock listing a playlist asks for every
+         * track, and the file is a parse each. */
+        if(!tagcache_fill_tags(id3, info.filename)) {
+            get_metadata(id3, -1, info.filename);
+        }
     } else {
         memcpy(id3, audio_current_track(), sizeof(*id3));
     }
@@ -308,17 +313,22 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
         info->release_date->minute  = 0;
         info->release_date->seconds = 0;
     }
+    /* A tag the track does not carry is NULL, and goes as an empty string */
     if(info->artist != NULL) {
-        check_act(iap_span_append(info->artist, id3.artist, strlen(id3.artist) + 1), return iap_false);
+        const char* s = id3.artist ? id3.artist : "";
+        check_act(iap_span_append(info->artist, s, strlen(s) + 1), return iap_false);
     }
     if(info->composer != NULL) {
-        check_act(iap_span_append(info->composer, id3.composer, strlen(id3.composer) + 1), return iap_false);
+        const char* s = id3.composer ? id3.composer : "";
+        check_act(iap_span_append(info->composer, s, strlen(s) + 1), return iap_false);
     }
     if(info->album != NULL) {
-        check_act(iap_span_append(info->album, id3.album, strlen(id3.album) + 1), return iap_false);
+        const char* s = id3.album ? id3.album : "";
+        check_act(iap_span_append(info->album, s, strlen(s) + 1), return iap_false);
     }
     if(info->title != NULL) {
-        check_act(iap_span_append(info->title, id3.title, strlen(id3.title) + 1), return iap_false);
+        const char* s = id3.title ? id3.title : "";
+        check_act(iap_span_append(info->title, s, strlen(s) + 1), return iap_false);
     }
     return iap_true;
 }

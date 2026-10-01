@@ -230,6 +230,23 @@ void tagcache_screensync_enable(bool state);
 
 bool tagcache_is_in_ram(void);
 bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
+
+/* The path index: a database entry by its file, from RAM. Every call misses
+ * unless the database is loaded into RAM (tagcache_ram On or Quick), and none
+ * of them touch the disk.
+ *
+ * The finds return an idx_id, or -1 for a file the database does not hold.
+ * tagcache_find_key() takes path_key() of the path (database/path_key.h). */
+int  tagcache_find_path(const char *path);
+int  tagcache_find_key(uint64_t key);
+/* A string tag of a found entry. False for <Untagged>, and for tag_filename:
+ * under Quick there are no paths in RAM, so a caller needing the path reads
+ * it with tagcache_retrieve(), one seek. */
+bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size);
+bool tagcache_entry_numeric(int idx_id, int tag, long *value);
+/* For the database info screen: false when the index is not loaded. The
+ * counts are lookups since boot. */
+bool tagcache_path_index_info(int *slots, int *found, int *missed);
 void tagcache_unload_ramcache(void);
 void tagcache_reload_ramcache(void);
 void tagcache_commit_finalize(void);

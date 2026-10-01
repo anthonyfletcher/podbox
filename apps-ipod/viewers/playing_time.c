@@ -24,6 +24,8 @@
 #include "system/format_time.h"
 #include "system/shutdown.h"
 #include "metadata.h"        /* struct mp3entry, get_metadata */
+#include "file.h"            /* open, ffilesize */
+#include "database/tagcache.h" /* tagcache_fill_tags */
 #include "playlist/playlist.h"        /* playlist_*, struct playlist_track_info */
 #include "audio.h"           /* audio_status, audio_current_track */
 #include "draw/viewport.h"        /* viewportmanager_theme_enable/undo */
@@ -393,6 +395,24 @@ static void pt_store_converted_totals(struct playing_time_info *pti)
     pti->size[ePT_TOTAL] = pti->size[ePT_ELAPSED] + pti->size[ePT_REMAINING];
 }
 
+/* The database holds every tag this screen counts except the size, which an
+ * open answers from the directory entry. Only a track the database lacks has
+ * its file parsed. */
+static bool pt_track_tags(struct mp3entry *id3, const char *path)
+{
+    int fd;
+
+    if (!tagcache_fill_tags(id3, path))
+        return get_metadata(id3, -1, path);
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return false;
+    id3->filesize = ffilesize(fd);
+    close(fd);
+    return true;
+}
+
 static int pt_add_track(int i, enum ePT_SUM section, struct playing_time_info *pti)
 {
     static struct mp3entry id3;
@@ -408,7 +428,7 @@ static int pt_add_track(int i, enum ePT_SUM section, struct playing_time_info *p
     if (action_userabort(TIMEOUT_NOBLOCK))
         return -1;
     else if (playlist_get_track_info(NULL, i, &pl_track) < 0
-             || !get_metadata(&id3, -1, pl_track.filename))
+             || !pt_track_tags(&id3, pl_track.filename))
     {
         pti->error_count++;
         return -2;

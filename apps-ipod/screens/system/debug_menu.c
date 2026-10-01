@@ -1394,6 +1394,15 @@ static int database_callback(int btn, struct gui_synclist *lists)
              stat->ramcache_used, stat->ramcache_allocated);
     simplelist_addline("Total entries: %d",
                        stat->total_entries);
+    {
+        int slots, found, missed;
+
+        if (tagcache_path_index_info(&slots, &found, &missed))
+            simplelist_addline("Path index: %d entries, %d found, %d missed",
+                               slots, found, missed);
+        else
+            simplelist_addline("Path index: not loaded");
+    }
     simplelist_setline("Progress:");
     simplelist_addline(" %d%% (%d entries)",
                        stat->progress, stat->processed_entries);

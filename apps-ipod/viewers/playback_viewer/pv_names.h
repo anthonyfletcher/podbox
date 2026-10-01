@@ -17,49 +17,41 @@
  * stored entry and would spawn a fresh aggregate on every play. */
 #define PV_NAME_MAX 40
 
-/* Build the path -> metadata map into the bottom of 'buf' and return how many
- * bytes of it were taken. The caller's own allocations start above that.
+/* Load the moved-folder table into the bottom of 'buf', matching folders
+ * again first when the database has changed since it was saved, and return
+ * how many bytes it took. The caller's own allocations start above that.
  *
- * Consults the saved map first and only sweeps the database when the saved
- * one does not match it, so this is usually a single file read. A sweep puts
- * a progress splash up, because on a spinning disk it is not quick.
- *
- * The map is sized to the buffer it is given and covers as much of the
- * database as fits, the sweep stopping there. Returns 0 when there is no
- * usable database, or no room for even a partial map, which is not an error:
- * every path then resolves by filename guesswork instead.
- *
- * 'may_sweep' false means build from the saved map or not at all. For a caller
- * that wants names if they are cheap and will not hold the screen for minutes
- * of seeking to get them -- a saved map too big for the buffer on offer reads
- * as no map, rather than as a reason to build one. */
-size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep);
+ * Names themselves take no buffer: they come from the database's path index.
+ * Returns 0 when there is no usable database, which is not an error: every
+ * path then resolves by filename guesswork instead. */
+size_t pv_names_init(void *buf, size_t bufsz);
 
-/* Delete the saved map and the moved-folder table, so the next
- * pv_names_init() sweeps the database and matches folders again. */
+/* Delete the moved-folder table, so the next pv_names_init() matches folders
+ * again. */
 void pv_names_discard(void);
 
 /* A value that changes whenever the names a path resolves to could: the
- * database's entry count and commit id, and the moved-folder table. 0 when
- * there is no usable database. Cheap -- no map is read -- so a cache of
- * resolved names can be checked against it before deciding to build one. */
+ * database's entry count and commit id, the moved-folder table, and whether
+ * the database is in RAM. 0 when there is no usable database. Cheap, so a
+ * cache of resolved names can be checked against it before deciding to build
+ * one. */
 unsigned long pv_names_identity(void);
 
-/* Whether a path the map does not know is one the database does not know
- * either: the map covers the whole database, or there is no database to
- * cover. False when there is a database and no map, or only part of one. */
+/* Whether names come from the database whenever it has them, now and for the
+ * rest of the session: it is in RAM, or there is none, or its RAM copy is
+ * switched off. False while the RAM copy is still to load, when a path the
+ * database holds is named from its filename. */
 bool pv_names_complete(void);
 
-/* Where a logged file is now. 'path' itself unless the map does not know it
- * and its folder is one the moved-folder table has matched; then the path in
+/* Where a logged file is now. 'path' itself unless the database does not know
+ * it and its folder is one the moved-folder table has matched; then the path in
  * the new folder, in a static buffer valid until the next call. Resolve names
  * and artwork from what this returns, not from the logged path. */
 const char *pv_names_locate(const char *path);
 
 /* Where a name came from. Worth knowing beyond curiosity: if nothing on a
- * device with a database ever comes back PV_NAME_DB, the logged paths and
- * the database's disagree in form, and the artwork cache -- which keys off
- * the same strings -- is missing everything too. */
+ * device with a database in RAM ever comes back PV_NAME_DB, the logged paths
+ * and the database's disagree in form. */
 enum pv_name_src
 {
     PV_NAME_PATH,
@@ -77,13 +69,8 @@ enum pv_name_src
 enum pv_name_src pv_names_resolve(const char *path, char *artist,
                                       char *title, char *album);
 
-/* What the map is made of: entries the database holds, and how many of them
- * were mapped. Equal numbers mean the whole database is covered.
- *
- * 'swept' (may be NULL) says whether the last init rebuilt the map from the
- * database rather than reading the saved one back -- which is the difference
- * between a first run and every run after it, and worth knowing before
- * drawing conclusions from how long it took. */
-void pv_names_info(int *db_entries, int *mapped, bool *swept);
+/* Entries the database holds, and how many of them the path index can name:
+ * equal numbers when it is in RAM, 0 mapped when it is not. */
+void pv_names_info(int *db_entries, int *mapped);
 
 #endif /* _PV_NAMES_H */

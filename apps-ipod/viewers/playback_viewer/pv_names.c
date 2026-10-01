@@ -9,27 +9,26 @@
  * The playback log records paths and nothing else, so the names have to come
  * from somewhere. Two sources, in order of how much they know:
  *
- *   The database. Every file the tagcache knows -- or as many of them as the
- *   buffer holds -- is resolved once into {path hash -> artist, album,
- *   title}, strings pooled, and that map is saved keyed to the database's
- *   entry count and commit id and the room it was built in, so later runs
- *   skip the sweep.
- *   This is the only source that can name an ALBUM at all.
+ *   The database, through its path index (tagcache_find_path()). Only while
+ *   the database is in RAM, and then for every file it holds, with no disk
+ *   access. This is the only source that can name an ALBUM at all.
  *
- *   The filename. For files the database does not know, "Artist - Album - NN
- *   Title.ext" is unpicked, falling back to the parent folder when the name
- *   carries no " - ". That fallback yields the ALBUM directory as the artist
- *   under an <artist>/<album>/<track> layout -- a known and visible weakness,
- *   and the reason the database path exists.
+ *   The filename. For files the database does not know, and for every file
+ *   while the database is not in RAM, "Artist - Album - NN Title.ext" is
+ *   unpicked, falling back to the parent folder when the name carries no
+ *   " - ". That fallback yields the ALBUM directory as the artist under an
+ *   <artist>/<album>/<track> layout -- a known and visible weakness, and the
+ *   reason the database path exists.
  *
  * Between the two sits pv_moves.c: a file the database does not know at its
  * logged path may be one whose folder has since moved, and pv_names_locate()
  * gives the path it has now, which the database may well know.
  *
- * Both keys are the path exactly as located, with no normalisation. That
- * matters beyond this file: the artwork cache hashes the same string (see
- * aa_dirname() in metadata/art_cache.c), so artwork resolves exactly when
- * names do. If one silently misses, so does the other.
+ * The database is asked by path_key(), which ignores case and a volume
+ * prefix. The artwork cache hashes the folder string as given (see
+ * aa_dirname() in metadata/art_cache.c), so artwork resolves for every path
+ * the database spells the same way, and a path that differs only in case is
+ * named without its art.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -42,246 +41,32 @@
 #include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
-#include "widgets/splash.h"
+#include "settings/settings.h"
 #include "pv_moves.h"
 #include "pv_names.h"
 
-/* Saved map. The header carries the database entry count and commit id it
- * was built against; anything else and the map is rebuilt rather than
- * trusted. The commit id is what notices a scan that moved or retagged files
- * without changing how many there are. */
+/* The saved name map the database's path index replaced. Nothing writes it;
+ * it is removed where it is found. */
 #define PV_MAP_PATH  ROCKBOX_DIR "/pv_names.dat"
-#define PV_MAP_MAGIC 0x50564e33UL   /* "PVN3" */
 
-/* Longest metadata string read out of the database. Anything past this is
- * truncated, which is what the aggregates would do to it anyway. */
+/* Moves whenever the way a path is named changes, so pv_names_identity()
+ * does too and every saved report is rebuilt from the log once. */
+#define PV_NAMES_VERSION 2
+
+/* Longest file name taken apart by the filename guesswork. */
 #define META_MAX 160
 
-/* Pool bytes an entry is sized for. What one costs is about the length of a
- * title, since the artist and the album it shares with its neighbours are
- * interned once between them.
- *
- * POOL_MIN is the least a map is worth building at: at that size a fully
- * tagged library runs the pool out towards the end of the sweep and the
- * entries past that point fall back to the filename, which still leaves most
- * of the library named. POOL_PER_ENTRY is what such a library actually uses,
- * and more than that would only take room the aggregate tables can use. */
-#define POOL_MIN        24
-#define POOL_PER_ENTRY  40
+static int  names_db_entries;   /* 0 = no usable database */
+static long names_db_commit;
 
-struct map_entry
-{
-    unsigned int hash;       /* of the full path, as logged */
-    unsigned int artist;     /* offsets into the pool; 0 = unknown */
-    unsigned int album;
-    unsigned int title;
-};
-
-static struct map_entry *map;
-static int  *map_slots;      /* slot -> entry index + 1; 0 = empty */
-static int   map_n, map_cap, map_mask;
-static char *map_pool;
-static unsigned map_pool_used, map_pool_cap;
-static int   map_db_entries;
-static long  map_db_commit;
-static bool  map_swept;      /* the map was rebuilt, not read back */
-static bool  map_full;       /* its sweep had room for the whole database */
-
-/* Index over the pool, so interning a string is a hash lookup rather than a
- * walk of everything interned so far. Without it the sweep is quadratic: a
- * 3,500-track library interns ~10,000 strings against a pool that ends up
- * holding ~3,500, which is around 18 million string compares and visibly
- * slower with every entry.
- *
- * Only the sweep uses it: a map read back from disk needs no interning. So it
- * sits at the very top of the region and is NOT counted in what this module
- * reports as used -- the caller's own allocations are expected to land on top
- * of it, which is safe precisely because nothing reads it once the sweep has
- * finished. On a 512 KB buffer that 32 KB is the difference between the
- * aggregate tables holding a real library and not. */
-static unsigned int *pool_slots;   /* pool offset + 1; 0 = empty */
-static int pool_slot_mask;
-static int pool_slot_n, pool_slot_max;
-
-/* ------------------------------------------------------------------ pool */
-
-/* Intern a string, returning its offset. Offset 0 is the empty string, which
- * is also what a caller gets when the pool is full -- a name going unknown is
- * a worse answer, not a broken one.
- *
- * Deduping matters because artist and album names repeat across every track
- * of a folder; titles almost never repeat and mostly just fill the pool. */
-static unsigned int pool_intern(const char *s)
-{
-    unsigned int h, off, len;
-    int i = 0;
-
-    if (!s || !s[0])
-        return 0;
-
-    h = fnv1a_str(s);
-
-    if (pool_slots)
-    {
-        i = (int)(h & (unsigned)pool_slot_mask);
-        while (pool_slots[i])
-        {
-            off = pool_slots[i] - 1;
-            if (!strcmp(map_pool + off, s))
-                return off;
-            i = (i + 1) & pool_slot_mask;
-        }
-    }
-
-    len = strlen(s) + 1;
-    if (map_pool_used + len > map_pool_cap)
-        return 0;
-
-    memcpy(map_pool + map_pool_used, s, len);
-    off = map_pool_used;
-    map_pool_used += len;
-
-    /* Past the load factor the index stops taking new strings. Lookups still
-     * terminate -- there are always empty slots -- and the only cost is that
-     * a later repeat of this string is interned again instead of being
-     * found, which wastes pool space rather than breaking anything. */
-    if (pool_slots && pool_slot_n < pool_slot_max)
-    {
-        pool_slots[i] = off + 1;
-        pool_slot_n++;
-    }
-    return off;
-}
-
-/* ----------------------------------------------------------------- table */
-
-static void map_index(void)
-{
-    memset(map_slots, 0, (size_t)(map_mask + 1) * sizeof(int));
-    for (int i = 0; i < map_n; i++)
-    {
-        int s = (int)(map[i].hash & (unsigned)map_mask);
-        while (map_slots[s])
-            s = (s + 1) & map_mask;
-        map_slots[s] = i + 1;
-    }
-}
-
-static const struct map_entry *map_get(const char *path)
-{
-    unsigned int h;
-    int s;
-
-    if (!map_n)
-        return NULL;
-
-    h = fnv1a_str(path);
-    s = (int)(h & (unsigned)map_mask);
-    while (map_slots[s])
-    {
-        const struct map_entry *e = &map[map_slots[s] - 1];
-        if (e->hash == h)
-            return e;      /* a collision costs one file the wrong name */
-        s = (s + 1) & map_mask;
-    }
-    return NULL;
-}
-
-/* ------------------------------------------------------------ persistence */
-
-/* All three writes checked, and the file removed if any falls short.
- *
- * Less costly to get wrong than the badge file, because map_load() rejecting a
- * short file makes map_sweep() rebuild the map rather than losing anything --
- * but that sweep is a pass over every file the database knows, which the
- * comment on it calls seeky on a spinning disk. Leaving a half-written map on
- * disk buys one of those on the next open for nothing. */
-static void map_save(void)
-{
-    unsigned long hdr[6];
-    size_t map_bytes;
-    bool ok;
-    int fd = open(PV_MAP_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-
-    if (fd < 0)
-        return;
-
-    hdr[0] = PV_MAP_MAGIC;
-    hdr[1] = (unsigned long)map_db_entries;
-    hdr[2] = (unsigned long)map_n;
-    hdr[3] = map_pool_used;
-    /* What the sweep was allowed to hold, which is not the same as what it
-     * found: a map stopped by the buffer is short of the library through no
-     * fault of the database, and only this says so. */
-    hdr[4] = (unsigned long)map_cap;
-    hdr[5] = (unsigned long)map_db_commit;
-    map_bytes = (size_t)map_n * sizeof(struct map_entry);
-
-    ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
-      && write(fd, map, map_bytes) == (ssize_t)map_bytes
-      && write(fd, map_pool, map_pool_used) == (ssize_t)map_pool_used;
-    close(fd);
-
-    if (!ok)
-        remove(PV_MAP_PATH);
-}
-
-/* True if the saved map matches the database as it stands and was read whole.
- *
- * Trap: a map is also refused when it was swept under a tighter cap than this
- * run has room for. Its entry count is a count of what it holds, so a map
- * truncated by a small buffer looks every bit as whole as a complete one --
- * and accepting it means a run with the room to name the whole library goes on
- * naming the same fraction of it, with the rest coming from folders. */
-static bool map_load(void)
-{
-    unsigned long hdr[6];
-    int fd = open(PV_MAP_PATH, O_RDONLY);
-    bool ok = false;
-
-    if (fd < 0)
-        return false;
-
-    if (read(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
-        && hdr[0] == PV_MAP_MAGIC
-        && (int)hdr[1] == map_db_entries
-        && (int)hdr[2] > 0 && (int)hdr[2] <= map_cap
-        && hdr[3] > 0 && hdr[3] <= map_pool_cap
-        && (int)hdr[4] >= map_cap
-        && (long)hdr[5] == map_db_commit)
-    {
-        int n = (int)hdr[2];
-        size_t bytes = (size_t)n * sizeof(struct map_entry);
-
-        if (read(fd, map, bytes) == (ssize_t)bytes
-            && read(fd, map_pool, hdr[3]) == (ssize_t)hdr[3])
-        {
-            map_n = n;
-            map_pool_used = (unsigned)hdr[3];
-            map_full = (int)hdr[4] >= (int)hdr[1];
-            map_index();
-            ok = true;
-        }
-        else
-        {
-            map_n = 0;      /* a partial read is not a map */
-        }
-    }
-
-    close(fd);
-    return ok;
-}
-
-/* Forget the saved map, and the moved-folder table built with it, so the
- * next open sweeps the database and matches folders again. */
 void pv_names_discard(void)
 {
     remove(PV_MAP_PATH);
     pv_moves_discard();
 }
 
-/* The database as the saved map and moved-folder table are keyed to it: its
- * entry count and commit id, or false when it is not there to ask. */
+/* The database as the moved-folder table is keyed to it: its entry count and
+ * commit id, or false when it is not there to ask. */
 static bool db_state(int *entries, long *commit)
 {
     struct tagcache_stat *stat = tagcache_get_stat();
@@ -299,214 +84,46 @@ unsigned long pv_names_identity(void)
 {
     int entries;
     long commit;
-    unsigned long key[3];
+    unsigned long key[5];
 
     if (!db_state(&entries, &commit))
         return 0;
     key[0] = (unsigned long)entries;
     key[1] = (unsigned long)commit;
     key[2] = pv_moves_ident(entries, commit);
+    key[3] = PV_NAMES_VERSION;
+    /* Names come from the database only while it is in RAM, so a report
+     * built without it is named differently from one built with it. */
+    key[4] = tagcache_is_in_ram();
     return fnv1a_bytes(key, sizeof(key));
 }
 
-/* One pass over every file the database knows. Seeky on a spinning disk, so
- * it only ever runs when the saved map does not match. */
-static void map_sweep(void)
+size_t pv_names_init(void *buf, size_t bufsz)
 {
-    struct tagcache_search tcs;
-    char fname[MAX_PATH];
-    char meta[META_MAX];
-
-    if (!tagcache_search(&tcs, tag_filename))
-        return;
-
-    while (map_n < map_cap && tagcache_get_next(&tcs, fname, sizeof(fname)))
-    {
-        struct map_entry *e = &map[map_n];
-
-        e->hash = fnv1a_str(fname);
-        e->artist = tagcache_retrieve(&tcs, tcs.idx_id, tag_artist,
-                                      meta, sizeof(meta))
-                    ? pool_intern(meta) : 0;
-        e->album  = tagcache_retrieve(&tcs, tcs.idx_id, tag_album,
-                                      meta, sizeof(meta))
-                    ? pool_intern(meta) : 0;
-        e->title  = tagcache_retrieve(&tcs, tcs.idx_id, tag_title,
-                                      meta, sizeof(meta))
-                    ? pool_intern(meta) : 0;
-        map_n++;
-
-        if ((map_n & 63) == 0)
-            splashf(0, "Reading the database (%d/%d)", map_n, map_cap);
-    }
-
-    tagcache_search_finish(&tcs);
-}
-
-size_t pv_names_init(void *buf, size_t bufsz, bool may_sweep)
-{
-    char *base = buf;
-    size_t used = 0;
-    size_t budget, index_bytes, slack;
-    int slots;
-
-    map = NULL;
-    map_slots = NULL;
-    map_pool = NULL;
-    pool_slots = NULL;
-    map_n = map_cap = 0;
-    map_pool_used = 0;
-    pool_slot_n = 0;
-    map_db_entries = 0;
-    map_db_commit = 0;
     pv_moves_forget();
+    remove(PV_MAP_PATH);
 
-    if (!db_state(&map_db_entries, &map_db_commit))
+    if (!db_state(&names_db_entries, &names_db_commit))
     {
-        map_db_entries = 0;
+        names_db_entries = 0;
         return 0;               /* no database: filenames it is */
     }
 
-    /* Half the buffer, counting the sweep's scratch, since that is the high
-     * water mark even though it is not charged. The aggregate tables have the
-     * rest, and squeezing those further to name a few more entries is not a
-     * trade worth making. */
-    budget = bufsz / 2;
-
-    /* The largest map that budget holds, rather than none at all. A map
-     * covering part of the library names that part from its tags; no map at
-     * all names none of it, and says nothing about it, because folder
-     * guesswork looks like an answer. The sweep stops at map_cap, so what a
-     * truncated map lacks is the tail of the database and nothing else.
-     *
-     * Searched by index size, which is a power of two and is paid for whole.
-     * An index of 's' slots serves at most s/2 entries -- the load factor the
-     * rest of this file is written to -- while what is left of the budget
-     * after it serves however many can still afford a pool. Those two limits
-     * move against each other, so every size is tried and the best kept.
-     *
-     * Trap: deriving the size from the entry count instead stops at whichever
-     * index the library asks for, and a large library on a small buffer asks
-     * for one that exhausts the budget on its own. That reads as no room for
-     * a map when the room for a smaller one is right there. */
-    map_cap = 0;
-    slots = 0;
-    index_bytes = 0;
-    for (int s = next_pow2(map_db_entries * 2); s >= 2; s >>= 1)
-    {
-        size_t idx = (size_t)s * (sizeof(int) + sizeof(unsigned int));
-        int fit;
-
-        if (idx >= budget)
-            continue;
-
-        fit = (int)((budget - idx) / (sizeof(struct map_entry) + POOL_MIN));
-        if (fit > s / 2)
-            fit = s / 2;
-        if (fit > map_db_entries)
-            fit = map_db_entries;
-
-        if (fit > map_cap)
-        {
-            map_cap = fit;
-            slots = s;
-            index_bytes = idx;
-        }
-    }
-
-    if (map_cap <= 0)
-        return 0;               /* no room for a map: filenames it is */
-
-    /* Whatever the entries and their index leave goes to the pool, capped at
-     * what a library can use. Slack is better spent here than handed back to
-     * the tables: an entry whose name did not fit in the pool is an entry the
-     * map may as well not hold, and a pool that runs out mid-sweep takes
-     * every entry after it as well. */
-    slack = budget - (size_t)map_cap * sizeof(struct map_entry) - index_bytes;
-    map_pool_cap = (unsigned)map_cap * POOL_PER_ENTRY;
-    if (map_pool_cap < 4096)
-        map_pool_cap = 4096;    /* a small library still gets a pool */
-    if (map_pool_cap > slack)
-        map_pool_cap = (unsigned)slack;
-
-    /* What survives this call, and is charged to the caller. */
-    used = (size_t)map_cap * sizeof(struct map_entry)
-         + (size_t)slots * sizeof(int)          /* entry index */
-         + map_pool_cap;
-
-    map       = (struct map_entry *)base;
-    map_slots = (int *)(base + (size_t)map_cap * sizeof(struct map_entry));
-    map_pool  = (char *)map_slots + (size_t)slots * sizeof(int);
-    /* Above everything that survives, so the caller reuses it. */
-    pool_slots = (unsigned int *)(map_pool + map_pool_cap);
-    map_mask  = slots - 1;
-
-    pool_slot_mask = slots - 1;
-    pool_slot_max  = slots * 3 / 4;
-    pool_slot_n    = 0;
-    memset(pool_slots, 0, (size_t)slots * sizeof(unsigned int));
-
-    map_pool[0] = '\0';         /* offset 0 is the empty string */
-    map_pool_used = 1;
-
-    map_swept = false;
-    map_full = false;
-    if (!map_load())
-    {
-        /* A caller that only wanted the saved map takes no for an answer. The
-         * sweep is minutes of seeking for a map it has already said it will
-         * not wait for, and the saved one is refused as often for being too
-         * big for this buffer as for being stale -- so this is the ordinary
-         * outcome of asking, not a failure. */
-        if (!may_sweep)
-        {
-            map = NULL;
-            map_cap = 0;
-            return 0;
-        }
-
-        map_n = 0;
-        map_pool_used = 1;
-        map_sweep();
-        map_swept = true;
-        map_full = map_cap >= map_db_entries;
-        if (map_n > 0)
-        {
-            map_index();
-            map_save();
-        }
-    }
-
-    if (map_n == 0)
-    {
-        map = NULL;             /* nothing usable; fall back everywhere */
-        return 0;
-    }
-
-    /* The pool index is scratch from here on. Say so by not counting it. */
-    pool_slots = NULL;
-    used = (used + 3u) & ~(size_t)3u;
-
-    /* A sweep means the database changed, which is when folders move. The
-     * matching borrows everything above the map, which the caller has not
-     * claimed yet. */
-    if (map_swept && pv_moves_stale(map_db_entries, map_db_commit))
-        pv_moves_build(base + used, bufsz - used, map_db_entries,
-                       map_db_commit);
-    used += pv_moves_load(base + used, bufsz - used, map_db_entries,
-                          map_db_commit);
-
-    return used;
+    /* The table follows the database: a commit is when folders move. */
+    if (pv_moves_stale(names_db_entries, names_db_commit))
+        pv_moves_build(buf, bufsz, names_db_entries, names_db_commit);
+    return pv_moves_load(buf, bufsz, names_db_entries, names_db_commit);
 }
 
-void pv_names_info(int *db_entries, int *mapped, bool *swept)
+void pv_names_info(int *db_entries, int *mapped)
 {
+    int slots = 0, found, missed;
+
+    tagcache_path_index_info(&slots, &found, &missed);
     if (db_entries)
-        *db_entries = map_db_entries;
+        *db_entries = names_db_entries;
     if (mapped)
-        *mapped = map_n;
-    if (swept)
-        *swept = map_swept;
+        *mapped = names_db_entries ? slots : 0;
 }
 
 /* ------------------------------------------------- filename guesswork */
@@ -700,51 +317,46 @@ static void path_to_meta(const char *path, char *artist, char *title,
         strlcpy(title, fname, PV_NAME_MAX);
 }
 
+/* Whether names can come from the database now, or never will this session:
+ * no database to name from, or one the RAM copy is switched off for. False
+ * while the RAM copy is still to load, which is the case a saved report must
+ * not be built in. */
 bool pv_names_complete(void)
 {
-    return map_db_entries == 0 || (map && map_full);
+    return names_db_entries == 0 || tagcache_is_in_ram()
+        || global_settings.tagcache_ram == TAGCACHE_RAM_OFF;
 }
 
+/* Moves apply only to paths the database is known to lack, so without the
+ * index nothing is moved. */
 const char *pv_names_locate(const char *path)
 {
     const char *moved;
 
-    if (!map || map_get(path))
+    if (!tagcache_is_in_ram() || tagcache_find_path(path) >= 0)
         return path;
     moved = pv_moves_apply(path);
     return moved ? moved : path;
 }
 
-/* The database's marker for a field the file does not carry. */
-static bool is_real(const char *s)
-{
-    return s[0] && strcmp(s, "<Untagged>") != 0;
-}
-
 enum pv_name_src pv_names_resolve(const char *path, char *artist,
                                       char *title, char *album)
 {
-    const struct map_entry *e = map ? map_get(path) : NULL;
+    int idx_id = tagcache_find_path(path);
 
     album[0] = '\0';
 
-    if (e)
+    /* Both halves of the name have to be real, or the filename is the better
+     * answer -- half a database name is worse than a whole guessed one.
+     * tagcache_entry_string() refuses <Untagged> itself. */
+    if (idx_id >= 0
+        && tagcache_entry_string(idx_id, tag_artist, artist, PV_NAME_MAX)
+        && tagcache_entry_string(idx_id, tag_title, title, PV_NAME_MAX)
+        && artist[0] && title[0])
     {
-        const char *ar = map_pool + e->artist;
-        const char *ti = map_pool + e->title;
-        const char *al = map_pool + e->album;
-
-        /* Both halves of the name have to be real, or the filename is the
-         * better answer -- half a database name is worse than a whole
-         * guessed one. */
-        if (is_real(ar) && is_real(ti))
-        {
-            strlcpy(artist, ar, PV_NAME_MAX);
-            strlcpy(title, ti, PV_NAME_MAX);
-            if (is_real(al))
-                strlcpy(album, al, PV_NAME_MAX);
-            return PV_NAME_DB;
-        }
+        if (!tagcache_entry_string(idx_id, tag_album, album, PV_NAME_MAX))
+            album[0] = '\0';
+        return PV_NAME_DB;
     }
 
     path_to_meta(path, artist, title, album);

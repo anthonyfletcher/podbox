@@ -807,39 +807,10 @@ static int year_menu(int cur, bool *to_root, bool *reload)
     return hi - pick;
 }
 
-/* One model build, priming the index first when the artwork slice would
- * otherwise crowd the name map out of the buffer.
- *
- * Names are resolved once, during the pass that reads the log, and written into
- * the index rows -- so a pass made with the whole region to work in fixes every
- * later open, which reads those rows back. Nothing is drawn until all of this
- * has finished, which is what makes the order free to choose: the artwork slice
- * is idle for the whole of the one pass that needs the room, and on a 512 KB
- * buffer it is the difference between mapping a part of the library and mapping
- * all of it.
- *
- * Only when the index does not already cover the log. When it does, the build
- * below reads its rows and resolves nothing, so there is no pass to protect and
- * the priming would be a second reading of the same file. On a buffer wide
- * enough for the map and the sleeves at once it is one extra read of the index
- * the pass just wrote -- a fraction of that pass, and only on the opens that
- * have one to make.
- *
- * The priming pass runs over the whole buffer, artwork slice included, so
- * whatever sleeves were cached in there are gone by the time it returns and
- * art_init() has to say so. */
+/* One model build, in whatever the artwork slice leaves. */
 static enum pv_build_result build_model(void *buf, size_t bufsz, bool art_on,
                                         struct pv_totals *out, int year)
 {
-    if (art_on && !pv_stats_index_covers(year))
-    {
-        /* Its result needs no handling of its own: the build below repeats it
-         * from the index it wrote, and fails the same way for the same reason
-         * if it failed here. That is where the screen hears about it. */
-        pv_stats_prime(buf, bufsz, bufsz - ART_BYTES, year);
-        art_init(buf);
-    }
-
     return pv_stats_build((char *)buf + (art_on ? ART_BYTES : 0),
                           bufsz - (art_on ? ART_BYTES : 0), out, year);
 }

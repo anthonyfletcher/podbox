@@ -50,6 +50,7 @@
 #include "metadata.h"
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "soundscan.h"
 
@@ -165,7 +166,7 @@ static void file_failed(const char *path)
     }
 
     memset(&none, 0, sizeof (none));
-    sound_index_fill(&rec, sound_index_key(path), 0, sz, 0, 0, &none,
+    sound_index_fill(&rec, path_key(path), 0, sz, 0, 0, &none,
                      TRACK_DECODE_FAILED);
 
     if (!opt_dry)
@@ -212,7 +213,7 @@ static bool measure(const char *path, uint32_t size)
     struct track_sound s;
     struct sound_record rec;
     unsigned long start_ms, analysed = 0;
-    uint64_t key = sound_index_key(path);
+    uint64_t key = path_key(path);
     int fd, rc;
 
     /* mtime stays zero: it is the player's FAT directory time read as local

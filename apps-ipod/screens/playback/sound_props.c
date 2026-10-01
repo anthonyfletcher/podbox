@@ -40,6 +40,7 @@
 #include "settings/settings.h"
 #include "files/filetypes.h"
 #include "database/sound_cal.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "database/sound_mix.h"
 #include "database/sound_mood.h"
@@ -242,7 +243,7 @@ static bool props_load(const char *path)
     if (sound_index_reader_open(&r) != SOUND_OK)
         return false;
 
-    key = sound_index_key(path);
+    key = path_key(path);
 
     if (sound_index_find(&r, key, &props_rec) &&
         sound_record_usable(&props_rec))
@@ -788,7 +789,7 @@ void sound_props_album_add(const char *path)
     if (!alb.open || path == NULL || path[0] == '\0')
         return;
 
-    if (!sound_index_find(&alb.r, sound_index_key(path), &rec) ||
+    if (!sound_index_find(&alb.r, path_key(path), &rec) ||
         !sound_record_usable(&rec))
         return;
 

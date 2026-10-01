@@ -50,6 +50,7 @@ SRC := soundscan.c lc.c stubs.c \
        $(APPS)/audio/beat_probe.c \
        $(APPS)/audio/chroma.c \
        $(APPS)/audio/spectrum_meter.c \
+       $(APPS)/database/path_key.c \
        $(APPS)/database/sound_index.c \
        $(ROOT)/lib/fixedpoint/fixedpoint.c \
        $(wildcard $(RBC)/metadata/*.c) \

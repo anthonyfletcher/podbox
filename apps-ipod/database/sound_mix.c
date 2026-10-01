@@ -49,6 +49,7 @@
 #include "file.h"
 #include "settings/settings.h"
 #include "timefuncs.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "database/sound_mix.h"
 #include "database/sound_mood.h"
@@ -657,7 +658,7 @@ static uint32_t artist_key(const char *path)
 
     /* Volume specifier off first: a seed path and the walk's paths come from
      * two different tagcache calls, and one of them carries it. */
-    path = sound_index_path(path);
+    path = path_key_strip(path);
 
     for (p = path; *p != '\0'; p++)
     {
@@ -692,8 +693,11 @@ static uint32_t mix_artist_key(struct tagcache_search *tcs, const char *path)
 {
     char artist[64];
 
+    /* An untagged artist comes back as the text "<Untagged>", and taken as
+     * a name would make every untagged track one artist. */
     if (tagcache_retrieve(tcs, tcs->idx_id, tag_artist, artist,
-                          sizeof (artist)) && artist[0] != '\0')
+                          sizeof (artist)) && artist[0] != '\0'
+        && strcmp(artist, UNTAGGED) != 0)
     {
         return fold_key(artist, NULL);
     }
@@ -715,7 +719,7 @@ static int mix_playlist_keys(uint64_t *out, int max)
         if (playlist_get_track_info(NULL, i, &info) < 0)
             continue;
 
-        out[n++] = sound_index_key(info.filename);
+        out[n++] = path_key(info.filename);
     }
 
     return n;
@@ -831,6 +835,75 @@ static bool mix_artist_ok(const struct pick *cand, const int *order,
     }
 
     return used < MIX_PER_ARTIST;
+}
+
+/* mix_artist_key() for an entry found through the path index. The path the
+ * folder fallback needs is not in RAM, so for an untagged artist it is read,
+ * one seek, unless the caller already has it. */
+static uint32_t mix_artist_ram(struct tagcache_search *tcs, int idx_id,
+                               const char *path, char *buf, size_t bufsz)
+{
+    char artist[64];
+
+    if (tagcache_entry_string(idx_id, tag_artist, artist, sizeof (artist))
+        && artist[0] != '\0')
+    {
+        return fold_key(artist, NULL);
+    }
+
+    if (path == NULL)
+    {
+        if (!tagcache_retrieve(tcs, idx_id, tag_filename, buf, bufsz))
+            return fold_key(UNTAGGED, NULL);
+        path = buf;
+    }
+
+    return artist_key(path);
+}
+
+/* Pass two through the database's path index: a lookup a candidate rather
+ * than a walk of the library, with the same answers. False, having done
+ * nothing, when the database is not in RAM. */
+static bool mix_resolve_ram(struct tagcache_search *tcs, char *buf,
+                            size_t bufsz, struct pick *cand, int held,
+                            uint64_t skip_key, const char *seed_path,
+                            int32_t *seed_len, uint32_t *seed_artist)
+{
+    long len;
+    int idx_id, i;
+
+    if (!tagcache_is_in_ram())
+        return false;
+
+    if (skip_key != 0)
+    {
+        idx_id = tagcache_find_key(skip_key);
+
+        if (idx_id >= 0 && tagcache_entry_numeric(idx_id, tag_length, &len))
+        {
+            *seed_len = (int32_t)len;
+
+            if (seed_path != NULL)
+                *seed_artist = mix_artist_ram(tcs, idx_id, seed_path,
+                                              buf, bufsz);
+        }
+    }
+
+    for (i = 0; i < held; i++)
+    {
+        struct pick *c = &cand[i];
+
+        idx_id = tagcache_find_key(c->key);
+        if (idx_id < 0 || !tagcache_entry_numeric(idx_id, tag_length, &len)
+            || len < MIX_MIN_LENGTH_MS)
+            continue;
+
+        c->artist = mix_artist_ram(tcs, idx_id, NULL, buf, bufsz);
+        c->len = (int32_t)len;
+        c->idx = idx_id;
+    }
+
+    return true;
 }
 
 /* The whole of building one, whatever it is being built from.
@@ -956,18 +1029,21 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
         return 0;
     }
 
-    /* Pass two: the database, for what is behind those keys. A record carries
-     * no path, so this walk is the only way back to one -- and the only place
-     * a candidate's artist and length can be read. */
+    /* Pass two: the database, for what is behind those keys -- the
+     * candidates' artists and lengths. A record carries no path, so without
+     * the path index this walk is the only way back to one. */
     if (!tagcache_search(&tcs, tag_filename))
     {
         cpu_boost(false);
         return SOUND_MIX_NO_DB;
     }
 
-    while (tagcache_get_next(&tcs, buf, sizeof (buf)))
+    bool ram = mix_resolve_ram(&tcs, buf, sizeof (buf), cand, held, skip_key,
+                               seed_path, &seed_len, &seed_artist);
+
+    while (!ram && tagcache_get_next(&tcs, buf, sizeof (buf)))
     {
-        uint64_t key = sound_index_key(buf);
+        uint64_t key = path_key(buf);
         long len = tagcache_get_numeric(&tcs, tag_length);
 
         /* The same reason as pass one: a boosted walk of the whole database
@@ -1208,7 +1284,7 @@ int sound_mix_from_track(const char *path, int want)
     struct sound_record seed;
     struct sound_axes sa;
     struct mix_goal g;
-    uint64_t seed_key = sound_index_key(path);
+    uint64_t seed_key = path_key(path);
 
     if (want < 1)
         want = 1;
@@ -1323,7 +1399,7 @@ void sound_mix_skipped(const char *path, unsigned long elapsed_ms)
         n_skipped--;
     }
 
-    skipped[n_skipped++] = sound_index_key(path);
+    skipped[n_skipped++] = path_key(path);
 }
 
 void sound_mix_playlist_ended(void)
@@ -1377,7 +1453,7 @@ int sound_mix_continue(int want)
         if (playlist_get_track_info(NULL, last, &info) < 0)
             return SOUND_MIX_NO_RECORD;
 
-        seed_key = sound_index_key(info.filename);
+        seed_key = path_key(info.filename);
 
         if (sound_index_reader_open(&r) != SOUND_OK)
             return SOUND_MIX_NO_INDEX;
@@ -1550,7 +1626,7 @@ int sound_mix_reorder(struct playlist_info *playlist)
         if (playing >= 0 && info.display_index - 1 == playing)
             start = i;
 
-        if (sound_index_find(&r, sound_index_key(info.filename), &rec) &&
+        if (sound_index_find(&r, path_key(info.filename), &rec) &&
             sound_record_usable(&rec))
         {
             sound_mix_axes(&rec, &cand_ax[i]);
@@ -1629,7 +1705,7 @@ int sound_mix_winddown(const char *path, int want)
 
     if (sound_index_reader_open(&r) == SOUND_OK)
     {
-        if (sound_index_find(&r, sound_index_key(path), &rec) &&
+        if (sound_index_find(&r, path_key(path), &rec) &&
             sound_record_usable(&rec))
         {
             sound_mix_axes(&rec, &a);
@@ -1682,6 +1758,6 @@ int sound_mix_winddown(const char *path, int want)
     g.mood_to = MOOD_CALM;
     g.steps = from == MOOD_CALM ? 1 : want;
 
-    return mix_build(&g, sound_index_key(path), path, want,
+    return mix_build(&g, path_key(path), path, want,
                      global_settings.mood_playlist, false);
 }

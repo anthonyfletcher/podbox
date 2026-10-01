@@ -25,6 +25,7 @@
 #include "string-extra.h"
 #include "audio/beat_probe.h"
 #include "audio/track_decode.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "screens/system/probe_debug.h"
 #include "widgets/list.h"
@@ -210,7 +211,7 @@ bool probe_debug_screen(void)
     {
         struct sound_record rec, have;
         struct sound_index_reader rd;
-        uint64_t key = sound_index_key(path);
+        uint64_t key = path_key(path);
 
         sound_index_fill(&rec, key, 0, 0, sound_index_genre_key(genre),
                          year, &s, rc);

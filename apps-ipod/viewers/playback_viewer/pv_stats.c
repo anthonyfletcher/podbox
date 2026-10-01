@@ -36,6 +36,7 @@
 #include "kernel.h"      /* current_tick, HZ */
 #include "database/tagcache.h"   /* the library's size, for the table caps */
 #include "system.h"      /* cpu_boost */
+#include "widgets/splash.h"
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
 #endif
@@ -103,12 +104,9 @@ static bool day_in_year(long day)
  * carried in the index so an extend continues it rather than restarting. */
 static struct pv_badge_state badge_state;
 
-/* Bump allocator over the caller's buffer, above whatever the name map took. */
+/* Bump allocator over the caller's buffer, above the moved-folder table. */
 static char  *abuf;
 static size_t abuf_sz, abuf_used;
-
-/* Non-zero during pv_stats_prime(): the most the tables may have. */
-static size_t prime_tables;
 
 static void *abuf_alloc(size_t n)
 {
@@ -353,28 +351,6 @@ static bool names_settled(void)
     return stat->ready || (stat->readyvalid && !tagcache_is_busy());
 }
 
-/* Whether a saved index accounts for the whole log, which is the same question
- * as whether anything has to be named: rows come back from the index with
- * their names in them, so a log with no unindexed tail needs no name map at
- * all. One open and a header read, against a map that can cost a sweep of the
- * database and takes room the aggregate tables would rather have.
- *
- * False whenever the answer is not plainly yes -- no index, one that does not
- * describe this log, or one that stops short of the end of it. */
-static bool index_covers_log(enum pv_source src, int year)
-{
-    struct pv_index_id id;
-    unsigned long log_size = pv_log_size(src);
-    unsigned long covered = 0;
-
-    index_identity(&id, src, year);
-    if (!pv_index_read_begin(&id, log_size, &covered))
-        return false;
-
-    pv_index_read_end();
-    return covered >= log_size;
-}
-
 /* Read a saved index into the tables, which the caller has already sized.
  * Anything that does not fit or does not read whole means no index. */
 static bool index_load(struct pv_totals *out, unsigned long log_size,
@@ -439,14 +415,12 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
      * this run: how long it took, and which capacities it was given. */
     {
         long ms_names = out->ms_names;
-        bool swept = out->names_swept;
         int ct = out->cap_titles, ca = out->cap_artists, cb = out->cap_albums;
         int de = out->db_entries, dm = out->db_mapped;
         enum pv_source src = out->source;
 
         *out = saved;
         out->ms_names = ms_names;
-        out->names_swept = swept;
         out->cap_titles = ct;
         out->cap_artists = ca;
         out->cap_albums = cb;
@@ -497,6 +471,31 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
         pv_index_write_abort();
 }
 
+/* How far a long read of the log has got, so whatever splash came before --
+ * often the moved-folder search -- is not left up over it. Not before half a
+ * second, so a short tail of new plays does not flash. 0 when no read is
+ * running. */
+static unsigned long replay_size;
+static long replay_start, replay_shown;
+
+static void replay_begin(unsigned long size)
+{
+    replay_size = size;
+    replay_start = replay_shown = current_tick;
+}
+
+static void replay_progress(unsigned long offset)
+{
+    if (replay_size == 0
+        || TIME_BEFORE(current_tick, replay_start + HZ / 2)
+        || TIME_BEFORE(current_tick, replay_shown + HZ / 5))
+        return;
+
+    replay_shown = current_tick;
+    splashf(0, "Reading play history (%lu%%)",
+            offset / (replay_size / 100 + 1));
+}
+
 static void entry_cb(const struct pv_entry *e, void *ctx)
 {
     struct pv_totals *t = ctx;
@@ -507,6 +506,8 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     bool night, year;
     struct pv_agg *ar = NULL, *al = NULL, *ti = NULL;
     int ar_idx = PV_ROW_NONE, al_idx = PV_ROW_NONE;
+
+    replay_progress(e->offset);
 
     if (e->artist)
     {
@@ -1250,42 +1251,22 @@ const struct pv_day *pv_stats_days(int *count)
     return days;
 }
 
-/* Build the name map above the tables, for the run that skipped it and then
- * found the index unusable after all.
- *
- * It gets what the tables left rather than the share it would have had, which
- * is a smaller map than a full pass deserves -- and still the better answer on
- * the one path that reaches here, where the alternative is folder guesswork
- * for every entry in the log. Safe above the tables because 'days' is the last
- * thing abuf_alloc() hands out; nothing claims arena space after this. */
-static void names_init_late(struct pv_totals *out, bool may_sweep)
-{
-    long t0 = current_tick;
-
-    pv_names_init(abuf + abuf_used, abuf_sz - abuf_used, may_sweep);
-    out->ms_names = (current_tick - t0) * 1000 / HZ;
-    pv_names_info(&out->db_entries, &out->db_mapped, &out->names_swept);
-}
-
 static enum pv_build_result build_body(void *buf, size_t bufsz,
                                        struct pv_totals *out)
 {
     size_t names_used;
-    bool names_skipped = false;
     int cap_title, cap_artist, cap_album;
     long lines;
     unsigned long save_covered = 0;
     bool save_wanted = false;
-    bool late_partial = false;
 
     memset(out, 0, sizeof(*out));
     overflowed = false;
     day_n = 0;
 
     /* Decide the source before anything else: a scrobbler log names its own
-     * entries, so the database sweep -- much the most expensive part of a
-     * first run -- is not merely unnecessary but meaningless, there being no
-     * paths for it to resolve. */
+     * entries, so there are no paths to resolve and no moved-folder table to
+     * load. */
     {
         long t0 = current_tick;
         out->source = pv_log_pick_source();
@@ -1294,9 +1275,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     if (out->source == PV_SRC_NONE)
         return PV_BUILD_NO_LOG;
 
-    /* The name map claims the bottom of the buffer when there is one to
-     * build; the tables live above it and never move, so the two never have
-     * to know about each other. */
+    /* The moved-folder table claims the bottom of the buffer; the tables live
+     * above it and never move, so the two never have to know about each other.
+     * Names take no buffer: they come from the database's path index. */
     if (out->source != PV_SRC_PLAYBACK)
     {
         /* Not merely zero for tidiness: pv_names_info() would otherwise hand
@@ -1305,41 +1286,18 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         names_used = 0;
         out->db_entries = out->db_mapped = 0;
     }
-    else if (index_covers_log(out->source, cur_year))
-    {
-        /* Every row is about to come back from the index with its name in it,
-         * so the map has nothing left to resolve and the tables can have the
-         * whole region. On a 512 KB buffer that is the difference between a
-         * full track table and half of one.
-         *
-         * The library's own size still sizes those tables, so a run that
-         * skips the map divides the buffer the same way as one that builds
-         * it -- which is what keeps the caps from coming out smaller than the
-         * row counts the index is about to ask for. */
-        struct tagcache_stat *stat = tagcache_get_stat();
-
-        names_used = 0;
-        names_skipped = true;
-        out->db_mapped = 0;
-        out->db_entries = (stat && stat->ready) ? stat->total_entries : 0;
-    }
     else
     {
         long t0 = current_tick;
 
-        names_used = pv_names_init(buf, bufsz, true);
+        names_used = pv_names_init(buf, bufsz);
         out->ms_names = (current_tick - t0) * 1000 / HZ;
-        pv_names_info(&out->db_entries, &out->db_mapped, &out->names_swept);
+        pv_names_info(&out->db_entries, &out->db_mapped);
     }
 
     abuf      = (char *)buf + names_used;
     abuf_sz   = bufsz - names_used;
     abuf_used = 0;
-
-    /* A priming pass sizes its tables no larger than the build after it will,
-     * or that build cannot load the index this one writes. */
-    if (prime_tables && abuf_sz > prime_tables)
-        abuf_sz = prime_tables;
 
     /* Size the tables to the library rather than to a guess. The database
      * knows how many files there are, and a track table can never need more
@@ -1368,8 +1326,8 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
      * rather than hidden.
      *
      * Trap: halving albums and artists once each is not enough. At 16,000
-     * tracks they are still 300 KB between them, more than a 5G has left once
-     * the name map is in, and no size of track table then fits. */
+     * tracks they are still 300 KB between them, and on a 5G no size of track
+     * table then fits. */
     day_cap = 1500;
     for (;;)
     {
@@ -1422,15 +1380,6 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     out->cap_albums  = cap_album;
     out->ms_alloc = (current_tick - t_alloc) * 1000 / HZ;
 
-    /* The tables have theirs, so a map in what is left above them costs them
-     * nothing -- and the week drill-down resolves names with it, live, long
-     * after this function has returned. Saved map only: a sweep here would run
-     * on every open, for names that only that one tile reads. A buffer with
-     * nothing spare simply has no map, which is what the drill-down already
-     * answers with folder names for. */
-    if (names_skipped)
-        names_init_late(out, false);
-
     {
         long t0 = current_tick;
         unsigned long log_size = pv_log_size(out->source);
@@ -1449,12 +1398,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         if (index_load(out, log_size, &covered))
         {
             out->from_index = true;
-            /* A log that grew between the coverage check and here leaves a
-             * tail to read, and entries in it have to be named. */
-            if (names_skipped && covered < log_size && !out->db_mapped)
-                names_init_late(out, true);
-            late_partial = names_skipped && covered < log_size
-                        && !pv_names_complete();
+            replay_begin(log_size);
             lines = (covered < log_size)
                   ? pv_log_read_range(out->source, covered, 0, entry_cb, out)
                   : 0;
@@ -1462,40 +1406,29 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
 
             /* Rewrite only once the unindexed tail is worth the write, which
              * costs as much as the read. Below that it is cheaper to replay
-             * the same few kilobytes next time than to save them -- except
-             * from a priming pass, whose whole purpose is the index it leaves
-             * behind. */
-            save_wanted = prime_tables
-                       || (log_size - covered >= PV_INDEX_REWRITE_AT);
+             * the same few kilobytes next time than to save them. */
+            save_wanted = (log_size - covered >= PV_INDEX_REWRITE_AT);
         }
         else
         {
-            /* The index the coverage check found does not load after all --
-             * most often its row counts do not fit tables sized like these.
-             * The whole log is replayed instead, so the names are needed
-             * after all. */
-            if (names_skipped && !out->db_mapped)
-                names_init_late(out, true);
-            late_partial = names_skipped && !pv_names_complete();
-            /* This index sends every open down this same path, so it goes:
-             * the next open then gives the map the bottom of the buffer and
-             * writes an index that loads. */
-            if (late_partial)
-                pv_index_discard();
+            /* No index, or one that does not load -- most often because its
+             * row counts do not fit tables sized like these. The whole log is
+             * replayed instead. */
+            replay_begin(log_size);
             lines = pv_log_read(out->source, entry_cb, out);
             out->ms_read = (current_tick - t0) * 1000 / HZ;
             save_wanted = (lines >= 0);
         }
 
+        replay_size = 0;
         if (lines < 0)
             return PV_BUILD_NO_LOG;
 
         /* Names are what the index cannot correct later, so it is not saved
-         * with names a full build would have got right: the database not yet
-         * able to say, or a map squeezed in above the tables that covers
-         * only part of it. */
+         * with names a later build would get right: the database not yet able
+         * to say, or not yet in RAM. */
         if (out->source == PV_SRC_PLAYBACK
-            && (late_partial || !names_settled()))
+            && (!pv_names_complete() || !names_settled()))
             save_wanted = false;
 
         save_covered = log_size;
@@ -1578,15 +1511,6 @@ void pv_stats_year_span(int *first, int *last)
         *last = y;
 }
 
-bool pv_stats_index_covers(int year)
-{
-    enum pv_source src = pv_log_pick_source();
-
-    /* No log at all is not an uncovered log: there is no pass to find room
-     * for, and the build will say so for itself. */
-    return src == PV_SRC_NONE || index_covers_log(src, year);
-}
-
 enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
                                     struct pv_totals *out, int year)
 {
@@ -1619,19 +1543,6 @@ enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
     cpu_boost(false);
 #endif
-
-    return r;
-}
-
-enum pv_build_result pv_stats_prime(void *buf, size_t bufsz,
-                                    size_t tables_max, int year)
-{
-    struct pv_totals scratch;
-    enum pv_build_result r;
-
-    prime_tables = tables_max;
-    r = pv_stats_build(buf, bufsz, &scratch, year);
-    prime_tables = 0;
 
     return r;
 }

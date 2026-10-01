@@ -29,6 +29,7 @@
 #include "file.h"
 #include "core_alloc.h"
 #include "audio/track_decode.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 
 #define SOUND_FILE   ROCKBOX_DIR "/db_sound.dat"
@@ -85,63 +86,9 @@ static int          table_sorted_upto; /* Entries [0, this) ascend by key.
 
 /** Keys **/
 
-#define FNV64_BASIS  0xcbf29ce484222325ULL
-#define FNV64_PRIME  0x100000001b3ULL
-
-static uint64_t fnv64_lower(const char *s)
-{
-    uint64_t h = FNV64_BASIS;
-
-    for (; s && *s; s++)
-    {
-        unsigned char c = (unsigned char)*s;
-
-        if (c >= 'A' && c <= 'Z')
-            c += 'a' - 'A';
-
-        h = (h ^ c) * FNV64_PRIME;
-    }
-
-    return h;
-}
-
-/* The path as the index names it: without a volume specifier.
- *
- * The same track arrives under two names. tagcache hands a walk the path as
- * it was scanned, while retrieving an entry dircache holds rebuilds it from
- * the dircache tree, which puts the volume root on the front -- so one file
- * is "/Music/x.flac" through tagcache_get_next() and "/<HDD0>/Music/x.flac"
- * through tagcache_retrieve(). A key has to name the file rather than the
- * route the caller took to it, so every key goes through here.
- *
- * Parsed here rather than by path_strip_volume(), which lives behind
- * HAVE_MULTIVOLUME: the offline tool computes keys that must match the
- * player's byte for byte, without the firmware's path layer. */
 bool sound_record_usable(const struct sound_record *r)
 {
     return !(r->flags & SOUND_F_FAILED) && r->analysed_s > 0;
-}
-
-const char *sound_index_path(const char *path)
-{
-    const char *p = path;
-
-    if (path == NULL || p[0] != '/' || p[1] != '<')
-        return path;
-
-    for (p += 2; *p != '\0' && *p != '>' && *p != '/'; p++)
-        ;
-
-    return (p[0] == '>' && p[1] == '/') ? p + 1 : path;
-}
-
-uint64_t sound_index_key(const char *path)
-{
-    /* Zero is the "no key" value a record is never written with, so a path
-     * that happened to hash to it is nudged. */
-    uint64_t h = fnv64_lower(sound_index_path(path));
-
-    return h ? h : 1;
 }
 
 uint32_t sound_index_genre_key(const char *genre)
@@ -160,7 +107,7 @@ uint32_t sound_index_genre_key(const char *genre)
      * half a dozen keys and the same-genre term in sound_mix_distance()
      * never fires on a library tagged by more than one tool. Cut at the
      * first separator and the qualifier stops mattering. Case is folded by
-     * fnv64_lower() below.
+     * path_key_fold_hash() below.
      *
      * Trap: this changes the key a genre hashes to, so records written
      * before it do not group with records written after it. The layout is
@@ -186,7 +133,7 @@ uint32_t sound_index_genre_key(const char *genre)
      * 32-bit one, so there is a single definition of "the same string" here.
      * A few hundred genres over 32 bits collide about once in fifty thousand
      * libraries, which is a mis-grouped genre and not a lost measurement. */
-    return (uint32_t)(fnv64_lower(first) >> 32);
+    return (uint32_t)(path_key_fold_hash(first) >> 32);
 }
 
 static uint8_t cap8(unsigned int v)

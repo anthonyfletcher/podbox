@@ -204,10 +204,10 @@ MENUITEM_FUNCTION(maint_rebuild_sound, 0, ID2P(LANG_REBUILD_SOUND),
  * it opens, which is where the work is and why the splash promises it rather
  * than reporting it.
  *
- * All of them, because they only make sense together. The index holds the rows
- * the log added up to, and the name map and moved-folder table hold the names
- * those rows were built from, so clearing only some rebuilds the same rows from
- * the same names. */
+ * Both of them, because they only make sense together. The index holds the
+ * rows the log added up to, and the moved-folder table says where the files
+ * those rows were named from are now, so clearing only one rebuilds the same
+ * rows from the same names. */
 static int maint_report_rebuild(void)
 {
     if (yesno_pop_confirm(ID2P(LANG_REBUILD_REPORT)))

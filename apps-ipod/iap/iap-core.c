@@ -55,6 +55,7 @@
 #include "audio.h"
 #include "settings.h"
 #include "metadata.h"
+#include "database/tagcache.h"
 #include "sound.h"
 #include "action.h"
 #include "powermgmt.h"
@@ -344,6 +345,10 @@ void iap_tx_strlcpy(const unsigned char *str)
 {
     ptrdiff_t txfree;
     int r;
+
+    /* A tag the track does not carry arrives as NULL */
+    if (str == NULL)
+        str = (const unsigned char *)"";
 
     txfree = TX_BUFLEN - (iap_txnext - iap_txstart);
     r = strlcpy(iap_txnext, str, txfree);
@@ -842,13 +847,14 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     if(tracknum >= playlist_amount())
         tracknum -= playlist_amount();
 
-    /* If the tracknumber is not the current one,
-       read id3 from disk */
+    /* If the tracknumber is not the current one, take its tags from the
+       database, or failing that read them from the file */
     if(playlist_next(0) != tracknum)
     {
         playlist_get_track_info(NULL, tracknum, &info);
-        /* memset(id3, 0, sizeof(*id3)) --get_metadata does this for us */
-        get_metadata(id3, -1, info.filename);
+        /* Both clear id3 before filling it */
+        if (!tagcache_fill_tags(id3, info.filename))
+            get_metadata(id3, -1, info.filename);
     } else {
         memcpy(id3, audio_current_track(), sizeof(*id3));
     }

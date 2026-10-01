@@ -39,6 +39,7 @@
 #include "cpu.h"                      /* cpu_boost */
 #include "system/app_buffer.h"
 #include "database/tagcache.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "database/sound_mix.h"
 #include "settings/settings.h"
@@ -434,7 +435,7 @@ static bool index_pass(const struct quiz_round *rounds)
     for (int i = 0; i < QUIZ_ROUNDS; i++)
     {
         struct sound_answer *a = &answers[answer_ct];
-        uint64_t key = sound_index_key(rounds[i].path);
+        uint64_t key = path_key(rounds[i].path);
 
         if (!sound_index_find(&r, key, &rec) || !sound_record_usable(&rec))
             continue;
@@ -502,8 +503,42 @@ static struct resolved *find_res(uint64_t key)
     return NULL;
 }
 
-/* An index record carries no path, so one walk of the database is the only
- * way back from the neighbours' keys to their titles. */
+/* The neighbours' titles from the database's path index, one lookup each,
+ * while the database is in RAM. False when it is not. */
+static bool resolve_near_ram(void)
+{
+    if (!tagcache_is_in_ram())
+        return false;
+
+    for (int i = 0; i < res_ct; i++)
+    {
+        struct resolved *e = &res[i];
+        int idx_id = tagcache_find_key(e->key);
+        long spoken;
+
+        if (idx_id < 0
+            || !tagcache_entry_numeric(idx_id, tag_virt_spoken, &spoken)
+            || spoken
+            || !tagcache_entry_numeric(idx_id, tag_length, &e->length)
+            || !tagcache_entry_string(idx_id, tag_title, e->title,
+                                      sizeof(e->title))
+            || !text_usable(e->title))
+            continue;
+        if (!tagcache_entry_string(idx_id, tag_artist, e->artist,
+                                   sizeof(e->artist))
+            || !text_usable(e->artist))
+            e->artist[0] = '\0';
+        if (!tagcache_entry_string(idx_id, tag_album, e->album,
+                                   sizeof(e->album))
+            || !text_usable(e->album))
+            e->album[0] = '\0';
+        e->found = true;
+    }
+    return true;
+}
+
+/* An index record carries no path, so without the path index one walk of the
+ * database is the only way back from the neighbours' keys to their titles. */
 static bool resolve_near(void)
 {
     struct tagcache_search tcs;
@@ -534,7 +569,7 @@ static bool resolve_near(void)
         res_ct = out;
     }
 
-    if (res_ct == 0)
+    if (res_ct == 0 || resolve_near_ram())
         return true;
     if (!tagcache_search(&tcs, tag_filename))
         return false;
@@ -547,7 +582,7 @@ static bool resolve_near(void)
         if ((++n & 15) == 0)
             yield();
 
-        e = find_res(sound_index_key(path));
+        e = find_res(path_key(path));
         if (e == NULL || e->found)
             continue;
 

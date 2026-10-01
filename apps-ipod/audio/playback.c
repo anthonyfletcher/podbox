@@ -1741,8 +1741,15 @@ static bool audio_get_track_metadata(int offset, struct mp3entry *id3)
     char path[MAX_PATH+1];
     if (playlist_peek(offset, path, sizeof (path)))
     {
-        /* Try to get it from the database */
-        if (!tagcache_fill_tags(id3, path))
+        /* Try to get it from the database. Tags only: with autoresume on it
+         * also loads the stored resume point, which would draw the progress
+         * bar there until the track's own entry arrives. */
+        if (tagcache_fill_tags(id3, path))
+        {
+            id3->elapsed = 0;
+            id3->offset = 0;
+        }
+        else
         {
             /* By now, filename is the only source of info */
             fill_metadata_from_path(id3, path);

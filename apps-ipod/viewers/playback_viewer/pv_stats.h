@@ -163,17 +163,15 @@ struct pv_totals
     int  cap_titles, cap_artists, cap_albums;
     bool overflowed;
 
-    /* Where the time went, in milliseconds. Split because the two halves
-     * have entirely different fixes: the name map is a file read (or, once,
-     * a database sweep), the log pass is reading and hashing every entry.
-     * An on-disk index would replace the second and not the first. */
+    /* Where the time went, in milliseconds: loading the moved-folder table
+     * (matching folders again after a database change), and the log pass,
+     * reading and hashing every entry the saved index does not cover. */
     long ms_names, ms_read;
     /* The phases that are neither: choosing a source, clearing the tables,
      * and the sorting and derived figures afterwards. Instrumented because a
      * loaded index made the other two nearly free and left most of the time
      * unaccounted for. */
     long ms_pick, ms_alloc, ms_post;
-    bool names_swept;   /* the map was rebuilt rather than read back */
     bool from_index;    /* loaded from the saved index rather than the log */
 
     /* Badges: how many of the wall is lit, and how big the wall is. */
@@ -203,21 +201,6 @@ enum pv_build_result
 #define PV_YEAR_ALL 0
 enum pv_build_result pv_stats_build(void *buf, size_t bufsz,
                                     struct pv_totals *out, int year);
-
-/* Whether a saved index already accounts for the whole log, so that the next
- * pv_stats_build() reads its rows instead of resolving any name.
- *
- * Asked by whoever divides the buffer: a build with names to resolve wants as
- * much of it as it can have, and one without has no use for the room. */
-bool pv_stats_index_covers(int year);
-
-/* A build made only for the index it saves, for a caller that is about to
- * build again in less room. The name map gets the whole of 'buf' and the
- * tables at most 'tables_max', the room the second build will give them. The
- * index is always written, so that build finds it covering the log and needs
- * no map of its own. */
-enum pv_build_result pv_stats_prime(void *buf, size_t bufsz,
-                                    size_t tables_max, int year);
 
 /* The same figures over the whole log, whatever year was asked for. This is
  * what the badges were scored against, and what the year switch offers from;

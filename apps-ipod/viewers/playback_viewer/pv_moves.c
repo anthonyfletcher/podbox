@@ -15,8 +15,8 @@
  * result is a table of old folder -> new folder, applied as a path is read;
  * the log itself is never rewritten.
  *
- * It is built right after a name-map sweep, which is when the database has
- * changed, and saved keyed to the same database state as the map.
+ * It is built when the database has changed since the saved table, and
+ * saved keyed to that database state.
  *
  *   build    the log's folders and files, two walks of the database, the
  *            verdicts, the file
@@ -94,6 +94,7 @@ static struct
     struct cand *cands;
     char *pool;
     unsigned pool_used, pool_cap;
+    bool ram;               /* the path index answers walk 1 as files arrive */
 } sc;
 
 /* The loaded table. */
@@ -182,11 +183,12 @@ static void log_cb(const struct pv_entry *e, void *ctx)
     sc.files[sc.f_n].path_h = h;
     sc.files[sc.f_n].base_h = fnv1a_str(slash + 1);
     sc.files[sc.f_n].dir    = d;
-    sc.files[sc.f_n].found  = false;
+    sc.files[sc.f_n].found  = sc.ram && tagcache_find_path(p) >= 0;
     sc.fslots[s] = ++sc.f_n;
 }
 
-/* Walk 1: which logged files the database still holds where they were. */
+/* Walk 1: which logged files the database still holds where they were. Only
+ * without the path index, which log_cb() asks instead. */
 static bool mark_found(void)
 {
     struct tagcache_search tcs;
@@ -381,10 +383,11 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
     memset(sc.dslots, 0, (size_t)ds * sizeof(int));
 
     splashf(0, "Looking for moved folders");
+    sc.ram = tagcache_is_in_ram();
     if (pv_log_read(PV_SRC_PLAYBACK, log_cb, NULL) < 0 || sc.f_n == 0)
         return;
 
-    if (!mark_found())
+    if (!sc.ram && !mark_found())
         return;
 
     /* From here the slots index the missing files by name. */

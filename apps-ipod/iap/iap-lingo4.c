@@ -20,6 +20,7 @@
 #include "screens/browse/browser_disk.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
+#include "database/tagcache.h"
 #include "string-extra.h"
 
 /*
@@ -1503,13 +1504,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                         switch(buf[3])
                         {
                             case 0x05:
-                                strmemccpy((char *)&data[7], id3.title,64);
+                                strmemccpy((char *)&data[7],
+                                           id3.title ? id3.title : "", 64);
                                 break;
                             case 0x02:
-                                strmemccpy((char *)&data[7], id3.artist,64);
+                                strmemccpy((char *)&data[7],
+                                           id3.artist ? id3.artist : "", 64);
                                 break;
                             case 0x03:
-                                strmemccpy((char *)&data[7], id3.album,64);
+                                strmemccpy((char *)&data[7],
+                                           id3.album ? id3.album : "", 64);
                                 break;
                             case 0x04:
                             case 0x06:
@@ -1834,14 +1838,15 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             tracknum += playlist_get_first_index(NULL);
             if(tracknum >= playlist_amount())
                 tracknum -= playlist_amount();
-            /* If the tracknumber is not the current one,
-               read id3 from disk */
+            /* If the tracknumber is not the current one, take its tags
+               from the database, or failing that read them from the file */
             if(playlist_next(0) != tracknum)
             {
                 struct playlist_track_info info;
                 playlist_get_track_info(NULL, tracknum, &info);
-                /* memset(&id3, 0, sizeof(struct mp3entry)); --get_metadata does this for us */
-                get_metadata(&id3, -1, info.filename);
+                /* Both clear id3 before filling it */
+                if (!tagcache_fill_tags(&id3, info.filename))
+                    get_metadata(&id3, -1, info.filename);
             }
             /* Return the requested track data */
             switch(cmd)

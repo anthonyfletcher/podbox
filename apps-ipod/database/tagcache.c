@@ -13,7 +13,8 @@
  *   - on-disk structs, byte-swapping, and the typed read/write helpers
  *   - opening the master and per-tag database files
  *   - the temporary buffer used during commit, and the yield helper
- *   - lookup: finding an entry by filename, in RAM or on disk
+ *   - lookup: finding an entry by filename, through the path index in RAM
+ *     or by scanning the filename file on disk
  *   - search: running a query's clauses and retrieving matching tags
  *   - modification: writing tags back, and deleting entries
  *   - the builder: scanning the tree into a temporary DB
@@ -87,6 +88,7 @@
 #include "usb.h"
 #include "metadata.h"
 #include "tagcache.h"
+#include "database/path_key.h"
 #include "db_spoken.h"
 #include "widgets/yesno.h"
 #include "core_alloc.h"
@@ -330,12 +332,27 @@ static struct master_header current_tcmh;
     ((struct dircache_fileref *)(tcramcache.hdr->tags[tag_filename] + \
                                   sizeof (struct tagcache_header)))
 
+/* One live entry of the path index: path_key() of its filename, split so the
+ * slot is 12 bytes rather than padded to 16. */
+struct path_slot {
+    uint32_t key_lo;
+    uint32_t key_hi;
+    int32_t  idx_id;
+};
+
 /* Header is created when loading database to ram. */
 struct ramcache_header {
     char *tags[TAG_COUNT];       /* Tag file content (dcfrefs if tag_filename) */
     int entry_count[TAG_COUNT];  /* Number of entries in the indices. */
+    int path_count;              /* Slots in the path index */
+    int path_first;              /* Its byte offset from this header */
     struct index_entry indices[0]; /* Master index file content */
 };
+
+/* The path index, sorted by key. An offset rather than a pointer so a move of
+ * the allocation needs nothing fixing. */
+#define tcrc_path_slots \
+    ((struct path_slot *)((char *)tcramcache.hdr + tcramcache.hdr->path_first))
 
 
 /* In-RAM ramcache structure (not persisted) */
@@ -781,55 +798,71 @@ static void free_tempbuf(void)
     tempbuf_size = 0;
 }
 
-/* find the ramcache entry corresponding to the file indicated by
- * filename and dc (it's corresponding dircache id). */
+/* Path index lookups since boot, for the database info screen. */
+static volatile int path_found, path_missed;
+
+static int path_slot_cmp(const void *a, const void *b)
+{
+    const struct path_slot *x = a, *y = b;
+
+    if (x->key_hi != y->key_hi)
+        return x->key_hi < y->key_hi ? -1 : 1;
+    if (x->key_lo != y->key_lo)
+        return x->key_lo < y->key_lo ? -1 : 1;
+    return x->idx_id - y->idx_id;
+}
+
+/* The live entry whose filename has this path_key(), or -1. Refuses unless
+ * the RAM copy is in use, which is exactly when the index describes the
+ * database: load_tagcache() builds it, and a commit turns the RAM copy off
+ * before it writes.
+ *
+ * Nothing here yields, so the allocation cannot move under it. Where two
+ * slots share a key -- the same file entered twice -- the first one not
+ * deleted since the load is the answer. */
+static int path_index_find(uint64_t key)
+{
+    const uint32_t hi = (uint32_t)(key >> 32), lo = (uint32_t)key;
+    const struct path_slot *s;
+    int first = 0, last;
+
+    if (!tc_stat.ramcache)
+        return -1;
+
+    s = tcrc_path_slots;
+    last = tcramcache.hdr->path_count;
+    while (first < last)
+    {
+        int mid = first + (last - first) / 2;
+
+        if (s[mid].key_hi < hi || (s[mid].key_hi == hi && s[mid].key_lo < lo))
+            first = mid + 1;
+        else
+            last = mid;
+    }
+
+    for (; first < tcramcache.hdr->path_count
+           && s[first].key_hi == hi && s[first].key_lo == lo; first++)
+    {
+        int idx_id = s[first].idx_id;
+
+        if (!(tcramcache.hdr->indices[idx_id].flag & FLAG_DELETED))
+        {
+            path_found++;
+            return idx_id;
+        }
+    }
+
+    path_missed++;
+    return -1;
+}
+
+/* The RAM copy's entry for a file, through the path index. Works under On and
+ * Quick alike: the index needs no dircache. -1 when the file is not in the
+ * database or the RAM copy is not in use; find_index() tells the two apart. */
 static long find_entry_ram(const char *filename)
 {
-    static long last_pos = 0;
-    struct dircache_fileref dcfref;
-
-    /* Check if tagcache is loaded into ram. */
-    if (!tc_stat.ramcache
-        || global_settings.tagcache_ram != TAGCACHE_RAM_ON)
-        return -1;
-
-    if (dircache_search(DCS_CACHED_PATH | DCS_UPDATE_FILEREF, &dcfref,
-                        filename) <= 0)
-    {
-        logf("tagcache: file not found.");
-        return -1;
-    }
-
-    /* Search references */
-    int end_pos = current_tcmh.tch.entry_count;
-    while (1)
-    {
-        for (int i = last_pos; i < end_pos; i++)
-        {
-            do_timed_yield();
-
-            if (!(tcramcache.hdr->indices[i].flag & FLAG_DIRCACHE))
-                continue;
-
-            int cmp = dircache_fileref_cmp(&tcrc_dcfrefs[i], &dcfref);
-            if (cmp < 3)
-                continue;
-
-            last_pos = MAX(0, i - 3);
-            return i;
-        }
-
-        if (last_pos == 0)
-        {
-            last_pos = MAX(0, end_pos - 3);
-            break;
-        }
-
-        end_pos = last_pos;
-        last_pos = 0;
-    }
-
-    return -1;
+    return path_index_find(path_key(filename));
 }
 
 static long find_entry_disk(const char *filename_raw, bool localfd)
@@ -937,16 +970,14 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
     return idx;
 }
 
+/* A miss in a loaded path index is final. Falling through to the disk would
+ * read the whole filename file only to agree with it. */
 static int find_index(const char *filename)
 {
-    long idx_id = -1;
+    if (tc_stat.ramcache)
+        return find_entry_ram(filename);
 
-    idx_id = find_entry_ram(filename);
-
-    if (idx_id < 0)
-        idx_id = find_entry_disk(filename, true);
-
-    return idx_id;
+    return find_entry_disk(filename, true);
 }
 
 bool tagcache_find_index(struct tagcache_search *tcs, const char *filename)
@@ -2195,6 +2226,13 @@ bool tagcache_fill_tags(struct mp3entry *id3, const char *filename)
     if (idx_id < 0)
         return false;
 
+    /* The path, and nothing that makes the entry valid_mp3entry(): it is
+     * tags without a file behind them, so no codec type and no size. Callers
+     * cache a filled entry by its path, and a play is counted only for a
+     * valid one. */
+    if (filename != id3->path)
+        strmemccpy(id3->path, filename, sizeof(id3->path));
+
     entry = &tcramcache.hdr->indices[idx_id];
 
     char* buf = id3->id3v2buf;
@@ -2251,6 +2289,68 @@ bool tagcache_fill_tags(struct mp3entry *id3, const char *filename)
     }
 
     return true;
+}
+
+int tagcache_find_path(const char *path)
+{
+    return path_index_find(path_key(path));
+}
+
+int tagcache_find_key(uint64_t key)
+{
+    return path_index_find(key);
+}
+
+/* The RAM copy's entry, if it is live. A deleted entry's string seeks hold a
+ * CRC of the text rather than a position (see delete_entry()), so they must
+ * not be followed. */
+static const struct index_entry *ram_entry(int idx_id)
+{
+    const struct index_entry *entry;
+
+    if (!tc_stat.ramcache || idx_id < 0
+        || idx_id >= current_tcmh.tch.entry_count)
+        return NULL;
+
+    entry = &tcramcache.hdr->indices[idx_id];
+    return (entry->flag & FLAG_DELETED) ? NULL : entry;
+}
+
+bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size)
+{
+    const struct index_entry *entry = ram_entry(idx_id);
+    const char *s;
+
+    /* tag_filename's block holds dircache references, not paths. */
+    if (!entry || tag < 0 || tag >= TAG_COUNT || TAGCACHE_IS_NUMERIC(tag)
+        || tag == tag_filename)
+        return false;
+
+    s = get_tag_string(entry, tag);
+    if (!s)
+        return false;
+
+    strmemccpy(buf, s, size);
+    return true;
+}
+
+bool tagcache_entry_numeric(int idx_id, int tag, long *value)
+{
+    const struct index_entry *entry = ram_entry(idx_id);
+
+    if (!entry || (unsigned)tag >= 32 || !TAGCACHE_IS_NUMERIC(tag))
+        return false;
+
+    *value = get_tag_numeric(entry, tag, idx_id);
+    return true;
+}
+
+bool tagcache_path_index_info(int *slots, int *found, int *missed)
+{
+    *found = path_found;
+    *missed = path_missed;
+    *slots = tc_stat.ramcache ? tcramcache.hdr->path_count : 0;
+    return tc_stat.ramcache;
 }
 
 static inline void write_item(const char *item)
@@ -2397,11 +2497,12 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     if (probe_file_format(path) == AFMT_UNKNOWN)
         return ;
 
-    /* Check if the file is already cached. */
-    idx_id = find_entry_ram(path);
-
-    /* Be sure the entry doesn't exist. */
-    if (filenametag_fd >= 0 && idx_id < 0)
+    /* Check if the file is already cached. A miss in the RAM copy's path
+     * index is final; only without one does the disk have to be asked, at
+     * the cost of a scan of the filename file for every file not found. */
+    if (tc_stat.ramcache)
+        idx_id = find_entry_ram(path);
+    else if (filenametag_fd >= 0)
         idx_id = find_entry_disk(path, false);
 
     /* Check if file has been modified. */
@@ -4478,6 +4579,7 @@ static bool allocate_tagcache(void)
     size_t alloc_size = tcmh.tch.datasize + 256 + TAGCACHE_RESERVE +
         sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
     alloc_size += tcmh.tch.entry_count*sizeof(struct dircache_fileref);
+    alloc_size += tcmh.tch.entry_count*sizeof(struct path_slot);
 
     /* Ensure enough memory remains for the audio buffer after allocation.
      * Without this check, a large database can consume so much RAM that
@@ -4537,6 +4639,7 @@ static bool load_tagcache(void)
     bool ok = false;
     ssize_t bytesleft = tc_stat.ramcache_allocated - sizeof(struct ramcache_header);
     int fd;
+    long load_start = current_tick;
     /* Which tag this got to before giving up, for the log at `failure:`. Every
      * exit below reports the same way through logf(), which is compiled out on
      * a release build -- so a load that fails on a device says nothing at all,
@@ -4589,9 +4692,27 @@ static bool load_tagcache(void)
     close(fd);
     fd = -1;
 
-    /* Load the tags right after the index entries */
+    /* The path index next, ahead of the tag blocks: the filename pass that
+     * fills it runs in the middle of the tag loop, before the blocks after it
+     * have a position. */
     char *p = (char *)&tcramcache.hdr->indices[tcmh.tch.entry_count];
+    ssize_t gap;
+    struct path_slot *slots;
+    int path_n = 0;
 
+    p = TC_ALIGN_PTR(p, struct path_slot, &gap);
+    bytesleft -= gap + tcmh.tch.entry_count * (ssize_t)sizeof(struct path_slot);
+    if (bytesleft < 0)
+    {
+        logf("too big tagcache (path index)");
+        goto failure;
+    }
+    slots = (struct path_slot *)p;
+    tcramcache.hdr->path_first = p - (char *)tcramcache.hdr;
+    tcramcache.hdr->path_count = 0;
+    p += tcmh.tch.entry_count * sizeof(struct path_slot);
+
+    /* Then the tags */
     for (int tag = 0; tag < TAG_COUNT; tag++)
     {
         ssize_t rc;
@@ -4708,8 +4829,7 @@ static bool load_tagcache(void)
                     goto failure;
                 }
 
-                if ((idx->flag & FLAG_DELETED)
-                    IFN_DIRCACHE( || !global_settings.tagcache_scan_on_eject ))
+                if (idx->flag & FLAG_DELETED)
                 {
                     /* seek over tag data instead of reading */
                     if (lseek(fd, fe->tag_length, SEEK_CUR) < 0)
@@ -4725,6 +4845,17 @@ static bool load_tagcache(void)
                 {
                     logf("read error #12");
                     goto failure;
+                }
+                filename[fe->tag_length] = '\0';
+
+                if (path_n < tcmh.tch.entry_count)
+                {
+                    uint64_t key = path_key(filename);
+
+                    slots[path_n].key_lo = (uint32_t)key;
+                    slots[path_n].key_hi = (uint32_t)(key >> 32);
+                    slots[path_n].idx_id = idx_id;
+                    path_n++;
                 }
                 continue;
             }
@@ -4758,8 +4889,15 @@ static bool load_tagcache(void)
 
         close(fd);
     }
+    fd = -1;
+
+    qsort(slots, path_n, sizeof(struct path_slot), path_slot_cmp);
+    tcramcache.hdr->path_count = path_n;
 
     tc_stat.ramcache_used = tc_stat.ramcache_allocated - bytesleft;
+    debug_log(DEBUG_LOG_TAGCACHE, "load: %d entries, %d paths, %ld ms",
+              (int)tcmh.tch.entry_count, path_n,
+              (current_tick - load_start) * 1000 / HZ);
     logf("tagcache loaded into ram!");
     logf("utilization: %d%%", 100*tc_stat.ramcache_used / tc_stat.ramcache_allocated);
 
