@@ -300,7 +300,7 @@ report rebuilds them itself the next time you open it.
 | Autocommit on Startup | Finishes a scan that was cut short by a flat battery or an unplug. Off asks first instead. | on | **Adv** |
 | Gather Runtime Data | Records play counts, ratings and when each track was last played. What the listening statistics are built from. | on | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. | / | **Adv** |
-| Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
+| Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
 | Write Debug Log | Writes scan progress to a log file. For working out why a track is missing from the database. | off | **Adv** |
 
 ### Library — Playlist Engine

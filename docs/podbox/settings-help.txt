@@ -635,8 +635,9 @@ Changing it is best followed by a rebuild, or entries from the old set linger.
 
 [year from folder]
 Takes the year from the track's folder when its name starts with one, as in
-"1998 - Album", instead of from the tags. For libraries where the tags hold each
-track's own release date and the folder holds the album's.
+"1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from
+the folder above. For libraries where the tags hold each track's own release
+date and the folder holds the album's.
 
 It replaces the year in the Music lists, album sorting and the carousel; the
 now playing screen still shows the tag. Takes effect at the next rebuild.

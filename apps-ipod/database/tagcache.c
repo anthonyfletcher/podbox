@@ -2287,21 +2287,15 @@ static int check_if_empty(char **tag)
  * idea, as it uses lots of stack and is called from a recursive function
  * (check_dir).
  */
-/* The year a track's own folder is named after, as in "1998 - Album", or 0:
- * four digits from 1900 to 2099, then anything but a fifth digit. */
-static int folder_name_year(const char *path)
+/* The year a folder name starts with, as in "1998 - Album", or 0: four digits
+ * from 1900 to 2099, then anything but a fifth digit. 'end' is the '/' after
+ * the name. */
+static int name_year(const char *start, const char *end)
 {
-    const char *end = strrchr(path, '/');
-    const char *start = end;
     int year = 0;
 
-    if (end == NULL)
-        return 0;
-    while (start > path && start[-1] != '/')
-        start--;
     if (end - start < 4)
         return 0;
-
     for (int i = 0; i < 4; i++)
     {
         if (!isdigit((unsigned char)start[i]))
@@ -2312,6 +2306,59 @@ static int folder_name_year(const char *path)
         return 0;
 
     return (year >= 1900 && year <= 2099) ? year : 0;
+}
+
+/* Whether a folder holds one disc of an album: "CD1", "Disc 2", "disk_3". */
+static bool disc_folder(const char *start, const char *end)
+{
+    static const char * const words[] = { "cd", "disc", "disk" };
+    const char *p = NULL;
+
+    for (size_t i = 0; i < ARRAYLEN(words) && p == NULL; i++)
+    {
+        size_t len = strlen(words[i]);
+
+        if ((size_t)(end - start) > len && !strncasecmp(start, words[i], len))
+            p = start + len;
+    }
+    if (p == NULL)
+        return false;
+
+    while (p < end && (*p == ' ' || *p == '-' || *p == '_' || *p == '.'))
+        p++;
+    if (p == end)
+        return false;
+    while (p < end && isdigit((unsigned char)*p))
+        p++;
+    return p == end;
+}
+
+/* The year of the album a track's folder belongs to, or 0: the folder's own
+ * name, or for a disc folder, the name of the folder above it. Only a disc
+ * folder looks up -- above an album is usually the artist, and a band named
+ * "1990s" is not a year. */
+static int folder_name_year(const char *path)
+{
+    const char *end = strrchr(path, '/');
+    const char *start = end;
+    int year;
+
+    if (end == NULL)
+        return 0;
+    while (start > path && start[-1] != '/')
+        start--;
+
+    year = name_year(start, end);
+    if (year == 0 && start > path && disc_folder(start, end))
+    {
+        end = start - 1;
+        start = end;
+        while (start > path && start[-1] != '/')
+            start--;
+        year = name_year(start, end);
+    }
+
+    return year;
 }
 
 static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
