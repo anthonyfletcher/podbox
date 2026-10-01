@@ -22455,6 +22455,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_ACCESSORY_BROWSING
+  desc: in accessories settings: how many entries a browsing accessory's lists hold
+  user: core
+  <source>
+    *: "Accessory Browsing"
+  </source>
+  <dest>
+    *: "Accessory Browsing"
+  </dest>
+  <voice>
+    *: "Accessory Browsing"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_ACCESSORY_CONNECTED
   desc: splash: an iAP accessory has identified itself
   user: core

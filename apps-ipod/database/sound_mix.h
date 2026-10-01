@@ -148,6 +148,11 @@ int sound_mix_from_mood(int mood, int want);
  * way, so the change is heard across the playlist rather than at a join. */
 int sound_mix_journey(int from, int to, int want);
 
+/* Either of the two, for a caller with no screen to ask on: a mood when
+ * 'from' and 'to' are the same mood. The playlist is replaced without the
+ * erase warning. */
+int sound_mix_mood_unasked(int from, int to, int want);
+
 /* A journey that ends calm, starting from where 'path' already sits.
  *
  * That track plays first and does not come round again, as it does for a mix

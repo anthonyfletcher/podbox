@@ -47,3 +47,7 @@ uint8_t _iap_convert_repeat_state(int rb_state);
 uint8_t _iap_convert_battery_level(int rb_battery_level);
 uint8_t _iap_convert_charge_status(enum charge_state_type rb_charge_state);
 void    _iap_convert_datetime(struct tm* rb_time, struct IAPDateTime* time);
+
+/* Answers a play held back while the library built the Queue, once it has;
+ * true if one was held and is now answered. Called every tick. */
+bool    iap_platform_library_play_done(struct IAPContext* ctx);

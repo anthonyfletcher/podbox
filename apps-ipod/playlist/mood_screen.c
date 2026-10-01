@@ -137,6 +137,17 @@ JOURNEY_ITEM(journey_4, 4, LANG_JOURNEY_MELANCHOLY_UPLIFTING);
 MAKE_MENU(journeys_menu, ID2P(LANG_JOURNEYS), NULL, Icon_NOICON,
           &journey_0, &journey_1, &journey_2, &journey_3, &journey_4);
 
+bool mood_screen_journey(int n, int *lang, int *from, int *to)
+{
+    if (n < 0 || n >= (int)ARRAYLEN(journeys))
+        return false;
+
+    *lang = journeys[n].lang;
+    *from = journeys[n].from;
+    *to = journeys[n].to;
+    return true;
+}
+
 bool mood_screen_pick(bool journey)
 {
     mood_started = false;

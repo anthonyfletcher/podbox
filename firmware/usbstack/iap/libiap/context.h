@@ -86,6 +86,10 @@ struct IAPContext {
     int32_t                      artwork_trans_id;
     uint16_t                     artwork_data_command;
     uint8_t                      artwork_data_lingo;
+    uint32_t                     db_record_index;
+    uint32_t                     db_record_end;
+    int32_t                      db_record_trans_id;
+    uint8_t                      db_record_type;
     uint8_t                      trans_id_support; /* TransIDSupport */
     /* notification.c */
     /* DisplayRemote::SetRemoteEventNotification */

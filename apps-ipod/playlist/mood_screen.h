@@ -14,4 +14,8 @@
  * screen; false if nothing was chosen or nothing could be built. */
 bool mood_screen_pick(bool journey);
 
+/* The nth journey offered, in menu order: its name and the two moods it runs
+ * between. False past the last. */
+bool mood_screen_journey(int n, int *lang, int *from, int *to);
+
 #endif /* _MOOD_SCREEN_H */

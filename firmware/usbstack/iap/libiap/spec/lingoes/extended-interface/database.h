@@ -22,6 +22,12 @@ struct IAPSelectDBRecord {
     uint32_t index;
 } __attribute__((packed));
 
+struct IAPSelectSortDBRecordPayload {
+    uint8_t  type; /* IAPDatabaseType */
+    uint32_t index;
+    uint8_t  sort; /* 0xFF for the default */
+} __attribute__((packed));
+
 struct IAPGetNumberCategorizedDBRecordsPayload {
     uint8_t type; /* IAPDatabaseType */
 } __attribute__((packed));

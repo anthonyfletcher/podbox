@@ -22,6 +22,7 @@
 #include "core_alloc.h"
 #include "metadata.h"
 #include "database/tagcache.h"
+#include "iap_library.h"
 #include "misc.h"
 #include "pcm_mixer.h"
 #include "pcm_sink.h"
@@ -107,6 +108,23 @@ IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatf
     return iap_true;
 }
 
+static bool library_play_held;
+
+bool iap_platform_library_play_done(struct IAPContext* ctx) {
+    struct Platform* plt = ctx->platform;
+    if(!library_play_held || iap_library_building()) {
+        return false;
+    }
+    /* playback starting has usually answered it already, but not where it
+     * was playing before and the stream never stopped */
+    library_play_held = false;
+    if(plt->control_pending) {
+        check_act(iap_control_response(ctx, plt->pending_control, true), );
+        plt->control_pending = false;
+    }
+    return true;
+}
+
 void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl control, struct IAPPlatformPendingControl pending) {
     struct Platform* plt = iap_ctx->platform;
 
@@ -116,6 +134,14 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
         button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         break;
     case IAPPlatformControl_Play:
+        if(iap_library_building()) {
+            /* The library starts playback once the Queue is built, and an
+             * accessory told before then asks about a Queue half made */
+            plt->control_pending = true;
+            plt->pending_control = pending;
+            library_play_held    = true;
+            return;
+        }
         if(audio_status() != AUDIO_STATUS_PLAY) {
             button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         }
@@ -156,6 +182,7 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
          * to maintain synchronization with accessories, do not send an ack until playback actually begins. */
         plt->control_pending = true;
         plt->pending_control = pending;
+        library_play_held    = false;
         return;
     }
 exit:
@@ -274,7 +301,8 @@ static void get_trackinfo(const unsigned int track, struct mp3entry* id3) {
         tracknum -= playlist_amount();
     }
 
-    if(playlist_next(0) != tracknum) {
+    /* Stopped, the current track's tags are empty */
+    if(playlist_next(0) != tracknum || !(audio_status() & AUDIO_STATUS_PLAY)) {
         struct playlist_track_info info;
         playlist_get_track_info(NULL, tracknum, &info);
         /* The database first: a dock listing a playlist asks for every
@@ -335,8 +363,48 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
 
 IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t index) {
     (void)iap_ctx;
+    /* audio_skip() locks up on an offset past the end rather than refusing it */
+    check_act(index < (uint32_t)playlist_amount(), return iap_false);
     audio_skip((int)index - playlist_next(0));
     return iap_true;
+}
+
+/* The library browsed from an accessory lives in apps-ipod (iap_library.h);
+ * only the Queue's tracks are named and chosen here. */
+IAPBool iap_platform_get_db_count(struct IAPContext* iap_ctx, uint8_t type, uint32_t* count) {
+    (void)iap_ctx;
+    return iap_library_count(type, count);
+}
+
+IAPBool iap_platform_get_db_record(struct IAPContext* iap_ctx, uint8_t type, uint32_t index, struct IAPSpan* name) {
+    struct IAPSpan saved = *name;
+    if(type == IAPDatabaseType_Track && iap_library_tracks_are_queue()) {
+        struct IAPPlatformTrackInfo info = {.title = name};
+        if(iap_platform_get_indexed_track_info(iap_ctx, index, &info)) {
+            return iap_true;
+        }
+    } else if(name->size > 0 && iap_library_name(type, index, (char*)name->ptr, name->size)) {
+        return iap_span_alloc(name, strlen((char*)name->ptr) + 1) != NULL;
+    }
+    /* a record that cannot be read goes with an empty name */
+    *name = saved;
+    return iap_span_append(name, "", 1);
+}
+
+IAPBool iap_platform_select_db_record(struct IAPContext* iap_ctx, uint8_t type, uint32_t index, uint8_t sort) {
+    if(iap_library_building()) {
+        /* an accessory asking again while the Queue is built */
+        return iap_true;
+    }
+    if(type == IAPDatabaseType_Track && iap_library_tracks_are_queue()) {
+        return iap_platform_set_playing_track(iap_ctx, index);
+    }
+    return iap_library_select(type, index, sort);
+}
+
+void iap_platform_reset_db_selection(struct IAPContext* iap_ctx) {
+    (void)iap_ctx;
+    iap_library_reset();
 }
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {

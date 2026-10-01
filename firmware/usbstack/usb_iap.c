@@ -33,6 +33,7 @@
 #include "iap/macros.h"
 #include "iap/platform-macros.h"
 #include "iap/platform.h"
+#include "iap_library.h"
 #include "usb_audio_def.h"
 #include "usb_class_driver.h"
 #include "usb_hid_def.h"
@@ -458,6 +459,7 @@ static void usb_iap_disconnect(void) {
     check_act(iap_deinit_ctx(ctx), );
     _iap_release_ctx();
     check_act(iap_audio_deinit(), );
+    iap_library_close();
     LOG("disconnected");
 }
 
@@ -627,7 +629,7 @@ static void usb_iap_notify_event(intptr_t data) {
     case Notify_Tick: {
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         struct Platform*   plt = ctx->platform;
-        if(plt->control_pending) {
+        if(plt->control_pending && !iap_platform_library_play_done(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();
             return;

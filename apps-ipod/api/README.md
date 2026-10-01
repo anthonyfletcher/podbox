@@ -31,6 +31,7 @@ reaches in by bare name exactly the way `firmware/` does:
 | `splash.h` | `firmware/powermgmt.c` |
 | `playback.h` | `firmware/usbstack/usb_iap.c`, `firmware/usbstack/iap/{notification,platform}.c` |
 | `playlist.h` | `firmware/usbstack/iap/platform.c` |
+| `iap_library.h` | `firmware/usbstack/usb_iap.c`, `firmware/usbstack/iap/platform.c` |
 | `buffering.h` | `lib/rbcodec/metadata/metadata.c` |
 | `fracmul.h` | `lib/rbcodec/dsp/*.c` (10 files) |
 | `rbcodecconfig.h` | `lib/rbcodec/codecs/codecs.h`, `lib/rbcodec/dsp/*.c`, `lib/rbcodec/platform.h` |
@@ -41,8 +42,8 @@ reaches in by bare name exactly the way `firmware/` does:
 The list covers files this fork compiles. Other targets' sources include these
 same headers and are ignored here, for the same reason `list.h` is (below).
 
-`playback.h` and `playlist.h` are reached only through `USB_ENABLE_IAP`, which
-both targets build.
+`playback.h`, `playlist.h` and `iap_library.h` are reached only through
+`USB_ENABLE_IAP`, which both targets build.
 
 ## Slashed paths
 

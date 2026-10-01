@@ -13,14 +13,13 @@
 
 #include "iap-core.h"
 #include "iap-lingo.h"
-#include "dir.h"
 #include "rbpaths.h"
 #include "settings.h"
 #include "system/strutil.h"          /* open_utf8, read_line */
-#include "screens/browse/browser_disk.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
 #include "database/tagcache.h"
+#include "iap-library.h"
 #include "string-extra.h"
 
 /*
@@ -44,15 +43,6 @@
             return; \
         }} while(0)
 
-/* Used to remember the last Type and Record requested */
-static char cur_dbrecord[5] = {0};
-
-/* Used to remember the total number of filtered database records */
-static unsigned long dbrecordcount = 0;
-
-/* Used to remember the LAST playlist selected */
-static unsigned long last_selected_playlist = 0;
-
 static void cmd_ack(const unsigned int cmd, const unsigned char status)
 {
     IAP_TX_INIT4(0x04, 0x0001);
@@ -63,73 +53,40 @@ static void cmd_ack(const unsigned int cmd, const unsigned char status)
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
 
-static void get_playlist_name(unsigned char *dest,
-                              unsigned long item_offset,
-                              size_t max_length)
+/* A song list being made into the Queue plays when it is done, and a dock
+ * answered before then asks about a Queue half made */
+static void wait_for_library(void)
 {
-    if (item_offset == 0) return;
-    DIR* dp;
-    struct dirent* playlist_file = NULL;
+    long until = current_tick + 15 * HZ;
 
-    dp = opendir(global_settings.playlist_catalog_dir);
-
-    char *extension;
-    unsigned long nbr = 0;
-    while ((nbr < item_offset) && ((playlist_file = readdir(dp)) != NULL))
-    {
-        /*Increment only if there is a playlist extension*/
-        if ((extension=strrchr(playlist_file->d_name, '.')) != NULL){
-            if ((strcmp(extension, ".m3u") == 0 ||
-                 strcmp(extension, ".m3u8") == 0))
-                nbr++;
-        }
-    }
-    if (playlist_file != NULL) {
-        strmemccpy(dest, playlist_file->d_name, max_length);
-    }
-    closedir(dp);
+    while (iap_library_building() && TIME_BEFORE(current_tick, until))
+        sleep(HZ / 10);
 }
 
-static void seek_to_playlist(unsigned long index)
+/* A selection, by SelectDBRecord or SelectSortDBRecord. A song from the Queue
+ * is skipped to here; anything else is the library's, whose categories are
+ * iAP's own. */
+static void select_record(const unsigned int cmd, const unsigned char *buf,
+                          int sort)
 {
-                    unsigned char selected_playlist
-                    [sizeof(global_settings.playlist_catalog_dir)
-                    + 1
-                    + MAX_PATH] = {0};
+    unsigned char type = buf[3];
+    uint32_t index = get_u32(&buf[4]);
+    bool ok;
 
-                    strcpy(selected_playlist,
-                            global_settings.playlist_catalog_dir);
-                    int len = strlen(selected_playlist);
-                    selected_playlist[len] = '/';
-                    get_playlist_name (selected_playlist + len + 1,
-                                       index,
-                                       MAX_PATH);
-                    browser_disk_play_playlist(selected_playlist,
-                                     global_settings.playlist_catalog_dir,
-                                     strrchr(selected_playlist, '/') + 1);
-}
-
-static unsigned long nbr_total_playlists(void)
-{
-    DIR* dp;
-    unsigned long nbr_total_playlists = 0;
-    struct dirent* playlist_file = NULL;
-    char *extension;
-    dp = opendir(global_settings.playlist_catalog_dir);
-    while ((playlist_file = readdir(dp)) != NULL)
+    if (iap_library_building())
+        ok = true;
+    else if (type == 0x05 && iap_library_tracks_are_queue())
     {
-        /*Increment only if there is a playlist extension*/
-        if ((extension=strrchr(playlist_file->d_name, '.')) != NULL)
-        {
-            if ((strcmp(extension, ".m3u") == 0 ||
-                 strcmp(extension, ".m3u8") == 0))
-            {
-                nbr_total_playlists++;
-            }
-        }
+        /* audio_skip() locks up on an offset past the end */
+        ok = index < (uint32_t)playlist_amount();
+        if (ok)
+            audio_skip(index - playlist_next(0));
     }
-    closedir(dp);
-    return nbr_total_playlists;
+    else
+        ok = iap_library_select(type, index, sort);
+
+    wait_for_library();
+    cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
 }
 
 void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
@@ -1128,9 +1085,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            cur_dbrecord[0] = 0;
-            put_u32(&cur_dbrecord[1],0);
-            /* respond with cmd ok packet */
+            iap_library_reset();
             cmd_ok(cmd);
             break;
         }
@@ -1219,69 +1174,10 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Podcast  0x08 1.08
              * Reserved 0x09+ N/A
              *
-             * cur_dbrecord[0] is the record type
-             * cur_dbrecord[1-4] is the u32 of the record number requested
-             * which might be a playlist or a track number depending on
-             * the value of cur_dbrecord[0]
              */
         {
-            memcpy(cur_dbrecord, buf + 3, 5);
-
-            int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
-            uint32_t index;
-            uint32_t trackcount;
-            index = get_u32(&cur_dbrecord[1]);
-            trackcount = playlist_amount();
-            /* Every record type from 0x02 to 0x06 reaches audio_skip()
-             * below, not just 0x05, and audio_skip() locks the device up
-             * on an out-of-range offset rather than rejecting it. The
-             * bound is >=, not >: a valid index is 0..count-1. */
-            if ((cur_dbrecord[0] >= 2) && (cur_dbrecord[0] <= 6) &&
-                (index >= trackcount))
-            {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            if ((cur_dbrecord[0] == 1) && (index > (nbr_total_playlists() + 1)))
-            {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            audio_pause();
-            switch (cur_dbrecord[0])
-            {
-                case 0x01: /* Playlist*/
-                {
-                    if (index != 0x00) /* 0x00 is the On-The-Go Playlist and
-                                          we do nothing with it  */
-                    {
-                        last_selected_playlist = index;
-                        audio_skip(-iap_get_trackindex());
-                        seek_to_playlist(last_selected_playlist);
-                    }
-                    break;
-                }
-                case 0x02: /* Artist   */
-                case 0x03: /* Album    */
-                case 0x04: /* Genre    */
-                case 0x05: /* Track    */
-                case 0x06: /* Composer */
-                {
-                    audio_skip(index - playlist_next(0));
-                    break;
-                }
-                default:
-               {
-                    /* We don't do anything with the other selections.
-                     * YET.
-                     */
-                    break;
-               }
-            }
-            if (!paused)
-                audio_resume();
-            /* respond with cmd ok packet */
-            cmd_ok(cmd);
+            CHECKLEN(8);
+            select_record(cmd, buf, IAP_LIBRARY_SORT_DEFAULT);
             break;
         }
         case 0x0018: /* GetNumberCategorizedDBRecords */
@@ -1329,29 +1225,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[] = {0x04, 0x00, 0x19,
                                     0x00, 0x00, 0x00, 0x00};
-            switch(buf[3]) /* type number */
-            {
-                case 0x01: /* total number of playlists */
-                    dbrecordcount = nbr_total_playlists() + 1;
-                    break;
-                case 0x05: /* total number of Tracks */
-                case 0x02: /* total number of Artists */
-                case 0x03: /* total number of Albums */
-                           /* We don't sort on the above but some Head Units
-                            * require at least one to exist so we just return
-                            * the number of tracks in the playlist. */
-                    dbrecordcount = playlist_amount();
-                    break;
-                case 0x04: /* total number of Genres */
-                case 0x06: /* total number of Composers */
-                case 0x07: /* total number of AudioBooks */
-                case 0x08: /* total number of Podcasts */
-                           /* We don't support the above so just return that
-                              there are none available. */
-                    dbrecordcount = 0;
-                    break;
-            }
-            put_u32(&data[3], dbrecordcount);
+            uint32_t count;
+
+            CHECKLEN(4);
+            if (!iap_library_count(buf[3], &count))
+                count = 0;
+            put_u32(&data[3], count);
             iap_send_pkt(data, sizeof(data));
             break;
         }
@@ -1432,98 +1311,45 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * a null-terminated UTF-8 encoded data array.
              */
         {
-            unsigned char data[7 + MAX_PATH] =
-                            {0x04, 0x00, 0x1B, 0x00, 0x00, 0x00, 0x00,
-                             'O','n','-','T','h','e','-','G','o','\0'};
-            struct playlist_track_info track;
+            unsigned char data[7 + MAX_PATH] = {0x04, 0x00, 0x1B};
+            char *name = (char *)&data[7];
             struct mp3entry id3;
+            uint32_t total, read_count, start_index;
+            bool queue;
 
-            unsigned long start_index = get_u32(&buf[4]);
-            unsigned long read_count = get_u32(&buf[8]);
-            unsigned long counter = 0;
-            unsigned int number_of_playlists = nbr_total_playlists();
-            uint32_t trackcount;
-            trackcount = playlist_amount();
+            CHECKLEN(12);
+            start_index = get_u32(&buf[4]);
+            read_count = get_u32(&buf[8]);
+            queue = buf[3] == 0x05 && iap_library_tracks_are_queue();
 
-            /* The spec's way of asking for every record is a read count of
-             * -1 (Table 5-30), and testing start_index + read_count wraps
-             * on that, so the bound passes and the loop below runs 4.3
-             * billion times, wedging the iAP thread for the rest of the
-             * session. Bound the start first, then clamp the count against
-             * what is left rather than adding the two.
-             */
-            if (buf[3] == 0x01) /* Playlists */
+            /* A category with no case is refused with the status the spec
+             * defines for it (Table 5-2, 0x01), not left to be asked again */
+            if (!iap_library_count(buf[3], &total))
             {
-                if (start_index > number_of_playlists)
-                {
-                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                    break;
-                }
-                if (read_count > (number_of_playlists + 1) - start_index)
-                    read_count = (number_of_playlists + 1) - start_index;
-            }
-            else if (buf[3] >= 0x02 && buf[3] <= 0x06) /* Tracks, artists */
-            {
-                if (start_index >= trackcount)
-                {
-                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                    break;
-                }
-                if (read_count > trackcount - start_index)
-                    read_count = trackcount - start_index;
-            }
-            else
-            {
-                /* Categories the switch below has no case for. Left
-                 * unbounded they spin it re-sending an unchanged buffer,
-                 * and the spec defines a status for exactly this
-                 * (Table 5-2, 0x01). */
                 cmd_ack(cmd, IAP_ACK_UNKNOWN_DB);
                 break;
             }
-            for (counter=0;counter<read_count;counter++)
+            if (start_index >= total)
             {
-                switch(buf[3]) /* type number */
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            /* -1 asks for every record from the start on, so the count is
+             * clamped against what is left rather than added to the start */
+            if (read_count > total - start_index)
+                read_count = total - start_index;
+
+            for (uint32_t i = start_index; i < start_index + read_count; i++)
+            {
+                if (queue)
                 {
-                    case 0x01: /* Playlists */
-                       get_playlist_name(data +7,start_index+counter, MAX_PATH);
-                        /*Remove file extension*/
-                       char *dot=NULL;
-                       dot = (strrchr(data+7, '.'));
-                       if (dot != NULL)
-                           *dot = '\0';
-                       break;
-                    case 0x05: /* Tracks   */
-                    case 0x02: /* Artists  */
-                    case 0x03: /* Albums   */
-                    case 0x04: /* Genre    */
-                    case 0x06: /* Composer */
-                        playlist_get_track_info(NULL, start_index + counter,
-                                                &track);
-                        iap_get_trackinfo(start_index + counter, &id3);
-                        switch(buf[3])
-                        {
-                            case 0x05:
-                                strmemccpy((char *)&data[7],
-                                           id3.title ? id3.title : "", 64);
-                                break;
-                            case 0x02:
-                                strmemccpy((char *)&data[7],
-                                           id3.artist ? id3.artist : "", 64);
-                                break;
-                            case 0x03:
-                                strmemccpy((char *)&data[7],
-                                           id3.album ? id3.album : "", 64);
-                                break;
-                            case 0x04:
-                            case 0x06:
-                                strmemccpy((char *)&data[7], "Not Supported",14);
-                                break;
-                        }
-                        break;
+                    iap_get_trackinfo(i, &id3);
+                    strmemccpy(name, id3.title ? id3.title : "", MAX_PATH);
                 }
-                put_u32(&data[3], start_index+counter);
-                iap_send_pkt(data, 7 + strlen(data+7) + 1);
+                else if (!iap_library_name(buf[3], i, name, MAX_PATH))
+                    *name = '\0';
+                put_u32(&data[3], i);
+                iap_send_pkt(data, 7 + strlen(name) + 1);
                 yield();
             }
             break;
@@ -2059,30 +1885,28 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
-            uint32_t index;
-            uint32_t trackcount;
-            index = get_u32(&buf[3]);
-            trackcount = playlist_amount();
-            if (index >= trackcount)
+            CHECKLEN(7);
+            uint32_t index = get_u32(&buf[3]);
+            bool ok;
+
+            if (iap_library_building())
+                ok = true;
+            else if (iap_library_tracks_are_queue())
             {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            audio_pause();
-            if(global_settings.playlist_shuffle)
-            {
-                playlist_randomise(NULL, current_tick, true);
+                ok = index < (uint32_t)playlist_amount();
+                if (ok)
+                {
+                    audio_skip(index - playlist_next(0));
+                    audio_resume();
+                }
             }
             else
-            {
-                playlist_sort(NULL, true);
-            }
-            audio_skip(index - playlist_next(0));
-            if (!paused)
-                audio_resume();
-            /* respond with cmd ok packet */
-            cmd_ok(cmd);
+                /* The library starts it once the Queue is built */
+                ok = iap_library_select(0x05, index,
+                                        IAP_LIBRARY_SORT_DEFAULT);
+
+            wait_for_library();
+            cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x0029: /* PlayControl */
@@ -3028,70 +2852,10 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * 0x03: Database Category Type
              * 0x04-0x07:  Category Record Index
              * 0x08 Database Sort Type
-             *
-             * On Rockbox, if the recordtype is playlist, we load the selected
-             * playlist and start playing from the first track.
-             * If the recordtype is track, we play that track from the current
-             * playlist.
-             * On anything else we just play the current track from the current
-             * playlist.
-             * cur_dbrecord[0] is the recordtype
-             * cur_dbrecord[1-4] is the u32 of the record number requested
-             * which might be a playlist or a track number depending on
-             * the value of cur_dbrecord[0]
              */
         {
-            memcpy(cur_dbrecord, buf + 3, 5);
-
-            int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
-            unsigned int number_of_playlists = nbr_total_playlists();
-            uint32_t index;
-            uint32_t trackcount;
-            index = get_u32(&cur_dbrecord[1]);
-            trackcount = playlist_amount();
-            if ((cur_dbrecord[0] == 0x05) && (index > trackcount))
-            {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            if ((cur_dbrecord[0] == 0x01) && (index > (number_of_playlists + 1)))
-            {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
-                break;
-            }
-            switch (cur_dbrecord[0])
-            {
-                case 0x01: /* Playlist*/
-                {
-                    if (index != 0x00) /* 0x00 is the On-The-Go Playlist and
-                                          we do nothing with it  */
-                    {
-                        audio_pause();
-                        audio_skip(-iap_get_trackindex());
-                        playlist_sort(NULL, true);
-                        last_selected_playlist = index;
-                        seek_to_playlist(last_selected_playlist);
-                    }
-                    break;
-                }
-                case 0x02: /* Artist   Do Nothing  */
-                case 0x03: /* Album    Do Nothing  */
-                case 0x04: /* Genre    Do Nothing  */
-                case 0x06: /* Composer Do Nothing  */
-                    break;
-                case 0x05: /* Track*/
-                {
-                    audio_pause();
-                    audio_skip(-iap_get_trackindex());
-                    playlist_sort(NULL, true);
-                    audio_skip(index - playlist_next(0));
-                    break;
-                }
-            }
-            if (!paused)
-                audio_resume();
-            /* respond with cmd ok packet */
-            cmd_ok(cmd);
+            CHECKLEN(9);
+            select_record(cmd, buf, buf[8]);
             break;
         }
         case 0x0039: /* GetColorDisplayImageLimits */
@@ -3190,9 +2954,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * enable an unsupported hierarchy, such as a video hierarchy on an
              * iPod  model that does not support video.
              */
-            dbrecordcount = 0;
-            cur_dbrecord[0] = 0;
-            put_u32(&cur_dbrecord[1],0);
+            iap_library_reset();
             switch (buf[3])
             {
                 case 0x01: /* Music */
@@ -3206,6 +2968,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     break;
                 }
             }
+            break;
         }
         default:
         {

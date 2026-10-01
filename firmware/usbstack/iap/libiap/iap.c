@@ -180,6 +180,22 @@ static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* reques
     return 0;
 }
 
+/* one ReturnCategorizedDatabaseRecords per record, the next sent once this one is out */
+static IAPBool send_db_record_cb(struct IAPContext* ctx) {
+    struct IAPSpan request = _iap_get_buffer_for_send_payload(ctx);
+
+    struct IAPReturnCategorizedDatabaseRecordsPayload* payload = iap_span_alloc(&request, sizeof(*payload));
+    check_ret(payload != NULL, iap_false);
+    payload->index = swap_32(ctx->db_record_index);
+    check_ret(iap_platform_get_db_record(ctx, ctx->db_record_type, ctx->db_record_index, &request), iap_false);
+    check_ret(_iap_send_packet(ctx, IAPLingoID_ExtendedInterface, IAPExtendedInterfaceCommandID_ReturnCategorizedDatabaseRecords, ctx->db_record_trans_id, request.ptr), iap_false);
+    ctx->db_record_index += 1;
+    if(ctx->db_record_index < ctx->db_record_end) {
+        ctx->on_send_complete = send_db_record_cb;
+    }
+    return iap_true;
+}
+
 static int32_t ipod_ack(uint16_t command, enum IAPAckStatus status, struct IAPSpan* response_span, uint16_t ret) {
     alloc_response(IAPIPodAckPayload);
     response->status = status;
@@ -202,6 +218,12 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             alloc_response(IAPReturnExtendedInterfaceModePayload);
             response->is_ext_mode = 1;
             return IAPGeneralCommandID_ReturnExtendedInterfaceMode;
+        } break;
+        case IAPGeneralCommandID_EnterExtendedInterfaceMode:
+        case IAPGeneralCommandID_ExitExtendedInterfaceMode: {
+            /* deprecated, but accessories such as Onkyo receivers retry them
+             * until acked; extended mode is always on, so both succeed */
+            return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
         case IAPGeneralCommandID_RequestIPodName: {
             // Note:  This should be pulled from .rockbox/playername.txt
@@ -756,29 +778,46 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             return 0;
         } break;
         case IAPExtendedInterfaceCommandID_ResetDBSelection: {
+            iap_platform_reset_db_selection(ctx);
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+        } break;
+        case IAPExtendedInterfaceCommandID_SelectDBRecord: {
+            read_request(IAPSelectDBRecord);
+            check_ret(iap_platform_select_db_record(ctx, request->type, swap_32(request->index), 0xFF), -IAPAckStatus_EBadParameter);
+            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+        } break;
+        case IAPExtendedInterfaceCommandID_SelectSortDBRecord: {
+            read_request(IAPSelectSortDBRecordPayload);
+            check_ret(iap_platform_select_db_record(ctx, request->type, swap_32(request->index), request->sort), -IAPAckStatus_EBadParameter);
+            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+        } break;
+        case IAPExtendedInterfaceCommandID_RetrieveCategorizedDatabaseRecords: {
+            read_request(IAPRetrieveCategorizedDatabaseRecordsPayload);
+            uint32_t total;
+            check_ret(iap_platform_get_db_count(ctx, request->type, &total), -IAPAckStatus_EUnknownDatabaseOrSessionID);
+            const uint32_t index = swap_32(request->index);
+            uint32_t       count = swap_32(request->count);
+            check_ret(index < total, -IAPAckStatus_EBadParameter);
+            /* a count of -1 asks for every record from index on */
+            if(count > total - index) {
+                count = total - index;
+            }
+            check_ret(count > 0, -IAPAckStatus_EBadParameter);
+            ctx->db_record_type     = request->type;
+            ctx->db_record_index    = index;
+            ctx->db_record_end      = index + count;
+            ctx->db_record_trans_id = ctx->handling_trans_id;
+            check_ret(send_db_record_cb(ctx), -IAPAckStatus_ECommandFailed);
+            /* responded in send_db_record_cb, no need to do it here */
+            response_span->ptr = NULL;
+            return 0;
         } break;
         case IAPExtendedInterfaceCommandID_GetNumberCategorizedDBRecords: {
             read_request(IAPGetNumberCategorizedDBRecordsPayload);
             uint32_t count;
-            switch(request->type) {
-            case IAPDatabaseType_Playlist: {
-                /* TODO: implement platform callback */
-                count = 99;
-            } break;
-            case IAPDatabaseType_Track: {
-                struct IAPPlatformPlayStatus status;
-                check_ret(iap_platform_get_play_status(ctx, &status), -IAPAckStatus_ECommandFailed);
-                /* track_count is invalid while stopped.
-                 * return non-zero dummy value in this case, because reporting zero tracks
-                 * may cause empty library error. */
-                /* TODO: maybe add dedicated platform callback? */
-                count = status.state == IAPIPodStatePlayStatus_PlaybackStopped ? 99 : status.track_count;
-            } break;
-            default: {
+            if(!iap_platform_get_db_count(ctx, request->type, &count)) {
                 warn("unsupported type 0x%02" PRIX8, request->type);
                 count = 0;
-            } break;
             }
 
             alloc_response(IAPReturnNumberCategorizedDBRecordsPayload);
@@ -841,6 +880,10 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPExtendedInterfaceCommandID_PlayCurrentSelection: {
             read_request(IAPPlayCurrentSelectionPayload);
+            const uint32_t index = swap_32(request->track_index);
+            if(index != 0xFFFFFFFF) {
+                check_ret(iap_platform_select_db_record(ctx, IAPDatabaseType_Track, index, 0xFF), -IAPAckStatus_EBadParameter);
+            }
             const struct IAPPlatformPendingControl pending = {
                 .req_command = command,
                 .ack_command = IAPExtendedInterfaceCommandID_IPodAck,
@@ -923,10 +966,6 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         case IAPExtendedInterfaceCommandID_SetCurrentPlayingTrack: {
             read_request(IAPSetCurrentPlayingTrackPayload);
             check_ret(iap_platform_set_playing_track(ctx, swap_32(request->index)), -IAPAckStatus_ECommandFailed);
-            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
-        } break;
-        case IAPExtendedInterfaceCommandID_SelectSortDBRecord: {
-            /* ignored */
             return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
         case IAPExtendedInterfaceCommandID_GetColorDisplayImageLimits: {

@@ -56,6 +56,7 @@
 #include "database/tagcache.h"
 #include "playlist/playlist.h"
 #include "system/app_util.h"
+#include "metadata/book_resume.h"
 
 #define AX  SOUND_AX
 
@@ -906,14 +907,36 @@ static bool mix_resolve_ram(struct tagcache_search *tcs, char *buf,
     return true;
 }
 
+/* The candidate arrays, cand_ax among them, are one set. A mix is built
+ * from the player's own screens and from an accessory's thread
+ * (iap/iap-library.c), so whoever comes second waits for the first. Recursive,
+ * as Rockbox mutexes are; every caller is the UI thread or that one, never
+ * the audio thread a mix ends by asking to play. */
+static struct mutex mix_mutex;
+static bool mix_mutex_ready;
+
+static void mix_lock(void)
+{
+    /* Threads here are cooperative, so nothing runs between the test and
+     * the set */
+    if (!mix_mutex_ready)
+    {
+        mutex_init(&mix_mutex);
+        mix_mutex_ready = true;
+    }
+    mutex_lock(&mix_mutex);
+}
+
 /* The whole of building one, whatever it is being built from.
  *
  * 'skip_key' is the seed's own record, which must not match itself, and
  * 'seed_path' is a track by the seed's artist, for the artist rules. It plays
  * first only when it is the seed itself -- when 'skip_key' is set. Both are
- * empty for a mood. */
-static int mix_build(const struct mix_goal *g, uint64_t skip_key,
-                     const char *seed_path, int want, int vary, bool append)
+ * empty for a mood. 'ask' puts the erase warning before a replaced playlist;
+ * without it the playlist is replaced unasked. */
+static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
+                          const char *seed_path, int want, int vary,
+                          bool append, bool ask)
 {
     static struct pick cand[MIX_CAND];
     static int cost[MIX_CAND];         /* the chain cost, this slot */
@@ -1200,7 +1223,9 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     }
     else
     {
-        if (!warn_on_pl_erase())
+        if (!ask)
+            book_resume_save();
+        else if (!warn_on_pl_erase())
         {
             cpu_boost(false);
             return SOUND_MIX_CANCELLED;
@@ -1278,6 +1303,18 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     return added;
 }
 
+static int mix_build(const struct mix_goal *g, uint64_t skip_key,
+                     const char *seed_path, int want, int vary, bool append,
+                     bool ask)
+{
+    int added;
+
+    mix_lock();
+    added = mix_build_held(g, skip_key, seed_path, want, vary, append, ask);
+    mutex_unlock(&mix_mutex);
+    return added;
+}
+
 int sound_mix_from_track(const char *path, int want)
 {
     struct sound_index_reader r;
@@ -1311,41 +1348,42 @@ int sound_mix_from_track(const char *path, int want)
     g.steps = 1;
 
     return mix_build(&g, seed_key, path, want,
-                     global_settings.track_playlist, false);
+                     global_settings.track_playlist, false, true);
 }
 
-int sound_mix_from_mood(int mood, int want)
+/* A mood is a journey that goes nowhere */
+static int mood_mix(int from, int to, int want, bool ask)
 {
     struct mix_goal g;
+    int least = from == to ? 1 : 2;
 
-    if (want < 1)
-        want = 1;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
-
-    g.seed = NULL;
-    g.mood_from = mood;
-    g.mood_to = mood;
-    g.steps = 1;
-
-    return mix_build(&g, 0, NULL, want, global_settings.mood_playlist, false);
-}
-
-int sound_mix_journey(int from, int to, int want)
-{
-    struct mix_goal g;
-
-    if (want < 2)
-        want = 2;
+    if (want < least)
+        want = least;
     if (want > SOUND_MIX_MAX)
         want = SOUND_MIX_MAX;
 
     g.seed = NULL;
     g.mood_from = from;
     g.mood_to = to;
-    g.steps = want;
+    g.steps = from == to ? 1 : want;
 
-    return mix_build(&g, 0, NULL, want, global_settings.mood_playlist, false);
+    return mix_build(&g, 0, NULL, want, global_settings.mood_playlist, false,
+                     ask);
+}
+
+int sound_mix_from_mood(int mood, int want)
+{
+    return mood_mix(mood, mood, want, true);
+}
+
+int sound_mix_journey(int from, int to, int want)
+{
+    return mood_mix(from, to, want, true);
+}
+
+int sound_mix_mood_unasked(int from, int to, int want)
+{
+    return mood_mix(from, to, want, false);
 }
 
 /** Carrying on **/
@@ -1486,7 +1524,7 @@ int sound_mix_continue(int want)
     return mix_build(&g, seed_key, NULL, want,
                      g.seed != NULL ? global_settings.track_playlist
                                     : global_settings.mood_playlist,
-                     true);
+                     true, true);
 }
 
 
@@ -1579,7 +1617,7 @@ int sound_mix_chain(const struct sound_axes *ax, const uint8_t *have,
     return chosen;
 }
 
-int sound_mix_reorder(struct playlist_info *playlist)
+static int reorder_held(struct playlist_info *playlist)
 {
     static uint8_t  have[SOUND_MIX_MAX];
     static int16_t  order[SOUND_MIX_MAX];
@@ -1658,6 +1696,16 @@ int sound_mix_reorder(struct playlist_info *playlist)
     return missing;
 }
 
+int sound_mix_reorder(struct playlist_info *playlist)
+{
+    int missed;
+
+    mix_lock();
+    missed = reorder_held(playlist);
+    mutex_unlock(&mix_mutex);
+    return missed;
+}
+
 int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
                          int want)
 {
@@ -1680,7 +1728,7 @@ int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
      * many of them the playlist can hold. That is the limit an album seed
      * needs, and it is the one that already exists. */
     return mix_build(&g, 0, one_track, want,
-                     global_settings.track_playlist, false);
+                     global_settings.track_playlist, false, true);
 }
 
 int sound_mix_winddown(const char *path, int want)
@@ -1759,5 +1807,5 @@ int sound_mix_winddown(const char *path, int want)
     g.steps = from == MOOD_CALM ? 1 : want;
 
     return mix_build(&g, path_key(path), path, want,
-                     global_settings.mood_playlist, false);
+                     global_settings.mood_playlist, false, true);
 }

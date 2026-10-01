@@ -347,6 +347,10 @@ iap/iap-lingo3.c
 iap/iap-lingo4.c
 #endif
 
+#if defined(USB_ENABLE_IAP) || defined(IPOD_ACCESSORY_PROTOCOL)
+iap/iap-library.c
+#endif
+
 /* Simulator shims -- symbols a sim build has no hardware or firmware for.
  * See sim/README.md. Nothing here reaches a hardware build. */
 #ifdef SIMULATOR

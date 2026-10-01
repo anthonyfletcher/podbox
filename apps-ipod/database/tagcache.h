@@ -244,6 +244,11 @@ int  tagcache_find_key(uint64_t key);
  * it with tagcache_retrieve(), one seek. */
 bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size);
 bool tagcache_entry_numeric(int idx_id, int tag, long *value);
+/* A string tag's value by the seek a search gave for it (result_seek). The
+ * search's idx_id names a song only for title and filename, so for an artist,
+ * album or genre this is the way to its name. RAM only; false for
+ * <Untagged>. */
+bool tagcache_seek_string(int tag, long seek, char *buf, size_t size);
 /* For the database info screen: false when the index is not loaded. The
  * counts are lookups since boot. */
 bool tagcache_path_index_info(int *slots, int *found, int *missed);

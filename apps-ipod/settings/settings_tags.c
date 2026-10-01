@@ -375,6 +375,7 @@ static const struct tag_row tag_rows[] = {
 { "hardware keyclick",   TAG_ADVANCED|TAG_SYSTEM,                "keyclick click speaker" },
 { "keyclick repeats",    TAG_ADVANCED|TAG_SYSTEM,                "keyclick click" },
 { "accessory protocol",  TAG_ADVANCED|TAG_SYSTEM,                "accessory dock iap car remote protocol" },
+{ "accessory browsing",  TAG_ADVANCED|TAG_SYSTEM,                "accessory receiver car library browse usb iap" },
 { "serial bitrate",      TAG_ADVANCED|TAG_SYSTEM,                "accessory serial dock" },
 { "accessory power supply", TAG_ADVANCED|TAG_SYSTEM,             "accessory dock power" },
 { "lineout",             TAG_ADVANCED|TAG_SYSTEM,                "line out dock" },

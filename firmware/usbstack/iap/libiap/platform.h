@@ -104,6 +104,12 @@ IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t inde
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork);
 IAPBool iap_platform_get_artwork_ptr(struct IAPContext* iap_ctx, struct IAPPlatformArtwork* artwork, struct IAPSpan* span);
 IAPBool iap_platform_close_artwork(struct IAPContext* iap_ctx, struct IAPPlatformArtwork* artwork);
+/* false for a category the platform does not offer */
+IAPBool iap_platform_get_db_count(struct IAPContext* iap_ctx, uint8_t type /* IAPDatabaseType */, uint32_t* count);
+IAPBool iap_platform_get_db_record(struct IAPContext* iap_ctx, uint8_t type /* IAPDatabaseType */, uint32_t index, struct IAPSpan* name);
+/* an index of 0xFFFFFFFF steps back up a level; sort is SelectSortDBRecord's, 0xFF for none */
+IAPBool iap_platform_select_db_record(struct IAPContext* iap_ctx, uint8_t type /* IAPDatabaseType */, uint32_t index, uint8_t sort);
+void    iap_platform_reset_db_selection(struct IAPContext* iap_ctx);
 
 /* other callbacks */
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs);

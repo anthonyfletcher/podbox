@@ -2334,6 +2334,22 @@ bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size)
     return true;
 }
 
+bool tagcache_seek_string(int tag, long seek, char *buf, size_t size)
+{
+    const struct tagfile_entry *ep;
+
+    if (!tc_stat.ramcache || tag < 0 || tag >= TAG_COUNT
+        || TAGCACHE_IS_NUMERIC(tag) || tag == tag_filename || seek < 0)
+        return false;
+
+    ep = (const struct tagfile_entry *)&tcramcache.hdr->tags[tag][seek];
+    if (!strcmp(ep->tag_data, UNTAGGED))
+        return false;
+
+    strmemccpy(buf, ep->tag_data, size);
+    return true;
+}
+
 bool tagcache_entry_numeric(int idx_id, int tag, long *value)
 {
     const struct index_entry *entry = ram_entry(idx_id);

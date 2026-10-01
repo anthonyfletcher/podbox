@@ -155,9 +155,7 @@ bool browser_disk_play_playlist(char* pathname, char* dirname, char* filename)
     if (res == BOOKMARK_CANCEL || res == BOOKMARK_DO_RESUME || !warn_on_pl_erase())
         return false;
 
-    /* Single exit so the indicator is cleared on both outcomes. This one is
-     * also reached from iap-lingo4.c, outside the file-type switch below that
-     * clears it for the rest of this file. */
+    /* Single exit so the indicator is cleared on both outcomes */
     bool started = false;
 
     ui_set_working(true);

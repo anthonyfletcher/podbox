@@ -56,6 +56,7 @@
 #include "settings.h"
 #include "metadata.h"
 #include "database/tagcache.h"
+#include "iap-library.h"
 #include "sound.h"
 #include "action.h"
 #include "powermgmt.h"
@@ -847,9 +848,10 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     if(tracknum >= playlist_amount())
         tracknum -= playlist_amount();
 
-    /* If the tracknumber is not the current one, take its tags from the
-       database, or failing that read them from the file */
-    if(playlist_next(0) != tracknum)
+    /* If the tracknumber is not the current one, or nothing is playing and
+       the current one's tags are empty, take them from the database, or
+       failing that read them from the file */
+    if(playlist_next(0) != tracknum || !(audio_status() & AUDIO_STATUS_PLAY))
     {
         playlist_get_track_info(NULL, tracknum, &info);
         /* Both clear id3 before filling it */
@@ -877,6 +879,16 @@ uint32_t iap_get_trackindex(void)
 void iap_periodic(void)
 {
     static int count;
+    static bool docked;
+    bool present = last_frame_tick
+                   && TIME_BEFORE(current_tick, last_frame_tick + 60 * HZ);
+
+    /* A dock that browsed leaves its lists behind; undocking frees them. A
+     * minute's silence rather than iap_accessory_present()'s five seconds,
+     * so a quiet dock is not made to rebuffer playback each time it browses */
+    if (docked && !present)
+        iap_library_close();
+    docked = present;
 
     if(!iap_setupflag || !iap_enabled) return;
 
