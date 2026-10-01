@@ -39,6 +39,7 @@
 #include "system/app_util.h"
 #include "system/app_buffer.h"
 #include "system/debug_log.h"
+#include "system/usb_log_file.h"
 #include "settings/settings.h"
 #include "settings/settings_list.h"
 #include "draw/screen_access.h"
@@ -388,6 +389,7 @@ int talk_value_decimal(long n, int unit, int decimals, bool enqueue)
     (void)n; (void)unit; (void)decimals; (void)enqueue; return 0;
 }
 
+void usb_log_file_enable(bool on) { (void)on; }
 void usb_set_audio(int value) { (void)value; }
 void usb_set_hid(bool enable) { (void)enable; }
 void usb_set_iap(bool enable) { (void)enable; }

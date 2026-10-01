@@ -892,7 +892,7 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG
-  desc: in database and art cache settings
+  desc: in database, art cache and USB settings
   user: core
   <source>
     *: "Write Debug Log"

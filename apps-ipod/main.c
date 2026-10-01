@@ -77,6 +77,7 @@
 #include "screens/shortcuts.h"
 
 #include "iap.h"
+#include "system/usb_log_file.h"
 
 #include "audio/audio_thread.h"
 #include "audio/playback.h"
@@ -779,6 +780,9 @@ static void init(void)
 
     car_adapter_mode_init();
     iap_setup(global_settings.serial_bitrate);
+#ifdef HAVE_USBSTACK
+    usb_log_file_init();
+#endif
     accessory_supply_set(global_settings.accessory_supply);
     lineout_set(global_settings.lineout_active);
     /* The last stage, and a slow one -- parsing the WPS and SBS, then loading

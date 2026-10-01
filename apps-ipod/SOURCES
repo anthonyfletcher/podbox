@@ -326,6 +326,9 @@ system/app_buffer.c
 system/app_util.c
 system/bg_task.c
 system/debug_log.c
+#ifdef HAVE_USBSTACK
+system/usb_log_file.c
+#endif
 draw/color.c
 audio/sound_feedback.c
 system/format_time.c

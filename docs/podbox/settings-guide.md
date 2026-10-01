@@ -500,6 +500,7 @@ shadow to colour.
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
 | USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
+| Write Debug Log | Writes every USB connection step to usb-log.txt in the .rockbox folder, without the USB Log debug screen open. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, so leave it off otherwise. | off | **Adv** |
 
 ### System — USB — USB DAC Output
 

@@ -533,6 +533,9 @@ static int usb_audio_callback(int action,
 }
 MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, usb_audio_callback);
 #endif
+#ifdef HAVE_USBSTACK
+MENUITEM_SETTING(debug_log_usb, &global_settings.debug_log_usb, NULL);
+#endif
 
 
 MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
@@ -547,6 +550,9 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
             &usb_dac_menu,
+#endif
+#ifdef HAVE_USBSTACK
+            &debug_log_usb,
 #endif
          );
 

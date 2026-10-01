@@ -898,6 +898,9 @@ struct user_settings
 #ifdef USB_ENABLE_AUDIO
     int usb_audio;
 #endif
+#ifdef HAVE_USBSTACK
+    bool debug_log_usb;         /* keep the USB log's file current */
+#endif
 
     unsigned char ui_vp_config[64]; /* viewport string for the lists */
 

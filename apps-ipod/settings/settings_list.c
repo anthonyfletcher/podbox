@@ -54,6 +54,7 @@
 #include "system/volume.h"
 #include "system/strutil.h"     /* skip_whitespace() */
 #include "system/debug_log.h"
+#include "system/usb_log_file.h"
 #include "audio/playback.h"
 #include "widgets/list.h"
 #include "rbunicode.h"
@@ -2018,6 +2019,13 @@ const struct settings_list settings[] = {
 #ifdef USB_ENABLE_AUDIO
     CHOICE_SETTING(0, usb_audio, LANG_USB_DAC, 0, "usb-dac", "never,always", usb_set_audio, 2,
         ID2P(LANG_OFF), ID2P(LANG_ON)),
+#endif
+#ifdef HAVE_USBSTACK
+    /* Diagnostics: keep .rockbox/usb-log.txt current without the debug
+     * menu's USB Log screen open. */
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                  debug_log_usb, LANG_DEBUG_LOG, false,
+                  "debug log usb", usb_log_file_enable),
 #endif
 
 

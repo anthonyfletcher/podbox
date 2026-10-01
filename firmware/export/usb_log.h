@@ -24,7 +24,8 @@
 /* The device side of a USB connection, event by event: every control request
  * and how it was answered, endpoint allocation, the controller's endpoint
  * setup, and the audio stream. Callable from interrupt context. The debug
- * menu's USB Log screen shows it and appends it to a file while it is open.
+ * menu's USB Log screen shows it; the application appends it to a file while
+ * that screen is open or its Write Debug Log setting is on.
  *
  * What a, b, c and d carry, per type: */
 enum usb_log_type
@@ -106,10 +107,10 @@ struct usb_log_entry
 #else
 void usb_log(int type, int a, int b, uint32_t c, uint32_t d);
 
-/* Thread context only. While the USB Log screen is open, wait up to three
- * seconds for everything logged so far to reach the file, so that a step
- * which hangs the player is on disk before it is taken. Returns at once when
- * the screen is closed or the host has the disk. */
+/* Thread context only. While something is writing the file, wait up to three
+ * seconds for everything logged so far to reach it, so that a step which
+ * hangs the player is on disk before it is taken. Returns at once when
+ * nothing is writing or the host has the disk. */
 void usb_log_sync(void);
 
 /* For the screen. Sequence numbers count every entry since boot; the ring

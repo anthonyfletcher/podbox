@@ -1265,6 +1265,12 @@ charger in it. A DAC on its own supply with nothing else on the cable goes
 unnoticed: use Turn On beside this instead. Off leaves every cable to the
 computer and charging.
 
+[debug log usb]
+Writes every USB connection step to usb-log.txt in the .rockbox folder, without
+the USB Log debug screen open. For working out why a computer, dock or car will
+not connect. It writes to the disk whenever the log grows, so leave it off
+otherwise.
+
 [talk menu]
 Speaks menu entries aloud. Needs a voice file on the player.
 
