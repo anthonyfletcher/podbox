@@ -2114,6 +2114,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     int level = c->currextra;
     int tag;
     bool sort = false;
+    bool articles_only = false; /* sorted only to move The/A/An */
     bool sort_inverse;
     bool is_basename = false;
     int sort_limit;
@@ -2259,8 +2260,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     /* A top-level list arrives in the database's own order and is otherwise
      * not sorted here, which is the order Sort Ignoring The/A/An
      * has to change. */
-    if (global_settings.sort_ignore_articles && tagcache_tag_skips_articles(tag))
+    if (global_settings.sort_ignore_articles && tagcache_tag_skips_articles(tag)
+        && !sort)
+    {
         sort = true;
+        articles_only = true;
+    }
 
     /* Album lists ordered by year rather than name; see write_year_prefix().
      * The order is per context, so Artist's albums can run by year while the
@@ -2282,6 +2287,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             year_prefix = YEAR_PREFIX_LEN;
             strip = YEAR_PREFIX_LEN;
             sort = true;
+            articles_only = false;
             sort_inverse = (album_order == DB_SORT_ALBUMS_YEAR_DESC);
         }
         else
@@ -2579,7 +2585,10 @@ entry_skip_formatter:
 
     if (sort)
     {
-        if (global_settings.interpret_numbers)
+        /* A list sorted only to move The/A/An compares as the database
+         * ordered it, a character at a time, as Cover Flow does: the setting
+         * must not also move names that start with a number. */
+        if (global_settings.interpret_numbers && !articles_only)
             qsort_fn = sort_inverse ? strnatcasecmp_n_inv : strnatcasecmp_n;
         else
             qsort_fn = sort_inverse ? strncasecmp_inv : strncasecmp;
