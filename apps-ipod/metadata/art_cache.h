@@ -50,9 +50,10 @@ struct art_cache_header
  * ready and idle, resolves each album folder's cover art, and renders it to
  * a set of square thumbnails (see metadata/art_sizes.h) under
  * ROCKBOX_DIR/thumbcache/<sizename>/<hash>.aat. Thumbnails are keyed by a hash
- * of the album's folder path, so once a folder is done later passes skip it
- * with a cheap existence check (no art re-resolution), and keys stay valid
- * across database rebuilds. */
+ * of the album's folder path, so keys stay valid across database rebuilds.
+ * Each folder also has a stamp of the image its thumbnails came from -- its
+ * path, size and modification time -- so a pass regenerates a folder whose
+ * image was replaced and deletes the thumbnails of one whose image is gone. */
 
 /* Start the background cache thread. Call once at startup, after tagcache. */
 void art_cache_init(void);
@@ -95,8 +96,8 @@ const char *art_cache_activity(void);
  * scratch. bg_task_update() runs a pass without purging, so artwork added
  * since the last one is picked up -- needed because the thread otherwise idles
  * until the database's track count changes, and adding a folder.jpg does not
- * change it. That pass is cheap, since a folder whose thumbnails all exist is
- * skipped with an existence check. */
+ * change it. That pass is cheap, since a folder whose image is unchanged is
+ * skipped on its directory entry without reading the image. */
 extern struct bg_task art_cache_task;
 
 /* Resolve the cache-file path for a given album folder and size index.

@@ -1334,7 +1334,8 @@ The figures are the database's own play counts, so this needs Gather Runtime Dat
 plays from before it was.
 
 [action: Update Art Cache]
-Generates thumbnails for artwork that does not have one yet.
+Generates thumbnails for artwork that does not have one yet, and redoes any
+whose image has been replaced or deleted since.
 
 The cache stops once it has covered everything it knew about, so artwork added
 to folders it has already been through -- artist photographs especially -- is

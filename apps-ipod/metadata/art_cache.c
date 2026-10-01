@@ -57,18 +57,44 @@
 /* Entry count the cache was last completed for, so a restart with an
  * unchanged library does not re-walk the whole database. */
 #define AA_DONE_FILE    THUMBCACHE_DIR "/done.txt"
+/* What each folder's thumbnails were made from, so a pass can tell a replaced
+ * or deleted image from an unchanged one: AA_STAMP_MAGIC, then one struct
+ * aa_stamp per folder. Later records override earlier ones, which is what lets
+ * aa_handle_offer() append rather than rewrite. */
+#define AA_STAMP_FILE   THUMBCACHE_DIR "/stamps.dat"
+#define AA_STAMP_MAGIC  0x31545341u  /* "AST1" */
 
 /* On-disk thumbnail format (struct art_cache_header + native pixels, in the
  * order the header names) is declared in art_cache.h so consumers can read it.
  * A magic/version lets a future format change be detected per file rather than
  * needing a global cache wipe. */
 
-/* Directory-dedup "seen" set: open-addressed table of directory-path hashes.
- * Sized generously; if a library exceeds this, extra directories simply get
- * re-resolved (still idempotent -- generation skips existing thumbnails). Holds
- * both album folders and their parent (artist) folders now, so it carries more
- * entries per pass than album-only did. */
+/* Folder table: open-addressed by directory-path hash, holding album folders
+ * and their parent (artist) folders alike. Sized generously; a folder that
+ * finds it full is skipped for that pass. */
 #define AA_SEEN_SLOTS 16384  /* power of two */
+
+/* One folder's entry in the table: its path hash and the stamp of the image
+ * its thumbnails were made from. The table is the pass's seen set as well, with
+ * a bit per slot saying whether this pass has reached the folder yet. */
+struct aa_stamp
+{
+    unsigned int key;    /* folder path hash; 0 marks an empty slot */
+    unsigned int stamp;
+};
+#define AA_TABLE_BYTES (AA_SEEN_SLOTS * sizeof(struct aa_stamp) \
+                        + AA_SEEN_SLOTS / 8)
+
+/* Stamps that are not an image's. NONE is a folder with no record, whose
+ * thumbnails a pass adopts as they stand rather than regenerating -- the case
+ * for every folder cached before stamps existed, and after the stamp file is
+ * lost. EMBEDDED is art from a track's tags, which folder art replaces. */
+#define AA_STAMP_NONE     0u
+#define AA_STAMP_EMBEDDED 1u
+
+/* The table, while a pass holds it; NULL otherwise. */
+static struct aa_stamp *aa_stamps;
+static unsigned char *aa_visited;
 
 /* Generous stack: the JPEG decoder called from a pass has deep frames. */
 #define AA_STACK_SIZE (DEFAULT_STACK_SIZE + 0x2000)
@@ -101,6 +127,11 @@ static char aa_probe[MAX_PATH];
 static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
+static char aa_stat_dir[MAX_PATH];
+
+/* Stamp-file records go through this a batch at a time. */
+#define AA_STAMP_BATCH 64
+static struct aa_stamp aa_stamp_io[AA_STAMP_BATCH];
 
 /* Names collected by one round of aa_purge_thumbs(). A thumbnail is
  * "%08x.aat" and the shared placeholder "_fallback.aat", so 32 bytes holds
@@ -378,6 +409,7 @@ static void aa_purge_thumbs(void)
      * they go too rather than being left to describe a cache that is gone. */
     remove(AA_NOART_ALBUMS);
     remove(AA_NOART_ARTISTS);
+    remove(AA_STAMP_FILE);
 
     debug_log(DEBUG_LOG_ARTCACHE, "purge: start");
 
@@ -495,9 +527,9 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
     dir[len] = 0;
 }
 
-/* Returns true if 'h' was already present; otherwise records it and returns
- * false. h==0 is remapped so 0 can mark an empty slot. */
-static bool aa_seen(unsigned int *seen, unsigned int h)
+/* The table slot for folder hash 'h', claimed with no stamp if it is new.
+ * NULL when the table is full. h==0 is remapped so 0 can mark an empty slot. */
+static struct aa_stamp *aa_slot(unsigned int h)
 {
     unsigned int i, idx;
     if (h == 0)
@@ -505,16 +537,177 @@ static bool aa_seen(unsigned int *seen, unsigned int h)
     idx = h & (AA_SEEN_SLOTS - 1);
     for (i = 0; i < AA_SEEN_SLOTS; i++)
     {
-        unsigned int slot = (idx + i) & (AA_SEEN_SLOTS - 1);
-        if (seen[slot] == 0)
+        struct aa_stamp *s = &aa_stamps[(idx + i) & (AA_SEEN_SLOTS - 1)];
+        if (s->key == 0)
         {
-            seen[slot] = h;
-            return false;
+            s->key = h;
+            s->stamp = AA_STAMP_NONE;
+            return s;
         }
-        if (seen[slot] == h)
-            return true;
+        if (s->key == h)
+            return s;
     }
-    return true; /* table full -> treat as present */
+    return NULL;
+}
+
+/* The slot for 'h' the first time this pass reaches it; NULL if the pass has
+ * been here already, or the table is full (the folder is then skipped). */
+static struct aa_stamp *aa_visit(unsigned int h)
+{
+    struct aa_stamp *s = aa_slot(h);
+    unsigned int i;
+
+    if (!s)
+        return NULL;
+    i = s - aa_stamps;
+    if (aa_visited[i / 8] & (1u << (i % 8)))
+        return NULL;
+    aa_visited[i / 8] |= 1u << (i % 8);
+    return s;
+}
+
+/* Fill the table from the stamp file. A missing or unrecognised file leaves
+ * every folder unstamped, so the pass adopts what is on disk. */
+static void aa_stamps_load(void)
+{
+    uint32_t magic;
+    int fd, n, i;
+
+    fd = open(AA_STAMP_FILE, O_RDONLY);
+    if (fd < 0)
+        return;
+    if (read(fd, &magic, sizeof(magic)) == (ssize_t)sizeof(magic)
+        && magic == AA_STAMP_MAGIC)
+    {
+        while ((n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
+        {
+            n /= sizeof(aa_stamp_io[0]);
+            for (i = 0; i < n; i++)
+            {
+                struct aa_stamp *s = aa_slot(aa_stamp_io[i].key);
+                if (s)
+                    s->stamp = aa_stamp_io[i].stamp;
+            }
+        }
+    }
+    close(fd);
+}
+
+/* Write the table back. A completed pass keeps only the folders it reached,
+ * which drops those gone from the library; an interrupted one keeps every
+ * stamp, since the folders it never reached still have their thumbnails. */
+static void aa_stamps_save(bool completed)
+{
+    static const char tmp[] = AA_STAMP_FILE ".tmp";
+    uint32_t magic = AA_STAMP_MAGIC;
+    bool ok;
+    int fd, i, n = 0;
+
+    fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0)
+        return;
+    ok = write(fd, &magic, sizeof(magic)) == (ssize_t)sizeof(magic);
+
+    for (i = 0; ok && i < AA_SEEN_SLOTS; i++)
+    {
+        const struct aa_stamp *s = &aa_stamps[i];
+
+        if (s->key == 0 || s->stamp == AA_STAMP_NONE)
+            continue;
+        if (completed && !(aa_visited[i / 8] & (1u << (i % 8))))
+            continue;
+        aa_stamp_io[n++] = *s;
+        if (n == AA_STAMP_BATCH)
+        {
+            ok = write(fd, aa_stamp_io, sizeof(aa_stamp_io))
+                 == (ssize_t)sizeof(aa_stamp_io);
+            n = 0;
+        }
+    }
+    if (ok && n)
+        ok = write(fd, aa_stamp_io, n * sizeof(aa_stamp_io[0]))
+             == (ssize_t)(n * sizeof(aa_stamp_io[0]));
+    close(fd);
+
+    if (ok)
+    {
+        remove(AA_STAMP_FILE);
+        rename(tmp, AA_STAMP_FILE);
+    }
+    else
+        remove(tmp);
+}
+
+/* Record one folder's stamp outside a pass, by appending to the file. */
+static void aa_stamp_append(unsigned int h, unsigned int stamp)
+{
+    struct aa_stamp rec = { h, stamp };
+    uint32_t magic = AA_STAMP_MAGIC;
+    int fd;
+
+    if (!file_exists(AA_STAMP_FILE))
+    {
+        fd = open(AA_STAMP_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd < 0)
+            return;
+        write(fd, &magic, sizeof(magic));
+    }
+    else
+    {
+        fd = open(AA_STAMP_FILE, O_WRONLY | O_APPEND);
+        if (fd < 0)
+            return;
+    }
+    write(fd, &rec, sizeof(rec));
+    close(fd);
+}
+
+/* The stamp of the image at 'path': its path, size and modification time,
+ * hashed. Size and time come from the directory entry, so no image is read.
+ * Equality is all a stamp is compared for -- a replacement copied in with an
+ * older timestamp is still a different one. */
+static unsigned int aa_art_stamp(const char *path)
+{
+    const char *name = strrchr(path, '/');
+    unsigned int stamp = aa_hash(path);
+    DIR *d;
+    struct dirent *e;
+
+    if (name)
+    {
+        aa_dirname(path, aa_stat_dir, sizeof(aa_stat_dir));
+        d = opendir(aa_stat_dir[0] ? aa_stat_dir : "/");
+        if (d)
+        {
+            while ((e = readdir(d)))
+            {
+                if (strcasecmp(e->d_name, name + 1))
+                    continue;
+                struct dirinfo info = dir_get_info(d, e);
+                stamp = (stamp ^ (unsigned int)info.size) * 16777619u;
+                stamp = (stamp ^ (unsigned int)info.mtime) * 16777619u;
+                break;
+            }
+            closedir(d);
+        }
+    }
+
+    /* never one of the stamps that are not an image's */
+    if (stamp <= AA_STAMP_EMBEDDED)
+        stamp += 2;
+    return stamp;
+}
+
+/* Delete every size of one folder's thumbnails. */
+static void aa_remove_thumbs(unsigned int dh)
+{
+    int s;
+
+    for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
+    {
+        aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
+        remove(aa_check_path);
+    }
 }
 
 /* Where an album-art image comes from: a file on disk (folder art), or a JPEG
@@ -931,19 +1124,40 @@ static bool aa_check_abort(void)
     return false;
 }
 
-/* Resolve one folder's cover art and render any of its thumbnail sizes that
- * don't exist yet. `probe_path` is a track filename under the folder (real for
- * an album folder, synthetic "<dir>/_" for an artist folder) that
- * search_albumart_files() strips down to the folder to locate cover.bmp /
- * folder.jpg; `dh` is that folder's hash (the cache key). Sets *aborted if a
- * USB/shutdown/DB-busy stop was hit mid-decode. A cheap no-op once every size
- * already exists (dircache-served file_exists checks, no art re-resolution). */
+/* Resolve one folder's cover art and bring its thumbnails in line with it:
+ * render the sizes that don't exist yet, and replace or delete the lot when
+ * the image they were made from has changed or gone. `probe_path` is a track
+ * filename under the folder (real for an album folder, synthetic "<dir>/_" for
+ * an artist folder) that search_albumart_files() strips down to the folder to
+ * locate cover.bmp / folder.jpg; `dh` is that folder's hash (the cache key) and
+ * `slot` its table entry. Sets *aborted if a USB/shutdown/DB-busy stop was hit
+ * mid-decode. Cheap once the folder is cached: the lookups and the stamp are
+ * all dircache-served, and no image is read. */
 static bool aa_cache_dir(const char *probe_path, unsigned int dh,
+                         struct aa_stamp *slot,
                          void *workbuf, size_t worksz, bool *aborted)
 {
     int s;
     bool all_exist = true;
+    unsigned int stamp;
 
+    /* album/albumartist left NULL: only folder-based art is searched
+     * (cover.bmp, folder.jpg, ../cover.bmp). */
+    memset(&aa_id3, 0, sizeof(aa_id3));
+    strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
+    if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath)))
+    {
+        /* The image these thumbnails were made from has been deleted. Embedded
+         * and unstamped thumbnails never came from a file here to lose. */
+        if (slot->stamp > AA_STAMP_EMBEDDED)
+        {
+            aa_remove_thumbs(dh);
+            slot->stamp = AA_STAMP_NONE;
+        }
+        return false;   /* no cover art in this folder */
+    }
+
+    stamp = aa_art_stamp(aa_artpath);
     for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
     {
         aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
@@ -953,16 +1167,22 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
             break;
         }
     }
+
+    /* Stamped before generating, so an interrupted pass leaves a part set
+     * that the next one finishes rather than throws away again. Every size
+     * goes on a change, because fast build derives the small ones from the
+     * large and must not find an old one to derive from. */
+    if (slot->stamp == AA_STAMP_NONE)
+        slot->stamp = stamp;
+    else if (slot->stamp != stamp)
+    {
+        debug_log(DEBUG_LOG_ARTCACHE, "art changed: %s", aa_artpath);
+        aa_remove_thumbs(dh);
+        slot->stamp = stamp;
+        all_exist = false;
+    }
     if (all_exist)
         return true;
-
-    /* Only now (a thumbnail is missing) resolve this folder's cover art.
-     * album/albumartist left NULL: only folder-based art is searched
-     * (cover.bmp, folder.jpg, ../cover.bmp). */
-    memset(&aa_id3, 0, sizeof(aa_id3));
-    strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
-    if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath)))
-        return false;   /* no cover art in this folder */
 
     struct aa_src src = { aa_artpath, -1, 0, 0 };  /* folder image on disk */
     int order[ART_CACHE_NUM_SIZES];
@@ -1048,7 +1268,6 @@ static bool aa_run_pass(void)
     size_t worksz;
     int wh, sh;
     void *workbuf;
-    unsigned int *seen;
     bool aborted = false;
     int since_yield = 0;
 
@@ -1058,7 +1277,7 @@ static bool aa_run_pass(void)
     if (wh <= 0)
         return false; /* not enough free memory right now; retry later */
 
-    sh = core_alloc(AA_SEEN_SLOTS * sizeof(unsigned int));
+    sh = core_alloc(AA_TABLE_BYTES);
     if (sh <= 0)
     {
         core_free(wh);
@@ -1066,12 +1285,14 @@ static bool aa_run_pass(void)
     }
 
     workbuf = core_get_data_pinned(wh);
-    seen = core_get_data_pinned(sh);
-    memset(seen, 0, AA_SEEN_SLOTS * sizeof(unsigned int));
+    aa_stamps = core_get_data_pinned(sh);
+    aa_visited = (unsigned char *)(aa_stamps + AA_SEEN_SLOTS);
+    memset(aa_stamps, 0, AA_TABLE_BYTES);
 
     aa_ensure_dirs();
     aa_check_format_version();
     aa_ensure_fallback(workbuf, worksz);
+    aa_stamps_load();
 
     if (!tagcache_search(&tcs, tag_filename))
     {
@@ -1095,6 +1316,7 @@ static bool aa_run_pass(void)
     while (tagcache_get_next(&tcs, aa_tcs_buf, sizeof(aa_tcs_buf)))
     {
         unsigned int dh, ah;
+        struct aa_stamp *slot;
 
         /* Abort promptly on USB/shutdown (the thread loop then acknowledges)
          * or yield the disk to an incoming database commit, so a long pass
@@ -1107,13 +1329,14 @@ static bool aa_run_pass(void)
 
         /* The track's own folder (the album), keyed by its path hash. Skip the
          * per-folder work entirely once this folder has been visited this pass
-         * (aa_seen records it), so later tracks of the same album are cheap. */
+         * (aa_visit records it), so later tracks of the same album are
+         * cheap. */
         aa_dirname(tcs.result, aa_dir, sizeof(aa_dir));
         dh = aa_hash(aa_dir);
-        if (!aa_seen(seen, dh))
+        if ((slot = aa_visit(dh)))
         {
             aa_counts.albums++;
-            if (aa_cache_dir(tcs.result, dh, workbuf, worksz, &aborted))
+            if (aa_cache_dir(tcs.result, dh, slot, workbuf, worksz, &aborted))
                 aa_counts.album_art++;
             else if (!aborted)
                 path_list_write_record(&noart_albums, aa_dir);
@@ -1129,11 +1352,12 @@ static bool aa_run_pass(void)
         if (aa_artist_dir[0] && strcmp(aa_artist_dir, aa_dir) != 0)
         {
             ah = aa_hash(aa_artist_dir);
-            if (!aa_seen(seen, ah))
+            if ((slot = aa_visit(ah)))
             {
                 snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
                 aa_counts.artists++;
-                if (aa_cache_dir(aa_probe, ah, workbuf, worksz, &aborted))
+                if (aa_cache_dir(aa_probe, ah, slot, workbuf, worksz,
+                                 &aborted))
                     aa_counts.artist_art++;
                 else if (!aborted)
                     path_list_write_record(&noart_artists, aa_artist_dir);
@@ -1153,6 +1377,9 @@ static bool aa_run_pass(void)
 
 out:
     noart_close(!aborted);
+    aa_stamps_save(!aborted);
+    aa_stamps = NULL;
+    aa_visited = NULL;
     core_unpin(wh);
     core_unpin(sh);
     core_free(sh);
@@ -1164,7 +1391,8 @@ out:
 /* Cache the offered track's embedded art into any of its folder's thumbnails
  * that don't exist yet. Fill-only: never overwrites art already cached (folder
  * images are the preferred on-disk source) -- this just gives a coverless folder
- * the art playback already had parsed for the WPS, at no decode cost to it. */
+ * the art playback already had parsed for the WPS, at no decode cost to it.
+ * Stamped EMBEDDED, so a pass that later finds folder art replaces it. */
 static void aa_handle_offer(void)
 {
     char path[MAX_PATH];
@@ -1223,6 +1451,9 @@ static void aa_handle_offer(void)
         aa_generate_size(&src, s, dh, aa_out_path, workbuf, worksz);
         yield();
     }
+
+    /* So the next pass replaces these if the folder gains an image. */
+    aa_stamp_append(dh, AA_STAMP_EMBEDDED);
 
     core_unpin(wh);
     core_free(wh);
@@ -1310,10 +1541,9 @@ void art_cache_init(void)
     if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
         remove(AA_DONE_FILE);
 
-    /* A pass holds the decode scratch and the seen-set at once, so the peak
+    /* A pass holds the decode scratch and the folder table at once, so the peak
      * declared to bg_task is both. */
-    art_cache_task.work_bytes = aa_work_bytes()
-                              + AA_SEEN_SLOTS * sizeof(unsigned int);
+    art_cache_task.work_bytes = aa_work_bytes() + AA_TABLE_BYTES;
 
     bg_task_init(&art_cache_task);
     aa_thread_id = create_thread(aa_thread, aa_stack, sizeof(aa_stack), 0,
