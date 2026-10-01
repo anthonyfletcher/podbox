@@ -69,7 +69,7 @@ void iap_platform_free(struct IAPContext* iap_ctx, void* ptr) {
 }
 
 int iap_platform_send_hid_report(struct IAPContext* iap_ctx, const void* ptr, size_t size) {
-    (void)iap_ctx;
+    iap_log_report(iap_ctx, ptr, size, true);
 #if DEBUG_DUMP_TX == 1
     logf("==== dev ==== %p %u > %d", ptr, size, HID_EP_IN);
     iap_platform_dump_hex(ptr, MIN(size, 48));

@@ -10,6 +10,7 @@
  * hooks.
  ****************************************************************************/
 #include <stdio.h>
+#include <string.h>
 #include "config.h"
 #include "system.h"
 #include "kernel.h"
@@ -92,6 +93,56 @@ static const char *usb_log_request_name(int type, int req, int value)
             return "reserved";
     }
 }
+
+#ifdef USB_ENABLE_IAP
+/* "iap > General:StartIDPS #0, 0 bytes": > from the accessory, < from the
+ * player. An acknowledgement names the command it answers instead of its
+ * payload, since that is what a stalled exchange is read for. */
+static void usb_log_format_iap(const struct usb_log_entry *e, char *p,
+                               size_t size)
+{
+    int lingo = e->a & ~USB_LOG_IAP_FROM_PLAYER;
+    const char *name = usb_log_iap_command(lingo, e->b);
+    unsigned len = e->c & 0xffff, trans = e->c >> 16;
+    int n = snprintf(p, size, "iap %c %s:%s", e->a & USB_LOG_IAP_FROM_PLAYER
+                     ? '<' : '>', usb_log_iap_lingo(lingo), name);
+    if (n < 0 || (size_t)n >= size)
+        return;
+    p += n;
+    size -= n;
+    if (trans != 0xffff)
+    {
+        n = snprintf(p, size, " #%u", trans);
+        if (n < 0 || (size_t)n >= size)
+            return;
+        p += n;
+        size -= n;
+    }
+
+    if ((!strcmp(name, "IPodAck") || !strcmp(name, "AccessoryAck"))
+        && len >= 2)
+    {
+        /* status, then the command: one byte, or two in lingo 4 */
+        int status = e->d >> 24;
+        int cmd = lingo == 4 ? (e->d >> 8) & 0xffff : (e->d >> 16) & 0xff;
+        snprintf(p, size, ": %s %s", usb_log_iap_command(lingo, cmd),
+                 status ? "FAILED" : "ok");
+        if (status)
+        {
+            n = strlen(p);
+            snprintf(p + n, size - n, " (status %02x)", status);
+        }
+        return;
+    }
+
+    n = snprintf(p, size, ", %u byte%s", len, len == 1 ? "" : "s");
+    for (unsigned i = 0; i < len && i < 4 && n >= 0 && (size_t)n < size; i++)
+        n += snprintf(p + n, size - n, " %02lx",
+                      (unsigned long)(e->d >> (24 - 8 * i)) & 0xff);
+    if (len > 4 && n >= 0 && (size_t)n < size)
+        snprintf(p + n, size - n, " ...");
+}
+#endif
 
 void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          size_t size)
@@ -246,6 +297,25 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          (unsigned long)e->c, (unsigned long)(e->d & 0xffff),
                          (unsigned long)(e->d >> 16), e->b);
             break;
+#ifdef USB_ENABLE_IAP
+        case USB_LOG_IAP:
+            usb_log_format_iap(e, p, size);
+            break;
+        case USB_LOG_IAP_RATE:
+            n = snprintf(p, size, "iap: host sets %lu Hz",
+                         (unsigned long)e->c);
+            if (e->d)
+                snprintf(p + n, size - n, ", %lu announced%s",
+                         (unsigned long)e->d, e->a ? ": IGNORED" : "");
+            break;
+        case USB_LOG_IAP_STREAM:
+            snprintf(p, size, "iap: stream now %s",
+                     e->a == USB_LOG_IAP_STREAM_AUDIO ? "carries audio" :
+                     e->a == USB_LOG_IAP_STREAM_NOTHING
+                         ? "silent, nothing playing"
+                         : "silent, waiting for the host to set the rate");
+            break;
+#endif
         case USB_LOG_SYNC:
             snprintf(p, size, "log on disk after %lu ms%s",
                      (unsigned long)e->c / 1000, e->a ? ", TIMED OUT" : "");

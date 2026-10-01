@@ -23,6 +23,7 @@
 #include "pcm_sink.h"
 #include "system.h"
 #include "usb_drv.h"
+#include "usb_log.h"
 
 #include "../usb_iap.h"
 #include "buffer.h"
@@ -51,6 +52,7 @@ static size_t         pulled_buf_cursor;
 static int8_t         set_freq; /* requested freq from rockbox */
 static int8_t         cur_freq; /* requested freq from accessory */
 static uint8_t        packet_count;
+static uint8_t        logged_stream; /* USB_LOG_IAP_STREAM_*, or 0xff */
 
 static bool enabled;
 static bool exhausted;
@@ -101,6 +103,15 @@ static void batch_get_more(const void** ptr, size_t* len) {
 #endif
 
 start:
+    {
+        const uint8_t stream = exhausted ? USB_LOG_IAP_STREAM_NOTHING
+                             : cur_freq != set_freq ? USB_LOG_IAP_STREAM_RATE_WAIT
+                                                    : USB_LOG_IAP_STREAM_AUDIO;
+        if(stream != logged_stream) {
+            logged_stream = stream;
+            usb_log(USB_LOG_IAP_STREAM, stream, 0, 0, 0);
+        }
+    }
     if(exhausted || cur_freq != set_freq) {
         *ptr = zero_buffer.buf.ptr;
         *len = packet_size;
@@ -221,6 +232,7 @@ bool iap_audio_init(void) {
     exhausted        = true;
     track_attrs_sent = false;
     packet_count     = 0;
+    logged_stream    = 0xff;
 
     return true;
 
@@ -265,6 +277,9 @@ bool iap_audio_set_sampr(uint32_t sampr) {
         }
     }
     check_act(freq < ARRAYLEN(samprs), return false);
+
+    usb_log(USB_LOG_IAP_RATE, set_freq >= 0 && freq != set_freq, 0, sampr,
+            set_freq >= 0 ? samprs[set_freq] : 0);
 
     if(set_freq >= 0 && freq != set_freq) {
         /* Accessories should only set the frequency we requested via

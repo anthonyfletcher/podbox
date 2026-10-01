@@ -545,6 +545,7 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
 #endif
 
             struct IAPContext* ctx = _iap_acquire_ctx(true);
+            iap_log_report(ctx, reqdata, req->wLength, false);
             const bool         ret = iap_feed_hid_report(ctx, reqdata, req->wLength);
             _iap_release_ctx();
 

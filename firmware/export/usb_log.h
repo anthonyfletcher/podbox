@@ -75,6 +75,15 @@ enum usb_log_type
                           * c = packets sent, d = underruns | errors << 16 */
     USB_LOG_ALLOC,       /* interfaces and endpoints being assigned:
                           * a = enabled drivers, b = core state */
+    /* USB iAP, configuration 2 */
+    USB_LOG_IAP,         /* a packet: a = lingo | USB_LOG_IAP_FROM_PLAYER,
+                          * b = command, c = payload bytes | transaction
+                          * << 16 (0xffff for none), d = the payload's
+                          * first four bytes, big-endian, zero-padded */
+    USB_LOG_IAP_RATE,    /* the host set a rate: a = ignored as not the one
+                          * announced, c = rate, d = rate announced or 0 */
+    USB_LOG_IAP_STREAM,  /* what the stream now carries: a =
+                          * USB_LOG_IAP_STREAM_* */
 };
 
 #define USB_LOG_SETUP_DROPPED  1 /* arrived during a bus reset; ignored */
@@ -92,6 +101,13 @@ enum usb_log_type
 #define USB_LOG_AUDIO_UNDERFLOW   5
 #define USB_LOG_AUDIO_OVERFLOW    6
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
+
+#define USB_LOG_IAP_FROM_PLAYER 0x80
+
+#define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
+#define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */
+#define USB_LOG_IAP_STREAM_RATE_WAIT 2 /* silence: the host has not set the
+                                        * rate the player announced */
 
 struct usb_log_entry
 {
@@ -121,6 +137,11 @@ bool usb_log_read(unsigned long seq, struct usb_log_entry *e);
 void usb_log_attach(bool on);
 void usb_log_set_written(unsigned long seq);
 unsigned long usb_log_written(void);
+
+/* Names for a USB_LOG_IAP entry, "?" for one the table does not know.
+ * Defined only where USB_ENABLE_IAP is. */
+const char *usb_log_iap_lingo(int lingo);
+const char *usb_log_iap_command(int lingo, int command);
 #endif
 
 #endif /* USB_LOG_H */

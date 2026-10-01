@@ -32,6 +32,12 @@
 #include "logf.h"
 #endif
 
+struct IAPContext;
+
+/* Logs the packet a HID report starts, to the USB log; a report continuing
+ * one is ignored. report is the report as sent, ID byte first. */
+void          iap_log_report(struct IAPContext* ctx, const void* report, size_t size, bool from_player);
+
 void          iap_lcd_scatter(const char* fmt, ...);
 unsigned long iap_debug_timestamp(void);
 void          iap_debug_reset_timestamp(void);

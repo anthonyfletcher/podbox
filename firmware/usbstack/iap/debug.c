@@ -27,6 +27,12 @@
 
 #include "font.h"
 #include "lcd.h"
+#include "usb_log.h"
+
+#include "debug.h"
+#include "libiap/iap.h"
+#include "libiap/spec/hid.h"
+#include "libiap/spec/iap.h"
 
 #define MAX_COLS 64
 
@@ -86,4 +92,64 @@ unsigned long iap_debug_timestamp(void) {
 
 void iap_debug_reset_timestamp(void) {
     timestamp_epoch = current_tick;
+}
+
+/* libiap's TransIDSupported; iap.c keeps the enum private */
+#define TRANS_ID_SUPPORTED 1
+
+void iap_log_report(struct IAPContext* ctx, const void* report, size_t size, bool from_player) {
+    const struct IAPHIDReport* r = report;
+    if(size < sizeof(*r) || (r->link_control & IAPHIDReportLinkControlBits_Continue)) {
+        return;
+    }
+
+    /* The header and the first payload bytes, zero-padded: a small report
+     * can end before the payload starts. */
+    uint8_t      buf[16] = {0};
+    const size_t avail   = size - sizeof(*r);
+    memcpy(buf, r->data, MIN(avail, sizeof(buf)));
+
+    const uint8_t* p = buf;
+    if(*p == IAP_SYNC_BYTE) {
+        p += 1;
+    }
+    if(*p++ != IAP_SOF_BYTE) {
+        return;
+    }
+    unsigned length = *p++;
+    if(length == 0) {
+        length = p[0] << 8 | p[1];
+        p += 2;
+    }
+    const uint8_t lingo   = *p++;
+    unsigned      command = *p++;
+    unsigned      header  = 2;
+    if(lingo == IAPLingoID_ExtendedInterface) {
+        command = command << 8 | *p++;
+        header += 1;
+    }
+    /* The accessory's first packet is what decides whether packets carry
+     * a transaction ID, so it has one only if it is StartIDPS. */
+    unsigned trans = 0xffff;
+    if(ctx->trans_id_support == TRANS_ID_SUPPORTED ||
+       (lingo == IAPLingoID_General && command == IAPGeneralCommandID_StartIDPS)) {
+        trans = p[0] << 8 | p[1];
+        p += 2;
+        header += 2;
+    }
+    const unsigned payload = length > header ? length - header : 0;
+    uint32_t       first   = 0;
+    for(unsigned i = 0; i < 4; i += 1) {
+        first = first << 8 | (i < payload ? p[i] : 0);
+    }
+    usb_log(USB_LOG_IAP, lingo | (from_player ? USB_LOG_IAP_FROM_PLAYER : 0), command,
+            payload | trans << 16, first);
+}
+
+const char* usb_log_iap_lingo(int lingo) {
+    return _iap_lingo_str(lingo);
+}
+
+const char* usb_log_iap_command(int lingo, int command) {
+    return _iap_command_str(lingo, command);
 }
