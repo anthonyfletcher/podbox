@@ -48,6 +48,8 @@ void browser_db_album_sort_set(int ctx, int order);
 int browser_db_export(void);
 int browser_db_import(void);
 void browser_db_init(void) INIT_ATTR;
+/* False when tagnavi.config is missing or did not parse: no menus to show */
+bool browser_db_ready(void);
 int browser_db_enter(struct browser_context* c, bool is_visible);
 void browser_db_exit(struct browser_context* c, bool is_visible);
 int browser_db_load(struct browser_context* c);

@@ -632,8 +632,10 @@ static char *sleep_timer_name(int selected_item, void *data,
     return buffer;
 }
 
-MENUITEM_FUNCTION_DYNTEXT(sleep_timer_item, 0, sleep_timer_run,
-                          sleep_timer_name, NULL, NULL, NULL, Icon_NOICON);
+/* MENU_FUNC_CHECK_RETVAL, or MENU in the list stops at this row */
+MENUITEM_FUNCTION_DYNTEXT(sleep_timer_item, MENU_FUNC_CHECK_RETVAL,
+                          sleep_timer_run, sleep_timer_name, NULL, NULL, NULL,
+                          Icon_NOICON);
 
 /* The read-out over a set of tracks: a folder in the file browser, a row's
  * subentries in the database. The gathering is sound_album_gather()'s, which

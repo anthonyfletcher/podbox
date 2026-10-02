@@ -1590,6 +1590,9 @@ static bool parse_menu(const char *filename)
 
 static void browser_db_unload(struct browser_context *c)
 {
+    if (browser_db_handle <= 0)
+        return;     /* a failed load has unloaded already */
+
     /* may be spurious... */
     core_pin(browser_db_handle);
 
@@ -1678,6 +1681,11 @@ static bool initialize_browser_db(void) /* also used when user selects 'Reload' 
 void browser_db_init(void)
 {
     initialize_browser_db();
+}
+
+bool browser_db_ready(void)
+{
+    return browser_db_handle > 0;
 }
 
 static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
@@ -2861,6 +2869,9 @@ static int load_root(struct browser_context *c)
     if (c->dirlevel == 0)
         c->currextra = rootmenu;
 
+    /* rootmenu is -1 and there are no menus when tagnavi.config failed */
+    if (c->currextra < 0 || c->currextra >= menu_count)
+        return 0;
     menu = menus[c->currextra];
     if (menu == NULL)
         return 0;

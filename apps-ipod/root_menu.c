@@ -20,6 +20,7 @@
 #include "widgets/menu.h"
 #include "root_menu.h"
 #include "lang.h"
+#include "rbpaths.h"
 #include "settings/settings.h"
 #include "kernel.h"
 #include "debug.h"
@@ -113,6 +114,17 @@ void browser_reveal_on_next_load(const char *path)
 static bool tagcache_reachable(void)
 {
     return tagcache_is_usable() && tagcache_get_commit_step() == 0;
+}
+
+/* The database browser's menus come from tagnavi.config, and without them it
+ * opens a list that takes no buttons. */
+static bool db_browser_ready(void)
+{
+    if (browser_db_ready())
+        return true;
+    splashf(HZ*3, "%s\n%s", str(LANG_FILE_NOT_FOUND),
+            ROCKBOX_DIR "/tagnavi.config");
+    return false;
 }
 
 /* Waits for the tagcache to become usable, showing build/init progress as
@@ -275,7 +287,7 @@ static int browser(void* param)
             push_current_activity(ACTIVITY_FILEBROWSER);
         break;
         case GO_TO_DBBROWSER:
-            if (!wait_for_tagcache_ready())
+            if (!wait_for_tagcache_ready() || !db_browser_ready())
                 return GO_TO_PREVIOUS;
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
@@ -313,7 +325,7 @@ static int browser(void* param)
             const char *target_menu;
             const unsigned char *target_name;
 
-            if (!wait_for_tagcache_ready())
+            if (!wait_for_tagcache_ready() || !db_browser_ready())
                 return GO_TO_PREVIOUS;
             if (!browser_db_get_main_menu_row(slot, &target_tag, &target_menu,
                                               &target_name))
@@ -352,7 +364,7 @@ static int browser(void* param)
         break;
 
         case GO_TO_ALBUM_COVERS_TRACKS:
-            if (!wait_for_tagcache_ready())
+            if (!wait_for_tagcache_ready() || !db_browser_ready())
                 return GO_TO_PREVIOUS;
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;

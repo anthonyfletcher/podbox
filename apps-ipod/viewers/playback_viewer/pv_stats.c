@@ -1384,6 +1384,10 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         long t0 = current_tick;
         unsigned long log_size = pv_log_size(out->source);
         unsigned long covered = 0;
+        /* The naming state the rows are read under, which a save must still
+         * match at the end: the database can finish loading mid-replay */
+        unsigned long names_id = pv_names_identity();
+        bool names_ready = pv_names_complete() && names_settled();
 
         /* Three ways in, in order of what they cost. Each falls through to
          * the next, so a saved index that cannot be trusted is simply not
@@ -1428,7 +1432,8 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
          * with names a later build would get right: the database not yet able
          * to say, or not yet in RAM. */
         if (out->source == PV_SRC_PLAYBACK
-            && (!pv_names_complete() || !names_settled()))
+            && (!names_ready || !pv_names_complete() || !names_settled()
+                || pv_names_identity() != names_id))
             save_wanted = false;
 
         save_covered = log_size;

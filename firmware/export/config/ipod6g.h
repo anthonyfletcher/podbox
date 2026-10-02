@@ -98,8 +98,8 @@
 /* Define this if the target supports composite video output.
  * PODBOX: declined -- nothing here turns it on, and the driver reserves a
  * 112.5 KB framebuffer whenever it is built. */
-#ifndef SIMULATOR
-//#define HAVE_COMPOSITE_VIDEO_OUT
+#if 0
+#define HAVE_COMPOSITE_VIDEO_OUT
 #endif
 
 /* Define this if your LCD can be put to sleep. HAVE_LCD_ENABLE

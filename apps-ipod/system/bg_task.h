@@ -113,6 +113,10 @@ struct bg_task
     struct bg_marks done_marks;  /* what the last completed pass covered */
     struct bg_marks prev_marks;  /* what last tick saw (stability check) */
     int  fails;         /* consecutive unfinished passes */
+    /* Gave way after BG_MAX_PREEMPT_FAILS: turns no lower pass back until the
+     * marks move off gave_way_marks or a trigger arrives */
+    bool gave_way;
+    struct bg_marks gave_way_marks;
     long retry_at;      /* tick before which not to try again, 0 = now */
     long next_check;    /* when a lower task's pass may next look at this */
 };

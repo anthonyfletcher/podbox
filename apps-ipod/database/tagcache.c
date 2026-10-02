@@ -344,6 +344,7 @@ struct path_slot {
 struct ramcache_header {
     char *tags[TAG_COUNT];       /* Tag file content (dcfrefs if tag_filename) */
     int entry_count[TAG_COUNT];  /* Number of entries in the indices. */
+    long tag_size[TAG_COUNT];    /* Bytes in each tags[], to bound a seek */
     int path_count;              /* Slots in the path index */
     int path_first;              /* Its byte offset from this header */
     struct index_entry indices[0]; /* Master index file content */
@@ -846,6 +847,10 @@ static int path_index_find(uint64_t key)
     {
         int idx_id = s[first].idx_id;
 
+        /* A buffer commit() borrowed and USB then switched back on holds
+         * scratch here, not entries */
+        if (idx_id < 0 || idx_id >= current_tcmh.tch.entry_count)
+            continue;
         if (!(tcramcache.hdr->indices[idx_id].flag & FLAG_DELETED))
         {
             path_found++;
@@ -2361,7 +2366,9 @@ bool tagcache_seek_string(int tag, long seek, char *buf, size_t size)
     const struct tagfile_entry *ep;
 
     if (!tc_stat.ramcache || tag < 0 || tag >= TAG_COUNT
-        || TAGCACHE_IS_NUMERIC(tag) || tag == tag_filename || seek < 0)
+        || TAGCACHE_IS_NUMERIC(tag) || tag == tag_filename || seek < 0
+        || seek > tcramcache.hdr->tag_size[tag]
+                  - (long)sizeof(struct tagfile_entry))
         return false;
 
     ep = (const struct tagfile_entry *)&tcramcache.hdr->tags[tag][seek];
@@ -4924,6 +4931,7 @@ static bool load_tagcache(void)
 
         if (tag == tag_filename)
             p = (char *)&tcrc_dcfrefs[tcmh.tch.entry_count];
+        tcramcache.hdr->tag_size[tag] = p - tcramcache.hdr->tags[tag];
 
         close(fd);
     }
@@ -5439,7 +5447,10 @@ static void load_ramcache(void)
 
     cpu_boost(true);
 
-    /* At first we should load the cache (if exists). */
+    /* Off while the buffer is rewritten, which can be in place with the RAM
+     * copy in use: readers fall back to the disk instead of finding an empty
+     * path index and taking every miss as final */
+    tc_stat.ramcache = false;
     tc_stat.ramcache = load_tagcache();
 
     if (!tc_stat.ramcache)

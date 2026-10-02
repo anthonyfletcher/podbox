@@ -19,6 +19,7 @@
 #include "string-extra.h"
 #include "file.h"
 #include "dir.h"
+#include "dircache.h"               /* whether a stamp check reads the disk */
 #include "pathfuncs.h"
 #include "rbpaths.h"
 #include "metadata.h"
@@ -689,6 +690,20 @@ static unsigned int aa_art_stamp(const char *path)
     return stamp;
 }
 
+/* Whether every size of one folder's thumbnails is on disk. */
+static bool aa_thumbs_exist(unsigned int dh)
+{
+    int s;
+
+    for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
+    {
+        aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
+        if (!file_exists(aa_check_path))
+            return false;
+    }
+    return true;
+}
+
 /* Delete every size of one folder's thumbnails. */
 static void aa_remove_thumbs(unsigned int dh)
 {
@@ -1093,6 +1108,12 @@ static bool aa_check_abort(void)
     return bg_task_should_stop(&art_cache_task);
 }
 
+/* Whether this pass looks up every folder's image. Off the directory cache
+ * that reads the disk for every folder, so only Update and Rebuild do it
+ * there; a pass the library starts takes a stamped folder with every size
+ * cached as it stands. */
+static bool aa_check_all;
+
 /* Resolve one folder's cover art and bring its thumbnails in line with it:
  * render the sizes that don't exist yet, and replace or delete the lot when
  * the image they were made from has changed or gone. `probe_path` is a track
@@ -1100,8 +1121,8 @@ static bool aa_check_abort(void)
  * an artist folder) that search_albumart_files() strips down to the folder to
  * locate cover.bmp / folder.jpg; `dh` is that folder's hash (the cache key) and
  * `slot` its table entry. Sets *aborted if a USB/shutdown/DB-busy stop was hit
- * mid-decode. Cheap once the folder is cached: the lookups and the stamp are
- * all dircache-served, and no image is read. */
+ * mid-decode. Cheap once the folder is cached: an existence check per size,
+ * plus the image lookup and stamp under aa_check_all, and no image is read. */
 static bool aa_cache_dir(const char *probe_path, unsigned int dh,
                          struct aa_stamp *slot,
                          void *workbuf, size_t worksz, bool *aborted)
@@ -1110,14 +1131,20 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
     bool all_exist = true;
     unsigned int stamp;
 
+    if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
+        return true;
+
     /* album/albumartist left NULL: only folder-based art is searched
      * (cover.bmp, folder.jpg, ../cover.bmp). */
     memset(&aa_id3, 0, sizeof(aa_id3));
     strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
     if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath)))
     {
-        /* The image these thumbnails were made from has been deleted. Embedded
-         * and unstamped thumbnails never came from a file here to lose. */
+        /* Embedded art has no file here, and is art all the same */
+        if (slot->stamp == AA_STAMP_EMBEDDED)
+            return aa_thumbs_exist(dh);
+        /* The image these thumbnails were made from has been deleted.
+         * Unstamped thumbnails never came from a file here to lose. */
         if (slot->stamp > AA_STAMP_EMBEDDED)
         {
             aa_remove_thumbs(dh);
@@ -1127,15 +1154,7 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
     }
 
     stamp = aa_art_stamp(aa_artpath);
-    for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
-    {
-        aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
-        if (!file_exists(aa_check_path))
-        {
-            all_exist = false;
-            break;
-        }
-    }
+    all_exist = aa_thumbs_exist(dh);
 
     /* Stamped before generating, so an interrupted pass leaves a part set
      * that the next one finishes rather than throws away again. Every size
@@ -1241,6 +1260,9 @@ static bool aa_run_pass(void)
     int since_yield = 0;
 
     worksz = aa_work_bytes();
+    /* No marks to have covered: a trigger, a first pass or a format bump */
+    aa_check_all = dircache_is_ready()
+                || art_cache_task.done_marks.entries < 0;
 
     wh = core_alloc(worksz);
     if (wh <= 0)

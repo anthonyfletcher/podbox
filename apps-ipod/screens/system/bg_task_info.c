@@ -112,8 +112,9 @@ static void add_art_cache_lines(void)
     }
 }
 
-/* Not a bg_task tick -- it runs its own thread on its own triggers -- so its
- * state comes from the walk rather than from bg_task_state(). */
+/* A .request task on the shared thread, with triggers of its own and none of
+ * the ranked tasks' state, so its state comes from the walk rather than from
+ * bg_task_state(). */
 static void add_file_index_lines(void)
 {
     const char *dir = file_index_activity();

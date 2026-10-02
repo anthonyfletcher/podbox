@@ -155,6 +155,7 @@ void bg_task_forget(struct bg_task *task)
     bg_marks_none(&task->prev_marks);
     task->retry_at = 0;
     task->fails = 0;
+    task->gave_way = false;
     task->verified = false;
 }
 
@@ -221,6 +222,12 @@ bool bg_task_preempted(const struct bg_task *task)
 
         if (other->rebuild_req || other->update_req)
             return true;
+
+        /* Trap: asking a task that gave way whether it is stale says yes
+         * again once its back-off ends, and a pass that restarts from the
+         * beginning, like the file walk, is then never let finish */
+        if (other->gave_way)
+            continue;
 
         /* The other task cannot tick while this pass holds the thread, so the
          * pass asks on its behalf, no more often than its own tick would. That
@@ -349,6 +356,8 @@ static bool bg_task_stale(struct bg_task *task)
     /* Require the marks to be stable across two consecutive ticks, so a scan
      * still in flight is never mistaken for a settled library. */
     bg_marks_now(task, &now);
+    if (task->gave_way && !bg_marks_equal(&now, &task->gave_way_marks))
+        task->gave_way = false;
     if (!bg_marks_equal(&now, &task->prev_marks))
     {
         task->prev_marks = now;
@@ -421,6 +430,7 @@ static void bg_task_tick(struct bg_task *task)
         task->prev_marks = covered;
         task->wants_run = false;
         task->fails = 0;
+        task->gave_way = false;
         bg_write_done(task, &covered);
         return;
     }
@@ -434,6 +444,8 @@ static void bg_task_tick(struct bg_task *task)
     {
         task->wants_run = false;
         task->fails = 0;
+        task->gave_way = true;
+        task->gave_way_marks = covered;
     }
     task->retry_at = current_tick + BG_RETRY_DELAY;
 }

@@ -36,8 +36,7 @@
 extern struct codec_api ci;   /* from codecs.c */
 
 static int              fd;
-static off_t            file_len;   /* Not "filesize": file.h has
-                                       that as a macro */
+static off_t            file_len;
 
 static unsigned char   *window;
 static size_t           window_sz;

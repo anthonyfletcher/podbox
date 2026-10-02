@@ -60,8 +60,9 @@ int skin_take_dirty_rects(enum screen_type screen,
 void skin_inhibit_flush(bool inhibit);
 bool skin_flush_inhibited(void);
 /* Draw scrolling lines static while something sits on top of the skin: the
- * scroll engine flushes on its own timer, so a line it owns paints through. */
-void skin_hold_scrolling(bool hold);
+ * scroll engine flushes on its own timer, so a line it owns paints through.
+ * Holds nest; true once the last is released. */
+bool skin_hold_scrolling(bool hold);
 /* Flush now -- for drawing done outside the action loop */
 void skin_flush_dirty(void);
 /* Redraw cost since boot; difference two readings for a rate. Renderers and

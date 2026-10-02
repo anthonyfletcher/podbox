@@ -99,11 +99,16 @@ bool skin_flush_inhibited(void)
     return flush_inhibited;
 }
 
-static bool scrolling_held = false;
+/* A count, since a dialog can open another over itself */
+static int scrolling_held = 0;
 
-void skin_hold_scrolling(bool hold)
+bool skin_hold_scrolling(bool hold)
 {
-    scrolling_held = hold;
+    if (hold)
+        scrolling_held++;
+    else if (scrolling_held > 0)
+        scrolling_held--;
+    return scrolling_held == 0;
 }
 
 static void pending_clear(enum screen_type screen)

@@ -692,10 +692,13 @@ int dialog_run(struct dialog *d, int poll_ticks)
     }
 
     /* A held line was drawn static and only redraws when its text changes,
-     * so ask for every line again to hand them back to the scroller. */
-    skin_hold_scrolling(false);
-    skin_request_full_update(CUSTOM_STATUSBAR);
-    sb_skin_force_next_update();
+     * so ask for every line again to hand them back to the scroller -- once
+     * no dialog this one sat on is still holding them. */
+    if (skin_hold_scrolling(false))
+    {
+        skin_request_full_update(CUSTOM_STATUSBAR);
+        sb_skin_force_next_update();
+    }
 
     return disp;
 }
