@@ -773,6 +773,11 @@ static void usb_audio_stop_playback(void)
         usb_audio_playing = false;
     }
     send_fb = false;
+    /* The transfer queued for the next packet stays primed when the host
+     * stops sending, and the next start primes on top of it: drop it. The
+     * completion handler re-arms only at alternate 1, so nothing re-queues
+     * it. */
+    usb_drv_reset_endpoint(EP_ISO_OUT, false);
 }
 
 /*

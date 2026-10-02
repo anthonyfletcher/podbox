@@ -297,6 +297,22 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          (unsigned long)e->c, (unsigned long)(e->d & 0xffff),
                          (unsigned long)(e->d >> 16), e->b);
             break;
+        case USB_LOG_HOST_MODE:
+            snprintf(p, size, "== host mode %s", e->a ? "on" : "off");
+            break;
+        case USB_LOG_HOST_DAC:
+            if (e->b & USB_LOG_HOST_PORT_READ)
+                snprintf(p, size, "host: DAC search, poll %d: %s; port: "
+                         "VBUS %s, %s, %s (%08lx)", e->a,
+                         (const char *)(uintptr_t)e->c,
+                         e->b & 1 ? "yes" : "no",
+                         e->b & 2 ? "connected" : "nothing connected",
+                         e->b & 4 ? "enabled" : "not enabled",
+                         (unsigned long)e->d);
+            else
+                snprintf(p, size, "host: DAC search: %s",
+                         (const char *)(uintptr_t)e->c);
+            break;
 #ifdef USB_ENABLE_IAP
         case USB_LOG_IAP:
             usb_log_format_iap(e, p, size);

@@ -28,8 +28,9 @@
  * sample rate.
  *
  * Volume is the player's own, applied to the samples and capped at 0 dB;
- * the DAC's own volume is left where it is. Balance and the tone controls,
- * which the headphone codec does in hardware, do not apply here. */
+ * the DAC's own is unmuted and turned to its maximum. Balance and the tone
+ * controls, which the headphone codec does in hardware, do not apply
+ * here. */
 
 #include <string.h>
 #include "system.h"
@@ -58,6 +59,7 @@
 #define UAC1_EP_GENERAL     0x01
 #define UAC1_GET_CUR        0x81
 #define UAC1_GET_MAX        0x83
+#define UAC2_RANGE          0x02
 #define UAC_FEATURE_UNIT    0x06
 #define UAC1_FU_MUTE        0x01
 #define UAC1_FU_VOLUME      0x02
@@ -94,8 +96,8 @@ static unsigned long sink_rate(int freq)
 
 static unsigned long sof_per_second = 8000;
 
-/* A class 1 DAC's first feature unit, and the controls it has on the
- * master channel and the first two */
+/* The DAC's first feature unit, and the controls it lets the host set on
+ * the master channel and the first two: bit 0 mute, bit 1 volume */
 static int fu_unit;
 static uint8_t fu_ctl[3];
 
@@ -155,23 +157,24 @@ static bool set_dac_rate(unsigned long rate)
     return true;
 }
 
-/* A class 1 feature unit can start muted or low, and the player applies
- * its own volume: unmute it and turn it up to its maximum. Each control is
- * set on the master channel where the unit has it there, and on channels 1
- * and 2 where it does not -- mute on the master and volume per channel is
- * common. */
-static void dac_unmute_uac1(void)
+/* A feature unit can start muted or low, and the player applies its own
+ * volume: unmute it and turn it up to its maximum. Each control is set on
+ * the master channel where the unit has it there, and on channels 1 and 2
+ * where it does not -- mute on the master and volume per channel is
+ * common. Class 1 reads the maximum with GET_MAX; class 2 reads a RANGE,
+ * the count of subranges and then the first one's minimum, maximum and
+ * resolution. */
+static void dac_unmute(void)
 {
     int index = (fu_unit << 8) | status.ac_iface;
 
     if (fu_unit == 0)
         return;
-    /* control bitmap: bit 0 mute, bit 1 volume */
     for (int bit = 0; bit < 2; bit++)
     {
         for (int ch = 0; ch < 3; ch++)
         {
-            uint8_t b[2] = { 0, 0 };
+            uint8_t b[8] = { 0 };
             int n;
 
             if (!(fu_ctl[ch] & (1 << bit)))
@@ -185,7 +188,7 @@ static void dac_unmute_uac1(void)
                 usb_log(USB_LOG_HOST_ENUM, n == 1, ch,
                         (uintptr_t)"dac unmute", usb_drv_host_last_status());
             }
-            else
+            else if (status.uac == 1)
             {
                 n = usb_drv_host_control(DEV_ADDR, USB_DIR_IN |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
@@ -200,6 +203,22 @@ static void dac_unmute_uac1(void)
                                              index, b, 2);
                 usb_log(USB_LOG_HOST_ENUM, n == 2, ch,
                         (uintptr_t)"dac volume", b[0] | b[1] << 8);
+            }
+            else
+            {
+                n = usb_drv_host_control(DEV_ADDR, USB_DIR_IN |
+                                         USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+                                         UAC2_RANGE,
+                                         (UAC1_FU_VOLUME << 8) | ch,
+                                         index, b, 8);
+                if (n == 8)
+                    n = usb_drv_host_control(DEV_ADDR, USB_DIR_OUT |
+                                             USB_TYPE_CLASS |
+                                             USB_RECIP_INTERFACE, UAC2_CUR,
+                                             (UAC1_FU_VOLUME << 8) | ch,
+                                             index, &b[4], 2);
+                usb_log(USB_LOG_HOST_ENUM, n == 2, ch,
+                        (uintptr_t)"dac volume", b[4] | b[5] << 8);
             }
             if (ch == 0)
                 break;
@@ -409,6 +428,7 @@ static bool find_setting(const struct usb_drv_host_enum *e,
     memset(best, 0, sizeof *best);
     status.clock = -1;
     fu_unit = 0;
+    memset(fu_ctl, 0, sizeof fu_ctl);
     for (int i = 0; i + 2 <= e->cfg_len && e->cfg[i] >= 2; i += e->cfg[i])
     {
         const uint8_t *c = &e->cfg[i];
@@ -467,6 +487,17 @@ static bool find_setting(const struct usb_drv_host_enum *e,
                 fu_unit = c[3];
                 for (int ch = 0; ch < 3 && 6 + ch * c[5] < len; ch++)
                     fu_ctl[ch] = c[6 + ch * c[5]];
+            }
+            else if (in_ac && !ac_uac1 && c[2] == UAC_FEATURE_UNIT &&
+                     len >= 10 && fu_unit == 0)
+            {
+                /* four bytes a channel from the master, two bits a
+                 * control: mute in bits 0-1, volume in 2-3, and 3 is
+                 * settable by the host */
+                fu_unit = c[3];
+                for (int ch = 0; ch < 3 && 5 + ch * 4 < len - 1; ch++)
+                    fu_ctl[ch] = ((c[5 + ch * 4] & 3) == 3) |
+                                 (((c[5 + ch * 4] >> 2) & 3) == 3) << 1;
             }
             else if (in_ac && c[2] == UAC2_CLOCK_SOURCE && len >= 4 &&
                 status.clock < 0)
@@ -561,8 +592,7 @@ bool usb_host_audio_start(void)
                               NULL, 0) == 0);
 
     STEP("set rate", set_dac_rate(sink_rate(DEFAULT_FREQ)));
-    if (as.uac == 1)
-        dac_unmute_uac1();
+    dac_unmute();
 
     memset(&iso, 0, sizeof iso);
     iso.addr = DEV_ADDR;

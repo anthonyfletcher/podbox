@@ -609,10 +609,8 @@ static struct host_dma *hd;
 static uint32_t host_last_status;
 static int host_ep0_mps = 64;
 /* A full-speed device is reached through the controller's own transaction
- * translator: hub address 0, and this port number. Some cores of this
- * family count ports from 0 rather than 1, so the reset tries both and the
- * one that enumerates is kept. */
-static int host_tt_port = 1;
+ * translator: hub address 0, port 1. */
+#define HOST_TT_PORT    1
 
 void usb_drv_host_set_ep0_mps(int mps)
 {
@@ -682,7 +680,7 @@ static int host_control(int addr, int reqtype, int req, int value,
     {
         hd->qh.chars = addr | QH_EPS_FULL | QH_DTC | QH_HEAD | QH_CTRL_EP |
                        QH_MPS(host_ep0_mps);
-        hd->qh.caps = QH_MULT1 | QH_HUB_PORT(host_tt_port);
+        hd->qh.caps = QH_MULT1 | QH_HUB_PORT(HOST_TT_PORT);
     }
     hd->qh.current = 0;
     hd->qh.overlay.next = (uint32_t)setup;
@@ -709,7 +707,7 @@ static int host_control(int addr, int reqtype, int req, int value,
                           setup->token :
                           (len && (data->token & (QTD_ACTIVE | QTD_HALTED))) ?
                           data->token : status->token;
-    usb_log(USB_LOG_HOST_EHCI, addr, req | host_tt_port << 8,
+    usb_log(USB_LOG_HOST_EHCI, addr, req | HOST_TT_PORT << 8,
             n < 0 ? host_last_status : 0, (uint32_t)n);
 
     REG_USBCMD &= ~USBCMD_ASYNC_SCHEDULE_EN;
@@ -957,7 +955,7 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
 
         memset(st, 0, sizeof *st);
         st->next = EHCI_T;
-        st->ep = host_tt_port << 24 | (iso->ep_out & 0xf) << 8 |
+        st->ep = HOST_TT_PORT << 24 | (iso->ep_out & 0xf) << 8 |
                  iso_cfg.addr;
         st->back = EHCI_T;
         itd_init(&iso_dma->out[s], iso_dma->buf[s], iso->ep_out, 0,
@@ -1057,13 +1055,11 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     {
         /* 100 ms connect debounce, then a 60 ms root-port reset. The
          * controller may time the reset itself; if not, end it here. A
-         * device that is not ready gets two more tries from a fresh reset,
-         * and a full-speed one is tried at both translator port numbers. */
+         * device that is not ready gets two more tries from a fresh reset. */
         host_reset_done = true;
         for (int attempt = 0; attempt < 3; attempt++)
         {
             host_resets++;
-            host_tt_port = attempt == 1 ? 0 : 1;
             udelay(100000);
             REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) |
                           PORTSCX_PORT_RESET;
@@ -1072,7 +1068,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
                 REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
             udelay(20000);
             portsc = REG_PORTSC1;
-            usb_log(USB_LOG_HOST_PORT, attempt, 0, portsc, host_tt_port);
+            usb_log(USB_LOG_HOST_PORT, attempt, 0, portsc, HOST_TT_PORT);
 #ifdef HAVE_USB_HOST
             if (portsc & PORTSCX_PORT_ENABLE)
             {

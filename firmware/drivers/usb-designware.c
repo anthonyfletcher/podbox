@@ -1393,6 +1393,19 @@ void usb_drv_cancel_all_transfers()
     usb_dw_target_enable_irq();
 }
 
+/* Drops a queued transfer without completing it, as the ARC's ENDPTFLUSH
+ * does. Not for use from the USB interrupt. */
+void usb_drv_reset_endpoint(int endpoint, bool send)
+{
+    int epnum = EP_NUM(endpoint);
+    enum usb_dw_epdir epdir = send ? USB_DW_EPDIR_IN : USB_DW_EPDIR_OUT;
+
+    usb_dw_target_disable_irq();
+    if (usb_dw_get_ep(epnum, epdir)->busy)
+        usb_dw_flush_endpoint(epnum, epdir);
+    usb_dw_target_enable_irq();
+}
+
 bool usb_drv_stalled(int endpoint, bool in)
 {
     return usb_dw_get_stall(EP_NUM(endpoint),
@@ -1629,8 +1642,9 @@ int usb_drv_host_control(int addr, int reqtype, int req, int value,
 /* The isochronous stream. This core in buffer DMA mode has no schedule of
  * its own: a periodic channel carries one packet, in the next microframe
  * whose parity its ODDFRM bit names, and must be set up again after. So the
- * start-of-microframe interrupt sets up the next microframe's packet, one a
- * microframe as every desktop host sends, on two OUT channels that take the
+ * start-of-microframe interrupt sets up the next microframe's packet, one
+ * per service interval of the endpoint (every microframe, for the DACs that
+ * want one, as every desktop host sends), on two OUT channels that take the
  * even and the odd microframes in turn. The interrupt is locked to the bus,
  * so no microframe gets two packets or none. Feedback is read on a third
  * channel at its endpoint's interval. */
@@ -1775,6 +1789,8 @@ static void iso_sof(void)
 
     /* owed even if this microframe is skipped: the next packet carries it */
     iso_acc += iso_stats.feedback;
+    if (next % iso_cfg.interval_out != 0)
+        return;                         /* not the endpoint's microframe */
     if (iso_cfg.begin && !iso_cfg.begin())
         return;
 
@@ -1794,7 +1810,8 @@ static void iso_sof(void)
 
 bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
 {
-    if (!host_active || iso_stats.running || iso->frame_bytes <= 0)
+    if (!host_active || iso_stats.running || iso->frame_bytes <= 0 ||
+        iso->interval_out < 1 || iso->interval_out > 8)
         return false;
 
     commit_discard_dcache_range(&host_dw_iso_mem, sizeof host_dw_iso_mem);

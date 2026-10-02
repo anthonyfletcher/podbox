@@ -148,12 +148,17 @@ static int usb_dac_polls = 0;           /* >0 while a try is polling */
 static volatile bool usb_dac_requested; /* Turn On posted, not yet taken */
 static struct timeout usb_dac_tmo;
 static struct usb_dac_auto_record usb_dac_rec = { .step = "no cable yet" };
+/* The last poll of the port, for the log: USB_LOG_HOST_DAC's b and d */
+static int usb_dac_port_bits;
+static uint32_t usb_dac_port_reg;
 
 static void usb_dac_note(const char *step)
 {
     usb_dac_rec.step = step;
     usb_dac_rec.tick = current_tick;
     usb_dac_rec.polls = usb_dac_polls;
+    usb_log(USB_LOG_HOST_DAC, usb_dac_polls, usb_dac_port_bits,
+            (uintptr_t)step, usb_dac_port_reg);
 }
 #endif
 static int usb_num_acks_to_expect = 0;
@@ -531,6 +536,7 @@ static void usb_host_probe_switch(bool on)
     if(on == usb_host_probe_on)
         return;
     usb_host_probe_on = on;
+    usb_log(USB_LOG_HOST_MODE, on, 0, 0, 0);
     if(on)
     {
         usb_extract();
@@ -550,6 +556,7 @@ static void usb_host_probe_switch(bool on)
     usb_host_audio_stop();
     usb_dac_tried = true;
     usb_dac_polls = 0;
+    usb_dac_port_bits = 0;
 #endif
     usb_host_probe_enable(false);
     /* Insertions were dropped meanwhile; replay the cable. */
@@ -590,6 +597,7 @@ static void usb_dac_turn(bool on)
     {
         usb_host_probe_switch(true);
         usb_dac_polls = 1;
+        usb_dac_port_bits = 0;
         usb_dac_note("polling (turned on)");
         usb_dac_requested = false;
         usb_dac_auto_step();
@@ -625,6 +633,7 @@ static void usb_dac_auto_step(void)
 
     if(usb_dac_polls == 0)
     {
+        usb_dac_port_bits = 0;
         usb_dac_rec.bus_resets = usb_record.bus_resets;
         if(!usb_dac_auto)
             usb_dac_note("skipped: setting off");
@@ -653,6 +662,9 @@ static void usb_dac_auto_step(void)
     }
 
     usb_drv_host_poll(&st);
+    usb_dac_port_bits = USB_LOG_HOST_PORT_READ | (st.vbus ? 1 : 0) |
+                        (st.connected ? 2 : 0) | (st.enabled ? 4 : 0);
+    usb_dac_port_reg = st.nregs ? st.regs[0].val : 0;
     e = usb_host_get_enum();
     if(e->result == 1)
     {

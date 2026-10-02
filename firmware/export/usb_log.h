@@ -73,6 +73,12 @@ enum usb_log_type
                           * b = parity, c = channel interrupts, d = HCTSIZ;
                           * a = 1, every 1000th: b = frames in it,
                           * c = packets sent, d = underruns | errors << 16 */
+    USB_LOG_HOST_MODE,   /* the port turned host (a = 1) or back (a = 0) */
+    USB_LOG_HOST_DAC,    /* the DAC search's decision: a = polls,
+                          * b = the last poll's port, bit 0 VBUS,
+                          * 1 connected, 2 enabled, USB_LOG_HOST_PORT_READ
+                          * if there was one, c = the decision (a static
+                          * string), d = HPRT or PORTSC1 */
     USB_LOG_ALLOC,       /* interfaces and endpoints being assigned:
                           * a = enabled drivers, b = core state */
     /* USB iAP, configuration 2 */
@@ -101,6 +107,8 @@ enum usb_log_type
 #define USB_LOG_AUDIO_UNDERFLOW   5
 #define USB_LOG_AUDIO_OVERFLOW    6
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
+
+#define USB_LOG_HOST_PORT_READ 0x80
 
 #define USB_LOG_IAP_FROM_PLAYER 0x80
 
