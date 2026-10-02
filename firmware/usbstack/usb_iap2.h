@@ -52,12 +52,16 @@ void usb_iap2_message_send(size_t n);
 /* As send, on the file transfer session; false when the accessory's link
  * has none, and the packet is not sent. */
 bool usb_iap2_file_send(size_t n);
+/* Packets that can be queued now. */
+size_t usb_iap2_room(void);
 
 void usb_iap2_control_link_up(void);
 void usb_iap2_control_reset(void);
 void usb_iap2_control_receive(const uint8_t *msg, size_t len);
 /* A packet's payload on the file transfer session. */
 void usb_iap2_control_file(const uint8_t *data, size_t len);
+/* A packet has gone and there is room to queue another. */
+void usb_iap2_control_room(void);
 void usb_iap2_control_tick(void);
 /* From usb_iap2_audio_rate(), on the audio thread. */
 void usb_iap2_control_rate(unsigned long rate);

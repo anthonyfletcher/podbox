@@ -34,6 +34,8 @@
  *   - playing a list
  *   - the Playlist category
  *   - the entry points
+ *   - the library as iAP2 sends it: every track by its key, and playing
+ *     the keys a car chooses
  ****************************************************************************/
 
 #include "config.h"
@@ -50,6 +52,7 @@
 #include "playlist/playlist.h"
 #include "playlist/mood_screen.h"
 #include "database/tagcache.h"
+#include "database/path_key.h"
 #include "database/sound_index.h"
 #include "database/sound_mix.h"
 #include "database/sound_mood.h"
@@ -952,4 +955,127 @@ void iap_library_close(void)
     folder_count_seen = -1;
     iap_library_reset();
     all_songs = false;
+}
+
+/* ------------------------------------------------------------------ *
+ * the library as iAP2 sends it                                       *
+ * ------------------------------------------------------------------ */
+
+/* An album, artist, genre or composer's ID, from its name (and an album's
+ * from its artist's too), so that it is the same in every track and at
+ * every connection. Salted per kind, so an artist and an album of the same
+ * name differ; never 0, which iAP2 reads as none. */
+static uint64_t name_id(int kind, const char *name, const char *also)
+{
+    uint64_t h = path_key_fold_hash(name) ^ (uint64_t)kind << 56;
+    if (also)
+        h = (h * 1099511628211ull) ^ path_key_fold_hash(also);
+    return h ? h : 1;
+}
+
+static char track_names[6][128];
+
+int iap_library_track_slots(void)
+{
+    return tagcache_path_slots();
+}
+
+bool iap_library_track(int n, struct iap_library_track *t)
+{
+    static const int tags[6] = {
+        tag_title, tag_album, tag_artist, tag_albumartist, tag_genre,
+        tag_composer,
+    };
+    const char **names[6] = {
+        &t->title, &t->album, &t->artist, &t->albumartist, &t->genre,
+        &t->composer,
+    };
+    int idx;
+    long v;
+
+    memset(t, 0, sizeof(*t));
+    if (!tagcache_path_slot(n, &t->key, &idx))
+        return false;
+    if (idx < 0)
+    {
+        t->key = 0;
+        return true;
+    }
+    for (int i = 0; i < 6; i++)
+        if (tagcache_entry_string(idx, tags[i], track_names[i],
+                                  sizeof(track_names[i])))
+            *names[i] = track_names[i];
+    if (tagcache_entry_numeric(idx, tag_length, &v) && v > 0)
+        t->length = v;
+    if (tagcache_entry_numeric(idx, tag_tracknumber, &v) && v > 0)
+        t->tracknum = v;
+    if (tagcache_entry_numeric(idx, tag_discnumber, &v) && v > 0)
+        t->discnum = v;
+
+    if (t->album)
+        t->album_id = name_id(1, t->album,
+                              t->albumartist ? t->albumartist : t->artist);
+    if (t->artist)
+        t->artist_id = name_id(2, t->artist, NULL);
+    if (t->albumartist)
+        t->albumartist_id = name_id(2, t->albumartist, NULL);
+    if (t->genre)
+        t->genre_id = name_id(3, t->genre, NULL);
+    if (t->composer)
+        t->composer_id = name_id(4, t->composer, NULL);
+    return true;
+}
+
+uint32_t iap_library_revision(void)
+{
+    uint64_t key;
+    int idx;
+    uint32_t live = 0;
+
+    for (int n = 0; tagcache_path_slot(n, &key, &idx); n++)
+        if (idx >= 0)
+            live++;
+    if (!live)
+        return 0;
+    /* A deletion leaves the commit count alone, so the live count too */
+    uint32_t rev = (uint32_t)tagcache_commit_id() << 20 ^ live;
+    return rev ? rev : 1;
+}
+
+uint64_t iap_library_key(const char *path)
+{
+    return path_key(path);
+}
+
+bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
+{
+    if (building || !open_block() || !n)
+        return false;
+    if (global_settings.party_mode && audio_status())
+        return false;
+
+    uint32_t count = 0, first = 0;
+    for (size_t i = 0; i < n && count < capacity; i++)
+    {
+        uint64_t key = 0;
+        for (int b = 0; b < 8; b++)
+            key = key << 8 | keys[i * 8 + b];
+        int idx = tagcache_find_key(key);
+        if (idx < 0)
+            continue;
+        if (i <= start)
+            first = count;
+        block->entries[count].key = 0;
+        block->entries[count].idx = idx;
+        count++;
+    }
+    if (!count)
+        return false;
+
+    list_count = count;
+    play_book = false;
+    clear_chosen(0);
+    all_songs = false;
+    start_work(EV_PLAY, first);
+    return true;
 }

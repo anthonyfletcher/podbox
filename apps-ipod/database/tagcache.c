@@ -2301,6 +2301,28 @@ int tagcache_find_key(uint64_t key)
     return path_index_find(key);
 }
 
+bool tagcache_path_slot(int n, uint64_t *key, int *idx_id)
+{
+    if (!tc_stat.ramcache || n < 0 || n >= tcramcache.hdr->path_count)
+        return false;
+
+    const struct path_slot *s = &tcrc_path_slots[n];
+    *key = (uint64_t)s->key_hi << 32 | s->key_lo;
+    *idx_id = tcramcache.hdr->indices[s->idx_id].flag & FLAG_DELETED
+              ? -1 : s->idx_id;
+    return true;
+}
+
+int tagcache_path_slots(void)
+{
+    return tc_stat.ramcache ? tcramcache.hdr->path_count : 0;
+}
+
+int32_t tagcache_commit_id(void)
+{
+    return current_tcmh.commitid;
+}
+
 /* The RAM copy's entry, if it is live. A deleted entry's string seeks hold a
  * CRC of the text rather than a position (see delete_entry()), so they must
  * not be followed. */

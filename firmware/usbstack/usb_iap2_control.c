@@ -47,6 +47,7 @@
  * iPhone in this car (its iAP debug log) and answering the car's replayed
  * messages. carplay-provenance.md gives the source of every fact here. */
 
+#include <stdio.h>
 #include <string.h>
 #include "system.h"
 #include "kernel.h"
@@ -61,6 +62,7 @@
 #include "usb_log.h"
 
 #include "iap/audio.h"
+#include "iap_library.h"
 #include "usb_iap2.h"
 
 #define REQUEST_CERTIFICATE        0xAA00
@@ -79,6 +81,8 @@
 #define LIBRARY_INFORMATION        0x4C01
 #define START_LIBRARY_UPDATES      0x4C03
 #define LIBRARY_UPDATE             0x4C04
+#define STOP_LIBRARY_UPDATES       0x4C05
+#define PLAY_LIBRARY_ITEMS         0x4C07
 #define DEVICE_INFORMATION_UPDATE  0x4E09
 #define DEVICE_LANGUAGE_UPDATE     0x4E0A
 #define DEVICE_UUID_UPDATE         0x4E0C
@@ -207,6 +211,9 @@ static void event(int what, uint32_t c, uint32_t d)
 {
     usb_log(USB_LOG_IAP2_EVENT, what, 0, c, d);
 }
+
+/* Logged as "iap2 event 12": the whole library has gone, c its slots. */
+#define EVENT_LIBRARY_SENT 12
 
 /* ---- building and reading messages -------------------------------------- */
 
@@ -365,6 +372,16 @@ static bool identified;
 static long availability_due;     /* when to send CarPlayAvailability, or 0 */
 static uint8_t next_transfer = 0x80; /* file transfer IDs run 80 to FF */
 static uint8_t artwork;           /* the artwork transfer just named, or 0 */
+/* The library on its way to the car: see the media library part */
+static struct
+{
+    bool active;
+    bool reset;             /* the next update opens with a reset */
+    int next, slots;        /* the path index slot to send next, of */
+    uint32_t mask;          /* the item properties the car asked for */
+    char rev[12];           /* the revision once all is sent */
+    char partial[12];       /* and on the way */
+} lib;
 
 static bool audio_on;
 static volatile unsigned long rate_wanted;
@@ -407,6 +424,7 @@ void usb_iap2_control_reset(void)
     identified = false;
     availability_due = 0;
     artwork = 0;
+    lib.active = false;
     car_receives_n = 0;
     now_playing = false;
     n_controls = 0;
@@ -503,15 +521,20 @@ static void send_power_update(uint32_t wanted_mask)
 
 /* ---- media library ------------------------------------------------------ */
 
-/* One library holding one track, the one playing, until the whole library is
- * sent: an iPhone's own library always holds tracks, its now playing names
- * the library and the track's ID in it, and this car reads nothing more
- * after an empty one. 4C01 is a group per library (0 name, 1 ID, 2 type, 0
- * the device's own). To 4C03, which names the revision the car holds and
- * the item properties it wants (parameter 2), the 4C04s an iPhone sends: the
- * first with 8 `00`, the second 9 `01`, then the items (parameter 2, a group
- * each), the revision and 7, the progress, 100. Item layout from an iPhone
- * in this car; carplay.md has the properties. */
+/* The library: 4C01 is a group per library (0 name, 1 ID, 2 type, 0 the
+ * device's own). To 4C03, which names the revision the car holds and the
+ * item properties it wants (parameter 2), the 4C04s an iPhone sends: the
+ * first with 8 `00`, the second 9 `01`; then, unless the car holds this
+ * revision already, the items (parameter 2, a group each) in updates of up
+ * to a packet, the first opening with 6, a reset; the last carries the
+ * revision and 7, the progress, 100. An update on the way carries the
+ * revision before this one and progress 0, so a car cut off mid-way asks
+ * again from the start. Every track goes, by its key, from the database in
+ * RAM, as fast as packets leave and a few slots short of full; without the
+ * database the library is the playing track alone. An iPhone's own library
+ * always holds tracks, and this car reads nothing more after an empty one.
+ * Item layout from an iPhone in this car; carplay.md has the properties. */
+
 static void send_library_information(void)
 {
     if (!msg_start(LIBRARY_INFORMATION))
@@ -527,39 +550,40 @@ static void send_library_information(void)
 static uint32_t hash(const char *s);
 static const char *track_title(const struct mp3entry *id3);
 
-/* A name and its ID (a hash of the name), where the track has the name. */
-static void named(uint32_t mask, unsigned id_param, const char *name)
+/* A name and its ID, where the track has the name. */
+static void named(uint32_t mask, unsigned id_param, uint64_t id,
+                  const char *name)
 {
     if (!name || !*name)
         return;
-    if (mask & 1u << id_param)
-        param_u64(id_param, 0, hash(name));
+    if ((mask & 1u << id_param) && id)
+        param_u64(id_param, id >> 32, id);
     if (mask & 1u << (id_param + 1))
         param_str(id_param + 1, name);
 }
 
-static void put_track(const struct mp3entry *id3, uint32_t mask)
+static void put_track(const struct iap_library_track *t, uint32_t mask)
 {
     group_start(2);
     if (mask & 1u << 0)
-        param_u64(0, 0, hash(id3->path)); /* now playing's ID for it too */
-    if (mask & 1u << 1)
-        param_str(1, track_title(id3));
+        param_u64(0, t->key >> 32, t->key); /* now playing's ID for it too */
+    if ((mask & 1u << 1) && t->title)
+        param_str(1, t->title);
     if (mask & 1u << 2)
         param_u8(2, 0);
     if (mask & 1u << 3)
         param_u8(3, 0);
-    if (mask & 1u << 4)
-        param_u32(4, id3->length);
-    named(mask, 5, id3->album);
-    if ((mask & 1u << 7) && id3->tracknum > 0)
-        param_u16(7, id3->tracknum);
-    if ((mask & 1u << 9) && id3->discnum > 0)
-        param_u16(9, id3->discnum);
-    named(mask, 11, id3->artist);
-    named(mask, 13, id3->albumartist);
-    named(mask, 15, id3->genre_string);
-    named(mask, 17, id3->composer);
+    if ((mask & 1u << 4) && t->length)
+        param_u32(4, t->length);
+    named(mask, 5, t->album_id, t->album);
+    if ((mask & 1u << 7) && t->tracknum > 0)
+        param_u16(7, t->tracknum);
+    if ((mask & 1u << 9) && t->discnum > 0)
+        param_u16(9, t->discnum);
+    named(mask, 11, t->artist_id, t->artist);
+    named(mask, 13, t->albumartist_id, t->albumartist);
+    named(mask, 15, t->genre_id, t->genre);
+    named(mask, 17, t->composer_id, t->composer);
     if (mask & 1u << 19)
         param_u8(19, 0);
     if (mask & 1u << 25)
@@ -569,31 +593,139 @@ static void put_track(const struct mp3entry *id3, uint32_t mask)
     group_end();
 }
 
-static void send_library_updates(uint32_t item_mask)
+/* The playing track, for a library without the database. */
+static void track_from_id3(const struct mp3entry *id3,
+                           struct iap_library_track *t)
 {
-    struct mp3entry *id3 = audio_current_track();
+    memset(t, 0, sizeof(*t));
+    t->key = iap_library_key(id3->path);
+    t->title = track_title(id3);
+    t->album = id3->album;
+    t->artist = id3->artist;
+    t->albumartist = id3->albumartist;
+    t->genre = id3->genre_string;
+    t->composer = id3->composer;
+    t->album_id = t->album ? hash(t->album) : 0;
+    t->artist_id = t->artist ? hash(t->artist) : 0;
+    t->albumartist_id = t->albumartist ? hash(t->albumartist) : 0;
+    t->genre_id = t->genre ? hash(t->genre) : 0;
+    t->composer_id = t->composer ? hash(t->composer) : 0;
+    t->length = id3->length;
+    t->tracknum = id3->tracknum;
+    t->discnum = id3->discnum;
+}
+
+static void library_flag(unsigned id, uint8_t value)
+{
     if (msg_start(LIBRARY_UPDATE))
     {
         param_str(0, LIBRARY_ID);
-        param_u8(8, 0);
+        param_u8(id, value);
         msg_send();
     }
-    if (msg_start(LIBRARY_UPDATE))
+}
+
+/* Updates while there is room, each as many tracks as a packet holds. */
+static void library_pump(void)
+{
+    while (lib.active && usb_iap2_room() > 2 && msg_start(LIBRARY_UPDATE))
     {
+        int items = 0;
         param_str(0, LIBRARY_ID);
-        param_u8(9, 1);
+        if (lib.reset)
+        {
+            param(6, NULL, 0);
+            lib.reset = false;
+        }
+        while (lib.next < lib.slots)
+        {
+            struct iap_library_track t;
+            if (!iap_library_track(lib.next, &t))
+            {
+                lib.active = false; /* the database has left RAM */
+                break;
+            }
+            if (!t.key)
+            {
+                lib.next++;
+                continue;
+            }
+            const size_t mark = m.len;
+            put_track(&t, lib.mask);
+            /* Room left for the revision and the progress after it */
+            if (!m.ok || m.len + 4 + sizeof(lib.rev) + 5 > m.room)
+            {
+                m.len = mark;
+                m.ok = true;
+                if (!items)
+                    lib.next++; /* a track no packet holds */
+                break;
+            }
+            lib.next++;
+            items++;
+        }
+        const bool done = lib.active && lib.next >= lib.slots;
+        param_str(1, done ? lib.rev : lib.partial);
+        param_u8(7, done ? 100 : 0);
         msg_send();
+        if (done)
+        {
+            lib.active = false;
+            event(EVENT_LIBRARY_SENT, lib.slots, 0);
+        }
     }
-    if (msg_start(LIBRARY_UPDATE))
+}
+
+static void send_library_updates(uint32_t mask, const char *car_revision)
+{
+    const uint32_t revision = iap_library_revision();
+    struct mp3entry *id3;
+
+    library_flag(8, 0);
+    library_flag(9, 1);
+    if (!revision)
     {
-        param_str(0, LIBRARY_ID);
-        if (id3)
-            put_track(id3, item_mask);
-        /* Always revision 1: the track goes again at every connection. */
-        param_str(1, "1");
-        param_u8(7, 100);
-        msg_send();
+        if (msg_start(LIBRARY_UPDATE))
+        {
+            param_str(0, LIBRARY_ID);
+            if ((id3 = audio_current_track()))
+            {
+                struct iap_library_track t;
+                track_from_id3(id3, &t);
+                put_track(&t, mask);
+            }
+            /* Always revision 1: the track goes again at every connection */
+            param_str(1, "1");
+            param_u8(7, 100);
+            msg_send();
+        }
+        return;
     }
+    snprintf(lib.rev, sizeof(lib.rev), "%lu", (unsigned long)revision);
+    snprintf(lib.partial, sizeof(lib.partial), "%lu",
+             (unsigned long)(revision - 1));
+    if (car_revision && !strcmp(car_revision, lib.rev))
+    {
+        if (msg_start(LIBRARY_UPDATE))
+        {
+            param_str(0, LIBRARY_ID);
+            param_str(1, lib.rev);
+            param_u8(7, 100);
+            msg_send();
+        }
+        return;
+    }
+    lib.active = true;
+    lib.reset = true;
+    lib.next = 0;
+    lib.slots = iap_library_track_slots();
+    lib.mask = mask;
+    library_pump();
+}
+
+void usb_iap2_control_room(void)
+{
+    library_pump();
 }
 
 /* ---- now playing -------------------------------------------------------- */
@@ -720,7 +852,10 @@ static void send_now_playing(bool media)
     {
         group_start(0);
         if (media_mask & 1u << MI_PERSISTENT_ID)
-            param_u64(MI_PERSISTENT_ID, 0, np_key);
+        {
+            const uint64_t key = iap_library_key(id3->path);
+            param_u64(MI_PERSISTENT_ID, key >> 32, key);
+        }
         if (media_mask & 1u << MI_TITLE)
             param_str(MI_TITLE, track_title(id3));
         if (media_mask & 1u << MI_DURATION)
@@ -1123,8 +1258,25 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
     case START_LIBRARY_UPDATES:
         if (car_takes(LIBRARY_UPDATE))
         {
+            const uint8_t *rev = find(p, plen, 1, &n);
+            const bool has_rev = rev && n && !rev[n - 1];
             v = find(p, plen, 2, &n);
-            send_library_updates(wanted(v, n, 0x0A0FFFFF));
+            send_library_updates(wanted(v, n, 0x0A0FFFFF),
+                                 has_rev ? (const char *)rev : NULL);
+        }
+        break;
+    case STOP_LIBRARY_UPDATES:
+        lib.active = false;
+        break;
+    case PLAY_LIBRARY_ITEMS:
+        /* 0 the tracks' keys back to back, 1 the index to start at */
+        if ((v = find(p, plen, 0, &n)) && n >= 8)
+        {
+            const uint8_t *s;
+            size_t sn;
+            const uint32_t start = (s = find(p, plen, 1, &sn)) && sn == 4
+                                   ? get_be(s, 4) : 0;
+            iap_library_play_keys(v, n / 8, start);
         }
         break;
     case START_USB_AUDIO:
@@ -1179,4 +1331,5 @@ void usb_iap2_control_tick(void)
         send_rate(rate_wanted);
     if (identified && now_playing)
         poll_now_playing();
+    library_pump();
 }

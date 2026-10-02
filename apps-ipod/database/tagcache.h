@@ -239,6 +239,13 @@ bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
  * tagcache_find_key() takes path_key() of the path (database/path_key.h). */
 int  tagcache_find_path(const char *path);
 int  tagcache_find_key(uint64_t key);
+/* The whole database by its keys, slot by slot in key order: n from 0 to
+ * tagcache_path_slots(). An entry deleted since the load gives an idx_id of
+ * -1. False past the end, and whenever the RAM copy is not in use. */
+bool tagcache_path_slot(int n, uint64_t *key, int *idx_id);
+int  tagcache_path_slots(void);
+/* Commits so far: it changes whenever the database does. */
+int32_t tagcache_commit_id(void);
 /* A string tag of a found entry. False for <Untagged>, and for tag_filename:
  * under Quick there are no paths in RAM, so a caller needing the path reads
  * it with tagcache_retrieve(), one seek. */

@@ -338,7 +338,14 @@ bool usb_iap2_sent(int status, int length)
         tx_slot = NULL;
     }
     send_next();
+    if (link_up && count < SLOTS)
+        usb_iap2_control_room();
     return true;
+}
+
+size_t usb_iap2_room(void)
+{
+    return link_up ? SLOTS - count : 0;
 }
 
 uint8_t *usb_iap2_message_start(size_t *room)

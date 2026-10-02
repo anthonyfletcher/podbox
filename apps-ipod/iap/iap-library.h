@@ -35,4 +35,25 @@ bool iap_library_building(void);
 /* Frees the lists; called when the accessory goes. */
 void iap_library_close(void);
 
+/* The library as iAP2 sends it: every track, while the database is in RAM.
+ * A track's key is path_key() of its file, so it survives a rebuild and
+ * names the same track at every connection. */
+struct iap_library_track {
+    uint64_t key;       /* 0: no track in this slot, skip it */
+    const char *title, *album, *artist, *albumartist, *genre, *composer;
+    uint64_t album_id, artist_id, albumartist_id, genre_id, composer_id;
+    uint32_t length;    /* ms */
+    int tracknum, discnum;
+};
+/* Slots run from 0 to the count; false past the end or once the database
+ * leaves RAM. A name is NULL when untagged, and good until the next call. */
+int iap_library_track_slots(void);
+bool iap_library_track(int n, struct iap_library_track *t);
+/* Changes whenever the library does; 0 when it cannot be read. */
+uint32_t iap_library_revision(void);
+uint64_t iap_library_key(const char *path);
+/* Plays the tracks named by n keys, big-endian, from the start'th. False when
+ * none is in the database or a list is still being built. */
+bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start);
+
 #endif /* _IAP_LIBRARY_H_ */
