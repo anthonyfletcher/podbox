@@ -21,11 +21,12 @@
  * it is played from its start.
  *
  * Every list lives in one block, allocated the first time the database is
- * browsed and sized by Accessory Browsing, and freed when the accessory
- * goes. A list longer than the block is cut short. The block also holds the
- * stack of a thread that builds the Queue and the engine's playlists, which
- * take longer than an accessory waits for a reply; while it runs the Track
- * category is the Queue as it grows, and the database lists are refused.
+ * browsed or a car asks for a cover, sized by Accessory Browsing, and freed
+ * when the accessory goes. A list longer than the block is cut short. The
+ * block also holds the stack of a thread that builds the Queue and the
+ * engine's playlists, which take longer than an accessory waits for a reply;
+ * while it runs the Track category is the Queue as it grows, and the
+ * database lists are refused.
  *
  * Parts, in order:
  *   - the selection
@@ -62,7 +63,6 @@
 #include "metadata/albumart.h"
 #include "file.h"
 #include "rbpaths.h"
-#include "system/strutil.h"
 #include "iap-library.h"
 
 /* iAP's database categories */
@@ -191,7 +191,7 @@ static long play_book_seek;
 
 static void play_tracks(uint32_t start);
 static void play_mix(int mix);
-static void read_artwork(void);
+static void read_artwork(intptr_t request);
 
 static void worker(void)
 {
@@ -204,7 +204,7 @@ static void worker(void)
             return;
         if (ev.id == EV_ARTWORK)
         {
-            read_artwork();     /* the lists are not its to finish */
+            read_artwork(ev.data);  /* the lists are not its to finish */
             continue;
         }
         if (ev.id == EV_PLAY)
@@ -215,13 +215,15 @@ static void worker(void)
     }
 }
 
-static bool open_block(void)
+/* lists is whether the caller needs entries[]; without, Accessory Browsing
+ * Off still gets the worker and the buffers, with no entries */
+static bool open_block(bool lists)
 {
-    if (block)
-        return true;
-
     uint32_t n = size_entries[global_settings.iap_browse_size];
-    if (n == 0)
+
+    if (block)
+        return !lists || capacity > 0;
+    if (lists && n == 0)
         return false;
 
     /* Immovable: the thread's stack is in it */
@@ -408,21 +410,24 @@ static uint32_t merge_values(struct entry *e, uint32_t n)
 /* Fills entries[] with the list of one category under the selection above
  * it. The database search reads RAM only, so it is quick enough to run on
  * the accessory's thread; tagcache_search_ready() keeps it from waiting out
- * a commit there. */
+ * a commit there. A sort that reads two names a comparison is not: a list
+ * longer than NAME_SORT_MAX keeps the database's own order instead, by title
+ * for songs, and without the The/A/An skip for the rest. */
+#define NAME_SORT_MAX 2000
 static bool build(int type)
 {
     int level = type_level(type);
     bool books;
-    struct tagcache_marks marks;
+    int32_t commit = tagcache_commit_id();
 
     if (level < 0 || building)
         return false;
 
-    /* A commit while browsing moves every seek held here */
-    tagcache_get_marks(&marks);
-    if (marks.commitid != lists_commit)
+    /* A commit while browsing moves every seek held here. Read per record
+     * named, so the commit count alone: the marks walk the whole index. */
+    if (commit != lists_commit)
     {
-        lists_commit = marks.commitid;
+        lists_commit = commit;
         clear_chosen(0);
         list_type = 0;
     }
@@ -432,7 +437,10 @@ static bool build(int type)
         return true;
     list_type = 0;
 
-    if (!tagcache_is_in_ram() || !tagcache_search_ready() || !open_block())
+    /* The block first: allocating it can yield, and a commit begun in that
+     * gap would hold the search up on this thread */
+    if (!tagcache_is_in_ram() || !open_block(true) ||
+        !tagcache_search_ready())
         return false;
 
     int tag = level < LEVEL_COUNT ? level_tag[level] : tag_title;
@@ -475,14 +483,18 @@ static bool build(int type)
     tagcache_search_finish(tcs);
 
     if (level == LEVEL_COUNT)
+    {
+        if (n > NAME_SORT_MAX && (group_tag >= 0 || by_year))
+            title_only = true;
         qsort(e, n, sizeof(*e), compare_track);
+    }
     else
     {
         n = merge_values(e, n);
 
         /* The database keeps names in case-blind order already; only
          * Sort Ignoring The/A/An needs them read */
-        if (tagcache_tag_skips_articles(tag))
+        if (tagcache_tag_skips_articles(tag) && n <= NAME_SORT_MAX)
         {
             sort_tag = tag;
             qsort(e, n, sizeof(*e), compare_name);
@@ -698,11 +710,64 @@ static uint32_t find_catalog_playlist(uint32_t nth, char *name, size_t size)
     return n;
 }
 
+/* The catalogue's filenames as the Playlist category was last counted, one
+ * after another, so that naming a record reads RAM rather than the
+ * directory. A catalogue that does not fit is scanned for each name. */
+static char catalog_names[2048];
+static uint32_t catalog_count;
+static bool catalog_cached;
+
+static uint32_t count_catalog(void)
+{
+    DIR *dir = opendir(global_settings.playlist_catalog_dir);
+    size_t used = 0;
+
+    catalog_count = 0;
+    catalog_cached = false;
+    if (!dir)
+        return 0;
+
+    bool fits = true;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (!is_playlist_file(entry->d_name))
+            continue;
+        catalog_count++;
+        size_t len = strlen(entry->d_name) + 1;
+        if (fits && used + len <= sizeof(catalog_names))
+        {
+            memcpy(catalog_names + used, entry->d_name, len);
+            used += len;
+        }
+        else
+            fits = false;
+    }
+    closedir(dir);
+    catalog_cached = fits;
+    return catalog_count;
+}
+
+/* The nth (from 1) playlist's filename, or false */
+static bool catalog_name(uint32_t nth, char *name, size_t size)
+{
+    if (!catalog_cached)
+        return find_catalog_playlist(nth, name, size) == nth;
+    if (nth == 0 || nth > catalog_count)
+        return false;
+
+    const char *p = catalog_names;
+    while (--nth)
+        p += strlen(p) + 1;
+    strmemccpy(name, p, size);
+    return true;
+}
+
 static bool play_catalog_playlist(uint32_t nth)
 {
     char file[MAX_PATH];
 
-    if (find_catalog_playlist(nth, file, sizeof(file)) != nth)
+    if (!catalog_name(nth, file, sizeof(file)))
         return false;
 
     book_resume_save();
@@ -734,7 +799,7 @@ static bool playlist_record_name(uint32_t index, char *buf, size_t size)
     else
     {
         *buf = '\0';
-        find_catalog_playlist(index - PLAYLIST_QUEUE - folders, buf, size);
+        catalog_name(index - PLAYLIST_QUEUE - folders, buf, size);
         char *dot = strrchr(buf, '.');
         if (dot)
             *dot = '\0';
@@ -841,7 +906,7 @@ static bool folder_select(uint32_t index)
         return start_playing(0);
     }
 
-    if (!open_block())
+    if (!open_block(true))
         return false;
     folder = FOLDER_NONE;
     all_songs = false;
@@ -859,7 +924,7 @@ bool iap_library_count(int type, uint32_t *count)
     {
         folder_count_seen = find_folders(folder_rows);
         *count = PLAYLIST_QUEUE + 1 + folder_count_seen
-                 + find_catalog_playlist(0, NULL, 0);
+                 + count_catalog();
         return true;
     }
     if (type == TYPE_TRACK && iap_library_tracks_are_queue())
@@ -965,6 +1030,7 @@ void iap_library_close(void)
     block = NULL;
     capacity = 0;
     folder_count_seen = -1;
+    catalog_cached = false;
     iap_library_reset();
     all_songs = false;
 }
@@ -1016,7 +1082,10 @@ bool iap_library_track(int n, struct iap_library_track *t)
     for (int i = 0; i < 6; i++)
         if (tagcache_entry_string(idx, tags[i], track_names[i],
                                   sizeof(track_names[i])))
+        {
+            iap_utf8_cut(track_names[i]);
             *names[i] = track_names[i];
+        }
     if (tagcache_entry_numeric(idx, tag_length, &v) && v > 0)
         t->length = v;
     if (tagcache_entry_numeric(idx, tag_tracknumber, &v) && v > 0)
@@ -1044,6 +1113,10 @@ uint32_t iap_library_revision(void)
     int idx;
     uint32_t live = 0;
 
+    /* Accessory Browsing Off has no entries to play a car's choice from, so
+     * the car is sent no library, as when the database is not in RAM */
+    if (!size_entries[global_settings.iap_browse_size])
+        return 0;
     for (int n = 0; tagcache_path_slot(n, &key, &idx); n++)
         if (idx >= 0)
             live++;
@@ -1051,7 +1124,9 @@ uint32_t iap_library_revision(void)
         return 0;
     /* A deletion leaves the commit count alone, so the live count too */
     uint32_t rev = (uint32_t)tagcache_commit_id() << 20 ^ live;
-    return rev ? rev : 1;
+    /* 0 and 1 are the car's revisions for a partial library and for the
+     * playing track alone */
+    return rev > 1 ? rev : 2;
 }
 
 uint64_t iap_library_key(const char *path)
@@ -1061,7 +1136,7 @@ uint64_t iap_library_key(const char *path)
 
 bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
 {
-    if (building || !open_block() || !n)
+    if (building || !open_block(true) || !n)
         return false;
     if (global_settings.party_mode && audio_status())
         return false;
@@ -1112,6 +1187,7 @@ static struct {
     volatile int state;             /* IAP_ART_* */
     volatile bool cancel;
     volatile bool reading;          /* the worker is in read_artwork() */
+    unsigned request;               /* the latest find's number */
     volatile uint32_t size;
     uint8_t buf[ART_BUFS][ART_BLOCK];
     volatile size_t len[ART_BUFS];  /* bytes ready in each, 0 when free */
@@ -1129,11 +1205,16 @@ static int car_preference(void)
     return global_settings.car_artwork - 1;
 }
 
-static void read_artwork(void)
+static void read_artwork(intptr_t request)
 {
     int fd = -1;
     uint32_t left = 0;
 
+    /* Trap: a find that timed out can still be queued when the next is
+     * posted, and reading both fills the ring a second time with nobody
+     * left to drain it, which holds the worker until unplug */
+    if ((unsigned)request != art.request)
+        return;
     art.reading = true;
 #ifdef HAVE_PRIORITY_SCHEDULING
     /* Trap: at background priority the worker waits behind the codec and
@@ -1182,7 +1263,7 @@ static void read_artwork(void)
 
 bool iap_library_artwork_find(const struct mp3entry *id3)
 {
-    if (art.reading || building || !open_block())
+    if (art.reading || building || !open_block(false))
         return false;
     copy_mp3entry(&art_track, id3);
     art.cancel = false;
@@ -1191,7 +1272,7 @@ bool iap_library_artwork_find(const struct mp3entry *id3)
     art.rd = art.wr = 0;
     art.off = 0;
     art.state = IAP_ART_FINDING;
-    queue_post(&worker_q, EV_ARTWORK, 0);
+    queue_post(&worker_q, EV_ARTWORK, ++art.request);
     return true;
 }
 
@@ -1226,15 +1307,64 @@ void iap_library_artwork_stop(void)
  * the player's name                                                  *
  * ------------------------------------------------------------------ */
 
-void iap_player_name(char *buf, size_t size)
+#define PLAYER_NAME_FILE ROCKBOX_DIR "/playername.txt"
+
+/* Read once, at boot: an accessory asks mid-exchange, where a read could wait
+ * out the disk spinning up */
+static char player_name[32];
+
+void iap_player_name_load(void)
 {
-    int fd = open_utf8(ROCKBOX_DIR "/playername.txt", O_RDONLY);
-    buf[0] = '\0';
+    char raw[3 + sizeof(player_name)];
+    char *name = raw;
+    ssize_t got = -1;
+    int fd = open(PLAYER_NAME_FILE, O_RDONLY);
+
     if (fd >= 0)
     {
-        read_line(fd, buf, size);
+        got = read(fd, raw, sizeof(raw) - 1);
         close(fd);
     }
-    if (buf[0] == '\0')
-        strlcpy(buf, IAP_PLAYER_NAME_DEFAULT, size);
+    raw[got > 0 ? got : 0] = '\0';
+    if (!strncmp(raw, "\xEF\xBB\xBF", 3))
+        name += 3;
+    name[strcspn(name, "\r\n")] = '\0';
+    strlcpy(player_name, name, sizeof(player_name));
+    iap_utf8_cut(player_name);
+
+    /* Missing, empty or the model's name: PodBox's is written for the
+     * owner to change */
+    if (player_name[0] == '\0' || !strcmp(player_name, MODEL_NAME))
+    {
+        strlcpy(player_name, IAP_PLAYER_NAME_DEFAULT, sizeof(player_name));
+        fd = open(PLAYER_NAME_FILE, O_CREAT|O_WRONLY|O_TRUNC, 0666);
+        if (fd >= 0)
+        {
+            fdprintf(fd, "%s", player_name);
+            close(fd);
+        }
+    }
+}
+
+void iap_player_name(char *buf, size_t size)
+{
+    strlcpy(buf, player_name[0] ? player_name : IAP_PLAYER_NAME_DEFAULT,
+            size);
+    iap_utf8_cut(buf);
+}
+
+void iap_utf8_cut(char *s)
+{
+    size_t n = strlen(s), i = n;
+
+    while (i && ((unsigned char)s[i - 1] & 0xC0) == 0x80)
+        i--;
+    if (i && (unsigned char)s[i - 1] >= 0xC0)
+    {
+        unsigned char lead = s[i - 1];
+        size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : 2;
+
+        if (n - (i - 1) < need)
+            s[i - 1] = '\0';
+    }
 }

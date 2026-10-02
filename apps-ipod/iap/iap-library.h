@@ -49,7 +49,8 @@ struct iap_library_track {
  * leaves RAM. A name is NULL when untagged, and good until the next call. */
 int iap_library_track_slots(void);
 bool iap_library_track(int n, struct iap_library_track *t);
-/* Changes whenever the library does; 0 when it cannot be read. */
+/* Changes whenever the library does; 0 when it cannot be read or Accessory
+ * Browsing is Off. */
 uint32_t iap_library_revision(void);
 uint64_t iap_library_key(const char *path);
 /* Plays the tracks named by n keys, big-endian, from the start'th. False when
@@ -70,8 +71,13 @@ void iap_library_artwork_next(void);
 void iap_library_artwork_stop(void);
 
 /* The name every iAP transport gives an accessory: the first line of
- * playername.txt, or PodBox when it has none. */
+ * playername.txt as load read it at boot, PodBox's written there when it has
+ * none of its own. */
 #define IAP_PLAYER_NAME_DEFAULT "PodBox"
+void iap_player_name_load(void);
 void iap_player_name(char *buf, size_t size);
+
+/* Drops a UTF-8 character that copying a string cut short */
+void iap_utf8_cut(char *s);
 
 #endif /* _IAP_LIBRARY_H_ */

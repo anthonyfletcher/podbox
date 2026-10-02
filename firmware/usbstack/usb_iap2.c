@@ -51,6 +51,8 @@
 #include <string.h>
 #include "system.h"
 #include "kernel.h"
+#include "usb.h"
+#include "usb_core.h"
 #include "usb_drv.h"
 #include "usb_log.h"
 
@@ -157,9 +159,12 @@ void usb_iap_set_iap2_mode(int m)
     mode = m;
 }
 
+/* Not with Accessory Protocol off: the probe would hold the disk back from a
+ * car that is then offered no iAP configuration to use instead */
 bool usb_iap2_offered(void)
 {
-    return mode != USB_IAP2_MODE_OFF || forced != USB_IAP2_OFF;
+    return usb_core_driver_enabled(USB_DRIVER_IAP) &&
+           (mode != USB_IAP2_MODE_OFF || forced != USB_IAP2_OFF);
 }
 
 void usb_iap2_host_is_car(void)

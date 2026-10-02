@@ -86,6 +86,7 @@ int   iap_platform_send_hid_report(struct IAPContext* iap_ctx, const void* ptr, 
 
 /* system info */
 IAPBool iap_platform_get_ipod_serial_num(struct IAPContext* iap_ctx, struct IAPSpan* serial);
+IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* name);
 
 /* audio controls */
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status);

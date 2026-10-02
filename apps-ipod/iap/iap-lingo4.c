@@ -1298,7 +1298,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * a null-terminated UTF-8 encoded data array.
              */
         {
-            unsigned char data[7 + MAX_PATH] = {0x04, 0x00, 0x1B};
+            /* One record a packet, so a name is cut to what TX_BUFLEN holds;
+             * a longer one panics in iap_send_tx() */
+            unsigned char data[TX_BUFLEN] = {0x04, 0x00, 0x1B};
             char *name = (char *)&data[7];
             struct mp3entry id3;
             uint32_t total, read_count, start_index;
@@ -1331,10 +1333,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 if (queue)
                 {
                     iap_get_trackinfo(i, &id3);
-                    strmemccpy(name, id3.title ? id3.title : "", MAX_PATH);
+                    strmemccpy(name, id3.title ? id3.title : "",
+                               sizeof(data) - 7);
                 }
-                else if (!iap_library_name(buf[3], i, name, MAX_PATH))
+                else if (!iap_library_name(buf[3], i, name, sizeof(data) - 7))
                     *name = '\0';
+                iap_utf8_cut(name);
                 put_u32(&data[3], i);
                 iap_send_pkt(data, 7 + strlen(name) + 1);
                 yield();

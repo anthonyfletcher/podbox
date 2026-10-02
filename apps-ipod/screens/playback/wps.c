@@ -352,17 +352,26 @@ static bool peek_album(int steps, char *album, size_t size)
 
 /* Skips by album tag rather than by folder, so it works however the
  * playlist was built: forward to the first track of the next album, or back
- * to the first track of the one before the current album. */
+ * to the first track of the one before the current album. Each step can
+ * read the disk on the UI thread, so without the database in RAM it skips
+ * by folder instead, and it looks no further than ALBUM_SCAN_MAX tracks. */
+#define ALBUM_SCAN_MAX 200
+
 static void change_album(int direction)
 {
     struct wps_state *state = get_wps_state();
-    int amount = playlist_amount();
+    int amount = MIN(playlist_amount(), ALBUM_SCAN_MAX);
     char current[MAX_PATH];
     char album[MAX_PATH];
     int steps = direction;
 
     if (global_settings.prevent_skip || !state->id3)
         return;
+    if (!tagcache_is_in_ram())
+    {
+        change_dir(direction);
+        return;
+    }
     strlcpy(current, state->id3->album ? state->id3->album : "",
             sizeof(current));
 

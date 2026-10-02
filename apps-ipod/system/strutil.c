@@ -321,12 +321,9 @@ int open_utf8(const char* pathname, int flags)
     else
     {
         ret = read(fd, bom, BOM_UTF_8_SIZE);
-        /* check for BOM */
-        if (ret == BOM_UTF_8_SIZE)
-        {
-            if(memcmp(bom, BOM_UTF_8, BOM_UTF_8_SIZE))
-                lseek(fd, 0, SEEK_SET);
-        }
+        /* check for BOM; a file shorter than one is all text */
+        if (ret != BOM_UTF_8_SIZE || memcmp(bom, BOM_UTF_8, BOM_UTF_8_SIZE))
+            lseek(fd, 0, SEEK_SET);
     }
     /* read or write failure, do not continue */
     if (ret < 0)

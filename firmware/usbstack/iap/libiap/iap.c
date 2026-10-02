@@ -1,8 +1,6 @@
 #include <inttypes.h>
 #include <string.h>
 
-#include "misc.h"
-
 #include "constants.h"
 #include "endian.h"
 #include "iap.h"
@@ -226,19 +224,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
         } break;
         case IAPGeneralCommandID_RequestIPodName: {
-            // Note:  This should be pulled from .rockbox/playername.txt
-            char ipod_name[32] = "Rockbox";
-            int fd = open_utf8(ROCKBOX_DIR "/playername.txt", O_RDONLY);
-            if (fd >= 0) {
-                read_line(fd, ipod_name, sizeof(ipod_name));
-                close(fd);
-                ipod_name[sizeof(ipod_name)-1] = 0;
-            }
-
             check_ret(
-                iap_span_append(response_span,
-                                ipod_name,
-                                strlen(ipod_name) + 1),
+                iap_platform_get_ipod_name(ctx, response_span),
                 -IAPAckStatus_EOutOfResource
             );
 

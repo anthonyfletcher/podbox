@@ -86,6 +86,13 @@ IAPBool iap_platform_get_ipod_serial_num(struct IAPContext* iap_ctx, struct IAPS
     return iap_span_append(serial, serial_num, strlen(serial_num) + 1);
 }
 
+IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* name) {
+    (void)iap_ctx;
+    char buf[32];
+    iap_player_name(buf, sizeof(buf));
+    return iap_span_append(name, buf, strlen(buf) + 1);
+}
+
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
     struct Platform* plt = iap_ctx->platform;
 

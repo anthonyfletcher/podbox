@@ -32,7 +32,9 @@
  * - USB audio: the iAP sink takes playback and the player announces its
  *   rate, again whenever the sink changes rate;
  * - power: the answer to the car's StartPowerUpdates;
- * - media library: one library with nothing in it, until browsing exists;
+ * - media library: every track in the database, sent as the link has room,
+ *   the tracks the car picks played, and the playing track's cover sent as
+ *   a file transfer;
  * - now playing: the track's attributes the car asked for, whenever the
  *   track changes, and its playback attributes whenever the state changes
  *   or the position jumps;
@@ -392,8 +394,10 @@ static struct
     int next, slots;        /* the path index slot to send next, of */
     uint32_t mask;          /* the item properties the car asked for */
     char rev[12];           /* the revision once all is sent */
-    char partial[12];       /* and on the way */
 } lib;
+
+/* The revision on the way, which no whole library has */
+#define PARTIAL_REVISION "0"
 
 static bool audio_on;
 static volatile unsigned long rate_wanted;
@@ -658,7 +662,10 @@ static void library_pump(void)
             struct iap_library_track t;
             if (!iap_library_track(lib.next, &t))
             {
-                lib.active = false; /* the database has left RAM */
+                /* The database has left RAM: the tick sends it again, from
+                 * the start, once it is back */
+                lib.active = false;
+                lib.waiting = true;
                 break;
             }
             if (!t.key)
@@ -681,7 +688,7 @@ static void library_pump(void)
             items++;
         }
         const bool done = lib.active && lib.next >= lib.slots;
-        param_str(1, done ? lib.rev : lib.partial);
+        param_str(1, done ? lib.rev : PARTIAL_REVISION);
         param_u8(7, done ? 100 : 0);
         msg_send();
         if (done)
@@ -734,8 +741,6 @@ static void library_start(uint32_t revision, uint32_t mask,
 {
     lib.waiting = false;
     snprintf(lib.rev, sizeof(lib.rev), "%lu", (unsigned long)revision);
-    snprintf(lib.partial, sizeof(lib.partial), "%lu",
-             (unsigned long)(revision - 1));
     if (car_revision && !strcmp(car_revision, lib.rev))
     {
         if (msg_start(LIBRARY_UPDATE))
@@ -1131,7 +1136,9 @@ static void parse_hid(const uint8_t *d, size_t len)
                             controls[n_controls++] = (struct control){
                                 id, *at + k, 1, 1, usages[k] & 0xFFFF};
                 }
-                else
+                /* field() reads at most 32 bits, and each report is
+                 * compared count squared times */
+                else if (size && size <= 32 && count <= 16)
                     controls[n_controls++] = (struct control){
                         id, *at, size, count, usage_min - logical_min};
             }

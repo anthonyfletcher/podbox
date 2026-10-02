@@ -79,7 +79,6 @@
 
 #include "iap.h"
 #include "iap/iap-library.h"
-#include "system/strutil.h"
 #include "system/usb_log_file.h"
 
 #include "audio/audio_thread.h"
@@ -166,27 +165,9 @@ int main(void)
 #endif
 
     allocate_playback_log();
-    /* The name every accessory is given. A file that is missing, empty or
-     * holding the model name is given PodBox's; any other name is the
-     * owner's and stays. */
-    {
-        char name[32] = "";
-        int fd = open_utf8(ROCKBOX_DIR"/playername.txt", O_RDONLY);
-        if (fd >= 0)
-        {
-            read_line(fd, name, sizeof(name));
-            close(fd);
-        }
-        if (name[0] == '\0' || !strcmp(name, MODEL_NAME))
-        {
-            fd = open(ROCKBOX_DIR"/playername.txt", O_CREAT|O_WRONLY|O_TRUNC, 0666);
-            if (fd >= 0)
-            {
-                fdprintf(fd, "%s", IAP_PLAYER_NAME_DEFAULT);
-                close(fd);
-            }
-        }
-    }
+#if defined(USB_ENABLE_IAP) || defined(IPOD_ACCESSORY_PROTOCOL)
+    iap_player_name_load();
+#endif
 
     global_status.last_volume_change = 0;
     /* no calls INIT_ATTR functions after this point anymore!
