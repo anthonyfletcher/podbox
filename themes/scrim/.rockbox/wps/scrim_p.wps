@@ -75,9 +75,10 @@
 %V(238,6,76,24,4)
 %ar%?ps<H>%?mm<|J|J|J|J>
 #
-# Pause bars, in the background colour, centred on the cover
+# Pause bars, centred on the cover. Pinned white, like the fade under
+# them is pinned black: an album colour can match the darkened cover.
 %Vl(Paused,136,56,48,52,-)
-%dr(0,0,16,52,000000,-,15,3)%dr(32,0,16,52,000000,-,15,3)
+%dr(0,0,16,52,!ffffff,-,15,3)%dr(32,0,16,52,!ffffff,-,15,3)
 #
 # Volume overlay
 %Vl(Volume,0,0,320,35,5)%Vg(000000,000000,ffffff)

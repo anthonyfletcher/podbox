@@ -24,10 +24,8 @@
 %dr(60,214,200,6,c8c8c8)
 %dr(60,220,200,6,b8b8b8)
 #
-#- Cover or grey tile, and the reflection fade. Same size as the .sbs cover
-%?C<|%dr(8,32,150,150,d8d8d8,a0a0a0)>
+#- Reflection fade under the cover
 %dr(8,184,150,22,e4e4e4,ffffff)
-%Cl(8,32,150,150,c,c)%Cd
 #
 #Foreground layer
 #
@@ -43,9 +41,11 @@
 %V(198,0,120,23,2)%Vf(000000)
 %ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
 #
-#- Grey tile's note
-%V(71,95,24,24,2)%Vf(ffffff)
-%?C<|b>
+#- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
+#  nothing here copies to screen once the art arrives
+%V(8,32,150,150,2)%Vy%Vg(d8d8d8,a0a0a0,ffffff)
+%?C<|%ac%Vs(gradient)b>
+%Cl(0,0,150,150,c,c)%Cd
 #
 #Track
 #

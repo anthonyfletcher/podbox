@@ -72,10 +72,10 @@
 %?if(%ft(themes/scrim.preferences,play-pause icon:),=,next)<%?mp<C|B|A|G|F>|%?mp<C|A|B|G|F>>%?ps<H>%?mm<|J|J|J|J>
 #
 # Spectrum analyser, with 2px peak caps unless spectrum peaks: off. The
-# caps' 262626 sits close to the background: dynamic colours keep a grey's
-# contrast with it, so a darker grey here is a fainter cap.
+# caps are grey: dynamic colours keep a grey's contrast with the
+# background, so a darker grey here is a fainter cap.
 %V(0,200,80,40,-)
-%?if(%ft(themes/scrim.preferences,spectrum peaks:),=,off)<%Sb(8,-,-,0)|%Sb(8,-,-,0,2,262626)>
+%?if(%ft(themes/scrim.preferences,spectrum peaks:),=,off)<%Sb(8,-,-,0)|%Sb(8,-,-,0,2,333333)>
 #
 # Volume overlay
 %Vl(Volume,0,0,320,35,5)%Vg(000000,000000,ffffff)
