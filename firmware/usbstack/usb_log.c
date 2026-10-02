@@ -16,8 +16,9 @@
  *
  ****************************************************************************/
 
-/* The USB event ring. Writers are the USB interrupt and the USB thread; the
- * one reader is the USB Log screen on the UI thread, which owns the file. */
+/* The USB event ring. Writers are the USB interrupt, the USB thread and, on
+ * the 5G, the PCM FIQ, so both mask FIQ too; the readers are the USB Log
+ * screen and the log's writer thread, and usb_log_file.c owns the file. */
 
 #include "system.h"
 #include "kernel.h"
@@ -31,7 +32,7 @@ static volatile bool attached;
 
 void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
 {
-    int oldlevel = disable_irq_save();
+    int oldlevel = disable_interrupt_save(IRQ_FIQ_STATUS);
     struct usb_log_entry *e = &ring[head % USB_LOG_SIZE];
     e->us = (uint32_t)USEC_TIMER;
     e->type = type;
@@ -40,7 +41,7 @@ void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
     e->c = c;
     e->d = d;
     head++;
-    restore_irq(oldlevel);
+    restore_interrupt(oldlevel);
 }
 
 void usb_log_sync(void)
@@ -72,11 +73,11 @@ unsigned long usb_log_head(void)
 /* False when the entry has been overwritten, or is being. */
 bool usb_log_read(unsigned long seq, struct usb_log_entry *e)
 {
-    int oldlevel = disable_irq_save();
+    int oldlevel = disable_interrupt_save(IRQ_FIQ_STATUS);
     bool ok = seq < head && head - seq <= USB_LOG_SIZE;
     if (ok)
         *e = ring[seq % USB_LOG_SIZE];
-    restore_irq(oldlevel);
+    restore_interrupt(oldlevel);
     return ok;
 }
 

@@ -525,8 +525,10 @@ static struct event_queue writer_queue;
 
 #define Q_WRITER_WAKE 1
 
+static bool started;            /* usb_log_file_init() has run */
 static bool screen_open;
 static bool writer_parked;
+static bool have_writer;
 
 /* usb_log_sync() waits only while something is draining the ring. The writer
  * stops draining while a host has the disk, and a sync then would stall the
@@ -534,7 +536,8 @@ static bool writer_parked;
 static void update_attach(void)
 {
     usb_log_attach(screen_open
-                   || (global_settings.debug_log_usb && !writer_parked));
+                   || (global_settings.debug_log_usb && have_writer
+                       && !writer_parked));
 }
 
 static void writer_thread(void)
@@ -578,22 +581,33 @@ void usb_log_file_screen(bool open)
 
 void usb_log_file_enable(bool on)
 {
+    /* settings_load() calls this before init, which applies the setting
+     * once the sound card's buffers exist for the header to report */
+    if (!started)
+        return;
     if (on)
         write_header("switched on");
     update_attach();
-    queue_post(&writer_queue, Q_WRITER_WAKE, 0);
+    if (have_writer)
+        queue_post(&writer_queue, Q_WRITER_WAKE, 0);
 }
 
 void usb_log_file_init(void)
 {
     mutex_init(&file_mutex);
     queue_init(&writer_queue, true);
+
+    /* Above the background workers, so a sync is not left waiting behind a
+     * database pass. Without a thread the queue leaves the broadcast list,
+     * or the disk handover waits for an ack nobody sends. */
+    if (!create_thread(writer_thread, writer_stack, sizeof(writer_stack), 0,
+                       writer_name IF_PRIO(, PRIORITY_SYSTEM)
+                       IF_COP(, CPU)))
+        queue_delete(&writer_queue);
+    else
+        have_writer = true;
+    started = true;
     if (global_settings.debug_log_usb)
         write_header("started");
     update_attach();
-
-    /* Above the background workers, so a sync is not left waiting behind a
-     * database pass. */
-    create_thread(writer_thread, writer_stack, sizeof(writer_stack), 0,
-                  writer_name IF_PRIO(, PRIORITY_SYSTEM) IF_COP(, CPU));
 }

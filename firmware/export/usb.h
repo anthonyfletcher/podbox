@@ -271,8 +271,10 @@ void usb_record_waypoint(enum usb_waypoint w, int a, int b);
 const struct usb_insert_record *usb_get_insert_record(void);
 #ifdef HAVE_USBSTACK
 /* Give the port to the USB host probe (true) or back to the device stack.
- * While the probe has it, cable insertion and removal are ignored. */
+ * While the probe has it, an insertion is ignored and a removal only re-arms
+ * the DAC check. */
 void usb_set_host_probe(bool on);
+bool usb_host_probe_active(void);
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
 /* Whether a cable that no computer answers is tried as a USB DAC:

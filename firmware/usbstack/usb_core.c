@@ -1550,8 +1550,9 @@ void usb_core_control_cancelled(void)
 
 void usb_core_setup_received(struct usb_ctrlrequest* req) {
 #ifndef BOOTLOADER
-    /* Every control request the host makes lands here first, so this answers
-     * "did the host talk to us at all" independently of what we did next. */
+    /* Every control request but SET_ADDRESS, which the controller driver
+     * takes first, lands here, so this answers "did the host talk to us at
+     * all" independently of what we did next. */
     usb_record_waypoint(USB_WP_SETUP, req->bRequest, 0);
 #endif
     usb_log(USB_LOG_SETUP, req->bRequestType, req->bRequest,
@@ -1661,7 +1662,15 @@ void usb_charging_enable(int state)
 
 int usb_charging_maxcurrent(void)
 {
-    if (!initialized || usb_charging_mode == USB_CHARGING_DISABLE)
+    if (usb_charging_mode == USB_CHARGING_DISABLE)
+        return 100;
+#ifndef BOOTLOADER
+    /* The player never powers the port, so 5V on it in host mode is a
+     * charger's */
+    if (usb_host_probe_active())
+        return usb_detect() != USB_EXTRACTED ? 500 : 100;
+#endif
+    if (!initialized)
         return 100;
     if (usb_state == CONFIGURED)
         return usb_charging_current_requested;

@@ -23,7 +23,7 @@
 
 /* The device side of a USB connection, event by event: every control request
  * and how it was answered, endpoint allocation, the controller's endpoint
- * setup, and the audio stream. Callable from interrupt context. The debug
+ * setup, and the audio stream. Callable from IRQ and FIQ context. The debug
  * menu's USB Log screen shows it; the application appends it to a file while
  * that screen is open or its Write Debug Log setting is on.
  *
@@ -172,8 +172,8 @@ void usb_log(int type, int a, int b, uint32_t c, uint32_t d);
  * nothing is writing or the host has the disk. */
 void usb_log_sync(void);
 
-/* For the screen. Sequence numbers count every entry since boot; the ring
- * keeps the most recent USB_LOG_SIZE. */
+/* For the screen and the file. Sequence numbers count every entry since boot;
+ * the ring keeps the most recent USB_LOG_SIZE. */
 #define USB_LOG_SIZE 512
 unsigned long usb_log_head(void);
 bool usb_log_read(unsigned long seq, struct usb_log_entry *e);

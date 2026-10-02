@@ -133,8 +133,8 @@ struct usb_drv_hw_info {
 };
 const struct usb_drv_hw_info *usb_drv_get_hw_info(void);
 
-/* The host probe: the controller as a USB host, root port status only, no
- * transfers. The target's usb_host_probe_enable() clocks the controller and
+/* The host probe: the controller as a USB host to one device on its root
+ * port. The target's usb_host_probe_enable() clocks the controller and
  * calls the driver's start and stop; only the USB thread calls it, and only
  * with the device stack disabled. usb_drv_host_poll() may be called from any
  * thread; it resets a newly connected device once, busy-waiting through the
@@ -173,9 +173,9 @@ const struct usb_drv_host_enum *usb_host_get_enum(void);
 void usb_host_enumerate(void);
 void usb_host_enum_clear(void);
 
-/* A control transfer to endpoint 0 of a high-speed device. Returns the
- * data-stage byte count, or -1; usb_drv_host_last_status() then holds the
- * controller's raw status for the stage that failed. */
+/* A control transfer to endpoint 0 of a high- or full-speed device. Returns
+ * the data-stage byte count, or -1; usb_drv_host_last_status() then holds
+ * the controller's raw status for the stage that failed. */
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len);
 uint32_t usb_drv_host_last_status(void);
@@ -199,7 +199,7 @@ struct usb_drv_host_iso {
     int ep_out, mps_out, interval_out;  /* in (micro)frames, 1-8 */
     int ep_fb, mps_fb, interval_fb;     /* ep_fb 0: no feedback */
     int frame_bytes;                    /* one sample frame, all channels */
-    uint32_t nominal;                   /* samples per microframe, 16.16 */
+    uint32_t nominal;                   /* samples per (micro)frame, 16.16 */
     bool (*begin)(void);
     void (*fill)(uint8_t *dst, int frames);
     void (*lost)(void);
@@ -207,10 +207,10 @@ struct usb_drv_host_iso {
 struct usb_drv_host_iso_stats {
     bool running;
     bool lost;              /* the device disconnected */
-    uint32_t feedback;      /* in use, samples per microframe, 16.16 */
+    uint32_t feedback;      /* in use, samples per (micro)frame, 16.16 */
     uint32_t fb_raw;        /* last value received */
     unsigned fb_ok, fb_bad;
-    unsigned frames;        /* 1 ms frames queued */
+    unsigned frames;        /* frames queued, OUT packets on DesignWare */
     unsigned underruns;     /* times the refill fell behind the controller */
     unsigned errors;        /* transactions completed with an error bit */
 };

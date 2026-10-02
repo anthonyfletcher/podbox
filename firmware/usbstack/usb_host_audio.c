@@ -113,7 +113,13 @@ static uint32_t nominal(unsigned long rate)
     return ((uint64_t)rate << 16) / sof_per_second;
 }
 
-/* Class 1: SET_CUR on the endpoint, then read it back for the screen */
+/* False when the DAC read back a rate other than the one just set */
+static bool rate_taken(void)
+{
+    return status.rate_read == 0 || status.rate_read == status.rate_set;
+}
+
+/* Class 1: SET_CUR on the endpoint, then read it back */
 static bool set_dac_rate_uac1(unsigned long rate)
 {
     uint8_t b[3] = { rate, rate >> 8, rate >> 16 };
@@ -130,10 +136,10 @@ static bool set_dac_rate_uac1(unsigned long rate)
                              USB_RECIP_ENDPOINT, UAC1_GET_CUR, UAC2_SAM_FREQ,
                              status.ep_rate, b, 3) == 3)
         status.rate_read = b[0] | (b[1] << 8) | (b[2] << 16);
-    return true;
+    return rate_taken();
 }
 
-/* Class 2: SET_CUR on the clock source, then read it back for the screen */
+/* Class 2: SET_CUR on the clock source, then read it back */
 static bool set_dac_rate(unsigned long rate)
 {
     int index = (status.clock << 8) | status.ac_iface;
@@ -154,7 +160,62 @@ static bool set_dac_rate(unsigned long rate)
                              index, b, 4) == 4)
         status.rate_read = b[0] | (b[1] << 8) | (b[2] << 16) |
                            ((uint32_t)b[3] << 24);
-    return true;
+    return rate_taken();
+}
+
+static uint32_t get_le32(const uint8_t *p)
+{
+    return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+/* Class 2: the rates the clock's RANGE lists, as wNumSubRanges then dMIN,
+ * dMAX and dRES each. A clock that will not say is taken to have both. */
+static int uac2_rates(void)
+{
+    static uint8_t b[2 + 12 * 16];
+    static const unsigned long want[2] = { SAMPR_48, SAMPR_44 };
+    int index = (status.clock << 8) | status.ac_iface;
+    int got, n, i, rates = 0;
+
+    if (status.clock < 0)
+        return RATE_48 | RATE_44;
+    got = usb_drv_host_control(DEV_ADDR, USB_DIR_IN | USB_TYPE_CLASS |
+                               USB_RECIP_INTERFACE, UAC2_RANGE,
+                               UAC2_SAM_FREQ, index, b, sizeof b);
+    if (got < 2)
+        return RATE_48 | RATE_44;
+    n = b[0] | (b[1] << 8);
+    for (i = 0; i < n && 2 + 12 * i + 12 <= got; i++)
+    {
+        const uint8_t *r = &b[2 + 12 * i];
+        uint32_t lo = get_le32(r), hi = get_le32(r + 4);
+        uint32_t res = get_le32(r + 8);
+
+        for (int k = 0; k < 2; k++)
+            if (lo <= want[k] && want[k] <= hi &&
+                (res == 0 || (want[k] - lo) % res == 0))
+                rates |= k == 0 ? RATE_48 : RATE_44;
+    }
+    return i ? rates : RATE_48 | RATE_44;
+}
+
+/* The sink's rates from a setting's, 44.1 kHz the default where there is a
+ * choice */
+static void offer_rates(int rates)
+{
+    if ((rates & (RATE_48 | RATE_44)) == (RATE_48 | RATE_44))
+    {
+        usb_host_pcm_sink.caps.samprs = samprs_both;
+        usb_host_pcm_sink.caps.num_samprs = ARRAYLEN(samprs_both);
+        usb_host_pcm_sink.caps.default_freq = 1;
+    }
+    else
+    {
+        usb_host_pcm_sink.caps.samprs =
+            rates & RATE_44 ? samprs_44 : samprs_48;
+        usb_host_pcm_sink.caps.num_samprs = 1;
+        usb_host_pcm_sink.caps.default_freq = 0;
+    }
 }
 
 /* A feature unit can start muted or low, and the player applies its own
@@ -294,10 +355,17 @@ static void sink_fill(uint8_t *dst, int frames)
     }
 }
 
+static void sink_lost(void);
+
+/* A rate the DAC refuses twice would have it play the mixer's samples at
+ * its own rate, so playback goes back to the headphones as for an
+ * unplugged DAC; the debug screen keeps the rate set and read. */
 static void sink_set_freq(uint16_t freq)
 {
-    if (set_dac_rate(sink_rate(freq)))
+    if (set_dac_rate(sink_rate(freq)) || set_dac_rate(sink_rate(freq)))
         usb_drv_host_iso_set_nominal(nominal(sink_rate(freq)));
+    else
+        sink_lost();
 }
 
 static void sink_lock(void)
@@ -447,7 +515,7 @@ static bool find_setting(const struct usb_drv_host_enum *e,
             cur.iface = c[2];
             cur.alt = c[3];
             cur.uac = c[7] == 0x20 ? 2 : 1;
-            /* class 2 rates are whatever its clock is set to */
+            /* class 2 rates are the clock's, asked for at start */
             cur.rates = cur.uac == 2 ? RATE_48 | RATE_44 : 0;
             in_ac = c[5] == 1 && c[6] == 1;
             in_as = c[5] == 1 && c[6] == 2 && (c[7] == 0x20 || c[7] == 0);
@@ -570,20 +638,10 @@ bool usb_host_audio_start(void)
     status.ep_rate = as.uac == 1 && as.rate_ctl ? as.ep_out : 0;
     sof_per_second = usb_drv_host_high_speed() ? 8000 : 1000;
 
-    /* 44.1 kHz is the default wherever the DAC has it */
-    if ((as.rates & (RATE_48 | RATE_44)) == (RATE_48 | RATE_44))
-    {
-        usb_host_pcm_sink.caps.samprs = samprs_both;
-        usb_host_pcm_sink.caps.num_samprs = ARRAYLEN(samprs_both);
-        usb_host_pcm_sink.caps.default_freq = 1;
-    }
-    else
-    {
-        usb_host_pcm_sink.caps.samprs =
-            as.rates & RATE_44 ? samprs_44 : samprs_48;
-        usb_host_pcm_sink.caps.num_samprs = 1;
-        usb_host_pcm_sink.caps.default_freq = 0;
-    }
+    if (as.uac == 2)
+        as.rates = uac2_rates();
+    STEP("no 44.1 or 48 kHz", as.rates & (RATE_48 | RATE_44));
+    offer_rates(as.rates);
 #define DEFAULT_FREQ (usb_host_pcm_sink.caps.default_freq)
 
     STEP("set interface",
@@ -591,7 +649,17 @@ bool usb_host_audio_start(void)
                               USB_REQ_SET_INTERFACE, as.alt, as.iface,
                               NULL, 0) == 0);
 
-    STEP("set rate", set_dac_rate(sink_rate(DEFAULT_FREQ)));
+    /* A clock can list 44.1 kHz and still refuse it: then 48 alone */
+    if (!set_dac_rate(sink_rate(DEFAULT_FREQ)))
+    {
+        STEP("set rate", as.rates == (RATE_48 | RATE_44));
+        offer_rates(RATE_48);
+        STEP("set rate", set_dac_rate(sink_rate(DEFAULT_FREQ)));
+    }
+    /* Trap: left at the last session's rate, the switch below finds nothing
+     * to change and never sets the DAC to the mixer's rate. It also indexes
+     * this session's rate table, which can be shorter. */
+    usb_host_pcm_sink.configured_freq = DEFAULT_FREQ;
     dac_unmute();
 
     memset(&iso, 0, sizeof iso);

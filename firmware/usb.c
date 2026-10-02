@@ -324,9 +324,10 @@ static inline void usb_configure_drivers(int for_state)
         /* Answering iAP2, no disk: a car selects configuration 1 before the
          * iAP one, and an iPhone's is PTP, so it takes nothing. Handing the
          * disk over unmounts it, stops playback and remounts it as the car
-         * moves on. */
+         * moves on. Accessory Protocol off answers no iAP2 at all. */
         usb_core_enable_driver(USB_DRIVER_MASS_STORAGE,
 #ifdef USB_ENABLE_IAP
+                               !usb_iap ||
                                usb_iap_answer_iap2() == USB_IAP2_OFF
 #else
                                true
@@ -547,6 +548,11 @@ void usb_set_host_probe(bool on)
     queue_post(&usb_queue, USB_HOST_PROBE, on);
 }
 
+bool usb_host_probe_active(void)
+{
+    return usb_host_probe_on;
+}
+
 static void usb_host_probe_switch(bool on)
 {
     if(on == usb_host_probe_on)
@@ -558,12 +564,10 @@ static void usb_host_probe_switch(bool on)
         usb_extract();
         usb_host_probe_enable(true);
 #ifdef HAVE_USB_CHARGING_ENABLE
-        /* The player never powers the port, so 5V on it now is a
-         * charger's. usb_extract() dropped the charge current to 100 mA
-         * with the device stack, and on the 6G that also stops the battery
-         * charging: commit to 500, as a computer's configuration would. */
-        if(usb_detect() != USB_EXTRACTED)
-            usb_charging_maxcurrent_change(500);
+        /* usb_extract() dropped the charge current with the device stack,
+         * which on the 6G also stops the battery charging;
+         * usb_charging_maxcurrent() answers for the probe */
+        usb_charging_maxcurrent_change(usb_charging_maxcurrent());
 #endif
         return;
     }
@@ -1277,13 +1281,12 @@ void usb_set_hid(bool enable)
 #endif /* USB_ENABLE_HID */
 
 #ifdef USB_ENABLE_IAP
-/* Takes effect at the next connection: the driver is only ever switched on
- * with the cable inserted, so turning it on here would offer it charge-only. */
+/* Takes effect at the next connection, either way: on here would offer the
+ * driver charge-only, and off mid-connection would skip its disconnect at
+ * unplug, leaving the mixer on the iAP sink. */
 void usb_set_iap(bool enable)
 {
     usb_iap = enable;
-    if (!enable)
-        usb_core_enable_driver(USB_DRIVER_IAP, false);
 }
 
 void usb_set_iap2_mode(int mode)

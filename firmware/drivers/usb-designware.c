@@ -1819,6 +1819,8 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
     iso_cfg = *iso;
     if (iso_cfg.interval_fb < 1)
         iso_cfg.interval_fb = 8;
+    /* A longer feedback packet is then babble, not a DMA past fb[] */
+    iso_cfg.mps_fb = MIN(iso->mps_fb, (int)sizeof iso_dma->fb);
     memset(&iso_stats, 0, sizeof iso_stats);
     iso_stats.feedback = iso->nominal;
     iso_acc = 0;

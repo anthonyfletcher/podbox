@@ -542,10 +542,10 @@ static void read_hw_info(void)
     hw_info.nregs = 4;
 }
 
-/* Host probe. The controller is an EHCI host with one root port and no
- * transaction translator, so only high-speed devices are expected to
- * enable. PORTSC1's change bits clear when written as 1, and writing PE as
- * 1 does nothing, so every write masks all four. */
+/* Host probe. The controller is an EHCI host with one root port; a
+ * full-speed device is reached through its transaction translator
+ * (HOST_TT_PORT). PORTSC1's change bits clear when written as 1, and writing
+ * PE as 1 does nothing, so every write masks all four. */
 #define PORTSCX_WRITE_MASK (PORTSCX_CONNECT_STATUS_CHANGE | \
                             PORTSCX_PORT_ENABLE | \
                             PORTSCX_PORT_EN_DIS_CHANGE | \
@@ -640,9 +640,9 @@ static void qtd_fill(struct ehci_qtd *qtd, void *next, void *alt,
         qtd->buf[i] = (a & ~0xfff) + i * 0x1000;
 }
 
-/* One control transfer to endpoint 0 of a high-speed device, on an async
- * schedule holding one queue head. Returns the data-stage byte count, or
- * -1 with host_last_status set from the qTD that halted or never
+/* One control transfer to endpoint 0 of a high- or full-speed device, on an
+ * async schedule holding one queue head. Returns the data-stage byte count,
+ * or -1 with host_last_status set from the qTD that halted or never
  * finished. */
 static int host_control(int addr, int reqtype, int req, int value,
                         int index, int len)
@@ -763,7 +763,8 @@ struct ehci_sitd {
 #define SITD_LEN(n)     ((n) << 16)
 
 /* The periodic schedule. Every frame-list entry for frame f leads to the
- * feedback iTD then the OUT iTD of slot f % ISO_SLOTS. The refill keeps
+ * feedback iTD then the OUT iTD of slot f % ISO_SLOTS, or at full speed to
+ * the slot's siTD. The refill keeps
  * between 2 and ISO_AHEAD frames queued, so it never rewrites the slot the
  * controller is on. Each slot's buffer lies inside one 4 KB page, so every
  * transaction uses page pointer 0. */
@@ -943,6 +944,8 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
 
     iso_dma = UNCACHED_ADDR(&host_iso_mem);
     iso_cfg = *iso;
+    /* A longer feedback packet is then babble, not a write past fbbuf */
+    iso_cfg.mps_fb = MIN(iso->mps_fb, (int)sizeof iso_dma->fbbuf[0]);
     memset(&iso_stats, 0, sizeof iso_stats);
     memset(iso_fb_armed, 0, sizeof iso_fb_armed);
     iso_stats.feedback = iso->nominal;
@@ -961,7 +964,7 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
         itd_init(&iso_dma->out[s], iso_dma->buf[s], iso->ep_out, 0,
                  iso->mps_out);
         itd_init(&iso_dma->fb[s], &iso_dma->fbbuf[s], iso->ep_fb & 0xf,
-                 ITD_DIR_IN, iso->mps_fb);
+                 ITD_DIR_IN, iso_cfg.mps_fb);
         iso_dma->fb[s].next = (uint32_t)&iso_dma->out[s];
     }
     for (int i = 0; i < 1024; i++)
