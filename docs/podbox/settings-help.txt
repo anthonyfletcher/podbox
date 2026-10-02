@@ -1212,6 +1212,28 @@ Answers docks, car kits and remotes that speak Apple's accessory protocol, over
 the dock connector or USB. Off, they get no reply: a dock charges but will not
 play or take its remote. Changes to USB take effect at the next connection.
 
+[iap2 accessories]
+Answers cars and other accessories that expect an iPhone, over USB. Auto
+knows a car by a request of Apple's that a car sends and a computer does
+not, and waits a second before handing a computer the disk, so a car never
+takes it. On answers any accessory that asks and never offers the disk.
+Off answers none, as an iPod does.
+
+[accessory browsing]
+Lets a receiver, car or dock browse artists, albums, genres, composers and
+audiobooks, and play Playlist Engine moods, up to this many songs in a list.
+Its memory is taken when browsing starts, which briefly rebuffers playback, and
+given back on unplugging. Needs the database in RAM. Off offers only the Queue
+and saved playlists.
+
+[car artwork]
+The cover a car shows with each track, sent over Apple's accessory protocol.
+As Album Art takes it from where the Album Art setting does; the other
+choices set an order for the car alone. Off sends none, and a car that looks
+covers up itself shows its own. A car takes about 140 KB a second, so a large
+image takes seconds to appear. The cache holds no JPEG, so Prefer Cache sends
+embedded art or an image file.
+
 [serial bitrate]
 The speed of the dock connector's serial line. Auto suits every accessory that
 follows the standard.
