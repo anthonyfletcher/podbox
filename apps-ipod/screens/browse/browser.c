@@ -1217,13 +1217,6 @@ static int dirbrowse(void)
                     else
                         return exit_to_new_screen(shortcut_ret);
                 }
-                else if (enter_shortcuts_menu) /* currently disabled */
-                {
-                    /* QuickScreen defers skin updates, popping its activity, when
-                       switching to Shortcuts Menu, so make up for that here:   */
-                    FOR_NB_SCREENS(i)
-                        skin_update(CUSTOM_STATUSBAR, i, SKIN_REFRESH_ALL);
-                }
 
                 restore = do_restore_display;
                 break;

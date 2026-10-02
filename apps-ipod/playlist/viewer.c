@@ -1110,16 +1110,11 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                 ret = PLAYLIST_VIEWER_MAINMENU;
                 goto exit;
             case ACTION_STD_QUICKSCREEN:
+                    /* Shortcuts are not offered from here, so a request for
+                       them from the quickscreen is ignored */
                     if (!global_settings.shortcuts_replaces_qs)
                     {
-                        if (quick_screen_quick(button) ==
-                            QUICKSCREEN_GOTO_SHORTCUTS_MENU) /* currently disabled */
-                        {
-                            /* QuickScreen defers skin updates when popping its activity
-                               to switch to Shortcuts Menu, so make up for that here: */
-                            FOR_NB_SCREENS(i)
-                                skin_update(CUSTOM_STATUSBAR, i, SKIN_REFRESH_ALL);
-                        }
+                        quick_screen_quick(button);
                         update_playlist(true);
                         update_gui(&playlist_lists, true);
                     }
