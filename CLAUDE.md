@@ -155,7 +155,7 @@ is the one-page state of it, and names the specification for each:
   remote drives the player.
 
 Both iAP transports sit behind one setting, **Accessory Protocol**, on by
-default. **Debug > USB log** and **Debug > Debug IAP** are the diagnostics;
+default. **Debug > USB log** and **Debug > Serial iAP** are the diagnostics;
 keep them.
 
 ## Build Commands

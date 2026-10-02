@@ -78,9 +78,8 @@ void piezo_button_beep(bool beep, bool force)
     (void)force;
 }
 
-/* Debug > View I/O ports. Defined per target under firmware/target/, none of
- * which is built here. Returning false leaves the debug menu on screen, which
- * is what every other unavailable entry does. */
+/* main.c's storage-failure screen. Defined per target under firmware/target/,
+ * none of which is built here. */
 bool dbg_ports(void)
 {
     return false;

@@ -49,11 +49,10 @@ across the change.
 `screens/system/debug_menu.c` builds, with its target-only screens guarded out
 the way upstream guards them — the disk and S.M.A.R.T. screens behind
 `PLATFORM_NATIVE`, the battery graph behind `!SIMULATOR` (its second half reads
-PP GPIO registers directly), the wheel and IAP screens likewise, `dbg_cpufreq`
-behind `HAVE_ADJUSTABLE_CPU_FREQ`, and the 6G SysCfg/bootflash pair behind
-`!SIMULATOR`. What is left is everything portable: **Skin Engine RAM usage**,
-Screendump, View OS stacks, View buflib allocs, the dircache and database
-screens and the metadata log.
+PP GPIO registers directly), the wheel screen likewise, and the 6G
+SysCfg/bootflash pair behind `!SIMULATOR`. What is left is everything
+portable: **Skin memory**, Screendump on USB, Threads, Buffers and CPU, the
+database and directory cache screens and the metadata log.
 
 Guarding a screen's menu entry alone is not enough here. Upstream can do that
 because an unreferenced `static` is discarded silently; this fork's warnings

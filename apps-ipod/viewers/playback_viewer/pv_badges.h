@@ -185,8 +185,4 @@ int  pv_badges_new_index(int k);       /* the k'th new badge, or -1 */
  * actually looked, so "NEW" survives until then. */
 void pv_badges_save(void);
 
-/* Mark every unlocked badge unannounced again, keeping the earned dates.
- * A test hook: nothing but the debug menu should call it. */
-void pv_badges_rearm(void);
-
 #endif /* _PV_BADGES_H */

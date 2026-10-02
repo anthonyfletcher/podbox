@@ -11,8 +11,10 @@
  * Almost every entry is one self-contained dbg_*() function that puts up a
  * list and returns when the user backs out, so entries are largely
  * independent of one another and of everything else -- read only the one you
- * care about. Screens that refresh live do so by returning a formatted string
- * from a getname callback the list widget polls, rather than drawing.
+ * care about. Screens that refresh live rebuild their lines from the list's
+ * action callback, which the list calls on every timeout, rather than drawing.
+ * A list keeps the theme; the few that draw on the LCD are marked in the menu
+ * and get the screen to themselves.
  *
  * The menu itself is assembled at the very bottom of the file; that is the
  * index to what is here.
@@ -20,10 +22,10 @@
  * Parts, in order:
  *   - threads, OS and CPU state
  *   - buffering, buflib allocations and partitions
- *   - power: PMU registers, CPU frequency, battery history
+ *   - power: battery history
  *   - disk: SMART attributes, identify data, dircache and tagcache stats
- *   - dumps and logs: ROM, screendump, metadata log
- *   - input, voice, USB and stored config
+ *   - toggles: screendump, metadata log
+ *   - input, USB and stored config
  *   - the menu declaration tying them together
  ****************************************************************************/
 
@@ -62,7 +64,6 @@
 #include "draw/viewport.h"
 #include "database/tagcache.h"
 #include "system/app_buffer.h"
-#include "viewers/playback_viewer/pv_badges.h"
 #include "database/db_featured.h"
 #include "crc32.h"
 #include "logf.h"
@@ -77,7 +78,6 @@
 #include "power.h"
 
 
-#include "draw/scrollbar.h"
 #include "audio/peak_meter.h"
 #include "skin/skin_engine.h"
 #include "log_viewer.h"
@@ -87,9 +87,6 @@
 #include "audio/playback.h"
 #include "hwcompat.h"
 #include "button.h"
-#if CONFIG_RTC == RTC_PCF50605
-#include "pcf50605.h"
-#endif
 #include "system/appevents.h"
 
 
@@ -110,9 +107,6 @@
 #endif
 #ifdef USB_ENABLE_AUDIO
 #include "../usbstack/usb_audio.h"
-#endif
-#ifdef USB_ENABLE_IAP
-#include "../usbstack/usb_iap.h"
 #endif
 
 #include "speech/talk.h"
@@ -337,6 +331,12 @@ struct cpu_sample
 };
 
 static struct cpu_sample sample_on_close;
+static struct cpu_sample sample_on_open;
+
+/* Fixed for the whole visit: what happened while the screen was shut. */
+static unsigned int away_ticks, away_frames;
+static int away_boost, away_clock, away_flush;
+static int away_render_ms, away_flush_ms;
 
 static void cpu_sample_take(struct cpu_sample *s)
 {
@@ -348,25 +348,79 @@ static void cpu_sample_take(struct cpu_sample *s)
     s->flush_usec = skin_flush_usec();
 }
 
+static void buffering_addline_used(const char *name, long used, long size)
+{
+    /* A long so a bad count shows as negative rather than as huge. */
+    simplelist_addline("%s: %ld/%ld %d%%", name, used, size,
+                       size > 0 ? (int)((long long)used * 100 / size) : 0);
+}
+
+/* SELECT skips to the next track, to watch the buffer refill. */
+static int buffering_callback(int action, struct gui_synclist *lists)
+{
+    struct buffering_debug d;
+    size_t bufsize = pcmbuf_get_bufsize();
+    size_t filebuflen = audio_get_filebuflen();
+    unsigned int here_ticks = ticks - sample_on_open.ticks;
+    (void)lists;
+
+    if (action == ACTION_STD_OK)
+    {
+        audio_next();
+        action = ACTION_REDRAW;
+    }
+
+    buffering_get_debugdata(&d);
+    simplelist_reset_lines();
+
+    buffering_addline_used("pcm", bufsize - pcmbuf_free(), bufsize);
+    buffering_addline_used("alloc", audio_filebufused(), filebuflen);
+    buffering_addline_used("real", d.buffered_data, filebuflen);
+    buffering_addline_used("useful", d.useful_data, filebuflen);
+    simplelist_addline("data_rem: %ld", (long)d.data_rem);
+    simplelist_addline("tracks: %u handles: %d",
+                       audio_track_count(), (int)d.num_handles);
+    simplelist_addline("pcmbufdesc: %d/%d", pcmbuf_used_descs(),
+                       pcmbuf_descs());
+    simplelist_addline("watermark: %d", (int)d.watermark);
+    simplelist_addline("cpu freq: %dMHz", (int)((FREQ + 500000) / 1000000));
+
+    if (here_ticks > 0)
+    {
+        /* in 100 kHz */
+        int avgclock   = (freq_sum - sample_on_open.freq_sum)
+                         * 10 / here_ticks;
+        /* in 0.1 % */
+        int boostquota = (boost_ticks - sample_on_open.boost_ticks)
+                         * 1000 / here_ticks;
+        simplelist_addline("boost: %d.%d%% (%d.%dMHz)",
+                           boostquota/10, boostquota%10,
+                           avgclock/10, avgclock%10);
+    }
+    if (away_ticks > 0)
+    {
+        simplelist_addline("away: %d.%d%% %d.%dMHz %d.%dfl/s",
+                           away_boost/10, away_boost%10,
+                           away_clock/10, away_clock%10,
+                           away_flush/10, away_flush%10);
+    }
+    if (away_frames > 0)
+    {
+        simplelist_addline("frame: rnd %d.%dms fls %d.%dms",
+                           away_render_ms/10, away_render_ms%10,
+                           away_flush_ms/10, away_flush_ms%10);
+    }
+
+    if (action == ACTION_NONE)
+        action = ACTION_REDRAW;
+    return action;
+}
+
 static bool dbg_buffering_thread(void)
 {
-    int button;
-    int line;
-    bool done = false;
-    bool to_root = false;
-    size_t bufused;
-    size_t bufsize = pcmbuf_get_bufsize();
-    int pcmbufdescs = pcmbuf_descs();
-    struct buffering_debug d;
-    size_t filebuflen = audio_get_filebuflen();
+    struct simplelist_info info;
     static bool task_running = false;
-    struct cpu_sample sample_on_open;
-    unsigned int away_ticks, away_frames = 0;
-    int away_boost = 0, away_clock = 0, away_flush = 0;
-    int away_render_ms = 0, away_flush_ms = 0;
-    /* This is a size_t, but call it a long so it puts a - when it's bad. */
-    #define STR_DATAREM "data_rem"
-    const char * const fmt_used = "%s: %6ld/%ld";
+    bool to_root;
 
     /* Added once and never removed: the counters have to keep running while
      * this screen is closed, or there is nothing to report on return. */
@@ -378,7 +432,8 @@ static bool dbg_buffering_thread(void)
 
     cpu_sample_take(&sample_on_open);
 
-    /* Fixed for the whole visit: what happened while the screen was shut. */
+    away_boost = away_clock = away_flush = 0;
+    away_render_ms = away_flush_ms = 0;
     away_ticks = sample_on_open.ticks - sample_on_close.ticks;
     if (away_ticks > 0)
     {
@@ -402,124 +457,19 @@ static bool dbg_buffering_thread(void)
                          - sample_on_close.flush_usec) / away_frames / 100;
     }
 
-    FOR_NB_SCREENS(i)
-        screens[i].setfont(FONT_SYSFIXED);
-
-    while(!done)
-    {
-        button = get_action(CONTEXT_STD,HZ/5);
-        switch(button)
-        {
-            case ACTION_STD_NEXT:
-                audio_next();
-                break;
-            case ACTION_STD_PREV:
-                audio_prev();
-                break;
-            case ACTION_STD_CANCEL:
-                done = true;
-                break;
-            case ACTION_STD_MENU:
-                to_root = true;
-                done = true;
-                break;
-        }
-
-        buffering_get_debugdata(&d);
-        bufused = bufsize - pcmbuf_free();
-
-        FOR_NB_SCREENS(i)
-        {
-            line = 0;
-            screens[i].clear_display();
-
-
-            screens[i].putsf(0, line++, fmt_used, "pcm", (long) bufused, (long) bufsize);
-
-            gui_scrollbar_draw(&screens[i],0, line*SYSFONT_HEIGHT, screens[i].lcdwidth, 6,
-                               bufsize, 0, bufused, HORIZONTAL);
-            line++;
-
-            screens[i].putsf(0, line++, fmt_used, "alloc", audio_filebufused(),
-                            (long) filebuflen);
-
-            if (screens[i].lcdheight > 80)
-            {
-                gui_scrollbar_draw(&screens[i],0, line*SYSFONT_HEIGHT, screens[i].lcdwidth, 6,
-                                   filebuflen, 0, audio_filebufused(), HORIZONTAL);
-                line++;
-
-                screens[i].putsf(0, line++, fmt_used, "real", (long)d.buffered_data,
-                                (long)filebuflen);
-
-                gui_scrollbar_draw(&screens[i],0, line*SYSFONT_HEIGHT, screens[i].lcdwidth, 6,
-                                   filebuflen, 0, (long)d.buffered_data, HORIZONTAL);
-                line++;
-            }
-
-            screens[i].putsf(0, line++, fmt_used, "usefl", (long)(d.useful_data),
-                                                       (long)filebuflen);
-
-            if (screens[i].lcdheight > 80)
-            {
-                gui_scrollbar_draw(&screens[i],0, line*SYSFONT_HEIGHT, screens[i].lcdwidth, 6,
-                                   filebuflen, 0, d.useful_data, HORIZONTAL);
-                line++;
-            }
-
-            screens[i].putsf(0, line++, "%s: %ld", STR_DATAREM, (long)d.data_rem);
-
-            screens[i].putsf(0, line++, "track count: %2u", audio_track_count());
-
-            screens[i].putsf(0, line++, "handle count: %d", (int)d.num_handles);
-
-            screens[i].putsf(0, line++, "cpu freq: %3dMHz",
-                             (int)((FREQ + 500000) / 1000000));
-
-            unsigned int here_ticks = ticks - sample_on_open.ticks;
-            if (here_ticks > 0)
-            {
-                /* in 100 kHz */
-                int avgclock   = (freq_sum - sample_on_open.freq_sum)
-                                 * 10 / here_ticks;
-                /* in 0.1 % */
-                int boostquota = (boost_ticks - sample_on_open.boost_ticks)
-                                 * 1000 / here_ticks;
-                screens[i].putsf(0, line++, "boost:%3d.%d%% (%d.%dMHz)",
-                                 boostquota/10, boostquota%10, avgclock/10, avgclock%10);
-            }
-            if (away_ticks > 0)
-            {
-                screens[i].putsf(0, line++, "away:%3d.%d%% %d.%dMHz %d.%dfl/s",
-                                 away_boost/10, away_boost%10,
-                                 away_clock/10, away_clock%10,
-                                 away_flush/10, away_flush%10);
-            }
-            if (away_frames > 0)
-            {
-                screens[i].putsf(0, line++, "frame: rnd%d.%dms fls%d.%dms",
-                                 away_render_ms/10, away_render_ms%10,
-                                 away_flush_ms/10, away_flush_ms%10);
-            }
-
-            screens[i].putsf(0, line++, "pcmbufdesc: %2d/%2d",
-                             pcmbuf_used_descs(), pcmbufdescs);
-            screens[i].putsf(0, line++, "watermark: %6d",
-                             (int)(d.watermark));
-
-            screens[i].update();
-        }
-    }
+    simplelist_info_init(&info, "Buffers and CPU", 0, NULL);
+    info.action_callback = buffering_callback;
+    info.scroll_all = true;
+    info.timeout = HZ/5;
+    /* The list sizes itself from the lines before it first calls back. */
+    buffering_callback(ACTION_REDRAW, NULL);
+    to_root = simplelist_show_list(&info);
 
     /* Mark the point of departure rather than stopping the counters, so the
      * next visit can report on whatever screen was used in between. */
     cpu_sample_take(&sample_on_close);
 
-    FOR_NB_SCREENS(i)
-        screens[i].setfont(FONT_UI);
-
     return to_root;
-#undef STR_DATAREM
 }
 
 #ifdef BUFLIB_DEBUG_PRINT
@@ -602,104 +552,6 @@ static bool dbg_partitions(void)
 }
 #endif /* CONFIG_PLATFORM & PLATFORM_NATIVE */
 
-
-#if (CONFIG_RTC == RTC_PCF50605) && (CONFIG_PLATFORM & PLATFORM_NATIVE)
-static bool dbg_pcf(void)
-{
-    int line;
-    int button;
-
-    lcd_setfont(FONT_SYSFIXED);
-    lcd_clear_display();
-
-    while(1)
-    {
-        line = 0;
-
-        lcd_putsf(0, line++, "DCDC1:  %02x", pcf50605_read(0x1b));
-        lcd_putsf(0, line++, "DCDC2:  %02x", pcf50605_read(0x1c));
-        lcd_putsf(0, line++, "DCDC3:  %02x", pcf50605_read(0x1d));
-        lcd_putsf(0, line++, "DCDC4:  %02x", pcf50605_read(0x1e));
-        lcd_putsf(0, line++, "DCDEC1: %02x", pcf50605_read(0x1f));
-        lcd_putsf(0, line++, "DCDEC2: %02x", pcf50605_read(0x20));
-        lcd_putsf(0, line++, "DCUDC1: %02x", pcf50605_read(0x21));
-        lcd_putsf(0, line++, "DCUDC2: %02x", pcf50605_read(0x22));
-        lcd_putsf(0, line++, "IOREGC: %02x", pcf50605_read(0x23));
-        lcd_putsf(0, line++, "D1REGC: %02x", pcf50605_read(0x24));
-        lcd_putsf(0, line++, "D2REGC: %02x", pcf50605_read(0x25));
-        lcd_putsf(0, line++, "D3REGC: %02x", pcf50605_read(0x26));
-        lcd_putsf(0, line++, "LPREG1: %02x", pcf50605_read(0x27));
-        lcd_update();
-        /* action_userabort() answers CANCEL only, so this screen polls for
-         * itself to see MENU as well -- and takes over the USB handling that
-         * came with it. */
-        button = get_action(CONTEXT_STD, HZ/10);
-        if (button == ACTION_STD_CANCEL || button == ACTION_STD_MENU)
-        {
-            lcd_setfont(FONT_UI);
-            return button == ACTION_STD_MENU;
-        }
-        default_event_handler(button);
-    }
-
-    lcd_setfont(FONT_UI);
-    return false;
-}
-#endif
-
-/* Nothing to show without a boost counter: get_cpu_boost_counter() and
- * set_cpu_frequency() are empty macros when the CPU's clock is not
- * adjustable, so the calls below would not even parse. */
-#ifdef HAVE_ADJUSTABLE_CPU_FREQ
-static bool dbg_cpufreq(void)
-{
-    int line;
-    int button;
-    bool done = false;
-    bool to_root = false;
-
-    lcd_setfont(FONT_SYSFIXED);
-    lcd_clear_display();
-
-    while(!done)
-    {
-        line = 0;
-
-        int temp = FREQ / 1000;
-        lcd_putsf(0, line++, "Frequency: %ld.%ld MHz", temp / 1000, temp % 1000);
-        lcd_putsf(0, line++, "boost_counter: %d", get_cpu_boost_counter());
-
-
-        lcd_update();
-        button = get_action(CONTEXT_STD,HZ/10);
-
-        switch(button)
-        {
-            case ACTION_STD_PREV:
-                cpu_boost(true);
-                break;
-
-            case ACTION_STD_NEXT:
-                cpu_boost(false);
-                break;
-            case ACTION_STD_OK:
-                while (get_cpu_boost_counter() > 0)
-                    cpu_boost(false);
-                set_cpu_frequency(CPUFREQ_DEFAULT);
-                break;
-
-            case ACTION_STD_MENU:
-                to_root = true;
-                /* fallthrough */
-            case ACTION_STD_CANCEL:
-                done = true;
-        }
-        lcd_clear_display();
-    }
-    lcd_setfont(FONT_UI);
-    return to_root;
-}
-#endif /* HAVE_ADJUSTABLE_CPU_FREQ */
 
 /* Not in a simulator: the per-target half of this screen reads the PP GPIO
  * registers and probed_ramsize directly, and there is no battery to graph. */
@@ -1739,33 +1591,7 @@ static bool dbg_usb_host_probe(void)
     return ret;
 }
 
-#ifdef USB_ENABLE_IAP
-/* Forces the answer until the next restart, over the iAP2 Accessories
- * setting (usb_iap.h). */
-static bool dbg_answer_iap2(void)
-{
-    static const char *const as[] = {
-        "iAP2 as the setting says",
-        "iAP2 answered as an iPod until restart",
-        "iAP2 answered as an iPhone until restart",
-    };
-    int next = (usb_iap_answer_iap2() + 1) % 3;
-    usb_iap_set_answer_iap2(next);
-    splash(HZ * 2, as[next]);
-    return false;
-}
-#endif
 #endif /* HAVE_USBSTACK */
-
-/* Put every earned badge back to unannounced, so the next report opens on the
- * crowns. A badge cannot be unlocked to order, so this is the only way to see
- * that screen without months of listening. The earned dates survive. */
-static bool dbg_pv_rearm(void)
-{
-    pv_badges_rearm();
-    splash(HZ * 2, "Playback report: crowns re-armed");
-    return false;
-}
 
 /* The guest table (database/db_featured.c): what a build finds, and how long
  * it takes.
@@ -1847,21 +1673,6 @@ static bool dbg_tagcache_info(void)
     return simplelist_show_list(&info);
 }
 
-#if defined(CPU_PP) && !(CONFIG_STORAGE & STORAGE_SD)
-static bool dbg_save_roms(void)
-{
-    int fd = creat("/internal_rom_000000-0FFFFF.bin", 0666);
-    if(fd >= 0)
-    {
-        write(fd, (void *)0x20000000, FLASH_SIZE);
-        close(fd);
-    }
-
-    return false;
-}
-#endif /* CPU */
-
-
 extern bool do_screendump_instead_of_usb;
 
 static bool dbg_screendump(void)
@@ -1881,91 +1692,6 @@ static bool dbg_metadatalog(void)
 }
 
 
-#ifdef CPU_BOOST_LOGGING
-static bool cpu_boost_log(void)
-{
-    int count = cpu_boost_log_getcount();
-    char *str = cpu_boost_log_getlog_first();
-    bool done;
-    lcd_setfont(FONT_SYSFIXED);
-    for (int i = 0; i < count ;)
-    {
-        lcd_clear_display();
-        for(int j=0; j<LCD_HEIGHT/SYSFONT_HEIGHT; j++,i++)
-        {
-            if (!str)
-                str = cpu_boost_log_getlog_next();
-            if (str)
-            {
-                if(strlen(str) > LCD_WIDTH/SYSFONT_WIDTH)
-                    lcd_puts_scroll(0, j, str);
-                else
-                    lcd_puts(0, j,str);
-            }
-            str = NULL;
-        }
-        lcd_update();
-        done = false;
-        while (!done)
-        {
-            switch(get_action(CONTEXT_STD,TIMEOUT_BLOCK))
-            {
-                case ACTION_STD_OK:
-                case ACTION_STD_PREV:
-                case ACTION_STD_NEXT:
-                    done = true;
-                break;
-                case ACTION_STD_CANCEL:
-                    i = count;
-                    done = true;
-                break;
-            }
-        }
-    }
-    lcd_scroll_stop();
-    get_action(CONTEXT_STD,TIMEOUT_BLOCK);
-    lcd_setfont(FONT_UI);
-    return false;
-}
-
-static bool cpu_boost_log_dump(void)
-{
-    int fd;
-    int count = cpu_boost_log_getcount();
-    char *str = cpu_boost_log_getlog_first();
-
-    splash(HZ, "Boost Log File Dumped");
-
-    /* nothing to print ? */
-    if(count == 0)
-        return false;
-
-    char fname[MAX_PATH];
-    struct tm *nowtm = get_time();
-    fd = open_pathfmt(fname, sizeof(fname), O_CREAT|O_WRONLY|O_TRUNC,
-                      "%s/boostlog_%04d%02d%02d%02d%02d%02d.txt", ROCKBOX_DIR,
-                      nowtm->tm_year + 1900, nowtm->tm_mon + 1, nowtm->tm_mday,
-                      nowtm->tm_hour, nowtm->tm_min, nowtm->tm_sec);
-    if(-1 != fd) {
-        for (int i = 0; i < count; i++)
-        {
-            if (!str)
-                str = cpu_boost_log_getlog_next();
-            if (str)
-            {
-               fdprintf(fd, "%s\n", str);
-               str = NULL;
-            }
-        }
-
-        close(fd);
-        return true;
-    }
-
-    return false;
-}
-#endif
-
 /* The click wheel's own driver state. A simulator sends button events from a
  * keyboard and has no wheel to instrument. */
 #ifndef SIMULATOR
@@ -1976,95 +1702,34 @@ extern int wheel_delta;
 extern unsigned int accumulated_wheel_delta;
 extern unsigned int wheel_velocity;
 
+/* Turning the wheel also moves the selection, which is harmless: every line
+ * fits on the screen. */
+static int scrollwheel_callback(int action, struct gui_synclist *lists)
+{
+    (void)lists;
+    simplelist_reset_lines();
+    simplelist_addline("wheel touched: %s", wheel_is_touched ? "yes" : "no");
+    simplelist_addline("new position: %d", new_wheel_value);
+    simplelist_addline("old position: %d", old_wheel_value);
+    simplelist_addline("wheel delta: %d", wheel_delta);
+    simplelist_addline("accumulated delta: %u", accumulated_wheel_delta);
+    simplelist_addline("velocity: %u deg/s", wheel_velocity);
+    simplelist_addline("accel. speed: %d",
+            button_apply_acceleration((1<<31)|(1<<24)|wheel_velocity));
+    if (action == ACTION_NONE)
+        action = ACTION_REDRAW;
+    return action;
+}
+
 static bool dbg_scrollwheel(void)
 {
-    int button;
-    bool to_root = false;
-
-    lcd_setfont(FONT_SYSFIXED);
-
-    while (1)
-    {
-        /* action_userabort() answers CANCEL only, so this screen polls for
-         * itself to see MENU as well -- and takes over the USB handling that
-         * came with it. */
-        button = get_action(CONTEXT_STD, HZ/10);
-        if (button == ACTION_STD_CANCEL)
-            break;
-        if (button == ACTION_STD_MENU)
-        {
-            to_root = true;
-            break;
-        }
-        default_event_handler(button);
-
-        lcd_clear_display();
-
-        /* show internal variables of scrollwheel driver */
-        lcd_putsf(0, 0, "wheel touched: %s", (wheel_is_touched) ? "true" : "false");
-        lcd_putsf(0, 1, "new position: %2d", new_wheel_value);
-        lcd_putsf(0, 2, "old position: %2d", old_wheel_value);
-        lcd_putsf(0, 3, "wheel delta: %2d", wheel_delta);
-        lcd_putsf(0, 4, "accumulated delta: %2d", accumulated_wheel_delta);
-        lcd_putsf(0, 5, "velo [deg/s]: %4d", (int)wheel_velocity);
-
-        /* show effective accelerated scrollspeed */
-        lcd_putsf(0, 6, "accel. speed: %4d",
-                button_apply_acceleration((1<<31)|(1<<24)|wheel_velocity) );
-
-        lcd_update();
-    }
-    lcd_setfont(FONT_UI);
-    return to_root;
+    struct simplelist_info info;
+    simplelist_info_init(&info, "Click wheel", 0, NULL);
+    info.action_callback = scrollwheel_callback;
+    scrollwheel_callback(ACTION_REDRAW, NULL);
+    return simplelist_show_list(&info);
 }
 #endif /* !SIMULATOR -- the scroll wheel */
-
-static bool dbg_talk(void)
-{
-    struct simplelist_info list;
-    struct talk_debug_data data;
-    talk_get_debug_data(&data);
-
-    simplelist_info_init(&list, "Voice Information:", 0, NULL);
-
-    list.scroll_all = true;
-    list.timeout = HZ;
-
-    simplelist_reset_lines();
-
-    simplelist_setline("Current voice file:");
-    if (data.status != TALK_STATUS_ERR_NOFILE)
-        simplelist_addline(" %s", data.voicefile);
-    else
-        simplelist_setline(" No voice information available");
-
-    if (data.status != TALK_STATUS_OK)
-    {
-        simplelist_addline("Talk Status: ERR (%i)",
-                    data.status);
-        return simplelist_show_list(&list);
-    }
-    else
-        simplelist_setline("Talk Status: OK");
-    simplelist_setline("Number of (empty) clips in voice file:");
-    simplelist_addline(" (%d) %d", data.num_empty_clips, data.num_clips);
-    simplelist_setline("Min/Avg/Max size of clips:");
-    simplelist_addline(" %d / %d / %d",
-                    data.min_clipsize, data.avg_clipsize, data.max_clipsize);
-    simplelist_setline("Memory allocated:");
-    simplelist_addline(" %ld.%02ld KB",
-                    data.memory_allocated / 1024, data.memory_allocated % 1024);
-    simplelist_addline("Memory used:");
-    simplelist_addline(" %ld.%02ld KB",
-                       data.memory_used / 1024, data.memory_used % 1024);
-    simplelist_setline("Number of clips in cache:");
-    simplelist_addline(" %d", data.cached_clips);
-    simplelist_setline("Cache hits / misses:");
-    simplelist_addline("%d / %d", data.cache_hits, data.cache_misses);
-
-    return simplelist_show_list(&list);
-}
-
 
 #ifdef USB_ENABLE_AUDIO
 static int dbg_usb_audio_cb(int action, struct gui_synclist *lists)
@@ -2211,108 +1876,118 @@ static bool dbg_bootflash_dump(void) {
 
 
 /** The menu **/
+/* Grouped, in this order: playback, library, display, accessories, hardware.
+ * A saved shortcut names its screen by desc, so renaming one strands it. */
 static const struct {
     unsigned char *desc; /* string or ID */
     /* True if the screen was left for the root menu -- MENU, or a USB
      * attach. menu_action_callback() takes this list out with it. */
     bool (*function) (void);
+    /* Draws on the LCD rather than putting up a list. */
+    bool lcd;
+    /* Flipped by function; its state is shown after desc. */
+    bool *toggle;
 } menuitems[] = {
-#if defined(CPU_PP) && !(CONFIG_STORAGE & STORAGE_SD)
-        { "Dump ROM contents", dbg_save_roms },
-#endif
-#if defined(CPU_PP) || defined(CPU_S5L87XX)
-        { "View I/O ports", dbg_ports },
-#endif
-#if (CONFIG_RTC == RTC_PCF50605) && (CONFIG_PLATFORM & PLATFORM_NATIVE)
-        { "View PCF registers", dbg_pcf },
-#endif
-#ifdef HAVE_ADJUSTABLE_CPU_FREQ
-        { "CPU frequency", dbg_cpufreq },
-#endif
-        { "View OS stacks", dbg_os },
+        { "Threads", dbg_os, false, NULL },
 #ifdef __linux__
-        { "View CPU stats", dbg_cpuinfo },
+        { "View CPU stats", dbg_cpuinfo, false, NULL },
 #endif
+        { "Buffers and CPU", dbg_buffering_thread, false, NULL },
+        { "Beat analysis", beat_debug_screen, true, NULL },
+        { "Beat tap", spike_tap_screen, false, NULL },
+        { "Sound probe", probe_debug_screen, false, NULL },
+#ifdef PM_DEBUG
+        { "pm histogram", peak_meter_histogram, true, NULL },
+#endif /* PM_DEBUG */
+#ifdef BUFLIB_DEBUG_PRINT
+        { "View buflib allocs", dbg_buflib_allocs, false, NULL },
+#endif
+
+        { "Database", dbg_tagcache_info, false, NULL },
+        { "Directory cache", dbg_dircache_info, false, NULL },
+        { "Featured artists", dbg_featured, false, NULL },
+        { "Metadata log", dbg_metadatalog, false, &write_metadata_log },
+
+        { "Skin memory", dbg_skin_engine, false, NULL },
+        { "Screendump on USB", dbg_screendump, false,
+          &do_screendump_instead_of_usb },
+
+#ifdef HAVE_USBSTACK
+        { "USB info", dbg_usb_info, false, NULL },
+        { "USB log", dbg_usb_log, false, NULL },
+        { "USB host probe", dbg_usb_host_probe, false, NULL },
+#endif
+#if defined(USB_ENABLE_AUDIO)
+        { "USB sound card", dbg_usb_audio, false, NULL },
+#endif
+#ifdef IPOD_ACCESSORY_PROTOCOL
+        { "Serial iAP", dbg_iap, false, NULL },
+#endif
+
 #if (CONFIG_BATTERY_MEASURE != 0) && !defined(SIMULATOR)
-        { "View battery", view_battery },
+        { "Battery", view_battery, true, NULL },
 #endif
-        { "Screendump", dbg_screendump },
-        { "Skin Engine RAM usage", dbg_skin_engine },
-#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
-        { "View HW info", dbg_hw_info },
+#ifndef SIMULATOR   /* reads the wheel driver */
+        { "Click wheel", dbg_scrollwheel, false, NULL },
 #endif
 /* Every one of these reads the ATA driver or the partition table. Guarding
  * the entries is enough -- the screens themselves are static and the compiler
  * drops them once nothing names them. */
 #if (CONFIG_PLATFORM & PLATFORM_NATIVE)
-        { "View partitions", dbg_partitions },
-        { "View disk info", dbg_disk_info },
+        { "Disk info", dbg_disk_info, false, NULL },
+        { "Partitions", dbg_partitions, false, NULL },
 #if (CONFIG_STORAGE & STORAGE_ATA)
-        { "Dump ATA identify info", dbg_identify_info},
-        { "View/Dump S.M.A.R.T. data", dbg_ata_smart},
+        { "S.M.A.R.T.", dbg_ata_smart, false, NULL },
+        { "Dump ATA identify", dbg_identify_info, false, NULL },
 #endif
+        { "Hardware info", dbg_hw_info, true, NULL },
 #endif
-        { "Metadata log", dbg_metadatalog },
-        { "View dircache info", dbg_dircache_info },
-        { "View database info", dbg_tagcache_info },
-        { "Playback report: re-arm crowns", dbg_pv_rearm },
-        { "Featured artists", dbg_featured },
-        { "Beat analysis", beat_debug_screen },
-        { "Sound probe", probe_debug_screen },
-        { "Beat tap", spike_tap_screen },
-#ifdef HAVE_USBSTACK
-        { "View USB info", dbg_usb_info },
-        { "USB log", dbg_usb_log },
-        { "USB host probe", dbg_usb_host_probe },
-#ifdef USB_ENABLE_IAP
-        { "Answer iAP2 probe", dbg_answer_iap2 },
-#endif
-#endif
-        { "View buffering thread", dbg_buffering_thread },
-#ifdef PM_DEBUG
-        { "pm histogram", peak_meter_histogram},
-#endif /* PM_DEBUG */
-#ifdef BUFLIB_DEBUG_PRINT
-        { "View buflib allocs", dbg_buflib_allocs },
+#if defined(IPOD_6G) && !defined(SIMULATOR)
+        { "SysCfg", dbg_syscfg, false, NULL },
+        { "Dump boot flash", dbg_bootflash_dump, false, NULL },
 #endif
 #ifdef ROCKBOX_HAS_LOGF
-        {"Show Log File", log_viewer_show },
-        {"Dump Log File", log_viewer_dump },
-#endif
-#if defined(USB_ENABLE_AUDIO)
-        {"USB Sound Card", dbg_usb_audio},
-#endif
-#ifdef CPU_BOOST_LOGGING
-        {"Show cpu_boost log",cpu_boost_log},
-        {"Dump cpu_boost log",cpu_boost_log_dump},
-#endif
-#ifndef SIMULATOR
-        {"Debug scrollwheel", dbg_scrollwheel },   /* reads the wheel driver */
-#endif
-#ifdef IPOD_ACCESSORY_PROTOCOL
-        {"Debug IAP", dbg_iap },
-#endif
-        {"Talk engine stats", dbg_talk },
-
-#if defined(IPOD_6G) && !defined(SIMULATOR)
-        {"View SysCfg", dbg_syscfg },
-        {"Dump bootflash to file", dbg_bootflash_dump },
+        { "Log file", log_viewer_show, true, NULL },
+        { "Dump log file", log_viewer_dump, false, NULL },
 #endif
 };
+
+/* A list screen keeps the theme. One that draws on the LCD gets the whole
+ * screen in fixed black on white, since the theme's colours can leave its
+ * text unreadable. */
+static bool run_item(int i)
+{
+    struct viewport vp;
+    unsigned fg, bg;
+    bool to_root;
+
+    if (!menuitems[i].lcd)
+        return menuitems[i].function();
+
+    viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
+    lcd_set_backdrop(NULL);
+    fg = lcd_get_foreground();
+    bg = lcd_get_background();
+    lcd_set_foreground(LCD_BLACK);
+    lcd_set_background(LCD_WHITE);
+
+    to_root = menuitems[i].function();
+
+    lcd_set_foreground(fg);
+    lcd_set_background(bg);
+    viewportmanager_theme_undo(SCREEN_MAIN, true);
+    return to_root;
+}
 
 static int menu_action_callback(int btn, struct gui_synclist *lists)
 {
     int selection = gui_synclist_get_sel_pos(lists);
     if (btn == ACTION_STD_OK)
     {
-        FOR_NB_SCREENS(i)
-           viewportmanager_theme_enable(i, false, NULL);
         /* A screen returns true when it was left for the root menu -- MENU, or
          * a USB attach. Handing that back as ACTION_STD_MENU takes this list
          * out with it rather than redrawing underneath. */
-        btn = menuitems[selection].function() ? ACTION_STD_MENU : ACTION_REDRAW;
-        FOR_NB_SCREENS(i)
-            viewportmanager_theme_undo(i, false);
+        btn = run_item(selection) ? ACTION_STD_MENU : ACTION_REDRAW;
     }
     else if (btn == ACTION_STD_CONTEXT)
     {
@@ -2327,8 +2002,12 @@ static int menu_action_callback(int btn, struct gui_synclist *lists)
 static const char* menu_get_name(int item, void * data,
                                     char *buffer, size_t buffer_len)
 {
-    (void)data; (void)buffer; (void)buffer_len;
-    return menuitems[item].desc;
+    (void)data;
+    if (!menuitems[item].toggle)
+        return menuitems[item].desc;
+    snprintf(buffer, buffer_len, "%s: %s", menuitems[item].desc,
+             *menuitems[item].toggle ? "on" : "off");
+    return buffer;
 }
 
 static int menu_get_talk(int item, void *data)
@@ -2358,15 +2037,7 @@ bool run_debug_screen(char* screen)
 {
     for (unsigned i=0; i<ARRAYLEN(menuitems); i++)
         if (!strcasecmp(screen, menuitems[i].desc))
-        {
-            bool to_root;
-            FOR_NB_SCREENS(j)
-               viewportmanager_theme_enable(j, false, NULL);
-            to_root = menuitems[i].function();
-            FOR_NB_SCREENS(j)
-                viewportmanager_theme_undo(j, false);
-            return to_root;
-        }
+            return run_item(i);
 
     return false;
 }

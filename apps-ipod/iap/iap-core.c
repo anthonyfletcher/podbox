@@ -222,7 +222,8 @@ static struct state_t {
     .state = ST_SYNC
 };
 
-/* What the framer has seen, for Debug IAP. Written from the serial ISR. */
+/* What the framer has seen, for Debug > Serial iAP. Written from the serial
+ * ISR. */
 #define RX_HISTORY 8
 static struct {
     unsigned long good;         /* frames that passed their checksum */
@@ -1596,49 +1597,46 @@ void iap_fill_power_state(void)
     }
 }
 
-#include "lcd.h"
-#include "font.h"
+#include "widgets/list.h"
+
+static int dbg_iap_callback(int action, struct gui_synclist *lists)
+{
+    (void)lists;
+    simplelist_reset_lines();
+    simplelist_addline("auth: %d acc: %d", device.auth.state, device.accinfo);
+    simplelist_addline("lin: %08lx", (unsigned long)device.lingoes);
+    simplelist_addline("notif: %08lx", (unsigned long)device.notifications);
+    simplelist_addline("cap: %08lx/%08lx", (unsigned long)device.capabilities,
+                       (unsigned long)device.capabilities_queried);
+    simplelist_addline("cert: v%04x section %d of %d", device.auth.version,
+                       device.auth.next_section, device.auth.max_section);
+    simplelist_addline("rx: %lu bad sum: %lu timeout: %lu", rx_stats.good,
+                       rx_stats.bad_check, rx_stats.timeouts);
+    simplelist_addline("bad len: %lu (last %u)", rx_stats.bad_len,
+                       rx_stats.last_bad_len);
+    simplelist_addline("last frames, newest first:");
+    for (int i = 0; i < RX_HISTORY; i++)
+    {
+        unsigned int k = (rx_stats.next + RX_HISTORY - 1 - i) % RX_HISTORY;
+        char line[3 * sizeof(rx_stats.last[0]) + 1];
+        char *p = line;
+
+        *p = '\0';
+        for (unsigned int b = 0; b < rx_stats.last_len[k]; b++)
+            p += snprintf(p, 4, "%02x ", rx_stats.last[k][b]);
+        simplelist_addline("%s", line);
+    }
+    if (action == ACTION_NONE)
+        action = ACTION_REDRAW;
+    return action;
+}
+
 bool dbg_iap(void)
 {
-    lcd_setfont(FONT_SYSFIXED);
-
-    while (1)
-    {
-        if (action_userabort(HZ/10))
-            break;
-
-        lcd_clear_display();
-
-        /* show internal state of IAP subsystem */
-        lcd_putsf(0, 0, "auth: %d acc: %d", device.auth.state, device.accinfo);
-        lcd_putsf(0, 1, "lin: %08x", device.lingoes);
-        lcd_putsf(0, 2, "notif: %08x", device.notifications);
-        lcd_putsf(0, 3, "cap: %08x/%08x", device.capabilities, device.capabilities_queried);
-        lcd_putsf(0, 4, "cert: v%04x section %d of %d", device.auth.version,
-                  device.auth.next_section, device.auth.max_section);
-        lcd_putsf(0, 5, "rx: %lu bad sum: %lu timeout: %lu", rx_stats.good,
-                  rx_stats.bad_check, rx_stats.timeouts);
-        lcd_putsf(0, 6, "bad len: %lu (last %u)", rx_stats.bad_len,
-                  rx_stats.last_bad_len);
-        lcd_puts(0, 7, "last frames, newest first:");
-        for (int i = 0; i < RX_HISTORY; i++)
-        {
-            unsigned int k = (rx_stats.next + RX_HISTORY - 1 - i) % RX_HISTORY;
-            char line[3 * sizeof(rx_stats.last[0]) + 1];
-            char *p = line;
-
-            *p = '\0';
-            for (unsigned int b = 0; b < rx_stats.last_len[k]; b++)
-                p += snprintf(p, 4, "%02x ", rx_stats.last[k][b]);
-            lcd_puts(0, 8 + i, line);
-        }
-
-        // frame_state.state
-        // serial state
-
-        lcd_update();
-    }
-
-    lcd_setfont(FONT_UI);
-    return false;
+    struct simplelist_info info;
+    simplelist_info_init(&info, "Serial iAP", 0, NULL);
+    info.action_callback = dbg_iap_callback;
+    info.scroll_all = true;
+    dbg_iap_callback(ACTION_REDRAW, NULL);
+    return simplelist_show_list(&info);
 }

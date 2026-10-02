@@ -527,19 +527,6 @@ void pv_badges_save(void)
         remove(PV_BADGES_PATH);
 }
 
-/* Put every unlocked badge back to unannounced, for testing the crowns.
- *
- * The dates survive, because classify() only stamps a badge that has none --
- * otherwise the one hook that makes the feature testable would destroy the
- * earned dates every time it was used. */
-void pv_badges_rearm(void)
-{
-    progress_load();
-    memset(seen, 0, sizeof(seen));
-    had_progress = true;     /* the save below is the file to be new against */
-    pv_badges_save();
-}
-
 int pv_badges_classify(void)
 {
     bool goal_taken[PV_AM_COUNT];
