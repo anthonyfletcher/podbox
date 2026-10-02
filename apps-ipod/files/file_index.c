@@ -23,12 +23,13 @@
  * .request-only shape -- the same one the tag database itself uses -- and
  * supplies its own triggers: the maintenance menu's Rescan row, a USB session
  * (the one moment files reliably change), and having no index at all at
- * startup.
+ * startup. It takes its turn on the shared background thread through a tick of
+ * its own, after the ranked tasks.
  *
  * Parts, in order:
  *   - the lists on disk
  *   - the walk
- *   - the thread, and what wakes it
+ *   - the tick, and what wakes it
  ****************************************************************************/
 
 #include <stdio.h>
@@ -55,11 +56,6 @@
  * thread's is modest; anything filed deeper than this is almost certainly not
  * a document someone means to browse. */
 #define FILE_INDEX_MAX_DEPTH 12
-
-#define FI_STACK_SIZE (DEFAULT_STACK_SIZE * 2)
-static long fi_stack[FI_STACK_SIZE / sizeof(long)];
-static const char fi_thread_name[] = "fileidx";
-static struct event_queue fi_queue;
 
 /* Set when something has happened that the lists would not reflect. */
 static volatile bool fi_wants_scan;
@@ -110,46 +106,18 @@ const char *file_index_list(bool images)
 
 /* ---- the walk ---------------------------------------------------------- */
 
-/* Give up promptly for a USB session or a shutdown -- this holds no lock, but
- * it does hold the disk, and a walk can run for minutes. */
+/* Give up promptly for a USB session, a shutdown, or the album index or
+ * artwork cache wanting the thread -- this holds no lock, but it does hold
+ * the disk and the thread, and a walk can run for minutes. */
 static bool fi_check_abort(void)
 {
-    struct queue_event ev;
-
     if (fi_abort)
         return true;
 
-    /* Trap: the queue alone is too late for a host. With the USB stack the
-     * broadcast comes from the mass-storage driver at SET_CONFIGURATION, so
-     * nothing arrives here until enumeration is nearly done -- by which point a
-     * walk still hammering the disk has already cost the host SET_ADDRESS.
-     * usb_host_is_present() is true from the moment the cable goes in.
-     *
-     * The same test already gates the *start* of a scan in fi_thread(); this is
-     * the one that stops a walk already under way. */
-    if (usb_host_is_present())
+    if (bg_task_should_stop(&file_index_task))
     {
         fi_abort = true;
         return true;
-    }
-
-    queue_wait_w_tmo(&fi_queue, &ev, 0);
-    switch (ev.id)
-    {
-        case SYS_USB_CONNECTED:
-            /* Put it back: fi_thread() is what acknowledges the connect and
-             * waits out the session, and this only needs the walk to stop. */
-            queue_post(&fi_queue, ev.id, ev.data);
-            fi_abort = true;
-            return true;
-
-        case SYS_POWEROFF:
-        case SYS_REBOOT:
-            /* Not re-posted. Nothing here handles either -- the walk stopping
-             * is the whole of what this thread owes a shutdown, and putting
-             * them back would only leave them in a queue nobody reads. */
-            fi_abort = true;
-            return true;
     }
     return false;
 }
@@ -283,49 +251,32 @@ static void fi_run_scan(void)
     fi_wants_scan = !completed;   /* interrupted: try again later */
 }
 
-/* ---- the thread -------------------------------------------------------- */
+/* ---- the tick, and what wakes it --------------------------------------- */
 
-static void fi_thread(void)
+/* bg_task.tick: this task's turn on the shared thread. */
+static void fi_tick(void)
 {
-    struct queue_event ev;
-
-    while (1)
+    /* Only while the database is leaving the disk alone: both walk it, and two
+     * at once makes each slower than the pair run in turn. Nor ahead of a
+     * task that outranks this one, which would only stop the walk again.
+     *
+     * And never while a host has hold of us: the disk is about to be taken
+     * back. The run is gated rather than the arming, so the request stays
+     * pending and a real extraction still gets its scan however early the
+     * question is asked. */
+    if (fi_wants_scan && !tagcache_is_busy() && !usb_host_is_present()
+        && !bg_task_preempted(&file_index_task))
     {
-        queue_wait_w_tmo(&fi_queue, &ev, HZ * 5);
-
-        switch (ev.id)
-        {
-            case SYS_USB_CONNECTED:
-                usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
-                usb_wait_for_disconnect(&fi_queue);
-                /* The host has had the disk. This is the one moment files
-                 * reliably appear and disappear without anyone telling us. */
-                fi_wants_scan = true;
-                break;
-
-            case SYS_TIMEOUT:
-                /* Only while the database is leaving the disk alone: both
-                 * walk it, and two at once makes each slower than the pair
-                 * run in turn.
-                 *
-                 * And never while a host has hold of us: the disk is about to
-                 * be taken back. The run is gated rather than the arming, so
-                 * the request stays pending and a real extraction still gets
-                 * its scan however early the question is asked. */
-                if (fi_wants_scan && !tagcache_is_busy()
-                    && !usb_host_is_present())
-                {
-                    fi_wants_scan = false;
-                    fi_run_scan();
-                }
-                break;
-        }
+        fi_wants_scan = false;
+        fi_run_scan();
     }
 }
 
 /* bg_task.request: both triggers do the same thing here. There is nothing to
  * keep between passes -- the walk rewrites both lists from scratch -- so a
- * rebuild and an update are the same walk. */
+ * rebuild and an update are the same walk. The thread sends one after a USB
+ * session too: the host has had the disk, the one moment files reliably
+ * appear and disappear without anyone telling us. */
 static void fi_request(bool rebuild)
 {
     (void)rebuild;
@@ -334,19 +285,16 @@ static void fi_request(bool rebuild)
 
 struct bg_task file_index_task =
 {
+    .rank    = BG_RANK_FILES,
     .request = fi_request,
+    .tick    = fi_tick,
 };
 
 void file_index_init(void)
 {
-    queue_init(&fi_queue, true);
     bg_task_init(&file_index_task);
 
     /* Nothing to read on a first boot, or after the lists were deleted. */
     if (!file_exists(FILE_INDEX_DOCS) && !file_exists(FILE_INDEX_IMAGES))
         fi_wants_scan = true;
-
-    create_thread(fi_thread, fi_stack, sizeof(fi_stack), 0,
-                  fi_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
-                  IF_COP(, CPU));
 }

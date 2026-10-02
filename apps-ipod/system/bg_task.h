@@ -11,9 +11,10 @@
  * library's marks against a marker file, run, record. That shape lives here,
  * so each task supplies only its pass.
  *
- * This owns no thread and is not a scheduler. Every task keeps its own
- * thread, stack and queue -- the stacks differ by a lot, and a thread holding
- * a queue has to acknowledge USB on it itself. What lives here is the policy:
+ * Every task runs on the one thread this owns, in rank order, sharing its
+ * stack and queue: thread slots are few enough that a screen starting its own
+ * thread can fail to get one. Each task keeps its pass, its events and its
+ * abort check in its own file. What lives here is the thread and the policy:
  * when a task may run, and which task gives way to which.
  ****************************************************************************/
 
@@ -32,6 +33,7 @@
  * the index while nothing at all blocks on artwork. */
 #define BG_RANK_INDEX   0
 #define BG_RANK_ART     1
+#define BG_RANK_FILES   2   /* last: a walk takes minutes, nothing waits on it */
 
 /* What "the library" looked like at some moment. A task is stale when the
  * marks move, so between them these are the whole definition of "something
@@ -89,12 +91,18 @@ struct bg_task
      * task rather than here. */
     void (*handle_event)(const struct queue_event *ev);
 
-    /* Optional, and exclusive with everything above: a task that drives its
-     * own scanning. bg_task_rebuild()/bg_task_update() call this and touch
-     * nothing else, and the task is never ticked. It exists so the tag
-     * database can present the same two triggers as the others without its
-     * thread being rewritten -- see tagcache_task. */
+    /* Optional, and exclusive with everything above but `rank`: a task that
+     * drives its own scanning. bg_task_rebuild()/bg_task_update() call this
+     * and touch nothing else, and the task is never ticked. It exists so the
+     * tag database can present the same two triggers as the others without
+     * its thread being rewritten -- see tagcache_task. */
     void (*request)(bool rebuild);
+
+    /* Optional, with `request`: the task's turn on the shared thread, taken
+     * every tick after the ranked tasks have had theirs. Such a task has no
+     * marks to re-check after a USB session, so it is sent request(false)
+     * instead. */
+    void (*tick)(void);
 
     /* ---- owned by bg_task.c ---- */
     volatile bool running;
@@ -106,28 +114,36 @@ struct bg_task
     struct bg_marks prev_marks;  /* what last tick saw (stability check) */
     int  fails;         /* consecutive unfinished passes */
     long retry_at;      /* tick before which not to try again, 0 = now */
+    long next_check;    /* when a lower task's pass may next look at this */
 };
 
-/* Register the task and read its marker back. Call before its thread starts.
+/* Register the task and read its marker back. Call before bg_task_start().
  *
- * A .request-only task may be passed and is deliberately ignored -- it is
- * never ticked, so it has nothing to register and no marker to read. Calling
- * this for one is harmless, so a caller need not know which kind it holds. */
+ * A .request-only task may be passed. It has no marker to read, and is
+ * registered only if it has a tick to take. Calling this for one is harmless,
+ * so a caller need not know which kind it holds. */
 void bg_task_init(struct bg_task *task);
+
+/* Start the thread every task shares. Once, after every bg_task_init(). */
+void bg_task_start(void);
+
+/* Queue an event for the task's handle_event(), to run on the thread. */
+void bg_task_post(struct bg_task *task, long id);
 
 /* The largest work_bytes any registered task declares: what the audio buffer
  * has to leave free for a background pass not to be paid for in stopped
  * playback. Zero until the tasks have registered. */
 size_t bg_task_reserve_bytes(void);
 
-/* One turn of a task's thread loop: wait on the queue with a timeout, then do
- * whatever that turn calls for. Intended to be the entire thread body. */
-void bg_task_tick(struct bg_task *task, struct event_queue *queue);
-
-/* True when a task that outranks this one is waiting to run. A pass should
- * check this as it goes and, if set, stop and return false -- it will be
- * retried once the other task is done. */
+/* True when a task that outranks this one is waiting to run. Asked during a
+ * pass, it looks at most once a tick period at whether the other has gone
+ * stale, as the other's own tick would have. */
 bool bg_task_preempted(const struct bg_task *task);
+
+/* Whether a pass should stop where it stands: preempted, a USB host arriving,
+ * or a shutdown. A pass checks this as it goes and, if set, returns false --
+ * it will be retried later. */
+bool bg_task_should_stop(const struct bg_task *task);
 
 /* One word for what the task is doing, for the status screen. Reads the state
  * above and nothing else, so it costs nothing to ask. */

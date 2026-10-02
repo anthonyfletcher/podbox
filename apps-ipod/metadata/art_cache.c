@@ -15,7 +15,6 @@
 
 #include "system.h"
 #include "kernel.h"
-#include "thread.h"
 #include "core_alloc.h"
 #include "string-extra.h"
 #include "file.h"
@@ -36,7 +35,6 @@
 #include "draw/img_filter.h"
 #include "bitmaps/podboxnoart.h" /* shared "no art" placeholder for aa_ensure_fallback */
 #include "draw/jpeg_load.h"
-#include "usb.h"
 #include "events.h"
 #include "system/appevents.h"
 #include "audio.h"
@@ -96,13 +94,6 @@ struct aa_stamp
 static struct aa_stamp *aa_stamps;
 static unsigned char *aa_visited;
 
-/* Generous stack: the JPEG decoder called from a pass has deep frames. */
-#define AA_STACK_SIZE (DEFAULT_STACK_SIZE + 0x2000)
-static long aa_stack[AA_STACK_SIZE / sizeof(long)];
-static const char aa_thread_name[] = "aacache";
-static unsigned int aa_thread_id;
-static struct event_queue aa_queue;
-
 static volatile bool cache_busy;
 
 /* What the current (or last completed) pass has covered, and the folder it is
@@ -115,7 +106,7 @@ static struct art_cache_counts aa_counts;
  * thread stack because struct mp3entry is large. */
 static struct mp3entry aa_id3;
 
-/* Scratch buffers used only by the aacache thread (aa_run_pass /
+/* Scratch buffers used only by the background thread (aa_run_pass /
  * aa_generate_one). Kept off the thread stack -- together with the JPEG
  * decoder's own deep frames they otherwise overflow it. Single-threaded and
  * non-reentrant, so module-level statics are safe. */
@@ -1090,9 +1081,7 @@ static void aa_ensure_fallback(void *workbuf, size_t workbuf_sz)
 }
 
 /* True if the pass should stop right now: a USB connection or shutdown is
- * pending, or a task that outranks this one is waiting to start. Uses
- * queue_peek so the event stays queued for the thread loop to actually
- * acknowledge -- we just need to stop touching the disk promptly.
+ * pending, or a task that outranks this one is waiting to start.
  *
  * The rank check is what keeps the album index from queueing behind a full
  * artwork pass. The index is short and the carousel can be waiting on it,
@@ -1101,27 +1090,7 @@ static void aa_ensure_fallback(void *workbuf, size_t workbuf_sz)
  * from where the thumbnails on disk leave it. */
 static bool aa_check_abort(void)
 {
-    struct queue_event ev;
-
-    if (bg_task_preempted(&art_cache_task))
-        return true;
-
-    /* Trap: the queue alone is too late for a host. Nothing arrives on it
-     * until SET_CONFIGURATION, by which point a pass holding the CPU has
-     * already cost the host SET_ADDRESS. */
-    if (usb_host_is_present())
-        return true;
-
-    if (!queue_peek(&aa_queue, &ev))
-        return false;
-    switch (ev.id)
-    {
-        case SYS_USB_CONNECTED:
-        case SYS_POWEROFF:
-        case SYS_REBOOT:
-            return true;
-    }
-    return false;
+    return bg_task_should_stop(&art_cache_task);
 }
 
 /* Resolve one folder's cover art and bring its thumbnails in line with it:
@@ -1474,7 +1443,7 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     aa_offer.pos = id3->albumart.pos;
     aa_offer.size = id3->albumart.size;
     aa_offer.flags = id3->albumart.type;
-    queue_post(&aa_queue, AA_EVENT_OFFER, 0);
+    bg_task_post(&art_cache_task, AA_EVENT_OFFER);
 }
 
 /* bg_task.run: one pass, with the tracing the pass itself does not do. */
@@ -1512,16 +1481,9 @@ struct bg_task art_cache_task =
     .handle_event = aa_task_event,
 };
 
-static void aa_thread(void)
-{
-    while (1)
-        bg_task_tick(&art_cache_task, &aa_queue);
-}
-
 void art_cache_init(void)
 {
     cache_busy = false;
-    queue_init(&aa_queue, true);
 
     /* Start the log from a readable point once per boot, so it says what this
      * run did rather than every run since the setting went on -- and so the
@@ -1546,10 +1508,6 @@ void art_cache_init(void)
     art_cache_task.work_bytes = aa_work_bytes() + AA_TABLE_BYTES;
 
     bg_task_init(&art_cache_task);
-    aa_thread_id = create_thread(aa_thread, aa_stack, sizeof(aa_stack), 0,
-                                 aa_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
-                                 IF_COP(, CPU));
-    (void)aa_thread_id;
 
     /* Opportunistically cache the embedded art of tracks as they play, for
      * folders that have no on-disk cover (fill-only -- see aa_handle_offer). */

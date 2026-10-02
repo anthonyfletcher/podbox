@@ -59,6 +59,7 @@
 #include "metadata/art_cache.h"
 #include "database/db_summary.h"
 #include "files/file_index.h"
+#include "system/bg_task.h"
 #include "screens/browse/browser_db.h"
 #include "lang.h"
 #include "string.h"
@@ -518,6 +519,7 @@ static void init_tagcache(void)
     db_summary_init();
     file_index_init();
     art_cache_init();
+    bg_task_start();
 
     while (!tagcache_is_initialized())
     {

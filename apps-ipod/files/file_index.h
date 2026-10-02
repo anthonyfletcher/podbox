@@ -9,8 +9,8 @@
 #include <stdbool.h>
 #include "system/bg_task.h"
 
-/* Start the background thread that keeps the document and image lists
- * current. Call once at startup. */
+/* Register the task that keeps the document and image lists current. Call
+ * once at startup, before bg_task_start(). */
 void file_index_init(void);
 
 /* Path of the list file for one class, for path_list_load(). Absent until a

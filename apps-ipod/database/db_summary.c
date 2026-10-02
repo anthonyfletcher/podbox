@@ -2073,9 +2073,9 @@ int db_summary_build_artists(struct db_summary_t *target,
  * made to wait for it. The carousel is unchanged: it still asks for the index
  * the same way, and simply finds it already written most of the time.
  *
- * The pass runs on the same terms as the artwork cache thread it sits beside,
- * and for the same reasons -- so both are expressed as a bg_task and the terms
- * themselves live in system/bg_task.c: only while the database is usable and
+ * The pass runs on the same terms as the artwork cache it sits beside, and for
+ * the same reasons -- so both are expressed as a bg_task, on the thread and the
+ * terms that live in system/bg_task.c: only while the database is usable and
  * idle, and only once the entry count has stopped moving, so a scan in
  * progress is left alone.
  *
@@ -2085,56 +2085,21 @@ int db_summary_build_artists(struct db_summary_t *target,
  * spoken for -- so the artwork pass is the one that gives way.
  * ------------------------------------------------------------------------ */
 
-#define IDX_STACK_SIZE (DEFAULT_STACK_SIZE + 0x2000)
-static long idx_stack[IDX_STACK_SIZE / sizeof(long)];
-static const char idx_thread_name[] = "albumidx";
-static unsigned int idx_thread_id;
-static struct event_queue idx_queue;
-
 /* Enough to build a large library's index; the app buffer the carousel builds
  * into is 512K, and this is the background equivalent. Anything smaller just
  * fails with ERROR_BUFFER_FULL, which leaves the carousel to build inline as
  * it always has. */
 #define IDX_BUILD_BUFSZ (384 * 1024)
 
-/* Whether the background pass should give up where it stands.
- *
- * The event is peeked, never taken. This queue is in the broadcast list, so
- * the storage handover counts an acknowledgement from it and hands the host
- * the disk only once every count is in -- and bg_task_tick() is what sends
- * this one. A pass that swallowed the event here would leave the handover
- * waiting for an acknowledgement nobody can still send, and the player would
- * report an empty drive for as long as it stayed plugged in. Returning true is
- * the whole job: the pass unwinds to the tick, which reads the event properly.
+/* Whether the background pass should give up where it stands. Returning true
+ * is the whole job: the pass unwinds to the thread, which reads the event.
  *
  * Without this the pass has no way to hear about USB at all, and a full
  * library index takes long enough for the host to give up and reset the port
  * while it runs. */
 static bool bg_should_stop(void)
 {
-    struct queue_event ev;
-
-    if (bg_task_preempted(&db_summary_task))
-        return true;
-
-    /* Trap: the queue alone is too late for a host. Nothing arrives on it
-     * until SET_CONFIGURATION, by which point a pass holding the CPU has
-     * already cost the host SET_ADDRESS. */
-    if (usb_host_is_present())
-        return true;
-
-    if (!queue_peek(&idx_queue, &ev))
-        return false;
-
-    switch (ev.id)
-    {
-        case SYS_USB_CONNECTED:
-        case SYS_POWEROFF:
-        case SYS_REBOOT:
-            return true;
-    }
-
-    return false;
+    return bg_task_should_stop(&db_summary_task);
 }
 
 
@@ -2495,21 +2460,10 @@ struct bg_task db_summary_task =
     .artifact_ok = saved_index_present,
 };
 
-static void idx_thread(void)
-{
-    while (1)
-        bg_task_tick(&db_summary_task, &idx_queue);
-}
-
 void db_summary_init(void)
 {
     mutex_init(&build_mutex);
-    queue_init(&idx_queue, true);
     bg_task_init(&db_summary_task);
-    idx_thread_id = create_thread(idx_thread, idx_stack, sizeof(idx_stack), 0,
-                                  idx_thread_name IF_PRIO(, PRIORITY_BACKGROUND)
-                                  IF_COP(, CPU));
-    (void)idx_thread_id;
 }
 
 void db_summary_invalidate(void)
