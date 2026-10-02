@@ -37,6 +37,9 @@
 #include "string.h"
 #ifdef HAVE_USBSTACK
 #include "usb_core.h"
+#ifdef USB_ENABLE_IAP
+#include "usbstack/usb_iap.h"
+#endif
 #include "usb_log.h"
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
@@ -318,7 +321,17 @@ static inline void usb_configure_drivers(int for_state)
 
     case USB_INSERTED:
 #ifdef USB_ENABLE_STORAGE
-        usb_core_enable_driver(USB_DRIVER_MASS_STORAGE, true);
+        /* Answering iAP2, no disk: a car selects configuration 1 before the
+         * iAP one, and an iPhone's is PTP, so it takes nothing. Handing the
+         * disk over unmounts it, stops playback and remounts it as the car
+         * moves on. */
+        usb_core_enable_driver(USB_DRIVER_MASS_STORAGE,
+#ifdef USB_ENABLE_IAP
+                               usb_iap_answer_iap2() == USB_IAP2_OFF
+#else
+                               true
+#endif
+                               );
 #endif
 #ifdef USB_ENABLE_HID
         usb_core_enable_driver(USB_DRIVER_HID, usb_hid);

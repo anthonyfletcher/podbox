@@ -38,6 +38,7 @@
 #include "usb_class_driver.h"
 #include "usb_hid_def.h"
 #include "usb_iap.h"
+#include "usb_iap2.h"
 
 struct usb_class_driver_ep_allocation usb_iap_ep_allocs[2] = {
     /* uac input */
@@ -130,6 +131,31 @@ static struct usb_as_format_type_i_discrete ipod_audio_stream_1_uac_discrete = {
     .bBitResolution     = 16,
     .bSamFreqType       = 3,
     .tSamFreq           = {
+        {0x00, 0x7D, 0x00}, /* 32000 */
+        {0x44, 0xAC, 0x00}, /* 44100 */
+        {0x80, 0xBB, 0x00}, /* 48000 */
+    },
+};
+
+/* An iPhone's list, used while answering iAP2: an iAP2 car names rates as
+ * indexes into it (this car's 08 07 06 are 48000, 44100 and 32000). Only the
+ * last three can be set; the car takes nothing else. */
+static struct usb_as_format_type_i_discrete iphone_stream_1_uac_discrete = {
+    .bLength            = USB_AS_SIZEOF_FORMAT_TYPE_I_DISCRETE(9),
+    .bDescriptorType    = USB_DT_CS_INTERFACE,
+    .bDescriptorSubType = USB_AS_FORMAT_TYPE,
+    .bFormatType        = USB_AS_FORMAT_TYPE_I,
+    .bNrChannels        = 2,
+    .bSubframeSize      = 2,
+    .bBitResolution     = 16,
+    .bSamFreqType       = 9,
+    .tSamFreq           = {
+        {0x40, 0x1F, 0x00}, /* 8000 */
+        {0x11, 0x2B, 0x00}, /* 11025 */
+        {0xE0, 0x2E, 0x00}, /* 12000 */
+        {0x80, 0x3E, 0x00}, /* 16000 */
+        {0x22, 0x56, 0x00}, /* 22050 */
+        {0xC0, 0x5D, 0x00}, /* 24000 */
         {0x00, 0x7D, 0x00}, /* 32000 */
         {0x44, 0xAC, 0x00}, /* 44100 */
         {0x80, 0xBB, 0x00}, /* 48000 */
@@ -348,7 +374,10 @@ static int usb_iap_get_config_descriptor(unsigned char* dest, int max_packet_siz
     PACK_DESC(ipod_audio_stream_0_desc);
     PACK_DESC(ipod_audio_stream_1_desc);
     PACK_DESC(ipod_audio_stream_1_uac_header);
-    PACK_DESC(ipod_audio_stream_1_uac_discrete);
+    if(usb_iap_answer_iap2() == USB_IAP2_OFF)
+        PACK_DESC(ipod_audio_stream_1_uac_discrete);
+    else
+        PACK_DESC(iphone_stream_1_uac_discrete);
     PACK_DESC(ipod_audio_stream_1_endpoint);
     PACK_DESC(ipod_audio_stream_1_endpoint_uac);
 
@@ -376,6 +405,7 @@ static int usb_iap_init_connection(void) {
     last_hold_switch_state = -1;
 
     iap_debug_reset_timestamp();
+    usb_iap2_connect();
 
     /* init audio sink */
     check_act(iap_audio_init(), return -1);
@@ -449,7 +479,9 @@ static void usb_iap_init(void) {
 
 static void usb_iap_disconnect(void) {
     iap_initialized = false;
-    audio_pause();
+    if(!usb_iap2_keeps_playing()) {
+        audio_pause();
+    }
     mixer_switch_sink(PCM_SINK_BUILTIN);
     timeout_cancel(&tick_tmo);
     if(platform.aa_slot >= 0) {
@@ -467,6 +499,10 @@ static void usb_iap_transfer_complete(int ep, int dir, int status, int length) {
     (void)length;
 
     if((ep | dir) == HID_EP_IN) {
+        if(usb_iap2_sent(status, length)) {
+            /* libiap did not send it, so is not told */
+            return;
+        }
         check_act(status == 0, return);
 #if DEBUG_DUMP_TX
         LOG("ep=%d dir=%d state=%d length=%d", ep, dir, status, length);
@@ -545,6 +581,10 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
             logf("==== acc: %u bytes ====", req->wLength);
             iap_platform_dump_hex(reqdata, req->wLength);
 #endif
+            if(usb_iap2_report(reqdata, req->wLength)) {
+                usb_core_control_response(USB_CONTROL_ACK, NULL, 0);
+                return true;
+            }
 
             struct IAPContext* ctx = _iap_acquire_ctx(true);
             iap_log_report(ctx, reqdata, req->wLength, false);
@@ -627,6 +667,10 @@ static bool usb_iap_control_request(struct usb_ctrlrequest* req, uint8_t* reqdat
 static void usb_iap_notify_event(intptr_t data) {
     switch(data) {
     case Notify_Tick: {
+        if(usb_iap2_tick()) {
+            /* the connection is iAP2's, and libiap stays quiet */
+            return;
+        }
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         struct Platform*   plt = ctx->platform;
         if(plt->control_pending && !iap_platform_library_play_done(ctx)) {

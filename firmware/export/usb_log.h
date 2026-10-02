@@ -90,6 +90,21 @@ enum usb_log_type
                           * announced, c = rate, d = rate announced or 0 */
     USB_LOG_IAP_STREAM,  /* what the stream now carries: a =
                           * USB_LOG_IAP_STREAM_* */
+    USB_LOG_IAP2,        /* an iAP2 report, raw: a = offset into it from
+                          * the link-control byte | USB_LOG_IAP_FROM_PLAYER,
+                          * b = report bytes, c, d = eight bytes from the
+                          * offset, big-endian, zero-padded */
+    USB_LOG_IAP2_SENT,   /* the player's iAP2 report left: c = status,
+                          * d = bytes */
+    USB_LOG_IAP2_PACKET, /* an iAP2 link packet: a = USB_LOG_IAP2_* status
+                          * | USB_LOG_IAP_FROM_PLAYER, b = bytes, c =
+                          * control, sequence, acknowledgement and session,
+                          * a byte each from the top */
+    USB_LOG_IAP2_MSG,    /* an iAP2 control message: a =
+                          * USB_LOG_IAP_FROM_PLAYER or 0, b = bytes, c = ID */
+    USB_LOG_IAP2_PARAMS, /* a received message's parameters, raw: a = bytes
+                          * valid, b = offset, c, d = eight bytes from it */
+    USB_LOG_IAP2_EVENT,  /* a = USB_LOG_IAP2_* event, c, d as it says */
 };
 
 #define USB_LOG_SETUP_DROPPED  1 /* arrived during a bus reset; ignored */
@@ -111,6 +126,26 @@ enum usb_log_type
 #define USB_LOG_HOST_PORT_READ 0x80
 
 #define USB_LOG_IAP_FROM_PLAYER 0x80
+
+#define USB_LOG_IAP2_OK       0
+#define USB_LOG_IAP2_CHECKSUM 1 /* the payload's checksum is wrong */
+#define USB_LOG_IAP2_TOO_LONG 2 /* longer than the player offered */
+#define USB_LOG_IAP2_AGAIN    3 /* the player's, sent again */
+
+#define USB_LOG_IAP2_LINK_UP     0 /* c = control session, d = window */
+#define USB_LOG_IAP2_LINK_LOST   1 /* c = sequence never acknowledged,
+                                    * d = sends */
+#define USB_LOG_IAP2_CERTIFICATE 2 /* c = its bytes, d = challenge bytes */
+#define USB_LOG_IAP2_IDENTIFIED  3 /* c = messages the car sends, d = takes */
+#define USB_LOG_IAP2_RATE        4 /* c = rate announced, d = index sent */
+#define USB_LOG_IAP2_NOW_PLAYING 5 /* c = track key, d = state << 24 | s */
+#define USB_LOG_IAP2_SEEK        6 /* c = ms */
+#define USB_LOG_IAP2_HID         7 /* c = controls found, d = descriptor
+                                    * bytes */
+#define USB_LOG_IAP2_BUTTON      8 /* c = usage, d = 1 when acted on */
+#define USB_LOG_IAP2_DROPPED     9 /* c = message ID not sent, d = bytes */
+#define USB_LOG_IAP2_POWER      10 /* c = 0 empty, 1 attributes; d = mask
+                                    * the car asked for */
 
 #define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
 #define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */
@@ -150,6 +185,7 @@ unsigned long usb_log_written(void);
  * Defined only where USB_ENABLE_IAP is. */
 const char *usb_log_iap_lingo(int lingo);
 const char *usb_log_iap_command(int lingo, int command);
+const char *usb_log_iap2_message(int id);
 #endif
 
 #endif /* USB_LOG_H */

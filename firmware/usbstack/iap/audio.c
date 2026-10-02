@@ -30,6 +30,7 @@
 #include "libiap/iap.h"
 #include "macros.h"
 #include "platform.h"
+#include "../usb_iap2.h"
 
 static const unsigned long samprs[] = {
     SAMPR_48,
@@ -66,6 +67,10 @@ static void sink_set_freq(uint16_t freq) {
     track_attrs_sent = true;
 
     set_freq = freq;
+
+    if(usb_iap2_audio_rate(samprs[freq])) {
+        return;
+    }
 
     struct IAPContext* ctx = _iap_acquire_ctx(true);
     check_act(iap_select_sampr(ctx, samprs[freq]), );
@@ -267,6 +272,10 @@ bool iap_audio_disable(void) {
     check_act(!enabled || usb_drv_batch_stop() == 0, return false);
     enabled = false;
     return true;
+}
+
+unsigned long iap_audio_sampr(void) {
+    return samprs[iap_pcm_sink.configured_freq];
 }
 
 bool iap_audio_set_sampr(uint32_t sampr) {

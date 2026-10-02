@@ -144,6 +144,63 @@ static void usb_log_format_iap(const struct usb_log_entry *e, char *p,
 }
 #endif
 
+#ifdef USB_ENABLE_IAP
+static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
+                                      size_t size)
+{
+    const unsigned long c = e->c, d = e->d;
+    switch (e->a)
+    {
+        case USB_LOG_IAP2_LINK_UP:
+            snprintf(p, size, "iap2 link up: control session %lu, "
+                     "window %lu", c, d);
+            break;
+        case USB_LOG_IAP2_LINK_LOST:
+            snprintf(p, size, "iap2 LINK LOST: seq %lu unacknowledged "
+                     "after %lu sends", c, d);
+            break;
+        case USB_LOG_IAP2_CERTIFICATE:
+            snprintf(p, size, "iap2 car's certificate %lu bytes, "
+                     "challenge %lu bytes", c, d);
+            break;
+        case USB_LOG_IAP2_IDENTIFIED:
+            snprintf(p, size, "iap2 IDENTIFIED: car sends %lu messages, "
+                     "takes %lu", c, d);
+            break;
+        case USB_LOG_IAP2_RATE:
+            snprintf(p, size, "iap2 audio rate %lu Hz announced as %lu",
+                     c, d);
+            break;
+        case USB_LOG_IAP2_NOW_PLAYING:
+            snprintf(p, size, "iap2 now playing: track %08lx, state %lu, "
+                     "%lu s", c, d >> 24, d & 0xffffff);
+            break;
+        case USB_LOG_IAP2_SEEK:
+            snprintf(p, size, "iap2 car seeks to %lu ms", c);
+            break;
+        case USB_LOG_IAP2_HID:
+            snprintf(p, size, "iap2 car's HID: %lu controls from a "
+                     "%lu-byte descriptor", c, d);
+            break;
+        case USB_LOG_IAP2_BUTTON:
+            snprintf(p, size, "iap2 car button: usage %02lx%s", c,
+                     d ? "" : ", not mapped");
+            break;
+        case USB_LOG_IAP2_DROPPED:
+            snprintf(p, size, "iap2 NOT SENT: %s (%04lx), %lu bytes",
+                     usb_log_iap2_message(c), c, d);
+            break;
+        case USB_LOG_IAP2_POWER:
+            snprintf(p, size, "iap2 power update %s, car asked for %08lx",
+                     c ? "with attributes" : "empty", d);
+            break;
+        default:
+            snprintf(p, size, "iap2 event %d", e->a);
+            break;
+    }
+}
+#endif
+
 void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          size_t size)
 {
@@ -330,6 +387,58 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                      e->a == USB_LOG_IAP_STREAM_NOTHING
                          ? "silent, nothing playing"
                          : "silent, waiting for the host to set the rate");
+            break;
+        case USB_LOG_IAP2:
+            snprintf(p, size, "iap2 %c %u bytes +%d: %08lx %08lx",
+                     e->a & USB_LOG_IAP_FROM_PLAYER ? '<' : '>', e->b,
+                     e->a & ~USB_LOG_IAP_FROM_PLAYER,
+                     (unsigned long)e->c, (unsigned long)e->d);
+            break;
+        case USB_LOG_IAP2_SENT:
+            snprintf(p, size, "iap2 < sent, status %ld, %lu bytes",
+                     (long)(int32_t)e->c, (unsigned long)e->d);
+            break;
+        case USB_LOG_IAP2_PACKET:
+        {
+            static const char *const status[] = {
+                "", ", BAD CHECKSUM", ", LONGER THAN OFFERED", ", again",
+            };
+            const unsigned control = e->c >> 24;
+            const int s = e->a & ~USB_LOG_IAP_FROM_PLAYER;
+            snprintf(p, size, "iap2 %c %s%s%s%s%sseq %lu ack %lu session %lu"
+                     ", %u bytes%s",
+                     e->a & USB_LOG_IAP_FROM_PLAYER ? '<' : '>',
+                     control & 0x80 ? "SYN " : "", control & 0x40 ? "ACK " : "",
+                     control & 0x20 ? "EAK " : "", control & 0x10 ? "RST " : "",
+                     control & 0xf0 ? "" : "- ",
+                     (unsigned long)(e->c >> 16 & 0xff),
+                     (unsigned long)(e->c >> 8 & 0xff),
+                     (unsigned long)(e->c & 0xff), e->b,
+                     s < (int)ARRAYLEN(status) ? status[s] : "");
+            break;
+        }
+        case USB_LOG_IAP2_MSG:
+            snprintf(p, size, "iap2 %c %s (%04lx), %u bytes",
+                     e->a & USB_LOG_IAP_FROM_PLAYER ? '<' : '>',
+                     usb_log_iap2_message(e->c), (unsigned long)e->c, e->b);
+            break;
+        case USB_LOG_IAP2_PARAMS:
+        {
+            /* Hex, then the same bytes as text, to read names in place. */
+            char text[9];
+            for (int i = 0; i < 8; i++)
+            {
+                unsigned ch = (i < 4 ? e->c >> (24 - 8 * i)
+                                     : e->d >> (56 - 8 * i)) & 0xff;
+                text[i] = i >= e->a ? ' ' : ch >= 0x20 && ch < 0x7f ? ch : '.';
+            }
+            text[8] = '\0';
+            snprintf(p, size, "iap2     +%-3u %08lx %08lx  %s", e->b,
+                     (unsigned long)e->c, (unsigned long)e->d, text);
+            break;
+        }
+        case USB_LOG_IAP2_EVENT:
+            usb_log_format_iap2_event(e, p, size);
             break;
 #endif
         case USB_LOG_SYNC:

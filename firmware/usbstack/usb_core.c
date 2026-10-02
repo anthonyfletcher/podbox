@@ -145,6 +145,21 @@ USB_STRING_INITIALIZER(u"Rockbox.org");
 static const struct usb_string_descriptor usb_string_iProduct =
 USB_STRING_INITIALIZER(u"Rockbox media player");
 
+#ifdef USB_ENABLE_IAP
+/* Answering iAP2 as an iPhone. */
+static const struct usb_string_descriptor usb_string_apple =
+USB_STRING_INITIALIZER(u"Apple Inc.");
+
+static const struct usb_string_descriptor usb_string_iphone =
+USB_STRING_INITIALIZER(u"iPhone");
+
+/* An iPhone's name for its iAP configuration, given to the player's while
+ * answering iAP2. */
+static const struct usb_string_descriptor usb_string_iap_config =
+USB_STRING_INITIALIZER(u"iPod USB Interface");
+#define USB_STRING_INDEX_IAP_CONFIG USB_STRING_INDEX_MAX
+#endif
+
 static struct usb_string_descriptor usb_string_iSerial =
 USB_STRING_INITIALIZER(u"00000000000000000000000000000000000000000");
 
@@ -839,6 +854,12 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             device_descriptor.idProduct = drivers[USB_DRIVER_AUDIO]->enabled ?
                 USB_PRODUCT_ID_AUDIO : USB_PRODUCT_ID;
 #endif
+#ifdef USB_ENABLE_IAP
+            if(usb_iap_answer_iap2() == USB_IAP2_IPHONE)
+                device_descriptor.idProduct = USB_PRODUCT_ID_IPHONE;
+            else if(device_descriptor.idProduct == USB_PRODUCT_ID_IPHONE)
+                device_descriptor.idProduct = USB_PRODUCT_ID;
+#endif
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);
             break;
@@ -880,6 +901,12 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             config_descriptor.bNumInterfaces = config_states[index].num_interfaces;
             config_descriptor.bConfigurationValue = index + 1;
             config_descriptor.wTotalLength = (uint16_t)size;
+#ifdef USB_ENABLE_IAP
+            config_descriptor.iConfiguration =
+                usb_iap_answer_iap2() != USB_IAP2_OFF &&
+                drivers[USB_DRIVER_IAP]->config == index + 1 ?
+                USB_STRING_INDEX_IAP_CONFIG : 0;
+#endif
             memcpy(reqdata, &config_descriptor, sizeof(struct usb_config_descriptor));
 
             ptr = reqdata;
@@ -889,7 +916,22 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             if((unsigned)index < USB_STRING_INDEX_MAX) {
                 size = usb_strings[index]->bLength;
                 ptr = usb_strings[index];
+#ifdef USB_ENABLE_IAP
+                if(usb_iap_answer_iap2() == USB_IAP2_IPHONE &&
+                   (index == USB_STRING_INDEX_MANUFACTURER ||
+                    index == USB_STRING_INDEX_PRODUCT)) {
+                    ptr = index == USB_STRING_INDEX_MANUFACTURER ?
+                          &usb_string_apple : &usb_string_iphone;
+                    size = ((const struct usb_string_descriptor*)ptr)->bLength;
+                }
+#endif
             }
+#ifdef USB_ENABLE_IAP
+            else if(index == USB_STRING_INDEX_IAP_CONFIG) {
+                size = usb_string_iap_config.bLength;
+                ptr = &usb_string_iap_config;
+            }
+#endif
             else if(index == 0xee) {
                 /* We don't have a real OS descriptor, and we don't handle
                  * STALL correctly on some devices, so we return any valid
@@ -1098,6 +1140,17 @@ static void request_handler_device(struct usb_ctrlrequest* req, uint8_t* reqdata
         #ifdef USB_ENABLE_IAP
         case USB_REQ_APPLE_SET_AVAIL_CURRENT:
             usb_core_control_response(USB_CONTROL_ACK, NULL, 0);
+            break;
+        case USB_REQ_APPLE_0x53:
+            /* An iPhone answers four zero bytes; an iPod refuses it. */
+            if(usb_iap_answer_iap2() != USB_IAP2_OFF &&
+               (req->bRequestType & USB_DIR_IN) && req->wLength <= 4) {
+                memset(reqdata, 0, req->wLength);
+                usb_core_control_response(USB_CONTROL_ACK, reqdata,
+                                          req->wLength);
+            } else {
+                usb_core_control_response(USB_CONTROL_STALL, NULL, 0);
+            }
             break;
         #endif
         default:

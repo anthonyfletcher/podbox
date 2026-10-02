@@ -111,6 +111,9 @@
 #ifdef USB_ENABLE_AUDIO
 #include "../usbstack/usb_audio.h"
 #endif
+#ifdef USB_ENABLE_IAP
+#include "../usbstack/usb_iap.h"
+#endif
 
 #include "speech/talk.h"
 
@@ -1735,6 +1738,22 @@ static bool dbg_usb_host_probe(void)
     usb_set_host_probe(false);
     return ret;
 }
+
+#ifdef USB_ENABLE_IAP
+/* Until the next restart: see usb_iap.h for why it is never on by itself. */
+static bool dbg_answer_iap2(void)
+{
+    static const char *const as[] = {
+        "iAP2 probe refused",
+        "iAP2 answered as an iPod until restart",
+        "iAP2 answered as an iPhone until restart",
+    };
+    int next = (usb_iap_answer_iap2() + 1) % 3;
+    usb_iap_set_answer_iap2(next);
+    splash(HZ * 2, as[next]);
+    return false;
+}
+#endif
 #endif /* HAVE_USBSTACK */
 
 /* Put every earned badge back to unannounced, so the next report opens on the
@@ -2244,6 +2263,9 @@ static const struct {
         { "View USB info", dbg_usb_info },
         { "USB log", dbg_usb_log },
         { "USB host probe", dbg_usb_host_probe },
+#ifdef USB_ENABLE_IAP
+        { "Answer iAP2 probe", dbg_answer_iap2 },
+#endif
 #endif
         { "View buffering thread", dbg_buffering_thread },
 #ifdef PM_DEBUG

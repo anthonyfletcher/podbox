@@ -26,3 +26,5 @@ bool iap_audio_deinit(void);
 bool iap_audio_enable(void);
 bool iap_audio_disable(void);
 bool iap_audio_set_sampr(uint32_t sampr);
+/* The rate the iAP sink is configured for. */
+unsigned long iap_audio_sampr(void);
