@@ -980,6 +980,18 @@ const struct settings_list settings[] = {
                 NULL, NULL, NULL),
     OFFON_SETTING(0, iap_enabled, LANG_ACCESSORY_PROTOCOL,
                   true, "accessory protocol", iap_enabled_set),
+#ifdef USB_ENABLE_IAP
+    CHOICE_SETTING(0, iap2_mode, LANG_IAP2_ACCESSORIES, 1,
+                   "iap2 accessories", "off,auto,on", usb_set_iap2_mode, 3,
+                   ID2P(LANG_OFF), ID2P(LANG_AUTO), ID2P(LANG_ON)),
+#endif
+    CHOICE_SETTING(0, car_artwork, LANG_CAR_ARTWORK, CAR_ARTWORK_AS_ALBUM_ART,
+                   "car artwork",
+                   "off,as album art,prefer embedded,prefer image file,"
+                   "prefer cache", NULL, 5,
+                   ID2P(LANG_OFF), ID2P(LANG_AS_ALBUM_ART),
+                   ID2P(LANG_PREFER_EMBEDDED), ID2P(LANG_PREFER_IMAGE_FILE),
+                   ID2P(LANG_PREFER_CACHE)),
     STRINGCHOICE_SETTING(0, iap_browse_size, LANG_ACCESSORY_BROWSING, 2,
                          "accessory browsing", "off,5000,10000,20000,40000",
                          NULL, 5, LANG_OFF,

@@ -56,4 +56,17 @@ uint64_t iap_library_key(const char *path);
  * none is in the database or a list is still being built. */
 bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start);
 
+/* A track's artwork, a JPEG as the file holds it, read on the library's
+ * worker: find starts it (false when the worker cannot take it now); state
+ * says whether it was found and how big it is; chunk gives the bytes read
+ * so far, none until more are, and next frees them for the worker; stop
+ * gives up. */
+enum { IAP_ART_NONE, IAP_ART_FINDING, IAP_ART_FOUND, IAP_ART_FAILED };
+struct mp3entry;
+bool iap_library_artwork_find(const struct mp3entry *id3);
+int iap_library_artwork_state(uint32_t *size);
+size_t iap_library_artwork_chunk(const uint8_t **data);
+void iap_library_artwork_next(void);
+void iap_library_artwork_stop(void);
+
 #endif /* _IAP_LIBRARY_H_ */

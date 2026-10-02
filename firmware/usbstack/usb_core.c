@@ -304,6 +304,33 @@ static struct usb_class_driver* drivers[USB_NUM_DRIVERS] =
 };
 
 static int usb_core_do_set_config(uint8_t new_config);
+
+#ifdef USB_ENABLE_IAP
+/* The disk handover held for a second while iAP2 is Auto (usb_iap.h): a
+ * car picks configuration 1, sends 0x53 and moves to the iAP one within
+ * half a second; a computer stays. The timer posts the configuration
+ * notification with STORAGE_HELD, out of a configuration's range, to make
+ * the handover on the USB thread if the host is still there. */
+#define STORAGE_HELD 0x100
+static struct timeout storage_tmo;
+static bool storage_held;
+
+static int storage_tmo_cb(struct timeout *tmo)
+{
+    (void)tmo;
+    usb_signal_notify(USB_NOTIFY_SET_CONFIG, STORAGE_HELD);
+    return 0;
+}
+
+static void storage_hold(bool on)
+{
+    storage_held = on;
+    if (on)
+        timeout_register(&storage_tmo, storage_tmo_cb, HZ, 0);
+    else
+        timeout_cancel(&storage_tmo);
+}
+#endif
 static void usb_core_control_request_handler(struct usb_ctrlrequest* req, uint8_t* reqdata, size_t reqdata_size);
 
 #define is_active(driver) ((driver)->enabled && !(driver)->error && (driver)->config == usb_config)
@@ -903,7 +930,7 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             config_descriptor.wTotalLength = (uint16_t)size;
 #ifdef USB_ENABLE_IAP
             config_descriptor.iConfiguration =
-                usb_iap_answer_iap2() != USB_IAP2_OFF &&
+                usb_iap2_offered() &&
                 drivers[USB_DRIVER_IAP]->config == index + 1 ?
                 USB_STRING_INDEX_IAP_CONFIG : 0;
 #endif
@@ -1064,12 +1091,23 @@ static int usb_core_do_set_config(uint8_t new_config)
     usb_record_waypoint(USB_WP_EXCLUSIVE, require_exclusive, 0);
 #endif
 
+#ifdef USB_ENABLE_IAP
+    if(require_exclusive && usb_iap2_offered()) {
+        /* Held while the host may yet prove a car; a car, never */
+        if(usb_iap_answer_iap2() == USB_IAP2_OFF && !storage_held)
+            storage_hold(true);
+    } else
+#endif
     if(require_exclusive) {
         /* Also preserve a pending handover across repeated SET_CONFIG.
          * Restarting it discards acknowledgements and races the USB UI. */
         usb_request_exclusive_storage();
-    } else if(!bus_reset_pending) {
-        usb_release_exclusive_storage();
+    } else {
+#ifdef USB_ENABLE_IAP
+        storage_hold(false);
+#endif
+        if(!bus_reset_pending)
+            usb_release_exclusive_storage();
     }
     /* A bus reset is not a physical disconnect. Keep the storage handover
      * (and its acknowledgement epoch) until the host selects a new config
@@ -1143,8 +1181,9 @@ static void request_handler_device(struct usb_ctrlrequest* req, uint8_t* reqdata
             break;
         case USB_REQ_APPLE_0x53:
             /* An iPhone answers four zero bytes; an iPod refuses it. */
-            if(usb_iap_answer_iap2() != USB_IAP2_OFF &&
+            if(usb_iap2_offered() &&
                (req->bRequestType & USB_DIR_IN) && req->wLength <= 4) {
+                usb_iap2_host_is_car();
                 memset(reqdata, 0, req->wLength);
                 usb_core_control_response(USB_CONTROL_ACK, reqdata,
                                           req->wLength);
@@ -1457,6 +1496,17 @@ void usb_core_handle_notify(long id, intptr_t data)
             usb_core_set_address(data);
             break;
         case USB_NOTIFY_SET_CONFIG:
+#ifdef USB_ENABLE_IAP
+            if(data == STORAGE_HELD) {
+                /* still on a configuration that needs the disk */
+                if(storage_held) {
+                    storage_held = false;
+                    if(usb_iap_answer_iap2() == USB_IAP2_OFF)
+                        usb_request_exclusive_storage();
+                }
+                break;
+            }
+#endif
             usb_core_do_set_config(data);
             break;
         case USB_NOTIFY_BUS_RESET:

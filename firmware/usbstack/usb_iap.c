@@ -374,7 +374,7 @@ static int usb_iap_get_config_descriptor(unsigned char* dest, int max_packet_siz
     PACK_DESC(ipod_audio_stream_0_desc);
     PACK_DESC(ipod_audio_stream_1_desc);
     PACK_DESC(ipod_audio_stream_1_uac_header);
-    if(usb_iap_answer_iap2() == USB_IAP2_OFF)
+    if(!usb_iap2_offered())
         PACK_DESC(ipod_audio_stream_1_uac_discrete);
     else
         PACK_DESC(iphone_stream_1_uac_discrete);

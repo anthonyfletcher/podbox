@@ -369,6 +369,8 @@ void usb_set_hid(bool enable);
 #ifdef USB_ENABLE_IAP
 /* enable or disable USB iAP, from the next connection */
 void usb_set_iap(bool enable);
+/* iAP2 Accessories: 0 off, 1 auto, 2 on (USB_IAP2_MODE_*) */
+void usb_set_iap2_mode(int mode);
 #endif
 
 #ifdef USB_ENABLE_SERIAL

@@ -22687,3 +22687,45 @@
     *: "One kind of question has to stay on"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_CAR_ARTWORK
+  desc: in accessories settings: where the cover art sent to a car comes from
+  user: core
+  <source>
+    *: "Car Artwork"
+  </source>
+  <dest>
+    *: "Car Artwork"
+  </dest>
+  <voice>
+    *: "Car Artwork"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AS_ALBUM_ART
+  desc: in Car Artwork: the same sources, in the same order, as Album Art
+  user: core
+  <source>
+    *: "As Album Art"
+  </source>
+  <dest>
+    *: "As Album Art"
+  </dest>
+  <voice>
+    *: "As Album Art"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP2_ACCESSORIES
+  desc: in accessories settings: answering accessories that expect an iPhone (iAP2) over USB
+  user: core
+  <source>
+    *: "iAP2 Accessories"
+  </source>
+  <dest>
+    *: "iAP2 Accessories"
+  </dest>
+  <voice>
+    *: "i A P 2 Accessories"
+  </voice>
+</phrase>

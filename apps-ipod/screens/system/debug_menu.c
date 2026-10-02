@@ -1740,11 +1740,12 @@ static bool dbg_usb_host_probe(void)
 }
 
 #ifdef USB_ENABLE_IAP
-/* Until the next restart: see usb_iap.h for why it is never on by itself. */
+/* Forces the answer until the next restart, over the iAP2 Accessories
+ * setting (usb_iap.h). */
 static bool dbg_answer_iap2(void)
 {
     static const char *const as[] = {
-        "iAP2 probe refused",
+        "iAP2 as the setting says",
         "iAP2 answered as an iPod until restart",
         "iAP2 answered as an iPhone until restart",
     };

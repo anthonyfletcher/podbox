@@ -372,11 +372,21 @@ static bool identified;
 static long availability_due;     /* when to send CarPlayAvailability, or 0 */
 static uint8_t next_transfer = 0x80; /* file transfer IDs run 80 to FF */
 static uint8_t artwork;           /* the artwork transfer just named, or 0 */
+/* The artwork transfer under way: see the now playing part */
+enum { ART_IDLE, ART_FINDING, ART_ANNOUNCED, ART_SENDING };
+static struct
+{
+    int phase;
+    uint8_t id;
+    uint32_t size, sent;
+    long started;
+} aw;
 /* The library on its way to the car: see the media library part */
 static struct
 {
     bool active;
     bool reset;             /* the next update opens with a reset */
+    bool waiting;           /* for the database, to send it unasked */
     int next, slots;        /* the path index slot to send next, of */
     uint32_t mask;          /* the item properties the car asked for */
     char rev[12];           /* the revision once all is sent */
@@ -424,7 +434,11 @@ void usb_iap2_control_reset(void)
     identified = false;
     availability_due = 0;
     artwork = 0;
+    if (aw.phase != ART_IDLE)
+        iap_library_artwork_stop();
+    aw.phase = ART_IDLE;
     lib.active = false;
+    lib.waiting = false;
     car_receives_n = 0;
     now_playing = false;
     n_controls = 0;
@@ -676,6 +690,9 @@ static void library_pump(void)
     }
 }
 
+static void library_start(uint32_t revision, uint32_t mask,
+                          const char *car_revision);
+
 static void send_library_updates(uint32_t mask, const char *car_revision)
 {
     const uint32_t revision = iap_library_revision();
@@ -699,8 +716,21 @@ static void send_library_updates(uint32_t mask, const char *car_revision)
             param_u8(7, 100);
             msg_send();
         }
+        /* The database loads into RAM a while after a start; the car's
+         * request is a subscription, so the whole library follows unasked
+         * when it can, as an iPhone sends a change. */
+        lib.waiting = true;
+        lib.mask = mask;
         return;
     }
+    library_start(revision, mask, car_revision);
+}
+
+/* The whole library, unless the car holds this revision already. */
+static void library_start(uint32_t revision, uint32_t mask,
+                          const char *car_revision)
+{
+    lib.waiting = false;
     snprintf(lib.rev, sizeof(lib.rev), "%lu", (unsigned long)revision);
     snprintf(lib.partial, sizeof(lib.partial), "%lu",
              (unsigned long)(revision - 1));
@@ -723,8 +753,11 @@ static void send_library_updates(uint32_t mask, const char *car_revision)
     library_pump();
 }
 
+static void artwork_pump(void);
+
 void usb_iap2_control_room(void)
 {
+    artwork_pump();
     library_pump();
 }
 
@@ -811,35 +844,116 @@ static int play_state(void)
 
 /* Artwork goes on the file transfer session, a transfer named by its ID in
  * the track's attribute 26. An iPhone opens one with every track, even with
- * nothing to send: [ID, 04 setup, 8-byte size, 00 02]; the car answers
- * [ID, 01] to go, the data follows as [ID, C0 first and last, bytes], and
- * the car answers [ID, 05]. Without it this car waits half a second, then
- * stops reading after the media library (unconfirmed as the cause). The
- * player has no artwork to send yet, so every transfer is empty. */
+ * nothing to send: [ID, 04 setup, 8-byte size, 00 02 for artwork]; the car
+ * answers [ID, 01] to go; the data follows in pieces of [ID, op, bytes], op
+ * C0 for the only piece, else 80 the first, 00 the middle ones and 40 the
+ * last; the car answers [ID, 05], and [ID, 02] cancels either way. Without
+ * it this car waits half a second before its media library. The JPEG is
+ * read on the library's worker; the setup goes when it has been found, or
+ * empty after 300 ms, inside the half second. Op values for pieces after
+ * the first from Nocturne (session/file_transfer.rs), facts only. */
 
-static void file_packet(const uint8_t *data, size_t n)
+static void file_packet(uint8_t id, uint8_t op, const uint8_t *data,
+                        size_t n)
 {
     size_t room;
     uint8_t *b = usb_iap2_message_start(&room);
-    if (!b || n > room)
+    if (!b || n + 2 > room)
         return;
-    memcpy(b, data, n);
-    usb_iap2_file_send(n);
+    b[0] = id;
+    b[1] = op;
+    if (n)
+        memcpy(b + 2, data, n);
+    usb_iap2_file_send(n + 2);
 }
 
-static void announce_artwork(void)
+static void announce_artwork(uint32_t size)
 {
-    const uint8_t setup[12] = {artwork, 0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2};
-    file_packet(setup, sizeof(setup));
-    artwork = 0;
+    const uint8_t setup[10] = {0, 0, 0, 0, size >> 24, size >> 16,
+                               size >> 8, size, 0, 2};
+    file_packet(aw.id, 0x04, setup, sizeof(setup));
+    aw.size = size;
+    aw.phase = ART_ANNOUNCED;
+}
+
+/* A new track's transfer, the last one cancelled if it is still going. */
+static void start_artwork(uint8_t id, const struct mp3entry *id3)
+{
+    if (aw.phase != ART_IDLE)
+    {
+        iap_library_artwork_stop();
+        file_packet(aw.id, 0x02, NULL, 0);
+    }
+    aw.id = id;
+    aw.sent = 0;
+    if (iap_library_artwork_find(id3))
+    {
+        aw.phase = ART_FINDING;
+        aw.started = current_tick;
+    }
+    else
+        announce_artwork(0);
+}
+
+static void artwork_pump(void)
+{
+    uint32_t size;
+    if (aw.phase == ART_FINDING)
+    {
+        const int state = iap_library_artwork_state(&size);
+        if (state == IAP_ART_FOUND)
+            announce_artwork(size);
+        else if (state != IAP_ART_FINDING ||
+                 TIME_AFTER(current_tick, aw.started + HZ * 3 / 10))
+        {
+            iap_library_artwork_stop();
+            announce_artwork(0);
+        }
+    }
+    while (aw.phase == ART_SENDING && usb_iap2_room() > 1)
+    {
+        const uint8_t *data;
+        const size_t n = iap_library_artwork_chunk(&data);
+        if (!n)
+        {
+            if (iap_library_artwork_state(&size) == IAP_ART_FAILED)
+            {
+                file_packet(aw.id, 0x02, NULL, 0);
+                aw.phase = ART_IDLE;
+            }
+            break;
+        }
+        const bool first = !aw.sent, last = aw.sent + n >= aw.size;
+        file_packet(aw.id, first ? (last ? 0xC0 : 0x80) : (last ? 0x40 : 0x00),
+                    data, n);
+        iap_library_artwork_next();
+        aw.sent += n;
+        if (last)
+            aw.phase = ART_IDLE;    /* the car's 05 needs no answer */
+    }
 }
 
 void usb_iap2_control_file(const uint8_t *data, size_t len)
 {
-    if (len >= 2 && data[1] == 0x01)
+    if (len < 2 || data[0] != aw.id)
+        return;
+    if (data[1] == 0x01 && aw.phase == ART_ANNOUNCED)
     {
-        const uint8_t empty[2] = {data[0], 0xC0};
-        file_packet(empty, sizeof(empty));
+        if (aw.size)
+        {
+            aw.phase = ART_SENDING;
+            artwork_pump();
+        }
+        else
+        {
+            file_packet(aw.id, 0xC0, NULL, 0);
+            aw.phase = ART_IDLE;
+        }
+    }
+    else if (data[1] == 0x02 && aw.phase != ART_IDLE)
+    {
+        iap_library_artwork_stop();
+        aw.phase = ART_IDLE;
     }
 }
 
@@ -910,12 +1024,27 @@ static void send_now_playing(bool media)
     group_end();
     msg_send();
     event(USB_LOG_IAP2_NOW_PLAYING, np_key, np_state << 24 | np_elapsed / 1000);
-    if (artwork)
-        announce_artwork();
+    if (artwork && id3)
+        start_artwork(artwork, id3);
+    artwork = 0;
+}
+
+/* The position alone, as an iPhone sends it about twice a second while
+ * playing: this car does not run the position on itself, and its progress
+ * bar stays at 0:00 without. */
+static void send_position(unsigned long elapsed)
+{
+    if (!(playback_mask & 1u << PB_POSITION) || !msg_start(NOW_PLAYING_UPDATE))
+        return;
+    group_start(1);
+    param_u32(PB_POSITION, elapsed);
+    group_end();
+    msg_send();
 }
 
 /* What changed since the last update: the track, the state, or a position
- * more than three seconds from where the last one runs on to. */
+ * more than three seconds from where the last one runs on to; and while
+ * playing, the position every half second. */
 static void poll_now_playing(void)
 {
     struct mp3entry *id3 = audio_current_track();
@@ -928,7 +1057,15 @@ static void poll_now_playing(void)
     const long drift = (long)elapsed - (long)expected;
     const bool track = key != np_key || np_full;
     if (!track && state == np_state && drift < 3000 && drift > -3000)
+    {
+        if (state == 1 && TIME_AFTER(current_tick, np_tick + HZ / 2))
+        {
+            np_elapsed = elapsed;
+            np_tick = current_tick;
+            send_position(elapsed);
+        }
         return;
+    }
     np_key = key;
     np_state = state;
     np_elapsed = elapsed;
@@ -1267,6 +1404,7 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
         break;
     case STOP_LIBRARY_UPDATES:
         lib.active = false;
+        lib.waiting = false;
         break;
     case PLAY_LIBRARY_ITEMS:
         /* 0 the tracks' keys back to back, 1 the index to start at */
@@ -1331,5 +1469,12 @@ void usb_iap2_control_tick(void)
         send_rate(rate_wanted);
     if (identified && now_playing)
         poll_now_playing();
+    artwork_pump();
+    if (lib.waiting && !lib.active)
+    {
+        const uint32_t revision = iap_library_revision();
+        if (revision)
+            library_start(revision, lib.mask, NULL);
+    }
     library_pump();
 }

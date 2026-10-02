@@ -36,6 +36,7 @@
  *   - the entry points
  *   - the library as iAP2 sends it: every track by its key, and playing
  *     the keys a car chooses
+ *   - artwork for iAP2: the playing track's JPEG, read on the worker
  ****************************************************************************/
 
 #include "config.h"
@@ -57,6 +58,8 @@
 #include "database/sound_mix.h"
 #include "database/sound_mood.h"
 #include "metadata/book_resume.h"
+#include "metadata/albumart.h"
+#include "file.h"
 #include "iap-library.h"
 
 /* iAP's database categories */
@@ -171,7 +174,7 @@ static uint32_t list_count;
 /* The database commit the lists and the selection were read under */
 static int32_t lists_commit = -1;
 
-enum { EV_PLAY = 1, EV_MIX, EV_EXIT };
+enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
@@ -185,6 +188,7 @@ static long play_book_seek;
 
 static void play_tracks(uint32_t start);
 static void play_mix(int mix);
+static void read_artwork(void);
 
 static void worker(void)
 {
@@ -195,6 +199,11 @@ static void worker(void)
         queue_wait(&worker_q, &ev);
         if (ev.id == EV_EXIT)
             return;
+        if (ev.id == EV_ARTWORK)
+        {
+            read_artwork();     /* the lists are not its to finish */
+            continue;
+        }
         if (ev.id == EV_PLAY)
             play_tracks(ev.data);
         else if (ev.id == EV_MIX)
@@ -1078,4 +1087,134 @@ bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
     all_songs = false;
     start_work(EV_PLAY, first);
     return true;
+}
+
+/* ------------------------------------------------------------------ *
+ * artwork for iAP2                                                   *
+ * ------------------------------------------------------------------ */
+
+/* The track's cover as a JPEG, from where Car Artwork says by Album Art's
+ * rules (albumart_find_source()), read on the worker, never the USB thread,
+ * into a ring of blocks the USB side sends from a packet's worth at a time.
+ * Trap: a read per packet seeks the disk away from the buffering thread
+ * hundreds of times a cover, and on the 5G the new track's audio runs dry.
+ * Larger covers than ART_MAX are not sent; nothing here re-encodes. */
+#define ART_MAX   (512 * 1024)
+#define ART_CHUNK 1000
+#define ART_BLOCK (8 * ART_CHUNK)
+#define ART_BUFS  4
+
+static struct mp3entry art_track;   /* the request, copied */
+static struct {
+    volatile int state;             /* IAP_ART_* */
+    volatile bool cancel;
+    volatile bool reading;          /* the worker is in read_artwork() */
+    volatile uint32_t size;
+    uint8_t buf[ART_BUFS][ART_BLOCK];
+    volatile size_t len[ART_BUFS];  /* bytes ready in each, 0 when free */
+    unsigned rd, wr;
+    size_t off;                     /* bytes of buf[rd] already sent */
+} art;
+
+static struct albumart_source art_source;
+
+/* Album Art's preference for the car, or AA_OFF */
+static int car_preference(void)
+{
+    if (global_settings.car_artwork == CAR_ARTWORK_AS_ALBUM_ART)
+        return global_settings.album_art;
+    return global_settings.car_artwork - 1;
+}
+
+static void read_artwork(void)
+{
+    int fd = -1;
+    uint32_t left = 0;
+
+    art.reading = true;
+#ifdef HAVE_PRIORITY_SCHEDULING
+    /* Trap: at background priority the worker waits behind the codec and
+     * the library sync, seconds before the first bytes and a cover at a
+     * fraction of the 140 KB/s the car takes from an iPhone */
+    int priority = thread_set_priority(worker_id, PRIORITY_USER_INTERFACE);
+#endif
+    if (albumart_find_source(&art_track, car_preference(), true,
+                             &art_source) &&
+        (fd = open(art_source.path, O_RDONLY)) >= 0)
+    {
+        off_t size = art_source.size;
+        if (size < 0)
+            size = lseek(fd, 0, SEEK_END);
+        if (size > 0 && size <= ART_MAX &&
+            lseek(fd, art_source.pos, SEEK_SET) == art_source.pos)
+            left = size;
+    }
+
+    art.size = left;
+    art.state = left ? IAP_ART_FOUND : IAP_ART_NONE;
+    while (left && !art.cancel && !leaving)
+    {
+        if (art.len[art.wr])
+        {
+            sleep(1);       /* every buffer waits for the USB side */
+            continue;
+        }
+        ssize_t got = read(fd, art.buf[art.wr], MIN(left, ART_BLOCK));
+        if (got <= 0)
+        {
+            art.state = IAP_ART_FAILED;
+            break;
+        }
+        left -= got;
+        art.len[art.wr] = got;
+        art.wr = (art.wr + 1) % ART_BUFS;
+    }
+    if (fd >= 0)
+        close(fd);
+#ifdef HAVE_PRIORITY_SCHEDULING
+    thread_set_priority(worker_id, priority);
+#endif
+    art.reading = false;
+}
+
+bool iap_library_artwork_find(const struct mp3entry *id3)
+{
+    if (art.reading || building || !open_block())
+        return false;
+    copy_mp3entry(&art_track, id3);
+    art.cancel = false;
+    art.size = 0;
+    memset((void *)art.len, 0, sizeof(art.len));
+    art.rd = art.wr = 0;
+    art.off = 0;
+    art.state = IAP_ART_FINDING;
+    queue_post(&worker_q, EV_ARTWORK, 0);
+    return true;
+}
+
+int iap_library_artwork_state(uint32_t *size)
+{
+    *size = art.size;
+    return art.state;
+}
+
+size_t iap_library_artwork_chunk(const uint8_t **data)
+{
+    *data = art.buf[art.rd] + art.off;
+    return MIN(art.len[art.rd] - art.off, ART_CHUNK);
+}
+
+void iap_library_artwork_next(void)
+{
+    art.off += MIN(art.len[art.rd] - art.off, ART_CHUNK);
+    if (art.off < art.len[art.rd])
+        return;
+    art.off = 0;
+    art.len[art.rd] = 0;
+    art.rd = (art.rd + 1) % ART_BUFS;
+}
+
+void iap_library_artwork_stop(void)
+{
+    art.cancel = true;
 }

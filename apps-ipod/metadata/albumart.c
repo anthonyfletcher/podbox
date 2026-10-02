@@ -19,6 +19,8 @@
 #include "system/strutil.h"
 #include "pathfuncs.h"
 #include "settings/settings.h"
+#include "art_cache.h"
+#include "settings/settings.h"
 #include "screens/playback/wps.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
@@ -267,3 +269,77 @@ bool find_albumart(const struct mp3entry *id3, char *buf, int buflen,
     return search_albumart_files(id3, size_string, buf, buflen);
 }
 
+/* One source, if the track has it. */
+static bool try_source(const struct mp3entry *id3, int kind, bool as_stored,
+                       struct albumart_source *src)
+{
+    switch (kind)
+    {
+    case AA_SOURCE_EMBEDDED:
+        if (!id3->has_embedded_albumart || id3->albumart.size <= 0)
+            return false;
+        /* Unsynchronised or base64 bytes are not a JPEG until decoded */
+        if (as_stored ? id3->albumart.type != AA_TYPE_JPG
+                      : (id3->albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
+            return false;
+        strmemccpy(src->path, id3->path, sizeof(src->path));
+        src->pos = id3->albumart.pos;
+        src->size = id3->albumart.size;
+        break;
+    case AA_SOURCE_FILE:
+    {
+        if (!search_albumart_files(id3, "", src->path, sizeof(src->path)))
+            return false;
+        const char *dot = strrchr(src->path, '.');
+        if (as_stored && !(dot && (!strcasecmp(dot, ".jpg") ||
+                                   !strcasecmp(dot, ".jpeg"))))
+            return false;
+        src->pos = 0;
+        src->size = -1;
+        break;
+    }
+    case AA_SOURCE_CACHE:
+    {
+        /* Raw thumbnail pixels: nothing that wants a stored JPEG can use it */
+        char dir[MAX_PATH];
+        const char *sep = strrchr(id3->path, '/');
+        const int size_index = art_cache_size_index("wps");
+        bool fallback;
+        if (as_stored || !sep || size_index < 0 ||
+            sep - id3->path >= (int)sizeof(dir))
+            return false;
+        strmemccpy(dir, id3->path, sep - id3->path + 1);
+        if (!art_cache_lookup(dir, size_index, src->path, sizeof(src->path),
+                              &fallback) || fallback)
+            return false;
+        src->pos = 0;
+        src->size = -1;
+        break;
+    }
+    default:
+        return false;
+    }
+    src->kind = kind;
+    return true;
+}
+
+bool albumart_find_source(const struct mp3entry *id3, int preference,
+                          bool as_stored, struct albumart_source *src)
+{
+    static const int order[][3] = {
+        [AA_PREFER_EMBEDDED] =
+            { AA_SOURCE_EMBEDDED, AA_SOURCE_FILE, AA_SOURCE_CACHE },
+        [AA_PREFER_IMAGE_FILE] =
+            { AA_SOURCE_FILE, AA_SOURCE_EMBEDDED, AA_SOURCE_CACHE },
+        [AA_PREFER_CACHE] =
+            { AA_SOURCE_CACHE, AA_SOURCE_EMBEDDED, AA_SOURCE_FILE },
+    };
+
+    src->kind = AA_SOURCE_NONE;
+    if (!id3 || preference <= AA_OFF || preference > AA_PREFER_CACHE)
+        return false;
+    for (int i = 0; i < 3; i++)
+        if (try_source(id3, order[preference][i], as_stored, src))
+            return true;
+    return false;
+}

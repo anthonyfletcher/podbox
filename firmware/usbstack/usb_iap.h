@@ -30,11 +30,29 @@ extern struct usb_class_driver_ep_allocation usb_iap_ep_allocs[2];
 
 extern struct usb_class_driver usb_cdrv_iap;
 
-/* Whether an accessory's iAP2 probe is answered, and as what. Off at every
- * start: an accessory that probes before falling back to iAP1 would
- * otherwise be taken into iAP2, which the player cannot yet finish. As an
- * iPhone, the player also enumerates with an iPhone's product ID and
- * Apple's manufacturer and product strings. */
+/* iAP2, by the setting: Off, the probe is refused, as an iPod refuses it.
+ * On, it is answered, and the disk is not offered. Auto, it is answered
+ * once the host has sent Apple's vendor request 0x53, as a car looking for
+ * an iPhone does, and the disk handover waits a second after the host
+ * picks a configuration that needs it: a car moves on to the iAP one within
+ * that, and is never handed the disk; a computer stays, and is. With iAP2
+ * not Off, the iAP configuration is an iPhone's: its nine rates and its
+ * name. */
+enum
+{
+    USB_IAP2_MODE_OFF,
+    USB_IAP2_MODE_AUTO,
+    USB_IAP2_MODE_ON,
+};
+void usb_iap_set_iap2_mode(int mode);
+bool usb_iap2_offered(void);
+/* The host has sent 0x53; and a new host, which has not. */
+void usb_iap2_host_is_car(void);
+void usb_iap2_host_new(void);
+
+/* Whether the probe is answered now, and as what. Debug > Answer iAP2 probe
+ * forces it until restart, an iPhone also enumerating with an iPhone's
+ * product ID and Apple's manufacturer and product strings. */
 enum
 {
     USB_IAP2_OFF,

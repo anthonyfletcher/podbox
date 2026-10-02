@@ -212,6 +212,17 @@ enum
     AA_PREFER_CACHE
 };
 
+/* Car Artwork: Off, or the Album Art setting's own order, or one of its
+ * orders chosen for the car alone (CAR_ARTWORK_x - 1 is that AA_PREFER_x) */
+enum
+{
+    CAR_ARTWORK_OFF = 0,
+    CAR_ARTWORK_AS_ALBUM_ART,
+    CAR_ARTWORK_EMBEDDED,
+    CAR_ARTWORK_IMAGE_FILE,
+    CAR_ARTWORK_CACHE
+};
+
 /* Which picture the now-playing screen shows. The artwork cache holds both,
  * keyed by folder, so this only chooses which folder to ask it about -- see
  * load_cached_albumart() in audio/playback.c.
@@ -876,6 +887,8 @@ struct user_settings
 
     bool iap_enabled; /* answer iAP accessories, serial and USB */
     int iap_browse_size; /* 0=off, else index into 5000,10000,20000,40000 */
+    int car_artwork;     /* CAR_ARTWORK_*: the art an iAP2 car is sent */
+    int iap2_mode;       /* 0 off, 1 auto, 2 on: answering iAP2 over USB */
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
     bool lineout_active;

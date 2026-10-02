@@ -1361,6 +1361,7 @@ void settings_apply(bool read_disk)
     iap_enable(global_settings.iap_enabled);
 #ifdef USB_ENABLE_IAP
     usb_set_iap(global_settings.iap_enabled);
+    usb_set_iap2_mode(global_settings.iap2_mode);
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
     usb_set_dac_output(global_settings.usb_dac_output);

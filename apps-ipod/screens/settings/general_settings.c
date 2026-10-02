@@ -451,6 +451,10 @@ MAKE_MENU(car_adapter_mode_menu, ID2P(LANG_CAR_ADAPTER_MODE), 0, Icon_NOICON,
            &car_adapter_mode, &car_adapter_mode_delay);
 MENUITEM_SETTING(iap_enabled, &global_settings.iap_enabled, NULL);
 MENUITEM_SETTING(iap_browse_size, &global_settings.iap_browse_size, NULL);
+MENUITEM_SETTING(car_artwork, &global_settings.car_artwork, NULL);
+#ifdef USB_ENABLE_IAP
+MENUITEM_SETTING(iap2_mode, &global_settings.iap2_mode, NULL);
+#endif
 MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate, NULL);
 MENUITEM_SETTING(accessory_supply, &global_settings.accessory_supply, NULL);
 MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
@@ -559,7 +563,12 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 
 /* The dock connector's other pins, and the headphone jack's remote. */
 MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
-            &iap_enabled, &iap_browse_size, &serial_bitrate, &accessory_supply,
+            &iap_enabled,
+#ifdef USB_ENABLE_IAP
+            &iap2_mode,
+#endif
+            &iap_browse_size, &car_artwork, &serial_bitrate,
+            &accessory_supply,
             &lineout_onoff
 #ifdef HAVE_MIKEY_REMOTE
             , &remote_track_skip

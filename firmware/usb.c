@@ -354,6 +354,9 @@ static inline void usb_configure_drivers(int for_state)
         /* USB_INSERTED: */
 
     case USB_EXTRACTED:
+#ifdef USB_ENABLE_IAP
+        usb_iap2_host_new();    /* the next host is not known to be a car */
+#endif
         /* do not call usb_release_exclusive_storage.
          * usb core handles it */
         break;
@@ -1281,6 +1284,11 @@ void usb_set_iap(bool enable)
     usb_iap = enable;
     if (!enable)
         usb_core_enable_driver(USB_DRIVER_IAP, false);
+}
+
+void usb_set_iap2_mode(int mode)
+{
+    usb_iap_set_iap2_mode(mode);
 }
 #endif /* USB_ENABLE_IAP */
 
