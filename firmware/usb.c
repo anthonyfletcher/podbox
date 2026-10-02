@@ -328,7 +328,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_MASS_STORAGE,
 #ifdef USB_ENABLE_IAP
                                !usb_iap ||
-                               usb_iap_answer_iap2() == USB_IAP2_OFF
+                               !usb_iap_answer_iap2()
 #else
                                true
 #endif

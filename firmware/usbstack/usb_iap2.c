@@ -79,7 +79,6 @@ static const uint8_t probe[] = {0xFF, 0x55, 0x02, 0x00, 0xEE, 0x10};
 
 #define SLOTS   8       /* the player's packets awaiting acknowledgement */
 
-static int forced;          /* USB_IAP2_*: the debug menu's, or OFF */
 static int mode = USB_IAP2_MODE_AUTO;
 static bool car_seen;       /* this host has sent Apple's 0x53 */
 static bool seen;           /* the probe has been answered */
@@ -139,19 +138,10 @@ static uint8_t report[96] USB_DEVBSS_ATTR __attribute__((aligned(32)));
 static uint8_t rx[MAX_PACKET + 256];
 static size_t rx_len;
 
-void usb_iap_set_answer_iap2(int as)
+bool usb_iap_answer_iap2(void)
 {
-    forced = as;
-}
-
-int usb_iap_answer_iap2(void)
-{
-    if (forced != USB_IAP2_OFF)
-        return forced;
-    if (mode == USB_IAP2_MODE_ON ||
-        (mode == USB_IAP2_MODE_AUTO && car_seen))
-        return USB_IAP2_IPOD;
-    return USB_IAP2_OFF;
+    return mode == USB_IAP2_MODE_ON ||
+           (mode == USB_IAP2_MODE_AUTO && car_seen);
 }
 
 void usb_iap_set_iap2_mode(int m)
@@ -164,7 +154,7 @@ void usb_iap_set_iap2_mode(int m)
 bool usb_iap2_offered(void)
 {
     return usb_core_driver_enabled(USB_DRIVER_IAP) &&
-           (mode != USB_IAP2_MODE_OFF || forced != USB_IAP2_OFF);
+           mode != USB_IAP2_MODE_OFF;
 }
 
 void usb_iap2_host_is_car(void)
@@ -605,7 +595,7 @@ static void take_packets(bool last)
 bool usb_iap2_report(const uint8_t *r, size_t len)
 {
     const struct IAPHIDReport *hr = (const struct IAPHIDReport *)r;
-    if (usb_iap_answer_iap2() == USB_IAP2_OFF || len < sizeof(*hr))
+    if (!usb_iap_answer_iap2() || len < sizeof(*hr))
         return false;
     const uint8_t *data = hr->data;
     size_t n = len - sizeof(*hr);

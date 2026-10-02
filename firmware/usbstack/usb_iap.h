@@ -50,15 +50,5 @@ bool usb_iap2_offered(void);
 void usb_iap2_host_is_car(void);
 void usb_iap2_host_new(void);
 
-/* Whether the probe is answered now, and as what. Debug > Answer iAP2 probe
- * forces it until restart, an iPhone also enumerating with an iPhone's
- * product ID and Apple's manufacturer and product strings. */
-enum
-{
-    USB_IAP2_OFF,
-    USB_IAP2_IPOD,
-    USB_IAP2_IPHONE,
-};
-#define USB_PRODUCT_ID_IPHONE 0x12A8
-void usb_iap_set_answer_iap2(int as);
-int usb_iap_answer_iap2(void);
+/* Whether the probe is answered now, by the mode above. */
+bool usb_iap_answer_iap2(void);

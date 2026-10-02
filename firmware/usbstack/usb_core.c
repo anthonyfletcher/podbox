@@ -146,13 +146,6 @@ static const struct usb_string_descriptor usb_string_iProduct =
 USB_STRING_INITIALIZER(u"PodBox media player");
 
 #ifdef USB_ENABLE_IAP
-/* Answering iAP2 as an iPhone. */
-static const struct usb_string_descriptor usb_string_apple =
-USB_STRING_INITIALIZER(u"Apple Inc.");
-
-static const struct usb_string_descriptor usb_string_iphone =
-USB_STRING_INITIALIZER(u"iPhone");
-
 /* An iPhone's name for its iAP configuration, given to the player's while
  * answering iAP2. */
 static const struct usb_string_descriptor usb_string_iap_config =
@@ -881,12 +874,6 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             device_descriptor.idProduct = drivers[USB_DRIVER_AUDIO]->enabled ?
                 USB_PRODUCT_ID_AUDIO : USB_PRODUCT_ID;
 #endif
-#ifdef USB_ENABLE_IAP
-            if(usb_iap_answer_iap2() == USB_IAP2_IPHONE)
-                device_descriptor.idProduct = USB_PRODUCT_ID_IPHONE;
-            else if(device_descriptor.idProduct == USB_PRODUCT_ID_IPHONE)
-                device_descriptor.idProduct = USB_PRODUCT_ID;
-#endif
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);
             break;
@@ -943,15 +930,6 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             if((unsigned)index < USB_STRING_INDEX_MAX) {
                 size = usb_strings[index]->bLength;
                 ptr = usb_strings[index];
-#ifdef USB_ENABLE_IAP
-                if(usb_iap_answer_iap2() == USB_IAP2_IPHONE &&
-                   (index == USB_STRING_INDEX_MANUFACTURER ||
-                    index == USB_STRING_INDEX_PRODUCT)) {
-                    ptr = index == USB_STRING_INDEX_MANUFACTURER ?
-                          &usb_string_apple : &usb_string_iphone;
-                    size = ((const struct usb_string_descriptor*)ptr)->bLength;
-                }
-#endif
             }
 #ifdef USB_ENABLE_IAP
             else if(index == USB_STRING_INDEX_IAP_CONFIG) {
@@ -1094,7 +1072,7 @@ static int usb_core_do_set_config(uint8_t new_config)
 #ifdef USB_ENABLE_IAP
     if(require_exclusive && usb_iap2_offered()) {
         /* Held while the host may yet prove a car; a car, never */
-        if(usb_iap_answer_iap2() == USB_IAP2_OFF && !storage_held)
+        if(!usb_iap_answer_iap2() && !storage_held)
             storage_hold(true);
     } else
 #endif
@@ -1501,7 +1479,7 @@ void usb_core_handle_notify(long id, intptr_t data)
                 /* still on a configuration that needs the disk */
                 if(storage_held) {
                     storage_held = false;
-                    if(usb_iap_answer_iap2() == USB_IAP2_OFF)
+                    if(!usb_iap_answer_iap2())
                         usb_request_exclusive_storage();
                 }
                 break;
