@@ -69,4 +69,9 @@ size_t iap_library_artwork_chunk(const uint8_t **data);
 void iap_library_artwork_next(void);
 void iap_library_artwork_stop(void);
 
+/* The name every iAP transport gives an accessory: the first line of
+ * playername.txt, or PodBox when it has none. */
+#define IAP_PLAYER_NAME_DEFAULT "PodBox"
+void iap_player_name(char *buf, size_t size);
+
 #endif /* _IAP_LIBRARY_H_ */

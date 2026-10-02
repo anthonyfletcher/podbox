@@ -140,10 +140,10 @@ static const struct usb_qualifier_descriptor __attribute__((aligned(2)))
 };
 
 static const struct usb_string_descriptor usb_string_iManufacturer =
-USB_STRING_INITIALIZER(u"Rockbox.org");
+USB_STRING_INITIALIZER(u"PodBox");
 
 static const struct usb_string_descriptor usb_string_iProduct =
-USB_STRING_INITIALIZER(u"Rockbox media player");
+USB_STRING_INITIALIZER(u"PodBox media player");
 
 #ifdef USB_ENABLE_IAP
 /* Answering iAP2 as an iPhone. */

@@ -13,6 +13,7 @@
 
 #include "iap-core.h"
 #include "iap-lingo.h"
+#include "iap-library.h"
 #include "kernel.h"
 #include "system.h"
 #include "tuner.h"
@@ -290,8 +291,10 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          */
         case 0x07:
         {
+            char name[32];
+            iap_player_name(name, sizeof(name));
             IAP_TX_INIT(0x00, 0x08);
-            IAP_TX_PUT_STRING("ROCKBOX");
+            IAP_TX_PUT_STRING(name);
 
             iap_send_tx();
             break;

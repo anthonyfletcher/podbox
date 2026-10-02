@@ -37,6 +37,7 @@
  *   - the library as iAP2 sends it: every track by its key, and playing
  *     the keys a car chooses
  *   - artwork for iAP2: the playing track's JPEG, read on the worker
+ *   - the player's name
  ****************************************************************************/
 
 #include "config.h"
@@ -60,6 +61,8 @@
 #include "metadata/book_resume.h"
 #include "metadata/albumart.h"
 #include "file.h"
+#include "rbpaths.h"
+#include "system/strutil.h"
 #include "iap-library.h"
 
 /* iAP's database categories */
@@ -1217,4 +1220,21 @@ void iap_library_artwork_next(void)
 void iap_library_artwork_stop(void)
 {
     art.cancel = true;
+}
+
+/* ------------------------------------------------------------------ *
+ * the player's name                                                  *
+ * ------------------------------------------------------------------ */
+
+void iap_player_name(char *buf, size_t size)
+{
+    int fd = open_utf8(ROCKBOX_DIR "/playername.txt", O_RDONLY);
+    buf[0] = '\0';
+    if (fd >= 0)
+    {
+        read_line(fd, buf, size);
+        close(fd);
+    }
+    if (buf[0] == '\0')
+        strlcpy(buf, IAP_PLAYER_NAME_DEFAULT, size);
 }

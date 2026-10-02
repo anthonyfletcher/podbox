@@ -101,12 +101,14 @@
 #define USB_AUDIO_INFORMATION      0xDA01
 #define STOP_USB_AUDIO             0xDA02
 
-#define DEVICE_NAME "PodBox"
 #define DEVICE_UUID "50F0D0B0-6E2B-4F8A-9C1D-0000000006C0"
 /* In an iPhone's form: a UUID, then -MPN- for the device's own library, then
  * a version. An ID ending -PODBOX was the last thing this car took before
  * going silent; unconfirmed as the cause. */
 #define LIBRARY_ID  "50F0D0B0-6E2B-4F8A-9C1D-0000000006C1-MPN-26.6.2"
+
+/* The player's name, read as the car identifies. */
+static char device_name[32];
 
 /* ---- names and logging -------------------------------------------------- */
 
@@ -554,7 +556,7 @@ static void send_library_information(void)
     if (!msg_start(LIBRARY_INFORMATION))
         return;
     group_start(0);
-    param_str(0, DEVICE_NAME);
+    param_str(0, device_name);
     param_str(1, LIBRARY_ID);
     param_u8(2, 0);
     group_end();
@@ -1012,7 +1014,7 @@ static void send_now_playing(bool media)
         param_u8(PB_REPEAT, global_settings.repeat_mode == REPEAT_ONE ? 1 :
                             global_settings.repeat_mode == REPEAT_ALL ? 2 : 0);
     if (playback_mask & 1u << PB_APP_NAME)
-        param_str(PB_APP_NAME, DEVICE_NAME);
+        param_str(PB_APP_NAME, IAP_PLAYER_NAME_DEFAULT);
     if (playback_mask & 1u << PB_LIBRARY)
         param_str(PB_LIBRARY, LIBRARY_ID);
     if (playback_mask & 1u << PB_SPEED)
@@ -1281,6 +1283,7 @@ static void take_identification(const uint8_t *p, size_t len)
     if (find(p, len, 6, &sent_n))
         sent_n /= 2;
 
+    iap_player_name(device_name, sizeof(device_name));
     send_empty(IDENTIFICATION_ACCEPTED);
     identified = true;
     event(USB_LOG_IAP2_IDENTIFIED, sent_n, car_receives_n);
@@ -1308,7 +1311,7 @@ static void take_identification(const uint8_t *p, size_t len)
     if (car_takes(DEVICE_INFORMATION_UPDATE) &&
         msg_start(DEVICE_INFORMATION_UPDATE))
     {
-        param_str(0, DEVICE_NAME);
+        param_str(0, device_name);
         msg_send();
     }
 
