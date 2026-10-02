@@ -640,6 +640,7 @@ int dialog_run(struct dialog *d, int poll_ticks)
 
     d->poll_ticks = poll_ticks;
 
+    skin_hold_scrolling(true);
     FOR_NB_SCREENS(i)
     {
         screens[i].scroll_stop();
@@ -689,6 +690,12 @@ int dialog_run(struct dialog *d, int poll_ticks)
         sb_set_persistent_title(d->title, Icon_NOICON, i);
         viewportmanager_theme_undo(i, false);
     }
+
+    /* A held line was drawn static and only redraws when its text changes,
+     * so ask for every line again to hand them back to the scroller. */
+    skin_hold_scrolling(false);
+    skin_request_full_update(CUSTOM_STATUSBAR);
+    sb_skin_force_next_update();
 
     return disp;
 }

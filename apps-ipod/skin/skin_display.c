@@ -99,6 +99,13 @@ bool skin_flush_inhibited(void)
     return flush_inhibited;
 }
 
+static bool scrolling_held = false;
+
+void skin_hold_scrolling(bool hold)
+{
+    scrolling_held = hold;
+}
+
 static void pending_clear(enum screen_type screen)
 {
     pending[screen].whole = false;
@@ -780,7 +787,7 @@ void write_line(struct screen *display, struct align_pos *format_align,
         }
     } /* (center_width == 0 && right_width != 0)*/
 
-    if (scroll && ((left_width > scroll_width) ||
+    if (scroll && !scrolling_held && ((left_width > scroll_width) ||
                    (center_width > scroll_width) ||
                    (right_width > scroll_width)))
     {
