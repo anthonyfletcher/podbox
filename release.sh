@@ -84,6 +84,18 @@ asset_name() {
         ipodvideo) echo "rockbox-ipodvideo-5g.zip" ;;
     esac
 }
+
+# Each build's link map rides with the release rather than in the zip, which
+# is synced onto the player. A panic address resolves only against the build
+# that crashed, and this is the one copy of it kept. Named to sort after the
+# zips, which must be what a visitor sees first.
+map_name() {
+    case "$1" in
+        ipod6g)    echo "symbols-ipod6g.map" ;;
+        ipodvideo) echo "symbols-ipodvideo-5g.map" ;;
+    esac
+}
+
 sim_asset_name() {
     case "$1" in
         ipod6g)    echo "simulator-ipod6g.zip" ;;
@@ -241,7 +253,8 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
     printf '| file | player |\n| --- | --- |\n'
     printf '| `%s` | iPod Classic 6G/7G |\n' "$(asset_name ipod6g)"
     printf '| `%s` | iPod Video 5G/5.5G |\n\n' "$(asset_name ipodvideo)"
-    printf 'Unzip onto the root of the player.\n\n'
+    printf 'Unzip onto the root of the player. The `.map` files resolve a\n'
+    printf 'crash address from this build and are not installed.\n\n'
     printf '### %s\n\n' "$HEADING"
     printf '%s\n' "$CHANGES"
 } > "$NOTES"
@@ -378,6 +391,8 @@ for target in $TARGETS; do
     ssh "$SERVER" "
         set -e
         [ -f '$zip' ] || { echo 'missing: $zip' >&2; exit 1; }
+        [ -s '$REMOTE_DIR/build-hw-$target/rockbox.map' ] ||
+            { echo 'missing: $target rockbox.map' >&2; exit 1; }
         for want in .rockbox/themes/scrim.cfg \
                     .rockbox/wps/scrim.sbs .rockbox/wps/scrim/volband.bmp \
                     .rockbox/docs/settings-help.txt \
@@ -453,6 +468,10 @@ scp "$SERVER:$REMOTE_DIR/build-hw-ipod6g/rockbox.zip" \
     "dist/$(asset_name ipod6g)"
 scp "$SERVER:$REMOTE_DIR/build-hw-ipodvideo/rockbox.zip" \
     "dist/$(asset_name ipodvideo)"
+for target in $TARGETS; do
+    scp "$SERVER:$REMOTE_DIR/build-hw-$target/rockbox.map" \
+        "dist/$(map_name "$target")"
+done
 for target in $SIM_TARGETS; do
     asset=$(sim_asset_name "$target")
     scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
@@ -556,13 +575,16 @@ scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
 ssh "$SERVER" "cd '$REMOTE_DIR' && \
     cp build-hw-ipod6g/rockbox.zip $(asset_name ipod6g) && \
     cp build-hw-ipodvideo/rockbox.zip $(asset_name ipodvideo) && \
+    cp build-hw-ipod6g/rockbox.map $(map_name ipod6g) && \
+    cp build-hw-ipodvideo/rockbox.map $(map_name ipodvideo) && \
     gh release create '$RELEASE' \
     --repo '$SLUG' \
     --target '$SHA' \
     --title 'Latest build' \
     --notes-file release-notes.md \
     $DRAFT \
-    $(asset_name ipod6g) $(asset_name ipodvideo)"
+    $(asset_name ipod6g) $(asset_name ipodvideo) \
+    $(map_name ipod6g) $(map_name ipodvideo)"
 
 say "Published $COMMIT as $RELEASE"
 echo "  https://github.com/$SLUG/releases/tag/$RELEASE"
