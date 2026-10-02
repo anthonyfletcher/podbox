@@ -457,13 +457,13 @@ void draw_progressbar(struct gui_wps *gwps, struct skin_viewport* skin_viewport,
         end = 0;
     }
 
-    /* A zero range divides by zero in the bar/scrollbar fill maths -- e.g. an
-     * always-drawn list scrollbar on an empty or fully-visible list, where
-     * max == min. Clamp to a full bar. */
+    /* A zero range divides by zero in the bar/scrollbar fill maths. A list
+     * scrollbar with max == min is a list that fits, so it draws full; any
+     * other bar -- %pP on a playlist with no indices yet -- draws empty. */
     if (length == 0)
     {
         length = 1;
-        end = 1;
+        end = (pb->type == SKIN_TOKEN_LIST_SCROLLBAR);
     }
 
     if (!pb->horizontal)
