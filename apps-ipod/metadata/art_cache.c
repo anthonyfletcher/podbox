@@ -1410,7 +1410,10 @@ static enum bg_result aa_run_pass(void)
         }
     }
     /* The walk ends the same way at the last entry and at an unreadable one,
-     * and only the search knows which it was. */
+     * and only the search knows which it was. A database a rebuild took away
+     * mid-walk is an interruption: the rebuilt one can carry the same marks. */
+    if (tcs.failed && (!tagcache_is_usable() || tagcache_is_busy()))
+        aborted = true;
     failed = !aborted && tcs.failed;
     tagcache_search_finish(&tcs);
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */

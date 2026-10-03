@@ -361,6 +361,7 @@ static struct tcramcache
 {
     struct ramcache_header *hdr;      /* allocated ramcache_header */
     int handle;                       /* buffer handle */
+    bool current;   /* holds the files as they are; a commit clears it */
 } tcramcache;
 
 static inline void tcrc_buffer_lock(void)
@@ -3678,6 +3679,7 @@ static bool commit(void)
 
     /* At first be sure to unload the ramcache! */
     tc_stat.ramcache = false;
+    tcramcache.current = false;
 
     /* Beyond here, jump to commit_error to undo locks and restore dircache */
     rc = false;
@@ -4601,9 +4603,7 @@ static size_t ramcache_size(struct master_header *tcmh)
     return size;
 }
 
-/* replacing: the memory is the RAM copy just given back, so the budget below
- * has already been met once and is not asked again. */
-static bool allocate_tagcache(bool replacing)
+static bool allocate_tagcache(void)
 {
     tc_stat.ramcache_allocated = 0;
     tcramcache.handle = 0;
@@ -4630,7 +4630,7 @@ static bool allocate_tagcache(bool replacing)
      * Nothing is lost by standing aside: shrinking is negotiated, and
      * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE. */
     size_t available = core_available();
-    if (!replacing && alloc_size <= available
+    if (alloc_size <= available
         && alloc_size + TAGCACHE_MIN_AUDIO_RESERVE > available)
     {
         logf("tagcache: ramcache %luKB exceeds budget (%luKB avail)",
@@ -5424,6 +5424,7 @@ void tagcache_build(void)
 static void free_ramcache(void)
 {
     tc_stat.ramcache = false;
+    tcramcache.current = false;
     tcramcache.hdr = NULL;
     int handle = tcramcache.handle;
     tcramcache.handle = 0;
@@ -5436,13 +5437,6 @@ static void free_ramcache(void)
 
 static void load_ramcache(void)
 {
-    /* Ask for the buffer again if an earlier attempt gave it back. Loading is
-     * all-or-nothing -- a load stopped part way is a failure like any other
-     * below, because a half-populated buffer must never be left where
-     * tagcache_reload_ramcache() would switch it back on -- and a USB connect
-     * arriving mid-load stops one. Without this, that single interruption cost
-     * the RAM copy for the rest of the session, whatever happened afterwards:
-     * the free below is permanent and every later call returned here. */
     /* A buffer is sized for the database it was allocated for, with
      * TAGCACHE_RESERVE to spare. An update or rebuild that grows the database
      * past that cannot load into it, so swap it for one that fits. */
@@ -5457,12 +5451,19 @@ static void load_ramcache(void)
                       tc_stat.ramcache_allocated / 1024,
                       (unsigned long)(need / 1024));
             free_ramcache();
-            if (!allocate_tagcache(true))
+            if (!allocate_tagcache())
                 return ;
         }
     }
 
-    if (!tcramcache.hdr && !allocate_tagcache(false))
+    /* Ask for the buffer again if an earlier attempt gave it back. Loading is
+     * all-or-nothing -- a load stopped part way is a failure like any other
+     * below, because a half-populated buffer must never be left where
+     * tagcache_reload_ramcache() would switch it back on -- and a USB connect
+     * arriving mid-load stops one. Without this, that single interruption cost
+     * the RAM copy for the rest of the session, whatever happened afterwards:
+     * the free below is permanent and every later call returned here. */
+    if (!tcramcache.hdr && !allocate_tagcache())
         return ;
 
     cpu_boost(true);
@@ -5472,6 +5473,7 @@ static void load_ramcache(void)
      * path index and taking every miss as final */
     tc_stat.ramcache = false;
     tc_stat.ramcache = load_tagcache();
+    tcramcache.current = tc_stat.ramcache;
 
     if (!tc_stat.ramcache)
         debug_log(DEBUG_LOG_TAGCACHE, "ramcache: buffer taken but load failed");
@@ -5497,15 +5499,16 @@ void tagcache_unload_ramcache(void)
 /* Put the RAM copy back into use.
  *
  * The counterpart to tagcache_unload_ramcache(), which clears a flag and does
- * nothing else -- the buffer stays allocated and stays populated. So this is
- * only a flag again, and the caller owns the one condition that matters:
- * nothing may have written to the database files in between. Whoever knows
+ * nothing else -- the buffer stays allocated and stays populated. A commit
+ * since the load, which can also have used the buffer as scratch, is refused
+ * here; the caller owns the rest: nothing else may have written to the
+ * database files in between. Whoever knows
  * that (a USB session the host only read from, say) can hand the searches
  * back to RAM instead of leaving them on the disk for the rest of the run. */
 void tagcache_reload_ramcache(void)
 {
     if (tcramcache.hdr != NULL && tc_stat.ramcache_allocated > 0
-        && tc_stat.ready)
+        && tcramcache.current && tc_stat.ready)
     {
         tc_stat.ramcache = true;
     }
@@ -5557,7 +5560,7 @@ static void tagcache_thread(void)
 
     /* Allocate space for the tagcache if found on disk. */
     if (global_settings.tagcache_ram && !tc_stat.ramcache)
-        allocate_tagcache(false);
+        allocate_tagcache();
 
     cpu_boost(false);
     tc_stat.initialized = true;
