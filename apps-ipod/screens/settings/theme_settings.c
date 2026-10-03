@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <limits.h>
+#include <string.h>
 #include "config.h"
 #include "lang.h"
 #include "kernel.h"
@@ -387,6 +388,17 @@ static struct browse_folder_info sbs   = {SBS_DIR, SHOW_SBS};
 static struct browse_folder_info wps = {WPS_DIR, SHOW_WPS};
 static struct browse_folder_info themes = {THEME_DIR, SHOW_CFG};
 
+/* The two stock themes are fallbacks rather than looks anyone would pick, so
+ * the theme list offers them only under Settings Mode: Everything. */
+static bool theme_shown(char *name, int attr, struct browser_context *tc)
+{
+    (void)attr;
+    (void)tc;
+    return global_settings.settings_mode != SETTINGS_MODE_STANDARD
+        || (strcasecmp(name, "rockbox_failsafe.cfg")
+            && strcasecmp(name, "rockbox_default_icons.cfg"));
+}
+
 int browse_folder(void *param)
 {
     const char *ext, *setting;
@@ -399,6 +411,7 @@ int browse_folder(void *param)
         .dirfilter = info->show_options,
         .icon = Icon_NOICON,
         .root = info->dir,
+        .callback_show_item = info == &themes ? theme_shown : NULL,
     };
 
     if (!dir_exists(info->dir)) {
