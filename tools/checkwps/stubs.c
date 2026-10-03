@@ -391,8 +391,10 @@ int talk_value_decimal(long n, int unit, int decimals, bool enqueue)
 
 void usb_log_file_enable(bool on) { (void)on; }
 void usb_set_audio(int value) { (void)value; }
+void usb_set_dac_output(int mode) { (void)mode; }
 void usb_set_hid(bool enable) { (void)enable; }
 void usb_set_iap(bool enable) { (void)enable; }
+void usb_set_iap2_mode(int mode) { (void)mode; }
 void usb_set_mode(int mode) { (void)mode; }
 void voice_set_mixer_level(int percent) { (void)percent; }
 
