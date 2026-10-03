@@ -78,7 +78,8 @@ struct iap_library_list {
     const uint64_t *keys;   /* its tracks, in order */
     uint32_t count;
 };
-/* False while a read is under way */
+/* False while a read is under way. A read rewrites the lists the last one
+ * gave, so not while a transfer is sending from them. */
 bool iap_library_playlists_ask(void);
 int iap_library_playlists(const struct iap_library_list **all);
 void iap_library_playlists_done(void);

@@ -962,7 +962,9 @@ static void list_pump(void)
     static uint8_t piece[125 * 8];
     const struct iap_library_list *all;
 
-    if (queue.due && iap_library_queue_ask())
+    /* A read rewrites the list a transfer is sending from */
+    if (queue.due && !(lx.queue && lx.phase != LX_IDLE) &&
+        iap_library_queue_ask())
     {
         queue.due = false;
         queue.asked = true;
@@ -976,8 +978,7 @@ static void list_pump(void)
     }
     while (lib.lists == LS_RECORDS && lib.rec < lib.n)
     {
-        iap_library_playlists(&all);
-        if (!send_records(all))
+        if (iap_library_playlists(&all) < 0 || !send_records(all))
             return;
     }
     if (lib.lists == LS_RECORDS)
@@ -989,14 +990,14 @@ static void list_pump(void)
         if (q && announce_queue(q))
             queue.asked = false;
     }
-    if (lx.phase == LX_IDLE && lib.lists == LS_TRACKS)
+    if (lx.phase == LX_IDLE && lib.lists == LS_TRACKS &&
+        iap_library_playlists(&all) >= 0)
     {
-        iap_library_playlists(&all);
         while (lib.xfer < lib.n && all[lib.xfer].folder)
             lib.xfer++;
         if (lib.xfer >= lib.n)
             library_finish();
-        else
+        else if (usb_iap2_room() > 0)
             start_transfer(list_ids[lib.xfer], &all[lib.xfer], false);
     }
     /* A car that never answers the setup does not hold up the rest */
@@ -1021,8 +1022,21 @@ static void list_pump(void)
     }
 }
 
+/* Ends the playlists' round, and the playlist transfer under way */
+static void lists_stop(void)
+{
+    if (lx.phase != LX_IDLE && !lx.queue)
+    {
+        file_packet(lx.id, 0x02, NULL, 0);
+        lx.phase = LX_IDLE;
+    }
+    lib.lists = LS_IDLE;
+    iap_library_playlists_done();
+}
+
 static void lists_start(void)
 {
+    lists_stop();
     lib.lists = LS_ASK;
     list_pump();
 }
@@ -1230,7 +1244,7 @@ static void artwork_pump(void)
             else
                 announce_artwork(0);
         }
-        else if (!aw.late &&
+        else if (!aw.late && usb_iap2_room() > 0 &&
                  TIME_AFTER(current_tick, aw.started + HZ * 3 / 10))
             blank_artwork();
     }
@@ -1815,13 +1829,7 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
     case STOP_LIBRARY_UPDATES:
         lib.active = false;
         lib.waiting = false;
-        if (lx.phase != LX_IDLE && !lx.queue)
-        {
-            file_packet(lx.id, 0x02, NULL, 0);
-            lx.phase = LX_IDLE;
-        }
-        lib.lists = LS_IDLE;
-        iap_library_playlists_done();
+        lists_stop();
         break;
     case PLAY_LIBRARY_ITEMS:
         /* 0 the tracks' keys back to back, 1 the index to start at */
