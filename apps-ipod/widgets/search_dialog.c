@@ -239,7 +239,10 @@ static int search_on_action(struct dialog *d, int action, void *data)
         {
             if (edit_line_action(&s->ed, action))
             {
-                edit_line_get(&s->ed, s->query, s->query_len, false);
+                /* Trimmed: a fresh wheel character starts as a space, so a
+                 * nudge back to it leaves one that cannot be seen and that
+                 * fails every match it does not happen to sit inside. */
+                edit_line_get(&s->ed, s->query, s->query_len, true);
                 s->last_edit_tick = current_tick;
                 s->pending = true;
             }

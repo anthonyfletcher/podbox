@@ -25,6 +25,7 @@
  *   - acting on a result
  ****************************************************************************/
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -187,6 +188,36 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
     return spoken == (active_scope == DB_SEARCH_SPOKEN);
 }
 
+/* Whether `query` occurs in `text`, ignoring case. A typed apostrophe also
+ * matches the typographic one (U+2019): the wheel offers only the first, and
+ * tags are full of the second. */
+static bool text_matches(const char *text, const char *query)
+{
+    if (!strchr(query, '\''))
+        return strcasestr(text, query) != NULL;
+
+    for (; *text; text++)
+    {
+        const char *t = text;
+        const char *q = query;
+
+        for (; *q; q++)
+        {
+            if (*q == '\'' && !strncmp(t, "\xe2\x80\x99", 3))
+                t += 3;
+            else if (tolower((unsigned char)*t) == tolower((unsigned char)*q))
+                t++;
+            else
+                break;
+        }
+
+        if (!*q)
+            return true;
+    }
+
+    return false;
+}
+
 static int run_search(const char *query, void *ctx)
 {
     char buf[TAGCACHE_BUFSZ];
@@ -223,7 +254,7 @@ static int run_search(const char *query, void *ctx)
 
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
         {
-            if (strcasestr(buf, query)
+            if (text_matches(buf, query)
                 && match_in_scope(tags[i], &tcs)
                 && !add_match(tags[i], buf, tcs.result_seek, tcs.idx_id))
                 break;
