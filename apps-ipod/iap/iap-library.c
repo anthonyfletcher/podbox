@@ -164,12 +164,28 @@ struct entry {
 
 #define WORKER_STACK_SIZE (DEFAULT_STACK_SIZE * 12)
 
+/* iAP2's pools, in the block so they cost nothing with no accessory */
+#define LIST_MAX  4096
+#define LISTS_MAX IAP_LIBRARY_LISTS_MAX
+#define QUEUE_MAX 300
+#define BOOKS_MAX 256
+#define BOOK_MAX  512
+#define ART_JPEG_MAX (64 * 1024)    /* 25-50 KB a 300px cover at 85 */
+
 struct block {
     long stack[WORKER_STACK_SIZE / sizeof(long)];
     struct tagcache_search tcs;
     struct book_resume resume;
     char name[TAGCACHE_BUFSZ];
     char other[TAGCACHE_BUFSZ]; /* the second name a comparison reads */
+    /* iAP2's playlists and covers, the worker's alone; see their parts */
+    uint64_t list_keys[LIST_MAX];
+    struct iap_library_list lists[LISTS_MAX];
+    uint64_t queue_keys[QUEUE_MAX];
+    int32_t book_seeks[BOOKS_MAX];
+    uint32_t book_order[BOOK_MAX];
+    uint8_t art_jpeg[ART_JPEG_MAX];
+    fb_data art_band[16 * ART_CACHE_MAX_DIM];
     struct entry entries[];
 };
 
@@ -1213,16 +1229,7 @@ void iap_library_repeat_next(void)
  * Queue as a list of its own, for the car's queue, has a pool of its own.
  * Trap: the Queue is read an entry at a time from the playlist's file, and
  * a few thousand hold the 5G's worker for 20 seconds. */
-#define LIST_MAX  4096
-#define LISTS_MAX IAP_LIBRARY_LISTS_MAX
-#define QUEUE_MAX 300
-#define BOOKS_MAX 256
-#define BOOK_MAX  512
-
-static uint64_t list_keys[LIST_MAX];
-static struct iap_library_list lists[LISTS_MAX];
 static int lists_n;
-static uint64_t queue_keys_pool[QUEUE_MAX];
 static struct iap_library_list queue_list;
 
 static struct {
@@ -1230,8 +1237,6 @@ static struct {
     int books;
     uint32_t catalog;
 } rows;
-static int32_t book_seeks[BOOKS_MAX];
-static uint32_t book_order[BOOK_MAX];
 
 /* The audiobooks' album seeks, in the database's order */
 static int find_books(void)
@@ -1246,10 +1251,10 @@ static int find_books(void)
            && tagcache_get_next(tcs, block->name, sizeof(block->name)))
     {
         int i = 0;
-        while (i < n && book_seeks[i] != tcs->result_seek)
+        while (i < n && block->book_seeks[i] != tcs->result_seek)
             i++;
         if (i == n)
-            book_seeks[n++] = tcs->result_seek;
+            block->book_seeks[n++] = tcs->result_seek;
     }
     tagcache_search_finish(tcs);
     return n;
@@ -1309,12 +1314,12 @@ static uint32_t book_keys(int32_t seek, uint64_t *keys, uint32_t room)
             | (tagcache_get_numeric(tcs, tag_tracknumber) & 0xffff);
         const uint64_t key = path_key(block->name);
         uint32_t i = n++;
-        for (; i > 0 && book_order[i - 1] > order; i--)
+        for (; i > 0 && block->book_order[i - 1] > order; i--)
         {
-            book_order[i] = book_order[i - 1];
+            block->book_order[i] = block->book_order[i - 1];
             keys[i] = keys[i - 1];
         }
-        book_order[i] = order;
+        block->book_order[i] = order;
         keys[i] = key;
     }
     tagcache_search_finish(tcs);
@@ -1362,11 +1367,11 @@ static void list_name(struct iap_library_list *l, const char *name)
 static void read_book(struct iap_library_list *l, int index,
                       const char *folder_name, uint32_t room)
 {
-    if (!tagcache_seek_string(tag_album, book_seeks[index], block->name,
+    if (!tagcache_seek_string(tag_album, block->book_seeks[index], block->name,
                               sizeof(block->name)))
         strmemccpy(block->name, UNTAGGED, sizeof(block->name));
     list_name(l, block->name);
-    l->count = book_keys(book_seeks[index], (uint64_t *)l->keys, room);
+    l->count = book_keys(block->book_seeks[index], (uint64_t *)l->keys, room);
     l->id = name_id(5, l->name, folder_name);
 }
 
@@ -1428,9 +1433,9 @@ static void read_lists(intptr_t what)
     if (what)
     {
         memset(&queue_list, 0, sizeof(queue_list));
-        queue_list.keys = queue_keys_pool;
+        queue_list.keys = block->queue_keys;
         if (!leaving)
-            queue_list.count = queue_keys(queue_keys_pool, QUEUE_MAX);
+            queue_list.count = queue_keys(block->queue_keys, QUEUE_MAX);
         queue_state = leaving ? IAP_LIST_IDLE : IAP_LIST_READY;
         return;
     }
@@ -1440,8 +1445,8 @@ static void read_lists(intptr_t what)
     find_rows();
     for (int row = 0; lists_n < LISTS_MAX && !leaving; row++)
     {
-        struct iap_library_list *l = &lists[lists_n];
-        if (!read_row(row, l, list_keys + used, LIST_MAX - used))
+        struct iap_library_list *l = &block->lists[lists_n];
+        if (!read_row(row, l, block->list_keys + used, LIST_MAX - used))
             break;
         if (l->folder || l->count)
         {
@@ -1463,8 +1468,10 @@ bool iap_library_playlists_ask(void)
 
 int iap_library_playlists(const struct iap_library_list **all)
 {
-    *all = lists;
-    return lists_state == IAP_LIST_READY ? lists_n : -1;
+    if (lists_state != IAP_LIST_READY)
+        return -1;
+    *all = block->lists;
+    return lists_n;
 }
 
 void iap_library_playlists_done(void)
@@ -1508,7 +1515,6 @@ void iap_library_queue_done(void)
 #define ART_CHUNK 1000
 #define ART_BLOCK (8 * ART_CHUNK)
 #define ART_BUFS  4
-#define ART_JPEG_MAX (64 * 1024)    /* 25-50 KB a 300px cover at 85 */
 
 static struct mp3entry art_track;   /* the request, copied */
 static struct {
@@ -1524,8 +1530,6 @@ static struct {
 } art;
 
 static struct albumart_source art_source;
-static uint8_t art_jpeg[ART_JPEG_MAX];
-static fb_data art_band[16 * ART_CACHE_MAX_DIM];
 
 struct aat_read
 {
@@ -1541,8 +1545,8 @@ static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
     return read(a->fd, band, n) == n;
 }
 
-/* A cache thumbnail as a JPEG in art_jpeg: its length, or 0. A cover too
- * busy to fit at 85 is tried at 60 before it is given up. */
+/* A cache thumbnail as a JPEG in the block's art_jpeg: its length, or 0. A
+ * cover too busy to fit at 85 is tried at 60 before it is given up. */
 static uint32_t encode_cache(const char *path)
 {
     static const int quality[] = { 85, 60 };
@@ -1560,10 +1564,11 @@ static uint32_t encode_cache(const char *path)
     {
         struct aat_read a = { fd, hdr.width };
         const struct jpeg_enc_src src =
-            { hdr.width, hdr.height, art_band, aat_rows, &a };
+            { hdr.width, hdr.height, block->art_band, aat_rows, &a };
         for (size_t i = 0; n < 0 && i < ARRAYLEN(quality); i++)
             if (lseek(fd, sizeof(hdr), SEEK_SET) == (off_t)sizeof(hdr))
-                n = jpeg_encode(&src, quality[i], art_jpeg, sizeof(art_jpeg));
+                n = jpeg_encode(&src, quality[i], block->art_jpeg,
+                                sizeof(block->art_jpeg));
     }
     close(fd);
     return n > 0 ? n : 0;
@@ -1641,7 +1646,7 @@ static void read_artwork(intptr_t request)
         if (fd >= 0)
             got = read(fd, art.buf[art.wr], got);
         else
-            memcpy(art.buf[art.wr], art_jpeg + sent, got);
+            memcpy(art.buf[art.wr], block->art_jpeg + sent, got);
         if (got <= 0)
         {
             art.state = IAP_ART_FAILED;
