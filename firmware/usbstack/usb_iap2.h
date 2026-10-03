@@ -34,6 +34,9 @@ bool usb_iap2_sent(int status, int length);
 /* Every tenth of a second. True once the probe has been answered, when
  * the connection is iAP2's and libiap stays quiet. */
 bool usb_iap2_tick(void);
+/* Whether the accessory is iAP2's, or a host that proved itself a car: one
+ * that leaves without having taken the audio leaves playback alone. */
+bool usb_iap2_keeps_playing(void);
 /* The iAP sink's new rate, from the audio thread. True when iAP2 announces
  * it, and libiap is not asked to. */
 bool usb_iap2_audio_rate(unsigned long rate);
