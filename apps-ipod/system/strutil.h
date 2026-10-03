@@ -51,5 +51,9 @@ char* skip_whitespace(char* const str);
  */
 char *strip_extension(char* buffer, int buffer_size, const char *filename);
 
+/* Whether the folder name from start to end holds one disc of an album:
+ * "CD1", "Disc 2", "disk_3". */
+bool is_disc_folder(const char *start, const char *end);
+
 
 #endif /* _STRUTIL_H_ */

@@ -2459,31 +2459,6 @@ static int name_year(const char *start, const char *end)
     return (year >= 1900 && year <= 2099) ? year : 0;
 }
 
-/* Whether a folder holds one disc of an album: "CD1", "Disc 2", "disk_3". */
-static bool disc_folder(const char *start, const char *end)
-{
-    static const char * const words[] = { "cd", "disc", "disk" };
-    const char *p = NULL;
-
-    for (size_t i = 0; i < ARRAYLEN(words) && p == NULL; i++)
-    {
-        size_t len = strlen(words[i]);
-
-        if ((size_t)(end - start) > len && !strncasecmp(start, words[i], len))
-            p = start + len;
-    }
-    if (p == NULL)
-        return false;
-
-    while (p < end && (*p == ' ' || *p == '-' || *p == '_' || *p == '.'))
-        p++;
-    if (p == end)
-        return false;
-    while (p < end && isdigit((unsigned char)*p))
-        p++;
-    return p == end;
-}
-
 /* The year of the album a track's folder belongs to, or 0: the folder's own
  * name, or for a disc folder, the name of the folder above it. Only a disc
  * folder looks up -- above an album is usually the artist, and a band named
@@ -2500,7 +2475,7 @@ static int folder_name_year(const char *path)
         start--;
 
     year = name_year(start, end);
-    if (year == 0 && start > path && disc_folder(start, end))
+    if (year == 0 && start > path && is_disc_folder(start, end))
     {
         end = start - 1;
         start = end;
@@ -4609,28 +4584,35 @@ static struct buflib_callbacks ops = {
     .shrink_callback = NULL,
 };
 
-static bool allocate_tagcache(void)
+/* Bytes the RAM copy of the database on disk needs, alignment slack
+ * included, or 0 if there is no database to read. */
+static size_t ramcache_size(struct master_header *tcmh)
+{
+    int fd = open_master_fd(tcmh, false);
+    if (fd < 0)
+        return 0;
+
+    close(fd);
+
+    size_t size = tcmh->tch.datasize + 256 + TAGCACHE_RESERVE +
+        sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
+    size += tcmh->tch.entry_count*sizeof(struct dircache_fileref);
+    size += tcmh->tch.entry_count*sizeof(struct path_slot);
+    return size;
+}
+
+/* replacing: the memory is the RAM copy just given back, so the budget below
+ * has already been met once and is not asked again. */
+static bool allocate_tagcache(bool replacing)
 {
     tc_stat.ramcache_allocated = 0;
     tcramcache.handle = 0;
     tcramcache.hdr = NULL;
 
-    /* Load the header. */
     struct master_header tcmh;
-    int fd = open_master_fd(&tcmh, false);
-    if (fd < 0)
+    size_t alloc_size = ramcache_size(&tcmh);
+    if (alloc_size == 0)
         return false;
-
-    close(fd);
-
-    /**
-     * Now calculate the required cache size plus
-     * some extra space for alignment fixes.
-     */
-    size_t alloc_size = tcmh.tch.datasize + 256 + TAGCACHE_RESERVE +
-        sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
-    alloc_size += tcmh.tch.entry_count*sizeof(struct dircache_fileref);
-    alloc_size += tcmh.tch.entry_count*sizeof(struct path_slot);
 
     /* Ensure enough memory remains for the audio buffer after allocation.
      * Without this check, a large database can consume so much RAM that
@@ -4648,7 +4630,7 @@ static bool allocate_tagcache(void)
      * Nothing is lost by standing aside: shrinking is negotiated, and
      * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE. */
     size_t available = core_available();
-    if (alloc_size <= available
+    if (!replacing && alloc_size <= available
         && alloc_size + TAGCACHE_MIN_AUDIO_RESERVE > available)
     {
         logf("tagcache: ramcache %luKB exceeds budget (%luKB avail)",
@@ -5439,6 +5421,19 @@ void tagcache_build(void)
     tc_stat.scanning = false;
 }
 
+static void free_ramcache(void)
+{
+    tc_stat.ramcache = false;
+    tcramcache.hdr = NULL;
+    int handle = tcramcache.handle;
+    tcramcache.handle = 0;
+    core_free(handle);
+    /* No buffer means nothing allocated. Leaving the size standing let
+     * commit() take the branch that carves its tempbuf out of the RAM
+     * copy, which with a freed one writes through (hdr + 1). */
+    tc_stat.ramcache_allocated = 0;
+}
+
 static void load_ramcache(void)
 {
     /* Ask for the buffer again if an earlier attempt gave it back. Loading is
@@ -5448,7 +5443,26 @@ static void load_ramcache(void)
      * arriving mid-load stops one. Without this, that single interruption cost
      * the RAM copy for the rest of the session, whatever happened afterwards:
      * the free below is permanent and every later call returned here. */
-    if (!tcramcache.hdr && !allocate_tagcache())
+    /* A buffer is sized for the database it was allocated for, with
+     * TAGCACHE_RESERVE to spare. An update or rebuild that grows the database
+     * past that cannot load into it, so swap it for one that fits. */
+    if (tcramcache.hdr)
+    {
+        struct master_header tcmh;
+        size_t need = ramcache_size(&tcmh);
+
+        if (need > (size_t)tc_stat.ramcache_allocated)
+        {
+            debug_log(DEBUG_LOG_TAGCACHE, "ramcache: %dKB held, %luKB needed",
+                      tc_stat.ramcache_allocated / 1024,
+                      (unsigned long)(need / 1024));
+            free_ramcache();
+            if (!allocate_tagcache(true))
+                return ;
+        }
+    }
+
+    if (!tcramcache.hdr && !allocate_tagcache(false))
         return ;
 
     cpu_boost(true);
@@ -5467,14 +5481,7 @@ static void load_ramcache(void)
         /* RAM loading failed. Free the allocation and fall back to
          * disk-based access. Do not set tc_stat.ready = false here;
          * the on-disk database may still be valid and usable. */
-        tcramcache.hdr = NULL;
-        int handle = tcramcache.handle;
-        tcramcache.handle = 0;
-        core_free(handle);
-        /* No buffer means nothing allocated. Leaving the size standing let
-         * commit() take the branch that carves its tempbuf out of the RAM
-         * copy, which with a freed one writes through (hdr + 1). */
-        tc_stat.ramcache_allocated = 0;
+        free_ramcache();
     }
 
     cpu_boost(false);
@@ -5550,7 +5557,7 @@ static void tagcache_thread(void)
 
     /* Allocate space for the tagcache if found on disk. */
     if (global_settings.tagcache_ram && !tc_stat.ramcache)
-        allocate_tagcache();
+        allocate_tagcache(false);
 
     cpu_boost(false);
     tc_stat.initialized = true;

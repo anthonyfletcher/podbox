@@ -31,6 +31,7 @@
 #include "database/tagcache.h"
 #include "system/bg_task.h"         /* the caching pass runs as one */
 #include "files/path_list.h"        /* the "found nothing" lists */
+#include "system/strutil.h"         /* is_disc_folder() */
 #include "lcd.h"
 #include "draw/bmp.h"
 #include "draw/img_filter.h"
@@ -538,6 +539,27 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
         len = dir_len - 1;
     memcpy(dir, path, len);
     dir[len] = 0;
+}
+
+/* Whether 'art', found for the folder of 'probe', can stand for it. The search
+ * falls back to the folder above, which is the album for a disc folder but the
+ * artist for an album folder -- and the artist's picture is no album's cover.
+ * So an image from above counts only for a disc folder. */
+static bool aa_art_is_folders(const char *probe, const char *art)
+{
+    const char *end = strrchr(probe, '/');
+    const char *start;
+    size_t dirlen;
+
+    if (!end)
+        return true;
+    dirlen = end - probe + 1;
+    if (!strncmp(probe, art, dirlen) && !strchr(art + dirlen, '/'))
+        return true;
+
+    for (start = end; start > probe && start[-1] != '/'; start--)
+        ;
+    return is_disc_folder(start, end);
 }
 
 /* The table slot for folder hash 'h', claimed with no stamp if it is new.
@@ -1156,10 +1178,11 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
         return true;
 
     /* album/albumartist left NULL: only folder-based art is searched
-     * (cover.bmp, folder.jpg, ../cover.bmp). */
+     * (cover.bmp, folder.jpg, and for a disc folder ../cover.bmp). */
     memset(&aa_id3, 0, sizeof(aa_id3));
     strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
-    if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath)))
+    if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath))
+        || !aa_art_is_folders(probe_path, aa_artpath))
     {
         /* Embedded art has no file here, and is art all the same */
         if (slot->stamp == AA_STAMP_EMBEDDED)

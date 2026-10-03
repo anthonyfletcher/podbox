@@ -642,8 +642,9 @@ static int usb_dac_tmo_cb(struct timeout *tmo)
 
 /* The first step is the USB_DAC_WAIT timer. A computer, or a car or dock
  * that reads the player as a disk or over iAP, has sent a request by then,
- * which under USB_DETECT_BY_REQUEST moves the state on from USB_POWERED; a
- * bus reset with no request yet counts as a computer too. Each later step
+ * which under USB_DETECT_BY_REQUEST moves the state on from USB_POWERED. A
+ * bus reset alone does not count: plugging in the Fosi DS2 makes one, and a
+ * computer follows its reset with a request within milliseconds. Each later step
  * is one poll of the port, which resets and enumerates a device as soon as
  * one connects. */
 static void usb_dac_auto_step(void)
@@ -665,8 +666,6 @@ static void usb_dac_auto_step(void)
             usb_dac_note("skipped: a host answered");
         else if(usb_state != USB_POWERED)
             usb_dac_note("skipped: cable out");
-        else if(usb_record.bus_resets > 0)
-            usb_dac_note("skipped: bus reset (computer)");
 #ifdef IPOD_ACCESSORY_PROTOCOL
         else if(iap_accessory_present())
             usb_dac_note("skipped: serial accessory");
@@ -820,7 +819,7 @@ static void NORETURN_ATTR usb_thread(void)
             {
                 timeout_register(&usb_dac_tmo, usb_dac_tmo_cb,
                                  USB_DAC_WAIT, 0);
-                usb_dac_note("waiting for a bus reset");
+                usb_dac_note("waiting for a host");
             }
 #endif
             break;

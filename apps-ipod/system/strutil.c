@@ -332,3 +332,27 @@ int open_utf8(const char* pathname, int flags)
     return ret >= 0 ? fd : -1;
 }
 
+/* Whether a folder holds one disc of an album: "CD1", "Disc 2", "disk_3". */
+bool is_disc_folder(const char *start, const char *end)
+{
+    static const char * const words[] = { "cd", "disc", "disk" };
+    const char *p = NULL;
+
+    for (size_t i = 0; i < ARRAYLEN(words) && p == NULL; i++)
+    {
+        size_t len = strlen(words[i]);
+
+        if ((size_t)(end - start) > len && !strncasecmp(start, words[i], len))
+            p = start + len;
+    }
+    if (p == NULL)
+        return false;
+
+    while (p < end && (*p == ' ' || *p == '-' || *p == '_' || *p == '.'))
+        p++;
+    if (p == end)
+        return false;
+    while (p < end && isdigit((unsigned char)*p))
+        p++;
+    return p == end;
+}
