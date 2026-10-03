@@ -2391,25 +2391,24 @@ static bool saved_index_present(void)
  * resume position and the artwork-cache mark. Its cache_version is about the
  * slide placeholder's format, which this pass does not build, so there was
  * never anything true for this file to say about it either. */
-static bool background_build(void)
+static enum bg_result background_build(void)
 {
     struct db_summary_t local;
     size_t bufsz = IDX_BUILD_BUFSZ;
     int handle;
     void *buf;
     int ret;
-    bool ok;
 
     /* Claim the builder before doing anything that leads to the lock, then
-     * give way if a foreground caller has already announced itself. Returning
-     * false is not a failure: bg_task simply tries again on a later tick, by
-     * which time whoever wanted it has finished and written the index this
-     * pass would have built anyway. */
+     * give way if a foreground caller has already announced itself.
+     * BG_INTERRUPTED is not a failure: bg_task simply tries again on a later
+     * tick, by which time whoever wanted it has finished and written the
+     * index this pass would have built anyway. */
     bg_claimed = true;
     if (foreground_wants_builder())
     {
         bg_claimed = false;
-        return false;
+        return BG_INTERRUPTED;
     }
 
     /* Ask outright rather than checking core_allocatable() first: that reports
@@ -2422,7 +2421,7 @@ static bool background_build(void)
     if (handle <= 0)
     {
         bg_claimed = false;
-        return false;
+        return BG_INTERRUPTED;
     }
 
     /* Pinned: a handle with no ops is movable, and the builder yields all the
@@ -2442,13 +2441,12 @@ static bool background_build(void)
     /* Released only now, after the lock has been let go inside build_into():
      * anyone polling db_summary_is_busy() is waiting to take that lock, so it
      * has to stay set until there is nothing left for them to collide with. */
-    ok = (ret == SUCCESS);
     bg_claimed = false;
 
     /* Only on a clean finish: an aborted or failed pass must be retried, not
      * recorded as covering this library. Saying so is enough -- bg_task writes
-     * the marker itself once we return true. */
-    return ok;
+     * the marker itself once we return BG_DONE. */
+    return ret == SUCCESS ? BG_DONE : BG_INTERRUPTED;
 }
 
 struct bg_task db_summary_task =

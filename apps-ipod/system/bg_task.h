@@ -53,6 +53,16 @@ struct bg_marks
     int deleted;   /* entries flagged deleted, -1 when not countable */
 };
 
+/* How a pass ended. */
+enum bg_result
+{
+    BG_INTERRUPTED, /* stopped early or lacked memory: tried again later */
+    BG_DONE,        /* covered the library: the marker is written */
+    BG_FAILED,      /* could not read what it needed: shown as Failed, and
+                     * not tried again until the marks move, a trigger
+                     * arrives or a USB session ends */
+};
+
 struct bg_task
 {
     /* ---- supplied by the task ---- */
@@ -70,10 +80,8 @@ struct bg_task
      * unclaimed instead. */
     size_t work_bytes;
 
-    /* The pass. Returns false if it did not finish -- interrupted, or the
-     * memory it needed was not free. The marker is written only on true, so a
-     * false is simply retried later. */
-    bool (*run)(void);
+    /* The pass. The marker is written only on BG_DONE. */
+    enum bg_result (*run)(void);
 
     /* Optional: throw away what the task produced, for a rebuild. The marker
      * file is the helper's, so this deals only with the artifacts. */
@@ -117,6 +125,9 @@ struct bg_task
      * marks move off gave_way_marks or a trigger arrives */
     bool gave_way;
     struct bg_marks gave_way_marks;
+    /* The last pass returned BG_FAILED against failed_marks */
+    bool failed;
+    struct bg_marks failed_marks;
     long retry_at;      /* tick before which not to try again, 0 = now */
     long next_check;    /* when a lower task's pass may next look at this */
 };
@@ -145,8 +156,8 @@ size_t bg_task_reserve_bytes(void);
 bool bg_task_preempted(const struct bg_task *task);
 
 /* Whether a pass should stop where it stands: preempted, a USB host arriving,
- * or a shutdown. A pass checks this as it goes and, if set, returns false --
- * it will be retried later. */
+ * or a shutdown. A pass checks this as it goes and, if set, returns
+ * BG_INTERRUPTED -- it will be retried later. */
 bool bg_task_should_stop(const struct bg_task *task);
 
 /* One word for what the task is doing, for the status screen. Reads the state

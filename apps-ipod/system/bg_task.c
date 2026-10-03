@@ -156,6 +156,7 @@ void bg_task_forget(struct bg_task *task)
     task->retry_at = 0;
     task->fails = 0;
     task->gave_way = false;
+    task->failed = false;
     task->verified = false;
 }
 
@@ -289,6 +290,8 @@ const char *bg_task_state(const struct bg_task *task)
      * the way -- another task's pass, or a database that is busy. */
     if (task->wants_run)
         return "Waiting";
+    if (task->failed)
+        return "Failed";
     if (task->retry_at != 0)
         return "Backing off";
     return "Idle";
@@ -364,6 +367,11 @@ static bool bg_task_stale(struct bg_task *task)
         return false;
     }
 
+    /* The same library will fail the same way, so a failed pass waits for
+     * the marks to move rather than repeating every retry delay. */
+    if (task->failed && bg_marks_equal(&now, &task->failed_marks))
+        return false;
+
     if (bg_marks_equal(&now, &task->done_marks))
     {
         /* Already answered once, and only a USB session or a trigger can have
@@ -393,7 +401,7 @@ static bool bg_task_stale(struct bg_task *task)
 static void bg_task_tick(struct bg_task *task)
 {
     struct bg_marks covered;
-    bool finished;
+    enum bg_result result;
 
     /* A rebuild throws the artifacts away first; an update keeps them and
      * lets the pass fill in what is missing. Either way the task is stale
@@ -421,17 +429,27 @@ static void bg_task_tick(struct bg_task *task)
     covered = task->prev_marks;
 
     task->running = true;
-    finished = task->run();
+    result = task->run();
     task->running = false;
 
-    if (finished)
+    if (result == BG_DONE)
     {
         task->done_marks = covered;
         task->prev_marks = covered;
         task->wants_run = false;
         task->fails = 0;
         task->gave_way = false;
+        task->failed = false;
         bg_write_done(task, &covered);
+        return;
+    }
+
+    if (result == BG_FAILED)
+    {
+        task->wants_run = false;
+        task->fails = 0;
+        task->failed = true;
+        task->failed_marks = covered;
         return;
     }
 
@@ -471,11 +489,13 @@ static void bg_thread(void)
                 /* The library may have changed while we were a disk, and so
                  * may the artifacts -- this is the one way they go missing
                  * without a trigger, so it is also the one place worth
-                 * re-checking. */
+                 * re-checking. A failed pass gets another go too: the host
+                 * may have repaired whatever it could not read. */
                 for (i = 0; i < bg_tasks_count; i++)
                 {
                     bg_marks_none(&bg_tasks[i]->prev_marks);
                     bg_tasks[i]->verified = false;
+                    bg_tasks[i]->failed = false;
                 }
                 for (i = 0; i < bg_steps_count; i++)
                     bg_steps[i]->request(false);

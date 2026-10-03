@@ -1203,8 +1203,8 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
 /* One full generation pass: walk every track filename, dedup by directory,
  * resolve folder art, and render any missing thumbnails -- both the track's own
  * (album) folder and its parent (artist) folder, for libraries laid out as
- * <artist>/<album>/<track>. Returns true if the pass ran to completion, false if
- * it was aborted (USB/DB busy/no memory) and should be retried later. */
+ * <artist>/<album>/<track>. Returns BG_INTERRUPTED if it was aborted (USB/DB
+ * busy/no memory) and BG_FAILED if the database could not be read to the end. */
 /* The two miss lists a pass is writing. One open file each for the whole pass
  * rather than an open/append/close per folder, which on a library with a lot
  * of coverless folders would be thousands of them. */
@@ -1250,13 +1250,15 @@ static size_t aa_work_bytes(void)
            + JPEG_DECODE_OVERHEAD;
 }
 
-static bool aa_run_pass(void)
+static enum bg_result aa_run_pass(void)
 {
     struct tagcache_search tcs;
     size_t worksz;
     int wh, sh;
     void *workbuf;
     bool aborted = false;
+    bool failed = false;
+    bool completed;
     int since_yield = 0;
 
     worksz = aa_work_bytes();
@@ -1266,13 +1268,13 @@ static bool aa_run_pass(void)
 
     wh = core_alloc(worksz);
     if (wh <= 0)
-        return false; /* not enough free memory right now; retry later */
+        return BG_INTERRUPTED; /* not enough free memory right now */
 
     sh = core_alloc(AA_TABLE_BYTES);
     if (sh <= 0)
     {
         core_free(wh);
-        return false;
+        return BG_INTERRUPTED;
     }
 
     workbuf = core_get_data_pinned(wh);
@@ -1363,12 +1365,16 @@ static bool aa_run_pass(void)
             yield();
         }
     }
+    /* The walk ends the same way at the last entry and at an unreadable one,
+     * and only the search knows which it was. */
+    failed = !aborted && tcs.failed;
     tagcache_search_finish(&tcs);
     cpu_boost(false); /* balances the boost above (skipped on the goto-out path) */
 
 out:
-    noart_close(!aborted);
-    aa_stamps_save(!aborted);
+    completed = !aborted && !failed;
+    noart_close(completed);
+    aa_stamps_save(completed);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);
@@ -1376,7 +1382,9 @@ out:
     core_free(sh);
     core_free(wh);
     cache_busy = false;
-    return !aborted;
+    if (failed)
+        return BG_FAILED;
+    return aborted ? BG_INTERRUPTED : BG_DONE;
 }
 
 /* Cache the offered track's embedded art into any of its folder's thumbnails
@@ -1469,15 +1477,17 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
 }
 
 /* bg_task.run: one pass, with the tracing the pass itself does not do. */
-static bool aa_task_run(void)
+static enum bg_result aa_task_run(void)
 {
-    bool done;
+    enum bg_result result;
 
     debug_log(DEBUG_LOG_ARTCACHE, "starting pass");
-    done = aa_run_pass();
+    result = aa_run_pass();
     debug_log(DEBUG_LOG_ARTCACHE,
-              done ? "pass complete, idle" : "pass interrupted");
-    return done;
+              result == BG_DONE   ? "pass complete, idle" :
+              result == BG_FAILED ? "pass failed: database unreadable" :
+                                    "pass interrupted");
+    return result;
 }
 
 /* bg_task.handle_event: everything on the queue that is ours rather than the

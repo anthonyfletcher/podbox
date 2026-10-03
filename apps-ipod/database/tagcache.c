@@ -2095,6 +2095,7 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
     if (!open_files(tcs, tcs->type))
     {
         tcs->valid = false;
+        tcs->failed = true;
         return false;
     }
 
@@ -2109,14 +2110,17 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
         case e_ENTRY_SIZEMISMATCH:
             logf("read error #5");
             tcs->valid = false;
+            tcs->failed = true;
             return false;
         case e_TAG_TOOLONG:
             tcs->valid = false;
+            tcs->failed = true;
             logf("too long tag #2");
             logf("P:%lX/%" PRIX32, (unsigned long) tcs->position, entry.tag_length);
             return false;
         case e_TAG_SIZEMISMATCH:
             tcs->valid = false;
+            tcs->failed = true;
             logf("read error #4");
             return false;
     }
@@ -2147,6 +2151,8 @@ bool tagcache_get_next(struct tagcache_search *tcs, char *buf, long size)
                 return true;
         }
     }
+    else if (tcs->valid)
+        tcs->failed = true;     /* the database went away mid-search */
 #ifdef LOGF_ENABLE
     if (tcs->unique_list_count > 0)
         logf(" uniqbuf: %d used / %d avail", tcs->unique_list_count, tcs->unique_list_capacity);
