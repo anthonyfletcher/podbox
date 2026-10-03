@@ -124,6 +124,9 @@ enum
     USB_HOST_AUTO,           /* Event - the next step of looking for a DAC */
     USB_HOST_DAC,            /* Event - data: DAC output on now, or off */
 #endif
+#ifdef USB_ENABLE_IAP
+    USB_CAR_RECONNECT,       /* Event - a car: again without the sound card */
+#endif
 #endif
 #ifdef USB_FIREWIRE_HANDLING
     USB_REQUEST_REBOOT,      /* Event */
@@ -373,6 +376,8 @@ void usb_set_hid(bool enable);
 void usb_set_iap(bool enable);
 /* iAP2 Accessories: 0 off, 1 auto, 2 on (USB_IAP2_MODE_*) */
 void usb_set_iap2_mode(int mode);
+/* The host has sent Apple's 0x53, as a car does; from the USB stack */
+void usb_car_found(void);
 #endif
 
 #ifdef USB_ENABLE_SERIAL

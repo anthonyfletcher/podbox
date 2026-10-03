@@ -28,3 +28,12 @@ bool iap_audio_disable(void);
 bool iap_audio_set_sampr(uint32_t sampr);
 /* The rate the iAP sink is configured for. */
 unsigned long iap_audio_sampr(void);
+
+/* What the stream has done since the last call, for the USB log: bytes
+ * taken from playback, in how many chunks; packets of silence sent for want
+ * of any; chunks that were not a whole number of stereo samples. */
+struct iap_audio_counts
+{
+    uint32_t bytes, chunks, silent, odd;
+};
+void iap_audio_take_counts(struct iap_audio_counts *c);

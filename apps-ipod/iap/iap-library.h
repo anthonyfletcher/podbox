@@ -56,6 +56,36 @@ uint64_t iap_library_key(const char *path);
 /* Plays the tracks named by n keys, big-endian, from the start'th. False when
  * none is in the database or a list is still being built. */
 bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start);
+/* An iAP2 car's shuffle and repeat buttons, as iAP1 accessories set them:
+ * shuffle on or off, and repeat off, all, one, off. */
+void iap_library_shuffle_toggle(void);
+void iap_library_repeat_next(void);
+
+/* The playlists as iAP2 sends them, in the Playlist category's order: the
+ * Queue; the folder Audiobooks, then each book; then the saved playlists.
+ * Moods and Journeys are iAP1's alone. All are read together on the
+ * library's worker: ask, then iap_library_playlists() gives them once read
+ * (-1 until then), and done lets them go. The Queue on its own, in the order it plays, is read the
+ * same way; it is cut short past a few hundred tracks, which a count below
+ * playlist_amount() shows. */
+enum { IAP_LIST_IDLE, IAP_LIST_BUSY, IAP_LIST_READY };
+#define IAP_LIBRARY_LISTS_MAX 64   /* playlists, at most */
+struct iap_library_list {
+    uint64_t id;            /* the same at every connection */
+    uint64_t parent;        /* the folder it is in, or 0 */
+    bool folder;
+    char name[64];
+    const uint64_t *keys;   /* its tracks, in order */
+    uint32_t count;
+};
+/* False while a read is under way */
+bool iap_library_playlists_ask(void);
+int iap_library_playlists(const struct iap_library_list **all);
+void iap_library_playlists_done(void);
+bool iap_library_queue_ask(void);
+/* NULL until read */
+const struct iap_library_list *iap_library_queue(void);
+void iap_library_queue_done(void);
 
 /* A track's artwork, a JPEG as the file holds it, read on the library's
  * worker: find starts it (false when the worker cannot take it now); state

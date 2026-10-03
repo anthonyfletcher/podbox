@@ -194,6 +194,31 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
             snprintf(p, size, "iap2 power update %s, car asked for %08lx",
                      c ? "with attributes" : "empty", d);
             break;
+        case USB_LOG_IAP2_AUDIO_START:
+            snprintf(p, size, "audio: car stream starts, mixing at %lu Hz, "
+                     "sending at %lu Hz", c, d);
+            break;
+        case USB_LOG_IAP2_AUDIO_TAKEN:
+            snprintf(p, size, "audio: in %u ms the stream took %lu bytes "
+                     "in %lu chunks", e->b, c, d);
+            break;
+        case USB_LOG_IAP2_AUDIO_GAPS:
+            snprintf(p, size, "audio: %lu packets of silence, %u chunks "
+                     "not whole samples, the track moved %ld ms",
+                     c, e->b, (long)d);
+            break;
+        case USB_LOG_IAP2_RECONNECT:
+            snprintf(p, size, "iap2: a car, so connecting again without the "
+                     "sound card");
+            break;
+        case USB_LOG_IAP2_COVER:
+        {
+            static const char * const from[] =
+                { "none", "embedded", "image file", "cache" };
+            snprintf(p, size, "iap2 cover: %lu bytes from %s, ready in %lu ms",
+                     c & 0xffffff, c >> 24 < 4 ? from[c >> 24] : "?", d);
+            break;
+        }
         default:
             snprintf(p, size, "iap2 event %d", e->a);
             break;

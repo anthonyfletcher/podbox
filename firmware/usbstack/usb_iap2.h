@@ -34,9 +34,6 @@ bool usb_iap2_sent(int status, int length);
 /* Every tenth of a second. True once the probe has been answered, when
  * the connection is iAP2's and libiap stays quiet. */
 bool usb_iap2_tick(void);
-/* At disconnect: true when the connection was iAP2's and playback never
- * left the built-in sink, so it carries on. */
-bool usb_iap2_keeps_playing(void);
 /* The iAP sink's new rate, from the audio thread. True when iAP2 announces
  * it, and libiap is not asked to. */
 bool usb_iap2_audio_rate(unsigned long rate);
@@ -65,7 +62,5 @@ void usb_iap2_control_room(void);
 void usb_iap2_control_tick(void);
 /* From usb_iap2_audio_rate(), on the audio thread. */
 void usb_iap2_control_rate(unsigned long rate);
-/* Whether the car has playback on the iAP sink. */
-bool usb_iap2_control_audio(void);
 
 #endif

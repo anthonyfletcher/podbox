@@ -1162,6 +1162,7 @@ static void request_handler_device(struct usb_ctrlrequest* req, uint8_t* reqdata
             if(usb_iap2_offered() &&
                (req->bRequestType & USB_DIR_IN) && req->wLength <= 4) {
                 usb_iap2_host_is_car();
+                usb_car_found();
                 memset(reqdata, 0, req->wLength);
                 usb_core_control_response(USB_CONTROL_ACK, reqdata,
                                           req->wLength);

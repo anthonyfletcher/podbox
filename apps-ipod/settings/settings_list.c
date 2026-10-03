@@ -985,7 +985,7 @@ const struct settings_list settings[] = {
                    "iap2 accessories", "off,auto,on", usb_set_iap2_mode, 3,
                    ID2P(LANG_OFF), ID2P(LANG_AUTO), ID2P(LANG_ON)),
 #endif
-    CHOICE_SETTING(0, car_artwork, LANG_CAR_ARTWORK, CAR_ARTWORK_AS_ALBUM_ART,
+    CHOICE_SETTING(0, car_artwork, LANG_CAR_ARTWORK, CAR_ARTWORK_CACHE,
                    "car artwork",
                    "off,as album art,prefer embedded,prefer image file,"
                    "prefer cache", NULL, 5,

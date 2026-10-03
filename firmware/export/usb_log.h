@@ -146,6 +146,17 @@ enum usb_log_type
 #define USB_LOG_IAP2_DROPPED     9 /* c = message ID not sent, d = bytes */
 #define USB_LOG_IAP2_POWER      10 /* c = 0 empty, 1 attributes; d = mask
                                     * the car asked for */
+#define USB_LOG_IAP2_COVER      11 /* c = AA_SOURCE_* << 24 | bytes, d = ms
+                                    * to find it, and encode a cache one */
+#define USB_LOG_IAP2_RECONNECT  13 /* a car, while the sound card is on: the
+                                    * player leaves the bus and comes back
+                                    * without it */
+#define USB_LOG_IAP2_AUDIO_START 15 /* c = the mixer's rate, d = the stream's */
+#define USB_LOG_IAP2_AUDIO_TAKEN 16 /* b = ms counted, c = bytes the stream
+                                     * took from playback, d = in chunks */
+#define USB_LOG_IAP2_AUDIO_GAPS  17 /* b = chunks not whole samples, c =
+                                     * packets of silence, d = how far the
+                                     * track's position moved, ms */
 
 #define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
 #define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */

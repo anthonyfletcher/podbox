@@ -37,11 +37,14 @@
  *   - the entry points
  *   - the library as iAP2 sends it: every track by its key, and playing
  *     the keys a car chooses
+ *   - playlists for iAP2: the Playlist category's rows as lists of keys,
+ *     read together, and the Queue as one of its own
  *   - artwork for iAP2: the playing track's JPEG, read on the worker
  *   - the player's name
  ****************************************************************************/
 
 #include "config.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "kernel.h"
@@ -61,9 +64,14 @@
 #include "database/sound_mood.h"
 #include "metadata/book_resume.h"
 #include "metadata/albumart.h"
+#include "system/strutil.h"
+#include "metadata/art_cache.h"
+#include "draw/jpeg_enc.h"
+#include "usb_log.h"
 #include "file.h"
 #include "rbpaths.h"
 #include "iap-library.h"
+#include "iap-core.h"
 
 /* iAP's database categories */
 enum {
@@ -177,13 +185,15 @@ static uint32_t list_count;
 /* The database commit the lists and the selection were read under */
 static int32_t lists_commit = -1;
 
-enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_EXIT };
+enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_LIST, EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
  * is set the worker owns the block. */
 static volatile bool building;
 static volatile bool leaving;
+/* IAP_LIST_*, the playlists' and the Queue's: see the playlists for iAP2 */
+static volatile int lists_state, queue_state;
 
 /* What EV_PLAY plays, taken before the selection is cleared */
 static bool play_book;
@@ -192,6 +202,7 @@ static long play_book_seek;
 static void play_tracks(uint32_t start);
 static void play_mix(int mix);
 static void read_artwork(intptr_t request);
+static void read_lists(intptr_t what);
 
 static void worker(void)
 {
@@ -205,6 +216,11 @@ static void worker(void)
         if (ev.id == EV_ARTWORK)
         {
             read_artwork(ev.data);  /* the lists are not its to finish */
+            continue;
+        }
+        if (ev.id == EV_LIST)
+        {
+            read_lists(ev.data);    /* nor are iAP2's */
             continue;
         }
         if (ev.id == EV_PLAY)
@@ -617,6 +633,12 @@ static bool start_playing(uint32_t start)
 enum { FOLDER_NONE, FOLDER_MOODS, FOLDER_JOURNEYS, FOLDER_BOOKS };
 static int folder;
 
+static const int folder_lang[] = {
+    [FOLDER_MOODS] = LANG_MOODS,
+    [FOLDER_JOURNEYS] = LANG_JOURNEYS,
+    [FOLDER_BOOKS] = LANG_AUDIOBOOKS,
+};
+
 static int journeys_offered(void)
 {
     int lang, from, to, n = 0;
@@ -781,11 +803,6 @@ static bool play_catalog_playlist(uint32_t nth)
 
 static bool playlist_record_name(uint32_t index, char *buf, size_t size)
 {
-    static const int folder_lang[] = {
-        [FOLDER_MOODS] = LANG_MOODS,
-        [FOLDER_JOURNEYS] = LANG_JOURNEYS,
-        [FOLDER_BOOKS] = LANG_AUDIOBOOKS,
-    };
     const int *rows;
     uint32_t folders = folders_offered(&rows);
 
@@ -1031,6 +1048,7 @@ void iap_library_close(void)
     capacity = 0;
     folder_count_seen = -1;
     catalog_cached = false;
+    lists_state = queue_state = IAP_LIST_IDLE;
     iap_library_reset();
     all_songs = false;
 }
@@ -1168,6 +1186,320 @@ bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
     return true;
 }
 
+void iap_library_shuffle_toggle(void)
+{
+    iap_shuffle_state(!global_settings.playlist_shuffle);
+}
+
+void iap_library_repeat_next(void)
+{
+    iap_repeat_next();
+}
+
+/* ------------------------------------------------------------------ *
+ * playlists for iAP2                                                 *
+ * ------------------------------------------------------------------ */
+
+/* iAP2's playlists are the Playlist category's rows, without [All Tracks]
+ * and without the engine's Moods and Journeys: the Queue, Audiobooks and
+ * each book, then the catalogue. A car names a playlist's tracks to play it,
+ * never the playlist, so a mix would have to be made for every connection,
+ * not when chosen; seconds each on the 5G, with its audio heard to stutter.
+ * All are read on the worker in one go, every list of track keys into one
+ * pool, so that the car is sent them together: it reloads its library at
+ * each update. A list that no longer
+ * fits the pool is left out, and so are rows past LISTS_MAX; an audiobook
+ * keeps its first BOOK_MAX tracks and the Queue its first QUEUE_MAX. The
+ * Queue as a list of its own, for the car's queue, has a pool of its own.
+ * Trap: the Queue is read an entry at a time from the playlist's file, and
+ * a few thousand hold the 5G's worker for 20 seconds. */
+#define LIST_MAX  4096
+#define LISTS_MAX IAP_LIBRARY_LISTS_MAX
+#define QUEUE_MAX 300
+#define BOOKS_MAX 256
+#define BOOK_MAX  512
+
+static uint64_t list_keys[LIST_MAX];
+static struct iap_library_list lists[LISTS_MAX];
+static int lists_n;
+static uint64_t queue_keys_pool[QUEUE_MAX];
+static struct iap_library_list queue_list;
+
+static struct {
+    int folders[3], n_folders;
+    int books;
+    uint32_t catalog;
+} rows;
+static int32_t book_seeks[BOOKS_MAX];
+static uint32_t book_order[BOOK_MAX];
+
+/* The audiobooks' album seeks, in the database's order */
+static int find_books(void)
+{
+    struct tagcache_search *tcs = &block->tcs;
+    int n = 0;
+
+    if (!tagcache_search(tcs, tag_album))
+        return 0;
+    tagcache_search_add_clause(tcs, &only_spoken);
+    while (n < BOOKS_MAX
+           && tagcache_get_next(tcs, block->name, sizeof(block->name)))
+    {
+        int i = 0;
+        while (i < n && book_seeks[i] != tcs->result_seek)
+            i++;
+        if (i == n)
+            book_seeks[n++] = tcs->result_seek;
+    }
+    tagcache_search_finish(tcs);
+    return n;
+}
+
+static void find_rows(void)
+{
+    int all[3];
+    const int n = find_folders(all);
+
+    rows.n_folders = rows.books = 0;
+    for (int i = 0; i < n; i++)
+        if (all[i] == FOLDER_BOOKS)
+        {
+            rows.folders[rows.n_folders++] = all[i];
+            rows.books = find_books();
+        }
+    rows.catalog = count_catalog();
+}
+
+/* The Queue as it plays, from the track playing at the start */
+static uint32_t queue_keys(uint64_t *keys, uint32_t room)
+{
+    struct playlist_track_info info;
+    const int amount = playlist_amount();
+    const int first = playlist_get_first_index(NULL);
+    uint32_t n = 0;
+
+    room = MIN(room, QUEUE_MAX);
+    for (int d = 0; d < amount && n < room && !leaving; d++)
+    {
+        if (playlist_get_track_info(NULL, (first + d) % amount, &info) < 0)
+            break;
+        keys[n++] = path_key(info.filename);
+        if (!(d & 31))
+            yield();
+    }
+    return n;
+}
+
+/* A book's tracks, by disc and track number */
+static uint32_t book_keys(int32_t seek, uint64_t *keys, uint32_t room)
+{
+    struct tagcache_search *tcs = &block->tcs;
+    uint32_t n = 0;
+
+    room = MIN(room, BOOK_MAX);
+    if (!tagcache_search(tcs, tag_filename))
+        return 0;
+    tagcache_search_add_filter(tcs, tag_album, seek);
+    tagcache_search_add_clause(tcs, &only_spoken);
+    while (n < room
+           && tagcache_get_next(tcs, block->name, sizeof(block->name)))
+    {
+        const uint32_t order =
+            (uint32_t)tagcache_get_numeric(tcs, tag_discnumber) << 16
+            | (tagcache_get_numeric(tcs, tag_tracknumber) & 0xffff);
+        const uint64_t key = path_key(block->name);
+        uint32_t i = n++;
+        for (; i > 0 && book_order[i - 1] > order; i--)
+        {
+            book_order[i] = book_order[i - 1];
+            keys[i] = keys[i - 1];
+        }
+        book_order[i] = order;
+        keys[i] = key;
+    }
+    tagcache_search_finish(tcs);
+    return n;
+}
+
+/* A saved playlist's tracks that the database holds, relative paths read
+ * from the playlist's own folder */
+static uint32_t file_keys(const char *path, uint64_t *keys, uint32_t room)
+{
+    char line[MAX_PATH], full[MAX_PATH];
+    const char *slash = strrchr(path, '/');
+    const int dirlen = slash ? slash - path : 0;
+    uint32_t n = 0;
+    int fd = open(path, O_RDONLY);
+
+    if (fd < 0)
+        return 0;
+    for (int i = 0; n < room && !leaving
+                    && read_line(fd, line, sizeof(line)) > 0; i++)
+    {
+        char *track = line;
+        if (!i && !memcmp(track, "\xef\xbb\xbf", 3))
+            track += 3;     /* a UTF-8 byte order mark */
+        if (*track == '#' || !*track)
+            continue;
+        for (char *c = track; *c; c++)
+            if (*c == '\\')
+                *c = '/';
+        if (*track != '/')
+        {
+            snprintf(full, sizeof(full), "%.*s/%s", dirlen, path, track);
+            track = full;
+        }
+        const uint64_t key = path_key(track);
+        if (tagcache_find_key(key) >= 0)
+            keys[n++] = key;
+        if (!(i & 31))
+            yield();
+    }
+    close(fd);
+    return n;
+}
+
+static void list_name(struct iap_library_list *l, const char *name)
+{
+    strmemccpy(l->name, name, sizeof(l->name));
+    iap_utf8_cut(l->name);
+}
+
+/* One of Audiobooks' rows: a book */
+static void read_book(struct iap_library_list *l, int index,
+                      const char *folder_name, uint32_t room)
+{
+    if (!tagcache_seek_string(tag_album, book_seeks[index], block->name,
+                              sizeof(block->name)))
+        strmemccpy(block->name, UNTAGGED, sizeof(block->name));
+    list_name(l, block->name);
+    l->count = book_keys(book_seeks[index], (uint64_t *)l->keys, room);
+    l->id = name_id(5, l->name, folder_name);
+}
+
+/* One row, its keys at 'keys'; false past the last */
+static bool read_row(int row, struct iap_library_list *l, uint64_t *keys,
+                     uint32_t room)
+{
+    memset(l, 0, sizeof(*l));
+    l->keys = keys;
+    if (row == 0)
+    {
+        list_name(l, str(LANG_CURRENT_PLAYLIST));
+        l->id = name_id(7, l->name, NULL);
+        l->count = queue_keys(keys, room);
+        return true;
+    }
+
+    int r = row - 1;
+    for (int f = 0; f < rows.n_folders; f++)
+    {
+        const char *folder_name = str(folder_lang[rows.folders[f]]);
+        const int held = rows.books;
+        if (r == 0)
+        {
+            list_name(l, folder_name);
+            l->id = name_id(5, folder_name, NULL);
+            l->folder = true;
+            return true;
+        }
+        if (r <= held)
+        {
+            read_book(l, r - 1, folder_name, room);
+            l->parent = name_id(5, folder_name, NULL);
+            return true;
+        }
+        r -= 1 + held;
+    }
+    if (r < 0 || (uint32_t)r >= rows.catalog)
+        return false;
+
+    char path[MAX_PATH];
+    if (catalog_name(r + 1, l->name, sizeof(l->name)))
+    {
+        snprintf(path, sizeof(path), "%s/%s",
+                 global_settings.playlist_catalog_dir, l->name);
+        char *dot = strrchr(l->name, '.');
+        if (dot)
+            *dot = '\0';
+        iap_utf8_cut(l->name);
+        l->id = name_id(6, l->name, NULL);
+        l->count = file_keys(path, keys, room);
+    }
+    return true;
+}
+
+/* On the worker: every row, or (what 1) the Queue alone */
+static void read_lists(intptr_t what)
+{
+    if (what)
+    {
+        memset(&queue_list, 0, sizeof(queue_list));
+        queue_list.keys = queue_keys_pool;
+        if (!leaving)
+            queue_list.count = queue_keys(queue_keys_pool, QUEUE_MAX);
+        queue_state = leaving ? IAP_LIST_IDLE : IAP_LIST_READY;
+        return;
+    }
+
+    uint32_t used = 0;
+    lists_n = 0;
+    find_rows();
+    for (int row = 0; lists_n < LISTS_MAX && !leaving; row++)
+    {
+        struct iap_library_list *l = &lists[lists_n];
+        if (!read_row(row, l, list_keys + used, LIST_MAX - used))
+            break;
+        if (l->folder || l->count)
+        {
+            used += l->count;
+            lists_n++;
+        }
+    }
+    lists_state = leaving ? IAP_LIST_IDLE : IAP_LIST_READY;
+}
+
+bool iap_library_playlists_ask(void)
+{
+    if (lists_state == IAP_LIST_BUSY || !open_block(false))
+        return false;
+    lists_state = IAP_LIST_BUSY;
+    queue_post(&worker_q, EV_LIST, 0);
+    return true;
+}
+
+int iap_library_playlists(const struct iap_library_list **all)
+{
+    *all = lists;
+    return lists_state == IAP_LIST_READY ? lists_n : -1;
+}
+
+void iap_library_playlists_done(void)
+{
+    if (lists_state == IAP_LIST_READY)
+        lists_state = IAP_LIST_IDLE;
+}
+
+bool iap_library_queue_ask(void)
+{
+    if (queue_state == IAP_LIST_BUSY || !open_block(false))
+        return false;
+    queue_state = IAP_LIST_BUSY;
+    queue_post(&worker_q, EV_LIST, 1);
+    return true;
+}
+
+const struct iap_library_list *iap_library_queue(void)
+{
+    return queue_state == IAP_LIST_READY ? &queue_list : NULL;
+}
+
+void iap_library_queue_done(void)
+{
+    if (queue_state == IAP_LIST_READY)
+        queue_state = IAP_LIST_IDLE;
+}
+
 /* ------------------------------------------------------------------ *
  * artwork for iAP2                                                   *
  * ------------------------------------------------------------------ */
@@ -1177,11 +1509,13 @@ bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
  * into a ring of blocks the USB side sends from a packet's worth at a time.
  * Trap: a read per packet seeks the disk away from the buffering thread
  * hundreds of times a cover, and on the 5G the new track's audio runs dry.
- * Larger covers than ART_MAX are not sent; nothing here re-encodes. */
+ * An image is sent as stored, and larger ones than ART_MAX not at all; a
+ * cache thumbnail is encoded as a JPEG first, into art_jpeg. */
 #define ART_MAX   (512 * 1024)
 #define ART_CHUNK 1000
 #define ART_BLOCK (8 * ART_CHUNK)
 #define ART_BUFS  4
+#define ART_JPEG_MAX (64 * 1024)    /* 25-50 KB a 300px cover at 85 */
 
 static struct mp3entry art_track;   /* the request, copied */
 static struct {
@@ -1197,6 +1531,50 @@ static struct {
 } art;
 
 static struct albumart_source art_source;
+static uint8_t art_jpeg[ART_JPEG_MAX];
+static fb_data art_band[16 * ART_CACHE_MAX_DIM];
+
+struct aat_read
+{
+    int fd;
+    int width;
+};
+
+static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
+{
+    const struct aat_read *a = ctx;
+    const ssize_t n = (ssize_t)rows * a->width * FB_DATA_SZ;
+    (void)y;    /* the rows come in order */
+    return read(a->fd, band, n) == n;
+}
+
+/* A cache thumbnail as a JPEG in art_jpeg: its length, or 0. A cover too
+ * busy to fit at 85 is tried at 60 before it is given up. */
+static uint32_t encode_cache(const char *path)
+{
+    static const int quality[] = { 85, 60 };
+    struct art_cache_header hdr;
+    int n = -1;
+    int fd = open(path, O_RDONLY);
+
+    if (fd < 0)
+        return 0;
+    if (read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr) &&
+        hdr.magic == ART_CACHE_MAGIC &&
+        hdr.version == ART_CACHE_FORMAT_VERSION && hdr.layout == AA_ROWS &&
+        hdr.width > 0 && hdr.width <= ART_CACHE_MAX_DIM &&
+        hdr.height > 0 && hdr.height <= ART_CACHE_MAX_DIM)
+    {
+        struct aat_read a = { fd, hdr.width };
+        const struct jpeg_enc_src src =
+            { hdr.width, hdr.height, art_band, aat_rows, &a };
+        for (size_t i = 0; n < 0 && i < ARRAYLEN(quality); i++)
+            if (lseek(fd, sizeof(hdr), SEEK_SET) == (off_t)sizeof(hdr))
+                n = jpeg_encode(&src, quality[i], art_jpeg, sizeof(art_jpeg));
+    }
+    close(fd);
+    return n > 0 ? n : 0;
+}
 
 /* Album Art's preference for the car, or AA_OFF */
 static int car_preference(void)
@@ -1209,7 +1587,8 @@ static int car_preference(void)
 static void read_artwork(intptr_t request)
 {
     int fd = -1;
-    uint32_t left = 0;
+    uint32_t left = 0, sent = 0;
+    const long start = current_tick;
 
     /* Trap: a find that timed out can still be queued when the next is
      * posted, and reading both fills the ring a second time with nobody
@@ -1223,8 +1602,26 @@ static void read_artwork(intptr_t request)
      * fraction of the 140 KB/s the car takes from an iPhone */
     int priority = thread_set_priority(worker_id, PRIORITY_USER_INTERFACE);
 #endif
-    if (albumart_find_source(&art_track, car_preference(), true,
-                             &art_source) &&
+    if (!albumart_find_source(&art_track, car_preference(), true,
+                              &art_source))
+        art_source.kind = AA_SOURCE_NONE;
+    if (art_source.kind == AA_SOURCE_CACHE)
+    {
+#ifdef HAVE_PRIORITY_SCHEDULING
+        /* Trap: encoding at the raised priority takes the CPU from the
+         * codec just as the new track starts */
+        thread_set_priority(worker_id, priority);
+#endif
+        left = encode_cache(art_source.path);
+        /* Unreadable, or too busy even at 60: the image itself, if any */
+        if (!left &&
+            (!albumart_find_source(&art_track, AA_PREFER_EMBEDDED, true,
+                                   &art_source) ||
+             art_source.kind == AA_SOURCE_CACHE))
+            art_source.kind = AA_SOURCE_NONE;
+    }
+    if (art_source.kind != AA_SOURCE_NONE &&
+        art_source.kind != AA_SOURCE_CACHE &&
         (fd = open(art_source.path, O_RDONLY)) >= 0)
     {
         off_t size = art_source.size;
@@ -1235,6 +1632,9 @@ static void read_artwork(intptr_t request)
             left = size;
     }
 
+    usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_COVER, 0,
+            (uint32_t)(left ? art_source.kind : AA_SOURCE_NONE) << 24 | left,
+            (current_tick - start) * 1000 / HZ);
     art.size = left;
     art.state = left ? IAP_ART_FOUND : IAP_ART_NONE;
     while (left && !art.cancel && !leaving)
@@ -1244,13 +1644,18 @@ static void read_artwork(intptr_t request)
             sleep(1);       /* every buffer waits for the USB side */
             continue;
         }
-        ssize_t got = read(fd, art.buf[art.wr], MIN(left, ART_BLOCK));
+        ssize_t got = MIN(left, ART_BLOCK);
+        if (fd >= 0)
+            got = read(fd, art.buf[art.wr], got);
+        else
+            memcpy(art.buf[art.wr], art_jpeg + sent, got);
         if (got <= 0)
         {
             art.state = IAP_ART_FAILED;
             break;
         }
         left -= got;
+        sent += got;
         art.len[art.wr] = got;
         art.wr = (art.wr + 1) % ART_BUFS;
     }

@@ -31,6 +31,7 @@
 #include "macros.h"
 #include "platform.h"
 #include "../usb_iap2.h"
+#include "audio.h"
 
 static const unsigned long samprs[] = {
     SAMPR_48,
@@ -58,6 +59,9 @@ static uint8_t        logged_stream; /* USB_LOG_IAP_STREAM_*, or 0xff */
 static bool enabled;
 static bool exhausted;
 static bool track_attrs_sent;
+
+/* See iap_audio_take_counts() */
+static volatile uint32_t count_bytes, count_chunks, count_silent, count_odd;
 
 extern struct pcm_sink iap_pcm_sink;
 
@@ -121,6 +125,7 @@ start:
         *ptr = zero_buffer.buf.ptr;
         *len = packet_size;
         packet_count = (packet_count + 1) % 10;
+        count_silent++;
         return;
     }
 
@@ -136,6 +141,10 @@ start:
         /* pushing_{buf,buf_size} are filled. reset cursor and continue filling */
         pcm_play_dma_status_callback(PCM_DMAST_STARTED);
         pulled_buf_cursor = 0;
+        count_bytes += pulled_buf_size;
+        count_chunks++;
+        if(pulled_buf_size & 3)
+            count_odd++;
     }
 
     /* fill this single packet */
@@ -276,6 +285,16 @@ bool iap_audio_disable(void) {
 
 unsigned long iap_audio_sampr(void) {
     return samprs[iap_pcm_sink.configured_freq];
+}
+
+void iap_audio_take_counts(struct iap_audio_counts *c) {
+    const int irq = disable_irq_save();
+    c->bytes  = count_bytes;
+    c->chunks = count_chunks;
+    c->silent = count_silent;
+    c->odd    = count_odd;
+    count_bytes = count_chunks = count_silent = count_odd = 0;
+    restore_irq(irq);
 }
 
 bool iap_audio_set_sampr(uint32_t sampr) {

@@ -300,12 +300,12 @@ static bool try_source(const struct mp3entry *id3, int kind, bool as_stored,
     }
     case AA_SOURCE_CACHE:
     {
-        /* Raw thumbnail pixels: nothing that wants a stored JPEG can use it */
+        /* Raw thumbnail pixels: as_stored takes them to encode itself */
         char dir[MAX_PATH];
         const char *sep = strrchr(id3->path, '/');
         const int size_index = art_cache_size_index("wps");
         bool fallback;
-        if (as_stored || !sep || size_index < 0 ||
+        if (!sep || size_index < 0 ||
             sep - id3->path >= (int)sizeof(dir))
             return false;
         strmemccpy(dir, id3->path, sep - id3->path + 1);

@@ -32,8 +32,9 @@ void get_albumart_size(struct bitmap *bmp);
  * follow in the order playback tries them -- art embedded in the file (a
  * JPEG, the one kind decoded from inside a file), an image file as
  * search_albumart_files() finds it, then the thumbnail cache. as_stored asks
- * for a JPEG exactly as the source holds it, for a caller that sends the
- * bytes on rather than decoding them. False when no source has art. */
+ * for a JPEG exactly as the source holds it, or the cache's raw thumbnail,
+ * for a caller that sends the bytes on rather than decoding them. False when
+ * no source has art. */
 enum { AA_SOURCE_NONE, AA_SOURCE_EMBEDDED, AA_SOURCE_FILE, AA_SOURCE_CACHE };
 struct albumart_source {
     int kind;               /* AA_SOURCE_* */

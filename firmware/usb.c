@@ -133,6 +133,12 @@ static int usb_audio = 0;
 #endif
 #ifdef USB_ENABLE_IAP
 static bool usb_iap = true;
+/* A car that finds the sound card beside the disk goes no further than
+ * Apple's 0x53, and reports an authentication error (a Mazda CX-30), where
+ * without it the car moves on to the iAP configuration at once. So once a
+ * host proves a car, the player leaves the bus and comes back without the
+ * card, for as long as the cable stays in. */
+static bool usb_car_no_audio = false;
 #endif
 static bool usb_host_present = false;
 /* The host probe owns the controller: cable events are not acted on. */
@@ -282,6 +288,17 @@ static inline void usb_handle_hotswap(long id)
 }
 #endif /* HAVE_HOTSWAP */
 
+#ifdef USB_ENABLE_AUDIO
+static bool usb_audio_wanted(void)
+{
+#ifdef USB_ENABLE_IAP
+    if(usb_car_no_audio)
+        return false;
+#endif
+    return usb_audio != 0;
+}
+#endif
+
 static inline void usb_configure_drivers(int for_state)
 {
 #ifdef USB_ENABLE_AUDIO
@@ -305,7 +322,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
 #endif
 #ifdef USB_ENABLE_AUDIO
-        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio != 0);
+        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio_wanted());
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
         usb_core_enable_driver(USB_DRIVER_IAP, false);
@@ -341,7 +358,7 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
 #endif
 #ifdef USB_ENABLE_AUDIO
-        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio != 0);
+        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio_wanted());
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
         usb_core_enable_driver(USB_DRIVER_IAP, usb_iap);
@@ -357,6 +374,7 @@ static inline void usb_configure_drivers(int for_state)
     case USB_EXTRACTED:
 #ifdef USB_ENABLE_IAP
         usb_iap2_host_new();    /* the next host is not known to be a car */
+        usb_car_no_audio = false;
 #endif
         /* do not call usb_release_exclusive_storage.
          * usb core handles it */
@@ -858,6 +876,19 @@ static void NORETURN_ATTR usb_thread(void)
             break;
             /* USB_EXTRACTED: */
 
+#ifdef USB_ENABLE_IAP
+        case USB_CAR_RECONNECT:
+            if(usb_state != USB_INSERTED || usb_car_no_audio)
+                break;
+            usb_car_no_audio = true;
+            usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_RECONNECT, 0, 0, 0);
+            usb_stack_enable(false);
+            sleep(HZ / 5);      /* long enough for the car to see it go */
+            usb_stack_enable(true);
+            usb_configure_drivers(USB_INSERTED);
+            break;
+#endif
+
 #if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
         case USB_HOST_PROBE:
             usb_host_probe_switch(ev.data);
@@ -1291,6 +1322,13 @@ void usb_set_iap(bool enable)
 void usb_set_iap2_mode(int mode)
 {
     usb_iap_set_iap2_mode(mode);
+}
+
+/* Any thread or an interrupt */
+void usb_car_found(void)
+{
+    if(usb_audio && !usb_car_no_audio)
+        queue_post(&usb_queue, USB_CAR_RECONNECT, 0);
 }
 #endif /* USB_ENABLE_IAP */
 

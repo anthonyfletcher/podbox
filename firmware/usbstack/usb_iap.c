@@ -19,6 +19,7 @@
  ****************************************************************************/
 #include "audio.h"
 #include "panic.h"
+#include "pcm.h"
 #include "pcm_mixer.h"
 #include "pcm_sink.h"
 #include "playback.h"
@@ -479,7 +480,11 @@ static void usb_iap_init(void) {
 
 static void usb_iap_disconnect(void) {
     iap_initialized = false;
-    if(!usb_iap2_keeps_playing()) {
+    /* An accessory that had the audio takes it with it, as a dock does; one
+     * that never took it leaves playback alone -- a car that has only
+     * identified itself, or the connection the player drops to come back to
+     * a car without the sound card. */
+    if(pcm_current_sink() == PCM_SINK_IAP) {
         audio_pause();
     }
     mixer_switch_sink(PCM_SINK_BUILTIN);

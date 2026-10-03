@@ -629,11 +629,6 @@ bool usb_iap2_report(const uint8_t *r, size_t len)
     return true;
 }
 
-bool usb_iap2_keeps_playing(void)
-{
-    return seen && !usb_iap2_control_audio();
-}
-
 bool usb_iap2_audio_rate(unsigned long rate)
 {
     if (!seen)
