@@ -1114,8 +1114,9 @@ uint32_t iap_library_revision(void)
     uint32_t live = 0;
 
     /* Accessory Browsing Off has no entries to play a car's choice from, so
-     * the car is sent no library, as when the database is not in RAM */
-    if (!size_entries[global_settings.iap_browse_size])
+     * the car is sent no library, as when the database is not in RAM. A
+     * block opened while it was Off has none until the accessory leaves. */
+    if (!size_entries[global_settings.iap_browse_size] || (block && !capacity))
         return 0;
     for (int n = 0; tagcache_path_slot(n, &key, &idx); n++)
         if (idx >= 0)
