@@ -217,9 +217,12 @@ bool dbg_ports(void)
     return false;
 }
 
-bool dbg_hw_info(void)
+/* The hardware info screen's lines, handed to addline one at a time. The
+ * clock estimate holds interrupts off for 10 ms, so it is measured only when
+ * the screen opens. */
+void dbg_hw_info_lines(void (*addline)(const char *fmt, ...), bool opening)
 {
-    int line = 0;
+    static int clock_khz;
 #if defined(CPU_PP502x)
     char pp_version[] = { (PP_VER2 >> 24) & 0xff, (PP_VER2 >> 16) & 0xff,
                           (PP_VER2 >> 8) & 0xff, (PP_VER2) & 0xff,
@@ -232,30 +235,20 @@ bool dbg_hw_info(void)
                           (PP_VER1 >> 8) & 0xff, PP_VER1 & 0xff, '\0' };
 #endif
 
-    lcd_setfont(FONT_SYSFIXED);
-    lcd_clear_display();
-
-    lcd_puts(0, line++, "[Hardware info]");
+    if (opening)
+        clock_khz = perfcheck();
 
 #ifdef IPOD_ARCH
-    lcd_putsf(0, line++, "HW rev: 0x%08lx", IPOD_HW_REVISION);
+    addline("HW rev: 0x%08lx", IPOD_HW_REVISION);
 #endif
 
 #if defined(IPOD_COLOR) || defined(IPOD_NANO)
     extern int lcd_type; /* Defined in lcd-colornano.c */
 
-    lcd_putsf(0, line++, "LCD type: %d", lcd_type);
+    addline("LCD type: %d", lcd_type);
 #endif
 
-    lcd_putsf(0, line++, "PP version: %s", pp_version);
+    addline("PP version: %s", pp_version);
 
-    lcd_putsf(0, line++, "Est. clock (kHz): %d", perfcheck());
-
-    lcd_update();
-
-    /* wait for exit */
-    while (button_get_w_tmo(HZ/10) != (DEBUG_CANCEL|BUTTON_REL));
-
-    lcd_setfont(FONT_UI);
-    return false;
+    addline("Est. clock (kHz): %d", clock_khz);
 }

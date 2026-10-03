@@ -345,5 +345,10 @@ bool dbg_ports(void);
 #if (CONFIG_PLATFORM & PLATFORM_NATIVE) || defined(SONY_NWZ_LINUX) || defined(HIBY_LINUX) || defined(FIIO_M3K_LINUX)
 bool dbg_hw_info(void);
 #endif
+#if defined(IPOD_6G) || defined(IPOD_VIDEO)
+/* This fork's two targets list their hardware info rather than draw it: each
+ * line goes to addline, and opening is true on the first call for a visit. */
+void dbg_hw_info_lines(void (*addline)(const char *fmt, ...), bool opening);
+#endif
 
 #endif /* __SYSTEM_H__ */

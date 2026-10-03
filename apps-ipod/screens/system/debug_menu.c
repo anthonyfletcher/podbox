@@ -1153,6 +1153,29 @@ static bool dbg_identify_info(void)
     return false;
 }
 
+/* The firmware supplies the lines, so they stay beside the hardware they
+ * read; refreshed twice a second for the ones that change. */
+static int hw_info_callback(int action, struct gui_synclist *lists)
+{
+    (void)lists;
+    simplelist_reset_lines();
+    dbg_hw_info_lines(simplelist_addline, false);
+    if (action == ACTION_NONE)
+        action = ACTION_REDRAW;
+    return action;
+}
+
+static bool dbg_hw_info_list(void)
+{
+    struct simplelist_info info;
+    simplelist_info_init(&info, "Hardware info", 0, NULL);
+    info.action_callback = hw_info_callback;
+    info.timeout = HZ/2;
+    simplelist_reset_lines();
+    dbg_hw_info_lines(simplelist_addline, true);
+    return simplelist_show_list(&info);
+}
+
 static bool dbg_disk_info(void)
 {
     struct simplelist_info info;
@@ -1638,8 +1661,8 @@ static bool dbg_featured(void)
     info.scroll_all = true;
     simplelist_reset_lines();
 
-    /* SIMPLELIST_MAX_LINES is 32, and going over it wraps the count to zero
-     * and shows an empty screen -- hence the ceiling on the names. */
+    /* Going over SIMPLELIST_MAX_LINES wraps the count to zero and shows an
+     * empty screen -- hence the ceiling on the names. */
     simplelist_addline("Build %ld ms%s", tick * 1000 / HZ,
                        st.truncated ? " TRUNCATED" : "");
     simplelist_addline("%d titles, %d album artists", st.titles, st.artists);
@@ -1940,7 +1963,7 @@ static const struct {
         { "S.M.A.R.T.", dbg_ata_smart, false, NULL },
         { "Dump ATA identify", dbg_identify_info, false, NULL },
 #endif
-        { "Hardware info", dbg_hw_info, true, NULL },
+        { "Hardware info", dbg_hw_info_list, false, NULL },
 #endif
 #if defined(IPOD_6G) && !defined(SIMULATOR)
         { "SysCfg", dbg_syscfg, false, NULL },
