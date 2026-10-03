@@ -43,7 +43,8 @@
 %Lb(Rows,300,30,-,46)
 #
 # A numeric battery display adds the percentage after the time, so the title
-# has a ChromeG (graphic) and a shorter ChromeN (numeric) copy.
+# and the time have a ChromeG (graphic) and a ChromeN (numeric) copy: the
+# time clears its whole viewport, so each starts where its title ends.
 #
 # - Title
 %Vl(Chrome,0,0,320,35,3)
@@ -58,8 +59,10 @@
 %ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>>
 #
 # - Time, and the battery percentage when the display is numeric
-%Vl(Chrome,160,8,120,24,1)%Vf(000000)
-%ar%?cf<%cH:%cM|%cl:%cM %cP>%?St(battery display)<|  %bl%%>
+%Vl(ChromeG,210,8,70,24,1)%Vf(000000)
+%ar%?cf<%cH:%cM|%cl:%cM %cP>
+%Vl(ChromeN,162,8,118,24,1)%Vf(000000)
+%ar%?cf<%cH:%cM|%cl:%cM %cP>  %bl%%
 #
 # List viewport
 %Vi(-,10,46,300,184,-)
