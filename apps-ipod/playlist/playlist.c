@@ -607,6 +607,19 @@ static ssize_t format_track_path(char *dest, char *src, int buf_length,
     return strlen (dest);
 }
 
+/* A line of the playlist file 'playlist' as the path playing it would use.
+ * line is rewritten, and it and dest are both size bytes. */
+ssize_t playlist_line_path(const char *playlist, char *line, char *dest,
+                           int size)
+{
+    const char *dir;
+    const size_t dirlen = path_dirname(playlist, &dir);
+
+    if (!is_m3u8_name(playlist))
+        convert_m3u_name(line, strlen(line), size, dest);
+    return format_track_path(dest, line, size, dir, dirlen);
+}
+
 /*
  * Initialize a new playlist for viewing/editing/playing.  dir is the
  * directory where the playlist is located and file is the filename.

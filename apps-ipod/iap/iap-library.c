@@ -1326,8 +1326,6 @@ static uint32_t book_keys(int32_t seek, uint64_t *keys, uint32_t room)
 static uint32_t file_keys(const char *path, uint64_t *keys, uint32_t room)
 {
     char line[MAX_PATH], full[MAX_PATH];
-    const char *slash = strrchr(path, '/');
-    const int dirlen = slash ? slash - path : 0;
     uint32_t n = 0;
     int fd = open(path, O_RDONLY);
 
@@ -1336,20 +1334,15 @@ static uint32_t file_keys(const char *path, uint64_t *keys, uint32_t room)
     for (int i = 0; n < room && !leaving
                     && read_line(fd, line, sizeof(line)) > 0; i++)
     {
-        char *track = line;
-        if (!i && !memcmp(track, "\xef\xbb\xbf", 3))
-            track += 3;     /* a UTF-8 byte order mark */
-        if (*track == '#' || !*track)
+        if (!i && !memcmp(line, "\xef\xbb\xbf", 3))  /* a byte order mark */
+            memmove(line, line + 3, strlen(line + 3) + 1);
+        if (*line == '#' || !*line)
             continue;
-        for (char *c = track; *c; c++)
-            if (*c == '\\')
-                *c = '/';
-        if (*track != '/')
-        {
-            snprintf(full, sizeof(full), "%.*s/%s", dirlen, path, track);
-            track = full;
-        }
-        const uint64_t key = path_key(track);
+        /* As playing it would: relative, drive letters, dot segments, and
+         * a .m3u's Latin-1 */
+        if (playlist_line_path(path, line, full, sizeof(full)) <= 0)
+            continue;
+        const uint64_t key = path_key(full);
         if (tagcache_find_key(key) >= 0)
             keys[n++] = key;
         if (!(i & 31))
@@ -1414,15 +1407,15 @@ static bool read_row(int row, struct iap_library_list *l, uint64_t *keys,
     if (r < 0 || (uint32_t)r >= rows.catalog)
         return false;
 
-    char path[MAX_PATH];
-    if (catalog_name(r + 1, l->name, sizeof(l->name)))
+    char path[MAX_PATH], name[MAX_PATH];
+    if (catalog_name(r + 1, name, sizeof(name)))
     {
         snprintf(path, sizeof(path), "%s/%s",
-                 global_settings.playlist_catalog_dir, l->name);
-        char *dot = strrchr(l->name, '.');
+                 global_settings.playlist_catalog_dir, name);
+        char *dot = strrchr(name, '.');
         if (dot)
             *dot = '\0';
-        iap_utf8_cut(l->name);
+        list_name(l, name);
         l->id = name_id(6, l->name, NULL);
         l->count = file_keys(path, keys, room);
     }

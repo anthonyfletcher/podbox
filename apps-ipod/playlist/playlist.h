@@ -171,6 +171,8 @@ int playlist_insert_playlist(struct playlist_info* playlist, const char *filenam
 bool playlist_entries_iterate(const char *filename,
                               struct playlist_insert_context *pl_context,
                               bool (*action_cb)(const char *file_name));
+ssize_t playlist_line_path(const char *playlist, char *line, char *dest,
+                           int size);
 void playlist_skip_entry(struct playlist_info *playlist, int steps);
 int playlist_delete(struct playlist_info* playlist, int index);
 int playlist_move(struct playlist_info* playlist, int index, int new_index);
