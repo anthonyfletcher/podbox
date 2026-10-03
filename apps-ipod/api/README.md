@@ -25,14 +25,14 @@ reaches in by bare name exactly the way `firmware/` does:
 
 | Stub | Included by |
 |---|---|
-| `settings.h` | `firmware/backlight.c`, `firmware/scroll_engine.c`, `firmware/sound.c`, `firmware/usb.c`, `lib/rbcodec/dsp/{afr,pbe,surround,tdspeed}.c` |
-| `misc.h` | `firmware/powermgmt.c`, `firmware/scroll_engine.c`, `firmware/usb.c` |
+| `settings.h` | `firmware/backlight.c`, `firmware/scroll_engine.c`, `firmware/sound.c`, `firmware/usb.c`, `firmware/usbstack/{usb_audio,usb_iap2_control}.c`, `firmware/usbstack/iap/platform.c`, `lib/rbcodec/dsp/{afr,pbe,surround,tdspeed}.c` |
+| `misc.h` | `firmware/powermgmt.c`, `firmware/scroll_engine.c`, `firmware/usb.c`, `firmware/usbstack/usb_audio.c`, `firmware/usbstack/iap/platform.c` |
 | `action.h` | `firmware/backlight.c` |
 | `splash.h` | `firmware/powermgmt.c` |
 | `playback.h` | `firmware/usbstack/usb_iap.c`, `firmware/usbstack/iap/{notification,platform}.c` |
-| `playlist.h` | `firmware/usbstack/iap/platform.c` |
-| `iap_library.h` | `firmware/usbstack/usb_iap.c`, `firmware/usbstack/iap/platform.c` |
-| `buffering.h` | `lib/rbcodec/metadata/metadata.c` |
+| `playlist.h` | `firmware/usbstack/usb_iap2_control.c`, `firmware/usbstack/iap/platform.c` |
+| `iap_library.h` | `firmware/usbstack/{usb_iap,usb_iap2_control}.c`, `firmware/usbstack/iap/platform.c` |
+| `buffering.h` | `firmware/usbstack/iap/platform.c`, `lib/rbcodec/metadata/metadata.c` |
 | `fracmul.h` | `lib/rbcodec/dsp/*.c` (10 files) |
 | `rbcodecconfig.h` | `lib/rbcodec/codecs/codecs.h`, `lib/rbcodec/dsp/*.c`, `lib/rbcodec/platform.h` |
 | `rbcodecplatform.h` | `lib/rbcodec/platform.h` |
@@ -47,13 +47,14 @@ same headers and are ignored here, for the same reason `list.h` is (below).
 
 ## Slashed paths
 
-Outside code also reaches in by slashed path, not just bare name. These mirror
-the pre-reorganisation directory layout:
+Outside code also reaches in by slashed path, not just bare name. The `gui/`
+ones mirror the pre-reorganisation directory layout:
 
 | Stub | Included by | Forwards to |
 |---|---|---|
 | `gui/yesno.h` | `firmware/usb.c` | `widgets/yesno.h` |
 | `gui/skin_engine/skin_engine.h` | `firmware/usb.c`, `firmware/backlight.c` | `skin/skin_engine.h` |
+| `database/tagcache.h` | `firmware/usbstack/iap/platform.c` | `database/tagcache.h` |
 
 ## The one member that cannot live here
 

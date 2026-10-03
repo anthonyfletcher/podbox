@@ -347,7 +347,11 @@ had been flattened -- are tabulated in `apps-ipod/sim/README.md`. **Read that
 file before adding a `#ifdef SIMULATOR` anywhere**; the rule is that a shim
 must fail the way the caller already handles, and a guard is the escalation.
 
-**The repository mirrors upstream; only `apps-ipod/` is ours.** `manual/`,
+**The repository mirrors upstream; `apps-ipod/` is ours, and outside it the
+fork changes only what its features need: the USB stack (`firmware/usbstack/`,
+`firmware/usb.c` and the two players' USB controller drivers), a few drivers
+for the two targets, and its own tools under `tools/`. Ask before changing
+anything outside `apps-ipod/`.** `manual/`,
 `android/`, `backdrops/`, `screenshots/`, the stock `wps/` themes and every
 `themes/` entry this fork did not convert are all still present and all
 unbuilt. They are
