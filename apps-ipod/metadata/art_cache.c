@@ -508,6 +508,27 @@ static void aa_check_format_version(void)
     }
 }
 
+/* bg_task.artifact_ok: whether the cache is still on disk. A cache deleted
+ * over USB leaves the marks in RAM matching, so without this nothing reruns
+ * until the library changes. The folders, not every thumbnail: a pass checks
+ * those itself, folder by folder. */
+static bool aa_artifact_ok(void)
+{
+    char p[MAX_PATH];
+    int i;
+
+    if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
+        return false;
+
+    for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
+    {
+        snprintf(p, sizeof(p), THUMBCACHE_DIR "/%s", art_sizes[i].name);
+        if (!dir_exists(p))
+            return false;
+    }
+    return true;
+}
+
 /* Extract the directory portion (without trailing slash) of a full path. */
 static void aa_dirname(const char *path, char *dir, int dir_len)
 {
@@ -1510,6 +1531,7 @@ struct bg_task art_cache_task =
     .rank         = BG_RANK_ART,
     .run          = aa_task_run,
     .purge        = aa_purge_thumbs,
+    .artifact_ok  = aa_artifact_ok,
     .handle_event = aa_task_event,
 };
 
