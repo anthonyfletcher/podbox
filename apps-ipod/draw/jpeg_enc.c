@@ -203,9 +203,10 @@ static void put_value(const struct huff *h, int sym, int v, int cat)
         put_bits(v < 0 ? v - 1 : v, cat);
 }
 
-/* quant: the table divisors, row-major; recip 65536 over each */
+/* quant: the table divisors, row-major; recip 65536 over each, which for a
+ * divisor of 1 needs 17 bits */
 static void code_block(const int16_t *blk, const uint8_t *quant,
-                       const uint16_t *recip, int *dc_prev,
+                       const uint32_t *recip, int *dc_prev,
                        const struct huff *dc, const struct huff *ac)
 {
     int32_t coef[64];
@@ -316,7 +317,7 @@ int jpeg_encode(const struct jpeg_enc_src *src, int quality,
 {
     const int w = src->width, h = src->height;
     uint8_t quant[2][64];
-    uint16_t recip[2][64];
+    uint32_t recip[2][64];
     int dc_prev[3] = { 0, 0, 0 };
     int16_t y_blk[4][64], cb_blk[64], cr_blk[64];
     int32_t cb_sum[64], cr_sum[64];
