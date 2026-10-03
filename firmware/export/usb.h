@@ -223,7 +223,7 @@ int usb_detect(void);
  * Diagnostic only. A connect that appears to do nothing is either charging-only
  * (no broadcast, the UI stays live) or a handover waiting on a thread that has
  * not acknowledged -- and nothing on screen tells those apart. Read by the
- * debug menu's "View USB info". */
+ * debug menu's "USB info". */
 struct usb_insert_record
 {
     long tick;               /* current_tick at insertion */

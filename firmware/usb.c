@@ -171,7 +171,7 @@ static uint32_t usb_broadcast_seqnum = 0x80000000;
 /* Diagnostic only: what happened at the last cable insertion. A connect that
  * appears to do nothing is either charging-only or a handover that never
  * completed, and nothing on screen distinguishes them. Shown by the debug
- * menu's "View USB info". Written outside the timing-critical path -- plain
+ * menu's "USB info". Written outside the timing-critical path -- plain
  * stores, no allocation, no disk. */
 static struct usb_insert_record usb_record = { .acks_expected = -1 };
 

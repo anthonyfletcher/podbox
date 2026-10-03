@@ -357,12 +357,30 @@ static void sink_fill(uint8_t *dst, int frames)
 
 static void sink_lost(void);
 
+static bool set_interface(int alt)
+{
+    return usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
+                                USB_REQ_SET_INTERFACE, alt, status.iface,
+                                NULL, 0) == 0;
+}
+
+/* Some DACs take a new rate only across an alternate setting change */
+static bool set_dac_rate_idle(unsigned long rate)
+{
+    bool ok;
+
+    if (!set_interface(0))
+        return false;
+    ok = set_dac_rate(rate);
+    return set_interface(status.alt) && ok;
+}
+
 /* A rate the DAC refuses twice would have it play the mixer's samples at
  * its own rate, so playback goes back to the headphones as for an
  * unplugged DAC; the debug screen keeps the rate set and read. */
 static void sink_set_freq(uint16_t freq)
 {
-    if (set_dac_rate(sink_rate(freq)) || set_dac_rate(sink_rate(freq)))
+    if (set_dac_rate(sink_rate(freq)) || set_dac_rate_idle(sink_rate(freq)))
         usb_drv_host_iso_set_nominal(nominal(sink_rate(freq)));
     else
         sink_lost();
@@ -399,8 +417,9 @@ static void sink_stop(void)
     restore_irq(oldlevel);
 }
 
-/* Stream interrupt, the DAC unplugged: the USB thread shuts the probe down,
- * which stops this sink and returns playback to the headphone socket. */
+/* The DAC unplugged (stream interrupt) or refusing a rate (thread): the USB
+ * thread shuts the probe down, which stops this sink and returns playback to
+ * the headphone socket. */
 static void sink_lost(void)
 {
     usb_set_host_probe(false);
