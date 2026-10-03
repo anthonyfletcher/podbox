@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-25 0 650 190" width="442" height="129" role="img" aria-label="The iPod plugged into a car's USB socket; the car's screen shows the track playing">
+<style>svg{--ink:#222;--body:#fff;--paper:#fbfaf6;--edge:#d8d4c8;--tone:#e4e4e4;--grey:#999;--grey2:#888;--grey3:#777;--accent:#1f6fb2;--power:#c46a00;--red:#c0392b}@media (prefers-color-scheme: dark){svg{--ink:#d4d4d4;--body:#2b2e34;--paper:#1c1e22;--edge:#3b3e44;--tone:#3d414a;--grey:#7c818a;--grey2:#6c717a;--grey3:#8c919a;--accent:#5aa2e0;--power:#e39a3c;--red:#e0605a}}</style>
+<defs><clipPath id='frame'><rect x='-24.5' y='0.5' width='649' height='189' rx='10'/></clipPath></defs>
+<rect x="-24.5" y="0.5" width="649" height="189" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
+<g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style='stroke:var(--ink)'>
+<g clip-path='url(#frame)'>
+<path d='M-40,126 L-10,124 C90,116 170,112 196,110 C206,110 210,106 210,96 V32 Q210,18 224,18 H408 Q422,18 422,32 V96 C422,106 426,108 436,108 C490,108 560,112 610,118 L640,121 V200 H-40 z' style='fill:var(--body)'/>
+<path d='M214,112 L206,200 M418,112 L426,200' stroke-width='1.5'/>
+</g>
+<rect x='222' y='30' width='188' height='76' rx='3' stroke-width='1.5' style='fill:var(--tone)'/>
+<rect x='232' y='40' width='44' height='44' rx='2' stroke-width='1.5' style='fill:var(--body)'/>
+<circle cx='254' cy='62' r='12' stroke-width='1.5' style='fill:var(--tone)'/>
+<circle cx='254' cy='62' r='2.5' stroke='none' style='fill:var(--ink)'/>
+<text x='288' y='56' font-family='Menlo, Consolas, monospace' font-size='10' stroke='none' style='fill:var(--ink)'>Blue in Green</text>
+<text x='288' y='70' font-family='Menlo, Consolas, monospace' font-size='9' stroke='none' style='fill:var(--grey3)'>Miles Davis</text>
+<path d='M232,96 H400' stroke-width='2' style='stroke:var(--grey)'/>
+<path d='M232,96 H290' stroke-width='2' style='stroke:var(--accent)'/>
+<circle cx='290' cy='96' r='3' stroke='none' style='fill:var(--accent)'/>
+<rect x='228' y='118' width='60' height='18' rx='4' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M234,124 H282 M234,130 H282' stroke-width='1.2' style='stroke:var(--grey)'/>
+<rect x='344' y='118' width='60' height='18' rx='4' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M350,124 H398 M350,130 H398' stroke-width='1.2' style='stroke:var(--grey)'/>
+<circle cx='316' cy='127' r='7' stroke-width='1.5' style='fill:var(--body)'/>
+<path d='M316,123 l3.5,6 h-7 z' stroke-width='1.2' style='stroke:var(--red)'/>
+<g clip-path='url(#frame)'>
+<path d='M510,157 L459,153 L459,190 L510,188 z M560,157 L611,153 L611,190 L560,188 z M518,195 L510,251 L560,251 L552,195 z' style='fill:var(--body)'/>
+<circle cx='535' cy='170' r='76' stroke-width='15'/>
+<circle cx='535' cy='170' r='76' stroke-width='11' style='stroke:var(--body)'/>
+<rect x='499' y='142' width='73' height='56' rx='20' style='fill:var(--body)'/>
+<circle cx='535' cy='171' r='7' stroke-width='1.5' style='fill:var(--tone)'/>
+<circle cx='482' cy='171' r='2.5' stroke='none' style='fill:var(--accent)'/>
+<circle cx='588' cy='171' r='2.5' stroke='none' style='fill:var(--accent)'/>
+</g>
+<g transform='translate(60,36)'>
+<rect width='64' height='106' rx='9' style='fill:var(--body)'/>
+<rect x='7' y='7' width='50' height='38' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M12,15 H40 M12,22 H46 M12,29 H36 M12,36 H43' stroke-width='2' style='stroke:var(--grey)'/>
+<circle cx='32' cy='76' r='21' style='fill:var(--body)'/>
+<circle cx='32' cy='76' r='7.5' style='fill:var(--body)'/>
+<path d='M28,90 l3,-2 v4 z M36,90 l-3,-2 v4 z' stroke='none' style='fill:var(--ink)'/>
+</g>
+<path d='M92,152 C92,172 104,178 130,178 H280 C306,178 316,172 316,162' stroke-width='5'/><path d='M92,152 C92,172 104,178 130,178 H280 C306,178 316,172 316,162' stroke-width='2' style='stroke:var(--paper)'/>
+<path d='M87,148 h10 l-1,7 h-8 z' stroke-width='1.5' style='fill:var(--body)'/><rect x='80' y='142' width='24' height='8' rx='2' style='fill:var(--body)'/>
+<rect x='308' y='152' width='16' height='10' rx='2' stroke-width='1.5' style='fill:var(--body)'/>
+</g>
+</svg>

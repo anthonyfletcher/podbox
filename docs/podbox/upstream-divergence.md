@@ -19,8 +19,8 @@ nothing for those.
 `apps/`, `manual/`, `android/`, `backdrops/`, `screenshots/` and every
 unconverted `themes/` entry are upstream-identical and unbuilt, kept so merges
 apply without delete/modify conflicts. `uisimulator/` is upstream-identical and
-built. Most `firmware/` changes are hardware work from RockPod; the `tools/`
-changes are this fork's.
+built. The `firmware/` changes are RockPod's hardware work and this fork's USB
+work; the `tools/` changes are this fork's.
 
 ---
 
@@ -43,6 +43,7 @@ changes are this fork's.
 | `drivers/lcd-color-common.c`, `export/lcd.h` | New `lcd_alpha_bitmap_part_img()`; `lcd.h` declares it and `lcd_alpha_bitmap_part()` | Draws an image through an alpha mask, for rounded corners on `%dr`, `%Cl` and `%La`. |
 | `drivers/lcd-16bit-common.c` | `lcd_alpha_bitmap_part_mix()`'s `DRMODE_FG` case skips fully transparent pixels | Every anti-aliased glyph gets cheaper. The local must not be named `alpha`, which `READ_ALPHA()` uses. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm code wrapped in `#ifdef HAVE_RTC_ALARM` | The 5G undefines it, and this was the one RTC driver without the guard. |
+| `export/system.h`, `target/arm/pp/debug-pp.c` | New `dbg_hw_info_lines()` for `IPOD_6G` and `IPOD_VIDEO`; `debug-pp.c`'s `dbg_hw_info()` becomes it | Hardware info as a themed list. `debug-pp.c` is shared by every PP target, and the others now have no `dbg_hw_info()`. |
 | `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()`, `dircache_get_index_path()` | Whole-player search from the cache. The sweep takes the filesystem lock as **reader**, so audio buffering is not held off, and `dircache_is_ready()` reads unlocked so it does not wait out a scan. |
 
 ## firmware/ — USB, device side
@@ -96,6 +97,21 @@ Upstream's libiap, on both players. An Onkyo ND-S1 plays both over S/PDIF.
 | `usbstack/iap/platform.c`, `platform.h` | Broadcasts `SYS_ACCESSORY_CONNECTED` once the sample rates are accepted; answers libiap's four database callbacks from `iap_library.h`, and holds a play back while that library builds the Queue | The "Accessory connected" splash, and browsing the library from an accessory. |
 | `usbstack/iap/libiap/iap.c`, `context.h`, `platform.h`, `spec/lingoes/extended-interface/database.h` | The database commands go to four new platform callbacks; Enter/ExitExtendedInterfaceMode are acked | Upstream answers them with fixed counts, so there is nothing to browse. Onkyo receivers retry the mode commands until acked. |
 | `usbstack/usb_core.c` | Manufacturer and product strings `PodBox` and `PodBox media player` | The name a computer shows. iAP's name comes from `/.rockbox/playername.txt`, which the app layer keeps set. |
+| `usbstack/usb_iap.c` | While iAP2 is offered, the stream lists an iPhone's nine rates; reports, ticks and send completions go to `usb_iap2_*` first; `iap_library_close()` on disconnect; a disconnect pauses playback only if the iAP sink had it | An iAP2 car names rates as indexes into an iPhone's list. An accessory that never took the audio, such as the connection dropped to come back without the sound card, leaves playback alone. |
+| `usbstack/iap/audio.c`, `audio.h` | A rate change goes to iAP2 while it holds the connection; new `iap_audio_sampr()`; the stream's state goes to the USB log; new `iap_audio_take_counts()`, what the stream took from playback | The counters are logged every 5 s while a car takes the audio. |
+
+### USB iAP2
+
+A car looking for an iPhone, answered by the player as an iPod. Upstream has no
+iAP2.
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `usbstack/usb_iap2.c`, `usb_iap2.h` (new) | iAP2's transport and link layer over the iAP configuration's HID interface, on the USB thread | **iAP2 Accessories**. |
+| `usbstack/usb_iap2_control.c` (new) | The control session: identification, USB audio, power, the library and its playlists, the queue, now playing, the car's buttons with shuffle and repeat, and cover art | Covers come from the art cache, encoded by `apps-ipod/draw/jpeg_enc.c`. |
+| `usbstack/usb_core.c` | Vendor request 0x53 answered as an iPhone answers it, four zero bytes, marking the host a car; under Auto the disk handover waits a second (`storage_hold()`) | A car moves on to the iAP configuration within that second and is never handed the disk; a computer stays, and is. |
+| `usb.c`, `export/usb.h` | New `usb_set_iap2_mode()`; the disk withheld while iAP2 is answered; new `usb_car_found()` and the `USB_CAR_RECONNECT` event: a car found while the sound card is on makes the player leave the bus and come back without it, until unplugged | The Mazda stops with an authentication error when it finds the sound card beside the disk. |
+| `usbstack/usb_iap.h` | `USB_IAP2_MODE_*`, `usb_iap_set_iap2_mode()`, `usb_iap2_offered()`, `usb_iap_answer_iap2()`, vendor request 0x53 | Off refuses the probe, On answers it and offers no disk, Auto answers once the host has sent 0x53. |
 
 ### The USB log
 
@@ -106,6 +122,7 @@ Upstream's libiap, on both players. An Onkyo ND-S1 plays both over S/PDIF.
 | `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/usb-log.txt` while the debug screen is open or **System → USB → Write Debug Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
 | `export/usb.h`, `usb.c` | The insertion record and waypoints | **Debug → USB info**: whether a connect that did nothing was charging-only or a stuck handover. |
 | `usbstack/usb_core.c` | `usb_log()` calls and waypoints in the handlers | Not on the notify path: the ARC driver calls `usb_core_bus_reset()` from its ISR and posts nothing. |
+| `usbstack/iap/debug.c`, `debug.h` | New `iap_log_report()`: the iAP packet a HID report starts, to the USB log | The log decodes iAP. |
 
 ## firmware/ — USB, host side
 
@@ -115,6 +132,7 @@ no VBUS.
 | File | What changed | Why |
 | --- | --- | --- |
 | `usbstack/usb_host.c` (new) | Enumeration over `usb_drv_host_control()` | Root port only; no hubs. |
+| `export/config.h` | `HAVE_USB_HOST` and `HAVE_USB_HOST_AUDIO` for the ARC and DesignWare controllers | Both players get the host probe and the DAC output. |
 | `usbstack/usb_host_audio.c`, `export/usb_host_audio.h` (new) | USB Audio Class 1 and 2 playback as `PCM_SINK_USB_HOST`, 44.1 and 48 kHz, software volume capped at 0 dB | The DAC output. |
 | `usb.c`, `export/usb.h` | The host probe, `USB_HOST_AUTO` and the DAC state calls | **USB DAC Output**. A cable still only powered after 2 s is polled for a DAC, unless a serial iAP accessory is talking, which the search would starve on the 5G. |
 | `export/usb_drv.h` | The host API | Implemented by both controller drivers. |
@@ -145,7 +163,7 @@ no VBUS.
 | `target/arm/s5l8702/ipod6g/mikey-6g.c` | `mikey_init()` returns early on `rec_hw_ver == 0` | The 80GB and fat 160GB have no Mikey to poll. |
 | `target/arm/s5l8702/ipod6g/mikey-6g.c`, `mikey-target.h` | New `mikey_probe()` | Returns the I2C status, so the debug screen can tell an empty jack from a missing chip. |
 | `target/arm/s5l8702/ipod6g/mikey-6g.c`, `export/button.h` | Centre clicks counted over 360 ms: two are next, three previous. `mikey_set_track_skip()` and `mikey_supported()` | Upstream's remote has no next or previous. Counting delays play/pause, so **Remote Track Skip** can turn it off. |
-| `target/arm/s5l8702/debug-s5l8702.c` | A second Mikey line: `jack=`, `hw=`, `probe rc=`, `r0=` | `rc` 1 means no Mikey answered; 0 means it did. |
+| `target/arm/s5l8702/debug-s5l8702.c` | `dbg_hw_info()` becomes `dbg_hw_info_lines()`, the lines of a list; adds the LTC4066 charger pins and a Mikey line: `jack=`, `hw=`, `probe rc=`, `r0=` | Hardware info keeps the theme. Mikey `rc` 1 means no Mikey answered; 0 means it did. |
 
 ### SSD mode: one setting, two mechanisms
 
@@ -265,11 +283,12 @@ upstream files reach the app layer by bare include name, through `api/` stubs:
 | File | What it is |
 | --- | --- |
 | `README.md`, `CLAUDE.md` | The fork's README, and an assistant's instructions. |
-| `build-hw.sh` | Clean build for `ipod6g`/`6g` or `ipodvideo`/`5g`, with `--appsdir` and all three bundle scripts. |
+| `build-hw.sh` | Clean build for `ipod6g`/`6g` or `ipodvideo`/`5g`, with `--appsdir` and all four bundle scripts. |
 | `build-sim.sh` | The same for the simulator, unpacked into `simdisk/`, which it keeps across the clean. `win` uses `--type=as6`; plain `s6` gives a normal build. |
 | `bundle-theme.sh` | Adds Scrim, `default-config.cfg` and the default iconset to the zip. Deletes `classic_statusbar` (the directory and the loose `.sbs`/`.rsbs` beside it) and the plugin data `buildzip.pl` copies from `apps/plugins/`. The theme is named, not globbed, so a merge cannot start shipping stock themes. |
 | `bundle-help.sh` | Ships `settings-help.txt`. Without it every **Explain** is empty and nothing else looks wrong. |
 | `bundle-trim.sh` | Ships `trim.config`, the whole of what **Trim Titles** trims. |
+| `bundle-tools.sh` | Adds `soundscan.exe` and the host-built codecs it loads, as `.rockbox/tools/`. A missing tool is reported, not fatal; `release.sh` requires it. |
 | `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator` and `latest` releases, in that order. |
 | `docs/CREDITS` | PodBox, RockPod and Spun blocks above `For RockBox:`. Upstream's list below is untouched, trailing newline included, so merges apply. |
 | `.gitignore` | `/build*` narrowed to the build directories; local drafts, `dist/` and editor state added. |

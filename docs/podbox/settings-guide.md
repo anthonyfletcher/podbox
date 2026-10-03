@@ -67,7 +67,7 @@ before it starts. All of them queue work for the background and return at once.
 
 The two Sound Analysis rows appear only once **Playlist Engine** is on, and
 unlike the rest they hold the player rather than queueing work. **Rebuild
-Playback Report** queues nothing either: it clears three cached files, and the
+Playback Report** queues nothing either: it clears two cached files, and the
 report rebuilds them itself the next time you open it.
 
 ---
@@ -201,7 +201,7 @@ report rebuilds them itself the next time you open it.
 | Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | on |  |
 | Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | on | **Adv** |
 | Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | on | **Adv** |
-| Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | off | **Adv** |
+| Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | off | **Adv** |
 | Show Icons | Draws icons beside the entries in the playing queue. | on |  |
 | Show Indices | Numbers the entries in the playing queue. | on |  |
 | Track Display | Whether the queue shows filenames or the artist and title from the tags. | track name |  |
@@ -496,11 +496,11 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only is useful with a car or a plug that would otherwise interrupt playback. | mass storage |  |
+| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only suits a plug that would otherwise take the disk and interrupt playback, but it also stops docks and cars that play from the player over USB. | mass storage |  |
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
 | USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
-| Write Debug Log | Writes every USB connection step to usb-log.txt in the .rockbox folder, without the USB Log debug screen open. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, so leave it off otherwise. | off | **Adv** |
+| Write Debug Log | Writes every USB connection step to usb-log.txt in the .rockbox folder, without the USB Log debug screen open. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, and connection steps wait for the log to reach the disk, which can slow them; leave it off otherwise. With a car, it also records every five seconds how much audio the car took. | off | **Adv** |
 
 ### System — USB — USB DAC Output
 
@@ -513,9 +513,9 @@ shadow to colour.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
-| iAP2 Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. | auto | **Adv** |
-| Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, and play Playlist Engine moods, up to this many songs in a list. Its memory is taken when browsing starts, which briefly rebuffers playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists. | 10000 | **Adv** |
-| Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. As Album Art takes it from where the Album Art setting does; the other choices set an order for the car alone. Off sends none, and a car that looks covers up itself shows its own. A car takes about 140 KB a second, so a large image takes seconds to appear. The cache holds no JPEG, so Prefer Cache sends embedded art or an image file. | as album art |  |
+| iAP2 Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. Needs Accessory Protocol on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
+| Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods, which a car is not sent. Its memory is taken when browsing starts, which briefly rebuffers playback, and given back on unplugging; a car takes it with the first cover. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once it is plugged in again. | 10000 | **Adv** |
+| Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. | prefer cache |  |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
 | Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |

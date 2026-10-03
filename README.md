@@ -4,6 +4,8 @@ PodBox is a modified version of Rockbox for the iPod Classic and iPod Video with
 Rockbox whilst providing album and artist art everywhere with colour schemes that
 follow the music.
 
+<a href='https://ko-fi.com/P3J3200FZY' target='_blank'><img height='36' style='border:0px;height:36px;' src='docs/podbox/images/support_me_on_kofi_dark.png' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+
 # Key features
 
 ## Colours that follow the music
@@ -84,7 +86,8 @@ Launch Spike from the context menu (hold <code>Select</code> then click
 <code>Play with Spike</code>) on the Now Playing screen.  [Video](docs/podbox/videos/spike_game.mp4)
 
 See how well you know your library - a clip plays from partway through a song and you
-pick its title from five options before the points drain away.
+name the track, the artist, the album or the year from five options before the points
+drain away.
 
 Find it at the bottom of the Music menu (`Music > Quiz`).
 
@@ -119,7 +122,7 @@ the whole update.
 
 When you first load PodBox it will be building your music and art database which will
 affect performance initially (particularly on the 5G).  You can check progress of the 
-background tasks by going to `System > Background tasks`.
+background tasks by going to `System > Background Tasks`.
 
 # Setting up your music library
 
@@ -157,8 +160,9 @@ e.g. `Artist/folder.jpg`.
 All artwork should be:
 
 - stored as a baseline / non-progressive JPEG file
-- stored at a "reasonable" resolution (the cache only stores them as 300x300px images) - anything
-bigger than this will just take longer to process.
+- stored at a "reasonable" resolution - the cache stores 300x300px copies, and anything much
+larger takes longer to process. A car is sent the cache's copy unless `Car Artwork` is set to
+send the original.
 
 Artwork is processed quietly in the background while the database is idle, so browsing stays
 fast.  As such, it can take a while to see the art appear.  You can check the cache activity by
@@ -227,17 +231,15 @@ they can be installed in any order and on their own.
   - Control visibility via `Settings > Appearance > Elements > Artist Art Rows`
 - Control the sort order of the albums list
   - `Settings > Library > Music > Sort Albums By`
+- Sort artists and albums ignoring a leading "The", "A" or "An"
+  - Off by default.  Turn it on in `Settings > Library > Music > Sort Ignoring The/A/An`
 - Start playing a random album
   - `Music > Random Album`
 - Search with live results across track, album or artist names
   - `Music > Search`
   - Control ordering of results via `Settings > Library > Music > Search`
   - See [`text-input-guide.md`](docs/podbox/text-input-guide.md) for guidance on inputting text
-- See the most played albums/artists
-  - `Music > Playback History`
-- See the most recently played albums/artists
-  - `Music > Playback History`
-- See your forgotten album/artists
+- See the most played albums/artists,  most recently played albums/artists and your forgotten album/artists
   - `Music > Playback History`
 - Control the items displayed in the Music menu and their order
   - Change via `Settings > Library > Music > Edit Music Menu`
@@ -246,7 +248,8 @@ they can be installed in any order and on their own.
 - View listening progress against albums and artists
   - Hold `Select` on an Album or Artist and select `Listening Progress`
 - Play the Music Quiz
-  - `Music > Quiz`
+  - Access by going to `Music > Quiz`
+  - Choose which questions it asks in `Settings > Library > Music > Quiz Questions`
   - Turn it off in `Settings > Library > Music > Edit Music Menu`
 
 ## Featured Artists
@@ -288,6 +291,8 @@ into `.mp3` ones
   - `Settings > Library > Carousel > On Album Select`
 - Display the covers/profiles in a flat top-down mode
   - `Settings > Library > Carousel > View Mode`
+- Give the carousel a fixed background colour that dynamic colours leave alone
+  - `Settings > Library > Carousel > Background > Custom`
 - Spin to a random album or artist
   - Hold `Play`
 
@@ -302,6 +307,8 @@ into `.mp3` ones
   - In auto mode the art will be shown depending on how you arrived at playing the track. If
 you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
  Album > Track` the album art would show.
+- Start a sleep timer from the Now Playing screen, with your usual length preselected
+  - Hold `Select` and select `Sleep Timer`
 
 ## Playlist engine
 
@@ -322,6 +329,8 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
   - Hold `Select` on the album or folder and select `Album Sound`
 - See what the analysis found across your whole library, and how much of it is measured
   - `Settings > Library > Playlist Engine > Library Sound`
+- Choose whether Play Similar and Wind Down start with the track you chose
+  - `Settings > Library > Playlist Engine > Start With Selected Track`
 - Turn on the Continue Playing setting to keep the music going when any playlist runs 
   out -- an album, a saved playlist, or a dynamic one -- by extending it with more of the
   same.  Turn it on by going to `Settings > Library > Playlist Engine > Continue Playing`.
@@ -356,7 +365,9 @@ song is by, the album it came from
 
 - Dynamic colouring of the UI based on the album/artist art including transformation of all theme colours.
   - Theme dependent
-  - `Settings > Appearance > Colours > Dynamic Colours`
+  - `Settings > Appearance > Colours > Dynamic Colors`
+- Choose whether the album's lighter or darker colour becomes the background
+  - `Settings > Appearance > Colours > Dynamic Colors Background`
 - Edits to appearance settings save to a config file linked to the running theme, so when you revert themes your settings follow, and themes don't inherit settings they don't set
   - `Settings > Appearance`
   - To reset to default
@@ -400,44 +411,83 @@ song is by, the album it came from
 
 ## Connectivity
 
+All connectivity described below works on both the iPod video and the iPod classic, apart from the
+earphone remote (see Headphones) - however testing has only been completed on a small number of
+accessories.  If you'd like to support testing, please follow [this guide](docs/podbox/connectivity-testing-guide.md).
+
+The USB and accessory settings below are under `Settings > System`, and most are shown only with
+`Settings > Settings Mode` set to `Everything`.
+
+### Sound card (New)
+
 <img src="docs/podbox/images/conn_sound_card.svg" alt="The iPod as a USB sound card for a computer"/>
 
-- Your iPod can act like a sound card for a computer - the computer plays through 
-the iPod, out of its headphone socket, using the iPod DAC, and the computer's volume 
-control sets the level
-  - `USB > USB Sound Card` - off by default
+Your iPod can act like a sound card - the computer plays through the iPod, out of its headphone socket, 
+using the iPod DAC.
+- Tested on Windows, MacOS and Ubuntu
+- `Settings > System > USB > USB Sound Card` - off by default; turning it on can need a restart
+
+### USB Host (New)
 
 <img src="docs/podbox/images/conn_usb_dac.svg" alt="The iPod sending digital audio to a USB DAC, which is powered by its own supply or by an injector in the cable"/>
 
-- Your iPod can output to a USB DAC - the iPod sends its audio digitally over USB to a
-  headphone amp or DAC, which does the conversion instead of the iPod.
-  - `USB > USB DAC Output > Start Automatically` - on by default - or `Turn On`
-    for a DAC with its own power supply that doesn't power the iPod
-  - The iPod supplies no power over USB, so the DAC needs its own supply or you can use a
-    USB splitter with a charger connected
-  - Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
-    kHz will not, and neither will a DAC behind a hub
+Your iPod can output to a USB DAC - the iPod sends its audio digitally over USB to a
+headphone amp or DAC, which does the conversion instead of the iPod.
+- `Settings > System > USB > USB DAC Output > Start Automatically` - on by default - or `Turn On`
+  for a DAC with its own power supply that doesn't power the iPod
+- The iPod supplies no power over USB, so the DAC needs its own supply - or you can use a
+  USB splitter with a charger connected
+- Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
+  kHz will not, and neither will a DAC behind a hub
 
-<img src="docs/podbox/images/conn_spdif_dock.svg" alt="The iPod in a dock sending S/PDIF to an amplifier"/>
+### Docks and receivers (Improved)
 
-- Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
-  digitally, over the USB pins of the dock connector, and turns it into
-  S/PDIF (optical or coax) for an amplifier
-  - On by default, through `Accessories > Accessory Protocol`
-  - Needs `USB > USB Mode` set to Mass Storage, which is the default; in Charge
-    Only the dock finds nothing to play
-  - Remote support improved to match click-wheel actions
+<img src="docs/podbox/images/conn_spdif_dock.svg" alt="The iPod on a speaker dock; or plugged into an amplifier's USB socket, the amplifier showing the track playing"/>
+
+Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
+digitally, over the USB pins of the dock connector
+- On by default, through `Settings > System > Accessories > Accessory Protocol`
+- Needs `Settings > System > USB > USB Mode` set to `Mass Storage` - in `Charge Only` the iPod
+  doesn't talk to docks or cars over USB
+- Remote support improved to match click-wheel actions
+
+A receiver or dock that browses an iPod shows what is playing and can browse 
+and play your library from its own screen and remote
+- Artist, album and title of the playing track
+- Playlists, Artists, Albums, Genres, Composers and Songs, as far as the
+  accessory offers them, sorted the way the Music menu sorts them
+- `Settings > System > Accessories > Accessory Browsing` sets how many songs a list can hold -
+  10,000 by default.
+
+### Modern Cars (New/Experimental)
+
+<img src="docs/podbox/images/conn_car.svg" alt="The iPod plugged into a car's USB socket; the car's screen shows the track playing"/>
+
+A car that takes an iPhone over USB, but no longer an iPod, can now connect to your iPod. The iPod
+speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media source - not CarPlay.
+- Plays through the car's speakers, with the car's own buttons and steering-wheel controls for
+  play, pause, skip, shuffle and repeat.
+- Title, artist, album, cover art and a moving progress bar on the car's screen
+- Your whole library in the car's own browser - pick an artist, album, playlist or song there and the iPod
+  plays it
+- `Settings > System > Accessories > iAP2 Accessories` - `Auto` by default. Auto recognises a car,
+  and a computer still mounts the iPod as a disk, about a second later than it otherwise would.
+  Needs `Accessory Protocol` on
+- `Settings > System > Accessories > Car Artwork` specifies where the cover comes from.
+  `Prefer Cache` by default, which appears almost at once. The other choices send the original
+  image - sharper, but slower to appear and more work for a 5G. Only JPEGs under 512 KB are sent
+  as they are
+  
+### Headphones (Improved)
 
 <img src="docs/podbox/images/conn_remote.svg" alt="Controlling the iPod from the earphone remote"/>
 
-- You can control your iPod using the earphone remote (only supported on iPod classic 
-120GB - Late 2008 and 160GB - Late 2009 thin version only)
-  - Click for play/pause, two clicks for the next track, three for the previous
-    one, and the volume buttons
-  - Always on. The multi-click skips are `Accessories > Remote Track Skip`, on
-    by default; turning it off makes play/pause react quicker
-
-
+You can control your iPod using the earphone remote (supported on the iPod classic
+120GB - Late 2008 and 160GB - Late 2009 thin versions only)
+- Click for play/pause, two clicks for the next track, three for the previous
+  one, and the volume buttons
+- Always on. The multi-click skips are `Settings > System > Accessories > Remote Track Skip`, on
+  by default; turning it off makes play/pause react quicker
 
 ---
 
@@ -529,6 +579,27 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Licensed under the MIT License —
     [full text](themes/bony/.rockbox/fonts/LICENSE-ProFont.txt)
 
+### Modern cars (iAP2)
+
+Thank you to the following sources, which supplied facts about the protocol - message numbers,
+layouts and behaviour to support the iAP2 development. Which fact came from where is in
+[`iap2-sources.md`](docs/podbox/iap2-sources.md).
+
+- carplayd by lvalen91 (https://github.com/lvalen91/carplayd)
+  - The message table and the order of authentication and identification
+- Nocturne by the Nocturne team (https://github.com/usenocturne/nocturne)
+  - Now playing, the car's buttons and file transfers
+- carplay-wifi-extractor by HaToan (https://github.com/HaToan/carplay-wifi-extractor)
+  - The phone's side of the conversation
+- JJTech0130's iAP2 gists (`carkit_iap2.py`, the `iap2.lua` Wireshark dissector)
+  - The message names, and how to talk iAP2 to a real iPhone
+- Adam Bell, "McLarens and CarPlay" (https://blog.adambell.ca)
+  - Showed that a device can stand in for an iPhone in a car
+- usbmuxd from libimobiledevice (https://github.com/libimobiledevice/usbmuxd)
+  - Apple's USB mode requests
+- pymobiledevice3 by doronz88 (https://github.com/doronz88/pymobiledevice3)
+  - Fetched the iPhone's logs of its conversation with the car
+
 ### Spike Video
 
 - Song: Gabriawll - Recall
@@ -553,6 +624,4 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
 - Spoon - Hot Thoughts - [Website](http://spoontheband.com/)
   - Artwork: Christine Messersmith
 - Vampire Weekend - Contra - [Website](http://vampireweekend.com/)
-  - Artwork: Complicated
-
-
+  - Artwork: Complicated  

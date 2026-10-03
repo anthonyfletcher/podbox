@@ -73,7 +73,7 @@ Rockbox builds out of tree, and `build-hw.sh` is only wrapping four steps:
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip
-../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
+../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-tools.sh
 ```
 
 Two of them are easy to get wrong by hand, and both fail quietly:
@@ -84,8 +84,9 @@ Two of them are easy to get wrong by hand, and both fail quietly:
 - **`make zip` on its own is incomplete.** `tools/buildzip.pl` is deliberately
   kept close to Rockbox and knows nothing about this fork, so its zip has no
   theme, no first-boot config, no iconset, no setting explanations and no
-  title trimming patterns. The three `bundle-*.sh` scripts add them and strip
-  what a plugin-less build cannot use.
+  title trimming patterns. The `bundle-*.sh` scripts add them and strip what a
+  plugin-less build cannot use; `bundle-tools.sh` also adds the desktop
+  sound-scan tool.
   `bundle-help.sh` is the one to watch: skip it and every **Explain** entry in
   a setting's context menu simply shows nothing, while everything else looks
   finished.
@@ -150,8 +151,8 @@ that is Rockbox's iPod keymap, not a simulator quirk.
 ### Where it differs from the player
 
 No dircache and no USB stack; both are stubbed, so the browser reads the disk
-directly. The debug menu's hardware screens — disk, battery, S.M.A.R.T., I/O
-ports, scroll wheel — are absent. Everything the skin engine does is real.
+directly. The debug menu's hardware screens — disk, battery, S.M.A.R.T.,
+hardware info, click wheel — are absent. Everything the skin engine does is real.
 
 The simulator needed no change outside `apps-ipod/`: upstream's `uisimulator/`
 and SDL backend work as they are. What it needed was for `apps-ipod/` to stop

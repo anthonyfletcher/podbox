@@ -480,9 +480,9 @@ Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a
 folder or playlist.
 
 [show queue options]
-Adds the Play Once entries to the Add to Queue menu. A play-once track leaves
-the queue after it has played and is skipped when the queue repeats; the queue
-marks it with a +.
+Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers
+them in a Play Once submenu. A play-once track leaves the queue after it has
+played and is skipped when the queue repeats; the queue marks it with a +.
 
 [max files in playlist]
 The largest number of tracks a playlist may hold. Building very large lists is
@@ -635,9 +635,9 @@ Changing it is best followed by a rebuild, or entries from the old set linger.
 
 [year from folder]
 Takes the year from the track's folder when its name starts with one, as in
-"1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from
-the folder above. For libraries where the tags hold each track's own release
-date and the folder holds the album's.
+"1998 - Album", instead of from the tags; a disc folder such as CD1 takes it
+from the folder above. For libraries where the tags hold each track's own
+release date and the folder holds the album's.
 
 It replaces the year in the Music lists, album sorting and the carousel; the
 now playing screen still shows the tag. Takes effect at the next rebuild.
@@ -1217,22 +1217,28 @@ Answers cars and other accessories that expect an iPhone, over USB. Auto
 knows a car by a request of Apple's that a car sends and a computer does
 not, and waits a second before handing a computer the disk, so a car never
 takes it. On answers any accessory that asks and never offers the disk.
-Off answers none, as an iPod does.
+Off answers none, as an iPod does. Needs Accessory Protocol on. With USB
+Sound Card on, a car makes the player drop off USB for a moment and come back
+without the sound card.
 
 [accessory browsing]
 Lets a receiver, car or dock browse artists, albums, genres, composers and
-audiobooks, and play Playlist Engine moods, up to this many songs in a list.
+audiobooks, up to this many songs in a list; a dock or receiver can also play
+Playlist Engine moods, which a car is not sent.
 Its memory is taken when browsing starts, which briefly rebuffers playback, and
-given back on unplugging. Needs the database in RAM. Off offers only the Queue
-and saved playlists.
+given back on unplugging; a car takes it with the first cover. Needs the
+database in RAM. Off offers only the Queue and saved playlists, and a car no
+library at all; a car connected while it was Off sees one only once it is
+plugged in again.
 
 [car artwork]
 The cover a car shows with each track, sent over Apple's accessory protocol.
-As Album Art takes it from where the Album Art setting does; the other
-choices set an order for the car alone. Off sends none, and a car that looks
-covers up itself shows its own. A car takes about 140 KB a second, so a large
-image takes seconds to appear. The cache holds no JPEG, so Prefer Cache sends
-embedded art or an image file.
+Prefer Cache sends the art cache's 300-pixel cover, which appears at once,
+and the album's image while the cache has not reached it. The other choices
+send the image itself: sharper on a large screen, but a large one takes
+seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album
+Art follows the Album Art setting. Off sends none,
+and a car that looks covers up itself shows its own.
 
 [serial bitrate]
 The speed of the dock connector's serial line. Auto suits every accessory that
@@ -1256,8 +1262,8 @@ Off, every click is play/pause and acts at once.
 
 [usb mode]
 What a USB connection does: present the disk to the computer, or charge only.
-Charge only is useful with a car or a plug that would otherwise interrupt
-playback.
+Charge only suits a plug that would otherwise take the disk and interrupt
+playback, but it also stops docks and cars that play from the player over USB.
 
 [usb hid]
 Presents the player as a keyboard or remote control to the computer, so its
@@ -1291,8 +1297,10 @@ computer and charging.
 [debug log usb]
 Writes every USB connection step to usb-log.txt in the .rockbox folder, without
 the USB Log debug screen open. For working out why a computer, dock or car will
-not connect. It writes to the disk whenever the log grows, so leave it off
-otherwise.
+not connect. It writes to the disk whenever the log grows, and connection steps
+wait for the log to reach the disk, which can slow them; leave it off
+otherwise. With a car, it also records every five seconds how much audio the
+car took.
 
 [talk menu]
 Speaks menu entries aloud. Needs a voice file on the player.
@@ -1349,11 +1357,12 @@ Refreshes the album and artist lists that Album Covers, Artist Portraits and the
 listening charts read. Fixes a browser that disagrees with the database.
 
 [action: Listening Progress]
-How much of the album or artist you are standing on has been heard, and which of its tracks have not. An artist lists
-their albums with a figure each; opening one of those shows the tracks still unplayed.
+How much of the album or artist you are standing on has been heard, and which
+of its tracks have not. An artist lists their albums with a figure each;
+opening one of those shows the tracks still unplayed.
 
-The figures are the database's own play counts, so this needs Gather Runtime Data switched on and knows nothing about
-plays from before it was.
+The figures are the database's own play counts, so this needs Gather Runtime
+Data switched on and knows nothing about plays from before it was.
 
 [action: Update Art Cache]
 Generates thumbnails for artwork that does not have one yet, and redoes any

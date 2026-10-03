@@ -145,17 +145,23 @@ Connectivity works on both players; `.specifications/interface-matrix.md`
 is the one-page state of it, and names the specification for each:
 
 - **USB sound card** (a computer plays through the player) behind the **USB
-  Sound Card** setting, off by default. `.specifications/usb-audio.md`.
+  Sound Card** setting, off by default.
+  `.specifications/COMPLETED/usb-audio.md`.
 - **USB DAC output** (the player as USB host, class 1 and 2 DACs). The player
-  supplies no VBUS. `.specifications/usb-host-mode.md`.
+  supplies no VBUS. `.specifications/COMPLETED/usb-host-mode.md`.
 - **USB iAP** through upstream's `USB_ENABLE_IAP` gate unchanged: an Onkyo
   ND-S1 dock selects configuration 2 and plays the player's audio out over
-  S/PDIF. `.specifications/usb-audio-source.md`.
+  S/PDIF. `.specifications/COMPLETED/usb-audio-source.md`.
 - **Serial iAP** (`apps-ipod/iap/`): an Onkyo DS-A3 dock authenticates and its
   remote drives the player.
+- **iAP2 to a car** (`firmware/usbstack/usb_iap2*.c`): a car that expects an
+  iPhone (a Mazda CX-30) plays from the player, browses its library and
+  playlists, and shows covers. `.specifications/carplay.md`, with the source
+  of every protocol fact in `carplay-provenance.md`.
 
-Both iAP transports sit behind one setting, **Accessory Protocol**, on by
-default. **Debug > USB log** and **Debug > Serial iAP** are the diagnostics;
+All three iAP transports sit behind **Accessory Protocol**, on by default;
+iAP2 also behind its own **iAP2 Accessories** (Off/Auto/On, Auto by
+default). **Debug > USB log** and **Debug > Serial iAP** are the diagnostics;
 keep them.
 
 ## Build Commands
@@ -185,7 +191,7 @@ omits it will silently build against whatever is in `apps/` instead.
 ./build-hw.sh ipodvideo      # explicit target name
 
 # Incremental rebuild
-cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
+cd build-hw-ipodvideo && make -j"$(nproc)" && make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-tools.sh
 
 # Non-interactive configure (reference)
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod  # 5G
@@ -202,10 +208,11 @@ make clean / make veryclean
 **Theme bundling — `make zip` is not enough.** `tools/buildzip.pl` is kept as
 close to upstream as possible and knows nothing about this fork's theme, so a
 zip straight from `make zip` has **no Scrim, no first-boot `config.cfg`, no
-setting explanations and no title trimming patterns**. Follow it with all three
+setting explanations and no title trimming patterns**. Follow it with the
 bundle scripts -- `../bundle-theme.sh`, `../bundle-help.sh`,
-`../bundle-trim.sh`. `./build-hw.sh` and `./build-sim.sh` both run all three; a
-bare `make zip` runs none.
+`../bundle-trim.sh`, and for the player `../bundle-tools.sh`, which adds the
+desktop sound-scan tool as `.rockbox/tools/soundscan.exe`. `./build-hw.sh` runs
+all four and `./build-sim.sh` the first three; a bare `make zip` runs none.
 
 Scrim is the only theme in the build. The others in `themes/` are published
 as their own release by `release.sh`, one zip each.
@@ -230,8 +237,9 @@ written beside it -- a `wps/classic_statusbar/*` pattern does not match those.
 **The simulator builds and runs** -- SDL2 and a host compiler, output
 `rockboxui`, storage in `simdisk/` beside it. A Windows `.exe` cross-compiles
 with `--type=as6` (that is **(A)dvanced** plus `s` and `6`; plain `--type=s6`
-silently gives a *normal* build). Follow either with `make zip` and the four
-`bundle-*.sh` scripts, then unzip into `simdisk/`, or it starts themeless.
+silently gives a *normal* build). Follow either with `make zip` and
+`bundle-theme.sh`, `bundle-help.sh` and `bundle-trim.sh`, then unzip into
+`simdisk/`, or it starts themeless.
 Read `apps-ipod/sim/README.md` before touching any of it.
 
 ```bash
@@ -254,10 +262,8 @@ nothing about any of them:
   that is usually a filename's capitalisation, which FAT on the player does not
   care about.
 
-The `--type=c` build needs no SDL. `configure`'s SDL check used to run for it
-anyway, since `[ -n \`echo $app_type | grep sdl\` ]` collapses to a bare
-`[ -n ]` and is always true; it is a real test now, so CheckWPS and warble skip
-it.
+The `--type=c` build needs no SDL, and `configure` checks for SDL only for the
+builds that use it, so CheckWPS and warble skip the check.
 
 The database tool runs from the top level of a mounted player and writes the
 database files itself, so the player does not have to scan.
@@ -348,10 +354,11 @@ file before adding a `#ifdef SIMULATOR` anywhere**; the rule is that a shim
 must fail the way the caller already handles, and a guard is the escalation.
 
 **The repository mirrors upstream; `apps-ipod/` is ours, and outside it the
-fork changes only what its features need: the USB stack (`firmware/usbstack/`,
-`firmware/usb.c` and the two players' USB controller drivers), a few drivers
-for the two targets, and its own tools under `tools/`. Ask before changing
-anything outside `apps-ipod/`.** `manual/`,
+fork changes what its features need: mostly the USB stack (`firmware/usbstack/`,
+`firmware/usb.c` and the two players' USB controller drivers), drivers and
+firmware core for the two targets, `lib/skin_parser` and `lib/rbcodec/metadata`,
+and its own tools under `tools/`; `docs/podbox/upstream-divergence.md` lists
+every file. Ask before changing anything outside `apps-ipod/`.** `manual/`,
 `android/`, `backdrops/`, `screenshots/`, the stock `wps/` themes and every
 `themes/` entry this fork did not convert are all still present and all
 unbuilt. They are
@@ -458,9 +465,10 @@ hand-built zip with every **Explain** entry silently empty looks finished.
 - `tools/convbdf` — BDF font converter
 - `tools/scramble` / `tools/descramble` — firmware file format tools
 - `tools/buildzip.pl` — creates deployment ZIP. Kept as close to upstream as
-  possible: its only local change is an `$APPSDIR` for the two files genuinely
-  shipped *from* the application layer. Fork packaging goes in the
-  `bundle-*.sh` scripts instead
+  possible: its three local changes are the application layer's source and
+  build paths and upstream's `.map` block left out, all listed in
+  `upstream-divergence.md`. Fork packaging goes in the `bundle-*.sh` scripts
+  instead
 - `tools/convfnt` — this fork's 4bpp icon-font tool. Theme icon fonts are 4bpp
   and `convbdf`/BDF cannot round-trip them, so use this instead
 - `tools/art_fetch/art_fetch.py` — fetches album and artist artwork

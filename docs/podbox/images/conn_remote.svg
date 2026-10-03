@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 210" width="218" height="143" role="img" aria-label="Controlling the iPod from the earphone remote">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-165 0 650 210" width="442" height="143" role="img" aria-label="Controlling the iPod from the earphone remote">
 <style>svg{--ink:#222;--body:#fff;--paper:#fbfaf6;--edge:#d8d4c8;--tone:#e4e4e4;--grey:#999;--grey2:#888;--grey3:#777;--accent:#1f6fb2;--power:#c46a00;--red:#c0392b}@media (prefers-color-scheme: dark){svg{--ink:#d4d4d4;--body:#2b2e34;--paper:#1c1e22;--edge:#3b3e44;--tone:#3d414a;--grey:#7c818a;--grey2:#6c717a;--grey3:#8c919a;--accent:#5aa2e0;--power:#e39a3c;--red:#e0605a}}</style>
 <defs>
 <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -6,7 +6,7 @@
 <marker id="ph" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 <path d="M0,0 L10,5 L0,10 z" style='fill:var(--power)'/></marker>
 </defs>
-<rect x="0.5" y="0.5" width="319" height="209" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
+<rect x="-164.5" y="0.5" width="649" height="209" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
 <g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style='stroke:var(--ink)'>
 <g transform='translate(30,60)'>
 <rect width='64' height='106' rx='9' style='fill:var(--body)'/>

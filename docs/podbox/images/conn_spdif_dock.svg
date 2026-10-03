@@ -1,47 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 10 610 190" width="415" height="129" role="img" aria-label="The iPod in a dock sending S/PDIF to an amplifier">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-25 0 650 190" width="442" height="129" role="img" aria-label="The iPod on a speaker dock; or plugged into an amplifier's USB socket, the amplifier showing the track playing">
 <style>svg{--ink:#222;--body:#fff;--paper:#fbfaf6;--edge:#d8d4c8;--tone:#e4e4e4;--grey:#999;--grey2:#888;--grey3:#777;--accent:#1f6fb2;--power:#c46a00;--red:#c0392b}@media (prefers-color-scheme: dark){svg{--ink:#d4d4d4;--body:#2b2e34;--paper:#1c1e22;--edge:#3b3e44;--tone:#3d414a;--grey:#7c818a;--grey2:#6c717a;--grey3:#8c919a;--accent:#5aa2e0;--power:#e39a3c;--red:#e0605a}}</style>
-<defs>
-<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-<path d="M0,0 L10,5 L0,10 z" style='fill:var(--accent)'/></marker>
-<marker id="ph" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-<path d="M0,0 L10,5 L0,10 z" style='fill:var(--power)'/></marker>
-</defs>
-<rect x="20.5" y="10.5" width="609" height="189" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
+<rect x="-24.5" y="0.5" width="649" height="189" rx="10" style='fill:var(--paper);stroke:var(--edge)'/>
 <g fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" style='stroke:var(--ink)'>
-<g transform='translate(90,26)'>
+<g transform='translate(-20,0)'>
+<rect x='16' y='122' width='168' height='50' rx='12' style='fill:var(--body)'/>
+<path d='M30,172 v4 M170,172 v4' stroke-width='3'/>
+<circle cx='42' cy='147' r='17' style='fill:var(--tone)'/>
+<circle cx='42' cy='147' r='6' stroke-width='1.5' style='fill:var(--body)'/>
+<circle cx='158' cy='147' r='17' style='fill:var(--tone)'/>
+<circle cx='158' cy='147' r='6' stroke-width='1.5' style='fill:var(--body)'/>
+<g transform='translate(68,18)'>
 <rect width='64' height='106' rx='9' style='fill:var(--body)'/>
 <rect x='7' y='7' width='50' height='38' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
 <path d='M12,15 H40 M12,22 H46 M12,29 H36 M12,36 H43' stroke-width='2' style='stroke:var(--grey)'/>
 <circle cx='32' cy='76' r='21' style='fill:var(--body)'/>
 <circle cx='32' cy='76' r='7.5' style='fill:var(--body)'/>
 <path d='M28,90 l3,-2 v4 z M36,90 l-3,-2 v4 z' stroke='none' style='fill:var(--ink)'/>
-</g><path d='M40,138 L54,128 H204 L190,138 z' style='fill:var(--body)'/>
-<path d='M190,138 L204,128 V166 L190,176 z' style='fill:var(--tone)'/>
-<rect x='40' y='138' width='150' height='38' rx='2' style='fill:var(--body)'/>
-<circle cx='54' cy='157' r='2.5' stroke='none' style='fill:var(--accent)'/>
-<path d='M66,157 h30' stroke-width='1.5' style='stroke:var(--grey)'/>
-<rect x='194' y='144' width='7' height='8' stroke='none' style='fill:var(--ink)'/>
-<circle cx='197.5' cy='160' r='3' stroke-width='1.5' style='fill:var(--body)'/>
-<path d='M82,136 L86,124 H158 L162,136 z' style='fill:var(--body)'/>
-<path d='M92,130 H152' stroke-width='1'/><path d='M201,148 C230,148 240,152 262,152' stroke-width='5'/><path d='M201,148 C230,148 240,152 262,152' stroke-width='2' style='stroke:var(--paper)'/><rect x='262' y='116' width='150' height='56' rx='4' style='fill:var(--body)'/>
-<path d='M268,172 v5 M406,172 v5' stroke-width='3'/>
-<rect x='274' y='128' width='62' height='18' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
-<text x='305' y='141' font-family='Menlo, Consolas, monospace' font-size='9' text-anchor='middle' stroke='none' style='fill:var(--ink)'>OPT 1</text>
-<circle cx='372' cy='144' r='15' style='fill:var(--body)'/>
-<path d='M372,132 v7' />
-<circle cx='282' cy='159' r='3' stroke-width='1.5' style='fill:var(--body)'/>
-<circle cx='295' cy='159' r='3' stroke-width='1.5' style='fill:var(--body)'/>
-<circle cx='308' cy='159' r='3' stroke-width='1.5' style='fill:var(--body)'/><path d='M412,146 C440,146 460,158 490,158' stroke-width='5'/><path d='M412,146 C440,146 460,158 490,158' stroke-width='2' style='stroke:var(--paper)'/><path d='M412,152 C440,202 560,202 586,178' stroke-width='5'/><path d='M412,152 C440,202 560,202 586,178' stroke-width='2' style='stroke:var(--paper)'/><rect x='490' y='84' width='52' height='92' rx='4' style='fill:var(--body)'/>
-<circle cx='516' cy='104' r='8' stroke-width='1.5' style='fill:var(--tone)'/>
-<circle cx='516' cy='142' r='18' style='fill:var(--body)'/>
-<circle cx='516' cy='142' r='7' stroke-width='1.5' style='fill:var(--tone)'/><rect x='560' y='84' width='52' height='92' rx='4' style='fill:var(--body)'/>
-<circle cx='586' cy='104' r='8' stroke-width='1.5' style='fill:var(--tone)'/>
-<circle cx='586' cy='142' r='18' style='fill:var(--body)'/>
-<circle cx='586' cy='142' r='7' stroke-width='1.5' style='fill:var(--tone)'/><g transform='rotate(-25 227 62)'>
+</g>
+<path d='M64,124 H136 L132,132 H68 z' style='fill:var(--body)'/>
+<path d='M90,156 h6 M104,156 h6 M107,153 v6' stroke-width='1.5'/>
+<circle cx='100' cy='164' r='2.5' stroke='none' style='fill:var(--accent)'/>
+</g>
+<g transform='translate(54,0)'>
+<rect x='190' y='96' width='220' height='70' rx='4' style='fill:var(--body)'/>
+<path d='M198,166 v5 M402,166 v5' stroke-width='3'/>
+<rect x='202' y='106' width='122' height='32' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
+<text x='209' y='119' font-family='Menlo, Consolas, monospace' font-size='10' stroke='none' style='fill:var(--ink)'>Blue in Green</text>
+<text x='209' y='132' font-family='Menlo, Consolas, monospace' font-size='9' stroke='none' style='fill:var(--grey3)'>Miles Davis</text>
+<circle cx='370' cy='126' r='18' style='fill:var(--body)'/>
+<path d='M370,112 v7'/>
+<circle cx='210' cy='153' r='3' stroke-width='1.5' style='fill:var(--body)'/>
+<circle cx='223' cy='153' r='3' stroke-width='1.5' style='fill:var(--body)'/>
+<circle cx='236' cy='153' r='3' stroke-width='1.5' style='fill:var(--body)'/>
+<path d='M522,140 C522,186 306,186 306,156' stroke-width='5'/><path d='M522,140 C522,186 306,186 306,156' stroke-width='2' style='stroke:var(--paper)'/>
+<rect x='298' y='147' width='16' height='10' rx='2' stroke-width='1.5' style='fill:var(--body)'/>
+<g transform='translate(490,24)'>
+<rect width='64' height='106' rx='9' style='fill:var(--body)'/>
+<rect x='7' y='7' width='50' height='38' rx='2' stroke-width='1.5' style='fill:var(--tone)'/>
+<path d='M12,15 H40 M12,22 H46 M12,29 H36 M12,36 H43' stroke-width='2' style='stroke:var(--grey)'/>
+<circle cx='32' cy='76' r='21' style='fill:var(--body)'/>
+<circle cx='32' cy='76' r='7.5' style='fill:var(--body)'/>
+<path d='M28,90 l3,-2 v4 z M36,90 l-3,-2 v4 z' stroke='none' style='fill:var(--ink)'/>
+</g>
+<path d='M517,136 h10 l-1,7 h-8 z' stroke-width='1.5' style='fill:var(--body)'/><rect x='510' y='130' width='24' height='8' rx='2' style='fill:var(--body)'/>
+<g transform='translate(392,46) rotate(-119) translate(-227,-62)'>
 <rect x='214' y='32' width='26' height='60' rx='8' style='fill:var(--body)'/>
 <circle cx='227' cy='52' r='8' stroke-width='1.5' style='fill:var(--body)'/>
 <circle cx='227' cy='52' r='2.5' stroke='none' style='fill:var(--ink)'/>
 <path d='M222,70 h10 M222,78 h10' stroke-width='1.5'/>
-</g><path d='M200,52 q-8,6 -6,16 M192,46 q-12,10 -9,26' stroke-width='1.4' style='stroke:var(--accent)'/>
+<path d='M220,24 q7,-5 14,0 M214,16 q13,-9 26,0' stroke-width='1.4' style='stroke:var(--accent)'/>
+</g>
+</g>
 </g>
 </svg>
