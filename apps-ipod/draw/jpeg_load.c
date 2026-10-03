@@ -1254,7 +1254,7 @@ static int process_markers(struct jpeg* p_jpeg)
     return (ret); /* return flags with seen markers */
 }
 
-static const struct huffman_table luma_table =
+const struct huffman_table jpeg_std_luma =
 {
     {
         0x00,0x01,0x05,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x00,
@@ -1277,7 +1277,7 @@ static const struct huffman_table luma_table =
     }
 };
 
-static const struct huffman_table chroma_table =
+const struct huffman_table jpeg_std_chroma =
 {
     {
         0x00,0x03,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x01,0x00,0x00,0x00,
@@ -1303,8 +1303,8 @@ static const struct huffman_table chroma_table =
 static void default_huff_tbl(struct jpeg* p_jpeg)
 {
 
-    MEMCPY(&p_jpeg->hufftable[0], &luma_table, sizeof(luma_table));
-    MEMCPY(&p_jpeg->hufftable[1], &chroma_table, sizeof(chroma_table));
+    MEMCPY(&p_jpeg->hufftable[0], &jpeg_std_luma, sizeof(jpeg_std_luma));
+    MEMCPY(&p_jpeg->hufftable[1], &jpeg_std_chroma, sizeof(jpeg_std_chroma));
 
     return;
 }

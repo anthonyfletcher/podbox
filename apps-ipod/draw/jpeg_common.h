@@ -100,6 +100,10 @@ struct huffman_table
     int huffmancodes_ac[AC_LEN];
 };
 
+/* The tables of the JPEG standard's Annex K, luminance and chrominance; the
+ * decoder's default, and the encoder's only ones */
+extern const struct huffman_table jpeg_std_luma, jpeg_std_chroma;
+
 struct frame_component
 {
     int ID;

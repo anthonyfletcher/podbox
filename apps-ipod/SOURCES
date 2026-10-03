@@ -84,6 +84,7 @@ draw/resize.c
 #endif
 #ifdef HAVE_JPEG
 draw/jpeg_load.c
+draw/jpeg_enc.c
 #ifdef CPU_ARM
 draw/jpeg_idct_arm.S
 #endif
