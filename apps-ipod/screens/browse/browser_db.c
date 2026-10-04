@@ -63,6 +63,7 @@
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
+#include "database/path_key.h"
 #include "metadata/cuesheet.h"      /* the chapter list screen */
 #include "metadata/chapters.h"      /* reading a book's chapter marks */
 #include "screens/browse/featured_artists.h"
@@ -2145,7 +2146,7 @@ static const char *level_book(struct browser_context *c, int level, int tag)
 /* Whether this level opens with a Resume row. */
 /* A book whose saved chapter played to its end is resumed from the chapter
  * after it, as the shelf does, unless that was its last: then it is finished
- * and there is nothing to resume. */
+ * and there is nothing to resume. Nor is there in a book marked by hand. */
 static bool book_resume_row(struct browser_context *c, int level, int tag)
 {
     const char *book = level_book(c, level, tag);
@@ -2153,8 +2154,15 @@ static bool book_resume_row(struct browser_context *c, int level, int tag)
     if (book == NULL || !book_resume_find(book, &resume_pos))
         return false;
 
-    return !resume_pos.ended
-        || !book_shelf_is_last_track(book, resume_pos.track);
+    switch (resume_pos.left)
+    {
+        case BOOK_LEFT_PARTWAY:
+            return resume_pos.track != 0;
+        case BOOK_LEFT_ENDED:
+            return !book_shelf_is_last_track(book, resume_pos.track);
+        default:
+            return false;
+    }
 }
 
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
@@ -3888,7 +3896,7 @@ static bool single_track_resume(const char *path, const char *book,
 {
     return book != NULL
            && (book_resume_get(book, pos) || book_resume_get(path, pos))
-           && strcmp(pos->track, path) == 0;
+           && pos->track == path_key(path);
 }
 
 static int play_single_track(const char *path, const char *book)
@@ -4735,20 +4743,20 @@ int browser_db_add_to_playlist(const char* playlist, bool new_playlist)
  * sat when the position was saved, which is right whenever the book has not
  * changed since -- the scan behind it is what covers a chapter added, removed
  * or retagged. -1 if the track is not in the playlist at all. */
-static int playlist_track_index(const char *track, int hint)
+static int playlist_track_index(uint64_t track, int hint)
 {
     struct playlist_track_info info;
     int i, amount = playlist_amount();
 
     if (hint >= 0 && hint < amount
         && playlist_get_track_info(NULL, hint, &info) >= 0
-        && strcmp(info.filename, track) == 0)
+        && path_key(info.filename) == track)
         return hint;
 
     for (i = 0; i < amount; i++)
     {
         if (playlist_get_track_info(NULL, i, &info) >= 0
-            && strcmp(info.filename, track) == 0)
+            && path_key(info.filename) == track)
             return i;
     }
 
@@ -4789,7 +4797,7 @@ static int browser_db_play_folder(struct browser_context* c)
 
         resume_armed = false;
 
-        if (index >= 0 && resume_pos.ended)
+        if (index >= 0 && resume_pos.left == BOOK_LEFT_ENDED)
         {
             index++;
             resume_pos.elapsed = 0;

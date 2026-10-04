@@ -22,7 +22,8 @@
  * Podcasts are left out: a show has no last episode to have finished.
  *
  * Choosing a book plays it. An In progress one resumes; the others start at
- * the beginning.
+ * the beginning. The context menu marks a book Finished, Not started or In
+ * progress by hand, which moves it to that shelf until it is played again.
  *
  * Parts, in order:
  *   - the arena and what it holds
@@ -47,6 +48,7 @@
 #include "lang.h"
 #include "strnatcmp.h"
 #include "widgets/list.h"
+#include "widgets/menu.h"             /* MENUITEM_STRINGLIST, do_menu */
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
 #include "settings/settings.h"
@@ -55,6 +57,7 @@
 #include "system/app_util.h"          /* warn_on_pl_erase */
 #include "database/tagcache.h"
 #include "database/db_spoken.h"
+#include "database/path_key.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
 #include "root_menu.h"
@@ -65,7 +68,7 @@
 #define BOOKS_MAX 1024
 
 /* As many as the resume file keeps. */
-#define RESUMES_MAX 64
+#define RESUMES_MAX BOOK_RESUME_MAX
 
 /* ------------------------------------------------------------------ *
  * the arena                                                          *
@@ -73,13 +76,16 @@
 
 struct shelf_resume
 {
-    char book[BOOK_KEY_MAX];
+    uint64_t book;              /* book_resume_key() */
     struct book_resume pos;
     int owner;                  /* its books[] entry, or -1 */
+    int32_t path;               /* into the arena, for a book keyed by its
+                                   file, or -1 */
 };
 
 struct shelf_book
 {
+    uint64_t key;               /* book_resume_key() of its name */
     long     seek;              /* the album tag's seek */
     uint32_t name;              /* into the arena */
     int      played;            /* tracks with a playcount */
@@ -108,6 +114,7 @@ static int                 *rows;
 static uint32_t            *uniq;
 static char  *names;
 static size_t names_sz;
+static size_t names_used;
 static int book_ct, resume_ct, row_ct;
 
 static enum book_shelf shelf_kind;
@@ -168,17 +175,30 @@ static uint32_t track_key(const struct tagcache_search *tcs)
     return (uint32_t)(((disc & 0x7fff) << 16) | (track & 0xffff));
 }
 
-static bool collect_resume(const char *book, const struct book_resume *pos,
-                           void *data)
+/* A file's path goes into the arena ahead of the book names. */
+static bool collect_resume(uint64_t book, const char *path,
+                           const struct book_resume *pos, void *data)
 {
+    struct shelf_resume *r = &resumes[resume_ct];
     (void)data;
 
     if (resume_ct >= RESUMES_MAX)
         return false;
 
-    strmemccpy(resumes[resume_ct].book, book, sizeof(resumes[0].book));
-    resumes[resume_ct].pos = *pos;
-    resumes[resume_ct].owner = -1;
+    r->book = book;
+    r->pos = *pos;
+    r->owner = -1;
+    r->path = -1;
+    if (path != NULL)
+    {
+        size_t len = strlen(path) + 1;
+
+        if (len > names_sz - names_used)
+            return true;
+        memcpy(names + names_used, path, len);
+        r->path = (int32_t)names_used;
+        names_used += len;
+    }
     resume_ct++;
     return true;
 }
@@ -194,7 +214,7 @@ static struct tagcache_search_clause spoken_clause = {
     .str = NULL,
 };
 
-bool book_shelf_is_last_track(const char *book, const char *path)
+bool book_shelf_is_last_track(const char *book, uint64_t track)
 {
     struct tagcache_search tcs;
     static char file[MAX_PATH];
@@ -220,7 +240,7 @@ bool book_shelf_is_last_track(const char *book, const char *path)
             last = key;
         seen = true;
 
-        if (!found && !strcmp(file, path))
+        if (!found && path_key(file) == track)
         {
             mine = key;
             found = true;
@@ -244,7 +264,7 @@ static bool collect_books(void)
 {
     struct tagcache_search tcs;
     char name[TAGCACHE_BUFSZ];
-    size_t used = 0;
+    size_t used = names_used;
 
     /* False is a normal answer -- another thread is building it, or a commit
      * landed -- and then every album reads as music this once. */
@@ -272,6 +292,7 @@ static bool collect_books(void)
 
         b = &books[book_ct++];
         memset(b, 0, sizeof(*b));
+        b->key = book_resume_key(name);
         b->seek = tcs.result_seek;
         b->name = (uint32_t)used;
         b->resume = -1;
@@ -279,6 +300,7 @@ static bool collect_books(void)
     }
 
     tagcache_search_finish(&tcs);
+    names_used = used;
 
     qsort(books, book_ct, sizeof(*books), compare_names);
     return true;
@@ -303,24 +325,13 @@ static int find_book(const char *name)
     return -1;
 }
 
-/* Whether a resume line's key names 'name'. The key was cut to BOOK_KEY_MAX
- * on the way into the file, so a key that long matches as a prefix. */
-static bool key_names(const char *key, const char *name)
-{
-    size_t n = strlen(key);
-
-    if (n < BOOK_KEY_MAX - 1)
-        return !strcmp(key, name);
-    return !strncmp(key, name, n);
-}
-
 static void match_resumes(void)
 {
     for (int r = 0; r < resume_ct; r++)
     {
         for (int b = 0; b < book_ct; b++)
         {
-            if (books[b].resume < 0 && key_names(resumes[r].book, book_name(b)))
+            if (books[b].resume < 0 && books[b].key == resumes[r].book)
             {
                 books[b].resume = r;
                 resumes[r].owner = b;
@@ -392,7 +403,8 @@ static bool walk_tracks(bool before)
         }
 
         if (b->resume >= 0 && !b->resume_found
-            && !strcmp(path, resumes[b->resume].pos.track))
+            && resumes[b->resume].pos.track != 0
+            && path_key(path) == resumes[b->resume].pos.track)
         {
             b->resume_key = key;
             b->resume_found = true;
@@ -412,12 +424,21 @@ static bool book_finished(const struct shelf_book *b)
     if (b->resume < 0)
         return b->last_heard;
 
-    return resumes[b->resume].pos.ended && b->resume_found
+    return resumes[b->resume].pos.left == BOOK_LEFT_ENDED && b->resume_found
         && b->resume_key == b->last_key;
 }
 
 static enum book_shelf book_state(const struct shelf_book *b)
 {
+    if (b->resume >= 0)
+    {
+        switch (resumes[b->resume].pos.left)
+        {
+            case BOOK_LEFT_FINISHED:  return BOOK_SHELF_FINISHED;
+            case BOOK_LEFT_UNSTARTED: return BOOK_SHELF_NOT_STARTED;
+            default:                  break;
+        }
+    }
     if (book_finished(b))
         return BOOK_SHELF_FINISHED;
     if (b->resume < 0 && b->played == 0)
@@ -447,7 +468,25 @@ static int book_percent(const struct shelf_book *b)
  * album tag, which is a book of one track. */
 static bool resume_is_file(int r)
 {
-    return resumes[r].owner < 0 && resumes[r].book[0] == '/';
+    return resumes[r].owner < 0 && resumes[r].path >= 0;
+}
+
+static const char *resume_path(int r)
+{
+    return names + resumes[r].path;
+}
+
+/* What a row is called: a book's name, or a file's own name. */
+static const char *row_name(int v)
+{
+    const char *path, *base;
+
+    if (!ROW_IS_RESUME(v))
+        return book_name(v);
+
+    path = resume_path(ROW_RESUME_OF(v));
+    base = strrchr(path, '/');
+    return base ? base + 1 : path;
 }
 
 /* In progress: the resume file's order first, which is most recent first, and
@@ -462,7 +501,7 @@ static int compare_rows(const void *a_v, const void *b_v)
     long la, lb;
 
     if (shelf_kind == BOOK_SHELF_NOT_STARTED)
-        return strnatcasecmp(book_name(a), book_name(b));
+        return strnatcasecmp(row_name(a), row_name(b));
 
     if (shelf_kind == BOOK_SHELF_IN_PROGRESS && (ra >= 0 || rb >= 0))
     {
@@ -497,8 +536,13 @@ static void build_rows(void)
 
         if (!resume_is_file(r))
             continue;
-        state = resumes[r].pos.ended ? BOOK_SHELF_FINISHED
-                                     : BOOK_SHELF_IN_PROGRESS;
+        switch (resumes[r].pos.left)
+        {
+            case BOOK_LEFT_ENDED:
+            case BOOK_LEFT_FINISHED:  state = BOOK_SHELF_FINISHED;    break;
+            case BOOK_LEFT_UNSTARTED: state = BOOK_SHELF_NOT_STARTED; break;
+            default:                  state = BOOK_SHELF_IN_PROGRESS; break;
+        }
         if (state == shelf_kind)
             rows[row_ct++] = ROW_RESUME(r);
     }
@@ -518,12 +562,7 @@ static const char *shelf_get_name(int n, void *data, char *buffer,
     (void)data;
 
     if (ROW_IS_RESUME(v))
-    {
-        const char *path = resumes[ROW_RESUME_OF(v)].book;
-        const char *base = strrchr(path, '/');
-
-        return base ? base + 1 : path;
-    }
+        return row_name(v);
 
     pct = shelf_kind == BOOK_SHELF_IN_PROGRESS ? book_percent(&books[v]) : -1;
     if (pct < 0)
@@ -553,7 +592,8 @@ static int shelf_title(enum book_shelf which)
 static struct
 {
     long seek;                  /* the album, or -1 for a file */
-    char track[MAX_PATH];       /* where to start, or "" for the beginning */
+    char path[MAX_PATH];        /* the file, when 'seek' is -1 */
+    uint64_t track;             /* where to start, or 0 for the beginning */
     bool after;                 /* start on the track after 'track' */
     unsigned long elapsed;
     unsigned long offset;
@@ -569,8 +609,9 @@ static void choose(int v)
     if (ROW_IS_RESUME(v))
     {
         pos = &resumes[ROW_RESUME_OF(v)].pos;
-        strmemccpy(chosen.track, pos->track, sizeof(chosen.track));
-        if (!pos->ended)
+        strmemccpy(chosen.path, resume_path(ROW_RESUME_OF(v)),
+                   sizeof(chosen.path));
+        if (pos->left == BOOK_LEFT_PARTWAY)
         {
             chosen.elapsed = pos->elapsed;
             chosen.offset = pos->offset;
@@ -583,11 +624,11 @@ static void choose(int v)
         return;
 
     pos = &resumes[books[v].resume].pos;
-    strmemccpy(chosen.track, pos->track, sizeof(chosen.track));
+    chosen.track = pos->track;
     /* A track that played to its end, in a book that did not: the listener
      * stopped between chapters, so go on from the next one. */
-    chosen.after = pos->ended;
-    if (!pos->ended)
+    chosen.after = pos->left == BOOK_LEFT_ENDED;
+    if (pos->left == BOOK_LEFT_PARTWAY)
     {
         chosen.elapsed = pos->elapsed;
         chosen.offset = pos->offset;
@@ -642,7 +683,7 @@ static int queue_book(struct playlist_insert_context *ctx)
             continue;
         if (playlist_insert_context_add(ctx, path) < 0)
             break;
-        if (chosen.track[0] && !strcmp(path, chosen.track))
+        if (chosen.track != 0 && path_key(path) == chosen.track)
         {
             start = chosen.after ? added + 1 : added;
             matched = true;
@@ -692,7 +733,7 @@ static int play_chosen(void)
 
     cpu_boost(true);
     if (chosen.seek < 0)
-        start = playlist_insert_context_add(&ctx, chosen.track) < 0 ? -1 : 0;
+        start = playlist_insert_context_add(&ctx, chosen.path) < 0 ? -1 : 0;
     else
         start = queue_book(&ctx);
     cpu_boost(false);
@@ -733,6 +774,71 @@ static void report_empty(void)
     splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
 }
 
+/* The row a mark was made on, or -1. A list callback can only end the list,
+ * not say why, so this is how the list learns to rebuild. */
+static int marked_row;
+
+/* Context: mark the book In progress, Not started or Finished. The menu's
+ * order is enum book_shelf's. */
+static int shelf_action_cb(int action, struct gui_synclist *lists)
+{
+    static const enum book_left marks[] = {
+        [BOOK_SHELF_IN_PROGRESS] = BOOK_LEFT_PARTWAY,
+        [BOOK_SHELF_NOT_STARTED] = BOOK_LEFT_UNSTARTED,
+        [BOOK_SHELF_FINISHED]    = BOOK_LEFT_FINISHED,
+    };
+    int n, v, choice;
+
+    if (action != ACTION_STD_CONTEXT)
+        return action;
+
+    n = gui_synclist_get_sel_pos(lists);
+    if (n < 0 || n >= row_ct)
+        return action;
+    v = rows[n];
+
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
+                        ID2P(LANG_BOOKS_IN_PROGRESS),
+                        ID2P(LANG_BOOKS_NOT_STARTED),
+                        ID2P(LANG_BOOKS_FINISHED));
+    choice = do_menu(&menu, NULL, NULL, false);
+
+    if (choice < 0 || choice >= (int)ARRAYLEN(marks)
+        || choice == (int)shelf_kind)
+        return ACTION_REDRAW;
+
+    book_resume_mark(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
+                                      : book_name(v),
+                     marks[choice]);
+    marked_row = n;
+    return ACTION_STD_CANCEL;
+}
+
+/* Everything the list is drawn from, read afresh. */
+static bool load(void)
+{
+    bool ok;
+
+    book_ct = resume_ct = row_ct = 0;
+    names_used = 0;
+
+    cpu_boost(true);
+    book_resume_each(collect_resume, NULL);
+    ok = collect_books();
+    if (ok)
+    {
+        match_resumes();
+        ok = walk_tracks(false);
+    }
+    if (ok && shelf_kind == BOOK_SHELF_IN_PROGRESS)
+        ok = walk_tracks(true);
+    cpu_boost(false);
+
+    if (ok)
+        build_rows();
+    return ok;
+}
+
 void book_shelf_arm(enum book_shelf which)
 {
     shelf_kind = which;
@@ -742,8 +848,8 @@ int book_shelf_run(void)
 {
     struct simplelist_info info;
     int ret = GO_TO_PREVIOUS;
+    int selection = 0;
     bool picked = false;
-    bool ok;
 
     /* Writes down a book that has just ended, and where the playing one is,
      * so both are on the shelf they belong on. */
@@ -760,41 +866,37 @@ int book_shelf_run(void)
     if (!tagcache_is_in_ram())
         splash(0, ID2P(LANG_WAIT));
 
-    cpu_boost(true);
-    book_resume_each(collect_resume, NULL);
-    ok = collect_books();
-    if (ok)
+    /* Round again after a mark, which has moved the book to another list. */
+    do
     {
-        match_resumes();
-        ok = walk_tracks(false);
-    }
-    if (ok && shelf_kind == BOOK_SHELF_IN_PROGRESS)
-        ok = walk_tracks(true);
-    cpu_boost(false);
+        marked_row = -1;
 
-    if (!ok)
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-    else
-    {
-        build_rows();
-
-        if (row_ct == 0)
-            report_empty();
-        else
+        if (!load())
         {
-            simplelist_info_init(&info, str(shelf_title(shelf_kind)), row_ct,
-                                 NULL);
-            info.get_name = shelf_get_name;
-
-            if (simplelist_show_list(&info))
-                ret = GO_TO_ROOT;
-            else if (info.selection >= 0 && info.selection < row_ct)
-            {
-                choose(rows[info.selection]);
-                picked = true;
-            }
+            splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+            break;
         }
-    }
+        if (row_ct == 0)
+        {
+            report_empty();
+            break;
+        }
+
+        simplelist_info_init(&info, str(shelf_title(shelf_kind)), row_ct,
+                             NULL);
+        info.get_name = shelf_get_name;
+        info.action_callback = shelf_action_cb;
+        info.selection = MIN(selection, row_ct - 1);
+
+        if (simplelist_show_list(&info))
+            ret = GO_TO_ROOT;
+        else if (info.selection >= 0 && info.selection < row_ct)
+        {
+            choose(rows[info.selection]);
+            picked = true;
+        }
+        selection = marked_row;
+    } while (marked_row >= 0);
 
     pop_current_activity();
     release();

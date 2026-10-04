@@ -11,10 +11,16 @@
  * books by, or the file's path for a single-file book with no album tag to
  * name it.
  *
- * One line per book, most recently played first. Nothing is held in RAM
- * between calls and every save rewrites the file -- sixty-four books is under
- * twenty-six kilobytes, and a save happens when a book stops being listened
- * to rather than while it plays.
+ * One line per book, most recently played first. Both the book and its track
+ * are written as 64-bit keys (database/path_key.h), so a line is about sixty
+ * bytes; only a book keyed by its path carries the path as well, since playing
+ * it needs the file and not just its key. Nothing is held in RAM between calls
+ * and every save rewrites the file, which happens when a book stops being
+ * listened to rather than while it plays.
+ *
+ * A file with no header line is the earlier format, which spelled the book
+ * and track out in full. It is read as it is, and the first save writes the
+ * whole file in the current one.
  *
  * A book played through to its end is the one save the UI cannot make: the
  * playlist ends, playback stops, and there is nothing playing left to ask. So
@@ -22,15 +28,16 @@
  * it down marked as ended.
  *
  * Parts, in order:
- *   - the line format, and reading books out of the file
+ *   - the line formats, and reading books out of the file
  *   - the track that ended, noted on the audio thread
- *   - writing: what is worth saving, and the temp-file swap
+ *   - writing: what is worth saving, marks, and the temp-file swap
  ****************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "config.h"
+#include "system.h"             /* ARRAYLEN */
 #include "file.h"
 #include "rbpaths.h"
 #include "string-extra.h"
@@ -38,6 +45,7 @@
 #include "events.h"
 #include "system/appevents.h"
 #include "database/db_spoken.h"
+#include "database/path_key.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
 #include "settings/settings.h"
@@ -46,64 +54,55 @@
 #define BOOK_RESUME_FILE  ROCKBOX_DIR "/audiobooks.resume"
 #define BOOK_RESUME_TMP   ROCKBOX_DIR "/audiobooks.resume.tmp"
 
-/* A path, a book name, a chapter name and the numbers. */
+/* The longest line either format writes: the earlier one's path, book name
+ * and numbers. */
 #define BOOK_LINE_MAX   (MAX_PATH + 160)
-
-/* How many books are remembered. The sixty-fifth to be played drops the one
- * played longest ago. The shelf's In progress row lists only these, so this
- * is also how long that list can get. */
-#define BOOK_RESUME_MAX 64
 
 /* A track this close to its end when it finishes was played out rather than
  * stopped. Generous, because the position is sampled rather than exact. */
 #define BOOK_END_SLACK_MS 10000
 
 /* ------------------------------------------------------------------ *
- * the line format                                                    *
+ * the line formats                                                   *
  * ------------------------------------------------------------------ */
 
-/* "<elapsed>\t<offset>\t<index>\t<book>\t<track>[\tended]". Tabs, because
- * every other field is tag text or a path and FAT forbids a tab in a
- * filename; a tag carrying one is scrubbed on the way in. The last field is
- * the literal word or absent, never a number, so nothing else can read as
- * it. */
-#define BOOK_ENDED_FIELD "ended"
+/* The current format opens with this line. Lines are
+ * "<book>\t<track>\t<elapsed>\t<offset>\t<index>\t<left>[\t<path>]": the two
+ * keys as sixteen hex digits, 'left' one of the words below, and 'path' only
+ * for a book keyed by its file. Tabs, because FAT forbids one in a filename. */
+#define BOOK_HEADER "# book positions 2"
 
-/* The book field of 'line', without writing into it -- the rewrite below
- * copies lines it keeps through verbatim. */
-static bool line_book(const char *line, const char **book, size_t *len)
+static const char *const left_words[] = {
+    [BOOK_LEFT_PARTWAY]   = "partway",
+    [BOOK_LEFT_ENDED]     = "ended",
+    [BOOK_LEFT_FINISHED]  = "finished",
+    [BOOK_LEFT_UNSTARTED] = "unstarted",
+};
+
+/* The earlier format, which has no header:
+ * "<elapsed>\t<offset>\t<index>\t<book>\t<track>[\tended]", the book spelled
+ * out and the track a full path. */
+#define OLD_ENDED_FIELD "ended"
+
+/* One line of either format. 'path' points into the line it was read from. */
+struct entry
 {
-    const char *p = line;
-    const char *end;
-    int i;
+    uint64_t book;
+    const char *path;           /* the file, for a book keyed by it */
+    struct book_resume pos;
+};
 
-    for (i = 0; i < 3; i++)
-    {
-        p = strchr(p, '\t');
-        if (p == NULL)
-            return false;
-        p++;
-    }
-
-    end = strchr(p, '\t');
-    if (end == NULL)
-        return false;
-
-    *book = p;
-    *len = end - p;
-    return true;
-}
-
-/* True when 'line' is the entry for 'book'. */
-static bool line_is_book(const char *line, const char *book)
+uint64_t book_resume_key(const char *book)
 {
-    const char *name;
-    size_t len;
+    char name[BOOK_KEY_MAX];
+    uint64_t h;
 
-    if (!line_book(line, &name, &len))
-        return false;
+    if (book[0] == '/')
+        return path_key(book);
 
-    return len == strlen(book) && memcmp(name, book, len) == 0;
+    strmemccpy(name, book, sizeof (name));
+    h = path_key_fold_hash(name);
+    return h ? h : 1;
 }
 
 /* The next tab-separated field, consuming it. Splits 'line' in place. */
@@ -127,67 +126,94 @@ static char *next_field(char **p)
     return field;
 }
 
-/* Fill 'pos' from 'line', splitting it in place. The book field is skipped:
- * a caller has either matched it already or read it with line_book(). */
-static bool parse_line(char *line, struct book_resume *pos)
+static bool parse_key(const char *s, uint64_t *out)
+{
+    uint64_t v = 0;
+    int i;
+
+    for (i = 0; i < 16; i++)
+    {
+        char c = s[i];
+        int d;
+
+        if (c >= '0' && c <= '9')
+            d = c - '0';
+        else if (c >= 'a' && c <= 'f')
+            d = c - 'a' + 10;
+        else
+            return false;
+        v = (v << 4) | d;
+    }
+
+    *out = v;
+    return s[16] == '\0';
+}
+
+static bool parse_current(char *line, struct entry *e)
 {
     char *p = line;
-    char *elapsed, *offset, *index, *track, *ended;
+    char *book, *track, *elapsed, *offset, *index, *left, *path;
+    unsigned i;
+
+    book    = next_field(&p);
+    track   = next_field(&p);
+    elapsed = next_field(&p);
+    offset  = next_field(&p);
+    index   = next_field(&p);
+    left    = next_field(&p);
+    path    = next_field(&p);
+
+    if (left == NULL || !parse_key(book, &e->book) || e->book == 0
+        || !parse_key(track, &e->pos.track))
+        return false;
+
+    for (i = 0; i < ARRAYLEN(left_words); i++)
+    {
+        if (strcmp(left, left_words[i]) == 0)
+            break;
+    }
+    if (i == ARRAYLEN(left_words))
+        return false;
+
+    e->pos.left    = (enum book_left)i;
+    e->pos.elapsed = strtoul(elapsed, NULL, 10);
+    e->pos.offset  = strtoul(offset, NULL, 10);
+    e->pos.index   = atoi(index);
+    e->path = path != NULL && path[0] == '/' ? path : NULL;
+    return true;
+}
+
+static bool parse_old(char *line, struct entry *e)
+{
+    char *p = line;
+    char *elapsed, *offset, *index, *book, *track, *ended;
 
     elapsed = next_field(&p);
     offset  = next_field(&p);
     index   = next_field(&p);
-    next_field(&p);
+    book    = next_field(&p);
     track   = next_field(&p);
     ended   = next_field(&p);
 
-    if (track == NULL || track[0] == '\0')
+    if (track == NULL || track[0] == '\0' || book[0] == '\0')
         return false;
 
-    pos->elapsed = strtoul(elapsed, NULL, 10);
-    pos->offset  = strtoul(offset, NULL, 10);
-    pos->index   = atoi(index);
-    pos->ended   = ended != NULL && strcmp(ended, BOOK_ENDED_FIELD) == 0;
-    strmemccpy(pos->track, track, sizeof (pos->track));
+    e->book = book_resume_key(book);
+    e->path = book[0] == '/' ? book : NULL;
+    e->pos.track   = path_key(track);
+    e->pos.elapsed = strtoul(elapsed, NULL, 10);
+    e->pos.offset  = strtoul(offset, NULL, 10);
+    e->pos.index   = atoi(index);
+    e->pos.left    = ended != NULL && strcmp(ended, OLD_ENDED_FIELD) == 0
+                     ? BOOK_LEFT_ENDED : BOOK_LEFT_PARTWAY;
     return true;
 }
 
-bool book_resume_get(const char *book, struct book_resume *pos)
-{
-    return book_resume_find(book, pos) && !pos->ended;
-}
-
-bool book_resume_find(const char *book, struct book_resume *pos)
+/* Every entry in the file, in order, until 'fn' returns false. */
+static void scan(bool (*fn)(const struct entry *e, void *data), void *data)
 {
     char line[BOOK_LINE_MAX];
-    int fd;
-    bool found = false;
-
-    if (book == NULL || book[0] == '\0')
-        return false;
-
-    fd = open(BOOK_RESUME_FILE, O_RDONLY);
-    if (fd < 0)
-        return false;
-
-    while (read_line(fd, line, sizeof (line)) > 0)
-    {
-        if (!line_is_book(line, book))
-            continue;
-
-        found = parse_line(line, pos);
-        break;
-    }
-
-    close(fd);
-    return found;
-}
-
-void book_resume_each(book_resume_fn fn, void *data)
-{
-    char line[BOOK_LINE_MAX];
-    char book[BOOK_KEY_MAX];
-    struct book_resume pos;
+    bool current = false;
     int fd;
 
     fd = open(BOOK_RESUME_FILE, O_RDONLY);
@@ -196,43 +222,93 @@ void book_resume_each(book_resume_fn fn, void *data)
 
     while (read_line(fd, line, sizeof (line)) > 0)
     {
-        const char *name;
-        size_t len;
+        struct entry e;
 
-        if (!line_book(line, &name, &len))
+        if (line[0] == '#')
+        {
+            current = current || strcmp(line, BOOK_HEADER) == 0;
             continue;
+        }
 
-        /* Copied out before parse_line() cuts the line up around it. */
-        if (len >= sizeof (book))
-            len = sizeof (book) - 1;
-        memcpy(book, name, len);
-        book[len] = '\0';
-
-        if (!parse_line(line, &pos))
+        if (!(current ? parse_current(line, &e) : parse_old(line, &e)))
             continue;
-        if (!fn(book, &pos, data))
+        if (!fn(&e, data))
             break;
     }
 
     close(fd);
 }
 
+struct find_ctx
+{
+    uint64_t book;
+    struct book_resume *pos;
+    bool found;
+};
+
+static bool find_one(const struct entry *e, void *data)
+{
+    struct find_ctx *ctx = data;
+
+    if (e->book != ctx->book)
+        return true;
+
+    *ctx->pos = e->pos;
+    ctx->found = true;
+    return false;
+}
+
+bool book_resume_get(const char *book, struct book_resume *pos)
+{
+    return book_resume_find(book, pos)
+        && pos->left == BOOK_LEFT_PARTWAY && pos->track != 0;
+}
+
+bool book_resume_find(const char *book, struct book_resume *pos)
+{
+    struct find_ctx ctx = { .pos = pos, .found = false };
+
+    if (book == NULL || book[0] == '\0')
+        return false;
+
+    ctx.book = book_resume_key(book);
+    scan(find_one, &ctx);
+    return ctx.found;
+}
+
+struct each_ctx
+{
+    book_resume_fn fn;
+    void *data;
+};
+
+static bool each_one(const struct entry *e, void *data)
+{
+    struct each_ctx *ctx = data;
+
+    return ctx->fn(e->book, e->path, &e->pos, ctx->data);
+}
+
+void book_resume_each(book_resume_fn fn, void *data)
+{
+    struct each_ctx ctx = { .fn = fn, .data = data };
+
+    scan(each_one, &ctx);
+}
+
 /* ------------------------------------------------------------------ *
  * the track that ended                                               *
  * ------------------------------------------------------------------ */
 
-/* The key a book is saved under: the album, the same as it is on the shelf.
+/* The name a book is saved under: the album, the same as it is on the shelf.
  * A book held in one file with no album tag has only its path to be known by,
  * and is reached by playing the file rather than by opening a book, so that is
  * the key it is looked up under too. */
-static void book_key(const struct mp3entry *id3, char *buf, size_t size)
+static const char *book_name(const struct mp3entry *id3)
 {
-    const char *name = id3->album;
-
-    if (name == NULL || name[0] == '\0')
-        name = id3->path;
-
-    strmemccpy(buf, name, size);
+    if (id3->album == NULL || id3->album[0] == '\0')
+        return id3->path;
+    return id3->album;
 }
 
 /* The last book track to play to its end, waiting for a save to write it
@@ -240,7 +316,8 @@ static void book_key(const struct mp3entry *id3, char *buf, size_t size)
  * last and cleared first, and neither thread yields in between. */
 static struct
 {
-    char book[BOOK_KEY_MAX];
+    uint64_t book;
+    bool by_path;               /* the book is keyed by 'track' */
     char track[MAX_PATH];
     unsigned long length;
 } ended_track;
@@ -251,6 +328,7 @@ static void track_finish_event(unsigned short id, void *ev_data)
 {
     const struct track_event *te = ev_data;
     const struct mp3entry *id3 = te->id3;
+    const char *name;
     (void)id;
 
     if (!global_settings.segregate_audiobooks)
@@ -265,7 +343,9 @@ static void track_finish_event(unsigned short id, void *ev_data)
         return;
 
     ended_pending = false;
-    book_key(id3, ended_track.book, sizeof (ended_track.book));
+    name = book_name(id3);
+    ended_track.book = book_resume_key(name);
+    ended_track.by_path = name == id3->path;
     strmemccpy(ended_track.track, id3->path, sizeof (ended_track.track));
     ended_track.length = id3->length;
     ended_pending = true;
@@ -280,72 +360,74 @@ void book_resume_init(void)
  * writing                                                            *
  * ------------------------------------------------------------------ */
 
-/* One field, preceded by its separator, with anything that would read back
- * as a field or line boundary turned into a space. Returns the new end. */
-static size_t append_field(char *buf, size_t size, size_t at, const char *s)
+static void write_entry(int fd, const struct entry *e)
 {
-    if (at + 1 < size)
-        buf[at++] = '\t';
-
-    for (; *s != '\0' && at + 1 < size; s++)
-        buf[at++] = (*s == '\t' || *s == '\n' || *s == '\r') ? ' ' : *s;
-
-    buf[at] = '\0';
-    return at;
+    fdprintf(fd, "%016llx\t%016llx\t%lu\t%lu\t%d\t%s",
+             (unsigned long long)e->book, (unsigned long long)e->pos.track,
+             e->pos.elapsed, e->pos.offset, e->pos.index,
+             left_words[e->pos.left]);
+    if (e->path != NULL)
+        fdprintf(fd, "\t%s", e->path);
+    fdprintf(fd, "\n");
 }
 
-/* 'book' first and the other books after it in the order they were last
- * played, which is what makes the cap drop the one heard longest ago. */
-static bool rewrite(const char *book, const char *track, int index,
-                    unsigned long elapsed, unsigned long offset, bool ended)
+struct copy_ctx
 {
-    char line[BOOK_LINE_MAX];
-    size_t at;
-    int n, in, out, kept = 1;
+    int out;
+    uint64_t skip;              /* the entry just replaced */
+    int kept;
+};
 
-    out = open(BOOK_RESUME_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (out < 0)
+static bool copy_one(const struct entry *e, void *data)
+{
+    struct copy_ctx *ctx = data;
+
+    if (e->book == ctx->skip)
+        return true;
+    if (++ctx->kept > BOOK_RESUME_MAX)
         return false;
 
-    n = snprintf(line, sizeof (line), "%lu\t%lu\t%d", elapsed, offset, index);
-    at = (n < 0 || (size_t)n >= sizeof (line)) ? sizeof (line) - 1 : (size_t)n;
-    at = append_field(line, sizeof (line), at, book);
-    at = append_field(line, sizeof (line), at, track);
-    if (ended)
-        append_field(line, sizeof (line), at, BOOK_ENDED_FIELD);
-    fdprintf(out, "%s\n", line);
+    write_entry(ctx->out, e);
+    return true;
+}
 
-    in = open(BOOK_RESUME_FILE, O_RDONLY);
-    if (in >= 0)
-    {
-        while (read_line(in, line, sizeof (line)) > 0)
-        {
-            const char *name;
-            size_t len;
+/* 'first' at the top and the other books after it in the order they were
+ * last played, which is what makes the cap drop the one heard longest ago.
+ * Every line goes out in the current format, whichever it was read in. */
+static bool rewrite(const struct entry *first)
+{
+    struct copy_ctx ctx = { .skip = first->book, .kept = 1 };
 
-            if (!line_book(line, &name, &len))
-                continue;
-            if (line_is_book(line, book))   /* the entry just replaced */
-                continue;
-            if (++kept > BOOK_RESUME_MAX)
-                break;
+    ctx.out = open(BOOK_RESUME_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (ctx.out < 0)
+        return false;
 
-            fdprintf(out, "%s\n", line);
-        }
+    fdprintf(ctx.out, "%s\n", BOOK_HEADER);
+    write_entry(ctx.out, first);
+    scan(copy_one, &ctx);
 
-        close(in);
-    }
-
-    close(out);
+    close(ctx.out);
 
     remove(BOOK_RESUME_FILE);
     return rename(BOOK_RESUME_TMP, BOOK_RESUME_FILE) >= 0;
 }
 
+bool book_resume_mark(const char *book, enum book_left left)
+{
+    struct entry e = {
+        .path = book[0] == '/' ? book : NULL,
+        .pos = { .track = 0, .index = -1, .left = left },
+    };
+
+    e.book = book_resume_key(book);
+    return rewrite(&e);
+}
+
 void book_resume_save(void)
 {
     struct mp3entry *id3 = NULL;
-    char book[BOOK_KEY_MAX];
+    const char *name = NULL;
+    uint64_t book = 0;
 
     if (!global_settings.segregate_audiobooks)
         return;
@@ -356,28 +438,51 @@ void book_resume_save(void)
         id3 = NULL;
 
     if (id3 != NULL)
-        book_key(id3, book, sizeof (book));
+    {
+        name = book_name(id3);
+        book = book_resume_key(name);
+    }
 
     if (ended_pending)
     {
         /* Copied out before anything yields: rewrite() opens files, and the
          * audio thread may note the next ended track meanwhile. That one
          * sets the flag again for the next save. */
-        static char ended_book[BOOK_KEY_MAX];
         static char ended_path[MAX_PATH];
-        unsigned long ended_length = ended_track.length;
+        struct entry e = {
+            .book = ended_track.book,
+            .path = ended_track.by_path ? ended_path : NULL,
+            .pos = {
+                .index   = -1,
+                .elapsed = ended_track.length,
+                .left    = BOOK_LEFT_ENDED,
+            },
+        };
 
-        strmemccpy(ended_book, ended_track.book, sizeof (ended_book));
         strmemccpy(ended_path, ended_track.track, sizeof (ended_path));
         ended_pending = false;
+        e.pos.track = path_key(ended_path);
 
         /* A chapter that ended into the next one of the same book is not the
          * book ending: the save below puts the book where it is now. */
-        if (id3 == NULL || strcmp(book, ended_book) != 0)
-            rewrite(ended_book, ended_path, -1, ended_length, 0, true);
+        if (id3 == NULL || book != e.book)
+            rewrite(&e);
     }
 
     if (id3 != NULL)
-        rewrite(book, id3->path, playlist_get_display_index() - 1,
-                id3->elapsed, id3->offset, false);
+    {
+        struct entry e = {
+            .book = book,
+            .path = name == id3->path ? id3->path : NULL,
+            .pos = {
+                .track   = path_key(id3->path),
+                .index   = playlist_get_display_index() - 1,
+                .elapsed = id3->elapsed,
+                .offset  = id3->offset,
+                .left    = BOOK_LEFT_PARTWAY,
+            },
+        };
+
+        rewrite(&e);
+    }
 }

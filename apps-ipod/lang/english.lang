@@ -22743,3 +22743,17 @@
     *: "Artist and Year, newest first"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_BOOK_MARK_AS
+  desc: Audiobooks shelf context menu: move a book to In progress, Not started or Finished
+  user: core
+  <source>
+    *: "Mark as"
+  </source>
+  <dest>
+    *: "Mark as"
+  </dest>
+  <voice>
+    *: "Mark as"
+  </voice>
+</phrase>

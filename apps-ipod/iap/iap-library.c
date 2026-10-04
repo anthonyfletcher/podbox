@@ -593,7 +593,8 @@ static void play_tracks(uint32_t start)
             continue;
         if (playlist_insert_context_add(&context, block->name) < 0)
             break;
-        if (resume && left_at < 0 && !strcmp(block->name, block->resume.track))
+        if (resume && left_at < 0
+            && path_key(block->name) == block->resume.track)
             left_at = inserted;
         inserted++;
         yield();
