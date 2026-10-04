@@ -389,7 +389,10 @@ void list_draw(struct screen *display, struct gui_synclist *list)
             }
         }
         linedes.style = style;
-        linedes.scroll = is_selected ? true : list->scroll_all;
+        /* under No Scrolling every row is cut to fit, not only the scrolling
+         * ones */
+        linedes.scroll = is_selected || list->scroll_all ||
+                         global_settings.no_scrolling;
         linedes.line = i % list->selected_size;
         icon = list->callback_get_item_icon ?
                     list->callback_get_item_icon(i, list->data) : Icon_NOICON;

@@ -299,6 +299,7 @@ static const struct tag_row tag_rows[] = {
 { "peak meter max",      TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "peak meter range" },
 
 /* --- scrolling ----------------------------------------------------------- */
+{ "no scrolling",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text ellipsis cut truncate" },
 { "scroll speed",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text" },
 { "scroll delay",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text start" },
 { "scroll step",         TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "scrolling text" },

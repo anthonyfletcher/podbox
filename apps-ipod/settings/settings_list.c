@@ -1045,6 +1045,8 @@ const struct settings_list settings[] = {
                   getlang_time_unit_0_is_off,
                   backlight_set_fade_out, 10, backlight_fade),
 #endif
+    OFFON_SETTING(0, no_scrolling, LANG_NO_SCROLLING, false, "no scrolling",
+                  NULL),
     INT_SETTING(F_THEMESETTING|F_PADTITLE, scroll_speed, LANG_SCROLL_SPEED, 9,"scroll speed",
                 UNIT_INT, 0, 17, 1, NULL, NULL, lcd_scroll_speed),
     INT_SETTING(F_THEMESETTING|F_TIME_SETTING | F_PADTITLE, scroll_delay, LANG_SCROLL_DELAY,

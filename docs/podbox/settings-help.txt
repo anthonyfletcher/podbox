@@ -1012,6 +1012,11 @@ The quiet end of the meter's range.
 [peak meter max]
 The loud end of the meter's range.
 
+[no scrolling]
+Text too long for its line is cut short with "..." instead of scrolling, in
+lists, menus and the theme's own scrolling lines. The other scroll settings
+then have nothing to move.
+
 [scroll speed]
 How quickly text too long for its line moves.
 

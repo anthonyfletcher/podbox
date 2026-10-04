@@ -605,6 +605,7 @@ struct user_settings
     int  bidir_limit;      /* bidir scroll length limit */
     int  scroll_delay;     /* delay (in 1/10s) before starting scroll */
     int  scroll_step;      /* pixels to advance per update */
+    bool no_scrolling;     /* cut text that would scroll to fit, with "..." */
 
     /* auto bookmark settings */
     int autoloadbookmark;   /* auto load option: 0=off, 1=ask, 2=on */

@@ -22757,3 +22757,17 @@
     *: "Mark as"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_NO_SCROLLING
+  desc: in the Scrolling menu, cut long text to fit with "..." instead of scrolling it
+  user: core
+  <source>
+    *: "No Scrolling"
+  </source>
+  <dest>
+    *: "No Scrolling"
+  </dest>
+  <voice>
+    *: "No Scrolling"
+  </voice>
+</phrase>

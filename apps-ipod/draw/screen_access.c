@@ -21,6 +21,7 @@
 
 #include "backlight.h"
 #include "screen_access.h"
+#include "line.h"
 #include "skin/backdrop.h"
 #include "viewport.h"
 
@@ -56,6 +57,20 @@ void screen_helper_setfont(int font)
 static int screen_helper_getuifont(void)
 {
     return global_status.font_id[SCREEN_MAIN];
+}
+
+/* A string cut to fit does not scroll, so No Scrolling needs nothing else. */
+static bool screen_helper_puts_scroll(int x, int y, const unsigned char *str)
+{
+    char fitted[TEXT_FIT_BUF];
+    if (global_settings.no_scrolling)
+    {
+        int font = lcd_getfont();
+        str = (const unsigned char *)text_fit((const char *)str, fitted,
+                sizeof(fitted), font,
+                lcd_getwidth() - x * font_get(font)->maxwidth);
+    }
+    return lcd_puts_scroll(x, y, str);
 }
 
 static void screen_helper_setuifont(int font)
@@ -139,7 +154,7 @@ struct screen screens[NB_SCREENS] =
         .puts=&lcd_puts,
         .putsf=&lcd_putsf,
         .putsxyf=&lcd_putsxyf,
-        .puts_scroll=&lcd_puts_scroll,
+        .puts_scroll=&screen_helper_puts_scroll,
         .putsxy_scroll_func=&lcd_putsxy_scroll_func,
         .scroll_speed=&lcd_scroll_speed,
         .scroll_delay=&lcd_scroll_delay,

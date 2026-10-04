@@ -6,13 +6,15 @@
  * GNU General Public License (version 2+)
  *
  * Renders one themed text line -- icon, text, scrolling, style -- into a
- * viewport. The primitive the list renderer is built on.
+ * viewport. The primitive the list renderer is built on. With No Scrolling on,
+ * a line that would scroll is cut to fit by text_fit() instead.
  ****************************************************************************/
 
 #include "screen_access.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "scroll_engine.h"
 #include "system.h"
@@ -25,6 +27,9 @@
 #include "draw/text_shadow.h"
 #include "skin/skin_albumart_color.h"
 #include "debug.h"
+#include "font.h"
+#include "rbunicode.h"
+#include "diacritic.h"
 
 #define MAX_LINES  LCD_SCROLLABLE_LINES
 
@@ -115,6 +120,14 @@ static void put_text(struct screen *display,
     unsigned drmode = DRMODE_FG;
     if (line->style & STYLE_INVERT)
         drmode = DRMODE_SOLID | DRMODE_INVERSEVID;
+
+    char fitted[TEXT_FIT_BUF];
+    if (line->scroll && !prevent_scroll && global_settings.no_scrolling)
+    {
+        text = text_fit(text, fitted, sizeof(fitted), lcd_getfont(),
+                        display->getwidth() - x + text_skip_pixels);
+        prevent_scroll = true;
+    }
 
     /* Before the text and from the same string, so a scrolling line carries
      * its shadow along: the scroller re-enters here with the line_desc it
@@ -386,4 +399,42 @@ void put_line(struct screen *display,
     va_start(ap, fmt);
     vput_line(display, x, y, line, fmt, ap);
     va_end(ap);
+}
+
+const char *text_fit(const char *text, char *buf, size_t size,
+                     int font, int maxwidth)
+{
+    struct font *pf = font_get(font);
+    const unsigned char *p = (const unsigned char *)text;
+    int ellw = 3 * font_get_width(pf, '.');
+    int width = 0;
+    size_t fit = 0;     /* bytes that fit with the "..." after them */
+    ucschar_t ch;
+
+    if (font_getstringsize(p, NULL, NULL, font) <= maxwidth)
+        return text;
+
+    while (*p)
+    {
+        const unsigned char *next = utf8decode(p, &ch);
+        if (!IS_DIACRITIC(ch))
+        {
+            width += font_get_width(pf, ch);
+            if (width + ellw > maxwidth)
+                break;
+        }
+        p = next;
+        fit = p - (const unsigned char *)text;
+    }
+
+    /* never split a UTF-8 sequence */
+    if (fit > size - 4)
+    {
+        fit = size - 4;
+        while (fit > 0 && (text[fit] & 0xc0) == 0x80)
+            fit--;
+    }
+    memcpy(buf, text, fit);
+    strcpy(buf + fit, "...");
+    return buf;
 }

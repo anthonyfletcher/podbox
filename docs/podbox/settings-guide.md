@@ -398,6 +398,7 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| No Scrolling | Text too long for its line is cut short with "..." instead of scrolling, in lists, menus and the theme's own scrolling lines. The other scroll settings then have nothing to move. | off |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |

@@ -11,6 +11,7 @@
 #ifndef __LINE_H__
 #define __LINE_H__
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
@@ -147,5 +148,14 @@ void  put_line(struct screen *display,
 void vput_line(struct screen *display,
                int x, int y, struct line_desc *line,
                const char *fmt, va_list ap);
+
+/* Buffer size for text_fit(): a 320-pixel line of the narrowest font, with
+ * room to spare. */
+#define TEXT_FIT_BUF 256
+
+/* text if it fits maxwidth pixels in font, else as much of it as fits followed
+ * by "...", written to buf. */
+const char *text_fit(const char *text, char *buf, size_t size,
+                     int font, int maxwidth);
 
 #endif /* __LINE_H__*/
