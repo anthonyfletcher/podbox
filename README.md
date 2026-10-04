@@ -155,7 +155,9 @@ tracks as either folder.jpg or cover.jpg e.g. `Artist/Album/folder.jpg`.
 Without these files, the art cache will only build from embedded images as tracks are played.
 
 Your artist art should be stored with the album folders as either folder.jpg or cover.jpg
-e.g. `Artist/folder.jpg`.
+e.g. `Artist/folder.jpg`. If your albums are grouped one level deeper, as in
+`Artist/Albums/Album One`, artist art can stay in `Artist/folder.jpg`; an image in the
+grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums under it.
 
 All artwork should be:
 

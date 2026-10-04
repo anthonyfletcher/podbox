@@ -4,7 +4,8 @@
  * Disk cache for cover art -- BOTH album art and artist art. Pre-scales each
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder, artist art
- * from its parent; each has its own placeholder for when nothing is found.
+ * from its parent or, failing that, the folder above; each has its own
+ * placeholder for when nothing is found.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -544,8 +545,11 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
 /* Whether 'art', found for the folder of 'probe', can stand for it. The search
  * falls back to the folder above, which is the album for a disc folder but the
  * artist for an album folder -- and the artist's picture is no album's cover.
- * So an image from above counts only for a disc folder. */
-static bool aa_art_is_folders(const char *probe, const char *art)
+ * So for an album an image from above counts only for a disc folder. For an
+ * artist it always counts, except from the volume root: under
+ * <artist>/<album_type>/<album> the folder above the album is the type, and
+ * the artist's picture is one further up. */
+static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
 {
     const char *end = strrchr(probe, '/');
     const char *start;
@@ -556,6 +560,8 @@ static bool aa_art_is_folders(const char *probe, const char *art)
     dirlen = end - probe + 1;
     if (!strncmp(probe, art, dirlen) && !strchr(art + dirlen, '/'))
         return true;
+    if (artist)
+        return strrchr(art, '/') != art;
 
     for (start = end; start > probe && start[-1] != '/'; start--)
         ;
@@ -1163,11 +1169,14 @@ static bool aa_check_all;
  * filename under the folder (real for an album folder, synthetic "<dir>/_" for
  * an artist folder) that search_albumart_files() strips down to the folder to
  * locate cover.bmp / folder.jpg; `dh` is that folder's hash (the cache key) and
- * `slot` its table entry. Sets *aborted if a USB/shutdown/DB-busy stop was hit
- * mid-decode. Cheap once the folder is cached: an existence check per size,
- * plus the image lookup and stamp under aa_check_all, and no image is read. */
+ * `slot` its table entry. An `artist` folder with no image of its own takes the
+ * one above it, cached under its own key so that every reader keying artist art
+ * on the album's parent finds it. Sets *aborted if a USB/shutdown/DB-busy stop
+ * was hit mid-decode. Cheap once the folder is cached: an existence check per
+ * size, plus the image lookup and stamp under aa_check_all, and no image is
+ * read. */
 static bool aa_cache_dir(const char *probe_path, unsigned int dh,
-                         struct aa_stamp *slot,
+                         struct aa_stamp *slot, bool artist,
                          void *workbuf, size_t worksz, bool *aborted)
 {
     int s;
@@ -1182,7 +1191,7 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
     memset(&aa_id3, 0, sizeof(aa_id3));
     strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
     if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath))
-        || !aa_art_is_folders(probe_path, aa_artpath))
+        || !aa_art_is_folders(probe_path, aa_artpath, artist))
     {
         /* Embedded art has no file here, and is art all the same */
         if (slot->stamp == AA_STAMP_EMBEDDED)
@@ -1373,7 +1382,8 @@ static enum bg_result aa_run_pass(void)
         if ((slot = aa_visit(dh)))
         {
             aa_counts.albums++;
-            if (aa_cache_dir(tcs.result, dh, slot, workbuf, worksz, &aborted))
+            if (aa_cache_dir(tcs.result, dh, slot, false, workbuf, worksz,
+                             &aborted))
                 aa_counts.album_art++;
             else if (!aborted)
                 path_list_write_record(&noart_albums, aa_dir);
@@ -1382,9 +1392,10 @@ static enum bg_result aa_run_pass(void)
             break;
 
         /* The parent folder (the artist), cached from <artist>/folder.jpg etc.
-         * for <artist>/<album>/<track> layouts. Deduped independently of the
-         * album so an artist whose first album has no cover still gets resolved.
-         * Skipped when there is no distinct parent (flat/rooted layouts). */
+         * for <artist>/<album>/<track> layouts, and from the folder above it
+         * for <artist>/<album_type>/<album>/<track>. Deduped independently of
+         * the album so an artist whose first album has no cover still gets
+         * resolved. Skipped when there is no distinct parent (flat/rooted layouts). */
         aa_dirname(aa_dir, aa_artist_dir, sizeof(aa_artist_dir));
         if (aa_artist_dir[0] && strcmp(aa_artist_dir, aa_dir) != 0)
         {
@@ -1393,7 +1404,7 @@ static enum bg_result aa_run_pass(void)
             {
                 snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
                 aa_counts.artists++;
-                if (aa_cache_dir(aa_probe, ah, slot, workbuf, worksz,
+                if (aa_cache_dir(aa_probe, ah, slot, true, workbuf, worksz,
                                  &aborted))
                     aa_counts.artist_art++;
                 else if (!aborted)
