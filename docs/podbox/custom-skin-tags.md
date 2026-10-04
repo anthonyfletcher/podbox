@@ -856,57 +856,84 @@ same colour; nothing is being remapped either way.
 
 ---
 
-## Palette colours: `bright`, `dark`, `accent` and `dominant`
+## Palette colours: `accent`, `dominant` and `vivid`
 
-Any colour argument that takes `rrggbb` also takes the word `bright` or `dark`:
-the lighter or the darker of the two colours dynamic colours take from the
-album.
+Any colour argument that takes `rrggbb` also takes a word naming one of the
+colours dynamic colours take from the album:
+
+| Word | The album's |
+|---|---|
+| `accent` | text colour, picked to read on `dominant` |
+| `dominant` | background colour |
+| `vivid` | most colourful colour, whatever its role |
+
+Use `accent` and `dominant` together, where the skin's background is the
+album's: text in `accent` on a panel of `dominant` always reads. Use `vivid`
+where the background is the skin's own, such as a progress bar over black: it
+is the colour the cover is remembered by, where `accent` on a pale sleeve is
+often a near-black that vanishes there.
+
+### Tone: making a colour read on your background
+
+Add `>NN` or `<NN` to keep a colour at tone `NN` or lighter, or at tone `NN`
+or darker. **Tone** is lightness as the eye sees it, from 0 for black to 100
+for white. A colour already within the bound is used as it is; one outside is
+made lighter or darker just far enough, keeping its hue.
 
 ```
-%Vf(bright)                   # progress bar over black: always the light one
-%Vg(bright,bright,dark)       # selection bar, with text that reads on it
-%dr(0,0,-,20,dark)            # a panel behind light text
+%Vf(vivid>50)                  # text over black: always readable
+%Vl(Bar,60,214,200,6,-)%Vf(vivid>40)   # a progress bar over black
+%dr(0,35,320,205,dominant<30)  # a panel white text always reads on
 ```
 
-The two are picked to contrast with each other, so `dark` on `bright` is
-always readable, and `bright` always shows on a dark theme. Which of them is
-the album's main colour depends on the album. A pale sleeve's main colour is
-`bright`, and a dark one's is `dark`.
+How readable two colours are together depends only on their tones, never on
+their hues, so the bound to write follows from the background:
 
-With no album colours — nothing played yet, or **Dynamic Colours** off —
-`bright` is white and `dark` is black.
+| On | Text | Bars, icons, fills |
+|---|---|---|
+| black (tone 0) | `>50` | `>40` |
+| white (tone 100) | `<50` | `<60` |
+| anything else | 50 apart from it | 40 apart from it |
+
+`!ffffff` has tone 100 and `!000000` tone 0, so white text reads on
+`dominant<50` and black text on `vivid>60`.
+
+Text needs the larger gap. A yellow album shows the difference: on white,
+`vivid<60` keeps a gold bar, while `vivid<50` text has to go olive. That is
+the price of yellow text on white, so write the text in white or black there
+and keep the album's colour for the bar.
+
+An album with no colourful colour, such as a black-and-white sleeve, gives
+`vivid` the lighter of its two colours for a `>` bound, the darker for a `<`,
+and its `accent` with neither.
+
+### Shade
 
 Add `.NN` for a shade: the colour at `NN` percent of its brightness, mixed
-toward black, from `0` to `100`. It is how a second tone of the same colour is
-written, such as the lower half of a glossy bar:
+toward black, from `0` to `100`, applied after any bound. It is how a second
+tone of the same colour is written, such as the lower half of a glossy bar:
 
 ```
-%Vl(Bar,60,214,200,6,-)%Vf(bright)       # upper half
+%Vl(Bar,60,214,200,6,-)%Vf(vivid>40)       # upper half
 %pb(0,0,-,-,noborder)
-%Vl(Bar,60,220,200,6,-)%Vf(bright.75)    # lower half, a quarter darker
-%pb(0,0,-,-,noborder)
-```
-
-The shade applies with no album colours too: `bright.75` is then a light grey.
-
-`accent` and `dominant` name the album's two colours by role instead: `accent`
-is its text colour and `dominant` its background. Use them where the role
-matters more than which is lighter, such as a progress bar that should always
-be the album's highlight:
-
-```
-%Vl(Bar,60,214,200,6,-)%Vf(accent:5ea8f0)       # upper half
-%pb(0,0,-,-,noborder)
-%Vl(Bar,60,220,200,6,-)%Vf(accent.75:2a7fd6)    # lower half
+%Vl(Bar,60,220,200,6,-)%Vf(vivid>40.75)    # lower half, a quarter darker
 %pb(0,0,-,-,noborder)
 ```
 
-After a `:` comes the colour to use with no album colours, exactly as written,
-so the skin looks as designed until something plays; the shade applies only to
-album colours. Without one, `accent` is the theme's foreground colour and
-`dominant` its background, shaded. The `.NN` shade goes before the `:`.
+### With no album colours
 
-Like `!`, the words are skin-only; a `.cfg` does not take them.
+Before anything has played, or with **Dynamic Colours** off, a word is the
+theme's foreground colour (`dominant`: its background), bounded and shaded the
+same way. Add `:rrggbb` to give a colour of your own instead, used exactly as
+written, so the skin looks as designed until something plays:
+
+```
+%Vf(vivid>40:5ea8f0)
+%Vf(vivid>40.75:2a7fd6)
+```
+
+The parts go in that order: word, bound, shade, fallback. Like `!`, the words
+are skin-only; a `.cfg` does not take them.
 
 ---
 

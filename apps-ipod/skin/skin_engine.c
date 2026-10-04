@@ -27,6 +27,7 @@
 #include "statusbar_skinned.h"
 #include "wps_internals.h"
 #include "skin_albumart_color.h"
+#include "draw/color.h"                /* color_words_reset */
 
 #define FAILSAFENAME "rockbox_failsafe"
 
@@ -152,6 +153,11 @@ void settings_apply_skins(void)
         }
     }
     skins_initialised = true;
+
+    /* Every skin is unloaded, so nothing holds an index into the palette
+     * word table; start it afresh, or each theme change would add its words
+     * to the last one's until a skin failed to load. */
+    color_words_reset();
 
     /* Make sure each skin is loaded */
     for (i=0; i<SKINNABLE_SCREENS_COUNT; i++)

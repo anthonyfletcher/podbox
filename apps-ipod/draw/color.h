@@ -25,34 +25,64 @@ int hex_to_rgb(const char* hex, int* color);
  * viewport's foreground (%Vg's text, %dr's fill) inherit it from there. */
 #define COLOR_FIXED (1u << 24)
 
-/* Set on a colour a skin wrote as the word `bright` or `dark`: the lighter or
- * the darker of the album's two colours, whichever that is. The bits below
- * hold white or black, which is what the colour is with no palette, and
- * dynamic_colors_resolve() strips the flag as it does COLOR_FIXED. */
-#define COLOR_BRIGHT (1u << 25)
-#define COLOR_DARK   (1u << 26)
+/* Set on a colour a skin wrote as a palette word: `accent`, `dominant` or
+ * `vivid`, with an optional tone bound, shade and fallback. A word with all
+ * three does not fit beside a colour in one int, so the bits below hold an
+ * index into a table of what was written (color_word()), and
+ * dynamic_colors_resolve() turns it into a colour. */
+#define COLOR_WORD (1u << 25)
+#define COLOR_WORD_INDEX(c) ((c) & 0xffu)
 
-/* Set on a colour a skin wrote as the word `accent` or `dominant`: the album's
- * text or background colour by role. `accent:5ea8f0` puts the colour used
- * with no palette in the bits below; plain `accent` sets COLOR_THEME instead,
- * which stands for the theme's own foreground (or, for `dominant`, its
- * background). */
-#define COLOR_ACCENT   (1u << 27)
-#define COLOR_DOMINANT (1u << 28)
-#define COLOR_THEME    (1u << 29)
+/* Distinct palette words, across every skin loaded at once. The table is
+ * emptied when the skins are reloaded (color_words_reset()), and a skin that
+ * asks for more fails to load. */
+#define COLOR_WORDS_MAX 64
 
-/* A palette word's shade, `bright.75`: the percentage of its brightness to
- * keep, mixed toward black. Held as the percentage plus one in the bits
- * between the colour and the flags, so zero means no suffix. */
-#define COLOR_SHADE_SHIFT 16
-#define COLOR_SHADE_MASK  (0x7fu << COLOR_SHADE_SHIFT)
+enum color_word_kind
+{
+    COLOR_WORD_ACCENT,          /* the album's text colour */
+    COLOR_WORD_DOMINANT,        /* the album's background colour */
+    COLOR_WORD_VIVID,           /* the album's most colourful colour */
+};
+
+/* What a skin wrote: `vivid>50.75:5ea8f0` is kind VIVID, bound +1, tone 50,
+ * shade 76, fallback 5ea8f0. */
+struct color_word
+{
+    unsigned char kind;         /* enum color_word_kind */
+    signed char bound;          /* +1 for `>tone`, -1 for `<tone`, 0 none */
+    unsigned char tone;         /* 0..100 */
+    unsigned char shade;        /* `.NN` plus one; 0 is none */
+    bool has_fallback;          /* `:rrggbb` was written */
+    unsigned fallback;          /* that colour, native */
+};
+
+/* The word a parsed colour stands for, or NULL if it is a plain colour. */
+const struct color_word *color_word(unsigned c);
+
+/* Empty the word table. Only while no skin holds an index into it: the skin
+ * engine calls it between unloading every skin and loading them again. */
+void color_words_reset(void);
 
 /* Parse a colour for the given screen, accepting the forms theme files and
- * skins use, plus a leading '!' for COLOR_FIXED and the words `bright`,
- * `dark`, `accent` and `dominant`, each with an optional `.NN` shade; the last
- * two also take a `:rrggbb` fallback after it. Returns true if text held a
- * usable colour. */
+ * skins use, plus a leading '!' for COLOR_FIXED and the palette words above.
+ * Returns true if text held a usable colour. */
 bool parse_color(enum screen_type screen, char *text, int *value);
+
+/* Tone is perceptual lightness, CIELAB L*: 0 is black, 100 white. Taken from
+ * the same luminance color_contrast() uses, so the contrast between two
+ * colours follows from their tones alone, whatever their hues.
+ *
+ * c moved to tone `tone` or lighter (bound > 0) or darker (bound < 0), as
+ * little as that takes: its OKLab lightness changes, its hue does not, and its
+ * chroma drops only where the display cannot show it at the new lightness. A
+ * colour already within the bound comes back unchanged. */
+unsigned color_tone_bound(unsigned c, int tone, int bound);
+
+/* OKLab chroma -- how colourful c is, independent of how light -- in units of
+ * 1/65536. Greys are 0, and the most vivid colours a display shows are about
+ * 21000. */
+int color_chroma(unsigned c);
 
 /* Mix c1 toward c2, per channel. t runs 0..256: 0 leaves c1 alone, 256 gives
  * c2. Used to derive a secondary colour from a foreground/background pair --

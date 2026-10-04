@@ -343,29 +343,24 @@ static const char *colour_origin(unsigned int actual, unsigned int baseline)
  * prints as the word. */
 static const char *colour_text(unsigned int c, char *buf, int len)
 {
+    static const char *const names[] = { "accent", "dominant", "vivid" };
+    const struct color_word *w = color_word(c);
     bool fixed = (c & COLOR_FIXED) != 0;
-    unsigned int shade = (c & COLOR_SHADE_MASK) >> COLOR_SHADE_SHIFT;
 
-    if (c & (COLOR_BRIGHT | COLOR_DARK))
+    if (w)
     {
-        const char *word = (c & COLOR_BRIGHT) ? "bright" : "dark";
+        int n = snprintf(buf, len, "%s", names[w->kind]);
 
-        if (!shade)
-            return word;
-        snprintf(buf, len, "%s.%u", word, shade - 1);
-        return buf;
-    }
-
-    if (c & (COLOR_ACCENT | COLOR_DOMINANT))
-    {
-        const char *word = (c & COLOR_ACCENT) ? "accent" : "dominant";
-        int n = snprintf(buf, len, "%s", word);
-
-        if (shade && n < len)
-            n += snprintf(buf + n, len - n, ".%u", shade - 1);
-        if (!(c & COLOR_THEME) && n < len)
-            snprintf(buf + n, len - n, ":%02x%02x%02x", RGB_UNPACK_RED(c),
-                     RGB_UNPACK_GREEN(c), RGB_UNPACK_BLUE(c));
+        if (w->bound && n < len)
+            n += snprintf(buf + n, len - n, "%c%u", w->bound > 0 ? '>' : '<',
+                          w->tone);
+        if (w->shade && n < len)
+            n += snprintf(buf + n, len - n, ".%u", w->shade - 1);
+        if (w->has_fallback && n < len)
+            snprintf(buf + n, len - n, ":%02x%02x%02x",
+                     RGB_UNPACK_RED(w->fallback),
+                     RGB_UNPACK_GREEN(w->fallback),
+                     RGB_UNPACK_BLUE(w->fallback));
         return buf;
     }
 

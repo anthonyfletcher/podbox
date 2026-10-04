@@ -4,10 +4,10 @@
 #CC BY-SA 3.0
 #-----------------------------------------------#
 #
-#Colours: accent is the album's text colour, white with
-#none, and accent.75 a shade of it. The .cfg makes the album's
-#background the darker of its two colours, so the accent is
-#always the lighter. Every other colour is pinned with !.
+#Colours: vivid is the album's most colourful colour, white
+#with none. Bars take it at tone 40 or lighter and icons at 50,
+#so both read on black; vivid>40.75 is the bars' lower, darker
+#half. Every other colour is pinned with !.
 #
 #Status bar off
 %wd
@@ -70,22 +70,22 @@
 %V(170,128,146,20,5)%Vf(!909090)
 %pp %Sx(of) %pe
 #
-#Progress, in two tones: accent over a shade of it
+#Progress, in two tones: vivid over a shade of it
 %Vl(Progress,2,210,52,20,4)%Vf(!ffffff)
 %ar%pc
-%Vl(Progress,60,214,200,6,-)%Vf(accent)
+%Vl(Progress,60,214,200,6,-)%Vf(vivid>40)
 %pb(0,0,-,-,noborder)
-%Vl(Progress,60,220,200,6,-)%Vf(accent.75)
+%Vl(Progress,60,220,200,6,-)%Vf(vivid>40.75)
 %pb(0,0,-,-,noborder)
 %Vl(Progress,266,210,52,20,4)%Vf(!ffffff)
 %al-%pr
 #
 #Volume
-%Vl(Volume,32,208,24,24,2)%Vf(accent)
+%Vl(Volume,32,208,24,24,2)%Vf(vivid>50)
 N
-%Vl(Volume,60,214,200,6,-)%Vf(accent)
+%Vl(Volume,60,214,200,6,-)%Vf(vivid>40)
 %pv(0,0,-,-,noborder)
-%Vl(Volume,60,220,200,6,-)%Vf(accent.75)
+%Vl(Volume,60,220,200,6,-)%Vf(vivid>40.75)
 %pv(0,0,-,-,noborder)
-%Vl(Volume,264,208,24,24,2)%Vf(accent)
+%Vl(Volume,264,208,24,24,2)%Vf(vivid>50)
 O

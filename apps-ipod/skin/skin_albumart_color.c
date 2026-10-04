@@ -35,14 +35,15 @@
  *
  * Parts, in order:
  *   - luminance, contrast and blending helpers
- *   - pick_accent() and extract_colors(): sampling the bitmap and choosing
- *     the palette
+ *   - pick_accent(), pick_vivid() and extract_colors(): sampling the bitmap
+ *     and choosing the palette
  *   - the %Cl filter chain, applied in place once per art change
  *   - track-change hook, the boot seed, theme colour save/restore, and the
  *     once-per-render check that drives both jobs
  *   - carrying a skin's own colours over to the new palette
- *   - the accessors skins resolve their colour tags through, which also
- *     report whether a change is recent enough to need another repaint
+ *   - the accessors skins resolve their colour tags through, palette words
+ *     included, which also report whether a change is recent enough to need
+ *     another repaint
  ****************************************************************************/
 
 #include "config.h"
@@ -134,6 +135,8 @@ struct dynamic_colors_cache {
     unsigned int accent;         /* fg color */
     unsigned int found_dominant; /* the pair as extracted, before */
     unsigned int found_accent;   /*   Dynamic Colors Background turns it */
+    unsigned int vivid;          /* the album's most colourful colour */
+    bool has_vivid;              /* the album has one: see pick_vivid() */
     int orientation;             /* the DYNAMIC_BG_* those two were turned by */
     unsigned int theme_fg;       /* saved original theme fg */
     unsigned int theme_bg;       /* saved original theme bg */
@@ -161,12 +164,20 @@ static int xform_entries;
 static int xform_rotation;
 static bool xform_rotation_valid;
 
+/* What each palette word came to, by its index in the word table, and which
+ * source that was for: a tone bound is a search, too dear to repeat every
+ * time a skin draws. */
+enum { WORD_UNKNOWN, WORD_FROM_PALETTE, WORD_FROM_THEME };
+static unsigned int word_out[COLOR_WORDS_MAX];
+static unsigned char word_from[COLOR_WORDS_MAX];
+
 /* Every transformed colour is derived from the palette and the theme, so both
  * changing invalidates the lot. */
 static void forget_transforms(void)
 {
     xform_entries = 0;
     xform_rotation_valid = false;
+    memset(word_from, WORD_UNKNOWN, sizeof word_from);
 }
 
 static int compute_luminance(int r8, int g8, int b8)
@@ -567,6 +578,69 @@ static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
     *out_b = acc_b;
 }
 
+/* The album's most colourful colour, for the `vivid` palette word: the bucket
+ * scoring highest on count times OKLab chroma squared, among those at least
+ * VIVID_CHROMA_MIN colourful whose hue -- the bucket's sector and both
+ * neighbours, pooled as strongest_hue_bucket() pools them -- covers
+ * 1/VIVID_SHARE of the picture. False when no bucket qualifies, as on a
+ * black-and-white or sepia sleeve.
+ *
+ * Chroma, not HSV saturation: a dark brown is highly saturated in HSV, and
+ * scored that way the wood and skin in a photograph win over the one red
+ * jacket the eye goes to. */
+#define VIVID_CHROMA_MIN 4588           /* 0.07 in color_chroma()'s units */
+#define VIVID_SHARE      64
+
+static bool pick_vivid(const fb_data *pixels, int total_pixels, int stride,
+                       unsigned int *out)
+{
+    unsigned int sector_count[HUE_SECTORS] = { 0 };
+    unsigned int samples = 0, best_score = 0;
+    int best = -1, i, r, g, b;
+
+    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+    {
+        int sector = histogram[i] ? bucket_sector(i) : -1;
+
+        samples += histogram[i];
+        if (sector >= 0)
+            sector_count[sector] += histogram[i];
+    }
+
+    for (i = 0; i < HISTOGRAM_BUCKETS; i++)
+    {
+        int sector = histogram[i] ? bucket_sector(i) : -1;
+        unsigned int run, score;
+        int chroma;
+
+        if (sector < 0)
+            continue;
+        run = sector_count[(sector + HUE_SECTORS - 1) % HUE_SECTORS]
+            + sector_count[sector]
+            + sector_count[(sector + 1) % HUE_SECTORS];
+        if (run * VIVID_SHARE < samples)
+            continue;
+        chroma = color_chroma(LCD_RGBPACK(((i >> 8) & 0xF) * 17,
+                                          ((i >> 4) & 0xF) * 17,
+                                          (i & 0xF) * 17));
+        if (chroma < VIVID_CHROMA_MIN)
+            continue;
+        chroma >>= 6;     /* the square times a count of 16384 fits 32 bits */
+        score = histogram[i] * (unsigned int)(chroma * chroma);
+        if (score > best_score)
+        {
+            best_score = score;
+            best = i;
+        }
+    }
+
+    if (best < 0)
+        return false;
+    average_bucket(pixels, total_pixels, stride, best, &r, &g, &b);
+    *out = LCD_RGBPACK(r, g, b);
+    return true;
+}
+
 static void extract_colors(const struct bitmap *bmp)
 {
     if (!bmp->data || bmp->width <= 0 || bmp->height <= 0)
@@ -777,6 +851,7 @@ static void extract_colors(const struct bitmap *bmp)
 
     cache.found_accent = accent;
     cache.found_dominant = dominant;
+    cache.has_vivid = pick_vivid(pixels, total_pixels, stride, &cache.vivid);
     apply_oriented();
 }
 
@@ -1617,46 +1692,62 @@ static unsigned int resolve_mapped(unsigned int original,
     return transform_cached(original);
 }
 
-/* `bright` and `dark`: the lighter and darker of the pair, or the white and
- * black the parser left in the colour bits when there is no palette. The
- * accent is picked for contrast against the dominant, so one of the pair is
- * always the light one and the other the dark one.
+/* What a palette word starts from, before its bound and shade.
  *
- * `accent` and `dominant` name one of the pair outright. With no palette they
- * are the fallback the skin wrote, or the theme's foreground or background. */
-static unsigned int resolve_palette_word(unsigned int original, bool palette)
+ * `vivid` on an album with no colourful colour falls back on the pair: the
+ * lighter of the two for a `>` bound, the darker for a `<`, and the accent
+ * with none, so a black-and-white sleeve keeps its own off-white or
+ * near-black rather than one the bound would have to invent. */
+static unsigned int word_base(const struct color_word *w)
 {
     unsigned int black = LCD_RGBPACK(0, 0, 0);
-    unsigned int shade = (original & COLOR_SHADE_MASK) >> COLOR_SHADE_SHIFT;
-    unsigned int out = original & ~(COLOR_BRIGHT | COLOR_DARK | COLOR_ACCENT |
-                                    COLOR_DOMINANT | COLOR_THEME |
-                                    COLOR_SHADE_MASK);
+    bool accent_lighter;
 
-    if (original & (COLOR_ACCENT | COLOR_DOMINANT))
-    {
-        bool accent = original & COLOR_ACCENT;
+    if (w->kind == COLOR_WORD_ACCENT)
+        return cache.accent;
+    if (w->kind == COLOR_WORD_DOMINANT)
+        return cache.dominant;
+    if (cache.has_vivid)
+        return cache.vivid;
+    if (w->bound == 0)
+        return cache.accent;
+    accent_lighter = color_contrast(cache.accent, black) >
+                     color_contrast(cache.dominant, black);
+    return (w->bound > 0) == accent_lighter ? cache.accent : cache.dominant;
+}
 
-        if (palette)
-            out = accent ? cache.accent : cache.dominant;
-        else if (original & COLOR_THEME)
-            out = accent ? (unsigned)global_settings.fg_color
-                         : (unsigned)global_settings.bg_color;
-        else
-            return out;     /* the fallback is used as written, unshaded */
-    }
-    else if (palette)
-    {
-        bool accent_lighter = color_contrast(cache.accent, black) >
-                              color_contrast(cache.dominant, black);
+/* A palette word: the album's colour by role, then the tone bound, then the
+ * shade. With no palette it is the fallback the skin wrote, as written, or
+ * failing that the theme's foreground (its background, for `dominant`),
+ * bounded and shaded the same way. */
+static unsigned int resolve_word(unsigned int original, bool palette)
+{
+    const struct color_word *w = color_word(original);
+    int i = COLOR_WORD_INDEX(original);
+    unsigned char from = palette ? WORD_FROM_PALETTE : WORD_FROM_THEME;
+    unsigned int out;
 
-        if (original & COLOR_BRIGHT)
-            out = accent_lighter ? cache.accent : cache.dominant;
-        else
-            out = accent_lighter ? cache.dominant : cache.accent;
-    }
+    if (!w)
+        return original & ~COLOR_WORD;  /* not reached: parsed as a word */
+    if (!palette && w->has_fallback)
+        return w->fallback;
+    if (word_from[i] == from)
+        return word_out[i];
 
-    if (shade)
-        out = color_blend(black, out, ((shade - 1) * 256) / 100);
+    if (palette)
+        out = word_base(w);
+    else if (w->kind == COLOR_WORD_DOMINANT)
+        out = global_settings.bg_color;
+    else
+        out = global_settings.fg_color;
+
+    out = color_tone_bound(out, w->tone, w->bound);
+    if (w->shade)
+        out = color_blend(LCD_RGBPACK(0, 0, 0), out,
+                          ((w->shade - 1) * 256) / 100);
+
+    word_out[i] = out;
+    word_from[i] = from;
     return out;
 }
 
@@ -1670,8 +1761,8 @@ unsigned int dynamic_colors_resolve(unsigned int original)
     if (original & COLOR_FIXED)
         return original & ~COLOR_FIXED;
 
-    if (original & (COLOR_BRIGHT | COLOR_DARK | COLOR_ACCENT | COLOR_DOMINANT))
-        return resolve_palette_word(original, palette);
+    if (original & COLOR_WORD)
+        return resolve_word(original, palette);
 
     if (!palette)
         return original;
