@@ -104,6 +104,9 @@ sim_asset_name() {
 }
 theme_asset_name() { echo "$1.zip"; }
 
+# Every extra theme in one download, beside the single ones.
+ALL_THEMES_ASSET=all-themes.zip
+
 cd "$(dirname "$0")"
 
 die() { echo "release: $*" >&2; exit 1; }
@@ -255,6 +258,11 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
     printf '| `%s` | iPod Video 5G/5.5G |\n\n' "$(asset_name ipodvideo)"
     printf 'Unzip onto the root of the player. The `.map` files resolve a\n'
     printf 'crash address from this build and are not installed.\n\n'
+    printf '**Update your themes too.** If you use any theme from the\n'
+    printf '[%s release](https://github.com/%s/releases/tag/%s), download it\n' \
+        "$THEMES_RELEASE" "$SLUG" "$THEMES_RELEASE"
+    printf 'again with this build: the themes there are made for this firmware.\n'
+    printf 'Scrim ships inside the firmware zip and needs nothing.\n\n'
     printf '### %s\n\n' "$HEADING"
     printf '%s\n' "$CHANGES"
 } > "$NOTES"
@@ -282,6 +290,7 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
     printf 'Extra themes for PodBox, each modified to support dynamic colours\n'
     printf 'and art in lists. Scrim is not here: it ships with the firmware.\n\n'
     printf '| file | theme |\n| --- | --- |\n'
+    printf '| `%s` | every theme below, in one download |\n' "$ALL_THEMES_ASSET"
     for theme in $EXTRA_THEMES; do
         printf '| `%s` | [%s](https://github.com/%s/blob/%s/themes/%s/README.md) |\n' \
             "$(theme_asset_name "$theme")" "$theme" "$SLUG" "$BRANCH" "$theme"
@@ -443,6 +452,27 @@ for theme in $EXTRA_THEMES; do
     "
 done
 
+# Unpacked from the single zips just made rather than staged again, so it
+# cannot differ from them. Fonts several themes share are the same file, and
+# land once.
+ssh "$SERVER" "
+    set -e
+    cd '$REMOTE_DIR'
+    out=\$(pwd)/'$ALL_THEMES_ASSET'
+    stage=\$(mktemp -d)
+    trap 'rm -rf \"\$stage\"' EXIT
+    for zip in $(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done); do
+        unzip -qo \"\$zip\" -d \"\$stage\"
+    done
+    rm -f \"\$out\"
+    (cd \"\$stage\" && zip -qr \"\$out\" .rockbox)
+    for theme in $EXTRA_THEMES; do
+        unzip -l \"\$out\" | grep -q \".rockbox/themes/\$theme.cfg\" ||
+            { echo \"$ALL_THEMES_ASSET is missing \$theme\" >&2; exit 1; }
+    done
+    printf '  %-14s ok  (%s)\n' 'all themes' \"\$(du -h \"\$out\" | cut -f1)\"
+"
+
 # The simulator ships as one file holding both halves: the exe, and the
 # simdisk/ beside it that build-sim.sh has already unpacked this build into.
 # Separating them would let somebody run last month's exe against this month's
@@ -480,6 +510,7 @@ for theme in $EXTRA_THEMES; do
     asset=$(theme_asset_name "$theme")
     scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
 done
+scp "$SERVER:$REMOTE_DIR/$ALL_THEMES_ASSET" "dist/$ALL_THEMES_ASSET"
 
 if [ -n "$DRY_RUN" ]; then
     say "Dry run: built and verified, nothing published"
@@ -535,6 +566,7 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     --title 'Extra themes' \
     --notes-file themes-notes.md \
     $DRAFT \
+    $ALL_THEMES_ASSET \
     $(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done)"
 
 say "Published $COMMIT as $THEMES_RELEASE"
