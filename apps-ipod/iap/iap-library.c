@@ -185,6 +185,8 @@ struct block {
     int32_t book_seeks[BOOKS_MAX];
     uint32_t book_order[BOOK_MAX];
     uint8_t art_jpeg[ART_JPEG_MAX];
+    char art_jpeg_of[MAX_PATH];     /* the cache file art_jpeg holds */
+    uint32_t art_jpeg_len;          /* and its length, 0 if it failed */
     fb_data art_band[16 * ART_CACHE_MAX_DIM];
     struct entry entries[];
 };
@@ -267,6 +269,7 @@ static bool open_block(bool lists)
         return false;
     }
     block = core_get_data(handle);
+    block->art_jpeg_of[0] = '\0';
     capacity = n;
 
     /* Not on the broadcast list, so it has no USB connection to answer */
@@ -1611,7 +1614,15 @@ static void read_artwork(intptr_t request)
          * codec just as the new track starts */
         thread_set_priority(worker_id, priority);
 #endif
-        left = encode_cache(art_source.path);
+        /* An album's tracks share a thumbnail, and on the 5G encoding it
+         * takes seconds, so the car is sent the last one again */
+        if (strcmp(art_source.path, block->art_jpeg_of))
+        {
+            block->art_jpeg_len = encode_cache(art_source.path);
+            strlcpy(block->art_jpeg_of, art_source.path,
+                    sizeof(block->art_jpeg_of));
+        }
+        left = block->art_jpeg_len;
         /* Unreadable, or too busy even at 60: the image itself, if any */
         if (!left &&
             (!albumart_find_source(&art_track, AA_PREFER_EMBEDDED, true,
@@ -1666,9 +1677,11 @@ static void read_artwork(intptr_t request)
     art.reading = false;
 }
 
+/* Trap: a car's pick starts its first track while the worker is still
+ * building the queue; the find waits behind that rather than giving up. */
 bool iap_library_artwork_find(const struct mp3entry *id3)
 {
-    if (art.reading || building || !open_block(false))
+    if (art.reading || !open_block(false))
         return false;
     copy_mp3entry(&art_track, id3);
     art.cancel = false;
