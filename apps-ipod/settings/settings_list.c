@@ -1853,11 +1853,15 @@ const struct settings_list settings[] = {
                   0, "album covers on select",
                   "show tracks,play album", NULL, 2,
                   ID2P(LANG_SHOW_TRACKS), ID2P(LANG_PLAY_ALBUM)),
+    /* The same choices as database_sort_albums_by below, in the same order. */
     CHOICE_SETTING(0, album_covers_sort_albums_by, LANG_SORT_ALBUMS_BY,
-                  0, "album covers sort albums by",
-                  "artist+name,artist+year,year,name", NULL, 4,
-                  ID2P(LANG_ARTIST_PLUS_NAME), ID2P(LANG_ARTIST_PLUS_YEAR),
-                  ID2P(LANG_ID3_YEAR), ID2P(LANG_NAME)),
+                  3, "album covers sort albums by",
+                  "name,year,year descending,"
+                  "artist+name,artist+year,artist+year descending", NULL, 6,
+                  ID2P(LANG_NAME), ID2P(LANG_SORT_BY_YEAR_ASC),
+                  ID2P(LANG_SORT_BY_YEAR_DESC), ID2P(LANG_ARTIST_PLUS_NAME),
+                  ID2P(LANG_ARTIST_PLUS_YEAR),
+                  ID2P(LANG_ARTIST_PLUS_YEAR_DESC)),
     /* Which Music menu rows are turned off, and the row set that was chosen
      * against. Never shown as settings themselves -- the screen in
      * screens/music_menu_config.c is the UI -- so the lang ids here are only
@@ -1881,25 +1885,32 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_BANFROMQS, trim_titles, LANG_TRIM_TITLES, false,
                   "trim titles", trim_titles_callback),
     /* The database browser's own album ordering. Separate from the carousel's
-     * above: that one groups by artist as well, which a browser list has
-     * already done by navigation. */
+     * above, which has the same choices. */
     CHOICE_SETTING(0, database_sort_albums_by, LANG_OTHER_LISTS,
                   0, "database sort albums by",
-                  "name,year,year descending", NULL, 3,
+                  "name,year,year descending,"
+                  "artist+name,artist+year,artist+year descending", NULL, 6,
                   ID2P(LANG_NAME), ID2P(LANG_SORT_BY_YEAR_ASC),
-                  ID2P(LANG_SORT_BY_YEAR_DESC)),
-    /* The per-context overrides of the line above, two bits each. Never shown
-     * as a setting itself -- the rows in general_settings.c are the UI -- so
-     * the lang id here is only there because the table wants one. */
+                  ID2P(LANG_SORT_BY_YEAR_DESC), ID2P(LANG_ARTIST_PLUS_NAME),
+                  ID2P(LANG_ARTIST_PLUS_YEAR),
+                  ID2P(LANG_ARTIST_PLUS_YEAR_DESC)),
+    /* The per-context overrides of the line above, three bits each (see
+     * browser_db.c). Never shown as a setting itself -- the rows in
+     * general_settings.c are the UI -- so the lang id here is only there
+     * because the table wants one. */
     INT_SETTING(F_BANFROMQS, database_album_sort_ctx, LANG_SORT_ALBUMS_BY, 0,
-                "database album sort contexts", UNIT_INT, 0, 0xff, 1,
+                "database album sort contexts", UNIT_INT, 0, 0xfff, 1,
                 NULL, NULL, NULL),
     OFFON_SETTING(0, sort_ignore_articles, LANG_SORT_IGNORE_ARTICLES, false,
                   "sort ignoring articles", NULL),
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
-    CHOICE_SETTING(0, album_covers_year_sort_order, LANG_YEAR_SORT_ORDER,
+    /* No longer shown: its descending half is now part of the sort list above.
+     * Read only so that settings_load() can carry a saved "descending" into
+     * that list; nothing else consults it. */
+    CHOICE_SETTING(F_BANFROMQS, album_covers_year_sort_order,
+                  LANG_YEAR_SORT_ORDER,
                   0, "album covers year sort order", "ascending,descending",
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
     OFFON_SETTING(F_THEMESETTING, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,

@@ -643,8 +643,10 @@ It replaces the year in the Music lists, album sorting and the carousel; the
 now playing screen still shows the tag. Takes effect at the next rebuild.
 
 [database sort albums by]
-The order for every album list that has no row of its own under Album Sort
-Order: by name, or by release year with either end first.
+The order for every album list that has no row of its own under Sort Albums By:
+by name, by release year with either end first, or by album artist and then
+name or year. Year and artist orders stay in name order after new music is
+added, until the album index has caught up with it.
 
 The four rows above it override this for the lists they name, so this is what
 the rest of the Music menu follows.
@@ -801,13 +803,11 @@ later. The captions turn black or white to read on it.
 Draws the status bar over the carousel. Off gives the covers the whole screen.
 
 [album covers sort albums by]
-The order covers appear in: by artist, by year, or by album name.
+The order covers appear in: by album name, by release year with either end
+first, or by album artist and then name or year.
 
 [album covers sort artists by]
 The order artist portraits appear in: by name, or most played first.
-
-[album covers year sort order]
-Whether sorting by year puts the oldest or the newest first.
 
 [album covers view mode]
 3D angles the covers away on both sides. Flat lays them face-on and the same

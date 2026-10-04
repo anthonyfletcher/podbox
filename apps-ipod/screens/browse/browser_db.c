@@ -1781,36 +1781,70 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
     return 0;
 }
 
-/* Ordering an album list by year
+/* Ordering an album list by year or by artist
  *
- * The sort compares the row's display name, so the year has to be *in* that
- * name: four zero-padded digits ahead of it, stripped again after the sort by
- * the same pass that strips a %format's own sort prefix. That is how every
- * ordered list here works -- qsort swaps whole entries, so a year held
- * alongside would have to be swapped in step with them.
+ * The sort compares the row's display name, so the key has to be *in* that
+ * name: zero-padded digits ahead of it, stripped again after the sort by the
+ * same pass that strips a %format's own sort prefix. That is how every ordered
+ * list here works -- qsort swaps whole entries, so a key held alongside would
+ * have to be swapped in step with them.
  *
- * The year cannot come from the database on this path. tagcache_get_numeric()
+ * Neither key can come from the database on this path. tagcache_get_numeric()
  * reads the row's index entry, and a unique tag's rows have none -- their
- * tagfile entries carry idx_id = -1. It comes from the summary index instead,
- * which also holds the better figure: the maximum across the album's tracks.
- */
-/* Four digits and a space. The space is load-bearing: the sort reads a run of
- * digits as one number, so without a non-digit between them an album named "21"
- * would extend its year into "200421" and sort after every album whose name
- * starts with a letter. Broken by the space, names order within a year exactly
- * as they do in the plain album list. */
-#define YEAR_PREFIX_LEN 5
+ * tagfile entries carry idx_id = -1. Both come from the summary index instead,
+ * which also holds the better year: the maximum across the album's tracks.
+ *
+ * Each field is digits and a space. The space is load-bearing: the sort reads a
+ * run of digits as one number, so without a non-digit after the last field an
+ * album named "21" would extend its year into "200421" and sort after every
+ * album whose name starts with a letter. Broken by the space, names order
+ * within a key exactly as they do in the plain album list. */
+#define YEAR_FIELD_LEN   5      /* "2004 " */
+#define ARTIST_FIELD_LEN 6      /* the artist's rank, "00042 " */
 /* Albums the summary has no year for -- one added since the last background
  * pass, or one whose tracks are untagged. Parked at the end together, and a
  * value that reads as "unknown" rather than one that hides among real years if
  * it is ever seen on screen. */
 #define YEAR_UNKNOWN    9999
 
-static void write_year_prefix(char *dst, const struct db_summary_year *tab,
-                              int count, long seek)
+/* How many characters the order prepends, 0 for none. */
+static int order_prefix_len(int order)
+{
+    switch (order)
+    {
+        case DB_SORT_ALBUMS_YEAR:
+        case DB_SORT_ALBUMS_YEAR_DESC:
+            return YEAR_FIELD_LEN;
+        case DB_SORT_ALBUMS_ARTIST_NAME:
+            return ARTIST_FIELD_LEN;
+        case DB_SORT_ALBUMS_ARTIST_YEAR:
+        case DB_SORT_ALBUMS_ARTIST_YEAR_DESC:
+            return ARTIST_FIELD_LEN + YEAR_FIELD_LEN;
+        default:
+            return 0;
+    }
+}
+
+/* 'len' - 1 digits of 'value' and a space. Written a character at a time
+ * rather than with snprintf, which would put a terminator where the album name
+ * goes. */
+static char *write_field(char *dst, int value, int len)
+{
+    for (int i = len - 2; i >= 0; i--)
+    {
+        dst[i] = '0' + value % 10;
+        value /= 10;
+    }
+    dst[len - 1] = ' ';
+    return dst + len;
+}
+
+static void write_order_prefix(char *dst, const struct db_summary_order *tab,
+                               int count, long seek, int order)
 {
     int lo = 0, hi = count - 1;
     int year = YEAR_UNKNOWN;
+    int artist = DB_SUMMARY_NO_ARTIST;
 
     while (lo <= hi)
     {
@@ -1819,6 +1853,7 @@ static void write_year_prefix(char *dst, const struct db_summary_year *tab,
         if (tab[mid].seek == seek)
         {
             year = tab[mid].year;
+            artist = tab[mid].artist;
             break;
         }
         if (tab[mid].seek < seek)
@@ -1830,13 +1865,16 @@ static void write_year_prefix(char *dst, const struct db_summary_year *tab,
     if (year <= 0 || year > 9999)
         year = YEAR_UNKNOWN;
 
-    /* Written a digit at a time rather than with snprintf, which would put a
-     * terminator on the fifth byte -- where the album name goes. */
-    dst[0] = '0' + (year / 1000) % 10;
-    dst[1] = '0' + (year / 100) % 10;
-    dst[2] = '0' + (year / 10) % 10;
-    dst[3] = '0' + year % 10;
-    dst[4] = ' ';
+    if (order >= DB_SORT_ALBUMS_ARTIST_NAME)
+        dst = write_field(dst, artist, ARTIST_FIELD_LEN);
+
+    /* Newest first under an artist is written reversed rather than sorted
+     * inverse, which would reverse the artists and the names as well. */
+    if (order == DB_SORT_ALBUMS_ARTIST_YEAR_DESC && year != YEAR_UNKNOWN)
+        year = YEAR_UNKNOWN - year;
+
+    if (order != DB_SORT_ALBUMS_ARTIST_NAME)
+        write_field(dst, year, YEAR_FIELD_LEN);
 }
 
 static struct tagentry* get_entries(struct browser_context *tc)
@@ -1857,18 +1895,23 @@ static void tcs_get_basename(struct tagcache_search *tcs, bool is_basename)
     }
 }
 
-/* Two bits per context, holding the order plus one so that 0 is free to mean
- * "nothing chosen here". Eight bits used of the setting's range. */
+/* Three bits per context, holding the order plus one so that 0 is free to mean
+ * "nothing chosen here". The low two bits sit at ctx * 2 and the third at
+ * 8 + ctx, which leaves a value saved with two bits per context reading the
+ * same. Twelve bits used of the setting's range. */
 #define ALBUM_SORT_SHIFT(ctx)   ((ctx) * 2)
+#define ALBUM_SORT_HIGH(ctx)    (8 + (ctx))
 
 int browser_db_album_sort_get(int ctx)
 {
+    int packed = global_settings.database_album_sort_ctx;
     int slot;
 
     if (ctx < 0 || ctx >= DB_ALBUM_CTX_COUNT)
         return -1;
 
-    slot = (global_settings.database_album_sort_ctx >> ALBUM_SORT_SHIFT(ctx)) & 3;
+    slot = ((packed >> ALBUM_SORT_SHIFT(ctx)) & 3)
+         | (((packed >> ALBUM_SORT_HIGH(ctx)) & 1) << 2);
     return slot ? slot - 1 : -1;
 }
 
@@ -1879,9 +1922,15 @@ void browser_db_album_sort_set(int ctx, int order)
     if (ctx < 0 || ctx >= DB_ALBUM_CTX_COUNT)
         return;
 
-    packed = global_settings.database_album_sort_ctx & ~(3 << ALBUM_SORT_SHIFT(ctx));
+    packed = global_settings.database_album_sort_ctx
+           & ~(3 << ALBUM_SORT_SHIFT(ctx)) & ~(1 << ALBUM_SORT_HIGH(ctx));
     if (order >= 0)
-        packed |= ((order + 1) & 3) << ALBUM_SORT_SHIFT(ctx);
+    {
+        int slot = (order + 1) & 7;
+
+        packed |= (slot & 3) << ALBUM_SORT_SHIFT(ctx);
+        packed |= (slot >> 2) << ALBUM_SORT_HIGH(ctx);
+    }
     global_settings.database_album_sort_ctx = packed;
 }
 
@@ -2127,9 +2176,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     bool is_basename = false;
     int sort_limit;
     int strip;
-    struct db_summary_year *year_tab = NULL;
-    int year_count = 0;
-    int year_prefix = 0;   /* characters this level prepends for the sort */
+    struct db_summary_order *order_tab = NULL;
+    int order_count = 0;
+    int order_prefix = 0;  /* characters this level prepends for the sort */
 
     if (c->currtable == TABLE_ALLSUBENTRIES || c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
     {
@@ -2275,31 +2324,32 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         articles_only = true;
     }
 
-    /* Album lists ordered by year rather than name; see write_year_prefix().
-     * The order is per context, so Artist's albums can run by year while the
-     * root Albums list runs by name. The table is refused outright when the
-     * saved index predates the current database commit, because its seeks would
-     * then match the wrong albums -- so a stale index leaves the list in name
-     * order rather than a wrong one. */
+    /* Album lists ordered by year or artist rather than name; see
+     * write_order_prefix(). The order is per context, so Artist's albums can
+     * run by year while the root Albums list runs by name. The table is refused
+     * outright when the saved index predates the current database commit,
+     * because its seeks would then match the wrong albums -- so a stale index
+     * leaves the list in name order rather than a wrong one. */
     int album_order = tag == tag_album ? album_sort_order(level)
                                        : DB_SORT_ALBUMS_NAME;
     if (album_order != DB_SORT_ALBUMS_NAME)
     {
-        size_t ytab_sz;
+        size_t otab_sz;
 
-        year_tab = app_get_buffer(&ytab_sz, "album year sort");
-        year_count = db_summary_read_year_table(year_tab,
-                                                ytab_sz / sizeof(*year_tab));
-        if (year_count > 0)
+        order_tab = app_get_buffer(&otab_sz, "album sort");
+        order_count = db_summary_read_order_table(order_tab,
+                                    otab_sz / sizeof(*order_tab),
+                                    global_settings.sort_ignore_articles);
+        if (order_count > 0)
         {
-            year_prefix = YEAR_PREFIX_LEN;
-            strip = YEAR_PREFIX_LEN;
+            order_prefix = order_prefix_len(album_order);
+            strip = order_prefix;
             sort = true;
             articles_only = false;
             sort_inverse = (album_order == DB_SORT_ALBUMS_YEAR_DESC);
         }
         else
-            year_tab = NULL;
+            order_tab = NULL;
     }
 
     /* lock buflib out due to possible yields */
@@ -2504,10 +2554,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             tcs.ramresult = true;
         }
 
-        /* year_prefix forces the copy: the branch below that skips it points
+        /* order_prefix forces the copy: the branch below that skips it points
          * dptr->name straight at shared memory, which has no room for a prefix
-         * and which the strip pass would then walk four characters into. */
-        if (!tcs.ramresult || fmt || year_prefix)
+         * and which the strip pass would then walk past the name's start. */
+        if (!tcs.ramresult || fmt || order_prefix)
         {
 
             dptr->name = core_get_data(c->cache.name_buffer_handle)+namebufused;
@@ -2548,7 +2598,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             else
             {
                 tcs_get_basename(&tcs, is_basename);
-                namebufused += tcs.result_len + year_prefix;
+                namebufused += tcs.result_len + order_prefix;
                 bool buffer_full = (namebufused >= c->cache.name_buffer_size);
                 if (!buffer_full)
                 {
@@ -2558,10 +2608,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                         namebufused += strlen(dptr->album_name)+1;
                     else
                         dptr->album_name = NULL;
-                    if (year_prefix)
-                        write_year_prefix(dptr->name, year_tab, year_count,
-                                          tcs.result_seek);
-                    strcpy(dptr->name + year_prefix, tcs.result);
+                    if (order_prefix)
+                        write_order_prefix(dptr->name, order_tab, order_count,
+                                           tcs.result_seek, album_order);
+                    strcpy(dptr->name + order_prefix, tcs.result);
                 }
                 else
                 {
@@ -2602,8 +2652,8 @@ entry_skip_formatter:
             qsort_fn = sort_inverse ? strncasecmp_inv : strncasecmp;
 
         sort_prefix = -1;
-        if (tagcache_tag_skips_articles(tag) && strip == year_prefix)
-            sort_prefix = year_prefix;
+        if (tagcache_tag_skips_articles(tag) && strip == order_prefix)
+            sort_prefix = order_prefix;
         sort_prefix_inverse = sort_inverse;
 
         struct tagentry *entries = get_entries(c);

@@ -202,6 +202,14 @@ static const char* get_slide_name(const int slide_index, bool artist)
     return tagcache_sort_name(get_album_name(slide_index));
 }
 
+/* Whether the slides run in year order alone, which is what the jumps step
+ * through instead of initials. */
+static bool sorted_by_year(void)
+{
+    return global_settings.album_covers_sort_albums_by == SORT_BY_YEAR
+        || global_settings.album_covers_sort_albums_by == SORT_BY_YEAR_DESC;
+}
+
 static int jmp_idx_prev(void)
 {
     /* Step back to the first slide of a run.
@@ -215,7 +223,7 @@ static int jmp_idx_prev(void)
      * Upstream (pictureflow) writes this as a `for` loop whose body always
      * returns, i.e. a disguised `if`. Unwound here, and in artist_jump_prev(),
      * which is the same walk over the artist list. */
-    if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
+    if (sorted_by_year())
     {
         int current_year = carousel_idx.album_index[center_index].year;
         int i = center_index - 1;
@@ -252,7 +260,7 @@ static int jmp_idx_prev(void)
 
 static int jmp_idx_next(void)
 {
-    if (global_settings.album_covers_sort_albums_by == SORT_BY_YEAR)
+    if (sorted_by_year())
     {
         int current_year = carousel_idx.album_index[center_index].year;
         for (int i = center_index + 1; i < carousel_idx.album_ct; i++ )
@@ -424,21 +432,19 @@ static int compare_albums(const void *a_v, const void *b_v)
             break;
         case SORT_BY_ARTIST_AND_YEAR:
             if (artist_a - artist_b == 0)
-            {
-                if (global_settings.album_covers_year_sort_order == ASCENDING)
-                    return year_a - year_b;
-                else
-                    return year_b - year_a;
-            }
+                return year_a - year_b;
+            break;
+        case SORT_BY_ARTIST_AND_YEAR_DESC:
+            if (artist_a - artist_b == 0)
+                return year_b - year_a;
             break;
         case SORT_BY_YEAR:
             if (year_a - year_b != 0)
-            {
-                if (global_settings.album_covers_year_sort_order == ASCENDING)
-                    return year_a - year_b;
-                else
-                    return year_b - year_a;
-            }
+                return year_a - year_b;
+            break;
+        case SORT_BY_YEAR_DESC:
+            if (year_a - year_b != 0)
+                return year_b - year_a;
             break;
         case SORT_BY_NAME:
             if (album_a - album_b != 0)
@@ -520,10 +526,12 @@ static bool sort_albums(int new_sorting, bool from_settings)
 {
     unsigned int hash_album, hash_artist;
     static const char* sort_options[] = {
+        ID2P(LANG_NAME),
+        ID2P(LANG_SORT_BY_YEAR_ASC),
+        ID2P(LANG_SORT_BY_YEAR_DESC),
         ID2P(LANG_ARTIST_PLUS_NAME),
         ID2P(LANG_ARTIST_PLUS_YEAR),
-        ID2P(LANG_ID3_YEAR),
-        ID2P(LANG_NAME)
+        ID2P(LANG_ARTIST_PLUS_YEAR_DESC)
     };
 
     carousel_settle();
@@ -760,7 +768,6 @@ static int album_on_menu(void)
 {
     /* Snapshot the settings whose change needs more than a cheap layout redraw. */
     int old_sort       = global_settings.album_covers_sort_albums_by;
-    int old_year_order = global_settings.album_covers_year_sort_order;
     int old_show_name  = global_settings.album_covers_show_album_name;
     int old_cache_ver  = pf_cfg.cache_version;
     bool old_statusbar = global_settings.album_covers_statusbar;
@@ -788,8 +795,7 @@ static int album_on_menu(void)
 
     /* A sort-order change must be applied explicitly: reinit()'s normal path
      * reloads the cached index in its saved order, so it wouldn't re-sort. */
-    if (global_settings.album_covers_sort_albums_by != old_sort
-        || global_settings.album_covers_year_sort_order != old_year_order)
+    if (global_settings.album_covers_sort_albums_by != old_sort)
         sort_albums(global_settings.album_covers_sort_albums_by, true);
 
     /* A treatment reaches a slide only as it is loaded, so the ones already

@@ -101,6 +101,7 @@ static long lasttime = 0;
 #include "dsp_proc_settings.h"
 #include "audio/playback.h"
 #include "screens/browse/browser.h"    /* browser_albumart_invalidate */
+#include "screens/covers/album_covers.h" /* the year sort carry-over */
 #include "pcm_sampr.h"
 
 #ifdef LOGF_ENABLE
@@ -218,6 +219,23 @@ static bool settings_crc_changed(void)
 
 static bool settings_write_config(const char* filename, int options);
 
+/* The carousel's Year Sort Order is now the descending half of its sort list.
+ * A saved "descending" moves into that list and the old setting returns to its
+ * default, so this happens once. */
+static void carry_year_sort_order(void)
+{
+    int *sort = &global_settings.album_covers_sort_albums_by;
+
+    if (global_settings.album_covers_year_sort_order != DESCENDING)
+        return;
+
+    if (*sort == SORT_BY_YEAR)
+        *sort = SORT_BY_YEAR_DESC;
+    else if (*sort == SORT_BY_ARTIST_AND_YEAR)
+        *sort = SORT_BY_ARTIST_AND_YEAR_DESC;
+    global_settings.album_covers_year_sort_order = ASCENDING;
+}
+
 /*
  * load settings from disk
  */
@@ -254,6 +272,9 @@ void settings_load(void)
 
     /* set initial CRC value - settings_save checks, if changed writes to disk */
     settings_crc_changed();
+
+    /* After the CRC, so the next save writes the result out. */
+    carry_year_sort_order();
 }
 
 bool cfg_string_to_int(const struct settings_list *setting, int* out, const char* str)

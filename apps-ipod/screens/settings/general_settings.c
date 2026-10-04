@@ -970,6 +970,9 @@ static int album_sort_ctx_option(void *param)
         { STR(LANG_NAME) },
         { STR(LANG_SORT_BY_YEAR_ASC) },
         { STR(LANG_SORT_BY_YEAR_DESC) },
+        { STR(LANG_ARTIST_PLUS_NAME) },
+        { STR(LANG_ARTIST_PLUS_YEAR) },
+        { STR(LANG_ARTIST_PLUS_YEAR_DESC) },
     };
     int ctx = (int)(intptr_t)param;
     int choice = browser_db_album_sort_get(ctx) + 1;

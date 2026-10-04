@@ -31,12 +31,15 @@ enum on_album_select_values {
     ON_SELECT_PLAY_ALBUM
 };
 
-/* Values for global_settings.album_covers_sort_albums_by */
+/* Values for global_settings.album_covers_sort_albums_by: the database
+ * browser's DB_SORT_ALBUMS_* choices, in the same order. */
 enum sort_albums_by_values {
-    SORT_BY_ARTIST_AND_NAME = 0,
-    SORT_BY_ARTIST_AND_YEAR,
+    SORT_BY_NAME = 0,
     SORT_BY_YEAR,
-    SORT_BY_NAME,
+    SORT_BY_YEAR_DESC,
+    SORT_BY_ARTIST_AND_NAME,
+    SORT_BY_ARTIST_AND_YEAR,
+    SORT_BY_ARTIST_AND_YEAR_DESC,
 
     SORT_VALUES_SIZE
 };
@@ -50,7 +53,8 @@ enum sort_artists_by_values {
     SORT_ARTISTS_BY_PLAYS,
 };
 
-/* Values for global_settings.album_covers_year_sort_order */
+/* Values for global_settings.album_covers_year_sort_order, which is read only
+ * to carry an old "descending" into the sort list above. */
 enum year_sort_order_values {
     ASCENDING = 0,
     DESCENDING

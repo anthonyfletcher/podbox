@@ -740,10 +740,10 @@ struct user_settings
     int  music_menu_hidden;
     int  music_menu_sig;
     /* DB_SORT_ALBUMS_*: how the database browser orders its album lists. The
-     * year comes from the summary index, not the database, so this is separate
-     * from the carousel's own sort. */
+     * year and artist come from the summary index, not the database. Separate
+     * from the carousel's own sort, which offers the same choices. */
     int  database_sort_albums_by;
-    /* Per-context overrides of the line above: two bits for each
+    /* Per-context overrides of the line above: three bits for each
      * DB_ALBUM_CTX_*, holding DB_SORT_ALBUMS_* + 1, or 0 for "follow
      * database_sort_albums_by". A context is the level an album list hangs
      * under, so Artist and Album Artist can order their albums differently

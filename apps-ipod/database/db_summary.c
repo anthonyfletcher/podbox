@@ -2289,15 +2289,42 @@ bool db_summary_read_album(struct db_summary_reader *r, int n,
         && read(r->fd, out, sizeof(*out)) == (ssize_t)sizeof(*out);
 }
 
-static int compare_year_seek(const void *a_v, const void *b_v)
+static int compare_order_seek(const void *a_v, const void *b_v)
 {
-    const struct db_summary_year *a = a_v;
-    const struct db_summary_year *b = b_v;
+    const struct db_summary_order *a = a_v;
+    const struct db_summary_order *b = b_v;
 
     return (a->seek > b->seek) - (a->seek < b->seek);
 }
 
-int db_summary_read_year_table(struct db_summary_year *out, int max)
+/* The artist blob compare_order_artist() reads names from, or NULL to order by
+ * offset alone -- the blob is already in name order, so that is enough when
+ * articles count. */
+static const char *order_names;
+static int order_names_len;
+
+/* Ahead of the ranking, .artist holds the album's artist_idx: an offset into
+ * the artist blob, -1 for none, which sorts last. */
+static int compare_order_artist(const void *a_v, const void *b_v)
+{
+    int a = ((const struct db_summary_order *)a_v)->artist;
+    int b = ((const struct db_summary_order *)b_v)->artist;
+
+    if (a < 0 || b < 0)
+        return (a < 0) - (b < 0);
+
+    if (order_names && a != b && a < order_names_len && b < order_names_len)
+    {
+        int res = strcasecmp(tagcache_sort_name(order_names + a),
+                             tagcache_sort_name(order_names + b));
+        if (res != 0)
+            return res;
+    }
+    return (a > b) - (a < b);
+}
+
+int db_summary_read_order_table(struct db_summary_order *out, int max,
+                                bool ignore_articles)
 {
     struct db_summary_t data;
     struct tagcache_marks marks;
@@ -2305,7 +2332,7 @@ int db_summary_read_year_table(struct db_summary_year *out, int max)
     off_t at;
     int fd;
     int ret;
-    int n;
+    int n, rank;
 
     ret = wait_for_background();
     if (ret != SUCCESS)
@@ -2343,9 +2370,43 @@ int db_summary_read_year_table(struct db_summary_year *out, int max)
             goto done;
         out[n].seek = rec.seek;
         out[n].year = rec.year;
+        out[n].artist = rec.artist_idx;
     }
 
-    qsort(out, n, sizeof(*out), compare_year_seek);
+    /* The names are needed only to step past articles, and go in the space
+     * the table does not use. Without room for them artists keep the
+     * database's order, articles and all. */
+    order_names = NULL;
+    if (ignore_articles
+        && (size_t)data.artist_len <= (size_t)(max - n) * sizeof(*out)
+        && lseek(fd, sizeof(data), SEEK_SET) == (off_t)sizeof(data)
+        && read(fd, &out[n], data.artist_len) == (ssize_t)data.artist_len)
+    {
+        order_names = (const char *)&out[n];
+        order_names_len = data.artist_len;
+    }
+
+    qsort(out, n, sizeof(*out), compare_order_artist);
+    order_names = NULL;
+
+    /* Equal artists are adjacent now and share a rank. */
+    rank = -1;
+    for (int i = 0, prev = -1; i < n; i++)
+    {
+        int offset = out[i].artist;
+
+        if (offset < 0)
+        {
+            out[i].artist = DB_SUMMARY_NO_ARTIST;
+            continue;
+        }
+        if (rank < 0 || offset != prev)
+            rank++;
+        prev = offset;
+        out[i].artist = MIN(rank, DB_SUMMARY_NO_ARTIST - 1);
+    }
+
+    qsort(out, n, sizeof(*out), compare_order_seek);
     ret = n;
 
 done:

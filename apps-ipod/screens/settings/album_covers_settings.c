@@ -65,7 +65,6 @@ MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_sho
 MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
 MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, NULL);
 MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
-MENUITEM_SETTING(album_covers_year_sort_order, &global_settings.album_covers_year_sort_order, NULL);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
 /* Custom needs a colour, so moving to it opens the picker, and the Custom
  * Colour row under it, shown only then, changes the colour afterwards. */
@@ -181,7 +180,6 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_background,
             &album_covers_custom_color_item,
             &album_covers_statusbar,
-            &album_covers_year_sort_order,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,
             &album_covers_view_mode,

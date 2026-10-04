@@ -15791,16 +15791,16 @@
 </phrase>
 <phrase>
   id: LANG_ARTIST_PLUS_YEAR
-  desc: in Settings
+  desc: "Sort Albums By" option: by artist, then release year, oldest first
   user: core
   <source>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </source>
   <dest>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </dest>
   <voice>
-    *: "Artist and Year"
+    *: "Artist and Year, oldest first"
   </voice>
 </phrase>
 <phrase>
@@ -19084,7 +19084,7 @@
 </phrase>
 <phrase>
   id: LANG_SORT_BY_YEAR_ASC
-  desc: database browser "Sort Albums By" option: release year, oldest first
+  desc: "Sort Albums By" option: release year, oldest first
   user: core
   <source>
     *: "Year (oldest first)"
@@ -19098,7 +19098,7 @@
 </phrase>
 <phrase>
   id: LANG_SORT_BY_YEAR_DESC
-  desc: database browser "Sort Albums By" option: release year, newest first
+  desc: "Sort Albums By" option: release year, newest first
   user: core
   <source>
     *: "Year (newest first)"
@@ -22727,5 +22727,19 @@
   </dest>
   <voice>
     *: "i A P 2 Accessories"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PLUS_YEAR_DESC
+  desc: "Sort Albums By" option: by artist, then release year, newest first
+  user: core
+  <source>
+    *: "Artist + Year (newest first)"
+  </source>
+  <dest>
+    *: "Artist + Year (newest first)"
+  </dest>
+  <voice>
+    *: "Artist and Year, newest first"
   </voice>
 </phrase>

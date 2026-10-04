@@ -23,6 +23,9 @@ enum database_sort_albums {
     DB_SORT_ALBUMS_NAME = 0,
     DB_SORT_ALBUMS_YEAR,
     DB_SORT_ALBUMS_YEAR_DESC,
+    DB_SORT_ALBUMS_ARTIST_NAME,
+    DB_SORT_ALBUMS_ARTIST_YEAR,
+    DB_SORT_ALBUMS_ARTIST_YEAR_DESC,
 };
 
 /* The parent an album list hangs under, which is what decides its order.

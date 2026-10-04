@@ -168,26 +168,33 @@ void db_summary_reader_close(struct db_summary_reader *r);
 bool db_summary_read_album(struct db_summary_reader *r, int n,
                            struct album_data *out);
 
-/* One album's release year, against the taglist position the database browser
- * knows it by. */
-struct db_summary_year {
+/* What an album list is ordered by, against the taglist position the database
+ * browser knows each album by. */
+struct db_summary_order {
     long seek;
     int  year;
+    /* The album artist's place in name order, counting from 0; equal for two
+     * albums by the same artist. DB_SUMMARY_NO_ARTIST for an album with none. */
+    int  artist;
 };
+#define DB_SUMMARY_NO_ARTIST 99999
 
-/* Fill 'out' with every album's pair, sorted by seek so the caller can binary
+/* Fill 'out' with every album's entry, sorted by seek so the caller can binary
  * search it. Returns how many were written, or a negative ERROR_*.
+ * 'ignore_articles' places artists as Sort Ignoring Articles does.
  *
- * For sorting album lists by year. The browser cannot read the year from the
- * database itself -- a unique tag's rows carry no index entry for a numeric
- * tag to be read from -- and the year here is the better one anyway: the
- * maximum across the album's tracks, which is what Album covers sorts on.
+ * For ordering album lists by year or by artist. The browser cannot read the
+ * year from the database itself -- a unique tag's rows carry no index entry for
+ * a numeric tag to be read from -- and the year here is the better one anyway:
+ * the maximum across the album's tracks, which is what Album covers sorts on.
+ * The artist is the album artist, also as Album covers has it.
  *
  * Refuses when the saved index predates the current database commit. A commit
  * that adds a track re-sorts the album tagfile and moves every seek in it, so a
  * stale table would join cleanly against the wrong albums and produce a
  * plausible, wrong order. Name order is the right answer in that case. */
-int db_summary_read_year_table(struct db_summary_year *out, int max);
+int db_summary_read_order_table(struct db_summary_order *out, int max,
+                                bool ignore_articles);
 
 /* Build only the artist half into 'target', from *buf, advancing it. The
  * artist carousel uses this on its own, without an album list. Serialises
