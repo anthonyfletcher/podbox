@@ -47,6 +47,7 @@
 #include "core_alloc.h"       /* buflib types for buf_ctx (see init()) */
 #include "database/tagcache.h"
 #include "database/db_summary.h"   /* the album/artist index, and playing one */
+#include "database/db_spoken.h"    /* whether the track playing is a book */
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
@@ -335,6 +336,11 @@ static int id3_get_index(struct mp3entry *id3)
 
         if (by_album >= 0)
             return by_album;
+
+        /* Segregate Audiobooks leaves books out of the index, so a book not
+         * being in it is expected and not worth a splash. */
+        if (db_spoken_is_spoken_genre(id3->genre_string))
+            return pf_cfg.last_album;
     }
 
     splash(HZ * 2, "Album not found");
