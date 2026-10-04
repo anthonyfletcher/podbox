@@ -788,25 +788,38 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
 
         case MP4_chpl:
             {
-                /* ADDME: add support for real chapters. Right now it's only
-                 * used for Nero's gapless hack */
+                /* Only Nero's gapless hack is read here, not a chapter
+                 * list. */
+                uint8_t version    = 0;
                 uint8_t chapters   = 0;
                 uint64_t timestamp = 0;
                 off_t chapter_pos = lseek(fd, 0, SEEK_CUR);
+                uint32_t rest;
 
-                /* size is unsigned: a box shorter than its own nine-byte
-                 * header wraps it, and the loop below then seeks by ~4GB.
-                 * Both reads have to be checked for the same reason. */
-                if (chapter_pos < 0 || size < 9
-                    || lseek(fd, 8, SEEK_CUR) != chapter_pos + 8
+                /* The count follows a version, three bytes of flags and,
+                 * when the version is not 0, a reserved word. size is
+                 * unsigned: a box shorter than its own header wraps it, and
+                 * the loop below then seeks by ~4GB. Every read has to be
+                 * checked for the same reason. */
+                if (chapter_pos < 0 || size < 1
+                    || read_uint8(fd, &version) != 1) {
+                    break;
+                }
+                size -= 1;
+                rest = version ? 8 : 4;     /* the flags to the count */
+                if (size < rest
+                    || lseek(fd, rest - 1, SEEK_CUR)
+                       != chapter_pos + (off_t)rest
                     || read_uint8(fd, &chapters) != 1) {
                     break;
                 }
-                size -= 9;
+                size -= rest;
 
-                /* the first chapter will be used as the lead_trim. A chapter
-                 * record is a timestamp and a length byte, so nine bytes. */
-                if (chapters > 0) {
+                /* A lone record is the encoder delay, used as the lead_trim.
+                 * More than one is a chapter list, whose first chapter can
+                 * start after 0:00 without any audio being trimmed. A record
+                 * is a timestamp and a length byte, so nine bytes. */
+                if (chapters == 1) {
                     if (size < 9 || read_uint64be(fd, &timestamp) != 8) {
                         break;
                     }
