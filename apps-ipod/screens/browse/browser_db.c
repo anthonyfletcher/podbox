@@ -340,6 +340,9 @@ static int rootmenu;
 
 static int current_offset;
 static int current_entry_count;
+/* The special rows atop the level loaded: <Random> and its kin. Counted
+ * whole, where special_entry_count counts only those on the loaded page. */
+static int head_rows;
 
 static struct browser_context *tc;
 
@@ -2486,6 +2489,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     }
 
     total_count += sidx;
+    head_rows = sidx;
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
@@ -3543,6 +3547,7 @@ int browser_db_load(struct browser_context* c)
     int table = c->currtable;
 
     c->dirsindir = 0;
+    head_rows = 0;
 
     if (!table)
     {
@@ -5151,6 +5156,63 @@ int browser_db_get_attr(struct browser_context* c)
     }
 
     return attr;
+}
+
+/* Row 'id' if the page holding it is loaded, else NULL. Unlike
+ * browser_db_get_entry() this never loads one: the skin asks of rows it is not
+ * drawing, and a page load is a database search. */
+static struct tagentry *loaded_entry(struct browser_context *c, int id)
+{
+    int realid = id - current_offset;
+
+    if (realid < 0 || realid >= current_entry_count)
+        return NULL;
+    return &get_entries(c)[realid];
+}
+
+enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id)
+{
+    struct tagentry *entry;
+
+    if (id < head_rows)
+        return LIST_ROW_COMMAND;
+
+    if (c->currtable != TABLE_ROOT)
+        return browser_db_get_attr(c) == FILE_ATTR_AUDIO ? LIST_ROW_TRACK
+                                                         : LIST_ROW_CONTAINER;
+
+    /* A menu row opens a list of its own; the rest play, jump or search. A
+     * row not loaded is taken for a menu, which most of them are. */
+    entry = loaded_entry(c, id);
+    if (!entry)
+        return LIST_ROW_MENU;
+    if (entry->customaction == ONPLAY_CUSTOMACTION_SHUFFLE_SONGS)
+        return LIST_ROW_ACTION;
+    switch (entry->newtable)
+    {
+        case TABLE_ROOT:
+        case TABLE_NAVIBROWSE:
+        case TABLE_ALBUM_CHARTS:
+        case TABLE_FEATURED_ARTISTS:
+            return LIST_ROW_MENU;
+        default:
+            return LIST_ROW_ACTION;
+    }
+}
+
+bool browser_db_entry_is_playing(struct browser_context *c, int id)
+{
+    struct mp3entry *id3;
+    struct tagentry *entry;
+
+    if (browser_db_get_entry_kind(c, id) != LIST_ROW_TRACK)
+        return false;
+    if (!(audio_status() & AUDIO_STATUS_PLAY)
+        || (id3 = audio_current_track()) == NULL || id3->tagcache_idx == 0)
+        return false;
+
+    entry = loaded_entry(c, id);
+    return entry && entry->idx_id + 1 == id3->tagcache_idx;
 }
 
 int browser_db_get_icon(struct browser_context* c)

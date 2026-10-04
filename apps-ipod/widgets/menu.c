@@ -177,6 +177,80 @@ static const char* get_menu_item_name(int selected_item,
     return P2STR(menu->callback_and_desc->desc);
 }
 
+/* The item a row stands for, as get_menu_item_name() resolves it. */
+static const struct menu_item_ex *menu_row_item(int selected_item,
+                                                const struct menu_item_ex *menu)
+{
+    if ((menu->flags&MENU_TYPE_MASK) == MT_MENU)
+        return menu->submenus[get_menu_selection(selected_item, menu)];
+    return menu;
+}
+
+/* The setting a row changes, or NULL for any other row. */
+static const struct settings_list *menu_row_setting(int selected_item,
+                                                    const struct menu_item_ex *menu)
+{
+    int type = (menu->flags&MENU_TYPE_MASK);
+
+    if (type == MT_RETURN_ID)
+        return NULL;
+    menu = menu_row_item(selected_item, menu);
+    type = (menu->flags&MENU_TYPE_MASK);
+    if (type != MT_SETTING && type != MT_SETTING_W_TEXT)
+        return NULL;
+    return find_setting(menu->variable);
+}
+
+static enum list_row_kind menu_get_kind(int selected_item, void * data)
+{
+    const struct menu_item_ex *menu = (const struct menu_item_ex *)data;
+    const struct settings_list *setting;
+
+    if ((menu->flags&MENU_TYPE_MASK) == MT_RETURN_ID)
+        return LIST_ROW_ACTION;
+
+    switch (menu_row_item(selected_item, menu)->flags&MENU_TYPE_MASK)
+    {
+        case MT_MENU:
+            return LIST_ROW_MENU;
+        case MT_SETTING:
+        case MT_SETTING_W_TEXT:
+            setting = menu_row_setting(selected_item, menu);
+            return setting && (setting->flags&F_T_MASK) == F_T_BOOL
+                   ? LIST_ROW_TOGGLE : LIST_ROW_SETTING;
+        default:
+            return LIST_ROW_ACTION;
+    }
+}
+
+/* A setting row's value as the setting's own screen words it. Only the
+ * types option_value_as_int() reads have one: a filename or a custom setting
+ * says nothing here. */
+static const char* menu_get_value(int selected_item, void * data,
+                                  char *buffer, size_t buffer_len)
+{
+    const struct settings_list *setting =
+        menu_row_setting(selected_item, (const struct menu_item_ex *)data);
+
+    if (!setting)
+        return NULL;
+    switch (setting->flags&F_T_MASK)
+    {
+        case F_T_BOOL:
+        case F_T_INT:
+        case F_T_UINT:
+            break;
+        default:
+            return NULL;
+    }
+
+    /* option_get_valuestring() leaves the buffer alone for a type it does
+     * not format. */
+    buffer[0] = '\0';
+    return option_get_valuestring(setting, buffer, buffer_len,
+                                  option_value_as_int(setting));
+}
+
 static enum themable_icons  menu_get_icon(int selected_item, void * data)
 {
     const struct menu_item_ex *menu = (const struct menu_item_ex *)data;
@@ -412,6 +486,7 @@ static int init_menu_lists(const struct menu_item_ex *menu,
     title = init_title(menu, &icon, buf, buf_sz);
     gui_synclist_set_title(lists, title, icon);
     gui_synclist_set_icon_callback(lists, global_settings.show_icons?menu_get_icon:NULL);
+    gui_synclist_set_row_callbacks(lists, menu_get_kind, menu_get_value, NULL);
     if(global_settings.talk_menu)
         gui_synclist_set_voice_callback(lists, talk_menu_item);
     gui_synclist_set_nb_items(lists,current_subitems_count);

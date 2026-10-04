@@ -88,6 +88,20 @@ static const char *guest_get_name(int n, void *data, char *buffer,
     return buffer;
 }
 
+static enum list_row_kind guest_get_kind(int n, void *data)
+{
+    (void)n;
+    (void)data;
+    return LIST_ROW_CONTAINER;
+}
+
+static enum list_row_kind track_get_kind(int n, void *data)
+{
+    (void)n;
+    (void)data;
+    return LIST_ROW_TRACK;
+}
+
 /* What the context action asked for, since a list callback can only end the
  * list and not say why. */
 static int pending_go_to;
@@ -277,6 +291,7 @@ static int run_track_list(const char *title)
 
     simplelist_info_init(&info, (char *)title, track_ct, NULL);
     info.get_name = track_get_name;
+    info.get_kind = track_get_kind;
     if (simplelist_show_list(&info))
         ret = GO_TO_ROOT;
 
@@ -342,6 +357,7 @@ int featured_artists_show(void)
     {
         simplelist_info_init(&info, str(LANG_FEATURED_ARTISTS), order_ct, NULL);
         info.get_name = guest_get_name;
+        info.get_kind = guest_get_kind;
         info.action_callback = guest_action_cb;
         info.selection = selection;
         if (simplelist_show_list(&info))

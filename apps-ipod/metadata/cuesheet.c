@@ -454,6 +454,16 @@ static const char* list_get_name_cb(int selected_item,
     return buffer;
 }
 
+/* Every row plays, except the Resume row above a book's chapters. */
+static enum list_row_kind list_get_kind_cb(int selected_item, void *data)
+{
+    struct cuesheet *cue = (struct cuesheet *)data;
+
+    if (cue->chapters && cue->resume_row && selected_item == 0)
+        return LIST_ROW_COMMAND;
+    return LIST_ROW_TRACK;
+}
+
 /* Voices a row: the track number, then the performer and the title, using
  * talk clips from the cuesheet's own directory where it has them. */
 static int cuesheet_list_voice_cb(int list_index, void *data)
@@ -530,6 +540,7 @@ enum cue_browse_result browse_cuesheet(struct cuesheet *cue)
     gui_synclist_init(&lists, list_get_name_cb, cue, false, rows, NULL);
     gui_synclist_set_nb_items(&lists, rows*cue->track_count + first);
     gui_synclist_set_title(&lists, title, 0);
+    gui_synclist_set_row_callbacks(&lists, list_get_kind_cb, NULL, NULL);
 
     if (global_settings.talk_menu)
         gui_synclist_set_voice_callback(&lists, cuesheet_list_voice_cb);

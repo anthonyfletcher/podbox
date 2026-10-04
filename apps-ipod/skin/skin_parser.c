@@ -2479,6 +2479,7 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_STRLEN:
                 case SKIN_TOKEN_STRFIND:
                 case SKIN_TOKEN_PAD:
+                case SKIN_TOKEN_TRIM:
                     function = parse_store_element;
                     break;
                 case SKIN_TOKEN_TEXT_BOX:
@@ -2505,6 +2506,10 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_LIST_ITEM_TEXT:
                 case SKIN_TOKEN_LIST_ITEM_ICON:
                 case SKIN_TOKEN_LIST_ITEM_ALBUMART:
+                case SKIN_TOKEN_LIST_ITEM_KIND:
+                case SKIN_TOKEN_LIST_ITEM_POSITION:
+                case SKIN_TOKEN_LIST_ITEM_VALUE:
+                case SKIN_TOKEN_LIST_ITEM_PLAYING:
                     function = parse_listitem;
                     break;
                 case SKIN_TOKEN_SPECTRUM_BARS:

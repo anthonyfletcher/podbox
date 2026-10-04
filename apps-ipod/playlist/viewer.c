@@ -850,6 +850,22 @@ static enum themable_icons playlist_callback_icons(int selected_item,
         return Icon_NOICON;
 }
 
+static enum list_row_kind playlist_callback_kind(int selected_item,
+                                                 void *data)
+{
+    (void)selected_item;
+    (void)data;
+    return LIST_ROW_TRACK;
+}
+
+static bool playlist_callback_playing(int selected_item, void *data)
+{
+    struct playlist_viewer *local_viewer = (struct playlist_viewer *)data;
+    struct playlist_entry *track = pv_get_track(local_viewer, selected_item);
+
+    return track->index == local_viewer->current_playing_track;
+}
+
 static int playlist_callback_voice(int selected_item, void *data)
 {
     struct playlist_viewer *local_viewer = (struct playlist_viewer *)data;
@@ -902,6 +918,8 @@ static void update_gui(struct gui_synclist * playlist_lists, bool init)
     gui_synclist_set_icon_callback(playlist_lists,
                   global_settings.playlist_viewer_icons?
                   &playlist_callback_icons:NULL);
+    gui_synclist_set_row_callbacks(playlist_lists, playlist_callback_kind,
+                                   NULL, playlist_callback_playing);
     gui_synclist_set_title(playlist_lists, viewer.title, Icon_Playlist);
     gui_synclist_select_item(playlist_lists, viewer.selected_track);
     /* init marks the passes that open the screen; the rest are redraws of a
@@ -1266,6 +1284,8 @@ bool search_playlist(void)
     gui_synclist_init(&playlist_lists, playlist_search_callback_name,
                       &s_data, false, 1, NULL);
     gui_synclist_set_title(&playlist_lists, str(LANG_SEARCH_RESULTS), NOICON);
+    gui_synclist_set_row_callbacks(&playlist_lists, playlist_callback_kind,
+                                   NULL, NULL);
     if(global_settings.talk_file)
         gui_synclist_set_voice_callback(&playlist_lists,
                                         global_settings.talk_file?

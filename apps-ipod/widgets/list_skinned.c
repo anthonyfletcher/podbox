@@ -138,6 +138,69 @@ enum themable_icons skinlist_get_item_icon(int offset, bool wrap)
     return current_list->callback_get_item_icon(item, current_list->data);
 }
 
+enum list_row_kind skinlist_get_item_kind(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+    if (item < 0 || !current_list || !current_list->callback_get_item_kind)
+        return LIST_ROW_PLAIN;
+    return current_list->callback_get_item_kind(item, current_list->data);
+}
+
+const char* skinlist_get_item_value(int offset, bool wrap,
+                                    char* buf, size_t buf_size)
+{
+    int item = offset_to_item(offset, wrap);
+    if (item < 0 || !current_list || !current_list->callback_get_item_value)
+        return NULL;
+    const char* ret = current_list->callback_get_item_value(
+                    item, current_list->data, buf, buf_size);
+    return ret ? P2STR((unsigned char*)ret) : NULL;
+}
+
+bool skinlist_item_is_playing(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+    if (item < 0 || !current_list || !current_list->callback_item_is_playing)
+        return false;
+    return current_list->callback_item_is_playing(item, current_list->data);
+}
+
+/* The tracks in rows [0, counted_to) of counted_list. Rows are drawn top to
+ * bottom, so each row's number carries on from the one above it, and only the
+ * first row drawn counts from the top of the list. */
+static struct gui_synclist *counted_list;
+static int counted_nb_items, counted_to = -1, counted;
+
+int skinlist_get_item_position(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+    list_get_kind *kind;
+    void *data;
+
+    if (item < 0 || !current_list || !current_list->callback_get_item_kind)
+        return -1;
+    kind = current_list->callback_get_item_kind;
+    data = current_list->data;
+    if (kind(item, data) != LIST_ROW_TRACK)
+        return -1;
+
+    if (counted_list != current_list
+        || counted_nb_items != current_list->nb_items
+        || counted_to < 0 || counted_to > item)
+    {
+        counted_list = current_list;
+        counted_nb_items = current_list->nb_items;
+        counted_to = 0;
+        counted = 0;
+    }
+    for (; counted_to < item; counted_to++)
+    {
+        if (kind(counted_to, data) == LIST_ROW_TRACK)
+            counted++;
+    }
+    return counted + 1;
+}
+
 const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
                                                 struct dim *size,
                                                 const struct img_filter *filter,
@@ -295,6 +358,7 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
         sb_set_title_text(list->title, list->title_icon, screen);
 
     current_list = list;
+    counted_to = -1;            /* the rows may not be the ones counted last */
     dynamic_colors_check_extraction(-1);
     wps.display = display;
     wps.data = listcfg[screen]->data;

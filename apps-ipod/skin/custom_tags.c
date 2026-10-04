@@ -105,6 +105,17 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_STRLEN,             "sl", "[ITS]",      0),
     TAG(SKIN_TOKEN_STRFIND,            "sf", "[ITS][ITS]", 0),
     TAG(SKIN_TOKEN_PAD,                "pd", "I[ITS]",     SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_TRIM,               "trm","[ITS]S",     SKIN_REFRESH_DYNAMIC),
+
+    /* What the row's list says of it, beyond the text and icon upstream's %LT
+     * and %LI give: its kind (enum list_row_kind -- values never change), its
+     * number among the list's tracks, a setting row's value, and whether it is
+     * playing. The arguments are %LT's: an offset to another row, and
+     * "nowrap". */
+    TAG(SKIN_TOKEN_LIST_ITEM_KIND,     "Lk", "|IS",        SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_LIST_ITEM_POSITION, "Lp", "|IS",        SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_LIST_ITEM_VALUE,    "Lv", "|IS",        SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_LIST_ITEM_PLAYING,  "LP", "|IS",        SKIN_REFRESH_DYNAMIC),
 
     /* %wt(text[,align]): draw text word-wrapped and aligned to fill the current
      * viewport, ellipsised on overflow. A drawing tag (renders directly like

@@ -279,6 +279,9 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     gui_list->title_color = -1;
     gui_list->callback_get_item_color = NULL;
     gui_list->selection_color = NULL;
+    gui_list->callback_get_item_kind = NULL;
+    gui_list->callback_get_item_value = NULL;
+    gui_list->callback_item_is_playing = NULL;
 }
 
 int gui_list_get_item_offset(struct gui_synclist * gui_list,
@@ -683,6 +686,16 @@ void gui_synclist_set_color_callback(struct gui_synclist * lists,
     lists->callback_get_item_color = color_callback;
 }
 
+void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
+                                    list_get_kind kind_callback,
+                                    list_get_name value_callback,
+                                    list_is_playing playing_callback)
+{
+    lists->callback_get_item_kind = kind_callback;
+    lists->callback_get_item_value = value_callback;
+    lists->callback_item_is_playing = playing_callback;
+}
+
 void gui_synclist_set_sel_color(struct gui_synclist * lists,
                                 struct list_selection_color *list_sel_color)
 {
@@ -1080,6 +1093,7 @@ bool simplelist_show_list(struct simplelist_info *info)
     gui_synclist_set_icon_callback(&lists, info->get_icon);
     gui_synclist_set_voice_callback(&lists, info->get_talk);
     gui_synclist_set_color_callback(&lists, info->get_color);
+    gui_synclist_set_row_callbacks(&lists, info->get_kind, NULL, NULL);
     if (info->selection_color)
         gui_synclist_set_sel_color(&lists, info->selection_color);
 
@@ -1197,6 +1211,7 @@ void simplelist_info_init(struct simplelist_info *info, char* title,
     info->get_name = NULL;
     info->get_talk = NULL;
     info->get_color = NULL;
+    info->get_kind = NULL;
     info->selection_color = NULL;
     info->callback_data = data;
     simplelist_line_count = 0;

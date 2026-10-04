@@ -374,6 +374,13 @@ static const char * value_setting_get_name_cb(int selected_item,
     return option_get_valuestring(data, buffer, buffer_len, selected_item);
 }
 
+static enum list_row_kind option_kind(int selected_item, void * data)
+{
+    (void)selected_item;
+    (void)data;
+    return LIST_ROW_OPTION;
+}
+
 /* wrapper to convert from int param to bool param in option_screen */
 static void (*boolfunction)(bool);
 static void bool_funcwrapper(int value)
@@ -500,6 +507,7 @@ bool option_screen(const struct settings_list *setting,
         title = P2STR(option_title);
 
     gui_synclist_set_title(&lists, title, Icon_Questionmark);
+    gui_synclist_set_row_callbacks(&lists, option_kind, NULL, NULL);
     if(global_settings.talk_menu)
         gui_synclist_set_voice_callback(&lists, option_talk);
 

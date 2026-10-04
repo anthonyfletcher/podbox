@@ -572,6 +572,14 @@ static const char *shelf_get_name(int n, void *data, char *buffer,
     return buffer;
 }
 
+/* A book, as it is in the database browser's list of books. */
+static enum list_row_kind shelf_get_kind(int n, void *data)
+{
+    (void)n;
+    (void)data;
+    return LIST_ROW_CONTAINER;
+}
+
 static int shelf_title(enum book_shelf which)
 {
     switch (which)
@@ -885,6 +893,7 @@ int book_shelf_run(void)
         simplelist_info_init(&info, str(shelf_title(shelf_kind)), row_ct,
                              NULL);
         info.get_name = shelf_get_name;
+        info.get_kind = shelf_get_kind;
         info.action_callback = shelf_action_cb;
         info.selection = MIN(selection, row_ct - 1);
 

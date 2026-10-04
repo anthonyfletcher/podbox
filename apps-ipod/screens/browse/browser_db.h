@@ -12,6 +12,7 @@
 #include "config.h"
 #include "database/tagcache.h"
 #include "browser.h"
+#include "widgets/list.h"               /* enum list_row_kind */
 
 #define TAGNAVI_VERSION    "#! rockbox/tagbrowser/2.0"
 #define TAGMENU_MAX_ITEMS  64
@@ -87,6 +88,9 @@ bool browser_db_get_album_dir(struct browser_context* c, int item,
 bool browser_db_get_artist_dir(struct browser_context* c, int item,
                             char *buf, int buflen);
 int browser_db_get_icon(struct browser_context* c);
+/* %Lk and %LP for row 'id' of the level on screen. */
+enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id);
+bool browser_db_entry_is_playing(struct browser_context *c, int id);
 
 /* What the selected row of the current browse names, for a caller that wants
  * to ask the database about it rather than browse into it. NONE for a track

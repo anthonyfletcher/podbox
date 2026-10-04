@@ -229,6 +229,51 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
     }
 }
 
+static enum list_row_kind browser_get_kind(int selected_item, void * data)
+{
+    struct browser_context * local_tc=(struct browser_context *)data;
+    struct entry *entry;
+    int masked;
+
+    if (*local_tc->dirfilter == SHOW_ID3DB)
+        return browser_db_get_entry_kind(&tc, selected_item);
+
+    entry = get_valid_entry(__func__, local_tc, selected_item);
+    masked = entry->attr & FILE_ATTR_MASK;
+    if (entry->attr & ATTR_DIRECTORY)
+        return LIST_ROW_CONTAINER;
+    if (file_attr_is_row(masked))
+        return LIST_ROW_COMMAND;
+    if (masked == FILE_ATTR_AUDIO)
+        return LIST_ROW_TRACK;
+    return LIST_ROW_FILE;
+}
+
+static bool browser_is_playing(int selected_item, void * data)
+{
+    struct browser_context * local_tc=(struct browser_context *)data;
+    struct mp3entry *id3;
+    struct entry *entry;
+    char path[MAX_PATH];
+    size_t len;
+
+    if (*local_tc->dirfilter == SHOW_ID3DB)
+        return browser_db_entry_is_playing(&tc, selected_item);
+
+    if (!(audio_status() & AUDIO_STATUS_PLAY)
+        || (id3 = audio_current_track()) == NULL)
+        return false;
+
+    entry = get_valid_entry(__func__, local_tc, selected_item);
+    if ((entry->attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
+        return false;
+
+    len = strlen(local_tc->currdir);
+    snprintf(path, sizeof(path), "%s%s%s", local_tc->currdir,
+             len && local_tc->currdir[len - 1] == '/' ? "" : "/", entry->name);
+    return strcmp(path, id3->path) == 0;
+}
+
 /* Album art for database album rows, drawn by the skin's %La tag.
  *
  * Resolving one row costs a tagcache search (browser_db_get_album_dir) plus a file
@@ -775,6 +820,8 @@ static int update_dir(void)
     gui_synclist_set_nb_items(list, tc.filesindir);
     gui_synclist_set_icon_callback(list,
                             global_settings.show_icons?browser_get_fileicon:NULL);
+    gui_synclist_set_row_callbacks(list, browser_get_kind, NULL,
+                                   browser_is_playing);
     /* Art (cover callback + tall uniform rows) on album lists (album art) and
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
      * and the whole off path never touch the art-resolution code.

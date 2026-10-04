@@ -891,6 +891,70 @@ static const char* NOINLINE get_pad_value(struct gui_wps *gwps,
     return buf;
 }
 
+/* Whether 'ch' is one of the characters in 'set', compared as code points so
+ * a set may name any character, not only ASCII. */
+static bool in_char_set(ucschar_t ch, const unsigned char *set)
+{
+    ucschar_t s;
+
+    while (*set)
+    {
+        set = utf8decode(set, &s);
+        if (s == ch)
+            return true;
+    }
+    return false;
+}
+
+/* %trm(text, chars) -- text with every character in chars removed from both
+ * ends. NOINLINE for the source buffers (recursive). */
+static const char* NOINLINE get_trim_value(struct gui_wps *gwps,
+                                           struct skin_element *element,
+                                           int offset, char *buf, int buf_size)
+{
+    char *skinbuffer = get_skin_buffer(gwps->data);
+    char src[MAX_PATH];
+    unsigned char set[64];
+    const unsigned char *p, *start, *end;
+    const char *t;
+    ucschar_t ch;
+    int bytes;
+
+    if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
+    if (buf_size <= 0) return NULL;
+    struct skin_tag_parameter *params =
+            SKINOFFSETTOPTR(skinbuffer, element->params);
+
+    t = eval_select_param(gwps, skinbuffer, &params[0], offset, buf, buf_size);
+    if (!t) return NULL;
+    strmemccpy(src, t, sizeof(src));
+    t = eval_select_param(gwps, skinbuffer, &params[1], offset, buf, buf_size);
+    strmemccpy((char *)set, t ? t : "", sizeof(set));
+
+    /* The first character to keep, and the end of the last one. */
+    start = (const unsigned char *)src;
+    while (*start)
+    {
+        p = utf8decode(start, &ch);
+        if (!in_char_set(ch, set))
+            break;
+        start = p;
+    }
+    end = start;
+    for (p = start; *p; )
+    {
+        p = utf8decode(p, &ch);
+        if (!in_char_set(ch, set))
+            end = p;
+    }
+
+    bytes = end - start;
+    if (bytes >= buf_size) bytes = buf_size - 1;
+    memcpy(buf, start, bytes);
+    buf[bytes] = '\0';
+    return buf;
+}
+
 /* %wr(n, text) -- return the nth (0-based) word-wrapped line of text, wrapped
  * to the current viewport width in its font. One forward pass per call: walk
  * the text accumulating pixel width (mirroring font_getstringnsize), remember
@@ -1516,6 +1580,11 @@ const char *get_token_value(struct gui_wps *gwps,
                     SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data),
                                    offset, buf, buf_size);
 
+        case SKIN_TOKEN_TRIM:
+            return get_trim_value(gwps,
+                    SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data),
+                                    offset, buf, buf_size);
+
         case SKIN_TOKEN_SUBSTRING:
         {
             struct substring *ss = SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
@@ -1622,6 +1691,40 @@ const char *get_token_value(struct gui_wps *gwps,
             itoa_buf(buf, buf_size, numeric_ret);
             numeric_buf = buf;
             goto gtv_ret_numeric_tag_info;
+        }
+        case SKIN_TOKEN_LIST_ITEM_KIND:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            numeric_ret = skinlist_get_item_kind(li->offset, li->wrap);
+            itoa_buf(buf, buf_size, numeric_ret);
+            numeric_buf = buf;
+            goto gtv_ret_numeric_tag_info;
+        }
+        case SKIN_TOKEN_LIST_ITEM_POSITION:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            int n = skinlist_get_item_position(li->offset, li->wrap);
+            if (n < 0)
+                return NULL;
+            /* Text only, not a number: %?Lp<..|..> is "is this a track",
+             * where a number would pick the branch by the track's place.
+             * %if still compares it as a number, from the text. */
+            itoa_buf(buf, buf_size, n);
+            return buf;
+        }
+        case SKIN_TOKEN_LIST_ITEM_VALUE:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            return skinlist_get_item_value(li->offset, li->wrap, buf, buf_size);
+        }
+        case SKIN_TOKEN_LIST_ITEM_PLAYING:
+        {
+            struct listitem *li = (struct listitem *)SKINOFFSETTOPTR(get_skin_buffer(data), token->value.data);
+            if (!li) return NULL;
+            return skinlist_item_is_playing(li->offset, li->wrap) ? "p" : NULL;
         }
         case SKIN_TOKEN_LIST_ITEM_ALBUMART:
         {

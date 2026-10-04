@@ -134,6 +134,32 @@ typedef int list_speak_item(int selected_item, void * data);
  */
 typedef int list_get_color(int selected_item, void * data);
 
+/*
+ * Row kind callback, read by the skin's %Lk: what choosing the row does.
+ * Themes compare these as numbers, so the values never change and a new kind
+ * is appended.
+ */
+enum list_row_kind
+{
+    LIST_ROW_PLAIN,             /* the list says nothing more */
+    LIST_ROW_MENU,              /* opens another menu */
+    LIST_ROW_TOGGLE,            /* an on/off setting */
+    LIST_ROW_SETTING,           /* a setting with a choice or a number */
+    LIST_ROW_ACTION,            /* does something, or goes somewhere */
+    LIST_ROW_COMMAND,           /* a library list's own row: [Random] and kin */
+    LIST_ROW_CONTAINER,         /* a library item that lists its contents */
+    LIST_ROW_TRACK,             /* something that plays */
+    LIST_ROW_FILE,              /* any other file */
+    LIST_ROW_OPTION,            /* one of a setting's values, in its picker */
+};
+typedef enum list_row_kind list_get_kind(int selected_item, void * data);
+
+/*
+ * Playing callback, read by the skin's %LP: whether the row is what is
+ * playing now.
+ */
+typedef bool list_is_playing(int selected_item, void * data);
+
 struct list_selection_color
 {
     /* text color, in native lcd format
@@ -200,6 +226,11 @@ struct gui_synclist
     struct list_selection_color *selection_color;
     struct viewport *parent[NB_SCREENS];
 
+    /* What the skin asks of a row beyond its text and icon. Each is optional;
+     * a list without one reads as plain, valueless and not playing. */
+    list_get_kind *callback_get_item_kind;
+    list_get_name *callback_get_item_value;     /* a setting row's value */
+    list_is_playing *callback_item_is_playing;
 };
 
 
@@ -224,6 +255,11 @@ extern void gui_synclist_set_voice_callback(struct gui_synclist * lists, list_sp
 extern void gui_synclist_set_viewport_defaults(struct viewport *vp, enum screen_type screen);
 extern void gui_synclist_set_color_callback(struct gui_synclist * lists, list_get_color color_callback);
 extern void gui_synclist_set_sel_color(struct gui_synclist * lists, struct list_selection_color *list_sel_color);
+/* The answers to %Lk, %Lv and %LP. Any may be NULL. */
+extern void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
+                                           list_get_kind kind_callback,
+                                           list_get_name value_callback,
+                                           list_is_playing playing_callback);
 extern void gui_synclist_speak_item(struct gui_synclist * lists);
 extern int gui_synclist_get_nb_items(struct gui_synclist * lists);
 
@@ -277,6 +313,14 @@ int skinlist_get_item_number(void);
 int skinlist_get_item_row(void);
 int skinlist_get_item_column(void);
 enum themable_icons skinlist_get_item_icon(int offset, bool wrap);
+/* %Lk, %Lv and %LP: what the row's list says of it. */
+enum list_row_kind skinlist_get_item_kind(int offset, bool wrap);
+const char* skinlist_get_item_value(int offset, bool wrap,
+                                    char* buf, size_t buf_size);
+bool skinlist_item_is_playing(int offset, bool wrap);
+/* %Lp: the row's number among the list's tracks, from 1; -1 on any row that
+ * is not a track. */
+int skinlist_get_item_position(int offset, bool wrap);
 const struct bitmap* skinlist_get_item_albumart(int offset, bool wrap,
                                                 struct dim *size,
                                                 const struct img_filter *filter,
@@ -341,6 +385,7 @@ struct simplelist_info {
     list_get_name *get_name; /* NULL if you're using simplelist_addline() */
     list_speak_item *get_talk; /* can be NULL to not speak */
     list_get_color *get_color;
+    list_get_kind *get_kind; /* can be NULL; every row is then plain */
     struct list_selection_color *selection_color;
     void *callback_data; /* data for callbacks */
 };
