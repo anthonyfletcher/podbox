@@ -977,8 +977,9 @@ static int album_sort_ctx_option(void *param)
     int ctx = (int)(intptr_t)param;
     int choice = browser_db_album_sort_get(ctx) + 1;
 
-    if (set_option(str(album_sort_ctx_lang[ctx]), &choice, RB_INT,
-                   orders, ARRAYLEN(orders), NULL))
+    /* set_option() returns true only when USB took over the screen. */
+    if (!set_option(str(album_sort_ctx_lang[ctx]), &choice, RB_INT,
+                    orders, ARRAYLEN(orders), NULL))
     {
         browser_db_album_sort_set(ctx, choice - 1);
         settings_save();
