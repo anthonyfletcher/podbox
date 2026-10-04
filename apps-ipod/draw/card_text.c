@@ -157,7 +157,8 @@ static void flush_line(const struct word *w, int n, int x, int top,
 }
 
 /* Put an ellipsis on a line that had to stop early, dropping trailing words
- * until it fits -- but never the last of them.
+ * until it fits, and then characters from the last word -- but never the
+ * whole of it, because three dots standing alone read as a fault.
  *
  * Three ASCII dots rather than U+2026, because a figure is set in a face
  * subset to seventeen glyphs and the ellipsis is not among them -- the full
@@ -176,9 +177,30 @@ static void ellipsise(struct word *line, int *n, int *pen, int max_w,
         ew = str_width("...", 3, font);
     }
 
-    /* Never down to nothing. A word wider than the card keeps its place and
-     * is clipped by the card's own edge, which reads as a name cut short;
-     * three dots standing alone read as a fault. */
+    /* A line of one long word -- a name broken mid-word, or any CJK title --
+     * has nothing left to drop, so the word itself gives way. The dots then
+     * take its face, since they finish it. */
+    if (*pen + ew > max_w)
+    {
+        struct word *w = &line[*n - 1];
+
+        font = w->font;
+        colour = w->colour;
+        ew = str_width("...", 3, font);
+        while (*pen + ew > max_w)
+        {
+            int len = char_boundary(w->p, w->len - 1);
+            int ww;
+
+            if (len < 1)
+                break;
+            ww = str_width(w->p, len, w->font);
+            *pen += ww - w->w;
+            w->len = len;
+            w->w = ww;
+        }
+    }
+
     if (*n >= LINE_WORDS || *pen + ew > max_w)
         return;
 
@@ -247,36 +269,6 @@ static int walk(const struct card_text *t, int x, int y, int max_w,
 
             ww = str_width(p, len, t->run[i].font);
 
-            /* A word too wide for a whole line is broken inside itself,
-             * between characters.
-             *
-             * Not an edge case: Japanese and Chinese put no spaces between
-             * words at all, so a track name in either is one "word" the width
-             * of the card several times over. Without this it is placed
-             * whole, runs off the card's edge and the rest of it is lost. */
-            if (n == 0 && ww > max_w && len > 1)
-            {
-                /* Guess by proportion first, then walk. One measurement per
-                 * character removed is forty measurements for a forty-
-                 * character title, EVERY FRAME it is on screen; from a
-                 * proportional guess it is two or three. */
-                int guess = len * max_w / ww;
-
-                if (guess < 1)
-                    guess = 1;
-                if (guess < len)
-                {
-                    len = char_boundary(p, guess);
-                    if (len < 1)
-                        len = char_boundary(p, guess + 1);
-                    ww = str_width(p, len, t->run[i].font);
-                }
-                while (ww > max_w && len > 1)
-                {
-                    len = char_boundary(p, len - 1);
-                    ww = str_width(p, len, t->run[i].font);
-                }
-            }
             /* A space between two words of the same run, and RUN_GAP between
              * two runs; at the start of a line, neither. */
             gap = (n == 0) ? 0
@@ -304,6 +296,42 @@ static int walk(const struct card_text *t, int x, int y, int max_w,
                 n = 0;
                 pen = 0;
                 gap = 0;
+            }
+
+            /* A word too wide for a whole line is broken inside itself,
+             * between characters.
+             *
+             * Not an edge case: Japanese and Chinese put no spaces between
+             * words at all, so a track name in either is one "word" the width
+             * of the card several times over. Without this it is placed
+             * whole, runs off the card's edge and the rest of it is lost.
+             *
+             * Trap: this has to come after the wrap above, not before it. A
+             * long name that follows a label -- "by", "from" -- does not start
+             * its line, so it would wrap whole onto the next one and never be
+             * broken at all. */
+            if (n == 0 && ww > max_w && len > 1)
+            {
+                /* Guess by proportion first, then walk. One measurement per
+                 * character removed is forty measurements for a forty-
+                 * character title, EVERY FRAME it is on screen; from a
+                 * proportional guess it is two or three. */
+                int guess = len * max_w / ww;
+
+                if (guess < 1)
+                    guess = 1;
+                if (guess < len)
+                {
+                    len = char_boundary(p, guess);
+                    if (len < 1)
+                        len = char_boundary(p, guess + 1);
+                    ww = str_width(p, len, t->run[i].font);
+                }
+                while (ww > max_w && len > 1)
+                {
+                    len = char_boundary(p, len - 1);
+                    ww = str_width(p, len, t->run[i].font);
+                }
             }
 
             /* The gap belongs to the word after it, which is what makes a

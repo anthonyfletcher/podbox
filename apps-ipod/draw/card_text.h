@@ -51,7 +51,8 @@ void card_text_add_line(struct card_text *t, const char *s, int font,
  * wide the block actually came out and how tall.
  *
  * A block that runs out of lines ends with an ellipsis on the last one, with
- * as many trailing words dropped as it takes to fit -- because the caller's
+ * as many trailing words dropped as it takes to fit, and then characters
+ * from the last word if it alone is too long -- because the caller's
  * limit is what the card HAS, and text past it is not shortened but simply
  * drawn off the bottom edge.
  *
