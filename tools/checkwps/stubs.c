@@ -95,8 +95,11 @@ int core_load_bmp(const char *filename, struct bitmap *bm, const int bmformat,
     return 1;
 }
 
-/* The parse buffer, which the parser asks the application layer for. */
-static char parse_buffer[512 * 1024];
+/* The parse buffer, which the parser asks the application layer for. Twice the
+ * 5G's 512KB, because a parsed skin is about twice its size here: a 64-bit
+ * host stores the parser's offsets as pointers, eight bytes where the player
+ * uses four. Any smaller and a skin that loads on the player fails here. */
+static char parse_buffer[1024 * 1024];
 
 void *app_get_buffer(size_t *buffer_size, const char *owner)
 {
