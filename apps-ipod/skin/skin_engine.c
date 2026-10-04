@@ -28,6 +28,7 @@
 #include "wps_internals.h"
 #include "skin_albumart_color.h"
 #include "draw/color.h"                /* color_words_reset */
+#include "metadata/book_resume.h"
 
 #define FAILSAFENAME "rockbox_failsafe"
 
@@ -131,7 +132,10 @@ void settings_apply_skins(void)
     dynamic_colors_save_theme();
 
     if (audio_status() & AUDIO_STATUS_PLAY)
+    {
+        book_resume_save();
         audio_stop();
+    }
 
     bool first_run = skin_backdrop_init();
     

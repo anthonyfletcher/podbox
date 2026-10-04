@@ -102,6 +102,7 @@ static long lasttime = 0;
 #include "audio/playback.h"
 #include "screens/browse/browser.h"    /* browser_albumart_invalidate */
 #include "screens/covers/album_covers.h" /* the year sort carry-over */
+#include "metadata/book_resume.h"
 #include "pcm_sampr.h"
 
 #ifdef LOGF_ENABLE
@@ -728,9 +729,13 @@ bool settings_load_config(const char* file, bool apply)
          * one of them competing with the theme's own reads for the disk.
          *
          * Stopping first leaves those allocations nothing to interrupt. The
-         * music stops either way; this only decides how long it takes. */
+         * music stops either way; this only decides how long it takes.
+         * A book's place is written down first, as at every other stop. */
         if (theme_changed)
+        {
+            book_resume_save();
             audio_stop();
+        }
 
         settings_save();
         settings_apply(true);
