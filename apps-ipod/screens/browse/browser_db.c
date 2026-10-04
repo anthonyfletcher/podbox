@@ -2523,6 +2523,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             }
         }
 
+        bool untagged = false;
         if (strcmp(tcs.result, UNTAGGED) == 0)
         {
             if (tag == tag_title && tcs.type == tag_title && tcs.filter_count <= 1)
@@ -2548,6 +2549,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             }
 
             tcs.result = str(LANG_TAGNAVI_UNTAGGED);
+            untagged = true;
             /* Every other result_len counts the terminator, and the copy below
              * writes one -- without it the next name starts on this row's. */
             tcs.result_len = strlen(tcs.result) + 1;
@@ -2608,7 +2610,15 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                         namebufused += strlen(dptr->album_name)+1;
                     else
                         dptr->album_name = NULL;
-                    if (order_prefix)
+                    /* [Untagged] stands for no one album, so it heads the
+                     * list rather than taking whichever year and artist the
+                     * index pairs with it: a prefix below any digit, or above
+                     * any for the one order that sorts inverse. */
+                    if (order_prefix && untagged)
+                        memset(dptr->name,
+                               album_order == DB_SORT_ALBUMS_YEAR_DESC
+                               ? '~' : ' ', order_prefix);
+                    else if (order_prefix)
                         write_order_prefix(dptr->name, order_tab, order_count,
                                            tcs.result_seek, album_order);
                     strcpy(dptr->name + order_prefix, tcs.result);
