@@ -748,6 +748,13 @@ A name with a comma or ampersand, like Tyler, The Creator, reads as two people
 unless an album is under it. List such names one per line in
 /.rockbox/known_artists.txt, then reboot or update the database.
 
+[art cache album source]
+Where album covers come from: the image in the album's folder, the art embedded
+in a track's tags, or both, the first named taking precedence. Artist pictures
+only ever come from image files.
+
+Changing it reads every album again, which takes a while on a large library.
+
 [art cache fast build]
 Decodes each image once for the largest thumbnail and derives the smaller sizes
 from it, instead of decoding once per size.
@@ -1237,10 +1244,10 @@ Lets a receiver, car or dock browse artists, albums, genres, composers and
 audiobooks, up to this many songs in a list; a dock or receiver can also play
 Playlist Engine moods.
 
-Its memory is taken when browsing starts, briefly rebuffering playback, and
-given back on unplugging. Needs the database in RAM. Off offers only the Queue
-and saved playlists, and a car no library at all; a car connected while it was
-Off sees one only once plugged in again.
+Its memory is taken when browsing starts, or with a car's first cover, briefly
+rebuffering playback, and given back on unplugging. Needs the database in RAM.
+Off offers only the Queue and saved playlists, and a car no library at all; a
+car connected while it was Off sees one only once plugged in again.
 
 [car artwork]
 The cover a car shows with each track, sent over Apple's accessory protocol.
@@ -1380,7 +1387,8 @@ whose image has been replaced or deleted since.
 
 The cache stops once it has covered everything it knew about, so artwork added
 to folders it has already been through -- artist photographs especially -- is
-never picked up on its own. This is how you ask.
+never picked up on its own. This is how you ask. It also reads each album's
+tags again when Album Art Source includes embedded art.
 
 [action: Update Sound Analysis]
 Measures tracks the sound analysis has not covered yet, and retries any it

@@ -346,6 +346,7 @@ about two times in three.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | image files, then embedded | |
 | Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
 | Write Debug Log | Writes thumbnail generation to a log file. For working out why a particular album has no art. | off | **Adv** |
 
@@ -543,15 +544,14 @@ shadow to colour.
 |---|---|---|---|
 | Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
 | iAP2 Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. Needs Accessory Protocol on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
-| Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
+| Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, or with a car's first cover, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
 | Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. | prefer cache |  |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
 | Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
 | Remote Track Skip | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
 
-A car is not offered Playlist Engine moods through **Accessory Browsing**, and
-takes its memory with the first cover rather than when browsing starts.
+A car is not offered Playlist Engine moods through **Accessory Browsing**.
 
 
 ### System — Keyclick
