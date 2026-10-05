@@ -277,6 +277,7 @@ const struct settings_list *find_setting_by_cfgname(const char *name)
  * --------------------------------------------------------------------- */
 
 void accessory_supply_set(bool on) { (void)on; }
+void art_cache_album_source_callback(int source) { (void)source; }
 void audio_flush_and_reload_tracks(void) { }
 void audio_set_playback_frequency(unsigned int rate) { (void)rate; }
 int  audio_status(void) { return 0; }

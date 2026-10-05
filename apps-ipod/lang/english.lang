@@ -14992,6 +14992,76 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_ART_CACHE_ALBUM_SOURCE
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Album Art Source"
+  </source>
+  <dest>
+    *: "Album Art Source"
+  </dest>
+  <voice>
+    *: "Album Art Source"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files Only"
+  </source>
+  <dest>
+    *: "Image Files Only"
+  </dest>
+  <voice>
+    *: "Image Files Only"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files, Then Embedded"
+  </source>
+  <dest>
+    *: "Image Files, Then Embedded"
+  </dest>
+  <voice>
+    *: "Image Files, Then Embedded"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded, Then Image Files"
+  </source>
+  <dest>
+    *: "Embedded, Then Image Files"
+  </dest>
+  <voice>
+    *: "Embedded, Then Image Files"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded Only"
+  </source>
+  <dest>
+    *: "Embedded Only"
+  </dest>
+  <voice>
+    *: "Embedded Only"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_HIDE_ALBUM_TITLE_NEW
   desc: in the pictureflow settings
   user: core

@@ -137,6 +137,8 @@ MENUITEM_SETTING(album_covers_statusbar, &global_settings.album_covers_statusbar
  * from now on -- rebuild the cache to apply it to what is already there. */
 MENUITEM_SETTING(art_cache_fast_build, &global_settings.art_cache_fast_build,
                  NULL);
+MENUITEM_SETTING(art_cache_album_source,
+                 &global_settings.art_cache_album_source, NULL);
 
 MENUITEM_SETTING(debug_log_artcache, &global_settings.debug_log_artcache, NULL);
 
@@ -159,6 +161,7 @@ MENUITEM_FUNCTION(art_health_artists_item, MENU_FUNC_CHECK_RETVAL,
                   art_health_artists, NULL, Icon_NOICON);
 
 MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,
+            &art_cache_album_source,
             &art_cache_fast_build,
             &art_health_albums_item,
             &art_health_artists_item,

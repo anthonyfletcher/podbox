@@ -3,9 +3,10 @@
  *
  * Disk cache for cover art -- BOTH album art and artist art. Pre-scales each
  * image to the sizes skins ask for and stores it, so browsing does not
- * re-decode on every track. Album art comes from the album folder, artist art
- * from its parent or, failing that, the folder above; each has its own
- * placeholder for when nothing is found.
+ * re-decode on every track. Album art comes from the album folder's image or a
+ * track's embedded art, as the album art source setting orders them; artist
+ * art from an image in its parent or, failing that, the folder above. Each has
+ * its own placeholder for when nothing is found.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -27,7 +28,7 @@
 #include "albumart.h"
 #include "art_cache.h"
 #include "art_sizes.h"
-#include "settings/settings.h"  /* global_settings.art_cache_fast_build */
+#include "settings/settings.h"  /* global_settings.art_cache_* */
 #include "system/debug_log.h"
 #include "database/tagcache.h"
 #include "system/bg_task.h"         /* the caching pass runs as one */
@@ -89,9 +90,11 @@ struct aa_stamp
 /* Stamps that are not an image's. NONE is a folder with no record, whose
  * thumbnails a pass adopts as they stand rather than regenerating -- the case
  * for every folder cached before stamps existed, and after the stamp file is
- * lost. EMBEDDED is art from a track's tags, which folder art replaces. */
+ * lost. EMBEDDED is art from a track's tags. NO_EMBED is a folder whose track
+ * was read and held no art, so a pass does not read it again. */
 #define AA_STAMP_NONE     0u
 #define AA_STAMP_EMBEDDED 1u
+#define AA_STAMP_NO_EMBED 2u
 
 /* The table, while a pass holds it; NULL otherwise. */
 static struct aa_stamp *aa_stamps;
@@ -734,8 +737,8 @@ static unsigned int aa_art_stamp(const char *path)
     }
 
     /* never one of the stamps that are not an image's */
-    if (stamp <= AA_STAMP_EMBEDDED)
-        stamp += 2;
+    if (stamp <= AA_STAMP_NO_EMBED)
+        stamp += 3;
     return stamp;
 }
 
@@ -1163,51 +1166,48 @@ static bool aa_check_abort(void)
  * cached as it stands. */
 static bool aa_check_all;
 
-/* Resolve one folder's cover art and bring its thumbnails in line with it:
- * render the sizes that don't exist yet, and replace or delete the lot when
- * the image they were made from has changed or gone. `probe_path` is a track
- * filename under the folder (real for an album folder, synthetic "<dir>/_" for
- * an artist folder) that search_albumart_files() strips down to the folder to
- * locate cover.bmp / folder.jpg; `dh` is that folder's hash (the cache key) and
- * `slot` its table entry. An `artist` folder with no image of its own takes the
- * one above it, cached under its own key so that every reader keying artist art
- * on the album's parent finds it. Sets *aborted if a USB/shutdown/DB-busy stop
- * was hit mid-decode. Cheap once the folder is cached: an existence check per
- * size, plus the image lookup and stamp under aa_check_all, and no image is
- * read. */
-static bool aa_cache_dir(const char *probe_path, unsigned int dh,
-                         struct aa_stamp *slot, bool artist,
-                         void *workbuf, size_t worksz, bool *aborted)
+/* Whether this pass reads a track's tags again for a folder whose stamp
+ * already says what they hold. Reading a track goes to the disk even with the
+ * directory cache up, so only a pass with no marks to have covered does it:
+ * Update, Rebuild, a change of album art source, a first pass. */
+static bool aa_reread_tags;
+
+/* Find the image file standing for the folder of `probe_path`, into
+ * aa_artpath. album/albumartist left NULL: only folder-based art is searched
+ * (cover.bmp, folder.jpg, and for a disc folder ../cover.bmp). */
+static bool aa_find_file(const char *probe_path, bool artist)
 {
-    int s;
-    bool all_exist = true;
-    unsigned int stamp;
-
-    if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
-        return true;
-
-    /* album/albumartist left NULL: only folder-based art is searched
-     * (cover.bmp, folder.jpg, and for a disc folder ../cover.bmp). */
     memset(&aa_id3, 0, sizeof(aa_id3));
     strlcpy(aa_id3.path, probe_path, sizeof(aa_id3.path));
-    if (!search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath))
-        || !aa_art_is_folders(probe_path, aa_artpath, artist))
-    {
-        /* Embedded art has no file here, and is art all the same */
-        if (slot->stamp == AA_STAMP_EMBEDDED)
-            return aa_thumbs_exist(dh);
-        /* The image these thumbnails were made from has been deleted.
-         * Unstamped thumbnails never came from a file here to lose. */
-        if (slot->stamp > AA_STAMP_EMBEDDED)
-        {
-            aa_remove_thumbs(dh);
-            slot->stamp = AA_STAMP_NONE;
-        }
-        return false;   /* no cover art in this folder */
-    }
+    return search_albumart_files(&aa_id3, "", aa_artpath, sizeof(aa_artpath))
+           && aa_art_is_folders(probe_path, aa_artpath, artist);
+}
 
-    stamp = aa_art_stamp(aa_artpath);
-    all_exist = aa_thumbs_exist(dh);
+/* Find the JPEG embedded in the track at `path`. Only JPEG: it is all the WPS
+ * shows from a track's tags too. */
+static bool aa_find_embedded(const char *path, struct aa_src *src)
+{
+    if (!get_metadata_ex(&aa_id3, -1, path, METADATA_EXCLUDE_ID3_PATH)
+        || !aa_id3.has_embedded_albumart
+        || (aa_id3.albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
+        return false;
+    src->path = path;
+    src->emb_pos = aa_id3.albumart.pos;
+    src->emb_size = aa_id3.albumart.size;
+    src->emb_flags = aa_id3.albumart.type;
+    return true;
+}
+
+/* Bring one folder's thumbnails in line with `src`, whose stamp is `stamp`:
+ * replace the lot if they were made from something else, and render the sizes
+ * that don't exist yet. */
+static bool aa_fill(const struct aa_src *src, unsigned int stamp,
+                    unsigned int dh, struct aa_stamp *slot,
+                    void *workbuf, size_t worksz, bool *aborted)
+{
+    bool all_exist = aa_thumbs_exist(dh);
+    int order[ART_CACHE_NUM_SIZES];
+    int i, s;
 
     /* Stamped before generating, so an interrupted pass leaves a part set
      * that the next one finishes rather than throws away again. Every size
@@ -1217,17 +1217,13 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
         slot->stamp = stamp;
     else if (slot->stamp != stamp)
     {
-        debug_log(DEBUG_LOG_ARTCACHE, "art changed: %s", aa_artpath);
+        debug_log(DEBUG_LOG_ARTCACHE, "art changed: %s", src->path);
         aa_remove_thumbs(dh);
         slot->stamp = stamp;
         all_exist = false;
     }
     if (all_exist)
         return true;
-
-    struct aa_src src = { aa_artpath, -1, 0, 0 };  /* folder image on disk */
-    int order[ART_CACHE_NUM_SIZES];
-    int i;
 
     /* Largest first, so a fast build has the big thumbnail on disk to derive
      * the smaller ones from. */
@@ -1247,10 +1243,86 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
             return false;
         }
         aa_cache_path(aa_out_path, sizeof(aa_out_path), s, dh);
-        aa_generate_size(&src, s, dh, aa_out_path, workbuf, worksz);
+        aa_generate_size(src, s, dh, aa_out_path, workbuf, worksz);
         yield();
     }
     return true;
+}
+
+/* Resolve one folder's cover art and bring its thumbnails in line with it.
+ * `probe_path` is a track filename under the folder (real for an album folder,
+ * synthetic "<dir>/_" for an artist folder); `dh` is that folder's hash (the
+ * cache key) and `slot` its table entry. An album takes its art from the
+ * sources the album art source setting names, in its order, reading one track's
+ * tags for the embedded kind; an `artist` takes it from an image file only, and
+ * with no image of its own takes the one above it, cached under its own key so
+ * that every reader keying artist art on the album's parent finds it. Sets
+ * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the folder is
+ * cached: an existence check per size, plus the image lookup and stamp under
+ * aa_check_all, and no image or track is read. */
+static bool aa_cache_dir(const char *probe_path, unsigned int dh,
+                         struct aa_stamp *slot, bool artist,
+                         void *workbuf, size_t worksz, bool *aborted)
+{
+    int source = artist ? ART_SOURCE_FILES
+                        : global_settings.art_cache_album_source;
+    bool embedded = source != ART_SOURCE_FILES;
+    struct aa_src src;
+
+    if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
+        return true;
+
+    if (source <= ART_SOURCE_FILES_FIRST && aa_find_file(probe_path, artist))
+        goto from_file;
+
+    if (embedded)
+    {
+        if (!aa_reread_tags && slot->stamp == AA_STAMP_EMBEDDED
+            && aa_thumbs_exist(dh))
+            return true;
+
+        /* Not read again until an Update: a folder already read and found
+         * bare, and with tags first, one that took an image file -- its tags
+         * were read then and held nothing. */
+        bool bare = !aa_reread_tags
+                    && (slot->stamp == AA_STAMP_NO_EMBED
+                        || (source == ART_SOURCE_EMBEDDED_FIRST
+                            && slot->stamp > AA_STAMP_NO_EMBED));
+        if (!bare)
+        {
+            if (aa_check_abort() || tagcache_is_busy())
+            {
+                *aborted = true;
+                return false;
+            }
+            if (aa_find_embedded(probe_path, &src))
+                return aa_fill(&src, AA_STAMP_EMBEDDED, dh, slot,
+                               workbuf, worksz, aborted);
+        }
+    }
+
+    if (source == ART_SOURCE_EMBEDDED_FIRST && aa_find_file(probe_path, artist))
+        goto from_file;
+
+    /* Nothing found. Thumbnails stamped EMBEDDED came from tags all the same:
+     * playback fills a folder from whichever track it plays, which need not be
+     * the one read here. */
+    if (embedded && slot->stamp == AA_STAMP_EMBEDDED && aa_thumbs_exist(dh))
+        return true;
+    /* What these thumbnails were made from is gone, or no longer a source.
+     * Unstamped thumbnails never came from anything here to lose. */
+    if (slot->stamp == AA_STAMP_EMBEDDED || slot->stamp > AA_STAMP_NO_EMBED)
+        aa_remove_thumbs(dh);
+    slot->stamp = embedded ? AA_STAMP_NO_EMBED : AA_STAMP_NONE;
+    return false;
+
+from_file:
+    src.path = aa_artpath;
+    src.emb_pos = -1;
+    src.emb_size = 0;
+    src.emb_flags = 0;
+    return aa_fill(&src, aa_art_stamp(aa_artpath), dh, slot,
+                   workbuf, worksz, aborted);
 }
 
 /* One full generation pass: walk every track filename, dedup by directory,
@@ -1318,6 +1390,7 @@ static enum bg_result aa_run_pass(void)
     /* No marks to have covered: a trigger, a first pass or a format bump */
     aa_check_all = dircache_is_ready()
                 || art_cache_task.done_marks.entries < 0;
+    aa_reread_tags = art_cache_task.done_marks.entries < 0;
 
     wh = core_alloc(worksz);
     if (wh <= 0)
@@ -1523,6 +1596,8 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
 {
     (void)id; (void)event_data;
     struct mp3entry *id3 = audio_current_track();
+    if (global_settings.art_cache_album_source == ART_SOURCE_FILES)
+        return;
     if (!id3 || !id3->has_embedded_albumart ||
         (id3->albumart.type & AA_CLEAR_FLAGS_MASK) != AA_TYPE_JPG)
         return;
@@ -1532,6 +1607,14 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     aa_offer.size = id3->albumart.size;
     aa_offer.flags = id3->albumart.type;
     bg_task_post(&art_cache_task, AA_EVENT_OFFER);
+}
+
+/* A pass trusts each folder's stamp for what its tags hold, so a change of
+ * source needs the pass that reads them again. */
+void art_cache_album_source_callback(int source)
+{
+    (void)source;
+    bg_task_update(&art_cache_task);
 }
 
 /* bg_task.run: one pass, with the tracing the pass itself does not do. */

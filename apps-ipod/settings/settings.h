@@ -782,6 +782,8 @@ struct user_settings
      * instead of decoding the source image once per size. Roughly a third of the
      * work for a slightly softer small thumbnail. Off by default. */
     bool art_cache_fast_build;
+    /* Where album art is taken from: enum art_album_source. */
+    int  art_cache_album_source;
 
     int browser_default;        /* Default browser when accessed from WPS */
 

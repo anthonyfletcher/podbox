@@ -67,6 +67,7 @@
 #include "screens/browse/browser.h"
 #include "database/db_summary.h"   /* db_summary_invalidate */
 #include "metadata/tag_trim.h"     /* tag_trim_init */
+#include "metadata/art_cache.h"    /* enum art_album_source */
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
 #include "screens/system/sound_scan.h"  /* sound_scan_screen */
 #include "database/sound_index.h"       /* sound_index_exists */
@@ -1988,6 +1989,15 @@ const struct settings_list settings[] = {
         INT(52), "database art row height", UNUSED},
     OFFON_SETTING(0, art_cache_fast_build, LANG_ART_CACHE_FAST_BUILD, false,
                   "art cache fast build", NULL),
+    CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                   art_cache_album_source, LANG_ART_CACHE_ALBUM_SOURCE,
+                   ART_SOURCE_FILES_FIRST, "art cache album source",
+                   "files,files then embedded,embedded then files,embedded",
+                   art_cache_album_source_callback, 4,
+                   ID2P(LANG_ART_SOURCE_FILES),
+                   ID2P(LANG_ART_SOURCE_FILES_FIRST),
+                   ID2P(LANG_ART_SOURCE_EMBEDDED_FIRST),
+                   ID2P(LANG_ART_SOURCE_EMBEDDED)),
     /* keyclick */
     CHOICE_SETTING(0, keyclick, LANG_KEYCLICK_SOFTWARE, 0,
                    "keyclick", "off,weak,moderate,strong", NULL, 4,

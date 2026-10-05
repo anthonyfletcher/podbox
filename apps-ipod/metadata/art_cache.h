@@ -100,6 +100,19 @@ const char *art_cache_activity(void);
  * skipped on its directory entry without reading the image. */
 extern struct bg_task art_cache_task;
 
+/* Where album art is taken from: global_settings.art_cache_album_source.
+ * Artist art comes from image files whatever this says. */
+enum art_album_source
+{
+    ART_SOURCE_FILES,           /* image files only */
+    ART_SOURCE_FILES_FIRST,     /* image files, then a track's embedded art */
+    ART_SOURCE_EMBEDDED_FIRST,
+    ART_SOURCE_EMBEDDED,        /* embedded art only */
+};
+
+/* The setting's callback: a change re-resolves every folder. */
+void art_cache_album_source_callback(int source);
+
 /* Resolve the cache-file path for a given album folder and size index.
  * Returns true and fills 'out' if a thumbnail is available, false otherwise.
  * 'dir' is the album's folder path (the directory containing the track), with no

@@ -220,6 +220,7 @@ static const struct tag_row tag_rows[] = {
 { "trim titles",         TAG_LIBRARY|TAG_APPEARANCE,             "tidy shorten feat remaster version" },
 
 /* --- artwork ------------------------------------------------------------- */
+{ "art cache album source", TAG_ARTWORK,                         "thumbnail cache embedded cover folder" },
 { "art cache fast build",TAG_ADVANCED|TAG_ARTWORK,               "thumbnail cache" },
 { "debug log artcache",  TAG_ADVANCED|TAG_ARTWORK,               "log debug thumbnail" },
 { "database album art",  TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows cover thumbnail" },
