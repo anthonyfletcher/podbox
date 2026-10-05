@@ -261,6 +261,16 @@ characters — useful for lining up columns in a monospaced layout.
 %pd(8, %ia): %it
 ```
 
+### `%trm(text, chars)` — strip characters from both ends
+
+Returns `text` with every character in `chars` removed from its start and its
+end. Characters in the middle are left alone, and `chars` may hold any
+characters, not only ASCII ones.
+
+```
+%trm(%LT,[])                  # "[All Tracks]" draws as "All Tracks"
+```
+
 ### `%ma(a, op, b)` — integer arithmetic
 
 Evaluates `a op b`, where `op` is one of `+ - * / %` (division and remainder by
@@ -481,6 +491,72 @@ Inside a row the two agree, and there `%?La` reads better.
 
 For a second row *height* you do not need this tag: that is `%Lb`'s fifth
 argument, below.
+
+---
+
+## List rows
+
+Four tags say what a list row is, beyond the text and icon `%LT` and `%LI`
+give. Each takes `%LT`'s arguments: an offset to ask about another row, and
+`nowrap`.
+
+### `%Lk` — what kind of row this is
+
+A number saying what choosing the row does:
+
+| Value | Kind | For example |
+|---|---|---|
+| `0` | plain: the list says nothing more | any list not listed below |
+| `1` | menu: opens another menu | Sound Settings, and Artist or Tracks by in the database |
+| `2` | toggle: an on/off setting | Shuffle |
+| `3` | setting: a choice or a number | Repeat, Volume Limit |
+| `4` | action: does something, or goes somewhere | the main menu's entries, a context menu's, Reset Settings |
+| `5` | command: a library list's own row | [Random], [Resume], [All Tracks], [In Progress] |
+| `6` | container: a library item that lists its contents | an artist, album, genre, book or folder |
+| `7` | track: something that plays | a database track, a playlist entry, an audio file, a chapter |
+| `8` | file: any other file | an image, a text file, a playlist file |
+| `9` | option: one of a setting's values | Off, One and All in Repeat's list |
+
+The menus, the settings, the database and file browsers, the playlist viewer,
+a setting's list of values, chapter lists, the Audiobooks shelf and Featured
+Artists all answer. Every other list's rows are `0`. The numbers never change;
+a new kind is given the next one.
+
+Compare it with `%if` or `%sel`:
+
+```
+%?if(%Lk,=,1)<...draw a chevron...|>
+%sel(%Lk,2,%Lv,3,%Lv)                 # a setting's value, where it has one
+```
+
+In a conditional the branches start at `1`, and plain takes the last:
+`%?Lk<menu|toggle|setting|action|command|container|track|file|option|plain>`.
+
+### `%Lp` — the row's number among the tracks
+
+The row's place among the list's track rows, from `1`, and empty on any other
+row. A list's [Random] or [Resume] row does not shift the numbers, nor does a
+folder or an image among a folder's files.
+
+```
+%?Lp<%Lp|>                     # numbers on tracks, nothing elsewhere
+%?if(%Lp,>,99)<...narrow digits...>
+```
+
+### `%Lv` — a setting row's value
+
+The current value of a toggle or setting row, as that setting's own screen
+words it: "On", "All", "-6 dB". Empty on every other row, and on a setting
+that names a file.
+
+### `%LP` — is this row playing
+
+True on the row that is playing now: in the playlist viewer, a database track
+list and the file browser.
+
+```
+%?LP<* |>%LT
+```
 
 ## Changed behaviour: `%Lb`'s art row height
 

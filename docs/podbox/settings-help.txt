@@ -657,6 +657,11 @@ The Beatles sits among the Bs. The names still show in full.
 
 Applies to the Music lists, By First Letter and the carousel.
 
+[album show year]
+Adds the release year after each album's name in the Music lists, so a
+discography reads in order at a glance. An album added since the album index
+last caught up shows no year until it has. The carousel has its own setting.
+
 [debug log tagcache]
 Writes scan progress to a log file. For working out why a track is missing from
 the database.
@@ -708,10 +713,11 @@ book again under Audiobooks puts a Resume row at the top of its chapter list.
 Choosing a chapter instead plays that chapter from its start. A book held in a
 single file has a chapter list only when Chapter Marks reads one out of it and
 Cuesheet Support finds no cuesheet for it; otherwise playing it resumes it.
-The last sixty-four books are remembered.
+The last 1,024 books are remembered.
 Above the first book on the list sit [Finished], [Not Started] and [In
 Progress], which sort the books by how far into them you are and play the one
-you choose; podcasts are in none of them.
+you choose; podcasts are in none of them. The context menu on a book there
+marks it as any of the three, until it is played again.
 
 Nothing else is read. Track length and title look much the same on a book, a
 live set and a long classical movement, so a book tagged as music browses as
@@ -815,6 +821,10 @@ size, in two piles either side of the current one.
 
 [album covers scroll speed]
 How far a flick of the wheel carries. Affects both view modes.
+
+[album covers random spin]
+How many covers go past when holding Play picks an album at random. Long makes
+more of a show of it and takes a little longer to land.
 
 [album covers transition speed]
 How quickly the 3D view settles after scrolling. No effect in Flat, which times
@@ -1012,10 +1022,10 @@ The quiet end of the meter's range.
 [peak meter max]
 The loud end of the meter's range.
 
-[no scrolling]
-Text too long for its line is cut short with "..." instead of scrolling, in
-lists, menus and the theme's own scrolling lines. The other scroll settings
-then have nothing to move.
+[scrolling enabled]
+Whether text too long for its line scrolls. Off, it is cut short with "..."
+instead, in lists, menus and the theme's own scrolling lines, and the other
+scroll settings then have nothing to move.
 
 [scroll speed]
 How quickly text too long for its line moves.
@@ -1569,12 +1579,16 @@ one list to differ.
 The order for the album list inside an artist.
 
 Year here reads as a discography in release order, which is usually what an
-artist's albums want.
+artist's albums want. Every album in the list is by the one artist, so the
+artist orders are not offered, and a Default that names one sorts by the rest.
 
 [action: Album Artist]
 The order for the album list inside an album artist. Genre, Year and the
 Playback History artist lists group by album artist too, so they follow this
 row as well.
+
+The artist orders are not offered, as under Artist, and a Default that names
+one sorts by the rest.
 
 [action: Composer]
 The order for the album list inside a composer.

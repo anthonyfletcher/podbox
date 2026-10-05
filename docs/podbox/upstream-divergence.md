@@ -210,6 +210,7 @@ Serial iAP is `apps-ipod/iap/`. It reaches two firmware headers:
 | File | What changed | Why |
 | --- | --- | --- |
 | `rbcodec/metadata/mp4.c`, `metadata.h` | `has_video` on `struct mp3entry` | Tagcache skips music videos. |
+| `rbcodec/metadata/mp4.c` | `chpl`: reads the version-0 header, and takes a lead trim only from a single record | A chapter list whose first chapter starts after 0:00 had that much audio cut from the start of the book. |
 | `skin_parser/tag_table.c` | `find_custom_tag()` declared **weak** and tried **first** in `find_tag()` | Custom tags are registered from the app layer. First, because upstream's shortest-match search would read `%sel` as `%s`. Weak, so the parser links standalone. |
 | `skin_parser/tag_table.h` | Six new `SKIN_TOKEN_*` members | The token field is a 1-byte enum; the table rows stay in `custom_tags.c`. |
 | `skin_parser/tag_table.h` | `SKIN_REFRESH_SPECTRUM`, in `SKIN_REFRESH_NON_STATIC` | Spectrum lines redraw with time. |

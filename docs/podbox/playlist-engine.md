@@ -30,9 +30,10 @@ times faster on the player, but noticeably less accurate.
   Fast, Melancholy and Uplifting.
 - **Journeys** — below Moods. A playlist that moves gradually from one mood to
   another, such as Slow → Fast.
-- **Wind Down** — hold `Select` on a track. It plays first, and each track
-  after it is calmer. With a sleep timer running, the playlist lasts as long
-  as the time left on it.
+- **Wind Down** — hold `Select` on a track, then choose how long it runs:
+  15 minutes to two hours, or Default. It plays first, and each track after
+  it is calmer. Default lasts as long as the time left on a running sleep
+  timer, and with none running holds Playlist Length's tracks.
 - **Order by Sound** — hold `Select` in the playlist viewer. Puts the playlist
   you already have in an order where each track leads into the next. The
   track playing stays first, tracks not yet measured go to the end, and a

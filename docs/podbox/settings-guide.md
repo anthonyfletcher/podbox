@@ -249,13 +249,14 @@ report rebuilds them itself the next time you open it.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Sort Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
-| Sort Albums By ▸ Artist | The order for the album list inside an artist. | default |  |
-| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. | default |  |
+| Sort Albums By ▸ Artist | The order for the album list inside an artist. Year here reads as a discography in release order, which is usually what an artist's albums want. Every album in the list is by the one artist, so the artist orders are not offered, and a Default that names one sorts by the rest. | default |  |
+| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | default |  |
 | Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
 | Sort Albums By ▸ Other Lists | The order for every album list that has no row of its own under Sort Albums By: by name, by release year with either end first, or by album artist and then name or year. Year and artist orders stay in name order after new music is added, until the album index has caught up with it. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
 | Sort Ignoring The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists, By First Letter and the carousel. | off |  |
+| Show Year in Album Lists | Adds the release year after each album's name in the Music lists, so a discography reads in order at a glance. An album added since the album index last caught up shows no year until it has. The carousel has its own setting. | off |  |
 | Featured Artists | Reads guest credits out of your tags -- the "feat. Somebody" in a track title or artist -- and lets you browse by them, so a singer with no album of their own still turns up. On, Music gains a Featured Artists row and an artist's album list gains one for the records they only guest on; the credits are worked out once per boot, at the first entry to Music. Needs the database loaded to RAM. A name with a comma or an ampersand in it, like Tyler, The Creator, reads as two people unless the player has an album under it. Put such names one per line in /.rockbox/known_artists.txt and they are treated as whole; the file is read when the credits are worked out, so a boot or a database update applies it. | off |  |
-| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu. Albums, artists, the carousel and search then show music only. The genre and composer lists are left as they are, so a book is still reachable under its own genre. The genre tag is the whole of the evidence. A genre counts if it has "audiobook", "audio book" or "spoken word" anywhere in it, so Audiobooks, Audiobook/Fiction and Spoken Word & Poetry all match; and it counts if it is exactly "book", "books", "spoken", "speech", "podcast", "podcasts", "non-music" or "nonmusic", which are too short to go looking for inside longer names. Capitals make no difference. Books also keep their place. Pausing, stopping, switching the player off or starting something else writes down where a book had got to, and opening that book again under Audiobooks puts a Resume row at the top of its chapter list. Choosing a chapter instead plays that chapter from its start. A book held in a single file has a chapter list only when Chapter Marks reads one out of it and Cuesheet Support finds no cuesheet for it; otherwise playing it resumes it. The last sixty-four books are remembered. Above the first book on the list sit [Finished], [Not Started] and [In Progress], which sort the books by how far into them you are and play the one you choose; podcasts are in none of them. Nothing else is read. Track length and title look much the same on a book, a live set and a long classical movement, so a book tagged as music browses as music and retagging it is the fix. An album or an artist has to be spoken word throughout to count as a book. One music track on it and the whole of it stays with the music, which is what keeps a compilation with a poem on it out of the Audiobooks menu. | off |  |
+| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu. Albums, artists, the carousel and search then show music only. The genre and composer lists are left as they are, so a book is still reachable under its own genre. The genre tag is the whole of the evidence. A genre counts if it has "audiobook", "audio book" or "spoken word" anywhere in it, so Audiobooks, Audiobook/Fiction and Spoken Word & Poetry all match; and it counts if it is exactly "book", "books", "spoken", "speech", "podcast", "podcasts", "non-music" or "nonmusic", which are too short to go looking for inside longer names. Capitals make no difference. Books also keep their place. Pausing, stopping, switching the player off or starting something else writes down where a book had got to, and opening that book again under Audiobooks puts a Resume row at the top of its chapter list. Choosing a chapter instead plays that chapter from its start. A book held in a single file has a chapter list only when Chapter Marks reads one out of it and Cuesheet Support finds no cuesheet for it; otherwise playing it resumes it. The last 1,024 books are remembered. Above the first book on the list sit [Finished], [Not Started] and [In Progress], which sort the books by how far into them you are and play the one you choose; podcasts are in none of them. The context menu on a book there marks it as any of the three, until it is played again. Nothing else is read. Track length and title look much the same on a book, a live set and a long classical movement, so a book tagged as music browses as music and retagging it is the fix. An album or an artist has to be spoken word throughout to count as a book. One music track on it and the whole of it stays with the music, which is what keeps a compilation with a poem on it out of the Audiobooks menu. | off |  |
 | Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "(Taylor's Version)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off, and where a whole album says the same thing after every track. Nothing on disk changes and neither does the database, so browsing and searching still see the full names and switching this off brings them back. A note at the start of a name is always kept. What counts as a note is a list in /.rockbox/trim.config, which you can edit: one pattern per line, and * matches anything. Switching this setting off and on again re-reads it. | off |  |
 | Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
@@ -288,6 +289,7 @@ report rebuilds them itself the next time you open it.
 | Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
 | Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175 |  |
+| Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | medium |  |
 
 ### Library — Database
 
@@ -311,7 +313,7 @@ report rebuilds them itself the next time you open it.
 | Playlist Length | The most tracks Play Similar, a mood or a journey puts in the playlist. Forty is about an evening. It is a limit rather than a target. Only tracks that really do sound like what was asked for are used, so a mood your library holds little of gives a short playlist rather than a long one filled out with whatever was nearest. A journey spreads its change across whatever length is set, so a short one moves between its two moods in fewer steps rather than covering less ground. | 40 | |
 | Track Playlist | How much Play Similar varies between runs. Predictable gives the same playlist every time from the same song, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. None of them reach further out for the difference -- the playlist is drawn from the same neighbourhood either way. | predictable | |
 | Mood Playlist | How much a mood or a journey varies between runs. Predictable gives the same playlist every time, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. Moods and journeys are on the Playlists screen, above the saved playlists. | weekly | |
-| Start With Selected Track | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. | on |  |
+| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. | on |  |
 | Continue Playing | Keeps the music going when a playlist runs out, by adding more tracks that sound like what has been playing and carrying on into them. Works for any playlist -- an album, a saved one, a folder, or one the engine built. A playlist the engine built is continued on its own terms: a mood keeps aiming at that mood rather than drifting away from it one extension at a time. Anything else is continued from the track that just finished. Nothing already in the playlist is added again. | off | |
 | Library Sound | What the analysis found across the whole library: how many tracks it has measured, how many it reached but could not read, and how many of those settled on a tempo or a key. The tempo count is the one to look at when Slow, Fast or Hypnotic offer fewer tracks than expected -- those three only consider tracks whose tempo the analysis trusts, and on most libraries that is well short of all of them. The last row says which music a track's Sound screen is comparing it against: your own library once enough of it has been measured, the built-in numbers until then. | -- | |
 
@@ -339,25 +341,27 @@ report rebuilds them itself the next time you open it.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
+| Dynamic Colors Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | auto |  |
 | Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
 | Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
 | Line Selector Colours ▸ Primary Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
 | Line Selector Colours ▸ Secondary Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
 | Line Selector Colours ▸ Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
 | Line Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
-| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
-| Dynamic Colors Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | auto |  |
-| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
-| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
-| Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
-| Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
-| Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
-| Button Text | The text colour of an unselected dialog button. | e7f3ef |  |
-| Button Background | The fill colour of an unselected dialog button. | 000c21 |  |
-| Button Border | The border colour of an unselected dialog button. | e7f3ef |  |
-| Selected Button Text | The text colour of the selected dialog button. | 000c21 |  |
-| Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
-| Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
+| Carousel ▸ Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
+| Carousel ▸ Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
+| Dialog Elements ▸ Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
+| Dialog Elements ▸ Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
+| Dialog Elements ▸ Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Dialog Elements ▸ Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
+| Dialog Elements ▸ Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Dialog Elements ▸ Button Text | The text colour of an unselected dialog button. | e7f3ef |  |
+| Dialog Elements ▸ Button Background | The fill colour of an unselected dialog button. | 000c21 |  |
+| Dialog Elements ▸ Button Border | The border colour of an unselected dialog button. | e7f3ef |  |
+| Dialog Elements ▸ Selected Button Text | The text colour of the selected dialog button. | 000c21 |  |
+| Dialog Elements ▸ Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
+| Dialog Elements ▸ Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
 
 Several rows here are listed only while something reads them, whatever Settings
 Mode says. The nine palette rows -- everything from Box Text down -- need
@@ -370,19 +374,19 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
-| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
-| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
-| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
-| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
-| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
-| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
-| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 | Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Cfg** |
 | Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
+| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
+| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
+| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
+| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
+| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
+| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
+| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
+| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 
 ### Appearance — Dialogs
 
@@ -398,7 +402,7 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| No Scrolling | Text too long for its line is cut short with "..." instead of scrolling, in lists, menus and the theme's own scrolling lines. The other scroll settings then have nothing to move. | off |  |
+| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus and the theme's own scrolling lines, and the other scroll settings then have nothing to move. | on |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |
