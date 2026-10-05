@@ -109,6 +109,10 @@ static bool lib_scan(void)
     {
         bool in_mood = false;
 
+        /* Or the codec stops refilling while music plays, which is heard. */
+        if ((i & 63) == 0)
+            yield();
+
         splash_progress(i, rd.count, "%s", str(LANG_WAIT));
         if (!sound_index_read(&rd, i, &r))
             break;

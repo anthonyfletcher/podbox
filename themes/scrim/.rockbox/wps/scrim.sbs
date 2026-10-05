@@ -75,11 +75,13 @@
 # Row setup
 #
 # - Row shape. 1 icon, 2 number, 3 bare. A library list's own rows (%Lk 5:
-#   <Random>, <Resume>, the shelf's three) have no track number, so they take
-#   the icon shape, as do the database's top menus, Music and Audiobooks. A
-#   genre called Audiobooks lists containers (%Lk 6), so it is not one.
+#   <Random>, <Resume>, <Featured In>, the shelf's three) have no track
+#   number, so they take the icon shape, as do the database's top menus, Music
+#   and Audiobooks. <All Tracks> and <By album> stay bare, in line with the
+#   album and artist rows they head. A genre called Audiobooks lists
+#   containers (%Lk 6), so it is not one.
 %Vl(Rows,0,0,1,1,-)
-%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5)))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
+%?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
 # - Chevron, on rows that open a list: a settings submenu, a folder, a
 #   database level above the tracks, a playlist in the catalogue. 2 for a

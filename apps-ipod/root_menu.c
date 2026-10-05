@@ -1370,6 +1370,10 @@ void root_menu_load_from_cfg(void* setting, char *value)
     if (!main_menu_added)
         root_menu__[menu_item_count++] = (struct menu_item_ex *)&menu_;
     root_menu_.flags |= MENU_ITEM_COUNT(menu_item_count);
+    /* A .cfg loaded once tagnavi.config is parsed gets no first entry to
+     * drop the slots it names that have no row. */
+    if (browser_db_ready())
+        root_menu_fixup_tagnavi_slots();
     *(bool*)setting = true;
 }
 

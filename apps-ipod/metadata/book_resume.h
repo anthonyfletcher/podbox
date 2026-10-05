@@ -66,7 +66,8 @@ void book_resume_init(void);
 void book_resume_save(void);
 
 /* Mark 'book' Finished, Not started, or -- with BOOK_LEFT_PARTWAY -- in
- * progress from its beginning. */
+ * progress from its beginning. Marking the book that is loaded stops it, or
+ * for in progress saves where it is. */
 bool book_resume_mark(const char *book, enum book_left left);
 
 /* The position saved for 'book'. False if it has none, and wherever there is

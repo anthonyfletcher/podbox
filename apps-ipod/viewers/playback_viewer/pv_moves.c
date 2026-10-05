@@ -195,11 +195,13 @@ static bool mark_found(void)
 {
     struct tagcache_search tcs;
     char fname[MAX_PATH];
-    int n = 0;
+    int n = 0, total;
 
     if (!tagcache_search(&tcs, tag_filename))
         return false;
 
+    /* Read before the walk: get_next() counts entry_count down on disk. */
+    total = tcs.entry_count;
     while (tagcache_get_next(&tcs, fname, sizeof(fname)))
     {
         uint32_t h = fnv1a_str(fname);
@@ -216,7 +218,7 @@ static bool mark_found(void)
             s = (s + 1) & sc.f_mask;
         }
 
-        splash_progress(++n, tcs.entry_count, "%s",
+        splash_progress(++n, total, "%s",
                         str(LANG_PV_MOVED_FOLDERS));
     }
 
@@ -268,18 +270,20 @@ static bool collect_votes(void)
 {
     struct tagcache_search tcs;
     char fname[MAX_PATH];
-    int n = 0;
+    int n = 0, total;
 
     if (!tagcache_search(&tcs, tag_filename))
         return false;
 
+    /* Read before the walk: get_next() counts entry_count down on disk. */
+    total = tcs.entry_count;
     while (tagcache_get_next(&tcs, fname, sizeof(fname)))
     {
         const char *slash = strrchr(fname, '/');
         uint32_t bh, dh;
         int s;
 
-        splash_progress(++n, tcs.entry_count, "%s",
+        splash_progress(++n, total, "%s",
                         str(LANG_PV_MOVED_FOLDERS));
         if (!slash || slash == fname)
             continue;

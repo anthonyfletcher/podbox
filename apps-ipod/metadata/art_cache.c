@@ -5,7 +5,8 @@
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder's image or a
  * track's embedded art, as the album art source setting orders them; artist
- * art from an image in its parent or, failing that, the folder above. Each has
+ * art from an image in its parent or, failing that, the folder above when it is
+ * named after the artist. Each has
  * its own placeholder for when nothing is found.
  ****************************************************************************/
 
@@ -102,6 +103,9 @@ static unsigned char *aa_visited;
 
 static volatile bool cache_busy;
 
+/* Counts every change to a thumbnail: see art_cache_generation(). */
+static volatile unsigned int aa_generation;
+
 /* What the current (or last completed) pass has covered, and the folder it is
  * on. Every one of these is a count of a branch the pass already takes, so
  * keeping them costs nothing beyond the increment; aa_dir is the scratch
@@ -121,6 +125,9 @@ static char aa_artpath[MAX_PATH];
 static char aa_dir[MAX_PATH];
 static char aa_artist_dir[MAX_PATH];
 static char aa_probe[MAX_PATH];
+/* The album artist and artist of the track whose folder an artist visit is
+ * for: the names an image from the folder above has to be filed under. */
+static char aa_artist_names[2][MAX_PATH];
 static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
@@ -444,6 +451,7 @@ static void aa_purge_thumbs(void)
             closedir(d);
 
             removed = 0;
+            aa_generation++;
             for (int j = 0; j < n; j++)
             {
                 snprintf(filepath, sizeof(filepath), "%s/%s", dirpath,
@@ -549,9 +557,10 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
  * falls back to the folder above, which is the album for a disc folder but the
  * artist for an album folder -- and the artist's picture is no album's cover.
  * So for an album an image from above counts only for a disc folder. For an
- * artist it always counts, except from the volume root: under
+ * artist it counts when the folder it is in is named after the artist: under
  * <artist>/<album_type>/<album> the folder above the album is the type, and
- * the artist's picture is one further up. */
+ * the artist's picture is one further up -- where under <genre>/<artist> or
+ * <Music>/<artist> it would be the genre's or the whole library's. */
 static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
 {
     const char *end = strrchr(probe, '/');
@@ -564,7 +573,21 @@ static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
     if (!strncmp(probe, art, dirlen) && !strchr(art + dirlen, '/'))
         return true;
     if (artist)
-        return strrchr(art, '/') != art;
+    {
+        const char *aend = strrchr(art, '/');
+        size_t len, i;
+
+        if (!aend)
+            return false;
+        for (start = aend; start > art && start[-1] != '/'; start--)
+            ;
+        len = aend - start;
+        for (i = 0; len > 0 && i < ARRAYLEN(aa_artist_names); i++)
+            if (strlen(aa_artist_names[i]) == len
+                && !strncasecmp(start, aa_artist_names[i], len))
+                return true;
+        return false;
+    }
 
     for (start = end; start > probe && start[-1] != '/'; start--)
         ;
@@ -756,11 +779,17 @@ static bool aa_thumbs_exist(unsigned int dh)
     return true;
 }
 
+unsigned int art_cache_generation(void)
+{
+    return aa_generation;
+}
+
 /* Delete every size of one folder's thumbnails. */
 static void aa_remove_thumbs(unsigned int dh)
 {
     int s;
 
+    aa_generation++;
     for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
     {
         aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
@@ -1067,6 +1096,7 @@ static void aa_generate_size(const struct aa_src *src, int size_index,
                              unsigned int dh, const char *out_path,
                              void *workbuf, size_t workbuf_sz)
 {
+    aa_generation++;
     if (global_settings.art_cache_fast_build &&
         aa_generate_chained(size_index, dh, out_path, workbuf, workbuf_sz))
         return;
@@ -1255,8 +1285,9 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
  * cache key) and `slot` its table entry. An album takes its art from the
  * sources the album art source setting names, in its order, reading one track's
  * tags for the embedded kind; an `artist` takes it from an image file only, and
- * with no image of its own takes the one above it, cached under its own key so
- * that every reader keying artist art on the album's parent finds it. Sets
+ * with no image of its own takes one from a folder above named after the
+ * artist, cached under its own key so that every reader keying artist art on
+ * the album's parent finds it. Sets
  * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the folder is
  * cached: an existence check per size, plus the image lookup and stamp under
  * aa_check_all, and no image or track is read. */
@@ -1271,6 +1302,18 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
 
     if (!aa_check_all && slot->stamp != AA_STAMP_NONE && aa_thumbs_exist(dh))
         return true;
+
+    /* A folder of loose tracks beside album folders is also an album, and
+     * one visit serves both. Its embedded cover yields only where the album
+     * art source would yield it, to an image of its own -- never to one from
+     * above. */
+    if (artist && slot->stamp == AA_STAMP_EMBEDDED && aa_thumbs_exist(dh))
+    {
+        if (global_settings.art_cache_album_source <= ART_SOURCE_FILES_FIRST
+            && aa_find_file(probe_path, false))
+            goto from_file;
+        return true;
+    }
 
     if (source <= ART_SOURCE_FILES_FIRST && aa_find_file(probe_path, artist))
         goto from_file;
@@ -1476,6 +1519,10 @@ static enum bg_result aa_run_pass(void)
             if ((slot = aa_visit(ah)))
             {
                 snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
+                tagcache_retrieve(&tcs, tcs.idx_id, tag_albumartist,
+                                  aa_artist_names[0], MAX_PATH);
+                tagcache_retrieve(&tcs, tcs.idx_id, tag_artist,
+                                  aa_artist_names[1], MAX_PATH);
                 aa_counts.artists++;
                 if (aa_cache_dir(aa_probe, ah, slot, true, workbuf, worksz,
                                  &aborted))
@@ -1611,10 +1658,22 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
 
 /* A pass trusts each folder's stamp for what its tags hold, so a change of
  * source needs the pass that reads them again. */
+/* The source the last change was acted on for, or -1 before the first. */
+static int aa_applied_source = -1;
+
 void art_cache_album_source_callback(int source)
 {
-    (void)source;
+    aa_applied_source = source;
     bg_task_update(&art_cache_task);
+}
+
+void art_cache_settings_applied(void)
+{
+    int source = global_settings.art_cache_album_source;
+
+    if (aa_applied_source >= 0 && aa_applied_source != source)
+        art_cache_album_source_callback(source);
+    aa_applied_source = source;
 }
 
 /* bg_task.run: one pass, with the tracing the pass itself does not do. */

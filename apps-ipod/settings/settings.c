@@ -103,6 +103,7 @@ static long lasttime = 0;
 #include "screens/browse/browser.h"    /* browser_albumart_invalidate */
 #include "screens/covers/album_covers.h" /* the year sort carry-over */
 #include "metadata/book_resume.h"
+#include "metadata/art_cache.h"
 #include "pcm_sampr.h"
 
 #ifdef LOGF_ENABLE
@@ -1261,6 +1262,7 @@ void settings_apply(bool read_disk)
         global_settings.peak_meter_clip_hold);
 
     settings_apply_dialog_style();
+    art_cache_settings_applied();
 
     if (read_disk)
     {

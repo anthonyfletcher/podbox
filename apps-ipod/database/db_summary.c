@@ -1268,42 +1268,45 @@ static int assign_album_artists(uint32_t *refs)
     splash_progress_set_delay(HZ / 2);
     draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUMS);
 
-    if (tagcache_search(&tcs, tag_year))
+    if (!tagcache_search(&tcs, tag_year))
+        return ERROR_USER_ABORT;
+
+    while (tagcache_get_next(&tcs, num, sizeof(num)))
     {
-        while (tagcache_get_next(&tcs, num, sizeof(num)))
+        struct album_data *al;
+
+        keep_awake_for_build();
+        if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUMS))
         {
-            struct album_data *al;
+            tagcache_search_finish(&tcs);
+            return ERROR_USER_ABORT;
+        }
 
-            keep_awake_for_build();
-            if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUMS))
-            {
-                tagcache_search_finish(&tcs);
-                return ERROR_USER_ABORT;
-            }
+        if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
+            continue;
 
-            if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
-                continue;
+        /* Album seeks are unique among these albums, so the artist one is
+         * given below cannot move it within the order searched here. */
+        r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
+        if (r == ct)
+            continue;
+        al = &pfi->album_index[REF_IDX(refs[r])];
+        if (al->seek != v[V_ALBUM] || (refs[r] & REF_SEEN))
+            continue;
 
-            /* Album seeks are unique among these albums, so the artist one is
-             * given below cannot move it within the order searched here. */
-            r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
-            if (r == ct)
-                continue;
-            al = &pfi->album_index[REF_IDX(refs[r])];
-            if (al->seek != v[V_ALBUM] || (refs[r] & REF_SEEN))
-                continue;
-
-            refs[r] |= REF_SEEN;
-            i = artist_by_seek(v[V_ARTIST]);
-            if (i >= 0)
-            {
-                al->artist_idx = pfi->artist_index[i].name_idx;
-                al->artist_seek = v[V_ARTIST];
-            }
+        refs[r] |= REF_SEEN;
+        i = artist_by_seek(v[V_ARTIST]);
+        if (i >= 0)
+        {
+            al->artist_idx = pfi->artist_index[i].name_idx;
+            al->artist_seek = v[V_ARTIST];
         }
     }
     tagcache_search_finish(&tcs);
-    return SUCCESS;
+
+    /* A walk cut short by a failed read would save the albums after it
+     * unassigned, under an index that looks complete. */
+    return tcs.failed ? ERROR_USER_ABORT : SUCCESS;
 }
 
 /* Count one track into the album *ref names, if that album is (album, artist).
@@ -1393,32 +1396,34 @@ static int assign_album_stats(uint32_t *refs)
     splash_progress_set_delay(HZ / 2);
     draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUM_STATS);
 
-    if (tagcache_search(&tcs, tag_year))
+    if (!tagcache_search(&tcs, tag_year))
+        return ERROR_USER_ABORT;
+
+    while (tagcache_get_next(&tcs, num, sizeof(num)))
     {
-        while (tagcache_get_next(&tcs, num, sizeof(num)))
+        keep_awake_for_build();
+        if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUM_STATS))
         {
-            keep_awake_for_build();
-            if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUM_STATS))
-            {
-                tagcache_search_finish(&tcs);
-                return ERROR_USER_ABORT;
-            }
-
-            if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
-                continue;
-
-            /* The track belongs to the album's entries that take any artist,
-             * and to those that take its own. */
-            for (r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
-                 r < ct && add_track(&refs[r], v, ANY_ARTIST); r++)
-                ;
-            for (r = ref_lower_bound(refs, ct, v[V_ALBUM], v[V_ARTIST]);
-                 r < ct && add_track(&refs[r], v, v[V_ARTIST]); r++)
-                ;
+            tagcache_search_finish(&tcs);
+            return ERROR_USER_ABORT;
         }
+
+        if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
+            continue;
+
+        /* The track belongs to the album's entries that take any artist,
+         * and to those that take its own. */
+        for (r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
+             r < ct && add_track(&refs[r], v, ANY_ARTIST); r++)
+            ;
+        for (r = ref_lower_bound(refs, ct, v[V_ALBUM], v[V_ARTIST]);
+             r < ct && add_track(&refs[r], v, v[V_ARTIST]); r++)
+            ;
     }
     tagcache_search_finish(&tcs);
-    return SUCCESS;
+
+    /* As in assign_album_artists(): no partial figures under a full stamp. */
+    return tcs.failed ? ERROR_USER_ABORT : SUCCESS;
 }
 
 /* Roll the album figures up to their artists.

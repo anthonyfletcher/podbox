@@ -906,6 +906,23 @@ static bool in_char_set(ucschar_t ch, const unsigned char *set)
     return false;
 }
 
+/* A copy cut at its buffer can end partway through a character, and
+ * utf8decode() steps over the NUL that interrupts one. Drop that character. */
+static void drop_partial_char(char *s)
+{
+    size_t n = strlen(s), i = n;
+    unsigned char lead;
+
+    while (i > 0 && ((unsigned char)s[i - 1] & 0xc0) == 0x80)
+        i--;
+    if (i == 0)
+        return;
+    lead = s[i - 1];
+    if (lead >= 0xc0 && n - (i - 1) < (size_t)(lead >= 0xf0 ? 4
+                                               : lead >= 0xe0 ? 3 : 2))
+        s[i - 1] = '\0';
+}
+
 /* %trm(text, chars) -- text with every character in chars removed from both
  * ends. NOINLINE for the source buffers (recursive). */
 static const char* NOINLINE get_trim_value(struct gui_wps *gwps,
@@ -928,8 +945,10 @@ static const char* NOINLINE get_trim_value(struct gui_wps *gwps,
     t = eval_select_param(gwps, skinbuffer, &params[0], offset, buf, buf_size);
     if (!t) return NULL;
     strmemccpy(src, t, sizeof(src));
+    drop_partial_char(src);
     t = eval_select_param(gwps, skinbuffer, &params[1], offset, buf, buf_size);
     strmemccpy((char *)set, t ? t : "", sizeof(set));
+    drop_partial_char((char *)set);
 
     /* The first character to keep, and the end of the last one. */
     start = (const unsigned char *)src;

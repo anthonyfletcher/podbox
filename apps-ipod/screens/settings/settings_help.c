@@ -45,6 +45,9 @@ bool settings_help_lookup(const char *key, char *buf, size_t bufsz)
 
     while (read_line(fd, line, sizeof line) > 0)
     {
+        if (line[0] == '#')
+            continue;           /* the file's own notes */
+
         if (line[0] == '[')
         {
             /* A second heading ends the stanza we were collecting. */

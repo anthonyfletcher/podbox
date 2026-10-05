@@ -90,6 +90,10 @@ void art_cache_get_counts(struct art_cache_counts *out);
 /* The folder a running pass is on, or "" when idle. */
 const char *art_cache_activity(void);
 
+/* A number that changes whenever any thumbnail is written or deleted, for a
+ * reader holding something made from one to tell whether it is still good. */
+unsigned int art_cache_generation(void);
+
 /* The caching pass, for the standard triggers.
  *
  * bg_task_rebuild() purges every cached thumbnail and regenerates from
@@ -112,6 +116,10 @@ enum art_album_source
 
 /* The setting's callback: a change re-resolves every folder. */
 void art_cache_album_source_callback(int source);
+
+/* From settings_apply(): the same for a change a loaded .cfg made, which
+ * runs no setting's callback. */
+void art_cache_settings_applied(void);
 
 /* Resolve the cache-file path for a given album folder and size index.
  * Returns true and fills 'out' if a thumbnail is available, false otherwise.

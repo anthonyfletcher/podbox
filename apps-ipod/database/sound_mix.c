@@ -1085,6 +1085,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
         return SOUND_MIX_NO_DB;
     }
 
+    /* Read before the walk: get_next() counts entry_count down on disk. */
+    int total = tcs.entry_count;
     bool ram = mix_resolve_ram(&tcs, buf, sizeof (buf), cand, held, skip_key,
                                seed_path, &seed_len, &seed_artist);
 
@@ -1097,7 +1099,7 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
          * with nothing else able to run. */
         yield();
 
-        mix_progress(ask, 1, ++walked, tcs.entry_count);
+        mix_progress(ask, 1, ++walked, total);
 
         /* The seed's own row, for the two things only the database holds: who
          * it is by, which the artist rules space the playlist against, and

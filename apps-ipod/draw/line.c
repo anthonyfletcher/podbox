@@ -30,6 +30,7 @@
 #include "font.h"
 #include "rbunicode.h"
 #include "diacritic.h"
+#include "bidi.h"
 
 #define MAX_LINES  LCD_SCROLLABLE_LINES
 
@@ -121,7 +122,9 @@ static void put_text(struct screen *display,
     if (line->style & STYLE_INVERT)
         drmode = DRMODE_SOLID | DRMODE_INVERSEVID;
 
-    char fitted[TEXT_FIT_BUF];
+    /* Static, because the scroll thread also calls this, on a 3 KB stack;
+     * it never cuts text, so only the UI thread writes here. */
+    static char fitted[TEXT_FIT_BUF];
     if (line->scroll && !prevent_scroll && !global_settings.scrolling_enabled)
     {
         text = text_fit(text, fitted, sizeof(fitted), lcd_getfont(),
@@ -409,6 +412,7 @@ const char *text_fit(const char *text, char *buf, size_t size,
     int ellw = 3 * font_get_width(pf, '.');
     int width = 0;
     size_t fit = 0;     /* bytes that fit with the "..." after them */
+    bool rtl = false;   /* the last letter kept reads right to left */
     ucschar_t ch;
 
     if (font_getstringsize(p, NULL, NULL, font) <= maxwidth)
@@ -423,6 +427,10 @@ const char *text_fit(const char *text, char *buf, size_t size,
             if (width + ellw > maxwidth)
                 break;
         }
+        if (is_rtl_char(ch))
+            rtl = true;
+        else if (ch >= 0x80 || isalnum(ch))
+            rtl = false;
         p = next;
         fit = p - (const unsigned char *)text;
     }
@@ -434,7 +442,19 @@ const char *text_fit(const char *text, char *buf, size_t size,
         while (fit > 0 && (text[fit] & 0xc0) == 0x80)
             fit--;
     }
-    memcpy(buf, text, fit);
-    strcpy(buf + fit, "...");
+    /* The dots go where the text was cut, which for right-to-left text is
+     * its left end: logically first, since bidi_l2v() lays the line out
+     * left to right. */
+    if (rtl)
+    {
+        memcpy(buf, "...", 3);
+        memcpy(buf + 3, text, fit);
+        buf[fit + 3] = '\0';
+    }
+    else
+    {
+        memcpy(buf, text, fit);
+        strcpy(buf + fit, "...");
+    }
     return buf;
 }

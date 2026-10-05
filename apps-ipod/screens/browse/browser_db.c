@@ -103,8 +103,11 @@
 static int browser_db_play_folder(struct browser_context* c);
 static bool under_artist_level(struct browser_context* c);
 
-/* reuse of browser_db data after browser_db_play_folder() */
+/* reuse of browser_db data after browser_db_play_folder(), with the two
+ * things retrieve_entries() works out that a reuse does not rebuild */
 static uint32_t loaded_entries_crc = 0;
+static int loaded_head_rows;
+static bool loaded_years_valid;
 
 
 /* this needs to be same size as struct entry (tree.h) and name needs to be
@@ -3744,6 +3747,8 @@ int browser_db_load(struct browser_context* c)
                 if (loaded_entries_crc == browser_db_data_crc(c))
                 {
                     count = c->dirlength;
+                    head_rows = loaded_head_rows;
+                    album_years_valid = loaded_years_valid;
                     logf("Reusing %d entries", count);
                     break;
                 }
@@ -4867,6 +4872,8 @@ static int browser_db_play_folder(struct browser_context* c)
         {
             playlist_start(index, resume_pos.elapsed, resume_pos.offset);
             loaded_entries_crc = browser_db_data_crc(c);
+            loaded_head_rows = head_rows;
+            loaded_years_valid = album_years_valid;
             return 0;
         }
     }
@@ -4891,6 +4898,8 @@ static int browser_db_play_folder(struct browser_context* c)
 
     playlist_start(start_index, 0, 0);
     loaded_entries_crc = browser_db_data_crc(c); /* save crc in case we return */
+    loaded_head_rows = head_rows;
+    loaded_years_valid = album_years_valid;
     return 0;
 }
 

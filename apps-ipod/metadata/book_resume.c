@@ -198,6 +198,10 @@ static bool parse_old(char *line, struct entry *e)
     if (track == NULL || track[0] == '\0' || book[0] == '\0')
         return false;
 
+    /* A book keyed by its path wrote that path cut short; its track is the
+     * same file in full. */
+    if (book[0] == '/')
+        book = track;
     e->book = book_resume_key(book);
     e->path = book[0] == '/' ? book : NULL;
     e->pos.track   = path_key(track);
@@ -209,8 +213,9 @@ static bool parse_old(char *line, struct entry *e)
     return true;
 }
 
-/* Every entry in the file, in order, until 'fn' returns false. */
-static void scan(bool (*fn)(const struct entry *e, void *data), void *data)
+/* Every entry in the file, in order, until 'fn' returns false. False when
+ * the file is there and could not be opened. */
+static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
 {
     char line[BOOK_LINE_MAX];
     bool current = false;
@@ -218,7 +223,7 @@ static void scan(bool (*fn)(const struct entry *e, void *data), void *data)
 
     fd = open(BOOK_RESUME_FILE, O_RDONLY);
     if (fd < 0)
-        return;
+        return !file_exists(BOOK_RESUME_FILE);
 
     while (read_line(fd, line, sizeof (line)) > 0)
     {
@@ -237,6 +242,7 @@ static void scan(bool (*fn)(const struct entry *e, void *data), void *data)
     }
 
     close(fd);
+    return true;
 }
 
 struct find_ctx
@@ -360,15 +366,22 @@ void book_resume_init(void)
  * writing                                                            *
  * ------------------------------------------------------------------ */
 
-static void write_entry(int fd, const struct entry *e)
+static bool write_entry(int fd, const struct entry *e)
 {
-    fdprintf(fd, "%016llx\t%016llx\t%lu\t%lu\t%d\t%s",
-             (unsigned long long)e->book, (unsigned long long)e->pos.track,
-             e->pos.elapsed, e->pos.offset, e->pos.index,
-             left_words[e->pos.left]);
-    if (e->path != NULL)
-        fdprintf(fd, "\t%s", e->path);
-    fdprintf(fd, "\n");
+    char line[BOOK_LINE_MAX];
+    int len;
+
+    len = snprintf(line, sizeof (line),
+                   "%016llx\t%016llx\t%lu\t%lu\t%d\t%s%s%s\n",
+                   (unsigned long long)e->book,
+                   (unsigned long long)e->pos.track,
+                   e->pos.elapsed, e->pos.offset, e->pos.index,
+                   left_words[e->pos.left],
+                   e->path != NULL ? "\t" : "",
+                   e->path != NULL ? e->path : "");
+    if (len >= (int)sizeof (line))
+        len = sizeof (line) - 1;
+    return write(fd, line, len) == len;
 }
 
 struct copy_ctx
@@ -376,6 +389,7 @@ struct copy_ctx
     int out;
     uint64_t skip;              /* the entry just replaced */
     int kept;
+    bool ok;
 };
 
 static bool copy_one(const struct entry *e, void *data)
@@ -387,61 +401,88 @@ static bool copy_one(const struct entry *e, void *data)
     if (++ctx->kept > BOOK_RESUME_MAX)
         return false;
 
-    write_entry(ctx->out, e);
-    return true;
+    ctx->ok = write_entry(ctx->out, e);
+    return ctx->ok;
 }
 
 /* 'first' at the top and the other books after it in the order they were
  * last played, which is what makes the cap drop the one heard longest ago.
- * Every line goes out in the current format, whichever it was read in. */
+ * Every line goes out in the current format, whichever it was read in. A
+ * failed write anywhere leaves the file as it was. */
 static bool rewrite(const struct entry *first)
 {
-    struct copy_ctx ctx = { .skip = first->book, .kept = 1 };
+    struct copy_ctx ctx = { .skip = first->book, .kept = 1, .ok = true };
+    int hlen = sizeof (BOOK_HEADER "\n") - 1;
 
     ctx.out = open(BOOK_RESUME_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (ctx.out < 0)
         return false;
 
-    fdprintf(ctx.out, "%s\n", BOOK_HEADER);
-    write_entry(ctx.out, first);
-    scan(copy_one, &ctx);
+    ctx.ok = write(ctx.out, BOOK_HEADER "\n", hlen) == hlen
+             && write_entry(ctx.out, first)
+             && scan(copy_one, &ctx) && ctx.ok;
 
-    close(ctx.out);
+    if (close(ctx.out) < 0)
+        ctx.ok = false;
+    if (!ctx.ok)
+    {
+        remove(BOOK_RESUME_TMP);
+        return false;
+    }
 
     remove(BOOK_RESUME_FILE);
     return rename(BOOK_RESUME_TMP, BOOK_RESUME_FILE) >= 0;
 }
 
+/* The book loaded for playback, playing or paused, or NULL. */
+static struct mp3entry *loaded_book(const char **name, uint64_t *book)
+{
+    struct mp3entry *id3 = audio_status() ? audio_current_track() : NULL;
+
+    if (id3 == NULL || !db_spoken_is_spoken_genre(id3->genre_string))
+        return NULL;
+
+    *name = book_name(id3);
+    *book = book_resume_key(*name);
+    return id3;
+}
+
+/* The loaded book cannot be marked from under itself: the next save would
+ * write its position straight over the mark. In progress takes that position
+ * as it is; the other two stop the book, the way finishing it would. */
 bool book_resume_mark(const char *book, enum book_left left)
 {
     struct entry e = {
         .path = book[0] == '/' ? book : NULL,
         .pos = { .track = 0, .index = -1, .left = left },
     };
+    const char *name;
+    uint64_t loaded;
 
     e.book = book_resume_key(book);
+    if (global_settings.segregate_audiobooks
+        && loaded_book(&name, &loaded) != NULL && loaded == e.book)
+    {
+        if (left == BOOK_LEFT_PARTWAY)
+        {
+            book_resume_save();
+            return true;
+        }
+        audio_stop();
+    }
     return rewrite(&e);
 }
 
 void book_resume_save(void)
 {
-    struct mp3entry *id3 = NULL;
+    struct mp3entry *id3;
     const char *name = NULL;
     uint64_t book = 0;
 
     if (!global_settings.segregate_audiobooks)
         return;
 
-    if (audio_status())
-        id3 = audio_current_track();
-    if (id3 != NULL && !db_spoken_is_spoken_genre(id3->genre_string))
-        id3 = NULL;
-
-    if (id3 != NULL)
-    {
-        name = book_name(id3);
-        book = book_resume_key(name);
-    }
+    id3 = loaded_book(&name, &book);
 
     if (ended_pending)
     {

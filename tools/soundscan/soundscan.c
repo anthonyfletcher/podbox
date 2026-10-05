@@ -105,9 +105,12 @@ const char *soundscan_codec_dir(void)
  * write caching each rewrite is a synchronous seek on its disk. It goes
  * through the host's stdio, not the player-rooted open(), and needs no
  * flush -- it only has to outlive the process, not the machine. Its first
- * line is the player root, so a marker left by one player is not applied to
- * another. Empty means clear. */
+ * line names the player by its volume's serial number, so a marker left by
+ * one player is not applied to another mounted at the same letter, and is
+ * still found when the same one comes back at a different letter. Empty
+ * means clear. */
 static char busy_file[1024];
+static char busy_player[64];
 
 static void busy_init(void)
 {
@@ -119,6 +122,23 @@ static void busy_init(void)
         dir = ".";
 
     snprintf(busy_file, sizeof (busy_file), "%s/soundscan.busy", dir);
+
+    /* Without a serial, the root as given: right as long as the player comes
+     * back at the same place. */
+    snprintf(busy_player, sizeof (busy_player), "%s", sim_root_dir);
+#ifdef _WIN32
+    {
+        char vol[MAX_PATH];
+        DWORD serial;
+
+        if (GetVolumePathNameA(sim_root_dir, vol, sizeof (vol)) &&
+            GetVolumeInformationA(vol, NULL, 0, &serial, NULL, NULL, NULL, 0))
+        {
+            snprintf(busy_player, sizeof (busy_player), "volume %08lx",
+                     (unsigned long)serial);
+        }
+    }
+#endif
 }
 
 static void busy_set(const char *path)
@@ -128,7 +148,7 @@ static void busy_set(const char *path)
     if (f == NULL)
         return;
 
-    fprintf(f, "%s\n%s", sim_root_dir, path);
+    fprintf(f, "%s\n%s", busy_player, path);
     fclose(f);
 }
 
@@ -168,6 +188,17 @@ static void on_crash(int sig)
     longjmp(crash_jmp, 1);
 }
 
+/* Ctrl-C finishes the track in hand and writes what the run has measured,
+ * rather than leaving the marker on a good track for the next run to file as
+ * unreadable. A second Ctrl-C has the default action back, and ends it. */
+static volatile sig_atomic_t stop_asked;
+
+static void on_interrupt(int sig)
+{
+    (void)sig;
+    stop_asked = 1;
+}
+
 /* Record a track as unreadable, so no run tries it a second time. */
 static void file_failed(const char *path)
 {
@@ -199,7 +230,7 @@ static const char *busy_get(void)
 {
     static char buf[1024 + MAX_PATH];
     FILE *f = fopen(busy_file, "rb");
-    size_t len, root_len = strlen(sim_root_dir);
+    size_t len, root_len = strlen(busy_player);
     char *path;
     ssize_t n;
 
@@ -210,7 +241,7 @@ static const char *busy_get(void)
     fclose(f);
     buf[len] = '\0';
 
-    if (len <= root_len || strncmp(buf, sim_root_dir, root_len) != 0 ||
+    if (len <= root_len || strncmp(buf, busy_player, root_len) != 0 ||
         buf[root_len] != '\n')
     {
         return NULL;
@@ -367,7 +398,7 @@ static bool walk(const char *dir, bool counting, int *total, int depth)
     if (d == NULL)
         return true;
 
-    while (ok && (e = readdir(d)) != NULL)
+    while (ok && !stop_asked && (e = readdir(d)) != NULL)
     {
         struct dirinfo info;
         char path[MAX_PATH];
@@ -627,6 +658,7 @@ int main(int argc, char **argv)
     signal(SIGSEGV, on_crash);
     signal(SIGILL, on_crash);
     signal(SIGFPE, on_crash);
+    signal(SIGINT, on_interrupt);
 
     for (i = 1; i < argc; i++)
     {
@@ -694,7 +726,7 @@ int main(int argc, char **argv)
     walk("/", true, &total, 0);
     printf(" %d tracks\n", total);
 
-    if (total == 0)
+    if (total == 0 || stop_asked)
         return 0;
 
     rc = sound_index_begin(total + 1, false);
@@ -723,6 +755,8 @@ int main(int argc, char **argv)
     busy_clear();
 
     printf("\r%-79s\r", "");
+    if (stop_asked)
+        printf("Stopped. Running it again carries on from here.\n");
     printf("%d tracks: %d measured, %d already current, %d too short, "
            "%d unreadable\n",
            n_seen, n_done, n_current, n_short, n_failed);

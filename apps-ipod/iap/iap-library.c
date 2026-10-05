@@ -188,7 +188,8 @@ struct block {
     uint32_t book_order[BOOK_MAX];
     uint8_t art_jpeg[ART_JPEG_MAX];
     char art_jpeg_of[MAX_PATH];     /* the cache file art_jpeg holds */
-    uint32_t art_jpeg_len;          /* and its length, 0 if it failed */
+    uint32_t art_jpeg_len;          /* and its length */
+    unsigned int art_jpeg_gen;      /* art_cache_generation() it was made at */
     struct mp3entry art_next;       /* the track a prefetch encodes for */
     fb_data art_band[16 * ART_CACHE_MAX_DIM];
     struct entry entries[];
@@ -298,8 +299,11 @@ static bool open_block(bool lists)
     return true;
 }
 
+static void prefetch_give_way(void);
+
 static void start_work(long id, intptr_t data)
 {
+    prefetch_give_way();
     building = true;
     list_type = 0;
     queue_post(&worker_q, id, data);
@@ -1476,6 +1480,7 @@ bool iap_library_playlists_ask(void)
     if (lists_state == IAP_LIST_BUSY || !open_block(false))
         return false;
     lists_state = IAP_LIST_BUSY;
+    prefetch_give_way();
     queue_post(&worker_q, EV_LIST, 0);
     return true;
 }
@@ -1499,6 +1504,7 @@ bool iap_library_queue_ask(void)
     if (queue_state == IAP_LIST_BUSY || !open_block(false))
         return false;
     queue_state = IAP_LIST_BUSY;
+    prefetch_give_way();
     queue_post(&worker_q, EV_LIST, 1);
     return true;
 }
@@ -1549,6 +1555,14 @@ static struct {
 
 static struct albumart_source art_source;
 
+/* Work the car is waiting on goes ahead of a cover nobody has asked for: the
+ * worker takes one event at a time, and an encode is seconds on the 5G. */
+static void prefetch_give_way(void)
+{
+    if (art.prefetching)
+        art.prefetch_stop = true;
+}
+
 struct aat_read
 {
     int fd;
@@ -1596,15 +1610,19 @@ static uint32_t encode_cache(const char *path, bool prefetch)
 }
 
 /* The thumbnail's JPEG: art_jpeg as it is when it holds this file's, which
- * an album's tracks share, else encoded now. A stopped prefetch leaves
- * art_jpeg holding nobody's. */
+ * an album's tracks share, and the art cache has not changed since; else
+ * encoded now. A stopped prefetch or a failed encode leaves art_jpeg holding
+ * nobody's, so the next ask tries again. */
 static uint32_t cache_jpeg(const char *path, bool prefetch)
 {
-    if (strcmp(path, block->art_jpeg_of))
+    unsigned int gen = art_cache_generation();
+
+    if (strcmp(path, block->art_jpeg_of) || gen != block->art_jpeg_gen)
     {
         block->art_jpeg_of[0] = '\0';
+        block->art_jpeg_gen = gen;
         block->art_jpeg_len = encode_cache(path, prefetch);
-        if (prefetch && art.prefetch_stop)
+        if ((prefetch && art.prefetch_stop) || block->art_jpeg_len == 0)
             return 0;
         strlcpy(block->art_jpeg_of, path, sizeof(block->art_jpeg_of));
     }
