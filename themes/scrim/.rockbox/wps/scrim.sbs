@@ -82,8 +82,9 @@
 %?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5)))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
 # - Chevron, on rows that open a list: a settings submenu, a folder, a
-#   database level above the tracks, a playlist in the catalogue.
-%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,1)|%vs(chev,set,0)>
+#   database level above the tracks, a playlist in the catalogue. 2 for a
+#   chevron, 1 for none: a skin variable is never below 1.
+%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,2)|%vs(chev,set,1)>
 #
 # - Row icon
 %Vl(Rows,2,3,24,24,2)
@@ -103,17 +104,17 @@
 #   short of it where there is. Only one of each pair draws a
 #   given row, so neither clears the other's text
 %Vl(Rows,46,5,250,20,-)
-%?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),=,0))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
-%Vl(Rows,46,5,226,20,-)
 %?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
+%Vl(Rows,46,5,226,20,-)
+%?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),=,2))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
 %Vl(Rows,12,5,284,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,0))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
-%Vl(Rows,12,5,260,20,-)
 %?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+%Vl(Rows,12,5,260,20,-)
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,2))<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
 #
 # - Chevron
 %Vl(Rows,272,3,24,24,2)
-%?La<|%?if(%vg(chev),=,1)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>Þ>>
+%?La<|%?if(%vg(chev),=,2)<%?Lc<%Vf(ffffff)|%Vf(bdbdbd)>Þ>>
 #
 # Album/Artist row setup
 #
