@@ -351,14 +351,11 @@ always; forcing a rate resamples everything.
 
 [spun artwork]
 Whether the report's cards show album and artist sleeves. A card without one
-draws a pattern instead, which is part of the design rather than a stand-in,
-so this is a choice of look and not a downgrade.
+draws a pattern instead, as part of the design rather than a stand-in.
 
-It also decides how the report spends its memory. The pictures are the largest
-fixed claim it makes, so turning them off gives that back to the statistics: on
-a very large library, more of it fits and fewer rows are dropped. Because that
-division is settled as the report opens, changing this from inside it reads the
-log again -- the same pause a change of year costs.
+Off also gives the pictures' memory to the statistics, so on a very large
+library fewer rows are dropped. Changing it inside the report reads the log
+again, the same pause a change of year costs.
 
 [spun top count]
 How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is
@@ -560,16 +557,13 @@ it back on costs nothing.
 
 [analysis depth]
 How much of each track the analysis listens to. Thorough takes forty seconds.
-Quick stops as soon as the tempo has settled, around eleven, which is roughly
-three and a half times faster.
+Quick stops once the tempo has settled, around eleven, about three and a half
+times faster -- but loudness, tone and key are measured over that shorter
+stretch too, so its matches are noticeably worse.
 
-Quick is faster than it is accurate. The tempo settling is what stops it, and
-that ends the measurement of loudness, tonal balance and key along with it --
-measured against a full window it disagreed about the closest track two times
-in three. Use it if a full analysis on the player is too long to sit through;
-the desktop tool does a whole library thoroughly in minutes.
-
-Changing this does not re-measure anything. Rebuild Sound Analysis does.
+Use Quick only if a full analysis on the player is too long to sit through;
+the desktop tool does a whole library thoroughly. Changing this re-measures
+nothing: Rebuild Sound Analysis does.
 
 [mix starts with selected]
 Whether Play Similar and Wind Down play the track you chose them from first.
@@ -729,62 +723,30 @@ right as the year tags.
 
 [segregate audiobooks]
 Keeps spoken word out of the music and gives it an Audiobooks row on the main
-menu. Albums, artists, the carousel and search then show music only. The genre
-and composer lists are left as they are, so a book is still reachable under
-its own genre.
+menu; albums, artists, the carousel and search then show music only. Only the
+genre tag counts: one containing "audiobook", "audio book" or "spoken word",
+or exactly "book", "podcast", "speech" and the like.
 
-The genre tag is the whole of the evidence. A genre counts if it has
-"audiobook", "audio book" or "spoken word" anywhere in it, so Audiobooks,
-Audiobook/Fiction and Spoken Word & Poetry all match; and it counts if it is
-exactly "book", "books", "spoken", "speech", "podcast", "podcasts",
-"non-music" or "nonmusic", which are too short to go looking for inside
-longer names.
-Capitals make no difference.
-
-Books also keep their place. Pausing, stopping, switching the player off or
-starting something else writes down where a book had got to, and opening that
-book again under Audiobooks puts a Resume row at the top of its chapter list.
-Choosing a chapter instead plays that chapter from its start. A book held in a
-single file has a chapter list only when Chapter Marks reads one out of it and
-Cuesheet Support finds no cuesheet for it; otherwise playing it resumes it.
-The last 1,024 books are remembered.
-Above the first book on the list sit [Finished], [Not Started] and [In
-Progress], which sort the books by how far into them you are and play the one
-you choose; podcasts are in none of them. The context menu on a book there
-marks it as any of the three, until it is played again.
-
-Nothing else is read. Track length and title look much the same on a book, a
-live set and a long classical movement, so a book tagged as music browses as
-music and retagging it is the fix.
-
-An album or an artist has to be spoken word throughout to count as a book. One
-music track on it and the whole of it stays with the music, which is what keeps
-a compilation with a poem on it out of the Audiobooks menu.
+Books keep their place: open one again under Audiobooks and a Resume row heads
+its chapters. An album with one music track on it stays with the music.
 
 [trim titles]
 Shortens the album and track names on the now playing screen by dropping a
-trailing note about the pressing -- "(feat. Clairo)", "(Taylor's Version)",
-"[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off,
-and where a whole album says the same thing after every track.
+trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021
+Remaster". Useful where long names scroll or get cut off.
 
-Nothing on disk changes and neither does the database, so browsing and
-searching still see the full names and switching this off brings them back.
-A note at the start of a name is always kept.
-
-What counts as a note is a list in /.rockbox/trim.config, which you can edit:
-one pattern per line, and * matches anything. Switching this setting off and
-on again re-reads it.
+Files and the database are untouched, so browsing and search still see full
+names. The notes are patterns in /.rockbox/trim.config, one per line, with *
+matching anything; switch this off and on to re-read it.
 
 [featured artists]
-Reads guest credits out of your tags -- the "feat. Somebody" in a track title
-or artist -- and lets you browse by them, so a singer with no album of their own
-still turns up. On, Music gains a Featured Artists row and an artist's album
-list gains one for the records they only guest on; the credits are worked out
-once per boot, at the first entry to Music. Needs the database loaded to RAM.
-A name with a comma or an ampersand in it, like Tyler, The Creator, reads as two
-people unless the player has an album under it. Put such names one per line in
-/.rockbox/known_artists.txt and they are treated as whole; the file is read
-when the credits are worked out, so a boot or a database update applies it.
+Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets
+you browse by them: Music gains a Featured Artists row, and an artist's album
+list gains the records they only guest on. Needs the database loaded to RAM.
+
+A name with a comma or ampersand, like Tyler, The Creator, reads as two people
+unless an album is under it. List such names one per line in
+/.rockbox/known_artists.txt, then reboot or update the database.
 
 [art cache fast build]
 Decodes each image once for the largest thumbnail and derives the smaller sizes
@@ -1273,12 +1235,12 @@ without the sound card.
 [accessory browsing]
 Lets a receiver, car or dock browse artists, albums, genres, composers and
 audiobooks, up to this many songs in a list; a dock or receiver can also play
-Playlist Engine moods, which a car is not sent.
-Its memory is taken when browsing starts, which briefly rebuffers playback, and
-given back on unplugging; a car takes it with the first cover. Needs the
-database in RAM. Off offers only the Queue and saved playlists, and a car no
-library at all; a car connected while it was Off sees one only once it is
-plugged in again.
+Playlist Engine moods.
+
+Its memory is taken when browsing starts, briefly rebuffering playback, and
+given back on unplugging. Needs the database in RAM. Off offers only the Queue
+and saved playlists, and a car no library at all; a car connected while it was
+Off sees one only once plugged in again.
 
 [car artwork]
 The cover a car shows with each track, sent over Apple's accessory protocol.
@@ -1334,14 +1296,13 @@ place, as there is room for only one of the two beside the disk.
 
 [usb dac output]
 On, a USB DAC plugged into the dock connector takes over playback, and
-unplugging it hands playback back to the headphone socket. It is checked for
-only when no computer answers the cable within two seconds, and not while a
-dock is talking to the player over the dock connector.
+unplugging it hands playback back to the headphone socket. It is looked for
+only when no computer answers within two seconds, and not while a dock is
+talking to the player.
 
-The check starts from a charger's power, such as a USB-C splitter with a
-charger in it. A DAC on its own supply with nothing else on the cable goes
-unnoticed: use Turn On beside this instead. Off leaves every cable to the
-computer and charging.
+The check needs a charger's power, such as a USB-C splitter with a charger in
+it. A DAC on its own supply with nothing else on the cable goes unnoticed: use
+Turn On beside this. Off leaves every cable to the computer and charging.
 
 [debug log usb]
 Writes every USB connection step to usb-log.txt in the .rockbox folder, without
