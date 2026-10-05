@@ -32,6 +32,8 @@
 #include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
+#include "lang.h"
+#include "settings/settings.h"    /* ID2P */
 #include "widgets/splash.h"
 #include "pv_log.h"
 #include "pv_moves.h"
@@ -214,8 +216,8 @@ static bool mark_found(void)
             s = (s + 1) & sc.f_mask;
         }
 
-        if ((++n & 255) == 0)
-            splashf(0, "Looking for moved folders (%d)", n);
+        splash_progress(++n, tcs.entry_count, "%s",
+                        str(LANG_PV_MOVED_FOLDERS));
     }
 
     tagcache_search_finish(&tcs);
@@ -277,8 +279,8 @@ static bool collect_votes(void)
         uint32_t bh, dh;
         int s;
 
-        if ((++n & 255) == 0)
-            splashf(0, "Looking for moved folders (%d)", n);
+        splash_progress(++n, tcs.entry_count, "%s",
+                        str(LANG_PV_MOVED_FOLDERS));
         if (!slash || slash == fname)
             continue;
 
@@ -382,7 +384,7 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
     memset(sc.fslots, 0, (size_t)fs * sizeof(int));
     memset(sc.dslots, 0, (size_t)ds * sizeof(int));
 
-    splashf(0, "Looking for moved folders");
+    splash(0, ID2P(LANG_PV_MOVED_FOLDERS));
     sc.ram = tagcache_is_in_ram();
     if (pv_log_read(PV_SRC_PLAYBACK, log_cb, NULL) < 0 || sc.f_n == 0)
         return;

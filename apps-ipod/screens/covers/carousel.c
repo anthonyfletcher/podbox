@@ -478,10 +478,11 @@ static bool pf_flat_moving;
 static bool pf_flat_handover;
 
 /* Random pick (held PLAY): how many recent picks it avoids, and how far short
- * of the pick the scroll starts -- the spin is a cut to there and a scroll the
- * rest of the way, so it takes the same time in a library of any size. */
+ * of the pick the scroll starts, by Random Spin Length -- the spin is a cut to
+ * there and a scroll the rest of the way, so it takes the same time in a
+ * library of any size. */
 #define PF_RANDOM_HISTORY 8
-#define PF_RANDOM_SPIN    12
+static const int pf_random_spin[] = { 6, 12, 24 };
 /* The recent picks as slide indices, newest first. An index means nothing once
  * the order changes, so they are forgotten on a re-sort, a rebuild and a
  * switch to the other carousel. */
@@ -2911,7 +2912,7 @@ static bool random_was_recent(int index, int depth)
 static void show_random_slide(void)
 {
     int n = number_of_slides;
-    int depth, pick, from, i;
+    int depth, pick, from, spin, i;
 
     if (n < 2)
         return;
@@ -2935,8 +2936,10 @@ static void show_random_slide(void)
     if (pf_random_count < PF_RANDOM_HISTORY)
         pf_random_count++;
 
-    from = (pick > center_index) ? MAX(center_index, pick - PF_RANDOM_SPIN)
-                                 : MIN(center_index, pick + PF_RANDOM_SPIN);
+    spin = pf_random_spin[global_settings.album_covers_random_spin
+                          % ARRAYLEN(pf_random_spin)];
+    from = (pick > center_index) ? MAX(center_index, pick - spin)
+                                 : MIN(center_index, pick + spin);
     if (from != center_index)
         set_current_slide(from);
     target = pick;

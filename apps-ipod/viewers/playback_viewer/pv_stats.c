@@ -36,6 +36,7 @@
 #include "kernel.h"      /* current_tick, HZ */
 #include "database/tagcache.h"   /* the library's size, for the table caps */
 #include "system.h"      /* cpu_boost */
+#include "lang.h"
 #include "widgets/splash.h"
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
@@ -471,29 +472,30 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
         pv_index_write_abort();
 }
 
-/* How far a long read of the log has got, so whatever splash came before --
- * often the moved-folder search -- is not left up over it. Not before half a
- * second, so a short tail of new plays does not flash. 0 when no read is
- * running. */
-static unsigned long replay_size;
-static long replay_start, replay_shown;
+/* How far a long read of the log has got, from 'from' to 'size', so whatever
+ * splash came before -- often the moved-folder search -- is not left up over
+ * it. Not before half a second, so a short tail of new plays does not flash.
+ * replay_size is 0 when no read is running. */
+static unsigned long replay_from, replay_size;
 
-static void replay_begin(unsigned long size)
+static void replay_begin(unsigned long from, unsigned long size)
 {
+    replay_from = from;
     replay_size = size;
-    replay_start = replay_shown = current_tick;
+    splash_progress_set_delay(HZ / 2);
 }
 
 static void replay_progress(unsigned long offset)
 {
-    if (replay_size == 0
-        || TIME_BEFORE(current_tick, replay_start + HZ / 2)
-        || TIME_BEFORE(current_tick, replay_shown + HZ / 5))
+    /* In thousandths, since an offset need not fit an int. */
+    unsigned long step = (replay_size - replay_from) / 1000 + 1;
+
+    if (replay_size == 0 || offset < replay_from)
         return;
 
-    replay_shown = current_tick;
-    splashf(0, "Reading play history (%lu%%)",
-            offset / (replay_size / 100 + 1));
+    splash_progress((int)((offset - replay_from) / step),
+                    (int)((replay_size - replay_from) / step),
+                    "%s", str(LANG_PV_READING_HISTORY));
 }
 
 static void entry_cb(const struct pv_entry *e, void *ctx)
@@ -1402,7 +1404,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         if (index_load(out, log_size, &covered))
         {
             out->from_index = true;
-            replay_begin(log_size);
+            replay_begin(covered, log_size);
             lines = (covered < log_size)
                   ? pv_log_read_range(out->source, covered, 0, entry_cb, out)
                   : 0;
@@ -1418,7 +1420,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
             /* No index, or one that does not load -- most often because its
              * row counts do not fit tables sized like these. The whole log is
              * replayed instead. */
-            replay_begin(log_size);
+            replay_begin(0, log_size);
             lines = pv_log_read(out->source, entry_cb, out);
             out->ms_read = (current_tick - t0) * 1000 / HZ;
             save_wanted = (lines >= 0);

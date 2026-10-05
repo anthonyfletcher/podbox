@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <ctype.h>
 #include "string-extra.h"
 #include "config.h"
 #include "system/appevents.h"
@@ -1048,25 +1047,18 @@ static struct menu_table menu_table[] = {
 #define MAX_MENU_ITEMS (sizeof(menu_table) / sizeof(struct menu_table))
 static struct menu_item_ex *root_menu__[MAX_MENU_ITEMS];
 
-/* Enforces a fixed canonical order on the main menu, requested explicitly:
- * Resume/Now Playing, Music, Album covers, [tagnavi rows, in whatever order
- * they're already in], Playlists, Files, Plugins, Shortcuts, Settings,
- * System. Called as the final step of anything that (re)builds
- * root_menu__[] (root_menu_set_default(), root_menu_load_from_cfg(), and
- * root_menu_fixup_tagnavi_slots(), which appends newly-available tagnavi
- * slots to the *tail* and would otherwise land them after Playlists/Files/
- * etc) rather than baking the order into menu_table[] itself: tagnavi
- * slots must stay the *last* entries in menu_table[] for
- * root_menu_active_count() to correctly trim unbacked ones from the end
- * (see the comment on menu_table[] above), which rules out just declaring
- * menu_table[] in the desired final order.
+/* The default order of the main menu: Resume/Now Playing, Music, Album
+ * covers, [tagnavi rows, in whatever order they're already in], Playlists,
+ * Files, Shortcuts, Settings, System. Applied by root_menu_set_default()
+ * only -- a saved order is the user's, and nothing that loads or amends it
+ * may re-sort it, or Move in Customize Main Menu is undone on the spot. It is
+ * a pass rather than the order of menu_table[] because tagnavi slots must
+ * stay the *last* entries there for root_menu_active_count() to trim
+ * unbacked ones from the end.
  *
  * Every item not named in before_tagnavi/after_tagnavi falls into the
- * middle "tagnavi" group by construction (there's nothing else it could
- * be), preserving whatever relative order it already had -- this doesn't
- * hardcode "tagnavi0..19" by name, so it can't drift out of sync with
- * however many rows actually exist. Missing items (e.g. HAVE_TAGCACHE off,
- * or the user disabled something) are simply skipped, not left as gaps. */
+ * middle "tagnavi" group by construction, preserving its relative order.
+ * Missing items are skipped, not left as gaps. */
 static void root_menu_apply_canonical_order(void)
 {
     static const struct menu_item_ex * const before_tagnavi[] = {
@@ -1198,78 +1190,38 @@ static int root_menu_active_count(void)
     return MAX_MENU_ITEMS - (TAGNAVI_MAIN_MENU_SLOTS - real);
 }
 
-/* settings_load() (via root_menu_set_default()/root_menu_load_from_cfg(),
- * both driven off the root_menu_customized CUSTOM_SETTING) runs before
- * browser_db_init() has parsed tagnavi.config, so root_menu_active_count()
- * would have seen zero real tagnavi rows at that point and any tagnavi
- * item the user's *saved* configuration explicitly wanted got silently
- * dropped by root_menu_load_from_cfg()'s own matching loop (it can only
- * match against menu_table[] entries root_menu_active_count() already
- * knows about). Called once from root_menu()'s first entry, well after
- * the database browser is guaranteed ready, this re-adds any now-available tagnavi slot
- * the saved config wanted but couldn't find yet. No-op if it was already
- * there (i.e. the database browser happened to be ready by settings-load time after
- * all).
- *
- * Skipped entirely on a still-default configuration: tagnavi rows start
- * disabled by design now (see root_menu_set_default()), so there's nothing
- * to "restore" for a user who never customized anything -- this isn't an
- * init-order casualty to correct, it's the actual desired state. Only
- * matters once root_menu_customized is true, i.e. there's a real saved
- * preference this init-order race could have clipped. */
-/* Tagnavi slots the saved configuration named but that could not be matched
- * when it was read. One bit per slot; TAGNAVI_MAIN_MENU_SLOTS is 20, so a
- * uint32_t covers it with room to spare. */
-static uint32_t wanted_tagnavi_slots;
+/* The tagnavi slot an item is, or -1. */
+static int tagnavi_slot_of_item(const struct menu_item_ex *item)
+{
+    int tagnavi_start = MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS;
+    int n;
 
+    for (n = 0; n < TAGNAVI_MAIN_MENU_SLOTS; n++)
+        if (menu_table[tagnavi_start + n].item == item)
+            return n;
+    return -1;
+}
+
+/* settings_load() reads the saved order before browser_db_init() has parsed
+ * tagnavi.config, so root_menu_load_from_cfg() cannot tell which tagnavi
+ * slots are backed by a row and keeps every one the order names, in place.
+ * Called once from root_menu()'s first entry, when the row count is known,
+ * this drops the slots that turned out to have no row. Trap: re-adding the
+ * named slots here instead, after the load dropped them, puts them at the
+ * end of the menu wherever the user had moved them. */
 static void root_menu_fixup_tagnavi_slots(void)
 {
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
     int real = browser_db_get_main_menu_tag_row_count();
-    int tagnavi_start = MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS;
-    int n;
+    unsigned i, out = 0;
 
-    if (!global_settings.root_menu_customized)
-        return;
+    for (i = 0; i < count; i++)
+        if (tagnavi_slot_of_item(root_menu__[i]) < real)
+            root_menu__[out++] = root_menu__[i];
 
-    if (real > TAGNAVI_MAIN_MENU_SLOTS)
-        real = TAGNAVI_MAIN_MENU_SLOTS;
-
-    for (n = 0; n < real; n++)
-    {
-        struct menu_item_ex *item =
-            (struct menu_item_ex *)menu_table[tagnavi_start + n].item;
-        unsigned i;
-        bool present = false;
-
-        /* Only slots the saved configuration actually named -- which is not
-         * the same as every slot backed by a real row. Adding those instead
-         * reads to the user as "turning one row on turned them all on": the
-         * first customization sets root_menu_customized, and the next boot
-         * adds the lot. wanted_tagnavi_slots is what records the difference. */
-        if (!(wanted_tagnavi_slots & (1u << n)))
-            continue;
-
-        for (i = 0; i < count; i++)
-        {
-            if (root_menu__[i] == item)
-            {
-                present = true;
-                break;
-            }
-        }
-        if (!present && count < MAX_MENU_ITEMS)
-            root_menu__[count++] = item;
-    }
-
-    /* Consumed: this runs once, and a later save writes the real list. */
-    wanted_tagnavi_slots = 0;
-
-    if (count != MENU_GET_COUNT(root_menu_.flags))
+    if (out != count)
         root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
-                            | MENU_ITEM_COUNT(count);
-
-    root_menu_apply_canonical_order();
+                            | MENU_ITEM_COUNT(out);
 }
 
 /* Segregate Audiobooks owns the Audiobooks row: one setting, one feature.
@@ -1302,9 +1254,29 @@ void root_menu_set_audiobooks_row(bool on)
 
     if (on)
     {
+        unsigned at = count;
+
         if (i < count || count >= MAX_MENU_ITEMS)
             return;                     /* already there, or no room */
-        root_menu__[count++] = item;
+
+        /* After the last tagnavi row, else before Settings, else last. */
+        for (i = count; i-- > 0; )
+            if (tagnavi_slot_of_item(root_menu__[i]) >= 0)
+                break;
+        if (i < count)
+            at = i + 1;
+        else
+            for (i = 0; i < count; i++)
+                if (root_menu__[i] == &menu_)
+                {
+                    at = i;
+                    break;
+                }
+
+        memmove(&root_menu__[at + 1], &root_menu__[at],
+                (count - at) * sizeof(root_menu__[0]));
+        root_menu__[at] = item;
+        count++;
     }
     else
     {
@@ -1317,8 +1289,6 @@ void root_menu_set_audiobooks_row(bool on)
 
     root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
                         | MENU_ITEM_COUNT(count);
-
-    root_menu_apply_canonical_order();
 }
 
 struct menu_table *root_menu_get_options(int *nb_options)
@@ -1328,25 +1298,27 @@ struct menu_table *root_menu_get_options(int *nb_options)
     return menu_table;
 }
 
-/* Record "tagnaviN" from a config token that matched nothing. Anything else
- * unmatched is a key from an older build, or a typo, and is simply dropped as
- * it always was. */
-static void note_wanted_tagnavi_slot(const char *key)
+/* The menu_table[] index a config token names, or -1. Tagnavi slots match
+ * whether or not tagnavi.config has been parsed yet: see
+ * root_menu_fixup_tagnavi_slots(). Anything else unmatched is a key from an
+ * older build, or a typo, and is dropped. */
+static int menu_table_index_of_key(const char *key)
 {
-    int slot;
+    int i;
 
-    if (strncmp(key, "tagnavi", 7) != 0 || !isdigit((unsigned char)key[7]))
-        return;
-
-    slot = atoi(key + 7);
-    if (slot >= 0 && slot < TAGNAVI_MAIN_MENU_SLOTS)
-        wanted_tagnavi_slots |= 1u << slot;
+    for (i = 0; i < root_menu_active_count(); i++)
+        if (!strcmp(key, menu_table[i].string))
+            return i;
+    for (i = MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS; i < (int)MAX_MENU_ITEMS; i++)
+        if (!strcmp(key, menu_table[i].string))
+            return i;
+    return -1;
 }
 
 void root_menu_load_from_cfg(void* setting, char *value)
 {
     char *next = value, *start, *end;
-    unsigned int menu_item_count = 0, i;
+    unsigned int menu_item_count = 0;
     bool main_menu_added = false;
 
     if (*value == '-')
@@ -1370,49 +1342,34 @@ void root_menu_load_from_cfg(void* setting, char *value)
         start = skip_whitespace(start);
         if ((end = strchr(start, ' ')))
             *end = '\0';
-        bool matched = false;
-        for (i=0; i<(unsigned)root_menu_active_count(); i++)
+        int idx = *start ? menu_table_index_of_key(start) : -1;
+        unsigned k;
+
+        if (idx < 0)
+            continue;
+
+        /* Once only, however many times the key is listed. Nothing
+         * downstream removes a repeat: it goes into root_menu__ twice,
+         * root_menu_write_to_cfg() writes it out twice from there, and
+         * the next load reads it back twice -- so a configuration that
+         * ever gained a duplicate key kept it, showing the row twice in
+         * Customize Main Menu and on the main menu itself. Skipping it
+         * here also repairs such a configuration on its next save. */
+        for (k = 0; k < menu_item_count; k++)
         {
-            if (*start && !strcmp(start, menu_table[i].string))
-            {
-                unsigned k;
-                matched = true;
-
-                /* Once only, however many times the key is listed. Nothing
-                 * downstream removes a repeat: it goes into root_menu__ twice,
-                 * root_menu_write_to_cfg() writes it out twice from there, and
-                 * the next load reads it back twice -- so a configuration that
-                 * ever gained a duplicate key kept it, showing the row twice in
-                 * Customize Main Menu and on the main menu itself. Skipping it
-                 * here also repairs such a configuration on its next save. */
-                for (k = 0; k < menu_item_count; k++)
-                {
-                    if (root_menu__[k] == menu_table[i].item)
-                        break;
-                }
-                if (k < menu_item_count)
-                    break;
-
-                root_menu__[menu_item_count++] = (struct menu_item_ex *)menu_table[i].item;
-                if (menu_table[i].item == &menu_)
-                    main_menu_added = true;
+            if (root_menu__[k] == menu_table[idx].item)
                 break;
-            }
         }
+        if (k < menu_item_count)
+            continue;
 
-        /* A tagnavi slot this configuration asked for that could not be
-         * matched, because the database browser has not parsed
-         * tagnavi.config yet and root_menu_active_count() therefore still
-         * hides every slot. Remember exactly which ones, so
-         * root_menu_fixup_tagnavi_slots() can restore those and only those
-         * once the real row count is known. */
-        if (!matched && *start)
-            note_wanted_tagnavi_slot(start);
+        root_menu__[menu_item_count++] = (struct menu_item_ex *)menu_table[idx].item;
+        if (menu_table[idx].item == &menu_)
+            main_menu_added = true;
     }
     if (!main_menu_added)
         root_menu__[menu_item_count++] = (struct menu_item_ex *)&menu_;
     root_menu_.flags |= MENU_ITEM_COUNT(menu_item_count);
-    root_menu_apply_canonical_order();
     *(bool*)setting = true;
 }
 

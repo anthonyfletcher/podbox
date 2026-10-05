@@ -157,15 +157,18 @@ int sound_mix_mood_unasked(int from, int to, int want);
  *
  * That track plays first and does not come round again, as it does for a mix
  * built from a track -- winding down *from* something means starting there.
- * With Start With Selected Track off it is left out altogether.
+ * With Play Selected First off it is left out altogether.
  * What it does not do is set the goal: the near end of the journey is the
  * track's nearest *mood*, because a journey moves between two moods' targets
  * and a track is not one of those.
  *
  * A track already nearest Calm has no run-up to make and gives a plain Calm
  * playlist, still led by itself. One the index has nothing usable for is
- * refused rather than answered about some other music. */
-int sound_mix_winddown(const char *path, int want);
+ * refused rather than answered about some other music.
+ *
+ * target_ms above zero fills the playlist to that much music, by the tracks'
+ * own lengths, and 'want' is then ignored; otherwise it holds 'want' tracks. */
+int sound_mix_winddown(const char *path, int want, long target_ms);
 
 /* Extend the playlist now playing with more of the same, and play on from the
  * first added track. Appends rather than replaces, and refuses anything the

@@ -22,6 +22,10 @@ extern const struct menu_item_ex
         theme_menu                  /* theme_menu.c     */
         , album_covers_menu         /* album_covers_settings.c */
         , art_cache_menu            /* album_covers_settings.c */
+        , album_covers_background   /* album_covers_settings.c -- these two
+                                       listed under both Carousel and
+                                       Appearance > Colours */
+        , album_covers_custom_color_item
         , text_viewer_menu          /* text_viewer_settings.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
         , spun_menu                 /* spun_settings.c */

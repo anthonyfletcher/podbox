@@ -83,9 +83,11 @@ static bool lib_scan(void)
         return false;
 
     lc.records = rd.count;
+    splash_progress_set_delay(HZ / 2);
 
     for (i = 0; i < rd.count; i++)
     {
+        splash_progress(i, rd.count, "%s", str(LANG_WAIT));
         if (!sound_index_read(&rd, i, &r))
             break;
 

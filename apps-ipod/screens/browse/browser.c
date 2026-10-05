@@ -168,7 +168,8 @@ static const char* browser_get_filename(int selected_item, void *data,
 
     if (id3db)
     {
-        return browser_db_get_entry_name(&tc, selected_item, buffer, buffer_len);
+        return browser_db_get_display_name(&tc, selected_item, buffer,
+                                           buffer_len);
     }
     else
     {
@@ -1577,8 +1578,11 @@ void browser_mem_init(void)
     cache->name_buffer_handle = core_alloc_ex(cache->name_buffer_size, &ops);
 
     cache->max_entries = global_settings.max_files_in_dir;
+    /* A year per entry follows the entries: see album_years() in
+     * browser_db.c. */
     cache->entries_handle =
-            core_alloc_ex(cache->max_entries*(sizeof(struct entry)), &ops);
+            core_alloc_ex(cache->max_entries*(sizeof(struct entry)
+                                              + sizeof(int16_t)), &ops);
 }
 
 bool bookmark_play(char *resume_file, int index, unsigned long elapsed,

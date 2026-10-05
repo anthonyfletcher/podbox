@@ -975,11 +975,23 @@ static int album_sort_ctx_option(void *param)
         { STR(LANG_ARTIST_PLUS_YEAR_DESC) },
     };
     int ctx = (int)(intptr_t)param;
-    int choice = browser_db_album_sort_get(ctx) + 1;
+    int order = browser_db_album_sort_get(ctx);
+    int count = ARRAYLEN(orders);
+    int choice;
+
+    /* Default, Name and the two year orders: see
+     * browser_db_album_sort_artist_first_moot(). */
+    if (browser_db_album_sort_artist_first_moot(ctx))
+    {
+        count = 1 + DB_SORT_ALBUMS_ARTIST_NAME;
+        if (order >= DB_SORT_ALBUMS_ARTIST_NAME)
+            order -= DB_SORT_ALBUMS_ARTIST_NAME;
+    }
+    choice = order + 1;
 
     /* set_option() returns true only when USB took over the screen. */
     if (!set_option(str(album_sort_ctx_lang[ctx]), &choice, RB_INT,
-                    orders, ARRAYLEN(orders), NULL))
+                    orders, count, NULL))
     {
         browser_db_album_sort_set(ctx, choice - 1);
         settings_save();
@@ -1009,6 +1021,7 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
           );
 MENUITEM_SETTING(sort_ignore_articles, &global_settings.sort_ignore_articles,
                  NULL);
+MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
 
 MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
@@ -1044,7 +1057,8 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
           &quiz_title, &quiz_artist, &quiz_album, &quiz_year);
 
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &album_sort_menu, &sort_ignore_articles, &music_menu_config_item,
+          &album_sort_menu, &sort_ignore_articles, &album_show_year,
+          &music_menu_config_item,
           &featured_artists, &segregate_audiobooks, &trim_titles,
           &search_menu, &quiz_menu
           );

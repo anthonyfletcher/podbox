@@ -60,6 +60,7 @@ MENUITEM_SETTING(album_covers_center_margin, &global_settings.album_covers_cente
 MENUITEM_SETTING(album_covers_slide_tuck, &global_settings.album_covers_slide_tuck, tilt_only_callback);
 MENUITEM_SETTING(album_covers_parallel_slides, &global_settings.album_covers_parallel_slides, tilt_only_callback);
 MENUITEM_SETTING(album_covers_scroll_speed, &global_settings.album_covers_scroll_speed, NULL);
+MENUITEM_SETTING(album_covers_random_spin, &global_settings.album_covers_random_spin, NULL);
 MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, tilt_only_callback);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
 MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
@@ -117,7 +118,8 @@ static int custom_colour_callback(int action,
     return action;
 }
 
-MENUITEM_SETTING(album_covers_background,
+/* Both are listed under Appearance > Colours as well. */
+MENUITEM_SETTING_EXPORTED(album_covers_background,
                  &global_settings.album_covers_background, background_callback);
 MENUITEM_FUNCTION(album_covers_custom_color_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_CAROUSEL_CUSTOM_COLOR), pick_custom_colour,
@@ -192,4 +194,5 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_pile_offset,
             &album_covers_filter_menu,
             /* Shared, so last. */
-            &album_covers_scroll_speed);
+            &album_covers_scroll_speed,
+            &album_covers_random_spin);

@@ -59,11 +59,11 @@ static int screen_helper_getuifont(void)
     return global_status.font_id[SCREEN_MAIN];
 }
 
-/* A string cut to fit does not scroll, so No Scrolling needs nothing else. */
+/* A string cut to fit does not scroll, so scrolling off needs nothing else. */
 static bool screen_helper_puts_scroll(int x, int y, const unsigned char *str)
 {
     char fitted[TEXT_FIT_BUF];
-    if (global_settings.no_scrolling)
+    if (!global_settings.scrolling_enabled)
     {
         int font = lcd_getfont();
         str = (const unsigned char *)text_fit((const char *)str, fitted,

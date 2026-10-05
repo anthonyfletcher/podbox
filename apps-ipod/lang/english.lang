@@ -22515,13 +22515,13 @@
   desc: in Playlist Engine settings: Play Similar and Wind Down lead with the chosen track
   user: core
   <source>
-    *: "Start With Selected Track"
+    *: "Play Selected First"
   </source>
   <dest>
-    *: "Start With Selected Track"
+    *: "Play Selected First"
   </dest>
   <voice>
-    *: "Start With Selected Track"
+    *: "Play Selected First"
   </voice>
 </phrase>
 <phrase>
@@ -22758,16 +22758,142 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_NO_SCROLLING
-  desc: in the Scrolling menu, cut long text to fit with "..." instead of scrolling it
+  id: LANG_SCROLLING_ENABLED
+  desc: in the Scrolling menu, off cuts long text to fit with "..." instead of scrolling it
   user: core
   <source>
-    *: "No Scrolling"
+    *: "Enabled"
   </source>
   <dest>
-    *: "No Scrolling"
+    *: "Enabled"
   </dest>
   <voice>
-    *: "No Scrolling"
+    *: "Scrolling Enabled"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_ELEMENTS
+  desc: in Appearance > Colours, the submenu holding the dialog colours
+  user: core
+  <source>
+    *: "Dialog Elements"
+  </source>
+  <dest>
+    *: "Dialog Elements"
+  </dest>
+  <voice>
+    *: "Dialog Elements"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_READING_HISTORY
+  desc: Playback Report, progress while the play log is read
+  user: core
+  <source>
+    *: "Reading play history"
+  </source>
+  <dest>
+    *: "Reading play history"
+  </dest>
+  <voice>
+    *: "Reading play history"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MOVED_FOLDERS
+  desc: Playback Report, progress while it matches logged files to folders they have moved to
+  user: core
+  <source>
+    *: "Looking for moved folders"
+  </source>
+  <dest>
+    *: "Looking for moved folders"
+  </dest>
+  <voice>
+    *: "Looking for moved folders"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN_DEFAULT
+  desc: Wind Down length choice: the time left on the sleep timer, or Playlist Length with none running
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "Default"
+  </dest>
+  <voice>
+    *: "Default"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_YEAR_IN_ALBUM_LISTS
+  desc: in Library > Music: the release year after each album name in the browser's album lists
+  user: core
+  <source>
+    *: "Show Year in Album Lists"
+  </source>
+  <dest>
+    *: "Show Year in Album Lists"
+  </dest>
+  <voice>
+    *: "Show Year in Album Lists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LENGTH
+  desc: in Carousel settings: how many covers a held PLAY spins past before the random pick
+  user: core
+  <source>
+    *: "Random Spin Length"
+  </source>
+  <dest>
+    *: "Random Spin Length"
+  </dest>
+  <voice>
+    *: "Random Spin Length"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_SHORT
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "Short"
+  </dest>
+  <voice>
+    *: "Short"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_MEDIUM
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Medium"
+  </source>
+  <dest>
+    *: "Medium"
+  </dest>
+  <voice>
+    *: "Medium"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LONG
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Long"
+  </source>
+  <dest>
+    *: "Long"
+  </dest>
+  <voice>
+    *: "Long"
   </voice>
 </phrase>

@@ -200,6 +200,7 @@ static const struct tag_row tag_rows[] = {
 { "year from folder",          TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "album release date folders" },
 { "database sort albums by",   TAG_LIBRARY,                      "sorting albums year artist" },
 { "sort ignoring articles",    TAG_LIBRARY,                      "sorting ignore the a an artists albums" },
+{ "album show year",           TAG_LIBRARY,                      "albums release date" },
 { "playlist engine",           TAG_LIBRARY|TAG_PLAYLIST,         "similar genius sound analysis mix" },
 { "track playlist",            TAG_LIBRARY|TAG_PLAYLIST,         "similar random varied repeatable" },
 { "analysis depth",            TAG_LIBRARY|TAG_PLAYLIST,         "scan speed accuracy quick thorough" },
@@ -238,6 +239,7 @@ static const struct tag_row tag_rows[] = {
 { "album covers sort artists by", TAG_LIBRARY,                   "carousel sorting" },
 { "album covers view mode",       TAG_APPEARANCE,                "carousel 3d flat" },
 { "album covers scroll speed",    TAG_APPEARANCE,                "carousel speed" },
+{ "album covers random spin",     TAG_LIBRARY,                   "carousel shuffle play hold" },
 { "album covers center margin",   TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },
 { "album covers slide tuck",      TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },
 { "album covers parallel slides", TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d" },
@@ -299,7 +301,7 @@ static const struct tag_row tag_rows[] = {
 { "peak meter max",      TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "peak meter range" },
 
 /* --- scrolling ----------------------------------------------------------- */
-{ "no scrolling",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text ellipsis cut truncate" },
+{ "scrolling enabled",   TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text ellipsis cut truncate" },
 { "scroll speed",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text" },
 { "scroll delay",        TAG_SCROLLING|TAG_APPEARANCE,           "scrolling text start" },
 { "scroll step",         TAG_ADVANCED|TAG_SCROLLING|TAG_APPEARANCE, "scrolling text" },

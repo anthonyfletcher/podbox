@@ -520,44 +520,50 @@ MAKE_MENU(skins_menu, ID2P(LANG_SKINS), NULL, Icon_Wps,
             &browse_sbs,
             &clear_main_bd);
 
-/* Every colour the interface uses, in one screen.
- *
- * The dialog colours were behind Theme Settings > Dialogs, which meant looking
- * in two places to answer one question. They are flat here rather than in a
- * submenu of their own because Standard hides all nine anyway -- what is left
- * is a short list, and Everything is for someone who has come looking. */
-MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
-            &set_fg_col,
-            &set_bg_col,
-            &lss_settings,
-            &set_sep_col,
-            &dynamic_colors,
-            &dynamic_colors_background,
+MAKE_MENU(carousel_colours_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL,
+            Icon_NOICON,
+            &album_covers_background,
+            &album_covers_custom_color_item);
+
+MAKE_MENU(dialog_colours_menu, ID2P(LANG_DIALOG_ELEMENTS), NULL, Icon_NOICON,
             &dialog_colors,                /* Dialog Colour Mode */
             &set_dlg_box_shadow_col,
             &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
             &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
-            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel,
+            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel);
+
+/* Every colour the interface uses, in one screen, most often changed first:
+ * the dynamic colours, then the theme's palette, then the carousel and the
+ * dialogs in submenus of their own. */
+MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
+            &dynamic_colors,
+            &dynamic_colors_background,
+            &set_fg_col,
+            &set_bg_col,
+            &lss_settings,
+            &set_sep_col,
+            &carousel_colours_menu,
+            &dialog_colours_menu,
             &reset_colors);
 
 /* The bars are here rather than in a Bars submenu of their own: three of the
    five are one-line on/off choices, and burying them cost more than it saved.
-   Ordered outside-in -- the bars framing the screen, then what fills them,
-   then the marks drawn between and around the rows. */
+   Most often changed first -- the art, then the icons and bars, then the
+   marks drawn between and around the rows. */
 MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
+            &db_albumart,
+            &db_artistart,
+            &db_bookart,
+            &wps_art_source,          /* general_settings.c, also under
+                                         Playback with the rest of that screen */
             &show_icons,
             &statusbar,
             &scrollbar_item,
             &scrollbar_width,
-            &volume_type,
             &battery_display,
+            &volume_type,
             &cursor_style,
-            &sep_menu,
-            &db_albumart,
-            &db_artistart,
-            &db_bookart,
-            &wps_art_source);         /* general_settings.c, also under
-                                         Playback with the rest of that screen */
+            &sep_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
 

@@ -494,13 +494,19 @@ static int sound_mix_callback(int action,
 MENUITEM_FUNCTION(sound_mix_item, 0, ID2P(LANG_SOUND_MIX),
                   sound_mix_run, sound_mix_callback, Icon_Audio);
 
-/* Seconds of music a track is taken to be, for turning the time left on the
- * sleep timer into a number of tracks.
- *
- * A guess, and the only one in the feature. Filling to a duration exactly
- * means reading every chosen track's length, and the walk that turns keys
- * back into filenames is built around not reading what it does not have to. */
-#define WINDDOWN_TRACK_SECS  240
+/* How long a wind-down runs, in minutes: 0 is Default, first. */
+static const int winddown_minutes[] = { 0, 15, 30, 45, 60, 90, 120 };
+
+static const char *winddown_choice_name(int selected_item, void *data,
+                                        char *buffer, size_t buffer_len)
+{
+    (void)data;
+
+    if (winddown_minutes[selected_item] == 0)
+        return str(LANG_WINDDOWN_DEFAULT);
+    return format_sleeptimer(buffer, buffer_len,
+                             winddown_minutes[selected_item], NULL);
+}
 
 /* A wind-down is seeded, which is why it is here beside Play Similar and not
  * on the Playlists screen with the Moods and Journeys. Those pick both ends
@@ -509,20 +515,25 @@ MENUITEM_FUNCTION(sound_mix_item, 0, ID2P(LANG_SOUND_MIX),
 static int winddown_run(void)
 {
     char seed[MAX_PATH];
-    int left = get_sleep_timer();
-    int want = global_settings.mix_length;
+    struct simplelist_info info;
+    long target_ms = 0;
 
-    /* A running timer decides the length outright, and Playlist Length does
-     * not cap it: a wind-down that stops before the player does has not wound
-     * anything down. With no timer the usual length is the honest answer --
-     * there is nothing counting down to fit. */
-    if (left > 0)
-    {
-        want = (left + WINDDOWN_TRACK_SECS / 2) / WINDDOWN_TRACK_SECS;
+    simplelist_info_init(&info, str(LANG_WINDDOWN),
+                         ARRAYLEN(winddown_minutes), NULL);
+    info.get_name = winddown_choice_name;
+    if (simplelist_show_list(&info))
+        return ONPLAY_MAINMENU;
+    if (info.selection < 0)
+        return ONPLAY_OK;
 
-        if (want < 2)
-            want = 2;
-    }
+    /* Default fills to the time left on a running sleep timer, which
+     * Playlist Length does not cap: a wind-down that stops before the player
+     * does has not wound anything down. With no timer it is Playlist Length's
+     * count, since there is nothing counting down to fit. */
+    if (winddown_minutes[info.selection] > 0)
+        target_ms = winddown_minutes[info.selection] * 60 * 1000L;
+    else if (get_sleep_timer() > 0)
+        target_ms = get_sleep_timer() * 1000L;
 
     splash(0, ID2P(LANG_WAIT));
 
@@ -532,7 +543,8 @@ static int winddown_run(void)
         return ONPLAY_OK;
     }
 
-    return sound_mix_report(sound_mix_winddown(seed, want));
+    return sound_mix_report(sound_mix_winddown(seed, global_settings.mix_length,
+                                               target_ms));
 }
 
 /* Tracks only. An album's mean is a point rather than a track, and the near

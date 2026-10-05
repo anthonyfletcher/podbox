@@ -47,6 +47,7 @@
 #include "system.h"
 #include "kernel.h"
 #include "file.h"
+#include "lang.h"
 #include "settings/settings.h"
 #include "timefuncs.h"
 #include "database/path_key.h"
@@ -56,6 +57,7 @@
 #include "database/tagcache.h"
 #include "playlist/playlist.h"
 #include "system/app_util.h"
+#include "widgets/splash.h"
 #include "metadata/book_resume.h"
 
 #define AX  SOUND_AX
@@ -584,7 +586,8 @@ struct pick
     uint64_t key;
     uint32_t artist;    /* 0 until the database pass finds the track */
     int32_t  idx;       /* Its master index entry, to read the path back */
-    int32_t  len;       /* Its length in ms, for the duplicate test */
+    int32_t  len;       /* Its length in ms, for the duplicate test and a
+                           playlist filled to a time */
     int      d;         /* To the goal, at whichever step it suits best */
 };
 
@@ -934,9 +937,25 @@ static void mix_lock(void)
  * first only when it is the seed itself -- when 'skip_key' is set. Both are
  * empty for a mood. 'ask' puts the erase warning before a replaced playlist;
  * without it the playlist is replaced unasked. */
+/* Progress for a mix someone is waiting on, in thousandths: pass one is the
+ * first half, the database walk the second. */
+#define MIX_PROGRESS_HALF 500
+
+static void mix_progress(bool ask, int half, int done, int total)
+{
+    if (ask && total > 0)
+        splash_progress(half * MIX_PROGRESS_HALF
+                        + (int)((int64_t)done * MIX_PROGRESS_HALF / total),
+                        2 * MIX_PROGRESS_HALF, "%s", str(LANG_WAIT));
+}
+
+/* 'ask' is also what says someone is waiting, so it is what shows progress:
+ * the unasked builds run from an accessory's thread or unwatched. With
+ * target_ms above zero the playlist is filled to that much music rather than
+ * to 'want' tracks, which is then only a ceiling. */
 static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
                           const char *seed_path, int want, int vary,
-                          bool append, bool ask)
+                          bool append, bool ask, long target_ms)
 {
     static struct pick cand[MIX_CAND];
     static int cost[MIX_CAND];         /* the chain cost, this slot */
@@ -954,7 +973,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     int n_excl = append ? mix_playlist_keys(excl, MIX_EXCLUDE - MIX_SKIPPED)
                         : 0;
     int32_t seed_len = 0;
-    int held = 0, worst = 0;
+    int64_t filled_ms = 0;
+    int held = 0, worst = 0, walked = 0;
     int base = 0;
     int chosen = 0, added = 0;
     int tau = mix_vary_begin(vary);
@@ -977,6 +997,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
      * integer square root in it, done once per step of the goal -- which for
      * a journey is a hundred times over every record in the index. */
     cpu_boost(true);
+    if (ask)
+        splash_progress_set_delay(HZ / 2);
 
     /* Pass one: every record, scored against every step of the goal and kept
      * at whichever step suits it best.
@@ -1006,6 +1028,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
          * read does and costs nothing in between. */
         if ((i & 63) == 0)
             yield();
+
+        mix_progress(ask, 0, i, r.count);
 
         if (!sound_index_read(&r, i, &rec))
             break;
@@ -1072,6 +1096,8 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
         /* The same reason as pass one: a boosted walk of the whole database
          * with nothing else able to run. */
         yield();
+
+        mix_progress(ask, 1, ++walked, tcs.entry_count);
 
         /* The seed's own row, for the two things only the database holds: who
          * it is by, which the artist rules space the playlist against, and
@@ -1141,13 +1167,28 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
      * under a second path. */
     memset(take, 0, sizeof (take));
 
-    while (chosen < want)
+    /* The seed leads unless Play Selected First is off, and a playlist filled
+     * to a time counts it. */
+    bool lead = !append && seed_path != NULL && skip_key != 0
+                && global_settings.mix_starts_with_selected;
+
+    if (lead)
+        filled_ms = seed_len;
+
+    while (chosen < want && (target_ms <= 0 || filled_ms < target_ms))
     {
         const struct sound_axes *prev = NULL;
-        int step = g->steps > 1 ? chosen * g->steps / want : 0;
+        int step = 0;
         int cap = MIX_ENERGY_STEP;
         int n_elig = 0;
         int best = 0;
+
+        /* How far into the run this slot is: by time when filling to one, so
+         * a journey reaches its far end at the end of the music. */
+        if (g->steps > 1 && target_ms > 0)
+            step = MIN(filled_ms * g->steps / target_ms, g->steps - 1);
+        else if (g->steps > 1)
+            step = chosen * g->steps / want;
 
         if (chosen > 0)
             prev = &cand_ax[order[chosen - 1]];
@@ -1206,6 +1247,7 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
         take[i] = 1;
         order[chosen] = i;
         chosen++;
+        filled_ms += cand[i].len;
     }
 
     if (chosen == 0)
@@ -1258,12 +1300,9 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     }
 
     /* The seed goes first, so a mix starts with what it was asked about,
-     * unless Start With Selected Track is off; either way it is not among the
+     * unless Play Selected First is off; either way it is not among the
      * choices. A mood or an album's mean is not a track and begins at its own
      * first choice. */
-    bool lead = !append && seed_path != NULL && skip_key != 0
-                && global_settings.mix_starts_with_selected;
-
     if (lead && playlist_insert_context_add(&context, seed_path) >= 0)
         added++;
 
@@ -1310,7 +1349,7 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     int added;
 
     mix_lock();
-    added = mix_build_held(g, skip_key, seed_path, want, vary, append, ask);
+    added = mix_build_held(g, skip_key, seed_path, want, vary, append, ask, 0);
     mutex_unlock(&mix_mutex);
     return added;
 }
@@ -1731,8 +1770,14 @@ int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
                      global_settings.track_playlist, false, true);
 }
 
-int sound_mix_winddown(const char *path, int want)
+/* How long a track is taken to be when a wind-down filled to a time has to
+ * decide how many steps its journey takes before any track is chosen. The
+ * length itself is filled from the tracks' real lengths. */
+#define WINDDOWN_TRACK_MS  (240 * 1000L)
+
+int sound_mix_winddown(const char *path, int want, long target_ms)
 {
+    int added;
     struct sound_index_reader r;
     struct sound_record rec;
     struct sound_axes a;
@@ -1784,6 +1829,8 @@ int sound_mix_winddown(const char *path, int want)
     if (from < 0)
         return SOUND_MIX_NO_RECORD;
 
+    if (target_ms > 0)
+        want = (target_ms + WINDDOWN_TRACK_MS / 2) / WINDDOWN_TRACK_MS;
     if (want < 2)
         want = 2;
     if (want > SOUND_MIX_MAX)
@@ -1806,6 +1853,13 @@ int sound_mix_winddown(const char *path, int want)
     g.mood_to = MOOD_CALM;
     g.steps = from == MOOD_CALM ? 1 : want;
 
-    return mix_build(&g, path_key(path), path, want,
-                     global_settings.mood_playlist, false, true);
+    /* Filled to a time, the track count is only the journey's length and
+     * the ceiling is the most a mix holds. */
+    mix_lock();
+    added = mix_build_held(&g, path_key(path), path,
+                           target_ms > 0 ? SOUND_MIX_MAX : want,
+                           global_settings.mood_playlist, false, true,
+                           target_ms);
+    mutex_unlock(&mix_mutex);
+    return added;
 }

@@ -1843,28 +1843,32 @@ static char *write_field(char *dst, int value, int len)
     return dst + len;
 }
 
-static void write_order_prefix(char *dst, const struct db_summary_order *tab,
-                               int count, long seek, int order)
+/* The order table's row for an album, by its seek, or NULL. */
+static const struct db_summary_order *find_order(
+        const struct db_summary_order *tab, int count, long seek)
 {
     int lo = 0, hi = count - 1;
-    int year = YEAR_UNKNOWN;
-    int artist = DB_SUMMARY_NO_ARTIST;
 
     while (lo <= hi)
     {
         int mid = (lo + hi) / 2;
 
         if (tab[mid].seek == seek)
-        {
-            year = tab[mid].year;
-            artist = tab[mid].artist;
-            break;
-        }
+            return &tab[mid];
         if (tab[mid].seek < seek)
             lo = mid + 1;
         else
             hi = mid - 1;
     }
+    return NULL;
+}
+
+static void write_order_prefix(char *dst, const struct db_summary_order *tab,
+                               int count, long seek, int order)
+{
+    const struct db_summary_order *row = find_order(tab, count, seek);
+    int year = row != NULL ? row->year : YEAR_UNKNOWN;
+    int artist = row != NULL ? row->artist : DB_SUMMARY_NO_ARTIST;
 
     if (year <= 0 || year > 9999)
         year = YEAR_UNKNOWN;
@@ -1884,6 +1888,18 @@ static void write_order_prefix(char *dst, const struct db_summary_order *tab,
 static struct tagentry* get_entries(struct browser_context *tc)
 {
     return core_get_data(tc->cache.entries_handle);
+}
+
+/* Each loaded entry's album year, 0 for none, in the same allocation just past
+ * the entries (browser_mem_init() sizes it). Kept apart from the name, which
+ * titles the next level and keys a book's position, and from struct
+ * tagentry, which must stay the size of struct entry. Valid only for the list
+ * retrieve_entries() last filled it for. */
+static bool album_years_valid;
+
+static int16_t *album_years(struct browser_context *c)
+{
+    return (int16_t *)(get_entries(c) + c->cache.max_entries);
 }
 
 static void tcs_get_basename(struct tagcache_search *tcs, bool is_basename)
@@ -1938,6 +1954,15 @@ void browser_db_album_sort_set(int ctx, int order)
     global_settings.database_album_sort_ctx = packed;
 }
 
+/* Under one artist every album has the same artist, so an artist-first order
+ * is the same order without it -- except where an album's summary artist
+ * differs, which splits it off into a group of its own for no visible reason.
+ * Those contexts read the artist-first orders as the plain ones. */
+bool browser_db_album_sort_artist_first_moot(int ctx)
+{
+    return ctx == DB_ALBUM_CTX_ARTIST || ctx == DB_ALBUM_CTX_ALBUMARTIST;
+}
+
 /* Which context an album list at this level belongs to, or -1 for a parent
  * with no slot of its own. */
 static int album_sort_ctx(int level)
@@ -1962,9 +1987,15 @@ static int album_sort_ctx(int level)
 /* The order an album list at this level is drawn in. */
 static int album_sort_order(int level)
 {
-    int order = browser_db_album_sort_get(album_sort_ctx(level));
+    int ctx = album_sort_ctx(level);
+    int order = browser_db_album_sort_get(ctx);
 
-    return order < 0 ? global_settings.database_sort_albums_by : order;
+    if (order < 0)
+        order = global_settings.database_sort_albums_by;
+    if (browser_db_album_sort_artist_first_moot(ctx)
+        && order >= DB_SORT_ALBUMS_ARTIST_NAME)
+        order -= DB_SORT_ALBUMS_ARTIST_NAME;
+    return order;
 }
 
 /* How many tracks the [Featured In] row would show at browse level 'level':
@@ -2343,7 +2374,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * leaves the list in name order rather than a wrong one. */
     int album_order = tag == tag_album ? album_sort_order(level)
                                        : DB_SORT_ALBUMS_NAME;
-    if (album_order != DB_SORT_ALBUMS_NAME)
+    bool show_year = tag == tag_album && global_settings.album_show_year;
+
+    album_years_valid = false;
+    if (album_order != DB_SORT_ALBUMS_NAME || show_year)
     {
         size_t otab_sz;
 
@@ -2351,7 +2385,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         order_count = db_summary_read_order_table(order_tab,
                                     otab_sz / sizeof(*order_tab),
                                     global_settings.sort_ignore_articles);
-        if (order_count > 0)
+        if (order_count <= 0)
+            order_tab = NULL;
+        else if (album_order != DB_SORT_ALBUMS_NAME)
         {
             order_prefix = order_prefix_len(album_order);
             strip = order_prefix;
@@ -2359,8 +2395,6 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             articles_only = false;
             sort_inverse = (album_order == DB_SORT_ALBUMS_YEAR_DESC);
         }
-        else
-            order_tab = NULL;
     }
 
     /* lock buflib out due to possible yields */
@@ -2684,6 +2718,23 @@ entry_skip_formatter:
               sizeof(struct tagentry),
               c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS ? compare_with_albums : compare
         );
+    }
+
+    if (show_year && order_tab != NULL)
+    {
+        struct tagentry *entries = get_entries(c);
+        int16_t *years = album_years(c);
+
+        for (i = 0; i < current_entry_count; i++)
+        {
+            const struct db_summary_order *row = i < c->special_entry_count
+                ? NULL : find_order(order_tab, order_count,
+                                    entries[i].extraseek);
+            int year = row != NULL ? row->year : 0;
+
+            years[i] = (year > 0 && year < YEAR_UNKNOWN) ? year : 0;
+        }
+        album_years_valid = true;
     }
 
     if (!init)
@@ -3548,6 +3599,7 @@ int browser_db_load(struct browser_context* c)
 
     c->dirsindir = 0;
     head_rows = 0;
+    album_years_valid = false;      /* retrieve_entries() sets it again */
 
     if (!table)
     {
@@ -4864,6 +4916,29 @@ static struct tagentry* browser_db_get_entry(struct browser_context *c, int id)
 
     entry = get_entries(c);
     return &entry[realid];
+}
+
+char* browser_db_get_display_name(struct browser_context *c, int id,
+                                  char* buf, size_t bufsize)
+{
+    char *name = browser_db_get_entry_name(c, id, buf, bufsize);
+    int realid = id - current_offset;
+    int year;
+
+    /* A row named by a phrase comes back as the phrase rather than in buf,
+     * and is never an album. */
+    if (name != buf || !album_years_valid
+        || realid < 0 || realid >= current_entry_count)
+        return name;
+
+    year = album_years(c)[realid];
+    if (year > 0)
+    {
+        size_t len = strlen(buf);
+
+        snprintf(buf + len, bufsize - len, " \xe2\x80\x93 %d", year);
+    }
+    return buf;
 }
 
 char* browser_db_get_entry_name(struct browser_context *c, int id,

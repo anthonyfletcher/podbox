@@ -605,7 +605,7 @@ struct user_settings
     int  bidir_limit;      /* bidir scroll length limit */
     int  scroll_delay;     /* delay (in 1/10s) before starting scroll */
     int  scroll_step;      /* pixels to advance per update */
-    bool no_scrolling;     /* cut text that would scroll to fit, with "..." */
+    bool scrolling_enabled; /* off: text that would scroll is cut to fit */
 
     /* auto bookmark settings */
     int autoloadbookmark;   /* auto load option: 0=off, 1=ask, 2=on */
@@ -717,6 +717,7 @@ struct user_settings
     int  album_covers_slide_tuck;
     bool album_covers_parallel_slides;
     int  album_covers_scroll_speed;
+    int  album_covers_random_spin;  /* 0..2: covers a held PLAY passes */
     int  album_covers_transition_speed;
     int  album_covers_show_album_name;
     int  album_covers_on_select;  /* ON_SELECT_*: browse the album, or play it */
@@ -753,6 +754,8 @@ struct user_settings
     /* Artists and albums sort past a leading "The ", "A " or "An ", in the
      * database browser and the carousel. See tagcache_sort_name(). */
     bool sort_ignore_articles;
+    /* " – 2004" after each name in the Music browser's album lists. */
+    bool album_show_year;
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

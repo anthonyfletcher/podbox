@@ -6,7 +6,7 @@
  * GNU General Public License (version 2+)
  *
  * Renders one themed text line -- icon, text, scrolling, style -- into a
- * viewport. The primitive the list renderer is built on. With No Scrolling on,
+ * viewport. The primitive the list renderer is built on. With scrolling off,
  * a line that would scroll is cut to fit by text_fit() instead.
  ****************************************************************************/
 
@@ -122,7 +122,7 @@ static void put_text(struct screen *display,
         drmode = DRMODE_SOLID | DRMODE_INVERSEVID;
 
     char fitted[TEXT_FIT_BUF];
-    if (line->scroll && !prevent_scroll && global_settings.no_scrolling)
+    if (line->scroll && !prevent_scroll && !global_settings.scrolling_enabled)
     {
         text = text_fit(text, fitted, sizeof(fitted), lcd_getfont(),
                         display->getwidth() - x + text_skip_pixels);

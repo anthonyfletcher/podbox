@@ -792,7 +792,7 @@ void write_line(struct screen *display, struct align_pos *format_align,
         }
     } /* (center_width == 0 && right_width != 0)*/
 
-    if (scroll && !scrolling_held && !global_settings.no_scrolling &&
+    if (scroll && !scrolling_held && global_settings.scrolling_enabled &&
                   ((left_width > scroll_width) ||
                    (center_width > scroll_width) ||
                    (right_width > scroll_width)))
@@ -804,8 +804,8 @@ void write_line(struct screen *display, struct align_pos *format_align,
     }
     else
     {
-        /* a %s line is cut to fit by put_line() under No Scrolling */
-        linedes->scroll = scroll && global_settings.no_scrolling;
+        /* a %s line is cut to fit by put_line() with scrolling off */
+        linedes->scroll = scroll && !global_settings.scrolling_enabled;
         /* clear the line first */
         display->set_drawmode(DRMODE_SOLID|DRMODE_INVERSEVID);
         display->fillrect(0, line*string_height, viewport_width, string_height);

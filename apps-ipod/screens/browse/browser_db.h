@@ -48,6 +48,8 @@ enum db_album_sort_ctx {
  * back. Neither call saves; the caller does. */
 int browser_db_album_sort_get(int ctx);
 void browser_db_album_sort_set(int ctx, int order);
+/* Whether that context reads the artist-first orders as the plain ones. */
+bool browser_db_album_sort_artist_first_moot(int ctx);
 
 int browser_db_export(void);
 int browser_db_import(void);
@@ -68,6 +70,11 @@ void browser_db_clear_shortcut_base(void);
  * <All tracks>/<Random> rows), or -1 for no preference. Clears the request, so
  * only the load that made it is affected -- call once, right after selecting. */
 int browser_db_take_pending_top_item(void);
+/* As browser_db_get_entry_name(), with what the row shows beside the name --
+ * an album's year, under Show Year in Album Lists. For drawing only: the name
+ * itself is what titles, keys and playlist names are made from. */
+char* browser_db_get_display_name(struct browser_context *c, int id,
+                                  char* buf, size_t bufsize);
 char* browser_db_get_entry_name(struct browser_context *c, int id,
                                     char* buf, size_t bufsize);
 bool browser_db_current_playlist_insert(int position, bool queue);

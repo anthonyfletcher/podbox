@@ -136,7 +136,7 @@ MENUITEM_SETTING_EXPORTED(brightness_item, &global_settings.brightness, NULL);
 
 
 /** Scroll menu **/
-MENUITEM_SETTING(no_scrolling, &global_settings.no_scrolling, NULL);
+MENUITEM_SETTING(scrolling_enabled, &global_settings.scrolling_enabled, NULL);
 MENUITEM_SETTING_W_TEXT(scroll_speed, &global_settings.scroll_speed,
                          ID2P(LANG_SCROLL), NULL);
 MENUITEM_SETTING(scroll_delay, &global_settings.scroll_delay, NULL);
@@ -153,7 +153,7 @@ MENUITEM_SETTING(list_wraparound, &global_settings.list_wraparound, NULL);
 MENUITEM_SETTING(list_order, &global_settings.list_order, NULL);
 
 MAKE_MENU(scroll_settings_menu, ID2P(LANG_SCROLL_MENU), 0, Icon_NOICON,
-          &no_scrolling,
+          &scrolling_enabled,
           &scroll_speed, &scroll_delay,
           &scroll_step,
           &bidir_limit,
