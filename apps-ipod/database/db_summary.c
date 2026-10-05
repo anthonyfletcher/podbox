@@ -22,7 +22,9 @@
  *   - name keys, and writing entries into the index buffer
  *   - the tagcache walks that populate it
  *   - the play log
- *   - carrying figures across a rebuild, and create_album_index() driving it
+ *   - carrying figures across a rebuild
+ *   - the track walks: each album's artist and figures
+ *   - create_album_index(), driving all of the above
  *   - the on-disk form: saving, and the album and artist loaders
  *   - db_summary_build_into(), which reuses the saved index or rebuilds it
  *   - the background pass: its progress reporting and the acquire/release pair
@@ -253,10 +255,11 @@ static void draw_progressbar(int step, int count, char *msg)
 
     /* Rate-limited, because this is not cheap: a status bar render plus an LCD
      * flush is a few milliseconds either side of ten, and the callers reach
-     * here once per album. Unthrottled, most of a foreground build was spent
-     * redrawing rather than reading the database -- the background pass, which
-     * draws nothing, finishes the same work several times quicker. 8fps is
-     * more than enough for an indicator that only spins. */
+     * here once per album or per track. Unthrottled, most of a foreground
+     * build was spent redrawing rather than reading the database -- the
+     * background pass, which draws nothing, finishes the same work several
+     * times quicker. 8fps is more than enough for an indicator that only
+     * spins. */
     static long next_draw_tick;
     long now = current_tick;
 
@@ -886,9 +889,10 @@ static void replay_plays(struct db_summary_t *idx)
 /* ---------------------------------------------------------------------------
  * Carrying figures across a rebuild
  *
- * Summarising an album costs a filtered tagcache search, and the build does
- * one per album whatever changed. An album whose tracks are the same as when
- * the last index was written already has its answer in that file.
+ * Summarising albums costs a walk of every track, and a filename fetch per
+ * album for its artwork folder. An album whose tracks are the same as when
+ * the last index was written already has its answer in that file, and when
+ * every album does the walk is skipped.
  *
  * The seeks in it are worthless by then -- a commit that adds a track re-sorts
  * the whole album tagfile and moves every one -- so entries are matched by the
@@ -1156,44 +1160,202 @@ static void carry_over_prepare(void **buf, size_t *bufsz)
         carried_ct = 0;
 }
 
+/* ---------------------------------------------------------------------------
+ * Walking the tracks
+ *
+ * An album's artist and its figures both come from its tracks. A filtered
+ * search reads the whole master index whatever it filters on, so asking album
+ * by album reads the library once per album; the two walks here read it once
+ * each and hand every track to the albums it belongs to.
+ *
+ * The albums being filled are found through refs[]: indices into album_index,
+ * sorted by album seek and then by the artist the album's tracks must carry,
+ * with REF_SEEN set once a track has been handed to that album. The walks
+ * visit tracks in master index order, which is the order a filtered search
+ * returns them in, so an album's first track is the one its own search would
+ * have found first.
+ * ------------------------------------------------------------------------ */
+
+#define REF_SEEN   0x80000000u
+#define REF_IDX(r) ((int)((r) & ~REF_SEEN))
+
+/* Below every real seek, so looking it up finds an album seek's first entry.
+ * As an album's artist it means any: an album whose artist never resolved
+ * takes every track of the album, with no artist to filter on. */
+#define ANY_ARTIST (-2)
+
+/* What a track walk reads of each track, in this order. */
+enum { V_ALBUM, V_ARTIST, V_YEAR, V_PLAYCOUNT, V_LASTPLAYED, V_COUNT };
+static const int track_tags[V_COUNT] =
+    { tag_album, tag_albumartist, tag_year, tag_playcount, tag_lastplayed };
+
+static long ref_artist(const struct album_data *a)
+{
+    return a->artist_idx < 0 ? ANY_ARTIST : a->artist_seek;
+}
+
+static int compare_ref(const void *a_v, const void *b_v)
+{
+    const struct album_data *a =
+        &pfi->album_index[REF_IDX(*(const uint32_t *)a_v)];
+    const struct album_data *b =
+        &pfi->album_index[REF_IDX(*(const uint32_t *)b_v)];
+    long aa, ba;
+
+    if (a->seek != b->seek)
+        return a->seek < b->seek ? -1 : 1;
+    aa = ref_artist(a);
+    ba = ref_artist(b);
+    return aa < ba ? -1 : (aa > ba);
+}
+
+/* The first of refs[] not ordered before (seek, artist), or ct if none is. */
+static int ref_lower_bound(const uint32_t *refs, int ct, long seek, long artist)
+{
+    int lo = 0, hi = ct;
+
+    while (lo < hi)
+    {
+        int mid = (lo + hi) / 2;
+        const struct album_data *a = &pfi->album_index[REF_IDX(refs[mid])];
+
+        if (a->seek < seek || (a->seek == seek && ref_artist(a) < artist))
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    return lo;
+}
+
+/* The artist list is in seek order, because build_artist_index() reads the
+ * tag file front to back. -1 if the seek is not in it. */
+static int artist_by_seek(long seek)
+{
+    int lo = 0, hi = pfi->artist_ct - 1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (pfi->artist_index[mid].seek == seek)
+            return mid;
+        if (pfi->artist_index[mid].seek < seek)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return -1;
+}
+
+/* Give each album with no artist yet the album artist of its first track. An
+ * album whose artist is not in the artist list -- left out of it as spoken
+ * word -- keeps none. */
+static int assign_album_artists(uint32_t *refs)
+{
+    char num[16];
+    long v[V_COUNT];
+    int ct = 0, n = 0, total, i, r;
+
+    for (i = 0; i < pfi->album_ct; i++)
+        if (pfi->album_index[i].artist_seek < 0)
+            refs[ct++] = i;
+    if (ct == 0)
+        return SUCCESS;
+
+    qsort(refs, ct, sizeof(*refs), compare_ref);
+
+    total = tagcache_get_stat()->total_entries;
+    splash_progress_set_delay(HZ / 2);
+    draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUMS);
+
+    if (tagcache_search(&tcs, tag_year))
+    {
+        while (tagcache_get_next(&tcs, num, sizeof(num)))
+        {
+            struct album_data *al;
+
+            keep_awake_for_build();
+            if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUMS))
+            {
+                tagcache_search_finish(&tcs);
+                return ERROR_USER_ABORT;
+            }
+
+            if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
+                continue;
+
+            /* Album seeks are unique among these albums, so the artist one is
+             * given below cannot move it within the order searched here. */
+            r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
+            if (r == ct)
+                continue;
+            al = &pfi->album_index[REF_IDX(refs[r])];
+            if (al->seek != v[V_ALBUM] || (refs[r] & REF_SEEN))
+                continue;
+
+            refs[r] |= REF_SEEN;
+            i = artist_by_seek(v[V_ARTIST]);
+            if (i >= 0)
+            {
+                al->artist_idx = pfi->artist_index[i].name_idx;
+                al->artist_seek = v[V_ARTIST];
+            }
+        }
+    }
+    tagcache_search_finish(&tcs);
+    return SUCCESS;
+}
+
+/* Count one track into the album *ref names, if that album is (album, artist).
+ * False once the walk has passed that album's entries. */
+static bool add_track(uint32_t *ref, const long *v, long artist)
+{
+    struct album_data *al = &pfi->album_index[REF_IDX(*ref)];
+
+    if (al->seek != v[V_ALBUM] || ref_artist(al) != artist)
+        return false;
+
+    /* Where this album's artwork is cached, from the first of its tracks.
+     * Taken here because this is the only pass that walks tracks, so the folder
+     * costs nothing beyond one fetch -- resolving it per slide instead is a
+     * filtered search per slide. */
+    if (!(*ref & REF_SEEN))
+    {
+        *ref |= REF_SEEN;
+        resolve_art_hashes(&tcs, &al->art_hash, &al->artist_art_hash);
+    }
+
+    if (v[V_YEAR] > al->year)
+        al->year = v[V_YEAR];
+
+    /* Negative is tagcache's "could not read it", not a count. */
+    if (v[V_PLAYCOUNT] > 0)
+    {
+        al->playcount += v[V_PLAYCOUNT];
+        if (v[V_LASTPLAYED] > al->lastplayed)
+            al->lastplayed = v[V_LASTPLAYED];
+    }
+    return true;
+}
+
 /* Summarise each album from its tracks: the year, and the playback history the
  * album charts sort on.
- *
- * All three come from one walk because the walk is the expensive part -- a
- * filtered tagcache search per album, which is why this is its own numbered
- * build step. A search on a numeric tag iterates one result per track (see
- * get_next() in tagcache.c, which sets idx_id per entry), so tagcache_get_numeric()
- * can be asked for any numeric tag of the track currently under the cursor,
- * not only the one being searched on.
  *
  * Year takes the maximum rather than the first because a compilation can carry
  * several; playcount sums because an album's plays are its tracks' plays; and
  * lastplayed takes the maximum because an album was last heard when its most
  * recently played track was. */
-static int assign_album_stats(void)
+static int assign_album_stats(uint32_t *refs)
 {
-    char tcs_buf[TAGCACHE_BUFSZ];
-    const long tcs_bufsz = sizeof(tcs_buf);
-    int carried_over = 0;
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_STATS);
-    for (int album_idx = 0; album_idx < pfi->album_ct; album_idx++)
+    char num[16];
+    long v[V_COUNT];
+    int carried_over = 0, ct = 0, n = 0, total, i, r;
+
+    for (i = 0; i < pfi->album_ct; i++)
     {
-        keep_awake_for_build();
-
-        if (progress_cancel(album_idx, pfi->album_ct, STR_STEP_ASSIGNING_ALBUM_STATS))
-            return ERROR_USER_ABORT;
-
-        int album_year = 0;
-        int album_playcount = 0;
-        long album_lastplayed = 0;
-        unsigned int album_art = 0, artist_art = 0;
-        bool first_track = true;
-
         /* Already answered, by a previous index, for an album whose tracks
-         * have not changed since. This is the whole point of the step: the
-         * search below is the expensive part of the build. */
-        struct album_data *ent = &pfi->album_index[album_idx];
+         * have not changed since. */
+        struct album_data *ent = &pfi->album_index[i];
         const struct carried *c;
 
         if (!album_is_dirty(name_key(pfi->album_names + ent->name_idx, NULL),
@@ -1209,67 +1371,53 @@ static int assign_album_stats(void)
             continue;
         }
 
-        if (tagcache_search(&tcs, tag_year))
-        {
-            tagcache_search_add_filter(&tcs, tag_album,
-                                       pfi->album_index[album_idx].seek);
-
-            if (pfi->album_index[album_idx].artist_idx >= 0)
-                tagcache_search_add_filter(&tcs, tag_albumartist,
-                    pfi->album_index[album_idx].artist_seek);
-
-            while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz)) {
-                int track_year = tagcache_get_numeric(&tcs, tag_year);
-
-                /* Where this album's artwork is cached, from the first of its
-                 * tracks. Taken here because this is the only per-album pass
-                 * that walks tracks, so the folder costs nothing beyond one
-                 * fetch -- resolving it per slide instead is a filtered search
-                 * per slide, which is what the carousel used to do. */
-                if (first_track)
-                {
-                    first_track = false;
-                    resolve_art_hashes(&tcs, &album_art, &artist_art);
-                }
-                long track_playcount = tagcache_get_numeric(&tcs, tag_playcount);
-
-                if (track_year > album_year)
-                    album_year = track_year;
-
-                /* Negative is tagcache's "could not read it", not a count.
-                 *
-                 * The lastplayed read is inside this test because every
-                 * tagcache_get_numeric() is a separate index lookup, and this
-                 * loop runs once per track in the library. A track that has
-                 * never been played cannot have a last-played time, so asking
-                 * for one would be a third lookup per track to learn nothing
-                 * -- and on most libraries the never-played tracks are the
-                 * majority. */
-                if (track_playcount > 0)
-                {
-                    long track_lastplayed =
-                        tagcache_get_numeric(&tcs, tag_lastplayed);
-
-                    album_playcount += track_playcount;
-                    if (track_lastplayed > album_lastplayed)
-                        album_lastplayed = track_lastplayed;
-                }
-            }
-        }
-        tagcache_search_finish(&tcs);
-
-        pfi->album_index[album_idx].year = album_year;
-        pfi->album_index[album_idx].playcount = album_playcount;
-        pfi->album_index[album_idx].lastplayed = album_lastplayed;
-        pfi->album_index[album_idx].art_hash = album_art;
-        pfi->album_index[album_idx].artist_art_hash = artist_art;
+        ent->year = 0;
+        ent->playcount = 0;
+        ent->lastplayed = 0;
+        ent->art_hash = 0;
+        ent->artist_art_hash = 0;
+        refs[ct++] = i;
     }
 
     /* Cast, because album_ct is int32_t and that is `long` on this toolchain,
      * so %d would not match it. */
     debug_log(DEBUG_LOG_TAGCACHE, "index: %d albums, %d carried, %d searched",
-              (int)pfi->album_ct, carried_over,
-              (int)pfi->album_ct - carried_over);
+              (int)pfi->album_ct, carried_over, ct);
+
+    if (ct == 0)
+        return SUCCESS;
+
+    qsort(refs, ct, sizeof(*refs), compare_ref);
+
+    total = tagcache_get_stat()->total_entries;
+    splash_progress_set_delay(HZ / 2);
+    draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUM_STATS);
+
+    if (tagcache_search(&tcs, tag_year))
+    {
+        while (tagcache_get_next(&tcs, num, sizeof(num)))
+        {
+            keep_awake_for_build();
+            if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUM_STATS))
+            {
+                tagcache_search_finish(&tcs);
+                return ERROR_USER_ABORT;
+            }
+
+            if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
+                continue;
+
+            /* The track belongs to the album's entries that take any artist,
+             * and to those that take its own. */
+            for (r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
+                 r < ct && add_track(&refs[r], v, ANY_ARTIST); r++)
+                ;
+            for (r = ref_lower_bound(refs, ct, v[V_ALBUM], v[V_ARTIST]);
+                 r < ct && add_track(&refs[r], v, v[V_ARTIST]); r++)
+                ;
+        }
+    }
+    tagcache_search_finish(&tcs);
     return SUCCESS;
 }
 
@@ -1278,9 +1426,8 @@ static int assign_album_stats(void)
  * Derived from the album index rather than walked out of the database again,
  * which makes it free: every album already carries its own playcount and
  * lastplayed, and the artist it belongs to. A second tagcache pass -- one
- * filtered search per artist, as assign_album_stats() does per album -- would
- * produce the same numbers for real disk work, and the build is already the
- * slowest thing here.
+ * filtered search per artist -- would produce the same numbers for real disk
+ * work, and the build is already the slowest thing here.
  *
  * album_data.artist_idx and artist_data.name_idx are both offsets into the
  * same artist name blob, so that is the join. Albums whose artist never
@@ -1336,15 +1483,14 @@ static void assign_artist_stats(void)
  */
 static int create_album_index(void)
 {
-    static char tcs_buf[TAGCACHE_BUFSZ];
-    const long tcs_bufsz = sizeof(tcs_buf);
     void *buf = pfi->buf;
     size_t buf_size = pfi->buf_sz;
 
     struct album_data* tmp_album;
     struct tagcache_marks marks;
+    uint32_t *refs;
 
-    int i, j, last, final, retry, res;
+    int i, j, res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
 
@@ -1392,57 +1538,20 @@ static int create_album_index(void)
     /* move buf ptr to end of album_index */
     buf = pfi->album_index + pfi->album_ct;
 
-    /* Assign indices */
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, pfi->album_ct, STR_STEP_ASSIGNING_ALBUMS);
-    for (j = 0; j < pfi->album_ct; j++)
-    {
-        keep_awake_for_build();
+    /* Scratch for the track walks, one slot per album, from what is left
+     * between the album array and the carry-over tables. */
+    if ((size_t)pfi->album_ct * sizeof(*refs) > buf_size)
+        return ERROR_BUFFER_FULL;
+    refs = buf;
 
-        if (progress_cancel(j, pfi->album_ct, STR_STEP_ASSIGNING_ALBUMS))
-            return ERROR_USER_ABORT;
-
-        if (pfi->album_index[j].artist_seek >= 0) { continue; }
-
-        tagcache_search(&tcs, tag_albumartist);
-        tagcache_search_add_filter(&tcs, tag_album, pfi->album_index[j].seek);
-
-        last = 0;
-        final = pfi->artist_ct;
-        retry = 0;
-        if (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
-        {
-
-retry_artist_lookup:
-            retry++;
-            for (i = last; i < final; i++)
-            {
-                if (tcs.result_seek == pfi->artist_index[i].seek)
-                {
-                    int idx = pfi->artist_index[i].name_idx;
-                    pfi->album_index[j].artist_idx = idx;
-                    pfi->album_index[j].artist_seek = tcs.result_seek;
-                    last = i; /* last match, start here next loop */
-                    final = pfi->artist_ct;
-                    retry = 0;
-                    break;
-                }
-            }
-            if (retry > 0 && retry < 2)
-            {
-                /* no match start back at beginning */
-                final = last;
-                last = 0;
-                goto retry_artist_lookup;
-            }
-        }
-        tagcache_search_finish(&tcs);
-    }
+    res = assign_album_artists(refs);
+    if (res < SUCCESS)
+        return res;
 
     /* Before the stats, not after: they are what the carry-over matches on. */
     assign_keys();
 
-    res = assign_album_stats();
+    res = assign_album_stats(refs);
 
     if (res < SUCCESS)
         return res;
@@ -2586,7 +2695,8 @@ int db_summary_play_album(const struct album_data *album)
         return -1;
     }
 
-    /* The same filter pair assign_album_stats() enumerates an album with. */
+    /* The tracks assign_album_stats() counts as the album's: its album, and
+     * its artist where it has one. */
     tagcache_search_add_filter(&tcs, tag_album, album->seek);
     if (album->artist_idx >= 0)
         tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);

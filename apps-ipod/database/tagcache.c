@@ -1338,6 +1338,24 @@ long tagcache_get_numeric(const struct tagcache_search *tcs, int tag)
     return check_virtual_tags(tag, tcs->idx_id, &idx);
 }
 
+/* Several tags of the track under the cursor from one read of its index
+ * entry, where tagcache_get_numeric() reads the entry again for each. A string
+ * tag gives its seek, the value tagcache_search_add_filter() compares. */
+bool tagcache_get_values(const struct tagcache_search *tcs,
+                         const int *tags, long *out, int count)
+{
+    struct index_entry idx;
+    int i;
+
+    if (!tc_stat.ready || !get_index(tcs->masterfd, tcs->idx_id, &idx, true))
+        return false;
+
+    for (i = 0; i < count; i++)
+        out[i] = check_virtual_tags(tags[i], tcs->idx_id, &idx);
+
+    return true;
+}
+
 inline static bool str_ends_with(const char *str1, const char *str2)
 {
     logf_clauses("%s %s %s", str1, __func__, str2);
