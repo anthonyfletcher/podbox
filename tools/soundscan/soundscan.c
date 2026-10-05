@@ -100,25 +100,44 @@ const char *soundscan_codec_dir(void)
  * and finds one already there knows the last attempt did not come back, and
  * files that track as unreadable rather than trying it a second time.
  *
- * Three lines of file handling to make the difference between a tool that
- * finishes and one that cannot. */
-#define BUSY_FILE  ROCKBOX_DIR "/db_sound.busy"
+ * The marker lives on this computer, in the temporary directory, not on the
+ * player: it is rewritten for every track, and on a player mounted without
+ * write caching each rewrite is a synchronous seek on its disk. It goes
+ * through the host's stdio, not the player-rooted open(), and needs no
+ * flush -- it only has to outlive the process, not the machine. Its first
+ * line is the player root, so a marker left by one player is not applied to
+ * another. Empty means clear. */
+static char busy_file[1024];
+
+static void busy_init(void)
+{
+    const char *dir = getenv("TEMP");
+
+    if (dir == NULL)
+        dir = getenv("TMPDIR");
+    if (dir == NULL)
+        dir = ".";
+
+    snprintf(busy_file, sizeof (busy_file), "%s/soundscan.busy", dir);
+}
 
 static void busy_set(const char *path)
 {
-    int fd = open(BUSY_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    FILE *f = fopen(busy_file, "wb");
 
-    if (fd < 0)
+    if (f == NULL)
         return;
 
-    write(fd, path, strlen(path));
-    fsync(fd);
-    close(fd);
+    fprintf(f, "%s\n%s", sim_root_dir, path);
+    fclose(f);
 }
 
 static void busy_clear(void)
 {
-    remove(BUSY_FILE);
+    FILE *f = fopen(busy_file, "wb");
+
+    if (f != NULL)
+        fclose(f);
 }
 
 /* Catching the fault, so one run gets through a library rather than one bad
@@ -175,23 +194,30 @@ static void file_failed(const char *path)
     n_failed++;
 }
 
-/* The path the last run died on, or NULL. */
+/* The path the last run on this player died on, or NULL. */
 static const char *busy_get(void)
 {
-    static char path[MAX_PATH];
-    int fd = open(BUSY_FILE, O_RDONLY);
+    static char buf[1024 + MAX_PATH];
+    FILE *f = fopen(busy_file, "rb");
+    size_t len, root_len = strlen(sim_root_dir);
+    char *path;
     ssize_t n;
 
-    if (fd < 0)
+    if (f == NULL)
         return NULL;
 
-    n = read(fd, path, sizeof (path) - 1);
-    close(fd);
+    len = fread(buf, 1, sizeof (buf) - 1, f);
+    fclose(f);
+    buf[len] = '\0';
 
-    if (n <= 0)
+    if (len <= root_len || strncmp(buf, sim_root_dir, root_len) != 0 ||
+        buf[root_len] != '\n')
+    {
         return NULL;
+    }
 
-    path[n] = '\0';
+    path = buf + root_len + 1;
+    n = (ssize_t)strlen(path);
 
     /* Whatever wrote it may have left a line ending on the end. A path with
      * one hashes to a key that will never match anything. */
@@ -647,6 +673,7 @@ int main(int argc, char **argv)
         return codec_check();
 
     sim_root_dir = target;
+    busy_init();
 
     if (!dir_exists("/.rockbox"))
     {
