@@ -294,6 +294,39 @@ static const char *date_of(long day)
     return pfmt("%d %s", d, pv_month_abbr[m]);
 }
 
+/* A stored name as a card shows it. A name that fills its slot was cut to
+ * PV_NAME_MAX when the log was read, and the card cannot tell, so it gets its
+ * ellipsis here -- backed off past a character the byte cut split, and past
+ * a trailing space. Display only: a name used to look music up stays as
+ * stored, because that is the form it is matched in. */
+static const char *shown(const char *name)
+{
+    size_t n = strlen(name), l;
+    char *b;
+
+    if (n < PV_NAME_MAX - 1)
+        return name;
+
+    for (l = n; l > 0 && (name[l - 1] & 0xC0) == 0x80; l--)
+        ;
+    if (l > 0)
+    {
+        unsigned char c = (unsigned char)name[l - 1];
+        size_t want = c < 0x80 ? 1 : c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : 2;
+
+        if (l - 1 + want > n)
+            n = l - 1;
+    }
+    while (n > 0 && name[n - 1] == ' ')
+        n--;
+
+    b = pool[pool_at];
+    pool_at = (pool_at + 1) % POOL_N;
+    memcpy(b, name, n);
+    memcpy(b + n, "...", 4);
+    return b;
+}
+
 /* --------------------------------------------------------- the sections */
 
 const char *pv_tiles_section_name(enum pv_sec sec)
@@ -1000,7 +1033,8 @@ static void name_card(struct card_content *c, const struct pv_agg *row,
         return;
     }
 
-    card_text_add(&c->text, row->name, card_paint_card_font(), ink.text);
+    card_text_add(&c->text, shown(row->name), card_paint_card_font(),
+                  ink.text);
 }
 
 /* "by [ARTIST]" on its own line, opening the sub-card of a row that belongs
@@ -1014,7 +1048,7 @@ static void by_artist(struct card_content *c, const struct pv_agg *row)
         return;
     card_paint_ink(c->base, &ink);
     card_text_add_line(&c->text, "by", card_paint_body_font(), ink.dim);
-    card_text_add(&c->text, artist, card_paint_card_font(), ink.text);
+    card_text_add(&c->text, shown(artist), card_paint_card_font(), ink.text);
 }
 
 static void kv_add(struct card_content *c, const char *label,
@@ -1236,11 +1270,12 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (wk_week != arg || !wk_top_artist[0])
             break;
         card_text_add(&out->text, "Top artist", body, ink.dim);
-        card_text_add_line(&out->text, wk_top_artist, name, ink.text);
+        card_text_add_line(&out->text, shown(wk_top_artist), name, ink.text);
         if (wk_top_track[0])
         {
             card_text_add_line(&out->text, "Top song", body, ink.dim);
-            card_text_add_line(&out->text, wk_top_track, name, ink.text);
+            card_text_add_line(&out->text, shown(wk_top_track), name,
+                               ink.text);
         }
         break;
 
@@ -1264,12 +1299,12 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (al)
         {
             card_text_add(&out->text, "Top album", body, ink.dim);
-            card_text_add_line(&out->text, al->name, name, ink.text);
+            card_text_add_line(&out->text, shown(al->name), name, ink.text);
         }
         if (so)
         {
             card_text_add_line(&out->text, "Top song", body, ink.dim);
-            card_text_add_line(&out->text, so->name, name, ink.text);
+            card_text_add_line(&out->text, shown(so->name), name, ink.text);
         }
         break;
     }
@@ -1293,7 +1328,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (al && al->name[0])
         {
             card_text_add_line(&out->text, "from", body, ink.dim);
-            card_text_add(&out->text, al->name, name, ink.text);
+            card_text_add(&out->text, shown(al->name), name, ink.text);
         }
         break;
     }
@@ -1320,7 +1355,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (so)
         {
             card_text_add_line(&out->text, "Top song", body, ink.dim);
-            card_text_add_line(&out->text, so->name, name, ink.text);
+            card_text_add_line(&out->text, shown(so->name), name, ink.text);
         }
         break;
     }
@@ -1348,7 +1383,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         out->prog    = n_skip && top_skip[0]->y_skips > 0
                      ? (int)((long)r->y_skips * 100 / top_skip[0]->y_skips)
                      : -1;
-        card_text_add(&out->text, r->name, name, ink.text);
+        card_text_add(&out->text, shown(r->name), name, ink.text);
         break;
     }
 
@@ -1379,7 +1414,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         out->art_key = r->art_hash;
         out->pat     = (unsigned char)r->art_hash;
         out->prog    = share(r, top_loyal[0]);
-        card_text_add(&out->text, r->name, name, ink.text);
+        card_text_add(&out->text, shown(r->name), name, ink.text);
         break;
     }
 
