@@ -2079,79 +2079,66 @@ static int wait_for_background(void)
  * a background pass holding pfi would resume after a yield writing through
  * whatever the artist build had left there. Same wait, same lock, same
  * clear-before-unlock as build_into(). */
-/* Artist figures for a build that has no album list to roll up from.
- *
- * The full build derives them from the albums for free (assign_artist_stats());
- * this cannot, so it goes to the database -- one filtered search per artist,
- * the same shape assign_album_stats() uses per album. The two agree by
- * construction: an artist's total is every track filed under them either way.
- *
- * Only worth its cost when something is going to sort on it, hence the opt-in
- * at the call site. Artists are far fewer than albums, so even then it is a
- * fraction of what a full build does. */
-/* Fill in each artist's folder, and optionally their playback figures, by
- * walking the database.
+/* Fill in each artist's folder, and optionally their playback figures, from
+ * one walk of the tracks.
  *
  * The artist-only build has no album list to derive either from -- that is what
  * assign_artist_stats() does on the full build -- so this is the one path that
- * has to ask. The folder is always resolved: it is what the artist carousel
- * shows a photo from, and skipping it here would leave every artist without one
- * until a full build wrote an index. The figures are only summed when something
- * is going to sort on them, since that is the part that reads every track. */
+ * has to ask the database. The two agree by construction: an artist's total is
+ * every track filed under them either way. The folder is always resolved, from
+ * the artist's first track: it is what the artist carousel shows a photo from.
+ *
+ * lastplayed holds -1 until an artist's first track has been seen, which is
+ * what says the folder still needs resolving. */
 static void assign_artist_art_and_stats(struct tagcache_search *tcs,
                                         bool with_stats)
 {
-    char tcs_buf[TAGCACHE_BUFSZ];
-    const long tcs_bufsz = sizeof(tcs_buf);
-    int a;
+    char num[16];
+    long v[V_COUNT];
+    int n = 0, total, a;
 
     for (a = 0; a < pfi->artist_ct; a++)
+        pfi->artist_index[a].lastplayed = -1;
+
+    total = tagcache_get_stat()->total_entries;
+
+    if (tagcache_search(tcs, tag_year))
     {
-        int playcount = 0;
-        long lastplayed = 0;
-        unsigned int artist_art = 0;
-        bool first_track = true;
-
-        keep_awake_for_build();
-        if (progress_cancel(a, pfi->artist_ct, STR_STEP_ARTIST_STATS))
-            break;
-
-        if (tagcache_search(tcs, tag_playcount))
+        while (tagcache_get_next(tcs, num, sizeof(num)))
         {
-            tagcache_search_add_filter(tcs, tag_albumartist,
-                                       pfi->artist_index[a].seek);
+            struct artist_data *ar;
 
-            while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
+            keep_awake_for_build();
+            if (progress_cancel(n++, total, STR_STEP_ARTIST_STATS))
+                break;
+
+            if (!tagcache_get_values(tcs, track_tags, v, V_COUNT))
+                continue;
+
+            a = artist_by_seek(v[V_ARTIST]);
+            if (a < 0)
+                continue;
+            ar = &pfi->artist_index[a];
+
+            if (ar->lastplayed < 0)
             {
-                if (first_track)
-                {
-                    first_track = false;
-                    resolve_art_hashes(tcs, NULL, &artist_art);
-                    /* Nothing else here needs a second track. */
-                    if (!with_stats)
-                        break;
-                }
+                ar->lastplayed = 0;
+                resolve_art_hashes(tcs, NULL, &ar->art_hash);
+            }
 
-                long n = tagcache_get_numeric(tcs, tag_playcount);
-
-                if (n > 0)
-                {
-                    long when = tagcache_get_numeric(tcs, tag_lastplayed);
-                    playcount += n;
-                    if (when > lastplayed)
-                        lastplayed = when;
-                }
+            if (with_stats && v[V_PLAYCOUNT] > 0)
+            {
+                ar->playcount += v[V_PLAYCOUNT];
+                if (v[V_LASTPLAYED] > ar->lastplayed)
+                    ar->lastplayed = v[V_LASTPLAYED];
             }
         }
-        tagcache_search_finish(tcs);
-
-        pfi->artist_index[a].art_hash = artist_art;
-        if (with_stats)
-        {
-            pfi->artist_index[a].playcount = playcount;
-            pfi->artist_index[a].lastplayed = lastplayed;
-        }
     }
+    tagcache_search_finish(tcs);
+
+    for (a = 0; a < pfi->artist_ct; a++)
+        if (pfi->artist_index[a].lastplayed < 0)
+            pfi->artist_index[a].lastplayed = 0;
 }
 
 int db_summary_build_artists(struct db_summary_t *target,

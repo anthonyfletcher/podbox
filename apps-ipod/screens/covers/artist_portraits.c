@@ -106,9 +106,8 @@ static int artist_build_index(void)
      * none to read.
      *
      * Rebuilding here instead looks cheap -- artists are few -- and is not.
-     * Sorting by plays needs each artist's figures, which cost a filtered
-     * search per artist on the build path and come free with the saved index.
-     * Reading wins in both sort orders, and makes the by-plays one free. */
+     * The build walks every track for the artists' folders, and the saved
+     * index already holds those and the figures by-plays sorts on. */
     res = db_summary_load_artists(&carousel_idx, &buf, &buf_size);
 
     /* Only a missing or unusable index falls through to a build. ERROR_USER_ABORT

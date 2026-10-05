@@ -214,10 +214,8 @@ int db_summary_load_artists(struct db_summary_t *target,
 /* Build the artist half from the database instead. Slower, and needed only
  * when there is no saved index to read.
  *
- * 'with_stats' also fills each artist's playcount/lastplayed, which this path
- * cannot get for free -- it has no album list to roll up from, so it costs a
- * filtered database search per artist. Ask for it only if something is going
- * to sort or rank on it. */
+ * 'with_stats' also fills each artist's playcount/lastplayed. Either way the
+ * build walks every track once, for each artist's folder. */
 int db_summary_build_artists(struct db_summary_t *target,
                               struct tagcache_search *tcs,
                               void **buf, size_t *bufsz, bool with_stats);
