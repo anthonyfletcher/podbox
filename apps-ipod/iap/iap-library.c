@@ -39,7 +39,8 @@
  *     the keys a car chooses
  *   - playlists for iAP2: the Playlist category's rows as lists of keys,
  *     read together, and the Queue as one of its own
- *   - artwork for iAP2: the playing track's JPEG, read on the worker
+ *   - artwork for iAP2: the playing track's JPEG, read on the worker, and
+ *     the next one's encoded ahead
  *   - the player's name
  ****************************************************************************/
 
@@ -68,6 +69,7 @@
 #include "metadata/art_cache.h"
 #include "draw/jpeg_enc.h"
 #include "usb_log.h"
+#include "storage.h"
 #include "file.h"
 #include "rbpaths.h"
 #include "iap-library.h"
@@ -187,6 +189,7 @@ struct block {
     uint8_t art_jpeg[ART_JPEG_MAX];
     char art_jpeg_of[MAX_PATH];     /* the cache file art_jpeg holds */
     uint32_t art_jpeg_len;          /* and its length, 0 if it failed */
+    struct mp3entry art_next;       /* the track a prefetch encodes for */
     fb_data art_band[16 * ART_CACHE_MAX_DIM];
     struct entry entries[];
 };
@@ -203,7 +206,7 @@ static uint32_t list_count;
 /* The database commit the lists and the selection were read under */
 static int32_t lists_commit = -1;
 
-enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_LIST, EV_EXIT };
+enum { EV_PLAY = 1, EV_MIX, EV_ARTWORK, EV_PREFETCH, EV_LIST, EV_EXIT };
 static struct event_queue worker_q;
 static unsigned int worker_id;
 /* Set by the caller before it posts work and cleared by the worker; while it
@@ -220,6 +223,7 @@ static long play_book_seek;
 static void play_tracks(uint32_t start);
 static void play_mix(int mix);
 static void read_artwork(intptr_t request);
+static void prefetch_artwork(void);
 static void read_lists(intptr_t what);
 
 static void worker(void)
@@ -234,6 +238,11 @@ static void worker(void)
         if (ev.id == EV_ARTWORK)
         {
             read_artwork(ev.data);  /* the lists are not its to finish */
+            continue;
+        }
+        if (ev.id == EV_PREFETCH)
+        {
+            prefetch_artwork();
             continue;
         }
         if (ev.id == EV_LIST)
@@ -270,6 +279,7 @@ static bool open_block(bool lists)
     }
     block = core_get_data(handle);
     block->art_jpeg_of[0] = '\0';
+    block->art_next.path[0] = '\0';
     capacity = n;
 
     /* Not on the broadcast list, so it has no USB connection to answer */
@@ -1514,7 +1524,9 @@ void iap_library_queue_done(void)
  * Trap: a read per packet seeks the disk away from the buffering thread
  * hundreds of times a cover, and on the 5G the new track's audio runs dry.
  * An image is sent as stored, and larger ones than ART_MAX not at all; a
- * cache thumbnail is encoded as a JPEG first, into art_jpeg. */
+ * cache thumbnail is encoded as a JPEG first, into art_jpeg. The next
+ * track's thumbnail is encoded there ahead of time, once the playing one's
+ * cover has gone, so that it is ready the moment the track starts. */
 #define ART_MAX   (512 * 1024)
 #define ART_CHUNK 1000
 #define ART_BLOCK (8 * ART_CHUNK)
@@ -1531,6 +1543,8 @@ static struct {
     volatile size_t len[ART_BUFS];  /* bytes ready in each, 0 when free */
     unsigned rd, wr;
     size_t off;                     /* bytes of buf[rd] already sent */
+    volatile bool prefetching;      /* an EV_PREFETCH is posted or running */
+    volatile bool prefetch_stop;    /* a different track wants the cover */
 } art;
 
 static struct albumart_source art_source;
@@ -1539,6 +1553,7 @@ struct aat_read
 {
     int fd;
     int width;
+    bool prefetch;  /* stopped by prefetch_stop */
 };
 
 static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
@@ -1546,12 +1561,14 @@ static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
     const struct aat_read *a = ctx;
     const ssize_t n = (ssize_t)rows * a->width * FB_DATA_SZ;
     (void)y;    /* the rows come in order */
+    if (a->prefetch && (art.prefetch_stop || leaving))
+        return false;
     return read(a->fd, band, n) == n;
 }
 
 /* A cache thumbnail as a JPEG in the block's art_jpeg: its length, or 0. A
  * cover too busy to fit at 85 is tried at 60 before it is given up. */
-static uint32_t encode_cache(const char *path)
+static uint32_t encode_cache(const char *path, bool prefetch)
 {
     static const int quality[] = { 85, 60 };
     struct art_cache_header hdr;
@@ -1566,7 +1583,7 @@ static uint32_t encode_cache(const char *path)
         hdr.width > 0 && hdr.width <= ART_CACHE_MAX_DIM &&
         hdr.height > 0 && hdr.height <= ART_CACHE_MAX_DIM)
     {
-        struct aat_read a = { fd, hdr.width };
+        struct aat_read a = { fd, hdr.width, prefetch };
         const struct jpeg_enc_src src =
             { hdr.width, hdr.height, block->art_band, aat_rows, &a };
         for (size_t i = 0; n < 0 && i < ARRAYLEN(quality); i++)
@@ -1576,6 +1593,22 @@ static uint32_t encode_cache(const char *path)
     }
     close(fd);
     return n > 0 ? n : 0;
+}
+
+/* The thumbnail's JPEG: art_jpeg as it is when it holds this file's, which
+ * an album's tracks share, else encoded now. A stopped prefetch leaves
+ * art_jpeg holding nobody's. */
+static uint32_t cache_jpeg(const char *path, bool prefetch)
+{
+    if (strcmp(path, block->art_jpeg_of))
+    {
+        block->art_jpeg_of[0] = '\0';
+        block->art_jpeg_len = encode_cache(path, prefetch);
+        if (prefetch && art.prefetch_stop)
+            return 0;
+        strlcpy(block->art_jpeg_of, path, sizeof(block->art_jpeg_of));
+    }
+    return block->art_jpeg_len;
 }
 
 /* Album Art's preference for the car, or AA_OFF */
@@ -1614,15 +1647,7 @@ static void read_artwork(intptr_t request)
          * codec just as the new track starts */
         thread_set_priority(worker_id, priority);
 #endif
-        /* An album's tracks share a thumbnail, and on the 5G encoding it
-         * takes seconds, so the car is sent the last one again */
-        if (strcmp(art_source.path, block->art_jpeg_of))
-        {
-            block->art_jpeg_len = encode_cache(art_source.path);
-            strlcpy(block->art_jpeg_of, art_source.path,
-                    sizeof(block->art_jpeg_of));
-        }
-        left = block->art_jpeg_len;
+        left = cache_jpeg(art_source.path, false);
         /* Unreadable, or too busy even at 60: the image itself, if any */
         if (!left &&
             (!albumart_find_source(&art_track, AA_PREFER_EMBEDDED, true,
@@ -1683,6 +1708,8 @@ bool iap_library_artwork_find(const struct mp3entry *id3)
 {
     if (art.reading || !open_block(false))
         return false;
+    if (art.prefetching && strcmp(id3->path, block->art_next.path))
+        art.prefetch_stop = true;
     copy_mp3entry(&art_track, id3);
     art.cancel = false;
     art.size = 0;
@@ -1692,6 +1719,44 @@ bool iap_library_artwork_find(const struct mp3entry *id3)
     art.state = IAP_ART_FINDING;
     queue_post(&worker_q, EV_ARTWORK, ++art.request);
     return true;
+}
+
+static void prefetch_artwork(void)
+{
+    if (!art.prefetch_stop &&
+        albumart_find_source(&block->art_next, car_preference(), true,
+                             &art_source) &&
+        art_source.kind == AA_SOURCE_CACHE)
+        cache_jpeg(art_source.path, true);
+    art.prefetching = false;
+}
+
+/* Looked at once a second, and taken once a track: only while the disk is
+ * spinning, or in the playing track's last PREFETCH_LEAD ms, when the cover
+ * would be read at the change anyway. The lead covers the two to three
+ * seconds the 5G takes to encode one. */
+#define PREFETCH_LEAD (20 * 1000)
+
+void iap_library_artwork_prefetch(void)
+{
+    static long next_look;
+    const struct mp3entry *id3;
+
+    if (!block || building || art.reading || art.prefetching ||
+        car_preference() == AA_OFF || TIME_BEFORE(current_tick, next_look))
+        return;
+    next_look = current_tick + HZ;
+    id3 = audio_current_track();
+    if (!id3 || (!storage_disk_is_active() &&
+                 id3->elapsed + PREFETCH_LEAD < id3->length))
+        return;
+    id3 = audio_next_track();
+    if (!id3 || !strcmp(id3->path, block->art_next.path))
+        return;
+    copy_mp3entry(&block->art_next, id3);
+    art.prefetch_stop = false;
+    art.prefetching = true;
+    queue_post(&worker_q, EV_PREFETCH, 0);
 }
 
 int iap_library_artwork_state(uint32_t *size)

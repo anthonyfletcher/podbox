@@ -1904,6 +1904,8 @@ void usb_iap2_control_tick(void)
             watch_queue();
     }
     artwork_pump();
+    if (now_playing && aw.phase == ART_IDLE && (media_mask & 1u << MI_ARTWORK))
+        iap_library_artwork_prefetch();
     list_pump();
     if (lib.waiting && !lib.active)
     {

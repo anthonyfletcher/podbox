@@ -92,7 +92,8 @@ void iap_library_queue_done(void);
  * worker: find starts it (false when the worker cannot take it now); state
  * says whether it was found and how big it is; chunk gives the bytes read
  * so far, none until more are, and next frees them for the worker; stop
- * gives up. */
+ * gives up. Prefetch, called while no cover is being sent, encodes the next
+ * track's ahead when it is due. */
 enum { IAP_ART_NONE, IAP_ART_FINDING, IAP_ART_FOUND, IAP_ART_FAILED };
 struct mp3entry;
 bool iap_library_artwork_find(const struct mp3entry *id3);
@@ -100,6 +101,7 @@ int iap_library_artwork_state(uint32_t *size);
 size_t iap_library_artwork_chunk(const uint8_t **data);
 void iap_library_artwork_next(void);
 void iap_library_artwork_stop(void);
+void iap_library_artwork_prefetch(void);
 
 /* The name every iAP transport gives an accessory: the first line of
  * playername.txt as load read it at boot, PodBox's written there when it has
