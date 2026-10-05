@@ -59,4 +59,12 @@ void sound_props_album_walk(const char *dir);
  * finishes the run; both may be made, in either order. */
 bool sound_props_album_result(struct sound_axes *out, char *path, size_t len);
 
+/* The read-out's Pace bands and note names, for a screen that counts a whole
+ * library in the same terms. A band is 0 to SOUND_PACE_BANDS - 1, slowest
+ * first; its name is a lang id. */
+#define SOUND_PACE_BANDS 7
+int sound_props_pace_band(int bpm);
+int sound_props_pace_name(int band);
+const char *sound_props_note(int tonic);
+
 #endif /* _SOUND_PROPS_H */

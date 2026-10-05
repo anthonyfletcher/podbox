@@ -21832,6 +21832,118 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SOUND_LIB_OVERVIEW
+  desc: Library Sound menu: the counts of what has been measured
+  user: core
+  <source>
+    *: "Overview"
+  </source>
+  <dest>
+    *: "Overview"
+  </dest>
+  <voice>
+    *: "Overview"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MOODS
+  desc: Library Sound menu: how many tracks each mood playlist can draw on
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Moods"
+  </dest>
+  <voice>
+    *: "Moods"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_PACE
+  desc: Library Sound menu: how many tracks fall in each tempo band
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "Pace"
+  </dest>
+  <voice>
+    *: "Pace"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEYS
+  desc: Library Sound menu: how many tracks are in each musical key
+  user: core
+  <source>
+    *: "Keys"
+  </source>
+  <dest>
+    *: "Keys"
+  </dest>
+  <voice>
+    *: "Keys"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_DECADES
+  desc: Library Sound menu: the average loudness of the tracks from each decade
+  user: core
+  <source>
+    *: "Loudness by Decade"
+  </source>
+  <dest>
+    *: "Loudness by Decade"
+  </dest>
+  <voice>
+    *: "Loudness by Decade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_MOOD
+  desc: Library Sound, Moods: tracks that no mood playlist would offer
+  user: core
+  <source>
+    *: "In no mood"
+  </source>
+  <dest>
+    *: "In no mood"
+  </dest>
+  <voice>
+    *: "In no mood"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNCLEAR
+  desc: Library Sound, Pace and Keys: tracks with no tempo or no key the engine trusts
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Unclear"
+  </dest>
+  <voice>
+    *: "Unclear"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_YEAR
+  desc: Library Sound, Loudness by Decade: tracks with no year in their tags
+  user: core
+  <source>
+    *: "No year"
+  </source>
+  <dest>
+    *: "No year"
+  </dest>
+  <voice>
+    *: "No year"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SOUND_REORDER
   desc: in the playlist viewer's context menu, puts the playlist in an order where neighbouring tracks sound alike
   user: core

@@ -154,6 +154,24 @@ static const struct band bd_pace[] = {
     { 170, LANG_SOUND_PACE_FAST,      -1 },
     { 32767, LANG_SOUND_PACE_VERY_FAST, -1 } };
 
+_Static_assert(ARRAYLEN(bd_pace) == SOUND_PACE_BANDS,
+               "SOUND_PACE_BANDS must count bd_pace");
+
+int sound_props_pace_band(int bpm)
+{
+    int i = 0;
+
+    while (i < SOUND_PACE_BANDS - 1 && bpm >= bd_pace[i].upto)
+        i++;
+
+    return i;
+}
+
+int sound_props_pace_name(int band)
+{
+    return bd_pace[band].lang;
+}
+
 /* One edge, this library's where it has one.
  *
  * A calibrated ladder cannot decrease, so resolved edges stay in the order
@@ -374,6 +392,11 @@ static int props_rows(void)
  * builds for. */
 static const char * const props_notes[12] = {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+
+const char *sound_props_note(int tonic)
+{
+    return tonic >= 0 && tonic < 12 ? props_notes[tonic] : "";
+}
 
 /* The label a row carries. Moods is the one that moves, because a track
  * inside none of them is being told something different. */

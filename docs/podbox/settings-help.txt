@@ -615,17 +615,51 @@ None of them reach further out for the difference -- the playlist is drawn
 from the same neighbourhood either way.
 
 [action: Library Sound]
-What the analysis found across the whole library: how many tracks it has
-measured, how many it reached but could not read, and how many of those
-settled on a tempo or a key.
+What the analysis found across the whole library: how much of it has been
+measured, how many tracks each mood can draw on, how tempos and keys are
+spread, and how loud each decade's music is.
 
-The tempo count is the one to look at when Slow, Fast or Hypnotic offer fewer
-tracks than expected -- those three only consider tracks whose tempo the
-analysis trusts, and on most libraries that is well short of all of them.
+Percentages are of the measured tracks. Hold Select on a section to explain
+its rows.
 
-The last row says which music a track's Sound screen is comparing it against:
-your own library once enough of it has been measured, the built-in numbers
-until then.
+[action: Overview]
+How many tracks have been measured, how many could not be read, and how many
+settled on a tempo or a key. Slow, Fast and Hypnotic use only tracks with a
+tempo, so a low tempo count makes those playlists short.
+
+Compared To says what a track's Sound screen measures it against: your own
+library once enough of it is measured, built-in numbers until then.
+
+[action: Moods]
+How many tracks each mood playlist can choose from. A track can be in several
+moods; In no mood counts those that no mood will ever offer.
+
+A playlist can still be shorter than its count: it skips tracks under 90
+seconds and spaces out each artist, so matches by fewer than four artists give
+no more than three tracks.
+
+[action: Pace]
+How many tracks fall in each Pace band: Very slow is under 70 BPM, then Slow
+to 90, Relaxed to 110, Moderate to 130, Brisk to 150, Fast to 170 and Very
+fast above.
+
+Unclear counts tracks whose beat wandered too much to trust. Slow, Fast and
+Hypnotic leave those out.
+
+[action: Keys]
+The keys the analysis found, most common first. Unclear counts tracks that
+settled on no key, which is normal for about two fifths of a library.
+
+Dark and Melancholy favour minor keys, and Bright and Uplifting major ones, so
+a library short of either makes those moods short.
+
+[action: Loudness by Decade]
+How loud each decade's music is on average, by each track's year, with the
+number of tracks in brackets. Nearer zero is louder: music from the late
+1990s on is often mastered several dB louder than older music.
+
+A decade with only a few tracks says more about those tracks than about the
+decade.
 
 [database scan paths]
 Restricts scanning to chosen folders, so spoken-word or sample libraries stay

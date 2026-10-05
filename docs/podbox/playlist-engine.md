@@ -65,8 +65,21 @@ is not offered again.
 - **An album or a folder** — hold `Select` on it and choose **Album Sound**.
   The same read-out, averaged over its tracks.
 - **Your library** — **Settings → Library → Playlist Engine → Library Sound**.
-  How much has been measured, how many tracks could not be read, and how many
-  have a steady enough tempo and a clear enough key to use.
+  Five sections:
+  - **Overview** — how much has been measured, how many tracks could not be
+    read, and how many have a steady enough tempo and a clear enough key to
+    use.
+  - **Moods** — how many tracks each mood can choose from, and how many fit
+    no mood at all. A mood playlist can be shorter than its count: tracks
+    under 90 seconds are left out, and the artist rules above mean matches by
+    fewer than four artists give no more than three tracks.
+  - **Pace** — how many tracks fall in each tempo band, from Very slow to
+    Very fast.
+  - **Keys** — the keys found, most common first.
+  - **Loudness by Decade** — the average loudness of each decade's music, by
+    each track's year, with the number of tracks beside it.
+
+  Hold `Select` on a section and choose Explain for what its rows count.
 
 The words compare the music with the rest of your library: *Bright* means
 brighter than three quarters of what you own. Library Sound's **Compared To**
