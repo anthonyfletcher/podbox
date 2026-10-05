@@ -413,6 +413,16 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          ? "silent, nothing playing"
                          : "silent, waiting for the host to set the rate");
             break;
+        case USB_LOG_IAP_IDENTIFY:
+        {
+            static const char *const auth[] = {
+                "none", "deferred", "immediate", "reserved"
+            };
+            snprintf(p, size, "iap: lingoes %08lx, options %08lx, "
+                     "authentication %s", (unsigned long)e->c,
+                     (unsigned long)e->d, auth[e->d & 3]);
+            break;
+        }
         case USB_LOG_IAP2:
             snprintf(p, size, "iap2 %c %u bytes +%d: %08lx %08lx",
                      e->a & USB_LOG_IAP_FROM_PLAYER ? '<' : '>', e->b,

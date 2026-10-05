@@ -91,6 +91,7 @@ struct IAPContext {
     int32_t                      db_record_trans_id;
     uint8_t                      db_record_type;
     uint8_t                      trans_id_support; /* TransIDSupport */
+    uint8_t                      auth_major;       /* accessory's auth protocol */
     /* notification.c */
     /* DisplayRemote::SetRemoteEventNotification */
     uint32_t enabled_notifications_3;

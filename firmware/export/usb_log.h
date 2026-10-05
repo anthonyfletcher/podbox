@@ -90,6 +90,8 @@ enum usb_log_type
                           * announced, c = rate, d = rate announced or 0 */
     USB_LOG_IAP_STREAM,  /* what the stream now carries: a =
                           * USB_LOG_IAP_STREAM_* */
+    USB_LOG_IAP_IDENTIFY, /* IdentifyDeviceLingoes: c = lingoes,
+                           * d = options */
     USB_LOG_IAP2,        /* an iAP2 report, raw: a = offset into it from
                           * the link-control byte | USB_LOG_IAP_FROM_PLAYER,
                           * b = report bytes, c, d = eight bytes from the

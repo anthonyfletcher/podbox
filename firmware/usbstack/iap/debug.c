@@ -144,6 +144,14 @@ void iap_log_report(struct IAPContext* ctx, const void* report, size_t size, boo
     }
     usb_log(USB_LOG_IAP, lingo | (from_player ? USB_LOG_IAP_FROM_PLAYER : 0), command,
             payload | trans << 16, first);
+
+    /* The options word decides whether authentication starts, and is past
+     * the four bytes above. */
+    if(!from_player && lingo == IAPLingoID_General &&
+       command == IAPGeneralCommandID_IdentifyDeviceLingoes && payload >= 8) {
+        usb_log(USB_LOG_IAP_IDENTIFY, 0, 0, first,
+                (uint32_t)p[4] << 24 | p[5] << 16 | p[6] << 8 | p[7]);
+    }
 }
 
 const char* usb_log_iap_lingo(int lingo) {

@@ -1001,7 +1001,7 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
         switch(command) {
         case IAPGeneralCommandID_IdentifyDeviceLingoes: {
             read_request(IAPIdentifyDeviceLingoesPayload);
-            switch(swap_32(request->options)) {
+            switch(swap_32(request->options) & IAPIdentifyDeviceLingoesOptions_AuthMask) {
             case IAPIdentifyDeviceLingoesOptions_NoAuth:
                 break;
             case IAPIdentifyDeviceLingoesOptions_DeferAuth:
@@ -1048,10 +1048,16 @@ static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t co
 
 static IAPBool send_auth_challenge_sig_cb(struct IAPContext* ctx) {
     check_ret(ctx->phase == IAPPhase_Auth, iap_false);
-    struct IAPSpan                     request_span = _iap_get_buffer_for_send_payload(ctx);
-    struct IAPGetAccAuthSigPayload2p0* request      = iap_span_alloc(&request_span, sizeof(*request));
-    check_ret(request != NULL, iap_false);
-    request->retry = 1;
+    struct IAPSpan request_span = _iap_get_buffer_for_send_payload(ctx);
+    if(ctx->auth_major == 1) {
+        struct IAPGetAccAuthSigPayload1p0* request = iap_span_alloc(&request_span, sizeof(*request));
+        check_ret(request != NULL, iap_false);
+        request->retry = 1;
+    } else {
+        struct IAPGetAccAuthSigPayload2p0* request = iap_span_alloc(&request_span, sizeof(*request));
+        check_ret(request != NULL, iap_false);
+        request->retry = 1;
+    }
     check_ret(_iap_send_packet(ctx, IAPLingoID_General, IAPGeneralCommandID_GetAccessoryAuthenticationSignature, _iap_next_trans_id(ctx), request_span.ptr), iap_false);
     return iap_true;
 }
@@ -1067,6 +1073,24 @@ static int32_t handle_in_auth(struct IAPContext* ctx, uint8_t lingo, uint16_t co
     case IAPLingoID_General:
         switch(command) {
         case IAPGeneralCommandID_RetAccessoryAuthenticationInfo: {
+            /* 1.0 is the version alone, with no certificate to collect */
+            struct IAPSpan                         peek    = *request_span;
+            const struct IAPRetAccAuthInfoPayload* version = iap_span_read(&peek, sizeof(*version));
+            check_ret(version != NULL, -IAPAckStatus_EBadParameter);
+            ctx->auth_major = version->protocol_major;
+            if(version->protocol_major != 1 && version->protocol_major != 2) {
+                warn("unsupported auth version %u.%u", version->protocol_major, version->protocol_minor);
+                alloc_response(IAPAckAccAuthInfoPayload);
+                response->status = IAPAckAccAuthInfoStatus_Unsupported;
+                return IAPGeneralCommandID_AckAccessoryAuthenticationInfo;
+            }
+            if(version->protocol_major == 1) {
+                print("accessory auth 1.0");
+                ctx->on_send_complete = send_auth_challenge_sig_cb;
+                alloc_response(IAPAckAccAuthInfoPayload);
+                response->status = IAPAckAccAuthInfoStatus_Supported;
+                return IAPGeneralCommandID_AckAccessoryAuthenticationInfo;
+            }
             read_request(IAPRetAccAuthInfoPayload2p0);
             print("accessory cert %" PRIu8 "/%" PRIu8, request->cert_current_section_index, request->cert_max_section_index);
             /* iap_platform_dump_hex(request->ptr, request->size); */

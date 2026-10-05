@@ -16,11 +16,13 @@ enum IAPIdentifyDeviceLingoesLingoBits {
     IAPIdentifyDeviceLingoesLingoBits_Storage            = 1 << 12,
 };
 
-/* [1] P.135 Table 3-25 IdentifyDeviceLingoes Options bits */
+/* [1] P.135 Table 3-25 IdentifyDeviceLingoes Options bits.
+ * Bits 3:2 are the power requirement, so compare under AuthMask. */
 enum IAPIdentifyDeviceLingoesOptions {
     IAPIdentifyDeviceLingoesOptions_NoAuth        = 0b00,
     IAPIdentifyDeviceLingoesOptions_DeferAuth     = 0b01,
     IAPIdentifyDeviceLingoesOptions_ImmediateAuth = 0b10,
+    IAPIdentifyDeviceLingoesOptions_AuthMask      = 0b11,
 };
 
 struct IAPIdentifyDeviceLingoesPayload {
