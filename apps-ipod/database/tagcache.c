@@ -523,6 +523,12 @@ static ssize_t read_index_entries(int fd, struct index_entry *buf, size_t count)
 
 static ssize_t write_index_entries(int fd, struct index_entry *buf, size_t count)
 {
+    /* One write for the batch. Through the one-sector file cache, a write
+     * per 96-byte entry turns every sector into a read and a write of its
+     * own; a batch goes out as whole sectors. */
+    if (!tc_stat.econ)
+        return write(fd, buf, sizeof(*buf) * count);
+
     ssize_t ret = 0;
     for (; count > 0; count--)
     {
@@ -2909,13 +2915,13 @@ inline static int tempbuf_find_location(int id)
 static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
 {
     struct master_header tcmh;
-    struct index_entry idx;
+    struct index_entry idxbuf[IDX_BUF_DEPTH];
     int masterfd;
     int masterfd_pos;
     struct temp_file_entry *entrybuf = (struct temp_file_entry *)tempbuf;
     int max_entries;
     int entries_processed = 0;
-    int i, j;
+    int i, j, k, n;
 
     max_entries = tempbuf_size / sizeof(struct temp_file_entry) - 1;
 
@@ -2934,7 +2940,10 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
         return false;
     }
 
-    while (entries_processed < h->entry_count && !USR_CANCEL)
+    /* Not cancelled part way: commit() decides before it starts, and a retry
+     * after a half-done pass would find the deleted entries already marked
+     * resurrected and copy their figures to nothing. */
+    while (entries_processed < h->entry_count)
     {
         int count = MIN(h->entry_count - entries_processed, max_entries);
 
@@ -3000,89 +3009,108 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
         lseek(masterfd, sizeof(struct master_header), SEEK_SET);
 
         /* Check if we can resurrect some deleted runtime statistics data. */
-        for (i = 0; i < tcmh.tch.entry_count && !USR_CANCEL; i++)
+        for (i = 0; i < tcmh.tch.entry_count; i += n)
         {
-            /* Read the index entry. */
-            if (read_index_entries(masterfd, &idx, 1) != sizeof(struct index_entry))
+            off_t loc = lseek(masterfd, 0, SEEK_CUR);
+            bool changed = false;
+
+            n = MIN(tcmh.tch.entry_count - i, IDX_BUF_DEPTH);
+            if (read_index_entries(masterfd, idxbuf, n)
+                != (ssize_t)sizeof(struct index_entry) * n)
             {
                 logf("read fail #3");
                 close(masterfd);
                 return false;
             }
 
-            /**
-             * Skip unless the entry is marked as being deleted
-             * or the data has already been resurrected.
-             */
-            if (!(idx.flag & FLAG_DELETED) || (idx.flag & FLAG_RESURRECTED))
-                continue;
-
-            /* Now try to match the entry. */
-            /**
-             * To succesfully match a song, the following conditions
-             * must apply:
-             *
-             * For numeric fields: tag_length
-             * - Full identical match is required
-             *
-             * If tag_filename matches, no further checking necessary.
-             *
-             * For string hashes: tag_artist, tag_album, tag_title
-             * - All three of these must match
-             */
-            for (j = 0; j < count; j++)
+            for (k = 0; k < n; k++)
             {
-                struct temp_file_entry *tfe = &entrybuf[j];
+                struct index_entry *idx = &idxbuf[k];
 
-                /* Try to match numeric fields first. */
-                if (tfe->tag_offset[tag_length] != idx.tag_seek[tag_length])
+                /**
+                 * Skip unless the entry is marked as being deleted
+                 * or the data has already been resurrected.
+                 */
+                if (!(idx->flag & FLAG_DELETED)
+                    || (idx->flag & FLAG_RESURRECTED))
                     continue;
 
-                /* Now it's time to do the hash matching. */
-                if (tfe->tag_offset[tag_filename] != idx.tag_seek[tag_filename])
+                /* Now try to match the entry. */
+                /**
+                 * To succesfully match a song, the following conditions
+                 * must apply:
+                 *
+                 * For numeric fields: tag_length
+                 * - Full identical match is required
+                 *
+                 * If tag_filename matches, no further checking necessary.
+                 *
+                 * For string hashes: tag_artist, tag_album, tag_title
+                 * - All three of these must match
+                 */
+                for (j = 0; j < count; j++)
                 {
-                    int match_count = 0;
+                    struct temp_file_entry *tfe = &entrybuf[j];
 
-                    /* No filename match, check if we can match two other tags. */
+                    /* Try to match numeric fields first. */
+                    if (tfe->tag_offset[tag_length]
+                        != idx->tag_seek[tag_length])
+                        continue;
+
+                    /* Now it's time to do the hash matching. */
+                    if (tfe->tag_offset[tag_filename]
+                        != idx->tag_seek[tag_filename])
+                    {
+                        int match_count = 0;
+
+                        /* No filename match: the other three tags must. */
 #define tmpdb_match(tag) \
-    if (tfe->tag_offset[tag] == idx.tag_seek[tag]) \
+    if (tfe->tag_offset[tag] == idx->tag_seek[tag]) \
         match_count++
 
-                    tmpdb_match(tag_artist);
-                    tmpdb_match(tag_album);
-                    tmpdb_match(tag_title);
+                        tmpdb_match(tag_artist);
+                        tmpdb_match(tag_album);
+                        tmpdb_match(tag_title);
 
-                    if (match_count < 3)
-                    {
-                        /* Still no match found, give up. */
-                        continue;
+                        if (match_count < 3)
+                        {
+                            /* Still no match found, give up. */
+                            continue;
+                        }
                     }
-                }
 
-                /* A match found, now copy & resurrect the statistical data. */
+                    /* A match: copy and resurrect the statistical data. */
 #define tmpdb_copy_tag(tag) \
-    tfe->tag_offset[tag] = idx.tag_seek[tag]
+    tfe->tag_offset[tag] = idx->tag_seek[tag]
 
-                tmpdb_copy_tag(tag_playcount);
-                tmpdb_copy_tag(tag_rating);
-                tmpdb_copy_tag(tag_playtime);
-                tmpdb_copy_tag(tag_lastplayed);
-                tmpdb_copy_tag(tag_commitid);
-                tmpdb_copy_tag(tag_lastelapsed);
-                tmpdb_copy_tag(tag_lastoffset);
+                    tmpdb_copy_tag(tag_playcount);
+                    tmpdb_copy_tag(tag_rating);
+                    tmpdb_copy_tag(tag_playtime);
+                    tmpdb_copy_tag(tag_lastplayed);
+                    tmpdb_copy_tag(tag_commitid);
+                    tmpdb_copy_tag(tag_lastelapsed);
+                    tmpdb_copy_tag(tag_lastoffset);
 
-                /* Avoid processing this entry again. */
-                idx.flag |= FLAG_RESURRECTED;
+                    /* Avoid processing this entry again: one deleted entry
+                     * gives its figures to one new entry. */
+                    idx->flag |= FLAG_RESURRECTED;
+                    changed = true;
 
-                lseek(masterfd, -(off_t)sizeof(struct index_entry), SEEK_CUR);
-                if (write_index_entries(masterfd, &idx, 1) != sizeof(struct index_entry))
+                    logf("Entry resurrected");
+                    break;
+                }
+            }
+
+            if (changed)
+            {
+                lseek(masterfd, loc, SEEK_SET);
+                if (write_index_entries(masterfd, idxbuf, n)
+                    != (ssize_t)sizeof(struct index_entry) * n)
                 {
                     logf("masterfd writeback fail #1");
                     close(masterfd);
                     return false;
                 }
-
-                logf("Entry resurrected");
             }
         }
 
@@ -3091,40 +3119,48 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
         lseek(masterfd, masterfd_pos, SEEK_SET);
 
         /* Commit the data to the index. */
-        for (i = 0; i < count && !USR_CANCEL; i++)
+        for (i = 0; i < count; i += n)
         {
-            int loc = lseek(masterfd, 0, SEEK_CUR);
+            off_t loc = lseek(masterfd, 0, SEEK_CUR);
 
-            if (read_index_entries(masterfd, &idx, 1) != sizeof(struct index_entry))
+            n = MIN(count - i, IDX_BUF_DEPTH);
+            if (read_index_entries(masterfd, idxbuf, n)
+                != (ssize_t)sizeof(struct index_entry) * n)
             {
                 logf("read fail #3");
                 close(masterfd);
                 return false;
             }
 
-            for (j = 0; j < TAG_COUNT; j++)
+            for (k = 0; k < n; k++)
             {
-                if (!TAGCACHE_IS_NUMERIC(j))
-                    continue;
+                struct index_entry *idx = &idxbuf[k];
 
-                idx.tag_seek[j] = entrybuf[i].tag_offset[j];
-            }
-            idx.flag = entrybuf[i].flag;
+                for (j = 0; j < TAG_COUNT; j++)
+                {
+                    if (!TAGCACHE_IS_NUMERIC(j))
+                        continue;
 
-            if (idx.tag_seek[tag_commitid])
-            {
-                /* Data has been resurrected. */
-                idx.flag |= FLAG_DIRTYNUM;
-            }
-            else if (tc_stat.ready && current_tcmh.commitid > 0)
-            {
-                idx.tag_seek[tag_commitid] = current_tcmh.commitid;
-                idx.flag |= FLAG_DIRTYNUM;
+                    idx->tag_seek[j] = entrybuf[i + k].tag_offset[j];
+                }
+                idx->flag = entrybuf[i + k].flag;
+
+                if (idx->tag_seek[tag_commitid])
+                {
+                    /* Data has been resurrected. */
+                    idx->flag |= FLAG_DIRTYNUM;
+                }
+                else if (tc_stat.ready && current_tcmh.commitid > 0)
+                {
+                    idx->tag_seek[tag_commitid] = current_tcmh.commitid;
+                    idx->flag |= FLAG_DIRTYNUM;
+                }
             }
 
             /* Write back the updated index. */
             lseek(masterfd, loc, SEEK_SET);
-            if (write_index_entries(masterfd, &idx, 1) != sizeof(struct index_entry))
+            if (write_index_entries(masterfd, idxbuf, n)
+                != (ssize_t)sizeof(struct index_entry) * n)
             {
                 logf("write fail");
                 close(masterfd);
