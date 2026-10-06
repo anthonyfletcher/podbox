@@ -5716,9 +5716,12 @@ static void tagcache_thread(void)
                 break;
 
             case Q_UPDATE:
+                /* Deletions first: a moved file keeps its play counts only
+                 * if its old entry is already deleted when the commit adds
+                 * it again. */
+                check_deleted_files();
                 tagcache_build();
                 load_ramcache();
-                check_deleted_files();
                 break ;
 
             case Q_START_SCAN:
@@ -5799,12 +5802,9 @@ static void tagcache_thread(void)
                 else
                 if (do_update)
                 {
-                    tagcache_build();
-
-                    /* This will be very slow unless dircache is enabled
-                       or target is flash based, but do it anyway for
-                       consistency. */
+                    /* Before the build, as in Q_UPDATE. */
                     check_deleted_files();
+                    tagcache_build();
                 }
 
                 logf("tagcache check done");

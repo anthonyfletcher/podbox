@@ -23,6 +23,7 @@
 #include "powermgmt.h"
 #include "backlight.h"
 #include "audio.h"
+#include "audio/playback.h" /* add_playbacklog */
 #include "storage.h"
 #include "usb_core.h"       /* usb_core_host_wrote_storage */
 #include "ata_idle_notify.h"
@@ -134,7 +135,13 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             system_flush();
         }
         else
+        {
+            /* Even on an empty battery: queued play counts and ratings, and
+             * the buffered playback log, are a few sector writes. */
+            tagcache_shutdown();
+            add_playbacklog(NULL);
             dircache_disable();
+        }
 
         if(global_settings.talk_menu)
         {
