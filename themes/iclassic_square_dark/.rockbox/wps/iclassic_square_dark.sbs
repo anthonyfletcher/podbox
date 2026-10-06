@@ -5,9 +5,14 @@
 #-----------------------------------------------#
 #
 #Colours: vivid is the album's most colourful colour, white
-#with none. Icons take it at tone 50 or lighter, so they read
-#on black; the selection bar at 60 or lighter, so black text
-#reads on it. Every other colour is pinned with !.
+#with none. Icons and text take it at tone 50 or lighter, so
+#they read on black; the selection bar at 60 or lighter, so
+#black text reads on it. Every other colour is pinned with !.
+#
+#Which parts take vivid is set in
+#themes/iclassic_square_dark.preferences, read at load. An
+#entry that is missing reads as its default: the tests for a
+#yes default ask for no, and those for a no ask for yes.
 #
 #Status bar off
 %wd
@@ -39,6 +44,7 @@
 #- Screen switches. 1x1 because a flip clears its line
 %V(319,239,1,1,-)
 %Vd(Chrome)
+%?mh<%Vd(Status)|%?mp<%Vd(StatusWide)|%Vd(Status)|%Vd(Status)|%Vd(Status)|%Vd(Status)>>
 %?if(%cs,=,10)<%Vd(QuickBg)%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
 %?if(%cs,=,22)<|%Vd(Pane)>
 #
@@ -55,30 +61,38 @@
 #
 #- Title
 %Vl(Chrome,6,3,196,19,4)%Vf(!ffffff)
-%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%s%Lt>>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50)|>%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%s%Lt>>
 #
-#- Status icons
-%Vl(Chrome,222,0,96,23,2)%Vf(!ffffff)
-%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#- Status icons, in 24px slots: battery rightmost, then hold or
+#  transport, then the rest, which close up when there is no
+#  transport icon. Split so the two can take their own colours
+%Vl(Status,222,0,48,23,2)%Vf(!ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(StatusWide,222,0,72,23,2)%Vf(!ffffff)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(Chrome,270,0,24,23,2)%Vf(!ffffff)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid>50)|>%?mh<À|%?mp<|A|B|G|F>>
+%Vl(Chrome,294,0,24,23,2)%Vf(!ffffff)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid>50)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
 #
-#- Selected row: a vivid bar with black text
+#- Selected row: a vivid bar with black text, or a white one
 #
 #- Plain row, the full width where there is no chevron
 %Vl(Rows,0,0,160,24,3)%Vy
-%?La<|%?and(%or(%if(%cs,!=,6),%and(%if(%LI,!=,19),%if(%LI,!=,0),%if(%LI,!=,2),%if(%LI,!=,4),%if(%LI,!=,7),%if(%LI,!=,10),%if(%LI,!=,22),%if(%LI,!=,24),%if(%LI,!=,25),%if(%LI,!=,26),%if(%LI,!=,29),%if(%LI,!=,30))),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%LI,!=,1)),%or(%if(%cs,!=,13),%if(%LI,!=,2)))<%?Lc<%Vg(vivid>60,vivid>60,!000000)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+%?La<|%?and(%or(%if(%cs,!=,6),%and(%if(%LI,!=,19),%if(%LI,!=,0),%if(%LI,!=,2),%if(%LI,!=,4),%if(%LI,!=,7),%if(%LI,!=,10),%if(%LI,!=,22),%if(%LI,!=,24),%if(%LI,!=,25),%if(%LI,!=,26),%if(%LI,!=,29),%if(%LI,!=,30))),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%LI,!=,1)),%or(%if(%cs,!=,13),%if(%LI,!=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_dark.preferences,vivid_selection:),=,no)<%Vg(!ffffff,!ffffff,!000000)|%Vg(vivid>60,vivid>60,!000000)>%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
 #
 #- Plain row beside a chevron. Only one of the two draws a
 #  given row, so neither clears the other's text
 %Vl(Rows,0,0,136,24,3)%Vy
-%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%Vg(vivid>60,vivid>60,!000000)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_dark.preferences,vivid_selection:),=,no)<%Vg(!ffffff,!ffffff,!000000)|%Vg(vivid>60,vivid>60,!000000)>%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
 #
 #- Plain row chevron
 %Vl(Rows,136,0,24,24,2)%Vy
-%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%Vg(vivid>60,vivid>60,!000000)%Vs(gradient)|%Vf(!ffffff)>Þ>>
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_dark.preferences,vivid_selection:),=,no)<%Vg(!ffffff,!ffffff,!000000)|%Vg(vivid>60,vivid>60,!000000)>%Vs(gradient)|%Vf(!ffffff)>Þ>>
 #
 #- Art row special icon. Must stay above the cover
 %Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(vivid>50)|%Vf(!ffffff)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
+%?La<%?Lc<%?if(%ft(themes/iclassic_square_dark.preferences,vivid_selection:),=,no)<%Vf(!ffffff)|%Vf(vivid>50)>|%Vf(!ffffff)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
 #
 #- Art row cover
 %Vl(Rows,1,1,44,44,-)
@@ -86,11 +100,11 @@
 #
 #- Art row text
 %Vl(Rows,46,0,114,46,3)%Vy
-%?La<%?Lc<%Vg(vivid>60,vivid>60,!000000)%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
+%?La<%?Lc<%?if(%ft(themes/iclassic_square_dark.preferences,vivid_selection:),=,no)<%Vg(!ffffff,!ffffff,!000000)|%Vg(vivid>60,vivid>60,!000000)>%Vs(gradient)|%Vf(!ffffff)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
 #
 #Now-playing pane
 %Vl(Pane,166,184,150,22,3)%Vf(!ffffff)
-%s%?it<%it|%fn>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_song_text:),=,yes)<%Vf(vivid>50)|>%s%?it<%it|%fn>
 %Vl(Pane,166,206,150,20,4)%Vf(!909090)
 %s%?ia<%ia|%?d(2)<%d(2)|>>
 #

@@ -7,7 +7,8 @@
 - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
 A dark version of iClassic Square: white and grey on black. The progress bar,
-the volume bar and the selected row take their colour from the album playing.
+the volume bar and the selected row take their colour from the album playing;
+the preferences below choose which parts do.
 
 Modified to support dynamic colours and album/artist art.
 
@@ -28,6 +29,23 @@ Modified to support dynamic colours and album/artist art.
 <img src="ss_1.png"/>
 <img src="ss_2.png"/>
 <img src="ss_3.png"/>
+
+## Preferences
+
+Edit `/.rockbox/themes/iclassic_square_dark.preferences` on the player, then
+load the theme again to pick the change up. `yes` gives a part the album's
+colour and `no` keeps it white.
+
+| Preference | Values | Default | What it colours |
+|---|---|---|---|
+| `vivid_progress_bar` | `yes`, `no` | `yes` | The progress bar on the playing screen. |
+| `vivid_volume_icons` | `yes`, `no` | `yes` | The speaker icons either side of the volume bar. |
+| `vivid_volume_bar` | `yes`, `no` | `yes` | The volume bar, shown in place of the progress bar while the volume changes. |
+| `vivid_transport_icon` | `yes`, `no` | `no` | The play, pause, fast-forward, rewind and hold icon in the title bar. |
+| `vivid_battery_icon` | `yes`, `no` | `no` | The battery icon in the title bar. |
+| `vivid_title_text` | `yes`, `no` | `no` | The title bar's text: the list's name, or Now Playing. |
+| `vivid_song_text` | `yes`, `no` | `no` | The song's title, on the playing screen and in the pane beside lists. |
+| `vivid_selection` | `yes`, `no` | `yes` | The bar behind the selected row. `no` makes it white. |
 
 ## Installation
 

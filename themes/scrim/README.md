@@ -39,20 +39,12 @@ Scrim is shipped with PodBox.  Switch between `scrim` and `scrim_p` via `Setting
 
 ## Preferences
 
-The line under the track title can show the artist, the album, both, or the
-playlist name.  Edit `sub-line mode:` in `/.rockbox/themes/scrim.preferences`
-to `artist`, `album`, `artist-album`, `album-artist` or `playlist_name`, then
-load the theme again to pick the change up.  Both `scrim` and `scrim_p` read it.
+Edit `/.rockbox/themes/scrim.preferences` on the player, then load the theme
+again to pick the change up.
 
-`scrim` can also clear the track title, sub-line, progress bar, times and
-status icons away once the player has been left alone.  Set `auto-hide:` to
-`5`, `10` or `30` seconds, or `off`; a button press or wheel turn brings them
-back.  `scrim_p` ignores it.
-
-The play/pause icon shows what is happening by default.  Set `play-pause icon:`
-to `next` to have it show what pressing Play will do instead -- pause while a
-track plays, play while it is paused.  `scrim_p` has no play/pause icon; it
-fades the cover and draws large pause bars over it while paused.
-
-`scrim`'s spectrum analyser has falling peak caps.  Set `spectrum peaks:` to
-`off` to remove them.
+| Preference | Values | Default | What it does |
+|---|---|---|---|
+| `sub-line mode` | `artist`, `album`, `artist-album`, `album-artist`, `playlist_name` | `artist` | What the line under the track title shows. Both `scrim` and `scrim_p`. |
+| `auto-hide` | `off`, `5`, `10`, `30` | `off` | Seconds without a button press or wheel turn before the track title, sub-line, progress bar, times and status icons clear away. Any input brings them back. `scrim` only. |
+| `play-pause icon` | `current`, `next` | `current` | `current` shows what is happening; `next` shows what pressing Play will do -- pause while a track plays. `scrim` only: `scrim_p` fades the cover and draws pause bars over it instead. |
+| `spectrum peaks` | `on`, `off` | `on` | Falling peak caps on the spectrum analyser. `scrim` only. |

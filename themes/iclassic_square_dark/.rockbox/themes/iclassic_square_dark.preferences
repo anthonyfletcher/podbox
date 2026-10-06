@@ -1,0 +1,48 @@
+#-----------------------------------------------#
+#iclassic_square_dark
+#(CC-BY-SA 3.0) by Humberto Santana
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+# Which parts take the album's colour. yes takes it, no keeps them
+# white. Reload the theme after changing any of them.
+#
+#-- Progress bar --#
+# The bar under the cover on the playing screen.
+# Possible Values: yes, no
+vivid_progress_bar: yes
+#
+#-- Volume icons --#
+# The speaker icons either side of the volume bar.
+# Possible Values: yes, no
+vivid_volume_icons: yes
+#
+#-- Volume bar --#
+# The bar shown in place of the progress bar while the volume changes.
+# Possible Values: yes, no
+vivid_volume_bar: yes
+#
+#-- Transport icon --#
+# The play, pause, fast-forward, rewind and hold icon in the title bar.
+# Possible Values: yes, no
+vivid_transport_icon: no
+#
+#-- Battery icon --#
+# The battery icon in the title bar.
+# Possible Values: yes, no
+vivid_battery_icon: no
+#
+#-- Title text --#
+# The text in the title bar: the list's name, or Now Playing.
+# Possible Values: yes, no
+vivid_title_text: no
+#
+#-- Song text --#
+# The song's title, on the playing screen and in the pane beside lists.
+# Possible Values: yes, no
+vivid_song_text: no
+#
+#-- Selection --#
+# The bar behind the selected row in lists. no makes it white.
+# Possible Values: yes, no
+vivid_selection: yes

@@ -5,9 +5,14 @@
 #-----------------------------------------------#
 #
 #Colours: vivid is the album's most colourful colour, white
-#with none. Bars take it at tone 40 or lighter and icons at 50,
-#so both read on black; vivid>40.75 is the bars' lower, darker
-#half. Every other colour is pinned with !.
+#with none. Bars take it at tone 40 or lighter and icons and
+#text at 50, so both read on black; vivid>40.75 is the bars'
+#lower, darker half. Every other colour is pinned with !.
+#
+#Which parts take vivid is set in
+#themes/iclassic_square_dark.preferences, read at load. An
+#entry that is missing reads as its default: the tests for a
+#yes default ask for no, and those for a no ask for yes.
 #
 #Status bar off
 %wd
@@ -37,14 +42,23 @@
 #- Volume or progress. 1x1 because a flip clears its line
 %V(319,239,1,1,-)
 %?mv(2)<%Vd(Volume)|%Vd(Progress)>
+%?mh<%Vd(Status)|%?mp<%Vd(StatusWide)|%Vd(Status)|%Vd(Status)|%Vd(Status)|%Vd(Status)>>
 #
 #- Title
 %V(6,3,190,19,4)%Vf(!ffffff)
-%Sx(Now Playing)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50)|>%Sx(Now Playing)
 #
-#- Status icons
-%V(198,0,120,23,2)%Vf(!ffffff)
-%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>%?mh<À|%?mp<|A|B|G|F>>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#- Status icons, in 24px slots: battery rightmost, then hold or
+#  transport, then the rest, which close up when there is no
+#  transport icon. Split so the two can take their own colours
+%Vl(Status,198,0,72,23,2)%Vf(!ffffff)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(StatusWide,198,0,96,23,2)%Vf(!ffffff)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%V(270,0,24,23,2)%Vf(!ffffff)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid>50)|>%?mh<À|%?mp<|A|B|G|F>>
+%V(294,0,24,23,2)%Vf(!ffffff)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid>50)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
 #
 #- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
 #  nothing here copies to screen once the art arrives
@@ -56,7 +70,7 @@
 #
 #- Title, artist, album
 %V(170,36,146,22,3)%Vf(!ffffff)
-%s%?it<%it|%fn>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_song_text:),=,yes)<%Vf(vivid>50)|>%s%?it<%it|%fn>
 %V(170,60,146,20,4)%Vf(!909090)
 %s%?ia<%ia|%?d(2)<%d(2)|>>
 %V(170,80,146,20,5)%Vf(!909090)
@@ -70,22 +84,23 @@
 %V(170,128,146,20,5)%Vf(!909090)
 %pp %Sx(of) %pe
 #
-#Progress, in two tones: vivid over a shade of it
+#Progress, in two tones: vivid over a shade of it, or white
+#over grey
 %Vl(Progress,2,210,52,20,4)%Vf(!ffffff)
 %ar%pc
 %Vl(Progress,60,214,200,6,-)%Vf(vivid>40)
-%pb(0,0,-,-,noborder)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!ffffff)|>%pb(0,0,-,-,noborder)
 %Vl(Progress,60,220,200,6,-)%Vf(vivid>40.75)
-%pb(0,0,-,-,noborder)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!bfbfbf)|>%pb(0,0,-,-,noborder)
 %Vl(Progress,266,210,52,20,4)%Vf(!ffffff)
 %al-%pr
 #
 #Volume
 %Vl(Volume,32,208,24,24,2)%Vf(vivid>50)
-N
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>N
 %Vl(Volume,60,214,200,6,-)%Vf(vivid>40)
-%pv(0,0,-,-,noborder)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!ffffff)|>%pv(0,0,-,-,noborder)
 %Vl(Volume,60,220,200,6,-)%Vf(vivid>40.75)
-%pv(0,0,-,-,noborder)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!bfbfbf)|>%pv(0,0,-,-,noborder)
 %Vl(Volume,264,208,24,24,2)%Vf(vivid>50)
-O
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>O
