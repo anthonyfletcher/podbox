@@ -64,6 +64,7 @@
 #include "playlist/playlist.h"
 #include "core_alloc.h"              /* background build buffer */
 #include "usb.h"                     /* SYS_USB_CONNECTED handling */
+#include "ata_idle_notify.h"         /* the play log waits for an idle disk */
 #include "db_summary.h"
 
 /* The index file, and the four-byte magic at its start. It holds albums and
@@ -749,27 +750,28 @@ static int build_artist_index(struct tagcache_search *tcs,
  * reader applies whatever arrived after the index was written.
  *
  * Both keys come from the track's own tags, so a play costs no database work
- * at all: an append, at a moment when tagcache is already writing runtime
- * data to the same disk.
+ * at all. The records wait in RAM, as tagcache's play counts do, and are
+ * appended when the disk is next about to sleep: a play is logged on the
+ * audio thread, which must not wait out a spin-up.
  * ------------------------------------------------------------------------ */
 
-void db_summary_log_play(const char *album, const char *albumartist,
-                       long serial)
+#define PLAYS_PENDING_MAX 16
+static struct play_rec plays_pending[PLAYS_PENDING_MAX];
+static int plays_pending_ct;
+
+/* Appends the plays waiting in RAM, taken before the first yield. A play
+ * logged while this writes stays in RAM until a later call. */
+void db_summary_write_plays(void)
 {
-    struct play_rec rec;
+    struct play_rec recs[PLAYS_PENDING_MAX];
+    ssize_t len = plays_pending_ct * sizeof(recs[0]);
     off_t before;
     int fd;
 
-    /* Nothing to attribute it to. assign_keys() gives a nameless album a key
-     * of 0 and matches nothing against it, so a record like this could never
-     * be applied to anything. */
-    if (!album || !*album)
+    if (len == 0)
         return;
-
-    rec.serial = serial;
-    rec.album_key = name_key(album, albumartist);
-    rec.artist_key = albumartist && *albumartist
-                   ? name_key(albumartist, NULL) : 0;
+    memcpy(recs, plays_pending, len);
+    plays_pending_ct = 0;
 
     fd = open(DB_PLAYS_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (fd < 0)
@@ -782,10 +784,11 @@ void db_summary_log_play(const char *album, const char *albumartist,
      * figures would then be credited to whichever album the misaligned bytes
      * happen to name, silently and for good.
      *
-     * So put the file back the way it was and drop this play instead. Losing
-     * one play is not worth noticing; losing the alignment is permanent. */
+     * So put the file back the way it was and drop these plays instead.
+     * Losing a few plays is not worth noticing; losing the alignment is
+     * permanent. */
     before = ffilesize(fd);
-    if (write(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
+    if (write(fd, recs, len) != len)
     {
         if (before >= 0)
             ftruncate(fd, before);
@@ -797,10 +800,33 @@ void db_summary_log_play(const char *album, const char *albumartist,
      * beats replaying it on every read. Cheap to say so: a build that finds
      * only plays changed carries every album's figures across bar the ones
      * named here. */
-    if (ffilesize(fd) > (long)(PLAY_LOG_MAX * sizeof(rec)))
+    if (ffilesize(fd) > (long)(PLAY_LOG_MAX * sizeof(recs[0])))
         bg_task_update(&db_summary_task);
 
     close(fd);
+}
+
+void db_summary_log_play(const char *album, const char *albumartist,
+                       long serial)
+{
+    struct play_rec *rec;
+
+    /* Nothing to attribute it to. assign_keys() gives a nameless album a key
+     * of 0 and matches nothing against it, so a record like this could never
+     * be applied to anything. */
+    if (!album || !*album)
+        return;
+
+    /* Full only if the disk has not slept in sixteen plays */
+    if (plays_pending_ct == PLAYS_PENDING_MAX)
+        db_summary_write_plays();
+
+    rec = &plays_pending[plays_pending_ct++];
+    rec->serial = serial;
+    rec->album_key = name_key(album, albumartist);
+    rec->artist_key = albumartist && *albumartist
+                    ? name_key(albumartist, NULL) : 0;
+    register_storage_idle_func(db_summary_write_plays);
 }
 
 /* The play log, opened for reading, or -1.

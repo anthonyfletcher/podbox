@@ -1264,8 +1264,8 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
         /* The same play, for the album and artist figures. tagcache holds it
          * per track; rolling that up is a search per album, which is why the
          * index keeps its own summary -- and why one play used to mean
-         * rebuilding the lot. Here it is twelve bytes appended beside the
-         * writes above, on a disk they have already woken. */
+         * rebuilding the lot. Here it is twelve bytes, held with the
+         * writes above until the disk is next idle. */
         db_summary_log_play(id3->album,
                             id3->albumartist && *id3->albumartist
                                 ? id3->albumartist : id3->artist,

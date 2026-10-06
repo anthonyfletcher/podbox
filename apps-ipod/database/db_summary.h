@@ -226,10 +226,15 @@ int db_summary_build_artists(struct db_summary_t *target,
  * serial() just returned, which is also what it stores as lastplayed.
  *
  * Both names come from the track's own tags, so this costs no database work:
- * it appends twelve bytes and returns. A reader applies whatever arrived
- * after the index it just loaded was written. */
+ * it keeps twelve bytes in RAM and returns, and they are appended when the
+ * disk is next idle. A reader applies whatever arrived after the index it
+ * just loaded was written. */
 void db_summary_log_play(const char *album, const char *albumartist,
                        long serial);
+
+/* Appends the plays still in RAM; for a shutdown that skips the idle
+ * callbacks. */
+void db_summary_write_plays(void);
 
 /* Start the background pass that keeps the saved index current. Called once
  * at startup; it builds only while the database is idle and settled. */
