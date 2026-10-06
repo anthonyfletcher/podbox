@@ -1796,11 +1796,14 @@ const struct settings_list settings[] = {
                      THEME_DIR "/", ".colours"),
     /* Off unless a theme asks for it: it repaints in colours taken from the
      * album art, which a skin not written for it has no reason to expect.
-     * F_THEMERESET so loading such a skin turns it back off. */
-    OFFON_SETTING(F_THEMERESET, dynamic_colors, LANG_DYNAMIC_COLORS, false,
-                  "dynamic colors", NULL),
+     * F_THEMERESET so loading such a skin turns it back off. F_TEMPVAR on
+     * this and the next, so neither takes effect until it is chosen: live,
+     * each value scrolled past recolours the whole screen under the open
+     * option list, and a turn from light to dark leaves it drawn wrongly. */
+    OFFON_SETTING(F_THEMERESET|F_TEMPVAR, dynamic_colors,
+                  LANG_DYNAMIC_COLORS, false, "dynamic colors", NULL),
     /* A light theme sets `light` so an album never turns it dark. */
-    CHOICE_SETTING(F_THEMERESET, dynamic_colors_background,
+    CHOICE_SETTING(F_THEMERESET|F_TEMPVAR, dynamic_colors_background,
                    LANG_DYNAMIC_COLORS_BACKGROUND, DYNAMIC_BG_AUTO,
                    "dynamic colors background", "auto,light,dark", NULL, 3,
                    ID2P(LANG_AUTO), ID2P(LANG_DYNAMIC_COLORS_LIGHT),
