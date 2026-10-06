@@ -2529,6 +2529,21 @@ static int folder_name_year(const char *path)
     return year;
 }
 
+/* The entries the walk found, one bit each. After a walk that completed,
+ * every live entry left unmarked is a file that has gone, and is deleted
+ * before the commit -- which is also what lets a moved file keep its figures.
+ * That replaces a second pass over every path asking the filesystem. Static,
+ * so it costs no allocation; a larger library, or a database that is not
+ * ready, falls back to check_file_refs(). */
+#define WALK_SEEN_MAX 65536
+static uint32_t walk_seen[WALK_SEEN_MAX / 32];
+static long walk_seen_count;
+
+static bool walk_checks_deletions(void)
+{
+    return tc_stat.ready && current_tcmh.tch.entry_count <= WALK_SEEN_MAX;
+}
+
 static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
 {
     #define ADD_TAG(entry, tag, data) \
@@ -2572,6 +2587,9 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         idx_id = find_entry_ram(path);
     else if (filenametag_fd >= 0)
         idx_id = find_entry_disk(path, false);
+
+    if (idx_id >= 0 && idx_id < walk_seen_count)
+        walk_seen[idx_id / 32] |= 1u << (idx_id % 32);
 
     /* Check if file has been modified. */
     if (idx_id >= 0)
@@ -5396,6 +5414,42 @@ void tagcache_screensync_enable(bool state)
     tc_stat.syncscreen = state;
 }
 
+/* After a complete walk: delete every live entry it did not find. */
+static void delete_unseen_entries(void)
+{
+    struct master_header hdr;
+    struct index_entry idxbuf[IDX_BUF_DEPTH];
+    long i, n, k, count;
+    int deleted = 0;
+    int fd = open_master_fd(&hdr, false);
+
+    if (fd < 0)
+        return;
+
+    count = MIN((long)hdr.tch.entry_count, walk_seen_count);
+    for (i = 0; i < count; i += n)
+    {
+        n = MIN(count - i, IDX_BUF_DEPTH);
+        if (read_index_entries(fd, idxbuf, n)
+            != (ssize_t)sizeof(struct index_entry) * n)
+            break;
+
+        for (k = 0; k < n; k++)
+        {
+            long id = i + k;
+            if ((idxbuf[k].flag & FLAG_DELETED)
+                || (walk_seen[id / 32] & (1u << (id % 32))))
+                continue;
+            if (delete_entry(id))
+                deleted++;
+        }
+        do_timed_yield();
+    }
+
+    close(fd);
+    debug_log(DEBUG_LOG_TAGCACHE, "walk: %d deleted", deleted);
+}
+
 /* this is called by the database tool to not pull in global_settings */
 static
 void do_tagcache_build(const char *path[])
@@ -5491,6 +5545,10 @@ void do_tagcache_build(const char *path[])
         j++;
     }
 
+    walk_seen_count = walk_checks_deletions() ? current_tcmh.tch.entry_count
+                                              : 0;
+    memset(walk_seen, 0, (walk_seen_count + 31) / 32 * sizeof(walk_seen[0]));
+
     struct search_roots_ll * this;
     /* check_dir might add new roots */
     for(this = &roots_ll[0]; this; this = this->next)
@@ -5527,10 +5585,15 @@ void do_tagcache_build(const char *path[])
         /* A partial temp file would stop every later scan this session and
          * be committed, incomplete, at the next boot. */
         logf("Aborted.");
+        walk_seen_count = 0;
         remove_db_file(TAGCACHE_FILE_TEMP);
         cpu_boost(false);
         return ;
     }
+
+    if (walk_seen_count)
+        delete_unseen_entries();
+    walk_seen_count = 0;
 
     /* Commit changes to the database. */
     if (commit())
@@ -5760,8 +5823,9 @@ static void tagcache_thread(void)
             case Q_UPDATE:
                 /* Deletions first: a moved file keeps its play counts only
                  * if its old entry is already deleted when the commit adds
-                 * it again. */
-                check_deleted_files();
+                 * it again. The walk does that itself where it can. */
+                if (!walk_checks_deletions())
+                    check_deleted_files();
                 tagcache_build();
                 load_ramcache();
                 break ;
@@ -5835,9 +5899,12 @@ static void tagcache_thread(void)
                      * the carousel for the life of the install. The other arm
                      * below always ran the check, so the asymmetry was not
                      * deliberate. Ask for it whenever a scan was asked for. */
+                    /* The walk below deletes what it does not find, where
+                     * it can; the storage check is then only the fallback. */
+                    bool delete_here = do_update && !walk_checks_deletions();
                     if (global_settings.tagcache_ram == TAGCACHE_RAM_ON
-                        || do_update)
-                        check_file_refs(do_update);
+                        || delete_here)
+                        check_file_refs(delete_here);
                     if (tc_stat.ramcache && do_update)
                         tagcache_build();
                 }
@@ -5845,7 +5912,8 @@ static void tagcache_thread(void)
                 if (do_update)
                 {
                     /* Before the build, as in Q_UPDATE. */
-                    check_deleted_files();
+                    if (!walk_checks_deletions())
+                        check_deleted_files();
                     tagcache_build();
                 }
 
