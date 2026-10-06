@@ -2452,7 +2452,7 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
 {
     struct db_summary_t data;
     struct tagcache_marks marks;
-    struct album_data rec;
+    struct album_data recs[16];
     off_t at;
     int fd;
     int ret;
@@ -2488,13 +2488,20 @@ int db_summary_read_order_table(struct db_summary_order *out, int max,
     if (lseek(fd, at, SEEK_SET) != at)
         goto done;
 
-    for (n = 0; n < data.album_ct; n++)
+    /* A few records a read: one read() a record through the file cache
+     * costs ~30 ms a list on a 5G. */
+    for (n = 0; n < data.album_ct; )
     {
-        if (read(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
+        int k = MIN((int)ARRAYLEN(recs), data.album_ct - n);
+        ssize_t len = k * sizeof(recs[0]);
+        if (read(fd, recs, len) != len)
             goto done;
-        out[n].seek = rec.seek;
-        out[n].year = rec.year;
-        out[n].artist = rec.artist_idx;
+        for (int i = 0; i < k; i++, n++)
+        {
+            out[n].seek = recs[i].seek;
+            out[n].year = recs[i].year;
+            out[n].artist = recs[i].artist_idx;
+        }
     }
 
     /* The names are needed only to step past articles, and go in the space

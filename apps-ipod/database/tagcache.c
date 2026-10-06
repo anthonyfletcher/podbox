@@ -1711,20 +1711,28 @@ static bool add_uniqbuf(struct tagcache_search *tcs, uint32_t id)
         return true;
     }
 
-    for (i = 0; i < tcs->unique_list_count; i++)
-    {
-        /* Return false if entry is found. */
-        if (tcs->unique_list[i] == id)
-        {
-            /* logf("%d Exists @ %d", id, i); */
-            return false;
-        }
-    }
+    /* An open-addressed hash set in the caller's buffer, so a level costs
+     * its rows rather than rows x distinct values. A slot of 0 is empty, so
+     * the key is id + 1; once full, duplicates are let through. */
+    uint32_t cap = tcs->unique_list_capacity;
+    uint32_t key = id + 1;
 
-    if (tcs->unique_list_count < tcs->unique_list_capacity)
+    if (cap == 0)
+        return true;
+
+    i = (key * 2654435761u) % cap;
+    for (uint32_t n = 0; n < cap; n++)
     {
-        tcs->unique_list[i] = id;
-        tcs->unique_list_count++;
+        if (tcs->unique_list[i] == key)
+            return false;
+        if (tcs->unique_list[i] == 0)
+        {
+            tcs->unique_list[i] = key;
+            tcs->unique_list_count++;
+            return true;
+        }
+        if (++i == (int)cap)
+            i = 0;
     }
 
     return true;
@@ -1990,7 +1998,8 @@ void tagcache_search_set_uniqbuf(struct tagcache_search *tcs,
     tcs->unique_list = (uint32_t *)buffer;
     tcs->unique_list_capacity = length / sizeof(*tcs->unique_list);
     tcs->unique_list_count = 0;
-    memset(tcs->unique_list, 0, tcs->unique_list_capacity);
+    memset(tcs->unique_list, 0,
+           tcs->unique_list_capacity * sizeof(*tcs->unique_list));
 }
 
 bool tagcache_search_add_filter(struct tagcache_search *tcs,

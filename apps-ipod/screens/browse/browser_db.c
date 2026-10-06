@@ -3746,9 +3746,17 @@ int browser_db_load(struct browser_context* c)
             }
 
             cpu_boost(true);
-            ui_set_working(true);
-            count = retrieve_entries(c, 0, true);
-            ui_set_working(false);
+            {
+                /* The indicator costs two full status-bar renders, ~60 ms
+                 * each on a 5G -- more than a level read from the RAM copy
+                 * takes. Shown only for a read from disk. */
+                bool slow = !tagcache_is_in_ram();
+                if (slow)
+                    ui_set_working(true);
+                count = retrieve_entries(c, 0, true);
+                if (slow)
+                    ui_set_working(false);
+            }
             cpu_boost(false);
             break;
 
