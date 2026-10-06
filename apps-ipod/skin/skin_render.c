@@ -1406,7 +1406,11 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         {
             bool dirty = (first_vp->flags & VP_FLAG_VP_SET_CLEAN)
                           == VP_FLAG_VP_DIRTY;
+            /* A %VB skin always owes it: gwps_enter_wps()'s clear_display()
+             * marks the screen clean, but what it copied was the .sbs's
+             * layer, and whatever no foreground viewport covers keeps it. */
             screen_clear_owed = dirty
+                || data->use_extra_framebuffer
                 || dynamic_colors_resolve(first_vp->bg_pattern)
                    != first_vp->bg_pattern
                 || dynamic_colors_screen_clear_needed();

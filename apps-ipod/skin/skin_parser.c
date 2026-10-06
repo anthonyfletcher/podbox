@@ -2082,6 +2082,7 @@ static void skin_data_reset(struct wps_data *wps_data)
     wps_data->draws_quickscreen = false;
     wps_data->wps_sb_tag = false;
     wps_data->show_sb_on_wps = false;
+    wps_data->use_extra_framebuffer = false;
     wps_data->wps_loaded = false;
 }
 
