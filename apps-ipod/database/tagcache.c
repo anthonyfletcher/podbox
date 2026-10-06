@@ -2560,7 +2560,6 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     int offset = 0;
     int path_length = strlen(path);
     bool has_artist;
-    bool has_grouping;
 
     DB_LOG("file", path);
 
@@ -2664,8 +2663,6 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     /* String tags. */
     has_artist = id3.artist != NULL
         && strlen(id3.artist) > 0;
-    has_grouping = id3.grouping != NULL
-        && strlen(id3.grouping) > 0;
 
     /* No album artist is the artist's own album, so every view grouped by
      * album artist finds the track under its artist, not under <Untagged>. */
@@ -2688,14 +2685,10 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     {
         ADD_TAG(entry, tag_virt_canonicalartist, &id3.albumartist);
     }
-    if (has_grouping)
-    {
-        ADD_TAG(entry, tag_grouping, &id3.grouping);
-    }
-    else
-    {
-        ADD_TAG(entry, tag_grouping, &id3.title);
-    }
+    /* Grouping as tagged, <Untagged> when it is not -- never a copy of the
+     * title, which made it a second sorted file of every title for each
+     * commit to rewrite, read by nothing. */
+    ADD_TAG(entry, tag_grouping, &id3.grouping);
     entry.data_length = offset;
 
     /* Write the header */
@@ -2718,14 +2711,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     {
         write_item(id3.albumartist);
     }
-    if (has_grouping)
-    {
-        write_item(id3.grouping);
-    }
-    else
-    {
-        write_item(id3.title);
-    }
+    write_item(id3.grouping);
 
     total_entry_count++;
 
@@ -3733,6 +3719,40 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
     return 1;
 }
 
+/* A generous estimate of the buffer a merge needs: build_index()'s index and
+ * lookup tables for every entry, old and new, and the largest sorted tag file
+ * twice over, plus the new tag data. */
+static size_t commit_need(const struct tagcache_header *tmp)
+{
+    struct master_header mhdr;
+    struct tagcache_header thdr;
+    size_t biggest = 0;
+    long count = tmp->entry_count + 1;
+    int fd;
+
+    fd = open_master_fd(&mhdr, false);
+    if (fd >= 0)
+    {
+        count += mhdr.tch.entry_count;
+        close(fd);
+    }
+
+    for (int tag = 0; tag < TAG_COUNT; tag++)
+    {
+        if (!TAGCACHE_IS_SORTED(tag))
+            continue;
+        fd = open_tag_fd(&thdr, tag, false);
+        if (fd >= 0)
+        {
+            biggest = MAX(biggest, (size_t)thdr.datasize);
+            close(fd);
+        }
+    }
+
+    return count * (sizeof(struct tempbuf_searchidx) + sizeof(void *))
+           + 2 * biggest + tmp->datasize + 65536;
+}
+
 static bool commit(void)
 {
     struct tagcache_header tch;
@@ -3818,11 +3838,18 @@ static bool commit(void)
     /* Try to steal every buffer we can :) */
     if (tempbuf_size == 0)
     {
-        /* Suspend dircache to free its allocation. */
-        dircache_free_buffer();
-        dircache_buffer_stolen = true;
-
+        /* Free memory first. Freeing the dircache means rebuilding it after
+         * the merge -- seconds on a disk, which the reload then waits out --
+         * so it is taken only for a merge free memory will not hold. */
         allocate_tempbuf();
+        if ((size_t)tempbuf_size < commit_need(&tch))
+        {
+            free_tempbuf();
+            dircache_free_buffer();
+            dircache_buffer_stolen = true;
+
+            allocate_tempbuf();
+        }
     }
 
     if (tempbuf_size == 0 && tc_stat.ramcache_allocated > 0)
@@ -4834,8 +4861,9 @@ static bool load_tagcache(void)
      * and the database is silently left on the disk for the session. */
     int failtag = -1;
 
-    /* Wait for any in-progress dircache build to complete */
-    dircache_wait();
+    /* No dircache_wait(): the load reads only the database files. The boot's
+     * dircache build takes seconds, and check_file_refs(), the one thing that
+     * wants the cache, waits for it itself. */
 
     logf("loading tagcache to ram...");
 
