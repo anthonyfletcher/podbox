@@ -42,7 +42,8 @@
 #                 directory. Defaults to $PODBOX_BUILD_ROOT or podbox-release.
 #   -y            don't ask for confirmation before publishing
 #   --draft       create the releases as drafts
-#   --dry-run     build and verify, then stop -- the existing releases stand
+#   --dry-run     build and verify, then stop -- the existing releases stand.
+#                 Required on any branch but master.
 #   --no-sim      skip the simulator; leave the Simulator release as it is
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
@@ -174,6 +175,11 @@ esac
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 COMMIT=$(git rev-parse --short HEAD)
+
+# `latest` is what every player installs, so it is published from master
+# only. A feature branch can still rehearse a release with --dry-run.
+[ "$BRANCH" = master ] || [ -n "$DRY_RUN" ] ||
+    die "on branch $BRANCH -- releases come from master (--dry-run is allowed)"
 
 say "Checking the build server"
 
