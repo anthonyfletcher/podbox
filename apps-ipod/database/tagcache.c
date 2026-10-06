@@ -5010,9 +5010,8 @@ static bool load_tagcache(void)
      * and the database is silently left on the disk for the session. */
     int failtag = -1;
 
-    /* No dircache_wait(): the load reads only the database files. The boot's
-     * dircache build takes seconds, and check_file_refs(), the one thing that
-     * wants the cache, waits for it itself. */
+    /* Wait for any in-progress dircache build to complete */
+    dircache_wait();
 
     logf("loading tagcache to ram...");
 
