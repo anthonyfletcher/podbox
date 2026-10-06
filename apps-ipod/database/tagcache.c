@@ -5838,12 +5838,13 @@ static void tagcache_thread(void)
     cpu_boost(false);
     tc_stat.initialized = true;
 
-    /* Don't delay bootup with the header check but do it on background. */
+    /* The header check, on this thread rather than holding up boot. */
     if (!tc_stat.ready)
-    {
-        sleep(HZ);
         tagcache_commit_finalize();
-    }
+
+    /* The first wait returns at once, so the boot scan and the RAM load start
+     * now rather than a second later. */
+    bool first_wait = true;
 
     while (1)
     {
@@ -5853,7 +5854,8 @@ static void tagcache_thread(void)
 
         run_command_queue(false);
 
-        queue_wait_w_tmo(&tagcache_queue, &ev, HZ);
+        queue_wait_w_tmo(&tagcache_queue, &ev, first_wait ? 0 : HZ);
+        first_wait = false;
 
         switch (ev.id)
         {
