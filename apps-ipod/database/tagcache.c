@@ -104,14 +104,12 @@
 
 #include "lang.h"
 #include "eeprom_settings.h"
-/* Whether the commit in progress should give up where it stands. commit() and
- * the two index builders it calls test it in seven loops and again before the
- * master header is written.
- *
- * Cancelling is safe: the loops fall out, the master header and
- * TAGCACHE_FILE_TEMP are left alone, commit_error releases the lock and the
- * borrowed buffers, and rc stays false. The commit has not happened, and the
- * next starts over from the temp file. */
+/* Whether the commit in progress should give up. It is honoured only where
+ * nothing has been written yet: build_index() stops while it is still reading,
+ * before it truncates a tag file, and otherwise finishes the tag it started;
+ * commit() then skips the numeric pass and the master header. The master stays
+ * dirty and TAGCACHE_FILE_TEMP stays, and the retry starts over from it --
+ * build_index() drops what an earlier attempt already appended. */
 static bool usr_cancel(void);
 #define USR_CANCEL usr_cancel()
 /*
@@ -892,7 +890,9 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
     const char *filename = filename_raw;
 
 
-    if (!tc_stat.ready)
+    /* The scan (!localfd) still looks, or a dirty database would have every
+     * file added again. */
+    if (!tc_stat.ready && localfd)
         return -2;
 
     fd = filenametag_fd;
@@ -3142,6 +3142,7 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
     bool error = false;
     int init;
     int masterfd_pos;
+    bool master_ok = false;
 
     logf("Building index: %d", index_type);
 
@@ -3151,6 +3152,7 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
     masterfd = open_master_fd(&tcmh, false);
     if (masterfd >= 0)
     {
+        master_ok = true;
         commit_entry_count += tcmh.tch.entry_count;
         close(masterfd);
     }
@@ -3253,6 +3255,12 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
                         return -2;
                 }
 
+                /* An interrupted commit already merged this entry for a new
+                 * track; it is inserted again from the temp file below. */
+                if (!TAGCACHE_IS_UNIQUE(index_type) && master_ok
+                    && entry.idx_id >= tcmh.tch.entry_count)
+                    continue;
+
                 /**
                  * Save the tag and tag id in the memory buffer. Tag id
                  * is saved so we can later reindex the master lookup
@@ -3271,7 +3279,31 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
             logf("done");
         }
         else
+        {
             tempbufidx = tch.entry_count;
+            /* Entries past the master's count were appended by an interrupted
+             * commit, and are appended again below. The file holds one entry
+             * per master entry, in order. */
+            if (master_ok && tch.entry_count > tcmh.tch.entry_count)
+            {
+                off_t pos = sizeof(struct tagcache_header);
+                for (i = 0; i < tcmh.tch.entry_count; i++)
+                {
+                    struct tagfile_entry entry;
+                    lseek(fd, pos, SEEK_SET);
+                    if (read_tagfile_entry(fd, &entry)
+                        != (ssize_t)sizeof(entry))
+                    {
+                        logf("read error #9");
+                        close(fd);
+                        return -2;
+                    }
+                    pos += sizeof(entry) + entry.tag_length;
+                }
+                ftruncate(fd, pos);
+                tempbufidx = tcmh.tch.entry_count;
+            }
+        }
     }
     else
     {
@@ -3423,6 +3455,10 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
         }
         logf("done");
 
+        /* The last point at which nothing has been written. */
+        if (commit_cancelled)
+            goto error_exit;
+
         /* Sort the buffer data and write it to the index file. */
         lseek(fd, sizeof(struct tagcache_header), SEEK_SET);
         /**
@@ -3442,7 +3478,7 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
          */
         logf("updating indices...");
         lseek(masterfd, sizeof(struct master_header), SEEK_SET);
-        for (i = 0; i < tcmh.tch.entry_count && !USR_CANCEL; i += idxbuf_pos)
+        for (i = 0; i < tcmh.tch.entry_count; i += idxbuf_pos)
         {
             int j;
             int loc = lseek(masterfd, 0, SEEK_CUR);
@@ -3497,12 +3533,17 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
     /**
      * Walk through the temporary file containing the new tags.
      */
+    /* An unsorted tag has written nothing yet; a sorted one passed its own
+     * check before truncating, and nothing since can set the flag. */
+    if (commit_cancelled)
+        goto error_exit;
+
     /* build_normal_index(h, tmpfd, masterfd, idx); */
     logf("updating new indices...");
     lseek(masterfd, masterfd_pos, SEEK_SET);
     lseek(tmpfd, sizeof(struct tagcache_header), SEEK_SET);
     lseek(fd, 0, SEEK_END);
-    for (i = 0; i < h->entry_count && !USR_CANCEL; i += idxbuf_pos)
+    for (i = 0; i < h->entry_count; i += idxbuf_pos)
     {
         int j;
 
@@ -3765,7 +3806,7 @@ static bool commit(void)
         do_timed_yield();
     }
 
-    if (!build_numeric_indices(&tch, tmpfd))
+    if (!USR_CANCEL && !build_numeric_indices(&tch, tmpfd))
     {
         logf("Failure to commit numeric indices");
         close(tmpfd);
@@ -3783,8 +3824,6 @@ static bool commit(void)
         if ( (masterfd = open_master_fd(&tcmh, true)) < 0)
             goto commit_error;
 
-        remove_db_file(TAGCACHE_FILE_TEMP);
-
         tcmh.tch.entry_count += tch.entry_count;
         tcmh.tch.datasize = sizeof(struct master_header)
             + sizeof(struct index_entry) * tcmh.tch.entry_count
@@ -3795,6 +3834,10 @@ static bool commit(void)
         lseek(masterfd, 0, SEEK_SET);
         write_master_header(masterfd, &tcmh);
         close(masterfd);
+
+        /* Only now: without it a cut here leaves a dirty master and no temp,
+         * and the next scan treats the whole library as new. */
+        remove_db_file(TAGCACHE_FILE_TEMP);
 
         logf("tagcache committed");
         tagcache_commit_finalize();
@@ -5413,7 +5456,10 @@ void do_tagcache_build(const char *path[])
 
     if (!ret)
     {
+        /* A partial temp file would stop every later scan this session and
+         * be committed, incomplete, at the next boot. */
         logf("Aborted.");
+        remove_db_file(TAGCACHE_FILE_TEMP);
         cpu_boost(false);
         return ;
     }
