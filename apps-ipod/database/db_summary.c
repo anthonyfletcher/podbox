@@ -520,8 +520,9 @@ static bool search_excluding_spoken(struct tagcache_search *tcs, int tag)
         && !db_spoken_group_ensure(tag))
         return false;
 
-    tagcache_search(tcs, tag);
-    return true;
+    /* Refused during a commit: an index built from nothing would be saved as
+     * the answer. */
+    return tagcache_search(tcs, tag);
 }
 
 /* adds tagcache_search results into artist/album index */

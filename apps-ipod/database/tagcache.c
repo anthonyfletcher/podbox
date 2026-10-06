@@ -1891,11 +1891,12 @@ bool tagcache_search(struct tagcache_search *tcs, int tag)
     struct master_header   master_hdr;
     int i;
 
-    while (read_lock)
-        sleep(1);
-
+    /* Refused, not waited for, while a commit holds read_lock: that is the
+     * commit's whole length, and the caller -- the UI, the audio thread, a
+     * car's request -- would stop with it. Every caller treats false as the
+     * database being busy. */
     memset(tcs, 0, sizeof(struct tagcache_search));
-    if (tc_stat.commit_step > 0 || !tc_stat.ready)
+    if (read_lock || tc_stat.commit_step > 0 || !tc_stat.ready)
         return false;
 
     /* Before write_lock++ below, so the rebuild's own search is an ordinary
@@ -1932,7 +1933,11 @@ bool tagcache_search(struct tagcache_search *tcs, int tag)
         {
             tcs->idxfd[tcs->type] = open_tag_fd(&tag_hdr, tcs->type, false);
             if (tcs->idxfd[tcs->type] < 0)
+            {
+                close(tcs->masterfd);
+                tcs->masterfd = -1;
                 return false;
+            }
 
             tcs->entry_count = tag_hdr.entry_count;
         }
@@ -3926,9 +3931,10 @@ static void command_queue_sync_callback(void)
 
     mutex_lock(&command_queue_mutex);
 
-    /* No master to write to -- a rebuild deletes it until its merge -- leaves
-     * the queue for the next flush, and the mutex free for whoever queues. */
-    if ( (masterfd = open_master_fd(&myhdr, true)) < 0)
+    /* A commit rewriting the master would write over these, so they wait for
+     * the next flush; so does a missing master, which a rebuild deletes until
+     * its merge. The mutex is left free for whoever queues meanwhile. */
+    if (read_lock || (masterfd = open_master_fd(&myhdr, true)) < 0)
     {
         mutex_unlock(&command_queue_mutex);
         return;
@@ -4024,9 +4030,10 @@ long tagcache_increase_serial(void)
     if (!tc_stat.ready)
         return -2;
 
-    while (read_lock)
-        sleep(1);
-
+    /* No wait for a commit: the audio thread calls this at every track end.
+     * A commit rereads the header as it finishes, so an increment made during
+     * one can be lost and two plays share a serial -- a tie in "recently
+     * played", nothing worse. */
     old = current_tcmh.serial++;
     queue_command(CMD_UPDATE_MASTER_HEADER, 0, 0, 0);
 

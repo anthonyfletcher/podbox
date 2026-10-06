@@ -1132,25 +1132,13 @@ static void browser_db_buffer_event(unsigned short id, void *ev_data)
 
     logf("be:%s", id3->path);
 
-    /* The audio thread is the caller, and everything below can wait on the
-     * database: tagcache_search() polls read_lock, which a commit holds for as
-     * long as it runs. Waiting here stalls the whole playback engine, and
-     * because audio_pause() is a queue_send it stalls the UI behind it -- a
-     * measured five seconds between pressing pause and the music stopping.
-     *
-     * Only one caller is actually blocked on the answer. audio_start_codec()
-     * sends this event before codec_go() when it needs a resume position, and
-     * after it otherwise; the test below is that same condition, which is what
-     * lets it be decided here instead of being passed in. Runtime data is not
-     * worth a stall, so when it is all that is at stake, do without it: this
-     * track's figures go unrecorded, and the finish event no-ops on the
-     * tagcache_idx that is never set. */
-    bool blocked_on_answer = autoresume && !id3->elapsed && !id3->offset;
-
+    /* While a commit holds the database the lookup below is refused, so a
+     * track buffered then starts from the beginning and its play goes
+     * unrecorded: the finish event no-ops on the tagcache_idx never set. */
     if (!tagcache_is_fully_initialized())
         return;
 
-    if (!blocked_on_answer && !tagcache_search_ready())
+    if (!tagcache_search_ready())
     {
         logf("tc busy, skipping runtime data for: %s", id3->path);
         return;
@@ -1278,7 +1266,10 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
          * index keeps its own summary -- and why one play used to mean
          * rebuilding the lot. Here it is twelve bytes appended beside the
          * writes above, on a disk they have already woken. */
-        db_summary_log_play(id3->album, id3->albumartist, lastplayed);
+        db_summary_log_play(id3->album,
+                            id3->albumartist && *id3->albumartist
+                                ? id3->albumartist : id3->artist,
+                            lastplayed);
     }
 
     if (autoresume)

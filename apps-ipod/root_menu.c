@@ -103,16 +103,13 @@ void browser_reveal_on_next_load(const char *path)
 }
 /* Can a database screen be opened right now?
  *
- * Deliberately stricter than tagcache_is_usable(), which only asks whether a
- * database exists. Committing one that already exists leaves it saying yes,
- * and every tagcache_search() made during a commit then blocks on the commit's
- * read lock -- on this, the UI thread -- so the screen stops redrawing and
- * stops taking buttons until the commit finishes, and the search fails at the
- * end of it anyway. Waiting below instead is the same wait with a progress
- * screen and a way out. */
+ * Stricter than tagcache_is_usable(), which only asks whether a database
+ * exists and says yes while one is being committed. Every tagcache_search()
+ * is refused for the whole of a commit, so a screen opened then would come up
+ * empty; waiting below instead shows progress and offers a way out. */
 static bool tagcache_reachable(void)
 {
-    return tagcache_is_usable() && tagcache_get_commit_step() == 0;
+    return tagcache_is_usable() && tagcache_search_ready();
 }
 
 /* The database browser's menus come from tagnavi.config, and without them it

@@ -348,12 +348,11 @@ int db_search_run(void)
     active_scope = armed_scope;
     armed_scope = DB_SEARCH_ALL;
 
-    /* Both gates the real feature would need. A commit holds tagcache's
-     * read_lock for its whole length and tagcache_search() waits on it with
-     * sleep(1), so calling in from a foreground screen during one is a freeze
-     * with no way out; and off the ramcache every entry costs a seek and a
-     * read, which on a disk is not slow but unusable. */
-    if (!tagcache_is_usable() || tagcache_get_commit_step() != 0)
+    /* Both gates the real feature would need. A commit refuses every
+     * tagcache_search() for its whole length, so a search screen opened then
+     * finds nothing; and off the ramcache every entry costs a seek and a read,
+     * which on a disk is not slow but unusable. */
+    if (!tagcache_is_usable() || !tagcache_search_ready())
     {
         splash(HZ * 2, "Database busy");
         return GO_TO_PREVIOUS;
