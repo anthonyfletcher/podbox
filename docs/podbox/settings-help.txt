@@ -1363,7 +1363,8 @@ database. The fix for a new album not showing up in the Music browser.
 Much quicker than a rebuild, because it only reads what it has to.
 
 [action: Rebuild Database]
-Throws the database away and reads every file on the player again.
+Throws the database away and reads every file on the player again. Play
+counts, ratings and last-played times are saved first and put back afterwards.
 
 Slow -- minutes on a full disk -- and rarely what you want: Update Database
 finds new music on its own. Worth it only if the database looks wrong rather
@@ -1621,8 +1622,9 @@ artist lists while still letting you play them from Files. Changing this offers
 a rebuild, because the database has to be built again to honour it.
 
 [action: Export Modifications]
-Writes play counts, ratings and last-played times to a file, so that a database
-rebuild does not lose them.
+Writes play counts, ratings and last-played times to a file. A rebuild does
+this by itself; use it to keep a copy, for instance before installing other
+firmware.
 
 [action: Import Modifications]
 Reads back a file written by Export Modifications and folds those play counts

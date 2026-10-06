@@ -597,6 +597,17 @@ static int NO_INLINE remove_db_file(const char* filename)
     return remove(buf);
 }
 
+static bool NO_INLINE rename_db_file(const char *from, const char *to)
+{
+    char src[MAX_PATH];
+    char dst[MAX_PATH];
+
+    snprintf(src, sizeof(src), "%s/%s", tc_stat.db_path, from);
+    snprintf(dst, sizeof(dst), "%s/%s", tc_stat.db_path, to);
+
+    return rename(src, dst) == 0;
+}
+
 static int open_tag_fd(struct tagcache_header *hdr, int tag, bool write)
 {
     int fd;
@@ -4277,90 +4288,105 @@ bool tagcache_import_changelog(void)
 }
 
 
-bool tagcache_create_changelog(struct tagcache_search *tcs)
+/* The runtime figures live only in the master index, which a rebuild deletes:
+ * play count, rating, play time, last played, the commit an entry arrived in,
+ * and its resume point. Saved as a changelog, which the import queued after the
+ * rebuild's commit reads back.
+ *
+ * Read from the files directly rather than through a search, so it works on a
+ * database that is not ready -- the state an interrupted merge leaves, and the
+ * one the automatic rebuild starts from. A master that cannot be read leaves an
+ * earlier changelog as it was; a readable one replaces it, so an old export is
+ * never imported over a newer library. */
+static bool save_runtime_data(void)
 {
-    struct master_header myhdr;
+    static const int tags[] = { tag_playcount, tag_rating, tag_playtime,
+                                tag_lastplayed, tag_commitid, tag_lastelapsed,
+                                tag_lastoffset };
+    struct master_header hdr;
+    struct tagcache_header tch;
     struct index_entry idx;
+    struct tagfile_entry tfe;
     char buf[TAGCACHE_BUFSZ];
-    const int bufsz = sizeof(buf);
-    char temp[32];
-    int clfd;
-    int i, j;
+    char num[16];
+    int masterfd, fnfd, clfd;
+    bool ok = true;
+    long i;
+    unsigned int t;
 
-    if (!tc_stat.ready)
+    /* Plays still queued are not in the master yet. */
+    run_command_queue(true);
+
+    masterfd = open_master_fd(&hdr, false);
+    if (masterfd < 0)
         return false;
 
-    if (!tagcache_search(tcs, tag_filename))
+    fnfd = open_tag_fd(&tch, tag_filename, false);
+    if (fnfd < 0)
+    {
+        close(masterfd);
         return false;
+    }
 
-    /* Initialize the changelog */
-    clfd = open_db_fd(TAGCACHE_FILE_CHANGELOG, O_WRONLY | O_CREAT | O_TRUNC);
+    clfd = open_db_fd(TAGCACHE_FILE_CHANGELOG ".new",
+                      O_WRONLY | O_CREAT | O_TRUNC);
     if (clfd < 0)
     {
-        logf("failure to open changelog");
-        tagcache_search_finish(tcs);
+        close(fnfd);
+        close(masterfd);
         return false;
     }
 
-    if (tcs->masterfd < 0)
-    {
-        if ( (tcs->masterfd = open_master_fd(&myhdr, false)) < 0)
-        {
-            close(clfd);
-            tagcache_search_finish(tcs);
-            return false;
-        }
-    }
-    else
-    {
-        lseek(tcs->masterfd, 0, SEEK_SET);
-        read_master_header(tcs->masterfd, &myhdr);
-    }
+    ok = write(clfd, "## Changelog version 1\n", 23) == 23;
 
-    write(clfd, "## Changelog version 1\n", 23);
-
-    for (i = 0; i < myhdr.tch.entry_count; i++)
+    for (i = 0; ok && i < hdr.tch.entry_count; i++)
     {
-        if (read_index_entries(tcs->masterfd, &idx, 1) != sizeof(struct index_entry))
+        if (read_index_entries(masterfd, &idx, 1) != (ssize_t)sizeof(idx))
         {
-            logf("read error #9");
-            tagcache_search_finish(tcs);
-            close(clfd);
-            return false;
+            ok = false;
+            break;
         }
 
-        /* Skip until the entry found has been modified. */
-        if (! (idx.flag & FLAG_DIRTYNUM) )
+        if (!(idx.flag & FLAG_DIRTYNUM) || (idx.flag & FLAG_DELETED))
             continue;
 
-        /* Skip deleted entries too. */
-        if (idx.flag & FLAG_DELETED)
+        if (lseek(fnfd, idx.tag_seek[tag_filename], SEEK_SET) < 0
+            || read_tagfile_entry(fnfd, &tfe) != (ssize_t)sizeof(tfe)
+            || tfe.tag_length <= 0 || tfe.tag_length > (int)sizeof(buf)
+            || read(fnfd, buf, tfe.tag_length) != tfe.tag_length)
             continue;
+        buf[tfe.tag_length - 1] = '\0';
 
-        /* Now retrieve all tags. */
-        for (j = 0; j < TAG_COUNT; j++)
+        ok = write_tag(clfd, "filename", buf);
+        for (t = 0; ok && t < ARRAYLEN(tags); t++)
         {
-            if (TAGCACHE_IS_NUMERIC(j))
-            {
-                itoa_buf(temp, sizeof temp, (int)idx.tag_seek[j]);
-                write_tag(clfd, tagcache_tag_to_str(j), temp);
-                continue;
-            }
-
-            tcs->type = j;
-            tagcache_retrieve(tcs, i, tcs->type, buf, bufsz);
-            write_tag(clfd, tagcache_tag_to_str(j), buf);
+            itoa_buf(num, sizeof num, (int)idx.tag_seek[tags[t]]);
+            ok = write_tag(clfd, tagcache_tag_to_str(tags[t]), num);
         }
+        if (ok)
+            ok = write(clfd, "\n", 1) == 1;
 
-        write(clfd, "\n", 1);
         do_timed_yield();
     }
 
+    close(fnfd);
+    close(masterfd);
     close(clfd);
 
-    tagcache_search_finish(tcs);
+    if (ok)
+        ok = rename_db_file(TAGCACHE_FILE_CHANGELOG ".new",
+                            TAGCACHE_FILE_CHANGELOG);
+    if (!ok)
+        remove_db_file(TAGCACHE_FILE_CHANGELOG ".new");
+    debug_log(DEBUG_LOG_TAGCACHE, "runtime data: %s", ok ? "saved" : "failed");
+    return ok;
+}
 
-    return true;
+/* Export Modifications: the same file a rebuild saves. */
+bool tagcache_create_changelog(struct tagcache_search *tcs)
+{
+    (void)tcs;
+    return save_runtime_data();
 }
 
 static bool delete_entry(long idx_id)
@@ -5477,12 +5503,9 @@ void do_tagcache_build(const char *path[])
         logf("tagcache built!");
     }
 
-    if (tcramcache.hdr)
-    {
-        /* Import runtime statistics if we just initialized the db. */
-        if (current_tcmh.serial == 0)
-            queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
-    }
+    /* Import runtime statistics if we just initialized the db. */
+    if (current_tcmh.serial == 0)
+        queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
 
     cpu_boost(false);
 }
@@ -5632,7 +5655,8 @@ static void tagcache_thread(void)
         if (go)
         {
             allocate_tempbuf();
-            commit();
+            if (commit() && current_tcmh.serial == 0)
+                queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
             free_tempbuf();
         }
     }
@@ -5665,10 +5689,15 @@ static void tagcache_thread(void)
         switch (ev.id)
         {
             case Q_IMPORT_CHANGELOG:
+                /* A lookup per line: the path index makes it a binary
+                 * search, the disk a walk of the filename file. */
+                if (global_settings.tagcache_ram && !tc_stat.ramcache)
+                    load_ramcache();
                 tagcache_import_changelog();
                 break;
 
             case Q_REBUILD:
+                save_runtime_data();
                 remove_files();
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
