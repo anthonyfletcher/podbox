@@ -268,6 +268,7 @@ enum tagcache_queue {
     Q_IMPORT_CHANGELOG,
     Q_UPDATE,
     Q_REBUILD,
+    Q_RELOAD_RAMCACHE,
 
     /* Internal tagcache command queue. */
     CMD_UPDATE_MASTER_HEADER,
@@ -3902,13 +3903,11 @@ static bool commit(void)
             tcrc_buffer_unlock();
         }
 
-        /* Ask for the RAM copy back: this rewrote the index files under it,
-         * and the scan is what reloads it -- see the tagcache thread's
-         * SYS_TIMEOUT arm. A commit with nothing in it cannot reach here, it
-         * returns above, which is what stops the cycle build -> commit(0) ->
-         * start_scan -> build -> ... from repeating forever. */
+        /* Ask for the RAM copy back: this rewrote the index files under it.
+         * A reload only -- the scan that led here has already walked the disk
+         * and checked for deletions, and a second scan would do both again. */
         if (tc_stat.ramcache_allocated > 0)
-            tagcache_start_scan();
+            queue_post(&tagcache_queue, Q_RELOAD_RAMCACHE, 0);
 
         rc = true;
     } /*!USR_CANCEL*/
@@ -5724,6 +5723,13 @@ static void tagcache_thread(void)
 
         switch (ev.id)
         {
+            case Q_RELOAD_RAMCACHE:
+                /* Q_UPDATE and Q_REBUILD reload for themselves, and leave
+                 * nothing to do here. */
+                if (global_settings.tagcache_ram && !tc_stat.ramcache)
+                    load_ramcache();
+                break;
+
             case Q_IMPORT_CHANGELOG:
                 /* A lookup per line: the path index makes it a binary
                  * search, the disk a walk of the filename file. */
