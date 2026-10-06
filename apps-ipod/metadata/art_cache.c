@@ -5,8 +5,7 @@
  * image to the sizes skins ask for and stores it, so browsing does not
  * re-decode on every track. Album art comes from the album folder's image or a
  * track's embedded art, as the album art source setting orders them; artist
- * art from an image in its parent or, failing that, the folder above when it is
- * named after the artist. Each has
+ * art from an image in its parent or, failing that, the folder above. Each has
  * its own placeholder for when nothing is found.
  ****************************************************************************/
 
@@ -125,9 +124,6 @@ static char aa_artpath[MAX_PATH];
 static char aa_dir[MAX_PATH];
 static char aa_artist_dir[MAX_PATH];
 static char aa_probe[MAX_PATH];
-/* The album artist and artist of the track whose folder an artist visit is
- * for: the names an image from the folder above has to be filed under. */
-static char aa_artist_names[2][MAX_PATH];
 static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
@@ -557,10 +553,11 @@ static void aa_dirname(const char *path, char *dir, int dir_len)
  * falls back to the folder above, which is the album for a disc folder but the
  * artist for an album folder -- and the artist's picture is no album's cover.
  * So for an album an image from above counts only for a disc folder. For an
- * artist it counts when the folder it is in is named after the artist: under
+ * artist it always counts, except from the volume root: under
  * <artist>/<album_type>/<album> the folder above the album is the type, and
- * the artist's picture is one further up -- where under <genre>/<artist> or
- * <Music>/<artist> it would be the genre's or the whole library's. */
+ * the artist's picture is one further up. Trap: under <Music>/<artist> or
+ * <genre>/<artist> the folder above is not the artist's, and an image there
+ * becomes the picture of every artist without one of their own. */
 static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
 {
     const char *end = strrchr(probe, '/');
@@ -573,21 +570,7 @@ static bool aa_art_is_folders(const char *probe, const char *art, bool artist)
     if (!strncmp(probe, art, dirlen) && !strchr(art + dirlen, '/'))
         return true;
     if (artist)
-    {
-        const char *aend = strrchr(art, '/');
-        size_t len, i;
-
-        if (!aend)
-            return false;
-        for (start = aend; start > art && start[-1] != '/'; start--)
-            ;
-        len = aend - start;
-        for (i = 0; len > 0 && i < ARRAYLEN(aa_artist_names); i++)
-            if (strlen(aa_artist_names[i]) == len
-                && !strncasecmp(start, aa_artist_names[i], len))
-                return true;
-        return false;
-    }
+        return strrchr(art, '/') != art;
 
     for (start = end; start > probe && start[-1] != '/'; start--)
         ;
@@ -1285,9 +1268,8 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
  * cache key) and `slot` its table entry. An album takes its art from the
  * sources the album art source setting names, in its order, reading one track's
  * tags for the embedded kind; an `artist` takes it from an image file only, and
- * with no image of its own takes one from a folder above named after the
- * artist, cached under its own key so that every reader keying artist art on
- * the album's parent finds it. Sets
+ * with no image of its own takes the one above it, cached under its own key so
+ * that every reader keying artist art on the album's parent finds it. Sets
  * *aborted if a USB/shutdown/DB-busy stop was hit. Cheap once the folder is
  * cached: an existence check per size, plus the image lookup and stamp under
  * aa_check_all, and no image or track is read. */
@@ -1519,10 +1501,6 @@ static enum bg_result aa_run_pass(void)
             if ((slot = aa_visit(ah)))
             {
                 snprintf(aa_probe, sizeof(aa_probe), "%s/_", aa_artist_dir);
-                tagcache_retrieve(&tcs, tcs.idx_id, tag_albumartist,
-                                  aa_artist_names[0], MAX_PATH);
-                tagcache_retrieve(&tcs, tcs.idx_id, tag_artist,
-                                  aa_artist_names[1], MAX_PATH);
                 aa_counts.artists++;
                 if (aa_cache_dir(aa_probe, ah, slot, true, workbuf, worksz,
                                  &aborted))
