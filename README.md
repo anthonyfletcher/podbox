@@ -46,7 +46,7 @@ break out of the theme no longer do.
 <img src="docs/podbox/images/ss_grid_menu_editing.png" alt="Screenshot"/>
 
 The database menu is now called Music and its views can be promoted onto the main menu. You
-can also turn items on and off inside the Music menu, order albums by year, and see
+can also turn items on and off inside the Music menu, order albums by year or by artist, and see
 album and artist chart information (frequently played, recently played, forgotten). You can
 even break Audiobooks out into their own root menu (see below).
 
@@ -150,25 +150,34 @@ Artist Three
 ## Album and artist art
 
 To support the carousel and artwork in lists, your album art should be stored with the album
-tracks as either folder.jpg or cover.jpg e.g. `Artist/Album/folder.jpg`.
-
-Without these files, the art cache will only build from embedded images as tracks are played.
+tracks as either folder.jpg or cover.jpg e.g. `Artist/Album/folder.jpg`, or embedded in the
+tracks themselves. The image file is used first and the embedded cover when there is none;
+`Settings > Library > Art Cache > Album Art Source` changes that order, or limits the cache to
+one kind.
 
 Your artist art should be stored with the album folders as either folder.jpg or cover.jpg
-e.g. `Artist/folder.jpg`. If your albums are grouped one level deeper, as in
-`Artist/Albums/Album One`, artist art can stay in `Artist/folder.jpg`; an image in the
-grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums under it.
+e.g. `Artist/folder.jpg`. Artist art only ever comes from image files. An artist folder with
+no image of its own borrows one from the folder above it, so if your albums are grouped one
+level deeper, as in `Artist/Albums/Album One`, artist art can stay in `Artist/folder.jpg`; an
+image in the grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums
+under it. The same borrowing means an image in a folder that holds your artists (e.g.
+`Music/folder.jpg` or a genre folder) becomes the picture of every artist without one, so
+keep them out of there. If that happens, delete the image and run
+`Settings > Library > Maintenance > Update Art Cache`.
 
 All artwork should be:
 
 - stored as a baseline / non-progressive JPEG file
+- embedded as JPEG, if embedded at all. PNG art in tags is skipped, and the cache reads one
+track per album, so put the cover in every track.
 - stored at a "reasonable" resolution - the cache stores 300x300px copies, and anything much
 larger takes longer to process. A car is sent the cache's copy unless `Car Artwork` is set to
 send the original.
 
 Artwork is processed quietly in the background while the database is idle, so browsing stays
 fast.  As such, it can take a while to see the art appear.  You can check the cache activity by
-checking `System > Background Tasks`.
+checking `System > Background Tasks`. After adding art to your tags, run
+`Settings > Library > Maintenance > Update Art Cache` to pick it up.
 
 A tool is available [here](tools/art_fetch/README.md) to fill your library with album and artist
 artwork.
@@ -196,8 +205,8 @@ colours or art in lists.
 
 To get the most out of PodBox you should use Scrim, the theme PodBox ships with.
 
-Additional [themes](themes/README.md) designed for PodBox are a separate download, one zip each, from 
-the [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Themes):
+Additional [themes](themes/README.md) designed for PodBox are a separate download, one zip each, or all of them 
+in all-themes.zip, from the [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Themes):
 
 - [themify 2](themes/themify_2/README.md)
 - [obsede 2](themes/obsede_2/README.md)
@@ -205,6 +214,9 @@ the [Themes release](https://github.com/anthonyfletcher/podbox/releases/tag/Them
 - [iclassic square](themes/iclassic_square/README.md)
 - [iclassic square dark](themes/iclassic_square_dark/README.md)
 - [jive](themes/jive/README.md)
+
+**Make sure to update your themes whenever you update PodBox. Themes are rebuilt for each release, 
+and a theme made for new firmware can fail on old firmware.**
 
 All PodBox themes attempt to support as many languages as possible.
 
@@ -231,7 +243,10 @@ they can be installed in any order and on their own.
   - Theme dependent
   - See above for artwork setup
   - Control visibility via `Settings > Appearance > Elements > Artist Art Rows`
-- Control the sort order of the albums list
+- Show the album release year after each album name
+  - `Settings > Library > Music > Show Year in Album Lists`, off by default
+- Control the sort order of the albums  chosen from name, year (oldest or newest first), 
+  or artist then name or year
   - `Settings > Library > Music > Sort Albums By`
 - Sort artists and albums ignoring a leading "The", "A" or "An"
   - Off by default.  Turn it on in `Settings > Library > Music > Sort Ignoring The/A/An`
@@ -278,6 +293,8 @@ your position.
   - Scroll up above the first book in `Audiobooks > Book` for `Finished`, `Not Started`
   and `In Progress`
   - Choosing a book plays it, from where you left off if you have started it
+  - Hold `Select` on a book on a shelf and choose Mark as to move it to In Progress, Not Started or 
+  Finished. The mark lasts until the book is next played.
 - Books held in a single file show their chapters.
   - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`
   - Reads the chapter marks written into `.m4b` books and the chapter frames written
@@ -297,6 +314,7 @@ into `.mp3` ones
   - `Settings > Library > Carousel > Background > Custom`
 - Spin to a random album or artist
   - Hold `Play`
+  - `Settings > Library > Carousel > Random Spin Length` to control the speed
 
 ## What's playing
 
@@ -321,8 +339,8 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
   ten more are available by going to `Playlists > Moods`
 - Play tracks that take you from one mood to another by going to `Playlists > Journeys`.
 - Wind down from a track you choose, with each track calmer than the last
-  - Hold `Select` on the track and select `Wind Down`
-  - With a sleep timer running, the playlist lasts as long as the time left on it
+  - Hold `Select` on the track and select `Wind Down`.  It asks how long to run, Default 
+  or 15 minutes to two hours. Default fills to a running sleep timer, or else to Playlist Length.
 - Put a playlist in an order where each track leads into the next
   - Hold `Select` in the playlist viewer and select `Order by Sound`
 - See what a track sounds like, in words -- its moods, energy, pace, tone, key and more
@@ -331,8 +349,10 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
   - Hold `Select` on the album or folder and select `Album Sound`
 - See what the analysis found across your whole library, and how much of it is measured
   - `Settings > Library > Playlist Engine > Library Sound`
+  - Overview, Moods, Pace, Keys and Loudness by Decade show how many tracks each mood can draw on, 
+  plus the spread of tempos and keys.
 - Choose whether Play Similar and Wind Down start with the track you chose
-  - `Settings > Library > Playlist Engine > Start With Selected Track`
+  - `Settings > Library > Playlist Engine > Play Selected First`
 - Turn on the Continue Playing setting to keep the music going when any playlist runs 
   out -- an album, a saved playlist, or a dynamic one -- by extending it with more of the
   same.  Turn it on by going to `Settings > Library > Playlist Engine > Continue Playing`.
@@ -365,12 +385,17 @@ song is by, the album it came from
 
 ## Appearance
 
-- Dynamic colouring of the UI based on the album/artist art including transformation of all theme colours.
+- Dynamic colouring of the UI based on the album/artist art including transformation of all theme 
+colours
   - Theme dependent
   - `Settings > Appearance > Colours > Dynamic Colors`
 - Choose whether the album's lighter or darker colour becomes the background
   - `Settings > Appearance > Colours > Dynamic Colors Background`
-- Edits to appearance settings save to a config file linked to the running theme, so when you revert themes your settings follow, and themes don't inherit settings they don't set
+- Control whether scrolling is enabled across the UI or whether long text is cut short with "..." 
+instead. 
+  - `Settings > Appearance > Scrolling > Enabled`, on by default
+- Edits to appearance settings save to a config file linked to the running theme, so when you revert 
+themes your settings follow, and themes don't inherit settings they don't set
   - `Settings > Appearance`
   - To reset to default
   - `Settings > Appearance > Forget My Changes`
