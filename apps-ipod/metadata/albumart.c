@@ -62,6 +62,48 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
     return (sep + 1);
 }
 
+/* Whether an image the search has found can be drawn. The JPEG decoder takes
+ * baseline images only, and one it cannot read must not stop the search: a
+ * progressive cover.jpg would otherwise hide a folder.jpg beside it, which
+ * the search only reaches later. Reads the markers up to the frame header,
+ * and leaves anything it cannot place for the decoder to judge. */
+static bool art_file_usable(const char *path)
+{
+    unsigned char b[4];
+    const char *ext = strrchr(path, '.');
+    int fd, i;
+    bool usable = true;
+
+    if (!file_exists(path))
+        return false;
+    if (!ext || (strcasecmp(ext, ".jpg") && strcasecmp(ext, ".jpeg")))
+        return true;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return false;
+    if (read(fd, b, 2) == 2 && b[0] == 0xff && b[1] == 0xd8)
+    {
+        for (i = 0; i < 64 && read(fd, b, 4) == 4 && b[0] == 0xff; i++)
+        {
+            int marker = b[1], seglen = (b[2] << 8) | b[3];
+
+            if (marker == 0xc0)
+                break;                          /* baseline */
+            if (marker >= 0xc1 && marker <= 0xcf
+                && marker != 0xc4 && marker != 0xcc)
+            {
+                usable = false;                 /* progressive and the rest */
+                break;
+            }
+            if (seglen < 2 || lseek(fd, seglen - 2, SEEK_CUR) < 0)
+                break;
+        }
+    }
+    close(fd);
+    return usable;
+}
+
 static const char * const extensions[] = { "jpeg", "jpg", "bmp" };
 static const unsigned char extension_lens[] = { 4, 3, 3 };
 /* Try checking for several file extensions, return true if a file is found and
@@ -80,7 +122,7 @@ static bool try_exts(char *path, int len)
         if (extension_lens[i] + len > MAX_PATH)
             continue;
         strcpy(path + len, extensions[i]);
-        if (file_exists(path))
+        if (art_file_usable(path))
             return true;
     }
     return false;
@@ -177,7 +219,7 @@ bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
         if (!found && !*size_string)
         {
             snprintf (path, sizeof(path), "%sfolder.jpg", dir);
-            found = file_exists(path);
+            found = art_file_usable(path);
         }
 
         artist = id3->albumartist != NULL ? id3->albumartist : id3->artist;
@@ -229,7 +271,7 @@ bool search_albumart_files(const struct mp3entry *id3, const char *size_string,
             if (!found && !*size_string)
             {
                 snprintf(path, sizeof(path), "%sfolder.jpg", dir);
-                found = file_exists(path);
+                found = art_file_usable(path);
             }
         }
         if (found)

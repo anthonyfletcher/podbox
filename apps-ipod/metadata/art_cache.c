@@ -1259,7 +1259,9 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
         aa_generate_size(src, s, dh, aa_out_path, workbuf, worksz);
         yield();
     }
-    return true;
+    /* An image that would not decode leaves the folder bare, and is counted
+     * and listed as one with no art. */
+    return aa_thumbs_exist(dh);
 }
 
 /* Resolve one folder's cover art and bring its thumbnails in line with it.
