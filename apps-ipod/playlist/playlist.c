@@ -1383,6 +1383,13 @@ static int add_track_to_playlist_unlocked(struct playlist_info* playlist,
             break;
     }
 
+    /* A playlist being built to play holds the music itself, not additions to
+     * it, so it leaves no insert chain behind: the first Add to Queue once it
+     * plays goes straight after the playing track. Resume restores the chain
+     * from the control file after each add, so it is not affected. */
+    if (!playlist->started)
+        playlist->last_insert_pos = -1;
+
     if (queue)
         flags |= PLAYLIST_QUEUED;
 
@@ -3864,6 +3871,26 @@ void playlist_set_last_shuffled_start(void)
     playlist_write_lock(playlist);
     playlist->last_shuffled_start = playlist->first_index > 0 ?
                                     playlist->first_index : playlist->amount;
+    playlist_write_unlock(playlist);
+}
+
+/* The current playlist's tracks are the music, not additions to it: the next
+ * PLAYLIST_INSERT goes straight after the playing track. For music put in
+ * around a track already playing, which the insert chain otherwise runs to
+ * the end of. */
+void playlist_forget_inserts(void)
+{
+    struct playlist_info* playlist = &current_playlist;
+
+    playlist_write_lock(playlist);
+    if (playlist->last_insert_pos >= 0)
+    {
+        playlist->last_insert_pos = -1;
+        if (playlist->control_fd >= 0 &&
+            update_control_unlocked(playlist, PLAYLIST_COMMAND_RESET,
+                                    -1, -1, NULL, NULL, NULL) >= 0)
+            sync_control_unlocked(playlist);
+    }
     playlist_write_unlock(playlist);
 }
 

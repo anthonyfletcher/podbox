@@ -801,6 +801,11 @@ static int add_to_playlist(void* arg)
 
     op_playlist_insert_selected(position, queue);
 
+    /* With the playing track kept, what was put in around it is the music
+     * now, not a queue: the next Add to Queue goes straight after that track. */
+    if ((param->flags & PL_REPLACE) == PL_REPLACE && !new_playlist)
+        playlist_forget_inserts();
+
     /* Replacing the playlist re-decides the artwork under the "auto" WPS art
      * source; queueing onto the one already playing deliberately does not.
      * Set unconditionally on a replace rather than only for a database browse:
