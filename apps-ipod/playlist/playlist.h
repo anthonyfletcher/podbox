@@ -163,6 +163,7 @@ int playlist_insert_context_create(struct playlist_info* playlist,
                                    int position, bool queue, bool progress);
 int playlist_insert_context_add(struct playlist_insert_context *context,
                                 const char *filename);
+void playlist_insert_context_yield(struct playlist_insert_context *context);
 void playlist_insert_context_release(struct playlist_insert_context *context);
 int playlist_insert_directory(struct playlist_info* playlist,
                               const char *dirname, int position, bool queue,

@@ -2592,6 +2592,16 @@ int playlist_insert_context_add(struct playlist_insert_context *context,
 }
 
 /*
+ * let other threads at the playlist between additions, keeping the context
+ */
+void playlist_insert_context_yield(struct playlist_insert_context *context)
+{
+    playlist_write_unlock(context->playlist);
+    yield();
+    playlist_write_lock(context->playlist);
+}
+
+/*
  * release opened insert context, sync playlist
  */
 void playlist_insert_context_release(struct playlist_insert_context *context)

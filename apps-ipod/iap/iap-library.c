@@ -568,6 +568,94 @@ static bool find_book_position(void)
            && book_resume_get(book, &block->resume);
 }
 
+/* Songs added before an unshuffled Queue starts playing; the rest follow
+ * while it plays */
+#define PLAY_AHEAD 10
+
+static bool insert_open(struct playlist_insert_context *context, int position)
+{
+    if (playlist_insert_context_create(NULL, context, position,
+                                       false, false) < 0)
+    {
+        /* create() keeps the playlist lock even when it fails */
+        playlist_insert_context_release(context);
+        return false;
+    }
+    return true;
+}
+
+/* Adds entries[from] up to entries[to - 1] where the context puts them, or
+ * from entries[to - 1] down to entries[from] when backwards. A song whose
+ * file cannot be found is left out. The playlist is let go after each song,
+ * so a track change or an accessory asking for a name waits for one song,
+ * not the whole Queue. left_at, if given, is where the book's resume track
+ * went. Returns false once the Queue is full or the accessory has gone. */
+static bool insert_songs(struct playlist_insert_context *context,
+                         uint32_t from, uint32_t to, bool backwards,
+                         int *left_at)
+{
+    struct tagcache_search *tcs = &block->tcs;
+
+    for (uint32_t k = from; k < to; k++)
+    {
+        uint32_t i = backwards ? to - 1 - (k - from) : k;
+
+        if (leaving)
+            return false;
+        if (!tagcache_retrieve(tcs, block->entries[i].idx, tag_filename,
+                               block->name, sizeof(block->name)))
+            continue;
+        if (left_at && *left_at < 0
+            && path_key(block->name) == block->resume.track)
+            *left_at = context->count;
+        if (playlist_insert_context_add(context, block->name) < 0)
+            return false;
+        playlist_insert_context_yield(context);
+    }
+    return true;
+}
+
+/* An unshuffled Queue plays as soon as the chosen song and a few after it
+ * are in. The rest of the songs after it go on the end and the ones before
+ * it on the front, last first, so the order ends up the list's. */
+static void play_tracks_now(uint32_t start)
+{
+    struct playlist_insert_context context;
+    uint32_t ahead = MIN(start + PLAY_AHEAD, list_count);
+    bool started = false, more;
+
+    if (!insert_open(&context, PLAYLIST_INSERT_LAST))
+        return;
+    more = insert_songs(&context, start, ahead, false, NULL);
+    playlist_insert_context_release(&context);
+    if (leaving)
+        return;
+    if (context.count > 0)
+    {
+        playlist_start(0, 0, 0);
+        started = true;
+    }
+
+    if (more && insert_open(&context, PLAYLIST_INSERT_LAST))
+    {
+        more = insert_songs(&context, ahead, list_count, false, NULL);
+        playlist_insert_context_release(&context);
+        if (!started && context.count > 0 && !leaving)
+        {
+            playlist_start(0, 0, 0);
+            started = true;
+        }
+    }
+
+    if (more && insert_open(&context, PLAYLIST_PREPEND))
+    {
+        insert_songs(&context, 0, start, true, NULL);
+        playlist_insert_context_release(&context);
+        if (!started && context.count > 0 && !leaving)
+            playlist_start(0, 0, 0);
+    }
+}
+
 /* On the worker: replaces the Queue with the song list in entries[] and
  * plays the one at start. A Queue that fills up keeps what it took. */
 static void play_tracks(uint32_t start)
@@ -588,34 +676,33 @@ static void play_tracks(uint32_t start)
         tagcache_search_finish(tcs);
         return;
     }
-    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
-                                       false, false) < 0)
+
+    /* A shuffle needs every song, and a book its resume track found, before
+     * either can start */
+    if (!resume && (play_book || !global_settings.playlist_shuffle))
     {
-        /* create() keeps the playlist lock even when it fails */
-        playlist_insert_context_release(&context);
+        play_tracks_now(start);
         tagcache_search_finish(tcs);
         return;
     }
 
-    /* A song whose file cannot be found is left out, which moves the
-     * chosen one up by as many */
-    uint32_t inserted = 0, first = 0;
-    int left_at = -1;
-    for (uint32_t i = 0; i < list_count && !leaving; i++)
+    if (!insert_open(&context, PLAYLIST_INSERT_LAST))
     {
-        if (i == start)
-            first = inserted;
-        if (!tagcache_retrieve(tcs, block->entries[i].idx, tag_filename,
-                               block->name, sizeof(block->name)))
-            continue;
-        if (playlist_insert_context_add(&context, block->name) < 0)
-            break;
-        if (resume && left_at < 0
-            && path_key(block->name) == block->resume.track)
-            left_at = inserted;
-        inserted++;
-        yield();
+        tagcache_search_finish(tcs);
+        return;
     }
+
+    /* A song left out moves the chosen one up by as many */
+    int *resume_at = NULL, left_at = -1;
+    if (resume)
+        resume_at = &left_at;
+    uint32_t first = 0;
+    if (insert_songs(&context, 0, start, false, resume_at))
+    {
+        first = context.count;
+        insert_songs(&context, start, list_count, false, resume_at);
+    }
+    uint32_t inserted = context.count;
     playlist_insert_context_release(&context);
     tagcache_search_finish(tcs);
 
