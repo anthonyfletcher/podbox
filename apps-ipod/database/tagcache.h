@@ -263,6 +263,7 @@ bool tagcache_seek_string(int tag, long seek, char *buf, size_t size);
 bool tagcache_path_index_info(int *slots, int *found, int *missed);
 void tagcache_unload_ramcache(void);
 void tagcache_reload_ramcache(void);
+bool tagcache_reinstate_ramcache(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
 bool tagcache_is_initialized(void);

@@ -1804,5 +1804,9 @@ void browser_restore(void)
         ui_set_working(false);
     }
 
+    /* The host wrote, but almost always music rather than the database
+     * files: then the RAM copy is still right, and the scan below can use it
+     * instead of waiting for a reload. */
+    tagcache_reinstate_ramcache();
     tagcache_start_scan();
 }

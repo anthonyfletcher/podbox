@@ -5636,6 +5636,75 @@ static void free_ramcache(void)
     tc_stat.ramcache_allocated = 0;
 }
 
+/* The size of each file the RAM copy was loaded from: the master first, then
+ * the tag files. Only a commit rewrites them, and a commit reloads; so after a
+ * USB session the same sizes and master header mean the host left the
+ * database alone, and the copy in RAM is still correct. */
+static off_t loaded_size[1 + TAG_COUNT];
+
+static off_t db_file_size(int tag)
+{
+    char buf[MAX_PATH];
+    off_t size = -1;
+    int fd;
+
+    if (tag < 0)
+        snprintf(buf, sizeof(buf), "%s/" TAGCACHE_FILE_MASTER,
+                 tc_stat.db_path);
+    else
+        snprintf(buf, sizeof(buf), "%s/" TAGCACHE_FILE_INDEX,
+                 tc_stat.db_path, tag);
+
+    fd = open(buf, O_RDONLY);
+    if (fd >= 0)
+    {
+        size = ffilesize(fd);
+        close(fd);
+    }
+    return size;
+}
+
+static void record_loaded_sizes(void)
+{
+    loaded_size[0] = db_file_size(-1);
+    for (int tag = 0; tag < TAG_COUNT; tag++)
+        loaded_size[1 + tag] = TAGCACHE_IS_NUMERIC(tag) ? 0
+                                                        : db_file_size(tag);
+}
+
+/* After a USB session that wrote to the disk: switch the RAM copy back on if
+ * the database files are the ones it was loaded from. A reload would take
+ * seconds, and browsing during the scan that follows would be served from
+ * disk meanwhile. */
+bool tagcache_reinstate_ramcache(void)
+{
+    struct master_header hdr;
+    int fd;
+
+    if (tcramcache.hdr == NULL || tc_stat.ramcache_allocated <= 0
+        || !tcramcache.current || !tc_stat.ready)
+        return false;
+
+    fd = open_master_fd(&hdr, false);
+    if (fd < 0)
+        return false;
+    close(fd);
+
+    if (hdr.tch.entry_count != current_tcmh.tch.entry_count
+        || hdr.commitid != current_tcmh.commitid || hdr.dirty)
+        return false;
+
+    if (db_file_size(-1) != loaded_size[0])
+        return false;
+    for (int tag = 0; tag < TAG_COUNT; tag++)
+        if (!TAGCACHE_IS_NUMERIC(tag)
+            && db_file_size(tag) != loaded_size[1 + tag])
+            return false;
+
+    tc_stat.ramcache = true;
+    return true;
+}
+
 static void load_ramcache(void)
 {
     /* A buffer is sized for the database it was allocated for, with
@@ -5675,6 +5744,8 @@ static void load_ramcache(void)
     tc_stat.ramcache = false;
     tc_stat.ramcache = load_tagcache();
     tcramcache.current = tc_stat.ramcache;
+    if (tc_stat.ramcache)
+        record_loaded_sizes();
 
     if (!tc_stat.ramcache)
         debug_log(DEBUG_LOG_TAGCACHE, "ramcache: buffer taken but load failed");
@@ -5911,6 +5982,11 @@ static void tagcache_thread(void)
                 else
                 if (do_update)
                 {
+                    /* A copy reinstated after USB still holds directory
+                     * cache references from before it; On refreshes them,
+                     * as it does after a load. */
+                    if (global_settings.tagcache_ram == TAGCACHE_RAM_ON)
+                        check_file_refs(false);
                     /* Before the build, as in Q_UPDATE. */
                     if (!walk_checks_deletions())
                         check_deleted_files();
