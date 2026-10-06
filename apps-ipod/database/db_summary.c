@@ -1633,11 +1633,6 @@ static int create_album_index(void)
     pfi->serial = marks.serial;
     pfi->deleted = marks.deleted_ct;
 
-    /* Everything in the log is now either counted in an album summarised from
-     * tagcache, or predates the watermark just stamped. Keeping it would
-     * replay those plays on top of figures that already hold them. */
-    remove(DB_PLAYS_FILE);
-
     /* Artist then album name, and that is all a reader is promised. A screen
      * that wants its albums arranged any particular way sorts them itself once
      * it has them -- which is where the setting deciding the arrangement lives
@@ -1727,6 +1722,16 @@ static inline int read2buf(int fildes, void *buf, size_t nbyte){
     return nread;
 }
 
+/* An index's seeks are seeks only for the commit it was built against (see
+ * db_summary.h): read after a later one, it names the wrong albums. */
+static bool index_current(const struct db_summary_t *data)
+{
+    struct tagcache_marks marks;
+
+    tagcache_get_marks(&marks);
+    return marks.commitid == data->commitid;
+}
+
 /* Read only the artist half of the saved index into the caller's buffer.
  *
  * The artist carousel wants the artist list and nothing else, and does not
@@ -1760,6 +1765,7 @@ static int load_artist_index(struct db_summary_t *target,
         || read(fr, &data, sizeof(data)) != sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
         || !header_fits(&data, bsz)
+        || !index_current(&data)
         || data.artist_ct == 0)
         goto failure;
 
@@ -1863,7 +1869,7 @@ static int load_album_index(void){
         {
             if (read(fr, &data, sizeof(data)) == sizeof(data) &&
                 memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) == 0 &&
-                header_fits(&data, bufstart_sz))
+                header_fits(&data, bufstart_sz) && index_current(&data))
             {
                 name_sz = data.artist_len + data.album_len;
                 album_idx_sz = data.album_ct * sizeof(struct album_data);
@@ -1999,8 +2005,23 @@ static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
             /* Only the foreground caller may report this: the background pass
              * owns no screen, and there is nothing the user could do anyway --
              * the carousel will simply build it again when asked. */
-            if (save_album_index() < 0 && !building_bg)
-                splash(HZ * 2, "Could not write index");
+            if (save_album_index() < 0)
+            {
+                /* The background pass retries instead of recording a pass
+                 * that left no index behind. */
+                if (building_bg)
+                    ret = ERROR_WRITE;
+                else
+                    splash(HZ * 2, "Could not write index");
+            }
+            else
+            {
+                /* Everything in the log is now either counted in the saved
+                 * index or predates its watermark; replaying it would count
+                 * those plays twice. Not before the save: a save that fails
+                 * would take the plays with it. */
+                remove(DB_PLAYS_FILE);
+            }
         }
     }
 
@@ -2307,6 +2328,7 @@ static int reader_start(struct db_summary_reader *r)
         || read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
         || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
         || !header_fits(&data, (size_t)fsize)
+        || !index_current(&data)
         || data.album_ct == 0)
         goto failure;
 

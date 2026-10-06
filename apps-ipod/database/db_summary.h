@@ -20,6 +20,7 @@
 #define ERROR_BUFFER_FULL   -2
 #define ERROR_NO_ARTISTS    -3
 #define ERROR_USER_ABORT    -4
+#define ERROR_WRITE         -5
 
 /* One album. Filled by a db_summary_build*(), read by whoever asked for the
  * index -- Album covers, the album charts, the browser's year sort.
