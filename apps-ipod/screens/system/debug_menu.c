@@ -1693,7 +1693,11 @@ static bool dbg_tagcache_info(void)
     /* info.timeout = TIMEOUT_NOBLOCK; */
     info.timeout = 1;
     tagcache_screensync_enable(true);
-    return simplelist_show_list(&info);
+    /* Off however the list is left -- SELECT and a USB connect leave it too,
+     * past the callback -- or the next scan waits for this screen for ever. */
+    bool ret = simplelist_show_list(&info);
+    tagcache_screensync_enable(false);
+    return ret;
 }
 
 extern bool do_screendump_instead_of_usb;

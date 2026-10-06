@@ -3883,8 +3883,13 @@ static void command_queue_sync_callback(void)
 
     mutex_lock(&command_queue_mutex);
 
+    /* No master to write to -- a rebuild deletes it until its merge -- leaves
+     * the queue for the next flush, and the mutex free for whoever queues. */
     if ( (masterfd = open_master_fd(&myhdr, true)) < 0)
+    {
+        mutex_unlock(&command_queue_mutex);
         return;
+    }
 
     while (command_queue_ridx != command_queue_widx)
     {
@@ -3899,7 +3904,10 @@ static void command_queue_sync_callback(void)
 
                 /* Re-open the masterfd. */
                 if ( (masterfd = open_master_fd(&myhdr, true)) < 0)
+                {
+                    mutex_unlock(&command_queue_mutex);
                     return;
+                }
 
                 break;
             }
@@ -5252,7 +5260,8 @@ static bool check_dir(const char *dirname, int add_files, int depth)
             add_tagcache(curpath, info.mtime);
 
             /* Wait until current path for debug screen is read and unset. */
-            while (tc_stat.syncscreen && tc_stat.curentry != NULL)
+            while (tc_stat.syncscreen && tc_stat.curentry != NULL
+                   && !check_event_queue())
                 yield();
 
             tc_stat.curentry = NULL;

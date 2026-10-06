@@ -4517,6 +4517,7 @@ static bool insert_all_playlist(struct browser_context *c,
         if (slots_remaining <= 0)
         {
             logf("Playlist has no space remaining");
+            playlist_insert_context_release(&context);
             tagcache_search_finish(&tcs);
             cpu_boost(false);
             return false;

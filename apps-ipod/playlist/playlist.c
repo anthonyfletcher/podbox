@@ -2128,14 +2128,18 @@ int playlist_create(const char *dir, const char *file)
     current_playlist_from_artist = false;
 
     dc_thread_stop(playlist);
+
+    /* Allocated before the lock, as playlist_resume() does: making room can
+     * stop playback, and stopping takes this lock to save the resume point. */
+    size_t buflen = 0;
+    int handle = file ? alloc_tempbuf(&buflen) : 0;
+
     playlist_write_lock(playlist);
 
     new_playlist_unlocked(playlist, dir, file);
 
     if (file)
     {
-        size_t buflen;
-        int handle = alloc_tempbuf(&buflen);
         if (handle > 0)
         {
             /* align for faster load times */
