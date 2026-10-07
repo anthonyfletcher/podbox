@@ -74,7 +74,6 @@
 #include "pathfuncs.h"
 #include "browser_disk.h"
 #include "browser_db.h"
-#include "book_shelf.h"          /* a book row's context menu */
 #include "rtc.h"
 #include "dircache.h"
 #include "database/tagcache.h"
@@ -1274,18 +1273,6 @@ static int dirbrowse(void)
 
                 if (tc.browse->flags & BROWSE_NO_CONTEXT_MENU)
                     break;
-
-                /* A book answers with the shelf's own menu */
-                if (id3db && numentries && !hotkey
-                    && browser_db_get_book(&tc, tc.selected_item,
-                                           buf, sizeof(buf)))
-                {
-                    if (book_shelf_mark_menu(buf, -1))
-                        reload_dir = true;
-                    else
-                        restore = true;
-                    break;
-                }
 
                 /* The Search row has no file behind it. Left to itself the
                  * menu below assembles currdir + the row's name and offers

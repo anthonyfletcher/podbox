@@ -22,9 +22,10 @@
  * Podcasts are left out: a show has no last episode to have finished.
  *
  * Choosing a book plays it. An In progress one resumes; the others start at
- * the beginning. The context menu marks a book Finished, Not started or In
- * progress by hand, which moves it to that shelf until it is played again; a
- * book row in the Audiobooks browse has the same menu.
+ * the beginning. A book's context menu is the one it has in the browser:
+ * Add to Queue, Add to Playlist, Show Track Info, Show in Files, and Mark as,
+ * which marks it Finished, Not started or In progress by hand and moves it to
+ * that shelf until it is played again.
  *
  * Parts, in order:
  *   - the arena and what it holds
@@ -32,6 +33,7 @@
  *   - deciding each book's state
  *   - the list
  *   - playing a book
+ *   - a book's context menu
  *   - the way in
  ****************************************************************************/
 
@@ -45,6 +47,7 @@
 #include "kernel.h"
 #include "cpu.h"                      /* cpu_boost */
 #include "file.h"                     /* MAX_PATH */
+#include "dir.h"                      /* ATTR_DIRECTORY */
 #include "audio.h"
 #include "lang.h"
 #include "strnatcmp.h"
@@ -60,6 +63,9 @@
 #include "database/path_key.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
+#include "screens/context_menu.h"     /* the queue and playlist submenus */
+#include "system/strutil.h"           /* open_utf8 */
+#include "viewers/properties.h"
 #include "root_menu.h"
 #include "book_shelf.h"
 
@@ -653,23 +659,19 @@ static int compare_book_tracks(const void *a_v, const void *b_v)
     return a->key < b->key ? -1 : a->key > b->key;
 }
 
-/* The chosen book's tracks, in the order its track list shows them, into the
- * playlist just created. The index to start at, or -1. */
-static int queue_book(struct playlist_insert_context *ctx)
+/* Book 'seek''s tracks to 'fn', in the order its track list shows them,
+ * sorted in 'list'. How many were found, or -1 if the database could not be
+ * read. 'fn' returns false to stop. */
+static int each_track(long seek, struct book_track *list, int cap,
+                      bool (*fn)(const char *path, void *data), void *data)
 {
     struct tagcache_search tcs;
     char path[MAX_PATH];
-    struct book_track *list;
-    size_t list_sz;
-    int cap, found = 0, added = 0, start = 0;
-    bool matched = false;
+    int found = 0;
 
     if (!tagcache_search(&tcs, tag_filename))
         return -1;
-    tagcache_search_add_filter(&tcs, tag_album, chosen.seek);
-
-    list = app_get_buffer(&list_sz, "book play");
-    cap = (int)(list_sz / sizeof(*list));
+    tagcache_search_add_filter(&tcs, tag_album, seek);
 
     while (found < cap && tagcache_get_next(&tcs, path, sizeof(path)))
     {
@@ -682,33 +684,60 @@ static int queue_book(struct playlist_insert_context *ctx)
 
     for (int i = 0; i < found; i++)
     {
-        if (!tagcache_retrieve(&tcs, list[i].idx_id, tag_filename,
-                               path, sizeof(path)))
-            continue;
-        if (playlist_insert_context_add(ctx, path) < 0)
+        if (tagcache_retrieve(&tcs, list[i].idx_id, tag_filename,
+                              path, sizeof(path))
+            && !fn(path, data))
             break;
-        if (chosen.track != 0 && path_key(path) == chosen.track)
-        {
-            start = chosen.after ? added + 1 : added;
-            matched = true;
-        }
-        added++;
     }
 
     tagcache_search_finish(&tcs);
+    return found;
+}
 
-    if (added == 0)
+struct queued
+{
+    struct playlist_insert_context *ctx;
+    int added;
+    int start;
+    bool matched;
+};
+
+static bool queue_track(const char *path, void *data)
+{
+    struct queued *q = data;
+
+    if (playlist_insert_context_add(q->ctx, path) < 0)
+        return false;
+    if (chosen.track != 0 && path_key(path) == chosen.track)
+    {
+        q->start = chosen.after ? q->added + 1 : q->added;
+        q->matched = true;
+    }
+    q->added++;
+    return true;
+}
+
+/* The chosen book's tracks into the playlist just created. The index to
+ * start at, or -1. */
+static int queue_book(struct playlist_insert_context *ctx)
+{
+    struct queued q = { ctx, 0, 0, false };
+    size_t list_sz;
+    struct book_track *list = app_get_buffer(&list_sz, "book play");
+
+    if (each_track(chosen.seek, list, (int)(list_sz / sizeof(*list)),
+                   queue_track, &q) < 0 || q.added == 0)
         return -1;
     /* The saved track is gone -- renamed or moved -- so its position belongs
      * to nothing here. The book starts at its first chapter, from the top. */
-    if (!matched)
+    if (!q.matched)
     {
         chosen.elapsed = 0;
         chosen.offset = 0;
     }
     /* The last chapter ended and the book is not finished -- it can only be
      * a book whose chapters were not all played. Start it again. */
-    return start < added ? start : 0;
+    return q.start < q.added ? q.start : 0;
 }
 
 static int play_chosen(void)
@@ -755,17 +784,8 @@ static int play_chosen(void)
 }
 
 /* ------------------------------------------------------------------ *
- * the way in                                                         *
+ * a book's context menu                                              *
  * ------------------------------------------------------------------ */
-
-static void report_empty(void)
-{
-    splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
-}
-
-/* The row a mark was made on, or -1. A list callback can only end the list,
- * not say why, so this is how the list learns to rebuild. */
-static int marked_row;
 
 /* The menu's order is enum book_shelf's. */
 bool book_shelf_mark_menu(const char *book, int current)
@@ -790,17 +810,160 @@ bool book_shelf_mark_menu(const char *book, int current)
                         ID2P(LANG_BOOKS_IN_PROGRESS),
                         ID2P(LANG_BOOKS_NOT_STARTED),
                         ID2P(LANG_BOOKS_FINISHED));
+    push_current_activity(ACTIVITY_CONTEXTMENU);
     choice = do_menu(&menu, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
 
     if (choice < 0 || choice >= (int)ARRAYLEN(marks) || choice == current)
         return false;
     return book_resume_mark(book, marks[choice]);
 }
 
-/* Context: mark the book In progress, Not started or Finished */
+/* The book the menu is about: its album, or -1 for one held in a single file
+ * known only by its path. */
+static long menu_seek;
+static char menu_path[MAX_PATH];
+
+/* Where the shelf goes once the menu has closed, or GO_TO_PREVIOUS to stay */
+static int menu_exit;
+
+/* The menu book's tracks to 'fn'. Sorted in the arena's free tail, since the
+ * list is up and holds the rest of it. */
+static int menu_tracks(bool (*fn)(const char *path, void *data), void *data)
+{
+    uintptr_t p = ALIGN_UP((uintptr_t)(names + names_used), sizeof(int32_t));
+    uintptr_t end = (uintptr_t)(names + names_sz);
+
+    if (menu_seek < 0)
+    {
+        fn(menu_path, data);
+        return 1;
+    }
+    return each_track(menu_seek, (struct book_track *)p,
+                      p < end ? (int)((end - p) / sizeof(struct book_track)) : 0,
+                      fn, data);
+}
+
+static bool insert_track(const char *path, void *data)
+{
+    return playlist_insert_context_add(data, path) >= 0;
+}
+
+/* Add to Queue's rows */
+static bool menu_insert(int position, bool queue, bool create_new)
+{
+    struct playlist_insert_context ctx;
+    bool ok;
+
+    (void)create_new;
+    if (playlist_insert_context_create(NULL, &ctx, position, queue, false) < 0)
+    {
+        playlist_insert_context_release(&ctx);
+        return false;
+    }
+    ok = menu_tracks(insert_track, &ctx) > 0;
+    playlist_insert_context_release(&ctx);
+    return ok;
+}
+
+static bool write_track(const char *path, void *data)
+{
+    return fdprintf(*(int *)data, "%s\n", path) > 0;
+}
+
+/* Add to Playlist's rows */
+static int menu_add_to_playlist(const char *playlist, bool new_playlist)
+{
+    int fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
+                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    int n;
+
+    if (fd < 0)
+        return -1;
+    n = menu_tracks(write_track, &fd);
+    close(fd);
+    return n > 0 ? 0 : -1;
+}
+
+static bool first_track(const char *path, void *data)
+{
+    strmemccpy(data, path, MAX_PATH);
+    return false;
+}
+
+/* The menu a book in the browser has, its rows run for the book's tracks.
+ * True if the book was marked. */
+static bool book_menu(const char *book)
+{
+    char first[MAX_PATH];
+    char sel[MAX_PATH];
+    int choice;
+
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                        ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
+                        ID2P(LANG_MENU_SHOW_ID3_INFO), ID2P(LANG_SHOW_IN_FILES),
+                        ID2P(LANG_BOOK_MARK_AS));
+
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    choice = do_menu(&menu, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+
+    /* Led by a slash, as the browser does, so a new playlist is offered the
+     * book's name */
+    snprintf(sel, sizeof(sel), "%s%s", book[0] == '/' ? "" : "/", book);
+    first[0] = '\0';
+
+    switch (choice)
+    {
+        case 0:
+            if (context_menu_show_playlist(sel, ATTR_DIRECTORY, menu_insert)
+                == ONPLAY_START_PLAY)
+                menu_exit = GO_TO_WPS;
+            break;
+        case 1:
+            context_menu_show_playlist_cat(sel, ATTR_DIRECTORY,
+                                           menu_add_to_playlist);
+            break;
+        case 2:
+            menu_tracks(first_track, first);
+            if (first[0] && properties(first) == GO_TO_ROOT)
+                menu_exit = GO_TO_ROOT;
+            break;
+        case 3:
+            menu_tracks(first_track, first);
+            if (first[0])
+            {
+                browser_reveal_on_next_load(first);
+                menu_exit = GO_TO_FILEBROWSER;
+            }
+            break;
+        case 4:
+            return book_shelf_mark_menu(book, shelf_kind);
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------ *
+ * the way in                                                         *
+ * ------------------------------------------------------------------ */
+
+static void report_empty(void)
+{
+    splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
+}
+
+/* The row a mark was made on, or -1. A list callback can only end the list,
+ * not say why, so this is how the list learns to rebuild. */
+static int marked_row;
+
+/* Context: the book's menu. A mark rebuilds the list, which has moved the
+ * book to another one; a row that leaves the shelf ends it. */
 static int shelf_action_cb(int action, struct gui_synclist *lists)
 {
     int n, v;
+    bool marked;
 
     if (action != ACTION_STD_CONTEXT)
         return action;
@@ -810,12 +973,15 @@ static int shelf_action_cb(int action, struct gui_synclist *lists)
         return action;
     v = rows[n];
 
-    if (!book_shelf_mark_menu(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
-                                               : book_name(v),
-                              shelf_kind))
-        return ACTION_REDRAW;
-    marked_row = n;
-    return ACTION_STD_CANCEL;
+    menu_seek = ROW_IS_RESUME(v) ? -1 : books[v].seek;
+    if (ROW_IS_RESUME(v))
+        strmemccpy(menu_path, resume_path(ROW_RESUME_OF(v)), sizeof(menu_path));
+    marked = book_menu(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
+                                        : book_name(v));
+    if (marked)
+        marked_row = n;
+    return marked || menu_exit != GO_TO_PREVIOUS ? ACTION_STD_CANCEL
+                                                 : ACTION_REDRAW;
 }
 
 /* Everything the list is drawn from, read afresh. */
@@ -871,6 +1037,7 @@ int book_shelf_run(void)
         splash(0, ID2P(LANG_WAIT));
 
     /* Round again after a mark, which has moved the book to another list. */
+    menu_exit = GO_TO_PREVIOUS;
     do
     {
         marked_row = -1;
@@ -895,13 +1062,15 @@ int book_shelf_run(void)
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
+        else if (menu_exit != GO_TO_PREVIOUS)
+            ret = menu_exit;
         else if (info.selection >= 0 && info.selection < row_ct)
         {
             choose(rows[info.selection]);
             picked = true;
         }
         selection = marked_row;
-    } while (marked_row >= 0);
+    } while (marked_row >= 0 && menu_exit == GO_TO_PREVIOUS);
 
     pop_current_activity();
     release();

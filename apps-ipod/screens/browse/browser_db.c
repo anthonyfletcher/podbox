@@ -2499,7 +2499,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         }
     }
 
-    if (tag != tag_title && tag != tag_filename && !shelf_rows)
+    /* Neither over spoken word: a book is heard whole and in order, so
+     * every track of an author, or of a book shuffled, is not something to
+     * offer. */
+    if (tag != tag_title && tag != tag_filename && !csi_mentions_spoken())
     {
         if (offset <= sidx)
         {
@@ -2514,10 +2517,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         }
         sidx++;
     }
-    /* <Random> everywhere except over spoken word: playing a book's
-     * chapters in a scrambled order is not something to offer. */
-    if (tag != tag_filename && !shelf_rows
-        && !(tag == tag_title && csi_mentions_spoken()))
+    if (tag != tag_filename && !csi_mentions_spoken())
     {
         if (offset <= sidx)
         {
@@ -5080,13 +5080,26 @@ bool browser_db_get_book(struct browser_context* c, int item,
                          char *buf, size_t buflen)
 {
     struct tagentry *entry;
+    struct tagcache_search tcs;
+    struct tagcache_album al;
+    bool ok;
 
-    if (!browser_db_is_spoken_list(c) || !browser_db_is_album_list(c)
-        || item < c->special_entry_count
-        || !(entry = browser_db_get_entry(c, item))
-        || !row_is_book(tag_album, entry->extraseek, c->currextra))
+    if (!browser_db_is_spoken_list(c) || item < c->special_entry_count
+        || !(entry = browser_db_get_entry(c, item)))
         return false;
-    return browser_db_get_entry_name(c, item, buf, buflen) != NULL;
+
+    if (browser_db_is_album_list(c))
+        return row_is_book(tag_album, entry->extraseek, c->currextra)
+               && browser_db_get_entry_name(c, item, buf, buflen) != NULL;
+
+    /* A track: the book is its album, if that is one */
+    if (entry->newtable != TABLE_PLAYTRACK
+        || !tagcache_album_get(tagcache_album_of(entry->extraseek), &al)
+        || al.spoken != al.tracks || !tagcache_search(&tcs, tag_album))
+        return false;
+    ok = tagcache_retrieve(&tcs, entry->extraseek, tag_album, buf, buflen);
+    tagcache_search_finish(&tcs);
+    return ok;
 }
 
 /* True when this browse level is listing artists -- the rows that can carry

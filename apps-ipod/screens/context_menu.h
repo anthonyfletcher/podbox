@@ -100,6 +100,7 @@ bool wps_context_menu_is_changed(void *setting, void *defaultval);
 /* needed for the playlist viewer.. eventually clean this up */
 void context_menu_show_playlist_cat(const char* track_name, int attr,
                                    void (*add_to_pl_cb));
-void context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb));
+/* Returns ONPLAY_START_PLAY when a row started playback */
+int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb));
 
 #endif

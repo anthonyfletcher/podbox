@@ -73,6 +73,7 @@
 #include "playlist/save_screen.h"
 #include "playlist/catalog.h"
 #include "screens/browse/browser_db.h"
+#include "screens/browse/book_shelf.h"
 #include "screens/browse/listen_progress.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
@@ -474,6 +475,14 @@ static int sound_mix_report(int added)
 /* Hidden rather than shown failing. The setting comes first: somebody who has
  * turned the engine off has said they do not want this, and an index left on
  * disk from before is not consent to keep offering it. */
+/* A row of the Audiobooks browse: the sound items, which build music, are not
+ * offered for it, and Mark as is. */
+static bool in_book_list(void)
+{
+    return selected_file.context == CONTEXT_ID3DB
+           && browser_db_is_spoken_list(browser_get_context());
+}
+
 static int sound_mix_callback(int action,
                               const struct menu_item_ex *this_item,
                               struct gui_synclist *this_list)
@@ -483,7 +492,8 @@ static int sound_mix_callback(int action,
 
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (!global_settings.playlist_engine || !mix_seed_available() ||
+        if (in_book_list() ||
+            !global_settings.playlist_engine || !mix_seed_available() ||
             !tagcache_is_usable() || !sound_index_exists())
             return ACTION_EXIT_MENUITEM;
     }
@@ -558,7 +568,8 @@ static int winddown_callback(int action,
 
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (!global_settings.playlist_engine || !sound_index_exists() ||
+        if (in_book_list() ||
+            !global_settings.playlist_engine || !sound_index_exists() ||
             !tagcache_is_usable() ||
             (selected_file.attr & ATTR_DIRECTORY) || !mix_seed_available())
             return ACTION_EXIT_MENUITEM;
@@ -684,7 +695,8 @@ static int sound_album_callback(int action,
 
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (!global_settings.playlist_engine || !sound_index_exists() ||
+        if (in_book_list() ||
+            !global_settings.playlist_engine || !sound_index_exists() ||
             !sound_album_selectable())
             return ACTION_EXIT_MENUITEM;
     }
@@ -1003,8 +1015,9 @@ static int treeplaylist_callback(int action,
  * the menu runs as whatever screen is underneath and a theme switching on %cs
  * dresses it as that screen's rows. Popped conditionally, like the other sites:
  * an item may have exited elsewhere and popped it already. */
-void context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb))
+int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb))
 {
+    context_menu_result = ONPLAY_OK;
     ctx_current_playlist_insert = playlist_insert_cb;
     selected_file_set(CONTEXT_STD, path, attr);
     in_queue_submenu = false;
@@ -1012,6 +1025,7 @@ void context_menu_show_playlist(const char* path, int attr, void (*playlist_inse
     do_menu(&browser_playlist_menu, NULL, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
+    return context_menu_result;
 }
 
 /* playlist catalog options */
@@ -1310,6 +1324,34 @@ static int reveal(void)
 
 MENUITEM_FUNCTION(reveal_item, 0, ID2P(LANG_SHOW_IN_FILES),
                   reveal, clipboard_callback, Icon_file_view_menu);
+
+static char mark_book[MAX_PATH];
+
+static int mark_book_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && !(in_book_list()
+             && browser_db_get_book(c, c->selected_item,
+                                    mark_book, sizeof(mark_book))))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+static int mark_book_run(void)
+{
+    if (book_shelf_mark_menu(mark_book, -1))
+        context_menu_result = ONPLAY_RELOAD_DIR;
+    return 0;
+}
+
+MENUITEM_FUNCTION(mark_book_item, 0, ID2P(LANG_BOOK_MARK_AS),
+                  mark_book_run, mark_book_callback, Icon_NOICON);
 
 static bool prepare_database_sel(void *param)
 {
@@ -1683,6 +1725,7 @@ MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            &create_dir_item, &properties_item, &track_info_item,
            &listen_progress_item,
            &reveal_item,
+           &mark_book_item,
            &set_backdrop_item,
            &add_to_faves_item, &set_as_dir_menu, &file_menu, &sort_playlists,
          );

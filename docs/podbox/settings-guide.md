@@ -283,8 +283,10 @@ its start. A book held in a single file has a chapter list only when Chapter
 Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are
-in none of them. A book's context menu, there or in the Book and Author lists,
-marks it as any of the three, until it is played again.
+in none of them. A book's context menu, on a shelf or in any Audiobooks list,
+offers Add to Queue, Add to Playlist, Show Track Info, Show in Files and Mark as,
+which moves it to any of the three until it is played again. The Audiobooks
+lists have no <All Tracks> or <Random> rows.
 
 **Trim Titles** never removes a note at the start of a name.
 
