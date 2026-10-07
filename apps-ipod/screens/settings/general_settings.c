@@ -75,13 +75,9 @@ static int dirs_to_scan(void)
     return 0;
 }
 
-MENUITEM_SETTING(tagcache_ram, &global_settings.tagcache_ram, NULL);
 MENUITEM_SETTING(tagcache_scan_on_eject, &global_settings.tagcache_scan_on_eject, NULL);
 MENUITEM_SETTING(tagcache_scan_on_startup,
                  &global_settings.tagcache_scan_on_startup, NULL);
-MENUITEM_SETTING(tagcache_autocommit,
-                 &global_settings.tagcache_autocommit, NULL);
-MENUITEM_SETTING(runtimedb, &global_settings.runtimedb, NULL);
 MENUITEM_SETTING(year_from_folder, &global_settings.year_from_folder, NULL);
 
 MENUITEM_FUNCTION(tc_export, MENU_ADVANCED, ID2P(LANG_TAGCACHE_EXPORT),
@@ -96,10 +92,8 @@ MENUITEM_FUNCTION(tc_paths, MENU_ADVANCED, ID2P(LANG_SELECT_DATABASE_DIRS),
 
 MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
-                &tagcache_ram,
                 &tagcache_scan_on_startup, &tagcache_scan_on_eject,
-                &tagcache_autocommit,
-                &runtimedb, &tc_paths, &year_from_folder,
+                &tc_paths, &year_from_folder,
                 &tc_export, &tc_import, &debug_log_tagcache
                 );
 

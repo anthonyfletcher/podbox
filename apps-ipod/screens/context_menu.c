@@ -1134,7 +1134,7 @@ static int clipboard_paste(void)
 static int set_rating_inline(void)
 {
     struct mp3entry* id3 = audio_current_track();
-    if (id3 && id3->tagcache_idx && global_settings.runtimedb)
+    if (id3 && id3->tagcache_idx)
     {
         set_int_ex(str(LANG_MENU_SET_RATING), "", UNIT_INT, (void*)(&id3->rating),
                    NULL, 1, 0, 10, NULL, NULL);
@@ -1152,7 +1152,7 @@ static int ratingitem_callback(int action,
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (!selected_file.path || !global_settings.runtimedb || !tagcache_is_usable())
+        if (!selected_file.path || !tagcache_is_usable())
             return ACTION_EXIT_MENUITEM;
     }
     return action;
@@ -1323,13 +1323,9 @@ static bool prepare_database_sel(void *param)
         }
         else
         {
-            /* If database is not loaded into RAM, or tagcache_ram is
-               set to "quick", filename needs to be retrieved from disk! */
+            /* The filename is read from disk */
             if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO
-                && !storage_disk_is_active()
-                && (global_settings.tagcache_ram != TAGCACHE_RAM_ON
-                    || !tagcache_is_in_ram())
-            )
+                && !storage_disk_is_active())
                 splash(0, ID2P(LANG_WAIT));
              if (!browser_db_get_subentry_filename(selected_file.buf, MAX_PATH))
             {
@@ -1453,25 +1449,9 @@ static bool set_catalogdir(void)
 MENUITEM_FUNCTION(set_catalogdir_item, 0, ID2P(LANG_PLAYLIST_DIR),
                   set_catalogdir, clipboard_callback, Icon_NOICON);
 
-static bool set_databasedir(void)
-{
-    struct tagcache_stat *tc_stat = tagcache_get_stat();
-    if (strcasecmp(selected_file.path, tc_stat->db_path))
-    {
-        splash(HZ, ID2P(LANG_PLEASE_REBOOT));
-    }
-
-    set_dir_helper(global_settings.tagcache_db_path,
-                   sizeof(global_settings.tagcache_db_path));
-    return false;
-}
-MENUITEM_FUNCTION(set_databasedir_item, 0, ID2P(LANG_DATABASE_DIR),
-                  set_databasedir, clipboard_callback, Icon_Audio);
-
 MAKE_ONPLAYMENU(set_as_dir_menu, ID2P(LANG_SET_AS),
                 clipboard_callback, Icon_NOICON,
                 &set_catalogdir_item,
-                &set_databasedir_item,
                 &set_startdir_item);
 
 static int clipboard_callback(int action,
@@ -1532,7 +1512,6 @@ static int clipboard_callback(int action,
                     if (this_item == &delete_dir_item ||
                         this_item == &set_startdir_item ||
                         this_item == &set_catalogdir_item ||
-                        this_item == &set_databasedir_item ||
                         this_item == &set_as_dir_menu
                         )
                         return action;

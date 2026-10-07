@@ -36,8 +36,7 @@ void album_charts_arm(enum album_chart kind);
 int album_charts_run(void);
 
 /* Pick an album at random and start playing it. GO_TO_WPS on success,
- * GO_TO_PREVIOUS if it could not. Needs no playback history, so this works
- * with runtime data gathering off. */
+ * GO_TO_PREVIOUS if it could not. Needs no playback history. */
 int album_random(void);
 
 #endif /* _ALBUM_CHARTS_H */

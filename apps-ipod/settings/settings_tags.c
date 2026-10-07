@@ -191,11 +191,8 @@ static const struct tag_row tag_rows[] = {
 { "dircache",            TAG_LIBRARY|TAG_SYSTEM,                 "directory cache speed" },
 
 /* --- the database -------------------------------------------------------- */
-{ "tagcache_ram",              TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database ram memory load" },
 { "tagcache_scan_on_startup",  TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database scan boot" },
 { "tagcache_scan_on_eject",    TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "database scan usb eject" },
-{ "tagcache_autocommit",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "database commit" },
-{ "gather runtime data",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE,         "play count rating runtime" },
 { "database scan paths",       TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "directories folders" },
 { "year from folder",          TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "album release date folders" },
 { "database sort albums by",   TAG_LIBRARY,                      "sorting albums year artist" },
@@ -479,10 +476,9 @@ static bool is_word_char(char c)
  *
  * Deliberately not a plain substring search. "base" occurs inside "database",
  * so a substring match on the misspelling alias for Bass also returns Sort
- * Albums By (cfg name "database sort albums by"), Load to RAM (search word
- * "database"), and -- worst -- every setting tagged TAG_DATABASE, because the
- * topic name contains it too. Anchoring to a word start removes all three at
- * once.
+ * Albums By (cfg name "database sort albums by") and -- worst -- every
+ * setting tagged TAG_DATABASE, because the topic name contains it too.
+ * Anchoring to a word start removes both at once.
  *
  * The cost is that a query has to start a word: "backlight" and "back" find
  * Backlight, "light" no longer does. That is what the search words column is

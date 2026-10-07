@@ -40,7 +40,6 @@
 #include "strnatcmp.h"
 #include "widgets/list.h"
 #include "widgets/splash.h"
-#include "widgets/yesno.h"
 #include "settings/settings.h"
 #include "input/action.h"
 #include "system/activity.h"
@@ -387,25 +386,6 @@ static int run_album_list(const char *title)
  * the way in                                                         *
  * ------------------------------------------------------------------ */
 
-/* Nothing played and nothing counting plays are the same screen and very
- * different problems, and 0% for the second makes the feature look broken
- * rather than the setting. Name the setting and offer it, as the album charts
- * do, and at most once a boot so that declining does not nag. */
-static bool runtimedb_asked;
-
-static void offer_runtimedb(void)
-{
-    if (global_settings.runtimedb || runtimedb_asked)
-        return;
-
-    runtimedb_asked = true;
-    if (yesno_pop(str(LANG_RUNTIMEDB_OFF_PROMPT)))
-    {
-        global_settings.runtimedb = true;
-        settings_save();
-    }
-}
-
 int listen_progress_show(void)
 {
     /* Copied rather than pointed at: the browse row's entry lives in the
@@ -438,12 +418,7 @@ int listen_progress_show(void)
         ret = GO_TO_PREVIOUS;
     }
     else
-    {
-        if ((artist ? artist_played : track_played) == 0)
-            offer_runtimedb();
-
         ret = artist ? run_album_list(title) : run_track_list(title);
-    }
 
     app_release_buffer("listening progress");
     arena = NULL;

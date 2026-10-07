@@ -197,7 +197,6 @@ enum variables {
  * translated whatever the config says.
  *
  * 'available' gates a row that cannot always do its job; NULL means always. */
-static bool db_search_available(void);
 static bool featured_artists_available(void);
 
 static const struct builtin_row {
@@ -208,8 +207,7 @@ static const struct builtin_row {
     bool (*available)(void);
 } builtin_rows[] = {
     { "random_album", LANG_RANDOM_ALBUM, TABLE_RANDOM_ALBUM, 0, NULL },
-    { "db_search",    LANG_DB_SEARCH,    TABLE_DB_SEARCH,    0,
-      db_search_available },
+    { "db_search",    LANG_DB_SEARCH,    TABLE_DB_SEARCH,    0, NULL },
     { "chart_albums_most_played",  LANG_MOST_PLAYED_ALBUMS,
       TABLE_ALBUM_CHARTS, ALBUM_CHART_MOST_PLAYED,      NULL },
     { "chart_artists_most_played", LANG_MOST_PLAYED_ARTISTS,
@@ -227,28 +225,15 @@ static const struct builtin_row {
     { "quiz", LANG_QUIZ, TABLE_MUSIC_QUIZ, 0, NULL },
 };
 
-/* The search screen scans the tag files, which off disk is a seek and a read
- * per entry -- db_search_run() refuses to open in that case, so the row is not
- * offered either. Matches db_search_callback() in root_menu.c, which hides the
- * main-menu entry on the same test. */
-static bool db_search_available(void)
-{
-    return global_settings.tagcache_ram != TAGCACHE_RAM_OFF;
-}
-
-/* Three tests, and they are three different kinds. The setting says what the
- * user asked for. The ramcache setting says whether the table could be built
- * at all -- off it costs a seek and a read per entry, which is not slow but
- * unusable. And an empty table means the library credits nobody, so the row
- * would lead to a list with nothing in it.
+/* The setting says what the user asked for. An empty table means the library
+ * credits nobody, or that it could not be built without the database in RAM,
+ * so the row would lead to a list with nothing in it.
  *
  * Nothing here builds: load_root() has already called db_featured_ensure()
  * by the time it asks, which is what lets the emptiness test be honest. */
 static bool featured_artists_available(void)
 {
-    return global_settings.featured_artists &&
-           global_settings.tagcache_ram != TAGCACHE_RAM_OFF &&
-           db_featured_count() > 0;
+    return global_settings.featured_artists && db_featured_count() > 0;
 }
 
 /* Capacity 10 000 entries (for example 10k different artists) */
@@ -1123,12 +1108,7 @@ static void browser_db_buffer_event(unsigned short id, void *ev_data)
     struct tagcache_search tcs;
     struct mp3entry *id3 = ((struct track_event *)ev_data)->id3;
 
-    bool runtimedb = global_settings.runtimedb;
     bool autoresume = global_settings.autoresume_enable;
-
-    /* Do not gather data unless proper setting has been enabled. */
-    if (!runtimedb && !autoresume)
-        return;
 
     logf("be:%s", id3->path);
 
@@ -1150,17 +1130,14 @@ static void browser_db_buffer_event(unsigned short id, void *ev_data)
         return;
     }
 
-    if (runtimedb)
-    {
-        id3->playcount  = tagcache_get_numeric(&tcs, tag_playcount);
-        if (!id3->rating)
-            id3->rating = tagcache_get_numeric(&tcs, tag_rating);
-        id3->lastplayed = tagcache_get_numeric(&tcs, tag_lastplayed);
-        id3->score      = tagcache_get_numeric(&tcs, tag_virt_autoscore) / 10;
-        id3->playtime   = tagcache_get_numeric(&tcs, tag_playtime);
+    id3->playcount  = tagcache_get_numeric(&tcs, tag_playcount);
+    if (!id3->rating)
+        id3->rating = tagcache_get_numeric(&tcs, tag_rating);
+    id3->lastplayed = tagcache_get_numeric(&tcs, tag_lastplayed);
+    id3->score      = tagcache_get_numeric(&tcs, tag_virt_autoscore) / 10;
+    id3->playtime   = tagcache_get_numeric(&tcs, tag_playtime);
 
-        logf("-> %ld/%ld", id3->playcount, id3->playtime);
-    }
+    logf("-> %ld/%ld", id3->playcount, id3->playtime);
 
     if (autoresume)
     {
@@ -1204,17 +1181,15 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
     tagcache_idx--;
 
     bool auto_skip = te->flags & TEF_AUTO_SKIP;
-    bool runtimedb = global_settings.runtimedb;
+    bool counted = true;
     bool autoresume = global_settings.autoresume_enable;
 
     /* Don't process unplayed tracks, or tracks interrupted within the
        first 15 seconds but always process autoresume point */
-    if (runtimedb && (id3->elapsed == 0
-        || (id3->elapsed < 15 * 1000 && !auto_skip)
-        ))
+    if (id3->elapsed == 0 || (id3->elapsed < 15 * 1000 && !auto_skip))
     {
         logf("not db logging unplayed or skipped track");
-        runtimedb = false;
+        counted = false;
     }
 
     /* 3s because that is the threshold the WPS uses to rewind instead
@@ -1226,11 +1201,9 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
         autoresume = false;
     }
 
-    /* Do not gather data unless proper setting has been enabled and at least
-       one is still slated to be recorded */
-    if (!(runtimedb || autoresume))
+    if (!(counted || autoresume))
     {
-        logf("runtimedb gathering and autoresume not enabled/ignored");
+        logf("nothing to record");
         return;
     }
 
@@ -1241,7 +1214,7 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
         return;
     }
 
-    if (runtimedb)
+    if (counted)
     {
         long playcount;
         long playtime;

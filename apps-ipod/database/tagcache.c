@@ -90,7 +90,6 @@
 #include "tagcache.h"
 #include "database/path_key.h"
 #include "db_spoken.h"
-#include "widgets/yesno.h"
 #include "core_alloc.h"
 #include "crc32.h"
 #include "system/strutil.h"
@@ -176,7 +175,6 @@ static bool usr_cancel(void);
 
 /* Flags */
 #define FLAG_DELETED     0x0001  /* Entry has been removed from db */
-#define FLAG_DIRCACHE    0x0002  /* Filename is a dircache pointer */
 #define FLAG_DIRTYNUM    0x0004  /* Numeric data has been modified */
 #define FLAG_TRKNUMGEN   0x0008  /* Track number has been generated  */
 #define FLAG_RESURRECTED 0x0010  /* Statistics data has been resurrected */
@@ -325,12 +323,6 @@ static struct master_header current_tcmh;
        *(gap_out_p) = (char *)__palgn - (char *)__p;          \
        __palgn; })
 
-#define IF_TCRCDC(...) IF_DIRCACHE(__VA_ARGS__)
-
-#define tcrc_dcfrefs \
-    ((struct dircache_fileref *)(tcramcache.hdr->tags[tag_filename] + \
-                                  sizeof (struct tagcache_header)))
-
 /* One live entry of the path index: path_key() of its filename, split so the
  * slot is 12 bytes rather than padded to 16. */
 struct path_slot {
@@ -341,7 +333,7 @@ struct path_slot {
 
 /* Header is created when loading database to ram. */
 struct ramcache_header {
-    char *tags[TAG_COUNT];       /* Tag file content (dcfrefs if tag_filename) */
+    char *tags[TAG_COUNT];       /* Tag file content; tag_filename's header only */
     int entry_count[TAG_COUNT];  /* Number of entries in the indices. */
     long tag_size[TAG_COUNT];    /* Bytes in each tags[], to bound a seek */
     int path_count;              /* Slots in the path index */
@@ -1092,16 +1084,7 @@ static bool get_index(int masterfd, int idxid,
 
 static bool write_index(int masterfd, int idxid, struct index_entry *idx)
 {
-    /* We need to exclude all memory only flags & tags when writing to disk. */
-    if (idx->flag & FLAG_DIRCACHE)
-    {
-        logf("memory only flags!");
-        return false;
-    }
-
-    /* Only update numeric data. Writing the whole index to RAM by memcpy
-     * destroys dircache pointers!
-     */
+    /* Only the numeric data: the RAM copy's string seeks already match */
     if (tc_stat.ramcache)
     {
         struct index_entry *idx_ram = &tcramcache.hdr->indices[idxid];
@@ -1114,9 +1097,9 @@ static bool write_index(int masterfd, int idxid, struct index_entry *idx)
             }
         }
 
-        /* Don't touch the dircache flag or attributes. */
+        /* Don't touch the attributes. */
         idx_ram->flag = (idx->flag & 0x0000ffff)
-            | (idx_ram->flag & (0xffff0000 | FLAG_DIRCACHE));
+            | (idx_ram->flag & 0xffff0000);
     }
 
     lseek(masterfd, idxid * sizeof(struct index_entry)
@@ -1150,8 +1133,8 @@ static bool open_files(struct tagcache_search *tcs, int tag)
     return true;
 }
 
-static bool retrieve(struct tagcache_search *tcs, IF_DIRCACHE(int idx_id,)
-                     struct index_entry *idx, int tag, char *buf, long bufsz)
+static bool retrieve(struct tagcache_search *tcs, struct index_entry *idx,
+                     int tag, char *buf, long bufsz)
 {
     bool success = false;
     bool is_basename = false;
@@ -1174,21 +1157,13 @@ static bool retrieve(struct tagcache_search *tcs, IF_DIRCACHE(int idx_id,)
         goto failure;
     }
 
-    if (tcs->ramsearch)
+    /* Filenames are never held in RAM */
+    if (tcs->ramsearch && tag != tag_filename)
     {
-        if (tag == tag_filename && (idx->flag & FLAG_DIRCACHE))
-        {
-            if (dircache_get_fileref_path(&tcrc_dcfrefs[idx_id], buf, bufsz) >= 0)
-                success = true;
-        }
-        else
-        if (tag != tag_filename)
-        {
-            struct tagfile_entry *ep =
-                (struct tagfile_entry *)&tcramcache.hdr->tags[tag][seek];
-            strmemccpy(buf, ep->tag_data, bufsz);
-            success = true;
-        }
+        struct tagfile_entry *ep =
+            (struct tagfile_entry *)&tcramcache.hdr->tags[tag][seek];
+        strmemccpy(buf, ep->tag_data, bufsz);
+        success = true;
     }
 
     if (!success && open_files(tcs, tag))
@@ -1602,7 +1577,7 @@ static bool check_clauses(struct tagcache_search *tcs,
                 if (clause->tag == tag_filename
                     || clause->tag == tag_virt_basename)
                 {
-                    if (!retrieve(tcs, IF_DIRCACHE(tcs->idx_id,) idx,
+                    if (!retrieve(tcs, idx,
                                   clause->tag, buf, bufsz))
                     {
                         tcs->failed = true;
@@ -2065,7 +2040,6 @@ bool tagcache_search_add_clause(struct tagcache_search *tcs,
 static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, long bufsz)
 {
     struct tagfile_entry entry;
-    long flag = 0;
 
     if (tcs->idxfd[tcs->type] < 0 && !is_numeric
         && !tcs->ramsearch
@@ -2074,7 +2048,8 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
 
     /* Relative fetch. */
     if (tcs->filter_count > 0 || tcs->clause_count > 0 || is_numeric
-        /* We need to retrieve flag status for dircache. */
+        /* RAM holds no filenames: the index walk reads them from disk and
+         * skips deleted entries */
         || (tcs->ramsearch && tcs->type == tag_filename)
         )
     {
@@ -2094,7 +2069,6 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
         }
 
         seeklist = &tcs->seeklist[tcs->list_position];
-        flag = seeklist->flag;
         tcs->position = seeklist->seek;
         tcs->idx_id = seeklist->idx_id;
         tcs->list_position++;
@@ -2123,20 +2097,6 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
     /* Direct fetch. */
     if (tcs->ramsearch)
     {
-        if (tcs->type == tag_filename && (flag & FLAG_DIRCACHE))
-        {
-            ssize_t len = dircache_get_fileref_path(&tcrc_dcfrefs[tcs->idx_id],
-                                                    buf, bufsz);
-            if (len >= 0)
-            {
-                tcs->result_len = len + 1;
-                tcs->result     = buf;
-                tcs->ramresult  = false;
-                return true;
-            }
-            /* else do it the hard way */
-        }
-
         if (tcs->type != tag_filename)
         {
             struct tagfile_entry *ep;
@@ -2233,7 +2193,7 @@ bool tagcache_retrieve(struct tagcache_search *tcs, int idxid,
     if (!get_index(tcs->masterfd, idxid, &idx, true))
         return false;
 
-    return retrieve(tcs, IF_DIRCACHE(idxid,) &idx, tag, buf, size);
+    return retrieve(tcs, &idx, tag, buf, size);
 }
 
 void tagcache_search_finish(struct tagcache_search *tcs)
@@ -2555,7 +2515,7 @@ static int folder_name_year(const char *path)
  * before the commit -- which is also what lets a moved file keep its figures.
  * That replaces a second pass over every path asking the filesystem. Static,
  * so it costs no allocation; a larger library, or a database that is not
- * ready, falls back to check_file_refs(). */
+ * ready, falls back to check_deleted_files(). */
 #define WALK_SEEN_MAX 65536
 static uint32_t walk_seen[WALK_SEEN_MAX / 32];
 static long walk_seen_count;
@@ -4938,7 +4898,6 @@ static size_t ramcache_size(struct master_header *tcmh)
 
     size_t size = tcmh->tch.datasize + 256 + TAGCACHE_RESERVE +
         sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
-    size += tcmh->tch.entry_count*sizeof(struct dircache_fileref);
     size += tcmh->tch.entry_count*sizeof(struct path_slot);
     return size;
 }
@@ -5177,21 +5136,11 @@ static bool load_tagcache(void)
                 }
             }
 
-            /* We have a special handling for the filename tags; neither the
-               paths nor the entry headers are stored; only the tagcache header
-               and dircache references are. */
+            /* Filenames are not kept: only the tag file's header, and each
+               path's key in the path index. fe is scratch, reused for every
+               entry. */
             if (tag == tag_filename)
             {
-                if (idx->flag & FLAG_DIRCACHE)
-                {
-                    /* This flag must not be used yet. */
-                    logf("internal error!");
-                    goto failure;
-                }
-
-                p += sizeof (struct dircache_fileref);
-                bytesleft -= sizeof (struct dircache_fileref);
-
                 char filename[TAGCACHE_BUFSZ];
                 if (fe->tag_length >= (long)sizeof(filename)-1)
                 {
@@ -5257,8 +5206,6 @@ static bool load_tagcache(void)
             }
         }
 
-        if (tag == tag_filename)
-            p = (char *)&tcrc_dcfrefs[tcmh.tch.entry_count];
         tcramcache.hdr->tag_size[tag] = p - tcramcache.hdr->tags[tag];
 
         close(fd);
@@ -5298,7 +5245,9 @@ failure:
     return ok;
 }
 
-static bool check_file_refs(bool auto_update)
+/* Deletes the entries whose files have gone, asking the directory cache and
+ * then the disk for each path. */
+static bool check_deleted_files(void)
 {
     int fd;
     bool ret = true;
@@ -5336,8 +5285,8 @@ static bool check_file_refs(bool auto_update)
         return false;
     }
 
-    debug_log(DEBUG_LOG_TAGCACHE, "refs: start, auto_update=%d entries=%d",
-              auto_update, (int)hdr.entry_count);
+    debug_log(DEBUG_LOG_TAGCACHE, "refs: start, entries=%d",
+              (int)hdr.entry_count);
 
     processed_dir_count = 0;
 
@@ -5366,13 +5315,11 @@ static bool check_file_refs(bool auto_update)
                 continue;
         }
 
-        int idx_id = tfe.idx_id; /* dircache reference clobbers *tfe */
-        unsigned int searchflag;
+        int idx_id = tfe.idx_id;
 
         /* The loader checks this too, but only for the entries the
          * tag file's own header admits to; this walk runs to the end
-         * of the file. Everything below writes at idx_id -- the flag,
-         * the dircache fileref, and delete_entry() -- so an entry past
+         * of the file. delete_entry() writes at idx_id, so an entry past
          * that count writes outside the RAM database. */
         if (idx_id < 0 || idx_id >= current_tcmh.tch.entry_count)
         {
@@ -5382,28 +5329,9 @@ static bool check_file_refs(bool auto_update)
             goto wend_finished;
         }
 
-        struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
-        if (!auto_update)
-        {
-            if(idx->flag & FLAG_DIRCACHE) /* already found */
-            {
-                continue;
-            }
-            searchflag = DCS_CACHED_PATH; /* attempt to load cache references */
-        }
-        else /* If auto updating, check storage too */
-        {
-            searchflag = DCS_STORAGE_PATH;
-        }
+        int rc_cache = dircache_search(DCS_STORAGE_PATH, NULL, buf);
 
-        int rc_cache = dircache_search(searchflag | DCS_UPDATE_FILEREF,
-                                   &tcrc_dcfrefs[idx_id], buf);
-
-        if (rc_cache > 0)           /* in cache and we have fileref */
-        {
-            idx->flag |= FLAG_DIRCACHE;
-        }
-        else if (rc_cache == 0)     /* not in cache but okay */
+        if (rc_cache >= 0)          /* there */
         {;}
         /* A negative return means the lookup did not succeed; it does not say
          * why in any form worth trusting. Upstream read absence out of the
@@ -5420,7 +5348,7 @@ static bool check_file_refs(bool auto_update)
          * stat, but only for entries that already failed to resolve -- 43 on
          * the library this was found on, against 3502 scanned -- and deleting
          * an entry is destructive enough to be worth confirming directly. */
-        else if (auto_update && !file_exists(buf))
+        else if (!file_exists(buf))
         {
             logf("Entry no longer valid.");
             logf("-> %s / %" PRId32, buf, tfe.tag_length);
@@ -5449,11 +5377,6 @@ wend_finished:
     logf("done");
 
     return ret;
-}
-
-static bool check_deleted_files(void)
-{
-    return check_file_refs(true);
 }
 
 /* Note that this function must not be inlined, otherwise the whole point
@@ -5993,31 +5916,14 @@ static void tagcache_thread(void)
      * the changes first in foreground. */
     if (db_file_exists(TAGCACHE_FILE_TEMP))
     {
-        static const char *lines[] = {ID2P(LANG_TAGCACHE_BUSY),
-                                      ID2P(LANG_TAGCACHE_UPDATE)};
-        static const struct text_message message = {lines, 2};
-        bool go = global_settings.tagcache_autocommit;
-
-        /* Asking runs on this thread, which owns no screen -- main.c's boot
-         * screen does. They do not collide only because the boot screen draws
-         * nothing until commit_step goes above zero, which cannot happen
-         * before this is answered. Keep that true if either side moves. */
-        if (!go)
-            go = gui_syncyesno_run_w_tmo(HZ * 5, YESNO_YES, str(LANG_TAGCACHE),
-                                         &message, NULL, NULL) == YESNO_YES;
-
-        if (go)
-        {
-            allocate_tempbuf();
-            if (commit() && current_tcmh.serial == 0)
-                queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
-            free_tempbuf();
-        }
+        allocate_tempbuf();
+        if (commit() && current_tcmh.serial == 0)
+            queue_post(&tagcache_queue, Q_IMPORT_CHANGELOG, 0);
+        free_tempbuf();
     }
 
-
     /* Allocate space for the tagcache if found on disk. */
-    if (global_settings.tagcache_ram && !tc_stat.ramcache)
+    if (!tc_stat.ramcache)
         allocate_tagcache();
 
     cpu_boost(false);
@@ -6047,14 +5953,14 @@ static void tagcache_thread(void)
             case Q_RELOAD_RAMCACHE:
                 /* Q_UPDATE and Q_REBUILD reload for themselves, and leave
                  * nothing to do here. */
-                if (global_settings.tagcache_ram && !tc_stat.ramcache)
+                if (!tc_stat.ramcache)
                     load_ramcache();
                 break;
 
             case Q_IMPORT_CHANGELOG:
                 /* A lookup per line: the path index makes it a binary
                  * search, the disk a walk of the filename file. */
-                if (global_settings.tagcache_ram && !tc_stat.ramcache)
+                if (!tc_stat.ramcache)
                     load_ramcache();
                 tagcache_import_changelog();
                 break;
@@ -6126,55 +6032,27 @@ static void tagcache_thread(void)
                  * create one, build it here in the background automatically
                  * -- there's no situation where you wouldn't want one. */
                 debug_log(DEBUG_LOG_TAGCACHE,
-                          "scan: asked=%d update=%d ready=%d ram=%d(set %d)",
+                          "scan: asked=%d update=%d ready=%d ram=%d",
                           asked_to_scan, do_update, tc_stat.ready,
-                          tc_stat.ramcache, global_settings.tagcache_ram);
+                          tc_stat.ramcache);
 
                 if (!tc_stat.ready)
                 {
                     tagcache_build();
-                    if (global_settings.tagcache_ram)
-                        load_ramcache();
+                    load_ramcache();
                     check_deleted_files();
                     check_done = true;
                     break ;
                 }
 
-                if (!tc_stat.ramcache && global_settings.tagcache_ram)
-                {
+                if (!tc_stat.ramcache)
                     load_ramcache();
-                    /* Two jobs share this call, picked by its argument, and
-                     * only one of them is what Quick opts out of.
-                     *
-                     * check_file_refs(false) populates dircache filerefs --
-                     * the optimisation Quick trades away for a faster load.
-                     * check_file_refs(true) checks storage and drops entries
-                     * whose files have gone, which needs no dircache and is
-                     * the only thing that ever notices a deletion.
-                     *
-                     * Gating both on Quick left a database that never forgets:
-                     * delete an album over USB and it stays in the browser and
-                     * the carousel for the life of the install. The other arm
-                     * below always ran the check, so the asymmetry was not
-                     * deliberate. Ask for it whenever a scan was asked for. */
-                    /* The walk below deletes what it does not find, where
-                     * it can; the storage check is then only the fallback. */
-                    bool delete_here = do_update && !walk_checks_deletions();
-                    if (global_settings.tagcache_ram == TAGCACHE_RAM_ON
-                        || delete_here)
-                        check_file_refs(delete_here);
-                    if (tc_stat.ramcache && do_update)
-                        tagcache_build();
-                }
-                else
+
                 if (do_update)
                 {
-                    /* A copy reinstated after USB still holds directory
-                     * cache references from before it; On refreshes them,
-                     * as it does after a load. */
-                    if (global_settings.tagcache_ram == TAGCACHE_RAM_ON)
-                        check_file_refs(false);
-                    /* Before the build, as in Q_UPDATE. */
+                    /* Before the build, as in Q_UPDATE: the walk deletes what
+                     * it does not find, where it can, and the storage check
+                     * is only the fallback. */
                     if (!walk_checks_deletions())
                         check_deleted_files();
                     tagcache_build();
@@ -6265,7 +6143,7 @@ void tagcache_get_marks(struct tagcache_marks *m)
      * way to notice one at all. */
     /* The handle, not just the header: a failed load frees the buffer and
      * clears both, and pinning a handle of 0 below is not something to find
-     * out about later. check_file_refs() guards the same way. */
+     * out about later. check_deleted_files() guards the same way. */
     if (!tc_stat.ready || !tc_stat.ramcache || tcramcache.handle <= 0)
         return;
 
@@ -6346,8 +6224,7 @@ void tagcache_init(void)
     filenametag_fd = -1;
     write_lock = read_lock = 0;
 
-    strmemccpy(tc_stat.db_path, global_settings.tagcache_db_path,
-               sizeof(tc_stat.db_path));
+    strmemccpy(tc_stat.db_path, ROCKBOX_DIR, sizeof(tc_stat.db_path));
     mutex_init(&command_queue_mutex);
     queue_init(&tagcache_queue, true);
     create_thread(tagcache_thread, tagcache_stack,

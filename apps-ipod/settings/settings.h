@@ -238,13 +238,6 @@ enum
     WPS_ART_AUTO
 };
 
-enum
-{
-    TAGCACHE_RAM_OFF = 0,
-    TAGCACHE_RAM_ON = 1,
-    TAGCACHE_RAM_QUICK = 2
-};
-
 /* Database search: which of the three tags is scanned first, and so which
  * results appear first -- the scan appends and never sorts. Indexes the table
  * in screens/system/db_search.c, so the two must stay in step. */
@@ -619,10 +612,8 @@ struct user_settings
                                              3=One per playlist and track */
 
     bool dircache;          /* enable directory cache */
-    int tagcache_ram;        /* load tagcache to ram: 1=on, 2=quick (ignore dircache) */
     bool tagcache_scan_on_eject; /* rescan after a USB session that wrote? */
     bool tagcache_scan_on_startup; /* also check for changes at boot? */
-    bool tagcache_autocommit;    /* finish an interrupted commit without asking */
     bool year_from_folder;       /* a "YYYY - " folder name replaces the year */
     /* Database search. The two counts are indices into evenly spaced choice
      * lists, not the values themselves. */
@@ -640,9 +631,7 @@ struct user_settings
     int autoresume_automatic; /* resume next track? 0=never, 1=always,
                                  2=custom */
     unsigned char autoresume_paths[MAX_PATHLIST+1]; /* colon-separated list */
-    bool runtimedb;           /* runtime database active? */
     unsigned char tagcache_scan_paths[MAX_PATHLIST+1];
-    unsigned char tagcache_db_path[MAX_PATHNAME+1];
 
     /* The sound analysis, and the playlists built from it. Off until somebody
        turns it on: it is worth nothing until a scan has run, and the scan is

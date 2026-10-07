@@ -317,14 +317,12 @@ static void path_to_meta(const char *path, char *artist, char *title,
         strlcpy(title, fname, PV_NAME_MAX);
 }
 
-/* Whether names can come from the database now, or never will this session:
- * no database to name from, or one the RAM copy is switched off for. False
- * while the RAM copy is still to load, which is the case a saved report must
- * not be built in. */
+/* Whether names can come from the database now, or there is no database to
+ * name from. False while the RAM copy is still to load, which is the case a
+ * saved report must not be built in. */
 bool pv_names_complete(void)
 {
-    return names_db_entries == 0 || tagcache_is_in_ram()
-        || global_settings.tagcache_ram == TAGCACHE_RAM_OFF;
+    return names_db_entries == 0 || tagcache_is_in_ram();
 }
 
 /* Moves apply only to paths the database is known to lack, so without the

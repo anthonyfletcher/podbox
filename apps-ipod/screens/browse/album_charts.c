@@ -43,7 +43,6 @@
 #include "lang.h"
 #include "widgets/list.h"
 #include "widgets/splash.h"
-#include "widgets/yesno.h"
 #include "settings/settings.h"
 #include "input/action.h"
 #include "system/activity.h"
@@ -75,9 +74,6 @@ static int chart[CHART_LEN];
 static long chart_tiebreak[CHART_LEN];
 static int chart_len;
 static enum album_chart chart_kind;
-
-/* Whether the "runtime data is off" offer has been made this boot. */
-static bool runtimedb_asked;
 
 static enum chart_rank rank_of(enum album_chart kind)
 {
@@ -269,27 +265,8 @@ static int chart_title(enum album_chart kind)
     return LANG_MOST_PLAYED_ALBUMS;
 }
 
-/* An empty chart has two very different causes, and reporting "no history
- * yet" for both makes the feature look broken: with runtimedb off nothing is
- * ever counted, so the charts would stay empty however much was played. Name
- * the setting and offer it, rather than leaving it to be found under General
- * Settings. Asked at most once per boot, so declining does not nag. */
 static void report_empty(void)
 {
-    if (!global_settings.runtimedb)
-    {
-        if (!runtimedb_asked)
-        {
-            runtimedb_asked = true;
-            if (yesno_pop(str(LANG_RUNTIMEDB_OFF_PROMPT)))
-            {
-                global_settings.runtimedb = true;
-                settings_save();
-            }
-        }
-        return;
-    }
-
     splash(HZ * 2, ID2P(LANG_NO_ALBUM_HISTORY));
 }
 
@@ -404,8 +381,7 @@ int album_charts_show(enum album_chart kind)
  *
  * Deliberately not a browse: the request is that it plays, so this builds the
  * playlist and starts it rather than dropping the user in a track list. It
- * needs no playback history, so unlike the charts it works with runtime data
- * gathering switched off.
+ * needs no playback history.
  *
  * One record is all this needs. The names in the index are for display and
  * nothing here displays anything, so it reads that record straight out of the

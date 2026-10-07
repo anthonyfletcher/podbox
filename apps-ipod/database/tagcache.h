@@ -234,7 +234,7 @@ bool tagcache_is_in_ram(void);
 bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
 
 /* The path index: a database entry by its file, from RAM. Every call misses
- * unless the database is loaded into RAM (tagcache_ram On or Quick), and none
+ * unless the database is loaded into RAM, and none
  * of them touch the disk.
  *
  * The finds return an idx_id, or -1 for a file the database does not hold.

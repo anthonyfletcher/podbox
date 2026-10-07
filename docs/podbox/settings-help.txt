@@ -126,12 +126,6 @@ read it each time.
 Makes browsing much faster and costs a little memory. Needs a restart to take
 effect.
 
-[tagcache_ram]
-Keeps the database in memory instead of reading it from disk as you browse.
-
-Much faster, and the reason searching works at all. Quick skips the check that
-the copy on disk has not changed, which saves a few seconds at boot.
-
 [autoresume enable]
 Remembers how far through each track you were, and returns there rather than
 starting from the beginning.
@@ -537,14 +531,6 @@ every start.
 
 [tagcache_scan_on_eject]
 Rescans after a USB session, which is the moment new music normally arrives.
-
-[tagcache_autocommit]
-Finishes a scan that was cut short by a flat battery or an unplug. Off asks
-first instead.
-
-[gather runtime data]
-Records play counts, ratings and when each track was last played. What the
-listening statistics are built from.
 
 [playlist engine]
 Measures how each track actually sounds -- its tempo, loudness, tonal balance

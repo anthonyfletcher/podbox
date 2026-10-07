@@ -878,16 +878,16 @@
 </phrase>
 <phrase>
   id: LANG_AUTOCOMMIT_ON_STARTUP
-  desc: in database settings
+  desc: deprecated
   user: core
   <source>
-    *: "Autocommit on Startup"
+    *: none
   </source>
   <dest>
-    *: "Autocommit on Startup"
+    *: none
   </dest>
   <voice>
-    *: "Autocommit on Startup"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -2219,19 +2219,16 @@
 </phrase>
 <phrase>
   id: LANG_TAGCACHE_RAM
-  desc: in tag cache settings
+  desc: deprecated
   user: core
   <source>
     *: none
-    tc_ramcache: "Load to RAM"
   </source>
   <dest>
     *: none
-    tc_ramcache: "Load to RAM"
   </dest>
   <voice>
     *: none
-    tc_ramcache: "Load to RAM"
   </voice>
 </phrase>
 <phrase>
@@ -2278,16 +2275,16 @@
 </phrase>
 <phrase>
   id: LANG_RUNTIMEDB_ACTIVE
-  desc: in settings_menu.
+  desc: deprecated
   user: core
   <source>
-    *: "Gather Runtime Data"
+    *: none
   </source>
   <dest>
-    *: "Gather Runtime Data"
+    *: none
   </dest>
   <voice>
-    *: "Gather Runtime Data"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -16243,16 +16240,16 @@
 </phrase>
 <phrase>
   id: LANG_DATABASE_DIR
-  desc: in database settings menu
+  desc: deprecated
   user: core
   <source>
-    *: "Database Directory"
+    *: none
   </source>
   <dest>
-    *: "Database Directory"
+    *: none
   </dest>
   <voice>
-    *: "Database Directory"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -16271,16 +16268,16 @@
 </phrase>
 <phrase>
   id: LANG_QUICK_IGNORE_DIRACHE
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </source>
   <dest>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </dest>
   <voice>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -18409,16 +18406,16 @@
 </phrase>
 <phrase>
   id: LANG_RUNTIMEDB_OFF_PROMPT
-  desc: album charts are empty because runtime data gathering is disabled
+  desc: deprecated
   user: core
   <source>
-    *: "Album stats need Gather Runtime Data. Turn it on?"
+    *: none
   </source>
   <dest>
-    *: "Album stats need Gather Runtime Data. Turn it on?"
+    *: none
   </dest>
   <voice>
-    *: "Album stats need Gather Runtime Data. Turn it on?"
+    *: none
   </voice>
 </phrase>
 <phrase>

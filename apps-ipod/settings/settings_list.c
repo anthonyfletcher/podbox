@@ -1331,8 +1331,6 @@ const struct settings_list settings[] = {
     TEXT_SETTING(0, autoresume_paths, "autoresume next track paths",
                  "/podcast:/podcasts", NULL, NULL),
 
-    OFFON_SETTING(0, runtimedb, LANG_RUNTIMEDB_ACTIVE, true,
-                  "gather runtime data", NULL),
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, playlist_engine,
                   LANG_ACTION_ENABLED, false, "playlist engine",
                   playlist_engine_callback),
@@ -1370,8 +1368,6 @@ const struct settings_list settings[] = {
                    ID2P(LANG_MIX_VARIABLE)),
     TEXT_SETTING(0, tagcache_scan_paths, "database scan paths",
                  DEFAULT_TAGCACHE_SCAN_PATHS, NULL, NULL),
-    TEXT_SETTING(0, tagcache_db_path, "database path",
-                 ROCKBOX_DIR, NULL, NULL),
 
     /* replay gain */
     CHOICE_SETTING(F_SOUNDSETTING, replaygain_settings.type,
@@ -1560,10 +1556,6 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_BANFROMQS,dircache,LANG_DIRCACHE_ENABLE,true,"dircache",NULL),
     SYSTEM_STATUS(0, dircache_size, 0, "DSZ"),
 
-    CHOICE_SETTING(F_BANFROMQS, tagcache_ram, LANG_TAGCACHE_RAM,
-                   2, "tagcache_ram", "off,on,quick",
-                   NULL, 3,
-                   ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_QUICK_IGNORE_DIRACHE)),
     OFFON_SETTING(F_BANFROMQS, tagcache_scan_on_eject, LANG_TAGCACHE_SCAN_ON_EJECT, true,
                   "tagcache_scan_on_eject", NULL),
     /* Separate from the above: that one rescans after a USB session that wrote
@@ -1572,12 +1564,6 @@ const struct settings_list settings[] = {
      * USB is usually looking for changes that cannot have happened. */
     OFFON_SETTING(F_BANFROMQS, tagcache_scan_on_startup, LANG_SCAN_ON_STARTUP,
                   false, "tagcache_scan_on_startup", NULL),
-    /* A commit cut short (a flat battery, a USB session mid-scan) leaves work
-     * to finish at the next boot. On means finish it; off asks first, which is
-     * only worth having because the commit holds up the database for as long
-     * as it runs. */
-    OFFON_SETTING(F_BANFROMQS, tagcache_autocommit, LANG_AUTOCOMMIT_ON_STARTUP,
-                  true, "tagcache_autocommit", NULL),
     /* Read at scan time only, so a change reaches the database at the next
      * rebuild and not before. */
     OFFON_SETTING(F_BANFROMQS, year_from_folder, LANG_YEAR_FROM_FOLDER,

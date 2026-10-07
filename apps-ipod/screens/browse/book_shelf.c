@@ -50,7 +50,6 @@
 #include "widgets/list.h"
 #include "widgets/menu.h"             /* MENUITEM_STRINGLIST, do_menu */
 #include "widgets/splash.h"
-#include "widgets/yesno.h"
 #include "settings/settings.h"
 #include "system/activity.h"
 #include "system/app_buffer.h"
@@ -762,23 +761,8 @@ static int play_chosen(void)
  * the way in                                                         *
  * ------------------------------------------------------------------ */
 
-/* Not started and Finished read the database's playcounts, which nothing
- * writes with runtime data gathering off. Say so and offer it, once a boot. */
-static bool runtimedb_asked;
-
 static void report_empty(void)
 {
-    if (!global_settings.runtimedb && !runtimedb_asked)
-    {
-        runtimedb_asked = true;
-        if (yesno_pop(str(LANG_RUNTIMEDB_OFF_PROMPT)))
-        {
-            global_settings.runtimedb = true;
-            settings_save();
-        }
-        return;
-    }
-
     splash(HZ * 2, ID2P(LANG_BOOK_SHELF_EMPTY));
 }
 
