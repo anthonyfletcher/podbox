@@ -23132,3 +23132,17 @@
     *: "Activity Indicators"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_LIBRARY_UPGRADE
+  desc: boot screen caption while the library's files are moved to a new layout
+  user: core
+  <source>
+    *: "Moving library files"
+  </source>
+  <dest>
+    *: "Moving library files"
+  </dest>
+  <voice>
+    *: "Moving library files"
+  </voice>
+</phrase>

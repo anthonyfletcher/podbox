@@ -5,8 +5,8 @@
  *
  * The sound index keys its records by it, the path index in tagcache finds a
  * database entry by it, and a car is given it as a track's ID. All three
- * outlive a build -- db_sound.dat on disk, the car in its own cache -- so the
- * value a path hashes to must never change.
+ * outlive a build -- the sound analysis on disk, the car in its own cache --
+ * so the value a path hashes to must never change.
  ****************************************************************************/
 
 #ifndef _PATH_KEY_H

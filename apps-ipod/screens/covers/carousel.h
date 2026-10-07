@@ -21,7 +21,7 @@
 #include <stddef.h>
 #include "config.h"
 #include "lcd.h"        /* fb_data */
-#include "rbpaths.h"    /* ROCKBOX_DIR, for CACHE_PREFIX */
+#include "system/library_files.h"  /* CACHE_PREFIX, EMPTY_SLIDE */
 #include "database/tagcache.h"   /* struct tagcache_search */
 /* The slide data itself belongs to the index builder, not to this engine:
  * struct db_summary_t, struct album_data, struct artist_data and the
@@ -38,8 +38,8 @@ typedef fb_data pix_t;
  * build_index() and the engine reads it back while rendering. Bumping
  * CACHE_VERSION invalidates every cached slide; CACHE_REBUILD is the stored
  * value meaning "no valid cache". */
-#define CACHE_PREFIX     ROCKBOX_DIR "/carousel"
-#define EMPTY_SLIDE      CACHE_PREFIX "/emptyslide.pfraw"
+#define CACHE_PREFIX     LIB_ART_DIR
+#define EMPTY_SLIDE      LIB_COVERS_EMPTY_FILE
 #define CACHE_VERSION    6
 #define CACHE_REBUILD    0
 

@@ -26,14 +26,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "file.h"
 #include "core_alloc.h"
 #include "audio/track_decode.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
 
-#define SOUND_FILE   ROCKBOX_DIR "/db_sound.dat"
-#define SOUND_PART   ROCKBOX_DIR "/db_sound.part"
+#define SOUND_FILE   LIB_SOUND_FILE
+#define SOUND_PART   LIB_SOUND_PART
 
 /* Bump the version with the layout of struct sound_record or of the header.
  * A reader also checks the record size, which catches a struct that grew

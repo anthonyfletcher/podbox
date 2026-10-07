@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system/hash.h"
 #include <file.h>
 #include "rbpaths.h"
@@ -434,7 +435,7 @@ long pv_badges_value(int i)
  * row: doing so hands every later badge someone else's history. The magic
  * carries the row count so a table that changed size is discarded rather than
  * misread. */
-#define PV_BADGES_PATH  ROCKBOX_DIR "/pv_badges.dat"
+#define PV_BADGES_PATH  LIB_BADGES_FILE
 #define PV_BADGES_MAGIC 0x50564231UL   /* "PVB1" */
 
 static unsigned char seen[(PV_N_BADGES + 7) / 8];

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "config.h"
+#include "system/library_files.h"
 
 
 #include "system.h"
@@ -48,14 +49,14 @@
 /*#define LOGF_ENABLE*/
 #include "logf.h"
 
-#define THUMBCACHE_DIR ROCKBOX_DIR "/thumbcache"
+#define THUMBCACHE_DIR LIB_ART_DIR
 #define AA_VERSION_FILE THUMBCACHE_DIR "/format.txt"
 /* Folders a pass found no art for, one path per line, for the health screen
- * (screens/system/art_health.c). Written to a .tmp and renamed only when a
+ * (screens/system/art_health.c). Written to a .new and renamed only when a
  * pass finishes, so an aborted pass leaves the previous -- complete -- list
  * standing rather than a partial one that reads as "the rest are fine". */
-#define AA_NOART_ALBUMS  THUMBCACHE_DIR "/noart_albums.lst"
-#define AA_NOART_ARTISTS THUMBCACHE_DIR "/noart_artists.lst"
+#define AA_NOART_ALBUMS  THUMBCACHE_DIR "/no_art_albums.txt"
+#define AA_NOART_ARTISTS THUMBCACHE_DIR "/no_art_artists.txt"
 /* Entry count the cache was last completed for, so a restart with an
  * unchanged library does not re-walk the whole database. */
 #define AA_DONE_FILE    THUMBCACHE_DIR "/done.txt"
@@ -648,7 +649,7 @@ static void aa_stamps_load(void)
  * stamp, since the folders it never reached still have their thumbnails. */
 static void aa_stamps_save(bool completed)
 {
-    static const char tmp[] = AA_STAMP_FILE ".tmp";
+    static const char tmp[] = AA_STAMP_FILE ".new";
     uint32_t magic = AA_STAMP_MAGIC;
     bool ok;
     int fd, i, n = 0;

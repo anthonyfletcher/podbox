@@ -36,6 +36,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system.h"
 #include "kernel.h"
 #include "file.h"
@@ -49,8 +50,8 @@
 #include "files/path_list.h"
 #include "file_index.h"
 
-#define FILE_INDEX_DOCS   ROCKBOX_DIR "/docs.lst"
-#define FILE_INDEX_IMAGES ROCKBOX_DIR "/images.lst"
+#define FILE_INDEX_DOCS   LIB_DOCUMENTS_FILE
+#define FILE_INDEX_IMAGES LIB_IMAGES_FILE
 
 /* Deepest nesting the walk will follow. Recursion here costs stack, and the
  * thread's is modest; anything filed deeper than this is almost certainly not

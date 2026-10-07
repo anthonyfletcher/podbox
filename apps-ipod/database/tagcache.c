@@ -79,6 +79,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "ata_idle_notify.h"
 #include "thread.h"
 #include "kernel.h"
@@ -130,9 +131,6 @@ static bool usr_cancel(void);
 /* Tag Cache Header version 'TCHxx'. Increment when changing internal structures. */
 #define TAGCACHE_MAGIC  0x54434810
 
-/* Dump store/restore header version 'TCSxx'. */
-#define TAGCACHE_STATEFILE_MAGIC 0x54435301
-
 /* How much to allocate extra space for ramcache. */
 #define TAGCACHE_RESERVE 32768
 
@@ -168,10 +166,7 @@ static bool usr_cancel(void);
 #define TAGCACHE_FILE_INDEX      "database_%d.tcd"
 
 /* ASCII dumpfile of the DB contents. */
-#define TAGCACHE_FILE_CHANGELOG  "database_changelog.txt"
-
-/* Serialized DB. */
-#define TAGCACHE_STATEFILE       "database_state.tcd"
+#define TAGCACHE_FILE_CHANGELOG  LIB_PLAYS_NAME
 
 /* Flags */
 #define FLAG_DELETED     0x0001  /* Entry has been removed from db */
@@ -5872,8 +5867,6 @@ static void load_ramcache(void)
 void tagcache_unload_ramcache(void)
 {
     tc_stat.ramcache = false;
-    /* Just to make sure there is no statefile present. */
-    /* remove_db_file(TAGCACHE_STATEFILE); */
 }
 
 /* Put the RAM copy back into use.
@@ -6096,11 +6089,6 @@ void tagcache_shutdown(void)
     /* Flush the command queue. */
     run_command_queue(true);
 
-}
-
-void tagcache_remove_statefile(void)
-{
-    remove_db_file(TAGCACHE_STATEFILE);
 }
 
 static int get_progress(void)

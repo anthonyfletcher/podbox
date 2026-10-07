@@ -4,10 +4,11 @@
  * The database index: the flat album and artist list derived from tagcache.
  *
  * Built by walking tagcache into a caller-supplied struct db_summary_t and a
- * caller-supplied buffer, and persisted to db_summary.dat so later reads get
- * it back instead of rescanning. It carries no artwork -- only names, years,
- * playback figures and the taglist seeks needed to navigate into the database
- * -- so it goes stale when the database changes, not when files on disk do.
+ * caller-supplied buffer, and persisted to library/cache/albums.dat so later
+ * reads get it back instead of rescanning. It carries no artwork -- only
+ * names, years, playback figures and the taglist seeks needed to navigate into
+ * the database -- so it goes stale when the database changes, not when files
+ * on disk do.
  *
  * Nothing here knows about the screens that read it. Whose index is being
  * built, and what that screen does afterwards, is the caller's business.
@@ -38,6 +39,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "string-extra.h"
+#include "system/library_files.h"
 #include "config.h"
 #include "system/hash.h"
 #include "system.h"          /* ALIGN_BUFFER/alignof */
@@ -72,12 +74,12 @@
  * the other state in ROCKBOX_DIR rather than in the carousel's own folder --
  * which keeps only what is genuinely the carousel's, its slide cache and empty
  * slide. Regenerated if absent. */
-#define DB_SUMMARY_FILE ROCKBOX_DIR "/db_summary.dat"
+#define DB_SUMMARY_FILE LIB_ALBUMS_FILE
 /* The index is always rewritten whole, so it is built here and renamed over
  * the real file rather than written into it. See save_album_index(). */
-#define DB_SUMMARY_TMP  DB_SUMMARY_FILE ".tmp"
+#define DB_SUMMARY_TMP  DB_SUMMARY_FILE ".new"
 /* Plays since the summary was written. */
-#define DB_PLAYS_FILE ROCKBOX_DIR "/db_summary.plays"
+#define DB_PLAYS_FILE LIB_ALBUM_PLAYS_FILE
 
 /* One finished track. The serial is tagcache's, which is what the index's own
  * watermark is compared against, and doubles as the lastplayed value.
@@ -2276,7 +2278,7 @@ void db_summary_progress(int *done, int *total)
  * and would therefore read as "rebuild" forever. This is the same marker the
  * artwork cache keeps for the same reason -- what was the library like when we
  * last finished. */
-#define DB_SUMMARY_DONE ROCKBOX_DIR "/db_summary.done"
+#define DB_SUMMARY_DONE LIB_ALBUMS_DONE_FILE
 
 /* Read the index without a buffer of your own; see db_summary.h.
  *

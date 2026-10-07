@@ -45,6 +45,7 @@
 #include "config.h"
 #include "codecs.h"
 #include "dir.h"
+#include "system/library_files.h"
 #include "file.h"
 #include "pathfuncs.h"
 #include "metadata.h"
@@ -713,6 +714,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* A player still on an older firmware has no library folder yet; it
+     * moves its own files in beside this one when it next boots. */
+    mkdir(LIB_DIR);
+
     if (!file_exists("/.rockbox/database_idx.tcd"))
         printf("Note: no tag database on the player. Measuring anyway.\n");
 
@@ -779,7 +784,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    printf("Wrote .rockbox/db_sound.dat in %lds.\n",
+    printf("Wrote .rockbox/library/sound.dat in %lds.\n",
            (long)(time(NULL) - t0));
 
     return 0;

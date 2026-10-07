@@ -33,12 +33,13 @@
 #include <string.h>
 #include <file.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "rbpaths.h"
 #include "settings/settings.h"
 #include "pv_log.h"
 
-#define PV_LOG_PATH ROCKBOX_DIR "/playback.log"
-#define PV_LOG_STEM ROCKBOX_DIR "/playback"
+#define PV_LOG_PATH LIB_PLAYBACK_LOG
+#define PV_LOG_STEM LIB_PLAYBACK_STEM
 #define PV_SCROBBLER_PATH "/.scrobbler.log"
 
 /* global_settings.playback_log, as audio/playback.c defines it. Not exported

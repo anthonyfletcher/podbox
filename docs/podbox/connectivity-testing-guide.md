@@ -14,12 +14,12 @@ one that does.
 1. Turn on `Settings > Settings Mode` **Everything**, then
    `Settings > System > Show Debug Menu` and
    `Settings > System > USB > Write Debug Log`
-2. Delete `.rockbox/usb-log.txt` from the iPod if it's there
+2. Delete `.rockbox/logs/usb.log` from the iPod if it's there
 3. Connect to the accessory and repeat the problem
-4. Copy `.rockbox/usb-log.txt` off the iPod, then turn `Write Debug Log` off -
+4. Copy `.rockbox/logs/usb.log` off the iPod, then turn `Write Debug Log` off -
    it slows every USB connection
 
-If `usb-log.txt` has nothing after its `== USB Log` lines, your dock uses the
+If `usb.log` has nothing after its `== USB Log` lines, your dock uses the
 serial pins instead. Take a photo of `System > Debug (Keep Out!) > Serial iAP`
 while docked.
 
@@ -63,7 +63,7 @@ of personal data - only one small file inside it is needed.
 ## 4. Send it in
 
 [Open an issue](https://github.com/anthonyfletcher/podbox/issues/new) with your
-notes, and drag in a zip of `usb-log.txt`, the `accessoryd-packets` file and any
+notes, and drag in a zip of `usb.log`, the `accessoryd-packets` file and any
 photos.
 
 Can't unpack the sysdiagnose? Say so in the issue rather than posting it

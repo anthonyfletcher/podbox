@@ -29,6 +29,7 @@
 #include <string.h>
 #include <file.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
@@ -38,7 +39,7 @@
 #include "pv_log.h"
 #include "pv_moves.h"
 
-#define PV_MOVES_PATH  ROCKBOX_DIR "/pv_moves.dat"
+#define PV_MOVES_PATH  LIB_REPORT_MOVES_FILE
 #define PV_MOVES_MAGIC 0x50564d31UL   /* "PVM1" */
 
 /* Candidate folders tracked per logged folder. A file name as common as

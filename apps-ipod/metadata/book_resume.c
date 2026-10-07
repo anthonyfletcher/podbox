@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system.h"             /* ARRAYLEN */
 #include "file.h"
 #include "rbpaths.h"
@@ -51,8 +52,8 @@
 #include "settings/settings.h"
 #include "system/strutil.h"     /* read_line */
 
-#define BOOK_RESUME_FILE  ROCKBOX_DIR "/audiobooks.resume"
-#define BOOK_RESUME_TMP   ROCKBOX_DIR "/audiobooks.resume.tmp"
+#define BOOK_RESUME_FILE  LIB_AUDIOBOOKS_FILE
+#define BOOK_RESUME_TMP   LIB_AUDIOBOOKS_FILE ".new"
 
 /* The longest line either format writes: the earlier one's path, book name
  * and numbers. */

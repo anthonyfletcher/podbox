@@ -145,7 +145,7 @@ const char *path_list_leaf(const struct path_list *pl, int index)
 
 static void tmp_name(const char *file, char *out, size_t out_sz)
 {
-    snprintf(out, out_sz, "%s.tmp", file);
+    snprintf(out, out_sz, "%s.new", file);
 }
 
 /* 'path' is the open/closed flag, not just the name.
@@ -153,7 +153,7 @@ static void tmp_name(const char *file, char *out, size_t out_sz)
  * Trap: writers are file-scope statics, so an untouched one is all zeroes --
  * and a zeroed 'fd' is 0, a perfectly good descriptor, not -1. Testing fd
  * alone would make _close() on a writer that was never opened close someone
- * else's file and then rename a ".tmp" built from a NULL name. Only _open()
+ * else's file and then rename a ".new" built from a NULL name. Only _open()
  * ever sets 'path', so testing that is what makes a zeroed writer safe. The
  * artwork cache reaches _close() without _open() on its no-memory path. */
 static bool writer_is_open(const struct path_list_writer *w)
@@ -194,7 +194,7 @@ void path_list_write_close(struct path_list_writer *w, bool completed)
 {
     char tmp[MAX_PATH];
 
-    /* Never opened, or closed already: there is no .tmp to publish or clean
+    /* Never opened, or closed already: there is no .new to publish or clean
      * up, and -- the point of the check -- nothing that would justify removing
      * the published list. */
     if (!writer_is_open(w))

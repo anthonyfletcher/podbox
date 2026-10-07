@@ -39,13 +39,14 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system.h"
 #include "file.h"
 #include "database/sound_cal.h"
 #include "database/sound_index.h"
 #include "database/sound_mix.h"
 
-#define CAL_FILE  ROCKBOX_DIR "/db_sound.cal"
+#define CAL_FILE  LIB_SOUND_CAL_FILE
 #define CAL_MAGIC 0x4c414353   /* "SCAL" */
 #define CAL_VER   2
 

@@ -13,8 +13,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "rbpaths.h"
+#include "system/library_files.h"
 
-#define USB_LOG_FILE ROCKBOX_DIR "/usb-log.txt"
+#define USB_LOG_FILE LIB_USB_LOG
 
 struct usb_log_entry;
 

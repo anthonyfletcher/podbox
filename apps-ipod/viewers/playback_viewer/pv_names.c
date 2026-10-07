@@ -45,10 +45,6 @@
 #include "pv_moves.h"
 #include "pv_names.h"
 
-/* The saved name map the database's path index replaced. Nothing writes it;
- * it is removed where it is found. */
-#define PV_MAP_PATH  ROCKBOX_DIR "/pv_names.dat"
-
 /* Moves whenever the way a path is named changes, so pv_names_identity()
  * does too and every saved report is rebuilt from the log once. */
 #define PV_NAMES_VERSION 2
@@ -61,7 +57,6 @@ static long names_db_commit;
 
 void pv_names_discard(void)
 {
-    remove(PV_MAP_PATH);
     pv_moves_discard();
 }
 
@@ -101,7 +96,6 @@ unsigned long pv_names_identity(void)
 size_t pv_names_init(void *buf, size_t bufsz)
 {
     pv_moves_forget();
-    remove(PV_MAP_PATH);
 
     if (!db_state(&names_db_entries, &names_db_commit))
     {

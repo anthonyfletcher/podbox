@@ -33,6 +33,7 @@
  *   - the public audio_* API, settings hooks, and startup
  ****************************************************************************/
 #include "config.h"
+#include "system/library_files.h"
 #include "timefuncs.h" /* get_time, mktime */
 #include "system.h"
 #include "version.h"
@@ -362,7 +363,7 @@ static int  codec_skip_status;
 static bool codec_seeking = false;          /* Codec seeking ack expected? */
 static unsigned int position_key = 0;
 
-#define PLAYBACK_LOG_PATH ROCKBOX_DIR "/playback.log"
+#define PLAYBACK_LOG_PATH LIB_PLAYBACK_LOG
 #define PLAYBACK_LOG_MAX_FILESZ_BYTES (511 << 10) /* 512k approx 1000-2500 tracks */
 #define PLAYBACK_LOG_MIN_ELAPSED_MS   (500) /* 500 milliseconds */
 #define PLAYBACK_LOG_BUFSZ (MAX_PATH * 10)
@@ -1384,7 +1385,7 @@ void allocate_playback_log(void)
             if (lseek(fd, 0, SEEK_END) > PLAYBACK_LOG_MAX_FILESZ_BYTES)
             {
                 close(fd);
-                create_numbered_filename(filename, ROCKBOX_DIR, "playback_",
+                create_numbered_filename(filename, LIB_USER_DIR, "playback_",
                                          ".log", 4 IF_CNFN_NUM_(, NULL));
                 DEBUGF("Renaming %s => %s\n", PLAYBACK_LOG_PATH, filename);
                 if (rename(PLAYBACK_LOG_PATH, filename) < 0)

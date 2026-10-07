@@ -8,11 +8,11 @@
  * seen, and a record that only exists for indexed music is one that
  * disappears when you play something out of a folder.
  *
- * Two files and one format. `spike.run` is the run in progress -- one line
- * a track, appended as it starts -- and `spike.scores` is the record: the
- * same lines under a header carrying the numbers. A run that beats the
- * record is copied over it, and that copy is the only time either file is
- * rewritten.
+ * Two files and one format. `spike_run.txt` is the run in progress -- one
+ * line a track, appended as it starts -- and `spike_scores.txt` is the
+ * record: the same lines under a header carrying the numbers. A run that
+ * beats the record is copied over it, and that copy is the only time either
+ * file is rewritten.
  *
  * Nothing is held in RAM between calls but one cached page of the list.
  * Track names are the size of a run and a run is an evening; the numbers
@@ -28,14 +28,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include "string-extra.h"   /* strlcpy */
+#include "system/library_files.h"
 #include "config.h"
 #include "file.h"
 #include "system/strutil.h"     /* read_line */
 #include "games/spike/spike_score.h"
 
-#define SPK_SCORE_FILE  ROCKBOX_DIR "/spike.scores"
-#define SPK_SCORE_TMP   ROCKBOX_DIR "/spike.scores.tmp"
-#define SPK_RUN_FILE    ROCKBOX_DIR "/spike.run"
+#define SPK_SCORE_FILE  LIB_SPIKE_FILE
+#define SPK_SCORE_TMP   LIB_SPIKE_FILE ".new"
+#define SPK_RUN_FILE    LIB_SPIKE_RUN_FILE
 
 /* A name, a genre, the tab between them and the tag. */
 #define SPK_LINE_MAX    (SPK_NAME_MAX + SPK_GENRE_MAX + 8)

@@ -70,7 +70,7 @@ often not among them.
 
 ## Names the player would otherwise split
 
-`/.rockbox/known_artists.txt` is how you fill that gap: a list of names you are
+`/.rockbox/library/user/known_artists.txt` is how you fill that gap: a list of names you are
 vouching for. Make a plain text file with one name per line.
 
 ```

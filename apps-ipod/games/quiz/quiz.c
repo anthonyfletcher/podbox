@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "string-extra.h"
+#include "system/library_files.h"
 #include "config.h"
 #include "system.h"
 #include "kernel.h"
@@ -58,7 +59,7 @@
 #include "games/quiz/quiz_pick.h"
 #include "games/quiz/quiz.h"
 
-#define QUIZ_SCORE_FILE     ROCKBOX_DIR "/musicquiz.scores"
+#define QUIZ_SCORE_FILE     LIB_QUIZ_FILE
 #define QUIZ_SCORE_MAGIC    "musicquiz 2"
 
 /* What a round is worth, and how long it takes to drain. */

@@ -225,7 +225,6 @@ bool tagcache_search_ready(void);
 int tagcache_get_commit_step(void);
 bool tagcache_prepare_shutdown(void);
 void tagcache_shutdown(void);
-void tagcache_remove_statefile(void);
 
 void tagcache_screensync_event(void);
 void tagcache_screensync_enable(bool state);

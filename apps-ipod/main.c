@@ -56,6 +56,7 @@
 #include "metadata/tag_trim.h"
 #include "metadata/book_resume.h"
 #include "database/tagcache.h"
+#include "system/library_files.h"
 #include "metadata/art_cache.h"
 #include "database/db_summary.h"
 #include "files/file_index.h"
@@ -275,6 +276,7 @@ enum boot_stage
     BOOT_STORAGE,       /* the screen is up; spinning the disk up */
     BOOT_MOUNT,
     BOOT_SETTINGS,
+    BOOT_LIBRARY,       /* the first load of a new library layout */
     BOOT_THEME,         /* settings_apply(): fonts, backdrops, colours */
     BOOT_DIRCACHE,
     BOOT_TAGCACHE,
@@ -292,6 +294,7 @@ static const unsigned char boot_weight[BOOT_STAGE_COUNT] =
     [BOOT_STORAGE]  = 2,
     [BOOT_MOUNT]    = 1,
     [BOOT_SETTINGS] = 1,
+    [BOOT_LIBRARY]  = 1,
     [BOOT_THEME]    = 3,
     [BOOT_DIRCACHE] = 2,
     [BOOT_AUDIO]    = 2,
@@ -432,6 +435,26 @@ static void boot_progress_bar(enum boot_stage stage, int num, int den)
                    boot_chunks_done(BOOT_STAGE_COUNT));
 }
 
+static void library_progress(int done, int total) INIT_ATTR;
+static void library_progress(int done, int total)
+{
+    boot_progress_bar(BOOT_LIBRARY, done, total);
+}
+
+/* Before anything reads the library's files, and before USB is answered */
+static void init_library_files(void) INIT_ATTR;
+static void init_library_files(void)
+{
+    if (!library_files_need_upgrade())
+    {
+        library_files_init(NULL);
+        return;
+    }
+    boot_progress(BOOT_LIBRARY, 0, 0, str(LANG_LIBRARY_UPGRADE));
+    library_files_init(library_progress);
+    boot_caption = NULL;
+}
+
 /* dircache_wait() blocks, which would leave the bar dead for the length of a
  * scan. Poll instead and keep it moving: `size` grows as the cache is built,
  * and the previous build's size is a fair guess at where it will stop. A
@@ -505,9 +528,6 @@ static void init_tagcache(void)
 {
     bool committed = false;
 
-    /* Ahead of tagcache_init(), which starts the thread that may put up the
-     * "commit now?" prompt -- painting after that point is what the loop
-     * below has to avoid. */
     boot_progress(BOOT_TAGCACHE, 0, 0, str(LANG_WAIT));
 
     tagcache_init();
@@ -520,11 +540,8 @@ static void init_tagcache(void)
     {
         int ret = tagcache_get_commit_step();
 
-        /* Nothing is drawn until the commit is actually running. That is what
-         * keeps this off the screen while the tagcache thread's "commit now?"
-         * prompt is up -- see tagcache_thread(). The first paint has to be a
-         * full one for the same reason: the prompt may have owned the screen
-         * up to this point. */
+        /* Nothing is drawn until a commit is actually running, and its
+         * first paint sets the caption. */
         if (ret > 0)
         {
             int max = tagcache_get_max_commit_step();
@@ -728,11 +745,11 @@ static void init(void)
     CHART(">init_battery_tables");
     init_battery_tables();
     CHART("<init_battery_tables");
+    init_library_files();
+
     CHART(">init_dircache(true)");
-    rc = init_dircache(true);
+    init_dircache(true);
     CHART("<init_dircache(true)");
-    if (rc < 0)
-        tagcache_remove_statefile();
 
     boot_progress(BOOT_THEME, 0, 0, NULL);
     CHART(">settings_apply(true)");

@@ -733,8 +733,8 @@ list gains the records they only guest on. Needs the database loaded to RAM.
 
 A name with a comma or ampersand, like Tyler, The Creator, reads as two people
 unless an album is under it. List such names one per line in
-/.rockbox/known_artists.txt, then reboot, or switch Featured Artists off and
-on.
+/.rockbox/library/user/known_artists.txt, then reboot, or switch Featured
+Artists off and on.
 
 [art cache album source]
 Where album covers come from: the image in the album's folder, the art embedded
@@ -1300,12 +1300,12 @@ it. A DAC on its own supply with nothing else on the cable goes unnoticed: use
 Turn On beside this. Off leaves every cable to the computer and charging.
 
 [debug log usb]
-Writes every USB connection step to usb-log.txt in the .rockbox folder, without
-the USB Log debug screen open. For working out why a computer, dock or car will
-not connect. It writes to the disk whenever the log grows, and connection steps
-wait for the log to reach the disk, which can slow them; leave it off
-otherwise. With a car, it also records every five seconds how much audio the
-car took.
+Writes every USB connection step to usb.log in the .rockbox/logs folder,
+without the USB Log debug screen open. For working out why a computer, dock or
+car will not connect. It writes to the disk whenever the log grows, and
+connection steps wait for the log to reach the disk, which can slow them; leave
+it off otherwise. With a car, it also records every five seconds how much audio
+the car took.
 
 [talk menu]
 Speaks menu entries aloud. Needs a voice file on the player.

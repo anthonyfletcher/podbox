@@ -98,7 +98,7 @@ Upstream's libiap, on both players. An Onkyo ND-S1 plays both over S/PDIF.
 | `usbstack/iap/libiap/iap.c`, `context.h`, `platform.h`, `spec/lingoes/extended-interface/database.h` | The database commands go to four new platform callbacks; Enter/ExitExtendedInterfaceMode are acked | Upstream answers them with fixed counts, so there is nothing to browse. Onkyo receivers retry the mode commands until acked. |
 | `usbstack/iap/libiap/iap.c`, `fid-token-values.c`, `spec/lingoes/general/identify-device-lingoes.h` | The identify options are compared under a new `AuthMask`, bits 1:0 | Bits 3:2 are the accessory's power requirement. Upstream compares the whole word, so a dock asking for authentication and power is acked and never authenticated. |
 | `usbstack/iap/libiap/iap.c`, `context.h` | Authentication 1.0: a version-only certificate reply is accepted and answered with a 16-byte challenge; any version but 1 or 2 is answered *unsupported* | Upstream reads every reply as 2.0, so a 1.0 accessory is refused and authentication stops. |
-| `usbstack/usb_core.c` | Manufacturer and product strings `PodBox` and `PodBox media player` | The name a computer shows. iAP's name comes from `/.rockbox/playername.txt`, which the app layer keeps set. |
+| `usbstack/usb_core.c` | Manufacturer and product strings `PodBox` and `PodBox media player` | The name a computer shows. iAP's name comes from `/.rockbox/library/user/player_name.txt`, which the app layer keeps set. |
 | `usbstack/usb_iap.c` | While iAP2 is offered, the stream lists an iPhone's nine rates; reports, ticks and send completions go to `usb_iap2_*` first; `iap_library_close()` on disconnect; a disconnect pauses playback only if the iAP sink had it | An iAP2 car names rates as indexes into an iPhone's list. An accessory that never took the audio, such as the connection dropped to come back without the sound card, leaves playback alone. |
 | `usbstack/iap/audio.c`, `audio.h` | A rate change goes to iAP2 while it holds the connection; new `iap_audio_sampr()`; the stream's state goes to the USB log; new `iap_audio_take_counts()`, what the stream took from playback | The counters are logged every 5 s while a car takes the audio. |
 
@@ -121,7 +121,7 @@ iAP2.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/usb-log.txt` while the debug screen is open or **System → USB → Write Debug Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
+| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/logs/usb.log` while the debug screen is open or **System → USB → Write Debug Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
 | `export/usb.h`, `usb.c` | The insertion record and waypoints | **Debug → USB info**: whether a connect that did nothing was charging-only or a stuck handover. |
 | `usbstack/usb_core.c` | `usb_log()` calls and waypoints in the handlers | Not on the notify path: the ARC driver calls `usb_core_bus_reset()` from its ISR and posts nothing. |
 | `usbstack/iap/debug.c`, `debug.h` | New `iap_log_report()`: the iAP packet a HID report starts, to the USB log, with an IdentifyDeviceLingoes's options on a line of their own | The log decodes iAP. |

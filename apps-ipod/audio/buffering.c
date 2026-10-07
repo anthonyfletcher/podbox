@@ -32,6 +32,7 @@
  *   - handle queries, watermark settings, and the buffering thread itself
  ****************************************************************************/
 #include "config.h"
+#include "system/library_files.h"
 #include <string.h>
 #include "system.h"
 #include "storage.h"
@@ -1846,7 +1847,7 @@ void INIT_ATTR buffering_init(void)
 static void drop_damaged_lists(void)
 {
     struct tm *tm = get_time();
-    int log = open(ROCKBOX_DIR "/buffer-damage.log",
+    int log = open(LIB_BUFFER_LOG,
                    O_WRONLY | O_CREAT | O_APPEND, 0666);
 
     mutex_lock(&llist_mutex);

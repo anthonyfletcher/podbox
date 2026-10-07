@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system/hash.h"
 #include "system.h"
 #include "rbpaths.h"
@@ -162,7 +163,7 @@ static bool artist_set_has(uint32_t h)
  * Absent is the ordinary case and costs one failed open. Read at build time,
  * so an edit takes effect at the next boot -- or at the next database update,
  * or from the debug screen, both of which build the table again. */
-#define KNOWN_ARTISTS_FILE ROCKBOX_DIR "/known_artists.txt"
+#define KNOWN_ARTISTS_FILE LIB_KNOWN_ARTISTS_FILE
 
 static void read_known_artists(void)
 {

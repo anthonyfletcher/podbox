@@ -1746,8 +1746,6 @@ static bool rescan_pending = false;
 void browser_restore(void)
 {
 
-    tagcache_remove_statefile();
-
     /* Only a write can have changed anything; after a read-only session the disk
      * is byte-for-byte as we left it. */
     if (usb_core_host_wrote_storage())

@@ -1828,7 +1828,7 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING, album_covers_parallel_slides, LANG_SPACING, true,
                   "album covers parallel slides", NULL),
     /* Diagnostics: append what the two background workers are doing to
-     * .rockbox/tagcache.log and .rockbox/artcache.log. Both drive the same
+     * .rockbox/logs/tagcache.log and art.log. Both drive the same
      * "Building" indicator, so when it will not go away these say which. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_tagcache, LANG_DEBUG_LOG, false,
@@ -2064,7 +2064,7 @@ const struct settings_list settings[] = {
         ID2P(LANG_OFF), ID2P(LANG_ON)),
 #endif
 #ifdef HAVE_USBSTACK
-    /* Diagnostics: keep .rockbox/usb-log.txt current without the debug
+    /* Diagnostics: keep .rockbox/logs/usb.log current without the debug
      * menu's USB Log screen open. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_usb, LANG_DEBUG_LOG, false,

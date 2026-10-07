@@ -43,6 +43,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "string-extra.h"
+#include "system/library_files.h"
 #include "config.h"
 #include "system.h"          /* MIN/MAX/ALIGN_BUFFER/ALIGN_DOWN */
 #include "rbpaths.h"
@@ -313,7 +314,7 @@ static const unsigned char pf_dither_table[16] =
 /* some magic numbers for cache_version. */
 
 /* current version for cover cache */
-#define CONFIG_FILE ROCKBOX_DIR "/album_covers.cfg"
+#define CONFIG_FILE LIB_COVERS_FILE
 
 /** structs we use */
 struct slide_data {

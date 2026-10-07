@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "system.h"
 #include "file.h"
 #include "kernel.h"
@@ -22,8 +23,8 @@ static const struct {
     const char *path;
     const char *name;
 } log_info[DEBUG_LOG_COUNT] = {
-    [DEBUG_LOG_TAGCACHE] = { ROCKBOX_DIR "/tagcache.log", "tagcache"  },
-    [DEBUG_LOG_ARTCACHE] = { ROCKBOX_DIR "/artcache.log", "art cache" },
+    [DEBUG_LOG_TAGCACHE] = { LIB_TAGCACHE_LOG, "tagcache"  },
+    [DEBUG_LOG_ARTCACHE] = { LIB_ART_LOG,      "art cache" },
 };
 
 bool debug_log_enabled(enum debug_log_id id)

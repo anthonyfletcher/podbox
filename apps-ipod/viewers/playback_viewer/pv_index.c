@@ -19,14 +19,15 @@
 #include <string.h>
 #include <file.h>
 #include "config.h"
+#include "system/library_files.h"
 #include "rbpaths.h"
 #include "pv_index.h"
 
-#define PV_INDEX_PATH ROCKBOX_DIR "/pv_index.dat"
+#define PV_INDEX_PATH LIB_REPORT_INDEX_FILE
 
 /* Written to a temporary name and renamed into place, so a write interrupted
  * by a flat battery leaves the previous index rather than a truncated one. */
-#define PV_INDEX_TMP  ROCKBOX_DIR "/pv_index.new"
+#define PV_INDEX_TMP  LIB_REPORT_INDEX_FILE ".new"
 
 #define PV_INDEX_MAGIC   0x50564931UL   /* "PVI1" */
 /* Bumped whenever the model's CONTENT changes shape, not just its layout.

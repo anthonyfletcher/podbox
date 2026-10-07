@@ -45,6 +45,7 @@
  ****************************************************************************/
 
 #include "config.h"
+#include "system/library_files.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1895,7 +1896,7 @@ void iap_library_artwork_stop(void)
  * the player's name                                                  *
  * ------------------------------------------------------------------ */
 
-#define PLAYER_NAME_FILE ROCKBOX_DIR "/playername.txt"
+#define PLAYER_NAME_FILE LIB_PLAYER_NAME_FILE
 
 /* Read once, at boot: an accessory asks mid-exchange, where a read could wait
  * out the disk spinning up */
