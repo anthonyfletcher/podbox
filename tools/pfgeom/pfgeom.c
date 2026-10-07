@@ -94,6 +94,21 @@ static inline PFreal fdiv(PFreal num, PFreal den)
     den >>= PFREAL_SHIFT - shift;
     return num / den;
 }
+static inline int div_cam_dist(int n)
+{
+    if (CAM_DIST != 240 || n < 0)
+        return n / CAM_DIST;
+    return (int)(((uint64_t)((unsigned)n >> 4) * 0x88888889u) >> 35);
+}
+static inline int div_by_recip(unsigned int num, unsigned int den,
+                               unsigned int recip)
+{
+    unsigned int q = ((uint64_t)num * recip) >> 32;
+
+    if ((q + 1) * den <= num)
+        q++;
+    return q;
+}
 #define fmin(a,b) (((a) < (b)) ? (a) : (b))
 #define fmax(a,b) (((a) > (b)) ? (a) : (b))
 #define fabsr(a) ((a) < 0 ? -(a) : (a))
@@ -483,13 +498,23 @@ static long render_slide_clipped(struct slide_data *slide, int x_from, int x_to)
     const int p_start_upper = (half_height - 1 - voff) * PFREAL_ONE;
     const int p_start_lower = (half_height - voff) * PFREAL_ONE;
 
-    for (x = xi; x < w; x++) {
+    for (x = xi; x < x_to; x++) {
         if (xs < slide_left) xs = slide_left;
         int column = (unsigned)(xs - slide_left) >> PFREAL_SHIFT;
         if (column >= sw) break;
-        if (perspective) dy = (CAM_DIST_R + zo + fmul(xs, sinr)) / CAM_DIST;
+        if (x < x_from) {
+            int k = x_from - x;
+            if (perspective) {
+                xsnum += k * xsnumi; xsden += k * xsdeni;
+                xs = fdiv(xsnum, xsden);
+            } else
+                xs += k * PFREAL_ONE;
+            x = x_from - 1;
+            continue;
+        }
+        if (perspective) dy = div_cam_dist(CAM_DIST_R + zo + fmul(xs, sinr));
 
-        if (x >= x_from && x < x_to) {
+        {
             int p = p_start_upper;
             int plim = MAX(0, p - (half_height - 1) * dy);
             int y = half_height - 1;
@@ -663,6 +688,28 @@ static long check_frame(int dir, int tick, long *plain, long long *bad)
     return *plain - culled;
 }
 
+/* The render divides by multiplying (div_cam_dist(), div_by_recip()), and a
+ * quotient one out moves a row or a column, so both are checked against plain
+ * division over everything the render can hand them -- and well past it:
+ * dy's numerator stays under 2^19, a row count's under 2^18, and dy itself
+ * between 1024 and about 1600. Returns the number of wrong quotients. */
+static long long check_divisions(void)
+{
+    long long bad = 0;
+    unsigned int n, d;
+
+    for (n = 0; n < (1u << 24); n++)
+        if (div_cam_dist(n) != (int)(n / CAM_DIST))
+            bad++;
+    for (d = 1; d < 4096; d++) {
+        unsigned int recip = 0xffffffffu / d;
+        for (n = 0; n < (1u << 18); n++)
+            if (div_by_recip(n, d, recip) != (int)(n / d))
+                bad++;
+    }
+    return bad;
+}
+
 int main(int argc, char **argv)
 {
     /* Cover shapes: covers are scaled into DISPLAY_WIDTH x DISPLAY_HEIGHT
@@ -680,6 +727,10 @@ int main(int argc, char **argv)
     long long frames = 0, configs = 0;
     unsigned seed = 12345;
     int verbose = (argc > 1 && !strcmp(argv[1], "-v"));
+
+    long long div_bad = check_divisions();
+    printf("division by multiplying: %lld wrong quotients%s\n", div_bad,
+           div_bad ? "  *** FAILED ***" : "  (pass)");
 
     exhaustive = (argc > 1 && !strcmp(argv[1], "-x"));
     if (exhaustive)
@@ -753,5 +804,5 @@ int main(int argc, char **argv)
            rows_short, rows_over_max,
            rows_short ? "  *** FAILED ***" : "  (pass)");
 
-    return (bad || rows_short) ? 1 : 0;
+    return (bad || rows_short || div_bad) ? 1 : 0;
 }

@@ -830,6 +830,35 @@ static inline PFreal fdiv(PFreal num, PFreal den)
     return num / den;
 }
 
+/* The render's per-column divisions, done by multiplying. Neither target's ARM
+ * has a divide instruction, and -Os calls the library even for a constant
+ * divisor, so each of these was a call of several dozen cycles. Both are exact:
+ * tools/pfgeom checks them against plain division over every value the render
+ * can reach. */
+
+/* n / CAM_DIST, for n >= 0. CAM_DIST is 240 on both targets, and 240 is 16 * 15;
+ * 0x88888889 >> 35 is the exact reciprocal of 15 for any 32-bit numerator. */
+static inline int div_cam_dist(int n)
+{
+    if (CAM_DIST != 240 || n < 0)
+        return n / CAM_DIST;
+    return (int)(((uint64_t)((unsigned)n >> 4) * 0x88888889u) >> 35);
+}
+
+/* num / den for 0 <= num < 2^31 and den > 0, given recip = 0xffffffff / den.
+ * The product is never more than one short of the quotient, which the test
+ * after it puts right -- so one division buys any number of quotients by the
+ * same divisor. */
+static inline int div_by_recip(unsigned int num, unsigned int den,
+                               unsigned int recip)
+{
+    unsigned int q = ((uint64_t)num * recip) >> 32;
+
+    if ((q + 1) * den <= num)
+        q++;
+    return q;
+}
+
 #define fmin(a,b) (((a) < (b)) ? (a) : (b))
 #define fmax(a,b) (((a) > (b)) ? (a) : (b))
 #define fabs(a) (a < 0 ? -a : a)
@@ -1500,7 +1529,7 @@ static int read_pfraw(char* filename, int prio)
         return -1;
     }
 
-    int size =  sizeof(struct dim) +
+    int size =  sizeof(int) + sizeof(struct dim) +
                 sizeof( pix_t ) * bmph.width * bmph.height;
 
     int hid;
@@ -1513,7 +1542,9 @@ static int read_pfraw(char* filename, int prio)
         return -1;
     }
 
-    struct dim *bm = buflib_get_data(&buf_ctx, hid);
+    char *block = buflib_get_data(&buf_ctx, hid);
+    *(int *)block = sizeof(int);           /* see get_slide() */
+    struct dim *bm = (struct dim *)(block + sizeof(int));
 
     bm->width = bmph.width;
     bm->height = bmph.height;
@@ -1604,6 +1635,14 @@ static const struct img_filter *carousel_filter(void)
     return carousel_chain.stages ? &carousel_chain : NULL;
 }
 
+/* Room to move a read up to a cache line. The 5G's disk does DMA only into a
+ * line-aligned buffer and copies with the CPU otherwise. */
+#ifdef HAVE_CPU_CACHE_ALIGN
+#define PF_READ_SLACK (CACHEALIGN_SIZE - 1)
+#else
+#define PF_READ_SLACK 0
+#endif
+
 /* Read a shared-cache thumbnail from an open fd (.aat: struct art_cache_header
  * followed by native pixels) into a buflib surface in the column-major layout
  * render_slide() expects. The fd stays the caller's to close.
@@ -1612,55 +1651,71 @@ static const struct img_filter *carousel_filter(void)
  * anyway, and asking the cache whether it exists first would be a second
  * directory lookup for the same answer.
  *
+ * The file is read whole, header and all, into a line-aligned spot in the
+ * block, so every sector of it goes by DMA in one transfer. The struct dim
+ * then goes over the end of the header, just ahead of the pixels.
+ *
  * Returns a buflib handle, empty_slide_hid on a corrupt file, or -1 on
  * allocation failure. */
 static int read_aat(int fh, int prio)
 {
     struct art_cache_header hdr;
     pix_t rowbuf[DISPLAY_WIDTH];
-    int row, col, w, h, size, hid;
+    const ssize_t most = sizeof(hdr)
+                       + sizeof(pix_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT;
+    ssize_t len = ffilesize(fh);
+    int row, col, w, h, hid;
 
-    if (read(fh, &hdr, sizeof(hdr)) != sizeof(hdr) ||
-        hdr.magic != ART_CACHE_MAGIC ||
-        hdr.version != ART_CACHE_FORMAT_VERSION ||
-        hdr.width == 0 || hdr.height == 0 ||
-        hdr.width > DISPLAY_WIDTH || hdr.height > DISPLAY_HEIGHT)
-    {
+    if (len <= (ssize_t)sizeof(hdr))
         return empty_slide_hid;
-    }
-
-    w = hdr.width;
-    h = hdr.height;
-    size = sizeof(struct dim) + sizeof(pix_t) * w * h;
+    if (len > most)
+        len = most;
 
     do {
-        hid = buflib_alloc(&buf_ctx, size);
+        hid = buflib_alloc(&buf_ctx, sizeof(int) + PF_READ_SLACK + len);
     } while (hid < 0 && free_slide_prio(prio));
 
     if (hid < 0)
         return -1;
 
-    struct dim *bm = buflib_get_data(&buf_ctx, hid);
+    char *block = buflib_get_data(&buf_ctx, hid);
+    char *file = CACHEALIGN_UP(block + sizeof(int));
+    struct dim *bm = (struct dim *)(file + sizeof(hdr) - sizeof(struct dim));
+    pix_t *dst = (pix_t *)(file + sizeof(hdr));
+
+    if (read(fh, file, len) != len)
+    {
+        buflib_free(&buf_ctx, hid);
+        return empty_slide_hid;
+    }
+
+    memcpy(&hdr, file, sizeof(hdr));
+    w = hdr.width;
+    h = hdr.height;
+    if (hdr.magic != ART_CACHE_MAGIC ||
+        hdr.version != ART_CACHE_FORMAT_VERSION ||
+        w == 0 || h == 0 || w > DISPLAY_WIDTH || h > DISPLAY_HEIGHT ||
+        len - (ssize_t)sizeof(hdr) < (ssize_t)(sizeof(pix_t) * w * h))
+    {
+        buflib_free(&buf_ctx, hid);
+        return empty_slide_hid;
+    }
+
+    *(int *)block = (char *)bm - block;    /* see get_slide() */
     bm->width = w;
     bm->height = h;
-    pix_t *dst = (pix_t*)(sizeof(struct dim) + (char *)bm);
 
     /* The "coverflow" size is stored column-major (art_sizes.h), which is the
-     * order rendering wants, so it reads straight in. The cache falls back to
-     * rows for a thumbnail it could not store transposed -- a non-square COVER
-     * fit -- and that one is transposed a row at a time on the way in. */
-    if (hdr.layout == AA_COLUMNS)
+     * order rendering wants, so it is already in place. The cache falls back
+     * to rows for a thumbnail it could not store transposed -- a non-square
+     * COVER fit -- and that one is read again, transposed a row at a time. */
+    if (hdr.layout != AA_COLUMNS)
     {
-        size_t bytes = sizeof(pix_t) * w * h;
-
-        if (read(fh, dst, bytes) != (ssize_t)bytes)
+        if (lseek(fh, sizeof(hdr), SEEK_SET) != (off_t)sizeof(hdr))
         {
             buflib_free(&buf_ctx, hid);
             return empty_slide_hid;
         }
-    }
-    else
-    {
         for (row = 0; row < h; row++)
         {
             if (read(fh, rowbuf, sizeof(pix_t) * w)
@@ -1900,11 +1955,13 @@ static inline struct dim *get_slide(const int hid)
     if (hid <= 0)
         return NULL;
 
-    struct dim *bmp;
+    /* A slide's block opens with an int giving where its struct dim starts,
+     * the pixels following straight after. Not fixed, because read_aat() puts
+     * the dim wherever the file's own alignment leaves it. An offset rather
+     * than a pointer: buflib may move the block. */
+    char *block = buflib_get_data(&buf_ctx, hid);
 
-    bmp = buflib_get_data(&buf_ctx, hid);
-
-    return bmp;
+    return (struct dim *)(block + *(int *)block);
 }
 
 
@@ -2458,11 +2515,64 @@ struct pf_col
     int n;              /* rows left to write */
 };
 
+/* `n` pixels of one column, from where it left off, `step` apart in the
+ * framebuffer. The two runs are functions of their own, never inlined, so that
+ * everything a pixel touches stays in a register: folded into the tile loop at
+ * -Os the faded run reloaded its fade terms and its pointer from the stack on
+ * every pixel, at nearly twice the cost of the arithmetic it does. Unrolled,
+ * because -Os will not and the loop branch is a quarter of an opaque pixel. */
+static void NO_INLINE draw_run(struct pf_col *k, int n, int step)
+{
+    const pix_t *src = k->src;
+    pix_t *pixel = k->px;
+    unsigned int p = k->p;
+    const int dp = k->dp;
+
+    for (; n >= 4; n -= 4)
+    {
+        *pixel = src[p >> PFREAL_SHIFT]; p += dp; pixel += step;
+        *pixel = src[p >> PFREAL_SHIFT]; p += dp; pixel += step;
+        *pixel = src[p >> PFREAL_SHIFT]; p += dp; pixel += step;
+        *pixel = src[p >> PFREAL_SHIFT]; p += dp; pixel += step;
+    }
+    while (n-- > 0)
+    {
+        *pixel = src[p >> PFREAL_SHIFT]; p += dp; pixel += step;
+    }
+    k->p = p;
+    k->px = pixel;
+}
+
+static void NO_INLINE draw_run_faded(struct pf_col *k, int n, int step,
+                                     const struct pf_fade *f)
+{
+    const pix_t *src = k->src;
+    pix_t *pixel = k->px;
+    unsigned int p = k->p;
+    const int dp = k->dp;
+    const unsigned int fa = f->a, frb = f->rb, fg = f->g;
+
+    for (; n >= 2; n -= 2)
+    {
+        *pixel = fade_color(src[p >> PFREAL_SHIFT], fa, frb, fg);
+        p += dp; pixel += step;
+        *pixel = fade_color(src[p >> PFREAL_SHIFT], fa, frb, fg);
+        p += dp; pixel += step;
+    }
+    if (n > 0)
+    {
+        *pixel = fade_color(src[p >> PFREAL_SHIFT], fa, frb, fg);
+        p += dp; pixel += step;
+    }
+    k->p = p;
+    k->px = pixel;
+}
+
 /* Draw one half, upper or lower, of a tile's columns a band at a time. `step`
- * is the framebuffer stride in the half's direction. Returns the pixels
- * written. */
-static int draw_tile_half(struct pf_col *cols, int ncols, int step, int alpha,
-                          unsigned int fa, unsigned int frb, unsigned int fg)
+ * is the framebuffer stride in the half's direction; `f` is NULL for an opaque
+ * slide. Returns the pixels written. */
+static int draw_tile_half(struct pf_col *cols, int ncols, int step,
+                          const struct pf_fade *f)
 {
     int total = 0;
     bool more = true;
@@ -2473,9 +2583,6 @@ static int draw_tile_half(struct pf_col *cols, int ncols, int step, int alpha,
         for (int c = 0; c < ncols; c++)
         {
             struct pf_col *k = &cols[c];
-            const pix_t *src = k->src;
-            pix_t *pixel = k->px;
-            int p = k->p, dp = k->dp;
             int n = MIN(k->n, PF_TILE_ROWS);
 
             if (n <= 0)
@@ -2483,33 +2590,20 @@ static int draw_tile_half(struct pf_col *cols, int ncols, int step, int alpha,
             k->n -= n;
             more |= (k->n > 0);
             total += n;
-            if (alpha == 256) {
-                while (n--) {
-                    *pixel = src[((unsigned)p) >> PFREAL_SHIFT];
-                    p += dp;
-                    pixel += step;
-                }
-            } else {
-                while (n--) {
-                    *pixel = fade_color(src[((unsigned)p) >> PFREAL_SHIFT],
-                                        fa, frb, fg);
-                    p += dp;
-                    pixel += step;
-                }
-            }
-            k->p = p;
-            k->px = pixel;
+            if (f)
+                draw_run_faded(k, n, step, f);
+            else
+                draw_run(k, n, step);
         }
     }
     return total;
 }
 
 static void draw_tile(struct pf_col *up, struct pf_col *lo, int ncols,
-                      int alpha, unsigned int fa, unsigned int frb,
-                      unsigned int fg)
+                      const struct pf_fade *f)
 {
-    int px = draw_tile_half(up, ncols, -BUFFER_WIDTH, alpha, fa, frb, fg)
-           + draw_tile_half(lo, ncols, BUFFER_WIDTH, alpha, fa, frb, fg);
+    int px = draw_tile_half(up, ncols, -BUFFER_WIDTH, f)
+           + draw_tile_half(lo, ncols, BUFFER_WIDTH, f);
 #if PF_SHOW_STATS
     pf_px += px;
 #else
@@ -2517,9 +2611,9 @@ static void draw_tile(struct pf_col *up, struct pf_col *lo, int ncols,
 #endif
 }
 
-/* Draw only columns in [x_from, x_to). The projection still has to walk every
- * column -- its state is carried forward one step at a time -- but a culled
- * column costs two divisions instead of a column of pixels. */
+/* Draw only columns in [x_from, x_to). The projection's state is carried
+ * forward a column at a time, so the walk starts at the slide's left edge and
+ * jumps the hidden columns before x_from rather than stepping through them. */
 static void render_slide_clipped(struct slide_data *slide, const int alpha,
                                  int x_from, int x_to)
 {
@@ -2529,9 +2623,8 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
     }
     if (slide->angle > 255 || slide->angle < -255)
         return;
-    /* Wholly hidden. Worth its own test: the walk below still costs two
-     * divisions a column even when every one of them is skipped, and the cull
-     * takes slides out entirely often enough for that to add up. */
+    /* Wholly hidden, which the cull makes common: skip the projection set-up,
+     * which is several divisions before the walk even starts. */
     if (x_from >= x_to)
         return;
     pix_t *src = (pix_t*)(sizeof(struct dim) + (char *)bmp);
@@ -2601,9 +2694,7 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
      * has no business shadowing. */
     struct pf_fade fd;
     fade_prepare(&fd, alpha);
-    /* Into plain locals so they land in registers rather than being reloaded
-     * through the struct on every pixel. */
-    const unsigned int fa = fd.a, frb = fd.rb, fg = fd.g;
+    const struct pf_fade *f = (alpha == 256) ? NULL : &fd;
 
     /* Walked a column at a time, which is the order the source is stored in
      * (art_sizes.h keeps the coverflow thumbnails column-major for exactly
@@ -2619,7 +2710,8 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
 
 #define LCDADDR(x, y) (&buffer[(y)*BUFFER_WIDTH + (x)])
 
-    for (x = xi; x < w; x++) {
+    /* Nothing at or past x_to is drawn, so the walk stops there. */
+    for (x = xi; x < x_to; x++) {
         /* Rounding in the reverse projection above can leave xs a fraction
          * below the slide's left edge. The cast is unsigned, so that would
          * wrap to a huge column and break out of the loop, truncating the
@@ -2629,39 +2721,55 @@ static void render_slide_clipped(struct slide_data *slide, const int alpha,
         int column = (unsigned)(xs - slide_left) >> PFREAL_SHIFT;
         if (column >= sw)
             break;
-        if (perspective) {
-            dy = (CAM_DIST_R + zo + fmul(xs, sinr)) / CAM_DIST;
+
+        /* Hidden: jump the walk straight to x_from. Its numerator and
+         * denominator step by fixed amounts, so k steps are one multiply. */
+        if (x < x_from)
+        {
+            int k = x_from - x;
+
+            if (perspective)
+            {
+                xsnum += k * xsnumi;
+                xsden += k * xsdeni;
+                xs = fdiv(xsnum, xsden);
+            } else
+                xs += k * PFREAL_ONE;
+            x = x_from - 1;
+            continue;
         }
 
-        if (x < x_from || x >= x_to)
-            goto next_column;   /* hidden: keep the projection, skip the pixels */
+        if (perspective)
+            dy = div_cam_dist(CAM_DIST_R + zo + fmul(xs, sinr));
 
         const pix_t *ptr = &src[column * sh];
         /* The rows each half draws: upward from the middle row while p stays
          * at or above plim, downward while it stays below plo. */
         int plim = MAX(0, p_start_upper - (half_height-1) * dy);
         int plo = MIN(sh * PFREAL_ONE, p_start_lower + lower_half * dy);
+        unsigned int recip = 0xffffffffu / dy;
         struct pf_col *u = &tile_up[ncols], *l = &tile_lo[ncols];
 
         u->src = l->src = ptr;
         u->p = p_start_upper;
         u->dp = -dy;
         u->px = LCDADDR(x, half_height - 1);
-        u->n = (p_start_upper >= plim) ? (p_start_upper - plim) / dy + 1 : 0;
+        u->n = (p_start_upper >= plim)
+             ? div_by_recip(p_start_upper - plim, dy, recip) + 1 : 0;
         l->p = p_start_lower;
         l->dp = dy;
         l->px = LCDADDR(x, half_height);
-        l->n = (plo > p_start_lower) ? (plo - p_start_lower + dy - 1) / dy : 0;
+        l->n = (plo > p_start_lower)
+             ? div_by_recip(plo - p_start_lower + dy - 1, dy, recip) : 0;
 
         /* A tile ends where a cache line does, not after PF_TILE_W columns
          * counted from wherever the slide happens to start. */
         if (++ncols == PF_TILE_W || (x & (PF_TILE_W - 1)) == PF_TILE_W - 1)
         {
-            draw_tile(tile_up, tile_lo, ncols, alpha, fa, frb, fg);
+            draw_tile(tile_up, tile_lo, ncols, f);
             ncols = 0;
         }
 
-next_column:
         if (perspective)
         {
             xsnum += xsnumi;
@@ -2672,7 +2780,7 @@ next_column:
 
     }
     if (ncols > 0)
-        draw_tile(tile_up, tile_lo, ncols, alpha, fa, frb, fg);
+        draw_tile(tile_up, tile_lo, ncols, f);
     /* let the music play... */
 #if PF_SHOW_STATS
     {
@@ -3924,10 +4032,15 @@ static void pf_stats_draw(void)
     if (!pf_stats.line[0])
         return;
 
+    /* In the caption's place, below the covers, where it can be read. */
+    int h = font_get(FONT_SYSFIXED)->height;
+    int y = (pf_text_h >= 2 * h) ? pf_text_y + (pf_text_h - 2 * h) / 2
+                                 : pf_height - 2 * h;
+
     lcd_setfont(FONT_SYSFIXED);
     lcd_set_foreground(pf_fg_color);
-    lcd_putsxy(2, 2, pf_stats.line);
-    lcd_putsxy(2, 2 + font_get(FONT_SYSFIXED)->height, pf_stats.line2);
+    lcd_putsxy(2, y, pf_stats.line);
+    lcd_putsxy(2, y + h, pf_stats.line2);
     lcd_setfont(screens[SCREEN_MAIN].getuifont());
 }
 #endif /* PF_SHOW_STATS */
@@ -4200,7 +4313,9 @@ static int album_covers_loop(void)
                     lcd_set_background(pf_bg_color);
                     pf_clear_band(pf_text_y, pf_text_h);
                 }
+#if !PF_SHOW_STATS   /* the overlay takes the caption's place */
                 model->draw_text();
+#endif
             }
 #if PF_SHOW_STATS
             pf_stats_draw();
