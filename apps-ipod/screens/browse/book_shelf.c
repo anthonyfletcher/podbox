@@ -797,25 +797,41 @@ bool book_shelf_mark_menu(const char *book, int current)
     };
     struct book_resume pos;
     int choice;
+    bool guessed = false;
 
     /* Marking in progress starts the book again, so a book that has a place
-     * to resume from is in progress already. */
-    if (current < 0 && book_resume_find(book, &pos))
-        current = pos.left == BOOK_LEFT_FINISHED  ? BOOK_SHELF_FINISHED
-                : pos.left == BOOK_LEFT_UNSTARTED ? BOOK_SHELF_NOT_STARTED
-                : book_resume_get(book, &pos)     ? BOOK_SHELF_IN_PROGRESS
-                : -1;
+     * to resume from is in progress already. A book with nothing saved has
+     * almost always not been started; that is only a guess, so choosing it
+     * still marks the book. */
+    if (current < 0)
+    {
+        if (!book_resume_find(book, &pos))
+        {
+            current = BOOK_SHELF_NOT_STARTED;
+            guessed = true;
+        }
+        else if (pos.left == BOOK_LEFT_FINISHED
+                 || (pos.left == BOOK_LEFT_ENDED
+                     && book_shelf_is_last_track(book, pos.track)))
+            current = BOOK_SHELF_FINISHED;
+        else if (pos.left == BOOK_LEFT_UNSTARTED)
+            current = BOOK_SHELF_NOT_STARTED;
+        else
+            current = BOOK_SHELF_IN_PROGRESS;
+    }
+    choice = current;
 
     MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
                         ID2P(LANG_BOOKS_IN_PROGRESS),
                         ID2P(LANG_BOOKS_NOT_STARTED),
                         ID2P(LANG_BOOKS_FINISHED));
     push_current_activity(ACTIVITY_CONTEXTMENU);
-    choice = do_menu(&menu, NULL, NULL, false);
+    choice = do_menu(&menu, &choice, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
 
-    if (choice < 0 || choice >= (int)ARRAYLEN(marks) || choice == current)
+    if (choice < 0 || choice >= (int)ARRAYLEN(marks)
+        || (choice == current && !guessed))
         return false;
     return book_resume_mark(book, marks[choice]);
 }
