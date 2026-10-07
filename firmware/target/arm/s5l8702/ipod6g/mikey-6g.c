@@ -21,25 +21,29 @@
 /* "Mikey" is the internal controller for the headphone jack microphone and
  * the inline earphone remote (I2C bus 0, address 0x72).
  *
- * Register protocol (reverse engineered on-device, 2026-07):
+ * Register protocol (reverse engineered on-device, 2026-07 and 2026-10).
+ * There are eight registers; 0x08-0x1f read as copies of them.
  *   reg0 = 0x2f     remote-reporting mode. The low 3 bits are the mic bias
  *                   level (7, same as the recording path uses); 0x28 arms
  *                   the button detection engine. The chip resets on jack
  *                   removal (all registers read zero afterwards), so the
  *                   mode is re-armed on insertion.
- *   reg4 & 0x40     identified-remote bit, set after the chip hears an
- *                   Apple remote's ID chirp. UNIT-DEPENDENT: reliably
- *                   latched on one 6G, never observed on two other
- *                   120GB units, so nothing is gated on it; it is only
- *                   shown in the hardware debug screen.
- *   reg4 & 0x05     center (play/pause) held; a level signal. Can
- *                   flicker while the mode is (re)armed, hence the
- *                   "armed" guard below.
- *   reg5            volume edge events, each readable for ~100ms:
+ *   reg1-3, reg7    0x17, 0x0f, 0xff, 0x13 throughout; meaning unknown.
+ *   reg4 & 0xe0     what is plugged in: 0x80 with an Apple remote, 0x20
+ *                   with a generic three-button headset -- which can drop
+ *                   to 0x00 mid-session, so nothing is gated on it. 0x40
+ *                   has been seen latched on one 6G and never since.
+ *   reg4 & 0x01     centre button held; a level signal. Can flicker while
+ *                   the mode is (re)armed, hence the "armed" guard below.
+ *   reg4 & 0x04     some button loads the mic line: an Apple centre press,
+ *                   or any button of a generic headset. Apple volume
+ *                   buttons never set it.
+ *   reg5            volume edge events, each readable for under 60ms:
  *                   0x04 vol+ press, 0x08 vol+ release,
  *                   0x01 vol- press, 0x02 vol- release.
- *                   0x30 is the accessory-ID event (no button meaning).
- *   reg6            centre-button edge events, latched for ~30ms:
+ *                   0x10/0x20 follow an Apple centre release, 0x30 the
+ *                   accessory-ID event; no button meaning.
+ *   reg6            0x20 while reg5 holds an event; centre-button edges
  *                   0x01 press, 0x02 release. The driver reads the reg4
  *                   level instead, which carries the same edges.
  * The remote itself signals volume as static DC loads on the mic line and
@@ -47,6 +51,7 @@
  * documented for the shuffle 3G remote); Mikey does that level and chirp
  * detection in hardware and reports the results as above. */
 
+#include <string.h>
 #include "system.h"
 #include "cpu.h"
 #include "kernel.h"
@@ -66,12 +71,14 @@ extern int rec_hw_ver;   /* capture hardware version, gpio-s5l8702.c */
 #define MIKEY_MODE_MIC      0x07    /* mic bias raised, for recording */
 #define MIKEY_MODE_REMOTE   0x2f    /* mic bias + button detection */
 
-#define MIKEY_ID_FLAG       0x40    /* identified-remote latch in reg4 */
-#define MIKEY_BTN_CENTER    0x05
+#define MIKEY_BTN_CENTER    0x01
+#define MIKEY_BTN_LINE      0x04    /* any button loading the mic line */
 #define MIKEY_EVT_VOLUP_DN  0x04
 #define MIKEY_EVT_VOLUP_UP  0x08
 #define MIKEY_EVT_VOLDN_DN  0x01
 #define MIKEY_EVT_VOLDN_UP  0x02
+#define MIKEY_EVT_VOLUP     (MIKEY_EVT_VOLUP_DN | MIKEY_EVT_VOLUP_UP)
+#define MIKEY_EVT_VOLDN     (MIKEY_EVT_VOLDN_DN | MIKEY_EVT_VOLDN_UP)
 
 /* A press+release pair landing in a single poll is stretched over this
  * many polls, so the button driver's debounce (two identical consecutive
@@ -197,6 +204,10 @@ static void mikey_decode_vol(unsigned char evt, unsigned char dn,
  * reading as a stuck center button. */
 #define MIKEY_ARM_WINDOW_POLLS  10      /* 200ms after (re)arming */
 
+/* A generic headset names its button 30-60ms after release; see
+ * mikey_line_gate(). */
+#define MIKEY_LINE_WINDOW   (HZ*15/100)
+
 /* Per-poll decode state, kept apart from the thread's power/mode
  * bookkeeping so the register-to-button logic is a pure function of
  * (state, reg4, reg5). */
@@ -212,6 +223,11 @@ struct mikey_decode {
     int pulse_btn;       /* what that pulse reports */
     int clicks;          /* clicks counted so far in the open window */
     long click_tick;     /* when the last of them was seen */
+    bool line_held;      /* reg4 MIKEY_BTN_LINE as of the last poll */
+    bool line_window;    /* a hold, or MIKEY_LINE_WINDOW after one */
+    long line_until;     /* when that window closes */
+    bool line_center;    /* the hold was the centre button */
+    bool line_used;      /* its one volume step has been given */
 };
 
 /* The edge state only. A re-arm or a stray NAK drops this, because both
@@ -227,6 +243,7 @@ static void mikey_decode_reset(struct mikey_decode *d)
     d->up_suppressed = d->dn_suppressed = false;
     d->center_down = false;
     d->center_off = MIKEY_CENTER_OFF_POLLS;
+    d->line_held = d->line_window = false;
 }
 
 /* The click state, dropped only when the jack empties. */
@@ -256,6 +273,51 @@ static unsigned char mikey_vol_gate(struct mikey_decode *d, unsigned char evt,
     return evt;
 }
 
+/* A generic headset holds MIKEY_BTN_LINE while any button is down and
+ * names the button only after release, as a volume press+release pair in
+ * reg5 -- and its centre button gets a false pair, in either direction. So
+ * from the start of such a hold until MIKEY_LINE_WINDOW after it, reg5's
+ * volume bits are replaced: the first event after an up or down becomes
+ * one press+release of that button, and everything else is dropped. Apple
+ * volume buttons never set MIKEY_BTN_LINE, so their events pass through
+ * and a held button still ramps. On a generic headset every press is one
+ * step: the chip says which button only once it has been let go. */
+static unsigned char mikey_line_gate(struct mikey_decode *d,
+                                     unsigned char btn, unsigned char evt)
+{
+    if (btn & MIKEY_BTN_LINE)
+    {
+        if (!d->line_held)
+        {
+            d->line_center = false;
+            d->line_used = false;
+        }
+        if (btn & MIKEY_BTN_CENTER)
+            d->line_center = true;
+        d->line_held = true;
+        d->line_window = true;
+        d->line_until = current_tick + MIKEY_LINE_WINDOW;
+    }
+    else
+    {
+        d->line_held = false;
+        if (d->line_window && TIME_AFTER(current_tick, d->line_until))
+            d->line_window = false;
+    }
+
+    if (!d->line_window)
+        return evt;
+
+    unsigned char vol = evt & (MIKEY_EVT_VOLUP | MIKEY_EVT_VOLDN);
+    evt &= ~vol;
+    if (vol && !d->line_center && !d->line_used)
+    {
+        d->line_used = true;
+        evt |= (vol & MIKEY_EVT_VOLUP) ? MIKEY_EVT_VOLUP : MIKEY_EVT_VOLDN;
+    }
+    return evt;
+}
+
 /* Decode one poll's register pair into a button mask. Volume is NOT
  * gated on the reg4 identified-remote bit: that bit proved to be
  * unit-dependent (reliably latched on one 6G, never seen on two other
@@ -264,6 +326,7 @@ static unsigned char mikey_vol_gate(struct mikey_decode *d, unsigned char evt,
 static int mikey_decode_poll(struct mikey_decode *d,
                              unsigned char btn, unsigned char evt)
 {
+    evt = mikey_line_gate(d, btn, evt);
     evt = mikey_vol_gate(d, evt, MIKEY_EVT_VOLUP_DN, MIKEY_EVT_VOLUP_UP,
                          &d->up_suppressed);
     evt = mikey_vol_gate(d, evt, MIKEY_EVT_VOLDN_DN, MIKEY_EVT_VOLDN_UP,
@@ -345,6 +408,83 @@ static int mikey_decode_poll(struct mikey_decode *d,
          | (d->vol_dn ? BUTTON_MULTIMEDIA_VOLUME_DOWN : 0);
 }
 
+/* ---- the register scope (button.h) ----------------------------------- */
+
+static struct mikey_scope scope;
+
+static void mikey_scope_log(unsigned char reg, unsigned char from,
+                            unsigned char to)
+{
+    struct mikey_scope_change *c = &scope.log[scope.head % MIKEY_SCOPE_LOG];
+    c->tick = current_tick;
+    c->reg = reg;
+    c->from = from;
+    c->to = to;
+    scope.head++;
+}
+
+/* Every register, in order. A NAK keeps the previous value and marks it. */
+static void mikey_scope_sweep(void)
+{
+    long start = current_tick;
+    for (int r = 0; r < MIKEY_SCOPE_REGS; r++)
+    {
+        unsigned char v;
+        if (i2c_read(0, MIKEY_ADDR, r, 1, &v) != 0)
+        {
+            scope.nak |= 1ul << r;
+            continue;
+        }
+        scope.nak &= ~(1ul << r);
+        if (v != scope.regs[r])
+            mikey_scope_log(r, scope.regs[r], v);
+        scope.regs[r] = v;
+        scope.seen[r] |= v;
+    }
+    scope.sweeps++;
+    scope.sweep_ticks = current_tick - start;
+}
+
+/* Every multimedia code carries the BUTTON_MULTIMEDIA bit, so each is
+ * tested whole. */
+#define MIKEY_HAS(btn, code) (((btn) & (code)) == (code))
+
+static unsigned char mikey_out_bits(int btn)
+{
+    return (MIKEY_HAS(btn, BUTTON_MULTIMEDIA_PLAYPAUSE) ? MIKEY_OUT_PLAY : 0)
+         | (MIKEY_HAS(btn, BUTTON_MULTIMEDIA_NEXT) ? MIKEY_OUT_NEXT : 0)
+         | (MIKEY_HAS(btn, BUTTON_MULTIMEDIA_PREV) ? MIKEY_OUT_PREV : 0)
+         | (MIKEY_HAS(btn, BUTTON_MULTIMEDIA_VOLUME_UP)
+            ? MIKEY_OUT_VOLUP : 0)
+         | (MIKEY_HAS(btn, BUTTON_MULTIMEDIA_VOLUME_DOWN)
+            ? MIKEY_OUT_VOLDN : 0);
+}
+
+/* What the button driver reads next, logged when the scope is on. */
+static void mikey_report(int btn)
+{
+    unsigned char out = mikey_out_bits(btn);
+    if (scope.on && out != scope.out)
+        mikey_scope_log(MIKEY_SCOPE_OUT, scope.out, out);
+    scope.out = out;
+    mikey_btn = btn;
+}
+
+void mikey_scope_enable(bool on)
+{
+    scope.on = on;
+}
+
+void mikey_scope_clear(void)
+{
+    memset(scope.seen, 0, sizeof(scope.seen));
+}
+
+const struct mikey_scope *mikey_scope_get(void)
+{
+    return &scope;
+}
+
 /* The chip only ACKs the bus while something occupies the jack, so
  * presence can't be probed at boot; it is probed here whenever the
  * jack is occupied. A few insertion transients may NAK before the
@@ -371,7 +511,7 @@ static void mikey_thread(void)
             naks = 0;
             mikey_decode_reset(&decode);
             mikey_clicks_reset(&decode);
-            mikey_btn = BUTTON_NONE;
+            mikey_report(BUTTON_NONE);
             sleep(HZ/2);   /* nothing to poll, check back at leisure */
             continue;
         }
@@ -385,7 +525,7 @@ static void mikey_thread(void)
         {
             /* no ACK: chip resetting around insertion, or not present */
             mikey_decode_reset(&decode);
-            mikey_btn = BUTTON_NONE;
+            mikey_report(BUTTON_NONE);
             if (naks < MIKEY_PROBE_TRIES)
             {
                 naks++;
@@ -403,17 +543,34 @@ static void mikey_thread(void)
         {
             mikey_write(MIKEY_REG_MODE, MIKEY_MODE_REMOTE);
             mikey_decode_reset(&decode);
-            mikey_btn = BUTTON_NONE;
+            mikey_report(BUTTON_NONE);
             sleep(HZ/50);
             continue;
         }
 
-        unsigned char evt = mikey_read(MIKEY_REG_EVT);
-        unsigned char btn = mikey_read(MIKEY_REG_BTN);
-        mikey_btn = mikey_decode_poll(&decode, btn, evt);
+        unsigned char evt, btn;
+        if (scope.on)
+        {
+            /* a NAKed register decodes as zero, as mikey_read() gives */
+            mikey_scope_sweep();
+            evt = (scope.nak & (1ul << MIKEY_REG_EVT))
+                ? 0 : scope.regs[MIKEY_REG_EVT];
+            btn = (scope.nak & (1ul << MIKEY_REG_BTN))
+                ? 0 : scope.regs[MIKEY_REG_BTN];
+        }
+        else
+        {
+            evt = mikey_read(MIKEY_REG_EVT);
+            btn = mikey_read(MIKEY_REG_BTN);
+            scope.nak = 0;
+            scope.regs[MIKEY_REG_MODE] = mode;
+            scope.regs[MIKEY_REG_EVT] = evt;
+            scope.regs[MIKEY_REG_BTN] = btn;
+        }
+        mikey_report(mikey_decode_poll(&decode, btn, evt));
 
-        /* volume edge events stay readable for ~100ms; 20ms leaves a
-         * comfortable margin against scheduling jitter */
+        /* volume edge events stay readable for under 60ms, so the poll
+         * has to come round inside that */
         sleep(HZ/50);
     }
 }

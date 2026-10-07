@@ -124,12 +124,11 @@ void dbg_hw_info_lines(void (*addline)(const char *fmt, ...), bool opening)
             pmu_accessory_present() ? "true" : "false");
 #endif
 #ifdef HAVE_MIKEY_REMOTE
-    /* r4/r5 are live register reads to help characterize the
-     * remote-ID behavior across units (it varies; see
-     * mikey-6g.c). r4 bit6 = ID bit, r5 = event register. */
+    /* The polling thread's own last reads: reading reg5 here would take
+     * volume events away from it. Debug > Mikey remote shows the rest. */
     addline("mikey remote ctrl: %s r4=%02x r5=%02x",
             mikey_present() ? "ok" : "--",
-            mikey_read(4), mikey_read(5));
+            mikey_scope_get()->regs[4], mikey_scope_get()->regs[5]);
     {
         unsigned char r0 = 0;
         int rc = mikey_probe(&r0);

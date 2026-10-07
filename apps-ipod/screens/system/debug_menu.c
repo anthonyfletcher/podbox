@@ -110,6 +110,7 @@
 #endif
 
 #include "speech/talk.h"
+#include "system/library_files.h"
 
 
 /* The SysCfg and bootflash screens below, and this header, reach the 6G's NOR
@@ -1758,6 +1759,148 @@ static bool dbg_scrollwheel(void)
 }
 #endif /* !SIMULATOR -- the scroll wheel */
 
+/* The earphone remote's registers, from the polling thread's own reads (see
+ * mikey_scope in button.h). Values on top, eight to a line with "--" for a
+ * NAK, each over the OR of every value it has held since the last clear;
+ * then the changes, newest first. Every change is also appended to
+ * LIB_MIKEY_LOG while the screen is open. Long SELECT clears the OR. */
+#if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
+#define LIB_MIKEY_LOG LIB_LOGS_DIR "/mikey.log"
+
+static struct {
+    int fd;
+    long opened;
+    unsigned long written;      /* log entries already in the file */
+} mikey_dbg;
+
+static void mikey_dbg_out(char *buf, size_t size, unsigned char out)
+{
+    snprintf(buf, size, "%s%s%s%s%s%s",
+             out ? "" : "none",
+             (out & MIKEY_OUT_PLAY) ? "play " : "",
+             (out & MIKEY_OUT_NEXT) ? "next " : "",
+             (out & MIKEY_OUT_PREV) ? "prev " : "",
+             (out & MIKEY_OUT_VOLUP) ? "vol+ " : "",
+             (out & MIKEY_OUT_VOLDN) ? "vol- " : "");
+}
+
+static void mikey_dbg_change(char *buf, size_t size,
+                             const struct mikey_scope_change *c)
+{
+    long t = c->tick - mikey_dbg.opened;
+    if (c->reg == MIKEY_SCOPE_OUT)
+    {
+        char out[32];
+        mikey_dbg_out(out, sizeof out, c->to);
+        snprintf(buf, size, "%4ld.%02lds out %s",
+                 t / HZ, t % HZ * 100 / HZ, out);
+    }
+    else
+        snprintf(buf, size, "%4ld.%02lds r%02x %02x>%02x",
+                 t / HZ, t % HZ * 100 / HZ, c->reg, c->from, c->to);
+}
+
+static void mikey_dbg_regs(char *buf, size_t size, const char *label,
+                           const unsigned char *v, unsigned long nak, int base)
+{
+    int n = snprintf(buf, size, "%s %02x:", label, base);
+    for (int r = base; r < base + 8 && n < (int)size; r++)
+        n += snprintf(buf + n, size - n, (nak & (1ul << r)) ? " --" : " %02x",
+                      v[r]);
+}
+
+/* Appends the changes logged since the last call. The ring holds only the
+ * last MIKEY_SCOPE_LOG, so anything older is counted rather than written. */
+static void mikey_dbg_write(void)
+{
+    const struct mikey_scope *s = mikey_scope_get();
+    unsigned long head = s->head;
+    char line[64];
+
+    if (mikey_dbg.fd < 0)
+        return;
+    if (head - mikey_dbg.written > MIKEY_SCOPE_LOG)
+    {
+        fdprintf(mikey_dbg.fd, "lost %lu changes\n",
+                 head - mikey_dbg.written - MIKEY_SCOPE_LOG);
+        mikey_dbg.written = head - MIKEY_SCOPE_LOG;
+    }
+    for (; mikey_dbg.written < head; mikey_dbg.written++)
+    {
+        mikey_dbg_change(line, sizeof line,
+                         &s->log[mikey_dbg.written % MIKEY_SCOPE_LOG]);
+        fdprintf(mikey_dbg.fd, "%s\n", line);
+    }
+}
+
+static int mikey_dbg_callback(int action, struct gui_synclist *lists)
+{
+    const struct mikey_scope *s = mikey_scope_get();
+    unsigned long head = s->head;
+    char line[64];
+    (void)lists;
+
+    if (action == ACTION_STD_CONTEXT)
+    {
+        mikey_scope_clear();
+        action = ACTION_REDRAW;
+    }
+    mikey_dbg_write();
+
+    simplelist_reset_lines();
+    simplelist_addline("jack %d  sweep %ld ms  %lu changes",
+                       headphones_inserted() ? 1 : 0,
+                       s->sweep_ticks * 1000 / HZ, head);
+    for (int base = 0; base < MIKEY_SCOPE_REGS; base += 8)
+    {
+        mikey_dbg_regs(line, sizeof line, "now ", s->regs, s->nak, base);
+        simplelist_addline("%s", line);
+        mikey_dbg_regs(line, sizeof line, "seen", s->seen, 0, base);
+        simplelist_addline("%s", line);
+    }
+    mikey_dbg_out(line, sizeof line, s->out);
+    simplelist_addline("reporting: %s", line);
+    for (unsigned long i = 0; i < 20 && i < head; i++)
+    {
+        mikey_dbg_change(line, sizeof line,
+                         &s->log[(head - 1 - i) % MIKEY_SCOPE_LOG]);
+        simplelist_addline("%s", line);
+    }
+
+    return action == ACTION_NONE ? ACTION_REDRAW : action;
+}
+
+static bool dbg_mikey(void)
+{
+    struct simplelist_info info;
+    bool ret;
+    struct tm *tm = get_time();
+
+    mikey_dbg.opened = current_tick;
+    mikey_dbg.written = mikey_scope_get()->head;
+    mikey_dbg.fd = open(LIB_MIKEY_LOG, O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (mikey_dbg.fd >= 0)
+        fdprintf(mikey_dbg.fd, "\n%04d-%02d-%02d %02d:%02d:%02d opened, "
+                 "times from here; changes from the values before\n",
+                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+                 tm->tm_hour, tm->tm_min, tm->tm_sec);
+    mikey_scope_clear();
+    mikey_scope_enable(true);
+
+    simplelist_info_init(&info, "Mikey remote", 0, NULL);
+    info.action_callback = mikey_dbg_callback;
+    info.scroll_all = true;
+    info.timeout = HZ/10;
+    ret = simplelist_show_list(&info);
+
+    mikey_scope_enable(false);
+    mikey_dbg_write();
+    if (mikey_dbg.fd >= 0)
+        close(mikey_dbg.fd);
+    return ret;
+}
+#endif /* HAVE_MIKEY_REMOTE && !SIMULATOR */
+
 #ifdef USB_ENABLE_AUDIO
 static int dbg_usb_audio_cb(int action, struct gui_synclist *lists)
 {
@@ -1956,6 +2099,9 @@ static const struct {
 #endif
 #ifndef SIMULATOR   /* reads the wheel driver */
         { "Click wheel", dbg_scrollwheel, false, NULL },
+#endif
+#if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
+        { "Mikey remote", dbg_mikey, false, NULL },
 #endif
 /* Every one of these reads the ATA driver or the partition table. Guarding
  * the entries is enough -- the screens themselves are static and the compiler

@@ -132,6 +132,44 @@ void mikey_set_track_skip(bool enable);
  * there. Answers from boot, unlike mikey_present(), which cannot latch
  * until something occupies the jack. */
 bool mikey_supported(void);
+
+/* The register scope behind Debug > Mikey remote. While it is on, the polling
+ * thread reads every register each poll instead of just reg0, reg4 and reg5,
+ * and decodes the buttons from that same read -- a second reader of reg5
+ * would take its events away from the remote. Each changed value goes into
+ * the log ring, as does each change in what the driver reports, under
+ * MIKEY_SCOPE_OUT with the MIKEY_OUT_* bits. Off, regs[] still carries the
+ * thread's own reg0, reg4 and reg5. */
+#define MIKEY_SCOPE_REGS    8       /* the chip mirrors these every 8 */
+#define MIKEY_SCOPE_LOG     128     /* a power of two */
+#define MIKEY_SCOPE_OUT     0xff
+
+#define MIKEY_OUT_PLAY      0x01
+#define MIKEY_OUT_NEXT      0x02
+#define MIKEY_OUT_PREV      0x04
+#define MIKEY_OUT_VOLUP     0x08
+#define MIKEY_OUT_VOLDN     0x10
+
+struct mikey_scope_change {
+    long tick;
+    unsigned char reg, from, to;
+};
+
+struct mikey_scope {
+    bool on;
+    unsigned char regs[MIKEY_SCOPE_REGS];
+    unsigned char seen[MIKEY_SCOPE_REGS];   /* OR of every value since clear */
+    unsigned long nak;                      /* bit per reg: last read NAKed */
+    unsigned char out;                      /* MIKEY_OUT_* reported now */
+    unsigned long sweeps;
+    long sweep_ticks;                       /* how long the last one took */
+    unsigned long head;                     /* changes ever logged */
+    struct mikey_scope_change log[MIKEY_SCOPE_LOG];
+};
+
+void mikey_scope_enable(bool on);
+void mikey_scope_clear(void);              /* seen[] only */
+const struct mikey_scope *mikey_scope_get(void);
 #endif
 
 #ifdef HAVE_TOUCHSCREEN

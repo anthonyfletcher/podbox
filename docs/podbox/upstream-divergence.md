@@ -166,6 +166,8 @@ no VBUS.
 | `target/arm/s5l8702/ipod6g/mikey-6g.c`, `mikey-target.h` | New `mikey_probe()` | Returns the I2C status, so the debug screen can tell an empty jack from a missing chip. |
 | `target/arm/s5l8702/ipod6g/mikey-6g.c`, `export/button.h` | Centre clicks counted over 360 ms: two are next, three previous. `mikey_set_track_skip()` and `mikey_supported()` | Upstream's remote has no next or previous. Counting delays play/pause, so **Remote Track Skip** can turn it off. |
 | `target/arm/s5l8702/debug-s5l8702.c` | `dbg_hw_info()` becomes `dbg_hw_info_lines()`, the lines of a list; adds the LTC4066 charger pins and a Mikey line: `jack=`, `hw=`, `probe rc=`, `r0=` | Hardware info keeps the theme. Mikey `rc` 1 means no Mikey answered; 0 means it did. |
+| `target/arm/s5l8702/ipod6g/mikey-6g.c` | Centre button read from reg4 bit 0 alone; `mikey_line_gate()` turns a generic headset's after-release reg5 event into one volume step, and drops the false one its centre button raises | A generic three-button headset sets bit 2 for every button, so each one played or paused, and its late events moved the volume at random. |
+| `target/arm/s5l8702/ipod6g/mikey-6g.c`, `export/button.h`, `target/arm/s5l8702/debug-s5l8702.c` | `mikey_scope_*()`: while on, the polling thread reads all eight registers and logs every change; the Hardware info line shows the thread's r4/r5 rather than reading them | **Debug > Mikey remote**. A second reader of reg5 takes volume events away from the remote. |
 
 ### SSD mode: one setting, two mechanisms
 
