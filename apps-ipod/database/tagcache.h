@@ -239,6 +239,48 @@ bool tagcache_fill_tags(struct mp3entry *id3, const char *filename);
  * The finds return an idx_id, or -1 for a file the database does not hold.
  * tagcache_find_key() takes path_key() of the path (database/path_key.h). */
 int  tagcache_find_path(const char *path);
+
+/* The album and artist tables, built with the RAM copy and gone with it.
+ * An album is one album name with one album artist; an artist is one album
+ * artist. Seeks are for this commit only, and first and last bound an
+ * album's tracks in the master index. Play figures follow every counted play.
+ * Rows are copied out, the tables living in a buffer that can move. */
+struct tagcache_album {
+    int32_t  album_seek;
+    int32_t  artist_seek;        /* tag_albumartist */
+    int32_t  first, last;
+    int32_t  playcount;
+    int32_t  lastplayed;
+    uint32_t art_hash;           /* art_cache_dir_hash() of its first track's
+                                    folder, 0 for none */
+    uint32_t artist_art_hash;    /* and of the folder above that */
+    int16_t  year;               /* the latest of its tracks' */
+    uint16_t tracks;
+    uint16_t spoken;             /* of them, in a spoken genre */
+    uint16_t pad;
+};
+
+struct tagcache_artist {
+    int32_t  seek;               /* tag_albumartist */
+    int32_t  playcount;
+    int32_t  lastplayed;
+    uint32_t art_hash;           /* its first album's artist_art_hash */
+    uint16_t albums;
+    uint16_t spoken_albums;      /* albums all of whose tracks are spoken */
+};
+
+/* Albums in album-seek order then artist-seek order; artists in seek order.
+ * Counts are 0 while the RAM copy is not in use. */
+int  tagcache_album_count(void);
+bool tagcache_album_get(int n, struct tagcache_album *out);
+int  tagcache_album_find(long album_seek, long artist_seek);
+int  tagcache_album_of(int idx_id);
+int  tagcache_artist_count(void);
+bool tagcache_artist_get(int n, struct tagcache_artist *out);
+int  tagcache_artist_find(long seek);
+
+/* A counted play of idx_id, at the play serial 'serial' */
+void tagcache_album_played(int idx_id, long serial);
 int  tagcache_find_key(uint64_t key);
 /* The whole database by its keys, slot by slot in key order: n from 0 to
  * tagcache_path_slots(). An entry deleted since the load gives an idx_id of

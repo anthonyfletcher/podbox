@@ -92,6 +92,7 @@
 #include "tagcache.h"
 #include "database/path_key.h"
 #include "db_spoken.h"
+#include "metadata/art_cache.h"   /* art_cache_dir_hash */
 #include "core_alloc.h"
 #include "crc32.h"
 #include "system/strutil.h"
@@ -335,6 +336,10 @@ struct ramcache_header {
     long tag_size[TAG_COUNT];    /* Bytes in each tags[], to bound a seek */
     int path_count;              /* Slots in the path index */
     int path_first;              /* Its byte offset from this header */
+    int album_count;             /* Rows in the album table, 0 for none */
+    int album_first;             /* Its byte offset from this header */
+    int artist_count;
+    int artist_first;
     struct index_entry indices[0]; /* Master index file content */
 };
 
@@ -829,6 +834,338 @@ static int path_slot_cmp(const void *a, const void *b)
     if (x->key_lo != y->key_lo)
         return x->key_lo < y->key_lo ? -1 : 1;
     return x->idx_id - y->idx_id;
+}
+
+/* ------------------------------------------------------------------ *
+ * the album and artist tables                                        *
+ * ------------------------------------------------------------------ */
+
+#define tcrc_albums \
+    ((struct tagcache_album *)((char *)tcramcache.hdr \
+                               + tcramcache.hdr->album_first))
+#define tcrc_artists \
+    ((struct tagcache_artist *)((char *)tcramcache.hdr \
+                                + tcramcache.hdr->artist_first))
+
+/* Rows the tables may need, for sizing the RAM copy: an album per album
+ * name, and one more per album artist for names they share, never more than
+ * the tracks */
+static size_t album_tables_size(int entries)
+{
+    struct tagcache_header h;
+    int albums = 0, artists = 0;
+    int fd;
+
+    if ((fd = open_tag_fd(&h, tag_album, false)) >= 0)
+    {
+        albums = h.entry_count;
+        close(fd);
+    }
+    if ((fd = open_tag_fd(&h, tag_albumartist, false)) >= 0)
+    {
+        artists = h.entry_count;
+        close(fd);
+    }
+    return MIN(entries, albums + artists) * sizeof(struct tagcache_album)
+           + artists * sizeof(struct tagcache_artist) + 16;
+}
+
+static int album_entry_cmp(const void *a, const void *b)
+{
+    const struct index_entry *x = &tcramcache.hdr->indices[*(const int32_t *)a];
+    const struct index_entry *y = &tcramcache.hdr->indices[*(const int32_t *)b];
+
+    if (x->tag_seek[tag_album] != y->tag_seek[tag_album])
+        return x->tag_seek[tag_album] < y->tag_seek[tag_album] ? -1 : 1;
+    if (x->tag_seek[tag_albumartist] != y->tag_seek[tag_albumartist])
+        return x->tag_seek[tag_albumartist] < y->tag_seek[tag_albumartist]
+               ? -1 : 1;
+    return *(const int32_t *)a - *(const int32_t *)b;
+}
+
+static int seek_cmp(const void *a, const void *b)
+{
+    int32_t x = *(const int32_t *)a, y = *(const int32_t *)b;
+
+    return x < y ? -1 : x > y;
+}
+
+static int album_row(long album_seek, long artist_seek)
+{
+    int lo = 0, hi = tcramcache.hdr->album_count - 1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+        const struct tagcache_album *r = &tcrc_albums[mid];
+
+        if (r->album_seek == album_seek && r->artist_seek == artist_seek)
+            return mid;
+        if (r->album_seek < album_seek
+            || (r->album_seek == album_seek && r->artist_seek < artist_seek))
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return -1;
+}
+
+static int artist_row(long seek)
+{
+    int lo = 0, hi = tcramcache.hdr->artist_count - 1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (tcrc_artists[mid].seek == seek)
+            return mid;
+        if (tcrc_artists[mid].seek < seek)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return -1;
+}
+
+static int entry_album_row(int idx_id)
+{
+    const struct index_entry *e = &tcramcache.hdr->indices[idx_id];
+
+    return album_row(e->tag_seek[tag_album], e->tag_seek[tag_albumartist]);
+}
+
+/* During a load, once the master index is in: the album rows and the artist
+ * rows, from the master alone, placed at *pp. scratch has room for a word per
+ * entry and is free until the filename pass. False, with no tables, when
+ * they do not fit; the RAM copy loads without them. */
+static bool albums_group(int32_t *scratch, int entries, char **pp,
+                         ssize_t *bytesleft)
+{
+    struct ramcache_header *hdr = tcramcache.hdr;
+    struct tagcache_album *rows;
+    struct tagcache_artist *arts;
+    ssize_t gap;
+    char *p;
+    int n = 0, nrows = 0, nart = 0;
+
+    hdr->album_count = 0;
+    hdr->artist_count = 0;
+
+    for (int i = 0; i < entries; i++)
+    {
+        if (!(hdr->indices[i].flag & FLAG_DELETED))
+            scratch[n++] = i;
+    }
+    qsort(scratch, n, sizeof(*scratch), album_entry_cmp);
+    for (int i = 0; i < n; i++)
+    {
+        const struct index_entry *a = i ? &hdr->indices[scratch[i - 1]]
+                                        : NULL;
+        const struct index_entry *b = &hdr->indices[scratch[i]];
+
+        if (!a || a->tag_seek[tag_album] != b->tag_seek[tag_album]
+            || a->tag_seek[tag_albumartist] != b->tag_seek[tag_albumartist])
+            nrows++;
+    }
+
+    p = TC_ALIGN_PTR(*pp, struct tagcache_album, &gap);
+    if (*bytesleft < gap + (ssize_t)(nrows * sizeof(*rows)))
+        return false;
+    rows = (struct tagcache_album *)p;
+    memset(rows, 0, nrows * sizeof(*rows));
+
+    for (int i = 0, r = -1; i < n; i++)
+    {
+        const struct index_entry *e = &hdr->indices[scratch[i]];
+        long plays = e->tag_seek[tag_playcount];
+
+        if (r < 0 || rows[r].album_seek != e->tag_seek[tag_album]
+            || rows[r].artist_seek != e->tag_seek[tag_albumartist])
+        {
+            r++;
+            rows[r].album_seek = e->tag_seek[tag_album];
+            rows[r].artist_seek = e->tag_seek[tag_albumartist];
+            rows[r].first = scratch[i];
+        }
+        rows[r].last = scratch[i];
+        rows[r].tracks++;
+        if (e->tag_seek[tag_year] > rows[r].year)
+            rows[r].year = e->tag_seek[tag_year];
+        if (plays > 0)
+        {
+            rows[r].playcount += plays;
+            if (e->tag_seek[tag_lastplayed] > rows[r].lastplayed)
+                rows[r].lastplayed = e->tag_seek[tag_lastplayed];
+        }
+    }
+
+    /* The artists: the distinct album artists of the albums */
+    for (int r = 0; r < nrows; r++)
+        scratch[r] = rows[r].artist_seek;
+    qsort(scratch, nrows, sizeof(*scratch), seek_cmp);
+    for (int r = 0; r < nrows; r++)
+    {
+        if (r == 0 || scratch[r] != scratch[nart - 1])
+            scratch[nart++] = scratch[r];
+    }
+
+    p += nrows * sizeof(*rows);
+    p = TC_ALIGN_PTR(p, struct tagcache_artist, &gap);
+    if (*bytesleft < (ssize_t)((char *)p - *pp)
+                     + (ssize_t)(nart * sizeof(*arts)))
+        return false;
+    arts = (struct tagcache_artist *)p;
+    memset(arts, 0, nart * sizeof(*arts));
+    for (int a = 0; a < nart; a++)
+    {
+        arts[a].seek = scratch[a];
+    }
+    p += nart * sizeof(*arts);
+
+    hdr->album_first = (char *)rows - (char *)hdr;
+    hdr->album_count = nrows;
+    hdr->artist_first = (char *)arts - (char *)hdr;
+    hdr->artist_count = nart;
+    *bytesleft -= p - *pp;
+    *pp = p;
+    return true;
+}
+
+/* During the filename pass: an album's art keys, from its first track */
+static void albums_note_path(int idx_id, const char *filename)
+{
+    static char dir[TAGCACHE_BUFSZ];
+    struct tagcache_album *r;
+    char *sep;
+    int n;
+
+    if (tcramcache.hdr->album_count == 0
+        || (n = entry_album_row(idx_id)) < 0)
+        return;
+    r = &tcrc_albums[n];
+    if (r->first != idx_id)
+        return;
+
+    strmemccpy(dir, filename, sizeof(dir));
+    sep = strrchr(dir, '/');
+    if (!sep || sep == dir)
+        return;
+    *sep = '\0';                     /* track file -> album folder */
+    r->art_hash = art_cache_dir_hash(dir);
+    sep = strrchr(dir, '/');
+    if (!sep || sep == dir)
+        return;
+    *sep = '\0';                     /* album -> artist folder */
+    r->artist_art_hash = art_cache_dir_hash(dir);
+}
+
+/* Once every tag is in: what needs the genres, and the artists' figures */
+static void albums_finish(int entries)
+{
+    struct ramcache_header *hdr = tcramcache.hdr;
+
+    if (hdr->album_count == 0)
+        return;
+
+    for (int i = 0; i < entries; i++)
+    {
+        const struct index_entry *e = &hdr->indices[i];
+        const struct tagfile_entry *g;
+        int n;
+
+        if ((e->flag & FLAG_DELETED) || e->tag_seek[tag_genre] < 0
+            || e->tag_seek[tag_genre] >= hdr->tag_size[tag_genre])
+            continue;
+        g = (const struct tagfile_entry *)&hdr->tags[tag_genre]
+                                                 [e->tag_seek[tag_genre]];
+        if (db_spoken_is_spoken_genre(g->tag_data)
+            && (n = entry_album_row(i)) >= 0)
+            tcrc_albums[n].spoken++;
+    }
+
+    for (int r = 0; r < hdr->album_count; r++)
+    {
+        const struct tagcache_album *al = &tcrc_albums[r];
+        int a = artist_row(al->artist_seek);
+        struct tagcache_artist *ar;
+
+        if (a < 0)
+            continue;
+        ar = &tcrc_artists[a];
+        ar->albums++;
+        if (al->spoken == al->tracks)
+            ar->spoken_albums++;
+        ar->playcount += al->playcount;
+        if (al->lastplayed > ar->lastplayed)
+            ar->lastplayed = al->lastplayed;
+        if (ar->art_hash == 0)
+            ar->art_hash = al->artist_art_hash;
+    }
+}
+
+int tagcache_album_count(void)
+{
+    return tc_stat.ramcache ? tcramcache.hdr->album_count : 0;
+}
+
+bool tagcache_album_get(int n, struct tagcache_album *out)
+{
+    if (n < 0 || n >= tagcache_album_count())
+        return false;
+    *out = tcrc_albums[n];
+    return true;
+}
+
+int tagcache_album_find(long album_seek, long artist_seek)
+{
+    return tagcache_album_count() ? album_row(album_seek, artist_seek) : -1;
+}
+
+int tagcache_album_of(int idx_id)
+{
+    if (!tagcache_album_count() || idx_id < 0
+        || idx_id >= current_tcmh.tch.entry_count
+        || (tcramcache.hdr->indices[idx_id].flag & FLAG_DELETED))
+        return -1;
+    return entry_album_row(idx_id);
+}
+
+int tagcache_artist_count(void)
+{
+    return tc_stat.ramcache ? tcramcache.hdr->artist_count : 0;
+}
+
+bool tagcache_artist_get(int n, struct tagcache_artist *out)
+{
+    if (n < 0 || n >= tagcache_artist_count())
+        return false;
+    *out = tcrc_artists[n];
+    return true;
+}
+
+int tagcache_artist_find(long seek)
+{
+    return tagcache_artist_count() ? artist_row(seek) : -1;
+}
+
+void tagcache_album_played(int idx_id, long serial)
+{
+    int n = tagcache_album_of(idx_id);
+    int a;
+
+    if (n < 0)
+        return;
+    tcrc_albums[n].playcount++;
+    if (serial > tcrc_albums[n].lastplayed)
+        tcrc_albums[n].lastplayed = serial;
+    a = artist_row(tcrc_albums[n].artist_seek);
+    if (a >= 0)
+    {
+        tcrc_artists[a].playcount++;
+        if (serial > tcrc_artists[a].lastplayed)
+            tcrc_artists[a].lastplayed = serial;
+    }
 }
 
 /* The live entry whose filename has this path_key(), or -1. Refuses unless
@@ -4987,6 +5324,7 @@ static size_t ramcache_size(struct master_header *tcmh)
     size_t size = tcmh->tch.datasize + 256 + TAGCACHE_RESERVE +
         sizeof(struct ramcache_header) + TAG_COUNT*sizeof(void *);
     size += tcmh->tch.entry_count*sizeof(struct path_slot);
+    size += album_tables_size(tcmh->tch.entry_count);
     return size;
 }
 
@@ -5132,6 +5470,11 @@ static bool load_tagcache(void)
     tcramcache.hdr->path_count = 0;
     p += tcmh.tch.entry_count * sizeof(struct path_slot);
 
+    /* The album tables next, grouped while the path index is still free to
+     * sort in. Without room for them the RAM copy loads all the same. */
+    if (!albums_group((int32_t *)slots, tcmh.tch.entry_count, &p, &bytesleft))
+        debug_log(DEBUG_LOG_TAGCACHE, "load: no room for the album tables");
+
     /* Then the tags */
     for (int tag = 0; tag < TAG_COUNT; tag++)
     {
@@ -5267,6 +5610,7 @@ static bool load_tagcache(void)
                     slots[path_n].idx_id = idx_id;
                     path_n++;
                 }
+                albums_note_path(idx_id, filename);
                 continue;
             }
 
@@ -5302,10 +5646,13 @@ static bool load_tagcache(void)
 
     qsort(slots, path_n, sizeof(struct path_slot), path_slot_cmp);
     tcramcache.hdr->path_count = path_n;
+    albums_finish(tcmh.tch.entry_count);
 
     tc_stat.ramcache_used = tc_stat.ramcache_allocated - bytesleft;
-    debug_log(DEBUG_LOG_TAGCACHE, "load: %d entries, %d paths, %ld ms",
+    debug_log(DEBUG_LOG_TAGCACHE,
+              "load: %d entries, %d paths, %d albums, %d artists, %ld ms",
               (int)tcmh.tch.entry_count, path_n,
+              tcramcache.hdr->album_count, tcramcache.hdr->artist_count,
               (current_tick - load_start) * 1000 / HZ);
     logf("tagcache loaded into ram!");
     logf("utilization: %d%%", 100*tc_stat.ramcache_used / tc_stat.ramcache_allocated);
