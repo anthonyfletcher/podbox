@@ -30,6 +30,7 @@
 #include <file.h>
 #include "config.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "system/hash.h"
 #include "rbpaths.h"
 #include "database/tagcache.h"
@@ -39,8 +40,11 @@
 #include "pv_log.h"
 #include "pv_moves.h"
 
-#define PV_MOVES_PATH  LIB_REPORT_MOVES_FILE
-#define PV_MOVES_MAGIC 0x50564d31UL   /* "PVM1" */
+/* A libfile: struct move records, then the pool of their folders as its
+ * tail. Its marks are the database the table was worked out for. */
+#define PV_MOVES_PATH    LIB_REPORT_MOVES_FILE
+#define PV_MOVES_MAGIC   LIB_MOVES_MAGIC
+#define PV_MOVES_VERSION LIB_MOVES_VERSION
 
 /* Candidate folders tracked per logged folder. A file name as common as
  * "01 - Intro.mp3" votes for a folder of its own in every album that has
@@ -327,32 +331,17 @@ static bool accept(const struct ldir *ld, const struct cand *best)
 static void moves_save(const struct move *m, int n, const char *pool,
                        unsigned pool_bytes, int db_entries, long db_commit)
 {
-    unsigned long hdr[6];
-    size_t m_bytes = (size_t)n * sizeof(struct move);
-    uint32_t sum = fnv1a_bytes(m, m_bytes);
-    bool ok;
-    int fd;
+    struct libfile_writer w;
+    struct libfile_marks marks;
 
-    for (unsigned i = 0; i < pool_bytes; i++)
-        sum = fnv1a_byte(sum, (unsigned char)pool[i]);
-
-    hdr[0] = PV_MOVES_MAGIC;
-    hdr[1] = (unsigned long)db_entries;
-    hdr[2] = (unsigned long)db_commit;
-    hdr[3] = (unsigned long)n;
-    hdr[4] = pool_bytes;
-    hdr[5] = sum ? sum : 1;
-
-    fd = open(PV_MOVES_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
-        return;
-    ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
-      && write(fd, m, m_bytes) == (ssize_t)m_bytes
-      && write(fd, pool, pool_bytes) == (ssize_t)pool_bytes;
-    close(fd);
-
-    if (!ok)
-        remove(PV_MOVES_PATH);
+    libfile_no_marks(&marks);
+    marks.entries = db_entries;
+    marks.commitid = db_commit;
+    if (libfile_begin(&w, PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
+                      sizeof(struct move), &marks))
+        libfile_finish(&w,
+                       libfile_write(&w, m, (size_t)n * sizeof(struct move), n)
+                       && libfile_write(&w, pool, pool_bytes, 0));
 }
 
 void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
@@ -479,29 +468,20 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
 
 /* ------------------------------------------------------------------- use */
 
-static bool read_hdr(int fd, unsigned long hdr[6], int db_entries,
-                     long db_commit)
+/* The table's header, if it was worked out for this database */
+static bool read_hdr(struct libfile_header *h, int db_entries, long db_commit)
 {
-    return read(fd, hdr, 6 * sizeof(unsigned long))
-               == (ssize_t)(6 * sizeof(unsigned long))
-        && hdr[0] == PV_MOVES_MAGIC
-        && (int)hdr[1] == db_entries
-        && (long)hdr[2] == db_commit
-        && hdr[3] <= MOVES_MAX
-        && hdr[4] <= MOVES_POOL_MAX;
+    return libfile_peek(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION, h)
+        && h->marks.entries == db_entries
+        && h->marks.commitid == db_commit
+        && h->count <= MOVES_MAX;
 }
 
 bool pv_moves_stale(int db_entries, long db_commit)
 {
-    unsigned long hdr[6];
-    int fd = open(PV_MOVES_PATH, O_RDONLY);
-    bool ok;
+    struct libfile_header h;
 
-    if (fd < 0)
-        return true;
-    ok = read_hdr(fd, hdr, db_entries, db_commit);
-    close(fd);
-    return !ok;
+    return !read_hdr(&h, db_entries, db_commit);
 }
 
 void pv_moves_forget(void)
@@ -514,21 +494,25 @@ void pv_moves_forget(void)
 
 size_t pv_moves_load(void *buf, size_t size, int db_entries, long db_commit)
 {
-    unsigned long hdr[6];
+    struct libfile_header h;
+    uint32_t pool_bytes;
     size_t need = 0;
     int fd, n, slots;
 
     pv_moves_forget();
-    fd = open(PV_MOVES_PATH, O_RDONLY);
+    if (!read_hdr(&h, db_entries, db_commit))
+        return 0;
+    fd = libfile_open(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
+                      sizeof(struct move), &h, &pool_bytes);
     if (fd < 0)
         return 0;
 
-    if (read_hdr(fd, hdr, db_entries, db_commit) && hdr[3] > 0 && hdr[4] > 0)
+    if (h.count > 0 && pool_bytes > 0 && pool_bytes <= MOVES_POOL_MAX)
     {
-        n = (int)hdr[3];
+        n = (int)h.count;
         slots = next_pow2(n * 2);
         need = (size_t)n * sizeof(struct move) + (size_t)slots * sizeof(int)
-             + hdr[4];
+             + pool_bytes;
 
         if (need <= size)
         {
@@ -537,11 +521,11 @@ size_t pv_moves_load(void *buf, size_t size, int db_entries, long db_commit)
             char *pool = (char *)sl + (size_t)slots * sizeof(int);
             bool ok = read(fd, m, (size_t)n * sizeof(struct move))
                           == (ssize_t)((size_t)n * sizeof(struct move))
-                   && read(fd, pool, hdr[4]) == (ssize_t)hdr[4]
-                   && pool[hdr[4] - 1] == '\0';
+                   && read(fd, pool, pool_bytes) == (ssize_t)pool_bytes
+                   && pool[pool_bytes - 1] == '\0';
 
             for (int i = 0; ok && i < n; i++)
-                ok = m[i].off < hdr[4];
+                ok = m[i].off < pool_bytes;
 
             if (ok)
             {
@@ -596,15 +580,11 @@ const char *pv_moves_apply(const char *path)
 
 unsigned long pv_moves_ident(int db_entries, long db_commit)
 {
-    unsigned long hdr[6];
-    int fd = open(PV_MOVES_PATH, O_RDONLY);
-    bool ok;
+    struct libfile_header h;
 
-    if (fd < 0)
+    if (!read_hdr(&h, db_entries, db_commit) || h.count == 0)
         return 0;
-    ok = read_hdr(fd, hdr, db_entries, db_commit);
-    close(fd);
-    return (ok && hdr[3] > 0) ? hdr[5] : 0;
+    return h.checksum ? h.checksum : 1;
 }
 
 void pv_moves_discard(void)

@@ -8,8 +8,8 @@
  * database, the carousel's album index and the artwork thumbnail cache -- and
  * the last two are identical in everything but the pass itself: wake on a
  * timer, acknowledge USB, wait for the database to settle, compare the
- * library's marks against a marker file, run, record. That shape lives here,
- * so each task supplies only its pass.
+ * library's marks against those its own file was made for, run, record. That
+ * shape lives here, so each task supplies only its pass.
  *
  * Every task runs on the one thread this owns, in rank order, sharing its
  * stack and queue: thread slots are few enough that a screen starting its own
@@ -67,9 +67,12 @@ struct bg_task
 {
     /* ---- supplied by the task ---- */
 
-    /* Where the marks of the last completed pass are kept. On disk rather
-     * than in RAM so an unchanged library costs nothing at startup. */
-    const char *done_file;
+    /* The marks of the last completed pass, kept in the header of the
+     * task's own file so an unchanged library costs nothing at startup.
+     * read_marks gives none when there is no such file; write_marks with
+     * NULL says no pass is complete. */
+    void (*read_marks)(struct bg_marks *m);
+    void (*write_marks)(const struct bg_marks *m);
     int rank;
 
     /* Peak this task's pass holds from core at once, or 0 for a task that

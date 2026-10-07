@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include "config.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 
 
 #include "system.h"
@@ -50,7 +51,6 @@
 #include "logf.h"
 
 #define THUMBCACHE_DIR LIB_ART_DIR
-#define AA_VERSION_FILE THUMBCACHE_DIR "/format.txt"
 /* Folders a pass found no art for, one path per line, for the health screen
  * (screens/system/art_health.c). Written to a .new and renamed only when a
  * pass finishes, so an aborted pass leaves the previous -- complete -- list
@@ -59,13 +59,14 @@
 #define AA_NOART_ARTISTS THUMBCACHE_DIR "/no_art_artists.txt"
 /* Entry count the cache was last completed for, so a restart with an
  * unchanged library does not re-walk the whole database. */
-#define AA_DONE_FILE    THUMBCACHE_DIR "/done.txt"
 /* What each folder's thumbnails were made from, so a pass can tell a replaced
- * or deleted image from an unchanged one: AA_STAMP_MAGIC, then one struct
- * aa_stamp per folder. Later records override earlier ones, which is what lets
- * aa_handle_offer() append rather than rewrite. */
+ * or deleted image from an unchanged one: one struct aa_stamp per folder, in a
+ * libfile. Later records override earlier ones, which is what lets
+ * aa_handle_offer() append rather than rewrite. Its version is the
+ * thumbnails' format, and its marks the library the last completed pass
+ * covered. */
 #define AA_STAMP_FILE   THUMBCACHE_DIR "/stamps.dat"
-#define AA_STAMP_MAGIC  0x31545341u  /* "AST1" */
+#define AA_STAMP_MAGIC  LIB_STAMPS_MAGIC
 
 /* On-disk thumbnail format (struct art_cache_header + native pixels, in the
  * order the header names) is declared in art_cache.h so consumers can read it.
@@ -233,11 +234,11 @@ static void aa_cache_path(char *out, int out_len, int size_index,
              art_sizes[size_index].name, arthash);
 }
 
-/* The shared placeholder thumbnail for a size. The "_" prefix cannot collide
- * with an %08x hash filename, so it lives alongside the real thumbnails. */
+/* The shared placeholder thumbnail for a size. Its name cannot collide with
+ * an %08x hash filename, so it lives alongside the real thumbnails. */
 static void aa_fallback_path(char *out, int out_len, int size_index)
 {
-    snprintf(out, out_len, THUMBCACHE_DIR "/%s/_fallback.aat",
+    snprintf(out, out_len, THUMBCACHE_DIR "/%s/fallback.aat",
              art_sizes[size_index].name);
 }
 
@@ -393,6 +394,17 @@ static void aa_ensure_dirs(void)
     }
 }
 
+/* An empty stamp file in this format: no folder stamped, and the format
+ * recorded at once, so a pass cut short does not purge again */
+static void aa_stamps_clear(void)
+{
+    struct libfile_writer w;
+
+    if (libfile_begin(&w, AA_STAMP_FILE, AA_STAMP_MAGIC,
+                      ART_CACHE_FORMAT_VERSION, sizeof(struct aa_stamp), NULL))
+        libfile_finish(&w, true);
+}
+
 /* Delete every cached thumbnail of every size (the directories themselves stay).
  * Used only when the on-disk format changes. */
 static void aa_purge_thumbs(void)
@@ -410,7 +422,7 @@ static void aa_purge_thumbs(void)
      * they go too rather than being left to describe a cache that is gone. */
     remove(AA_NOART_ALBUMS);
     remove(AA_NOART_ARTISTS);
-    remove(AA_STAMP_FILE);
+    aa_stamps_clear();
 
     debug_log(DEBUG_LOG_ARTCACHE, "purge: start");
 
@@ -468,24 +480,13 @@ static void aa_purge_thumbs(void)
     debug_log(DEBUG_LOG_ARTCACHE, "purge: done");
 }
 
-/* The format version stamped alongside the cache, or -1 if there is none. */
-static int aa_stamped_format(void)
+/* Whether the stamp file says the thumbnails are in this format */
+static bool aa_format_current(void)
 {
-    char buf[16];
-    int fd, n, ver = -1;
+    struct libfile_header h;
 
-    fd = open(AA_VERSION_FILE, O_RDONLY);
-    if (fd >= 0)
-    {
-        n = read(fd, buf, sizeof(buf) - 1);
-        if (n > 0)
-        {
-            buf[n] = '\0';
-            ver = atoi(buf);
-        }
-        close(fd);
-    }
-    return ver;
+    return libfile_peek(AA_STAMP_FILE, AA_STAMP_MAGIC,
+                        ART_CACHE_FORMAT_VERSION, &h);
 }
 
 /* The generator decides "already cached?" with a bare file_exists(), and the
@@ -498,24 +499,11 @@ static int aa_stamped_format(void)
  * start; art_cache_init() is what makes sure a bump allows it. */
 static void aa_check_format_version(void)
 {
-    char buf[16];
-    int fd, n;
-    int ver = aa_stamped_format();
-
-    if (ver == ART_CACHE_FORMAT_VERSION)
+    if (aa_format_current())
         return;
 
-    logf("albumart cache: format %d -> %d, purging", ver,
-         ART_CACHE_FORMAT_VERSION);
+    logf("albumart cache: new format %d, purging", ART_CACHE_FORMAT_VERSION);
     aa_purge_thumbs();
-
-    fd = open(AA_VERSION_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd >= 0)
-    {
-        n = snprintf(buf, sizeof(buf), "%d\n", ART_CACHE_FORMAT_VERSION);
-        write(fd, buf, n);
-        close(fd);
-    }
 }
 
 /* bg_task.artifact_ok: whether the cache is still on disk. A cache deleted
@@ -527,7 +515,7 @@ static bool aa_artifact_ok(void)
     char p[MAX_PATH];
     int i;
 
-    if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
+    if (!aa_format_current())
         return false;
 
     for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
@@ -621,24 +609,21 @@ static struct aa_stamp *aa_visit(unsigned int h)
  * every folder unstamped, so the pass adopts what is on disk. */
 static void aa_stamps_load(void)
 {
-    uint32_t magic;
+    struct libfile_header h;
     int fd, n, i;
 
-    fd = open(AA_STAMP_FILE, O_RDONLY);
+    fd = libfile_open(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                      sizeof(struct aa_stamp), &h, NULL);
     if (fd < 0)
         return;
-    if (read(fd, &magic, sizeof(magic)) == (ssize_t)sizeof(magic)
-        && magic == AA_STAMP_MAGIC)
+    while ((n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
     {
-        while ((n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
+        n /= sizeof(aa_stamp_io[0]);
+        for (i = 0; i < n; i++)
         {
-            n /= sizeof(aa_stamp_io[0]);
-            for (i = 0; i < n; i++)
-            {
-                struct aa_stamp *s = aa_slot(aa_stamp_io[i].key);
-                if (s)
-                    s->stamp = aa_stamp_io[i].stamp;
-            }
+            struct aa_stamp *s = aa_slot(aa_stamp_io[i].key);
+            if (s)
+                s->stamp = aa_stamp_io[i].stamp;
         }
     }
     close(fd);
@@ -649,15 +634,15 @@ static void aa_stamps_load(void)
  * stamp, since the folders it never reached still have their thumbnails. */
 static void aa_stamps_save(bool completed)
 {
-    static const char tmp[] = AA_STAMP_FILE ".new";
-    uint32_t magic = AA_STAMP_MAGIC;
+    struct libfile_writer w;
     bool ok;
-    int fd, i, n = 0;
+    int i, n = 0;
 
-    fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0)
+    if (!libfile_begin(&w, AA_STAMP_FILE, AA_STAMP_MAGIC,
+                       ART_CACHE_FORMAT_VERSION, sizeof(struct aa_stamp),
+                       NULL))
         return;
-    ok = write(fd, &magic, sizeof(magic)) == (ssize_t)sizeof(magic);
+    ok = true;
 
     for (i = 0; ok && i < AA_SEEN_SLOTS; i++)
     {
@@ -670,47 +655,22 @@ static void aa_stamps_save(bool completed)
         aa_stamp_io[n++] = *s;
         if (n == AA_STAMP_BATCH)
         {
-            ok = write(fd, aa_stamp_io, sizeof(aa_stamp_io))
-                 == (ssize_t)sizeof(aa_stamp_io);
+            ok = libfile_write(&w, aa_stamp_io, sizeof(aa_stamp_io), n);
             n = 0;
         }
     }
     if (ok && n)
-        ok = write(fd, aa_stamp_io, n * sizeof(aa_stamp_io[0]))
-             == (ssize_t)(n * sizeof(aa_stamp_io[0]));
-    close(fd);
-
-    if (ok)
-    {
-        remove(AA_STAMP_FILE);
-        rename(tmp, AA_STAMP_FILE);
-    }
-    else
-        remove(tmp);
+        ok = libfile_write(&w, aa_stamp_io, n * sizeof(aa_stamp_io[0]), n);
+    libfile_finish(&w, ok);
 }
 
 /* Record one folder's stamp outside a pass, by appending to the file. */
 static void aa_stamp_append(unsigned int h, unsigned int stamp)
 {
     struct aa_stamp rec = { h, stamp };
-    uint32_t magic = AA_STAMP_MAGIC;
-    int fd;
 
-    if (!file_exists(AA_STAMP_FILE))
-    {
-        fd = open(AA_STAMP_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (fd < 0)
-            return;
-        write(fd, &magic, sizeof(magic));
-    }
-    else
-    {
-        fd = open(AA_STAMP_FILE, O_WRONLY | O_APPEND);
-        if (fd < 0)
-            return;
-    }
-    write(fd, &rec, sizeof(rec));
-    close(fd);
+    libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                   sizeof(rec), &rec, 1);
 }
 
 /* The stamp of the image at 'path': its path, size and modification time,
@@ -1685,9 +1645,41 @@ static void aa_task_event(const struct queue_event *ev)
  * settled count after a boot never matched, so a full pass ran on every startup,
  * walking the whole database with cache_busy set, which is what held the
  * "Building" indicator up with nothing actually to do. */
+/* bg_task.read_marks and write_marks: the stamp file's header */
+static void aa_read_marks(struct bg_marks *m)
+{
+    struct libfile_header h;
+
+    if (libfile_peek(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                     &h))
+    {
+        m->entries = h.marks.entries;
+        m->commitid = h.marks.commitid;
+        m->deleted = h.marks.deleted;
+    }
+    else
+        m->entries = m->commitid = m->deleted = -1;
+}
+
+static void aa_write_marks(const struct bg_marks *m)
+{
+    struct libfile_marks lm;
+
+    libfile_no_marks(&lm);
+    if (m)
+    {
+        lm.entries = m->entries;
+        lm.commitid = m->commitid;
+        lm.deleted = m->deleted;
+    }
+    libfile_set_marks(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                      &lm);
+}
+
 struct bg_task art_cache_task =
 {
-    .done_file    = AA_DONE_FILE,
+    .read_marks   = aa_read_marks,
+    .write_marks  = aa_write_marks,
     .rank         = BG_RANK_ART,
     .run          = aa_task_run,
     .purge        = aa_purge_thumbs,
@@ -1705,18 +1697,10 @@ void art_cache_init(void)
      * before init_tagcache() reaches here, so the gate reads the real value. */
     debug_log_restart(DEBUG_LOG_ARTCACHE);
 
-    /* A format bump leaves every cached thumbnail unreadable, but it does not
-     * move the database's entry count -- so the marker still says this library
-     * is covered, and the pass that would purge and regenerate them would
-     * never be run to notice. Every cover goes blank and stays blank.
-     *
-     * So drop the marker here, before bg_task_init() reads it, which is enough
-     * to make the task stale; the purge itself stays inside the pass. Boot is
-     * the only place this needs checking, the version being a compile-time
-     * constant that can only move across a firmware update. */
-    if (aa_stamped_format() != ART_CACHE_FORMAT_VERSION)
-        remove(AA_DONE_FILE);
-
+    /* A format bump leaves every cached thumbnail unreadable without moving
+     * the database's marks. The stamp file carries the format as its version,
+     * so aa_read_marks() finds none then and the task is stale; the purge
+     * itself stays inside the pass. */
     /* A pass holds the decode scratch and the folder table at once, so the peak
      * declared to bg_task is both. */
     art_cache_task.work_bytes = aa_work_bytes() + AA_TABLE_BYTES;

@@ -5,7 +5,7 @@
  * is.
  *
  * Parts, in order:
- *   - the marker file (what the last completed pass covered)
+ *   - the marks (what the last completed pass covered)
  *   - registration and ranking
  *   - the triggers
  *   - the tick, which is where all the policy is
@@ -63,7 +63,7 @@ static const char bg_thread_name[] = "bgtask";
 static struct event_queue bg_queue;
 
 /* ---------------------------------------------------------------------------
- * The marker file
+ * The marks
  * ------------------------------------------------------------------------ */
 
 /* Marks that match nothing, so a task holding them is stale. */
@@ -101,56 +101,14 @@ static void bg_marks_now(const struct bg_task *task, struct bg_marks *m)
     m->deleted = tm.deleted_ct < 0 ? task->done_marks.deleted : tm.deleted_ct;
 }
 
-/* The marks of the last completed pass, or none if there wasn't one.
- *
- * A file written before the marks existed holds a single number, so the parse
- * falls short and the task reads as never having run -- one pass each after
- * the firmware update, which is the right answer anyway since nothing before
- * this could see a deletion. */
-static void bg_read_done(const struct bg_task *task, struct bg_marks *m)
-{
-    char buf[48];
-    int fd = open(task->done_file, O_RDONLY);
-
-    bg_marks_none(m);
-
-    if (fd >= 0)
-    {
-        int n = read(fd, buf, sizeof(buf) - 1);
-        if (n > 0)
-        {
-            buf[n] = '\0';
-            if (sscanf(buf, "%d %d %d",
-                       &m->entries, &m->commitid, &m->deleted) != 3)
-                bg_marks_none(m);
-        }
-        close(fd);
-    }
-}
-
-static void bg_write_done(const struct bg_task *task,
-                          const struct bg_marks *m)
-{
-    char buf[48];
-    int fd = open(task->done_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-
-    if (fd >= 0)
-    {
-        int n = snprintf(buf, sizeof(buf), "%d %d %d\n",
-                         m->entries, m->commitid, m->deleted);
-        write(fd, buf, n);
-        close(fd);
-    }
-}
-
-/* Forget that any pass ever completed, so the next tick runs one. The file
- * goes as well as the copy in RAM: a rebuild interrupted half way through
- * must not leave a marker behind claiming the library is covered, and a pass
- * that purges its own artifacts partway through must not leave the copy in
- * RAM saying they are still there. */
+/* Forget that any pass ever completed, so the next tick runs one. The marks
+ * on disk go as well as the copy in RAM: a rebuild interrupted half way
+ * through must not leave marks behind claiming the library is covered, and a
+ * pass that purges its own artifacts partway through must not leave the copy
+ * in RAM saying they are still there. */
 void bg_task_forget(struct bg_task *task)
 {
-    remove(task->done_file);
+    task->write_marks(NULL);
     bg_marks_none(&task->done_marks);
     bg_marks_none(&task->prev_marks);
     task->retry_at = 0;
@@ -168,9 +126,9 @@ void bg_task_init(struct bg_task *task)
 {
     int i;
 
-    /* A .request-only task keeps none of the marker state. It stays out of the
-     * rank table, whose `running`/`wants_run` it would never set, and it has
-     * no done_file -- reading one would mean handing open() a NULL path. */
+    /* A .request-only task keeps none of the marks. It stays out of the rank
+     * table, whose `running`/`wants_run` it would never set, and it has no
+     * file to read them from. */
     if (task->request)
     {
         if (!task->tick)
@@ -181,7 +139,7 @@ void bg_task_init(struct bg_task *task)
         return;
     }
 
-    bg_read_done(task, &task->done_marks);
+    task->read_marks(&task->done_marks);
     bg_marks_none(&task->prev_marks);
 
     if (bg_tasks_count >= BG_MAX_TASKS)
@@ -440,7 +398,7 @@ static void bg_task_tick(struct bg_task *task)
         task->fails = 0;
         task->gave_way = false;
         task->failed = false;
-        bg_write_done(task, &covered);
+        task->write_marks(&covered);
         return;
     }
 

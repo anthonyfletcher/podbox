@@ -16,7 +16,9 @@
  *   - the layout's version and the log
  *   - moving one file
  *   - the steps: folders, files, numbered playback logs, a database kept
- *     elsewhere, dead names
+ *     elsewhere
+ *   - converting the files whose format changed, into libfiles
+ *   - dead names
  *   - library_files_init()
  ****************************************************************************/
 
@@ -32,6 +34,8 @@
 #include "rbpaths.h"
 #include "system/strutil.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
+#include "metadata/art_cache.h"     /* ART_CACHE_FORMAT_VERSION */
 
 /* The layout these sources expect. A change to it adds steps and bumps this. */
 #define LIBRARY_FORMAT 1
@@ -138,14 +142,14 @@ static const struct move {
     { ROCKBOX_DIR "/playername.txt",         LIB_PLAYER_NAME_FILE },
     { ROCKBOX_DIR "/db_summary.dat",         LIB_ALBUMS_FILE },
     { ROCKBOX_DIR "/db_summary.plays",       LIB_ALBUM_PLAYS_FILE },
-    { ROCKBOX_DIR "/db_summary.done",        LIB_ALBUMS_DONE_FILE },
     { ROCKBOX_DIR "/album_covers.cfg",       LIB_COVERS_FILE },
     { ROCKBOX_DIR "/pv_index.dat",           LIB_REPORT_INDEX_FILE },
     { ROCKBOX_DIR "/pv_moves.dat",           LIB_REPORT_MOVES_FILE },
     { ROCKBOX_DIR "/docs.lst",               LIB_DOCUMENTS_FILE },
     { ROCKBOX_DIR "/images.lst",             LIB_IMAGES_FILE },
     { ROCKBOX_DIR "/spike.run",              LIB_SPIKE_RUN_FILE },
-    /* The thumbnails go as one folder, and their lists after them */
+    /* The thumbnails go as one folder (see move_folder()), and their lists
+     * after them */
     { ROCKBOX_DIR "/thumbcache",             LIB_ART_DIR },
     { LIB_ART_DIR "/noart_albums.lst",  LIB_ART_DIR "/no_art_albums.txt" },
     { LIB_ART_DIR "/noart_artists.lst", LIB_ART_DIR "/no_art_artists.txt" },
@@ -157,9 +161,16 @@ static const struct move {
 };
 
 /* Files nothing reads any more, and the half-written copies an older
- * firmware may have left */
+ * firmware may have left. The art cache's markers go only after
+ * convert_stamps() has read them. */
 static const char *const dead[] = {
     ROCKBOX_DIR "/pv_names.dat",
+    ROCKBOX_DIR "/db_summary.done",
+    LIB_ART_DIR "/done.txt",
+    LIB_ART_DIR "/format.txt",
+    LIB_ART_DIR "/coverflow/_fallback.aat",
+    LIB_ART_DIR "/list/_fallback.aat",
+    LIB_ART_DIR "/wps/_fallback.aat",
     ROCKBOX_DIR "/database_state.tcd",
     ROCKBOX_DIR "/stage0.log",
     ROCKBOX_DIR "/audiobooks.resume.tmp",
@@ -174,6 +185,59 @@ static const char *const dead[] = {
     LIB_ART_DIR "/noart_albums.lst.tmp",
     LIB_ART_DIR "/noart_artists.lst.tmp",
 };
+
+/* A folder to a new name, or into the folder already there. That one is
+ * newer -- something wrote it after an earlier boot failed to move this --
+ * so where both hold a file, the old copy is dropped. Only caches are moved
+ * this way. */
+static bool move_folder(const char *from, const char *to)
+{
+    bool moved;
+
+    if (!dir_exists(from))
+        return true;
+    if (!exists(to))
+        return move_file(from, to);
+
+    upgrade_log("merging %s into %s", from, to);
+    do
+    {
+        DIR *dir = opendir(from);
+        struct dirent *de;
+
+        if (!dir)
+            return false;
+        moved = false;
+        while ((de = readdir(dir)) != NULL)
+        {
+            char src[MAX_PATH], dst[MAX_PATH];
+
+            if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+                continue;
+            snprintf(src, sizeof(src), "%s/%s", from, de->d_name);
+            snprintf(dst, sizeof(dst), "%s/%s", to, de->d_name);
+            if (dir_get_info(dir, de).attribute & ATTR_DIRECTORY)
+            {
+                if (!move_folder(src, dst))
+                {
+                    closedir(dir);
+                    return false;
+                }
+            }
+            else if (exists(dst) ? remove(src) < 0 : rename(src, dst) < 0)
+            {
+                /* Stop rather than scan the folder again for ever */
+                closedir(dir);
+                upgrade_log("FAILED %s -> %s (%d)", src, dst, errno);
+                return false;
+            }
+            moved = true;
+        }
+        closedir(dir);
+    } while (moved);    /* entries removed under the reader can be skipped */
+
+    return rmdir(from) == 0 || !dir_exists(from);
+}
 
 /* playback_0001.log and on. Names are gathered before any is moved: renaming
  * out of a folder while reading it can skip entries. */
@@ -292,6 +356,186 @@ static bool move_database(void)
     return ok;
 }
 
+/* ------------------------------------------------------------------ *
+ * converting the files whose format changed                          *
+ * ------------------------------------------------------------------ */
+
+/* The magic an old file starts with, or 0 */
+static uint32_t first_word(const char *path)
+{
+    uint32_t w = 0;
+    int fd = open(path, O_RDONLY);
+
+    if (fd >= 0)
+    {
+        if (read(fd, &w, sizeof(w)) != (ssize_t)sizeof(w))
+            w = 0;
+        close(fd);
+    }
+    return w;
+}
+
+/* Up to three numbers from a small text file; how many were read */
+static int read_numbers(const char *path, int *v)
+{
+    char buf[48];
+    int fd = open(path, O_RDONLY);
+    int n;
+
+    if (fd < 0)
+        return 0;
+    n = read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+    if (n <= 0)
+        return 0;
+    buf[n] = '\0';
+    return sscanf(buf, "%d %d %d", &v[0], &v[1], &v[2]);
+}
+
+/* stamps.dat: "AST1", then 8-byte records. Its format.txt becomes the
+ * version, and done.txt the marks, so a cache that was current stays so. */
+static bool convert_stamps(void)
+{
+    static const char path[] = LIB_ART_DIR "/stamps.dat";
+    struct libfile_writer w;
+    struct libfile_marks marks;
+    unsigned char buf[256];
+    int done[3];
+    int fd, version, n;
+    bool ok = true;
+
+    if (first_word(path) != 0x31545341u)        /* "AST1" */
+        return true;
+
+    version = read_numbers(LIB_ART_DIR "/format.txt", done) >= 1 ? done[0] : 0;
+    libfile_no_marks(&marks);
+    if (read_numbers(LIB_ART_DIR "/done.txt", done) == 3)
+    {
+        marks.entries = done[0];
+        marks.commitid = done[1];
+        marks.deleted = done[2];
+    }
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0 || lseek(fd, 4, SEEK_SET) != 4
+        || !libfile_begin(&w, path, LIB_STAMPS_MAGIC, version, 8, &marks))
+    {
+        if (fd >= 0)
+            close(fd);
+        return false;
+    }
+    while (ok && (n = read(fd, buf, sizeof(buf))) >= 8)
+        ok = libfile_write(&w, buf, n & ~7, n / 8);
+    close(fd);
+    ok = libfile_finish(&w, ok);
+    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert", path);
+    return ok;
+}
+
+/* album_plays.dat: bare 12-byte records */
+static bool convert_album_plays(void)
+{
+    struct libfile_writer w;
+    struct libfile_header h;
+    unsigned char buf[240];
+    int fd, n;
+    bool ok = true;
+
+    if (!file_exists(LIB_ALBUM_PLAYS_FILE)
+        || libfile_peek(LIB_ALBUM_PLAYS_FILE, LIB_PLAYS_MAGIC,
+                        LIB_PLAYS_VERSION, &h))
+        return true;
+
+    fd = open(LIB_ALBUM_PLAYS_FILE, O_RDONLY);
+    if (fd < 0)
+        return false;
+    if (ffilesize(fd) % 12 != 0)
+    {
+        /* Misaligned: no record in it can be trusted */
+        close(fd);
+        remove(LIB_ALBUM_PLAYS_FILE);
+        upgrade_log("dropped misaligned %s", LIB_ALBUM_PLAYS_FILE);
+        return true;
+    }
+    if (!libfile_begin(&w, LIB_ALBUM_PLAYS_FILE, LIB_PLAYS_MAGIC,
+                       LIB_PLAYS_VERSION, 12, NULL))
+    {
+        close(fd);
+        return false;
+    }
+    while (ok && (n = read(fd, buf, sizeof(buf))) > 0)
+        ok = libfile_write(&w, buf, n, n / 12);
+    close(fd);
+    ok = libfile_finish(&w, ok);
+    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert",
+                LIB_ALBUM_PLAYS_FILE);
+    return ok;
+}
+
+/* report_badges.dat: "PVB1", the row count, a bit per row, then a 32-bit
+ * time per row. Each row becomes { when, seen, pad[3] }. */
+static bool convert_badges(void)
+{
+    struct libfile_writer w;
+    uint32_t hdr[2];
+    unsigned char seen[128];
+    uint32_t when;
+    int fd;
+    bool ok;
+
+    if (first_word(LIB_BADGES_FILE) != 0x50564231u)     /* "PVB1" */
+        return true;
+
+    fd = open(LIB_BADGES_FILE, O_RDONLY);
+    if (fd < 0)
+        return false;
+    ok = read(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
+         && hdr[1] <= sizeof(seen) * 8
+         && read(fd, seen, (hdr[1] + 7) / 8) == (ssize_t)((hdr[1] + 7) / 8);
+    if (!ok)
+    {
+        /* Too short to hold what it claims: no earned date is trustworthy */
+        close(fd);
+        remove(LIB_BADGES_FILE);
+        upgrade_log("dropped unreadable %s", LIB_BADGES_FILE);
+        return true;
+    }
+    if (!libfile_begin(&w, LIB_BADGES_FILE, LIB_BADGES_MAGIC,
+                       LIB_BADGES_VERSION, 8, NULL))
+    {
+        close(fd);
+        return false;
+    }
+    for (uint32_t i = 0; ok && i < hdr[1]; i++)
+    {
+        unsigned char rec[8] = { 0 };
+
+        ok = read(fd, &when, sizeof(when)) == (ssize_t)sizeof(when);
+        memcpy(rec, &when, sizeof(when));
+        rec[4] = (seen[i / 8] >> (i % 8)) & 1;
+        ok = ok && libfile_write(&w, rec, sizeof(rec), 1);
+    }
+    close(fd);
+    ok = libfile_finish(&w, ok);
+    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert",
+                LIB_BADGES_FILE);
+    return ok;
+}
+
+/* Rebuildable, and rebuilt when the report next opens */
+static void drop_old_moves(void)
+{
+    if (first_word(LIB_REPORT_MOVES_FILE) == 0x50564d31u)   /* "PVM1" */
+    {
+        remove(LIB_REPORT_MOVES_FILE);
+        upgrade_log("removed old %s", LIB_REPORT_MOVES_FILE);
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ * dead names                                                         *
+ * ------------------------------------------------------------------ */
+
 static void remove_dead(void)
 {
     for (unsigned i = 0; i < ARRAYLEN(dead); i++)
@@ -313,7 +557,7 @@ bool library_files_need_upgrade(void)
 
 void library_files_init(void (*progress)(int done, int total))
 {
-    const int total = ARRAYLEN(moves) + 3;
+    const int total = ARRAYLEN(moves) + 4;
     int done = 0;
     bool ok = true;
 
@@ -327,7 +571,10 @@ void library_files_init(void (*progress)(int done, int total))
 
     for (unsigned i = 0; i < ARRAYLEN(moves); i++)
     {
-        ok &= move_file(moves[i].from, moves[i].to);
+        if (dir_exists(moves[i].from))
+            ok &= move_folder(moves[i].from, moves[i].to);
+        else
+            ok &= move_file(moves[i].from, moves[i].to);
         if (progress)
             progress(++done, total);
     }
@@ -340,7 +587,14 @@ void library_files_init(void (*progress)(int done, int total))
     if (progress)
         progress(++done, total);
 
-    remove_dead();
+    ok &= convert_stamps() & convert_album_plays() & convert_badges();
+    drop_old_moves();
+    if (progress)
+        progress(++done, total);
+
+    /* Only once the markers have been read into what replaced them */
+    if (ok)
+        remove_dead();
     if (progress)
         progress(++done, total);
 

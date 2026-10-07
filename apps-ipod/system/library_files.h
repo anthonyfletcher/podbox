@@ -38,7 +38,6 @@
 
 #define LIB_ALBUMS_FILE     LIB_CACHE_DIR "/albums.dat"
 #define LIB_ALBUM_PLAYS_FILE LIB_CACHE_DIR "/album_plays.dat"
-#define LIB_ALBUMS_DONE_FILE LIB_CACHE_DIR "/albums_done.txt"
 #define LIB_COVERS_FILE     LIB_CACHE_DIR "/covers.cfg"
 #define LIB_REPORT_INDEX_FILE LIB_CACHE_DIR "/report_index.dat"
 #define LIB_REPORT_MOVES_FILE LIB_CACHE_DIR "/report_moves.dat"
@@ -52,6 +51,16 @@
 #define LIB_USB_LOG         LIB_LOGS_DIR "/usb.log"
 #define LIB_BUFFER_LOG      LIB_LOGS_DIR "/buffer_damage.log"
 #define LIB_UPGRADE_LOG     LIB_LOGS_DIR "/upgrade.log"
+
+/* The libfile magic of each file kept in one (database/libfile.h), and the
+ * version of its records where the file's own module does not set one */
+#define LIB_STAMPS_MAGIC    0x53545241u     /* "ARTS"; version: the format */
+#define LIB_PLAYS_MAGIC     0x504c4241u     /* "ABLP" */
+#define LIB_PLAYS_VERSION   1
+#define LIB_BADGES_MAGIC    0x53474442u     /* "BDGS" */
+#define LIB_BADGES_VERSION  1
+#define LIB_MOVES_MAGIC     0x45564f4du     /* "MOVE" */
+#define LIB_MOVES_VERSION   1
 
 /* Whether this boot has files to move into the layout above */
 bool library_files_need_upgrade(void);

@@ -24,6 +24,7 @@
 #include <string.h>
 #include "config.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "system/hash.h"
 #include <file.h>
 #include "rbpaths.h"
@@ -429,14 +430,21 @@ long pv_badges_value(int i)
 
 /* ---------------------------------------------------------- progress file */
 
-/* What the user has already been shown, and when each badge was earned.
+/* What the user has already been shown, and when each badge was earned: one
+ * record per row of the badge table, in a libfile.
  *
  * Keyed by table index, which is why pv_badges_table.h says never to insert a
- * row: doing so hands every later badge someone else's history. The magic
- * carries the row count so a table that changed size is discarded rather than
- * misread. */
-#define PV_BADGES_PATH  LIB_BADGES_FILE
-#define PV_BADGES_MAGIC 0x50564231UL   /* "PVB1" */
+ * row: doing so hands every later badge someone else's history. A table that
+ * has grown reads the rows it had, and the new ones start unearned. */
+#define PV_BADGES_PATH    LIB_BADGES_FILE
+#define PV_BADGES_MAGIC   LIB_BADGES_MAGIC
+#define PV_BADGES_VERSION LIB_BADGES_VERSION
+
+struct badge_rec {
+    uint32_t when;
+    uint8_t  seen;
+    uint8_t  pad[3];
+};
 
 static unsigned char seen[(PV_N_BADGES + 7) / 8];
 static unsigned char is_new[(PV_N_BADGES + 7) / 8];
@@ -465,8 +473,9 @@ static void bit_set(unsigned char *m, int i)
 
 static void progress_load(void)
 {
-    unsigned long hdr[2];
-    int fd;
+    struct libfile_header h;
+    struct badge_rec rec;
+    int fd, rows;
 
     if (progress_loaded)
         return;
@@ -475,57 +484,49 @@ static void progress_load(void)
     memset(seen, 0, sizeof(seen));
     memset(when, 0, sizeof(when));
 
-    fd = open(PV_BADGES_PATH, O_RDONLY);
+    fd = libfile_open(PV_BADGES_PATH, PV_BADGES_MAGIC, PV_BADGES_VERSION,
+                      sizeof(rec), &h, NULL);
     if (fd < 0)
         return;
 
-    if (read(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
-        && hdr[0] == PV_BADGES_MAGIC
-        && hdr[1] == (unsigned long)PV_N_BADGES)
+    rows = (int)h.count < PV_N_BADGES ? (int)h.count : PV_N_BADGES;
+    for (int i = 0; i < rows; i++)
     {
-        if (read(fd, seen, sizeof(seen)) != (ssize_t)sizeof(seen)
-            || read(fd, when, sizeof(when)) != (ssize_t)sizeof(when))
+        if (read(fd, &rec, sizeof(rec)) != (ssize_t)sizeof(rec))
         {
             /* A partial read is not partial progress. */
             memset(seen, 0, sizeof(seen));
             memset(when, 0, sizeof(when));
+            close(fd);
+            return;
         }
-        else
-        {
-            had_progress = true;
-        }
+        when[i] = rec.when;
+        if (rec.seen)
+            bit_set(seen, i);
     }
+    had_progress = true;
     close(fd);
 }
 
-/* All three writes checked, and the file removed if any falls short.
- *
- * progress_load() treats a short read as no progress at all rather than
- * partial progress, which is the right call -- but it means a truncated save
- * leaves a valid header over a short body, the next load zeroes every badge,
- * and the save after that writes the zeroes back. A careful reader and a
- * careless writer between them turn one full disk into progress lost for good.
- * Removing the file instead leaves the next load with nothing to open, which
- * it already handles. */
+/* Written whole and renamed over the old file, so a save cut short leaves
+ * the previous progress rather than a truncated one */
 void pv_badges_save(void)
 {
-    unsigned long hdr[2];
-    bool ok;
-    int fd = open(PV_BADGES_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    struct libfile_writer w;
+    struct badge_rec rec;
+    bool ok = true;
 
-    if (fd < 0)
+    if (!libfile_begin(&w, PV_BADGES_PATH, PV_BADGES_MAGIC, PV_BADGES_VERSION,
+                       sizeof(rec), NULL))
         return;
-
-    hdr[0] = PV_BADGES_MAGIC;
-    hdr[1] = (unsigned long)PV_N_BADGES;
-
-    ok = write(fd, hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
-      && write(fd, seen, sizeof(seen)) == (ssize_t)sizeof(seen)
-      && write(fd, when, sizeof(when)) == (ssize_t)sizeof(when);
-    close(fd);
-
-    if (!ok)
-        remove(PV_BADGES_PATH);
+    memset(&rec, 0, sizeof(rec));
+    for (int i = 0; ok && i < PV_N_BADGES; i++)
+    {
+        rec.when = when[i];
+        rec.seen = bit_get(seen, i);
+        ok = libfile_write(&w, &rec, sizeof(rec), 1);
+    }
+    libfile_finish(&w, ok);
 }
 
 int pv_badges_classify(void)

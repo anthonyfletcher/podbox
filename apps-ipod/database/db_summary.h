@@ -8,6 +8,7 @@
 #define _DB_SUMMARY_H
 
 #include <stdbool.h>
+#include "database/libfile.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "database/tagcache.h"
@@ -98,6 +99,9 @@ struct db_summary_t {
      * cannot be matched back to an album, so a build that finds this changed
      * summarises everything rather than carrying anything across. */
     int32_t             deleted;
+    /* The marks the last completed background pass covered, rewritten in
+     * place when one completes; see db_summary_task. */
+    struct libfile_marks covered;
 
     char               *artist_names;
     struct artist_data *artist_index;

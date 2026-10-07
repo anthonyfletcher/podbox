@@ -40,6 +40,7 @@
 #include <stddef.h>
 #include "string-extra.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "config.h"
 #include "system/hash.h"
 #include "system.h"          /* ALIGN_BUFFER/alignof */
@@ -95,6 +96,8 @@ struct play_rec
     uint32_t album_key;
     uint32_t artist_key;
 };
+#define DB_PLAYS_MAGIC   LIB_PLAYS_MAGIC
+#define DB_PLAYS_VERSION LIB_PLAYS_VERSION
 
 /* Past this the log stops being cheaper to replay than to fold in, so the
  * background pass is asked for. */
@@ -120,8 +123,9 @@ struct play_rec
  *                 count wraps silently past 65535 albums.
  *   PFIK -> PFIL: no layout change. "podcasts" became a spoken genre, and an
  *                 index written before that still lists those albums as
- *                 music -- a change of meaning the layout checks cannot see. */
-#define INDEX_HDR "PFIL"
+ *                 music -- a change of meaning the layout checks cannot see.
+ *   PFIL -> PFIM: the header gained the background pass's covered marks. */
+#define INDEX_HDR "PFIM"
 
 enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
 
@@ -766,46 +770,27 @@ static int plays_pending_ct;
 void db_summary_write_plays(void)
 {
     struct play_rec recs[PLAYS_PENDING_MAX];
-    ssize_t len = plays_pending_ct * sizeof(recs[0]);
-    off_t before;
-    int fd;
+    struct libfile_header h;
+    int n = plays_pending_ct;
 
-    if (len == 0)
+    if (n == 0)
         return;
-    memcpy(recs, plays_pending, len);
+    memcpy(recs, plays_pending, n * sizeof(recs[0]));
     plays_pending_ct = 0;
 
-    fd = open(DB_PLAYS_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
-    if (fd < 0)
+    /* A write cut short is put back as it was, and these plays dropped:
+     * losing a few is not worth noticing, a misaligned log would be. */
+    if (!libfile_append(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION,
+                        sizeof(recs[0]), recs, n))
         return;
-
-    /* A short write here is the one thing that can wreck the whole log. The
-     * file has no record markers -- readers step through it at a fixed stride
-     * from offset 0 -- so a partial record leaves every record appended after
-     * it at the wrong offset, and there is nothing to resynchronise from. The
-     * figures would then be credited to whichever album the misaligned bytes
-     * happen to name, silently and for good.
-     *
-     * So put the file back the way it was and drop these plays instead.
-     * Losing a few plays is not worth noticing; losing the alignment is
-     * permanent. */
-    before = ffilesize(fd);
-    if (write(fd, recs, len) != len)
-    {
-        if (before >= 0)
-            ftruncate(fd, before);
-        close(fd);
-        return;
-    }
 
     /* Ask for a pass once it has grown enough that folding it into the index
      * beats replaying it on every read. Cheap to say so: a build that finds
      * only plays changed carries every album's figures across bar the ones
      * named here. */
-    if (ffilesize(fd) > (long)(PLAY_LOG_MAX * sizeof(recs[0])))
+    if (libfile_peek(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION, &h)
+        && h.count > PLAY_LOG_MAX)
         bg_task_update(&db_summary_task);
-
-    close(fd);
 }
 
 void db_summary_log_play(const char *album, const char *albumartist,
@@ -831,33 +816,19 @@ void db_summary_log_play(const char *album, const char *albumartist,
     register_storage_idle_func(db_summary_write_plays);
 }
 
-/* The play log, opened for reading, or -1.
+/* The play log, opened at its first record, or -1.
  *
- * A log whose length is not a whole number of records has had a write cut
- * short at some point, and everything after that point is misaligned (see
- * db_summary_log_play()). Reading it anyway credits plays to the wrong albums,
- * so it is discarded instead: the figures already folded into the saved index
- * are untouched, and only the plays not yet folded in are lost.
- *
- * Belt and braces -- the writer above is what stops this arising -- but it is
- * the difference between losing a few plays and quietly corrupting every
- * album's figures, and both readers get it by calling this. */
+ * A log that fails its checksum is discarded: reading it anyway could credit
+ * plays to the wrong albums. The figures already folded into the saved index
+ * are untouched, and only the plays not yet folded in are lost. */
 static int open_play_log(void)
 {
-    int fd = open(DB_PLAYS_FILE, O_RDONLY);
-    off_t size;
+    struct libfile_header h;
+    int fd = libfile_open(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION,
+                          sizeof(struct play_rec), &h, NULL);
 
-    if (fd < 0)
-        return -1;
-
-    size = ffilesize(fd);
-    if (size < 0 || (size % (off_t)sizeof(struct play_rec)) != 0)
-    {
-        close(fd);
+    if (fd < 0 && file_exists(DB_PLAYS_FILE))
         remove(DB_PLAYS_FILE);
-        return -1;
-    }
-
     return fd;
 }
 
@@ -1682,6 +1653,49 @@ static bool write_block(int fd, const void *buf, size_t len)
     return len == 0 || write(fd, buf, len) == (ssize_t)len;
 }
 
+/* bg_task.read_marks and write_marks: the covered marks in the index's
+ * header, which a foreground build carries over unchanged */
+static void read_covered_marks(struct bg_marks *m)
+{
+    struct db_summary_t data;
+    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
+
+    m->entries = m->commitid = m->deleted = -1;
+    if (fd < 0)
+        return;
+    if (read(fd, &data, sizeof(data)) == (ssize_t)sizeof(data)
+        && !memcmp(&data.header, INDEX_HDR, sizeof(data.header)))
+    {
+        m->entries = data.covered.entries;
+        m->commitid = data.covered.commitid;
+        m->deleted = data.covered.deleted;
+    }
+    close(fd);
+}
+
+static void write_covered_marks(const struct bg_marks *m)
+{
+    struct db_summary_t data;
+    struct libfile_marks lm;
+    int fd = open(DB_SUMMARY_FILE, O_RDWR);
+
+    if (fd < 0)
+        return;
+    libfile_no_marks(&lm);
+    if (m)
+    {
+        lm.entries = m->entries;
+        lm.commitid = m->commitid;
+        lm.deleted = m->deleted;
+    }
+    if (read(fd, &data, sizeof(data)) == (ssize_t)sizeof(data)
+        && !memcmp(&data.header, INDEX_HDR, sizeof(data.header))
+        && lseek(fd, offsetof(struct db_summary_t, covered), SEEK_SET)
+           == (off_t)offsetof(struct db_summary_t, covered))
+        write(fd, &lm, sizeof(lm));
+    close(fd);
+}
+
 static int save_album_index(void){
     /* Written beside the real file and renamed over it, never into it.
      *
@@ -1700,6 +1714,13 @@ static int save_album_index(void){
 
     memcpy(&data, pfi, sizeof(struct db_summary_t));
     memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
+    {
+        struct bg_marks m;
+        read_covered_marks(&m);
+        data.covered.entries = m.entries;
+        data.covered.commitid = m.commitid;
+        data.covered.deleted = m.deleted;
+    }
 
     /* The struct is written whole, pointers and all, and a pointer means
      * nothing to whoever reads it back -- it is this boot's address for memory
@@ -2272,14 +2293,6 @@ void db_summary_progress(int *done, int *total)
     *total = bg_total;
 }
 
-/* The database entry count the last background build covered. Its own marker,
- * not a screen's cache-version flag: those say whether a screen's on-disk
- * formats are current, are written by that screen and by nothing on this path,
- * and would therefore read as "rebuild" forever. This is the same marker the
- * artwork cache keeps for the same reason -- what was the library like when we
- * last finished. */
-#define DB_SUMMARY_DONE LIB_ALBUMS_DONE_FILE
-
 /* Read the index without a buffer of your own; see db_summary.h.
  *
  * Here rather than in the caller because IDX_BUILD_BUFSZ is here: how much a
@@ -2671,7 +2684,8 @@ static enum bg_result background_build(void)
 
 struct bg_task db_summary_task =
 {
-    .done_file   = DB_SUMMARY_DONE,
+    .read_marks  = read_covered_marks,
+    .write_marks = write_covered_marks,
     .rank        = BG_RANK_INDEX,
     .work_bytes  = IDX_BUILD_BUFSZ,
     .run         = background_build,
