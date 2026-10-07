@@ -86,8 +86,8 @@ bool browser_db_is_artist_list(struct browser_context* c);
 /* True when this browse was reached through a menu row asking about the
  * `spoken` tag -- an audiobook list, at any of its levels. */
 bool browser_db_is_spoken_list(struct browser_context* c);
-/* The book row 'item' of a spoken-word list is, or is a track of: its name,
- * the key its saved position is kept under. False for any other row. */
+/* The book row 'item' of a spoken-word list is, or is a track of: its
+ * book_resume_id(). False for any other row. */
 bool browser_db_get_book(struct browser_context* c, int item,
                          char *buf, size_t buflen);
 /* True when the path down to the browser's current level came through an artist

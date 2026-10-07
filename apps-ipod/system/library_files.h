@@ -71,7 +71,7 @@
 #define LIB_PLAYS_MAGIC     0x53594c50u     /* "PLYS" */
 #define LIB_PLAYS_VERSION   1
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */
-#define LIB_BOOKS_VERSION   1
+#define LIB_BOOKS_VERSION   2       /* 1: books keyed by album alone */
 #define LIB_QUIZ_MAGIC      0x5a495551u     /* "QUIZ" */
 #define LIB_QUIZ_VERSION    1
 #define LIB_SPIKE_MAGIC     0x534b5053u     /* "SPKS"; and the run, "SPKR" */

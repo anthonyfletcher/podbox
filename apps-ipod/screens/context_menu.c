@@ -74,6 +74,7 @@
 #include "playlist/catalog.h"
 #include "screens/browse/browser_db.h"
 #include "screens/browse/book_shelf.h"
+#include "metadata/book_resume.h"
 #include "screens/browse/listen_progress.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
@@ -1325,7 +1326,7 @@ static int reveal(void)
 MENUITEM_FUNCTION(reveal_item, 0, ID2P(LANG_SHOW_IN_FILES),
                   reveal, clipboard_callback, Icon_file_view_menu);
 
-static char mark_book[MAX_PATH];
+static char mark_book[BOOK_ID_MAX];
 
 static int mark_book_callback(int action,
                               const struct menu_item_ex *this_item,

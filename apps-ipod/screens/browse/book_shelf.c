@@ -17,9 +17,9 @@
  * book without one is finished if its last track has been played, not started
  * if nothing of it has, and in progress otherwise.
  *
- * A book is an album the database calls one -- spoken word and nothing else
- * (database/db_spoken.c) -- keyed by name, as the resume file keys it. A name
- * that a book shares with a music album is the book's tracks alone.
+ * A book is a row of the database's album tables that is spoken word and
+ * nothing else: an album by one album artist, keyed as the resume file keys
+ * it. Its tracks are that album's spoken ones.
  * Podcasts are left out: a show has no last episode to have finished.
  *
  * Choosing a book plays it. An In progress one resumes; the others start at
@@ -92,9 +92,12 @@ struct shelf_resume
 
 struct shelf_book
 {
-    uint64_t key;               /* book_resume_key() of its name */
+    uint64_t key;               /* book_resume_key() of its id */
     long     seek;              /* the album tag's seek */
-    uint32_t name;              /* into the arena */
+    long     artist_seek;       /* and the album artist's */
+    int      row;               /* its album-table row */
+    uint32_t name;              /* the album, into the arena */
+    uint32_t id;                /* its book_resume_id(), into the arena */
     int      played;            /* tracks with a playcount */
     unsigned long length;       /* all its tracks, ms */
     unsigned long before;       /* the tracks ahead of the resume track, ms */
@@ -118,7 +121,6 @@ struct shelf_book
 static struct shelf_book   *books;
 static struct shelf_resume *resumes;
 static int                 *rows;
-static uint32_t            *uniq;
 static char  *names;
 static size_t names_sz;
 static size_t names_used;
@@ -132,8 +134,7 @@ static bool claim(void)
     char *p = app_claim_buffer(&sz, "book shelf");
 
     fixed = BOOKS_MAX * sizeof(*books) + RESUMES_MAX * sizeof(*resumes)
-          + (BOOKS_MAX + RESUMES_MAX) * sizeof(*rows)
-          + BOOKS_MAX * 2 * sizeof(*uniq);
+          + (BOOKS_MAX + RESUMES_MAX) * sizeof(*rows);
     if (p == NULL || sz < fixed + MAX_PATH)
     {
         if (p != NULL)
@@ -145,7 +146,6 @@ static bool claim(void)
     resumes = (struct shelf_resume *)p; p += RESUMES_MAX * sizeof(*resumes);
     rows    = (int *)p;                 p += (BOOKS_MAX + RESUMES_MAX)
                                              * sizeof(*rows);
-    uniq    = (uint32_t *)p;            p += BOOKS_MAX * 2 * sizeof(*uniq);
     names    = p;
     names_sz = sz - fixed;
 
@@ -161,6 +161,11 @@ static void release(void)
 static const char *book_name(int b)
 {
     return names + books[b].name;
+}
+
+static const char *book_id(int b)
+{
+    return names + books[b].id;
 }
 
 /* ------------------------------------------------------------------ *
@@ -225,7 +230,9 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
 {
     struct tagcache_search tcs;
     static char file[MAX_PATH];
-    static char text[TAGCACHE_BUFSZ];
+    static char id[BOOK_ID_MAX];
+    struct tagcache_album al;
+    uint64_t want = book_resume_key(book);
     uint32_t last = 0, mine = 0;
     bool seen = false, found = false;
 
@@ -238,8 +245,10 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
     {
         uint32_t key;
 
-        if (!tagcache_retrieve(&tcs, tcs.idx_id, tag_album, text, sizeof(text))
-            || strcmp(text, book))
+        if (!tagcache_album_get(tagcache_album_of(tcs.idx_id), &al)
+            || !book_resume_id_of(al.album_seek, al.artist_seek, id,
+                                  sizeof(id))
+            || book_resume_key(id) != want)
             continue;
 
         key = track_key(&tcs);
@@ -258,72 +267,69 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
     return found && mine == last;
 }
 
-static int compare_names(const void *a_v, const void *b_v)
+/* A string into the arena, or false when it is full */
+static bool arena_add(const char *s, uint32_t *at)
 {
-    const struct shelf_book *a = a_v;
-    const struct shelf_book *b = b_v;
+    size_t len = strlen(s) + 1;
 
-    return strcmp(names + a->name, names + b->name);
-}
-
-/* Every album that is a book, sorted by name for find_book(). */
-static bool collect_books(void)
-{
-    struct tagcache_search tcs;
-    char name[TAGCACHE_BUFSZ];
-    size_t used = names_used;
-
-    if (!tagcache_search(&tcs, tag_album))
+    if (len > names_sz - names_used)
         return false;
-
-    tagcache_search_set_uniqbuf(&tcs, uniq, BOOKS_MAX * 2 * sizeof(*uniq));
-    tagcache_search_add_clause(&tcs, &spoken_clause);
-
-    while (book_ct < BOOKS_MAX && tagcache_get_next(&tcs, name, sizeof(name)))
-    {
-        struct shelf_book *b;
-        size_t avail = names_sz - used;
-        int len;
-
-        if (!strcmp(name, UNTAGGED)
-            || !db_spoken_album_has_book(tcs.result_seek))
-            continue;
-
-        len = snprintf(names + used, avail, "%s", name);
-        if (len < 0 || (size_t)len >= avail)
-            break;
-
-        b = &books[book_ct++];
-        memset(b, 0, sizeof(*b));
-        b->key = book_resume_key(name);
-        b->seek = tcs.result_seek;
-        b->name = (uint32_t)used;
-        b->resume = -1;
-        used += (size_t)len + 1;
-    }
-
-    tagcache_search_finish(&tcs);
-    names_used = used;
-
-    qsort(books, book_ct, sizeof(*books), compare_names);
+    memcpy(names + names_used, s, len);
+    *at = (uint32_t)names_used;
+    names_used += len;
     return true;
 }
 
-static int find_book(const char *name)
+/* Every album-table row that is a book, in table order for find_book().
+ * Needs the database in RAM, where the tables are. */
+static bool collect_books(void)
+{
+    struct tagcache_album al;
+    char name[BOOK_KEY_MAX];
+    char id[BOOK_ID_MAX];
+
+    if (tagcache_album_count() == 0)
+        return false;
+
+    for (int n = 0; book_ct < BOOKS_MAX && tagcache_album_get(n, &al); n++)
+    {
+        struct shelf_book *b = &books[book_ct];
+
+        if (al.spoken != al.tracks
+            || !tagcache_seek_string(tag_album, al.album_seek, name,
+                                     sizeof(name))
+            || !book_resume_id_of(al.album_seek, al.artist_seek, id,
+                                  sizeof(id)))
+            continue;
+
+        memset(b, 0, sizeof(*b));
+        if (!arena_add(name, &b->name) || !arena_add(id, &b->id))
+            break;
+        b->key = book_resume_key(id);
+        b->seek = al.album_seek;
+        b->artist_seek = al.artist_seek;
+        b->row = n;
+        b->resume = -1;
+        book_ct++;
+    }
+    return true;
+}
+
+/* The book on album-table row 'row', or -1 */
+static int find_book(int row)
 {
     int lo = 0, hi = book_ct - 1;
 
     while (lo <= hi)
     {
         int mid = (lo + hi) / 2;
-        int c = strcmp(name, book_name(mid));
 
-        if (c == 0)
+        if (books[mid].row == row)
             return mid;
-        if (c < 0)
-            hi = mid - 1;
-        else
+        if (books[mid].row < row)
             lo = mid + 1;
+        else
+            hi = mid - 1;
     }
     return -1;
 }
@@ -366,9 +372,7 @@ static bool walk_tracks(bool before)
         long length;
         int i;
 
-        if (!tagcache_retrieve(&tcs, tcs.idx_id, tag_album, text, sizeof(text)))
-            continue;
-        i = find_book(text);
+        i = find_book(tagcache_album_of(tcs.idx_id));
         if (i < 0)
             continue;
         b = &books[i];
@@ -603,6 +607,7 @@ static int shelf_title(enum book_shelf which)
 static struct
 {
     long seek;                  /* the album, or -1 for a file */
+    long artist_seek;           /* and its album artist */
     char path[MAX_PATH];        /* the file, when 'seek' is -1 */
     uint64_t track;             /* where to start, or 0 for the beginning */
     bool after;                 /* start on the track after 'track' */
@@ -631,6 +636,7 @@ static void choose(int v)
     }
 
     chosen.seek = books[v].seek;
+    chosen.artist_seek = books[v].artist_seek;
     if (shelf_kind != BOOK_SHELF_IN_PROGRESS || books[v].resume < 0)
         return;
 
@@ -660,11 +666,12 @@ static int compare_book_tracks(const void *a_v, const void *b_v)
     return a->key < b->key ? -1 : a->key > b->key;
 }
 
-/* Book 'seek''s tracks to 'fn', in the order its track list shows them,
- * sorted in 'list'. How many were found, or -1 if the database could not be
- * read. 'fn' returns false to stop. */
-static int each_track(long seek, struct book_track *list, int cap,
-                      bool (*fn)(const char *path, void *data), void *data)
+/* The tracks of album 'seek' by 'artist_seek' to 'fn', in the order its
+ * track list shows them, sorted in 'list'. How many were found, or -1 if the
+ * database could not be read. 'fn' returns false to stop. */
+static int each_track(long seek, long artist_seek, struct book_track *list,
+                      int cap, bool (*fn)(const char *path, void *data),
+                      void *data)
 {
     struct tagcache_search tcs;
     char path[MAX_PATH];
@@ -673,6 +680,7 @@ static int each_track(long seek, struct book_track *list, int cap,
     if (!tagcache_search(&tcs, tag_filename))
         return -1;
     tagcache_search_add_filter(&tcs, tag_album, seek);
+    tagcache_search_add_filter(&tcs, tag_albumartist, artist_seek);
     tagcache_search_add_clause(&tcs, &spoken_clause);
 
     while (found < cap && tagcache_get_next(&tcs, path, sizeof(path)))
@@ -727,8 +735,9 @@ static int queue_book(struct playlist_insert_context *ctx)
     size_t list_sz;
     struct book_track *list = app_get_buffer(&list_sz, "book play");
 
-    if (each_track(chosen.seek, list, (int)(list_sz / sizeof(*list)),
-                   queue_track, &q) < 0 || q.added == 0)
+    if (each_track(chosen.seek, chosen.artist_seek, list,
+                   (int)(list_sz / sizeof(*list)), queue_track, &q) < 0
+        || q.added == 0)
         return -1;
     /* The saved track is gone -- renamed or moved -- so its position belongs
      * to nothing here. The book starts at its first chapter, from the top. */
@@ -838,9 +847,10 @@ bool book_shelf_mark_menu(const char *book, int current)
     return book_resume_mark(book, marks[choice]);
 }
 
-/* The book the menu is about: its album, or -1 for one held in a single file
- * known only by its path. */
+/* The book the menu is about: its album and album artist, or -1 for one held
+ * in a single file known only by its path. */
 static long menu_seek;
+static long menu_artist_seek;
 static char menu_path[MAX_PATH];
 
 /* Where the shelf goes once the menu has closed, or GO_TO_PREVIOUS to stay */
@@ -858,7 +868,7 @@ static int menu_tracks(bool (*fn)(const char *path, void *data), void *data)
         fn(menu_path, data);
         return 1;
     }
-    return each_track(menu_seek, (struct book_track *)p,
+    return each_track(menu_seek, menu_artist_seek, (struct book_track *)p,
                       p < end ? (int)((end - p) / sizeof(struct book_track)) : 0,
                       fn, data);
 }
@@ -911,8 +921,8 @@ static bool first_track(const char *path, void *data)
 }
 
 /* The menu a book in the browser has, its rows run for the book's tracks.
- * True if the book was marked. */
-static bool book_menu(const char *book)
+ * 'book' is its id, 'name' what it is called. True if the book was marked. */
+static bool book_menu(const char *book, const char *name)
 {
     char first[MAX_PATH];
     char sel[MAX_PATH];
@@ -930,7 +940,7 @@ static bool book_menu(const char *book)
 
     /* Led by a slash, as the browser does, so a new playlist is offered the
      * book's name */
-    snprintf(sel, sizeof(sel), "%s%s", book[0] == '/' ? "" : "/", book);
+    snprintf(sel, sizeof(sel), "%s%s", name[0] == '/' ? "" : "/", name);
     first[0] = '\0';
 
     switch (choice)
@@ -992,10 +1002,11 @@ static int shelf_action_cb(int action, struct gui_synclist *lists)
     v = rows[n];
 
     menu_seek = ROW_IS_RESUME(v) ? -1 : books[v].seek;
+    menu_artist_seek = ROW_IS_RESUME(v) ? -1 : books[v].artist_seek;
     if (ROW_IS_RESUME(v))
         strmemccpy(menu_path, resume_path(ROW_RESUME_OF(v)), sizeof(menu_path));
-    marked = book_menu(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
-                                        : book_name(v));
+    marked = ROW_IS_RESUME(v) ? book_menu(menu_path, menu_path)
+                              : book_menu(book_id(v), book_name(v));
     if (marked)
         marked_row = n;
     return marked || menu_exit != GO_TO_PREVIOUS ? ACTION_STD_CANCEL

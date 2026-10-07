@@ -11,11 +11,28 @@
 #include <stdint.h>
 #include "file.h"           /* MAX_PATH */
 
-/* As much of a book's name as identifies it. The browser knows a book by the
- * title of the level it is on, which it holds in a buffer of this size, so a
- * longer name is cut to the same length before it is keyed or the two would
- * never match. */
+/* As much of a book's album or album artist as identifies it. The browser
+ * knows a book by the title of the level it is on, which it holds in a buffer
+ * of this size, so a longer name is cut to the same length before it is keyed
+ * or the two would never match. */
 #define BOOK_KEY_MAX    128
+
+/* A book's id, which every call below takes as 'book': its album and its
+ * album artist together, or the file's path for a single-file book with no
+ * album to name it. Two books of one title by different authors are two
+ * books; retagging either name loses the position. */
+#define BOOK_ID_MAX     (2 * BOOK_KEY_MAX)
+
+/* The id of the book 'album' by 'author', where the author is the album
+ * artist, else the artist, else <Untagged> -- as the database files it. */
+void book_resume_id(char *buf, size_t size, const char *album,
+                    const char *author);
+
+/* The id of the album at 'album_seek' by the album artist at 'artist_seek';
+ * with -1 for the artist, by the album artist whose album of that name is a
+ * book. False where the database is not in RAM or does not know it. */
+bool book_resume_id_of(long album_seek, long artist_seek, char *buf,
+                       size_t size);
 
 /* How many books are remembered: as many as the shelf can list, so a book
  * marked by hand keeps its mark in any library the shelf was written for. */
@@ -44,9 +61,8 @@ struct book_resume
     enum book_left left;
 };
 
-/* The key 'book' is saved under. 'book' is its album tag, or the file's path
- * for a single-file book with no album to name it. Letter case is folded, so
- * two albums named alike but for case are one book here. */
+/* The key 'book' is saved under. Letter case is folded, so two albums named
+ * alike but for case are one book here. */
 uint64_t book_resume_key(const char *book);
 
 /* Registers for the end of a track, which is how a book played through to its

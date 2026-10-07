@@ -7,9 +7,10 @@
  * the database, so it has neither a directory nor a playlist file -- and a
  * .bmark is keyed by one or the other, which is why bookmark.c turns a
  * playlist like this one away (bookmark_is_bookmarkable_state()). The key
- * here is the book itself: its album tag, which is what the shelf browses
- * books by, or the file's path for a single-file book with no album tag to
- * name it.
+ * here is the book itself: its album and album artist, which is how the
+ * database tells albums apart, or the file's path for a single-file book with
+ * no album tag to name it. A position saved under the album alone, as an
+ * older firmware keyed them, is rekeyed once the database is in RAM.
  *
  * One entry per book, most recently played first, in a libfile of entries
  * that each say their length. Both the book and its track are 64-bit keys
@@ -30,6 +31,7 @@
  * Parts, in order:
  *   - the entry, and reading books out of the file
  *   - the older text formats, and converting them
+ *   - positions keyed by the album alone, rekeyed
  *   - the track that ended, noted on the audio thread
  *   - writing: what is worth saving, marks, and the swap
  ****************************************************************************/
@@ -49,6 +51,7 @@
 #include "system/appevents.h"
 #include "database/db_spoken.h"
 #include "database/path_key.h"
+#include "database/tagcache.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
 #include "settings/settings.h"
@@ -77,7 +80,7 @@ struct book_rec
     uint32_t offset;
     int32_t  index;
     uint8_t  left;
-    uint8_t  pad;
+    uint8_t  named;             /* keyed by the album alone */
     uint16_t path_len;
 };
 
@@ -104,12 +107,13 @@ struct entry
 {
     uint64_t book;
     const char *path;           /* the file, for a book keyed by it */
+    bool named;                 /* 'book' is the album's key alone */
     struct book_resume pos;
 };
 
 uint64_t book_resume_key(const char *book)
 {
-    char name[BOOK_KEY_MAX];
+    char name[BOOK_ID_MAX];
     uint64_t h;
 
     if (book[0] == '/')
@@ -118,6 +122,43 @@ uint64_t book_resume_key(const char *book)
     strmemccpy(name, book, sizeof (name));
     h = path_key_fold_hash(name);
     return h ? h : 1;
+}
+
+void book_resume_id(char *buf, size_t size, const char *album,
+                    const char *author)
+{
+    snprintf(buf, size, "%.*s\t%.*s", BOOK_KEY_MAX - 1, album,
+             BOOK_KEY_MAX - 1, author && author[0] ? author : UNTAGGED);
+}
+
+bool book_resume_id_of(long album_seek, long artist_seek, char *buf,
+                       size_t size)
+{
+    char album[BOOK_KEY_MAX];
+    char author[BOOK_KEY_MAX];
+    struct tagcache_album al;
+    int n;
+
+    /* The book of that name if there is one, else whoever's album it is */
+    for (n = tagcache_album_find_name(album_seek);
+         artist_seek < 0 && n >= 0 && tagcache_album_get(n, &al)
+         && al.album_seek == album_seek; n++)
+    {
+        if (al.spoken == al.tracks)
+            artist_seek = al.artist_seek;
+    }
+    if (artist_seek < 0 && n > 0 && tagcache_album_get(n - 1, &al)
+        && al.album_seek == album_seek)
+        artist_seek = al.artist_seek;
+
+    if (artist_seek < 0
+        || !tagcache_seek_string(tag_album, album_seek, album, sizeof(album)))
+        return false;
+    if (!tagcache_seek_string(tag_albumartist, artist_seek, author,
+                              sizeof(author)))
+        author[0] = '\0';
+    book_resume_id(buf, size, album, author);
+    return true;
 }
 
 /* The next tab-separated field, consuming it. Splits 'line' in place. */
@@ -195,6 +236,7 @@ static bool parse_current(char *line, struct entry *e)
     e->pos.offset  = strtoul(offset, NULL, 10);
     e->pos.index   = atoi(index);
     e->path = path != NULL && path[0] == '/' ? path : NULL;
+    e->named = e->path == NULL;
     return true;
 }
 
@@ -219,6 +261,7 @@ static bool parse_old(char *line, struct entry *e)
         book = track;
     e->book = book_resume_key(book);
     e->path = book[0] == '/' ? book : NULL;
+    e->named = e->path == NULL;
     e->pos.track   = path_key(track);
     e->pos.elapsed = strtoul(elapsed, NULL, 10);
     e->pos.offset  = strtoul(offset, NULL, 10);
@@ -236,9 +279,15 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
     struct libfile_header h;
     struct book_rec r;
     int fd;
+    bool old = false;
 
     fd = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, LIB_BOOKS_VERSION, 1,
                       &h, NULL);
+    if (fd < 0)
+    {
+        fd = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, 1, 1, &h, NULL);
+        old = true;
+    }
     if (fd < 0)
         return !file_exists(BOOK_RESUME_FILE);
 
@@ -252,6 +301,7 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
         path[r.path_len] = '\0';
         e.book = r.book;
         e.path = r.path_len ? path : NULL;
+        e.named = e.path == NULL && (old || r.named);
         e.pos.track = r.track;
         e.pos.elapsed = r.elapsed;
         e.pos.offset = r.offset;
@@ -326,6 +376,8 @@ bool book_resume_get(const char *book, struct book_resume *pos)
         && pos->left == BOOK_LEFT_PARTWAY && pos->track != 0;
 }
 
+static void rekey(void);
+
 bool book_resume_find(const char *book, struct book_resume *pos)
 {
     struct find_ctx ctx = { .pos = pos, .found = false };
@@ -333,6 +385,7 @@ bool book_resume_find(const char *book, struct book_resume *pos)
     if (book == NULL || book[0] == '\0')
         return false;
 
+    rekey();
     ctx.book = book_resume_key(book);
     scan(find_one, &ctx);
     return ctx.found;
@@ -355,22 +408,106 @@ void book_resume_each(book_resume_fn fn, void *data)
 {
     struct each_ctx ctx = { .fn = fn, .data = data };
 
+    rekey();
     scan(each_one, &ctx);
+}
+
+/* ------------------------------------------------------------------ *
+ * positions keyed by the album alone                                 *
+ * ------------------------------------------------------------------ */
+
+static bool rekey_checked;
+
+static bool find_named(const struct entry *e, void *data)
+{
+    *(bool *)data = e->named;
+    return !e->named;
+}
+
+/* The key of the book whose album had the key 'named', or 0 */
+static uint64_t book_of_album(uint64_t named)
+{
+    struct tagcache_album al;
+    char album[BOOK_KEY_MAX];
+    char id[BOOK_ID_MAX];
+
+    for (int n = 0; tagcache_album_get(n, &al); n++)
+    {
+        if (al.spoken == al.tracks
+            && tagcache_seek_string(tag_album, al.album_seek, album,
+                                    sizeof(album))
+            && book_resume_key(album) == named
+            && book_resume_id_of(al.album_seek, al.artist_seek, id,
+                                 sizeof(id)))
+            return book_resume_key(id);
+    }
+    return 0;
+}
+
+static bool write_entry(struct libfile_writer *w, const struct entry *e);
+
+struct rekey_ctx
+{
+    struct libfile_writer *out;
+    bool ok;
+};
+
+/* A position whose book has gone keeps its key; it then matches nothing,
+ * and falls off the end of the file in time. */
+static bool rekey_one(const struct entry *e, void *data)
+{
+    struct rekey_ctx *ctx = data;
+    struct entry n = *e;
+
+    if (n.named)
+    {
+        uint64_t book = book_of_album(n.book);
+
+        if (book != 0)
+            n.book = book;
+        n.named = false;
+    }
+    ctx->ok = write_entry(ctx->out, &n);
+    return ctx->ok;
+}
+
+/* Once per boot, as soon as the database is in RAM: the album tables are
+ * what say which author an album's book is by. */
+static void rekey(void)
+{
+    struct libfile_writer w;
+    struct rekey_ctx ctx = { .out = &w, .ok = true };
+    bool any = false;
+
+    if (rekey_checked || tagcache_album_count() == 0)
+        return;
+    rekey_checked = true;
+
+    scan(find_named, &any);
+    if (!any || !libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
+                               LIB_BOOKS_VERSION, 1, NULL))
+        return;
+    ctx.ok = scan(rekey_one, &ctx) && ctx.ok;
+    libfile_finish(&w, ctx.ok);
 }
 
 /* ------------------------------------------------------------------ *
  * the track that ended                                               *
  * ------------------------------------------------------------------ */
 
-/* The name a book is saved under: the album, the same as it is on the shelf.
- * A book held in one file with no album tag has only its path to be known by,
- * and is reached by playing the file rather than by opening a book, so that is
- * the key it is looked up under too. */
-static const char *book_name(const struct mp3entry *id3)
+/* The id a book is saved under: its album and author, built in 'buf'. A book
+ * held in one file with no album tag has only its path to be known by, and is
+ * reached by playing the file rather than by opening a book, so that is the
+ * key it is looked up under too. */
+static const char *book_name(const struct mp3entry *id3, char *buf,
+                             size_t size)
 {
     if (id3->album == NULL || id3->album[0] == '\0')
         return id3->path;
-    return id3->album;
+    book_resume_id(buf, size, id3->album,
+                   id3->albumartist && id3->albumartist[0] ? id3->albumartist
+                                                           : id3->artist);
+    return buf;
 }
 
 /* The last book track to play to its end, waiting for a save to write it
@@ -388,6 +525,7 @@ static volatile bool ended_pending;
 /* PLAYBACK_EVENT_TRACK_FINISH, on the audio thread: no file I/O here. */
 static void track_finish_event(unsigned short id, void *ev_data)
 {
+    static char id_buf[BOOK_ID_MAX];
     const struct track_event *te = ev_data;
     const struct mp3entry *id3 = te->id3;
     const char *name;
@@ -405,7 +543,7 @@ static void track_finish_event(unsigned short id, void *ev_data)
         return;
 
     ended_pending = false;
-    name = book_name(id3);
+    name = book_name(id3, id_buf, sizeof(id_buf));
     ended_track.book = book_resume_key(name);
     ended_track.by_path = name == id3->path;
     strmemccpy(ended_track.track, id3->path, sizeof (ended_track.track));
@@ -433,6 +571,7 @@ static bool write_entry(struct libfile_writer *w, const struct entry *e)
     r.offset = e->pos.offset;
     r.index = e->pos.index;
     r.left = e->pos.left;
+    r.named = e->named;
     r.path_len = e->path != NULL ? strlen(e->path) : 0;
     return libfile_write(w, &r, sizeof(r), sizeof(r))
            && libfile_write(w, e->path, r.path_len, r.path_len);
@@ -499,12 +638,13 @@ bool book_resume_convert(const char *text_file)
 /* The book loaded for playback, playing or paused, or NULL. */
 static struct mp3entry *loaded_book(const char **name, uint64_t *book)
 {
+    static char id_buf[BOOK_ID_MAX];
     struct mp3entry *id3 = audio_status() ? audio_current_track() : NULL;
 
     if (id3 == NULL || !db_spoken_is_spoken_genre(id3->genre_string))
         return NULL;
 
-    *name = book_name(id3);
+    *name = book_name(id3, id_buf, sizeof(id_buf));
     *book = book_resume_key(*name);
     return id3;
 }
@@ -521,6 +661,7 @@ bool book_resume_mark(const char *book, enum book_left left)
     const char *name;
     uint64_t loaded;
 
+    rekey();
     e.book = book_resume_key(book);
     if (global_settings.segregate_audiobooks
         && loaded_book(&name, &loaded) != NULL && loaded == e.book)
@@ -544,6 +685,7 @@ void book_resume_save(void)
     if (!global_settings.segregate_audiobooks)
         return;
 
+    rekey();
     id3 = loaded_book(&name, &book);
 
     if (ended_pending)

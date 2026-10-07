@@ -563,9 +563,9 @@ static bool build(int type)
 /* Where the book being played was left, if it was */
 static bool find_book_position(void)
 {
-    char book[BOOK_KEY_MAX];
+    char book[BOOK_ID_MAX];
 
-    return tagcache_seek_string(tag_album, play_book_seek, book, sizeof(book))
+    return book_resume_id_of(play_book_seek, -1, book, sizeof(book))
            && book_resume_get(book, &block->resume);
 }
 

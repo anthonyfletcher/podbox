@@ -278,8 +278,9 @@ listed in both menus. The genre and composer lists are left as they are, so a
 book is still reachable under its own genre.
 
 Pausing, stopping, switching off or starting something else saves a book's
-place, and the last 1,024 books are remembered. Choosing a chapter plays it from
-its start. A book held in a single file has a chapter list only when Chapter
+place, and the last 1,024 books are remembered. A place is kept under the book's
+album and album artist, so retagging either loses it. Choosing a chapter plays
+it from its start. A book held in a single file has a chapter list only when Chapter
 Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are

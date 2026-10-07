@@ -2133,10 +2133,22 @@ static const struct {
     { LANG_BOOK_SHELF_ROW_PROGRESS, BOOK_SHELF_IN_PROGRESS },
 };
 
-/* The book a track list is under -- its album, which is what the shelf
- * browses books by -- or NULL where this is not one. */
+/* The album artist chosen above 'level', or -1 */
+static long level_artist(int level)
+{
+    for (int i = 0; i < level; i++)
+        if (csi->tagorder[i] == tag_albumartist)
+            return csi->result_seek[i];
+    return -1;
+}
+
+/* The id of the book a track list is under -- its album, by the album artist
+ * chosen above it or else the one whose book it is -- or NULL where this is
+ * not one. */
 static const char *level_book(struct browser_context *c, int level, int tag)
 {
+    static char id[BOOK_ID_MAX];
+
     if (!global_settings.segregate_audiobooks)
         return NULL;
     if (c->currtable != TABLE_NAVIBROWSE || tag != tag_title)
@@ -2146,7 +2158,9 @@ static const char *level_book(struct browser_context *c, int level, int tag)
     if (csi->tagorder[level - 1] != tag_album || !csi_mentions_spoken())
         return NULL;
 
-    return current_title[level];
+    return book_resume_id_of(csi->result_seek[level - 1],
+                             level_artist(level - 1), id, sizeof(id))
+           ? id : NULL;
 }
 
 /* Whether this level opens with a Resume row. */
@@ -4234,7 +4248,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         && newextra == TABLE_NAVIBROWSE)
     {
         char path[MAX_PATH];
-        char book[BOOK_KEY_MAX];
+        char book[BOOK_ID_MAX];
         char name[BOOK_KEY_MAX];
         bool spoken = global_settings.segregate_audiobooks
                       && csi_mentions_spoken();
@@ -4251,8 +4265,10 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         if (one)
             strmemccpy(name, (const char *)P2STR((unsigned char *)dptr->name),
                        sizeof(name));
-        if (one && spoken)
-            strmemccpy(book, name, sizeof(book));
+        if (one && spoken && csi->tagorder[c->currextra] == tag_album
+            && !book_resume_id_of(seek, level_artist(c->currextra), book,
+                                  sizeof(book)))
+            book[0] = '\0';
         core_unpin(browser_db_handle);
 
         if (one)
@@ -5096,9 +5112,7 @@ bool browser_db_get_book(struct browser_context* c, int item,
                          char *buf, size_t buflen)
 {
     struct tagentry *entry;
-    struct tagcache_search tcs;
     struct tagcache_album al;
-    bool ok;
 
     if (!browser_db_is_spoken_list(c) || item < c->special_entry_count
         || !(entry = browser_db_get_entry(c, item)))
@@ -5106,16 +5120,14 @@ bool browser_db_get_book(struct browser_context* c, int item,
 
     if (browser_db_is_album_list(c))
         return row_has_book(tag_album, entry->extraseek, c->currextra)
-               && browser_db_get_entry_name(c, item, buf, buflen) != NULL;
+               && book_resume_id_of(entry->extraseek,
+                                    level_artist(c->currextra), buf, buflen);
 
     /* A track: the book is its album, if that is one */
-    if (entry->newtable != TABLE_PLAYTRACK
-        || !tagcache_album_get(tagcache_album_of(entry->extraseek), &al)
-        || al.spoken != al.tracks || !tagcache_search(&tcs, tag_album))
-        return false;
-    ok = tagcache_retrieve(&tcs, entry->extraseek, tag_album, buf, buflen);
-    tagcache_search_finish(&tcs);
-    return ok;
+    return entry->newtable == TABLE_PLAYTRACK
+           && tagcache_album_get(tagcache_album_of(entry->extraseek), &al)
+           && al.spoken == al.tracks
+           && book_resume_id_of(al.album_seek, al.artist_seek, buf, buflen);
 }
 
 /* True when this browse level is listing artists -- the rows that can carry
