@@ -68,13 +68,14 @@ enum pv_name_src
 
 /* Artist and title for a logged path, and the album when it is known.
  *
- * 'album' comes back empty unless the database named one, since a path does
- * not carry an album; the caller decides what to do about that. The return
- * value describes the artist and title, not the album.
+ * 'album' and 'album_artist' come back empty unless the database named them,
+ * since a path does not carry an album; the caller decides what to do about
+ * that. The return value describes the artist and title, not the album.
  *
- * All three buffers must hold PV_NAME_MAX bytes. */
+ * Every buffer must hold PV_NAME_MAX bytes; 'album_artist' may be NULL. */
 enum pv_name_src pv_names_resolve(const char *path, char *artist,
-                                      char *title, char *album);
+                                      char *title, char *album,
+                                      char *album_artist);
 
 /* Entries the database holds, and how many of them the path index can name:
  * equal numbers when it is in RAM, 0 mapped when it is not. */

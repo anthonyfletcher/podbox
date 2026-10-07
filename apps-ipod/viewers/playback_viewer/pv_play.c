@@ -18,10 +18,17 @@
  * playing is playing the wrong thing, and an empty playlist under a track
  * that is still going is the quiet version of it.
  *
+ * An album card is looked for in the database's album tables first: the album
+ * of that name by that album artist is one row there, every track of it,
+ * guests included, between two entries of the index. Only when the tables
+ * cannot place it -- the database is not in RAM, or the card's artist is
+ * nobody's album artist and several albums share the name -- is it searched
+ * for by name, narrowed by the track artist.
+ *
  * Parts: the clause pair that turns a name into a search; the queue that
- * defers the erase; the count that decides whether to go on; then the two
- * ways a match reaches the playlist, in track order for an album and in
- * search order for the rest.
+ * defers the erase; the count that decides whether to go on; an album from
+ * the tables; then the two ways a match reaches the playlist, in track order
+ * for an album and in search order for the rest.
  ****************************************************************************/
 
 #include <stdlib.h>
@@ -34,6 +41,7 @@
 #include "widgets/splash.h"
 #include "system/app_util.h"            /* warn_on_pl_erase */
 #include "playlist/playlist.h"
+#include "pv_names.h"                   /* PV_NAME_MAX */
 #include "pv_play.h"
 
 /* Tracks an album is ordered in one go. Past this it is played in the order
@@ -161,6 +169,126 @@ static int compare_ordered(const void *a_v, const void *b_v)
     return a->key - b->key;
 }
 
+/* Whether a full tag 'full' is the name a card holds, which was cut to
+ * PV_NAME_MAX when the play was named */
+static bool names_match(const char *full, const char *card)
+{
+    size_t n = strlen(card);
+
+    return strncmp(full, card, n) == 0
+           && (full[n] == '\0' || n >= PV_NAME_MAX - 1);
+}
+
+/* Whether album-table row 'al' holds a track by 'artist' */
+static bool row_has_artist(const struct tagcache_album *al,
+                           const char *artist)
+{
+    struct tagcache_search tcs;
+    struct tagcache_search_clause by;
+    char buf[MAX_PATH];
+    bool found;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return false;
+    tagcache_search_add_filter(&tcs, tag_album, al->album_seek);
+    tagcache_search_add_filter(&tcs, tag_albumartist, al->artist_seek);
+    tagcache_search_set_range(&tcs, al->first, al->last);
+    memset(&by, 0, sizeof(by));
+    by.tag = tag_artist;
+    by.type = clause_is;
+    by.source = source_constant;
+    by.str = (char *)artist;
+    tagcache_search_add_clause(&tcs, &by);
+    found = tagcache_get_next(&tcs, buf, sizeof(buf));
+    tagcache_search_finish(&tcs);
+    return found;
+}
+
+/* The album-table row an album card means: of the albums of its name, the
+ * one by its artist as album artist, else the only one, else the first with a
+ * track by its artist. -1 when the tables cannot say. */
+static int album_row(const struct pv_target *t)
+{
+    struct tagcache_album al;
+    char tag[MAX_PATH];
+    bool artist = t->artist && t->artist[0];
+    int only = -1, named = 0;
+
+    for (int n = 0; tagcache_album_get(n, &al); n++)
+    {
+        if (!tagcache_seek_string(tag_album, al.album_seek, tag, sizeof(tag))
+            || !names_match(tag, t->name))
+            continue;
+        named++;
+        only = n;
+        if (artist
+            && tagcache_seek_string(tag_albumartist, al.artist_seek, tag,
+                                    sizeof(tag))
+            && names_match(tag, t->artist))
+            return n;
+    }
+    if (named == 1)
+        return only;
+    for (int n = 0; artist && named > 1 && tagcache_album_get(n, &al); n++)
+    {
+        if (tagcache_seek_string(tag_album, al.album_seek, tag, sizeof(tag))
+            && names_match(tag, t->name) && row_has_artist(&al, t->artist))
+            return n;
+    }
+    return -1;
+}
+
+/* Album-table row 'al', every track of it, in track order where it fits */
+static int insert_album_row(struct queue *q, const struct tagcache_album *al)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    int found = 0, added = 0;
+    bool ordered = al->tracks <= ORDER_MAX;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return 0;
+    tagcache_search_add_filter(&tcs, tag_album, al->album_seek);
+    tagcache_search_add_filter(&tcs, tag_albumartist, al->artist_seek);
+    tagcache_search_set_range(&tcs, al->first, al->last);
+
+    while (tagcache_get_next(&tcs, path, sizeof(path)))
+    {
+        int disc, track;
+
+        if (!ordered || found >= ORDER_MAX)
+        {
+            /* Too big to order: the scan's own order, which is close to
+             * track order for most rips */
+            if (queue_add(q, path) < 0)
+                break;
+            added++;
+            continue;
+        }
+        disc  = tagcache_get_numeric(&tcs, tag_discnumber);
+        track = tagcache_get_numeric(&tcs, tag_tracknumber);
+        if (disc < 0)  disc = 0;
+        if (track < 0) track = 0;
+        order[found].idx_id = tcs.idx_id;
+        order[found].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
+        found++;
+    }
+
+    qsort(order, found, sizeof(*order), compare_ordered);
+    for (int i = 0; i < found; i++)
+    {
+        if (!tagcache_retrieve(&tcs, order[i].idx_id, tag_filename,
+                               path, sizeof(path)))
+            continue;
+        if (queue_add(q, path) < 0)
+            break;
+        added++;
+    }
+
+    tagcache_search_finish(&tcs);
+    return added;
+}
+
 /* Every match, in the order the search returns them, at most 'limit' of them
  * (0 for all). Folder by folder, which is album by album for an artist. */
 static int insert_in_search_order(struct queue *q,
@@ -255,6 +383,23 @@ int pv_play_target(const struct pv_target *t)
 
     cpu_boost(true);
 
+    if (t->kind == PV_TARGET_ALBUM)
+    {
+        struct tagcache_album al;
+
+        if (tagcache_album_get(album_row(t), &al) && al.tracks > 0)
+        {
+            if (!warn_on_pl_erase())
+            {
+                cpu_boost(false);
+                return -1;
+            }
+            q.open = false;
+            added = insert_album_row(&q, &al);
+            goto queued;
+        }
+    }
+
     /* Narrowed by the artist first, because any number of albums and songs
      * share a title. Widening when that finds nothing is what makes a
      * disagreeing artist a looser match rather than no match at all: Spun's
@@ -300,6 +445,7 @@ int pv_play_target(const struct pv_target *t)
                                        t->kind == PV_TARGET_SONG ? 1 : 0);
     }
 
+queued:
     if (q.open)
         playlist_insert_context_release(&q.ctx);
     cpu_boost(false);

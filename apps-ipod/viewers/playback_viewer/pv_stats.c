@@ -29,7 +29,10 @@
  * A note on albums. A path does not carry one, so an album name can only come
  * from the database. Without one, plays are bucketed under the ARTIST
  * instead: the numbers stay meaningful and the album card degrades to an
- * artist card, which is better than a table full of folder names.
+ * artist card, which is better than a table full of folder names. With one,
+ * an album belongs to its album artist, as the database files it: a
+ * compilation is one album, not one per track artist, and two artists'
+ * albums of one name are two.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -673,6 +676,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
 {
     struct pv_totals *t = ctx;
     char artist[PV_NAME_MAX], title[PV_NAME_MAX], album[PV_NAME_MAX];
+    char album_artist[PV_NAME_MAX];
     const char *path = e->path;
     enum pv_name_src src;
     unsigned elapsed;
@@ -689,6 +693,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
         strlcpy(artist, e->artist, sizeof(artist));
         strlcpy(title, e->title, sizeof(title));
         strlcpy(album, e->album ? e->album : "", sizeof(album));
+        album_artist[0] = '\0';
         src = PV_NAME_LOG;
         t->from_log++;
     }
@@ -699,7 +704,7 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
         path = pv_names_locate(e->path);
         if (tagcache_find_key(key) < 0)
             logged_add(key, path == e->path ? key : path_key(path));
-        src = pv_names_resolve(path, artist, title, album);
+        src = pv_names_resolve(path, artist, title, album, album_artist);
         if (src == PV_NAME_DB)
             t->from_db++;
         else
@@ -752,7 +757,15 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
         }
         if (album[0] || artist[0])
         {
-            al = htable_get(&t_album, album[0] ? album : artist, ar_idx);
+            /* An album artist who is not this track's own is a row of the
+             * artist table too, though one with no plays of its own */
+            int owner = ar_idx;
+
+            if (album[0] && album_artist[0] && strcmp(album_artist, artist))
+                owner = row_index(&t_artist,
+                                  htable_get(&t_artist, album_artist,
+                                             PV_ROW_NONE));
+            al = htable_get(&t_album, album[0] ? album : artist, owner);
             al_idx = row_index(&t_album, al);
         }
         if (title[0])

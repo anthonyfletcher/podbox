@@ -47,7 +47,7 @@
 
 /* Moves whenever the way a path is named changes, so pv_names_identity()
  * does too and every saved report is rebuilt from the log once. */
-#define PV_NAMES_VERSION 2
+#define PV_NAMES_VERSION 3
 
 /* Longest file name taken apart by the filename guesswork. */
 #define META_MAX 160
@@ -347,11 +347,14 @@ const char *pv_names_locate(const char *path)
 }
 
 enum pv_name_src pv_names_resolve(const char *path, char *artist,
-                                      char *title, char *album)
+                                      char *title, char *album,
+                                      char *album_artist)
 {
     int idx_id = tagcache_find_path(path);
 
     album[0] = '\0';
+    if (album_artist)
+        album_artist[0] = '\0';
 
     /* Both halves of the name have to be real, or the filename is the better
      * answer -- half a database name is worse than a whole guessed one.
@@ -363,6 +366,10 @@ enum pv_name_src pv_names_resolve(const char *path, char *artist,
     {
         if (!tagcache_entry_string(idx_id, tag_album, album, PV_NAME_MAX))
             album[0] = '\0';
+        if (album_artist
+            && !tagcache_entry_string(idx_id, tag_albumartist, album_artist,
+                                      PV_NAME_MAX))
+            album_artist[0] = '\0';
         return PV_NAME_DB;
     }
 
