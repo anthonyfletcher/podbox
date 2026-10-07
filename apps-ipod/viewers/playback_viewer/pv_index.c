@@ -169,7 +169,6 @@ bool pv_index_write_end(void)
     wr_fd = -1;
 
     /* Only now does the new index become the index. */
-    remove(PV_INDEX_PATH);
     return rename(PV_INDEX_TMP, PV_INDEX_PATH) == 0;
 }
 

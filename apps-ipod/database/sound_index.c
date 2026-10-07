@@ -714,7 +714,6 @@ int sound_index_finish(bool prune)
 
     /* In place only once the replacement is whole: a scan of this length must
      * not be able to destroy the previous index by failing near the end. */
-    remove(SOUND_FILE);
     if (rename(SOUND_FILE ".new", SOUND_FILE) < 0)
         return SOUND_ERR_IO;
 

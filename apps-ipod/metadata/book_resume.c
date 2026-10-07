@@ -431,7 +431,6 @@ static bool rewrite(const struct entry *first)
         return false;
     }
 
-    remove(BOOK_RESUME_FILE);
     return rename(BOOK_RESUME_TMP, BOOK_RESUME_FILE) >= 0;
 }
 

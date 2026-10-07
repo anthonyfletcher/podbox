@@ -204,10 +204,7 @@ void path_list_write_close(struct path_list_writer *w, bool completed)
     tmp_name(w->path, tmp, sizeof(tmp));
 
     if (completed)
-    {
-        remove(w->path);
         rename(tmp, w->path);
-    }
     else
         remove(tmp);
 

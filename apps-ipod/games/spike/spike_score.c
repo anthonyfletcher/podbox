@@ -299,7 +299,5 @@ bool spk_score_end(const struct spk_run *r)
 
     close(out);
 
-    remove(SPK_SCORE_FILE);
-
     return rename(SPK_SCORE_TMP, SPK_SCORE_FILE) >= 0;
 }

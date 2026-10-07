@@ -103,15 +103,20 @@ static void scores_load(void)
     close(fd);
 }
 
+/* Written beside the old file and renamed over it, so a save cut short
+ * leaves the previous best */
 static void scores_save(void)
 {
-    int fd = open(QUIZ_SCORE_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int fd = open(QUIZ_SCORE_FILE ".new", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    bool ok;
 
     if (fd < 0)
         return;
 
-    fdprintf(fd, "%s\nbest %d\n", QUIZ_SCORE_MAGIC, best);
-    close(fd);
+    ok = fdprintf(fd, "%s\nbest %d\n", QUIZ_SCORE_MAGIC, best) > 0;
+    if (close(fd) < 0 || !ok || rename(QUIZ_SCORE_FILE ".new",
+                                       QUIZ_SCORE_FILE) < 0)
+        remove(QUIZ_SCORE_FILE ".new");
 }
 
 /* ------------------------------------------------------------------ *
