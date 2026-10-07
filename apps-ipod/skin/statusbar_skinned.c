@@ -36,7 +36,6 @@
 #include "system/activity.h"
 #include "metadata/art_cache.h"
 #include "database/tagcache.h"
-#include "database/db_summary.h"
 #include "files/file_index.h"
 
 /* initial setup of wps_data  */
@@ -243,15 +242,14 @@ void do_sbs_update_callback(unsigned short id, void *param)
     button_queue_post(BUTTON_NONE, 0);
 }
 
-/* The four background passes behind %lb: the music database, the album index,
- * the album-art thumbnail cache and the document/image index. None was asked
+/* The three background passes behind %lb: the music database, the album-art
+ * thumbnail cache and the document/image index. None was asked
  * for, none is visible, and any of them can be why a screen is slow to open --
  * so they share one indicator. Here rather than beside the tag because the busy
  * tick below needs the same question answered. */
 bool sb_background_busy(void)
 {
-    return tagcache_is_busy() || db_summary_is_busy()
-        || art_cache_is_busy() || file_index_is_busy();
+    return tagcache_is_busy() || art_cache_is_busy() || file_index_is_busy();
 }
 
 /* Each indicator off means off everywhere: the tag shows nothing, and the busy

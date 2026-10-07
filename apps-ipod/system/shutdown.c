@@ -39,7 +39,6 @@
 #include "widgets/list.h"
 #include "playlist/playlist.h"
 #include "database/tagcache.h"
-#include "database/db_summary.h" /* db_summary_write_plays */
 #include "screens/system/usb_screen.h"
 #include "screens/bookmark.h"
 #include "metadata/book_resume.h"
@@ -140,7 +139,6 @@ static bool clean_shutdown(enum shutdown_type sd_type,
             /* Even on an empty battery: queued play counts and ratings, and
              * the buffered playback log, are a few sector writes. */
             tagcache_shutdown();
-            db_summary_write_plays();
             add_playbacklog(NULL);
             dircache_disable();
         }

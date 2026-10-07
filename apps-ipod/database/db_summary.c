@@ -1,36 +1,22 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The database index: the flat album and artist list derived from tagcache.
+ * The database index: the flat album and artist list, for the screens that
+ * want one -- Album covers, Artist portraits, the charts, Random album, and
+ * the browser's year and artist orders.
  *
- * Built by walking tagcache into a caller-supplied struct db_summary_t and a
- * caller-supplied buffer, and persisted to library/cache/albums.dat so later
- * reads get it back instead of rescanning. It carries no artwork -- only
- * names, years, playback figures and the taglist seeks needed to navigate into
- * the database -- so it goes stale when the database changes, not when files
- * on disk do.
- *
- * Nothing here knows about the screens that read it. Whose index is being
- * built, and what that screen does afterwards, is the caller's business.
- *
- * It began as the carousel's own list and is no longer only that: the album
- * and artist charts read the same index for their rankings, which is why it
- * is named for the database rather than for any one screen. Building it is
- * nobody's screen's job, and is intended to happen while none of them is up.
+ * tagcache keeps the album and artist tables with the database in RAM (see
+ * tagcache_album_get()), current with every commit and every play. This
+ * copies them out into a caller's buffer as names and records the screens
+ * read, leaving out spoken word when Segregate Audiobooks keeps it apart.
+ * Nothing is built in the background or kept on disk; the lists exist while
+ * the database is in RAM.
  *
  * Parts, in order:
- *   - progress reporting and cancellation
- *   - name keys, and writing entries into the index buffer
- *   - the tagcache walks that populate it
- *   - the play log
- *   - carrying figures across a rebuild
- *   - the track walks: each album's artist and figures
- *   - create_album_index(), driving all of the above
- *   - the on-disk form: saving, and the album and artist loaders
- *   - db_summary_build_into(), which reuses the saved index or rebuilds it
- *   - the background pass: its progress reporting and the acquire/release pair
- *   - reading single records out of the saved file, without holding it
- *   - the background pass again: its staleness gate, its run and its thread
+ *   - what is left out, and copying names
+ *   - the artist and album lists
+ *   - single albums, for a caller with no buffer
+ *   - the order table for album lists
  *   - playing an album
  ****************************************************************************/
 
@@ -39,925 +25,128 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "string-extra.h"
-#include "system/library_files.h"
-#include "database/libfile.h"
 #include "config.h"
 #include "system/hash.h"
-#include "system.h"          /* ALIGN_BUFFER/alignof */
-#include "rbpaths.h"
+#include "system.h"          /* ALIGN_BUFFER */
 #include "kernel.h"
-#include "file.h"
 #include "lang.h"
+#include "settings/settings.h"
 #include "database/tagcache.h"
-#include "database/db_spoken.h"    /* which albums and artists are books */
-#include "metadata/art_cache.h"      /* art_cache_dir_hash */
 #include "widgets/splash.h"
-#include "widgets/yesno.h"           /* gui_syncyesno_run, YESNO_YES */
-#include "draw/screen_access.h"
-#include "skin/statusbar_skinned.h"  /* sb_skin_update */
-#include "skin/skin_engine.h"        /* skin_flush_dirty */
-#include "input/action.h"
-#include "powermgmt.h"               /* reset_poweroff_timer */
-#include "system/shutdown.h"
-#include "system/activity.h"          /* ui_set_working */
-#include "system/bg_task.h"           /* the background pass runs as one */
-#include "system/debug_log.h"         /* what the carry-over managed to skip */
 #include "system/app_buffer.h"        /* scratch for ordering an album */
 #include "system/app_util.h"          /* warn_on_pl_erase */
 #include "playlist/playlist.h"
-#include "core_alloc.h"              /* background build buffer */
-#include "usb.h"                     /* SYS_USB_CONNECTED handling */
-#include "ata_idle_notify.h"         /* the play log waits for an idle disk */
 #include "db_summary.h"
 
-/* The index file, and the four-byte magic at its start. It holds albums and
- * artists alike, and is read by more than the carousel now, so it lives beside
- * the other state in ROCKBOX_DIR rather than in the carousel's own folder --
- * which keeps only what is genuinely the carousel's, its slide cache and empty
- * slide. Regenerated if absent. */
-#define DB_SUMMARY_FILE LIB_ALBUMS_FILE
-/* The index is always rewritten whole, so it is built here and renamed over
- * the real file rather than written into it. See save_album_index(). */
-#define DB_SUMMARY_TMP  DB_SUMMARY_FILE ".new"
-/* Plays since the summary was written. */
-#define DB_PLAYS_FILE LIB_ALBUM_PLAYS_FILE
+/* ---- what is left out, and copying names ------------------------------- */
 
-/* One finished track. The serial is tagcache's, which is what the index's own
- * watermark is compared against, and doubles as the lastplayed value.
- *
- * Trap: tagcache_increase_serial() returns the value *before* the increment,
- * while the watermark is the counter as it stands -- the next value to be
- * handed out. So a record is already counted in an index only when its serial
- * is strictly below that watermark. Testing <= instead discards the first
- * play after every build, and no other. */
-struct play_rec
+/* Spoken word, when Segregate Audiobooks keeps it out of the music: an album
+ * all of whose tracks are spoken, and an artist all of whose albums are */
+static bool album_hidden(const struct tagcache_album *a)
 {
-    int32_t  serial;
-    uint32_t album_key;
-    uint32_t artist_key;
-};
-#define DB_PLAYS_MAGIC   LIB_ALBUM_PLAYS_MAGIC
-#define DB_PLAYS_VERSION LIB_ALBUM_PLAYS_VERSION
-
-/* Past this the log stops being cheaper to replay than to fold in, so the
- * background pass is asked for. */
-#define PLAY_LOG_MAX 512
-/* Bump the magic whenever struct album_data or struct artist_data, or the
- * file's layout, changes. load_album_index() validates nothing finer -- it
- * checks this and some coarse sizes -- so a struct that grew without a new
- * magic is read back at the wrong stride from a file written by an older
- * build.
- *   PFID -> PFIE: album_data gained playcount/lastplayed (the album charts).
- *   PFIE -> PFIF: artist_data gained the same (the artist charts), and the
- *                 file moved out of the carousel folder.
- *   PFIF -> PFIG: both gained art_hash (the carousel's slide loading).
- *   PFIG -> PFIH: album_data gained artist_art_hash. PFIG indexes also have to
- *                 go regardless: they were written by a build that resolved
- *                 every art_hash to 0, so nothing in them would ever match a
- *                 cached thumbnail.
- *   PFIH -> PFII: both gained key, and the header gained the commitid/serial
- *                 watermarks.
- *   PFII -> PFIJ: the header gained the deleted count.
- *   PFIJ -> PFIK: artist_ct/album_ct are int32_t rather than uint16_t, which
- *                 moves every field after them. They have to be: a 16-bit
- *                 count wraps silently past 65535 albums.
- *   PFIK -> PFIL: no layout change. "podcasts" became a spoken genre, and an
- *                 index written before that still lists those albums as
- *                 music -- a change of meaning the layout checks cannot see.
- *   PFIL -> PFIM: the header gained the background pass's covered marks. */
-#define INDEX_HDR "PFIM"
-
-enum ePFS { ePFS_ARTIST = 0, ePFS_ALBUM };
-
-/* Whether a header just read off the disk describes something that could fit
- * in `bufsz` -- and, more to the point, whose counts survive being multiplied
- * by a struct size.
- *
- * Every reader of the file has to ask this before it multiplies or adds any of
- * these four fields, because the failure is not a rejected file: a count large
- * enough to overflow the 32-bit size arithmetic wraps to a *small* number, the
- * reads sized from it are satisfied, and the loop that then walks the real
- * count runs off the end of the allocation. carry_over_prepare() writes in
- * that loop.
- *
- * The magic does not cover this. It is four bytes at the front of the file,
- * and a header scribbled by a bad unmount keeps them while the counts behind
- * them turn to noise. Bounding each count by what the buffer could hold at
- * best is enough: the products below cannot then exceed bufsz, so the sums the
- * callers make of them cannot wrap either. */
-static bool header_fits(const struct db_summary_t *d, size_t bufsz)
-{
-    return d->album_ct  >= 0
-        && d->artist_ct >= 0
-        && (size_t)d->album_ct  <= bufsz / sizeof(struct album_data)
-        && (size_t)d->artist_ct <= bufsz / sizeof(struct artist_data)
-        && d->album_len  <= bufsz
-        && d->artist_len <= bufsz;
+    return global_settings.segregate_audiobooks && a->tracks > 0
+           && a->spoken == a->tracks;
 }
 
-/* Shared by every walk below; the models keep their own where they need one. */
-static struct tagcache_search tcs;
-
-/* The index currently being built, and the buffer it is being built into.
- *
- * A file static rather than a parameter threaded through the ten functions
- * that touch it, and deliberately singular: only one build may run at a time,
- * whoever asked for it. That lets the same code serve the carousel building
- * into the app buffer it has claimed, and a background build into memory of
- * its own -- the allocation differs, the builder does not. */
-static struct db_summary_t *pfi;
-
-/* Serialises the two callers of the builder. The carousel blocks here rather
- * than starting a second build; because it has usually just asked for one, it
- * sets idx_abort first so the background pass gives up promptly instead of
- * making the screen wait out a full scan. */
-static struct mutex build_mutex;
-
-/* True while the *background* pass owns the builder. It changes two things
- * the builder must not do off the main thread: draw, and read the keypad. */
-static bool building_bg;
-static volatile bool idx_abort;
-
-/* Which side is about to want the builder.
- *
- * building_bg cannot answer that, because it is set inside build_mutex: between
- * a foreground caller finding it clear and that caller reaching the lock, the
- * background pass can take the lock, and the caller then blocks on it with a
- * dead screen and no way out -- precisely what wait_for_background() exists to
- * prevent. These two are set before either side reaches for the lock, so the
- * question can be asked while the answer still means something.
- *
- * Each side announces itself and only then looks at the other, so a tie is
- * resolved rather than missed: at least one of them sees the other's mark. The
- * background pass is the side that gives way, because nothing is waiting on it
- * and its next tick is a few seconds away. The reverse case costs nothing --
- * a background thread blocking on the mutex is invisible; only the thread
- * holding the screen must never do it. */
-static volatile bool bg_claimed;
-static long fg_wanted_tick;
-
-/* Long enough to cover a foreground caller getting from its announcement to
- * the lock. It is refreshed while that caller waits, so it does not have to
- * cover the waiting itself; and going stale only ever risks the background
- * pass blocking on the mutex, which is harmless. */
-#define FG_CLAIM_TICKS (HZ / 2)
-
-static bool foreground_wants_builder(void)
+static bool artist_hidden(const struct tagcache_artist *r)
 {
-    return TIME_BEFORE(current_tick, fg_wanted_tick + FG_CLAIM_TICKS);
+    return global_settings.segregate_audiobooks && r->albums > 0
+           && r->spoken_albums == r->albums;
 }
 
-/* Last progress the background pass reported; read by anything showing it.
- * bg_step is the step name the builder was already passing to the progress
- * bar and the background path was already throwing away -- keeping the
- * pointer is the whole cost of reporting what the pass is doing. */
-static int bg_done, bg_total;
-static const char *bg_step;
-
-static void draw_progressbar(int step, int count, char *msg);
-static int wait_for_background(void);
-static bool bg_should_stop(void);
-
-/* Keep an idle poweroff from interrupting a build the user is watching.
- *
- * Deliberately not done for a background pass. reset_poweroff_timer() records
- * a *user event*, and claiming one on behalf of a pass nobody asked for would
- * hold poweroff off for the whole build and then restart the timer from the
- * moment it ended -- on a device sitting idle with the screen off. Poweroff is
- * already deferred while the pass runs, by the disk activity it genuinely
- * causes (see handle_auto_poweroff()). */
-static void keep_awake_for_build(void)
-{
-    if (!building_bg)
-        reset_poweroff_timer();
-}
-
-/* The "working" indicator, likewise only for a build someone is watching.
- *
- * ui_set_working() repaints the status bar on the spot and flushes it -- it has
- * to, because a foreground build then blocks without redrawing, and the
- * indicator would otherwise appear only once the work was over. From the
- * background thread that same repaint lands on whatever screen the user is
- * actually on, which is the flicker seen as a background build finished. The
- * background pass has no indicator to show and nothing to show it on. */
-static void set_working_for_build(bool working)
-{
-    if (!building_bg)
-        ui_set_working(working);
-}
-
-static void draw_progressbar(int step, int count, char *msg)
-{
-    if (building_bg)
-    {
-        /* Record it instead. Nothing may reach the LCD from the background
-         * thread -- whatever screen the user is on owns it. */
-        bg_done = step;
-        bg_total = count;
-        bg_step = msg;
-        return;
-    }
-
-    (void)step; (void)count; (void)msg;
-
-    /* Rate-limited, because this is not cheap: a status bar render plus an LCD
-     * flush is a few milliseconds either side of ten, and the callers reach
-     * here once per album or per track. Unthrottled, most of a foreground
-     * build was spent redrawing rather than reading the database -- the
-     * background pass, which draws nothing, finishes the same work several
-     * times quicker. 8fps is more than enough for an indicator that only
-     * spins. */
-    static long next_draw_tick;
-    long now = current_tick;
-
-    if (!TIME_AFTER(now, next_draw_tick))
-        return;
-    next_draw_tick = now + HZ / 8;
-
-    sb_skin_update(SCREEN_MAIN, true);
-    skin_flush_dirty();
-}
-
-static bool progress_cancel(int step, int count, char *msg)
-{
-    if (building_bg)
-    {
-        /* No get_action() here: the background pass must not consume button
-         * presses meant for the screen in front of the user. It gives up when
-         * someone else wants the builder, or on the way to a USB session.
-         *
-         * The yield is not optional. Scheduling is cooperative, so a pass that
-         * never gives up the CPU freezes the UI however low its priority --
-         * and get_action(), which used to be the yield point on this path, is
-         * exactly what was removed above. */
-        yield();
-        if (count)
-            draw_progressbar(step, count, msg);
-        return idx_abort || bg_should_stop();
-    }
-
-    const struct text_message prompt = {
-            (const char*[]) {"Quit?", "Progress will be lost"}, 2};
-
-    int action = get_action(CONTEXT_STD,TIMEOUT_NOBLOCK);
-
-    /* While a foreground build runs, this get_action() is the only thing
-     * reading the button queue -- and a USB connect arrives on it as an
-     * action. That queue is in the broadcast list, so the storage handover
-     * counts an acknowledgement from it, and default_event_handler() is what
-     * sends it. Dropping the action here leaves the handover waiting and the
-     * host looking at a drive with no medium in it for the length of the
-     * build. Give up afterwards: the library this was reading may have changed
-     * while the host had the disk. */
-    if (default_event_handler(action) == SYS_USB_CONNECTED)
-        return true;
-
-    if (action == ACTION_STD_CANCEL || action == ACTION_STD_MENU)
-    {
-        if (gui_syncyesno_run(&prompt, NULL, NULL) == YESNO_YES)
-            return true;
-        lcd_clear_display();
-    }
-
-    if (count)
-        draw_progressbar(step, count, msg);
-
-    return false;
-}
-
-static int compare_album_artists (const void *a_v, const void *b_v)
-{
-    uint32_t a = ((struct album_data *)a_v)->artist_idx;
-    uint32_t b = ((struct album_data *)b_v)->artist_idx;
-    return (int)(a - b);
-}
-
-/* The order the index is left in, and therefore the order it is saved in.
- *
- * Artist, then album name -- both offsets into name blobs that were written in
- * the order tagcache walked them, so this is a total order over the entries
- * and reading no setting. That matters twice: the file is reproducible from
- * the same library, and the charts, which keep array order between entries
- * whose figures tie, show the same tied albums after a rebuild as before it.
- * qsort is not stable, so leaving the ties to it would give neither. */
-static int compare_index_order(const void *a_v, const void *b_v)
-{
-    const struct album_data *a = a_v;
-    const struct album_data *b = b_v;
-
-    if (a->artist_idx != b->artist_idx)
-        return (int)((uint32_t)a->artist_idx - (uint32_t)b->artist_idx);
-    return (int)((uint32_t)a->name_idx - (uint32_t)b->name_idx);
-}
-
-/* FNV-1a over one name, or two joined by a NUL so that ("ab", "c") and
- * ("a", "bc") do not land on the same value. Pass NULL for 'b' to key on a
- * single name.
- *
- * 32 bits: a collision merges two entries' playback figures, which is wrong
- * but not corrupt, and the next full rebuild reads the real numbers back out
- * of tagcache anyway. */
+/* Identity hashed from the names: an album's from its name and its artist's,
+ * an artist's from its name alone */
 static uint32_t name_key(const char *a, const char *b)
 {
     uint32_t h = FNV1A_BASIS;
 
     for (; a && *a; a++)
         h = fnv1a_byte(h, (unsigned char)*a);
-
-    h = fnv1a_byte(h, 0);   /* the joining NUL */
-
+    h = fnv1a_byte(h, 0);
     for (; b && *b; b++)
         h = fnv1a_byte(h, (unsigned char)*b);
-
     return h;
 }
 
-/* Fill in every entry's key, once the album list is final. Left to the end
- * rather than done as entries are written because an album's artist is not
- * known until the artist pass has resolved it.
- *
- * A nameless album keys to 0, meaning "do not match this against anything".
- * The list really does hold a few -- four on the library this was written
- * against, sorted to the front with no name, no artist and no year -- and
- * they would otherwise all share one key and be handed each other's figures. */
-static void assign_keys(void)
+/* A name at the end of the blob being filled; its offset into the blob, or
+ * -1 when it does not fit. A value with no tag is UNTAGGED. */
+static int add_name(int tag, long seek, char *blob, size_t *len, size_t cap)
 {
-    int i;
+    char name[TAGCACHE_BUFSZ];
+    size_t n;
 
-    for (i = 0; i < pfi->album_ct; i++)
-    {
-        struct album_data *a = &pfi->album_index[i];
-        const char *name = pfi->album_names + a->name_idx;
-        const char *artist = a->artist_idx >= 0
-                           ? pfi->artist_names + a->artist_idx : NULL;
-
-        a->key = *name ? name_key(name, artist) : 0;
-    }
+    if (!tagcache_seek_string(tag, seek, name, sizeof(name)))
+        strmemccpy(name, UNTAGGED, sizeof(name));
+    n = strlen(name) + 1;
+    if (*len + n > cap)
+        return -1;
+    memcpy(blob + *len, name, n);
+    *len += n;
+    return *len - n;
 }
 
-static void write_album_index(int idx, int name_idx,
-                              long album_seek, int artist_idx, long artist_seek)
+/* ---- the artist and album lists ---------------------------------------- */
+
+/* The artist half into *buf, advancing it: the array, then its names */
+static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
 {
-    pfi->album_index[idx].name_idx = name_idx;
-    pfi->album_index[idx].key = 0;
-    pfi->album_index[idx].seek = album_seek;
-    pfi->album_index[idx].artist_idx = artist_idx;
-    pfi->album_index[idx].artist_seek = artist_seek;
-    pfi->album_index[idx].year = 0;
-    pfi->album_index[idx].playcount = 0;
-    pfi->album_index[idx].lastplayed = 0;
-    pfi->album_index[idx].art_hash = 0;
-    pfi->album_index[idx].artist_art_hash = 0;
-}
+    struct tagcache_artist r;
+    int nr = tagcache_artist_count(), n = 0;
+    size_t len = 0, cap;
+    char *p = ALIGN_UP(*buf, sizeof(long));
+    size_t left = *bufsz - (p - *buf);
 
-static inline void write_album_entry(struct tagcache_search *tcs,
-                                     int name_idx, unsigned int len)
-{
-    write_album_index(-pfi->album_ct, name_idx, tcs->result_seek, 0, -1);
-    pfi->album_len += len;
-    pfi->album_ct++;
-
-    if (pfi->album_untagged_seek == -1 && strcmp(UNTAGGED, tcs->result) == 0)
-    {
-        pfi->album_untagged_idx = name_idx;
-        pfi->album_untagged_seek = tcs->result_seek;
-    }
-}
-
-static void write_artist_entry(struct tagcache_search *tcs,
-                               int name_idx, unsigned int len)
-{
-    pfi->artist_index[-pfi->artist_ct].name_idx = name_idx;
-    pfi->artist_index[-pfi->artist_ct].key = 0;
-    pfi->artist_index[-pfi->artist_ct].seek = tcs->result_seek;
-    pfi->artist_index[-pfi->artist_ct].playcount = 0;
-    pfi->artist_index[-pfi->artist_ct].lastplayed = 0;
-    pfi->artist_index[-pfi->artist_ct].art_hash = 0;
-    pfi->artist_len += len;
-    pfi->artist_ct++;
-}
-
-/* The art_cache keys for the folders holding the artwork of the track the given
- * search is currently sitting on: its own folder (the album's), and that
- * folder's parent (the artist's, under the <artist>/<album>/<track> layout the
- * artist list assumes). Either is set to 0 if the path is too shallow to strip
- * that far. Both are resolved together because they come from one path.
- *
- * The caller must be on a *filtered or numeric* search. Those go through
- * build_lookup_list(), which walks the master index and so records a real
- * master-index id per result -- and tcs->idx_id is what makes the path one
- * direct fetch away, with no search and no scan of our own. An unfiltered
- * search on a unique tag (tag_album, tag_albumartist) is not usable here: those
- * tag files are deduplicated and their entries carry idx_id -1, so there is no
- * track to ask about. That is why this is called from the per-album and
- * per-artist passes rather than from the walks that first enumerate them.
- *
- * Done during the build so that displaying a slide never has to go near the
- * database. Either output pointer may be NULL for a caller that wants only the
- * other one. */
-static void resolve_art_hashes(struct tagcache_search *tcs,
-                               unsigned int *album_hash,
-                               unsigned int *artist_hash)
-{
-    /* Static rather than automatic: this can run on the background build
-     * thread, whose stack is modest, and one build at a time is enforced by
-     * build_mutex. */
-    static char path[MAX_PATH];
-    char *sep;
-
-    if (album_hash)
-        *album_hash = 0;
-    if (artist_hash)
-        *artist_hash = 0;
-
-    if (tcs->idx_id < 0
-        || !tagcache_retrieve(tcs, tcs->idx_id, tag_filename,
-                              path, sizeof(path)))
-        return;
-
-    sep = strrchr(path, '/');
-    if (!sep || sep == path)
-        return;
-    *sep = '\0';                     /* track file -> album folder */
-    if (album_hash)
-        *album_hash = art_cache_dir_hash(path);
-
-    sep = strrchr(path, '/');
-    if (!sep || sep == path)
-        return;
-    *sep = '\0';                     /* album -> artist folder */
-    if (artist_hash)
-        *artist_hash = art_cache_dir_hash(path);
-}
-
-/* Spoken word is kept out of the index when the setting says so, which is what
- * reaches Album covers, Artist portraits, Random album and the charts -- all
- * four read this index rather than the database.
- *
- * Dropped entry by entry rather than by a clause on the search, because a
- * clause moves tagcache off the tag file and onto the master index (see
- * build_lookup_list() there): the names would then be collected in database
- * order, and this index is ordered by their offsets into the name blobs. The
- * order of every screen reading it is that order.
- *
- * The index is written to disk, so a change to the setting has to invalidate
- * it: nothing here notices, the saved file's own staleness checks being about
- * the database rather than about what was asked of it. See
- * db_summary_invalidate(), which the setting's callback calls. */
-static bool exclude_spoken(const struct tagcache_search *tcs)
-{
-    return global_settings.segregate_audiobooks
-        && db_spoken_group_is_book(tcs->type, tcs->result_seek);
-}
-
-/* Start a search with the table it will be filtered against already built.
- *
- * The build has to happen before the search -- it runs searches of its own,
- * which cannot nest -- and both halves have to name one tag, which is why the
- * search is started here rather than beside the call: exclude_spoken() above
- * then reads that tag back off the search and the two cannot drift apart.
- *
- * False when the table would not build, which is a reason to come back later
- * rather than to carry on. This index is written to disk and its own staleness
- * checks are about the database, so an unfiltered one built now would stand as
- * the answer until the setting is toggled or the database commits. */
-static bool search_excluding_spoken(struct tagcache_search *tcs, int tag)
-{
-    if (global_settings.segregate_audiobooks && db_spoken_group_tag(tag)
-        && !db_spoken_group_ensure(tag))
-        return false;
-
-    /* Refused during a commit: an index built from nothing would be saved as
-     * the answer. */
-    return tagcache_search(tcs, tag);
-}
-
-/* adds tagcache_search results into artist/album index */
-static int get_tcs_search_res(int type, struct tagcache_search *tcs,
-                              void **buf, size_t *bufsz)
-{
-    char tcs_buf[TAGCACHE_BUFSZ];
-    const long tcs_bufsz = sizeof(tcs_buf);
-    int ret = SUCCESS;
-    unsigned int l, name_idx = 0;
-    void (*writefn)(struct tagcache_search *, int, unsigned int);
-    int data_size;
-    if (type == ePFS_ARTIST)
-    {
-        writefn = &write_artist_entry;
-        data_size = sizeof(struct artist_data);
-    }
-    else
-    {
-        writefn = &write_album_entry;
-        data_size = sizeof(struct album_data);
-    }
-
-    while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
-    {
-        if (exclude_spoken(tcs))
-            continue;
-
-        if (progress_cancel(0, 0, NULL))
-        {
-            ret = ERROR_USER_ABORT;
-            break;
-        }
-
-        l = tcs->result_len;
-
-        /* Check before subtracting -- *bufsz is unsigned, so subtracting
-         * data_size (or l) once the real remaining space is smaller than
-         * that would wrap to a huge value instead of going negative,
-         * permanently defeating this check for the rest of the scan and
-         * letting strcpy()/writefn() below walk past the end of
-         * pfi->buf on any library large enough to fill it. */
-        if ((size_t)data_size > *bufsz || l > *bufsz - data_size)
-        {
-            /* not enough memory */
-            ret = ERROR_BUFFER_FULL;
-            break;
-        }
-
-        *bufsz -= data_size;
-
-        strcpy(*buf, tcs->result);
-
-        *bufsz -= l;
-        *buf = l + (char *)*buf;
-
-        writefn(tcs, name_idx, l);
-
-        name_idx += l;
-    }
-    tagcache_search_finish(tcs);
-    return ret;
-}
-
-#define STR_STEP_INDEXING_UNTAGGED "1/5 Find " UNTAGGED
-#define STR_STEP_ASSIGNING_ALBUMS "2/5 Find Albums"
-#define STR_STEP_ASSIGNING_ALBUM_STATS "3/5 Check Album Info"
-#define STR_STEP_REMOVING_DUPLICATES "4/5 Remove Duplicates"
-#define STR_STEP_ARTIST_STATS "Check Artist Info"
-
-/*adds <untagged> albums/artist to existing album index */
-static int create_album_untagged(struct tagcache_search *tcs, size_t *bufsz)
-{
-    static char tcs_buf[TAGCACHE_BUFSZ];
-    const long tcs_bufsz = sizeof(tcs_buf);
-    int ret = SUCCESS;
-    int album_count = pfi->album_ct; /* store existing count */
-    int total_count = pfi->album_ct + pfi->artist_ct * 2;
-    long seek;
-    int last, final, retry;
-    int i, j;
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, total_count, STR_STEP_INDEXING_UNTAGGED);
-
-    /* search tagcache for all <untagged> albums & save the albumartist seek pos */
-    if (tagcache_search(tcs, tag_albumartist))
-    {
-        tagcache_search_add_filter(tcs, tag_album, pfi->album_untagged_seek);
-
-        while (tagcache_get_next(tcs, tcs_buf, tcs_bufsz))
-        {
-            if (progress_cancel(pfi->album_ct, total_count, STR_STEP_INDEXING_UNTAGGED))
-            {
-                tagcache_search_finish(tcs);
-                return ERROR_USER_ABORT;
-            }
-
-            if (tcs->result_seek ==
-                pfi->album_index[-(pfi->album_ct - 1)].artist_seek)
-                continue;
-
-            if (sizeof(struct album_data) > *bufsz)
-            {
-                /* not enough memory */
-                ret = ERROR_BUFFER_FULL;
-                break;
-            }
-
-            *bufsz -= sizeof(struct album_data);
-            write_album_index(-pfi->album_ct, pfi->album_untagged_idx,
-                               pfi->album_untagged_seek, -1, tcs->result_seek);
-            pfi->album_ct++;
-        }
-        tagcache_search_finish(tcs);
-
-        if (ret == SUCCESS) {
-            draw_progressbar(0, pfi->album_ct, STR_STEP_INDEXING_UNTAGGED);
-
-            last = 0;
-            final = pfi->artist_ct;
-            retry = 0;
-
-            /* map the artist_seek position to the artist name index */
-            for (j = album_count; j < pfi->album_ct; j++)
-            {
-                if (progress_cancel(j, pfi->album_ct, STR_STEP_INDEXING_UNTAGGED))
-                    return ERROR_USER_ABORT;
-
-                seek = pfi->album_index[-j].artist_seek;
-                /* Per album, as the same walk in create_album_index() does.
-                 * Left at 2 by a miss, every later album searches whatever
-                 * truncated range that miss left behind and never wraps. */
-                retry = 0;
-
-    retry_artist_lookup:
-                retry++;
-                for (i = last; i < final; i++)
-                {
-                    if (seek == pfi->artist_index[i].seek)
-                    {
-                        int idx = pfi->artist_index[i].name_idx;
-                        pfi->album_index[-j].artist_idx = idx;
-                        last = i; /* last match, start here next loop */
-                        final = pfi->artist_ct;
-                        retry = 0;
-                        break;
-                    }
-                }
-                if (retry > 0 && retry < 2)
-                {
-                    /* no match start back at beginning */
-                    final = last;
-                    last = 0;
-                    goto retry_artist_lookup;
-                }
-            }
-        }
-    }
-
-    return ret;
-}
-
-/* Create an index of all artists from the database, into whichever index pfi
- * currently points at. Like everything else here it assumes build_mutex is
- * held and pfi is set -- db_summary_build_artists() is how an outside caller
- * gets into that state. */
-static int build_artist_index(struct tagcache_search *tcs,
-                                 void **buf, size_t *bufsz)
-{
-    int i, res = SUCCESS;
-    struct artist_data* tmp_artist;
-
-    /* artist index starts at end of buf it will be rearranged when finalized */
-    pfi->artist_index = ((struct artist_data *)(*bufsz + (char *) *buf)) - 1;
-    pfi->artist_ct = 0;
-    pfi->artist_len = 0;
-    /* artist names starts at beginning of buf */
-    pfi->artist_names = *buf;
-
-    if (!search_excluding_spoken(tcs, tag_albumartist))
-        return ERROR_USER_ABORT;
-
-    res = get_tcs_search_res(ePFS_ARTIST, tcs, &(*buf), bufsz);
-    tagcache_search_finish(tcs);
-    if (res < SUCCESS)
-        return res;
-
-    /* finalize the artist index */
-    ALIGN_BUFFER(*buf, *bufsz, alignof(struct artist_data));
-    tmp_artist = (struct artist_data*)*buf;
-    for (i = pfi->artist_ct - 1; i >= 0; i--)
-        tmp_artist[i] = pfi->artist_index[-i];
-
-    pfi->artist_index = tmp_artist;
-    /* move buf ptr to end of artist_index */
-    *buf = pfi->artist_index + pfi->artist_ct;
-
-    /* Here rather than with the albums' keys, so the artist-only build gets
-     * them too -- that path never reaches create_album_index(). */
-    for (i = 0; i < pfi->artist_ct; i++)
-    {
-        const char *name = pfi->artist_names + pfi->artist_index[i].name_idx;
-
-        pfi->artist_index[i].key = *name ? name_key(name, NULL) : 0;
-    }
-
-    if (res == SUCCESS)
-    {
-        if (pfi->artist_ct > 0)
-            res = pfi->artist_ct;
-        else
-            res = ERROR_NO_ALBUMS;
-    }
-
-    return res;
-}
-
-/* ---------------------------------------------------------------------------
- * The play log
- *
- * A play changes an album's figures and nothing else about it, so rebuilding
- * the index for one is absurd -- and rebuilding is the only thing that ever
- * updated them. Instead each finished track appends twelve bytes here, and a
- * reader applies whatever arrived after the index was written.
- *
- * Both keys come from the track's own tags, so a play costs no database work
- * at all. The records wait in RAM, as tagcache's play counts do, and are
- * appended when the disk is next about to sleep: a play is logged on the
- * audio thread, which must not wait out a spin-up.
- * ------------------------------------------------------------------------ */
-
-#define PLAYS_PENDING_MAX 16
-static struct play_rec plays_pending[PLAYS_PENDING_MAX];
-static int plays_pending_ct;
-
-/* Appends the plays waiting in RAM, taken before the first yield. A play
- * logged while this writes stays in RAM until a later call. */
-void db_summary_write_plays(void)
-{
-    struct play_rec recs[PLAYS_PENDING_MAX];
-    struct libfile_header h;
-    int n = plays_pending_ct;
-
+    for (int i = 0; i < nr; i++)
+        if (tagcache_artist_get(i, &r) && !artist_hidden(&r))
+            n++;
     if (n == 0)
-        return;
-    memcpy(recs, plays_pending, n * sizeof(recs[0]));
-    plays_pending_ct = 0;
+        return ERROR_NO_ARTISTS;
+    if (left < n * sizeof(struct artist_data))
+        return ERROR_BUFFER_FULL;
 
-    /* A write cut short is put back as it was, and these plays dropped:
-     * losing a few is not worth noticing, a misaligned log would be. */
-    if (!libfile_append(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION,
-                        sizeof(recs[0]), recs, n))
-        return;
+    t->artist_index = (struct artist_data *)p;
+    t->artist_names = p + n * sizeof(struct artist_data);
+    cap = left - n * sizeof(struct artist_data);
 
-    /* Ask for a pass once it has grown enough that folding it into the index
-     * beats replaying it on every read. Cheap to say so: a build that finds
-     * only plays changed carries every album's figures across bar the ones
-     * named here. */
-    if (libfile_peek(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION, &h)
-        && h.count > PLAY_LOG_MAX)
-        bg_task_update(&db_summary_task);
-}
-
-void db_summary_log_play(const char *album, const char *albumartist,
-                       long serial)
-{
-    struct play_rec *rec;
-
-    /* Nothing to attribute it to. assign_keys() gives a nameless album a key
-     * of 0 and matches nothing against it, so a record like this could never
-     * be applied to anything. */
-    if (!album || !*album)
-        return;
-
-    /* Full only if the disk has not slept in sixteen plays */
-    if (plays_pending_ct == PLAYS_PENDING_MAX)
-        db_summary_write_plays();
-
-    rec = &plays_pending[plays_pending_ct++];
-    rec->serial = serial;
-    rec->album_key = name_key(album, albumartist);
-    rec->artist_key = albumartist && *albumartist
-                    ? name_key(albumartist, NULL) : 0;
-    register_storage_idle_func(db_summary_write_plays);
-}
-
-/* The play log, opened at its first record, or -1.
- *
- * A log that fails its checksum is discarded: reading it anyway could credit
- * plays to the wrong albums. The figures already folded into the saved index
- * are untouched, and only the plays not yet folded in are lost. */
-static int open_play_log(void)
-{
-    struct libfile_header h;
-    int fd = libfile_open(DB_PLAYS_FILE, DB_PLAYS_MAGIC, DB_PLAYS_VERSION,
-                          sizeof(struct play_rec), &h, NULL);
-
-    if (fd < 0 && file_exists(DB_PLAYS_FILE))
-        remove(DB_PLAYS_FILE);
-    return fd;
-}
-
-/* Apply the log to an index just read from disk. Records at or below its
- * watermark are already counted in the figures it was saved with.
- *
- * Linear over the arrays rather than sorted-and-searched: a few hundred
- * records against a few hundred albums is nothing, and the arrays are in
- * display order by the time anyone wants them. */
-static void replay_plays(struct db_summary_t *idx)
-{
-    struct play_rec batch[32];
-    int fd = open_play_log();
-    ssize_t got;
-
-    if (fd < 0)
-        return;
-
-    while ((got = read(fd, batch, sizeof(batch))) >= (ssize_t)sizeof(batch[0]))
+    n = 0;
+    for (int i = 0; i < nr; i++)
     {
-        int n = got / sizeof(batch[0]);
-        int i, j;
+        struct artist_data *d = &t->artist_index[n];
+        int at;
 
-        for (i = 0; i < n; i++)
-        {
-            if (batch[i].serial < idx->serial)
-                continue;
-
-            for (j = 0; j < idx->album_ct; j++)
-            {
-                struct album_data *a = &idx->album_index[j];
-
-                if (a->key != batch[i].album_key || a->key == 0)
-                    continue;
-                a->playcount++;
-                if (batch[i].serial > a->lastplayed)
-                    a->lastplayed = batch[i].serial;
-                break;
-            }
-
-            for (j = 0; j < idx->artist_ct; j++)
-            {
-                struct artist_data *r = &idx->artist_index[j];
-
-                if (r->key != batch[i].artist_key || r->key == 0)
-                    continue;
-                r->playcount++;
-                if (batch[i].serial > r->lastplayed)
-                    r->lastplayed = batch[i].serial;
-                break;
-            }
-        }
+        if (!tagcache_artist_get(i, &r) || artist_hidden(&r))
+            continue;
+        at = add_name(tag_albumartist, r.seek, t->artist_names, &len, cap);
+        if (at < 0)
+            return ERROR_BUFFER_FULL;
+        d->name_idx = at;
+        d->key = name_key(t->artist_names + at, NULL);
+        d->playcount = r.playcount;
+        d->lastplayed = r.lastplayed;
+        d->seek = r.seek;
+        d->art_hash = r.art_hash;
+        n++;
     }
-
-    close(fd);
+    t->artist_ct = n;
+    t->artist_len = len;
+    *bufsz -= (t->artist_names + len) - *buf;
+    *buf = t->artist_names + len;
+    return SUCCESS;
 }
 
-/* ---------------------------------------------------------------------------
- * Carrying figures across a rebuild
- *
- * Summarising albums costs a walk of every track, and a filename fetch per
- * album for its artwork folder. An album whose tracks are the same as when
- * the last index was written already has its answer in that file, and when
- * every album does the walk is skipped.
- *
- * The seeks in it are worthless by then -- a commit that adds a track re-sorts
- * the whole album tagfile and moves every one -- so entries are matched by the
- * name key instead, and only the figures are taken.
- * ------------------------------------------------------------------------ */
-
-/* Room for the albums that gained tracks, and for the search's unique list.
- * Past the first, so much has changed that summarising the lot is no worse
- * than working out what to skip. */
-#define CARRY_DIRTY_MAX 512
-#define CARRY_UNIQ_MAX  2048
-
-struct carried
+/* The listed artist with this seek, by its place in seek order */
+static const struct artist_data *find_artist(const struct db_summary_t *t,
+                                             long seek)
 {
-    uint32_t key;
-    int year;
-    int playcount;
-    long lastplayed;
-    unsigned int art_hash;
-    unsigned int artist_art_hash;
-};
-
-static struct carried *carried_tab;
-static int carried_ct;
-/* Album-name hashes with a track newer than the saved index. The name alone,
- * without the artist: a search on tag_album yields names, and matching more
- * albums than strictly necessary only costs the search we would have done. */
-static uint32_t *dirty_tab;
-static int dirty_ct;
-/* Full album keys named in the play log. Their figures must come from
- * tagcache, which already holds the real counts -- carrying the old ones and
- * then replaying the log on top of them would count those plays twice. */
-static uint32_t *played_tab;
-static int played_ct;
-/* What was taken off the buffer for the two tables, so the caller can have it
- * back once they are finished with. */
-static size_t carry_reserved;
-
-static int compare_carried(const void *a, const void *b)
-{
-    uint32_t ka = ((const struct carried *)a)->key;
-    uint32_t kb = ((const struct carried *)b)->key;
-    return ka < kb ? -1 : (ka > kb);
-}
-
-static int compare_u32(const void *a, const void *b)
-{
-    uint32_t ka = *(const uint32_t *)a, kb = *(const uint32_t *)b;
-    return ka < kb ? -1 : (ka > kb);
-}
-
-static const struct carried *carried_find(uint32_t key)
-{
-    int lo = 0, hi = carried_ct - 1;
-
-    if (key == 0)   /* nameless: matches nothing, by assign_keys()'s rule */
-        return NULL;
+    int lo = 0, hi = t->artist_ct - 1;
 
     while (lo <= hi)
     {
         int mid = (lo + hi) / 2;
 
-        if (carried_tab[mid].key == key)
-            return &carried_tab[mid];
-        if (carried_tab[mid].key < key)
+        if (t->artist_index[mid].seek == seek)
+            return &t->artist_index[mid];
+        if (t->artist_index[mid].seek < seek)
             lo = mid + 1;
         else
             hi = mid - 1;
@@ -965,1748 +154,239 @@ static const struct carried *carried_find(uint32_t key)
     return NULL;
 }
 
-static bool in_u32_table(const uint32_t *tab, int ct, uint32_t v)
+/* The index's own order: by artist, then by album name */
+static int compare_index_order(const void *a_v, const void *b_v)
 {
-    int lo = 0, hi = ct - 1;
+    const struct album_data *a = a_v, *b = b_v;
 
-    while (lo <= hi)
-    {
-        int mid = (lo + hi) / 2;
-
-        if (tab[mid] == v)
-            return true;
-        if (tab[mid] < v)
-            lo = mid + 1;
-        else
-            hi = mid - 1;
-    }
-    return false;
+    if (a->artist_idx != b->artist_idx)
+        return a->artist_idx < b->artist_idx ? -1 : 1;
+    return a->name_idx - b->name_idx;
 }
 
-/* Albums that cannot take the previous index's figures: one that gained
- * tracks (matched on the name, which is all the commitid search reports) or
- * one that was played (matched on the full key, which the log carries). */
-static bool album_is_dirty(uint32_t namehash, uint32_t key)
-{
-    return in_u32_table(dirty_tab, dirty_ct, namehash)
-        || in_u32_table(played_tab, played_ct, key);
-}
-
-/* The albums named in the log since the saved index was written. */
-static void load_played(int32_t since)
-{
-    struct play_rec batch[32];
-    int fd = open_play_log();
-    ssize_t got;
-
-    if (fd < 0)
-        return;
-
-    while ((got = read(fd, batch, sizeof(batch))) >= (ssize_t)sizeof(batch[0]))
-    {
-        int n = got / sizeof(batch[0]);
-        int i;
-
-        for (i = 0; i < n; i++)
-        {
-            if (batch[i].serial < since || played_ct >= PLAY_LOG_MAX)
-                continue;
-            played_tab[played_ct++] = batch[i].album_key;
-        }
-    }
-
-    close(fd);
-
-    if (played_ct > 0)
-        qsort(played_tab, played_ct, sizeof(*played_tab), compare_u32);
-}
-
-/* Albums holding a track committed after the saved index was written. One
- * pass over the master index, no per-album work. */
-static void load_dirty(int32_t since, uint32_t *uniq)
-{
-    struct tagcache_search dtcs;
-    struct tagcache_search_clause clause;
-    char buf[TAGCACHE_BUFSZ];
-
-    memset(&clause, 0, sizeof(clause));
-    clause.tag = tag_commitid;
-    clause.type = clause_gt;
-    clause.numeric = true;
-    clause.numeric_data = since;
-
-    if (!tagcache_search(&dtcs, tag_album))
-        return;
-
-    /* Without this the search reports one result per track rather than per
-     * album, and a single album would fill the table on its own. */
-    tagcache_search_set_uniqbuf(&dtcs, uniq, CARRY_UNIQ_MAX * sizeof(*uniq));
-    tagcache_search_add_clause(&dtcs, &clause);
-
-    while (tagcache_get_next(&dtcs, buf, sizeof(buf)))
-    {
-        if (dirty_ct >= CARRY_DIRTY_MAX)
-        {
-            dirty_ct = -1;   /* too many: summarise everything */
-            break;
-        }
-        dirty_tab[dirty_ct++] = name_key(buf, NULL);
-    }
-
-    tagcache_search_finish(&dtcs);
-
-    if (dirty_ct > 0)
-        qsort(dirty_tab, dirty_ct, sizeof(*dirty_tab), compare_u32);
-}
-
-/* Read the previous index's album figures, and work out which albums cannot
- * use them. Both tables are optional: on any doubt they are left empty and
- * every album is summarised from the database exactly as before.
- *
- * The buffer shrinks rather than this being allocated separately. The arrays
- * below are built from both ends of it, so the only safe place to stand is
- * outside what the build can reach. */
-static void carry_over_prepare(void **buf, size_t *bufsz)
-{
-    struct db_summary_t old;
-    struct tagcache_marks marks;
-    struct album_data *raw;
-    size_t need;
-    int i, fd;
-
-    carried_tab = NULL;
-    carried_ct = 0;
-    dirty_tab = NULL;
-    dirty_ct = 0;
-    played_tab = NULL;
-    played_ct = 0;
-    carry_reserved = 0;
-
-    fd = open(DB_SUMMARY_FILE, O_RDONLY);
-    if (fd < 0)
-        return;
-
-    if (read(fd, &old, sizeof(old)) != sizeof(old)
-        || memcmp(&old.header, INDEX_HDR, sizeof(old.header)) != 0
-        || !header_fits(&old, *bufsz)
-        || old.album_ct == 0)
-    {
-        close(fd);
-        return;
-    }
-
-    /* A deletion moves figures this cannot account for -- a removed track's
-     * plays should stop counting, and nothing here says which album lost one.
-     * Deletions are rare, so give the whole carry-over up rather than carry
-     * something wrong. */
-    tagcache_get_marks(&marks);
-    if (marks.deleted_ct != old.deleted)
-    {
-        close(fd);
-        return;
-    }
-
-    need = (size_t)old.album_ct * sizeof(struct album_data)
-         + (CARRY_DIRTY_MAX + CARRY_UNIQ_MAX + PLAY_LOG_MAX) * sizeof(uint32_t);
-
-    /* Never at the build's expense: it has to fit what it is building. */
-    if (need > *bufsz / 3)
-    {
-        close(fd);
-        return;
-    }
-
-    *bufsz -= need;
-    carry_reserved = need;
-    raw = (struct album_data *)((char *)*buf + *bufsz);
-    dirty_tab = (uint32_t *)(raw + old.album_ct);
-
-    /* Past the header and both name blobs; the album array follows them. */
-    if (lseek(fd, sizeof(old) + old.artist_len + old.album_len, SEEK_SET) < 0
-        || read(fd, raw, old.album_ct * sizeof(struct album_data))
-           != (ssize_t)(old.album_ct * sizeof(struct album_data)))
-    {
-        close(fd);
-        *bufsz += need;
-        carry_reserved = 0;
-        dirty_tab = NULL;
-        return;
-    }
-    close(fd);
-
-    /* Compacted in place, forward: struct carried is the smaller of the two,
-     * so entry i is always written below where entry i was read from. */
-    carried_tab = (struct carried *)raw;
-    for (i = 0; i < old.album_ct; i++)
-    {
-        struct album_data a = raw[i];
-
-        carried_tab[i].key = a.key;
-        carried_tab[i].year = a.year;
-        carried_tab[i].playcount = a.playcount;
-        carried_tab[i].lastplayed = a.lastplayed;
-        carried_tab[i].art_hash = a.art_hash;
-        carried_tab[i].artist_art_hash = a.artist_art_hash;
-    }
-    carried_ct = old.album_ct;
-    qsort(carried_tab, carried_ct, sizeof(*carried_tab), compare_carried);
-
-    played_tab = dirty_tab + CARRY_DIRTY_MAX + CARRY_UNIQ_MAX;
-
-    load_dirty(old.commitid, dirty_tab + CARRY_DIRTY_MAX);
-    load_played(old.serial);
-
-    if (dirty_ct < 0)       /* too much changed to be worth matching */
-        carried_ct = 0;
-}
-
-/* ---------------------------------------------------------------------------
- * Walking the tracks
- *
- * An album's artist and its figures both come from its tracks. A filtered
- * search reads the whole master index whatever it filters on, so asking album
- * by album reads the library once per album; the two walks here read it once
- * each and hand every track to the albums it belongs to.
- *
- * The albums being filled are found through refs[]: indices into album_index,
- * sorted by album seek and then by the artist the album's tracks must carry,
- * with REF_SEEN set once a track has been handed to that album. The walks
- * visit tracks in master index order, which is the order a filtered search
- * returns them in, so an album's first track is the one its own search would
- * have found first.
- * ------------------------------------------------------------------------ */
-
-#define REF_SEEN   0x80000000u
-#define REF_IDX(r) ((int)((r) & ~REF_SEEN))
-
-/* Below every real seek, so looking it up finds an album seek's first entry.
- * As an album's artist it means any: an album whose artist never resolved
- * takes every track of the album, with no artist to filter on. */
-#define ANY_ARTIST (-2)
-
-/* What a track walk reads of each track, in this order. */
-enum { V_ALBUM, V_ARTIST, V_YEAR, V_PLAYCOUNT, V_LASTPLAYED, V_COUNT };
-static const int track_tags[V_COUNT] =
-    { tag_album, tag_albumartist, tag_year, tag_playcount, tag_lastplayed };
-
-static long ref_artist(const struct album_data *a)
-{
-    return a->artist_idx < 0 ? ANY_ARTIST : a->artist_seek;
-}
-
-static int compare_ref(const void *a_v, const void *b_v)
-{
-    const struct album_data *a =
-        &pfi->album_index[REF_IDX(*(const uint32_t *)a_v)];
-    const struct album_data *b =
-        &pfi->album_index[REF_IDX(*(const uint32_t *)b_v)];
-    long aa, ba;
-
-    if (a->seek != b->seek)
-        return a->seek < b->seek ? -1 : 1;
-    aa = ref_artist(a);
-    ba = ref_artist(b);
-    return aa < ba ? -1 : (aa > ba);
-}
-
-/* The first of refs[] not ordered before (seek, artist), or ct if none is. */
-static int ref_lower_bound(const uint32_t *refs, int ct, long seek, long artist)
-{
-    int lo = 0, hi = ct;
-
-    while (lo < hi)
-    {
-        int mid = (lo + hi) / 2;
-        const struct album_data *a = &pfi->album_index[REF_IDX(refs[mid])];
-
-        if (a->seek < seek || (a->seek == seek && ref_artist(a) < artist))
-            lo = mid + 1;
-        else
-            hi = mid;
-    }
-    return lo;
-}
-
-/* The artist list is in seek order, because build_artist_index() reads the
- * tag file front to back. -1 if the seek is not in it. */
-static int artist_by_seek(long seek)
-{
-    int lo = 0, hi = pfi->artist_ct - 1;
-
-    while (lo <= hi)
-    {
-        int mid = (lo + hi) / 2;
-
-        if (pfi->artist_index[mid].seek == seek)
-            return mid;
-        if (pfi->artist_index[mid].seek < seek)
-            lo = mid + 1;
-        else
-            hi = mid - 1;
-    }
-    return -1;
-}
-
-/* Give each album with no artist yet the album artist of its first track. An
- * album whose artist is not in the artist list -- left out of it as spoken
- * word -- keeps none. */
-static int assign_album_artists(uint32_t *refs)
-{
-    char num[16];
-    long v[V_COUNT];
-    int ct = 0, n = 0, total, i, r;
-
-    for (i = 0; i < pfi->album_ct; i++)
-        if (pfi->album_index[i].artist_seek < 0)
-            refs[ct++] = i;
-    if (ct == 0)
-        return SUCCESS;
-
-    qsort(refs, ct, sizeof(*refs), compare_ref);
-
-    total = tagcache_get_stat()->total_entries;
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUMS);
-
-    if (!tagcache_search(&tcs, tag_year))
-        return ERROR_USER_ABORT;
-
-    while (tagcache_get_next(&tcs, num, sizeof(num)))
-    {
-        struct album_data *al;
-
-        keep_awake_for_build();
-        if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUMS))
-        {
-            tagcache_search_finish(&tcs);
-            return ERROR_USER_ABORT;
-        }
-
-        if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
-            continue;
-
-        /* Album seeks are unique among these albums, so the artist one is
-         * given below cannot move it within the order searched here. */
-        r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
-        if (r == ct)
-            continue;
-        al = &pfi->album_index[REF_IDX(refs[r])];
-        if (al->seek != v[V_ALBUM] || (refs[r] & REF_SEEN))
-            continue;
-
-        refs[r] |= REF_SEEN;
-        i = artist_by_seek(v[V_ARTIST]);
-        if (i >= 0)
-        {
-            al->artist_idx = pfi->artist_index[i].name_idx;
-            al->artist_seek = v[V_ARTIST];
-        }
-    }
-    tagcache_search_finish(&tcs);
-
-    /* A walk cut short by a failed read would save the albums after it
-     * unassigned, under an index that looks complete. */
-    return tcs.failed ? ERROR_USER_ABORT : SUCCESS;
-}
-
-/* Count one track into the album *ref names, if that album is (album, artist).
- * False once the walk has passed that album's entries. */
-static bool add_track(uint32_t *ref, const long *v, long artist)
-{
-    struct album_data *al = &pfi->album_index[REF_IDX(*ref)];
-
-    if (al->seek != v[V_ALBUM] || ref_artist(al) != artist)
-        return false;
-
-    /* Where this album's artwork is cached, from the first of its tracks.
-     * Taken here because this is the only pass that walks tracks, so the folder
-     * costs nothing beyond one fetch -- resolving it per slide instead is a
-     * filtered search per slide. */
-    if (!(*ref & REF_SEEN))
-    {
-        *ref |= REF_SEEN;
-        resolve_art_hashes(&tcs, &al->art_hash, &al->artist_art_hash);
-    }
-
-    if (v[V_YEAR] > al->year)
-        al->year = v[V_YEAR];
-
-    /* Negative is tagcache's "could not read it", not a count. */
-    if (v[V_PLAYCOUNT] > 0)
-    {
-        al->playcount += v[V_PLAYCOUNT];
-        if (v[V_LASTPLAYED] > al->lastplayed)
-            al->lastplayed = v[V_LASTPLAYED];
-    }
-    return true;
-}
-
-/* Summarise each album from its tracks: the year, and the playback history the
- * album charts sort on.
- *
- * Year takes the maximum rather than the first because a compilation can carry
- * several; playcount sums because an album's plays are its tracks' plays; and
- * lastplayed takes the maximum because an album was last heard when its most
- * recently played track was. */
-static int assign_album_stats(uint32_t *refs)
-{
-    char num[16];
-    long v[V_COUNT];
-    int carried_over = 0, ct = 0, n = 0, total, i, r;
-
-    for (i = 0; i < pfi->album_ct; i++)
-    {
-        /* Already answered, by a previous index, for an album whose tracks
-         * have not changed since. */
-        struct album_data *ent = &pfi->album_index[i];
-        const struct carried *c;
-
-        if (!album_is_dirty(name_key(pfi->album_names + ent->name_idx, NULL),
-                            ent->key)
-            && (c = carried_find(ent->key)) != NULL)
-        {
-            ent->year = c->year;
-            ent->playcount = c->playcount;
-            ent->lastplayed = c->lastplayed;
-            ent->art_hash = c->art_hash;
-            ent->artist_art_hash = c->artist_art_hash;
-            carried_over++;
-            continue;
-        }
-
-        ent->year = 0;
-        ent->playcount = 0;
-        ent->lastplayed = 0;
-        ent->art_hash = 0;
-        ent->artist_art_hash = 0;
-        refs[ct++] = i;
-    }
-
-    /* Cast, because album_ct is int32_t and that is `long` on this toolchain,
-     * so %d would not match it. */
-    debug_log(DEBUG_LOG_TAGCACHE, "index: %d albums, %d carried, %d searched",
-              (int)pfi->album_ct, carried_over, ct);
-
-    if (ct == 0)
-        return SUCCESS;
-
-    qsort(refs, ct, sizeof(*refs), compare_ref);
-
-    total = tagcache_get_stat()->total_entries;
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, total, STR_STEP_ASSIGNING_ALBUM_STATS);
-
-    if (!tagcache_search(&tcs, tag_year))
-        return ERROR_USER_ABORT;
-
-    while (tagcache_get_next(&tcs, num, sizeof(num)))
-    {
-        keep_awake_for_build();
-        if (progress_cancel(n++, total, STR_STEP_ASSIGNING_ALBUM_STATS))
-        {
-            tagcache_search_finish(&tcs);
-            return ERROR_USER_ABORT;
-        }
-
-        if (!tagcache_get_values(&tcs, track_tags, v, V_COUNT))
-            continue;
-
-        /* The track belongs to the album's entries that take any artist,
-         * and to those that take its own. */
-        for (r = ref_lower_bound(refs, ct, v[V_ALBUM], ANY_ARTIST);
-             r < ct && add_track(&refs[r], v, ANY_ARTIST); r++)
-            ;
-        for (r = ref_lower_bound(refs, ct, v[V_ALBUM], v[V_ARTIST]);
-             r < ct && add_track(&refs[r], v, v[V_ARTIST]); r++)
-            ;
-    }
-    tagcache_search_finish(&tcs);
-
-    /* As in assign_album_artists(): no partial figures under a full stamp. */
-    return tcs.failed ? ERROR_USER_ABORT : SUCCESS;
-}
-
-/* Roll the album figures up to their artists.
- *
- * Derived from the album index rather than walked out of the database again,
- * which makes it free: every album already carries its own playcount and
- * lastplayed, and the artist it belongs to. A second tagcache pass -- one
- * filtered search per artist -- would produce the same numbers for real disk
- * work, and the build is already the slowest thing here.
- *
- * album_data.artist_idx and artist_data.name_idx are both offsets into the
- * same artist name blob, so that is the join. Albums whose artist never
- * resolved carry a negative artist_idx and are simply not counted anywhere.
- *
- * Must run after assign_album_stats() and before the duplicate pass trims the
- * album list, or the totals would miss whatever the trim removes. */
-static void assign_artist_stats(void)
-{
-    int a, j;
-
-    if (!pfi->artist_index)
-        return;
-
-    for (a = 0; a < pfi->artist_ct; a++)
-    {
-        pfi->artist_index[a].playcount = 0;
-        pfi->artist_index[a].lastplayed = 0;
-        pfi->artist_index[a].art_hash = 0;
-    }
-
-    for (j = 0; j < pfi->album_ct; j++)
-    {
-        int artist_idx = pfi->album_index[j].artist_idx;
-
-        if (artist_idx < 0)
-            continue;
-
-        for (a = 0; a < pfi->artist_ct; a++)
-        {
-            if (pfi->artist_index[a].name_idx != artist_idx)
-                continue;
-
-            pfi->artist_index[a].playcount += pfi->album_index[j].playcount;
-            if (pfi->album_index[j].lastplayed >
-                pfi->artist_index[a].lastplayed)
-                pfi->artist_index[a].lastplayed =
-                    pfi->album_index[j].lastplayed;
-            /* Its albums' folders share a parent, which is the artist's own --
-             * so the first album to resolve one answers for the artist, and no
-             * separate walk is needed to find it. */
-            if (pfi->artist_index[a].art_hash == 0)
-                pfi->artist_index[a].art_hash =
-                    pfi->album_index[j].artist_art_hash;
-            break;
-        }
-    }
-}
-
-/**
-  Create an index of all artists and albums from the database.
-  Also store the artists and album names so we can access them later.
- */
-static int create_album_index(void)
-{
-    void *buf = pfi->buf;
-    size_t buf_size = pfi->buf_sz;
-
-    struct album_data* tmp_album;
-    struct tagcache_marks marks;
-    uint32_t *refs;
-
-    int i, j, res;
-
-    ALIGN_BUFFER(buf, buf_size, sizeof(long));
-
-    /* Before anything claims the buffer: this takes its share off the top,
-     * where neither of the arrays built from the ends can reach it. */
-    carry_over_prepare(&buf, &buf_size);
-
-    /* Artists */
-    res = build_artist_index(&tcs, &buf, &buf_size);
-    if (res < SUCCESS)
-        return res;
-
-    /* Albums */
-    pfi->album_ct = 0;
-    pfi->album_len =0;
-    pfi->album_untagged_idx = -1;
-    pfi->album_untagged_seek = -1;
-
-    /* album_index starts at end of buf it will be rearranged when finalized */
-    pfi->album_index = ((struct album_data *)(buf_size + (char *)buf)) - 1;
-    /* album_names starts at the beginning of buf */
-    pfi->album_names = buf;
-
-    if (!search_excluding_spoken(&tcs, tag_album))
-        return ERROR_USER_ABORT;
-
-    res = get_tcs_search_res(ePFS_ALBUM, &tcs, &buf, &buf_size);
-    tagcache_search_finish(&tcs);
-    if (res < SUCCESS)
-        return res;
-
-    /* Build artist list for untagged albums */
-    res = create_album_untagged(&tcs, &buf_size);
-
-    if (res < SUCCESS)
-        return res;
-
-    /* finalize the album index */
-    ALIGN_BUFFER(buf, buf_size, alignof(struct album_data));
-    tmp_album = (struct album_data*)buf;
-    for (i = pfi->album_ct - 1; i >= 0; i--)
-        tmp_album[i] = pfi->album_index[-i];
-
-    pfi->album_index = tmp_album;
-    /* move buf ptr to end of album_index */
-    buf = pfi->album_index + pfi->album_ct;
-
-    /* Scratch for the track walks, one slot per album, from what is left
-     * between the album array and the carry-over tables. */
-    if ((size_t)pfi->album_ct * sizeof(*refs) > buf_size)
-        return ERROR_BUFFER_FULL;
-    refs = buf;
-
-    res = assign_album_artists(refs);
-    if (res < SUCCESS)
-        return res;
-
-    /* Before the stats, not after: they are what the carry-over matches on. */
-    assign_keys();
-
-    res = assign_album_stats(refs);
-
-    if (res < SUCCESS)
-        return res;
-
-    assign_artist_stats();
-
-    /* sort list order to find duplicates */
-    qsort(pfi->album_index, pfi->album_ct,
-              sizeof(struct album_data), compare_album_artists);
-
-    splash_progress_set_delay(HZ / 2);
-    draw_progressbar(0, pfi->album_ct, STR_STEP_REMOVING_DUPLICATES);
-    /* mark duplicate albums for deletion */
-    for (i = 0; i < pfi->album_ct - 1; i++) /* -1 don't check last entry */
-    {
-        keep_awake_for_build();
-
-        if (progress_cancel(i, pfi->album_ct, STR_STEP_REMOVING_DUPLICATES))
-            return ERROR_USER_ABORT;
-
-        int idxi = pfi->album_index[i].artist_idx;
-        int seeki = pfi->album_index[i].seek;
-
-        for (j = i + 1; j < pfi->album_ct; j++)
-        {
-            if (idxi > 0 &&
-            idxi == pfi->album_index[j].artist_idx &&
-            seeki == pfi->album_index[j].seek)
-            {
-                pfi->album_index[j].artist_idx = -1;
-            }
-            else
-            {
-                i = j - 1;
-                break;
-            }
-        }
-    }
-
-    /* now fix the album list order */
-    qsort(pfi->album_index, pfi->album_ct,
-              sizeof(struct album_data), compare_album_artists);
-
-    /* remove any extra untagged albums
-     * extra space is orphaned till restart */
-    pfi->album_index += pfi->album_untagged_idx + 1;
-    pfi->album_ct -= pfi->album_untagged_idx + 1;
-
-    /* The duplicate pass above rewrites artist_idx, so the keys assigned
-     * before the stats no longer describe every entry. Cheap to redo, and
-     * these are the ones that get saved. */
-    assign_keys();
-
-    pfi->buf = buf;
-    /* The carry-over tables are finished with, so hand their space back
-     * rather than leaving the caller short of it for this build. */
-    pfi->buf_sz = buf_size + carry_reserved;
-    carry_reserved = 0;
-    /* artist_index must survive this. The figures assign_artist_stats() has
-     * just filled in are saved with the rest of the index and read back by the
-     * artist charts, and the array itself is intact -- build_artist_index()
-     * finalises it into the buffer ahead of the album data, which nothing
-     * above overwrites. Clearing the pointer here would lose all of it and
-     * look free, because the memory is still there. */
-
-    /* Stamped after the figures have been read, not before. A play landing
-     * mid-build is then simply not replayed later; stamping first would
-     * replay one that assign_album_stats() had already counted. Both correct
-     * themselves at the next full build, which re-reads tagcache -- this is
-     * the quieter of the two while they stand. */
-    tagcache_get_marks(&marks);
-    pfi->commitid = marks.commitid;
-    pfi->serial = marks.serial;
-    pfi->deleted = marks.deleted_ct;
-
-    /* Artist then album name, and that is all a reader is promised. A screen
-     * that wants its albums arranged any particular way sorts them itself once
-     * it has them -- which is where the setting deciding the arrangement lives
-     * anyway, and why no order here can be the right one for everybody. */
-    qsort(pfi->album_index, pfi->album_ct,
-          sizeof(struct album_data), compare_index_order);
-
-    return (pfi->album_ct > 0) ? 0 : ERROR_NO_ALBUMS;
-}
-
-/* Saves the album index into a binary file, so the next screen that wants it
-   reads it back instead of walking the database again. */
-
-/* write() that insists on the whole block. A half-written index is not a
- * usable one, so a short write has to fail the save rather than be left to be
- * discovered by whoever reads it back. */
-static bool write_block(int fd, const void *buf, size_t len)
-{
-    return len == 0 || write(fd, buf, len) == (ssize_t)len;
-}
-
-/* bg_task.read_marks and write_marks: the covered marks in the index's
- * header, which a foreground build carries over unchanged */
-static void read_covered_marks(struct bg_marks *m)
-{
-    struct db_summary_t data;
-    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
-
-    m->entries = m->commitid = m->deleted = -1;
-    if (fd < 0)
-        return;
-    if (read(fd, &data, sizeof(data)) == (ssize_t)sizeof(data)
-        && !memcmp(&data.header, INDEX_HDR, sizeof(data.header)))
-    {
-        m->entries = data.covered.entries;
-        m->commitid = data.covered.commitid;
-        m->deleted = data.covered.deleted;
-    }
-    close(fd);
-}
-
-static void write_covered_marks(const struct bg_marks *m)
-{
-    struct db_summary_t data;
-    struct libfile_marks lm;
-    int fd = open(DB_SUMMARY_FILE, O_RDWR);
-
-    if (fd < 0)
-        return;
-    libfile_no_marks(&lm);
-    if (m)
-    {
-        lm.entries = m->entries;
-        lm.commitid = m->commitid;
-        lm.deleted = m->deleted;
-    }
-    if (read(fd, &data, sizeof(data)) == (ssize_t)sizeof(data)
-        && !memcmp(&data.header, INDEX_HDR, sizeof(data.header))
-        && lseek(fd, offsetof(struct db_summary_t, covered), SEEK_SET)
-           == (off_t)offsetof(struct db_summary_t, covered))
-        write(fd, &lm, sizeof(lm));
-    close(fd);
-}
-
-static int save_album_index(void){
-    /* Written beside the real file and renamed over it, never into it.
-     *
-     * The index is rewritten whole, so writing in place destroys the previous
-     * one the instant it starts -- and anything that cuts the write short, a
-     * USB session or a flat battery, leaves a truncated file that the next
-     * load rejects, sending the carousel off to rebuild from the database.
-     * rename() creates the new directory entry before dropping the old one, so
-     * a reader arriving at any moment sees one complete index or the other. */
-    int fd = creat(DB_SUMMARY_TMP, 0666);
-    struct db_summary_t data;
-    bool ok;
-
-    if (fd < 0)
-        return -1;
-
-    memcpy(&data, pfi, sizeof(struct db_summary_t));
-    memcpy(&data.header, INDEX_HDR, sizeof(pfi->header));
-    {
-        struct bg_marks m;
-        read_covered_marks(&m);
-        data.covered.entries = m.entries;
-        data.covered.commitid = m.commitid;
-        data.covered.deleted = m.deleted;
-    }
-
-    /* The struct is written whole, pointers and all, and a pointer means
-     * nothing to whoever reads it back -- it is this boot's address for memory
-     * that will be somewhere else, or gone, next time. Zero them on the way
-     * out so the file cannot carry a plausible-looking address, and so a
-     * loader that forgets to rebind one gets a NULL fault here rather than a
-     * silent read of a stale location. The lengths and counts beside them are
-     * the real content. */
-    data.artist_names = NULL;
-    data.artist_index = NULL;
-    data.album_names  = NULL;
-    data.album_index  = NULL;
-    data.buf          = NULL;
-    data.buf_sz       = 0;
-
-    /* Header from the nulled copy, bodies from pfi -- `data`'s pointers have
-     * just been cleared, so they are no longer where the arrays live.
-     *
-     * The artist array is written last so the layout before it is unchanged
-     * from the versions that did not keep it; the magic tells the two apart
-     * anyway. */
-    ok = write_block(fd, &data, sizeof(struct db_summary_t))
-      && write_block(fd, pfi->artist_names, data.artist_len)
-      && write_block(fd, pfi->album_names, data.album_len)
-      && write_block(fd, pfi->album_index,
-                     (size_t)data.album_ct * sizeof(struct album_data))
-      && write_block(fd, pfi->artist_index,
-                     (size_t)data.artist_ct * sizeof(struct artist_data));
-
-    close(fd);
-
-    if (!ok || rename(DB_SUMMARY_TMP, DB_SUMMARY_FILE) < 0)
-    {
-        remove(DB_SUMMARY_TMP);
-        return -1;
-    }
-
-    return 0;
-}
-
-/* reads data from save file to buffer */
-static inline int read2buf(int fildes, void *buf, size_t nbyte){
-    int nread;
-    nread = read(fildes, buf, nbyte);
-    if (nread < (int)nbyte)
-        return 0;
-
-    return nread;
-}
-
-/* An index's seeks are seeks only for the commit it was built against (see
- * db_summary.h): read after a later one, it names the wrong albums. */
-static bool index_current(const struct db_summary_t *data)
+static void stamp(struct db_summary_t *t)
 {
     struct tagcache_marks marks;
 
     tagcache_get_marks(&marks);
-    return marks.commitid == data->commitid;
+    t->commitid = marks.commitid;
+    t->serial = marks.serial;
+    t->deleted = marks.deleted_ct;
 }
 
-/* Read only the artist half of the saved index into the caller's buffer.
- *
- * The artist carousel wants the artist list and nothing else, and does not
- * have to rebuild it: the same list, with its playback figures already
- * summarised, is sitting in the index file. Reading it is a file read against
- * a walk of every album-artist tag.
- *
- * Only the artist parts are kept. The file is written as
- *
- *     header, artist_names, album_names, album_index, artist_index
- *
- * with no padding between -- plain sequential writes -- so the album halves
- * can be stepped over with one seek and never cost the caller any memory.
- * (Alignment in load_album_index() is of the destination buffer, not of file
- * offsets, so it does not enter into the arithmetic here.)
- *
- * SUCCESS, or an ERROR_* leaving the caller to build the list the slow way. */
-static int load_artist_index(struct db_summary_t *target,
-                             void **buf, size_t *bufsz)
+int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
 {
-    struct db_summary_t data;
-    void *b = *buf;
-    size_t bsz = *bufsz;
-    unsigned int artist_idx_sz;
-    int i, fr = open(DB_SUMMARY_FILE, O_RDONLY);
+    struct tagcache_album a;
+    char *p = buf;
+    size_t left = buf_sz, len = 0, cap;
+    int na = tagcache_album_count(), n = 0, ret;
 
-    if (fr < 0)
-        return ERROR_NO_ARTISTS;
+    memset(t, 0, sizeof(*t));
+    t->album_untagged_seek = -1;
+    if (na == 0)
+        return ERROR_NO_ALBUMS;
+    stamp(t);
 
-    if ((unsigned long)ffilesize(fr) <= sizeof(data)
-        || read(fr, &data, sizeof(data)) != sizeof(data)
-        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
-        || !header_fits(&data, bsz)
-        || !index_current(&data)
-        || data.artist_ct == 0)
-        goto failure;
-
-    /* Each length checked against the space left, never their sum against the
-     * total: artist_len comes straight out of the file, so on a corrupt header
-     * the addition wraps and a bounds check written that way passes. It is
-     * caught further down only because read2buf() then comes up short, which
-     * is the read defending the check rather than the other way round. */
-    artist_idx_sz = data.artist_ct * sizeof(struct artist_data);
-    if (data.artist_len > bsz || artist_idx_sz > bsz - data.artist_len)
-        goto failure;
-
-    if (read2buf(fr, b, data.artist_len) == 0)
-        goto failure;
-    target->artist_names = b;
-    b = (char *)b + data.artist_len;
-    bsz -= data.artist_len;
-
-    /* past the album halves, which this caller has no use for */
-    if (lseek(fr, data.album_len + data.album_ct * sizeof(struct album_data),
-              SEEK_CUR) < 0)
-        goto failure;
-
-    ALIGN_BUFFER(b, bsz, alignof(struct artist_data));
-    if (read2buf(fr, b, artist_idx_sz) == 0)
-        goto failure;
-    target->artist_index = b;
-    b = (char *)b + artist_idx_sz;
-    bsz -= artist_idx_sz;
-
-    close(fr);
-
-    /* Same sanity check load_album_index() makes: a name offset past the end
-     * of the blob means the file is not what it claims to be. */
-    for (i = 0; i < data.artist_ct; i++)
-    {
-        if (target->artist_index[i].name_idx >= (int)data.artist_len)
-            return ERROR_NO_ARTISTS;
-    }
-
-    target->artist_ct = data.artist_ct;
-    target->artist_len = data.artist_len;
-    target->commitid = data.commitid;
-
-    /* No album list on this path, and said three ways rather than one. A zero
-     * count alone is not enough of a guard: a walk that forgets to check it
-     * would read through whatever pointers the struct happens to be carrying,
-     * from the previous load or from the file. NULL faults instead. */
-    target->album_ct = 0;
-    target->album_len = 0;
-    target->album_names = NULL;
-    target->album_index = NULL;
-    target->serial = data.serial;
-    /* Artists only on this path, but the log carries their keys too. */
-    replay_plays(target);
-    *buf = b;
-    *bufsz = bsz;
-    return SUCCESS;
-
-failure:
-    close(fr);
-    return ERROR_NO_ARTISTS;
-}
-
-int db_summary_load_artists(struct db_summary_t *target,
-                          void **buf, size_t *bufsz)
-{
-    int ret = wait_for_background();
-
-    if (ret != SUCCESS)
+    ret = fill_artists(t, &p, &left);
+    if (ret == ERROR_BUFFER_FULL)
         return ret;
-
-    /* Held for the read: the background pass rewrites this file in place, so
-     * without it a pass finishing mid-read would be seen as a corrupt index
-     * and thrown away for a full rebuild. */
-    mutex_lock(&build_mutex);
-    ret = load_artist_index(target, buf, bufsz);
-    mutex_unlock(&build_mutex);
-
-    return ret;
-}
-
-/*Loads the album_index information stored in the hard drive*/
-static int load_album_index(void){
-
-    int i, fr = open(DB_SUMMARY_FILE, O_RDONLY);
-    struct db_summary_t data;
-
-    void *bufstart = pfi->buf;
-    unsigned int bufstart_sz = pfi->buf_sz;
-
-    void* buf = pfi->buf;
-    size_t buf_size = pfi->buf_sz;
-
-    unsigned int name_sz, album_idx_sz, artist_idx_sz;
-    int album_idx, artist_idx;
-
-    if (fr >= 0){
-        const unsigned long fsize = ffilesize(fr);
-        if (fsize > sizeof(data))
-        {
-            if (read(fr, &data, sizeof(data)) == sizeof(data) &&
-                memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) == 0 &&
-                header_fits(&data, bufstart_sz) && index_current(&data))
-            {
-                name_sz = data.artist_len + data.album_len;
-                album_idx_sz = data.album_ct * sizeof(struct album_data);
-                artist_idx_sz = data.artist_ct * sizeof(struct artist_data);
-
-                if (name_sz + album_idx_sz + artist_idx_sz > bufstart_sz)
-                    goto failure;
-
-                /* lseek(fr, sizeof(data) + 1, SEEK_SET); */
-                /* artist names */
-                if (read2buf(fr, buf, data.artist_len) == 0)
-                    goto failure;
-
-                data.artist_names = buf;
-                buf = (char *)buf + data.artist_len;
-                buf_size -= data.artist_len;
-
-                /* album names */
-                if (read2buf(fr, buf, data.album_len) == 0)
-                    goto failure;
-
-                data.album_names = buf;
-                buf = (char *)buf + data.album_len;
-                buf_size -= data.album_len;
-
-                /* index of album names */
-                ALIGN_BUFFER(buf, buf_size, alignof(struct album_data));
-                if (read2buf(fr, buf, album_idx_sz) == 0)
-                    goto failure;
-
-                data.album_index = buf;
-                buf = (char *)buf + album_idx_sz;
-                buf_size -= album_idx_sz;
-
-                /* index of artists, with their playback figures */
-                ALIGN_BUFFER(buf, buf_size, alignof(struct artist_data));
-                if (artist_idx_sz > 0
-                    && read2buf(fr, buf, artist_idx_sz) == 0)
-                    goto failure;
-
-                data.artist_index = buf;
-                buf = (char *)buf + artist_idx_sz;
-                buf_size -= artist_idx_sz;
-
-                close(fr);
-
-                /* sanity check loaded data */
-                for (i = 0; i < data.album_ct; i++)
-                {
-                    album_idx = data.album_index[i].name_idx;
-                    artist_idx = data.album_index[i].artist_idx;
-                    if (album_idx >= (int) data.album_len ||
-                        artist_idx >= (int) data.artist_len)
-                    {
-                        goto failure;
-                    }
-                }
-
-                memcpy(pfi, &data, sizeof(struct db_summary_t));
-                pfi->buf = buf;
-                pfi->buf_sz = buf_size;
-
-                /* The figures in the file are correct as of its watermark;
-                 * anything played since is sitting in the log. */
-                replay_plays(pfi);
-
-                return 0;
-            }
-        }
-    }
-
-failure:
-    /* Silent: there being no readable index is a normal state -- first run,
-     * a bumped INDEX_HDR, a deleted file -- and the caller just builds one.
-     * Nothing here is the user's to act on. */
-    if (fr >= 0)
-        close(fr);
-
-    pfi->buf = bufstart;
-    pfi->buf_sz = bufstart_sz;
-    pfi->artist_ct = 0;
-    pfi->album_ct = 0;
-    return -1;
-
-}
-
-/* Reuse the saved index, or build one and persist it, into the caller's
- * struct and the caller's memory. Which memory is the only thing that varies
- * between a build the carousel asks for and one a background pass does. */
-static int build_into(struct db_summary_t *target, void *buf, size_t buf_sz,
-                      bool background)
-{
-    int ret = SUCCESS;
-
-    mutex_lock(&build_mutex);
-    idx_abort = false;
-
-    /* Set inside the lock, and cleared before releasing it, so it describes
-     * exactly who is building right now. Set it outside and a foreground build
-     * can start while it still reads "background", then abort itself on the
-     * next tick's idx_abort -- which closed the carousel mid-open. */
-    building_bg = background;
-
-    pfi = target;
-    pfi->buf = buf;
-    pfi->buf_sz = buf_sz;
-
-    /* The background pass is the one that rebuilds. bg_task runs it only when
-     * the library has changed or a trigger fired, so when it does run there is
-     * nothing to reuse and it always builds. Every other caller reads the saved
-     * index, and builds only when there is none to read.
-     *
-     * Whether to rebuild is decided here, from the file, and must not be taken
-     * from any screen's state: a caller that has not opened that screen this
-     * boot would read its defaults and walk the whole database with a perfectly
-     * good index sitting on disk unread. The album charts and Random album are
-     * both such callers. A stale *format* is caught by INDEX_HDR, which is what
-     * that magic is for. */
-    if (background || load_album_index() < 0)
-    {
-        set_working_for_build(true);   /* the "working" LED while (re)building */
-        ret = create_album_index();
-        set_working_for_build(false);
-
-        /* Writing the index is the whole of what a rebuild does. In
-         * particular it does not invalidate any artwork: thumbnails are keyed
-         * by the folder they came from, not by list position, so the same
-         * album still resolves to the same file however the list is
-         * reordered. Nothing in this file may touch the carousel's config --
-         * see background_build() for what goes wrong when it does. */
-        if (ret == 0)
-        {
-            /* Only the foreground caller may report this: the background pass
-             * owns no screen, and there is nothing the user could do anyway --
-             * the carousel will simply build it again when asked. */
-            if (save_album_index() < 0)
-            {
-                /* The background pass retries instead of recording a pass
-                 * that left no index behind. */
-                if (building_bg)
-                    ret = ERROR_WRITE;
-                else
-                    splash(HZ * 2, "Could not write index");
-            }
-            else
-            {
-                /* Everything in the log is now either counted in the saved
-                 * index or predates its watermark; replaying it would count
-                 * those plays twice. Not before the save: a save that fails
-                 * would take the plays with it. */
-                remove(DB_PLAYS_FILE);
-            }
-        }
-    }
-
-    pfi = NULL;
-    building_bg = false;
-    mutex_unlock(&build_mutex);
-    return ret;
-}
-
-int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz)
-{
-    /* build_into() takes build_mutex, which the background pass holds for its
-     * whole run -- so a caller arriving mid-pass blocks on it with a dead
-     * screen and no way out. Waiting here instead is the same wait with the
-     * pass's progress on it and a way to leave, and doing it inside means no
-     * caller can forget. A caller with its own reason to wait earlier still
-     * may; arriving here with nothing running costs nothing. */
-    int ret = wait_for_background();
-
     if (ret != SUCCESS)
-        return ret;
+        t->artist_ct = 0;
 
-    return build_into(target, buf, buf_sz, false);
-}
-
-/* Wait out a background build rather than restarting its work here.
- *
- * Interrupting it and rebuilding in the foreground was the original design,
- * from when both cost the same. They do not: this path redraws the status bar
- * for every album and the background one does not, which makes it several
- * times slower. So the quickest way to get an index is to let the pass that is
- * already running finish, then read what it wrote.
- *
- * Polls rather than blocking on the mutex, so the screen stays alive and can
- * be left. */
-static int wait_for_background(void)
-{
-    /* Announce before asking, so a pass deciding whether to start sees this
-     * and stands down instead of taking the lock out from under us. */
-    fg_wanted_tick = current_tick;
-
-    if (!db_summary_is_busy())
-        return SUCCESS;
-
-    /* Nothing on screen at all if it finishes promptly. */
-    splash_progress_set_delay(HZ / 2);
-
-    while (db_summary_is_busy())
-    {
-        /* Kept current for as long as we are here, so the claim never lapses
-         * while we are still waiting on a pass that is already running. */
-        fg_wanted_tick = current_tick;
-
-        splash_progress(bg_done, bg_total > 0 ? bg_total : 1,
-                        "%s", str(LANG_WAIT));
-
-        int action = get_action(CONTEXT_STD, HZ / 10);
-
-        /* USB counts as leaving, and has to be handled rather than dropped --
-         * this poll owns the button queue for as long as the wait lasts, and
-         * the acknowledgement the storage handover is waiting for is the one
-         * default_event_handler() sends. */
-        if (default_event_handler(action) == SYS_USB_CONNECTED ||
-            action == ACTION_STD_CANCEL)
-        {
-            /* Leaving, not switching to the slow path: tell it to stop so it
-             * is not still running behind whatever comes next. */
-            idx_abort = true;
-            return ERROR_USER_ABORT;
-        }
-    }
-
-    return SUCCESS;
-}
-
-/* The artist half only, with no album list, into the caller's index and the
- * caller's memory.
- *
- * The locking is the point of this function existing. pfi is one shared slot
- * and build_mutex is what makes pointing it somewhere safe -- so the artist
- * model cannot reach build_artist_index() directly, however tempting, because
- * a background pass holding pfi would resume after a yield writing through
- * whatever the artist build had left there. Same wait, same lock, same
- * clear-before-unlock as build_into(). */
-/* Fill in each artist's folder, and optionally their playback figures, from
- * one walk of the tracks.
- *
- * The artist-only build has no album list to derive either from -- that is what
- * assign_artist_stats() does on the full build -- so this is the one path that
- * has to ask the database. The two agree by construction: an artist's total is
- * every track filed under them either way. The folder is always resolved, from
- * the artist's first track: it is what the artist carousel shows a photo from.
- *
- * lastplayed holds -1 until an artist's first track has been seen, which is
- * what says the folder still needs resolving. */
-static void assign_artist_art_and_stats(struct tagcache_search *tcs,
-                                        bool with_stats)
-{
-    char num[16];
-    long v[V_COUNT];
-    int n = 0, total, a;
-
-    for (a = 0; a < pfi->artist_ct; a++)
-        pfi->artist_index[a].lastplayed = -1;
-
-    total = tagcache_get_stat()->total_entries;
-
-    if (tagcache_search(tcs, tag_year))
-    {
-        while (tagcache_get_next(tcs, num, sizeof(num)))
-        {
-            struct artist_data *ar;
-
-            keep_awake_for_build();
-            if (progress_cancel(n++, total, STR_STEP_ARTIST_STATS))
-                break;
-
-            if (!tagcache_get_values(tcs, track_tags, v, V_COUNT))
-                continue;
-
-            a = artist_by_seek(v[V_ARTIST]);
-            if (a < 0)
-                continue;
-            ar = &pfi->artist_index[a];
-
-            if (ar->lastplayed < 0)
-            {
-                ar->lastplayed = 0;
-                resolve_art_hashes(tcs, NULL, &ar->art_hash);
-            }
-
-            if (with_stats && v[V_PLAYCOUNT] > 0)
-            {
-                ar->playcount += v[V_PLAYCOUNT];
-                if (v[V_LASTPLAYED] > ar->lastplayed)
-                    ar->lastplayed = v[V_LASTPLAYED];
-            }
-        }
-    }
-    tagcache_search_finish(tcs);
-
-    for (a = 0; a < pfi->artist_ct; a++)
-        if (pfi->artist_index[a].lastplayed < 0)
-            pfi->artist_index[a].lastplayed = 0;
-}
-
-int db_summary_build_artists(struct db_summary_t *target,
-                              struct tagcache_search *tcs,
-                              void **buf, size_t *bufsz, bool with_stats)
-{
-    int ret = wait_for_background();
-
-    if (ret != SUCCESS)
-        return ret;
-
-    mutex_lock(&build_mutex);
-    pfi = target;
-    ret = build_artist_index(tcs, buf, bufsz);
-    if (ret >= SUCCESS)
-        assign_artist_art_and_stats(tcs, with_stats);
-    pfi = NULL;
-    mutex_unlock(&build_mutex);
-
-    return ret;
-}
-
-/* ---------------------------------------------------------------------------
- * Building it in the background
- *
- * The index only goes stale when the database changes, so the work can be done
- * once after a scan settles rather than when someone opens the carousel and is
- * made to wait for it. The carousel is unchanged: it still asks for the index
- * the same way, and simply finds it already written most of the time.
- *
- * The pass runs on the same terms as the artwork cache it sits beside, and for
- * the same reasons -- so both are expressed as a bg_task, on the thread and the
- * terms that live in system/bg_task.c: only while the database is usable and
- * idle, and only once the entry count has stopped moving, so a scan in
- * progress is left alone.
- *
- * This one outranks the artwork cache. It finishes in seconds where a full
- * artwork pass takes minutes, the carousel can be sat waiting on it, and it
- * needs a 384K allocation that an artwork pass in flight has effectively
- * spoken for -- so the artwork pass is the one that gives way.
- * ------------------------------------------------------------------------ */
-
-/* Enough to build a large library's index; the app buffer the carousel builds
- * into is 512K, and this is the background equivalent. Anything smaller just
- * fails with ERROR_BUFFER_FULL, which leaves the carousel to build inline as
- * it always has. */
-#define IDX_BUILD_BUFSZ (384 * 1024)
-
-/* Whether the background pass should give up where it stands. Returning true
- * is the whole job: the pass unwinds to the thread, which reads the event.
- *
- * Without this the pass has no way to hear about USB at all, and a full
- * library index takes long enough for the host to give up and reset the port
- * while it runs. */
-static bool bg_should_stop(void)
-{
-    return bg_task_should_stop(&db_summary_task);
-}
-
-
-/* True from before the background pass reaches for the lock until after it has
- * let go, not merely while it holds it -- see bg_claimed. */
-bool db_summary_is_busy(void)
-{
-    return bg_claimed || building_bg;
-}
-
-const char *db_summary_activity(void)
-{
-    return bg_step ? bg_step : "";
-}
-
-void db_summary_progress(int *done, int *total)
-{
-    *done = bg_done;
-    *total = bg_total;
-}
-
-/* Read the index without a buffer of your own; see db_summary.h.
- *
- * Here rather than in the caller because IDX_BUILD_BUFSZ is here: how much a
- * build needs is the builder's business, and a second copy of that number
- * elsewhere would be one to keep in step. Same allocation shape as
- * background_build() below, for the same reasons -- ask outright rather than
- * checking core_allocatable() first, since core_alloc() shrinks what will
- * shrink and that is usually the only way this gets memory, and pin it because
- * a handle with no ops is movable while the builder yields throughout. */
-int db_summary_acquire(struct db_summary_t *target, int *handle)
-{
-    void *buf;
-    int ret;
-
-    /* Same wait the carousel does, and for the same reason: build_into() takes
-     * build_mutex, so without this a caller arriving while the background pass
-     * is running blocks on it with a dead screen and no way out. Here it shows
-     * the pass's progress and can be left. */
-    ret = wait_for_background();
-    if (ret != SUCCESS)
-        return ret;
-
-    *handle = core_alloc(IDX_BUILD_BUFSZ);
-    if (*handle <= 0)
-        return ERROR_BUFFER_FULL;
-
-    buf = core_get_data_pinned(*handle);
-    memset(target, 0, sizeof(*target));
-
-    ret = db_summary_build_into(target, buf, IDX_BUILD_BUFSZ);
-    if (ret < SUCCESS)
-    {
-        db_summary_release(*handle);
-        *handle = 0;
-    }
-    return ret;
-}
-
-void db_summary_release(int handle)
-{
-    if (handle <= 0)
-        return;
-    core_put_data_pinned(core_get_data(handle));
-    core_free(handle);
-}
-
-/* ---------------------------------------------------------------------------
- * Reading records without holding the index
- *
- * What save_album_index() writes is a header, the two name blobs and then the
- * two arrays, all contiguous and in that order, and struct album_data is
- * fixed-size. So album n is one seek away, and a caller that wants one record
- * need not have the whole index in memory to reach it -- see the reader notes
- * in db_summary.h for why that matters.
- *
- * Only albums so far. The charts want the same treatment and will want artists
- * with it; nothing else does.
- * ------------------------------------------------------------------------ */
-
-/* Open the file and work out where the album array starts, or leave nothing
- * open. Separate from db_summary_reader_open() because that tries it twice,
- * once either side of building an index. */
-static int reader_start(struct db_summary_reader *r)
-{
-    struct db_summary_t data;
-    off_t fsize;
-    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
-
-    if (fd < 0)
+    for (int i = 0; i < na; i++)
+        if (tagcache_album_get(i, &a) && !album_hidden(&a))
+            n++;
+    if (n == 0)
         return ERROR_NO_ALBUMS;
 
-    fsize = ffilesize(fd);
-    if (fsize <= (off_t)sizeof(data)
-        || read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
-        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
-        || !header_fits(&data, (size_t)fsize)
-        || !index_current(&data)
-        || data.album_ct == 0)
-        goto failure;
+    p = ALIGN_UP(p, sizeof(long));
+    left = buf_sz - (p - (char *)buf);
+    if (left < n * sizeof(struct album_data))
+        return ERROR_BUFFER_FULL;
+    t->album_index = (struct album_data *)p;
+    t->album_names = p + n * sizeof(struct album_data);
+    cap = left - n * sizeof(struct album_data);
 
-    r->album_ct = data.album_ct;
-    r->album_off = (long)(sizeof(data) + data.artist_len + data.album_len);
+    n = 0;
+    for (int i = 0; i < na; i++)
+    {
+        struct album_data *d = &t->album_index[n];
+        const struct artist_data *ar;
+        int at;
 
-    /* The array has to be inside the file that claims to hold it. The magic is
-     * the first four bytes, so a truncated index passes the check above --
-     * without this one a seek would land past the end and the read would leave
-     * the caller's record as whatever was on its stack. */
-    if (r->album_off + (long)r->album_ct * (long)sizeof(struct album_data)
-        > (long)fsize)
-        goto failure;
+        if (!tagcache_album_get(i, &a) || album_hidden(&a))
+            continue;
+        at = add_name(tag_album, a.album_seek, t->album_names, &len, cap);
+        if (at < 0)
+            return ERROR_BUFFER_FULL;
+        ar = find_artist(t, a.artist_seek);
+        d->name_idx = at;
+        d->artist_idx = ar ? ar->name_idx : 0;
+        d->key = name_key(t->album_names + at,
+                          ar ? t->artist_names + ar->name_idx : NULL);
+        d->year = a.year;
+        d->playcount = a.playcount;
+        d->lastplayed = a.lastplayed;
+        d->artist_seek = a.artist_seek;
+        d->seek = a.album_seek;
+        d->art_hash = a.art_hash;
+        d->artist_art_hash = a.artist_art_hash;
+        if (t->album_untagged_seek < 0
+            && !strcmp(t->album_names + at, UNTAGGED))
+        {
+            t->album_untagged_seek = a.album_seek;
+            t->album_untagged_idx = at;
+        }
+        n++;
+    }
+    t->album_ct = n;
+    t->album_len = len;
+    qsort(t->album_index, n, sizeof(*t->album_index), compare_index_order);
 
-    r->fd = fd;
+    t->buf = t->album_names + len;
+    t->buf_sz = buf_sz - ((char *)t->buf - (char *)buf);
     return SUCCESS;
-
-failure:
-    close(fd);
-    return ERROR_NO_ALBUMS;
 }
+
+int db_summary_load_artists(struct db_summary_t *t, void **buf,
+                            size_t *bufsz)
+{
+    char *p = *buf;
+    int ret;
+
+    memset(t, 0, sizeof(*t));
+    if (tagcache_artist_count() == 0)
+        return ERROR_NO_ARTISTS;
+    stamp(t);
+    ret = fill_artists(t, &p, bufsz);
+    if (ret == SUCCESS)
+        *buf = p;
+    return ret;
+}
+
+/* ---- single albums, for a caller with no buffer ------------------------ */
 
 int db_summary_reader_open(struct db_summary_reader *r)
 {
-    struct db_summary_t built;
-    int handle;
-    int ret;
+    struct tagcache_album a;
+    int na = tagcache_album_count();
 
-    r->fd = -1;
-
-    /* The same wait db_summary_acquire() makes, and for the same reason: the
-     * lock below is the one a background pass holds for its whole run. */
-    ret = wait_for_background();
-    if (ret != SUCCESS)
-        return ret;
-
-    /* Held until the reader closes. A pass finishing mid-read renames a new
-     * index over this file, which would leave the reader seeking to offsets
-     * that no longer describe what it is reading. */
-    mutex_lock(&build_mutex);
-    if (reader_start(r) == SUCCESS)
-        return SUCCESS;
-    mutex_unlock(&build_mutex);
-
-    /* Nothing readable there. Build one for the file it writes, not for the
-     * copy it returns -- which is thrown away here exactly as
-     * background_build() throws its own away. This is the one path that still
-     * costs the 384K, and it runs on a player that has never built an index. */
-    ret = db_summary_acquire(&built, &handle);
-    if (ret < SUCCESS)
-        return ret;
-    db_summary_release(handle);
-
-    mutex_lock(&build_mutex);
-    if (reader_start(r) == SUCCESS)
-        return SUCCESS;
-    mutex_unlock(&build_mutex);
-
-    return ERROR_NO_ALBUMS;
+    r->album_ct = 0;
+    for (int i = 0; i < na; i++)
+        if (tagcache_album_get(i, &a) && !album_hidden(&a))
+            r->album_ct++;
+    return r->album_ct ? SUCCESS : ERROR_NO_ALBUMS;
 }
 
 void db_summary_reader_close(struct db_summary_reader *r)
 {
-    if (r->fd < 0)
-        return;
-
-    close(r->fd);
-    r->fd = -1;
-    mutex_unlock(&build_mutex);
+    r->album_ct = 0;
 }
 
 bool db_summary_read_album(struct db_summary_reader *r, int n,
                            struct album_data *out)
 {
-    off_t at;
+    struct tagcache_album a;
+    int na = tagcache_album_count();
 
-    if (r->fd < 0 || n < 0 || n >= r->album_ct)
+    if (n < 0 || n >= r->album_ct)
         return false;
-
-    at = r->album_off + (long)n * (long)sizeof(*out);
-    return lseek(r->fd, at, SEEK_SET) == at
-        && read(r->fd, out, sizeof(*out)) == (ssize_t)sizeof(*out);
-}
-
-static int compare_order_seek(const void *a_v, const void *b_v)
-{
-    const struct db_summary_order *a = a_v;
-    const struct db_summary_order *b = b_v;
-
-    return (a->seek > b->seek) - (a->seek < b->seek);
-}
-
-/* The artist blob compare_order_artist() reads names from, or NULL to order by
- * offset alone -- the blob is already in name order, so that is enough when
- * articles count. */
-static const char *order_names;
-static int order_names_len;
-
-/* Ahead of the ranking, .artist holds the album's artist_idx: an offset into
- * the artist blob, -1 for none, which sorts last. */
-static int compare_order_artist(const void *a_v, const void *b_v)
-{
-    int a = ((const struct db_summary_order *)a_v)->artist;
-    int b = ((const struct db_summary_order *)b_v)->artist;
-
-    if (a < 0 || b < 0)
-        return (a < 0) - (b < 0);
-
-    if (order_names && a != b && a < order_names_len && b < order_names_len)
+    for (int i = 0; i < na; i++)
     {
-        int res = strcasecmp(tagcache_sort_name(order_names + a),
-                             tagcache_sort_name(order_names + b));
-        if (res != 0)
-            return res;
+        if (!tagcache_album_get(i, &a) || album_hidden(&a) || n-- > 0)
+            continue;
+        memset(out, 0, sizeof(*out));
+        out->year = a.year;
+        out->playcount = a.playcount;
+        out->lastplayed = a.lastplayed;
+        out->artist_seek = a.artist_seek;
+        out->seek = a.album_seek;
+        out->art_hash = a.art_hash;
+        out->artist_art_hash = a.artist_art_hash;
+        return true;
     }
-    return (a > b) - (a < b);
+    return false;
+}
+
+/* ---- the order table for album lists ----------------------------------- */
+
+/* Artist rows by name, while the ranks are worked out */
+static bool order_articles;
+
+static int compare_artist_rows(const void *a_v, const void *b_v)
+{
+    struct tagcache_artist a, b;
+    char an[TAGCACHE_BUFSZ], bn[TAGCACHE_BUFSZ];
+    int ra = *(const int *)a_v, rb = *(const int *)b_v;
+
+    if (!tagcache_artist_get(ra, &a) || !tagcache_artist_get(rb, &b)
+        || !tagcache_seek_string(tag_albumartist, a.seek, an, sizeof(an))
+        || !tagcache_seek_string(tag_albumartist, b.seek, bn, sizeof(bn)))
+        return ra - rb;
+    int res = order_articles ? strcasecmp(tagcache_sort_name(an),
+                                          tagcache_sort_name(bn))
+                             : 0;
+    return res ? res : ra - rb;
 }
 
 int db_summary_read_order_table(struct db_summary_order *out, int max,
                                 bool ignore_articles)
 {
-    struct db_summary_t data;
-    struct tagcache_marks marks;
-    struct album_data recs[16];
-    off_t at;
-    int fd;
-    int ret;
-    int n, rank;
+    struct tagcache_album a;
+    int na = tagcache_album_count(), nr = tagcache_artist_count();
+    int n = 0;
+    int *rank = NULL;
 
-    ret = wait_for_background();
-    if (ret != SUCCESS)
-        return ret;
+    if (na == 0)
+        return ERROR_NO_ALBUMS;
 
-    mutex_lock(&build_mutex);
-
-    fd = open(DB_SUMMARY_FILE, O_RDONLY);
-    if (fd < 0)
+    /* One entry an album name, the albums under it sharing their name's: the
+     * latest year among them, and the first artist's place */
+    for (int i = 0; i < na; i++)
     {
-        ret = ERROR_NO_ALBUMS;
-        goto done;
-    }
-
-    ret = ERROR_NO_ALBUMS;
-    if (read(fd, &data, sizeof(data)) != (ssize_t)sizeof(data)
-        || memcmp(&(data.header), INDEX_HDR, sizeof(data.header)) != 0
-        || !header_fits(&data, (size_t)ffilesize(fd))
-        || data.album_ct == 0 || data.album_ct > max)
-        goto done;
-
-    /* The seeks below are only seeks for the commit they were written against;
-     * see the note in db_summary.h. */
-    tagcache_get_marks(&marks);
-    if (marks.commitid != data.commitid)
-        goto done;
-
-    at = (off_t)(sizeof(data) + data.artist_len + data.album_len);
-    if (lseek(fd, at, SEEK_SET) != at)
-        goto done;
-
-    /* A few records a read: one read() a record through the file cache
-     * costs ~30 ms a list on a 5G. */
-    for (n = 0; n < data.album_ct; )
-    {
-        int k = MIN((int)ARRAYLEN(recs), data.album_ct - n);
-        ssize_t len = k * sizeof(recs[0]);
-        if (read(fd, recs, len) != len)
-            goto done;
-        for (int i = 0; i < k; i++, n++)
+        if (!tagcache_album_get(i, &a) || album_hidden(&a))
+            continue;
+        if (n > 0 && out[n - 1].seek == a.album_seek)
         {
-            out[n].seek = recs[i].seek;
-            out[n].year = recs[i].year;
-            out[n].artist = recs[i].artist_idx;
-        }
-    }
-
-    /* The names are needed only to step past articles, and go in the space
-     * the table does not use. Without room for them artists keep the
-     * database's order, articles and all. */
-    order_names = NULL;
-    if (ignore_articles
-        && (size_t)data.artist_len <= (size_t)(max - n) * sizeof(*out)
-        && lseek(fd, sizeof(data), SEEK_SET) == (off_t)sizeof(data)
-        && read(fd, &out[n], data.artist_len) == (ssize_t)data.artist_len)
-    {
-        order_names = (const char *)&out[n];
-        order_names_len = data.artist_len;
-    }
-
-    qsort(out, n, sizeof(*out), compare_order_artist);
-    order_names = NULL;
-
-    /* Equal artists are adjacent now and share a rank. */
-    rank = -1;
-    for (int i = 0, prev = -1; i < n; i++)
-    {
-        int offset = out[i].artist;
-
-        if (offset < 0)
-        {
-            out[i].artist = DB_SUMMARY_NO_ARTIST;
+            if (a.year > out[n - 1].year)
+                out[n - 1].year = a.year;
             continue;
         }
-        if (rank < 0 || offset != prev)
-            rank++;
-        prev = offset;
-        out[i].artist = MIN(rank, DB_SUMMARY_NO_ARTIST - 1);
+        if (n == max)
+            return ERROR_BUFFER_FULL;
+        out[n].seek = a.album_seek;
+        out[n].year = a.year;
+        out[n].artist = tagcache_artist_find(a.artist_seek);
+        n++;
     }
 
-    qsort(out, n, sizeof(*out), compare_order_seek);
-    ret = n;
-
-done:
-    if (fd >= 0)
-        close(fd);
-    mutex_unlock(&build_mutex);
-    return ret;
-}
-
-/* bg_task.artifact_ok: the marker matching the entry count is not on its own
- * enough -- the index file it refers to has to still be there, and be in a
- * format this build can read. The magic is checked because the library does not
- * change when the firmware does: after an upgrade that bumped INDEX_HDR the
- * marker still matches, so without this the background pass would leave a file
- * it can no longer read in place and the next caller that wanted the index
- * would rebuild it in the foreground, progress bar and all. Cheap: the header
- * is four bytes and nothing else is read. */
-static bool saved_index_present(void)
-{
-    uint32_t header;
-    int fd = open(DB_SUMMARY_FILE, O_RDONLY);
-    bool ok;
-
-    if (fd < 0)
-        return false;
-
-    ok = read(fd, &header, sizeof(header)) == sizeof(header)
-      && memcmp(&header, INDEX_HDR, sizeof(header)) == 0;
-    close(fd);
-    return ok;
-}
-
-/* bg_task.run: one background build, into memory of its own. The result is the
- * file on disk; the index it builds in RAM is thrown away, because the
- * carousel will read it back for itself when it needs it.
- *
- * Returns false if it could not finish, which leaves the marker alone so the
- * next tick tries again.
- *
- * Nothing in this file touches the carousel's config, and nothing may. It is
- * a file-scope struct the carousel's own init() fills; a pass running on a
- * boot where nobody opened the carousel would be saving zeroes over the
- * resume position and the artwork-cache mark. Its cache_version is about the
- * slide placeholder's format, which this pass does not build, so there was
- * never anything true for this file to say about it either. */
-static enum bg_result background_build(void)
-{
-    struct db_summary_t local;
-    size_t bufsz = IDX_BUILD_BUFSZ;
-    int handle;
-    void *buf;
-    int ret;
-
-    /* Claim the builder before doing anything that leads to the lock, then
-     * give way if a foreground caller has already announced itself.
-     * BG_INTERRUPTED is not a failure: bg_task simply tries again on a later
-     * tick, by which time whoever wanted it has finished and written the
-     * index this pass would have built anyway. */
-    bg_claimed = true;
-    if (foreground_wants_builder())
+    /* Artists are in name order already, articles and all, being in seek
+     * order. Stepping past articles needs them sorted again, in the space the
+     * table does not use; without room they keep the database's order. */
+    if (ignore_articles && nr > 0
+        && (size_t)(max - n) * sizeof(*out) >= 2 * nr * sizeof(int))
     {
-        bg_claimed = false;
-        return BG_INTERRUPTED;
+        int *order = (int *)&out[n];
+
+        rank = order + nr;
+        for (int i = 0; i < nr; i++)
+            order[i] = i;
+        order_articles = true;
+        qsort(order, nr, sizeof(*order), compare_artist_rows);
+        for (int i = 0; i < nr; i++)
+            rank[order[i]] = i;
     }
 
-    /* Ask outright rather than checking core_allocatable() first: that reports
-     * space already free, and on a player with the audio buffer claimed there
-     * is rarely any. core_alloc() shrinks what will shrink to make room, which
-     * is the only way this ever gets memory. Failure just means try later --
-     * and by then the artwork pass, which is what usually has the memory, will
-     * have seen this task waiting and let go of it. */
-    handle = core_alloc(bufsz);
-    if (handle <= 0)
+    for (int i = 0; i < n; i++)
     {
-        bg_claimed = false;
-        return BG_INTERRUPTED;
+        int r = out[i].artist;
+
+        if (r < 0)
+            out[i].artist = DB_SUMMARY_NO_ARTIST;
+        else
+            out[i].artist = MIN(rank ? rank[r] : r, DB_SUMMARY_NO_ARTIST - 1);
     }
-
-    /* Pinned: a handle with no ops is movable, and the builder yields all the
-     * way through -- to the database, and to be nice to playback. */
-    buf = core_get_data_pinned(handle);
-
-    memset(&local, 0, sizeof(local));
-    bg_done = bg_total = 0;
-
-    ret = build_into(&local, buf, bufsz, true);
-
-    bg_done = bg_total = 0;
-
-    core_put_data_pinned(buf);
-    core_free(handle);
-
-    /* Released only now, after the lock has been let go inside build_into():
-     * anyone polling db_summary_is_busy() is waiting to take that lock, so it
-     * has to stay set until there is nothing left for them to collide with. */
-    bg_claimed = false;
-
-    /* Only on a clean finish: an aborted or failed pass must be retried, not
-     * recorded as covering this library. Saying so is enough -- bg_task writes
-     * the marker itself once we return BG_DONE. */
-    return ret == SUCCESS ? BG_DONE : BG_INTERRUPTED;
-}
-
-struct bg_task db_summary_task =
-{
-    .read_marks  = read_covered_marks,
-    .write_marks = write_covered_marks,
-    .rank        = BG_RANK_INDEX,
-    .work_bytes  = IDX_BUILD_BUFSZ,
-    .run         = background_build,
-    .artifact_ok = saved_index_present,
-};
-
-void db_summary_init(void)
-{
-    mutex_init(&build_mutex);
-    bg_task_init(&db_summary_task);
-}
-
-void db_summary_invalidate(void)
-{
-    /* Forget what the last pass covered, so the next tick rebuilds. Used by
-     * the carousel's rebuild/update, which otherwise only reach its own build
-     * and would leave the background pass thinking it was up to date.
-     *
-     * An update rather than a rebuild: there is nothing here to purge that the
-     * pass does not overwrite anyway, the index being a single file. */
-    bg_task_update(&db_summary_task);
+    return n;
 }
 
 /* ---- playing an album -------------------------------------------------- */
@@ -2759,8 +439,7 @@ int db_summary_play_album(const struct album_data *album)
         return -1;
     }
 
-    /* The tracks assign_album_stats() counts as the album's: its album, and
-     * its artist where it has one. */
+    /* The album's tracks: its name, and its artist where it has one. */
     tagcache_search_add_filter(&tcs, tag_album, album->seek);
     if (album->artist_idx >= 0)
         tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);

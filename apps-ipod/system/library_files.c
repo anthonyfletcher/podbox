@@ -40,8 +40,9 @@
 
 /* The layout these sources expect. A change to it adds steps and bumps this.
  *   1: library/, logs/, the libfile .dat files.
- *   2: the database in library/database; every file the player owns a .dat. */
-#define LIBRARY_FORMAT 2
+ *   2: the database in library/database; every file the player owns a .dat.
+ *   3: no album index on disk: tagcache keeps the album tables. */
+#define LIBRARY_FORMAT 3
 
 /* Where layout 1 kept its version, as text */
 #define FORMAT_FILE_1  LIB_DIR "/format.txt"
@@ -205,8 +206,6 @@ static const struct move {
     { ROCKBOX_DIR "/pv_badges.dat",          LIB_BADGES_FILE },
     { ROCKBOX_DIR "/known_artists.txt",      LIB_KNOWN_ARTISTS_FILE },
     { ROCKBOX_DIR "/playername.txt",         LIB_PLAYER_NAME_FILE },
-    { ROCKBOX_DIR "/db_summary.dat",         LIB_ALBUMS_FILE },
-    { ROCKBOX_DIR "/db_summary.plays",       LIB_ALBUM_PLAYS_FILE },
     { ROCKBOX_DIR "/album_covers.cfg",       LIB_COVERS_FILE },
     { ROCKBOX_DIR "/pv_index.dat",           LIB_REPORT_INDEX_FILE },
     { ROCKBOX_DIR "/pv_moves.dat",           LIB_REPORT_MOVES_FILE },
@@ -474,46 +473,6 @@ static bool convert_stamps(void)
     return ok;
 }
 
-/* album_plays.dat: bare 12-byte records */
-static bool convert_album_plays(void)
-{
-    struct libfile_writer w;
-    struct libfile_header h;
-    unsigned char buf[240];
-    int fd, n;
-    bool ok = true;
-
-    if (!file_exists(LIB_ALBUM_PLAYS_FILE)
-        || libfile_peek(LIB_ALBUM_PLAYS_FILE, LIB_ALBUM_PLAYS_MAGIC,
-                        LIB_ALBUM_PLAYS_VERSION, &h))
-        return true;
-
-    fd = open(LIB_ALBUM_PLAYS_FILE, O_RDONLY);
-    if (fd < 0)
-        return false;
-    if (ffilesize(fd) % 12 != 0)
-    {
-        /* Misaligned: no record in it can be trusted */
-        close(fd);
-        remove(LIB_ALBUM_PLAYS_FILE);
-        upgrade_log("dropped misaligned %s", LIB_ALBUM_PLAYS_FILE);
-        return true;
-    }
-    if (!libfile_begin(&w, LIB_ALBUM_PLAYS_FILE, LIB_ALBUM_PLAYS_MAGIC,
-                       LIB_ALBUM_PLAYS_VERSION, 12, NULL))
-    {
-        close(fd);
-        return false;
-    }
-    while (ok && (n = read(fd, buf, sizeof(buf))) > 0)
-        ok = libfile_write(&w, buf, n, n / 12);
-    close(fd);
-    ok = libfile_finish(&w, ok);
-    upgrade_log("%s %s", ok ? "converted" : "FAILED to convert",
-                LIB_ALBUM_PLAYS_FILE);
-    return ok;
-}
-
 /* report_badges.dat: "PVB1", the row count, a bit per row, then a 32-bit
  * time per row. Each row becomes { when, seen, pad[3] }. */
 static bool convert_badges(void)
@@ -642,6 +601,11 @@ static bool convert_text_files(void)
 static const char *const dead[] = {
     ROCKBOX_DIR "/pv_names.dat",
     ROCKBOX_DIR "/db_summary.done",
+    ROCKBOX_DIR "/db_summary.dat",
+    ROCKBOX_DIR "/db_summary.plays",
+    LIB_CACHE_DIR "/albums.dat",
+    LIB_CACHE_DIR "/albums.dat.new",
+    LIB_CACHE_DIR "/album_plays.dat",
     ROCKBOX_DIR "/database_state.tcd",
     ROCKBOX_DIR "/stage0.log",
     ROCKBOX_DIR "/docs.lst",
@@ -722,7 +686,7 @@ void library_files_init(void (*progress)(int done, int total))
     if (progress)
         progress(++done, total);
 
-    ok &= convert_stamps() & convert_album_plays() & convert_badges();
+    ok &= convert_stamps() & convert_badges();
     drop_old_moves();
     if (progress)
         progress(++done, total);

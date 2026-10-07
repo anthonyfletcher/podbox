@@ -93,7 +93,6 @@ static int compare_artists_by_name(const void *a_v, const void *b_v)
 
 static int artist_build_index(void)
 {
-    struct tagcache_search tcs;   /* local; the engine's shared tcs stays private */
     void *buf = carousel_idx.buf;
     size_t buf_size = carousel_idx.buf_sz;
     bool by_plays = global_settings.album_covers_sort_artists_by
@@ -102,29 +101,7 @@ static int artist_build_index(void)
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
 
-    /* Read the saved index first, and only walk the database when there is
-     * none to read.
-     *
-     * Rebuilding here instead looks cheap -- artists are few -- and is not.
-     * The build walks every track for the artists' folders, and the saved
-     * index already holds those and the figures by-plays sorts on. */
     res = db_summary_load_artists(&carousel_idx, &buf, &buf_size);
-
-    /* Only a missing or unusable index falls through to a build. ERROR_USER_ABORT
-     * means the user cancelled out of waiting for the background pass, and
-     * answering that by starting the very work they declined to wait for
-     * would be the opposite of what they asked -- see wait_for_background(). */
-    if (res == ERROR_NO_ARTISTS)
-    {
-        /* The background pass has not produced an index yet, or a rebuild is
-         * pending. Ask for the figures here only if the sort will use them. */
-        buf = carousel_idx.buf;
-        buf_size = carousel_idx.buf_sz;
-        ALIGN_BUFFER(buf, buf_size, sizeof(long));
-        res = db_summary_build_artists(&carousel_idx, &tcs, &buf, &buf_size,
-                                       by_plays);
-    }
-
     if (res < SUCCESS)
         return res;
 

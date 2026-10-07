@@ -573,23 +573,14 @@ static void album_sort_prev(void)
 }
 
 /* bg_task.request: the carousel drives itself, so this is a task only in the
- * sense that the menu can reach it the same way as the others.
- *
- * It is not one background pass but two things going stale together: the
- * carousel's own on-disk state, which nothing else touches, and the album
- * index, which really is a bg_task and is told separately. Pointing a menu at
- * that index alone would leave the first half undone.
- *
- * `rebuild` is ignored, and the menu offers only the one row because of it:
- * the index is a single file that is always rewritten whole, so there is
- * nothing a rebuild could discard that an update does not overwrite anyway --
- * db_summary_invalidate() says the same about its own half. */
+ * sense that the menu can reach it the same way as the others. It drops the
+ * carousel's own on-disk state, which the next opening makes again.
+ * `rebuild` is ignored: there is nothing an update would keep. */
 static void album_covers_request(bool rebuild)
 {
     (void)rebuild;
     pf_cfg.cache_version = CACHE_REBUILD;
     remove(EMPTY_SLIDE);
-    db_summary_invalidate();
     pf_config_save();
 }
 

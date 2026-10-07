@@ -288,7 +288,6 @@ void backlight_set_fade_out(int value) { (void)value; }
 void backlight_set_on_button_hold(int index) { (void)index; }
 void backlight_set_timeout(int value) { (void)value; }
 void backlight_set_timeout_plugged(int value) { (void)value; }
-void db_summary_invalidate(void) { }
 void debug_log_restart(enum debug_log_id id) { (void)id; }
 void dsp_afr_enable(int var) { (void)var; }
 void dsp_dither_enable(bool enable) { (void)enable; }

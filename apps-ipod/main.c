@@ -58,7 +58,6 @@
 #include "database/tagcache.h"
 #include "system/library_files.h"
 #include "metadata/art_cache.h"
-#include "database/db_summary.h"
 #include "files/file_index.h"
 #include "system/bg_task.h"
 #include "screens/browse/browser_db.h"
@@ -531,7 +530,6 @@ static void init_tagcache(void)
     boot_progress(BOOT_TAGCACHE, 0, 0, str(LANG_WAIT));
 
     tagcache_init();
-    db_summary_init();
     file_index_init();
     art_cache_init();
     bg_task_start();

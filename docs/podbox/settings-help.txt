@@ -660,8 +660,7 @@ now playing screen still shows the tag. Takes effect at the next rebuild.
 [database sort albums by]
 The order for every album list that has no row of its own under Sort Albums By:
 by name, by release year with either end first, or by album artist and then
-name or year. Year and artist orders stay in name order after new music is
-added, until the album index has caught up with it.
+name or year.
 
 The four rows above it override this for the lists they name, so this is what
 the rest of the Music menu follows.
@@ -674,8 +673,7 @@ Applies to the Music lists, By First Letter and the carousel.
 
 [album show year]
 Adds the release year after each album's name in the Music lists, so a
-discography reads in order at a glance. An album added since the album index
-last caught up shows no year until it has. The carousel has its own setting.
+discography reads in order at a glance. The carousel has its own setting.
 
 [debug log tagcache]
 Writes scan progress to a log file. For working out why a track is missing from
@@ -1359,8 +1357,8 @@ finds new music on its own. Worth it only if the database looks wrong rather
 than merely incomplete.
 
 [action: Update Index]
-Refreshes the album and artist lists that Album Covers, Artist Portraits and the
-listening charts read. Fixes a browser that disagrees with the database.
+Makes Album Covers lay out its covers afresh the next time it opens, for a
+carousel that looks wrong after the library has changed.
 
 [action: Listening Progress]
 How much of the album or artist you are standing on has been heard, and which

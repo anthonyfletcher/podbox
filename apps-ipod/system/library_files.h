@@ -43,8 +43,6 @@
  * Import reads, so a copy goes to other firmware and comes back */
 #define LIB_EXPORT_FILE     ROCKBOX_DIR "/database_changelog.txt"
 
-#define LIB_ALBUMS_FILE     LIB_CACHE_DIR "/albums.dat"
-#define LIB_ALBUM_PLAYS_FILE LIB_CACHE_DIR "/album_plays.dat"
 #define LIB_COVERS_FILE     LIB_CACHE_DIR "/covers.cfg"
 #define LIB_REPORT_INDEX_FILE LIB_CACHE_DIR "/report_index.dat"
 #define LIB_REPORT_MOVES_FILE LIB_CACHE_DIR "/report_moves.dat"
@@ -66,8 +64,6 @@
  * of entries that each say their own length. */
 #define LIB_FORMAT_MAGIC    0x544f594cu     /* "LYOT"; version: the layout */
 #define LIB_STAMPS_MAGIC    0x53545241u     /* "ARTS"; version: the format */
-#define LIB_ALBUM_PLAYS_MAGIC 0x504c4241u   /* "ABLP" */
-#define LIB_ALBUM_PLAYS_VERSION 1
 #define LIB_BADGES_MAGIC    0x53474442u     /* "BDGS" */
 #define LIB_BADGES_VERSION  1
 #define LIB_MOVES_MAGIC     0x45564f4du     /* "MOVE" */

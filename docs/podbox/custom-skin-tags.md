@@ -412,9 +412,9 @@ again.
 
 ### `%lb` — background index building
 
-Non-empty (`"b"`) while any of four background passes is running — the music
-database, the album index behind the carousels and charts, the album-art
-thumbnail cache, or the document/image index — otherwise empty. All four are
+Non-empty (`"b"`) while any of three background passes is running — the music
+database, the album-art thumbnail cache, or the document/image index —
+otherwise empty. All three are
 work the user did not ask for and cannot see, and any of them can be why the
 player feels slow, so they share one indicator. Use it as a conditional to show
 a "busy" glyph:
@@ -427,8 +427,7 @@ a "busy" glyph:
 
 Non-empty (`"w"`) while the UI is busy with something the user did ask for and
 is waiting on: the file browser waiting for a directory-cache scan, the database
-browser exporting or importing modifications, the album index being brought up
-to date. Where `%lb` means "something is happening behind your back", `%lw`
+browser exporting or importing modifications. Where `%lb` means "something is happening behind your back", `%lw`
 means "the thing you just asked for is still going".
 
 ```

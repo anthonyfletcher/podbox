@@ -65,7 +65,6 @@
 #include "screens/context_menu.h"
 #include "playlist/playlist.h"
 #include "screens/browse/browser.h"
-#include "database/db_summary.h"   /* db_summary_invalidate */
 #include "metadata/tag_trim.h"     /* tag_trim_init */
 #include "metadata/art_cache.h"    /* enum art_album_source */
 #include "root_menu.h"             /* root_menu_set_audiobooks_row */
@@ -648,17 +647,9 @@ static void albumart_callback(int mode)
     set_albumart_mode(mode);
 }
 
-/* Two things follow from this one, which is the point of it being one setting.
- *
- * The album and artist index is built once and saved, so it holds whatever the
- * setting said at the time. Nothing about the database has changed, and the
- * index's own staleness checks only watch that -- so without the invalidate
- * the carousel and Random album keep serving the old list until something else
- * forces a rebuild. */
 static void segregate_audiobooks_callback(bool segregate)
 {
     root_menu_set_audiobooks_row(segregate);
-    db_summary_invalidate();
 }
 
 /* Switching the engine on is how the analysis gets started. Nothing can be

@@ -59,7 +59,7 @@
 #include "input/action.h"
 #include "settings/settings.h"
 #include "database/tagcache.h"
-#include "database/db_summary.h"   /* db_summary_log_play */
+#include "database/db_summary.h"
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
@@ -1234,15 +1234,8 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
         tagcache_update_numeric(tagcache_idx, tag_playtime, playtime);
         tagcache_update_numeric(tagcache_idx, tag_lastplayed, lastplayed);
 
-        /* The same play, for the album and artist figures. tagcache holds it
-         * per track; rolling that up is a search per album, which is why the
-         * index keeps its own summary -- and why one play used to mean
-         * rebuilding the lot. Here it is twelve bytes, held with the
-         * writes above until the disk is next idle. */
-        db_summary_log_play(id3->album,
-                            id3->albumartist && *id3->albumartist
-                                ? id3->albumartist : id3->artist,
-                            lastplayed);
+        /* The same play, for the album and artist figures */
+        tagcache_album_played(tagcache_idx, lastplayed);
     }
 
     if (autoresume)

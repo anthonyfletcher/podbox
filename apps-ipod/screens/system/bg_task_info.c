@@ -1,10 +1,10 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * A live view of the background work: the tag database, the carousel's album
- * index, the artwork thumbnail cache and the document and image index.
+ * A live view of the background work: the tag database, the artwork
+ * thumbnail cache and the document and image index.
  *
- * Everything shown is read from state those four already keep for their own
+ * Everything shown is read from state those three already keep for their own
  * purposes -- nothing here asks them to measure anything, and nothing here
  * runs when the screen is closed. The one thing deliberately *not* shown is
  * the database's current file: tc_stat.curentry is only held still long enough
@@ -22,7 +22,6 @@
 #include "widgets/list.h"
 #include "input/action.h"
 #include "database/tagcache.h"
-#include "database/db_summary.h"
 #include "metadata/art_cache.h"
 #include "files/file_index.h"
 #include "system/bg_task.h"
@@ -67,27 +66,6 @@ static void add_tagcache_lines(void)
      * total that is the track count, so the two do not divide into anything. */
     if (tagcache_is_busy())
         simplelist_addline("  Processed: %d", stat->processed_entries);
-}
-
-static void add_db_summary_lines(void)
-{
-    const char *step = db_summary_activity();
-    int done, total;
-
-    db_summary_progress(&done, &total);
-
-    simplelist_addline("Summary Index: %s",
-                       bg_task_state(&db_summary_task));
-    simplelist_addline("  Covered: %d entries", db_summary_task.done_marks.entries);
-
-    /* Only while it is running. The step is held over after a pass, and one
-     * that finished reporting "4/5 Remove Duplicates" reads as stuck on it. */
-    if (db_summary_is_busy() && step[0])
-    {
-        simplelist_addline("  Step: %s", step);
-        if (total > 0)
-            simplelist_addline("  Progress: %d/%d", done, total);
-    }
 }
 
 static void add_art_cache_lines(void)
@@ -141,7 +119,6 @@ static int bg_task_info_callback(int action, struct gui_synclist *lists)
     simplelist_reset_lines();
 
     add_tagcache_lines();
-    add_db_summary_lines();
     add_art_cache_lines();
     add_file_index_lines();
 
