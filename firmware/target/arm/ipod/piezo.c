@@ -24,6 +24,7 @@
 #include "usb.h"
 #include "logf.h"
 #include "piezo.h"
+#include "timer.h"
 
 static long piezo_stack[DEFAULT_STACK_SIZE/sizeof(long)];
 static const char piezo_thread_name[] = "piezo";
@@ -61,6 +62,32 @@ static inline void piezo_hw_stop(void)
 #endif
 }
 
+/* A timed click is ended by the user timer, not by this thread waiting it
+ * out. The PWM sounds by itself, so waiting only holds the processor, and a
+ * thread at real-time priority is never made to give it up: a wait here costs
+ * every click of the wheel 4 ms that nothing else can use. */
+static bool click_timer;
+
+static void piezo_click_off(void)
+{
+    piezo_hw_stop();
+    beeping = false;
+    timer_unregister();
+    click_timer = false;
+}
+
+static void piezo_click_cancel(void)
+{
+    int oldlevel = disable_irq_save();
+
+    if (click_timer)
+    {
+        timer_unregister();
+        click_timer = false;
+    }
+    restore_irq(oldlevel);
+}
+
 static void piezo_thread(void)
 {
     struct queue_event ev;
@@ -69,6 +96,8 @@ static void piezo_thread(void)
     while(1)
     {
         queue_wait(&piezo_queue, &ev);
+        if (ev.id != SYS_TIMEOUT)
+            piezo_click_cancel();
         switch(ev.id)
         {
             case Q_PIEZO_BEEP:
@@ -86,9 +115,17 @@ static void piezo_thread(void)
                 queue_clear(&piezo_queue);
                 break;
             case Q_PIEZO_BEEP_FOR_USEC:
-                piezo_usec_off = USEC_TIMER + duration;
                 piezo_hw_tick((unsigned int)ev.data);
                 beeping = true;
+                if (timer_register(1, NULL,
+                                   (long)duration * (TIMER_FREQ / 1000000),
+                                   piezo_click_off IF_COP(, CPU)))
+                {
+                    click_timer = true;
+                    break;
+                }
+                /* The timer is taken: wait the click out as before. */
+                piezo_usec_off = USEC_TIMER + duration;
                 while (TIME_BEFORE(USEC_TIMER, piezo_usec_off))
                     if (duration >= 5000) yield();
                 if (beeping)
