@@ -96,8 +96,8 @@ struct play_rec
     uint32_t album_key;
     uint32_t artist_key;
 };
-#define DB_PLAYS_MAGIC   LIB_PLAYS_MAGIC
-#define DB_PLAYS_VERSION LIB_PLAYS_VERSION
+#define DB_PLAYS_MAGIC   LIB_ALBUM_PLAYS_MAGIC
+#define DB_PLAYS_VERSION LIB_ALBUM_PLAYS_VERSION
 
 /* Past this the log stops being cheaper to replay than to fold in, so the
  * background pass is asked for. */

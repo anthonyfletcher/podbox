@@ -55,8 +55,8 @@
  * (screens/system/art_health.c). Written to a .new and renamed only when a
  * pass finishes, so an aborted pass leaves the previous -- complete -- list
  * standing rather than a partial one that reads as "the rest are fine". */
-#define AA_NOART_ALBUMS  THUMBCACHE_DIR "/no_art_albums.txt"
-#define AA_NOART_ARTISTS THUMBCACHE_DIR "/no_art_artists.txt"
+#define AA_NOART_ALBUMS  LIB_NO_ART_ALBUMS_FILE
+#define AA_NOART_ARTISTS LIB_NO_ART_ARTISTS_FILE
 /* Entry count the cache was last completed for, so a restart with an
  * unchanged library does not re-walk the whole database. */
 /* What each folder's thumbnails were made from, so a pass can tell a replaced

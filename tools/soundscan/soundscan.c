@@ -718,7 +718,8 @@ int main(int argc, char **argv)
      * moves its own files in beside this one when it next boots. */
     mkdir(LIB_DIR);
 
-    if (!file_exists("/.rockbox/database_idx.tcd"))
+    if (!file_exists(LIB_DB_DIR "/database_idx.tcd")
+        && !file_exists("/.rockbox/database_idx.tcd"))
         printf("Note: no tag database on the player. Measuring anyway.\n");
 
     file_window = malloc(FILE_WINDOW);

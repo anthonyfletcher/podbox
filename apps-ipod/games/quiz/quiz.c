@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include "string-extra.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "config.h"
 #include "system.h"
 #include "kernel.h"
@@ -59,8 +60,11 @@
 #include "games/quiz/quiz_pick.h"
 #include "games/quiz/quiz.h"
 
+/* A libfile of one record, the best score */
 #define QUIZ_SCORE_FILE     LIB_QUIZ_FILE
-#define QUIZ_SCORE_MAGIC    "musicquiz 2"
+
+/* The first line of the text file an older firmware kept */
+#define QUIZ_TEXT_MAGIC     "musicquiz 2"
 
 /* What a round is worth, and how long it takes to drain. */
 #define ROUND_POINTS        100
@@ -81,42 +85,54 @@ static int best;
 
 static void scores_load(void)
 {
-    char line[64];
+    struct libfile_header h;
+    int32_t b;
     int fd;
 
     best = 0;
 
-    fd = open(QUIZ_SCORE_FILE, O_RDONLY);
+    fd = libfile_open(QUIZ_SCORE_FILE, LIB_QUIZ_MAGIC, LIB_QUIZ_VERSION,
+                      sizeof(b), &h, NULL);
     if (fd < 0)
         return;
+    if (h.count >= 1 && read(fd, &b, sizeof(b)) == (ssize_t)sizeof(b))
+        best = b;
+    close(fd);
+}
 
+static bool write_best(int32_t b)
+{
+    struct libfile_writer w;
+
+    return libfile_begin(&w, QUIZ_SCORE_FILE, LIB_QUIZ_MAGIC,
+                         LIB_QUIZ_VERSION, sizeof(b), NULL)
+           && libfile_finish(&w, libfile_write(&w, &b, sizeof(b), 1));
+}
+
+static void scores_save(void)
+{
+    write_best(best);
+}
+
+bool quiz_scores_convert(const char *text_file)
+{
+    char line[64];
+    int32_t b = 0;
+    int fd = open(text_file, O_RDONLY);
+
+    if (fd < 0)
+        return false;
     if (read_line(fd, line, sizeof(line)) > 0
-        && !strcmp(line, QUIZ_SCORE_MAGIC))
+        && !strcmp(line, QUIZ_TEXT_MAGIC))
     {
         while (read_line(fd, line, sizeof(line)) > 0)
         {
             if (!strncmp(line, "best ", 5))
-                best = strtol(line + 5, NULL, 10);
+                b = strtol(line + 5, NULL, 10);
         }
     }
-
     close(fd);
-}
-
-/* Written beside the old file and renamed over it, so a save cut short
- * leaves the previous best */
-static void scores_save(void)
-{
-    int fd = open(QUIZ_SCORE_FILE ".new", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    bool ok;
-
-    if (fd < 0)
-        return;
-
-    ok = fdprintf(fd, "%s\nbest %d\n", QUIZ_SCORE_MAGIC, best) > 0;
-    if (close(fd) < 0 || !ok || rename(QUIZ_SCORE_FILE ".new",
-                                       QUIZ_SCORE_FILE) < 0)
-        remove(QUIZ_SCORE_FILE ".new");
+    return write_best(b);
 }
 
 /* ------------------------------------------------------------------ *

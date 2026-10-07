@@ -80,6 +80,7 @@
 #include <ctype.h>
 #include "config.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "ata_idle_notify.h"
 #include "thread.h"
 #include "kernel.h"
@@ -165,8 +166,6 @@ static bool usr_cancel(void);
 /* The main database string data. */
 #define TAGCACHE_FILE_INDEX      "database_%d.tcd"
 
-/* ASCII dumpfile of the DB contents. */
-#define TAGCACHE_FILE_CHANGELOG  LIB_PLAYS_NAME
 
 /* Flags */
 #define FLAG_DELETED     0x0001  /* Entry has been removed from db */
@@ -4361,82 +4360,106 @@ static bool read_tag(char *dest, long size,
     return false;
 }
 
-static int parse_changelog_line(int line_n, char *buf, void *parameters)
+/* The runtime figures, in the order both saved forms carry them */
+static const int runtime_tags[] = {
+    tag_playcount, tag_rating, tag_playtime, tag_lastplayed, tag_commitid,
+    tag_lastelapsed, tag_lastoffset
+};
+#define RUNTIME_TAGS ((int)ARRAYLEN(runtime_tags))
+
+/* One entry of plays.dat: the figures, then the filename's length; the
+ * filename follows it, unterminated. */
+struct runtime_rec {
+    int32_t  data[RUNTIME_TAGS];
+    uint16_t name_len;
+} __attribute__((packed));
+
+/* Folds one file's figures into the database, a negative one meaning none.
+ * An entry already changed since is left as it is. False only when the
+ * master could not be written. */
+static bool import_one(int masterfd, const char *filename, const long *data)
 {
     struct index_entry idx;
+    int idx_id = find_index(filename);
+
+    if (idx_id < 0 || !get_index(masterfd, idx_id, &idx, false)
+        || (idx.flag & FLAG_DIRTYNUM))
+        return true;
+
+    idx.flag |= FLAG_DIRTYNUM;
+    for (int i = 0; i < RUNTIME_TAGS; i++)
+    {
+        int tag = runtime_tags[i];
+
+        if (data[i] < 0)
+            continue;
+        idx.tag_seek[tag] = data[i];
+        if (tag == tag_lastplayed && data[i] >= current_tcmh.serial)
+            current_tcmh.serial = data[i] + 1;
+        else if (tag == tag_commitid && data[i] >= current_tcmh.commitid)
+            current_tcmh.commitid = data[i] + 1;
+    }
+
+    return write_index(masterfd, idx_id, &idx);
+}
+
+/* One line of an export: tag="value" pairs, the filename among them */
+static int parse_changelog_line(int line_n, char *buf, void *parameters)
+{
     char tag_data[TAGCACHE_BUFSZ];
-    int idx_id;
+    char filename[TAGCACHE_BUFSZ];
+    long data[RUNTIME_TAGS];
     long masterfd = (long)(intptr_t)parameters;
-    const int import_tags[] = { tag_playcount, tag_rating, tag_playtime,
-                                tag_lastplayed, tag_commitid, tag_lastelapsed,
-                                tag_lastoffset };
-    int i;
     (void)line_n;
 
     if (*buf == '#')
         return 0;
-
-    /* logf("%d/%s", line_n, buf); */
-    if (!read_tag(tag_data, sizeof tag_data, buf, "filename"))
-    {
-        logf("%d/filename missing", line_n);
-        logf("-> %s", buf);
-        return 0;
-    }
-
-    idx_id = find_index(tag_data);
-    if (idx_id < 0)
-    {
-        logf("%d/entry not found", line_n);
-        return 0;
-    }
-
-    if (!get_index(masterfd, idx_id, &idx, false))
-    {
-        logf("%d/failed to retrieve index entry", line_n);
-        return 0;
-    }
-
-    /* Stop if tag has already been modified. */
-    if (idx.flag & FLAG_DIRTYNUM)
+    if (!read_tag(filename, sizeof filename, buf, "filename"))
         return 0;
 
-    logf("%d/import: %s", line_n, tag_data);
-
-    idx.flag |= FLAG_DIRTYNUM;
-    for (i = 0; i < (long)(sizeof(import_tags)/sizeof(import_tags[0])); i++)
+    for (int i = 0; i < RUNTIME_TAGS; i++)
     {
-        int data;
-
-        if (!read_tag(tag_data, sizeof tag_data, buf,
-                      tagcache_tag_to_str(import_tags[i])))
-        {
-            continue;
-        }
-
-        data = atoi(tag_data);
-        if (data < 0)
-            continue;
-
-        idx.tag_seek[import_tags[i]] = data;
-
-        if (import_tags[i] == tag_lastplayed && data >= current_tcmh.serial)
-            current_tcmh.serial = data + 1;
-        else if (import_tags[i] == tag_commitid && data >= current_tcmh.commitid)
-            current_tcmh.commitid = data + 1;
+        data[i] = -1;
+        if (read_tag(tag_data, sizeof tag_data, buf,
+                     tagcache_tag_to_str(runtime_tags[i])))
+            data[i] = atoi(tag_data);
     }
 
-    return write_index(masterfd, idx_id, &idx) ? 0 : -5;
+    return import_one(masterfd, filename, data) ? 0 : -5;
 }
 
-bool tagcache_import_changelog(void)
+/* Every entry of plays.dat */
+static bool import_runtime_records(int fd, int masterfd)
+{
+    struct runtime_rec rec;
+    char filename[TAGCACHE_BUFSZ];
+    long data[RUNTIME_TAGS];
+
+    while (read(fd, &rec, sizeof(rec)) == (ssize_t)sizeof(rec))
+    {
+        if (rec.name_len >= sizeof(filename)
+            || read(fd, filename, rec.name_len) != rec.name_len)
+            return false;
+        filename[rec.name_len] = '\0';
+        for (int i = 0; i < RUNTIME_TAGS; i++)
+            data[i] = rec.data[i];
+        if (!import_one(masterfd, filename, data))
+            return false;
+        do_timed_yield();
+    }
+    return true;
+}
+
+/* Folds saved figures back in: from plays.dat after a rebuild, or from an
+ * export the owner asked for. */
+static bool import_runtime_data(bool from_export)
 {
     struct master_header myhdr;
     struct tagcache_header tch;
-    int clfd;
+    struct libfile_header lh;
+    int fd;
     long masterfd;
     char buf[2048];
-    const int bufsz = sizeof(buf);
 
     if (!tc_stat.ready)
         return false;
@@ -4444,16 +4467,20 @@ bool tagcache_import_changelog(void)
     while (read_lock)
         sleep(1);
 
-    clfd = open_db_fd(TAGCACHE_FILE_CHANGELOG, O_RDONLY);
-    if (clfd < 0)
+    if (from_export)
+        fd = open(LIB_EXPORT_FILE, O_RDONLY);
+    else
+        fd = libfile_open(LIB_PLAYS_FILE, LIB_PLAYS_MAGIC, LIB_PLAYS_VERSION,
+                          1, &lh, NULL);
+    if (fd < 0)
     {
-        logf("failure to open changelog");
+        logf("no runtime data to import");
         return false;
     }
 
     if ( (masterfd = open_master_fd(&myhdr, true)) < 0)
     {
-        close(clfd);
+        close(fd);
         return false;
     }
 
@@ -4461,10 +4488,13 @@ bool tagcache_import_changelog(void)
 
     filenametag_fd = open_tag_fd(&tch, tag_filename, false);
 
-    fast_readline(clfd, buf, bufsz, (void *)(intptr_t)masterfd,
-                  parse_changelog_line);
+    if (from_export)
+        fast_readline(fd, buf, sizeof(buf), (void *)(intptr_t)masterfd,
+                      parse_changelog_line);
+    else
+        import_runtime_records(fd, masterfd);
 
-    close(clfd);
+    close(fd);
     close(masterfd);
 
     if (filenametag_fd >= 0)
@@ -4480,32 +4510,35 @@ bool tagcache_import_changelog(void)
     return true;
 }
 
+bool tagcache_import_changelog(void)
+{
+    return import_runtime_data(true);
+}
 
 /* The runtime figures live only in the master index, which a rebuild deletes:
  * play count, rating, play time, last played, the commit an entry arrived in,
- * and its resume point. Saved as a changelog, which the import queued after the
- * rebuild's commit reads back.
+ * and its resume point. A rebuild saves them to plays.dat, which the import
+ * queued after its commit reads back; Export Modifications writes the same
+ * figures as Rockbox's text changelog instead.
  *
  * Read from the files directly rather than through a search, so it works on a
  * database that is not ready -- the state an interrupted merge leaves, and the
  * one the automatic rebuild starts from. A master that cannot be read leaves an
- * earlier changelog as it was; a readable one replaces it, so an old export is
- * never imported over a newer library. */
-static bool save_runtime_data(void)
+ * earlier file as it was; a readable one replaces it, so an old copy is never
+ * imported over a newer library. */
+static bool save_runtime_data(bool as_export)
 {
-    static const int tags[] = { tag_playcount, tag_rating, tag_playtime,
-                                tag_lastplayed, tag_commitid, tag_lastelapsed,
-                                tag_lastoffset };
     struct master_header hdr;
     struct tagcache_header tch;
     struct index_entry idx;
     struct tagfile_entry tfe;
+    struct libfile_writer w;
     char buf[TAGCACHE_BUFSZ];
     char num[16];
-    int masterfd, fnfd, clfd;
+    int masterfd, fnfd, clfd = -1;
     bool ok = true;
     long i;
-    unsigned int t;
+    int t;
 
     /* Plays still queued are not in the master yet. */
     run_command_queue(true);
@@ -4521,16 +4554,23 @@ static bool save_runtime_data(void)
         return false;
     }
 
-    clfd = open_db_fd(TAGCACHE_FILE_CHANGELOG ".new",
-                      O_WRONLY | O_CREAT | O_TRUNC);
-    if (clfd < 0)
+    if (as_export)
     {
+        clfd = open(LIB_EXPORT_FILE ".new", O_WRONLY | O_CREAT | O_TRUNC,
+                    0666);
+        ok = clfd >= 0 && write(clfd, "## Changelog version 1\n", 23) == 23;
+    }
+    else
+        ok = libfile_begin(&w, LIB_PLAYS_FILE, LIB_PLAYS_MAGIC,
+                           LIB_PLAYS_VERSION, 1, NULL);
+    if (!ok)
+    {
+        if (clfd >= 0)
+            close(clfd);
         close(fnfd);
         close(masterfd);
         return false;
     }
-
-    ok = write(clfd, "## Changelog version 1\n", 23) == 23;
 
     for (i = 0; ok && i < hdr.tch.entry_count; i++)
     {
@@ -4550,36 +4590,54 @@ static bool save_runtime_data(void)
             continue;
         buf[tfe.tag_length - 1] = '\0';
 
-        ok = write_tag(clfd, "filename", buf);
-        for (t = 0; ok && t < ARRAYLEN(tags); t++)
+        if (as_export)
         {
-            itoa_buf(num, sizeof num, (int)idx.tag_seek[tags[t]]);
-            ok = write_tag(clfd, tagcache_tag_to_str(tags[t]), num);
+            ok = write_tag(clfd, "filename", buf);
+            for (t = 0; ok && t < RUNTIME_TAGS; t++)
+            {
+                itoa_buf(num, sizeof num, (int)idx.tag_seek[runtime_tags[t]]);
+                ok = write_tag(clfd, tagcache_tag_to_str(runtime_tags[t]),
+                               num);
+            }
+            if (ok)
+                ok = write(clfd, "\n", 1) == 1;
         }
-        if (ok)
-            ok = write(clfd, "\n", 1) == 1;
+        else
+        {
+            struct runtime_rec rec;
+
+            for (t = 0; t < RUNTIME_TAGS; t++)
+                rec.data[t] = idx.tag_seek[runtime_tags[t]];
+            rec.name_len = strlen(buf);
+            ok = libfile_write(&w, &rec, sizeof(rec), sizeof(rec))
+                 && libfile_write(&w, buf, rec.name_len, rec.name_len);
+        }
 
         do_timed_yield();
     }
 
     close(fnfd);
     close(masterfd);
-    close(clfd);
 
-    if (ok)
-        ok = rename_db_file(TAGCACHE_FILE_CHANGELOG ".new",
-                            TAGCACHE_FILE_CHANGELOG);
-    if (!ok)
-        remove_db_file(TAGCACHE_FILE_CHANGELOG ".new");
+    if (as_export)
+    {
+        close(clfd);
+        if (ok)
+            ok = rename(LIB_EXPORT_FILE ".new", LIB_EXPORT_FILE) == 0;
+        if (!ok)
+            remove(LIB_EXPORT_FILE ".new");
+    }
+    else
+        ok = libfile_finish(&w, ok);
     debug_log(DEBUG_LOG_TAGCACHE, "runtime data: %s", ok ? "saved" : "failed");
     return ok;
 }
 
-/* Export Modifications: the same file a rebuild saves. */
+/* Export Modifications */
 bool tagcache_create_changelog(struct tagcache_search *tcs)
 {
     (void)tcs;
-    return save_runtime_data();
+    return save_runtime_data(true);
 }
 
 static bool delete_entry(long idx_id)
@@ -5955,11 +6013,11 @@ static void tagcache_thread(void)
                  * search, the disk a walk of the filename file. */
                 if (!tc_stat.ramcache)
                     load_ramcache();
-                tagcache_import_changelog();
+                import_runtime_data(false);
                 break;
 
             case Q_REBUILD:
-                save_runtime_data();
+                save_runtime_data(false);
                 remove_files();
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
@@ -6209,7 +6267,7 @@ void tagcache_init(void)
     filenametag_fd = -1;
     write_lock = read_lock = 0;
 
-    strmemccpy(tc_stat.db_path, ROCKBOX_DIR, sizeof(tc_stat.db_path));
+    strmemccpy(tc_stat.db_path, LIB_DB_DIR, sizeof(tc_stat.db_path));
     mutex_init(&command_queue_mutex);
     queue_init(&tagcache_queue, true);
     create_thread(tagcache_thread, tagcache_stack,

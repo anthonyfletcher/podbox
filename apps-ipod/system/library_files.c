@@ -4,19 +4,18 @@
  * The first load of a new layout: library_files.h says where each file
  * lives, and this moves the files of an older layout there, once.
  *
- * library/format.txt holds the layout's version. A firmware that expects a
- * higher one runs the steps after it at boot, before anything reads the
- * files and before USB is answered. Every step skips what is already done,
- * so a boot cut short by a flat battery simply finishes the rest next time;
- * format.txt is written only once every step has succeeded. Each move is a
- * rename on the same volume, so nothing is copied. What it did is appended
- * to logs/upgrade.log.
+ * library/format.dat holds the layout's version. A firmware that expects a
+ * higher one runs the steps at boot, before anything reads the files and
+ * before USB is answered. Every step skips what is already done, so a boot cut
+ * short by a flat battery simply finishes the rest next time, and a player
+ * several layouts behind runs them all; format.dat is written only once every
+ * step has succeeded. Each move is a rename on the same volume, so nothing is
+ * copied. What it did is appended to logs/upgrade.log.
  *
  * Parts, in order:
  *   - the layout's version and the log
- *   - moving one file
- *   - the steps: folders, files, numbered playback logs, a database kept
- *     elsewhere
+ *   - moving one file, and a folder
+ *   - the steps: folders, files, numbered playback logs, the database
  *   - converting the files whose format changed, into libfiles
  *   - dead names
  *   - library_files_init()
@@ -35,11 +34,17 @@
 #include "system/strutil.h"
 #include "system/library_files.h"
 #include "database/libfile.h"
-#include "metadata/art_cache.h"     /* ART_CACHE_FORMAT_VERSION */
+#include "metadata/book_resume.h"
+#include "games/quiz/quiz.h"
+#include "games/spike/spike_score.h"
 
-/* The layout these sources expect. A change to it adds steps and bumps this. */
-#define LIBRARY_FORMAT 1
-#define FORMAT_FILE    LIB_DIR "/format.txt"
+/* The layout these sources expect. A change to it adds steps and bumps this.
+ *   1: library/, logs/, the libfile .dat files.
+ *   2: the database in library/database; every file the player owns a .dat. */
+#define LIBRARY_FORMAT 2
+
+/* Where layout 1 kept its version, as text */
+#define FORMAT_FILE_1  LIB_DIR "/format.txt"
 
 /* ------------------------------------------------------------------ *
  * the layout's version and the log                                   *
@@ -47,10 +52,20 @@
 
 static int read_format(void)
 {
+    struct libfile_header h;
     char buf[16];
-    int fd = open(FORMAT_FILE, O_RDONLY);
-    int n;
+    int fd, n;
 
+    fd = open(LIB_FORMAT_FILE, O_RDONLY);
+    if (fd >= 0)
+    {
+        n = read(fd, &h, sizeof(h));
+        close(fd);
+        if (n == (int)sizeof(h) && h.magic == LIB_FORMAT_MAGIC)
+            return h.version;
+    }
+
+    fd = open(FORMAT_FILE_1, O_RDONLY);
     if (fd < 0)
         return 0;
     n = read(fd, buf, sizeof(buf) - 1);
@@ -63,13 +78,13 @@ static int read_format(void)
 
 static bool write_format(void)
 {
-    int fd = open(FORMAT_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    struct libfile_writer w;
 
-    if (fd < 0)
+    if (!libfile_begin(&w, LIB_FORMAT_FILE, LIB_FORMAT_MAGIC, LIBRARY_FORMAT,
+                       1, NULL) || !libfile_finish(&w, true))
         return false;
-    bool ok = fdprintf(fd, "%d\n", LIBRARY_FORMAT) > 0;
-    close(fd);
-    return ok;
+    remove(FORMAT_FILE_1);
+    return true;
 }
 
 static void upgrade_log(const char *fmt, ...)
@@ -88,7 +103,7 @@ static void upgrade_log(const char *fmt, ...)
 }
 
 /* ------------------------------------------------------------------ *
- * moving one file                                                    *
+ * moving one file, and a folder                                      *
  * ------------------------------------------------------------------ */
 
 static bool exists(const char *path)
@@ -116,75 +131,6 @@ static bool move_file(const char *from, const char *to)
     upgrade_log("moved %s -> %s", from, to);
     return true;
 }
-
-/* ------------------------------------------------------------------ *
- * the steps                                                          *
- * ------------------------------------------------------------------ */
-
-static const char *const folders[] = {
-    LIB_DIR, LIB_USER_DIR, LIB_CACHE_DIR, LIB_LOGS_DIR,
-};
-
-static const struct move {
-    const char *from;
-    const char *to;
-} moves[] = {
-    { ROCKBOX_DIR "/db_sound.dat",           LIB_SOUND_FILE },
-    { ROCKBOX_DIR "/db_sound.part",          LIB_SOUND_PART },
-    { ROCKBOX_DIR "/db_sound.cal",           LIB_SOUND_CAL_FILE },
-    { ROCKBOX_DIR "/database_changelog.txt", LIB_PLAYS_FILE },
-    { ROCKBOX_DIR "/playback.log",           LIB_PLAYBACK_LOG },
-    { ROCKBOX_DIR "/audiobooks.resume",      LIB_AUDIOBOOKS_FILE },
-    { ROCKBOX_DIR "/pv_badges.dat",          LIB_BADGES_FILE },
-    { ROCKBOX_DIR "/musicquiz.scores",       LIB_QUIZ_FILE },
-    { ROCKBOX_DIR "/spike.scores",           LIB_SPIKE_FILE },
-    { ROCKBOX_DIR "/known_artists.txt",      LIB_KNOWN_ARTISTS_FILE },
-    { ROCKBOX_DIR "/playername.txt",         LIB_PLAYER_NAME_FILE },
-    { ROCKBOX_DIR "/db_summary.dat",         LIB_ALBUMS_FILE },
-    { ROCKBOX_DIR "/db_summary.plays",       LIB_ALBUM_PLAYS_FILE },
-    { ROCKBOX_DIR "/album_covers.cfg",       LIB_COVERS_FILE },
-    { ROCKBOX_DIR "/pv_index.dat",           LIB_REPORT_INDEX_FILE },
-    { ROCKBOX_DIR "/pv_moves.dat",           LIB_REPORT_MOVES_FILE },
-    { ROCKBOX_DIR "/docs.lst",               LIB_DOCUMENTS_FILE },
-    { ROCKBOX_DIR "/images.lst",             LIB_IMAGES_FILE },
-    { ROCKBOX_DIR "/spike.run",              LIB_SPIKE_RUN_FILE },
-    /* The thumbnails go as one folder (see move_folder()), and their lists
-     * after them */
-    { ROCKBOX_DIR "/thumbcache",             LIB_ART_DIR },
-    { LIB_ART_DIR "/noart_albums.lst",  LIB_ART_DIR "/no_art_albums.txt" },
-    { LIB_ART_DIR "/noart_artists.lst", LIB_ART_DIR "/no_art_artists.txt" },
-    { ROCKBOX_DIR "/carousel/emptyslide.pfraw", LIB_COVERS_EMPTY_FILE },
-    { ROCKBOX_DIR "/tagcache.log",           LIB_TAGCACHE_LOG },
-    { ROCKBOX_DIR "/artcache.log",           LIB_ART_LOG },
-    { ROCKBOX_DIR "/usb-log.txt",            LIB_USB_LOG },
-    { ROCKBOX_DIR "/buffer-damage.log",      LIB_BUFFER_LOG },
-};
-
-/* Files nothing reads any more, and the half-written copies an older
- * firmware may have left. The art cache's markers go only after
- * convert_stamps() has read them. */
-static const char *const dead[] = {
-    ROCKBOX_DIR "/pv_names.dat",
-    ROCKBOX_DIR "/db_summary.done",
-    LIB_ART_DIR "/done.txt",
-    LIB_ART_DIR "/format.txt",
-    LIB_ART_DIR "/coverflow/_fallback.aat",
-    LIB_ART_DIR "/list/_fallback.aat",
-    LIB_ART_DIR "/wps/_fallback.aat",
-    ROCKBOX_DIR "/database_state.tcd",
-    ROCKBOX_DIR "/stage0.log",
-    ROCKBOX_DIR "/audiobooks.resume.tmp",
-    ROCKBOX_DIR "/spike.scores.tmp",
-    ROCKBOX_DIR "/db_summary.tmp",
-    ROCKBOX_DIR "/pv_index.new",
-    ROCKBOX_DIR "/db_sound.dat.new",
-    ROCKBOX_DIR "/docs.lst.tmp",
-    ROCKBOX_DIR "/images.lst.tmp",
-    ROCKBOX_DIR "/database_changelog.txt.new",
-    LIB_ART_DIR "/stamps.dat.tmp",
-    LIB_ART_DIR "/noart_albums.lst.tmp",
-    LIB_ART_DIR "/noart_artists.lst.tmp",
-};
 
 /* A folder to a new name, or into the folder already there. That one is
  * newer -- something wrote it after an earlier boot failed to move this --
@@ -238,6 +184,43 @@ static bool move_folder(const char *from, const char *to)
 
     return rmdir(from) == 0 || !dir_exists(from);
 }
+
+/* ------------------------------------------------------------------ *
+ * the steps                                                          *
+ * ------------------------------------------------------------------ */
+
+static const char *const folders[] = {
+    LIB_DIR, LIB_DB_DIR, LIB_USER_DIR, LIB_CACHE_DIR, LIB_LOGS_DIR,
+};
+
+/* Files whose contents stay as they are */
+static const struct move {
+    const char *from;
+    const char *to;
+} moves[] = {
+    { ROCKBOX_DIR "/db_sound.dat",           LIB_SOUND_FILE },
+    { ROCKBOX_DIR "/db_sound.part",          LIB_SOUND_PART },
+    { ROCKBOX_DIR "/db_sound.cal",           LIB_SOUND_CAL_FILE },
+    { ROCKBOX_DIR "/playback.log",           LIB_PLAYBACK_LOG },
+    { ROCKBOX_DIR "/pv_badges.dat",          LIB_BADGES_FILE },
+    { ROCKBOX_DIR "/known_artists.txt",      LIB_KNOWN_ARTISTS_FILE },
+    { ROCKBOX_DIR "/playername.txt",         LIB_PLAYER_NAME_FILE },
+    { ROCKBOX_DIR "/db_summary.dat",         LIB_ALBUMS_FILE },
+    { ROCKBOX_DIR "/db_summary.plays",       LIB_ALBUM_PLAYS_FILE },
+    { ROCKBOX_DIR "/album_covers.cfg",       LIB_COVERS_FILE },
+    { ROCKBOX_DIR "/pv_index.dat",           LIB_REPORT_INDEX_FILE },
+    { ROCKBOX_DIR "/pv_moves.dat",           LIB_REPORT_MOVES_FILE },
+    /* The thumbnails go as one folder (see move_folder()) */
+    { ROCKBOX_DIR "/thumbcache",             LIB_ART_DIR },
+    { ROCKBOX_DIR "/carousel/emptyslide.pfraw", LIB_COVERS_EMPTY_FILE },
+    { ROCKBOX_DIR "/tagcache.log",           LIB_TAGCACHE_LOG },
+    { ROCKBOX_DIR "/artcache.log",           LIB_ART_LOG },
+    { ROCKBOX_DIR "/usb-log.txt",            LIB_USB_LOG },
+    { ROCKBOX_DIR "/buffer-damage.log",      LIB_BUFFER_LOG },
+    /* Layout 1 kept a rebuild's play data where Export Modifications now
+     * writes; the export is the place for an older copy */
+    { LIB_USER_DIR "/plays.txt",             LIB_EXPORT_FILE },
+};
 
 /* playback_0001.log and on. Names are gathered before any is moved: renaming
  * out of a folder while reading it can skip entries. */
@@ -308,51 +291,110 @@ static bool old_database_dir(char *out, size_t size)
     return len > 0 && strcasecmp(out, ROCKBOX_DIR);
 }
 
-/* A database kept elsewhere is the one that was in use, so it replaces
- * whatever /.rockbox holds, which is older. */
-static bool move_database(void)
+/* The database's files: -2 the master, -1 a merge to finish, then the tags */
+static void database_name(int i, char *name, size_t size)
 {
-    char dir[MAX_PATH];
-    char from[MAX_PATH], to[MAX_PATH];
-    bool ok = true;
+    if (i == -2)
+        strmemccpy(name, "database_idx.tcd", size);
+    else if (i == -1)
+        strmemccpy(name, "database_tmp.tcd", size);
+    else
+        snprintf(name, size, "database_%d.tcd", i);
+}
 
-    if (!old_database_dir(dir, sizeof(dir)))
-        return true;
-    snprintf(from, sizeof(from), "%s/database_idx.tcd", dir);
-    snprintf(to, sizeof(to), "%s/database_tmp.tcd", dir);
-    if (!file_exists(from) && !file_exists(to))
-        return true;
+static bool has_database(const char *dir)
+{
+    char path[MAX_PATH];
 
-    upgrade_log("database in %s", dir);
+    snprintf(path, sizeof(path), "%s/database_idx.tcd", dir);
+    if (file_exists(path))
+        return true;
+    snprintf(path, sizeof(path), "%s/database_tmp.tcd", dir);
+    return file_exists(path);
+}
+
+/* Whether dir holds any of a database's files at all */
+static bool has_database_file(const char *dir)
+{
+    char name[32], path[MAX_PATH];
+
     for (int i = -2; i < 32; i++)
     {
-        char name[32];
-
-        if (i == -2)
-            strcpy(name, "database_idx.tcd");
-        else if (i == -1)
-            strcpy(name, "database_tmp.tcd");
-        else
-            snprintf(name, sizeof(name), "database_%d.tcd", i);
-        snprintf(from, sizeof(from), "%s/%s", dir, name);
-        snprintf(to, sizeof(to), ROCKBOX_DIR "/%s", name);
-        if (!file_exists(from))
-        {
-            /* A stale file /.rockbox has and the moved one does not */
-            if (file_exists(to))
-                remove(to);
-            continue;
-        }
-        remove(to);
-        ok &= move_file(from, to);
+        database_name(i, name, sizeof(name));
+        snprintf(path, sizeof(path), "%s/%s", dir, name);
+        if (file_exists(path))
+            return true;
     }
+    return false;
+}
 
-    snprintf(from, sizeof(from), "%s/database_changelog.txt", dir);
-    if (file_exists(from))
+enum db_move {
+    DB_REPLACE,     /* dir's database is the one in use: it replaces all */
+    DB_FINISH,      /* a move cut short: the files not yet across follow */
+    DB_DROP,        /* dir's database is stale: it goes */
+};
+
+/* Every database file in dir, into library/database or away. A database is
+ * all of a piece, so a replacing one also removes a file only the old one
+ * had. */
+static bool move_database_from(const char *dir, enum db_move how)
+{
+    char name[32], from[MAX_PATH], to[MAX_PATH];
+    bool ok = true;
+
+    upgrade_log("database in %s: %s", dir, how == DB_REPLACE ? "moving"
+                : how == DB_FINISH ? "finishing the move" : "stale, dropped");
+    for (int i = -2; i < 32; i++)
     {
-        remove(LIB_PLAYS_FILE);
-        ok &= move_file(from, LIB_PLAYS_FILE);
+        database_name(i, name, sizeof(name));
+        snprintf(from, sizeof(from), "%s/%s", dir, name);
+        snprintf(to, sizeof(to), LIB_DB_DIR "/%s", name);
+
+        if (how == DB_REPLACE && file_exists(to))
+            remove(to);
+        if (!file_exists(from))
+            continue;
+        if (how == DB_DROP || (how == DB_FINISH && file_exists(to)))
+            remove(from);
+        else
+            ok &= move_file(from, to);
     }
+    return ok;
+}
+
+/* A database kept elsewhere is the one that was in use, so it replaces any
+ * other, and its changelog becomes the export */
+static bool move_database(void)
+{
+    char dir[MAX_PATH], from[MAX_PATH], name[32];
+    bool ok = true;
+
+    if (old_database_dir(dir, sizeof(dir)) && has_database(dir))
+    {
+        ok = move_database_from(dir, DB_REPLACE);
+        for (int i = -2; i < 32; i++)
+        {
+            database_name(i, name, sizeof(name));
+            snprintf(from, sizeof(from), ROCKBOX_DIR "/%s", name);
+            remove(from);
+        }
+        snprintf(from, sizeof(from), "%s/database_changelog.txt", dir);
+        if (file_exists(from))
+        {
+            remove(LIB_EXPORT_FILE);
+            ok &= move_file(from, LIB_EXPORT_FILE);
+        }
+        return ok;
+    }
+
+    /* A whole database in /.rockbox moves, unless library/database already
+     * has one, which is newer. Tag files without a master are a move cut
+     * short, finished now. */
+    if (has_database(ROCKBOX_DIR))
+        ok = move_database_from(ROCKBOX_DIR, has_database(LIB_DB_DIR)
+                                             ? DB_DROP : DB_REPLACE);
+    else if (has_database_file(ROCKBOX_DIR))
+        ok = move_database_from(ROCKBOX_DIR, DB_FINISH);
     return ok;
 }
 
@@ -442,8 +484,8 @@ static bool convert_album_plays(void)
     bool ok = true;
 
     if (!file_exists(LIB_ALBUM_PLAYS_FILE)
-        || libfile_peek(LIB_ALBUM_PLAYS_FILE, LIB_PLAYS_MAGIC,
-                        LIB_PLAYS_VERSION, &h))
+        || libfile_peek(LIB_ALBUM_PLAYS_FILE, LIB_ALBUM_PLAYS_MAGIC,
+                        LIB_ALBUM_PLAYS_VERSION, &h))
         return true;
 
     fd = open(LIB_ALBUM_PLAYS_FILE, O_RDONLY);
@@ -457,8 +499,8 @@ static bool convert_album_plays(void)
         upgrade_log("dropped misaligned %s", LIB_ALBUM_PLAYS_FILE);
         return true;
     }
-    if (!libfile_begin(&w, LIB_ALBUM_PLAYS_FILE, LIB_PLAYS_MAGIC,
-                       LIB_PLAYS_VERSION, 12, NULL))
+    if (!libfile_begin(&w, LIB_ALBUM_PLAYS_FILE, LIB_ALBUM_PLAYS_MAGIC,
+                       LIB_ALBUM_PLAYS_VERSION, 12, NULL))
     {
         close(fd);
         return false;
@@ -532,9 +574,102 @@ static void drop_old_moves(void)
     }
 }
 
+/* A text file an older firmware kept, at either name it had, through its
+ * own module's converter. A .dat already there is newer, and the text is
+ * then kept for the owner to look at. */
+static bool convert_text(const char *const old[2], const char *dat,
+                         bool (*convert)(const char *text))
+{
+    bool ok = true;
+
+    for (int i = 0; i < 2; i++)
+    {
+        if (!file_exists(old[i]))
+            continue;
+        if (file_exists(dat))
+        {
+            upgrade_log("kept %s: %s already there", old[i], dat);
+            continue;
+        }
+        if (convert(old[i]))
+        {
+            remove(old[i]);
+            upgrade_log("converted %s -> %s", old[i], dat);
+        }
+        else
+        {
+            upgrade_log("FAILED to convert %s", old[i]);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+static bool convert_spike_scores(const char *text)
+{
+    return spk_score_convert(text, NULL);
+}
+
+static bool convert_spike_run(const char *text)
+{
+    return spk_score_convert(NULL, text);
+}
+
+static bool convert_text_files(void)
+{
+    static const char *const books[2] = {
+        ROCKBOX_DIR "/audiobooks.resume", LIB_USER_DIR "/audiobooks.txt" };
+    static const char *const quiz[2] = {
+        ROCKBOX_DIR "/musicquiz.scores", LIB_USER_DIR "/quiz_scores.txt" };
+    static const char *const spike[2] = {
+        ROCKBOX_DIR "/spike.scores", LIB_USER_DIR "/spike_scores.txt" };
+    static const char *const run[2] = {
+        ROCKBOX_DIR "/spike.run", LIB_CACHE_DIR "/spike_run.txt" };
+
+    return convert_text(books, LIB_AUDIOBOOKS_FILE, book_resume_convert)
+         & convert_text(quiz, LIB_QUIZ_FILE, quiz_scores_convert)
+         & convert_text(spike, LIB_SPIKE_FILE, convert_spike_scores)
+         & convert_text(run, LIB_SPIKE_RUN_FILE, convert_spike_run);
+}
+
 /* ------------------------------------------------------------------ *
  * dead names                                                         *
  * ------------------------------------------------------------------ */
+
+/* Files nothing reads any more: lists the next pass rebuilds in their new
+ * form, the markers convert_stamps() read, and the half-written copies an
+ * older firmware may have left */
+static const char *const dead[] = {
+    ROCKBOX_DIR "/pv_names.dat",
+    ROCKBOX_DIR "/db_summary.done",
+    ROCKBOX_DIR "/database_state.tcd",
+    ROCKBOX_DIR "/stage0.log",
+    ROCKBOX_DIR "/docs.lst",
+    ROCKBOX_DIR "/images.lst",
+    LIB_CACHE_DIR "/documents.txt",
+    LIB_CACHE_DIR "/images.txt",
+    LIB_CACHE_DIR "/albums_done.txt",
+    LIB_ART_DIR "/noart_albums.lst",
+    LIB_ART_DIR "/noart_artists.lst",
+    LIB_ART_DIR "/no_art_albums.txt",
+    LIB_ART_DIR "/no_art_artists.txt",
+    LIB_ART_DIR "/done.txt",
+    LIB_ART_DIR "/format.txt",
+    LIB_ART_DIR "/coverflow/_fallback.aat",
+    LIB_ART_DIR "/list/_fallback.aat",
+    LIB_ART_DIR "/wps/_fallback.aat",
+    ROCKBOX_DIR "/audiobooks.resume.tmp",
+    ROCKBOX_DIR "/spike.scores.tmp",
+    ROCKBOX_DIR "/db_summary.tmp",
+    ROCKBOX_DIR "/pv_index.new",
+    ROCKBOX_DIR "/db_sound.dat.new",
+    ROCKBOX_DIR "/docs.lst.tmp",
+    ROCKBOX_DIR "/images.lst.tmp",
+    ROCKBOX_DIR "/database_changelog.txt.new",
+    LIB_ART_DIR "/stamps.dat.tmp",
+    LIB_ART_DIR "/noart_albums.lst.tmp",
+    LIB_ART_DIR "/noart_artists.lst.tmp",
+};
 
 static void remove_dead(void)
 {
@@ -557,7 +692,7 @@ bool library_files_need_upgrade(void)
 
 void library_files_init(void (*progress)(int done, int total))
 {
-    const int total = ARRAYLEN(moves) + 4;
+    const int total = ARRAYLEN(moves) + 5;
     int done = 0;
     bool ok = true;
 
@@ -589,6 +724,10 @@ void library_files_init(void (*progress)(int done, int total))
 
     ok &= convert_stamps() & convert_album_plays() & convert_badges();
     drop_old_moves();
+    if (progress)
+        progress(++done, total);
+
+    ok &= convert_text_files();
     if (progress)
         progress(++done, total);
 

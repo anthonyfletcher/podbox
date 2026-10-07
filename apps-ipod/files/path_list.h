@@ -7,6 +7,7 @@
 #define _PATH_LIST_H
 
 #include <stdbool.h>
+#include "database/libfile.h"
 
 /* Hard ceiling on lines held, whatever a caller asks for. These lists are
  * meant to be read by a person; past a few hundred the screen is not the
@@ -15,7 +16,7 @@
 
 struct path_list {
     bool  held;                    /* the scratch buffer is ours */
-    char *text;                    /* the file, newlines turned into NULs */
+    char *text;                    /* the paths, each NUL-terminated */
     int   line[PATH_LIST_MAX];     /* offset of each path into text */
     int   count;
     bool  truncated;               /* more lines, or more bytes, than were kept */
@@ -55,21 +56,15 @@ const char *path_list_leaf(const struct path_list *pl, int index);
 /* Writing a list.
  *
  * Both producers -- the file index and the artwork cache's "found nothing"
- * lists -- publish the same way: lines go to a ".tmp" beside the real file,
- * which replaces it only when the pass that wrote it finished. An interrupted
- * pass leaves the previous list standing.
- *
- * Trap, and the reason this lives here rather than in each producer: renaming
- * a ".tmp" that was never created still removes the published file first, so a
- * writer that skips the open() check destroys the previous list and puts
- * nothing in its place. Both producers had that bug independently. _open()
- * reports failure and _close() re-checks, so neither can have it again.
+ * lists -- publish the same way: a libfile of NUL-terminated paths is written
+ * beside the real file and replaces it only when the pass that wrote it
+ * finished. An interrupted pass leaves the previous list standing.
  *
  * A producer writing a pair of lists should open both before recording
  * anything and publish neither unless both opened -- see fi_run_scan(). */
 struct path_list_writer {
-    int   fd;          /* < 0 when the open failed; nothing is published */
-    const char *path;  /* the published name; ".tmp" is derived from it */
+    struct libfile_writer lf;
+    const char *path;  /* the published name, or NULL when not open */
     int   count;
 };
 

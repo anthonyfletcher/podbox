@@ -78,6 +78,10 @@ bool book_resume_get(const char *book, struct book_resume *pos);
 /* Whatever is saved for 'book', pos->left saying what. */
 bool book_resume_find(const char *book, struct book_resume *pos);
 
+/* Rewrites the positions an older firmware kept as text in text_file as
+ * this one's file; the first boot of a new layout calls it. */
+bool book_resume_convert(const char *text_file);
+
 /* Every saved book, most recently played first, ended and marked ones
  * included. 'path' is the file for a book keyed by its path, NULL for one
  * keyed by its album. 'fn' returns false to stop early. */

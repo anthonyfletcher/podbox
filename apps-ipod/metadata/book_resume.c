@@ -11,16 +11,16 @@
  * books by, or the file's path for a single-file book with no album tag to
  * name it.
  *
- * One line per book, most recently played first. Both the book and its track
- * are written as 64-bit keys (database/path_key.h), so a line is about sixty
- * bytes; only a book keyed by its path carries the path as well, since playing
- * it needs the file and not just its key. Nothing is held in RAM between calls
- * and every save rewrites the file, which happens when a book stops being
- * listened to rather than while it plays.
+ * One entry per book, most recently played first, in a libfile of entries
+ * that each say their length. Both the book and its track are 64-bit keys
+ * (database/path_key.h), so an entry is 32 bytes; only a book keyed by its
+ * path carries the path as well, since playing it needs the file and not just
+ * its key. Nothing is held in RAM between calls and every save rewrites the
+ * file, which happens when a book stops being listened to rather than while it
+ * plays.
  *
- * A file with no header line is the earlier format, which spelled the book
- * and track out in full. It is read as it is, and the first save writes the
- * whole file in the current one.
+ * The two text formats an older firmware wrote are read only to convert them,
+ * at the first boot of a new layout (book_resume_convert()).
  *
  * A book played through to its end is the one save the UI cannot make: the
  * playlist ends, playback stops, and there is nothing playing left to ask. So
@@ -28,9 +28,10 @@
  * it down marked as ended.
  *
  * Parts, in order:
- *   - the line formats, and reading books out of the file
+ *   - the entry, and reading books out of the file
+ *   - the older text formats, and converting them
  *   - the track that ended, noted on the audio thread
- *   - writing: what is worth saving, marks, and the temp-file swap
+ *   - writing: what is worth saving, marks, and the swap
  ****************************************************************************/
 
 #include <stdio.h>
@@ -38,6 +39,7 @@
 #include <string.h>
 #include "config.h"
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "system.h"             /* ARRAYLEN */
 #include "file.h"
 #include "rbpaths.h"
@@ -53,10 +55,9 @@
 #include "system/strutil.h"     /* read_line */
 
 #define BOOK_RESUME_FILE  LIB_AUDIOBOOKS_FILE
-#define BOOK_RESUME_TMP   LIB_AUDIOBOOKS_FILE ".new"
 
-/* The longest line either format writes: the earlier one's path, book name
- * and numbers. */
+/* The longest line either text format wrote: the earlier one's path, book
+ * name and numbers. */
 #define BOOK_LINE_MAX   (MAX_PATH + 160)
 
 /* A track this close to its end when it finishes was played out rather than
@@ -64,10 +65,23 @@
 #define BOOK_END_SLACK_MS 10000
 
 /* ------------------------------------------------------------------ *
- * the line formats                                                   *
+ * the entry                                                          *
  * ------------------------------------------------------------------ */
 
-/* The current format opens with this line. Lines are
+/* One book in the file; the path, path_len bytes, follows it */
+struct book_rec
+{
+    uint64_t book;
+    uint64_t track;
+    uint32_t elapsed;
+    uint32_t offset;
+    int32_t  index;
+    uint8_t  left;
+    uint8_t  pad;
+    uint16_t path_len;
+};
+
+/* The second text format opens with this line. Lines are
  * "<book>\t<track>\t<elapsed>\t<offset>\t<index>\t<left>[\t<path>]": the two
  * keys as sixteen hex digits, 'left' one of the words below, and 'path' only
  * for a book keyed by its file. Tabs, because FAT forbids one in a filename. */
@@ -85,7 +99,7 @@ static const char *const left_words[] = {
  * out and the track a full path. */
 #define OLD_ENDED_FIELD "ended"
 
-/* One line of either format. 'path' points into the line it was read from. */
+/* One book, from either form. 'path' points into what it was read from. */
 struct entry
 {
     uint64_t book;
@@ -215,16 +229,57 @@ static bool parse_old(char *line, struct entry *e)
 }
 
 /* Every entry in the file, in order, until 'fn' returns false. False when
- * the file is there and could not be opened. */
+ * the file is there and could not be read. */
 static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
+{
+    static char path[MAX_PATH];
+    struct libfile_header h;
+    struct book_rec r;
+    int fd;
+
+    fd = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, LIB_BOOKS_VERSION, 1,
+                      &h, NULL);
+    if (fd < 0)
+        return !file_exists(BOOK_RESUME_FILE);
+
+    while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
+    {
+        struct entry e;
+
+        if (r.path_len >= sizeof(path) || r.left >= ARRAYLEN(left_words)
+            || read(fd, path, r.path_len) != r.path_len)
+            break;
+        path[r.path_len] = '\0';
+        e.book = r.book;
+        e.path = r.path_len ? path : NULL;
+        e.pos.track = r.track;
+        e.pos.elapsed = r.elapsed;
+        e.pos.offset = r.offset;
+        e.pos.index = r.index;
+        e.pos.left = (enum book_left)r.left;
+        if (!fn(&e, data))
+            break;
+    }
+
+    close(fd);
+    return true;
+}
+
+/* ------------------------------------------------------------------ *
+ * the older text formats                                             *
+ * ------------------------------------------------------------------ */
+
+static bool scan_text(const char *file,
+                      bool (*fn)(const struct entry *e, void *data),
+                      void *data)
 {
     char line[BOOK_LINE_MAX];
     bool current = false;
     int fd;
 
-    fd = open(BOOK_RESUME_FILE, O_RDONLY);
+    fd = open(file, O_RDONLY);
     if (fd < 0)
-        return !file_exists(BOOK_RESUME_FILE);
+        return false;
 
     while (read_line(fd, line, sizeof (line)) > 0)
     {
@@ -367,27 +422,25 @@ void book_resume_init(void)
  * writing                                                            *
  * ------------------------------------------------------------------ */
 
-static bool write_entry(int fd, const struct entry *e)
+static bool write_entry(struct libfile_writer *w, const struct entry *e)
 {
-    char line[BOOK_LINE_MAX];
-    int len;
+    struct book_rec r;
 
-    len = snprintf(line, sizeof (line),
-                   "%016llx\t%016llx\t%lu\t%lu\t%d\t%s%s%s\n",
-                   (unsigned long long)e->book,
-                   (unsigned long long)e->pos.track,
-                   e->pos.elapsed, e->pos.offset, e->pos.index,
-                   left_words[e->pos.left],
-                   e->path != NULL ? "\t" : "",
-                   e->path != NULL ? e->path : "");
-    if (len >= (int)sizeof (line))
-        len = sizeof (line) - 1;
-    return write(fd, line, len) == len;
+    memset(&r, 0, sizeof(r));
+    r.book = e->book;
+    r.track = e->pos.track;
+    r.elapsed = e->pos.elapsed;
+    r.offset = e->pos.offset;
+    r.index = e->pos.index;
+    r.left = e->pos.left;
+    r.path_len = e->path != NULL ? strlen(e->path) : 0;
+    return libfile_write(w, &r, sizeof(r), sizeof(r))
+           && libfile_write(w, e->path, r.path_len, r.path_len);
 }
 
 struct copy_ctx
 {
-    int out;
+    struct libfile_writer *out;
     uint64_t skip;              /* the entry just replaced */
     int kept;
     bool ok;
@@ -408,30 +461,39 @@ static bool copy_one(const struct entry *e, void *data)
 
 /* 'first' at the top and the other books after it in the order they were
  * last played, which is what makes the cap drop the one heard longest ago.
- * Every line goes out in the current format, whichever it was read in. A
- * failed write anywhere leaves the file as it was. */
+ * A failed write anywhere leaves the file as it was. */
 static bool rewrite(const struct entry *first)
 {
-    struct copy_ctx ctx = { .skip = first->book, .kept = 1, .ok = true };
-    int hlen = sizeof (BOOK_HEADER "\n") - 1;
+    struct libfile_writer w;
+    struct copy_ctx ctx = { .out = &w, .skip = first->book, .kept = 1,
+                            .ok = true };
 
-    ctx.out = open(BOOK_RESUME_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (ctx.out < 0)
+    if (!libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
+                       LIB_BOOKS_VERSION, 1, NULL))
         return false;
 
-    ctx.ok = write(ctx.out, BOOK_HEADER "\n", hlen) == hlen
-             && write_entry(ctx.out, first)
-             && scan(copy_one, &ctx) && ctx.ok;
+    ctx.ok = write_entry(&w, first) && scan(copy_one, &ctx) && ctx.ok;
+    return libfile_finish(&w, ctx.ok);
+}
 
-    if (close(ctx.out) < 0)
-        ctx.ok = false;
-    if (!ctx.ok)
-    {
-        remove(BOOK_RESUME_TMP);
+static bool convert_one(const struct entry *e, void *data)
+{
+    struct copy_ctx *ctx = data;
+
+    ctx->ok = write_entry(ctx->out, e);
+    return ctx->ok;
+}
+
+bool book_resume_convert(const char *text_file)
+{
+    struct libfile_writer w;
+    struct copy_ctx ctx = { .out = &w, .ok = true };
+
+    if (!libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
+                       LIB_BOOKS_VERSION, 1, NULL))
         return false;
-    }
-
-    return rename(BOOK_RESUME_TMP, BOOK_RESUME_FILE) >= 0;
+    ctx.ok = scan_text(text_file, convert_one, &ctx) && ctx.ok;
+    return libfile_finish(&w, ctx.ok);
 }
 
 /* The book loaded for playback, playing or paused, or NULL. */

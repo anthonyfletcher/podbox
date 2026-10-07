@@ -1,7 +1,8 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * A file of paths, one per line, read into memory and indexed by line.
+ * A file of paths, a libfile of them each NUL-terminated, read into memory
+ * and indexed.
  *
  * Two features keep lists of this shape -- the folders the artwork cache found
  * nothing for, and the documents and images the file index found -- and both
@@ -19,6 +20,7 @@
 #include "config.h"
 #include "file.h"
 #include "system/app_buffer.h"
+#include "system/library_files.h"
 #include "path_list.h"
 
 /* One name for the claim, because only one list is ever loaded at a time --
@@ -29,6 +31,7 @@
 
 bool path_list_load(struct path_list *pl, const char *file, int max_entries)
 {
+    struct libfile_header h;
     size_t cap;
     off_t size;
     int fd, i;
@@ -41,11 +44,11 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
     if (max_entries > PATH_LIST_MAX)
         max_entries = PATH_LIST_MAX;
 
-    fd = open(file, O_RDONLY);
+    fd = libfile_open(file, LIB_PATHS_MAGIC, LIB_PATHS_VERSION, 1, &h, NULL);
     if (fd < 0)
         return false;
 
-    size = ffilesize(fd);
+    size = h.count;
     if (size <= 0)
     {
         close(fd);
@@ -55,11 +58,9 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
     pl->text = app_claim_buffer(&cap, PATH_LIST_OWNER);
     pl->held = true;
 
-    /* One byte kept back so the last line is terminated even with no trailing
-     * newline. A file bigger than that is read as far as it fits -- the reader
-     * only ever shows PATH_LIST_MAX lines anyway, and the alternative was
-     * allocating the whole of a file that may have been written before the
-     * writer started capping its own output. */
+    /* One byte kept back so the last path is terminated even in a file cut
+     * short. A file bigger than that is read as far as it fits -- the reader
+     * only ever shows PATH_LIST_MAX paths anyway. */
     if ((size_t)size > cap - 1)
     {
         size = (off_t)(cap - 1);
@@ -79,13 +80,12 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
      * offering a half a filename the caller would fail to open. */
     if (pl->truncated)
     {
-        while (size > 0 && pl->text[size - 1] != '\n')
+        while (size > 0 && pl->text[size - 1] != '\0')
             size--;
         pl->text[size] = '\0';
     }
 
-    /* Split in place. A line is recorded by where it starts; its newline
-     * becomes the terminator of the one before. */
+    /* Each path is recorded by where it starts */
     for (i = 0; i < (int)size; i++)
     {
         if (i == 0 || pl->text[i - 1] == '\0')
@@ -97,13 +97,7 @@ bool path_list_load(struct path_list *pl, const char *file, int max_entries)
             }
             pl->line[pl->count++] = i;
         }
-        if (pl->text[i] == '\n')
-            pl->text[i] = '\0';
     }
-
-    /* A trailing newline leaves an empty final entry; drop it. */
-    if (pl->count > 0 && pl->text[pl->line[pl->count - 1]] == '\0')
-        pl->count--;
 
     if (pl->count == 0)
     {
@@ -143,17 +137,10 @@ const char *path_list_leaf(const struct path_list *pl, int index)
 
 /* ---- writing a list ---------------------------------------------------- */
 
-static void tmp_name(const char *file, char *out, size_t out_sz)
-{
-    snprintf(out, out_sz, "%s.new", file);
-}
-
 /* 'path' is the open/closed flag, not just the name.
  *
  * Trap: writers are file-scope statics, so an untouched one is all zeroes --
- * and a zeroed 'fd' is 0, a perfectly good descriptor, not -1. Testing fd
- * alone would make _close() on a writer that was never opened close someone
- * else's file and then rename a ".new" built from a NULL name. Only _open()
+ * and a zeroed descriptor is 0, a perfectly good one, not -1. Only _open()
  * ever sets 'path', so testing that is what makes a zeroed writer safe. The
  * artwork cache reaches _close() without _open() on its no-memory path. */
 static bool writer_is_open(const struct path_list_writer *w)
@@ -163,14 +150,12 @@ static bool writer_is_open(const struct path_list_writer *w)
 
 bool path_list_write_open(struct path_list_writer *w, const char *file)
 {
-    char tmp[MAX_PATH];
+    bool ok = libfile_begin(&w->lf, file, LIB_PATHS_MAGIC, LIB_PATHS_VERSION,
+                            1, NULL);
 
     w->count = 0;
-    tmp_name(file, tmp, sizeof(tmp));
-    w->fd = open(tmp, O_CREAT | O_WRONLY | O_TRUNC, 0666);
-    w->path = (w->fd >= 0) ? file : NULL;
-
-    return w->fd >= 0;
+    w->path = ok ? file : NULL;
+    return ok;
 }
 
 /* Lines past what a reader would keep are dropped rather than written: the
@@ -181,8 +166,10 @@ void path_list_write_record(struct path_list_writer *w, const char *line)
     if (!writer_is_open(w) || w->count >= PATH_LIST_MAX)
         return;
 
-    fdprintf(w->fd, "%s\n", line);
-    w->count++;
+    size_t len = strlen(line) + 1;
+
+    if (libfile_write(&w->lf, line, len, len))
+        w->count++;
 }
 
 bool path_list_write_full(const struct path_list_writer *w)
@@ -192,22 +179,12 @@ bool path_list_write_full(const struct path_list_writer *w)
 
 void path_list_write_close(struct path_list_writer *w, bool completed)
 {
-    char tmp[MAX_PATH];
-
-    /* Never opened, or closed already: there is no .new to publish or clean
-     * up, and -- the point of the check -- nothing that would justify removing
-     * the published list. */
+    /* Never opened, or closed already: there is nothing to publish or clean
+     * up, and -- the point of the check -- nothing that would justify
+     * touching the published list. */
     if (!writer_is_open(w))
         return;
 
-    close(w->fd);
-    tmp_name(w->path, tmp, sizeof(tmp));
-
-    if (completed)
-        rename(tmp, w->path);
-    else
-        remove(tmp);
-
-    w->fd = -1;
+    libfile_finish(&w->lf, completed);
     w->path = NULL;
 }

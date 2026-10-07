@@ -1610,13 +1610,15 @@ artist lists while still letting you play them from Files. Changing this offers
 a rebuild, because the database has to be built again to honour it.
 
 [action: Export Modifications]
-Writes play counts, ratings and last-played times to a file. A rebuild does
-this by itself; use it to keep a copy, for instance before installing other
-firmware.
+Writes play counts, ratings and last-played times to
+/.rockbox/database_changelog.txt, the file Rockbox's own Import Modifications
+reads. A rebuild keeps them by itself; use this to keep a copy, for instance
+before installing other firmware.
 
 [action: Import Modifications]
-Reads back a file written by Export Modifications and folds those play counts
-and ratings into the current database.
+Reads back /.rockbox/database_changelog.txt, written by Export Modifications
+here or in Rockbox, and folds those play counts and ratings into the current
+database.
 
 [action: Missing Album Artwork]
 Lists the albums that have no artwork, so you can see what is worth finding

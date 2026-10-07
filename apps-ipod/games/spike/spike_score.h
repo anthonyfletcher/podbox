@@ -58,6 +58,10 @@ void spk_score_played(const char *name, const char *genre);
  * has become the record's. */
 bool spk_score_end(const struct spk_run *r);
 
+/* Rewrites the record and the run an older firmware kept as text, either
+ * path NULL for none; the first boot of a new layout calls it. */
+bool spk_score_convert(const char *scores_text, const char *run_text);
+
 /* The list, for the screen. A page is cached, so scrolling costs one file
  * read a screenful rather than one a row. */
 int spk_score_tracks(enum spk_log which);

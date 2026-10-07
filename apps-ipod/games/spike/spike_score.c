@@ -3,16 +3,16 @@
  *
  * What the best run has been, and what it was played over.
  *
- * Small text files rather than the tagcache's runtime data, and the reason
+ * Files of their own rather than the tagcache's runtime data, and the reason
  * is not simplicity: a player can be playing a track the database has never
  * seen, and a record that only exists for indexed music is one that
  * disappears when you play something out of a folder.
  *
- * Two files and one format. `spike_run.txt` is the run in progress -- one
- * line a track, appended as it starts -- and `spike_scores.txt` is the
- * record: the same lines under a header carrying the numbers. A run that
- * beats the record is copied over it, and that copy is the only time either
- * file is rewritten.
+ * Two libfiles of the same records, one a track. spike_run.dat is the run in
+ * progress, a record appended as each track starts; spike_scores.dat is the
+ * record, the same tracks with the run's numbers after them. A run that beats
+ * the record is copied over it, and that copy is the only time either file is
+ * rewritten.
  *
  * Nothing is held in RAM between calls but one cached page of the list.
  * Track names are the size of a run and a run is an evening; the numbers
@@ -22,6 +22,7 @@
  *   - the log
  *   - reading
  *   - writing
+ *   - converting the text files an older firmware kept
  ****************************************************************************/
 
 #include <stdio.h>
@@ -29,46 +30,55 @@
 #include <string.h>
 #include "string-extra.h"   /* strlcpy */
 #include "system/library_files.h"
+#include "database/libfile.h"
 #include "config.h"
 #include "file.h"
 #include "system/strutil.h"     /* read_line */
 #include "games/spike/spike_score.h"
 
 #define SPK_SCORE_FILE  LIB_SPIKE_FILE
-#define SPK_SCORE_TMP   LIB_SPIKE_FILE ".new"
 #define SPK_RUN_FILE    LIB_SPIKE_RUN_FILE
 
-/* A name, a genre, the tab between them and the tag. */
-#define SPK_LINE_MAX    (SPK_NAME_MAX + SPK_GENRE_MAX + 8)
+/* One track of a run */
+struct spk_rec
+{
+    char name[SPK_NAME_MAX];
+    char genre[SPK_GENRE_MAX];
+};
 
-/* The record's header, and the whole of the file's version check. A header
- * the reader does not recognise is a file with nothing in it, and the first
- * run to finish writes it out again.
- *
- * Trap: it earns its place because a foreign file here is not gibberish but
- * plausible -- a per-track score table writes lines that read as tracks with
- * the score still on the front of the name. Bump the letter with the layout
- * of a line. */
-#define SPK_HEAD        "R1"
-#define SPK_HEAD_LEN    2
+/* The record's numbers, after its tracks */
+struct spk_best
+{
+    int32_t score;
+    int32_t beats;
+    int32_t secs;
+    int32_t tracks;
+    int32_t bpm10;
+};
 
 /* One screenful and a little, so an ordinary scroll never turns a page. */
 #define SPK_PAGE        16
 
-static int logged;              /* lines this run has written */
+static int logged;              /* tracks this run has written */
 
 
 /** The log **/
 
-static const char *spk_file(enum spk_log which)
+/* The file a list is in, opened at its first track; -1 if there is none */
+static int spk_open(enum spk_log which, struct libfile_header *h,
+                    uint32_t *tail)
 {
-    return which == SPK_LOG_BEST ? SPK_SCORE_FILE : SPK_RUN_FILE;
+    if (which == SPK_LOG_BEST)
+        return libfile_open(SPK_SCORE_FILE, LIB_SPIKE_MAGIC,
+                            LIB_SPIKE_VERSION, sizeof(struct spk_rec), h,
+                            tail);
+    return libfile_open(SPK_RUN_FILE, LIB_SPIKE_RUN_MAGIC, LIB_SPIKE_VERSION,
+                        sizeof(struct spk_rec), h, tail);
 }
 
-/* A field on its way into the file. Tabs separate the two fields and
- * newlines separate the lines, so neither may survive in either -- and a
- * name is truncated here rather than by the screen, since a line nobody can
- * read the end of costs nothing to shorten. */
+/* A field on its way into the file. Control characters go, and a name is
+ * truncated here rather than by the screen, since a name nobody can read the
+ * end of costs nothing to shorten. */
 static void spk_clean(char *dst, int size, const char *src)
 {
     int i;
@@ -99,67 +109,53 @@ void spk_score_begin(void)
  * price of not holding an evening of track names in RAM. */
 void spk_score_played(const char *name, const char *genre)
 {
-    char n[SPK_NAME_MAX], g[SPK_GENRE_MAX];
-    int fd;
+    struct spk_rec r;
 
     if (logged >= SPK_LOG_MAX)
         return;
 
-    spk_clean(n, sizeof (n), name);
-    spk_clean(g, sizeof (g), genre);
+    memset(&r, 0, sizeof(r));
+    spk_clean(r.name, sizeof (r.name), name);
+    spk_clean(r.genre, sizeof (r.genre), genre);
 
-    if (n[0] == '\0')
+    if (r.name[0] == '\0')
         return;
 
-    fd = open(SPK_RUN_FILE, O_WRONLY | O_CREAT | O_APPEND, 0666);
-    if (fd < 0)
-        return;
-
-    fdprintf(fd, "T %s\t%s\n", n, g);
-    close(fd);
-
-    logged++;
+    if (libfile_append(SPK_RUN_FILE, LIB_SPIKE_RUN_MAGIC, LIB_SPIKE_VERSION,
+                       sizeof(r), &r, 1))
+        logged++;
 }
 
 
 /** Reading **/
 
-/* The header, which only the record carries. */
+/* The numbers, which only the record carries, after its tracks */
 bool spk_score_best(struct spk_run *out)
 {
-    char line[SPK_LINE_MAX];
+    struct libfile_header h;
+    struct spk_best b;
+    uint32_t tail;
+    bool found;
     int fd;
-    bool found = false;
 
-    out->score = 0;
-    out->beats = 0;
-    out->secs = 0;
-    out->tracks = 0;
-    out->bpm10 = 0;
+    memset(out, 0, sizeof(*out));
 
-    fd = open(SPK_SCORE_FILE, O_RDONLY);
+    fd = spk_open(SPK_LOG_BEST, &h, &tail);
     if (fd < 0)
         return false;
-
-    while (read_line(fd, line, sizeof (line)) > 0)
-    {
-        char *p = line;
-
-        if (strncmp(line, SPK_HEAD " ", SPK_HEAD_LEN + 1) != 0)
-            continue;
-
-        p += SPK_HEAD_LEN + 1;
-        out->score = strtol(p, &p, 10);
-        out->beats = strtol(p, &p, 10);
-        out->secs = strtol(p, &p, 10);
-        out->tracks = (int)strtol(p, &p, 10);
-        out->bpm10 = (int)strtol(p, &p, 10);
-        found = true;
-        break;
-    }
-
+    found = tail == sizeof(b)
+            && lseek(fd, h.count * sizeof(struct spk_rec), SEEK_CUR) >= 0
+            && read(fd, &b, sizeof(b)) == (ssize_t)sizeof(b);
     close(fd);
 
+    if (found)
+    {
+        out->score = b.score;
+        out->beats = b.beats;
+        out->secs = b.secs;
+        out->tracks = b.tracks;
+        out->bpm10 = b.bpm10;
+    }
     return found;
 }
 
@@ -173,19 +169,13 @@ static struct
     int  first;                 /* row the page begins at, from zero */
     int  rows;
     int  total;
-    char name[SPK_PAGE][SPK_NAME_MAX];
-    char genre[SPK_PAGE][SPK_GENRE_MAX];
+    struct spk_rec rec[SPK_PAGE];
 } page;
 
 static void spk_score_fill(enum spk_log which, int first)
 {
-    char line[SPK_LINE_MAX];
-    int fd, i = 0;
-
-    /* The log is track lines and nothing else; the record's are under a
-     * header, and one it does not recognise means a file written by a
-     * version that kept something else. */
-    bool ready = which == SPK_LOG_RUN;
+    struct libfile_header h;
+    int fd, n;
 
     page.valid = true;
     page.which = which;
@@ -193,39 +183,16 @@ static void spk_score_fill(enum spk_log which, int first)
     page.rows = 0;
     page.total = 0;
 
-    fd = open(spk_file(which), O_RDONLY);
+    fd = spk_open(which, &h, NULL);
     if (fd < 0)
         return;
 
-    while (read_line(fd, line, sizeof (line)) > 0)
-    {
-        char *tab;
-
-        if (!ready)
-        {
-            ready = strncmp(line, SPK_HEAD " ", SPK_HEAD_LEN + 1) == 0;
-            continue;
-        }
-
-        if (line[0] != 'T' || line[1] != ' ')
-            continue;
-
-        page.total++;
-
-        if (i >= first && page.rows < SPK_PAGE)
-        {
-            tab = strchr(line + 2, '\t');
-            if (tab != NULL)
-                *tab = '\0';
-
-            strlcpy(page.name[page.rows], line + 2, SPK_NAME_MAX);
-            strlcpy(page.genre[page.rows], tab != NULL ? tab + 1 : "",
-                    SPK_GENRE_MAX);
-            page.rows++;
-        }
-
-        i++;
-    }
+    page.total = h.count;
+    n = page.total - first < SPK_PAGE ? page.total - first : SPK_PAGE;
+    if (n > 0 && lseek(fd, first * sizeof(struct spk_rec), SEEK_CUR) >= 0
+        && read(fd, page.rec, n * sizeof(struct spk_rec))
+           == (ssize_t)(n * sizeof(struct spk_rec)))
+        page.rows = n;
 
     close(fd);
 }
@@ -254,21 +221,44 @@ void spk_score_track(enum spk_log which, int n, char *name, int nsize,
         return;
     }
 
-    strlcpy(name, page.name[n - page.first], nsize);
-    strlcpy(genre, page.genre[n - page.first], gsize);
+    strlcpy(name, page.rec[n - page.first].name, nsize);
+    strlcpy(genre, page.rec[n - page.first].genre, gsize);
 }
 
 
 /** Writing **/
 
-/* The record is the run's own log under a header, so beating it is a copy
- * and nothing more: the numbers were gathered as the run went and the lines
- * were written as it went. */
+/* The record is the run's own log with the numbers after it, so beating it
+ * is a copy and nothing more: the numbers were gathered as the run went and
+ * the tracks were written as it went. */
+static bool write_record(const struct spk_run *r, int run_fd,
+                         uint32_t run_count)
+{
+    struct libfile_writer w;
+    struct spk_rec rec;
+    struct spk_best b = {
+        .score = r->score, .beats = r->beats, .secs = r->secs,
+        .tracks = r->tracks, .bpm10 = r->bpm10,
+    };
+    bool ok;
+
+    if (!libfile_begin(&w, SPK_SCORE_FILE, LIB_SPIKE_MAGIC, LIB_SPIKE_VERSION,
+                       sizeof(rec), NULL))
+        return false;
+    ok = true;
+    for (uint32_t i = 0; ok && run_fd >= 0 && i < run_count; i++)
+        ok = read(run_fd, &rec, sizeof(rec)) == (ssize_t)sizeof(rec)
+             && libfile_write(&w, &rec, sizeof(rec), 1);
+    ok = ok && libfile_write(&w, &b, sizeof(b), 0);
+    return libfile_finish(&w, ok);
+}
+
 bool spk_score_end(const struct spk_run *r)
 {
-    char line[SPK_LINE_MAX];
+    struct libfile_header h;
     struct spk_run best;
-    int in, out;
+    bool ok;
+    int in;
 
     page.valid = false;
 
@@ -278,26 +268,82 @@ bool spk_score_end(const struct spk_run *r)
     if (r->score <= 0)
         return false;
 
-    out = open(SPK_SCORE_TMP, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (out < 0)
-        return false;
-
-    fdprintf(out, SPK_HEAD " %ld %ld %ld %d %d\n", r->score, r->beats,
-             r->secs, r->tracks, r->bpm10);
-
-    in = open(SPK_RUN_FILE, O_RDONLY);
+    in = spk_open(SPK_LOG_RUN, &h, NULL);
+    ok = write_record(r, in, in >= 0 ? h.count : 0);
     if (in >= 0)
-    {
-        while (read_line(in, line, sizeof (line)) > 0)
-        {
-            if (line[0] == 'T' && line[1] == ' ')
-                fdprintf(out, "%s\n", line);
-        }
-
         close(in);
+    return ok;
+}
+
+
+/** Converting the text files an older firmware kept **/
+
+/* "T <name>\t<genre>" track lines; the record's under an "R1 " line of its
+ * numbers */
+static bool convert_text(const char *text, const char *dat, uint32_t magic,
+                         struct spk_run *best)
+{
+    struct libfile_writer w;
+    struct spk_rec rec;
+    char line[SPK_NAME_MAX + SPK_GENRE_MAX + 8];
+    bool ok;
+    int fd = open(text, O_RDONLY);
+
+    if (fd < 0)
+        return false;
+    if (!libfile_begin(&w, dat, magic, LIB_SPIKE_VERSION, sizeof(rec), NULL))
+    {
+        close(fd);
+        return false;
     }
+    ok = true;
+    while (ok && read_line(fd, line, sizeof(line)) > 0)
+    {
+        if (best && !strncmp(line, "R1 ", 3))
+        {
+            char *p = line + 3;
 
-    close(out);
+            best->score = strtol(p, &p, 10);
+            best->beats = strtol(p, &p, 10);
+            best->secs = strtol(p, &p, 10);
+            best->tracks = (int)strtol(p, &p, 10);
+            best->bpm10 = (int)strtol(p, &p, 10);
+            continue;
+        }
+        if (line[0] != 'T' || line[1] != ' ')
+            continue;
 
-    return rename(SPK_SCORE_TMP, SPK_SCORE_FILE) >= 0;
+        char *tab = strchr(line + 2, '\t');
+        if (tab != NULL)
+            *tab = '\0';
+        memset(&rec, 0, sizeof(rec));
+        strlcpy(rec.name, line + 2, sizeof(rec.name));
+        strlcpy(rec.genre, tab != NULL ? tab + 1 : "", sizeof(rec.genre));
+        ok = libfile_write(&w, &rec, sizeof(rec), 1);
+    }
+    close(fd);
+
+    if (ok && best)
+    {
+        struct spk_best b = {
+            .score = best->score, .beats = best->beats, .secs = best->secs,
+            .tracks = best->tracks, .bpm10 = best->bpm10,
+        };
+        ok = libfile_write(&w, &b, sizeof(b), 0);
+    }
+    return libfile_finish(&w, ok);
+}
+
+bool spk_score_convert(const char *scores_text, const char *run_text)
+{
+    struct spk_run best;
+    bool ok = true;
+
+    memset(&best, 0, sizeof(best));
+    if (scores_text)
+        ok = convert_text(scores_text, SPK_SCORE_FILE, LIB_SPIKE_MAGIC,
+                          &best);
+    if (run_text)
+        ok &= convert_text(run_text, SPK_RUN_FILE, LIB_SPIKE_RUN_MAGIC, NULL);
+    return ok;
 }
