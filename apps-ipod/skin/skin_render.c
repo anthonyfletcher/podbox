@@ -333,8 +333,13 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
      * before the switch: a tag that refreshes without drawing costs a flush of
      * a region that did not change, where a draw that went unreported would
      * leave a stale one on the LCD. Note that `needs_update` cannot stand in
-     * for this, as it only tracks tags that produce text. */
-    if (do_refresh)
+     * for this, as it only tracks tags that produce text.
+     *
+     * %Lb is the exception: it hands the list its row skin and draws nothing,
+     * yet refreshes on every pass. Counting it would report its whole viewport
+     * each time -- often the full screen -- and a screen drawing under the
+     * status bar would then repaint itself on every status bar refresh. */
+    if (do_refresh && token->type != SKIN_TOKEN_LIST_ITEM_CFG)
         info->drew = true;
 
     switch (token->type)
