@@ -22924,13 +22924,13 @@
 </phrase>
 <phrase>
   id: LANG_BOOK_MARK_AS
-  desc: Audiobooks shelf context menu: move a book to In progress, Not started or Finished
+  desc: a book's context menu: move a book to In progress, Not started or Finished
   user: core
   <source>
-    *: "Mark as"
+    *: "Mark as..."
   </source>
   <dest>
-    *: "Mark as"
+    *: "Mark as..."
   </dest>
   <voice>
     *: "Mark as"

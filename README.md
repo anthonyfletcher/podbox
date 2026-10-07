@@ -294,7 +294,7 @@ your position.
   and `In Progress`; a list with no books in it is not shown
   - Choosing a book plays it, from where you left off if you have started it
   - Hold `Select` on a book, on a shelf or in any Audiobooks list, for Add to Queue, Add to Playlist, Show Track Info,
-  Listening Progress, Show in Files and Mark as, which moves it to In Progress, Not Started or 
+  Listening Progress, Show in Files and Mark as..., which moves it to In Progress, Not Started or 
   Finished. The mark lasts until the book is next played.
 - Books held in a single file show their chapters.
   - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`
