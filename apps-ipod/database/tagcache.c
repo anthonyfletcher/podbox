@@ -6194,9 +6194,6 @@ void tagcache_start_scan(void)
 
 bool tagcache_update(void)
 {
-    if (!tc_stat.ready)
-        return false;
-
     queue_post(&tagcache_queue, Q_UPDATE, 0);
     return false;
 }

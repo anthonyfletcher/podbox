@@ -1620,13 +1620,24 @@ static bool initialize_browser_db(void) /* also used when user selects 'Reload' 
         panicf("browser_db OOM");
 
     /* Use the user tagnavi config if present, otherwise use the default. */
-    const char* tagnavi_file;
-    if(file_exists(TAGNAVI_USER_CONFIG))
-        tagnavi_file = TAGNAVI_USER_CONFIG;
-    else
-        tagnavi_file = TAGNAVI_DEFAULT_CONFIG;
-
-    if (!parse_menu(tagnavi_file))
+    bool user = file_exists(TAGNAVI_USER_CONFIG);
+    bool ok = parse_menu(user ? TAGNAVI_USER_CONFIG : TAGNAVI_DEFAULT_CONFIG);
+    if (!ok && user)
+    {
+        /* An outdated or broken user file: the shipped one, from scratch */
+        for (int i = 0; i < menu_count; i++)
+            menus[i] = NULL;
+        for (int i = 0; i < format_count; i++)
+            formats[i] = NULL;
+        menu_count = 0;
+        format_count = 0;
+        max_history_level = 0;
+        menu = NULL;
+        rootmenu = -1;
+        browser_db_buf_used = 0;
+        ok = parse_menu(TAGNAVI_DEFAULT_CONFIG);
+    }
+    if (!ok)
     {
         browser_db_unload(NULL);
         return false;

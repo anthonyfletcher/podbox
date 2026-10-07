@@ -922,49 +922,6 @@ static int get_next_dir(char *dir, int direction)
         base_len = 0;
     }
 
-    /* process random folder advance */
-    if (global_settings.next_folder == FOLDER_ADVANCE_RANDOM)
-    {
-        int fd = open(ROCKBOX_DIR "/folder_advance_list.dat", O_RDONLY);
-        if (fd >= 0)
-        {
-            int folder_count = 0;
-            ssize_t nread = read(fd,&folder_count,sizeof(int));
-            if ((nread == sizeof(int)) && folder_count)
-            {
-                char buffer[MAX_PATH];
-                /* give up looking for a directory after we've had four
-                   times as many tries as there are directories. */
-                unsigned long allowed_tries = folder_count * 4;
-                int i;
-                srand(current_tick);
-                *(tc->dirfilter) = SHOW_MUSIC;
-                tc->sort_dir = global_settings.sort_dir;
-                while (!exit && allowed_tries--)
-                {
-                    i = rand() % folder_count;
-                    lseek(fd, sizeof(int) + (MAX_PATH * i), SEEK_SET);
-                    read(fd, buffer, MAX_PATH);
-                    /* is the current dir within our base dir and has music? */
-                    if ((base_len == 0 || !strncmp(buffer, dir, base_len))
-                        && check_subdir_for_music(buffer, "", false) == 0)
-                            exit = true;
-                }
-                close(fd);
-                *(tc->dirfilter) = saved_dirfilter;
-                tc->sort_dir = global_settings.sort_dir;
-                reload_directory();
-                if (exit)
-                {
-                    strcpy(dir,buffer);
-                    return 0;
-                }
-            }
-            else
-                close(fd);
-        }
-    }
-
     /* if the current file is within our base dir, use its dir instead */
     if (base_len == 0 || !strncmp(playlist->filename, dir, base_len))
         strmemccpy(dir, playlist->filename, playlist->dirlen);

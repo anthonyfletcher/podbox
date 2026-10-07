@@ -1311,9 +1311,8 @@ const struct settings_list settings[] = {
 
 
     CHOICE_SETTING(0, next_folder, LANG_NEXT_FOLDER, FOLDER_ADVANCE_OFF,
-                   "folder navigation", "off,on,random",NULL ,3,
-                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES),
-                   ID2P(LANG_RANDOM)),
+                   "folder navigation", "off,on", NULL, 2,
+                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES)),
     BOOL_SETTING(0, constrain_next_folder, LANG_CONSTRAIN_NEXT_FOLDER, false,
                  "constrain next folder", off_on,
                  LANG_SET_BOOL_YES, LANG_SET_BOOL_NO, NULL),
@@ -1969,7 +1968,7 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_statusbar,
                   LANG_STATUS_BAR,
                   false, "album covers statusbar", NULL),
-    /* Config-file only (lang_id -1, no menu entry): a theme sets these. Off
+    /* A theme sets these, and Appearance > Elements shows them. Off
      * unless asked for, because they make album rows grow to the tall height
      * to fit a cover -- a theme whose list config doesn't draw the %La cover
      * gets the tall rows with nothing in them. F_THEMERESET so a theme that

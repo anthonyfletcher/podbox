@@ -65,11 +65,7 @@ static int dirs_to_scan(void)
                       (char *)global_settings.tagcache_scan_paths,
                       sizeof(global_settings.tagcache_scan_paths)))
     {
-        static const char *lines[] = {ID2P(LANG_TAGCACHE_BUSY),
-                                      ID2P(LANG_TAGCACHE_FORCE_UPDATE)};
-        static const struct text_message message = {lines, 2};
-
-        if (gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
+        if (yesno_pop_confirm(ID2P(LANG_TAGCACHE_FORCE_UPDATE)))
             tagcache_rebuild_with_splash();
     }
     return 0;
@@ -721,27 +717,6 @@ MAKE_MENU(bookmark_settings_menu, ID2P(LANG_BOOKMARK_SETTINGS), 0,
 
 /** Autoresume menu **/
 
-static int autoresume_callback(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-
-    if (action == ACTION_EXIT_MENUITEM  /* on exit */
-        && global_settings.autoresume_enable
-        && !tagcache_is_usable())
-    {
-        static const char *lines[] = {ID2P(LANG_TAGCACHE_BUSY),
-                                      ID2P(LANG_TAGCACHE_FORCE_UPDATE)};
-        static const struct text_message message = {lines, 2};
-
-        if (gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
-            tagcache_rebuild_with_splash();
-    }
-    return action;
-}
-
 static int autoresume_nexttrack_callback(int action,
                                          const struct menu_item_ex *this_item,
                                          struct gui_synclist *this_list)
@@ -767,7 +742,7 @@ static int autoresume_nexttrack_callback(int action,
 }
 
 MENUITEM_SETTING(autoresume_enable, &global_settings.autoresume_enable,
-                 autoresume_callback);
+                 NULL);
 MENUITEM_SETTING(autoresume_automatic, &global_settings.autoresume_automatic,
                  autoresume_nexttrack_callback);
 

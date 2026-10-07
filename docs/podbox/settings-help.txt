@@ -123,8 +123,8 @@ rows. A theme-author setting -- it has to match the artwork the theme draws.
 Keeps the layout of the disk in memory so the file browser does not have to
 read it each time.
 
-Makes browsing much faster and costs a little memory. Needs a restart to take
-effect.
+Makes browsing much faster and costs a little memory. Takes effect when you
+leave the setting.
 
 [autoresume enable]
 Remembers how far through each track you were, and returns there rather than
@@ -306,8 +306,7 @@ reads .m4b files and .mp3 files with chapter frames, and a book of more than 99
 chapters lists the first 99 of them.
 
 [folder navigation]
-At the end of a folder, move to the next one rather than stopping. Random picks
-one at random instead.
+At the end of a folder, move to the next one rather than stopping.
 
 [constrain next folder]
 When playback moves on to the next folder by itself, keeps that move inside the
@@ -521,8 +520,10 @@ Puts the current folder, or the whole path to it, in the title bar.
 What the hotkey button does in the file browser.
 
 [max files in dir]
-The largest number of entries loaded from one folder. A folder with more is
-truncated rather than refused.
+The largest number of entries loaded from one folder or one Music list. A
+longer folder is cut short; a longer Music list is shown a page at a time in
+the database's order, so The/A/An and numbers are not sorted. Takes effect
+after a restart.
 
 [tagcache_scan_on_startup]
 Rescans the library at every boot. Mostly redundant if Scan on Eject is on,
@@ -732,7 +733,8 @@ list gains the records they only guest on. Needs the database loaded to RAM.
 
 A name with a comma or ampersand, like Tyler, The Creator, reads as two people
 unless an album is under it. List such names one per line in
-/.rockbox/known_artists.txt, then reboot or update the database.
+/.rockbox/known_artists.txt, then reboot, or switch Featured Artists off and
+on.
 
 [art cache album source]
 Where album covers come from: the image in the album's folder, the art embedded
