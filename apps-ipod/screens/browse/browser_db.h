@@ -86,6 +86,10 @@ bool browser_db_is_artist_list(struct browser_context* c);
 /* True when this browse was reached through a menu row asking about the
  * `spoken` tag -- an audiobook list, at any of its levels. */
 bool browser_db_is_spoken_list(struct browser_context* c);
+/* The name of row 'item' if it is a book in a spoken-word album list, the key
+ * its saved position is kept under; false for any other row. */
+bool browser_db_get_book(struct browser_context* c, int item,
+                         char *buf, size_t buflen);
 /* True when the path down to the browser's current level came through an artist
  * level. Recorded on a playlist built from here, for the "auto" WPS art
  * source. */

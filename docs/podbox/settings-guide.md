@@ -271,9 +271,11 @@ report rebuilds them itself the next time you open it.
 Audiobook/Fiction and Spoken Word & Poetry all match -- or if it is exactly
 "book", "books", "spoken", "speech", "podcast", "podcasts", "non-music" or
 "nonmusic". Capitals make no difference. Nothing but the genre is read, so a
-book tagged as music browses as music: retag it. An album or artist counts as a
-book only when every track on it is spoken word. The genre and composer lists
-are left as they are, so a book is still reachable under its own genre.
+book tagged as music browses as music: retag it. An album counts as a book only
+when every track on it is spoken word; under an album artist, a book and a music
+album with the same name are told apart. An artist with books and music is
+listed in both menus. The genre and composer lists are left as they are, so a
+book is still reachable under its own genre.
 
 Pausing, stopping, switching off or starting something else saves a book's
 place, and the last 1,024 books are remembered. Choosing a chapter plays it from
@@ -281,8 +283,8 @@ its start. A book held in a single file has a chapter list only when Chapter
 Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are
-in none of them. A book's context menu there marks it as any of the three, until
-it is played again.
+in none of them. A book's context menu, there or in the Book and Author lists,
+marks it as any of the three, until it is played again.
 
 **Trim Titles** never removes a note at the start of a name.
 

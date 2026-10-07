@@ -2187,6 +2187,38 @@ static int table_album_row(int level, long seek)
     return n;
 }
 
+/* Whether row 'seek' of a 'tag' list at 'level' is a book. An album under an
+ * album artist is answered by its own table row, so a book and a music album
+ * of one name are told apart there; anything else by db_spoken. */
+static bool row_is_book(int tag, long seek, int level)
+{
+    struct tagcache_album al;
+    int i;
+
+    for (i = 0; tag == tag_album && i < level; i++)
+        if (csi->tagorder[i] == tag_albumartist
+            && tagcache_album_get(tagcache_album_find(seek,
+                                                      csi->result_seek[i]),
+                                  &al))
+            return al.spoken == al.tracks;
+    return db_spoken_group_is_book(tag, seek);
+}
+
+/* Which rows a list keeps: a music browse drops the books, and a spoken-word
+ * one keeps only books and the album artists who have one -- its clause alone
+ * would keep any album with one spoken track. */
+enum spoken_keep { KEEP_ALL, KEEP_MUSIC, KEEP_BOOKS };
+
+static bool row_kept(enum spoken_keep keep, int tag, long seek, int level)
+{
+    if (keep == KEEP_MUSIC)
+        return !row_is_book(tag, seek, level);
+    if (keep == KEEP_BOOKS)
+        return tag == tag_albumartist ? db_spoken_artist_has_book(seek)
+                                      : row_is_book(tag, seek, level);
+    return true;
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2242,7 +2274,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * thread is building it -- leaves this browse unfiltered rather than
      * half-filtered; the next entry to the screen has it. */
     bool exclude = exclude_spoken_wanted();
-    bool exclude_by_seek = exclude && db_spoken_group_ensure(tag);
+    enum spoken_keep keep = KEEP_ALL;
+
+    if (exclude && db_spoken_group_ensure(tag))
+        keep = KEEP_MUSIC;
+    else if ((tag == tag_album || tag == tag_albumartist)
+             && csi_mentions_spoken() && !browse_picked_by_name
+             && tagcache_album_count() > 0)
+        keep = KEEP_BOOKS;
 
     if (!tagcache_search(&tcs, tag))
         return -1;
@@ -2529,8 +2568,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
         /* Ahead of the offset count, or a page would be short by however
-         * many books fell inside it. */
-        if (exclude_by_seek && db_spoken_group_is_book(tag, tcs.result_seek))
+         * many rows fell inside it. */
+        if (!row_kept(keep, tag, tcs.result_seek, level))
             continue;
 
         if (total_count++ < offset)
@@ -2748,7 +2787,7 @@ entry_skip_formatter:
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
-        if (exclude_by_seek && db_spoken_group_is_book(tag, tcs.result_seek))
+        if (!row_kept(keep, tag, tcs.result_seek, level))
             continue;
 
         total_count++;
@@ -5035,6 +5074,19 @@ bool browser_db_is_album_list(struct browser_context* c)
 bool browser_db_is_spoken_list(struct browser_context* c)
 {
     return c->currtable == TABLE_NAVIBROWSE && csi_mentions_spoken();
+}
+
+bool browser_db_get_book(struct browser_context* c, int item,
+                         char *buf, size_t buflen)
+{
+    struct tagentry *entry;
+
+    if (!browser_db_is_spoken_list(c) || !browser_db_is_album_list(c)
+        || item < c->special_entry_count
+        || !(entry = browser_db_get_entry(c, item))
+        || !row_is_book(tag_album, entry->extraseek, c->currextra))
+        return false;
+    return browser_db_get_entry_name(c, item, buf, buflen) != NULL;
 }
 
 /* True when this browse level is listing artists -- the rows that can carry

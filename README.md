@@ -293,7 +293,7 @@ your position.
   - Scroll up above the first book in `Audiobooks > Book` for `Finished`, `Not Started`
   and `In Progress`
   - Choosing a book plays it, from where you left off if you have started it
-  - Hold `Select` on a book on a shelf and choose Mark as to move it to In Progress, Not Started or 
+  - Hold `Select` on a book, on a shelf or in the Book and Author lists, and choose Mark as to move it to In Progress, Not Started or 
   Finished. The mark lasts until the book is next played.
 - Books held in a single file show their chapters.
   - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`

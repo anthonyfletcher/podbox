@@ -420,6 +420,14 @@ static bool album_is_book(long seek)
     return book;
 }
 
+bool db_spoken_artist_has_book(long seek)
+{
+    struct tagcache_artist ar;
+
+    return tagcache_artist_get(tagcache_artist_find(seek), &ar)
+           && ar.spoken_albums > 0;
+}
+
 bool db_spoken_group_is_book(int tag, long seek)
 {
     const struct spoken_group *g = group_for(tag);

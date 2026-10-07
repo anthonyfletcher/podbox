@@ -55,6 +55,10 @@ bool db_spoken_is_spoken_seek(long genre_seek);
 bool db_spoken_group_tag(int tag);
 bool db_spoken_group_is_book(int tag, long seek);
 
+/* Whether the album artist at 'seek' has at least one album that is a book.
+ * False while the database is not in RAM. */
+bool db_spoken_artist_has_book(long seek);
+
 /* Build one tag's table if it is missing or stale. True once the table can be
  * read; false for a tag that has none, and for a build that could not finish
  * -- the database was unreadable, a commit landed inside it, or another thread

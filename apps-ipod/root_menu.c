@@ -78,6 +78,9 @@ static int last_screen = GO_TO_ROOT; /* unfortunatly needed so we can resume
                                         or goto current track based on previous
                                         screen */
 
+/* Set while the screen being loaded was reached by BACK */
+static bool came_back;
+
 static int previous_music = GO_TO_WPS; /* Toggles behavior of the return-to
                                         * playback-button. Upstream this also
                                         * tracked the FM screen; this fork has
@@ -256,6 +259,9 @@ static int browser(void* param)
     static char last_folder[MAX_PATH] = "/";
     /* and stuff for the database browser */
     static int last_db_dirlevel = 0, last_db_selection = 0, last_ft_dirlevel = 0;
+    /* A main-menu row's browse left for a screen one of its rows opens, kept
+     * so BACK from that screen lands on the list it was opened from */
+    static int row_slot = -1, row_dirlevel, row_selection, row_table;
 
     switch ((intptr_t)param)
     {
@@ -329,6 +335,16 @@ static int browser(void* param)
 
             filter = SHOW_ID3DB;
             last_ft_dirlevel = tc->dirlevel;
+            if (came_back && slot == row_slot)
+            {
+                tc->dirlevel = row_dirlevel;
+                tc->selected_item = row_selection;
+                tc->currtable = row_table;
+                row_slot = -1;
+                push_current_activity(ACTIVITY_DATABASEBROWSER);
+                break;
+            }
+            row_slot = -1;
             /* Jump straight into this row's branch of the Database's root
              * menu, independent of the plain Database entry's own
              * last_db_dirlevel/selection resume memory. Looked up by tag
@@ -423,6 +439,18 @@ static int browser(void* param)
         TAGNAVI_CASE(12) TAGNAVI_CASE(13) TAGNAVI_CASE(14) TAGNAVI_CASE(15)
         TAGNAVI_CASE(16) TAGNAVI_CASE(17) TAGNAVI_CASE(18) TAGNAVI_CASE(19)
 #undef TAGNAVI_CASE
+            /* The screens a row opens in place of a deeper list; the browser
+             * leaves for them with its own state untouched. */
+            if (ret_val == GO_TO_BOOK_SHELF || ret_val == GO_TO_ALBUM_CHARTS
+                || ret_val == GO_TO_DB_SEARCH
+                || ret_val == GO_TO_FEATURED_ARTISTS
+                || ret_val == GO_TO_MUSIC_QUIZ)
+            {
+                row_slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
+                row_dirlevel = tc->dirlevel;
+                row_selection = tc->selected_item;
+                row_table = tc->currtable;
+            }
             /* Leave the database browser as a fresh Music entry would find it.
              *
              * A shortcut enters at dirlevel 0 so one BACK leaves, which means
@@ -1734,6 +1762,7 @@ void root_menu(void)
                 }
 
                 ignore_back_button_stub(false);
+                came_back = false;
 
                 if (next_screen != GO_TO_PREVIOUS)
                     last_screen = GO_TO_ROOT;
@@ -1754,6 +1783,7 @@ void root_menu(void)
 
             case GO_TO_PREVIOUS:
             {
+                came_back = true;
                 next_screen = last_screen;
                 if (last_screen == GO_TO_PLUGIN)/* for WPS */
                     last_screen = GO_TO_PREVIOUS;
@@ -1785,6 +1815,7 @@ void root_menu(void)
         continue;
 load_next_screen: /* load_screen is inlined */
         next_screen = load_screen(next_screen);
+        came_back = false;
     }
 
 }

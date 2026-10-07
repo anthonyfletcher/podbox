@@ -23,7 +23,8 @@
  *
  * Choosing a book plays it. An In progress one resumes; the others start at
  * the beginning. The context menu marks a book Finished, Not started or In
- * progress by hand, which moves it to that shelf until it is played again.
+ * progress by hand, which moves it to that shelf until it is played again; a
+ * book row in the Audiobooks browse has the same menu.
  *
  * Parts, in order:
  *   - the arena and what it holds
@@ -766,16 +767,40 @@ static void report_empty(void)
  * not say why, so this is how the list learns to rebuild. */
 static int marked_row;
 
-/* Context: mark the book In progress, Not started or Finished. The menu's
- * order is enum book_shelf's. */
-static int shelf_action_cb(int action, struct gui_synclist *lists)
+/* The menu's order is enum book_shelf's. */
+bool book_shelf_mark_menu(const char *book, int current)
 {
     static const enum book_left marks[] = {
         [BOOK_SHELF_IN_PROGRESS] = BOOK_LEFT_PARTWAY,
         [BOOK_SHELF_NOT_STARTED] = BOOK_LEFT_UNSTARTED,
         [BOOK_SHELF_FINISHED]    = BOOK_LEFT_FINISHED,
     };
-    int n, v, choice;
+    struct book_resume pos;
+    int choice;
+
+    /* Marking in progress starts the book again, so a book that has a place
+     * to resume from is in progress already. */
+    if (current < 0 && book_resume_find(book, &pos))
+        current = pos.left == BOOK_LEFT_FINISHED  ? BOOK_SHELF_FINISHED
+                : pos.left == BOOK_LEFT_UNSTARTED ? BOOK_SHELF_NOT_STARTED
+                : book_resume_get(book, &pos)     ? BOOK_SHELF_IN_PROGRESS
+                : -1;
+
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
+                        ID2P(LANG_BOOKS_IN_PROGRESS),
+                        ID2P(LANG_BOOKS_NOT_STARTED),
+                        ID2P(LANG_BOOKS_FINISHED));
+    choice = do_menu(&menu, NULL, NULL, false);
+
+    if (choice < 0 || choice >= (int)ARRAYLEN(marks) || choice == current)
+        return false;
+    return book_resume_mark(book, marks[choice]);
+}
+
+/* Context: mark the book In progress, Not started or Finished */
+static int shelf_action_cb(int action, struct gui_synclist *lists)
+{
+    int n, v;
 
     if (action != ACTION_STD_CONTEXT)
         return action;
@@ -785,19 +810,10 @@ static int shelf_action_cb(int action, struct gui_synclist *lists)
         return action;
     v = rows[n];
 
-    MENUITEM_STRINGLIST(menu, ID2P(LANG_BOOK_MARK_AS), NULL,
-                        ID2P(LANG_BOOKS_IN_PROGRESS),
-                        ID2P(LANG_BOOKS_NOT_STARTED),
-                        ID2P(LANG_BOOKS_FINISHED));
-    choice = do_menu(&menu, NULL, NULL, false);
-
-    if (choice < 0 || choice >= (int)ARRAYLEN(marks)
-        || choice == (int)shelf_kind)
+    if (!book_shelf_mark_menu(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
+                                               : book_name(v),
+                              shelf_kind))
         return ACTION_REDRAW;
-
-    book_resume_mark(ROW_IS_RESUME(v) ? resume_path(ROW_RESUME_OF(v))
-                                      : book_name(v),
-                     marks[choice]);
     marked_row = n;
     return ACTION_STD_CANCEL;
 }
