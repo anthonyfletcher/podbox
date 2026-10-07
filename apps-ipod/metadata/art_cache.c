@@ -480,6 +480,65 @@ static void aa_purge_thumbs(void)
     debug_log(DEBUG_LOG_ARTCACHE, "purge: done");
 }
 
+/* After a completed pass: every thumbnail of a folder the pass did not reach
+ * belongs to one that has gone. fallback.aat, not a hash, is left alone.
+ * Collected and removed a batch at a time, as aa_purge_thumbs() does. */
+static bool aa_was_visited(unsigned int h);
+
+static void aa_remove_orphans(void)
+{
+    char dirpath[MAX_PATH];
+    char filepath[MAX_PATH];
+    int i, removed_all = 0;
+
+    for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
+    {
+        int n, removed;
+
+        snprintf(dirpath, sizeof(dirpath), THUMBCACHE_DIR "/%s",
+                 art_sizes[i].name);
+        do
+        {
+            DIR *d = opendir(dirpath);
+            struct dirent *e;
+
+            if (!d)
+                break;
+            n = 0;
+            while (n < AA_PURGE_BATCH && (e = readdir(d)))
+            {
+                char *end;
+                unsigned long h;
+
+                if (strlen(e->d_name) != 12
+                    || strcasecmp(e->d_name + 8, ".aat"))
+                    continue;
+                h = strtoul(e->d_name, &end, 16);
+                if (end != e->d_name + 8 || aa_was_visited(h))
+                    continue;
+                strlcpy(aa_purge_names[n++], e->d_name,
+                        sizeof(aa_purge_names[0]));
+            }
+            closedir(d);
+
+            removed = 0;
+            for (int k = 0; k < n; k++)
+            {
+                snprintf(filepath, sizeof(filepath), "%s/%s", dirpath,
+                         aa_purge_names[k]);
+                if (remove(filepath) == 0)
+                    removed++;
+            }
+            removed_all += removed;
+        } while (n == AA_PURGE_BATCH && removed > 0);
+    }
+    if (removed_all)
+    {
+        aa_generation++;
+        debug_log(DEBUG_LOG_ARTCACHE, "orphans: %d removed", removed_all);
+    }
+}
+
 /* Whether the stamp file says the thumbnails are in this format */
 static bool aa_format_current(void)
 {
@@ -587,6 +646,26 @@ static struct aa_stamp *aa_slot(unsigned int h)
             return s;
     }
     return NULL;
+}
+
+/* Whether this pass reached the folder with hash 'h' */
+static bool aa_was_visited(unsigned int h)
+{
+    unsigned int i, idx;
+
+    if (h == 0)
+        h = 1;
+    idx = h & (AA_SEEN_SLOTS - 1);
+    for (i = 0; i < AA_SEEN_SLOTS; i++)
+    {
+        unsigned int at = (idx + i) & (AA_SEEN_SLOTS - 1);
+
+        if (aa_stamps[at].key == 0)
+            return false;
+        if (aa_stamps[at].key == h)
+            return aa_visited[at / 8] & (1u << (at % 8));
+    }
+    return false;
 }
 
 /* The slot for 'h' the first time this pass reaches it; NULL if the pass has
@@ -1493,6 +1572,8 @@ static enum bg_result aa_run_pass(void)
 out:
     completed = !aborted && !failed;
     noart_close(completed);
+    if (completed)
+        aa_remove_orphans();
     aa_stamps_save(completed);
     aa_stamps = NULL;
     aa_visited = NULL;
