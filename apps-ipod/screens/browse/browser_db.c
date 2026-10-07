@@ -2204,9 +2204,26 @@ static bool row_is_book(int tag, long seek, int level)
     return db_spoken_group_is_book(tag, seek);
 }
 
+/* Whether row 'seek' holds a book. An album placed by its album artist is
+ * one or is not; an album name holds one if any album of that name is one,
+ * and its spoken-word clause then lists only that book's tracks under it. */
+static bool row_has_book(int tag, long seek, int level)
+{
+    int i;
+
+    if (tag == tag_albumartist)
+        return db_spoken_artist_has_book(seek);
+    for (i = 0; tag == tag_album && i < level; i++)
+        if (csi->tagorder[i] == tag_albumartist)
+            return row_is_book(tag, seek, level);
+    if (tag == tag_album)
+        return db_spoken_album_has_book(seek);
+    return row_is_book(tag, seek, level);
+}
+
 /* Which rows a list keeps: a music browse drops the books, and a spoken-word
- * one keeps only books and the album artists who have one -- its clause alone
- * would keep any album with one spoken track. */
+ * one keeps only the rows holding one -- its clause alone would keep any
+ * album with one spoken track. */
 enum spoken_keep { KEEP_ALL, KEEP_MUSIC, KEEP_BOOKS };
 
 static bool row_kept(enum spoken_keep keep, int tag, long seek, int level)
@@ -2214,8 +2231,7 @@ static bool row_kept(enum spoken_keep keep, int tag, long seek, int level)
     if (keep == KEEP_MUSIC)
         return !row_is_book(tag, seek, level);
     if (keep == KEEP_BOOKS)
-        return tag == tag_albumartist ? db_spoken_artist_has_book(seek)
-                                      : row_is_book(tag, seek, level);
+        return row_has_book(tag, seek, level);
     return true;
 }
 
@@ -5089,7 +5105,7 @@ bool browser_db_get_book(struct browser_context* c, int item,
         return false;
 
     if (browser_db_is_album_list(c))
-        return row_is_book(tag_album, entry->extraseek, c->currextra)
+        return row_has_book(tag_album, entry->extraseek, c->currextra)
                && browser_db_get_entry_name(c, item, buf, buflen) != NULL;
 
     /* A track: the book is its album, if that is one */

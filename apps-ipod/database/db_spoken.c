@@ -428,6 +428,17 @@ bool db_spoken_artist_has_book(long seek)
            && ar.spoken_albums > 0;
 }
 
+bool db_spoken_album_has_book(long seek)
+{
+    struct tagcache_album al;
+    int n = tagcache_album_find_name(seek);
+
+    while (n >= 0 && tagcache_album_get(n++, &al) && al.album_seek == seek)
+        if (al.spoken == al.tracks)
+            return true;
+    return false;
+}
+
 bool db_spoken_group_is_book(int tag, long seek)
 {
     const struct spoken_group *g = group_for(tag);

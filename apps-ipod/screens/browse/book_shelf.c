@@ -18,7 +18,8 @@
  * if nothing of it has, and in progress otherwise.
  *
  * A book is an album the database calls one -- spoken word and nothing else
- * (database/db_spoken.c) -- keyed by name, as the resume file keys it.
+ * (database/db_spoken.c) -- keyed by name, as the resume file keys it. A name
+ * that a book shares with a music album is the book's tracks alone.
  * Podcasts are left out: a show has no last episode to have finished.
  *
  * Choosing a book plays it. An In progress one resumes; the others start at
@@ -285,7 +286,7 @@ static bool collect_books(void)
         int len;
 
         if (!strcmp(name, UNTAGGED)
-            || !db_spoken_group_is_book(tag_album, tcs.result_seek))
+            || !db_spoken_album_has_book(tcs.result_seek))
             continue;
 
         len = snprintf(names + used, avail, "%s", name);
@@ -672,6 +673,7 @@ static int each_track(long seek, struct book_track *list, int cap,
     if (!tagcache_search(&tcs, tag_filename))
         return -1;
     tagcache_search_add_filter(&tcs, tag_album, seek);
+    tagcache_search_add_clause(&tcs, &spoken_clause);
 
     while (found < cap && tagcache_get_next(&tcs, path, sizeof(path)))
     {

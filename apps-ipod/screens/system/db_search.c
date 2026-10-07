@@ -158,7 +158,8 @@ void db_search_arm_scope(int scope)
  * A title is per track, so the tag itself says. Album and album artist are
  * unique-valued -- their tag files hold one entry per distinct string with no
  * track behind it -- so db_spoken answers for them. An album artist with books
- * and music is found on both sides. */
+ * and music is found on both sides, and so is an album name that a book and a
+ * music album share. */
 static bool match_in_scope(int tag, const struct tagcache_search *tcs)
 {
     bool spoken;
@@ -169,6 +170,8 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
 
     if (tag == tag_albumartist && active_scope == DB_SEARCH_SPOKEN)
         return db_spoken_artist_has_book(tcs->result_seek);
+    if (tag == tag_album && active_scope == DB_SEARCH_SPOKEN)
+        return db_spoken_album_has_book(tcs->result_seek);
     if (db_spoken_group_tag(tag))
         spoken = db_spoken_group_is_book(tag, tcs->result_seek);
     else
