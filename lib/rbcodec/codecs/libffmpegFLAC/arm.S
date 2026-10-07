@@ -270,3 +270,62 @@ lpc_decode_arm:
 .exit:
     ldmpc regs=r4-r11
 
+/* The same filter for streams too wide for a 32-bit sum -- 24-bit audio,
+   whose sum takes the sample width, the coefficient precision and the order
+   together. The sum is kept in 64 bits with smlal, and the coefficient is
+   always the multiplier operand: it is small, and the ARM7's multiplier ends
+   early on a small one. Unrolled by 4 like .default above, coefficients
+   walked from the far end, so the oldest history sample meets the last.
+
+   r0 = samples to make, r1 = qlevel, r2 = pred_order, r3 = data,
+   coeffs on the stack. Sum low in r14, high in r0, so the sample count lives
+   on the stack.
+ */
+    .global lpc_decode_arm_wide
+lpc_decode_arm_wide:
+    stmdb sp!, { r4-r11, lr }
+    ldr r4, [sp, #36]         @ r4 = coeffs
+    cmp r0, #0
+    beq .wexit
+    str r0, [sp, #-4]!        @ samples left, on the stack
+    sub r3, r3, r2, lsl #2    @ r3 = history
+.wsample:
+    add r5, r4, r2, lsl #2    @ walk the coefficients from the far end
+    movs r7, r2, lsr #2       @ r7 = groups of four
+    mov r14, #0
+    mov r0, #0
+    beq .wrest
+.wloop:
+    ldmdb r5!, { r8-r11 }
+    ldmia r3!, { r6, r12 }
+    smlal r14, r0, r6, r11
+    smlal r14, r0, r12, r10
+    ldmia r3!, { r6, r12 }
+    smlal r14, r0, r6, r9
+    smlal r14, r0, r12, r8
+    subs r7, r7, #1
+    bne .wloop
+.wrest:
+    ands r7, r2, #3           @ the order's remainder, one at a time
+    beq .wsave
+.wone:
+    ldr r12, [r5, #-4]!
+    ldr r6, [r3], #4
+    smlal r14, r0, r6, r12
+    subs r7, r7, #1
+    bne .wone
+.wsave:
+    mov r14, r14, lsr r1      @ low word of sum >> qlevel; a register
+    rsb r6, r1, #32           @ shift of 32 gives 0, so qlevel 0 is right
+    orr r14, r14, r0, lsl r6
+    ldr r12, [r3]             @ load residual
+    add r14, r12, r14
+    str r14, [r3], #4         @ store result
+    sub r3, r3, r2, lsl #2    @ wrap history pointer back to next first pos
+    ldr r0, [sp]
+    subs r0, r0, #1
+    str r0, [sp]
+    bne .wsample
+    add sp, sp, #4
+.wexit:
+    ldmpc regs=r4-r11

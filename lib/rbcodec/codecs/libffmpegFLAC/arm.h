@@ -4,5 +4,7 @@
 #include "bitstream.h"
 
 void lpc_decode_arm(int blocksize, int qlevel, int pred_order, int32_t* data, int* coeffs);
+void lpc_decode_arm_wide(int blocksize, int qlevel, int pred_order,
+                         int32_t* data, int* coeffs);
 
 #endif

@@ -236,6 +236,7 @@ int decode_subframe_fixed(FLACContext *s, int32_t* decoded, int pred_order, int 
 }
 
 #if !defined(CPU_COLDFIRE)
+#ifndef CPU_ARM_CLASSIC     /* lpc_decode_arm_wide() there */
 static void flac_lpc_32_c(int32_t *decoded, int coeffs[],
                           int pred_order, int qlevel, int len) ICODE_ATTR_FLAC;
 static void flac_lpc_32_c(int32_t *decoded, int coeffs[],
@@ -250,6 +251,34 @@ static void flac_lpc_32_c(int32_t *decoded, int coeffs[],
         decoded[j] += sum >> qlevel;
     }
 
+}
+#endif
+
+/* flac_decode_frame()'s yield, for the filter below. */
+static void (*flac_yield)(void);
+
+/* Samples the wide filter makes between yields. A frame's channel is
+ * otherwise one run of the decoder: at 24 bits that is tens of milliseconds
+ * on a PP502x, during which nothing else on the core can draw. */
+#define FLAC_LPC_STEP 1024
+
+static void flac_lpc_32(int32_t *decoded, int coeffs[],
+                        int pred_order, int qlevel, int len)
+{
+    int i, n;
+
+    for (i = pred_order; i < len; i += n)
+    {
+        n = MIN(FLAC_LPC_STEP, len - i);
+#if defined(CPU_ARM_CLASSIC)
+        lpc_decode_arm_wide(n, qlevel, pred_order, decoded + i, coeffs);
+#else
+        flac_lpc_32_c(decoded + i - pred_order, coeffs, pred_order, qlevel,
+                      pred_order + n);
+#endif
+        if (i + n < len && flac_yield)
+            flac_yield();
+    }
 }
 
 static void lpc_analyze_remodulate(int32_t *decoded, int coeffs[],
@@ -338,7 +367,7 @@ static int decode_subframe_lpc(FLACContext *s, int32_t* decoded, int pred_order,
         lpc_decode_emac_wide(s->blocksize - pred_order, qlevel, pred_order,
                              decoded + pred_order, coeffs);
         #else
-        flac_lpc_32_c(decoded, coeffs, pred_order, qlevel, s->blocksize);
+        flac_lpc_32(decoded, coeffs, pred_order, qlevel, s->blocksize);
 
         if (bps <= 16)
             lpc_analyze_remodulate(decoded, coeffs, pred_order, qlevel, s->blocksize, bps);
@@ -634,6 +663,7 @@ int flac_decode_frame(FLACContext *s,
     int framesize;
     int scale;
 
+    flac_yield = yield;
     /* check that there is at least the smallest decodable amount of data.
        this amount corresponds to the smallest valid FLAC frame possible.
        this amount corresponds to the smallest valid FLAC frame possible.
