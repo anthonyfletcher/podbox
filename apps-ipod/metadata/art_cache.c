@@ -7,6 +7,11 @@
  * track's embedded art, as the album art source setting orders them; artist
  * art from an image in its parent or, failing that, the folder above. Each has
  * its own placeholder for when nothing is found.
+ *
+ * A pass after a library update that only added tracks visits the folders of
+ * those tracks alone. One after a deletion, an Update, a Rebuild or a change
+ * of format visits every folder, and only that kind removes the thumbnails of
+ * folders that have gone and rewrites the lists of folders with no art.
  ****************************************************************************/
 
 #include <stdio.h>
@@ -1215,6 +1220,11 @@ static bool aa_check_abort(void)
  * cached as it stands. */
 static bool aa_check_all;
 
+/* Whether this pass visits only the tracks added since the last completed
+ * one. The library has only grown since then, so a folder that pass covered
+ * has lost nothing; one that gained a track is visited with it. */
+static bool aa_added_only;
+
 /* Whether this pass reads a track's tags again for a folder whose stamp
  * already says what they hold. Reading a track goes to the disk even with the
  * directory cache up, so only a pass with no marks to have covered does it:
@@ -1454,6 +1464,16 @@ static enum bg_result aa_run_pass(void)
     aa_check_all = dircache_is_ready()
                 || art_cache_task.done_marks.entries < 0;
     aa_reread_tags = art_cache_task.done_marks.entries < 0;
+    {
+        const struct bg_marks *done = &art_cache_task.done_marks;
+        struct tagcache_marks now;
+
+        tagcache_get_marks(&now);
+        aa_added_only = done->entries >= 0 && done->deleted >= 0
+                     && now.deleted_ct == done->deleted
+                     && now.commitid >= done->commitid
+                     && tagcache_get_stat()->total_entries > done->entries;
+    }
 
     wh = core_alloc(worksz);
     if (wh <= 0)
@@ -1481,6 +1501,16 @@ static enum bg_result aa_run_pass(void)
         aborted = true;
         goto out;
     }
+    /* New tracks are appended to the index. A filename search walks the
+     * index only with the database in RAM; from the disk it takes everything,
+     * and the pass is a whole one. */
+    if (aa_added_only && tcs.ramsearch)
+        tagcache_search_set_range(&tcs, art_cache_task.done_marks.entries,
+                                  tagcache_get_stat()->total_entries - 1);
+    else
+        aa_added_only = false;
+    debug_log(DEBUG_LOG_ARTCACHE, aa_added_only ? "visiting added tracks"
+                                                : "visiting every folder");
 
     /* Counting starts over: these describe this pass, not every pass since
      * boot. Zeroed here rather than at the top so an early return -- no
@@ -1567,10 +1597,12 @@ static enum bg_result aa_run_pass(void)
 
 out:
     completed = !aborted && !failed;
-    noart_close(completed);
-    if (completed)
+    /* What the walk did not visit is not missing when it saw only the
+     * added tracks */
+    noart_close(completed && !aa_added_only);
+    if (completed && !aa_added_only)
         aa_remove_orphans();
-    aa_stamps_save(completed);
+    aa_stamps_save(completed && !aa_added_only);
     aa_stamps = NULL;
     aa_visited = NULL;
     core_unpin(wh);

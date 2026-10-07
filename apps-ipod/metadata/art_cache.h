@@ -157,9 +157,10 @@ bool art_cache_lookup_hash(unsigned int dir_hash, int size_index,
 void art_cache_thumb_path(unsigned int dir_hash, int size_index,
                           char *out, int out_len);
 
-/* The folders the last completed pass found no art for, as a file of one path
- * per line. Written only when a pass finishes, so an interrupted one leaves
- * the previous list rather than a partial one. Read by the health screen
+/* The folders the last completed pass over every folder found no art for, as
+ * a file of one path per line. Written only when such a pass finishes, so an
+ * interrupted one, or one over added tracks alone, leaves the previous list
+ * rather than a partial one. Read by the health screen
  * (screens/system/art_health.c); absent until a pass has completed. */
 const char *art_cache_noart_list(bool artists);
 

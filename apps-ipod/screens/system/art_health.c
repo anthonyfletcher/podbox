@@ -11,7 +11,7 @@
  *
  * A report, not a settings screen, which is why it sits here beside the
  * background-task view rather than under screens/settings/. It reads the list
- * the last completed pass wrote (see art_cache_noart_list()) and displays it;
+ * the last whole pass wrote (see art_cache_noart_list()) and displays it;
  * nothing here scans, and nothing runs when the screen is closed.
  ****************************************************************************/
 
