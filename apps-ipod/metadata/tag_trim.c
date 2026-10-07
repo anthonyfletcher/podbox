@@ -12,9 +12,10 @@
  * which is what lets the setting be switched off with nothing to undo.
  *
  * What counts as a note is not decided here. /.rockbox/trim.config holds one
- * pattern per line and the file is the whole list, so a library this fork's
+ * pattern per line, and the owner's own patterns in library/user/trim.txt are
+ * read after it; the two files are the whole list, so a library this fork's
  * defaults read wrongly is fixed by editing a text file rather than by a new
- * build.
+ * build. An install replaces trim.config and leaves trim.txt alone.
  *
  * Parts, in order:
  *   - the pattern list, and reading the file
@@ -30,12 +31,13 @@
 #include "file.h"
 #include "settings/settings.h"
 #include "system/strutil.h"          /* read_line, BOM_UTF_8 */
+#include "system/library_files.h"     /* LIB_TRIM_FILE */
 #include "tag_trim.h"
 
 #define TRIM_FILE      ROCKBOX_DIR "/trim.config"
-#define TRIM_PATTERNS  64      /* patterns kept; a longer file is read and the
+#define TRIM_PATTERNS  128     /* patterns kept; longer files are read and the
                                   rest ignored */
-#define TRIM_TEXT      1024    /* bytes of pattern text kept */
+#define TRIM_TEXT      2048    /* bytes of pattern text kept */
 #define TRIM_LINE      128
 
 /* ------------------------------------------------------------------ *
@@ -54,21 +56,16 @@ static char fold(char c)
     return (c >= 'A' && c <= 'Z') ? (char)(c + ('a' - 'A')) : c;
 }
 
-/* Reading the file blocks on the disk, which yields, so a skin can render
- * part-way through this. `n` is only published to pattern_count once the list
- * is whole: a reader that arrives mid-load sees the old count or none, never
- * a pattern pointing into text being rewritten under it. */
-void tag_trim_init(void)
+/* The patterns of 'file' onto the list, from pattern *n and text byte *used */
+static void read_patterns(const char *file, int *n_io, int *used_io)
 {
     char line[TRIM_LINE];
     bool first = true;
-    int used = 0;
-    int n = 0;
+    int used = *used_io;
+    int n = *n_io;
     int fd;
 
-    pattern_count = 0;
-
-    fd = open(TRIM_FILE, O_RDONLY);
+    fd = open(file, O_RDONLY);
     if (fd < 0)
         return;
 
@@ -107,6 +104,22 @@ void tag_trim_init(void)
     }
 
     close(fd);
+    *n_io = n;
+    *used_io = used;
+}
+
+/* Reading the files blocks on the disk, which yields, so a skin can render
+ * part-way through this. `n` is only published to pattern_count once the list
+ * is whole: a reader that arrives mid-load sees the old count or none, never
+ * a pattern pointing into text being rewritten under it. */
+void tag_trim_init(void)
+{
+    int used = 0;
+    int n = 0;
+
+    pattern_count = 0;
+    read_patterns(TRIM_FILE, &n, &used);
+    read_patterns(LIB_TRIM_FILE, &n, &used);
     pattern_count = n;
 }
 

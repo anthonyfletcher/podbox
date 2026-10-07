@@ -722,7 +722,8 @@ Remaster". Useful where long names scroll or get cut off.
 
 Files and the database are untouched, so browsing and search still see full
 names. The notes are patterns in /.rockbox/trim.config, one per line, with *
-matching anything; switch this off and on to re-read it.
+matching anything. Add your own to /.rockbox/library/user/trim.txt, which an
+install leaves alone; switch this off and on to re-read them.
 
 [featured artists]
 Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets

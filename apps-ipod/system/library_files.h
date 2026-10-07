@@ -38,6 +38,7 @@
 #define LIB_SPIKE_FILE      LIB_USER_DIR "/spike_scores.dat"
 #define LIB_KNOWN_ARTISTS_FILE LIB_USER_DIR "/known_artists.txt"
 #define LIB_PLAYER_NAME_FILE   LIB_USER_DIR "/player_name.txt"
+#define LIB_TRIM_FILE       LIB_USER_DIR "/trim.txt"
 
 /* Export and Import Modifications: Rockbox's own name and place, which its
  * Import reads, so a copy goes to other firmware and comes back */

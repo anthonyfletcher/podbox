@@ -672,8 +672,8 @@ static void playlist_engine_callback(bool on)
         sound_scan_screen(false);
 }
 
-/* The pattern file is read at startup, so switching this on is also how an
- * edited trim.config is picked up without a reboot. */
+/* The pattern files are read at startup, so switching this on is also how an
+ * edited trim.config or trim.txt is picked up without a reboot. */
 static void trim_titles_callback(bool trim)
 {
     (void)trim;
