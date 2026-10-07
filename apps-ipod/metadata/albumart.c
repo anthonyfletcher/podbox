@@ -63,10 +63,11 @@ static char* strip_filename(char* buf, int buf_size, const char* fullpath)
 }
 
 /* Whether an image the search has found can be drawn. The JPEG decoder takes
- * baseline images only, and one it cannot read must not stop the search: a
- * progressive cover.jpg would otherwise hide a folder.jpg beside it, which
- * the search only reaches later. Reads the markers up to the frame header,
- * and leaves anything it cannot place for the decoder to judge. */
+ * baseline and progressive Huffman-coded images only, and one it cannot read
+ * must not stop the search: an arithmetic-coded cover.jpg would otherwise
+ * hide a folder.jpg beside it, which the search only reaches later. Reads the
+ * markers up to the frame header, and leaves anything it cannot place for
+ * the decoder to judge. */
 static bool art_file_usable(const char *path)
 {
     unsigned char b[4];
@@ -88,12 +89,12 @@ static bool art_file_usable(const char *path)
         {
             int marker = b[1], seglen = (b[2] << 8) | b[3];
 
-            if (marker == 0xc0)
-                break;                          /* baseline */
+            if (marker == 0xc0 || marker == 0xc2)
+                break;                          /* baseline, progressive */
             if (marker >= 0xc1 && marker <= 0xcf
                 && marker != 0xc4 && marker != 0xcc)
             {
-                usable = false;                 /* progressive and the rest */
+                usable = false;                 /* arithmetic and the rest */
                 break;
             }
             if (seglen < 2 || lseek(fd, seglen - 2, SEEK_CUR) < 0)
