@@ -52,17 +52,16 @@
 /* Longest file name taken apart by the filename guesswork. */
 #define META_MAX 160
 
-static int  names_db_entries;   /* 0 = no usable database */
-static long names_db_commit;
+static struct pv_moves_db names_db;     /* entries 0 = no usable database */
 
 void pv_names_discard(void)
 {
     pv_moves_discard();
 }
 
-/* The database as the moved-folder table is keyed to it: its entry count and
- * commit id, or false when it is not there to ask. */
-static bool db_state(int *entries, long *commit)
+/* The database as the moved-folder table is keyed to it, or false when it is
+ * not there to ask. */
+static bool db_state(struct pv_moves_db *db)
 {
     struct tagcache_stat *stat = tagcache_get_stat();
     struct tagcache_marks marks;
@@ -70,43 +69,59 @@ static bool db_state(int *entries, long *commit)
     if (!stat || !stat->ready || stat->total_entries <= 0)
         return false;
     tagcache_get_marks(&marks);
-    *entries = stat->total_entries;
-    *commit = marks.commitid;
+    db->entries = stat->total_entries;
+    db->commit = marks.commitid;
+    db->deleted = marks.deleted_ct;
     return true;
 }
 
 unsigned long pv_names_identity(void)
 {
-    int entries;
-    long commit;
-    unsigned long key[5];
+    struct pv_moves_db db;
+    unsigned long key[3];
 
-    if (!db_state(&entries, &commit))
+    if (!db_state(&db))
         return 0;
-    key[0] = (unsigned long)entries;
-    key[1] = (unsigned long)commit;
-    key[2] = pv_moves_ident(entries, commit);
-    key[3] = PV_NAMES_VERSION;
+    key[0] = pv_moves_ident(&db);
+    key[1] = PV_NAMES_VERSION;
     /* Names come from the database only while it is in RAM, so a report
      * built without it is named differently from one built with it. */
-    key[4] = tagcache_is_in_ram();
+    key[2] = tagcache_is_in_ram();
     return fnv1a_bytes(key, sizeof(key));
+}
+
+uint32_t pv_names_fingerprint(uint64_t key)
+{
+    char names[3 * PV_NAME_MAX];
+    char *artist = names, *title = names + PV_NAME_MAX;
+    char *album = names + 2 * PV_NAME_MAX;
+    int idx_id = tagcache_find_key(key);
+
+    if (idx_id < 0)
+        return 0;
+    memset(names, 0, sizeof(names));
+    if (!tagcache_entry_string(idx_id, tag_artist, artist, PV_NAME_MAX))
+        artist[0] = '\0';
+    if (!tagcache_entry_string(idx_id, tag_title, title, PV_NAME_MAX))
+        title[0] = '\0';
+    if (!tagcache_entry_string(idx_id, tag_album, album, PV_NAME_MAX))
+        album[0] = '\0';
+    return fnv1a_bytes(names, sizeof(names)) | 1;
 }
 
 size_t pv_names_init(void *buf, size_t bufsz)
 {
     pv_moves_forget();
 
-    if (!db_state(&names_db_entries, &names_db_commit))
+    if (!db_state(&names_db))
     {
-        names_db_entries = 0;
+        names_db.entries = 0;
         return 0;               /* no database: filenames it is */
     }
 
-    /* The table follows the database: a commit is when folders move. */
-    if (pv_moves_stale(names_db_entries, names_db_commit))
-        pv_moves_build(buf, bufsz, names_db_entries, names_db_commit);
-    return pv_moves_load(buf, bufsz, names_db_entries, names_db_commit);
+    if (pv_moves_stale(&names_db))
+        pv_moves_build(buf, bufsz, &names_db);
+    return pv_moves_load(buf, bufsz, &names_db);
 }
 
 void pv_names_info(int *db_entries, int *mapped)
@@ -115,9 +130,9 @@ void pv_names_info(int *db_entries, int *mapped)
 
     tagcache_path_index_info(&slots, &found, &missed);
     if (db_entries)
-        *db_entries = names_db_entries;
+        *db_entries = names_db.entries;
     if (mapped)
-        *mapped = names_db_entries ? slots : 0;
+        *mapped = names_db.entries ? slots : 0;
 }
 
 /* ------------------------------------------------- filename guesswork */
@@ -316,7 +331,7 @@ static void path_to_meta(const char *path, char *artist, char *title,
  * saved report must not be built in. */
 bool pv_names_complete(void)
 {
-    return names_db_entries == 0 || tagcache_is_in_ram();
+    return names_db.entries == 0 || tagcache_is_in_ram();
 }
 
 /* Moves apply only to paths the database is known to lack, so without the

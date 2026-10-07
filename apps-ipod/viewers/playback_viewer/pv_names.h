@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* Longest artist, album or title kept. Names are compared and hashed in this
  * truncated form -- a longer name hashed in full would never match its own
@@ -30,12 +31,18 @@ size_t pv_names_init(void *buf, size_t bufsz);
  * again. */
 void pv_names_discard(void);
 
-/* A value that changes whenever the names a path resolves to could: the
- * database's entry count and commit id, the moved-folder table, and whether
- * the database is in RAM. 0 when there is no usable database. Cheap, so a
- * cache of resolved names can be checked against it before deciding to build
- * one. */
+/* A value that changes whenever the names every path resolves to could: the
+ * moved-folder table, and whether the database is in RAM. 0 when there is no
+ * usable database. Cheap, so a cache of resolved names can be checked against
+ * it before deciding to build one. What the database says about one path is
+ * pv_names_fingerprint()'s. */
 unsigned long pv_names_identity(void);
+
+/* What the database says about the file whose path_key() is 'key': a hash of
+ * the names it holds for it, or 0 when it does not hold the file. A path's
+ * names are settled by its own fingerprint, the fingerprint of where
+ * pv_names_locate() puts it, and pv_names_identity(). */
+uint32_t pv_names_fingerprint(uint64_t key);
 
 /* Whether names come from the database whenever it has them, now and for the
  * rest of the session: it is in RAM, or there is none, or its RAM copy is

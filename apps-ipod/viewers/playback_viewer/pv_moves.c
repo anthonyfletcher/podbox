@@ -15,8 +15,11 @@
  * result is a table of old folder -> new folder, applied as a path is read;
  * the log itself is never rewritten.
  *
- * It is built when the database has changed since the saved table, and
- * saved keyed to that database state.
+ * It is saved with the database state it was worked out for, and built
+ * again when a track has been deleted since -- a move is a deletion and an
+ * addition -- or when a track added since shares a file name with one of the
+ * missing files the last build could not place, since it may be that file's
+ * new home. Other additions leave it standing.
  *
  *   build    the log's folders and files, two walks of the database, the
  *            verdicts, the file
@@ -40,8 +43,12 @@
 #include "pv_log.h"
 #include "pv_moves.h"
 
-/* A libfile: struct move records, then the pool of their folders as its
- * tail. Its marks are the database the table was worked out for. */
+/* A libfile: struct move records, then as its tail the count and file-name
+ * hashes of the missing files left unplaced (uint32_t each; UNPLACED_ALL for
+ * more than UNPLACED_MAX) and the pool of the moved folders. Its marks are
+ * the database the table was worked out for. */
+#define UNPLACED_MAX 512
+#define UNPLACED_ALL 0xffffffffu
 #define PV_MOVES_PATH    LIB_REPORT_MOVES_FILE
 #define PV_MOVES_MAGIC   LIB_MOVES_MAGIC
 #define PV_MOVES_VERSION LIB_MOVES_VERSION
@@ -74,6 +81,7 @@ struct ldir                 /* a distinct folder the log names */
     int      missing;       /* of its logged files, how many are gone */
     int      matches;       /* database files sharing a missing file's name */
     int      cand;          /* first of its CANDS in cands[], or -1 */
+    int      best;          /* the cands[] entry it moved to, or -1 */
 };
 
 struct cand
@@ -152,6 +160,7 @@ static int dir_find_or_add(const char *path, size_t n)
     sc.dirs[sc.d_n].missing = 0;
     sc.dirs[sc.d_n].matches = 0;
     sc.dirs[sc.d_n].cand    = -1;
+    sc.dirs[sc.d_n].best    = -1;
     sc.dslots[s] = ++sc.d_n;
     return sc.d_n - 1;
 }
@@ -328,23 +337,32 @@ static bool accept(const struct ldir *ld, const struct cand *best)
     return best->votes >= 3 || same_leaf;
 }
 
+/* The missing files left unplaced, by name */
+static uint32_t unplaced[UNPLACED_MAX];
+static uint32_t unplaced_n;
+
 static void moves_save(const struct move *m, int n, const char *pool,
-                       unsigned pool_bytes, int db_entries, long db_commit)
+                       unsigned pool_bytes, const struct pv_moves_db *db)
 {
     struct libfile_writer w;
     struct libfile_marks marks;
 
     libfile_no_marks(&marks);
-    marks.entries = db_entries;
-    marks.commitid = db_commit;
+    marks.entries = db->entries;
+    marks.commitid = db->commit;
+    marks.deleted = db->deleted;
     if (libfile_begin(&w, PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
                       sizeof(struct move), &marks))
         libfile_finish(&w,
                        libfile_write(&w, m, (size_t)n * sizeof(struct move), n)
+                       && libfile_write(&w, &unplaced_n, sizeof(unplaced_n), 0)
+                       && (unplaced_n == UNPLACED_ALL
+                           || libfile_write(&w, unplaced,
+                                            unplaced_n * sizeof(uint32_t), 0))
                        && libfile_write(&w, pool, pool_bytes, 0));
 }
 
-void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
+void pv_moves_build(void *scratch, size_t size, const struct pv_moves_db *db)
 {
     char *p = scratch;
     size_t used;
@@ -427,6 +445,38 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
     if (missing_dirs && !collect_votes())
         return;
 
+    /* Where each folder went, decided while the files are still there to
+     * say which missing ones are left over */
+    for (int i = 0; i < sc.d_n; i++)
+    {
+        struct ldir *ld = &sc.dirs[i];
+        const struct cand *c;
+
+        if (!ld->missing || ld->cand < 0)
+            continue;
+        c = &sc.cands[ld->cand];
+        for (int k = 0; k < CANDS; k++)
+            if (c[k].votes && (ld->best < 0 || c[k].votes > c[ld->best].votes))
+                ld->best = k;
+        if (ld->best >= 0 && !accept(ld, &c[ld->best]))
+            ld->best = -1;
+    }
+
+    /* A log with more files than the table took may have missing ones it
+     * never saw, so it counts as leaving every name unplaced. */
+    unplaced_n = sc.f_n >= sc.f_cap ? UNPLACED_ALL : 0;
+    for (int i = 0; i < sc.f_n && unplaced_n != UNPLACED_ALL; i++)
+    {
+        const struct lfile *f = &sc.files[i];
+
+        if (f->found || sc.dirs[f->dir].best >= 0)
+            continue;
+        if (unplaced_n == UNPLACED_MAX)
+            unplaced_n = UNPLACED_ALL;
+        else
+            unplaced[unplaced_n++] = f->base_h;
+    }
+
     /* The files and their slots are finished with: the table is assembled
      * where they were. */
     out = (struct move *)sc.files;
@@ -439,20 +489,13 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
                     && n_moves < sc.f_cap; i++)
     {
         const struct ldir *ld = &sc.dirs[i];
-        const struct cand *c, *best = NULL;
         const char *dir;
         unsigned len;
 
-        if (!ld->missing || ld->cand < 0)
-            continue;
-        c = &sc.cands[ld->cand];
-        for (int k = 0; k < CANDS; k++)
-            if (c[k].votes && (!best || c[k].votes > best->votes))
-                best = &c[k];
-        if (!best || !accept(ld, best))
+        if (ld->best < 0)
             continue;
 
-        dir = sc.pool + best->off;
+        dir = sc.pool + sc.cands[ld->cand + ld->best].off;
         len = (unsigned)strlen(dir) + 1;
         if (out_used + len > out_cap)
             break;
@@ -463,25 +506,75 @@ void pv_moves_build(void *scratch, size_t size, int db_entries, long db_commit)
         n_moves++;
     }
 
-    moves_save(out, n_moves, out_pool, out_used, db_entries, db_commit);
+    moves_save(out, n_moves, out_pool, out_used, db);
 }
 
 /* ------------------------------------------------------------------- use */
 
-/* The table's header, if it was worked out for this database */
-static bool read_hdr(struct libfile_header *h, int db_entries, long db_commit)
+/* Whether a track added since entry 'from' -- new entries are appended --
+ * bears the name of an unplaced missing file */
+static bool added_matches(int from, int to)
 {
-    return libfile_peek(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION, h)
-        && h->marks.entries == db_entries
-        && h->marks.commitid == db_commit
-        && h->count <= MOVES_MAX;
+    struct tagcache_search tcs;
+    char fname[MAX_PATH];
+    bool hit = false;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return true;
+    /* With the database in RAM, which a deleted count needs, a filename
+     * search walks the index, so the range holds */
+    tagcache_search_set_range(&tcs, from, to - 1);
+    while (!hit && tagcache_get_next(&tcs, fname, sizeof(fname)))
+    {
+        const char *slash = strrchr(fname, '/');
+        uint32_t h = fnv1a_str(slash ? slash + 1 : fname);
+
+        for (uint32_t i = 0; i < unplaced_n && !hit; i++)
+            hit = unplaced[i] == h;
+    }
+    tagcache_search_finish(&tcs);
+    return hit;
 }
 
-bool pv_moves_stale(int db_entries, long db_commit)
+/* The table's header, if the table still serves this database: the one it
+ * was worked out for, or that one with tracks only added since, none of them
+ * named like a file the table could not place. */
+static bool read_hdr(struct libfile_header *h, const struct pv_moves_db *db)
+{
+    uint32_t tail;
+    int fd;
+    bool ok;
+
+    if (!libfile_peek(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION, h)
+        || h->count > MOVES_MAX)
+        return false;
+    if (h->marks.entries == db->entries && h->marks.commitid == db->commit)
+        return true;
+    if (db->deleted < 0 || h->marks.deleted != db->deleted
+        || db->entries < h->marks.entries || db->commit < h->marks.commitid)
+        return false;
+
+    fd = libfile_open(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
+                      sizeof(struct move), h, &tail);
+    if (fd < 0)
+        return false;
+    ok = tail >= sizeof(unplaced_n)
+         && lseek(fd, (off_t)h->count * sizeof(struct move), SEEK_CUR) >= 0
+         && read(fd, &unplaced_n, sizeof(unplaced_n))
+                == (ssize_t)sizeof(unplaced_n)
+         && unplaced_n <= UNPLACED_MAX
+         && read(fd, unplaced, unplaced_n * sizeof(uint32_t))
+                == (ssize_t)(unplaced_n * sizeof(uint32_t));
+    close(fd);
+    return ok && (unplaced_n == 0
+                  || !added_matches(h->marks.entries, db->entries));
+}
+
+bool pv_moves_stale(const struct pv_moves_db *db)
 {
     struct libfile_header h;
 
-    return !read_hdr(&h, db_entries, db_commit);
+    return !read_hdr(&h, db);
 }
 
 void pv_moves_forget(void)
@@ -492,20 +585,44 @@ void pv_moves_forget(void)
     mv_n = 0;
 }
 
-size_t pv_moves_load(void *buf, size_t size, int db_entries, long db_commit)
+size_t pv_moves_load(void *buf, size_t size, const struct pv_moves_db *db)
 {
     struct libfile_header h;
     uint32_t pool_bytes;
+    off_t names_skip;
     size_t need = 0;
     int fd, n, slots;
 
     pv_moves_forget();
-    if (!read_hdr(&h, db_entries, db_commit))
+    if (!read_hdr(&h, db))
         return 0;
     fd = libfile_open(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
                       sizeof(struct move), &h, &pool_bytes);
     if (fd < 0)
         return 0;
+
+    /* The unplaced names lead the tail, ahead of the pool: read past them,
+     * then back to the records */
+    {
+        uint32_t names;
+        off_t skip;
+
+        if (lseek(fd, (off_t)h.count * sizeof(struct move), SEEK_CUR) < 0
+            || read(fd, &names, sizeof(names)) != (ssize_t)sizeof(names))
+        {
+            close(fd);
+            return 0;
+        }
+        skip = sizeof(names)
+             + (names == UNPLACED_ALL ? 0 : (off_t)names * sizeof(uint32_t));
+        pool_bytes = pool_bytes > (uint32_t)skip ? pool_bytes - (uint32_t)skip : 0;
+        if (lseek(fd, sizeof(struct libfile_header), SEEK_SET) < 0)
+        {
+            close(fd);
+            return 0;
+        }
+        names_skip = skip;
+    }
 
     if (h.count > 0 && pool_bytes > 0 && pool_bytes <= MOVES_POOL_MAX)
     {
@@ -521,6 +638,7 @@ size_t pv_moves_load(void *buf, size_t size, int db_entries, long db_commit)
             char *pool = (char *)sl + (size_t)slots * sizeof(int);
             bool ok = read(fd, m, (size_t)n * sizeof(struct move))
                           == (ssize_t)((size_t)n * sizeof(struct move))
+                   && lseek(fd, names_skip, SEEK_CUR) >= 0
                    && read(fd, pool, pool_bytes) == (ssize_t)pool_bytes
                    && pool[pool_bytes - 1] == '\0';
 
@@ -578,11 +696,11 @@ const char *pv_moves_apply(const char *path)
     return NULL;
 }
 
-unsigned long pv_moves_ident(int db_entries, long db_commit)
+unsigned long pv_moves_ident(const struct pv_moves_db *db)
 {
     struct libfile_header h;
 
-    if (!read_hdr(&h, db_entries, db_commit) || h.count == 0)
+    if (!read_hdr(&h, db) || h.count == 0)
         return 0;
     return h.checksum ? h.checksum : 1;
 }

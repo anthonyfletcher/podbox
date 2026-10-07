@@ -19,6 +19,13 @@
  * plain data with no pointers in it -- it is already the shape it needs to be
  * to be written to a file.
  *
+ * The saved index holds the rows already named, so it is good for as long as
+ * every logged file would still be named the same. A file the database holds
+ * is renamed only by being deleted or retagged, and a retag deletes the old
+ * entry too, so the database's deleted count covers all of those; the files
+ * it did not hold are kept in the index with what the database says of them.
+ * An update that only adds tracks, the usual one, leaves the index standing.
+ *
  * A note on albums. A path does not carry one, so an album name can only come
  * from the database. Without one, plays are bucketed under the ARTIST
  * instead: the numbers stay meaningful and the album card degrades to an
@@ -35,6 +42,7 @@
 #include "system/hash.h"
 #include "kernel.h"      /* current_tick, HZ */
 #include "database/tagcache.h"   /* the library's size, for the table caps */
+#include "database/path_key.h"
 #include "system.h"      /* cpu_boost */
 #include "lang.h"
 #include "widgets/splash.h"
@@ -104,6 +112,84 @@ static bool day_in_year(long day)
 /* The badge engine's chronological state, built as the log is read and
  * carried in the index so an extend continues it rather than restarting. */
 static struct pv_badge_state badge_state;
+
+/* The logged files the database does not hold, each with where
+ * pv_names_locate() put it. A set that fills makes the index keyed to the
+ * database's exact state instead. */
+#define PV_ABSENT_MAX 1024
+
+struct pv_logged
+{
+    uint64_t key;               /* path_key() of the logged path */
+    uint64_t loc;               /* and of where it was named from */
+};
+
+static struct pv_logged *logged;
+static int *logged_slots;
+static int logged_cap, logged_mask, logged_n;
+static bool logged_full;
+
+static void logged_add(uint64_t key, uint64_t loc)
+{
+    int s;
+
+    if (logged_cap == 0)
+        return;
+    s = (int)((uint32_t)key & (unsigned)logged_mask);
+    while (logged_slots[s])
+    {
+        if (logged[logged_slots[s] - 1].key == key)
+            return;
+        s = (s + 1) & logged_mask;
+    }
+    if (logged_n >= logged_cap)
+    {
+        logged_full = true;
+        return;
+    }
+    logged[logged_n].key = key;
+    logged[logged_n].loc = loc;
+    logged_slots[s] = ++logged_n;
+}
+
+/* One absent file as the index keeps it */
+struct pv_logged_rec
+{
+    uint64_t key;
+    uint64_t loc;
+    uint32_t loc_names;         /* pv_names_fingerprint() of 'loc' */
+    uint32_t pad;
+};
+
+/* The database's state */
+struct pv_db_whole
+{
+    int32_t entries;
+    int32_t commit;
+    int32_t deleted;            /* -1 where it cannot be counted */
+};
+
+static void db_whole(struct pv_db_whole *w)
+{
+    struct tagcache_stat *stat = tagcache_get_stat();
+    struct tagcache_marks marks;
+
+    tagcache_get_marks(&marks);
+    w->entries = stat ? stat->total_entries : 0;
+    w->commit = marks.commitid;
+    w->deleted = marks.deleted_ct;
+}
+
+/* Whether a database in state 'now' names every file it held at 'then' as
+ * it did: nothing deleted or retagged since, only added */
+static bool db_only_added(const struct pv_db_whole *then,
+                          const struct pv_db_whole *now)
+{
+    if (memcmp(then, now, sizeof(*now)) == 0)
+        return true;
+    return then->deleted >= 0 && now->deleted == then->deleted
+        && now->entries >= then->entries && now->commit >= then->commit;
+}
 
 /* Bump allocator over the caller's buffer, above the moved-folder table. */
 static char  *abuf;
@@ -352,6 +438,82 @@ static bool names_settled(void)
     return stat->ready || (stat->readyvalid && !tagcache_is_busy());
 }
 
+static void logged_reset(void)
+{
+    logged_n = 0;
+    logged_full = false;
+    if (logged_cap)
+        memset(logged_slots, 0, (size_t)(logged_mask + 1) * sizeof(int));
+}
+
+/* The database's state and the absent files, with what it says of where
+ * each was named from; -1 for the files when the set filled, which keys the
+ * index to the exact state */
+static bool logged_save(const struct pv_db_whole *db)
+{
+    struct pv_logged_rec r[32];
+    int32_t n = (logged_full || logged_cap == 0) ? -1 : logged_n;
+
+    if (!pv_index_write(db, sizeof(*db)) || !pv_index_write(&n, sizeof(n)))
+        return false;
+
+    for (int i = 0; i < n; )
+    {
+        int k = 0;
+
+        memset(r, 0, sizeof(r));
+        for (; k < (int)ARRAYLEN(r) && i < n; k++, i++)
+        {
+            r[k].key = logged[i].key;
+            r[k].loc = logged[i].loc;
+            r[k].loc_names = pv_names_fingerprint(r[k].loc);
+        }
+        if (!pv_index_write(r, (size_t)k * sizeof(r[0])))
+            return false;
+    }
+    return true;
+}
+
+/* Whether every logged file would be named as it was when the index was
+ * saved. The absent files are taken back into the set, for the plays read
+ * after the index. */
+static bool logged_check(void)
+{
+    struct pv_logged_rec r[32];
+    struct pv_db_whole then, now;
+    int32_t n;
+
+    logged_reset();
+    db_whole(&now);
+    if (!pv_index_read(&then, sizeof(then)) || !pv_index_read(&n, sizeof(n)))
+        return false;
+    if (n < 0)
+    {
+        logged_full = true;
+        return memcmp(&then, &now, sizeof(now)) == 0;
+    }
+    if (!db_only_added(&then, &now) || n > logged_cap)
+        return false;
+
+    for (int i = 0; i < n; )
+    {
+        int k = n - i < (int)ARRAYLEN(r) ? n - i : (int)ARRAYLEN(r);
+
+        if (!pv_index_read(r, (size_t)k * sizeof(r[0])))
+            return false;
+        for (int j = 0; j < k; j++, i++)
+        {
+            /* Added since, or named from a moved file that changed */
+            if (pv_names_fingerprint(r[j].key) != 0
+                || (r[j].loc != r[j].key
+                    && pv_names_fingerprint(r[j].loc) != r[j].loc_names))
+                return false;
+            logged_add(r[j].key, r[j].loc);
+        }
+    }
+    return true;
+}
+
 /* Read a saved index into the tables, which the caller has already sized.
  * Anything that does not fit or does not read whole means no index. */
 static bool index_load(struct pv_totals *out, unsigned long log_size,
@@ -386,6 +548,10 @@ static bool index_load(struct pv_totals *out, unsigned long log_size,
         || !pv_index_read(t_title.items, (size_t)n_title * sizeof(struct pv_agg))
         || !pv_index_read(t_album.items, (size_t)n_album * sizeof(struct pv_agg))
         || !pv_index_read(days, (size_t)n_days * sizeof(struct pv_day)))
+        goto fail;
+
+    /* Every logged file still named as it was, or the rows are not */
+    if (out->source == PV_SRC_PLAYBACK && !logged_check())
         goto fail;
 
     pv_index_read_end();
@@ -442,8 +608,12 @@ fail:
     pv_badges_reset(&badge_state);
     day_n = 0;
     t_artist.n = t_title.n = t_album.n = 0;
+    logged_reset();
     return false;
 }
+
+/* The database the rows being saved were named from */
+static struct pv_db_whole index_db;
 
 static void index_save(const struct pv_totals *out, unsigned long covered)
 {
@@ -466,7 +636,8 @@ static void index_save(const struct pv_totals *out, unsigned long covered)
                           (size_t)t_title.n * sizeof(struct pv_agg))
         && pv_index_write(t_album.items,
                           (size_t)t_album.n * sizeof(struct pv_agg))
-        && pv_index_write(days, (size_t)day_n * sizeof(struct pv_day)))
+        && pv_index_write(days, (size_t)day_n * sizeof(struct pv_day))
+        && (out->source != PV_SRC_PLAYBACK || logged_save(&index_db)))
         pv_index_write_end();
     else
         pv_index_write_abort();
@@ -523,7 +694,11 @@ static void entry_cb(const struct pv_entry *e, void *ctx)
     }
     else
     {
+        uint64_t key = path_key(e->path);
+
         path = pv_names_locate(e->path);
+        if (tagcache_find_key(key) < 0)
+            logged_add(key, path == e->path ? key : path_key(path));
         src = pv_names_resolve(path, artist, title, album);
         if (src == PV_NAME_DB)
             t->from_db++;
@@ -1257,7 +1432,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
                                        struct pv_totals *out)
 {
     size_t names_used;
-    int cap_title, cap_artist, cap_album;
+    int cap_title, cap_artist, cap_album, cap_logged;
     long lines;
     unsigned long save_covered = 0;
     bool save_wanted = false;
@@ -1321,15 +1496,18 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
      * table -- the one the deck is mostly made of -- to buy room for artist
      * rows a library will never fill.
      *
-     * Days go first (1024 of them is nearly three years of daily listening,
-     * and they feed only the heatmap and the streak), then albums down to 200
-     * rows, then artists down to 200. The track table is cut last and only
+     * The absent-file set goes first, halving down to 128 and then to none,
+     * which costs only a rebuild after updates. Days go next (1024 of them is
+     * nearly three years of daily listening, and they feed only the heatmap
+     * and the streak), then albums down to 200 rows, then artists down to
+     * 200. The track table is cut last and only
      * when nothing else is left, and a table that then fills up is reported
      * rather than hidden.
      *
      * Trap: halving albums and artists once each is not enough. At 16,000
      * tracks they are still 300 KB between them, and on a 5G no size of track
      * table then fits. */
+    cap_logged = PV_ABSENT_MAX;
     day_cap = 1500;
     for (;;)
     {
@@ -1337,6 +1515,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
 
         need  = (size_t)cap_title * sizeof(struct pv_agg)
               + (size_t)next_pow2(cap_title * 2) * sizeof(int);
+        if (cap_logged)
+            need += (size_t)cap_logged * sizeof(struct pv_logged) + 8
+                  + (size_t)next_pow2(cap_logged * 2) * sizeof(int);
         need += (size_t)cap_artist * sizeof(struct pv_agg)
               + (size_t)next_pow2(cap_artist * 2) * sizeof(int);
         need += (size_t)cap_album * sizeof(struct pv_agg)
@@ -1346,7 +1527,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         if (need <= abuf_sz)
             break;
 
-        if (day_cap > 1024)
+        if (cap_logged)
+            cap_logged = cap_logged > 128 ? cap_logged / 2 : 0;
+        else if (day_cap > 1024)
             day_cap = 1024;
         else if (day_cap > 512)
             day_cap = 512;
@@ -1377,6 +1560,24 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     if (!days)
         return PV_BUILD_NO_MEMORY;
 
+    logged_cap = logged_n = 0;
+    logged_full = false;
+    if (cap_logged)
+    {
+        int slots = next_pow2(cap_logged * 2);
+        char *p = abuf_alloc((size_t)cap_logged * sizeof(struct pv_logged)
+                             + 8);
+
+        logged_slots = abuf_alloc((size_t)slots * sizeof(int));
+        if (p && logged_slots)
+        {
+            /* Eight-aligned for the keys; the allocator gives four */
+            logged = (struct pv_logged *)(((uintptr_t)p + 7) & ~(uintptr_t)7);
+            logged_cap = cap_logged;
+            logged_mask = slots - 1;
+        }
+    }
+
     out->cap_titles  = cap_title;
     out->cap_artists = cap_artist;
     out->cap_albums  = cap_album;
@@ -1390,6 +1591,11 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
          * match at the end: the database can finish loading mid-replay */
         unsigned long names_id = pv_names_identity();
         bool names_ready = pv_names_complete() && names_settled();
+        /* And the database itself: the fingerprints saved at the end must
+         * describe the database the rows were named from */
+        struct pv_db_whole whole_start, whole_end;
+
+        db_whole(&whole_start);
 
         /* Three ways in, in order of what they cost. Each falls through to
          * the next, so a saved index that cannot be trusted is simply not
@@ -1433,9 +1639,12 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         /* Names are what the index cannot correct later, so it is not saved
          * with names a later build would get right: the database not yet able
          * to say, or not yet in RAM. */
+        db_whole(&whole_end);
+        index_db = whole_start;
         if (out->source == PV_SRC_PLAYBACK
             && (!names_ready || !pv_names_complete() || !names_settled()
-                || pv_names_identity() != names_id))
+                || pv_names_identity() != names_id
+                || memcmp(&whole_start, &whole_end, sizeof(whole_end)) != 0))
             save_wanted = false;
 
         save_covered = log_size;
