@@ -76,6 +76,8 @@
 #include "screens/browse/book_shelf.h"
 #include "metadata/book_resume.h"
 #include "screens/browse/listen_progress.h"
+#include "database/tagcache.h"
+#include "database/db_spoken.h"
 #include "metadata/cuesheet.h"
 #include "skin/statusbar_skinned.h"
 #include "draw/viewport.h"
@@ -1333,11 +1335,16 @@ static int mark_book_callback(int action,
                               struct gui_synclist *this_list)
 {
     struct browser_context *c = browser_get_context();
+    long album_seek, artist_seek;
 
     (void)this_item;
     (void)this_list;
+    /* Not a podcast, which the shelves leave out: a show is never finished */
     if (action == ACTION_REQUEST_MENUITEM
         && !(in_book_list()
+             && browser_db_get_book_album(c, c->selected_item, &album_seek,
+                                          &artist_seek)
+             && !db_spoken_album_is_podcast(album_seek, artist_seek)
              && browser_db_get_book(c, c->selected_item,
                                     mark_book, sizeof(mark_book))))
         return ACTION_EXIT_MENUITEM;
@@ -1416,10 +1423,22 @@ MENUITEM_FUNCTION_W_PARAM(track_info_item, 0, ID2P(LANG_MENU_SHOW_ID3_INFO),
  * path -- the screen asks the browser which row is selected. */
 static bool context_menu_listen_progress(void)
 {
+    struct browser_context *c = browser_get_context();
+    char title[MAX_PATH];
+    long album_seek, artist_seek;
+    int ret;
+
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity_without_refresh();
 
-    if (listen_progress_show() == GO_TO_ROOT)
+    /* A book, track rows included, is that author's book alone */
+    if (browser_db_get_book_album(c, c->selected_item, &album_seek,
+                                  &artist_seek)
+        && tagcache_seek_string(tag_album, album_seek, title, sizeof(title)))
+        ret = listen_progress_show_book(album_seek, artist_seek, title);
+    else
+        ret = listen_progress_show();
+    if (ret == GO_TO_ROOT)
         context_menu_result = ONPLAY_MAINMENU;
     return false;
 }
@@ -1517,8 +1536,16 @@ static int clipboard_callback(int action,
                     this_item == &reveal_item)
                     return action;
                 if (this_item == &listen_progress_item)
+                {
+                    struct browser_context *c = browser_get_context();
+                    long album_seek, artist_seek;
+
                     return browser_db_current_scope() != BROWSER_DB_SCOPE_NONE
+                           || browser_db_get_book_album(c, c->selected_item,
+                                                        &album_seek,
+                                                        &artist_seek)
                          ? action : ACTION_EXIT_MENUITEM;
+                }
                 return ACTION_EXIT_MENUITEM;
             }
             if (this_item == &clipboard_paste_item)

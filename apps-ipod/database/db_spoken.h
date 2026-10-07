@@ -61,6 +61,10 @@ bool db_spoken_group_is_book(int tag, long seek);
 bool db_spoken_artist_has_book(long seek);
 bool db_spoken_album_has_book(long seek);
 
+/* Whether the album at 'album_seek' by 'artist_seek' is a podcast, going by
+ * its first track's genre. Runs a database search of its own. */
+bool db_spoken_album_is_podcast(long album_seek, long artist_seek);
+
 /* Build one tag's table if it is missing or stale. True once the table can be
  * read; false for a tag that has none, and for a build that could not finish
  * -- the database was unreadable, a commit landed inside it, or another thread

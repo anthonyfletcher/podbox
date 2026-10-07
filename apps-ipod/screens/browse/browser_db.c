@@ -2123,6 +2123,9 @@ static bool resume_armed;           /* the next playlist starts at it */
  * the album level at the top of a menu that asks for spoken word -- under
  * Author the albums are a level down, and keep the usual rows. */
 static bool shelf_rows;
+/* The books on each shelf, when shelf_rows is; a shelf with none has no row.
+ * -1 where they could not be counted, which keeps every row. */
+static int shelf_count[3];
 
 static const struct {
     int lang_id;
@@ -2297,6 +2300,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         resume_row = book_resume_row(c, level, tag);
         shelf_rows = global_settings.segregate_audiobooks && level == 0
                      && tag == tag_album && csi_mentions_spoken();
+        if (shelf_rows && !book_shelf_count(shelf_count))
+            shelf_count[0] = shelf_count[1] = shelf_count[2] = -1;
     }
 
     /* Before the search: the table is built by searches of its own, which
@@ -2512,6 +2517,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     {
         for (unsigned s = 0; s < ARRAYLEN(shelf_row); s++)
         {
+            if (shelf_count[shelf_row[s].kind] == 0)
+                continue;
             if (offset <= sidx)
             {
                 /* The list the row opens rides in extraseek, as the chart
@@ -5108,8 +5115,21 @@ bool browser_db_is_spoken_list(struct browser_context* c)
     return c->currtable == TABLE_NAVIBROWSE && csi_mentions_spoken();
 }
 
-bool browser_db_get_book(struct browser_context* c, int item,
-                         char *buf, size_t buflen)
+/* The album artist whose album of the name at 'album_seek' is a book, or -1 */
+static long book_artist(long album_seek)
+{
+    struct tagcache_album al;
+
+    for (int n = tagcache_album_find_name(album_seek);
+         n >= 0 && tagcache_album_get(n, &al) && al.album_seek == album_seek;
+         n++)
+        if (al.spoken == al.tracks)
+            return al.artist_seek;
+    return -1;
+}
+
+bool browser_db_get_book_album(struct browser_context* c, int item,
+                               long *album_seek, long *artist_seek)
 {
     struct tagentry *entry;
     struct tagcache_album al;
@@ -5119,15 +5139,33 @@ bool browser_db_get_book(struct browser_context* c, int item,
         return false;
 
     if (browser_db_is_album_list(c))
-        return row_has_book(tag_album, entry->extraseek, c->currextra)
-               && book_resume_id_of(entry->extraseek,
-                                    level_artist(c->currextra), buf, buflen);
+    {
+        if (!row_has_book(tag_album, entry->extraseek, c->currextra))
+            return false;
+        *album_seek = entry->extraseek;
+        *artist_seek = level_artist(c->currextra);
+        if (*artist_seek < 0)
+            *artist_seek = book_artist(entry->extraseek);
+        return *artist_seek >= 0;
+    }
 
     /* A track: the book is its album, if that is one */
-    return entry->newtable == TABLE_PLAYTRACK
-           && tagcache_album_get(tagcache_album_of(entry->extraseek), &al)
-           && al.spoken == al.tracks
-           && book_resume_id_of(al.album_seek, al.artist_seek, buf, buflen);
+    if (entry->newtable != TABLE_PLAYTRACK
+        || !tagcache_album_get(tagcache_album_of(entry->extraseek), &al)
+        || al.spoken != al.tracks)
+        return false;
+    *album_seek = al.album_seek;
+    *artist_seek = al.artist_seek;
+    return true;
+}
+
+bool browser_db_get_book(struct browser_context* c, int item,
+                         char *buf, size_t buflen)
+{
+    long album_seek, artist_seek;
+
+    return browser_db_get_book_album(c, item, &album_seek, &artist_seek)
+           && book_resume_id_of(album_seek, artist_seek, buf, buflen);
 }
 
 /* True when this browse level is listing artists -- the rows that can carry

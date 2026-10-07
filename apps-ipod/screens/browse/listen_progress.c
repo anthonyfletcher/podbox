@@ -10,9 +10,10 @@
  * the rest in the same walk. The log knows a great deal more about a play and
  * nothing whatever about a track that was never played.
  *
- * The scope is the browse row the context menu was opened on, which is why
- * nothing here takes an album or an artist as an argument: browser_db.c scopes
- * the search to that row, ancestor levels and all.
+ * The scope is the browse row the context menu was opened on: browser_db.c
+ * scopes the search to that row, ancestor levels and all. A book is the one
+ * exception, named by its album and album artist, since a shelf has no browse
+ * row behind it.
  *
  * Two levels, and the artist one lists albums rather than tracks: an artist's
  * unheard tracks run to hundreds and say nothing about where the gaps are,
@@ -386,22 +387,12 @@ static int run_album_list(const char *title)
  * the way in                                                         *
  * ------------------------------------------------------------------ */
 
-int listen_progress_show(void)
+/* Whatever 'scope' names, under 'title' */
+static int show(const char *title)
 {
-    /* Copied rather than pointed at: the browse row's entry lives in the
-     * browser's paging buffer, and a scan below can page a different chunk of
-     * the level in underneath it. */
-    char title[MAX_PATH];
-    bool artist, ok;
+    bool artist = (scope.scope == BROWSER_DB_SCOPE_ARTIST);
+    bool ok;
     int ret;
-
-    /* Both of these read the browse row, so both happen before the claim
-     * below: paging a chunk of the level in borrows the same buffer. */
-    if (!browser_db_current_filters(&scope))
-        return GO_TO_PREVIOUS;
-    browser_db_current_entry_name(title, sizeof(title));
-
-    artist = (scope.scope == BROWSER_DB_SCOPE_ARTIST);
 
     push_current_activity(ACTIVITY_LISTENPROGRESS);
     arena = app_claim_buffer(&arena_sz, "listening progress");
@@ -425,4 +416,32 @@ int listen_progress_show(void)
     pop_current_activity();
 
     return ret;
+}
+
+int listen_progress_show(void)
+{
+    /* Copied rather than pointed at: the browse row's entry lives in the
+     * browser's paging buffer, and a scan can page a different chunk of the
+     * level in underneath it. */
+    char title[MAX_PATH];
+
+    /* Both of these read the browse row, so both happen before show()'s
+     * claim: paging a chunk of the level in borrows the same buffer. */
+    if (!browser_db_current_filters(&scope))
+        return GO_TO_PREVIOUS;
+    browser_db_current_entry_name(title, sizeof(title));
+    return show(title);
+}
+
+int listen_progress_show_book(long album_seek, long artist_seek,
+                              const char *title)
+{
+    memset(&scope, 0, sizeof(scope));
+    scope.scope = BROWSER_DB_SCOPE_ALBUM;
+    scope.tag[0] = tag_albumartist;
+    scope.seek[0] = artist_seek;
+    scope.tag[1] = tag_album;
+    scope.seek[1] = album_seek;
+    scope.count = 2;
+    return show(title);
 }

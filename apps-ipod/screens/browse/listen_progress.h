@@ -17,4 +17,10 @@
  * go out of its way to see it. */
 int listen_progress_show(void);
 
+/* The same for the book that is album 'album_seek' by album artist
+ * 'artist_seek', under 'title': a book has the screen wherever it is listed,
+ * including where no browse row stands for it. */
+int listen_progress_show_book(long album_seek, long artist_seek,
+                              const char *title);
+
 #endif /* _LISTEN_PROGRESS_H */

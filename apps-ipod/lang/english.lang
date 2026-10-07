@@ -23134,15 +23134,15 @@
 </phrase>
 <phrase>
   id: LANG_LIBRARY_UPGRADE
-  desc: boot screen caption while the library's files are moved to a new layout
+  desc: boot screen caption while the library's files are upgraded to a new layout, the database included
   user: core
   <source>
-    *: "Moving library files"
+    *: "Performing maintenance..."
   </source>
   <dest>
-    *: "Moving library files"
+    *: "Performing maintenance..."
   </dest>
   <voice>
-    *: "Moving library files"
+    *: "Performing maintenance"
   </voice>
 </phrase>

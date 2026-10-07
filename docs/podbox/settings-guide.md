@@ -285,9 +285,10 @@ Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are
 in none of them. A book's context menu, on a shelf or in any Audiobooks list,
-offers Add to Queue, Add to Playlist, Show Track Info, Show in Files and Mark as,
-which moves it to any of the three until it is played again. The Audiobooks
-lists have no <All Tracks> or <Random> rows.
+offers Add to Queue, Add to Playlist, Show Track Info, Listening Progress, Show
+in Files and Mark as, which moves it to any of the three until it is played
+again; a podcast has no Mark as. A list with no books in it has no row. The
+Audiobooks lists have no <All Tracks> or <Random> rows.
 
 **Trim Titles** never removes a note at the start of a name.
 

@@ -17,6 +17,11 @@ enum book_shelf {
     BOOK_SHELF_FINISHED,
 };
 
+/* How many books each list holds, indexed by enum book_shelf. False when
+ * that could not be read -- the database is busy, or the app buffer is in
+ * use. */
+bool book_shelf_count(int counts[3]);
+
 /* Which list the next book_shelf_run() shows. The database browser's rows arm
  * this before returning GO_TO_BOOK_SHELF, because a browse level can hand back
  * only a bare screen code. */

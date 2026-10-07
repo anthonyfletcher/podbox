@@ -428,6 +428,22 @@ bool db_spoken_artist_has_book(long seek)
            && ar.spoken_albums > 0;
 }
 
+bool db_spoken_album_is_podcast(long album_seek, long artist_seek)
+{
+    struct tagcache_album al;
+    struct tagcache_search tcs;
+    char genre[SPOKEN_GENRE_BUFSZ];
+    bool podcast;
+
+    if (!tagcache_album_get(tagcache_album_find(album_seek, artist_seek), &al)
+        || !tagcache_search(&tcs, tag_genre))
+        return false;
+    podcast = tagcache_retrieve(&tcs, al.first, tag_genre, genre, sizeof(genre))
+              && db_spoken_is_podcast_genre(genre);
+    tagcache_search_finish(&tcs);
+    return podcast;
+}
+
 bool db_spoken_album_has_book(long seek)
 {
     struct tagcache_album al;

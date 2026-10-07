@@ -67,6 +67,7 @@
 #include "screens/context_menu.h"     /* the queue and playlist submenus */
 #include "system/strutil.h"           /* open_utf8 */
 #include "viewers/properties.h"
+#include "screens/browse/listen_progress.h"
 #include "root_menu.h"
 #include "book_shelf.h"
 
@@ -527,30 +528,33 @@ static int compare_rows(const void *a_v, const void *b_v)
     return ra - rb;
 }
 
+/* Which shelf the book or file at row value 'v' is on */
+static enum book_shelf row_state(int v)
+{
+    if (!ROW_IS_RESUME(v))
+        return book_state(&books[v]);
+    switch (resumes[ROW_RESUME_OF(v)].pos.left)
+    {
+        case BOOK_LEFT_ENDED:
+        case BOOK_LEFT_FINISHED:  return BOOK_SHELF_FINISHED;
+        case BOOK_LEFT_UNSTARTED: return BOOK_SHELF_NOT_STARTED;
+        default:                  return BOOK_SHELF_IN_PROGRESS;
+    }
+}
+
 static void build_rows(void)
 {
     row_ct = 0;
 
     for (int b = 0; b < book_ct; b++)
     {
-        if (books[b].counted && book_state(&books[b]) == shelf_kind)
+        if (books[b].counted && row_state(b) == shelf_kind)
             rows[row_ct++] = b;
     }
 
     for (int r = 0; r < resume_ct; r++)
     {
-        enum book_shelf state;
-
-        if (!resume_is_file(r))
-            continue;
-        switch (resumes[r].pos.left)
-        {
-            case BOOK_LEFT_ENDED:
-            case BOOK_LEFT_FINISHED:  state = BOOK_SHELF_FINISHED;    break;
-            case BOOK_LEFT_UNSTARTED: state = BOOK_SHELF_NOT_STARTED; break;
-            default:                  state = BOOK_SHELF_IN_PROGRESS; break;
-        }
-        if (state == shelf_kind)
+        if (resume_is_file(r) && row_state(ROW_RESUME(r)) == shelf_kind)
             rows[row_ct++] = ROW_RESUME(r);
     }
 
@@ -856,6 +860,11 @@ static char menu_path[MAX_PATH];
 /* Where the shelf goes once the menu has closed, or GO_TO_PREVIOUS to stay */
 static int menu_exit;
 
+/* Listening Progress was chosen for the menu book, and runs once the list is
+ * down and the arena released */
+static bool menu_progress;
+static char menu_name[BOOK_KEY_MAX];
+
 /* The menu book's tracks to 'fn'. Sorted in the arena's free tail, since the
  * list is up and holds the rest of it. */
 static int menu_tracks(bool (*fn)(const char *path, void *data), void *data)
@@ -928,13 +937,28 @@ static bool book_menu(const char *book, const char *name)
     char sel[MAX_PATH];
     int choice;
 
+    /* A file with no album has no figures for Listening Progress to give */
+    enum { QUEUE, PLAYLIST, INFO, PROGRESS, FILES, MARK };
+    static const int file_rows[] = { QUEUE, PLAYLIST, INFO, FILES, MARK };
     MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                        ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
+                        ID2P(LANG_MENU_SHOW_ID3_INFO),
+                        ID2P(LANG_LISTEN_PROGRESS), ID2P(LANG_SHOW_IN_FILES),
+                        ID2P(LANG_BOOK_MARK_AS));
+    MENUITEM_STRINGLIST(file_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
                         ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
                         ID2P(LANG_MENU_SHOW_ID3_INFO), ID2P(LANG_SHOW_IN_FILES),
                         ID2P(LANG_BOOK_MARK_AS));
 
     push_current_activity(ACTIVITY_CONTEXTMENU);
-    choice = do_menu(&menu, NULL, NULL, false);
+    if (menu_seek < 0)
+    {
+        choice = do_menu(&file_menu, NULL, NULL, false);
+        choice = choice >= 0 && choice < (int)ARRAYLEN(file_rows)
+                 ? file_rows[choice] : -1;
+    }
+    else
+        choice = do_menu(&menu, NULL, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
 
@@ -945,21 +969,26 @@ static bool book_menu(const char *book, const char *name)
 
     switch (choice)
     {
-        case 0:
+        case QUEUE:
             if (context_menu_show_playlist(sel, ATTR_DIRECTORY, menu_insert)
                 == ONPLAY_START_PLAY)
                 menu_exit = GO_TO_WPS;
             break;
-        case 1:
+        case PLAYLIST:
             context_menu_show_playlist_cat(sel, ATTR_DIRECTORY,
                                            menu_add_to_playlist);
             break;
-        case 2:
+        case INFO:
             menu_tracks(first_track, first);
             if (first[0] && properties(first) == GO_TO_ROOT)
                 menu_exit = GO_TO_ROOT;
             break;
-        case 3:
+        case PROGRESS:
+            /* It claims the app buffer the shelf holds, so the shelf lets
+             * go first and is read again after. */
+            menu_progress = true;
+            break;
+        case FILES:
             menu_tracks(first_track, first);
             if (first[0])
             {
@@ -967,7 +996,7 @@ static bool book_menu(const char *book, const char *name)
                 menu_exit = GO_TO_FILEBROWSER;
             }
             break;
-        case 4:
+        case MARK:
             return book_shelf_mark_menu(book, shelf_kind);
     }
     return false;
@@ -1005,12 +1034,14 @@ static int shelf_action_cb(int action, struct gui_synclist *lists)
     menu_artist_seek = ROW_IS_RESUME(v) ? -1 : books[v].artist_seek;
     if (ROW_IS_RESUME(v))
         strmemccpy(menu_path, resume_path(ROW_RESUME_OF(v)), sizeof(menu_path));
+    if (!ROW_IS_RESUME(v))
+        strmemccpy(menu_name, book_name(v), sizeof(menu_name));
     marked = ROW_IS_RESUME(v) ? book_menu(menu_path, menu_path)
                               : book_menu(book_id(v), book_name(v));
-    if (marked)
+    if (marked || menu_progress)
         marked_row = n;
-    return marked || menu_exit != GO_TO_PREVIOUS ? ACTION_STD_CANCEL
-                                                 : ACTION_REDRAW;
+    return marked || menu_progress || menu_exit != GO_TO_PREVIOUS
+           ? ACTION_STD_CANCEL : ACTION_REDRAW;
 }
 
 /* Everything the list is drawn from, read afresh. */
@@ -1038,6 +1069,32 @@ static bool load(void)
     return ok;
 }
 
+bool book_shelf_count(int counts[3])
+{
+    enum book_shelf kind = shelf_kind;
+    bool ok;
+
+    if (!claim())
+        return false;
+
+    /* Any list but In progress, which alone needs the second walk */
+    shelf_kind = BOOK_SHELF_NOT_STARTED;
+    ok = load();
+    if (ok)
+    {
+        counts[0] = counts[1] = counts[2] = 0;
+        for (int b = 0; b < book_ct; b++)
+            if (books[b].counted)
+                counts[row_state(b)]++;
+        for (int r = 0; r < resume_ct; r++)
+            if (resume_is_file(r))
+                counts[row_state(ROW_RESUME(r))]++;
+    }
+    release();
+    shelf_kind = kind;
+    return ok;
+}
+
 void book_shelf_arm(enum book_shelf which)
 {
     shelf_kind = which;
@@ -1048,7 +1105,9 @@ int book_shelf_run(void)
     struct simplelist_info info;
     int ret = GO_TO_PREVIOUS;
     int selection = 0;
+    int rounds = 0;
     bool picked = false;
+    bool held = true;
 
     /* Writes down a book that has just ended, and where the playing one is,
      * so both are on the shelf they belong on. */
@@ -1065,8 +1124,10 @@ int book_shelf_run(void)
     if (!tagcache_is_in_ram())
         splash(0, ID2P(LANG_WAIT));
 
-    /* Round again after a mark, which has moved the book to another list. */
+    /* Round again after a mark, which has moved the book to another list,
+     * and after Listening Progress. */
     menu_exit = GO_TO_PREVIOUS;
+    menu_progress = false;
     do
     {
         marked_row = -1;
@@ -1076,9 +1137,12 @@ int book_shelf_run(void)
             splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
             break;
         }
+        /* A list a mark has just emptied goes back to the books, whose row
+         * for it has gone too */
         if (row_ct == 0)
         {
-            report_empty();
+            if (rounds == 0)
+                report_empty();
             break;
         }
 
@@ -1098,11 +1162,27 @@ int book_shelf_run(void)
             choose(rows[info.selection]);
             picked = true;
         }
+
+        if (menu_progress)
+        {
+            menu_progress = false;
+            release();
+            held = false;
+            if (listen_progress_show_book(menu_seek, menu_artist_seek,
+                                          menu_name) == GO_TO_ROOT)
+                menu_exit = ret = GO_TO_ROOT;
+            else if (claim())
+                held = true;
+            else
+                break;
+        }
         selection = marked_row;
+        rounds++;
     } while (marked_row >= 0 && menu_exit == GO_TO_PREVIOUS);
 
     pop_current_activity();
-    release();
+    if (held)
+        release();
 
     if (picked)
         ret = play_chosen();

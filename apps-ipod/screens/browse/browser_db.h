@@ -90,6 +90,9 @@ bool browser_db_is_spoken_list(struct browser_context* c);
  * book_resume_id(). False for any other row. */
 bool browser_db_get_book(struct browser_context* c, int item,
                          char *buf, size_t buflen);
+/* And that book's album and album artist */
+bool browser_db_get_book_album(struct browser_context* c, int item,
+                               long *album_seek, long *artist_seek);
 /* True when the path down to the browser's current level came through an artist
  * level. Recorded on a playlist built from here, for the "auto" WPS art
  * source. */
