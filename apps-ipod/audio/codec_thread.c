@@ -190,6 +190,8 @@ void codec_thread_do_callback(void (*fn)(void), unsigned int *id)
 
 /** Codec API callbacks **/
 
+#define CODEC_INSERT_STEP 1024
+
 static void codec_pcmbuf_insert_callback(
         const void *ch1, const void *ch2, int count)
 {
@@ -204,7 +206,11 @@ static void codec_pcmbuf_insert_callback(
     {
         struct dsp_buffer dst;
         dst.remcount = 0;
-        dst.bufcount = MAX(src.remcount, 1024); /* Arbitrary min request */
+        /* At most CODEC_INSERT_STEP frames a pass, with a yield between
+         * passes: a whole decoded frame through the DSP at once can hold the
+         * processor for tens of milliseconds, and threads here switch only
+         * where one yields. */
+        dst.bufcount = CODEC_INSERT_STEP;
 
         if ((dst.p16out = pcmbuf_request_buffer(&dst.bufcount)) == NULL)
         {
@@ -222,6 +228,7 @@ static void codec_pcmbuf_insert_callback(
             {
                 pcmbuf_write_complete(dst.remcount, ci.id3->elapsed,
                                       ci.id3->offset);
+                yield();
             }
             else if (src.remcount <= 0)
             {
