@@ -277,8 +277,8 @@ static bool browser_is_playing(int selected_item, void * data)
 
 /* Album art for database album rows, drawn by the skin's %La tag.
  *
- * Resolving one row costs a tagcache search (browser_db_get_album_dir) plus a file
- * read, and the skin asks for every visible row on every redraw -- so a few
+ * Resolving one row can cost a tagcache search (browser_db_get_art_hash) plus a
+ * file read, and the skin asks for every visible row on every redraw -- so a few
  * decoded thumbnails are kept, keyed by list item, and thrown away whenever the
  * list reloads. A miss simply returns NULL: thumbnails are produced in the
  * background, so a row just has no cover until the cache catches up. */
@@ -448,8 +448,8 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
                                               uint32_t filter_hash)
 {
     struct browser_context *local_tc = (struct browser_context *)data;
-    char dir[MAX_PATH];
     char aat[MAX_PATH];
+    unsigned int hash;
     int slot;
     /* The shorter edge: a row viewport is not always square, and the cover has
      * to fit the tighter of the two or it is cropped. */
@@ -464,22 +464,13 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
             browser_aa_slot[slot].filter_hash == filter_hash)
             goto hit;
 
-    /* One list is either an album list or an artist list; resolve the row to the
-     * matching folder (album folder, or its parent artist folder). */
-    bool artist = !browser_db_is_album_list(local_tc);
-    if (artist)
-    {
-        if (!browser_db_get_artist_dir(local_tc, selected_item, dir, sizeof(dir)))
-            return NULL;
-    }
-    else if (!browser_db_get_album_dir(local_tc, selected_item, dir, sizeof(dir)))
+    hash = browser_db_get_art_hash(local_tc, selected_item);
+    if (hash == 0)
         return NULL;
 
     /* Both kinds of row want the placeholder returned transparently, so a row
-     * with no art still fills its viewport. Album and artist rows share one
-     * placeholder image, so there is nothing to distinguish between here --
-     * only the folder lookup above differs. */
-    if (!art_cache_lookup(dir, browser_aa_size_idx, aat, sizeof(aat), NULL))
+     * with no art still fills its viewport; album and artist rows share one. */
+    if (!art_cache_lookup_hash(hash, browser_aa_size_idx, aat, sizeof(aat), NULL))
         return NULL;    /* no art and no placeholder generated yet */
 
     slot = browser_aa_victim;

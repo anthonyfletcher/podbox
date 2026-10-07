@@ -1750,8 +1750,8 @@ static inline bool load_and_prepare_surface(const int slide_index,
     bool got_shared = false;
 
     /* Prefer the shared, database-driven thumbnail cache. It is keyed by a hash
-     * of the folder the tracks live in, which the album index resolved once
-     * when it was built -- so this costs a file open, not a database search. */
+     * of the folder the tracks live in, which the album tables resolved when
+     * the database loaded -- so this costs a file open, not a database search. */
     unsigned int art_hash = model->art_key(slide_index);
     if (pf_cover_size_idx >= 0 && art_hash != 0)
     {

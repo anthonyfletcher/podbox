@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 /* Auto-refreshing status list: state and current activity for the database,
- * the album index, the artwork cache and the document and image index. Runs
+ * the artwork cache and the document and image index. Runs
  * its own loop until the user leaves. Returns simplelist_show_list()'s result
  * (true if USB was attached). */
 bool bg_task_info_screen(void);

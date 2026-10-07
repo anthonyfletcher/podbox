@@ -265,10 +265,6 @@ static bool collect_books(void)
     char name[TAGCACHE_BUFSZ];
     size_t used = names_used;
 
-    /* False is a normal answer -- another thread is building it, or a commit
-     * landed -- and then every album reads as music this once. */
-    db_spoken_group_ensure(tag_album);
-
     if (!tagcache_search(&tcs, tag_album))
         return false;
 

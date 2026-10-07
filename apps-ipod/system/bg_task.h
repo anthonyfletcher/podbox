@@ -5,8 +5,8 @@
  * artifacts current.
  *
  * Three things rebuild themselves after the library changes -- the tag
- * database, the carousel's album index and the artwork thumbnail cache -- and
- * the last two are identical in everything but the pass itself: wake on a
+ * database, the artwork thumbnail cache and the document and image index --
+ * and the last two are identical in everything but the pass itself: wake on a
  * timer, acknowledge USB, wait for the database to settle, compare the
  * library's marks against those its own file was made for, run, record. That
  * shape lives here, so each task supplies only its pass.
@@ -28,10 +28,7 @@
 
 /* Rank decides who waits. A task *outranks* another when its rank is the
  * smaller number: it runs first, and it turns a running pass of the other
- * back. The index outranks the artwork cache because it finishes in seconds
- * where a full artwork pass takes minutes, and because the carousel blocks on
- * the index while nothing at all blocks on artwork. */
-#define BG_RANK_INDEX   0
+ * back. */
 #define BG_RANK_ART     1
 #define BG_RANK_FILES   2   /* last: a walk takes minutes, nothing waits on it */
 
@@ -44,8 +41,7 @@
  * library that only ever loses tracks looks untouched forever.
  *
  * The play counter (tagcache's serial) is deliberately absent. Playing a
- * track changes nothing either pass produces -- the album index carries
- * playback figures, but it keeps them current by its own means. */
+ * track changes nothing either pass produces. */
 struct bg_marks
 {
     int entries;   /* tagcache entry count */

@@ -98,9 +98,7 @@ int carousel_settings_menu(void);
 /* The carousel's own cached state, for the standard triggers.
  *
  * bg_task_rebuild() forces it to be built again the next time Album covers
- * opens; bg_task_update() fills in what is missing instead. Both also tell the
- * album index to rebuild, which is the part that is a real background task --
- * see album_covers_request(). */
+ * opens; bg_task_update() fills in what is missing instead. */
 extern struct bg_task album_covers_task;
 
 #endif

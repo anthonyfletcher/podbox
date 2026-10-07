@@ -189,9 +189,10 @@ bool db_spoken_is_spoken_seek(long genre_seek)
 
 /* Album, album artist and canonical artist are unique-valued, so their tag
  * files hold one entry per distinct string with no track behind it -- there
- * is nothing to ask about the genre of. These tables answer for them instead,
- * built once per commit by asking the database which of them hold spoken word
- * and which hold music.
+ * is nothing to ask about the genre of. Albums and album artists are answered
+ * by tagcache's album tables. Canonical artist has no row there, so a table
+ * answers for it instead, built once per commit by asking the database which
+ * artists hold spoken word and which hold music.
  *
  * A group is a book when it holds spoken word and no music. That is the same
  * answer a tag_virt_spoken clause gives -- a filtered list keeps a group as
@@ -209,8 +210,6 @@ static struct spoken_group {
     int ct;
     bool valid;
 } spoken_groups[] = {
-    { tag_album,                 { 0 }, 0, false },
-    { tag_albumartist,           { 0 }, 0, false },
     { tag_virt_canonicalartist,  { 0 }, 0, false },
 };
 
@@ -352,6 +351,8 @@ bool db_spoken_group_ensure(int tag)
 {
     struct spoken_group *g = group_for(tag);
 
+    if (tag == tag_album || tag == tag_albumartist)
+        return tagcache_album_count() > 0;
     if (!g)
         return false;
 
@@ -361,8 +362,7 @@ bool db_spoken_group_ensure(int tag)
     /* One build at a time, and the loser goes away rather than waiting.
      *
      * Both passes yield -- build_lookup_list() in tagcache.c does, once per
-     * entry it accepts -- and the callers are on two threads: the album index
-     * builds on its own while the browse and the search run on the main one.
+     * entry it accepts -- so another thread can arrive while one is building.
      * A second entrant would memset group_tcs out from under the first, so it
      * is turned away instead, with the table left invalid for it to try again
      * on its next visit. Blocking would put a browse behind a background pass,
@@ -405,14 +405,32 @@ bool db_spoken_group_ensure(int tag)
 
 bool db_spoken_group_tag(int tag)
 {
-    return group_for(tag) != NULL;
+    return tag == tag_album || tag == tag_albumartist || group_for(tag);
+}
+
+/* Every album of that name is spoken word throughout, whoever it is by */
+static bool album_is_book(long seek)
+{
+    struct tagcache_album al;
+    int n = tagcache_album_find_name(seek);
+    bool book = n >= 0;
+
+    while (book && tagcache_album_get(n++, &al) && al.album_seek == seek)
+        book = al.spoken == al.tracks;
+    return book;
 }
 
 bool db_spoken_group_is_book(int tag, long seek)
 {
     const struct spoken_group *g = group_for(tag);
+    struct tagcache_artist ar;
     int i;
 
+    if (tag == tag_album)
+        return album_is_book(seek);
+    if (tag == tag_albumartist)
+        return tagcache_artist_get(tagcache_artist_find(seek), &ar)
+               && ar.spoken_albums == ar.albums;
     if (!g)
         return false;
 

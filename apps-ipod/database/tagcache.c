@@ -77,6 +77,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <ctype.h>
 #include "config.h"
 #include "system/library_files.h"
@@ -1122,6 +1123,26 @@ int tagcache_album_find(long album_seek, long artist_seek)
     return tagcache_album_count() ? album_row(album_seek, artist_seek) : -1;
 }
 
+int tagcache_album_find_name(long album_seek)
+{
+    int lo = 0, hi = tagcache_album_count() - 1, found = -1;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+
+        if (tcrc_albums[mid].album_seek < album_seek)
+            lo = mid + 1;
+        else
+        {
+            if (tcrc_albums[mid].album_seek == album_seek)
+                found = mid;
+            hi = mid - 1;
+        }
+    }
+    return found;
+}
+
 int tagcache_album_of(int idx_id)
 {
     if (!tagcache_album_count() || idx_id < 0
@@ -2058,7 +2079,9 @@ static bool build_lookup_list(struct tagcache_search *tcs)
     {
         tcrc_buffer_lock(); /* lock because below makes a pointer to movable data */
 
-        for (i = tcs->seek_pos; i < current_tcmh.tch.entry_count; i++)
+        int end = MIN(tcs->seek_end, current_tcmh.tch.entry_count);
+
+        for (i = tcs->seek_pos; i < end; i++)
         {
             struct tagcache_seeklist_entry *seeklist;
             /* idx points to movable data, don't yield or reload */
@@ -2134,7 +2157,7 @@ static bool build_lookup_list(struct tagcache_search *tcs)
      * returning short is a truncated file rather than the end of one. Ending
      * the loop on the read instead cannot tell those apart, and answers a
      * partial list as though it were the whole answer. */
-    while (tcs->seek_pos < tcs->master_entry_count)
+    while (tcs->seek_pos < MIN(tcs->seek_end, tcs->master_entry_count))
     {
         struct tagcache_seeklist_entry *seeklist;
 
@@ -2253,6 +2276,7 @@ bool tagcache_search(struct tagcache_search *tcs, int tag)
     tcs->position = sizeof(struct tagcache_header);
     tcs->type = tag;
     tcs->seek_pos = 0;
+    tcs->seek_end = INT_MAX;
     tcs->list_position = 0;
     tcs->seek_list_count = 0;
     tcs->filter_count = 0;
@@ -2309,6 +2333,12 @@ void tagcache_search_set_uniqbuf(struct tagcache_search *tcs,
     tcs->unique_list_count = 0;
     memset(tcs->unique_list, 0,
            tcs->unique_list_capacity * sizeof(*tcs->unique_list));
+}
+
+void tagcache_search_set_range(struct tagcache_search *tcs, int first, int last)
+{
+    tcs->seek_pos = first;
+    tcs->seek_end = last + 1;
 }
 
 bool tagcache_search_add_filter(struct tagcache_search *tcs,
@@ -6408,9 +6438,8 @@ static void tagcache_thread(void)
                 /* Load it back, as Q_UPDATE below does. commit() unloads the
                  * RAM copy before it starts, so without this a rebuild from
                  * the menu leaves the database on the disk for the rest of the
-                 * session: every search a seek, the album index half a second
-                 * an album, the browser slow, and get_progress() with no entry
-                 * count to divide by. It returns only on the next USB session
+                 * session: every search a seek, no album tables, the browser
+                 * slow, and get_progress() with no entry count to divide by. It returns only on the next USB session
                  * or reboot, which is what makes it look like a USB fault.
                  *
                  * No check_deleted_files() to go with it: a rebuild has just

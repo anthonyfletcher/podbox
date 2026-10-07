@@ -152,6 +152,7 @@ struct tagcache_search {
     int clause_count;
     int list_position;
     int seek_pos;
+    int seek_end;        /* The master entry the walk stops before */
     long position;
     int entry_count;
     int master_entry_count; /* Index entries the master header claims */
@@ -192,6 +193,9 @@ void tagcache_search_set_uniqbuf(struct tagcache_search *tcs,
                                  void *buffer, long length);
 bool tagcache_search_add_filter(struct tagcache_search *tcs,
                                 int tag, int seek);
+/* Walks only master entries first to last, for a caller that knows every
+ * match lies there -- an album's, from its row. */
+void tagcache_search_set_range(struct tagcache_search *tcs, int first, int last);
 bool tagcache_search_add_clause(struct tagcache_search *tcs,
                                 struct tagcache_search_clause *clause);
 bool tagcache_get_next(struct tagcache_search *tcs, char *buf, long size);
@@ -274,6 +278,8 @@ struct tagcache_artist {
 int  tagcache_album_count(void);
 bool tagcache_album_get(int n, struct tagcache_album *out);
 int  tagcache_album_find(long album_seek, long artist_seek);
+/* The first row with this album name; any others follow it */
+int  tagcache_album_find_name(long album_seek);
 int  tagcache_album_of(int idx_id);
 int  tagcache_artist_count(void);
 bool tagcache_artist_get(int n, struct tagcache_artist *out);

@@ -48,9 +48,10 @@ bool db_spoken_is_spoken_seek(long genre_seek);
  * mixed album reads as music either way. db_spoken_group_tag() says whether a
  * tag has a table at all; anything else is false, i.e. music.
  *
- * Call db_spoken_group_ensure() first, and believe it. Everything is music
- * until it has run, so a caller that forgets hides nothing rather than
- * everything. */
+ * Album and album artist are answered from tagcache's album tables, and
+ * read as music while the database is not in RAM. For canonical artist, call
+ * db_spoken_group_ensure() first, and believe it. Everything is music until
+ * it has run, so a caller that forgets hides nothing rather than everything. */
 bool db_spoken_group_tag(int tag);
 bool db_spoken_group_is_book(int tag, long seek);
 
@@ -59,11 +60,12 @@ bool db_spoken_group_is_book(int tag, long seek);
  * -- the database was unreadable, a commit landed inside it, or another thread
  * was already building. Only one build runs at a time and the loser is turned
  * away rather than made to wait, so false is a normal answer, not an error.
+ * Album and album artist are tagcache's album tables, so they are false only
+ * while the database is not in RAM.
  *
  * What a caller does with false is its own: a browse or a search shows the
  * books this once and gets the table on its next visit, which costs nothing
- * that lasts. A caller writing the answer down -- the saved album index --
- * must not, and has to come back instead.
+ * that lasts.
  *
  * Two passes over the master index, so this is for a screen that is about to
  * need that tag, not for the search path itself: it is cheap only because it

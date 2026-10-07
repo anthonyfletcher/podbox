@@ -107,9 +107,9 @@ const char *file_index_list(bool images)
 
 /* ---- the walk ---------------------------------------------------------- */
 
-/* Give up promptly for a USB session, a shutdown, or the album index or
- * artwork cache wanting the thread -- this holds no lock, but it does hold
- * the disk and the thread, and a walk can run for minutes. */
+/* Give up promptly for a USB session, a shutdown, or the artwork cache
+ * wanting the thread -- this holds no lock, but it does hold the disk and the
+ * thread, and a walk can run for minutes. */
 static bool fi_check_abort(void)
 {
     if (fi_abort)

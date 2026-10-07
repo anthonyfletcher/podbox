@@ -1201,13 +1201,9 @@ static void aa_ensure_fallback(void *workbuf, size_t workbuf_sz)
 }
 
 /* True if the pass should stop right now: a USB connection or shutdown is
- * pending, or a task that outranks this one is waiting to start.
- *
- * The rank check is what keeps the album index from queueing behind a full
- * artwork pass. The index is short and the carousel can be waiting on it,
- * while a pass here can run for minutes and has the memory the index needs
- * pinned for the whole of it. Standing down costs nothing: the pass resumes
- * from where the thumbnails on disk leave it. */
+ * pending, or a task that outranks this one is waiting to start. Standing
+ * down costs nothing: the pass resumes from where the thumbnails on disk
+ * leave it. */
 static bool aa_check_abort(void)
 {
     return bg_task_should_stop(&art_cache_task);
@@ -1720,12 +1716,10 @@ static void aa_task_event(const struct queue_event *ev)
         aa_handle_offer();
 }
 
-/* Ranked below the album index: a full pass here runs for minutes and pins the
- * memory the index wants, so this is the one that stands down. The marker is
- * read back at init rather than started at -1 -- starting at -1 meant the first
- * settled count after a boot never matched, so a full pass ran on every startup,
- * walking the whole database with cache_busy set, which is what held the
- * "Building" indicator up with nothing actually to do. */
+/* The marker is read back at init rather than started at -1 -- starting at -1
+ * meant the first settled count after a boot never matched, so a full pass ran
+ * on every startup, walking the whole database with cache_busy set, which is
+ * what held the "Building" indicator up with nothing actually to do. */
 /* bg_task.read_marks and write_marks: the stamp file's header */
 static void aa_read_marks(struct bg_marks *m)
 {

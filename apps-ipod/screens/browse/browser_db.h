@@ -90,10 +90,9 @@ bool browser_db_is_spoken_list(struct browser_context* c);
  * level. Recorded on a playlist built from here, for the "auto" WPS art
  * source. */
 bool browser_db_current_under_artist_level(void);
-bool browser_db_get_album_dir(struct browser_context* c, int item,
-                           char *buf, int buflen);
-bool browser_db_get_artist_dir(struct browser_context* c, int item,
-                            char *buf, int buflen);
+/* The art-cache key of album or artist row 'item': its album folder, or the
+ * artist folder above it. 0 for any other row, or one with no folder. */
+unsigned int browser_db_get_art_hash(struct browser_context* c, int item);
 int browser_db_get_icon(struct browser_context* c);
 /* %Lk and %LP for row 'id' of the level on screen. */
 enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id);

@@ -715,7 +715,7 @@ static int lastdoc_scrn(void* param)
     return text_viewer(path);
 }
 
-/* Both read the album index, which is derived from the database -- so they
+/* Both read the album tables, which come with the database in RAM -- so they
  * need the same wait the database screens do, not merely a database that
  * exists. */
 static int album_charts_scrn(void* param)

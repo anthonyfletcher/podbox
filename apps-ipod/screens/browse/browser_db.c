@@ -63,6 +63,7 @@
 #include "database/db_featured.h"  /* the guest table the rows are drawn from */
 #include "database/db_spoken.h"    /* which albums and artists are books */
 #include "metadata/book_resume.h"  /* where a book was left */
+#include "metadata/art_cache.h"    /* art keys of album and artist rows */
 #include "database/path_key.h"
 #include "metadata/cuesheet.h"      /* the chapter list screen */
 #include "metadata/chapters.h"      /* reading a book's chapter marks */
@@ -2170,6 +2171,22 @@ static bool book_resume_row(struct browser_context *c, int level, int tag)
     }
 }
 
+/* The album-table row of the album at 'seek' on 'level', or -1: placed by the
+ * album artist above it, or by its name where no other album shares it. */
+static int table_album_row(int level, long seek)
+{
+    struct tagcache_album al;
+    int i, n;
+
+    for (i = 0; i < level; i++)
+        if (csi->tagorder[i] == tag_albumartist)
+            return tagcache_album_find(seek, csi->result_seek[i]);
+    n = tagcache_album_find_name(seek);
+    if (tagcache_album_get(n + 1, &al) && al.album_seek == seek)
+        return -1;
+    return n;
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2254,6 +2271,19 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             tagcache_search_add_filter(&tcs, csi->tagorder[i],
                                        csi->result_seek[i]);
         }
+    }
+
+    /* An album's tracks lie between its first and last master entries, so a
+     * placed album's list walks those rather than the whole index. */
+    if (c->currtable == TABLE_NAVIBROWSE && tag == tag_title && level > 0
+        && csi->tagorder[level - 1] == tag_album)
+    {
+        struct tagcache_album al;
+
+        if (tagcache_album_get(table_album_row(level - 1,
+                                           csi->result_seek[level - 1]),
+                               &al))
+            tagcache_search_set_range(&tcs, al.first, al.last);
     }
 
     /* because tagcache saves the clauses, we need to lock the buffer
@@ -3835,6 +3865,25 @@ int browser_db_take_pending_top_item(void)
  * true, make sure that you are back at the previous dirlevel, by
  * calling browser_db_exit as needed, with is_visible set to false.
  */
+/* Whether album row 'seek' certainly opens on more than one track: the album
+ * table counts them, where nothing but its album artist narrows the list. */
+static bool album_has_tracks(struct browser_context *c, int seek)
+{
+    struct tagcache_album al;
+    int i;
+
+    if (csi->tagorder[c->currextra] != tag_album)
+        return false;
+    for (i = 0; i < c->currextra; i++)
+        if (csi->tagorder[i] != tag_albumartist)
+            return false;
+    for (i = 0; i <= c->currextra + 1; i++)
+        if (csi->clause_count[i])
+            return false;
+    return tagcache_album_get(table_album_row(c->currextra, seek), &al)
+           && al.tracks > 1;
+}
+
 /* The path of the one track below the row whose tag entry is at `seek`, if
  * there is exactly one.
  *
@@ -3847,12 +3896,12 @@ int browser_db_take_pending_top_item(void)
  * for the same reason -- an album seek identifies a *name*, so counting
  * without the levels above would count every album that shares one.
  *
- * Two rows are read, but that is not what it costs. A filtered search walks
- * the master index and fills its seek list a batch at a time, and an album
- * holds fewer tracks than a batch, so the first read scans the index to the
- * end. Entering an album therefore does that walk twice: once here and once
- * in retrieve_entries(), which needs every track anyway. Affordable on a
- * select, where it happens once; unthinkable per row while drawing a list.
+ * An album the table counts as several tracks is answered without a search.
+ * Otherwise two rows are read, but that is not what it costs: a filtered
+ * search fills its seek list a batch at a time, and an album holds fewer
+ * tracks than a batch, so the first read scans the index to the end.
+ * Affordable on a select, where it happens once; unthinkable per row while
+ * drawing a list.
  */
 static bool single_track_path(struct browser_context* c, int seek,
                               char *buf, int buflen)
@@ -3865,6 +3914,8 @@ static bool single_track_path(struct browser_context* c, int seek,
     if (!csi || c->currextra < 0 || level >= csi->tagorder_count)
         return false;
     if (csi->tagorder[level] != tag_title)
+        return false;
+    if (album_has_tracks(c, seek))
         return false;
 
     if (!tagcache_search(&tcs, tag_filename))
@@ -5094,23 +5145,46 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
     return ok;
 }
 
-/* The album folder of browse row `item` -- the album-art cache key. */
-bool browser_db_get_album_dir(struct browser_context* c, int item,
-                           char *buf, int buflen)
+/* The art key of a row tagcache's album tables can place: an album artist, or
+ * an album table_album_row() finds. 0 for any other row. */
+static unsigned int table_art_hash(struct browser_context* c,
+                                   const struct tagentry *entry)
 {
-    if (!browser_db_is_album_list(c) || item < c->special_entry_count)
-        return false;
-    return browser_db_get_track_dir(c, item, buf, buflen, 0);
+    int level = c->currextra;
+    int tag = csi->tagorder[level];
+    int n;
+
+    if (tag == tag_albumartist)
+    {
+        struct tagcache_artist ar;
+        n = tagcache_artist_find(entry->extraseek);
+        return tagcache_artist_get(n, &ar) ? ar.art_hash : 0;
+    }
+    if (tag == tag_album)
+    {
+        struct tagcache_album al;
+        n = table_album_row(level, entry->extraseek);
+        return tagcache_album_get(n, &al) ? al.art_hash : 0;
+    }
+    return 0;
 }
 
-/* The artist folder of browse row `item` -- the parent of the album folder for
- * <artist>/<album>/<track> layouts, i.e. the artist-art cache key. */
-bool browser_db_get_artist_dir(struct browser_context* c, int item,
-                            char *buf, int buflen)
+unsigned int browser_db_get_art_hash(struct browser_context* c, int item)
 {
-    if (!browser_db_is_artist_list(c) || item < c->special_entry_count)
-        return false;
-    return browser_db_get_track_dir(c, item, buf, buflen, 1);
+    char dir[MAX_PATH];
+    struct tagentry *entry;
+    unsigned int hash;
+    bool album = browser_db_is_album_list(c);
+
+    if (item < c->special_entry_count
+        || (!album && !browser_db_is_artist_list(c))
+        || !(entry = browser_db_get_entry(c, item)))
+        return 0;
+    hash = table_art_hash(c, entry);
+    if (hash == 0
+        && browser_db_get_track_dir(c, item, dir, sizeof(dir), album ? 0 : 1))
+        hash = art_cache_dir_hash(dir);
+    return hash;
 }
 
 /* ---- scoping a search to the selected row ------------------------------- */
