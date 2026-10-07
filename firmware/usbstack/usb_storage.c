@@ -570,7 +570,11 @@ static int usb_storage_init_connection(void)
     int i;
     for(i=0;i<storage_num_drives();i++) {
         locked[i] = false;
-        ejected[i] = !check_disk_present(IF_MD(i));
+        ejected[i] = !check_disk_present(IF_MD(i))
+#ifndef BOOTLOADER
+                     || usb_storage_is_ejected()
+#endif
+                     ;
         queue_broadcast(SYS_USB_LUN_LOCKED, (i<<16)+0);
     }
     return 0;
@@ -1139,6 +1143,15 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 }
             }
             send_csw(UMS_STATUS_GOOD);
+#ifndef BOOTLOADER
+            /* Every drive ejected: the disk goes back to the player now. */
+            if(usb_exclusive_storage()) {
+                int i;
+                for(i=0;i<storage_num_drives() && ejected[i];i++);
+                if(i==storage_num_drives())
+                    usb_storage_ejected();
+            }
+#endif
             break;
 
         case SCSI_ALLOW_MEDIUM_REMOVAL:
@@ -1446,7 +1459,7 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                     usb_storage_send_ata_identify();
                     break;
 #ifdef HAVE_ATA_SMART
-                } else if (cbw->command_block[9] == 0xb0) {
+                } else if (cbw->command_block[9] == 0xb0 && lun_present) {
                     usb_storage_send_smart(cbw->command_block[3]);
                     break;
 #endif
@@ -1466,7 +1479,7 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                     usb_storage_send_ata_identify();
                     break;
 #ifdef HAVE_ATA_SMART
-                } else if (cbw->command_block[14] == 0xb0) {
+                } else if (cbw->command_block[14] == 0xb0 && lun_present) {
                     usb_storage_send_smart(cbw->command_block[4]);
                     break;
 #endif
@@ -1492,7 +1505,13 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
  * OUT endpoint is not rearmed until this CBW has received its CSW. */
 static void handle_scsi(struct command_block_wrapper* cbw)
 {
-    if(!usb_exclusive_storage()) {
+    /* After an eject the player owns the disk and every drive answers
+     * "medium not present" without touching it, so nothing is held back. */
+    if(!usb_exclusive_storage()
+#ifndef BOOTLOADER
+       && !usb_storage_is_ejected()
+#endif
+       ) {
         state = WAITING_FOR_STORAGE;
         return;
     }

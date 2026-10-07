@@ -45,6 +45,12 @@ bool usb_host_is_present(void)
     return false;
 }
 
+/* Set by the stack when a host ejects the disk. */
+bool usb_storage_is_ejected(void)
+{
+    return false;
+}
+
 /* Charging-mode selection, declared under HAVE_USB_POWER. */
 void usb_set_mode(int mode)
 {

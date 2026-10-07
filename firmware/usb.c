@@ -141,6 +141,9 @@ static bool usb_iap = true;
 static bool usb_car_no_audio = false;
 #endif
 static bool usb_host_present = false;
+/* The host ejected the disk and it is back with the player, which goes on
+ * charging; it is not handed over again until the cable is replugged. */
+static bool usb_disk_ejected = false;
 /* The host probe owns the controller: cable events are not acted on. */
 static bool usb_host_probe_on = false;
 #ifdef HAVE_USB_HOST_AUDIO
@@ -557,6 +560,7 @@ static void usb_extract(void)
 #ifndef BOOTLOADER
     send_event(SYS_EVENT_USB_EXTRACTED, NULL);
 #endif
+    usb_disk_ejected = false;
     usb_set_host_present(false);
 }
 
@@ -1199,10 +1203,11 @@ bool usb_inserted(void)
  * Where USB_DETECT_BY_REQUEST is defined this turns true on the first
  * completed control transfer -- before SET_ADDRESS, so callers have time to
  * stand down and leave the controller the CPU it needs to answer. Elsewhere it
- * follows cable detect. */
+ * follows cable detect. False again once the host has ejected the disk: from
+ * then on it is a charger, and work that waits for the host to go can run. */
 bool usb_host_is_present(void)
 {
-    return usb_host_present;
+    return usb_host_present && !usb_disk_ejected;
 }
 
 #if defined(USB_FULL_INIT)
@@ -1258,7 +1263,7 @@ bool usb_exclusive_storage(void)
 
 void usb_request_exclusive_storage(void)
 {
-    if(exclusive_storage_requested)
+    if(exclusive_storage_requested || usb_disk_ejected)
         return;
 
     exclusive_storage_requested = true;
@@ -1300,6 +1305,19 @@ void usb_release_exclusive_storage(void)
     (void)bccount;
 #endif
     return;
+}
+
+/* USB thread, once the host has ejected every drive. The player stays
+ * configured, so it keeps the current the host granted and goes on charging. */
+void usb_storage_ejected(void)
+{
+    usb_disk_ejected = true;
+    usb_release_exclusive_storage();
+}
+
+bool usb_storage_is_ejected(void)
+{
+    return usb_disk_ejected;
 }
 
 #ifdef USB_ENABLE_HID

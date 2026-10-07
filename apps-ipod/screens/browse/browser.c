@@ -1756,8 +1756,9 @@ void browser_restore(void)
      * a rescan we should have run; the request simply stays pending and the next
      * disconnect picks it up. Erring that way is deliberate -- a briefly stale
      * database costs the user nothing they will notice, and a spurious rescan
-     * costs three and a half seconds of every single connect. */
-    if (usb_inserted())
+     * costs three and a half seconds of every single connect. A host that
+     * ejected the disk has finished with it, cable or not. */
+    if (usb_inserted() && !usb_storage_is_ejected())
         return;
 
     /* The cable really is out, so release this session's suspend. Always --

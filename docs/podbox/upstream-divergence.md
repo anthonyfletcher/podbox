@@ -65,6 +65,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | --- | --- | --- |
 | `usbstack/usb_storage.c`, `.h`; `usbstack/usb_core.c`; `export/usb_core.h` | `host_wrote`, set by `WRITE_10`/`WRITE_16`, reached as `usb_core_host_wrote_storage()` | The app layer skips the database and dircache rebuild after a host that only read. Windows disconnects and reconnects on every connect. |
 | `usbstack/usb_storage.c` | The LUN is bounds-checked; `set_transfer_range()` makes the LBA arithmetic overflow-safe; a zero `block_size_mult` is refused | Host-supplied values upstream uses unchecked. |
+| `usbstack/usb_storage.c`, `usb.c`, `export/usb.h` | Ejecting every drive gives the disk back to the player (`usb_storage_ejected()`) until unplug; the drive then answers "medium not present" without waiting for storage, and `usb_host_is_present()` turns false | The player is usable while it charges from the computer, as Apple's firmware is. Upstream records the eject and keeps the disk until the cable is pulled. |
 
 ### Buffers claimed at boot
 

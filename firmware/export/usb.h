@@ -355,12 +355,17 @@ static inline void usb_signal_class_notify(int8_t class_num, uint32_t data) {
 bool usb_driver_enabled(int driver);
 /* returns whether exclusive storage is available for USB */
 bool usb_exclusive_storage(void);
+/* the host ejected the disk: give it back to the player until unplug */
+void usb_storage_ejected(void);
 #endif /* HAVE_USBSTACK */
 
 /* broadcast usb insertion event to enable exclusive storage */
 void usb_request_exclusive_storage(void);
 /* finish exclusive storage access if enabled and mount volumes */
 void usb_release_exclusive_storage(void);
+/* whether the host ejected the disk since the cable went in; it stays with the
+ * player, and the cable is only charging it, until unplug */
+bool usb_storage_is_ejected(void);
 
 #ifdef USB_FIREWIRE_HANDLING
 bool firewire_detect(void);

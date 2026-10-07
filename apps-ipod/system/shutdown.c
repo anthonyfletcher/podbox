@@ -319,11 +319,12 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
 #endif
             gui_usb_screen_run(false, seqnum);
 #ifdef BOOTFILE
-            /* Only once the cable is really out, and only if the host could have
-             * replaced the firmware. Otherwise a mid-connect blip scans
-             * /.rockbox for nothing -- and can pop the "Boot changed, reboot
-             * now?" prompt while the device is still mounted. */
-            if (!usb_inserted())
+            /* Only once the cable is really out or the host has ejected the
+             * disk, and only if the host could have replaced the firmware.
+             * Otherwise a mid-connect blip scans /.rockbox for nothing -- and
+             * can pop the "Boot changed, reboot now?" prompt while the device
+             * is still mounted. */
+            if (!usb_inserted() || usb_storage_is_ejected())
             {
                 bootfile_baseline_taken = false;
                 if (usb_core_host_wrote_storage())
