@@ -2029,10 +2029,7 @@ const char *get_token_value(struct gui_wps *gwps,
 
 
         case SKIN_TOKEN_VLED_HDD:
-            if(led_read(HZ/2))
-                return "h";
-            else
-                return NULL;
+            return sb_show_disk_activity() ? "h" : NULL;
         case SKIN_TOKEN_VLED_BUILDING:
         {
             /* The four background passes; sb_background_busy() names them, since
@@ -2042,12 +2039,12 @@ const char *get_token_value(struct gui_wps *gwps,
              * whole-disk walk reported as plain disk activity (%lh), which
              * reads as ordinary loading and hid a walk running right through a
              * USB handshake. */
-            return sb_background_busy() ? "b" : NULL;
+            return sb_show_background_tasks() ? "b" : NULL;
         }
         case SKIN_TOKEN_VLED_WORKING:
             /* generic busy flag for other long-running work; set via
              * ui_set_working() -- no built-in driver yet */
-            return ui_working() ? "w" : NULL;
+            return sb_show_working() ? "w" : NULL;
         case SKIN_TOKEN_LOADING_ANIM:
             /* Time-cycling frame index for an animated "busy" spinner. A theme
              * conditional (%?la<f0|f1|...|fN>) maps it to N glyphs; the frame

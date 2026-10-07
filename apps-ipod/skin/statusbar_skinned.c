@@ -254,6 +254,23 @@ bool sb_background_busy(void)
         || art_cache_is_busy() || file_index_is_busy();
 }
 
+/* Each indicator off means off everywhere: the tag shows nothing, and the busy
+ * tick below does not wake the screen to animate it. */
+bool sb_show_disk_activity(void)
+{
+    return global_settings.show_disk_activity && led_read(HZ/2);
+}
+
+bool sb_show_background_tasks(void)
+{
+    return global_settings.show_background_tasks && sb_background_busy();
+}
+
+bool sb_show_working(void)
+{
+    return global_settings.show_working && ui_working();
+}
+
 /* Animate a busy indicator on a screen that is otherwise still.
  *
  * The status bar has no clock: sb_skin_update() is only reached from
@@ -298,7 +315,8 @@ static void sb_busy_tick(void)
         return;
 
     /* The union of the three indicators a skin can draw: %lh, %lb and %lw. */
-    busy = led_read(HZ/2) || sb_background_busy() || ui_working();
+    busy = sb_show_disk_activity() || sb_show_background_tasks()
+        || sb_show_working();
 
     /* One poke after the last one, or the indicator stays on screen: the tag
      * turns false but nothing repaints the line it was drawn on, so the final
@@ -313,13 +331,14 @@ static void sb_busy_tick(void)
      * far more than a spinner frame does. Asking for one every frame is what
      * made lists drag.
      *
-     * The last poke is the exception and does need one. A line is only rewritten
-     * when its content changed, and a tag that stops producing text is not a
-     * change the engine notices -- the line simply comes out shorter and nothing
-     * erases what the longer one left. Once, at the end of the work, a full
-     * repaint costs nothing worth counting. */
+     * The last poke is the exception and needs more. A tag that stops
+     * producing text is not a change the engine notices, so its line is not
+     * rewritten and the last frame stays. The viewports holding an indicator
+     * are redrawn in full instead -- not the whole bar, which on a theme with a
+     * background layer costs tens of milliseconds and, under a screen like the
+     * carousel, a repaint of that screen as well. */
     if (!busy)
-        skin_request_full_update(CUSTOM_STATUSBAR);
+        skin_request_busy_redraw(CUSTOM_STATUSBAR);
     was_busy = busy;
 
     force_waiting = true;

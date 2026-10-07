@@ -44,7 +44,6 @@
 #include "draw/scrollbar.h"
 #include "lang.h"
 #include "sound.h"
-#include "system/activity.h"
 #include "system/app_util.h"
 #include "audio/sound_feedback.h"
 #include "system/shutdown.h"
@@ -962,9 +961,9 @@ int list_do_action_timeout(struct gui_synclist *lists, int timeout)
      * recolouring case above and cap the wait to the spinner's frame rate for
      * as long as any such work is busy. */
     {
-        bool ui_busy = ui_working();
-        ui_busy = ui_busy || tagcache_is_busy();
-        ui_busy = ui_busy || art_cache_is_busy();
+        bool ui_busy = sb_show_working();
+        ui_busy = ui_busy || (global_settings.show_background_tasks
+                              && (tagcache_is_busy() || art_cache_is_busy()));
         if (ui_busy)
         {
             int busy_timeout = HZ / 10;

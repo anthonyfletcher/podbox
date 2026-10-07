@@ -911,6 +911,15 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(F_THEMESETTING, battery_display, LANG_BATTERY_DISPLAY, 0,
                    "battery display", graphic_numeric, NULL, 2,
                    ID2P(LANG_DISPLAY_GRAPHIC), ID2P(LANG_DISPLAY_NUMERIC)),
+    /* Disk activity is off by default: while music plays the disk is read
+     * often enough to keep it lit, and every frame it animates is a status
+     * bar repaint. */
+    OFFON_SETTING(0, show_disk_activity, LANG_SHOW_DISK_ACTIVITY, false,
+                  "show disk activity", NULL),
+    OFFON_SETTING(0, show_background_tasks, LANG_SHOW_BACKGROUND_TASKS, true,
+                  "show background tasks", NULL),
+    OFFON_SETTING(0, show_working, LANG_SHOW_WORKING, true,
+                  "show working", NULL),
     CHOICE_SETTING(0, timeformat, LANG_TIMEFORMAT, 1,
         "time format", "24hour,12hour", NULL, 2,
         ID2P(LANG_24_HOUR_CLOCK), ID2P(LANG_12_HOUR_CLOCK)),

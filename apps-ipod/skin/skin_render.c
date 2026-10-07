@@ -1506,6 +1506,13 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
             if (skin_viewport->output_to_backdrop_buffer)
                 backdrop_flipped = true;
         }
+        else if (data->busy_redraw && skin_viewport->has_busy_tag
+                 && vp_refresh_mode)
+        {
+            vp_refresh_mode = SKIN_REFRESH_ALL;
+            if (skin_viewport->output_to_backdrop_buffer)
+                backdrop_flipped = true;
+        }
 
         display->set_viewport_ex(&skin_viewport->vp, VP_FLAG_VP_SET_CLEAN);
 
@@ -1542,6 +1549,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
 
         refresh_mode = old_refresh_mode;
     }
+    data->busy_redraw = false;
     skin_backdrop_set_buffer(-1, skin_viewport);
     skin_backdrop_show(data->backdrop_id);
     if (screen_clear_owed)

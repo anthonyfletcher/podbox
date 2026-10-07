@@ -380,6 +380,16 @@ MENUITEM_SETTING(scrollbar_width, &global_settings.scrollbar_width, NULL);
 MENUITEM_SETTING(statusbar, &global_settings.statusbar, statusbar_callback);
 MENUITEM_SETTING(volume_type, &global_settings.volume_type, NULL);
 MENUITEM_SETTING(battery_display, &global_settings.battery_display, NULL);
+MENUITEM_SETTING(show_disk_activity, &global_settings.show_disk_activity,
+                 NULL);
+MENUITEM_SETTING(show_background_tasks, &global_settings.show_background_tasks,
+                 NULL);
+MENUITEM_SETTING(show_working, &global_settings.show_working, NULL);
+MAKE_MENU(activity_indicators_menu, ID2P(LANG_ACTIVITY_INDICATORS), NULL,
+            Icon_NOICON,
+            &show_disk_activity,
+            &show_background_tasks,
+            &show_working);
 
 /*                                  */
 
@@ -562,6 +572,7 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &scrollbar_width,
             &battery_display,
             &volume_type,
+            &activity_indicators_menu,
             &cursor_style,
             &sep_menu);
 

@@ -102,6 +102,7 @@ void gui_sync_skin_init(void);
 
 bool skin_do_full_update(enum skinnable_screens skin, enum screen_type screen);
 void skin_request_full_update(enum skinnable_screens skin);
+void skin_request_busy_redraw(enum skinnable_screens skin);
 void skin_request_update_locked(bool locked);
 
 /* restart %Tl's idle timer, as though a button had just been pressed */

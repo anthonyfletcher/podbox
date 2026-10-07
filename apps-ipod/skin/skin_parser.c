@@ -2311,6 +2311,7 @@ static int convert_viewport(struct wps_data *data, struct skin_element* element)
     skin_vp->hidden_flags = 0;
     skin_vp->label = PTRTOSKINOFFSET(skin_buffer, NULL);
     skin_vp->is_infovp = false;
+    skin_vp->has_busy_tag = false;
     skin_vp->parsed_fontid = 1;
     element->data = PTRTOSKINOFFSET(skin_buffer, skin_vp);
     curr_vp = skin_vp;
@@ -2564,6 +2565,11 @@ static int skin_element_callback(struct skin_element* element, void* data)
                         token->value.i = get_param(element, 0)->data.number;
                     else
                         token->value.i = 0;
+                    break;
+                case SKIN_TOKEN_VLED_HDD:
+                case SKIN_TOKEN_VLED_BUILDING:
+                case SKIN_TOKEN_VLED_WORKING:
+                    curr_vp->has_busy_tag = true;
                     break;
                 case SKIN_TOKEN_VIEWPORT_DRAWONBG:
                     curr_vp->output_to_backdrop_buffer = true;

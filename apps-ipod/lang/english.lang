@@ -23079,3 +23079,59 @@
     *: "Long"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_SHOW_DISK_ACTIVITY
+  desc: Elements setting: show the disk activity indicator
+  user: core
+  <source>
+    *: "Show Disk Activity"
+  </source>
+  <dest>
+    *: "Show Disk Activity"
+  </dest>
+  <voice>
+    *: "Show Disk Activity"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_BACKGROUND_TASKS
+  desc: Elements setting: show the background tasks indicator
+  user: core
+  <source>
+    *: "Show Background Tasks"
+  </source>
+  <dest>
+    *: "Show Background Tasks"
+  </dest>
+  <voice>
+    *: "Show Background Tasks"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_WORKING
+  desc: Elements setting: show the working indicator
+  user: core
+  <source>
+    *: "Show Working"
+  </source>
+  <dest>
+    *: "Show Working"
+  </dest>
+  <voice>
+    *: "Show Working"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACTIVITY_INDICATORS
+  desc: Elements submenu holding the three Show indicator settings
+  user: core
+  <source>
+    *: "Activity Indicators"
+  </source>
+  <dest>
+    *: "Activity Indicators"
+  </dest>
+  <voice>
+    *: "Activity Indicators"
+  </voice>
+</phrase>

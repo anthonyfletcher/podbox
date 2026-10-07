@@ -199,6 +199,7 @@ struct skin_viewport {
     bool is_infovp;
     bool output_to_backdrop_buffer;
     bool fgbg_changed;
+    bool has_busy_tag;   /* holds %lh, %lb or %lw; skin_request_busy_redraw() */
     struct gradient_config start_gradient;
     unsigned int dc_orig_fg; /* original parsed fg for dynamic colors */
     unsigned int dc_orig_bg; /* original parsed bg for dynamic colors */
@@ -456,6 +457,8 @@ struct wps_data
     int16_t font_count;
     int16_t backdrop_id;
     bool use_extra_framebuffer;
+    /* Owed: redraw the viewports holding a busy indicator in full. */
+    bool busy_redraw;
 
     /* Every %Cl the skin declared, in the order written. A %Cd draws one of
      * them by label, a bare %Cd the first. Several cost no more than one

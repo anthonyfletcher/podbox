@@ -585,6 +585,10 @@ struct user_settings
     int max_files_in_playlist; /* Max entries in playlist */
     int volume_type;   /* how volume is displayed: 0=graphic, 1=percent */
     int battery_display; /* how battery is displayed: 0=graphic, 1=percent */
+    /* Which busy indicators a theme may show: %lh, %lb and %lw */
+    bool show_disk_activity;
+    bool show_background_tasks;
+    bool show_working;
     bool show_icons;   /* 0=hide 1=show */
     bool show_debug_menu; /* show the Debug entry in the System menu */
     int settings_mode; /* SETTINGS_MODE_* enum values */

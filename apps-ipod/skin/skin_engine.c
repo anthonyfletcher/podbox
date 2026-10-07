@@ -279,6 +279,16 @@ void skin_request_full_update(enum skinnable_screens skin)
         skins[skin][i].needs_full_update = true;
 }
 
+/* Redraw in full, next time, only the viewports holding a busy indicator. A
+ * line whose tag stops producing text is not otherwise rewritten, so this is
+ * what clears an indicator that has stopped -- at the cost of those
+ * viewports, not of the whole skin and its background layer. */
+void skin_request_busy_redraw(enum skinnable_screens skin)
+{
+    FOR_NB_SCREENS(i)
+        skins[skin][i].data.busy_redraw = true;
+}
+
 /* the hold switch moved; redraw the statusbar so it shows the new state.
  * Called from firmware/backlight.c. */
 void skin_request_update_locked(bool locked)

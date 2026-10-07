@@ -33,6 +33,10 @@ void sb_skin_set_update_delay(int delay);
 void sb_skin_force_next_update(void);
 /* Any of the four background index/cache passes is running -- what %lb shows. */
 bool sb_background_busy(void);
+/* What %lh, %lb and %lw show: the busy states, each with its Show setting. */
+bool sb_show_disk_activity(void);
+bool sb_show_background_tasks(void);
+bool sb_show_working(void);
 bool sb_set_title_text(const char* title, enum themable_icons icon, enum screen_type screen);
 bool sb_set_persistent_title(const char* title, enum themable_icons icon,
                              enum screen_type screen);

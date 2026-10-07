@@ -273,6 +273,9 @@ static const struct tag_row tag_rows[] = {
 { "scrollbar width",     TAG_ADVANCED|TAG_APPEARANCE,            "scroll bar" },
 { "volume display",      TAG_APPEARANCE,                         "status bar volume" },
 { "battery display",     TAG_APPEARANCE|TAG_BATTERY,             "status bar battery" },
+{ "show disk activity",  TAG_APPEARANCE,                         "busy spinner" },
+{ "show background tasks", TAG_APPEARANCE|TAG_DATABASE,          "busy spinner" },
+{ "show working",        TAG_APPEARANCE,                         "busy spinner" },
 
 /* dialogs: the first row picks how they are coloured, the rest are geometry
  * and the nine colours behind it */
