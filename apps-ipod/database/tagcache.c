@@ -166,6 +166,9 @@ static bool usr_cancel(void);
 /* The main database string data. */
 #define TAGCACHE_FILE_INDEX      "database_%d.tcd"
 
+/* Present while a commit's .new files are being renamed into place */
+#define TAGCACHE_FILE_SWAP       "database_swap.tcd"
+
 
 /* Flags */
 #define FLAG_DELETED     0x0001  /* Entry has been removed from db */
@@ -3683,13 +3686,14 @@ static void merge_discard(void)
     remove_db_file(TAGCACHE_FILE_MASTER ".new");
 }
 
-/* Put the new files in place: the tag files, then the master. Each rename
- * replaces its target whole; a cut between them leaves a dirty master and
- * the temp file, which the next boot commits again. */
-static bool merge_swap(void)
+static bool db_file_exists(const char *filename);
+
+/* The renames of a swap: every .new file still there over its real one */
+static bool swap_renames(void)
 {
     char name[32];
     char real[32];
+    bool ok = true;
 
     for (int t = 0; t < TAG_COUNT; t++)
     {
@@ -3697,10 +3701,41 @@ static bool merge_swap(void)
             continue;
         snprintf(name, sizeof(name), TAGCACHE_FILE_INDEX ".new", t);
         snprintf(real, sizeof(real), TAGCACHE_FILE_INDEX, t);
-        if (!rename_db_file(name, real))
-            return false;
+        if (db_file_exists(name))
+            ok &= rename_db_file(name, real);
     }
-    return rename_db_file(TAGCACHE_FILE_MASTER ".new", TAGCACHE_FILE_MASTER);
+    if (db_file_exists(TAGCACHE_FILE_MASTER ".new"))
+        ok &= rename_db_file(TAGCACHE_FILE_MASTER ".new", TAGCACHE_FILE_MASTER);
+    return ok;
+}
+
+/* Put the new files in place: the tag files, then the master. Each rename
+ * replaces its target whole, but a cut between two would pair new tag files
+ * with the old master. So the marker goes down first, once every .new file
+ * is complete, and finish_interrupted_swap() completes a swap it finds at
+ * the next boot. */
+static bool merge_swap(void)
+{
+    int fd = open_db_fd(TAGCACHE_FILE_SWAP, O_WRONLY | O_CREAT | O_TRUNC);
+
+    if (fd < 0)
+        return false;
+    close(fd);
+    if (!swap_renames())
+        return false;
+    remove_db_file(TAGCACHE_FILE_SWAP);
+    return true;
+}
+
+/* At boot, before anything opens the database: a swap that was cut short is
+ * carried through, its .new files having been complete when it began. */
+static void finish_interrupted_swap(void)
+{
+    if (!db_file_exists(TAGCACHE_FILE_SWAP))
+        return;
+    debug_log(DEBUG_LOG_TAGCACHE, "swap: finishing one cut short");
+    if (swap_renames())
+        remove_db_file(TAGCACHE_FILE_SWAP);
 }
 
 /* Lay out `merge` at the front of tempbuf: a remap table per sorted tag,
@@ -5963,6 +5998,8 @@ static void tagcache_thread(void)
     struct queue_event ev;
     bool check_done = false;
     cpu_boost(true);
+    finish_interrupted_swap();
+
     /* If the previous cache build/update was interrupted, commit
      * the changes first in foreground. */
     if (db_file_exists(TAGCACHE_FILE_TEMP))
