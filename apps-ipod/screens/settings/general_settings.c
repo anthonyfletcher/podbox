@@ -33,6 +33,7 @@
 #include "widgets/yesno.h"
 #include "speech/talk.h"
 #include "powermgmt.h"
+#include "power.h"               /* charger_inserted */
 #include "button.h"
 #include "audio/playback.h"
 #include "screens/playback/quick_screen.h"
@@ -46,6 +47,7 @@
 #include "files/file_index.h"
 #include "system/format_time.h"
 #include "system/volume.h"
+#include "system/app_util.h"     /* charging_splash */
 #include "pathfuncs.h"
 #include "screens/system/sound_library.h"
 #include "screens/system/sound_scan.h"
@@ -650,6 +652,39 @@ MENUITEM_SETTING(show_shutdown_message, &global_settings.show_shutdown_message, 
 MENUITEM_SETTING(clear_settings_on_hold,
                  &global_settings.clear_settings_on_hold, NULL);
 
+/* The same calls as the Shut Down and Reboot shortcuts, and the same refusal
+ * on the charger. */
+static int menu_shutdown(void)
+{
+#if CONFIG_CHARGING && !defined(HAVE_POWEROFF_WHILE_CHARGING)
+    if (charger_inserted())
+    {
+        charging_splash();
+        return 0;
+    }
+#endif
+    sys_poweroff();
+    return 0;
+}
+
+static int menu_reboot(void)
+{
+#if CONFIG_CHARGING && !defined(HAVE_POWEROFF_WHILE_CHARGING)
+    if (charger_inserted())
+    {
+        charging_splash();
+        return 0;
+    }
+#endif
+    sys_reboot();
+    return 0;
+}
+
+MENUITEM_FUNCTION(shutdown_item, 0, ID2P(LANG_SHUT_DOWN), menu_shutdown,
+                  NULL, Icon_NOICON);
+MENUITEM_FUNCTION(reboot_item, 0, ID2P(LANG_REBOOT), menu_reboot,
+                  NULL, Icon_NOICON);
+
 /* The sleep timer is its own screen under Battery & Power rather than four
    rows of Startup/Shutdown: it is the thing people reach for to make the
    player stop on its own, and it has nothing to do with booting. */
@@ -667,6 +702,8 @@ MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
             &clear_settings_on_hold,
 #undef SETTINGS_CLEAR_ON_HOLD
 #endif
+            &shutdown_item,
+            &reboot_item,
          );
 
 /* Battery & Power.

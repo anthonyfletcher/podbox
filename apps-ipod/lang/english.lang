@@ -7380,6 +7380,34 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SHUT_DOWN
+  desc: in System > Startup/Shutdown: switch the player off now
+  user: core
+  <source>
+    *: "Shut Down"
+  </source>
+  <dest>
+    *: "Shut Down"
+  </dest>
+  <voice>
+    *: "Shut Down"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBOOT
+  desc: in System > Startup/Shutdown: restart the player now
+  user: core
+  <source>
+    *: "Reboot"
+  </source>
+  <dest>
+    *: "Reboot"
+  </dest>
+  <voice>
+    *: "Reboot"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_REBOOT_NOW
   desc: Do you want to reboot?
   user: core

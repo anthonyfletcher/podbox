@@ -1208,6 +1208,13 @@ Shows a message while shutting down, rather than the screen simply going dark.
 [start in screen]
 Which screen opens at power-on.
 
+[action: Shut Down]
+Switches the player off now, as holding Play does. Refused while charging, on
+a player that cannot switch off on the charger.
+
+[action: Reboot]
+Restarts the player now. Refused while charging, as Shut Down is.
+
 [clear settings on hold]
 Holding a button during startup clears the settings. A way back from a
 configuration that makes the player unusable.
