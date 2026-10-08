@@ -22,6 +22,8 @@
 #include "root_menu.h"       /* GO_TO_* screen codes, MENU_ATTACHED_USB */
 #include "album_covers.h"    /* artist_portraits(), ALBUM_NAME_* */
 #include "carousel.h"
+#include "draw/line.h"              /* TEXT_FIT_BUF */
+#include "lang.h"
 #include "database/db_summary.h" /* build_artist_index() */
 
 /* "Resume to this slide on next open", set by artist_enter() and consumed by
@@ -194,7 +196,8 @@ static void artist_draw_text(void)
 {
     struct pf_caption cap;
     int txt_x, txt_y;
-    char name[TAGCACHE_BUFSZ];
+    char name[TAGCACHE_BUFSZ], fit[TEXT_FIT_BUF];
+    const char *line;
 
     if (global_settings.album_covers_show_album_name == ALBUM_NAME_HIDE)
         return;
@@ -203,9 +206,10 @@ static void artist_draw_text(void)
     struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
     lcd_setfont(pf_bold_font);
+    line = carousel_caption_fit(name, fit, sizeof(fit));
     /* Nothing but the slide decides this caption, hence the 0 variant. */
     if (carousel_caption_changed(center_index, 0))
-        set_scroll_line(name, PF_SCROLL_ALBUM);
+        set_scroll_line(line, PF_SCROLL_ALBUM);
 
     /* One line where the album carousel draws two. The engine reserves the
      * same band either way and centres whatever it is given in it, so this
@@ -216,7 +220,7 @@ static void artist_draw_text(void)
     txt_y = cap.y1;
 
     txt_x = get_scroll_line_offset(PF_SCROLL_ALBUM);
-    lcd_putsxy(txt_x, txt_y, name);
+    lcd_putsxy(txt_x, txt_y, line);
     lcd_setfont(screens[SCREEN_MAIN].getuifont());
     carousel_text_end(saved_vp);
 }
@@ -309,7 +313,7 @@ static const struct carousel_model artist_model = {
     .set_initial = artist_set_initial,
     .on_menu     = artist_on_menu,
     .owns_cache_version = false,
-    .title       = "Artist Portraits",
+    .title       = (const char *)ID2P(LANG_ARTIST_PORTRAITS),
 };
 
 int artist_portraits(const char *selected_file)

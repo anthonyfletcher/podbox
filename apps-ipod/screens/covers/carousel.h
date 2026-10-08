@@ -135,6 +135,10 @@ extern bool  pf_resume_last_album;
 int  carousel_run(const struct carousel_model *m, const char *selected_file);
 void set_current_slide(int index);
 void set_scroll_line(const char *str, enum pf_scroll_line_type type);
+/* 'str', or with Scrolling off, as much as fits the caption in the current
+ * font with "..." -- which set_scroll_line() then centres and never moves.
+ * 'buf' is TEXT_FIT_BUF bytes. */
+const char *carousel_caption_fit(const char *str, char *buf, size_t size);
 int  get_scroll_line_offset(enum pf_scroll_line_type type);
 /* True when the caption needs building again -- a different slide, or a
  * different `variant` (whatever else the model's caption text depends on;

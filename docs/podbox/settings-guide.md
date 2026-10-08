@@ -443,7 +443,7 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus and the theme's own scrolling lines, and the other scroll settings then have nothing to move. | on |  |
+| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | on |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |
@@ -619,7 +619,7 @@ other, so they survive leaving the game and survive the session.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Now Playing | Names the track under Spike's field, with the time remaining beside it. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off | |
-| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding, which is what keeps it readable on this screen. Off is the calmer choice while you are playing, and shows as much of the name as fits. | Off | |
+| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding, which is what keeps it readable on this screen. Off is the calmer choice while you are playing, and shows as much of the name as fits. Off as well while Scrolling is off. | Off | |
 | Audio Offset | How far ahead of the sound the game judges a press. Raise it if your presses feel late when they sounded on the beat, lower it if they feel early. It corrects the delay below the player's own buffer -- headphones and the codec -- so it is worth setting once and leaving. | -50 ms | **Adv** |
 
 ---

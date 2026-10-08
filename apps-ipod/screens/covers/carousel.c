@@ -56,6 +56,7 @@
 #include "playlist/playlist.h"
 #include "playlist/catalog.h"
 #include "settings/settings.h"
+#include "draw/line.h"              /* text_fit() */
 #include "draw/img_filter.h"    /* the slides' own treatment */
 #include "lang.h"
 #include "widgets/splash.h"
@@ -1025,6 +1026,18 @@ bool carousel_caption_changed(int index, int variant)
     caption_variant = variant;
     caption_valid = true;
     return true;
+}
+
+const char *carousel_caption_fit(const char *str, char *buf, size_t size)
+{
+    return global_settings.scrolling_enabled ? str
+         : text_fit(str, buf, size, lcd_getfont(), PF_TEXT_WIDTH);
+}
+
+/* The model's title is a phrase, resolved each time it is shown. */
+static const char *model_title(void)
+{
+    return P2STR((unsigned char *)model->title);
 }
 
 void set_scroll_line(const char *str, enum pf_scroll_line_type type)
@@ -4188,7 +4201,7 @@ static int album_covers_loop(void)
             if (!carousel_reinit())
                 return GO_TO_PREVIOUS;
             model->set_initial(NULL);
-            sb_set_persistent_title(model->title, Icon_NOICON, SCREEN_MAIN);
+            sb_set_persistent_title(model_title(), Icon_NOICON, SCREEN_MAIN);
             lcd_set_viewport(&pf_vp);
             lcd_set_background(pf_bg_color);
             lcd_set_foreground(pf_fg_color);
@@ -4457,7 +4470,7 @@ static int album_covers_loop(void)
                 return ret;   /* a GO_TO_* screen code */
             /* Handled in place -- restore the carousel's own status bar/viewport
              * after the menu overlay, and (on a rebuild) its colours. */
-            sb_set_persistent_title(model->title, Icon_NOICON, SCREEN_MAIN);
+            sb_set_persistent_title(model_title(), Icon_NOICON, SCREEN_MAIN);
             lcd_set_viewport(&pf_vp);
             if (ret == CAROUSEL_MENU_RELOADED)
             {
@@ -4575,7 +4588,7 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
      * screen's title from the moment it opens rather than whatever the
      * previous screen left behind. The PF_MENU case in album_covers_loop()
      * re-sets it on the way back from the in-screen menu. */
-    sb_set_persistent_title(model->title, Icon_NOICON, SCREEN_MAIN);
+    sb_set_persistent_title(model_title(), Icon_NOICON, SCREEN_MAIN);
 
     /* Jump to selected_file's album if one was passed (e.g. context_menu.c's
      * "Album covers" context-menu item on a specific track), otherwise the

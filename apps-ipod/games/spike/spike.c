@@ -982,7 +982,8 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
     f->caption_w = cap_w;
     f->caption_at = cap_at;
     f->caption_chars = cap_chars;
-    f->caption_scroll = global_settings.spike_caption_scroll;
+    f->caption_scroll = global_settings.spike_caption_scroll
+                        && global_settings.scrolling_enabled;
     f->font = cap_font;
 
     /* And the wheel's answer over the top of it, while it is still warm.
@@ -1066,6 +1067,7 @@ static void spike_event(int button)
 static bool spike_paused(bool by_hold)
 {
     bool quit = false;
+    bool meter_up = false;      /* the volume meter is over the splash */
 
     /* The player's own splash, not a box of the game's: it is the same
      * word in the same place it appears everywhere else on the machine,
@@ -1091,6 +1093,26 @@ static bool spike_paused(bool by_hold)
             }
             if (!button_hold())
                 break;
+            continue;
+        }
+
+        /* The wheel is the volume here as on the field. The field is
+         * redrawn where it stopped, for the meter in it, with the splash
+         * back on top; once the meter's time is up, once more without it. */
+        if (button == ACTION_SPIKE_UP || button == ACTION_SPIKE_DOWN)
+            adjust_volume(button == ACTION_SPIKE_UP ? 1 : -1);
+        if (button == ACTION_SPIKE_UP || button == ACTION_SPIKE_DOWN
+            || (meter_up
+                && !TIME_BEFORE(current_tick,
+                                global_status.last_volume_change
+                                + SPK_VOL_TICKS)))
+        {
+            struct spk_frame frame;
+
+            spike_fill_frame(&frame, last_grid);
+            spk_draw_frame(&frame);
+            splash(0, ID2P(LANG_PAUSE));
+            meter_up = frame.volume >= 0;
             continue;
         }
 

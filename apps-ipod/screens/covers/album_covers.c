@@ -85,6 +85,7 @@
 #include "skin/statusbar_skinned.h" /* sb_set_persistent_title */
 #include "album_covers.h"
 #include "carousel.h"     /* the shared engine: carousel_idx, the model */
+#include "draw/line.h"              /* TEXT_FIT_BUF */
 
 /** Globals **/
 
@@ -154,7 +155,7 @@ static const struct carousel_model album_model = {
     .on_menu     = album_on_menu,
     .prepare     = album_prepare,
     .owns_cache_version = true,
-    .title       = "Album Covers",
+    .title       = (const char *)ID2P(LANG_ALBUM_COVERS),
 };
 
 /**
@@ -596,6 +597,8 @@ static void draw_album_text(void)
 {
     char album_and_year[MAX_PATH];
     char albumtxt[TAGCACHE_BUFSZ], artisttxt[TAGCACHE_BUFSZ];
+    char album_fit[TEXT_FIT_BUF], artist_fit[TEXT_FIT_BUF];
+    const char *album_line, *artist_line;
     struct pf_caption cap;
     int albumtxt_x, albumtxt_y, artisttxt_x;
     bool show_artist;
@@ -637,8 +640,10 @@ static void draw_album_text(void)
      * name's *actual* rendering font, not FONT_UI, or a bold font with a
      * different average glyph width would end up mis-centered. */
     lcd_setfont(pf_bold_font);
+    album_line = carousel_caption_fit(album_and_year, album_fit,
+                                      sizeof(album_fit));
     if (album_changed)
-        set_scroll_line(album_and_year, PF_SCROLL_ALBUM);
+        set_scroll_line(album_line, PF_SCROLL_ALBUM);
 
     /* The engine measures both fonts and centres the block for us, so top and
      * bottom captions need no separate arithmetic here. */
@@ -651,7 +656,7 @@ static void draw_album_text(void)
     {
         if (carousel_idx.album_index[center_index].seek
             != carousel_idx.album_untagged_seek)
-            lcd_putsxy(albumtxt_x, albumtxt_y, album_and_year);
+            lcd_putsxy(albumtxt_x, albumtxt_y, album_line);
         /* Restored before the artist line: render_all_slides()/the FPS
          * overlay/etc all assume pf_vp's font is the real UI font, and the
          * artist name itself is never bold. screens[SCREEN_MAIN].getuifont(),
@@ -659,14 +664,16 @@ static void draw_album_text(void)
         lcd_setfont(screens[SCREEN_MAIN].getuifont());
 
         get_album_artist(center_index, artisttxt, sizeof(artisttxt));
+        artist_line = carousel_caption_fit(artisttxt, artist_fit,
+                                           sizeof(artist_fit));
         if (album_changed)
-            set_scroll_line(artisttxt, PF_SCROLL_ARTIST);
+            set_scroll_line(artist_line, PF_SCROLL_ARTIST);
         artisttxt_x = get_scroll_line_offset(PF_SCROLL_ARTIST);
-        lcd_putsxy(artisttxt_x, cap.y2, artisttxt);
+        lcd_putsxy(artisttxt_x, cap.y2, artist_line);
     }
     else
     {
-        lcd_putsxy(albumtxt_x, albumtxt_y, album_and_year);
+        lcd_putsxy(albumtxt_x, albumtxt_y, album_line);
         lcd_setfont(screens[SCREEN_MAIN].getuifont());
     }
     carousel_text_end(saved_vp);
