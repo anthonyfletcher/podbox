@@ -222,6 +222,10 @@ static void codec_pcmbuf_insert_callback(
         }
         else
         {
+            /* The request hands back all the contiguous space there is. */
+            if (dst.bufcount > CODEC_INSERT_STEP)
+                dst.bufcount = CODEC_INSERT_STEP;
+
             dsp_process(ci.dsp, &src, &dst, true);
 
             if (dst.remcount > 0)

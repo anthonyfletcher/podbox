@@ -817,10 +817,12 @@ static void pcmbuf_pcm_callback(const void **start, size_t *size)
     }
 }
 
-/* The mixer switched output rate on us; follow it with the DSP. */
+/* The mixer switched output rate on us; follow it with the DSP, and with the
+ * cached rate that the next track's codec setup reads. */
 static void pcmbuf_sampr_callback(uint32_t sampr)
 {
     struct dsp_config* dsp = dsp_get_config(CODEC_IDX_AUDIO);
+    pcmbuf_sampr = sampr;
     dsp_configure(dsp, DSP_SET_OUT_FREQUENCY, sampr);
 }
 

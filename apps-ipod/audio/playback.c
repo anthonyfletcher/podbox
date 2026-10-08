@@ -64,6 +64,7 @@
 #include "system/app_util.h"
 #include "system/bg_task.h"    /* the headroom a background pass needs */
 #include "audio/sound_feedback.h"
+#include "audio/track_decode.h"
 #include "settings/settings.h"
 #include "audiohw.h"
 #include "general.h"
@@ -195,7 +196,8 @@ static int albumart_mode = -1;
 static struct albumart_slot
 {
     struct dim dim;     /* Holds width, height of the albumart */
-    int used;           /* Counter; increments if something uses it */
+    uint32_t key;       /* See playback_claim_aa_slot_keyed() */
+    int used;          /* Counter; increments if something uses it */
 } albumart_slots[MAX_MULTIPLE_AA]; /* (A,O) */
 
 static char last_folder_aa_path[MAX_PATH] = "\0";
@@ -368,6 +370,9 @@ static unsigned int position_key = 0;
 #define PLAYBACK_LOG_MIN_ELAPSED_MS   (500) /* 500 milliseconds */
 #define PLAYBACK_LOG_BUFSZ (MAX_PATH * 10)
 static int playback_log_handle = 0; /* core_alloc handle for playback log buffer */
+/* The buffer is filled by the audio thread and flushed by it or by the UI
+ * thread (playback_log_flush()); every use of it holds this. */
+static struct mutex playback_log_mutex SHAREDBSS_ATTR;
 
 /* global_settings.playback_log values */
 #define PLAYBACK_LOG_OFF     0
@@ -379,10 +384,28 @@ static int playback_log_handle = 0; /* core_alloc handle for playback log buffer
 #define SCROBBLER_LISTENED_PCT 50   /* played >= this % of a track => rating 'L' */
 #define SCROBBLER_UNTAGGED     "<UNTAGGED>"
 
-static const char *playbacklog_path(void)
+/* The mode the buffered lines were formatted in. The setting can change while
+ * they wait, and each line belongs in the file of its own format. */
+static int playback_log_buf_mode;
+
+/* Open a mode's log for appending. An empty scrobbler log gets the
+ * Audioscrobbler header first, however it came to be empty: uploaders that
+ * check for it reject the file without it. */
+static int open_playbacklog(int mode)
 {
-    return global_settings.playback_log == PLAYBACK_LOG_LASTFM ?
-           SCROBBLER_LOG_PATH : PLAYBACK_LOG_PATH;
+    const char *path = mode == PLAYBACK_LOG_LASTFM ? SCROBBLER_LOG_PATH
+                                                   : PLAYBACK_LOG_PATH;
+    int fd;
+
+    DEBUGF("Opening %s \n", path);
+    fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0666);
+    if (fd >= 0 && mode == PLAYBACK_LOG_LASTFM && lseek(fd, 0, SEEK_END) == 0)
+        fdprintf(fd,
+            "#AUDIOSCROBBLER/1.1\n#TZ/UNKNOWN\n"
+            "#CLIENT/Rockbox " TARGET_NAME SCROBBLER_TIMELESS "\n"
+            "#ARTIST\t#ALBUM\t#TITLE\t#TRACKNUM\t#LENGTH\t#RATING\t"
+            "#TIMESTAMP\t#MUSICBRAINZ_TRACKID\n");
+    return fd;
 }
 
 /* Format one log line for the current mode. Returns snprintf's return value. */
@@ -1359,19 +1382,10 @@ void allocate_playback_log(void)
 
     if (global_settings.playback_log == PLAYBACK_LOG_LASTFM)
     {
-        /* Audioscrobbler .log: the spec header goes in once, when the file is
-         * first created; afterwards we only ever append entries (no rotation). */
-        fd = open(SCROBBLER_LOG_PATH, O_WRONLY|O_CREAT|O_APPEND, 0666);
+        /* Audioscrobbler .log: entries are only ever appended (no rotation). */
+        fd = open_playbacklog(PLAYBACK_LOG_LASTFM);
         if (fd >= 0)
-        {
-            if (lseek(fd, 0, SEEK_END) == 0)
-                fdprintf(fd,
-                    "#AUDIOSCROBBLER/1.1\n#TZ/UNKNOWN\n"
-                    "#CLIENT/Rockbox " TARGET_NAME SCROBBLER_TIMELESS "\n"
-                    "#ARTIST\t#ALBUM\t#TITLE\t#TRACKNUM\t#LENGTH\t#RATING\t"
-                    "#TIMESTAMP\t#MUSICBRAINZ_TRACKID\n");
             close(fd);
-        }
         return;
     }
 
@@ -1403,7 +1417,7 @@ void allocate_playback_log(void)
     }
 }
 
-void add_playbacklog(struct mp3entry *id3)
+static void write_playbacklog(struct mp3entry *id3)
 {
     if (!global_settings.playback_log)
         return;
@@ -1428,12 +1442,15 @@ void add_playbacklog(struct mp3entry *id3)
     if (id3 && id3->elapsed > PLAYBACK_LOG_MIN_ELAPSED_MS)
     {
         timestamp = mktime(get_time());
-        if (buf)  /* we have a buffer allocd from core */
+        /* Lines of another mode are flushed first rather than joined. */
+        if (buf && (used == 0 ||
+                    playback_log_buf_mode == global_settings.playback_log))
         {
             ssize_t entrylen = format_playbacklog(buf, bufsz, id3, timestamp);
 
             if (entrylen < bufsz)
             {
+                playback_log_buf_mode = global_settings.playback_log;
                 DEBUGF("BUFFERED: time: %lu elapsed %ld/%ld saving file: %s\n",
                     timestamp, (long)id3->elapsed, (long)id3->length, id3->path);
                 return; /* succeed or snprintf fail return */
@@ -1445,41 +1462,52 @@ void add_playbacklog(struct mp3entry *id3)
     else
         id3 = NULL;
 
-    if (id3 || used > 0) /* flush */
+    if (buf && used > 0) /* flush, to the file of the mode it was written in */
     {
-        const char *path = playbacklog_path();
-        DEBUGF("Opening %s \n", path);
-        int fd = open(path, O_WRONLY|O_CREAT|O_APPEND, 0666);
+        int fd = open_playbacklog(playback_log_buf_mode);
         if (fd < 0)
         {
             return; /* failure */
         }
-        if (buf) /* we have a buffer allocd from core */
-        {
-            /* write() can yield, and buflib may compact the pool while we are
-             * blocked, moving this allocation out from under us. Pinning holds
-             * it still for the duration; every _pinned get needs its matching
-             * core_put_data_pinned() or the pool can never compact again. */
-            buf = core_get_data_pinned(playback_log_handle);
-            write(fd, buf, used);
-            DEBUGF("%s Writing %lu bytes of buf:\n%s\n", __func__, used, buf);
-            buf[0] = '\0';
-            core_put_data_pinned(buf);
-        }
-        if (id3)
-        {
-            /* we have the timestamp from when we tried to add to buffer */
-            char entry[MAX_PATH + 128];
-            int len = format_playbacklog(entry, sizeof(entry), id3, timestamp);
-            if (len > (int)sizeof(entry) - 1) /* snprintf returns untruncated len */
-                len = sizeof(entry) - 1;
-            if (len > 0)
-                write(fd, entry, len);
-        }
-
+        /* write() can yield, and buflib may compact the pool while we are
+         * blocked, moving this allocation out from under us. Pinning holds
+         * it still for the duration; every _pinned get needs its matching
+         * core_put_data_pinned() or the pool can never compact again. */
+        buf = core_get_data_pinned(playback_log_handle);
+        write(fd, buf, used);
+        DEBUGF("%s Writing %lu bytes of buf:\n%s\n", __func__, used, buf);
+        buf[0] = '\0';
+        core_put_data_pinned(buf);
         close(fd);
-        return;
     }
+    if (id3)
+    {
+        int fd = open_playbacklog(global_settings.playback_log);
+        if (fd < 0)
+        {
+            return; /* failure */
+        }
+        /* we have the timestamp from when we tried to add to buffer */
+        char entry[MAX_PATH + 128];
+        int len = format_playbacklog(entry, sizeof(entry), id3, timestamp);
+        if (len > (int)sizeof(entry) - 1) /* snprintf returns untruncated len */
+            len = sizeof(entry) - 1;
+        if (len > 0)
+            write(fd, entry, len);
+        close(fd);
+    }
+}
+
+void add_playbacklog(struct mp3entry *id3)
+{
+    mutex_lock(&playback_log_mutex);
+    write_playbacklog(id3);
+    mutex_unlock(&playback_log_mutex);
+}
+
+void playback_log_flush(void)
+{
+    add_playbacklog(NULL);
 }
 
 /* Send track events that use a struct track_event for data */
@@ -3271,6 +3299,23 @@ static void audio_start_playback(const struct audio_resume_info *resume_info,
         return;
     }
 #endif
+    /* Refuse rather than start when the buffer is gone and too little is
+     * free to lay one out: audio_reset_buffer() panics on that. A screen
+     * holding the heap (the image viewer) can be open while another thread
+     * starts playback -- a car or dock choosing a track. */
+    if (audiobuf_handle <= 0 &&
+        core_allocatable() < pcmbuf_size_reqd() + scratch_mem_size()
+                             + AUDIO_BUFFER_RESERVE)
+    {
+        queue_reply(&audio_queue, 0);
+        return;
+    }
+    /* A sound scan's codec is in the slot; loading over it crashes. */
+    if (track_decode_busy())
+    {
+        queue_reply(&audio_queue, 0);
+        return;
+    }
     static struct audio_resume_info resume = { 0, 0 };
     enum play_status old_status = play_status;
 
@@ -4432,9 +4477,9 @@ int playback_current_aa_hid(int slot)
     return ERR_HANDLE_NOT_FOUND;
 }
 
-/* Find an album art slot that doesn't match the dimensions of another that
-   is already claimed - increment the use count if it is */
-int playback_claim_aa_slot(struct dim *dim)
+/* Find an album art slot that doesn't match the dimensions and key of
+   another that is already claimed - increment the use count if it is */
+int playback_claim_aa_slot_keyed(struct dim *dim, uint32_t key)
 {
     /* First try to find a slot already having the size to reuse it since we
        don't want albumart of the same size buffered multiple times */
@@ -4443,7 +4488,8 @@ int playback_claim_aa_slot(struct dim *dim)
         struct albumart_slot *slot = &albumart_slots[i];
 
         if (slot->dim.width == dim->width &&
-            slot->dim.height == dim->height)
+            slot->dim.height == dim->height &&
+            slot->key == key)
         {
             slot->used++;
             return i;
@@ -4457,12 +4503,18 @@ int playback_claim_aa_slot(struct dim *dim)
         {
             albumart_slots[i].used++;
             albumart_slots[i].dim = *dim;
+            albumart_slots[i].key = key;
             return i;
         }
     }
 
     /* Sorry, no free slot */
     return -1;
+}
+
+int playback_claim_aa_slot(struct dim *dim)
+{
+    return playback_claim_aa_slot_keyed(dim, 0);
 }
 
 /* Invalidate the albumart_slot - decrement the use count if > 0 */
@@ -4642,6 +4694,7 @@ void INIT_ATTR playback_init(void)
 
     /* Initialize the track buffering system */
     mutex_init(&id3_mutex);
+    mutex_init(&playback_log_mutex);
     track_list_init();
     buffering_init();
     pcmbuf_update_frequency();

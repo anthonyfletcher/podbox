@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "audio.h"
 #include "file.h"
 #include "system.h"
 #include "codecs.h"
@@ -61,6 +62,9 @@ static bool             gave_up;
 static bool             had_enough;
 
 static struct track_decode_stats stats;
+
+/* Set while this holds the codec slot; playback refuses to start on it. */
+static volatile bool    codec_borrowed;
 
 
 /** The file window **/
@@ -433,12 +437,21 @@ int track_decode_run(const char *path,
      * while codec_thread still believes one is loaded, and the next track
      * finds a codec that is registered and gone.
      *
-     * codec_unload() is the call that clears both halves. */
+     * codec_unload() is the call that clears both halves.
+     *
+     * A dock or car can start playback from its own thread between two runs
+     * of a scan, so the slot is claimed first and anything playing stopped
+     * after: the claim keeps it from starting again until codec_close(). */
+    codec_borrowed = true;
+    if (audio_status() != 0)
+        audio_stop();
+
     if (codec_loaded() != AFMT_UNKNOWN)
         codec_unload();
 
     if (codec_load_file(codec_fn, &dci) < 0)
     {
+        codec_borrowed = false;
         close(fd);
         return TRACK_DECODE_NO_CODEC;
     }
@@ -452,6 +465,7 @@ int track_decode_run(const char *path,
     cpu_boost(false);
 
     codec_close();
+    codec_borrowed = false;
     close(fd);
 
     stats.codec_status = status;
@@ -472,4 +486,9 @@ int track_decode_run(const char *path,
 void track_decode_get_stats(struct track_decode_stats *out)
 {
     *out = stats;
+}
+
+bool track_decode_busy(void)
+{
+    return codec_borrowed;
 }

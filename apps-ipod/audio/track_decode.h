@@ -67,8 +67,8 @@ void track_decode_get_stats(struct track_decode_stats *out);
  *
  * Runs on the calling thread and does not return until the window is done,
  * the file ends, 'enough' says it has what it came for, or 'abort' says to
- * stop. Playback must be stopped first: one codec may be loaded at a time and
- * this loads it.
+ * stop. One codec may be loaded at a time and this loads it, so it stops
+ * playback and holds it off until the codec is closed.
  *
  * The two callbacks are separate because they mean opposite things. 'enough'
  * is success arriving early -- a measurement that has settled needs no more
@@ -92,5 +92,8 @@ int track_decode_run(const char *path,
                      bool (*enough)(void),
                      bool (*abort)(void),
                      unsigned long *analysed_ms);
+
+/* True while a run holds the codec slot. Playback must not start then. */
+bool track_decode_busy(void);
 
 #endif /* TRACK_DECODE_H */

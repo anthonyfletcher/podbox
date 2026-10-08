@@ -117,6 +117,10 @@ struct playlist_viewer {
     struct mp3entry *id3;
     unsigned long loading_tick; /* when to next splash while entries load    */
     bool is_open;               /* false until the viewer is on screen       */
+    /* The playlist the buffer was loaded from; see playlist_changed()       */
+    unsigned long loaded_tick;
+    int loaded_amount;
+    int loaded_seed;
 };
 
 struct playlist_search_data
@@ -126,6 +130,33 @@ struct playlist_search_data
 };
 
 static struct playlist_viewer  viewer;
+
+static void note_playlist(void)
+{
+    const struct playlist_info *pl = viewer.playlist ? viewer.playlist
+                                                     : playlist_get_current();
+
+    viewer.loaded_tick = pl->created_tick;
+    viewer.loaded_amount = pl->amount;
+    viewer.loaded_seed = pl->seed;
+}
+
+/* An index the viewer holds is good only for the playlist it was loaded from,
+ * which another thread can shuffle or replace -- the car, or an iAP Queue.
+ * Checked before acting on one. A changed playlist cancels a move. */
+static bool playlist_changed(void)
+{
+    const struct playlist_info *pl = viewer.playlist ? viewer.playlist
+                                                     : playlist_get_current();
+
+    if (pl->created_tick == viewer.loaded_tick
+        && pl->amount == viewer.loaded_amount
+        && pl->seed == viewer.loaded_seed)
+        return false;
+    viewer.moving_track = -1;
+    viewer.moving_playlist_index = -1;
+    return true;
+}
 
 static void playlist_buffer_init(struct playlist_buffer *pb, char *names_buffer,
                                  int names_buffer_size)
@@ -352,6 +383,7 @@ static bool update_playlist(bool force)
     {
         /* Reload tracks */
         viewer.num_tracks = nb_tracks;
+        note_playlist();
         if (viewer.num_tracks <= 0)
         {
             if (!viewer.playlist)
@@ -690,6 +722,14 @@ static enum pv_context_result context_menu(int index)
         viewer.moving_track = -1;
         viewer.moving_playlist_index = -1;
 
+        /* Remove and Move act on the row's index, which the menu may have
+         * outlived */
+        if ((sel == 2 || sel == 3) && playlist_changed())
+        {
+            splash(HZ, ID2P(LANG_FAILED));
+            return PV_CONTEXT_PL_UPDATE;
+        }
+
         switch (sel)
         {
             case 0:
@@ -992,11 +1032,14 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
         else
             track = -1;
 
+        bool changed = playlist_changed();
+
         if (track != viewer.current_playing_track ||
-            playlist_amount_ex(viewer.playlist) != viewer.num_tracks)
+            playlist_amount_ex(viewer.playlist) != viewer.num_tracks ||
+            changed)
         {
             /* Playlist has changed (new track started?) */
-            if (!update_playlist(false))
+            if (!update_playlist(changed))
                 goto exit;
             /*Needed because update_playlist gives wrong value when
                                                             playing is stopped*/
@@ -1055,9 +1098,12 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                 if (viewer.moving_track >= 0)
                 {
                     /* Move track */
-                    ret_val = playlist_move(viewer.playlist,
-                                            viewer.moving_playlist_index,
-                                            current_track->index);
+                    if (playlist_changed())
+                        ret_val = -1;
+                    else
+                        ret_val = playlist_move(viewer.playlist,
+                                                viewer.moving_playlist_index,
+                                                current_track->index);
                     if (ret_val < 0)
                     {
                          cond_talk_ids_fq(LANG_MOVE, LANG_FAILED);
@@ -1154,10 +1200,15 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                 }
                 else if (hk_act == HOTKEY_DELETE)
                 {
-                    if (update_viewer(&playlist_lists,
-                            delete_track(current_track->index,
+                    enum pv_context_result act = PV_CONTEXT_PL_UPDATE;
+
+                    if (playlist_changed())
+                        splash(HZ, ID2P(LANG_FAILED));
+                    else
+                        act = delete_track(current_track->index,
                             viewer.selected_track,
-                            (current_track->index == viewer.current_playing_track))))
+                            (current_track->index == viewer.current_playing_track));
+                    if (update_viewer(&playlist_lists, act))
                     {
                         ret = PLAYLIST_VIEWER_CANCEL;
                         exit = true;

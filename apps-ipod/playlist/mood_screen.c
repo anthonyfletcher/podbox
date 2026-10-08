@@ -24,6 +24,7 @@
 #include "database/sound_mood.h"
 #include "playlist/mood_screen.h"
 #include "system/activity.h"
+#include "root_menu.h"
 
 /* Whether a mood playlist started, so the caller knows to leave for the
  * playing screen rather than stay in the browser. */
@@ -148,8 +149,10 @@ bool mood_screen_journey(int n, int *lang, int *from, int *to)
     return true;
 }
 
-bool mood_screen_pick(bool journey)
+int mood_screen_pick(bool journey)
 {
+    int rc;
+
     mood_started = false;
 
     /* Its own activity, and not the catalogue's. A theme decides whether a
@@ -159,9 +162,11 @@ bool mood_screen_pick(bool journey)
      * list of options is what this is. */
     push_current_activity(ACTIVITY_OPTIONSELECT);
 
-    do_menu(journey ? &journeys_menu : &moods_menu, NULL, NULL, false);
+    rc = do_menu(journey ? &journeys_menu : &moods_menu, NULL, NULL, false);
 
     pop_current_activity();
 
-    return mood_started;
+    if (rc == MENU_ATTACHED_USB)
+        return GO_TO_ROOT;
+    return mood_started ? GO_TO_WPS : GO_TO_PREVIOUS;
 }

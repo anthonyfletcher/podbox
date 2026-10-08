@@ -1438,7 +1438,10 @@ static int remove_track_unlocked(struct playlist_info* playlist,
     int i;
     int result = 0;
 
-    if (playlist->amount <= 0)
+    /* A caller can hold an index from before another thread changed the
+     * playlist; out of range it would drop the last track and log a bad D:
+     * line. */
+    if (position < 0 || position >= playlist->amount)
         return -1;
 
     struct dircache_fileref *dcfrefs = NULL;
@@ -2507,6 +2510,7 @@ int playlist_insert_context_create(struct playlist_info* playlist,
 
     context->position = position;
     context->queue = queue;
+    context->created_tick = playlist->created_tick;
     context->initialized = true;
 
     return 0;
@@ -2520,6 +2524,11 @@ int playlist_insert_context_add(struct playlist_insert_context *context,
 {
     struct playlist_insert_context* c = context;
     int insert_pos;
+
+    /* A yield lets another thread create or set the playlist; the tracks
+     * still to come belong to the one that was replaced. */
+    if (c->playlist->created_tick != c->created_tick)
+        return -1;
 
     insert_pos = add_track_to_playlist_unlocked(c->playlist, filename,
                                                 c->position, c->queue, -1);

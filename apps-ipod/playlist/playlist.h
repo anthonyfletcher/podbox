@@ -103,6 +103,8 @@ struct playlist_insert_context {
     bool initialized;
     int count;
     int32_t count_langid;
+    unsigned long created_tick; /* the playlist's, so add() can refuse once
+                                   another thread has replaced it */
 };
 
 /* Exported functions only for current playlist. */

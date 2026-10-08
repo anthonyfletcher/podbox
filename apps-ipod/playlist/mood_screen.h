@@ -9,10 +9,10 @@
 
 #include <stdbool.h>
 
-/* Offer the moods, or the journeys, and play what is chosen. True if a
- * playlist started, which is the caller's cue to leave for the playing
- * screen; false if nothing was chosen or nothing could be built. */
-bool mood_screen_pick(bool journey);
+/* Offer the moods, or the journeys, and play what is chosen. The screen to go
+ * to next: GO_TO_WPS if a playlist started, GO_TO_ROOT after a USB connect,
+ * GO_TO_PREVIOUS if nothing was chosen or nothing could be built. */
+int mood_screen_pick(bool journey);
 
 /* The nth journey offered, in menu order: its name and the two moods it runs
  * between. False past the last. */

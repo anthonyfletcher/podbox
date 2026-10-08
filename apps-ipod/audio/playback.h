@@ -39,6 +39,13 @@ int playback_current_aa_hid(int slot);
 int playback_claim_aa_slot(struct dim *dim);
 
 /*
+ * As playback_claim_aa_slot(), which passes key 0, but a slot is shared only
+ * by claims of the same size and key. Key 0 is the art as loaded. A caller
+ * that rewrites the buffered pixels in place passes a nonzero key naming
+ * what it does to them, so nobody else draws the result. */
+int playback_claim_aa_slot_keyed(struct dim *dim, uint32_t key);
+
+/*
  * Releases the albumart slot with given id
  *
  * Save to call from other threads */
@@ -84,5 +91,7 @@ struct mp3entry* get_temp_mp3entry(struct mp3entry *free);
 
 void allocate_playback_log(void);
 void add_playbacklog(struct mp3entry *id3);
+/* Write the buffered log lines to their file now. Safe from any thread. */
+void playback_log_flush(void);
 
 #endif /* _PLAYBACK_H */
