@@ -43,6 +43,7 @@
 #include "playlist/playlist.h"
 #include "lang.h"
 #include "speech/language.h"
+#include "speech/lang_override.h"
 #include "rolo.h"
 #include "widgets/splash.h"
 #include "metadata/cuesheet.h"
@@ -755,6 +756,8 @@ int browser_disk_enter(struct browser_context* c)
                     splash(HZ, ID2P(LANG_FAILED));
                     break;
                 }
+                /* The load put every phrase back to the file's own. */
+                lang_override_load();
                 set_file(buf, (char *)global_settings.lang_file);
                 talk_init(); /* use voice of same language */
                 viewportmanager_theme_changed(THEME_LANGUAGE);
