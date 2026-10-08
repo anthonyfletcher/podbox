@@ -17,6 +17,10 @@
 # positives: the remembered-state settings, which carry a lang id the table
 # wants but have no menu row, and three lang description strings it mistakes
 # for cfg names. They are listed in KNOWN_UNDOCUMENTED and filtered out.
+#
+# It sees only settings declared with a LANG_ id. A TEXT_SETTING, a
+# FILENAME_SETTING or a raw initialiser with lang id -1 is invisible to it, so
+# one of those left untagged with a menu row passes every check here.
 
 HELP=docs/podbox/settings-help.txt
 GUIDE=docs/podbox/settings-guide.md
@@ -30,9 +34,11 @@ for f in "$HELP" "$GUIDE" "$LIST" "$TAGS" "$PHRASES"; do
     [ -f "$f" ] || { echo "not found: $f -- run from the repository root" >&2; exit 2; }
 done
 
-# Settings with no menu row of their own, plus three lang description strings
-# check 2's regexp cannot tell from a cfg name. None of these want a stanza.
-KNOWN_UNDOCUMENTED='^(album covers year sort order|Announce Battery Level|No Backlight On Selected Actions|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order)$'
+# Settings with no setting row of their own, plus three lang description
+# strings check 2's regexp cannot tell from a cfg name. None of these want a
+# stanza. Selective Backlight Actions is the exemption mask, set through an
+# action row rather than shown as a setting.
+KNOWN_UNDOCUMENTED='^(album covers year sort order|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order)$'
 
 # Byte order throughout, because sort and comm have to agree about what "in
 # order" means. Under a UTF-8 locale sort collates "usb hid", "usb keypad

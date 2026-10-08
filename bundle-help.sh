@@ -8,8 +8,7 @@
 #
 # Its own script rather than a line in bundle-theme.sh because it has nothing to
 # do with the theme, and not in tools/buildzip.pl because that is kept as close
-# to upstream as possible -- the same reason the theme, the EQ presets and the
-# licences each have one of these.
+# to upstream as possible -- the same reason each bundle-*.sh exists.
 #
 # Usage: run from inside a build dir, or pass the build dir as an argument.
 set -e

@@ -116,6 +116,12 @@ int playback_claim_aa_slot(struct dim *dim)
     return 0;
 }
 
+int playback_claim_aa_slot_keyed(struct dim *dim, uint32_t key)
+{
+    (void)key;
+    return playback_claim_aa_slot(dim);
+}
+
 void playback_release_aa_slot(int slot)
 {
     return;

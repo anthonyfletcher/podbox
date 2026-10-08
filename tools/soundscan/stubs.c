@@ -44,6 +44,17 @@ void codec_unload(void)
 {
 }
 
+/* track_decode.c stops playback before it takes the codec slot. Nothing
+ * plays here. */
+int audio_status(void)
+{
+    return 0;
+}
+
+void audio_stop(void)
+{
+}
+
 /* The player's version logs and clamps; this is the lookup it wraps. */
 const char *get_codec_filename(int cod_spec)
 {

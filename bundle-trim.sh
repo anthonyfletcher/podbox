@@ -7,8 +7,7 @@
 # and does nothing at all.
 #
 # Its own script rather than a line in tools/buildzip.pl because that is kept
-# as close to upstream as possible -- the same reason the theme, the licences
-# and the setting explanations each have one of these.
+# as close to upstream as possible -- the same reason each bundle-*.sh exists.
 #
 # Usage: run from inside a build dir, or pass the build dir as an argument.
 set -e

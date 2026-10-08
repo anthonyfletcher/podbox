@@ -335,7 +335,15 @@ def save_square_jpeg(
     if img.width != size or img.height != size:
         img = img.resize((size, size), Image.Resampling.LANCZOS)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    img.save(output_path, "JPEG", quality=92, optimize=True, progressive=False)
+    # Written beside the target and renamed over it, so an interrupted run
+    # leaves the old image or none, never a truncated one that later runs skip.
+    tmp_path = output_path.with_name(output_path.name + ".tmp")
+    try:
+        img.save(tmp_path, "JPEG", quality=92, optimize=True, progressive=False)
+        os.replace(tmp_path, output_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 # ---------------------------------------------------------------------
 # Last.fm helpers, including robust Rêve-style photo gallery parsing

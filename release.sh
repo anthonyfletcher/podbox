@@ -214,11 +214,10 @@ ssh -o BatchMode=yes "$SERVER" 'gh auth status >/dev/null 2>&1' ||
 # nothing here creates it, gh does, on the server.
 #
 # It is also the only tag worth asking about. This tree mirrors upstream
-# Rockbox, so upstream's tags (v3.x, v4.0-final) ARE ancestors of HEAD while the
-# fork's own were orphaned by a history squash -- which is why `git describe`
-# used to walk straight past ours into somebody else's changelog, and why the
-# old script needed a --since escape hatch. `$RELEASE` always names a commit
-# this script itself published, so it needs none.
+# Rockbox, so upstream's tags (v3.x, v4.0-final) ARE ancestors of HEAD and the
+# fork has none of its own in that history: `git describe` walks straight into
+# upstream's changelog. `$RELEASE` always names a commit this script itself
+# published, so no override for the start point is needed.
 
 say "Working out what has changed"
 
@@ -545,10 +544,11 @@ SHA=$(git rev-parse HEAD)
 # wrong repo. (CLAUDE.md's "no --repo" note describes running gh on the local
 # machine, where origin *is* the fork. It does not apply on the server.)
 #
-# Each release deletes its old self and its tag first. `gh release create`
-# reuses an existing tag rather than moving it, so a leftover tag would publish
-# these zips against an older commit. The second delete covers a tag left
-# behind by a run that died between the two; it goes through gh rather than
+# Each release deletes its old self and its tag before the new one takes the
+# tag. `gh release create` reuses an existing tag rather than moving it, so a
+# leftover tag would publish these zips against an older commit. The second
+# delete covers a tag left behind by a run that died between the two; it goes
+# through gh rather than
 # `git push --delete` because this script may itself be running on the server,
 # where the fork is an https remote with no credentials -- a push there fails
 # silently and leaves the stale tag for `gh release create` to reuse.
@@ -599,11 +599,19 @@ if [ -n "$SIM_TARGETS" ]; then
     echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
 fi
 
-say "Replacing the $RELEASE release"
-ssh "$SERVER" "gh release delete '$RELEASE' --repo '$SLUG' --yes --cleanup-tag \
-    || true"
-ssh "$SERVER" "gh api --method DELETE --silent \
-    'repos/$SLUG/git/refs/tags/$RELEASE' 2>/dev/null || true"
+# The firmware is uploaded as a draft under $STAGING_TAG while the old release
+# still stands, so a failed upload leaves the old `latest` and its tag -- and
+# the tag keeps the next run's notes to what is new. A draft has no tag until
+# it is published, so the swap deletes the old release and tag, then renames
+# and publishes the draft. A failure inside the swap leaves the build as the
+# draft; publish it by hand with
+#   gh release edit latest-next --repo <slug> --tag latest --draft=false
+STAGING_TAG=$RELEASE-next
+PUBLISH=--draft=false
+[ -z "$DRAFT" ] || PUBLISH=
+
+say "Uploading the $RELEASE release as a draft"
+ssh "$SERVER" "gh release delete '$STAGING_TAG' --repo '$SLUG' --yes || true"
 
 scp -q "$NOTES" "$SERVER:$REMOTE_DIR/release-notes.md"
 # Both targets produce a file called rockbox.zip, so they must be renamed
@@ -615,14 +623,22 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     cp build-hw-ipodvideo/rockbox.zip $(asset_name ipodvideo) && \
     cp build-hw-ipod6g/rockbox.map $(map_name ipod6g) && \
     cp build-hw-ipodvideo/rockbox.map $(map_name ipodvideo) && \
-    gh release create '$RELEASE' \
+    gh release create '$STAGING_TAG' \
     --repo '$SLUG' \
     --target '$SHA' \
     --title 'Latest build' \
     --notes-file release-notes.md \
-    $DRAFT \
+    --draft \
     $(asset_name ipod6g) $(asset_name ipodvideo) \
     $(map_name ipod6g) $(map_name ipodvideo)"
+
+say "Replacing the $RELEASE release"
+ssh "$SERVER" "gh release delete '$RELEASE' --repo '$SLUG' --yes --cleanup-tag \
+    || true"
+ssh "$SERVER" "gh api --method DELETE --silent \
+    'repos/$SLUG/git/refs/tags/$RELEASE' 2>/dev/null || true"
+ssh "$SERVER" "gh release edit '$STAGING_TAG' --repo '$SLUG' \
+    --tag '$RELEASE' $PUBLISH"
 
 say "Published $COMMIT as $RELEASE"
 echo "  https://github.com/$SLUG/releases/tag/$RELEASE"

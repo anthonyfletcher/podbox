@@ -53,9 +53,9 @@
 # Usage:  perl tools/spun_testlog.pl --tracks FILE [--out DIR]
 #         default DIR is ./spun_testlog
 #
-# Copy the resulting *.log files to <device>:\.rockbox\ by hand. They cannot
-# be shipped in the zip: build-rb.cmd excludes playback*.log from robocopy,
-# and /XF is symmetric -- excluded files are not copied from the zip either.
+# Copy the resulting *.log files to <device>:\.rockbox\library\user\ by hand.
+# They cannot be shipped in the zip: build-pb-hw.cmd leaves .rockbox\library\
+# out of its robocopy (/XD), so nothing from the zip reaches it.
 
 use strict;
 use warnings;
@@ -704,4 +704,4 @@ printf "  %-20s %8d bytes\n", $names[$_], length($files[$_]) for (0 .. $#names);
 printf "  %-20s\n", 'spun_expected.txt';
 printf "\n%d data lines: %d plays, %d skips, %d taps, %d minutes listened\n",
     $lines, $plays, $skips, $taps, $mins;
-print  "Copy the *.log files to <device>:\\.rockbox\\ by hand.\n";
+print  "Copy the *.log files to <device>:\\.rockbox\\library\\user\\ by hand.\n";

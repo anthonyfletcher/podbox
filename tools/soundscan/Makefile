@@ -74,17 +74,26 @@ WARN := -Wall -Wextra -Wno-unused-result -Wno-unused-parameter
 # Overridable so a crash can be looked at: make native OPT="-g -O0"
 OPT  ?= -O2
 
+# The tool bakes in the app layer's file paths and structure layouts and the
+# simulator's autoconf.h, so a change to any of these headers must rebuild it.
+DEPS := $(wildcard *.h $(APPS)/*.h $(APPS)/*/*.h $(APPS)/sim/include/*.h \
+                   $(RBC)/*.h $(RBC)/*/*.h $(FIRM)/export/*.h \
+                   $(FIRM)/include/*.h) Makefile
+
 all: native
 
-native: BUILD := $(NATDIR)
-native: $(SRC) $(OSFILE_UNIX)
+native: soundscan
+win: soundscan.exe
+
+soundscan: BUILD := $(NATDIR)
+soundscan: $(SRC) $(OSFILE_UNIX) $(DEPS) $(wildcard $(NATDIR)/autoconf.h)
 	@test -f $(NATDIR)/autoconf.h || \
 	  (echo "No simulator build at $(NATDIR) -- run ./build-sim.sh 5g"; false)
 	$(CC) $(OPT) -std=gnu11 $(WARN) $(DEFINES) $(INCLUDES) \
 	      -o soundscan $(SRC) $(OSFILE_UNIX) -lm -ldl
 
-win: BUILD := $(SIMDIR)
-win: $(SRC) $(OSFILE_WIN)
+soundscan.exe: BUILD := $(SIMDIR)
+soundscan.exe: $(SRC) $(OSFILE_WIN) $(DEPS) $(wildcard $(SIMDIR)/autoconf.h)
 	@test -f $(SIMDIR)/autoconf.h || \
 	  (echo "No simulator build at $(SIMDIR) -- run ./build-sim.sh 5g win"; false)
 	$(WINCC) $(OPT) -std=gnu11 $(WARN) $(DEFINES) $(INCLUDES) \

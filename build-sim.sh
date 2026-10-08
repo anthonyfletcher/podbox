@@ -3,7 +3,8 @@
 #
 # The player's storage is simdisk/ inside the build directory. It is carried
 # across a rebuild rather than deleted with everything else -- it holds your
-# music and database, and getting those back takes far longer than the build.
+# music, database and settings, and getting those back takes far longer than
+# the build.
 set -e
 cd "$(dirname "$0")"
 
@@ -96,11 +97,10 @@ make zip
 ../bundle-help.sh
 ../bundle-trim.sh
 
-# Install into the player's storage. .rockbox is replaced wholesale so a file
-# dropped from the build does not linger; everything beside it -- music, the
-# database, screendumps -- is left alone.
-rm -rf simdisk/.rockbox
-unzip -q rockbox.zip -d simdisk/
+# Install into the player's storage by unzipping over the top. What the player
+# wrote under .rockbox -- library/, logs/, config.cfg -- is kept, and so is a
+# file the build no longer ships: delete simdisk/.rockbox by hand to drop one.
+unzip -oq rockbox.zip -d simdisk/
 
 echo
 if [ "$HOST" = native ]; then

@@ -652,6 +652,7 @@ int main(int argc, char **argv)
     time_t t0;
     int total = 0;
     int i, rc;
+    bool had_part;
 
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -714,9 +715,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* A player still on an older firmware has no library folder yet; it
-     * moves its own files in beside this one when it next boots. */
-    mkdir(LIB_DIR);
+    /* The firmware moves its old analysis into library/ on its first boot,
+     * and keeps whatever it finds there already. An index written before that
+     * boot would orphan the old one, so the player has to have booted. */
+    if (!file_exists(LIB_FORMAT_FILE))
+    {
+        printf("This player has not started on the new firmware yet.\n"
+               "Start it once, then run this again.\n");
+        return 1;
+    }
 
     if (!file_exists(LIB_DB_DIR "/database_idx.tcd")
         && !file_exists("/.rockbox/database_idx.tcd"))
@@ -735,6 +742,9 @@ int main(int argc, char **argv)
     if (total == 0 || stop_asked)
         return 0;
 
+    /* The index works in the part file, seeded from the finished one. A dry
+     * run removes it again unless a run on the player had one going. */
+    had_part = file_exists(LIB_SOUND_PART);
     rc = sound_index_begin(total + 1, false);
     if (rc != SOUND_OK)
     {
@@ -770,6 +780,8 @@ int main(int argc, char **argv)
     if (opt_dry)
     {
         sound_index_close();
+        if (!had_part)
+            remove(LIB_SOUND_PART);
         printf("Dry run: nothing written.\n");
         return 0;
     }
