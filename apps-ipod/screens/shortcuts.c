@@ -487,13 +487,16 @@ void shortcuts_init(void)
     --buflib_move_lock;
 }
 
-/* Cheap probe for the root menu: true if the shortcuts file holds at least one
- * entry. The first [shortcut] header sits at the top, so reading the head of the
- * file is enough -- no need to build the whole in-RAM list just to decide
- * whether to show the Shortcuts root item. */
+/* Cheap probe for the root menu: true if there is at least one shortcut. The
+ * in-RAM count comes first because shortcuts_add() writes the file only at
+ * storage idle, so a shortcut added a moment ago is not in it yet. The file is
+ * still read for one copied over USB, which the in-RAM list never sees. Its
+ * first [shortcut] header sits at the top, so the head of the file is enough. */
 bool shortcuts_available(void)
 {
     char buf[512];
+    if (shortcut_count > 0)
+        return true;
     int fd = open_utf8(SHORTCUTS_FILENAME, O_RDONLY);
     if (fd < 0)
         return false;
