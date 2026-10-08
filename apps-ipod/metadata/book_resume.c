@@ -433,12 +433,6 @@ void book_resume_each(book_resume_fn fn, void *data)
 
 static bool rekey_checked;
 
-static bool find_named(const struct entry *e, void *data)
-{
-    *(bool *)data = e->named;
-    return !e->named;
-}
-
 /* The key of album-table row 'n' as a book, if it is a whole book whose
  * album has the key 'named'; else 0. */
 static uint64_t book_of_row(int n, uint64_t named)
@@ -474,6 +468,19 @@ static uint64_t book_of_album(uint64_t named, uint64_t track)
 }
 
 static bool write_entry(struct libfile_writer *w, const struct entry *e);
+
+/* Whether 'e' is a position keyed by its album alone whose book can now be
+ * found. One whose book cannot be found stays as it is, so a file holding
+ * only those is not rewritten at every boot to change nothing. */
+static bool find_convertible(const struct entry *e, void *data)
+{
+    if (e->named && book_of_album(e->book, e->pos.track) != 0)
+    {
+        *(bool *)data = true;
+        return false;
+    }
+    return true;
+}
 
 struct rekey_ctx
 {
@@ -515,7 +522,7 @@ static void rekey(void)
         return;
     rekey_checked = true;
 
-    scan(find_named, &any);
+    scan(find_convertible, &any);
     if (!any || !libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
                                LIB_BOOKS_VERSION, 1, NULL))
         return;
