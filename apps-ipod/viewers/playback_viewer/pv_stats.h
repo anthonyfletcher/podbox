@@ -158,8 +158,9 @@ struct pv_totals
     char sample[3][PV_NAME_MAX * 2];
     int  samples;
 
-    /* A table that filled up stopped counting, silently, and every figure
-     * above is then an undercount. Capacities are reported so that shows. */
+    /* A table that fills up stops counting, and every figure above is then
+     * an undercount; a full day table drops its oldest days instead. Either
+     * sets overflowed. Nothing on screen reads it or the capacities. */
     int  cap_titles, cap_artists, cap_albums;
     bool overflowed;
 

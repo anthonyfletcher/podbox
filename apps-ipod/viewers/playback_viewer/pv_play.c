@@ -369,7 +369,7 @@ static int insert_in_track_order(struct queue *q,
 int pv_play_target(const struct pv_target *t)
 {
     struct queue q;
-    bool narrowed;
+    bool narrowed, usb;
     int found, added;
 
     if (!t || t->kind == PV_TARGET_NONE || !t->name || !t->name[0])
@@ -389,11 +389,11 @@ int pv_play_target(const struct pv_target *t)
 
         if (tagcache_album_get(album_row(t), &al) && al.tracks > 0)
         {
-            if (!warn_on_pl_erase())
-            {
-                cpu_boost(false);
-                return -1;
-            }
+            /* Unboosted while the listener reads the prompt */
+            cpu_boost(false);
+            if (!warn_on_pl_erase_usb(&usb))
+                return usb ? -2 : -1;
+            cpu_boost(true);
             q.open = false;
             added = insert_album_row(&q, &al);
             goto queued;
@@ -421,12 +421,12 @@ int pv_play_target(const struct pv_target *t)
     /* Asked here, where nothing is held. The question is the listener's to
      * answer and the answer costs them a playlist, so it is put before the
      * second search rather than inside it -- a prompt raised with a tagcache
-     * search open holds the read lock for as long as the listener thinks. */
-    if (!warn_on_pl_erase())
-    {
-        cpu_boost(false);
-        return -1;
-    }
+     * search open holds the read lock for as long as the listener thinks.
+     * Unboosted for as long, too. */
+    cpu_boost(false);
+    if (!warn_on_pl_erase_usb(&usb))
+        return usb ? -2 : -1;
+    cpu_boost(true);
 
     q.open = false;
 

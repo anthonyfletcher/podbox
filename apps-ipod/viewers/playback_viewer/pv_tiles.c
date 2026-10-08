@@ -649,6 +649,8 @@ static void build_new(void)
     }
 }
 
+static int wk_week;
+
 int pv_tiles_build(enum pv_sec sec, const struct pv_totals *t)
 {
     int want;
@@ -656,6 +658,8 @@ int pv_tiles_build(enum pv_sec sec, const struct pv_totals *t)
     tile_n = 0;
     tile_sec = (int)sec;
     totals = t;
+    /* A week is an index into these totals, which may not be the last ones */
+    wk_week = -1;
 
     want = global_settings.spun_top_count;
     if (want < 1)      want = 1;

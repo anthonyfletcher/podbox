@@ -14,7 +14,8 @@
  * that name, and -1 when the attempt could not be made at all -- the database
  * was busy, the playlist refused, or the user declined to lose the current
  * one. Only 0 needs the caller to say anything: the other two have already
- * put their own message on screen or are the user's own choice.
+ * put their own message on screen or are the user's own choice. -2 when a USB
+ * connect answered the prompt, which the caller passes on as GO_TO_ROOT.
  *
  * Nothing is queued until a match is certain, so a miss leaves whatever is
  * playing exactly as it was.

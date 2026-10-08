@@ -1034,6 +1034,9 @@ static int row_session(bool *again)
                      * listener declined to lose the playlist they had. */
                     repaint(year);
                     break;
+                case -2:
+                    ret = GO_TO_ROOT;   /* USB answered the prompt */
+                    goto done;
                 default:
                     ret = GO_TO_WPS;
                     goto done;

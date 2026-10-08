@@ -328,10 +328,14 @@ static void path_to_meta(const char *path, char *artist, char *title,
 
 /* Whether names can come from the database now, or there is no database to
  * name from. False while the RAM copy is still to load, which is the case a
- * saved report must not be built in. */
+ * saved report must not be built in. A database refused RAM names from paths
+ * for good, so it counts as complete; a saved index keys on
+ * tagcache_entry_key(), which is 0 off RAM, so the RAM copy arriving later
+ * still discards it. */
 bool pv_names_complete(void)
 {
-    return names_db.entries == 0 || tagcache_is_in_ram();
+    return names_db.entries == 0 || tagcache_is_in_ram()
+        || tagcache_ram_refused();
 }
 
 /* Moves apply only to paths the database is known to lack, so without the

@@ -51,6 +51,7 @@
 #include "widgets/splash.h"
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
+#include "audio/playback.h"  /* playback_log_flush() */
 #endif
 #include "pv_badges.h"
 #include "pv_index.h"
@@ -170,6 +171,8 @@ struct pv_db_whole
     int32_t entries;
     int32_t commit;
     int32_t deleted;            /* -1 where it cannot be counted */
+    int32_t pad;                /* zero, so memcmp() sees no padding */
+    uint64_t last_key;          /* tagcache_entry_key() of the last entry */
 };
 
 static void db_whole(struct pv_db_whole *w)
@@ -181,17 +184,22 @@ static void db_whole(struct pv_db_whole *w)
     w->entries = stat ? stat->total_entries : 0;
     w->commit = marks.commitid;
     w->deleted = marks.deleted_ct;
+    w->pad = 0;
+    w->last_key = tagcache_entry_key(w->entries - 1);
 }
 
 /* Whether a database in state 'now' names every file it held at 'then' as
- * it did: nothing deleted or retagged since, only added */
+ * it did: nothing deleted or retagged since, only added. A Rebuild renumbers
+ * the entries, which the file at the old last entry shows. RAM only. */
 static bool db_only_added(const struct pv_db_whole *then,
                           const struct pv_db_whole *now)
 {
     if (memcmp(then, now, sizeof(*now)) == 0)
         return true;
     return then->deleted >= 0 && now->deleted == then->deleted
-        && now->entries >= then->entries && now->commit >= then->commit;
+        && now->entries > then->entries && now->commit >= then->commit
+        && then->last_key != 0
+        && tagcache_entry_key(then->entries - 1) == then->last_key;
 }
 
 /* Bump allocator over the caller's buffer, above the moved-folder table. */
@@ -293,9 +301,13 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name,
 }
 
 /* Logs run forwards, so the day being added is almost always the last one
- * seen. The scan behind it is the exception, not the rule. */
+ * seen. The scan behind it is the exception, not the rule. A full table keeps
+ * the newest days: a new day takes the oldest one's slot, so the calendar and
+ * the streaks stay current and only the far past is lost. */
 static void day_add(long day, unsigned secs, unsigned long offset)
 {
+    int slot = day_n;
+
     if (day_n && days[day_n - 1].day == day)
     {
         days[day_n - 1].count++;
@@ -313,21 +325,29 @@ static void day_add(long day, unsigned secs, unsigned long offset)
         }
     }
 
-    if (day_n < day_cap)
-    {
-        days[day_n].day = day;
-        days[day_n].count = 1;
-        days[day_n].secs = secs;
-        days[day_n].skips = 0;
-        /* The first entry seen for this day, which is where a later reader
-         * should start looking for it. */
-        days[day_n].offset = offset;
-        day_n++;
-    }
-    else
+    if (day_n >= day_cap)
     {
         overflowed = true;
+        slot = 0;
+        for (int i = 1; i < day_n; i++)
+            if (days[i].day < days[slot].day)
+                slot = i;
+        if (days[slot].day > day)
+            return;
+        /* The new day goes last, where the next play looks first */
+        days[slot] = days[day_n - 1];
+        slot = day_n - 1;
     }
+    else
+        day_n++;
+
+    days[slot].day = day;
+    days[slot].count = 1;
+    days[slot].secs = secs;
+    days[slot].skips = 0;
+    /* The first entry seen for this day, which is where a later reader
+     * should start looking for it. */
+    days[slot].offset = offset;
 }
 
 #ifdef HAVE_ALBUMART
@@ -1457,6 +1477,8 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
     /* Decide the source before anything else: a scrobbler log names its own
      * entries, so there are no paths to resolve and no moved-folder table to
      * load. */
+    /* Plays still in the audio thread's buffer count too */
+    playback_log_flush();
     {
         long t0 = current_tick;
         out->source = pv_log_pick_source();
@@ -1514,8 +1536,9 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
      * nearly three years of daily listening, and they feed only the heatmap
      * and the streak), then albums down to 200 rows, then artists down to
      * 200. The track table is cut last and only
-     * when nothing else is left, and a table that then fills up is reported
-     * rather than hidden.
+     * when nothing else is left. A table that then fills up stops counting,
+     * and the day table drops its oldest days; either sets out->overflowed,
+     * which nothing on screen shows.
      *
      * Trap: halving albums and artists once each is not enough. At 16,000
      * tracks they are still 300 KB between them, and on a 5G no size of track
@@ -1553,7 +1576,7 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
         else if (cap_title > 200)
             cap_title /= 2;
         else
-            break;      /* as small as it goes; overflow will say so */
+            break;      /* as small as it goes; overflowed records it */
     }
 
     long t_alloc = current_tick;
@@ -1620,12 +1643,15 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
          * and count the whole log a second time on top of what was loaded.
          * The watermark is checked where it can still act -- against the
          * header, in pv_index_read_begin(). */
+        /* Both replays stop at log_size, which is what the index records as
+         * covered: plays flushed while they ran are the next build's. */
         if (index_load(out, log_size, &covered))
         {
             out->from_index = true;
             replay_begin(covered, log_size);
             lines = (covered < log_size)
-                  ? pv_log_read_range(out->source, covered, 0, entry_cb, out)
+                  ? pv_log_read_range(out->source, covered, log_size,
+                                      entry_cb, out)
                   : 0;
             out->ms_read = (current_tick - t0) * 1000 / HZ;
 
@@ -1639,10 +1665,11 @@ static enum pv_build_result build_body(void *buf, size_t bufsz,
             /* No index, or one that does not load -- most often because its
              * row counts do not fit tables sized like these. The whole log is
              * replayed instead. */
+            /* A 'to' of 0 reads to the end, so an empty log saves nothing */
             replay_begin(0, log_size);
-            lines = pv_log_read(out->source, entry_cb, out);
+            lines = pv_log_read_range(out->source, 0, log_size, entry_cb, out);
             out->ms_read = (current_tick - t0) * 1000 / HZ;
-            save_wanted = (lines >= 0);
+            save_wanted = (lines >= 0 && log_size > 0);
         }
 
         replay_size = 0;

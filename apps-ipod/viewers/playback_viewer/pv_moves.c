@@ -43,10 +43,11 @@
 #include "pv_log.h"
 #include "pv_moves.h"
 
-/* A libfile: struct move records, then as its tail the count and file-name
- * hashes of the missing files left unplaced (uint32_t each; UNPLACED_ALL for
- * more than UNPLACED_MAX) and the pool of the moved folders. Its marks are
- * the database the table was worked out for. */
+/* A libfile: struct move records, then as its tail tagcache_entry_key() of
+ * the database's last entry, the count and file-name hashes of the missing
+ * files left unplaced (uint32_t each; UNPLACED_ALL for more than
+ * UNPLACED_MAX) and the pool of the moved folders. Its marks are the database
+ * the table was worked out for. */
 #define UNPLACED_MAX 512
 #define UNPLACED_ALL 0xffffffffu
 #define PV_MOVES_PATH    LIB_REPORT_MOVES_FILE
@@ -346,6 +347,7 @@ static void moves_save(const struct move *m, int n, const char *pool,
 {
     struct libfile_writer w;
     struct libfile_marks marks;
+    uint64_t last_key = tagcache_entry_key(db->entries - 1);
 
     libfile_no_marks(&marks);
     marks.entries = db->entries;
@@ -355,6 +357,7 @@ static void moves_save(const struct move *m, int n, const char *pool,
                       sizeof(struct move), &marks))
         libfile_finish(&w,
                        libfile_write(&w, m, (size_t)n * sizeof(struct move), n)
+                       && libfile_write(&w, &last_key, sizeof(last_key), 0)
                        && libfile_write(&w, &unplaced_n, sizeof(unplaced_n), 0)
                        && (unplaced_n == UNPLACED_ALL
                            || libfile_write(&w, unplaced,
@@ -538,9 +541,11 @@ static bool added_matches(int from, int to)
 
 /* The table's header, if the table still serves this database: the one it
  * was worked out for, or that one with tracks only added since, none of them
- * named like a file the table could not place. */
+ * named like a file the table could not place. A Rebuild renumbers the
+ * entries, which the file at the old last entry shows. */
 static bool read_hdr(struct libfile_header *h, const struct pv_moves_db *db)
 {
+    uint64_t last_key;
     uint32_t tail;
     int fd;
     bool ok;
@@ -551,15 +556,18 @@ static bool read_hdr(struct libfile_header *h, const struct pv_moves_db *db)
     if (h->marks.entries == db->entries && h->marks.commitid == db->commit)
         return true;
     if (db->deleted < 0 || h->marks.deleted != db->deleted
-        || db->entries < h->marks.entries || db->commit < h->marks.commitid)
+        || db->entries <= h->marks.entries || db->commit < h->marks.commitid)
         return false;
 
     fd = libfile_open(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
                       sizeof(struct move), h, &tail);
     if (fd < 0)
         return false;
-    ok = tail >= sizeof(unplaced_n)
+    ok = tail >= sizeof(last_key) + sizeof(unplaced_n)
          && lseek(fd, (off_t)h->count * sizeof(struct move), SEEK_CUR) >= 0
+         && read(fd, &last_key, sizeof(last_key)) == (ssize_t)sizeof(last_key)
+         && last_key != 0
+         && tagcache_entry_key(h->marks.entries - 1) == last_key
          && read(fd, &unplaced_n, sizeof(unplaced_n))
                 == (ssize_t)sizeof(unplaced_n)
          && unplaced_n <= UNPLACED_MAX
@@ -601,19 +609,20 @@ size_t pv_moves_load(void *buf, size_t size, const struct pv_moves_db *db)
     if (fd < 0)
         return 0;
 
-    /* The unplaced names lead the tail, ahead of the pool: read past them,
-     * then back to the records */
+    /* The key and the unplaced names lead the tail, ahead of the pool: read
+     * past them, then back to the records */
     {
         uint32_t names;
         off_t skip;
 
-        if (lseek(fd, (off_t)h.count * sizeof(struct move), SEEK_CUR) < 0
+        if (lseek(fd, (off_t)h.count * sizeof(struct move) + sizeof(uint64_t),
+                  SEEK_CUR) < 0
             || read(fd, &names, sizeof(names)) != (ssize_t)sizeof(names))
         {
             close(fd);
             return 0;
         }
-        skip = sizeof(names)
+        skip = sizeof(uint64_t) + sizeof(names)
              + (names == UNPLACED_ALL ? 0 : (off_t)names * sizeof(uint32_t));
         pool_bytes = pool_bytes > (uint32_t)skip ? pool_bytes - (uint32_t)skip : 0;
         if (lseek(fd, sizeof(struct libfile_header), SEEK_SET) < 0)
