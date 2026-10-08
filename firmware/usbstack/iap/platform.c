@@ -500,6 +500,7 @@ IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct I
     }
     check_act(has_44k && has_48k, return iap_false, "accessory lacks mandatory freq support: 44k=%d 48k=%d", has_44k, has_48k);
     check_act(mixer_switch_sink(PCM_SINK_IAP), return false);
+    iap_audio_connected();
     queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
     return iap_true;
 }

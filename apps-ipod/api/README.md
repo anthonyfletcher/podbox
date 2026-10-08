@@ -30,6 +30,7 @@ reaches in by bare name exactly the way `firmware/` does:
 | `action.h` | `firmware/backlight.c` |
 | `splash.h` | `firmware/powermgmt.c` |
 | `playback.h` | `firmware/usbstack/usb_iap.c`, `firmware/usbstack/iap/{notification,platform}.c` |
+| `appevents.h` | `firmware/usbstack/iap/audio.c` |
 | `playlist.h` | `firmware/usbstack/usb_iap2_control.c`, `firmware/usbstack/iap/platform.c` |
 | `iap_library.h` | `firmware/usbstack/{usb_iap,usb_iap2_control}.c`, `firmware/usbstack/iap/platform.c` |
 | `buffering.h` | `firmware/usbstack/iap/platform.c`, `lib/rbcodec/metadata/metadata.c` |
@@ -42,7 +43,7 @@ reaches in by bare name exactly the way `firmware/` does:
 The list covers files this fork compiles. Other targets' sources include these
 same headers and are ignored here, for the same reason `list.h` is (below).
 
-`playback.h`, `playlist.h` and `iap_library.h` are reached only through
+`playback.h`, `appevents.h`, `playlist.h` and `iap_library.h` are reached only through
 `USB_ENABLE_IAP`, which both targets build.
 
 ## Slashed paths

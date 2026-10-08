@@ -708,6 +708,7 @@ static void usb_iap_notify_event(intptr_t data) {
         }
 #endif
 
+        iap_audio_tick();
         check_act(iap_periodic_tick(ctx), );
         _iap_release_ctx();
     } break;

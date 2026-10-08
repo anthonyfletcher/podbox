@@ -18,6 +18,7 @@
  *
  ****************************************************************************/
 #include "core_alloc.h"
+#include "events.h"
 #include "pcm-internal.h"
 #include "pcm_sampr.h"
 #include "pcm_sink.h"
@@ -30,6 +31,7 @@
 #include "libiap/iap.h"
 #include "macros.h"
 #include "platform.h"
+#include "appevents.h"
 #include "../usb_iap2.h"
 #include "audio.h"
 
@@ -59,6 +61,7 @@ static uint8_t        logged_stream; /* USB_LOG_IAP_STREAM_*, or 0xff */
 static bool enabled;
 static bool exhausted;
 static bool track_attrs_sent;
+static volatile bool track_changed; /* since TrackNewAudioAttributes */
 
 /* See iap_audio_take_counts() */
 static volatile uint32_t count_bytes, count_chunks, count_silent, count_odd;
@@ -69,6 +72,7 @@ static void sink_set_freq(uint16_t freq) {
     LOG("freq=%d", freq);
 
     track_attrs_sent = true;
+    track_changed    = false;
 
     set_freq = freq;
 
@@ -202,6 +206,29 @@ static void sink_play(const void* addr, size_t size) {
     }
 }
 
+/* Digital Audio 1.01 and later announce every track, not only a new rate,
+ * and libiap reports the lingo as 1.03. */
+static void on_track_change(unsigned short id, void* data) {
+    (void)id;
+    (void)data;
+    track_changed = true;
+}
+
+void iap_audio_connected(void) {
+    /* The sink keeps its rate between connections, so switching to it sets
+     * no rate after the first, and a dock that waits for the announcement
+     * before it sends any button would wait for ever. */
+    if(!track_attrs_sent) {
+        sink_set_freq(iap_pcm_sink.configured_freq);
+    }
+}
+
+void iap_audio_tick(void) {
+    if(track_changed && track_attrs_sent) {
+        sink_set_freq(set_freq);
+    }
+}
+
 static void sink_stop(void) {
     LOG("stop");
     /* we don't call usb_drv_batch_stop() here,
@@ -245,9 +272,11 @@ bool iap_audio_init(void) {
     enabled          = false;
     exhausted        = true;
     track_attrs_sent = false;
+    track_changed    = false;
     packet_count     = 0;
     logged_stream    = 0xff;
 
+    add_event(PLAYBACK_EVENT_TRACK_CHANGE, on_track_change);
     return true;
 
 error:
@@ -261,6 +290,7 @@ error:
 }
 
 bool iap_audio_deinit(void) {
+    remove_event(PLAYBACK_EVENT_TRACK_CHANGE, on_track_change);
     check_act(usb_drv_batch_deinit() == 0, );
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
         core_free(staging_buffers[i].buf.handle);

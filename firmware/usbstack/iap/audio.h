@@ -26,6 +26,11 @@ bool iap_audio_deinit(void);
 bool iap_audio_enable(void);
 bool iap_audio_disable(void);
 bool iap_audio_set_sampr(uint32_t sampr);
+/* TrackNewAudioAttributes once the accessory's rates are accepted, if
+ * nothing has sent it yet on this connection. */
+void iap_audio_connected(void);
+/* USB thread: TrackNewAudioAttributes again if a track has started since. */
+void iap_audio_tick(void);
 /* The rate the iAP sink is configured for. */
 unsigned long iap_audio_sampr(void);
 
