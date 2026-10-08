@@ -4322,6 +4322,8 @@ void audio_hard_stop(void)
     /* Stopping the playback and voice paths does not idle the PCM sink,
      * and a late callback must not fire during a ROLO */
     pcm_play_stop();
+    /* The next play has to lay out a new buffer, not run on the freed one */
+    buffer_state = AUDIOBUF_STATE_TRASHED;
     audiobuf_handle = core_free(audiobuf_handle);
 }
 

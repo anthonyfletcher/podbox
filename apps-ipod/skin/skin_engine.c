@@ -132,10 +132,14 @@ void settings_apply_skins(void)
     dynamic_colors_save_theme();
 
     if (audio_status() & AUDIO_STATUS_PLAY)
-    {
         book_resume_save();
-        audio_stop();
-    }
+    /* Release the audio buffer, not just stop. A skin's buffer is pinned for
+     * good, and one allocated while the audio buffer holds the pool is cut
+     * from its back -- the top of the pool -- where no compaction can move
+     * it. The next play then cannot lay out a buffer and panics. Released
+     * first, the skins land low, where the boot load puts them. */
+    if (skins_initialised)
+        audio_hard_stop();
 
     bool first_run = skin_backdrop_init();
     

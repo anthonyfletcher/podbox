@@ -816,6 +816,10 @@ buflib_allocatable(struct buflib_context* ctx)
 
     /* select the best */
     max_free_space = MAX(max_free_space, free_space);
+    /* a hole has to hold the block header too, as free_space_at_end()
+     * allows for; without this a request for exactly this size never fits */
+    max_free_space = max_free_space > BUFLIB_NUM_FIELDS ?
+                     max_free_space - BUFLIB_NUM_FIELDS : 0;
     max_free_space *= sizeof(union buflib_data);
     max_free_space = MAX(max_free_space, free_space_at_end(ctx));
 
