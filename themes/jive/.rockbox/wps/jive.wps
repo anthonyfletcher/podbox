@@ -7,7 +7,7 @@
 %wd
 #
 #Preload fonts
-%Fl(2,14-noto-sans-medium.fnt)
+%Fl(2,14-noto-sans-bold.fnt)
 %Fl(3,24x24-icons.fnt)
 %Fl(4,jive-ring.fnt)
 %Fl(5,16-noto-sans-medium.fnt)
@@ -74,8 +74,10 @@
 %V(242,173,54,4,-)%Vf(ffffff)
 %pv(0,0,-,-,noborder)
 #
-#Track: title, then artist alternating with album and year
+#Track: title, then artist alternating with album and year. The second line
+#takes the album's most colourful colour, kept light enough to read
+#on the grey, and the theme's own blue with no art
 %V(16,200,288,18,5)%Vf(ffffff)
 %al%s%?it<%it|%fn>
-%V(16,219,288,18,5)%Vf(92ccee)
+%V(16,219,288,18,5)%Vf(vivid>75:92ccee)
 %al%t(5)%s%?ia<%ia|%?d(2)<%d(2)|>>;%al%t(5)%s%?id<%id|%?d(1)<%d(1)|>>%?iy< · %iy|>
