@@ -30,11 +30,16 @@
  *                      up. Takes ownership; MUST be matched by
  *                      app_release_buffer() when the screen tears down.
  *
+ *   app_try_claim_buffer()  As app_claim_buffer(), but returns NULL instead
+ *                      of panicking when a long-lived holder has it, for a
+ *                      caller with somewhere else to go.
+ *
  * `owner` is a short literal naming the caller. It appears in the panic
  * message, so make it something worth reading on a device screen.
  */
 void* app_get_buffer(size_t *buffer_size, const char *owner);
 void* app_claim_buffer(size_t *buffer_size, const char *owner);
+void* app_try_claim_buffer(size_t *buffer_size, const char *owner);
 void app_release_buffer(const char *owner);
 
 #endif /* _APP_BUFFER_H_ */

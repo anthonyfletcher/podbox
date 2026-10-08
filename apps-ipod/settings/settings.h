@@ -353,6 +353,7 @@ bool settings_save_config(int options);
 struct settings_list;
 struct filename_setting;
 void reset_setting(const struct settings_list *setting, void *var);
+void reset_setting_by_user(const struct settings_list *setting);
 void settings_reset(void);
 void sound_settings_apply(void);
 

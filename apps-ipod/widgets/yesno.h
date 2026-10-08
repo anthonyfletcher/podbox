@@ -52,6 +52,12 @@ extern enum yesno_res gui_syncyesno_run_w_tmo(
                            const struct text_message * yes_message,
                            const struct text_message * no_message);
 
+/* As gui_syncyesno_run(), but a USB connection returns YESNO_USB without
+ * being handled, so the caller can put its state back first and then pass
+ * SYS_USB_CONNECTED to default_event_handler() itself. */
+extern enum yesno_res gui_syncyesno_run_defer_usb(
+                           const struct text_message * main_message);
+
 bool yesno_pop(const char* text);
 bool yesno_pop_confirm(const char* text);
 

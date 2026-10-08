@@ -44,6 +44,7 @@ struct yesno_ctx
     const struct text_message *yes_message; /* shown on accept, optional */
     const struct text_message *no_message;  /* shown on cancel, optional */
     enum yesno_res result;
+    bool defer_usb;                /* return YESNO_USB without handling it */
     /* message word-wrapped to the box width, rebuilt by yesno_measure() */
     struct dialog_text_line wrap[YN_MAX_LINES];
     int wrap_count;
@@ -302,6 +303,11 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
         case ACTION_REDRAW: /* handled by the per-pass repaint */
             break;
         default:
+            if (c->defer_usb && action == SYS_USB_CONNECTED)
+            {
+                c->result = YESNO_USB;
+                return DIALOG_ABORT;
+            }
             if (default_event_handler(action) == SYS_USB_CONNECTED)
             {
                 c->result = YESNO_USB;
@@ -353,11 +359,11 @@ static void yesno_on_close(struct dialog *d, void *data)
  *  yes_message - displayed when YESNO_YES is choosen
  *   no_message - displayed when YESNO_NO is choosen
 */
-enum yesno_res gui_syncyesno_run_w_tmo(int ticks, enum yesno_res tmo_default_res,
-                                       const char * title,
-                                       const struct text_message * main_message,
-                                       const struct text_message * yes_message,
-                                       const struct text_message * no_message)
+static enum yesno_res yesno_run(int ticks, enum yesno_res tmo_default_res,
+                                bool defer_usb, const char * title,
+                                const struct text_message * main_message,
+                                const struct text_message * yes_message,
+                                const struct text_message * no_message)
 {
     static const struct dialog_callbacks cb = {
         .measure   = yesno_measure,
@@ -381,10 +387,28 @@ enum yesno_res gui_syncyesno_run_w_tmo(int ticks, enum yesno_res tmo_default_res
     c.yes_message  = yes_message;
     c.no_message   = no_message;
     c.result       = YESNO_NO;
+    c.defer_usb    = defer_usb;
 
     dialog_init(&d, CONTEXT_YESNOSCREEN, title, NULL, &cb, &c);
     dialog_run(&d, HZ / 2); /* poll for statusbar and the timeout countdown */
     return c.result;
+}
+
+enum yesno_res gui_syncyesno_run_w_tmo(int ticks, enum yesno_res tmo_default_res,
+                                       const char * title,
+                                       const struct text_message * main_message,
+                                       const struct text_message * yes_message,
+                                       const struct text_message * no_message)
+{
+    return yesno_run(ticks, tmo_default_res, false, title,
+                     main_message, yes_message, no_message);
+}
+
+enum yesno_res gui_syncyesno_run_defer_usb(
+                                 const struct text_message * main_message)
+{
+    return yesno_run(TIMEOUT_BLOCK, YESNO_TMO, true, NULL,
+                     main_message, NULL, NULL);
 }
 
 enum yesno_res gui_syncyesno_run(const struct text_message * main_message,

@@ -26,6 +26,9 @@
 #include "screens/browse/browser_db.h"
 #include "screens/music_menu_config.h"
 #include "usb.h"
+#ifdef IPOD_ACCESSORY_PROTOCOL
+#include "iap.h"                 /* iap_accessory_present */
+#endif
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
 #include "speech/talk.h"
@@ -501,9 +504,28 @@ static char *usb_dac_toggle_name(int selected_item, void *data,
                                          : LANG_USB_DAC_TURN_ON);
 }
 
+/* Turn On is hidden while a computer, car or dock is using the port, or a
+ * serial accessory is attached: the firmware refuses it then. Turn Off is
+ * always offered. */
+static int usb_dac_toggle_callback(int action,
+                                   const struct menu_item_ex *this_item,
+                                   struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !usb_dac_playing()
+        && (usb_host_is_present()
+#ifdef IPOD_ACCESSORY_PROTOCOL
+            || iap_accessory_present()
+#endif
+           ))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 MENUITEM_FUNCTION_DYNTEXT(usb_dac_toggle_item, 0, usb_dac_toggle,
-                          usb_dac_toggle_name, NULL, NULL, NULL,
-                          Icon_NOICON);
+                          usb_dac_toggle_name, NULL, NULL,
+                          usb_dac_toggle_callback, Icon_NOICON);
 MAKE_MENU(usb_dac_menu, ID2P(LANG_USB_DAC_OUTPUT), 0, Icon_NOICON,
           &usb_dac_output, &usb_dac_toggle_item);
 #endif

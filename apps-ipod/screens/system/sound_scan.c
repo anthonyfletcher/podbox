@@ -106,6 +106,7 @@ static char          ss_now[64];
 
 static bool          ss_stop;      /* The user asked */
 static bool          ss_unplugged;
+static bool          ss_usb;       /* ss_abort() took SYS_USB_CONNECTED */
 
 
 /** Progress **/
@@ -300,9 +301,11 @@ static bool ss_abort(void)
         return true;
     }
 
+    /* Acknowledged once the walk has closed the index; until then every
+     * thread waits on the connection. */
     if (button == SYS_USB_CONNECTED)
     {
-        ss_stop = true;
+        ss_stop = ss_usb = true;
         return true;
     }
 
@@ -448,6 +451,7 @@ static bool ss_have_index(void)
 static bool ss_gate(bool *fresh)
 {
     int partial = 0;
+    bool update = false;
 
     if (!tagcache_is_usable())
     {
@@ -462,7 +466,7 @@ static bool ss_gate(bool *fresh)
      * yesno_pop() rather than yesno_pop_confirm(): the latter puts "Are you
      * sure?" on a line of its own above whatever it is given, which reads as
      * two questions when the thing below is already one. */
-    if (sound_index_partial(&partial))
+    if (sound_index_partial(&partial, &update))
     {
         char q[64];
 
@@ -479,7 +483,15 @@ static bool ss_gate(bool *fresh)
         if (!yesno_pop("Start again from the beginning?"))
             return false;
 
-        *fresh = true;
+        /* Again as the same kind of run: an abandoned update must not turn
+         * into a full rebuild. */
+        if (update)
+        {
+            sound_index_discard_part();
+            *fresh = false;
+        }
+        else
+            *fresh = true;
         return true;
     }
 
@@ -557,7 +569,7 @@ bool sound_scan_screen(bool rebuild)
     ss_done = ss_skipped = ss_failed = 0;
     ss_work = 0;
     ss_audio_ms = 0;
-    ss_stop = ss_unplugged = false;
+    ss_stop = ss_unplugged = ss_usb = false;
     strlcpy(ss_now, "", sizeof (ss_now));
 
     /* Immovable. The window's address is handed to track_decode.c, which
@@ -692,7 +704,10 @@ bool sound_scan_screen(bool rebuild)
     if (ss_stop)
     {
         sound_index_close();
-        splashf(HZ * 4, "Stopped. %d of %d done", written, ss_total);
+        if (ss_usb)
+            default_event_handler(SYS_USB_CONNECTED);
+        else
+            splashf(HZ * 4, "Stopped. %d of %d done", written, ss_total);
     }
     else if (sound_index_finish(complete) == SOUND_OK)
     {

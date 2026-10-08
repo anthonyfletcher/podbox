@@ -215,6 +215,7 @@ static const struct tag_row tag_rows[] = {
 { "quiz year",           TAG_LIBRARY,                            "music quiz game questions date" },
 { "featured artists",    TAG_LIBRARY,                            "guest feat credits" },
 { "trim titles",         TAG_LIBRARY|TAG_APPEARANCE,             "tidy shorten feat remaster version" },
+{ "segregate audiobooks", TAG_LIBRARY,                           "audiobook books spoken word podcast" },
 
 /* --- artwork ------------------------------------------------------------- */
 { "art cache album source", TAG_ARTWORK,                         "thumbnail cache embedded cover folder" },
@@ -222,6 +223,7 @@ static const struct tag_row tag_rows[] = {
 { "debug log artcache",  TAG_ADVANCED|TAG_ARTWORK,               "log debug thumbnail" },
 { "database album art",  TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows cover thumbnail" },
 { "database artist art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows photo thumbnail" },
+{ "database audiobook art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows book cover thumbnail" },
 { "database art row height", TAG_ADVANCED|TAG_ARTWORK|TAG_THEMEAUTHOR, "art rows" },
 { "wps art source",      TAG_ARTWORK|TAG_APPEARANCE,             "cover art artist photo" },
 { "dynamic colors",      TAG_APPEARANCE|TAG_ARTWORK,             "dynamic colours album" },
@@ -341,6 +343,7 @@ static const struct tag_row tag_rows[] = {
 { "backlight fade in",   TAG_ADVANCED|TAG_BATTERY|TAG_APPEARANCE,"backlight fade" },
 { "backlight fade out",  TAG_ADVANCED|TAG_BATTERY|TAG_APPEARANCE,"backlight fade" },
 { "backlight filters first keypress", TAG_ADVANCED|TAG_BATTERY,  "backlight first button" },
+{ "No Backlight On Selected Actions", TAG_ADVANCED|TAG_BATTERY,  "backlight exemptions selective play seek skip volume" },
 { "lcd sleep after backlight off", TAG_ADVANCED|TAG_BATTERY,     "screen sleep panel" },
 { "brightness",          TAG_BATTERY|TAG_APPEARANCE,             "screen bright" },
 { "idle poweroff",       TAG_BATTERY|TAG_SYSTEM,                 "idle power off shutdown" },
@@ -399,6 +402,7 @@ static const struct tag_row tag_rows[] = {
 { "talk dir clip",       TAG_ADVANCED|TAG_VOICE,                 "voice clips" },
 { "talk file clip",      TAG_ADVANCED|TAG_VOICE,                 "voice clips" },
 { "talk filetype",       TAG_ADVANCED|TAG_VOICE,                 "voice file type" },
+{ "Announce Battery Level", TAG_ADVANCED|TAG_VOICE,              "voice speak battery level" },
 { "talk mixer level",    TAG_ADVANCED|TAG_VOICE,                 "voice volume" },
 };
 

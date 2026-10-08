@@ -136,10 +136,15 @@ static bool clean_shutdown(enum shutdown_type sd_type,
         }
         else
         {
-            /* Even on an empty battery: queued play counts and ratings, and
-             * the buffered playback log, are a few sector writes. */
-            tagcache_shutdown();
-            add_playbacklog(NULL);
+            /* Queued play counts and ratings, and the buffered playback log,
+             * are a few sector writes -- but only to a disk already spinning.
+             * A spin-up on an empty battery can brown out mid-write and
+             * damage the filesystem. */
+            if (storage_disk_is_active())
+            {
+                tagcache_shutdown();
+                add_playbacklog(NULL);
+            }
             dircache_disable();
         }
 

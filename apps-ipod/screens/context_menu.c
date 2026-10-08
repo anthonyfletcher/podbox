@@ -243,7 +243,8 @@ static void playing_time(void)
 
 static void view_album_art(void)
 {
-    image_viewer(NULL);
+    if (image_viewer(NULL) == GO_TO_ROOT)
+        context_menu_result = ONPLAY_MAINMENU;
 }
 
 /* Returns its own result rather than a fixed one, so that leaving the lyrics
@@ -270,7 +271,8 @@ MENUITEM_FUNCTION(playing_time_item, 0, ID2P(LANG_PLAYING_TIME),
  * nowhere else: what it is played against is what is already playing. */
 static int spike_run(void)
 {
-    spike_screen();
+    if (spike_screen())
+        context_menu_result = ONPLAY_MAINMENU;
     return ONPLAY_OK;
 }
 
@@ -475,9 +477,6 @@ static int sound_mix_report(int added)
     return ONPLAY_OK;
 }
 
-/* Hidden rather than shown failing. The setting comes first: somebody who has
- * turned the engine off has said they do not want this, and an index left on
- * disk from before is not consent to keep offering it. */
 /* A row of the Audiobooks browse: the sound items, which build music, are not
  * offered for it, and Mark as is. */
 static bool in_book_list(void)
@@ -486,6 +485,9 @@ static bool in_book_list(void)
            && browser_db_is_spoken_list(browser_get_context());
 }
 
+/* Hidden rather than shown failing. The setting comes first: somebody who has
+ * turned the engine off has said they do not want this, and an index left on
+ * disk from before is not consent to keep offering it. */
 static int sound_mix_callback(int action,
                               const struct menu_item_ex *this_item,
                               struct gui_synclist *this_list)
@@ -1151,11 +1153,14 @@ static int clipboard_paste(void)
 static int set_rating_inline(void)
 {
     struct mp3entry* id3 = audio_current_track();
-    if (id3 && id3->tagcache_idx)
+    if (browser_db_track_idx(id3) >= 0)
     {
         set_int_ex(str(LANG_MENU_SET_RATING), "", UNIT_INT, (void*)(&id3->rating),
                    NULL, 1, 0, 10, NULL, NULL);
-        tagcache_update_numeric(id3->tagcache_idx-1, tag_rating, id3->rating);
+        /* Asked again: a Rebuild may have finished while the screen was up. */
+        if (browser_db_track_idx(id3) >= 0)
+            tagcache_update_numeric(browser_db_track_idx(id3), tag_rating,
+                                    id3->rating);
     }
     else
         splash(HZ*2, ID2P(LANG_ID3_NO_INFO));
@@ -1184,7 +1189,11 @@ static bool view_cue(void)
     {
         /* True closes the menu, which only the chapter row asks for -- it
            carries MENU_FUNC_CHECK_RETVAL and the cuesheet row does not. */
-        return browse_cuesheet(id3->cuesheet) != CUE_BROWSE_NONE;
+        enum cue_browse_result res = browse_cuesheet(id3->cuesheet);
+
+        if (res == CUE_BROWSE_USB)
+            context_menu_result = ONPLAY_MAINMENU;
+        return res != CUE_BROWSE_NONE;
     }
     return false;
 }

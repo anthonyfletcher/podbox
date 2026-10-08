@@ -63,6 +63,15 @@ void* app_claim_buffer(size_t *buffer_size, const char *owner)
     return pluginbuf;
 }
 
+/* As app_claim_buffer(), but NULL while another screen holds it. */
+void* app_try_claim_buffer(size_t *buffer_size, const char *owner)
+{
+    if (buffer_owner)
+        return NULL;
+
+    return app_claim_buffer(buffer_size, owner);
+}
+
 /* Releasing a buffer nobody holds is deliberately allowed: teardown paths run
  * whether or not setup got as far as claiming (carousel's cleanup() is called
  * on its init-failure path too), and panicking there would break ordinary use

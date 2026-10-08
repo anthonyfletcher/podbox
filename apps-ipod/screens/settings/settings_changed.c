@@ -164,7 +164,7 @@ static int changed_action(int action, struct gui_synclist *lists)
 
         if (setting && yesno_pop_confirm(ID2P(LANG_RESET_SETTING)))
         {
-            reset_setting(setting, setting->setting);
+            reset_setting_by_user(setting);
             settings_save();
             settings_apply(false);
             refresh(lists);

@@ -34,6 +34,9 @@ char *output_dyn_value(char *buf,
 /* Ask the user if they really want to erase the current dynamic playlist
  * returns true if the playlist should be replaced */
 bool warn_on_pl_erase(void);
+/* The same, also setting *usb when a USB connect answered the prompt, which
+ * the caller passes on as GO_TO_ROOT. usb may be NULL. */
+bool warn_on_pl_erase_usb(bool *usb);
 
 bool show_search_progress(bool init, int count, int current, int total);
 

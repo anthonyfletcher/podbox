@@ -1973,8 +1973,11 @@ const struct settings_list settings[] = {
                   false, "database audiobook art", NULL),
     OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
                   false, "segregate audiobooks", segregate_audiobooks_callback),
-    {F_T_INT|F_THEMESETTING, &global_settings.db_art_row_height, -1,
-        INT(52), "database art row height", UNUSED},
+    /* 0 leaves the skin's own row height; the bounds stop a hand-edited .cfg
+     * giving a row taller than the screen. */
+    INT_SETTING(F_THEMESETTING, db_art_row_height, -1, 52,
+                "database art row height", UNIT_PIXEL, 0, LCD_HEIGHT, 1,
+                NULL, NULL, NULL),
     OFFON_SETTING(0, art_cache_fast_build, LANG_ART_CACHE_FAST_BUILD, false,
                   "art cache fast build", NULL),
     CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,

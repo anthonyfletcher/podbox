@@ -835,7 +835,7 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                             }
                             break;
                         case 1: /* reset setting */
-                            reset_setting(setting, setting->setting);
+                            reset_setting_by_user(setting);
                             settings_save();
                             settings_apply(false);
                             break;

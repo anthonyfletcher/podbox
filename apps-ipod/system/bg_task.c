@@ -215,7 +215,14 @@ bool bg_task_preempted(const struct bg_task *task)
  * drive for as long as it stayed plugged in. */
 bool bg_task_should_stop(const struct bg_task *task)
 {
-    struct queue_event ev;
+    /* Searched past the head: a broadcast the thread cannot drain mid-pass
+     * can sit in front of these. */
+    static const long stop_events[3][2] =
+    {
+        { SYS_USB_CONNECTED, SYS_USB_CONNECTED },
+        { SYS_POWEROFF, SYS_POWEROFF },
+        { SYS_REBOOT, SYS_REBOOT },
+    };
 
     if (bg_task_preempted(task))
         return true;
@@ -227,17 +234,8 @@ bool bg_task_should_stop(const struct bg_task *task)
     if (usb_host_is_present())
         return true;
 
-    if (!queue_peek(&bg_queue, &ev))
-        return false;
-
-    switch (ev.id)
-    {
-        case SYS_USB_CONNECTED:
-        case SYS_POWEROFF:
-        case SYS_REBOOT:
-            return true;
-    }
-    return false;
+    /* Count field is filters minus one. */
+    return queue_peek_ex(&bg_queue, NULL, 2, stop_events);
 }
 
 const char *bg_task_state(const struct bg_task *task)

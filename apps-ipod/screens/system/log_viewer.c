@@ -26,6 +26,7 @@
 #include "input/action.h"
 #include "widgets/splash.h"
 #include "system/strutil.h"
+#include "system/shutdown.h"   /* default_event_handler */
 int compute_nb_lines(int w, struct font* font)
 {
     int i, nb_lines;
@@ -173,6 +174,9 @@ bool log_viewer_show(void)
                 user_index = 0;
                 break;
             default:
+                /* true takes the debug menu back to the root on USB. */
+                if (default_event_handler(action) == SYS_USB_CONNECTED)
+                    return true;
                 break;
         }
     } while(action != ACTION_STD_CANCEL);

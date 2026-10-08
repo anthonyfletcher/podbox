@@ -98,6 +98,14 @@ char *output_dyn_value(char *buf,
 
 bool warn_on_pl_erase(void)
 {
+    return warn_on_pl_erase_usb(NULL);
+}
+
+bool warn_on_pl_erase_usb(bool *usb)
+{
+    if (usb)
+        *usb = false;
+
     /* Every path that replaces the current playlist asks here first, which
      * makes this the one place a book being listened to is left behind
      * without a pause or a stop to record it. Saving is silent unless a book
@@ -114,10 +122,14 @@ bool warn_on_pl_erase(void)
             {ID2P(LANG_WARN_ERASEDYNPLAYLIST_PROMPT)};
         static const struct text_message message={lines, 1};
 
-        if (gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
+        enum yesno_res res = gui_syncyesno_run(&message, NULL, NULL);
+
+        if (res == YESNO_YES)
             return true;
         else
         {
+            if (usb)
+                *usb = (res == YESNO_USB);
             splash(HZ, ID2P(LANG_CANCEL));
             return false;
         }

@@ -188,16 +188,18 @@ const char* setting_get_cfgvals(const struct settings_list *setting)
  * stack because it runs from the main thread at startup and from the UI thread
  * for a theme, neither of which is short of room.
  *
- * Shared by the two functions below, which the callback calls one after the
- * other rather than nested. Both write the same file, so anything calling them
- * concurrently is already broken for a larger reason. */
+ * The storage thread's config.cfg flush and the UI thread's overlay and saved
+ * .cfg writes share it, and a write yields every few lines, so every user
+ * holds settings_line_mtx. */
 static char settings_line[SETTINGS_MAX_LINE];
+static struct mutex settings_line_mtx;
 
 /* calculates and stores crc of settings, returns true if settings have changed */
 static bool settings_crc_changed(void)
 {
     char *value = settings_line;
     uint32_t custom_crc = 0xFFFFFFFF;
+    mutex_lock(&settings_line_mtx);
     for(int i=0; i<nb_settings; i++)
     {
         const struct settings_list *setting = &settings[i];
@@ -206,6 +208,7 @@ static bool settings_crc_changed(void)
         cfg_to_string(setting, value, SETTINGS_MAX_LINE);
         custom_crc = crc_32(value, strlen(value), custom_crc);
     }
+    mutex_unlock(&settings_line_mtx);
 
     uint32_t crc = crc_32(&global_settings, sizeof(global_settings), custom_crc);
     if (crc != user_settings_crc)
@@ -220,6 +223,7 @@ static bool settings_crc_changed(void)
 /** Reading from a config file **/
 
 static bool settings_write_config(const char* filename, int options);
+static void mark_theme_overlay(void);
 
 /* The carousel's Year Sort Order is now the descending half of its sort list.
  * A saved "descending" moves into that list and the old setting returns to its
@@ -245,6 +249,7 @@ void settings_load(void)
 {
     logf("\r\n%s()\r\n", __func__);
     debug_available_settings();
+    mutex_init(&settings_line_mtx);
 
     /* make temp files current make current files .old */
     rename_temp_file(RESUMEFILE_TEMP, RESUMEFILE, RESUMEFILE".old");
@@ -258,11 +263,14 @@ void settings_load(void)
      * value would be missing from config.cfg and set again from here on every
      * boot. This has to sit after the renames above, or the boot following the
      * first save finds config.cfg missing and overwrites a full set of the
-     * user's settings with the shipped ones. */
+     * user's settings with the shipped ones. Written aside and renamed, so a
+     * power cut cannot leave a partial config.cfg that shuts the defaults out
+     * for good. */
     if (!file_exists(CONFIGFILE) &&
         settings_load_config(DEFAULTCONFIGFILE, false))
     {
-        settings_write_config(CONFIGFILE, SETTINGS_SAVE_CHANGED);
+        if (settings_write_config(CONFIGFILE ".tmp", SETTINGS_SAVE_CHANGED))
+            rename(CONFIGFILE ".tmp", CONFIGFILE);
     }
     else
         settings_load_config(CONFIGFILE, false); /* load user_settings items */
@@ -277,6 +285,8 @@ void settings_load(void)
 
     /* After the CRC, so the next save writes the result out. */
     carry_year_sort_order();
+
+    mark_theme_overlay();
 }
 
 bool cfg_string_to_int(const struct settings_list *setting, int* out, const char* str)
@@ -386,7 +396,17 @@ bool string_to_cfg(const char *name, char* value, bool *theme_changed)
         else
             if (setting_get_cfgvals(setting) == NULL)
             {
-                *(int*)setting->setting = atoi(value);
+                int v = atoi(value);
+                /* A hand-edited .cfg is not trusted: callers divide and loop
+                 * on these. Some ranges are declared high to low. */
+                if (flags & F_INT_SETTING)
+                {
+                    const struct int_setting *info = setting->int_setting;
+                    int lo = MIN(info->min, info->max);
+                    int hi = MAX(info->min, info->max);
+                    v = MIN(MAX(v, lo), hi);
+                }
+                *(int*)setting->setting = v;
                 logf("Val: %s\r\n",value);
             }
             else
@@ -437,11 +457,12 @@ bool string_to_cfg(const char *name, char* value, bool *theme_changed)
     case F_T_BOOL:
     {
         int temp;
-        if (cfg_string_to_int(setting, &temp, value))
-        {
-            *(bool*)setting->setting = !!temp;
-            logf("Val: %s\r\n", value);
-        }
+        /* An unparsed value leaves the setting alone: no change to report,
+         * and nothing in temp. */
+        if (!cfg_string_to_int(setting, &temp, value))
+            return false;
+        *(bool*)setting->setting = !!temp;
+        logf("Val: %s\r\n", value);
         if (setting->bool_setting->option_callback)
         {
             setting->bool_setting->option_callback(!!temp);
@@ -512,9 +533,9 @@ static bool config_is_theme(int fd, char *line, int line_size)
  * handful of deliberate choices, not a configuration -- and a list needs no
  * compile-time bound on nb_settings.
  *
- * Not persisted. The overlay file is the record: reading it back at theme-load
- * time re-marks everything in it, so a reboot loses nothing and no baseline
- * has to be reconstructed. */
+ * Not persisted. The overlay file is the record: a theme load and
+ * settings_load() both re-mark everything in it, so a reboot loses nothing and
+ * no baseline has to be reconstructed. */
 #define MAX_TWEAKS 64
 static const struct settings_list *tweaked[MAX_TWEAKS];
 static int tweak_count;
@@ -571,9 +592,8 @@ void settings_mark_user_tweak(const struct settings_list *setting)
 {
     /* Rewritten whole on every tweak, including one already marked -- the
      * value has changed even when the marking has not. That is a disk write
-     * per appearance change, but every path that gets here has just called
-     * settings_save() for config.cfg, so the disk is already awake and this
-     * costs no spin-up of its own. */
+     * per appearance change, made now: settings_save() only queues config.cfg
+     * for the next time the disk is idle. */
     if (mark_tweak(setting))
         write_theme_overlay();
 }
@@ -599,7 +619,7 @@ static void set_theme_file(const char *file)
  * settings_apply_skins().
  *
  * `mark` re-marks every setting the file names, which is how the overlay
- * survives a reboot: the file is the record of what was tweaked. */
+ * survives a theme reload: the file is the record of what was tweaked. */
 static void read_config_lines(int fd, char *line, int line_size,
                               bool *theme_changed, bool mark)
 {
@@ -643,6 +663,31 @@ static void load_theme_overlay(char *line, int line_size, bool *theme_changed)
     close(fd);
 }
 
+/* At boot, mark the overlay's names without applying its values: config.cfg
+ * already holds them, and without the marks the first tweak would rewrite the
+ * overlay with that one setting alone. */
+static void mark_theme_overlay(void)
+{
+    char path[MAX_PATH];
+    char line[SETTINGS_MAX_LINE];
+    char *name, *value;
+    int fd;
+
+    if (!theme_overlay_path(path, sizeof path))
+        return;
+
+    fd = open_utf8(path, O_RDONLY);
+    if (fd < 0)
+        return;
+
+    while (read_line(fd, line, sizeof line) > 0)
+    {
+        if (settings_parseline(line, &name, &value))
+            mark_tweak(find_setting_by_cfgname(name));
+    }
+    close(fd);
+}
+
 bool settings_forget_theme_tweaks(void)
 {
     char path[MAX_PATH];
@@ -683,9 +728,9 @@ bool settings_load_config(const char* file, bool apply)
      *
      * Restricted further to files that actually describe a look, which is not
      * every .cfg the user can pick: an EQ preset is one too, and loading one
-     * must not quietly drop the current theme's backdrop and colours. A theme
-     * always names at least one theme setting (its wps, sbs or a colour), so
-     * scan for one first and rewind. */
+     * must not quietly drop the current theme's backdrop and colours. A file
+     * that names a font counts as a look (see config_is_theme()), so scan for
+     * one first and rewind. */
     if (apply)
     {
         is_theme = config_is_theme(fd, line, sizeof line);
@@ -704,10 +749,14 @@ bool settings_load_config(const char* file, bool apply)
             tweak_count = 0;
 
             /* Before the file is read, so a tweak made during this load knows
-             * which theme it belongs to. Gated on is_theme, so an EQ preset or
-             * a saved config -- FILE_ATTR_CFG fires for every .cfg the user
-             * can open -- does not become "the current theme". */
-            set_theme_file(file);
+             * which theme it belongs to. Only a file in THEME_DIR becomes "the
+             * current theme": a saved settings .cfg names a font too, and its
+             * overlay and Forget Tweaks would point at a theme that is not
+             * there. Such a file can still name one with its own theme line. */
+            if (!strncasecmp(file, THEME_DIR "/", sizeof(THEME_DIR)))
+                set_theme_file(file);
+            else
+                global_settings.theme_file[0] = '\0';
         }
     }
 
@@ -894,6 +943,7 @@ static bool settings_write_config(const char* filename, int options)
     if (fd < 0)
         return false;
 
+    mutex_lock(&settings_line_mtx);
     if (options != SETTINGS_SAVE_RESUMEINFO)
     {
         fdprintf(fd, "# .cfg file created by rockbox %s - "
@@ -956,6 +1006,7 @@ static bool settings_write_config(const char* filename, int options)
 
         fdprintf(fd,"%s: %s\r\n",setting->cfg_name,value);
     } /* for(...) */
+    mutex_unlock(&settings_line_mtx);
     close(fd);
     return true;
 }
@@ -1314,6 +1365,14 @@ void settings_apply(bool read_disk)
             lang_core_load(buf);
             CHART("<lang_core_load");
         }
+        else
+        {
+            /* What a .lng load does first. Without it a phrase dropped from
+             * overrides.cfg keeps pointing into the spare buffer, which the
+             * load below rewrites. */
+            lang_init(core_language_builtin, language_strings,
+                      LANG_LAST_INDEX_IN_ARRAY);
+        }
         /* Last, because loading a .lng points every string back at the
          * built-in one first. */
         lang_override_load();
@@ -1429,6 +1488,43 @@ void reset_setting(const struct settings_list *setting, void *var)
                    setting->filename_setting->max_len);
         break;
     }
+}
+
+/* A reset the user asked for runs the setting's callback, as picking the
+ * default by hand would; some settings take effect only through it. */
+void reset_setting_by_user(const struct settings_list *setting)
+{
+    uint32_t flags = setting->flags;
+
+    if ((flags & F_BOOL_SETTING) == F_BOOL_SETTING)
+    {
+        bool *v = (bool*)setting->setting;
+        bool old = *v;
+        reset_setting(setting, v);
+        if (*v != old && setting->bool_setting->option_callback)
+            setting->bool_setting->option_callback(*v);
+        return;
+    }
+
+    if ((flags & F_T_MASK) != F_T_INT && (flags & F_T_MASK) != F_T_UINT)
+    {
+        reset_setting(setting, setting->setting);
+        return;
+    }
+
+    int *v = (int*)setting->setting;
+    int old = *v;
+    void (*cb)(int) = NULL;
+
+    reset_setting(setting, v);
+    if (flags & F_INT_SETTING)
+        cb = setting->int_setting->option_callback;
+    else if (flags & F_CHOICE_SETTING)
+        cb = setting->choice_setting->option_callback;
+    else if (flags & F_TABLE_SETTING)
+        cb = setting->table_setting->option_callback;
+    if (*v != old && cb)
+        cb(*v);
 }
 
 void settings_reset(void)
