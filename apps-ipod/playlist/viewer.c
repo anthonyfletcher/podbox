@@ -729,7 +729,8 @@ static enum pv_context_result context_menu(int index)
         {
             case 0:
                 /* Playing Next... menu */
-                context_menu_show_playlist(current_track->name, FILE_ATTR_AUDIO, NULL);
+                context_menu_show_playlist(current_track->name, FILE_ATTR_AUDIO, NULL,
+                                           false);
                 return PV_CONTEXT_UNCHANGED;
             case 1:
                 /* Add to Playlist... menu */

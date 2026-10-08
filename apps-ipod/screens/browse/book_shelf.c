@@ -978,8 +978,8 @@ static bool book_menu(const char *book, const char *name)
     switch (choice)
     {
         case QUEUE:
-            if (context_menu_show_playlist(sel, ATTR_DIRECTORY, menu_insert)
-                == ONPLAY_START_PLAY)
+            if (context_menu_show_playlist(sel, ATTR_DIRECTORY, menu_insert,
+                                           true) == ONPLAY_START_PLAY)
                 menu_exit = GO_TO_WPS;
             break;
         case PLAYLIST:

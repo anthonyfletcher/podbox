@@ -477,13 +477,22 @@ static int sound_mix_report(int added)
     return ONPLAY_OK;
 }
 
-/* A row of the Audiobooks browse: the sound items, which build music, are not
- * offered for it, and Mark as is. */
+/* A row of the Audiobooks browse, or a book in any other: the sound items,
+ * which build music, are not offered for it, and Mark as is. */
 static bool in_book_list(void)
 {
+    struct browser_context *c = browser_get_context();
+    long album_seek, artist_seek;
+
     return selected_file.context == CONTEXT_ID3DB
-           && browser_db_is_spoken_list(browser_get_context());
+           && (browser_db_is_spoken_list(c)
+               || browser_db_get_book_album(c, c->selected_item, &album_seek,
+                                            &artist_seek));
 }
+
+/* The queue rows on offer are for a book, which is heard in order: the
+ * shuffled ones are left out */
+static bool ctx_in_order;
 
 /* Hidden rather than shown failing. The setting comes first: somebody who has
  * turned the engine off has said they do not want this, and an index left on
@@ -988,6 +997,8 @@ static int treeplaylist_callback(int action,
             if (param->position == PLAYLIST_INSERT_SHUFFLED ||
                 param->position == PLAYLIST_INSERT_LAST_SHUFFLED)
             {
+                if (ctx_in_order)
+                    return ACTION_EXIT_MENUITEM;
                 if (!global_settings.show_shuffled_adding_options)
                     return ACTION_EXIT_MENUITEM;
 
@@ -1020,11 +1031,13 @@ static int treeplaylist_callback(int action,
  * the menu runs as whatever screen is underneath and a theme switching on %cs
  * dresses it as that screen's rows. Popped conditionally, like the other sites:
  * an item may have exited elsewhere and popped it already. */
-int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb))
+int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb),
+                               bool in_order)
 {
     context_menu_result = ONPLAY_OK;
     ctx_current_playlist_insert = playlist_insert_cb;
     selected_file_set(CONTEXT_STD, path, attr);
+    ctx_in_order = in_order;
     in_queue_submenu = false;
     push_current_activity(ACTIVITY_CONTEXTMENU);
     do_menu(&browser_playlist_menu, NULL, NULL, false);
@@ -2159,6 +2172,7 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
     context_menu_result = ONPLAY_OK;
     ctx_current_playlist_insert = NULL;
     selected_file_set(from_context, NULL, attr);
+    ctx_in_order = from_context == CONTEXT_ID3DB && in_book_list();
 
     if (from_context == CONTEXT_ID3DB)
     {

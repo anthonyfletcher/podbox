@@ -5363,14 +5363,23 @@ bool browser_db_get_book_album(struct browser_context* c, int item,
 {
     struct tagentry *entry;
     struct tagcache_album al;
+    bool spoken = browser_db_is_spoken_list(c);
 
-    if (!browser_db_is_spoken_list(c) || item < c->special_entry_count
+    /* Outside the Audiobooks browse too -- a book Search opened lands in the
+     * music lists -- while books are kept apart, which is when they have a
+     * place to be marked and a position saved. There an album name is a book
+     * only when every album of it is one; in the Audiobooks browse when any
+     * is, as its list shows them. */
+    if (!(spoken || global_settings.segregate_audiobooks)
+        || item < c->special_entry_count
+        || c->currtable != TABLE_NAVIBROWSE
         || !(entry = browser_db_get_entry(c, item)))
         return false;
 
     if (browser_db_is_album_list(c))
     {
-        if (!row_has_book(tag_album, entry->extraseek, c->currextra))
+        if (!(spoken ? row_has_book(tag_album, entry->extraseek, c->currextra)
+                     : row_is_book(tag_album, entry->extraseek, c->currextra)))
             return false;
         *album_seek = entry->extraseek;
         *artist_seek = level_artist(c->currextra);
