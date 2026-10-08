@@ -66,6 +66,7 @@ static long last_dirty_tick;
 static struct viewport parent[NB_SCREENS];
 static struct gui_synclist *current_lists;
 static bool need_full_update = false;
+static unsigned last_generation;   /* the last gui_synclist.generation issued */
 
 bool list_need_full_update(void)
 {
@@ -281,6 +282,7 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     gui_list->callback_get_item_kind = NULL;
     gui_list->callback_get_item_value = NULL;
     gui_list->callback_item_is_playing = NULL;
+    gui_list->generation = ++last_generation;
 }
 
 int gui_list_get_item_offset(struct gui_synclist * gui_list,
@@ -600,6 +602,7 @@ static void gui_list_select_at_offset(struct gui_synclist * gui_list,
 void gui_synclist_add_item(struct gui_synclist * gui_list)
 {
     gui_list->nb_items++;
+    gui_list->generation = ++last_generation;
     /* if only one item in the list, select it */
     if (gui_list->nb_items == 1)
         gui_list->selected_item = 0;
@@ -616,6 +619,7 @@ void gui_synclist_del_item(struct gui_synclist * gui_list)
         if (gui_list->selected_item == gui_list->nb_items-1)
             gui_list->selected_item--;
         gui_list->nb_items--;
+        gui_list->generation = ++last_generation;
         gui_synclist_select_item(gui_list, gui_list->selected_item);
     }
 }
@@ -637,6 +641,7 @@ void gui_synclist_set_title(struct gui_synclist * gui_list,
 void gui_synclist_set_nb_items(struct gui_synclist * lists, int nb_items)
 {
     lists->nb_items = nb_items;
+    lists->generation = ++last_generation;
     FOR_NB_SCREENS(i)
     {
         lists->offset_position[i] = 0;
@@ -691,6 +696,7 @@ void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
                                     list_is_playing playing_callback)
 {
     lists->callback_get_item_kind = kind_callback;
+    lists->generation = ++last_generation;
     lists->callback_get_item_value = value_callback;
     lists->callback_item_is_playing = playing_callback;
 }

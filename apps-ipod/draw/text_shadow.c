@@ -23,9 +23,11 @@
  * free: both passes carry a running sum, so a wider window costs only its
  * border.
  *
- * One mask serves every caller, the scroll thread included. Nothing here
- * yields and threads switch only where something does, so the buffers need no
- * lock -- keep it that way.
+ * One mask serves every caller, the scroll thread included, with no lock.
+ * font_get_bits() can yield on a glyph-cache miss while the mask is being
+ * built, so another thread can draw a shadow in between; the cost is one
+ * shadow garbled until its text is drawn again. Nothing else here
+ * may yield.
  *
  * Trap: the shadow is clipped by the viewport but not by the line, so a
  * shadow reaching past the line's slack over the font height spills into the

@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include "string-extra.h"
 #include <stdlib.h>
+#include <limits.h>
 #include "kernel.h"
 #include "input/action.h"
 #include "system.h"
@@ -764,6 +765,8 @@ free_id3_outtext:
     return out_text;
 }
 
+#define SELECT_MAX_DEPTH 5
+
 /* Render one %sel argument to text. Keys and values may each be written as a
  * literal, a number, or a tag, so all three parameter shapes are accepted. */
 static const char* eval_select_param(struct gui_wps *gwps, char *skinbuffer,
@@ -781,12 +784,20 @@ static const char* eval_select_param(struct gui_wps *gwps, char *skinbuffer,
             return buf;
         case CODE:
         {
+            /* Each value tag holds a MAX_PATH buffer on the stack while its
+             * argument is evaluated, and the UI stack is 8 KiB, so nesting
+             * past SELECT_MAX_DEPTH evaluates to nothing. */
+            static int depth;
+            const char *out;
             struct skin_element *element =
                     SKINOFFSETTOPTR(skinbuffer, param->data.code);
-            if (!element) return NULL;
-            return get_token_value(gwps,
-                                   SKINOFFSETTOPTR(skinbuffer, element->data),
-                                   offset, buf, buf_size, NULL);
+            if (!element || depth >= SELECT_MAX_DEPTH) return NULL;
+            depth++;
+            out = get_token_value(gwps,
+                                  SKINOFFSETTOPTR(skinbuffer, element->data),
+                                  offset, buf, buf_size, NULL);
+            depth--;
+            return out;
         }
         default:
             return NULL;
@@ -1556,15 +1567,20 @@ const char *get_token_value(struct gui_wps *gwps,
             char op = ops ? ops[0] : 0;       /* before p[2] reuses buf */
             int b = eval_param_int(gwps, skinbuffer, &p[2], offset,
                                    buf, buf_size);
+            /* In 64 bits and clamped, so no operand pair overflows:
+             * INT_MIN / -1 traps on x86 and + - * would be undefined. */
+            int64_t r;
             switch (op)
             {
-                case '+': numeric_ret = a + b; break;
-                case '-': numeric_ret = a - b; break;
-                case '*': numeric_ret = a * b; break;
-                case '/': numeric_ret = b ? a / b : 0; break;
-                case '%': numeric_ret = b ? a % b : 0; break;
-                default:  numeric_ret = 0; break;
+                case '+': r = (int64_t)a + b; break;
+                case '-': r = (int64_t)a - b; break;
+                case '*': r = (int64_t)a * b; break;
+                case '/': r = b ? (int64_t)a / b : 0; break;
+                case '%': r = b ? (int64_t)a % b : 0; break;
+                default:  r = 0; break;
             }
+            numeric_ret = r > INT_MAX ? INT_MAX
+                        : r < INT_MIN ? INT_MIN : (int)r;
             itoa_buf(buf, buf_size, numeric_ret);
             numeric_buf = buf;
             goto gtv_ret_numeric_tag_info;

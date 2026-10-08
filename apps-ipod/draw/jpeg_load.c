@@ -1860,7 +1860,7 @@ static void search_restart(struct jpeg *p_jpeg)
             code |= get_bits((p_jpeg), 1); \
             nb++; \
         } \
-        if (nb > 16) /* error in Huffman */ \
+        if (nb > 16 || code < (tbl)->mincode[nb]) /* error in Huffman */ \
         { \
             r = 0; s = 0; /* fake a zero, this is most safe */ \
         } else { \
@@ -1895,7 +1895,7 @@ static void search_restart(struct jpeg *p_jpeg)
             code |= get_bits((p_jpeg), 1); \
             nb++; \
         } \
-        if (nb > 16) /* error in Huffman */ \
+        if (nb > 16 || code < (tbl)->mincode[nb]) /* error in Huffman */ \
         { \
             s = 0; /* fake a zero, this is most safe */ \
         } else { \

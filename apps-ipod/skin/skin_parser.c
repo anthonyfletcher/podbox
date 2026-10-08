@@ -758,6 +758,8 @@ static int parse_viewporttextshadow(struct skin_element *element,
     struct line_desc *line = skin_buffer_alloc(sizeof(*line));
     unsigned colour;
 
+    if (!line)
+        return -1;
     *line = (struct line_desc)LINE_DESC_DEFINIT;
 
     /* A '-' colour is the way off: the style then carries no STYLE_SHADOW,
@@ -1702,6 +1704,12 @@ static int parse_albumart_load(struct skin_element* element,
         return WPS_ERROR_INVALID_PARAM;
     }
 
+    /* A blurring chain renders into a buffer of width x height, and its
+     * render writes at least one pixel, so an empty box would overrun it. */
+    if ((aa->filter.stages & IMG_CLASS_RESIZE)
+        && (aa->width < 1 || aa->height < 1))
+        return WPS_ERROR_INVALID_PARAM;
+
     /* Eighth parameter: corner radius. Clamped to the box rather than to the
      * art, which is only known once a track has one -- art smaller than the
      * box than falls back to square corners at draw time rather than taking
@@ -1745,22 +1753,28 @@ static int parse_albumart_load(struct skin_element* element,
         aa->label = PTRTOSKINOFFSET(skin_buffer, (void*)label);
     }
 
-    /* Slots dedupe by dimension, so a blurred %Cl no longer shares one with
-     * a same-sized unblurred one. That is right -- they want different
-     * pixels -- and it is what keeps the saving: audio_load_albumart() runs
-     * per buffered track, so a full-screen slot costs ~115 KiB per track
-     * where the decimated one costs about seven.
+    /* Slots dedupe by dimension, and a blurred %Cl claims its decimated size,
+     * so it does not share a large slot with a same-sized unblurred one.
+     * That is what keeps the saving: audio_load_albumart() runs per buffered
+     * track, so a full-screen slot costs ~115 KiB per track where the
+     * decimated one costs about seven.
      *
      * The same dedupe is what makes several %Cl affordable: any that agree on
      * size share the one buffered bitmap, whether they are in this skin or the
      * other one. Only a new size costs anything, and there are only
      * MAX_MULTIPLE_AA of those to go round -- past that the claim fails and
-     * the art simply does not draw. */
+     * the art simply does not draw. An unblurred chain filters the buffered
+     * bitmap in place, so it keys its slot by the compiled chain and shares
+     * the bitmap only with the same chain. */
     int div = img_filter_source_divisor(&aa->filter, aa->width, aa->height);
     dimensions.width = (aa->width + div - 1) / div;
     dimensions.height = (aa->height + div - 1) / div;
 
-    aa->slot = playback_claim_aa_slot(&dimensions);
+    uint32_t key = 0;
+    if (!(aa->filter.stages & IMG_CLASS_RESIZE)
+        && (aa->filter.stages || aa->filter.has_adaptive))
+        key = fnv1a_bytes(&aa->filter, offsetof(struct img_filter, error)) | 1;
+    aa->slot = playback_claim_aa_slot_keyed(&dimensions, key);
 
     /* Appended only now that nothing can still fail: an entry in the chain is
      * one skin_data_free_buflib_allocs() will release a slot for. */
@@ -2639,6 +2653,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
         case LINE:
         {
             curr_line = skin_buffer_alloc(sizeof(*curr_line));
+            if (!curr_line)
+                return CALLBACK_ERROR;
             curr_line->update_mode = SKIN_REFRESH_STATIC;
             element->data = PTRTOSKINOFFSET(skin_buffer, curr_line);
         }
@@ -2646,6 +2662,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
         case LINE_ALTERNATOR:
         {
             struct line_alternator *alternator = skin_buffer_alloc(sizeof(*alternator));
+            if (!alternator)
+                return CALLBACK_ERROR;
             alternator->current_line = 0;
             alternator->next_change_tick = current_tick;
             element->data = PTRTOSKINOFFSET(skin_buffer, alternator);
@@ -2654,6 +2672,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
         case CONDITIONAL:
         {
             struct conditional *conditional = skin_buffer_alloc(sizeof(*conditional));
+            if (!conditional)
+                return CALLBACK_ERROR;
             conditional->last_value = -1;
             conditional->token = element->data;
             element->data = PTRTOSKINOFFSET(skin_buffer, conditional);

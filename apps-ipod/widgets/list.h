@@ -231,6 +231,10 @@ struct gui_synclist
     list_get_kind *callback_get_item_kind;
     list_get_name *callback_get_item_value;     /* a setting row's value */
     list_is_playing *callback_item_is_playing;
+
+    /* Changes whenever the items may have: init, the item count or the kind
+     * callback. Unique across lists, so a reused struct gets a new one. */
+    unsigned generation;
 };
 
 

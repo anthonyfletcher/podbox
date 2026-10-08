@@ -165,10 +165,10 @@ bool skinlist_item_is_playing(int offset, bool wrap)
     return current_list->callback_item_is_playing(item, current_list->data);
 }
 
-/* The tracks in rows [0, counted_to) of counted_list. Rows are drawn top to
- * bottom, so each row's number carries on from the one above it, and only the
- * first row drawn counts from the top of the list. */
-static struct gui_synclist *counted_list;
+/* The tracks in rows [0, counted_to) of the list whose generation is
+ * counted_generation. The count is kept across draws and walked to each row
+ * asked for, so a wheel step costs a few kind() calls, not a recount. */
+static unsigned counted_generation;
 static int counted_nb_items, counted_to = -1, counted;
 
 int skinlist_get_item_position(int offset, bool wrap)
@@ -184,11 +184,11 @@ int skinlist_get_item_position(int offset, bool wrap)
     if (kind(item, data) != LIST_ROW_TRACK)
         return -1;
 
-    if (counted_list != current_list
+    if (counted_generation != current_list->generation
         || counted_nb_items != current_list->nb_items
-        || counted_to < 0 || counted_to > item)
+        || counted_to < 0 || item < counted_to - item)  /* nearer the top */
     {
-        counted_list = current_list;
+        counted_generation = current_list->generation;
         counted_nb_items = current_list->nb_items;
         counted_to = 0;
         counted = 0;
@@ -197,6 +197,11 @@ int skinlist_get_item_position(int offset, bool wrap)
     {
         if (kind(counted_to, data) == LIST_ROW_TRACK)
             counted++;
+    }
+    for (; counted_to > item; counted_to--)
+    {
+        if (kind(counted_to - 1, data) == LIST_ROW_TRACK)
+            counted--;
     }
     return counted + 1;
 }
@@ -358,7 +363,6 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
         sb_set_title_text(list->title, list->title_icon, screen);
 
     current_list = list;
-    counted_to = -1;            /* the rows may not be the ones counted last */
     dynamic_colors_check_extraction(-1);
     wps.display = display;
     wps.data = listcfg[screen]->data;
@@ -427,7 +431,7 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
              viewport;
              viewport = SKINOFFSETTOPTR(get_skin_buffer(wps.data), viewport->next))
         {
-            int original_x, original_y;
+            int original_x, original_y, original_w, original_h;
             skin_viewport = SKINOFFSETTOPTR(get_skin_buffer(wps.data), viewport->data);
             char *viewport_label = NULL;
             if (skin_viewport)
@@ -449,6 +453,8 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
             }
             original_x = skin_viewport->vp.x;
             original_y = skin_viewport->vp.y;
+            original_w = skin_viewport->vp.width;
+            original_h = skin_viewport->vp.height;
             if (listcfg[screen]->tile)
             {
                 int cols = (parent->width / listcfg[screen]->width);
@@ -469,6 +475,21 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
                  * on the left and the name bar centred beside it), rather than
                  * stretching to fill a taller row. */
             }
+            /* Clip to the parent: a pitch smaller than the %Vl extent moves
+             * the last row past it, and past the framebuffer when the %Vi
+             * reaches the bottom of the LCD. */
+            int room_w = parent->x + parent->width - skin_viewport->vp.x;
+            int room_h = parent->y + parent->height - skin_viewport->vp.y;
+            if (room_w <= 0 || room_h <= 0)
+            {
+                skin_viewport->vp.x = original_x;
+                skin_viewport->vp.y = original_y;
+                continue;
+            }
+            if (skin_viewport->vp.width > room_w)
+                skin_viewport->vp.width = room_w;
+            if (skin_viewport->vp.height > room_h)
+                skin_viewport->vp.height = room_h;
             display->set_viewport(&skin_viewport->vp);
             /* Dynamic colors: resolve from stored originals */
             skin_viewport->vp.fg_pattern =
@@ -512,6 +533,8 @@ bool skinlist_draw(struct screen *display, struct gui_synclist *list)
                 display->scroll_stop_viewport(&skin_viewport->vp);
                 skin_viewport->vp.x = original_x;
                 skin_viewport->vp.y = original_y;
+                skin_viewport->vp.width = original_w;
+                skin_viewport->vp.height = original_h;
             }
         }
         row_top += row_height;

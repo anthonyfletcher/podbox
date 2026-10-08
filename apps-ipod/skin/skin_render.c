@@ -1413,9 +1413,12 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
                           == VP_FLAG_VP_DIRTY;
             /* A %VB skin always owes it: gwps_enter_wps()'s clear_display()
              * marks the screen clean, but what it copied was the .sbs's
-             * layer, and whatever no foreground viewport covers keeps it. */
+             * layer, and whatever no foreground viewport covers keeps it.
+             * Only the WPS skin itself: a %we bar clearing here would blank
+             * the WPS under it. */
             screen_clear_owed = dirty
-                || data->use_extra_framebuffer
+                || (data->use_extra_framebuffer
+                    && gwps == skin_get_gwps(WPS, display->screen_type))
                 || dynamic_colors_resolve(first_vp->bg_pattern)
                    != first_vp->bg_pattern
                 || dynamic_colors_screen_clear_needed();
@@ -1434,6 +1437,11 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         refresh_mode = 0;
 
     bool art_checks_done = false;
+    /* Taken and cleared before the pass, not after it: sb_busy_tick() sets
+     * it from the tick, and a request landing mid-pass is then kept for the
+     * next one rather than wiped. */
+    bool busy_redraw = data->busy_redraw;
+    data->busy_redraw = false;
 
     for (viewport = SKINOFFSETTOPTR(skin_buffer, data->tree);
          viewport;
@@ -1506,7 +1514,7 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
             if (skin_viewport->output_to_backdrop_buffer)
                 backdrop_flipped = true;
         }
-        else if (data->busy_redraw && skin_viewport->has_busy_tag
+        else if (busy_redraw && skin_viewport->has_busy_tag
                  && vp_refresh_mode)
         {
             vp_refresh_mode = SKIN_REFRESH_ALL;
@@ -1549,7 +1557,6 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
 
         refresh_mode = old_refresh_mode;
     }
-    data->busy_redraw = false;
     skin_backdrop_set_buffer(-1, skin_viewport);
     skin_backdrop_show(data->backdrop_id);
     if (screen_clear_owed)

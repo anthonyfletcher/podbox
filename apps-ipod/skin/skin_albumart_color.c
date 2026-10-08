@@ -1122,13 +1122,13 @@ static bool palette_from_cache(void)
  * next album. Striking the entries instead would be worse -- the new chain
  * would compose on top of the old one's output rather than replace it.
  *
- * One above SKINNABLE_SCREENS_COUNT because that is the largest playback.c's
- * MAX_MULTIPLE_AA can be (it grows by one for USB iAP), and room for three
- * buffers each, which is every one that can be alive at once: the slot's
- * current handle and the two playback holds for the album. Overflowing costs
- * one wasted pass, not a wrong picture. */
+ * AA_FILTER_SLOTS is one above SKINNABLE_SCREENS_COUNT because that is the
+ * largest playback.c's MAX_MULTIPLE_AA can be (it grows by one for USB iAP).
+ * The set is sized for the buffer, not the slots: every buffered track keeps
+ * its own cover, so a skip back lands on a handle filtered many skips ago.
+ * One that has fallen out of the set is filtered a second time. */
 #define AA_FILTER_SLOTS (SKINNABLE_SCREENS_COUNT + 1)
-#define AA_FILTERED_MAX (AA_FILTER_SLOTS * 3)
+#define AA_FILTERED_MAX 128
 
 /* Zero is the empty entry; buflib issues no such handle. */
 static volatile int filtered_art[AA_FILTERED_MAX];
