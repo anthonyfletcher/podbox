@@ -293,6 +293,8 @@ static struct mutex command_queue_mutex SHAREDBSS_ATTR;
 /* Moves whenever entry numbers stop meaning what they did: remove_files()
  * bumps it. */
 static volatile uint32_t db_generation;
+/* Set once boot has loaded the skins; the boot scan waits for it. */
+static volatile bool boot_finished;
 
 /* Tag database structures. */
 
@@ -1807,12 +1809,9 @@ inline static bool str_contains_oneof(const char *str, char *list)
 
 /* An article is skipped only with something after it: "The The" sorts as
  * "The", and a band called "A" stays under A. */
-const char *tagcache_sort_name(const char *name)
+const char *tagcache_skip_article(const char *name)
 {
     static const char * const articles[] = { "the ", "a ", "an " };
-
-    if (!global_settings.sort_ignore_articles)
-        return name;
 
     for (size_t i = 0; i < ARRAYLEN(articles); i++)
     {
@@ -1823,6 +1822,12 @@ const char *tagcache_sort_name(const char *name)
     }
 
     return name;
+}
+
+const char *tagcache_sort_name(const char *name)
+{
+    return global_settings.sort_ignore_articles
+        ? tagcache_skip_article(name) : name;
 }
 
 bool tagcache_tag_skips_articles(int tag)
@@ -6777,6 +6782,14 @@ static void tagcache_thread(void)
                           asked_to_scan, do_update, tc_stat.ready,
                           tc_stat.ramcache);
 
+                /* Not before boot has loaded the skins. A commit takes all
+                 * but TAGCACHE_MIN_AUDIO_RESERVE as one locked block, and a
+                 * small library reaches it within seconds -- the theme's
+                 * fonts then fail to load on a fresh player's first boot.
+                 * check_done stays clear, so the next tick tries again. */
+                if ((!tc_stat.ready || do_update) && !boot_finished)
+                    break ;
+
                 if (!tc_stat.ready)
                 {
                     tagcache_build();
@@ -6972,6 +6985,11 @@ void tagcache_init(void)
 bool tagcache_is_initialized(void)
 {
     return tc_stat.initialized;
+}
+
+void tagcache_boot_finished(void)
+{
+    boot_finished = true;
 }
 bool tagcache_is_fully_initialized(void)
 {

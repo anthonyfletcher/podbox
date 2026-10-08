@@ -181,6 +181,35 @@ static char* get_album_artist(const int slide_index, char *buf, size_t size)
 }
 
 
+int carousel_album_order(void)
+{
+    int order;
+
+    if (!global_settings.album_covers_sort_same_as_music)
+        return global_settings.album_covers_sort_albums_by;
+    order = browser_db_album_sort_get(DB_ALBUM_CTX_ROOT);
+    return order >= 0 ? order : global_settings.database_sort_albums_by;
+}
+
+int carousel_artist_order(void)
+{
+    return global_settings.album_covers_sort_same_as_music
+        ? global_settings.database_sort_artists_by
+        : global_settings.album_covers_sort_artists_by;
+}
+
+bool carousel_skips_articles(void)
+{
+    return global_settings.album_covers_sort_same_as_music
+        ? global_settings.sort_ignore_articles
+        : global_settings.album_covers_sort_ignore_articles;
+}
+
+const char *carousel_sort_name(const char *name)
+{
+    return carousel_skips_articles() ? tagcache_skip_article(name) : name;
+}
+
 /* The first letter of the name a slide sorts by, which is what the letter
  * jumps compare. */
 static char get_slide_initial(const int slide_index, bool artist)
@@ -191,15 +220,15 @@ static char get_slide_initial(const int slide_index, bool artist)
         get_album_artist(slide_index, name, sizeof(name));
     else
         get_album_name(slide_index, name, sizeof(name));
-    return tagcache_sort_name(name)[0];
+    return carousel_sort_name(name)[0];
 }
 
 /* Whether the slides run in year order alone, which is what the jumps step
  * through instead of initials. */
 static bool sorted_by_year(void)
 {
-    return global_settings.album_covers_sort_albums_by == SORT_BY_YEAR
-        || global_settings.album_covers_sort_albums_by == SORT_BY_YEAR_DESC;
+    return carousel_album_order() == SORT_BY_YEAR
+        || carousel_album_order() == SORT_BY_YEAR_DESC;
 }
 
 static int jmp_idx_prev(void)
@@ -232,7 +261,7 @@ static int jmp_idx_prev(void)
     }
     else
     {
-        bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
+        bool by_artist = carousel_album_order() != SORT_BY_NAME;
         char current_selection = get_slide_initial(center_index, by_artist);
         int i = center_index - 1;
 
@@ -261,7 +290,7 @@ static int jmp_idx_next(void)
     }
     else
     {
-        bool by_artist = global_settings.album_covers_sort_albums_by != SORT_BY_NAME;
+        bool by_artist = carousel_album_order() != SORT_BY_NAME;
         char current_selection = get_slide_initial(center_index, by_artist);
         for (int i = center_index + 1; i < carousel_idx.album_ct; i++ )
             if(get_slide_initial(i, by_artist) != current_selection)
@@ -372,14 +401,14 @@ static int name_order(int tag, long a, long b)
 {
     char an[TAGCACHE_BUFSZ], bn[TAGCACHE_BUFSZ];
 
-    if (a == b || !global_settings.sort_ignore_articles)
+    if (a == b || !carousel_skips_articles())
         return (int)(a - b);
 
     int res = strcasecmp(
-        tagcache_sort_name(db_summary_name(&carousel_idx, tag, a,
-                                           an, sizeof(an))),
-        tagcache_sort_name(db_summary_name(&carousel_idx, tag, b,
-                                           bn, sizeof(bn))));
+        tagcache_skip_article(db_summary_name(&carousel_idx, tag, a,
+                                              an, sizeof(an))),
+        tagcache_skip_article(db_summary_name(&carousel_idx, tag, b,
+                                              bn, sizeof(bn))));
     return res != 0 ? res : (int)(a - b);
 }
 
@@ -394,7 +423,7 @@ static int compare_albums(const void *a_v, const void *b_v)
     int year_a = ((struct album_data *)a_v)->year;
     int year_b = ((struct album_data *)b_v)->year;
 
-    switch (global_settings.album_covers_sort_albums_by)
+    switch (carousel_album_order())
     {
         case SORT_BY_ARTIST_AND_NAME:
             if (artist_a - artist_b == 0)
@@ -500,10 +529,20 @@ static bool sort_albums(int new_sorting, bool from_settings)
 
     carousel_settle();
 
-    global_settings.album_covers_sort_albums_by = new_sorting;
+    /* Choosing an order here makes it the carousel's own, so it leaves Sort
+     * Same as Music, keeping the other two orders it was taking from Music. */
     if (!from_settings)
     {
-        splash(HZ, sort_options[global_settings.album_covers_sort_albums_by]);
+        if (global_settings.album_covers_sort_same_as_music)
+        {
+            global_settings.album_covers_sort_artists_by =
+                carousel_artist_order();
+            global_settings.album_covers_sort_ignore_articles =
+                carousel_skips_articles();
+            global_settings.album_covers_sort_same_as_music = false;
+        }
+        global_settings.album_covers_sort_albums_by = new_sorting;
+        splash(HZ, sort_options[new_sorting]);
     }
 
     album_seek = carousel_idx.album_index[center_index].seek;
@@ -520,13 +559,12 @@ static bool sort_albums(int new_sorting, bool from_settings)
  * album sort orders and re-sort. */
 static void album_sort_next(void)
 {
-    sort_albums((global_settings.album_covers_sort_albums_by + 1)
-                % SORT_VALUES_SIZE, false);
+    sort_albums((carousel_album_order() + 1) % SORT_VALUES_SIZE, false);
 }
 
 static void album_sort_prev(void)
 {
-    sort_albums((global_settings.album_covers_sort_albums_by + (SORT_VALUES_SIZE - 1))
+    sort_albums((carousel_album_order() + (SORT_VALUES_SIZE - 1))
                 % SORT_VALUES_SIZE, false);
 }
 
@@ -569,7 +607,13 @@ static void draw_album_text(void)
                 || global_settings.album_covers_show_album_name == ALBUM_AND_ARTIST_BOTTOM);
 
     get_album_name(center_index, albumtxt, sizeof(albumtxt));
-    if (global_settings.album_covers_show_year
+    if (global_settings.album_covers_show_year == ALBUM_YEAR_BEFORE
+        && carousel_idx.album_index[center_index].year > 0)
+    {
+        snprintf(album_and_year, sizeof(album_and_year), "%d \xe2\x80\x93 %s",
+                  carousel_idx.album_index[center_index].year, albumtxt);
+    }
+    else if (global_settings.album_covers_show_year == ALBUM_YEAR_AFTER
         && carousel_idx.album_index[center_index].year > 0)
     {
         snprintf(album_and_year, sizeof(album_and_year), "%s \xe2\x80\x93 %d",
@@ -581,8 +625,8 @@ static void draw_album_text(void)
     struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
 
-    /* The year is the caption's other input: turning it on or off changes the
-     * string without moving the selection. */
+    /* The year is the caption's other input: moving it changes the string
+     * without moving the selection. */
     bool album_changed = carousel_caption_changed(
                              center_index, global_settings.album_covers_show_year);
 
@@ -729,7 +773,8 @@ int carousel_settings_menu(void)
 static int album_on_menu(void)
 {
     /* Snapshot the settings whose change needs more than a cheap layout redraw. */
-    int old_sort       = global_settings.album_covers_sort_albums_by;
+    int old_sort       = carousel_album_order();
+    bool old_articles  = carousel_skips_articles();
     int old_show_name  = global_settings.album_covers_show_album_name;
     int old_cache_ver  = pf_cfg.cache_version;
     bool old_statusbar = global_settings.album_covers_statusbar;
@@ -757,8 +802,9 @@ static int album_on_menu(void)
 
     /* A sort-order change must be applied explicitly: reinit()'s normal path
      * reloads the cached index in its saved order, so it wouldn't re-sort. */
-    if (global_settings.album_covers_sort_albums_by != old_sort)
-        sort_albums(global_settings.album_covers_sort_albums_by, true);
+    if (carousel_album_order() != old_sort
+        || carousel_skips_articles() != old_articles)
+        sort_albums(carousel_album_order(), true);
 
     /* A treatment reaches a slide only as it is loaded, so the ones already
      * decoded have to go -- otherwise the new look arrives a screen at a time

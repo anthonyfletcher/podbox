@@ -1898,8 +1898,20 @@ const struct settings_list settings[] = {
                 NULL, NULL, NULL),
     OFFON_SETTING(0, sort_ignore_articles, LANG_SORT_IGNORE_ARTICLES, false,
                   "sort ignoring articles", NULL),
-    OFFON_SETTING(0, album_show_year, LANG_SHOW_YEAR_IN_ALBUM_LISTS, false,
-                  "album show year", NULL),
+    /* The same choices as album_covers_sort_artists_by, in the same order. */
+    CHOICE_SETTING(0, database_sort_artists_by, LANG_SORT_ARTISTS_BY,
+                  0, "database sort artists by", "name,most played", NULL, 2,
+                  ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
+    OFFON_SETTING(0, album_covers_sort_ignore_articles,
+                  LANG_SORT_IGNORE_ARTICLES, false,
+                  "album covers sort ignoring articles", NULL),
+    OFFON_SETTING(0, album_covers_sort_same_as_music, LANG_SORT_SAME_AS_MUSIC,
+                  false, "album covers sort same as music", NULL),
+    /* "on" is After, so a config saved as "on" keeps its meaning. */
+    CHOICE_SETTING(0, album_show_year, LANG_SHOW_YEAR_IN_ALBUM_LISTS,
+                   ALBUM_YEAR_OFF, "album show year", "off,before,on", NULL, 3,
+                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_YEAR_BEFORE_NAME),
+                   ID2P(LANG_YEAR_AFTER_NAME)),
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
@@ -1910,8 +1922,12 @@ const struct settings_list settings[] = {
                   LANG_YEAR_SORT_ORDER,
                   0, "album covers year sort order", "ascending,descending",
                   NULL, 2, ID2P(LANG_ASCENDING), ID2P(LANG_DESCENDING)),
-    OFFON_SETTING(F_THEMESETTING, album_covers_show_year, LANG_SHOW_YEAR_IN_ALBUM_TITLE,
-                  false, "album covers show year", NULL),
+    /* As album show year: "on" is After. */
+    CHOICE_SETTING(F_THEMESETTING, album_covers_show_year,
+                   LANG_SHOW_YEAR_IN_ALBUM_TITLE, ALBUM_YEAR_OFF,
+                   "album covers show year", "off,before,on", NULL, 3,
+                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_YEAR_BEFORE_NAME),
+                   ID2P(LANG_YEAR_AFTER_NAME)),
 #define CAROUSEL_FILTER_CHOICES \
                    ID2P(LANG_OFF),               ID2P(LANG_FILTER_BW),  \
                    ID2P(LANG_FILTER_INVERT),     ID2P(LANG_FILTER_BRIGHTER), \
@@ -1971,6 +1987,8 @@ const struct settings_list settings[] = {
                   false, "database artist art", NULL),
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_bookart, LANG_DB_BOOK_ART,
                   false, "database audiobook art", NULL),
+    OFFON_SETTING(F_THEMESETTING|F_THEMERESET, db_authorart, LANG_DB_AUTHOR_ART,
+                  false, "database author art", NULL),
     OFFON_SETTING(F_BANFROMQS, segregate_audiobooks, LANG_SEGREGATE_AUDIOBOOKS,
                   false, "segregate audiobooks", segregate_audiobooks_callback),
     /* 0 leaves the skin's own row height; the bounds stop a hand-edited .cfg

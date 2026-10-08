@@ -89,18 +89,17 @@ static int compare_artists_by_name(const void *a_v, const void *b_v)
     char an[TAGCACHE_BUFSZ], bn[TAGCACHE_BUFSZ];
 
     return strcasecmp(
-        tagcache_sort_name(db_summary_name(&carousel_idx, tag_albumartist,
-                                           a->seek, an, sizeof(an))),
-        tagcache_sort_name(db_summary_name(&carousel_idx, tag_albumartist,
-                                           b->seek, bn, sizeof(bn))));
+        tagcache_skip_article(db_summary_name(&carousel_idx, tag_albumartist,
+                                              a->seek, an, sizeof(an))),
+        tagcache_skip_article(db_summary_name(&carousel_idx, tag_albumartist,
+                                              b->seek, bn, sizeof(bn))));
 }
 
 static int artist_build_index(void)
 {
     void *buf = carousel_idx.buf;
     size_t buf_size = carousel_idx.buf_sz;
-    bool by_plays = global_settings.album_covers_sort_artists_by
-                        == SORT_ARTISTS_BY_PLAYS;
+    bool by_plays = carousel_artist_order() == SORT_ARTISTS_BY_PLAYS;
     int res;
 
     ALIGN_BUFFER(buf, buf_size, sizeof(long));
@@ -116,7 +115,7 @@ static int artist_build_index(void)
     if (by_plays)
         qsort(carousel_idx.artist_index, carousel_idx.artist_ct,
               sizeof(struct artist_data), compare_artists_by_plays);
-    else if (global_settings.sort_ignore_articles)
+    else if (carousel_skips_articles())
         qsort(carousel_idx.artist_index, carousel_idx.artist_ct,
               sizeof(struct artist_data), compare_artists_by_name);
 
@@ -157,7 +156,7 @@ static char artist_initial(int index)
 {
     char name[TAGCACHE_BUFSZ];
 
-    return tagcache_sort_name(artist_name(index, name, sizeof(name)))[0];
+    return carousel_sort_name(artist_name(index, name, sizeof(name)))[0];
 }
 
 /* Jump to the next/previous artist whose name starts with a different letter. */
@@ -233,7 +232,8 @@ static int artist_on_menu(void)
 {
     int old_show_name = global_settings.album_covers_show_album_name;
     bool old_statusbar = global_settings.album_covers_statusbar;
-    int old_sort = global_settings.album_covers_sort_artists_by;
+    int old_sort = carousel_artist_order();
+    bool old_articles = carousel_skips_articles();
     int old_filter[CAROUSEL_FILTER_SLOTS];
     char old_chain[CAROUSEL_FILTER_MAX];
     long seek = carousel_idx.artist_index[center_index].seek;
@@ -251,7 +251,8 @@ static int artist_on_menu(void)
      * The artist on screen stays on screen. */
     if (global_settings.album_covers_show_album_name != old_show_name
         || global_settings.album_covers_statusbar != old_statusbar
-        || global_settings.album_covers_sort_artists_by != old_sort)
+        || carousel_artist_order() != old_sort
+        || carousel_skips_articles() != old_articles)
     {
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;

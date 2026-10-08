@@ -518,6 +518,7 @@ MENUITEM_SETTING(dynamic_colors_background,
 MENUITEM_SETTING(db_albumart, &global_settings.db_albumart, NULL);
 MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
 MENUITEM_SETTING(db_bookart, &global_settings.db_bookart, NULL);
+MENUITEM_SETTING(db_authorart, &global_settings.db_authorart, NULL);
 
 /* Appearance is split by what a setting does, not by which layer implements
  * it: Skins picks the layouts, Colours picks the palette, Elements decides
@@ -564,6 +565,7 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &db_albumart,
             &db_artistart,
             &db_bookart,
+            &db_authorart,
             &wps_art_source,          /* general_settings.c, also under
                                          Playback with the rest of that screen */
             &show_icons,

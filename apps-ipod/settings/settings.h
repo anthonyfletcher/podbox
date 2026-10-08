@@ -72,6 +72,13 @@ enum {
     MIX_VARY_VARIABLE,          /* a new list every time */
 };
 
+/* global_settings.album_show_year -- where an album list puts the year */
+enum {
+    ALBUM_YEAR_OFF = 0,
+    ALBUM_YEAR_BEFORE,          /* "2004 – Album" */
+    ALBUM_YEAR_AFTER,           /* "Album – 2004" */
+};
+
 /* Shared by all bookmark parameters */
 enum {
     BOOKMARK_NO = 0,
@@ -716,8 +723,13 @@ struct user_settings
     int  album_covers_on_select;  /* ON_SELECT_*: browse the album, or play it */
     int  album_covers_sort_albums_by;
     int  album_covers_sort_artists_by; /* SORT_ARTISTS_*: portraits ordering */
+    /* The carousel's own Sort Ignoring The/A/An */
+    bool album_covers_sort_ignore_articles;
+    /* The carousel takes the Music lists' three sort settings instead of its
+     * own. See carousel_album_order(). */
+    bool album_covers_sort_same_as_music;
     int  album_covers_year_sort_order;
-    bool album_covers_show_year;
+    int  album_covers_show_year;  /* ALBUM_YEAR_*, as album_show_year */
     int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
     int  album_covers_custom_color; /* ...when that is CAROUSEL_BG_CUSTOM */
     bool album_covers_statusbar;  /* show it, or take the screen and cover it */
@@ -738,6 +750,8 @@ struct user_settings
      * year and artist come from the summary index, not the database. Separate
      * from the carousel's own sort, which offers the same choices. */
     int  database_sort_albums_by;
+    /* DB_SORT_ARTISTS_*: how the database browser orders its artist lists. */
+    int  database_sort_artists_by;
     /* Per-context overrides of the line above: three bits for each
      * DB_ALBUM_CTX_*, holding DB_SORT_ALBUMS_* + 1, or 0 for "follow
      * database_sort_albums_by". A context is the level an album list hangs
@@ -747,8 +761,8 @@ struct user_settings
     /* Artists and albums sort past a leading "The ", "A " or "An ", in the
      * database browser and the carousel. See tagcache_sort_name(). */
     bool sort_ignore_articles;
-    /* " – 2004" after each name in the Music browser's album lists. */
-    bool album_show_year;
+    /* An album's year beside its name in the Music browser's album lists. */
+    int  album_show_year;       /* ALBUM_YEAR_* */
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */
@@ -758,9 +772,11 @@ struct user_settings
     bool db_artistart;
     /* Art on the book rows of an audiobook browse, overriding the two above
      * for those lists only -- tall rows are a different bargain over a few
-     * dozen books than over a few thousand albums. Author rows are never
-     * given art: hardly anyone keeps a photograph of one. Off by default. */
+     * dozen books than over a few thousand albums. Off by default. */
     bool db_bookart;
+    /* The same for the author rows, apart, since few people keep a photograph
+     * of an author. Off by default. */
+    bool db_authorart;
     /* Audiobooks kept apart from the music: spoken word out of the Music
      * menu, Album covers, Artist portraits and Random album, and the
      * Audiobooks row put in the main menu. One setting rather than two,

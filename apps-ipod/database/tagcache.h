@@ -185,6 +185,8 @@ const char* tagcache_tag_to_str(int tag);
  * while Sort Ignoring The/A/An is on, otherwise the name itself. Only
  * the order changes; a list still shows the whole name. */
 const char *tagcache_sort_name(const char *name);
+/* The same, whatever Sort Ignoring The/A/An says. */
+const char *tagcache_skip_article(const char *name);
 /* Whether lists of this tag sort by tagcache_sort_name(): artists and albums. */
 bool tagcache_tag_skips_articles(int tag);
 
@@ -333,6 +335,8 @@ bool tagcache_ram_refused(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
 bool tagcache_is_initialized(void);
+/* Boot has loaded the skins: the boot scan may build or update. */
+void tagcache_boot_finished(void);
 bool tagcache_is_fully_initialized(void);
 bool tagcache_is_usable(void);
 void tagcache_start_scan(void);

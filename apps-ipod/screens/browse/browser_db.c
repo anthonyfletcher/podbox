@@ -1070,11 +1070,24 @@ static bool parse_search(struct menu_entry *entry, const char *str)
 static int sort_prefix;
 static bool sort_prefix_inverse;
 
+/* Whether a row's name, past its 'prefix' sort key, is [Untagged]. */
+static bool name_is_untagged(const char *name, int prefix)
+{
+    return !strcmp(name + prefix, str(LANG_TAGNAVI_UNTAGGED));
+}
+
+/* [Untagged] heads the list whatever the order, as it does in the database's
+ * own: compared as text, "[" sorts after digits and punctuation. */
 static int compare(const void *p1, const void *p2)
 {
     struct tagentry *e1 = (struct tagentry *)p1;
     struct tagentry *e2 = (struct tagentry *)p2;
     const char *a = e1->name, *b = e2->name;
+    int prefix = sort_prefix > 0 ? sort_prefix : 0;
+    bool untagged_a = name_is_untagged(a, prefix);
+
+    if (untagged_a != name_is_untagged(b, prefix))
+        return untagged_a ? -1 : 1;
 
     if (sort_prefix >= 0)
     {
@@ -1803,6 +1816,10 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
  * within a key exactly as they do in the plain album list. */
 #define YEAR_FIELD_LEN   5      /* "2004 " */
 #define ARTIST_FIELD_LEN 6      /* the artist's rank, "00042 " */
+#define PLAYS_FIELD_LEN  8      /* PLAYS_MAX less an artist's plays */
+#define PLAYS_MAX        9999999
+
+static int artist_plays(int tag, long seek);
 /* Albums the summary has no year for -- one added since the last background
  * pass, or one whose tracks are untagged. Parked at the end together, and a
  * value that reads as "unknown" rather than one that hides among real years if
@@ -2555,7 +2572,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * leaves the list in name order rather than a wrong one. */
     int album_order = tag == tag_album ? album_sort_order(level)
                                        : DB_SORT_ALBUMS_NAME;
-    bool show_year = tag == tag_album && global_settings.album_show_year;
+    bool show_year = tag == tag_album
+                     && global_settings.album_show_year != ALBUM_YEAR_OFF;
 
     album_years_valid = false;
     if (album_order != DB_SORT_ALBUMS_NAME || show_year)
@@ -2578,6 +2596,25 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             articles_only = false;
             sort_inverse = (album_order == DB_SORT_ALBUMS_YEAR_DESC);
         }
+    }
+
+    /* Artist lists by plays, the key ahead of the name as the album orders
+     * write theirs. The plays are counted down from PLAYS_MAX, so the most
+     * played sorts first and a tie keeps name order. Without the RAM copy there
+     * are no figures, and the list stays in name order. An audiobook author
+     * list is not a Music list and keeps name order too. */
+    bool artist_by_plays = !fmt && keep != KEEP_BOOKS
+        && global_settings.database_sort_artists_by == DB_SORT_ARTISTS_PLAYS
+        && (tag == tag_albumartist || tag == tag_artist
+            || tag == tag_virt_canonicalartist)
+        && tagcache_artist_count() > 0;
+    if (artist_by_plays)
+    {
+        order_prefix = PLAYS_FIELD_LEN;
+        strip = order_prefix;
+        sort = true;
+        articles_only = false;
+        sort_inverse = false;
     }
 
     /* lock buflib out due to possible yields */
@@ -2851,6 +2888,11 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                         memset(dptr->name,
                                album_order == DB_SORT_ALBUMS_YEAR_DESC
                                ? '~' : ' ', order_prefix);
+                    else if (artist_by_plays)
+                        write_field(dptr->name,
+                                    PLAYS_MAX - artist_plays(tag,
+                                                    tcs.result_seek),
+                                    PLAYS_FIELD_LEN);
                     else if (order_prefix)
                         write_order_prefix(dptr->name, order_tab, order_count,
                                            tcs.result_seek, album_order);
@@ -2919,6 +2961,9 @@ entry_skip_formatter:
                                     entries[i].extraseek);
             int year = row != NULL ? row->year : 0;
 
+            /* [Untagged] is no one album, so it has no year of its own. */
+            if (row != NULL && name_is_untagged(entries[i].name, order_prefix))
+                year = 0;
             years[i] = (year > 0 && year < YEAR_UNKNOWN) ? year : 0;
         }
         album_years_valid = true;
@@ -5218,7 +5263,21 @@ char* browser_db_get_display_name(struct browser_context *c, int id,
         return name;
 
     year = album_years(c)[realid];
-    if (year > 0)
+    if (year > 0 && global_settings.album_show_year == ALBUM_YEAR_BEFORE)
+    {
+        char head[16];
+        size_t n = snprintf(head, sizeof(head), "%d \xe2\x80\x93 ", year);
+        size_t len = strlen(buf);
+
+        if (n >= bufsize)
+            return buf;
+        if (len > bufsize - 1 - n)
+            len = bufsize - 1 - n;
+        memmove(buf + n, buf, len);
+        memcpy(buf, head, n);
+        buf[n + len] = '\0';
+    }
+    else if (year > 0)
     {
         size_t len = strlen(buf);
 
@@ -5447,38 +5506,50 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
     return ok;
 }
 
-/* The art key of the album artist named as row 'seek' of a 'tag' list is, the
- * name matched without regard to case, as the database matches names. The
- * artist table is in seek order, which is name order because the album-artist
- * tag file is sorted that way, <Untagged> first. 0 when no album artist has
- * the name, and always without the RAM copy. */
-static unsigned int artist_name_art_hash(int tag, long seek)
+/* The album artist named as row 'seek' of a 'tag' list is, the name matched
+ * without regard to case, as the database matches names. The artist table is
+ * in seek order, which is name order because the album-artist tag file is
+ * sorted that way, <Untagged> first. False when no album artist has the name,
+ * and always without the RAM copy. */
+static bool artist_by_name(int tag, long seek, struct tagcache_artist *ar)
 {
     char name[MAX_PATH], other[MAX_PATH];
-    struct tagcache_artist ar;
     int lo = 0, hi = tagcache_artist_count() - 1;
 
+    if (tag == tag_albumartist)
+        return tagcache_artist_get(tagcache_artist_find(seek), ar);
     if (!tagcache_seek_string(tag, seek, name, sizeof(name)))
-        return 0;
+        return false;
 
     while (lo <= hi)
     {
         int mid = (lo + hi) / 2;
         int cmp;
 
-        if (!tagcache_artist_get(mid, &ar))
-            return 0;
-        cmp = tagcache_seek_string(tag_albumartist, ar.seek,
+        if (!tagcache_artist_get(mid, ar))
+            return false;
+        cmp = tagcache_seek_string(tag_albumartist, ar->seek,
                                    other, sizeof(other))
               ? strcasecmp(other, name) : -1;
         if (cmp == 0)
-            return ar.art_hash;
+            return true;
         if (cmp < 0)
             lo = mid + 1;
         else
             hi = mid - 1;
     }
-    return 0;
+    return false;
+}
+
+/* The plays of the album artist row 'seek' of a 'tag' list names. An artist
+ * who is no album artist -- one who only guests -- has none. */
+static int artist_plays(int tag, long seek)
+{
+    struct tagcache_artist ar;
+
+    if (!artist_by_name(tag, seek, &ar))
+        return 0;
+    return MIN(ar.playcount, PLAYS_MAX);
 }
 
 /* The art key of a row tagcache's album tables can place: an album artist, an
@@ -5491,13 +5562,11 @@ static unsigned int table_art_hash(struct browser_context* c,
     int tag = csi->tagorder[level];
     int n;
 
-    if (tag == tag_artist || tag == tag_virt_canonicalartist)
-        return artist_name_art_hash(tag, entry->extraseek);
-    if (tag == tag_albumartist)
+    if (tag == tag_artist || tag == tag_virt_canonicalartist
+        || tag == tag_albumartist)
     {
         struct tagcache_artist ar;
-        n = tagcache_artist_find(entry->extraseek);
-        return tagcache_artist_get(n, &ar) ? ar.art_hash : 0;
+        return artist_by_name(tag, entry->extraseek, &ar) ? ar.art_hash : 0;
     }
     if (tag == tag_album)
     {

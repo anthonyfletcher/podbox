@@ -669,15 +669,20 @@ name or year.
 The four rows above it override this for the lists they name, so this is what
 the rest of the Music menu follows.
 
+[database sort artists by]
+The order of the artist lists in Music: by name, or most played first. Plays
+are counted from the albums an artist heads, so an artist who only guests on
+other albums sorts with the unplayed ones.
+
 [sort ignoring articles]
 Sorts artists and albums as if a leading "The", "A" or "An" were not there, so
 The Beatles sits among the Bs. The names still show in full.
 
-Applies to the Music lists, By First Letter and the carousel.
+Applies to the Music lists and By First Letter. The carousel has its own.
 
 [album show year]
-Adds the release year after each album's name in the Music lists, so a
-discography reads in order at a glance. The carousel has its own setting.
+Shows each album's release year in the Music lists, before or after its name,
+so a discography reads in order at a glance. The carousel has its own setting.
 
 [debug log tagcache]
 Writes scan progress to a log file. For working out why a track is missing from
@@ -768,6 +773,10 @@ that supports artwork in lists, or the rows are tall and empty.
 Draws cover art beside the rows in the Audiobooks browser. Needs a theme that
 supports artwork in lists, or the rows are tall and empty.
 
+[database author art]
+Draws a photograph beside each author in the Audiobooks browser, from a
+folder.jpg in the author's folder. Without one the row shows a placeholder.
+
 [wps art source]
 Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.
@@ -790,7 +799,7 @@ What Select does on a cover: open the album's track list, or start playing it.
 Whether the album name is drawn over the covers, and where.
 
 [album covers show year]
-Adds the release year to the caption.
+Shows the release year in the caption, before or after the album's name.
 
 [album covers background]
 Which colour fills the screen behind the covers: one of the theme's, which
@@ -802,12 +811,21 @@ later. The captions turn black or white to read on it.
 [album covers statusbar]
 Draws the status bar over the carousel. Off gives the covers the whole screen.
 
+[album covers sort same as music]
+Sorts the carousels the way the Music lists are sorted: albums as All Albums,
+artists and The/A/An as their Music settings. The carousel's own sort settings
+are hidden while it is on. Choosing an order inside the carousel turns it off.
+
 [album covers sort albums by]
 The order covers appear in: by album name, by release year with either end
 first, or by album artist and then name or year.
 
 [album covers sort artists by]
 The order artist portraits appear in: by name, or most played first.
+
+[album covers sort ignoring articles]
+Sorts covers and portraits as if a leading "The", "A" or "An" were not there,
+so The Beatles sits among the Bs. The names still show in full.
 
 [album covers view mode]
 3D angles the covers away on both sides. Flat lays them face-on and the same

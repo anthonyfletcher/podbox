@@ -805,6 +805,7 @@ static void init(void)
     CHART("<settings_apply_skins");
     settings_apply_skins();
     CHART(">settings_apply_skins");
+    tagcache_boot_finished();
 }
 
 #ifdef CPU_PP

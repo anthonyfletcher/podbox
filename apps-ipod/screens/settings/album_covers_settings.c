@@ -64,8 +64,27 @@ MENUITEM_SETTING(album_covers_random_spin, &global_settings.album_covers_random_
 MENUITEM_SETTING(album_covers_transition_speed, &global_settings.album_covers_transition_speed, tilt_only_callback);
 MENUITEM_SETTING(album_covers_show_album_name, &global_settings.album_covers_show_album_name, NULL);
 MENUITEM_SETTING(album_covers_on_select, &global_settings.album_covers_on_select, NULL);
-MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, NULL);
-MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, NULL);
+/* Under Sort Same as Music the carousel's own three sort rows do nothing, so
+ * they are hidden while it is on. */
+static int own_sort_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM
+        && global_settings.album_covers_sort_same_as_music)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+MENUITEM_SETTING(album_covers_sort_same_as_music,
+                 &global_settings.album_covers_sort_same_as_music, NULL);
+MENUITEM_SETTING(album_covers_sort_albums_by, &global_settings.album_covers_sort_albums_by, own_sort_callback);
+MENUITEM_SETTING(album_covers_sort_artists_by, &global_settings.album_covers_sort_artists_by, own_sort_callback);
+MENUITEM_SETTING(album_covers_sort_ignore_articles,
+                 &global_settings.album_covers_sort_ignore_articles,
+                 own_sort_callback);
 MENUITEM_SETTING(album_covers_show_year, &global_settings.album_covers_show_year, NULL);
 /* Custom needs a colour, so moving to it opens the picker, and the Custom
  * Colour row under it, shown only then, changes the colour afterwards. */
@@ -185,8 +204,10 @@ MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_background,
             &album_covers_custom_color_item,
             &album_covers_statusbar,
+            &album_covers_sort_same_as_music,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,
+            &album_covers_sort_ignore_articles,
             &album_covers_view_mode,
             /* Whichever mode is selected, its own settings follow it. */
             &album_covers_center_margin,

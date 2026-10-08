@@ -253,8 +253,9 @@ report rebuilds them itself the next time you open it.
 | Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | default |  |
 | Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
 | Sort Albums By ▸ Other Lists | The order for every album list that has no row of its own under Sort Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
-| Sort Ignoring The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists, By First Letter and the carousel. | off |  |
-| Show Year in Album Lists | Adds the release year after each album's name in the Music lists, so a discography reads in order at a glance. The carousel has its own setting. | off |  |
+| Sort Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | name |  |
+| Sort Ignoring The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | off |  |
+| Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | no |  |
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | off |  |
 | Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "podcast", "speech" and the like. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | off |  |
 | Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | off |  |
@@ -299,12 +300,14 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 |---|---|---|---|
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | show tracks |  |
 | Show Album Title | Whether the album name is drawn over the covers, and where. | both bottom |  |
-| Show Year in Album Title | Adds the release year to the caption. | off |  |
+| Show Year in Album Title | Shows the release year in the caption, before or after the album's name. | no |  |
 | Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
 | Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
 | Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | off |  |
+| Sort Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | off |  |
 | Sort Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | artist+name |  |
 | Sort Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
+| Sort Ignoring The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | off |  |
 | Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
 | Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
 | Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
@@ -406,6 +409,7 @@ shadow to colour.
 | Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
 | Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | off |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Cfg** |
 | Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 | Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |

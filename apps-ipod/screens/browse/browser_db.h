@@ -29,6 +29,12 @@ enum database_sort_albums {
     DB_SORT_ALBUMS_ARTIST_YEAR_DESC,
 };
 
+/* global_settings.database_sort_artists_by: how an artist list is ordered. */
+enum database_sort_artists {
+    DB_SORT_ARTISTS_NAME = 0,
+    DB_SORT_ARTISTS_PLAYS,
+};
+
 /* The parent an album list hangs under, which is what decides its order.
  * The level above is the whole identity, so every menu grouping by the same
  * artist tag shares one slot: Genre, Year and the history lists all land in

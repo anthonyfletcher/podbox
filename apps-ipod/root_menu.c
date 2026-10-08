@@ -1148,66 +1148,6 @@ static void root_menu_apply_canonical_order(void)
                             | MENU_ITEM_COUNT(out);
 }
 
-/* Display-only counterpart to root_menu__[] -- see
- * root_menu_build_display_list()'s comment for why this has to be a
- * separate array rather than a temporary edit of root_menu__[] itself. */
-static struct menu_item_ex *root_menu_display__[MAX_MENU_ITEMS];
-
-/* Resume Playback/Now Playing must stay reachable from the main menu
- * while something is genuinely playing, even if the user toggled it off
- * in Customize Main Menu at a moment nothing was playing (see
- * main_menu_config.c's locking of that item while audio_status() is
- * true, which stops it being toggled off *while* playing, but can't do
- * anything about a user who disabled it earlier and then started
- * playback some other way, e.g. resuming via a bookmark).
- *
- * Builds the list into root_menu_display__[], never root_menu__[] itself:
- * whether something happens to be playing at the exact moment
- * settings_save() fires must not affect what actually gets persisted (see
- * root_menu_write_to_cfg(), which reads root_menu__[] directly), so this
- * has to be entirely display-only, rebuilt fresh every time the root menu
- * is about to be shown rather than baked into the persisted array even
- * temporarily.
- *
- * *inserted_at_front is set if this actually added the item (it wasn't
- * already present) -- the caller needs that to keep root_menu()'s own
- * "selected" index (which indexes into the *persisted* root_menu__[]
- * layout) correct against the now-possibly-shifted display list. Returns
- * the resulting item count. */
-static unsigned root_menu_build_display_list(bool *inserted_at_front)
-{
-    unsigned count = MENU_GET_COUNT(root_menu_.flags);
-    unsigned i;
-    bool wps_present = false;
-
-    *inserted_at_front = false;
-    if (count > MAX_MENU_ITEMS)
-        count = MAX_MENU_ITEMS;
-
-    /* Must finish copying every entry before returning. Trap: an early return
-     * from inside this loop -- say as soon as wps_item is spotted, which is
-     * first in canonical order -- leaves every later slot stale in
-     * root_menu_display__[] while the count still reports them valid, and
-     * do_menu() then dereferences them. */
-    for (i = 0; i < count; i++)
-    {
-        root_menu_display__[i] = root_menu__[i];
-        if (root_menu__[i] == &wps_item)
-            wps_present = true;
-    }
-
-    if (wps_present || !audio_status() || count >= MAX_MENU_ITEMS)
-        return count;
-
-    /* Insert at the front, matching Resume/Now Playing's canonical
-     * position (see root_menu_apply_canonical_order()). */
-    memmove(&root_menu_display__[1], &root_menu_display__[0],
-            count * sizeof(root_menu_display__[0]));
-    root_menu_display__[0] = (struct menu_item_ex *)&wps_item;
-    *inserted_at_front = true;
-    return count + 1;
-}
-
 /* Of MAX_MENU_ITEMS, how many are actually usable right now -- hides any
  * trailing GO_TO_TAGNAVI_FIRST.. slots beyond browser_db's real row count (see
  * the comment on menu_table[] above) from both the Customize Main Menu
@@ -1774,36 +1714,7 @@ void root_menu(void)
                  * button to be handled by HOST instead of rockbox */
                 ignore_back_button_stub(true);
 
-                {
-                    /* See root_menu_build_display_list()'s comment: this
-                     * is a display-only copy, built fresh every time,
-                     * that may insert Resume Playback/Now Playing even
-                     * though the user toggled it off -- root_menu__[]
-                     * itself (what actually gets persisted) is never
-                     * touched. 'selected' indexes into the persisted
-                     * layout, so it needs shifting to match whenever the
-                     * display list has the extra item inserted ahead of
-                     * it, and shifting back afterward for whatever else
-                     * consumes it (e.g. the next get_selection() call). */
-                    struct menu_item_ex display_menu = root_menu_;
-                    bool inserted;
-                    unsigned display_count =
-                        root_menu_build_display_list(&inserted);
-                    int display_selected = selected + (inserted ? 1 : 0);
-
-                    display_menu.submenus =
-                        (const struct menu_item_ex **)&root_menu_display__;
-                    display_menu.flags =
-                        (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
-                        | MENU_ITEM_COUNT(display_count);
-
-                    next_screen = do_menu(&display_menu, &display_selected,
-                                          NULL, false);
-
-                    selected = display_selected - (inserted ? 1 : 0);
-                    if (selected < 0)
-                        selected = 0;
-                }
+                next_screen = do_menu(&root_menu_, &selected, NULL, false);
 
                 ignore_back_button_stub(false);
                 came_back = false;

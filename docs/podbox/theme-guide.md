@@ -63,7 +63,7 @@ The reset covers 68 settings:
 | Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
 | Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
 | Backdrop | `backdrop` |
-| Artwork | `database album art`, `database artist art`, `database audiobook art`, `database art row height`, `dynamic colors` |
+| Artwork | `database album art`, `database artist art`, `database audiobook art`, `database author art`, `database art row height`, `dynamic colors` |
 | Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
 | Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, `album covers filter`, and the 3D and Flat geometry |
 | Scrolling | `scroll speed`, `scroll delay`, `scroll step`, `bidir limit`, `screen scroll step`, and the two main-menu scrolling switches |
@@ -408,13 +408,14 @@ the art branch never draws:
 database album art: on
 database artist art: on
 database audiobook art: on
+database author art: on
 ```
 
-They reset when your theme loads (§2), so each has to be stated. The third is
-easy to miss: an audiobook album list is a spoken list, and it reads
-`database audiobook art` rather than `database album art` — so a theme naming
-only the first two draws plain rows under Audiobooks. There is no artist-art
-switch for spoken lists: an audiobook author list is plain whatever you set.
+They reset when your theme loads (§2), so each has to be stated. The last two
+are easy to miss: an audiobook list is a spoken list, and it reads `database
+audiobook art` for its books and `database author art` for its authors rather
+than the first two — so a theme naming only those draws plain rows under
+Audiobooks.
 
 The row height for an art list is the **fifth argument to `%Lb`** (below). Name
 it there rather than in the `.cfg`: it sits with the viewport offsets that

@@ -1010,6 +1010,8 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
           &album_sort_root, &album_sort_artist, &album_sort_albumartist,
           &album_sort_composer, &database_sort_albums_by
           );
+MENUITEM_SETTING(database_sort_artists_by,
+                 &global_settings.database_sort_artists_by, NULL);
 MENUITEM_SETTING(sort_ignore_articles, &global_settings.sort_ignore_articles,
                  NULL);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
@@ -1048,7 +1050,8 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
           &quiz_title, &quiz_artist, &quiz_album, &quiz_year);
 
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &album_sort_menu, &sort_ignore_articles, &album_show_year,
+          &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles,
+          &album_show_year,
           &music_menu_config_item,
           &featured_artists, &segregate_audiobooks, &trim_titles,
           &search_menu, &quiz_menu

@@ -26,7 +26,6 @@
 #include "widgets/list.h"
 #include "root_menu.h"
 #include "screens/settings/exported_settings.h"
-#include "audio.h" /* audio_status() -- see item_is_locked() */
 
 static struct menu_table *menu_table;
 static int menu_item_count;
@@ -251,25 +250,12 @@ static void move_item(int from, int to)
     }
 }
 
-/* Settings and Resume Playback/Now Playing are breaking changes to turn
- * off by accident: disabling Settings leaves no easy way back into the
- * menu that could re-enable it, and disabling the WPS item while
- * something's actually playing leaves no menu-based way to reach playback
- * controls at all. Requested explicitly to be un-toggleable while that
- * risk actually applies -- Settings always, the WPS item only while
- * audio_status() is true (nothing stops disabling it when nothing's
- * playing, which is a legitimate, safe choice). This only blocks the
- * toggle here, in the UI; root_menu.c's root_menu_build_display_list()
- * separately guarantees the WPS item is still shown live in the actual
- * main menu whenever something's playing, even if it was left disabled
- * from an earlier moment when nothing was. */
+/* Settings cannot be turned off: it is the only way back into this screen.
+ * The WPS item can, even while playing -- the Play button still reaches the
+ * WPS. */
 static bool item_is_locked(int n)
 {
-    if (strcmp(menu_items[n].string, "settings") == 0)
-        return true;
-    if (strcmp(menu_items[n].string, "wps") == 0)
-        return audio_status() != 0;
-    return false;
+    return strcmp(menu_items[n].string, "settings") == 0;
 }
 
 static int menu_speak_item(int selected_item, void *data)

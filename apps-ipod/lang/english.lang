@@ -18125,6 +18125,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_DB_AUTHOR_ART
+  desc: in Settings, database browser audiobook author art rows
+  user: core
+  <source>
+    *: "Author Art Rows"
+  </source>
+  <dest>
+    *: "Author Art Rows"
+  </dest>
+  <voice>
+    *: "Author Art Rows"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SEGREGATE_AUDIOBOOKS
   desc: in Settings, keep audiobooks apart from the music
   user: core
@@ -22662,6 +22676,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_SORT_SAME_AS_MUSIC
+  desc: in Carousel settings: sort the carousels as the Music lists are sorted
+  user: core
+  <source>
+    *: "Sort Same as Music"
+  </source>
+  <dest>
+    *: "Sort Same as Music"
+  </dest>
+  <voice>
+    *: "Sort Same as Music"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_SORT_IGNORE_ARTICLES
   desc: in Music settings: sort artists and albums past a leading The, A or An
   user: core
@@ -23018,6 +23046,34 @@
   </dest>
   <voice>
     *: "Show Year in Album Lists"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_BEFORE_NAME
+  desc: in Show Year in Album Lists: the year ahead of the album name
+  user: core
+  <source>
+    *: "Before"
+  </source>
+  <dest>
+    *: "Before"
+  </dest>
+  <voice>
+    *: "Before"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_AFTER_NAME
+  desc: in Show Year in Album Lists: the year after the album name
+  user: core
+  <source>
+    *: "After"
+  </source>
+  <dest>
+    *: "After"
+  </dest>
+  <voice>
+    *: "After"
   </voice>
 </phrase>
 <phrase>

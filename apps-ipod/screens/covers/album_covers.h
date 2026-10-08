@@ -95,6 +95,14 @@ int artist_portraits(const char *selected_file);
  * album and artist models care about different settings. */
 int carousel_settings_menu(void);
 
+/* The orders the carousels sort by: their own settings, or under Sort Same as
+ * Music the Music lists' -- All Albums' order for the albums. */
+int carousel_album_order(void);         /* SORT_BY_* */
+int carousel_artist_order(void);        /* SORT_ARTISTS_BY_* */
+bool carousel_skips_articles(void);
+/* 'name' past a leading article when carousel_skips_articles() */
+const char *carousel_sort_name(const char *name);
+
 /* The carousel's own cached state, for the standard triggers.
  *
  * bg_task_rebuild() forces it to be built again the next time Album covers

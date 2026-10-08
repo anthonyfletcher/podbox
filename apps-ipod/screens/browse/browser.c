@@ -842,17 +842,16 @@ static int update_dir(void)
      * artist lists (artist art), each behind its own toggle -- so ordinary lists
      * and the whole off path never touch the art-resolution code.
      *
-     * An audiobook browse asks its own toggle instead of those two, since a
+     * An audiobook browse asks toggles of its own instead of those two, since a
      * book list is an album list and an author list is an artist list, and
      * tall rows are a different bargain over a few dozen books than over a few
      * thousand albums. It has to be asked first for that reason: db_albumart
      * answers for a book list as readily as for any other.
      *
-     * Only the books, though. A book has a cover, embedded if not beside it,
-     * but next to nobody keeps a photograph of an author -- so tall rows there
-     * buy a column of identical "no art" placeholders at the price of half the
-     * rows on screen. An audiobook author list is plain whatever either toggle
-     * says.
+     * Books and authors are toggled apart. A book has a cover, embedded
+     * if not beside it, but few people keep a photograph of an author -- so
+     * tall rows there usually buy a column of "no art" placeholders at the
+     * price of half the rows on screen.
      *
      * Every level of an audiobook browse is a spoken one, the tracks under a
      * book included, which is the other reason the level test governs: a track
@@ -865,7 +864,8 @@ static int update_dir(void)
             bool artist = !album && browser_db_is_artist_list(&tc);
 
             if (browser_db_is_spoken_list(&tc))
-                tall_rows = album && global_settings.db_bookart;
+                tall_rows = album ? global_settings.db_bookart
+                                  : artist && global_settings.db_authorart;
             else if (album)
                 tall_rows = global_settings.db_albumart;
             else if (artist)
