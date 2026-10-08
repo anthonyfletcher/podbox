@@ -249,8 +249,9 @@ void fatal_error(void)
  *
  * So, once the bootloader has control:
  *
- * 1) If the hold switch is on, or the menu button is being held,
- *    try to boot the Apple firmware.
+ * 1) If the menu button is being held, try to boot the Apple
+ *    firmware. The hold switch plays no part, so Rockbox still
+ *    boots with it locked.
  *   1a) First, it looks for apple_os.ipod on the FAT32 partition,
  *       in .rockbox or the root directory. If found it loads that
  *       without further checking and runs it.
@@ -301,14 +302,8 @@ void* main(void)
     int btn;
     int rc;
     bool haveramos;
-    bool button_was_held;
     struct partinfo pinfo;
     unsigned short* identify_info;
-
-    /* Check the button hold status as soon as possible - to
-       give the user maximum chance to turn it off in order to
-       reset the settings in rockbox. */
-    button_was_held = button_hold();
 
     system_init();
     kernel_init();
@@ -384,9 +379,8 @@ void* main(void)
         fatal_error();
     }
 
-    if (button_was_held || (btn==BUTTON_MENU)) {
-        /* If either the hold switch was on, or the Menu button was held, then
-           try the Apple firmware */
+    if (btn==BUTTON_MENU) {
+        /* If the Menu button was held, then try the Apple firmware */
 
         printf("Loading original firmware...");
 

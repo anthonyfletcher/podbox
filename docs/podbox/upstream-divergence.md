@@ -25,6 +25,15 @@ work; the `tools/` changes are this fork's.
 
 ---
 
+## bootloader/
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `ipod.c` | The hold switch no longer boots Apple's firmware; only MENU does | Upstream boots Apple's firmware whenever the player starts locked, so a lock left on through a reset or a dead battery starts the wrong OS. |
+| `ipod-s5l87xx.c` | The hold switch no longer boots Apple's firmware. MENU at t2 no longer launches it at once: it takes the path the hold switch did, after storage is up | That path holds the LBA48 check. Upstream's early MENU launch skips it, and starts an OF without LBA48 on a disk past 2^28 sectors. Shared with the Nano 3G/4G, which this fork does not build. |
+
+---
+
 ## firmware/ — core
 
 | File | What changed | Why |
@@ -59,7 +68,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usb.c`, `export/usb.h` | New `usb_host_is_present()`, and a `USB_NONE` stub | Background work — database scan, album index, file index — stands down while a host enumerates. `usb_inserted()` is true on a charger too; `usb_host_present` turns true on the first control transfer or `SET_ADDRESS` (both targets define `USB_DETECT_BY_REQUEST`) and never for a charger. |
+| `usb.c`, `export/usb.h` | New `usb_host_is_present()` under `USB_FULL_INIT`, and a `USB_NONE` stub | Background work — database scan, album index, file index — stands down while a host enumerates. `usb_inserted()` is true on a charger too; `usb_host_present` turns true on the first control transfer or `SET_ADDRESS` (both targets define `USB_DETECT_BY_REQUEST`) and never for a charger. |
 | `usb.c` | `usb_set_host_present()` raises the USB thread to `PRIORITY_REALTIME` until the host goes | Upstream raises it only at `SET_CONFIGURATION`, leaving enumeration below the UI thread. |
 | `usb.c` | The `SET_ADDRESS` notification sets `USB_INSERTED` and the host present | Since `841007dfa1` the driver answers `SET_ADDRESS` itself, so a host that sends it first — an Onkyo ND-S1 — never enabled the drivers. Not yet reported upstream. |
 | `usbstack/usb_core.c` | `usb_core_set_address()` assigns interfaces and endpoints if the core is still `DEFAULT` | The same host otherwise got every interface numbered 0. |

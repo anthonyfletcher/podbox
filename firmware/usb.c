@@ -1207,6 +1207,7 @@ bool usb_inserted(void)
     return usb_state == USB_INSERTED || usb_state == USB_POWERED;
 }
 
+#if defined(USB_FULL_INIT)
 /* Whether a host has spoken to us, rather than a cable merely supplying 5V.
  * usb_inserted() covers USB_POWERED too, so a charger satisfies it.
  *
@@ -1220,7 +1221,6 @@ bool usb_host_is_present(void)
     return usb_host_present && !usb_disk_ejected;
 }
 
-#if defined(USB_FULL_INIT)
 bool usb_exclusive_storage(void)
 {
     /* Storage isn't actually exclusive until slave mode has been entered */

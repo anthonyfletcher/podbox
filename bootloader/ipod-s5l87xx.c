@@ -448,7 +448,7 @@ static int kernel_launch_onb(void)
  *
  *  t2 = ~650 ms.
  *     Check user button selection.
- *     If OF, diagmode, or diskmode is selected then launch ONB.
+ *     If diagmode or diskmode is selected then launch ONB.
  *     If not, wait for LCD initialization.
  *
  *  t3 = ~700,~900 ms. (lcd_type_01,lcd_type_23)
@@ -457,7 +457,7 @@ static int kernel_launch_onb(void)
  *
  *  t4 = ~2600,~2800 ms.
  *     HDD is ready.
- *     If hold switch is locked, then load and launch ONB.
+ *     If MENU was held at t2, then load and launch ONB.
  *     If not, load rockbox.ipod file from HDD.
  *
  *  t5 = ~2800,~3000 ms.
@@ -966,6 +966,7 @@ enum {
 void main(void)
 {
     int rc = 0;
+    bool menu_held = false;
 
     usec_timer_init();
 
@@ -1010,9 +1011,11 @@ void main(void)
             sleep(HZ);
             btn = button_read_device();
         }
-        /* Enter OF, diagmode and diskmode using ONB */
-        if ((btn == BUTTON_MENU)
-                || (btn == (BUTTON_SELECT|BUTTON_LEFT))
+        /* The OF waits for storage, to pass the LBA48 check below.
+         * Diagmode and diskmode do not address the disk as the OF does. */
+        menu_held = (btn == BUTTON_MENU);
+        /* Enter diagmode and diskmode using ONB */
+        if ((btn == (BUTTON_SELECT|BUTTON_LEFT))
                 || (btn == (BUTTON_SELECT|BUTTON_PLAY))) {
             rc = kernel_launch_onb();
         }
@@ -1109,8 +1112,8 @@ void main(void)
 
         filesystem_init();
 
-        /* We wait until HDD spins up to check for hold button */
-        if (button_hold()) {
+        /* The OF launch waits until HDD spins up to check LBA48 support */
+        if (menu_held) {
 #ifdef SYSCFG_MAX_ENTRIES
             bool lba48 = false;
             struct SysCfg syscfg;
