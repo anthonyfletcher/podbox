@@ -554,6 +554,22 @@ static void read_hw_info(void)
 static bool host_active;
 static bool host_reset_done;
 static int host_resets;
+/* Held by whoever drives the control schedule or the port, as these may
+ * sleep and the USB, UI and audio threads all reach them; recursive, as the
+ * poll enumerates through usb_drv_host_control() */
+static struct mutex host_mtx;
+static bool host_mtx_ready;
+
+/* One wait between reads of the controller: 100 us for the first
+ * millisecond, which is all a transfer usually takes, then a tick at a
+ * time, so a slow or refusing device lets the other threads run */
+static void host_wait(int polls)
+{
+    if (polls < 10)
+        udelay(100);
+    else
+        sleep(1);
+}
 
 /* EHCI 1.0 section 3.5: queue element transfer descriptor */
 struct ehci_qtd {
@@ -653,6 +669,7 @@ static int host_control(int addr, int reqtype, int req, int value,
     bool in = reqtype & USB_DIR_IN;
     uint32_t token = QTD_ACTIVE | QTD_CERR3;
     int n = -1;
+    long end;
 
     hd->setup.bRequestType = reqtype;
     hd->setup.bRequest = req;
@@ -690,9 +707,10 @@ static int host_control(int addr, int reqtype, int req, int value,
     REG_ENDPOINTLISTADDR = (uint32_t)&hd->qh;
     REG_USBCMD |= USBCMD_ASYNC_SCHEDULE_EN;
 
-    for (int t = 0; t < 5000; t++)
+    end = current_tick + HZ / 2;
+    for (int t = 0; ; t++)
     {
-        udelay(100);
+        host_wait(t);
         if ((setup->token | data->token | status->token) & QTD_HALTED)
             break;
         if (!(status->token & QTD_ACTIVE))
@@ -700,6 +718,8 @@ static int host_control(int addr, int reqtype, int req, int value,
             n = len - ((data->token >> 16) & 0x7fff);
             break;
         }
+        if (TIME_AFTER(current_tick, end))
+            break;
     }
 
     if (n < 0)
@@ -719,15 +739,20 @@ static int host_control(int addr, int reqtype, int req, int value,
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len)
 {
-    int n;
+    int n = -1;
 
-    if (!host_active || len > (int)sizeof hd->data)
+    if (!host_active)
         return -1;
-    if (!(reqtype & USB_DIR_IN))
-        memcpy(hd->data, data, len);
-    n = host_control(addr, reqtype, req, value, index, len);
-    if (n > 0 && (reqtype & USB_DIR_IN))
-        memcpy(data, hd->data, n);
+    mutex_lock(&host_mtx);
+    if (host_active && len <= (int)sizeof hd->data)
+    {
+        if (!(reqtype & USB_DIR_IN))
+            memcpy(hd->data, data, len);
+        n = host_control(addr, reqtype, req, value, index, len);
+        if (n > 0 && (reqtype & USB_DIR_IN))
+            memcpy(data, hd->data, n);
+    }
+    mutex_unlock(&host_mtx);
     return n;
 }
 
@@ -787,7 +812,7 @@ static struct usb_drv_host_iso iso_cfg;
 static struct usb_drv_host_iso_stats iso_stats;
 static unsigned int iso_next;          /* next frame to fill */
 static bool iso_full_speed;            /* siTDs, one packet a frame */
-static uint32_t iso_acc;               /* fractional samples, 16.16 */
+static uint32_t iso_acc;               /* samples owed, 16.16 */
 static bool iso_fb_armed[ISO_SLOTS];
 
 static void itd_init(struct ehci_itd *itd, void *buf, int ep, int dir,
@@ -841,7 +866,7 @@ static void iso_fill_sitd(int slot)
         iso_stats.errors++;
     iso_acc += iso_stats.feedback;
     n = MIN((int)(iso_acc >> 16), max);
-    iso_acc &= 0xffff;
+    iso_acc -= (uint32_t)n << 16;
     bytes = n * iso_cfg.frame_bytes;
     iso_cfg.fill(buf, n);
 
@@ -878,7 +903,7 @@ static void iso_fill_slot(int slot, unsigned int frame)
 
         iso_acc += iso_stats.feedback * step;
         n = MIN((int)(iso_acc >> 16), max);
-        iso_acc &= 0xffff;
+        iso_acc -= (uint32_t)n << 16;
         bytes = n * iso_cfg.frame_bytes;
         iso_cfg.fill(buf + off, n);
         o->trans[m] = ITD_ACTIVE | ITD_LEN(bytes) | (base + off);
@@ -1002,6 +1027,14 @@ void usb_drv_host_iso_set_nominal(uint32_t nominal)
     restore_irq(oldlevel);
 }
 
+/* A frame's slot buffer is shared by its eight microframes' packets */
+int usb_drv_host_iso_max_packet(int interval_out)
+{
+    if (!usb_drv_host_high_speed())
+        return ISO_SLOT_BYTES;
+    return ISO_SLOT_BYTES / (8 / interval_out);
+}
+
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)
 {
     *st = iso_stats;
@@ -1009,6 +1042,12 @@ void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)
 
 void usb_drv_host_start(void)
 {
+    if (!host_mtx_ready)
+    {
+        mutex_init(&host_mtx);
+        host_mtx_ready = true;
+    }
+    mutex_lock(&host_mtx);
     commit_discard_dcache();
     hd = UNCACHED_ADDR(&host_dma_mem);
 #ifdef HAVE_USB_HOST
@@ -1024,16 +1063,19 @@ void usb_drv_host_start(void)
     host_reset_done = false;
     host_resets = 0;
     host_active = true;
+    mutex_unlock(&host_mtx);
 }
 
 void usb_drv_host_stop(void)
 {
+    mutex_lock(&host_mtx);
     usb_drv_host_iso_stop();
     host_active = false;
     REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_POWER);
     REG_USBCMD &= ~USBCMD_RUN;
     REG_USBCMD |= USBCMD_CTRL_RESET;
     while (REG_USBCMD & USBCMD_CTRL_RESET);
+    mutex_unlock(&host_mtx);
 }
 
 void usb_drv_host_poll(struct usb_drv_host_status *st)
@@ -1044,6 +1086,13 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     st->active = host_active;
     if (!host_active)
         return;
+    mutex_lock(&host_mtx);
+    st->active = host_active;
+    if (!host_active)
+    {
+        mutex_unlock(&host_mtx);
+        return;
+    }
 
     portsc = REG_PORTSC1;
     if (!(portsc & PORTSCX_CURRENT_CONNECT_STATUS))
@@ -1063,13 +1112,13 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
         for (int attempt = 0; attempt < 3; attempt++)
         {
             host_resets++;
-            udelay(100000);
+            sleep(HZ / 10);
             REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) |
                           PORTSCX_PORT_RESET;
-            udelay(60000);
+            sleep(HZ * 60 / 1000);
             if (REG_PORTSC1 & PORTSCX_PORT_RESET)
                 REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_RESET);
-            udelay(20000);
+            sleep(HZ / 50);
             portsc = REG_PORTSC1;
             usb_log(USB_LOG_HOST_PORT, attempt, 0, portsc, HOST_TT_PORT);
 #ifdef HAVE_USB_HOST
@@ -1102,6 +1151,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     st->regs[3].name = "USBMODE";
     st->regs[3].val = REG_USBMODE;
     st->nregs = 4;
+    mutex_unlock(&host_mtx);
 }
 
 /* manual: 32.14.1 Device Controller Initialization */

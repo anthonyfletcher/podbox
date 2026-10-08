@@ -137,8 +137,10 @@ const struct usb_drv_hw_info *usb_drv_get_hw_info(void);
  * port. The target's usb_host_probe_enable() clocks the controller and
  * calls the driver's start and stop; only the USB thread calls it, and only
  * with the device stack disabled. usb_drv_host_poll() may be called from any
- * thread; it resets a newly connected device once, busy-waiting through the
- * reset so the probe cannot be stopped under it. */
+ * thread; it resets a newly connected device once, holding the driver's lock
+ * through the reset so the probe cannot be stopped under it. The poll,
+ * usb_drv_host_control(), start and stop all take that lock, and the first
+ * two sleep through their waits, so none may run in an interrupt. */
 struct usb_drv_host_status {
     bool active;
     bool host_mode;         /* the controller reports itself a host */
@@ -218,6 +220,8 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso);
 void usb_drv_host_iso_stop(void);
 /* A new sample rate: feedback restarts from this 16.16 nominal. */
 void usb_drv_host_iso_set_nominal(uint32_t nominal);
+/* The most bytes the controller sends in one OUT packet at this interval */
+int usb_drv_host_iso_max_packet(int interval_out);
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st);
 
 void usb_drv_host_start(void);

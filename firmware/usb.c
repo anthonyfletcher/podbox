@@ -632,18 +632,28 @@ bool usb_dac_playing(void)
 static void usb_dac_auto_step(void);
 
 /* USB thread: Turn On starts the search at its polling step, past the
- * checks that decide whether an unanswered cable is worth a try. */
+ * setting and once-per-cable checks. It never takes the port from a
+ * computer, car or dock that is using it, nor from a serial accessory. */
 static void usb_dac_turn(bool on)
 {
     if(on && !usb_host_probe_on)
     {
-        usb_host_probe_switch(true);
-        usb_dac_polls = 1;
-        usb_dac_port_bits = 0;
-        usb_dac_note("polling (turned on)");
-        usb_dac_requested = false;
-        usb_dac_auto_step();
-        return;
+        if(usb_state == USB_INSERTED)
+            usb_dac_note("refused: a host answered");
+#ifdef IPOD_ACCESSORY_PROTOCOL
+        else if(iap_accessory_present())
+            usb_dac_note("refused: serial accessory");
+#endif
+        else
+        {
+            usb_host_probe_switch(true);
+            usb_dac_polls = 1;
+            usb_dac_port_bits = 0;
+            usb_dac_note("polling (turned on)");
+            usb_dac_requested = false;
+            usb_dac_auto_step();
+            return;
+        }
     }
     usb_dac_requested = false;
     if(!on && usb_host_probe_on)

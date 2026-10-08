@@ -91,7 +91,7 @@ void usb_host_enumerate(void)
     n = usb_drv_host_control(0, USB_DIR_OUT, USB_REQ_SET_ADDRESS, 1, 0,
                              NULL, 0);
     STEP("set address", n == 0);
-    udelay(10000);
+    sleep(HZ / 100);
     n = get_descriptor(1, USB_DT_DEVICE << 8, 0, e->dev, 18);
     STEP("device @1", n == 18);
     n = get_descriptor(1, USB_DT_CONFIG << 8, 0, host_cfg, 9);

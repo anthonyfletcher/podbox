@@ -530,7 +530,7 @@ static void usb_audio_init(void)
  * is met by shrinking the audio buffer, and that callback stops playback with a
  * synchronous queue_send -- issued from inside the SET_CONFIGURATION handler it
  * blocks the USB thread mid-control-transfer and the player stops responding.
- * usb_storage's transfer buffer was moved to boot for the same reason.
+ * usb_storage's transfer buffer is claimed at boot for the same reason.
  *
  * Called from the application layer once the settings are loaded and before
  * audio_init(), so the audio buffer does not exist yet and nothing is shrunk.
@@ -1211,8 +1211,8 @@ static int usb_audio_init_connection(void)
 {
     logf("usbaudio: init connection");
 
-    /* Claimed at boot, or not at all. Allocating here is what wedged the
-     * player -- see usb_audio_alloc_buffers(). */
+    /* Claimed at boot, or not at all: allocating here stalls the USB
+     * thread -- see usb_audio_alloc_buffers(). */
     if (!usb_audio_buffers_ready())
     {
         logf("usbaudio: no buffers, restart with the setting on");
@@ -1347,6 +1347,11 @@ static void start_mixer(void)
         .get_more = playback_audio_get_more,
     };
     mixer_channel_play_data(PCM_MIXER_CHAN_USBAUDIO, &cbs, NULL, 0);
+#ifdef HAVE_CS42L55
+    /* pcmbuf_play_stop() leaves the codec powered down, and a USB connect
+     * stops playback; the CS42L55 leaves PDN_CODEC only with MCLK running. */
+    audiohw_idle_powerup();
+#endif
 }
 
 /* Playback is started here, on the USB thread, once the transfer interrupt

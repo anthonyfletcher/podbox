@@ -462,16 +462,33 @@ static bool usable(const struct as_setting *s)
            s->interval_out >= 1 && s->interval_out <= 8 && s->rates;
 }
 
+/* Whether a 48 kHz packet at the top of the feedback window fits the
+ * endpoint and the controller. One that does not is cut short every
+ * packet, and the DAC plays slow. */
+static bool fits(const struct as_setting *s)
+{
+    bool hs = usb_drv_host_high_speed();
+    int sof = hs ? 8000 : 1000;
+    int frames = (SAMPR_48 * 9 / 8 * (hs ? s->interval_out : 1) + sof - 1) /
+                 sof;
+    int limit = MIN(s->mps_out,
+                    usb_drv_host_iso_max_packet(s->interval_out));
+
+    return frames * s->channels * s->subslot <= limit;
+}
+
 /* Class 2: a 16-bit setting where there is one. Class 1: the widest
  * samples, the format a desktop host streams in and so the one a class 1
  * DAC's firmware is tested with -- a Fosi DAC-Q4's 16-bit setting plays
  * noise on its left channel. The player's samples go in the top of the
- * slot. */
+ * slot. Any setting that fits() comes before one that does not. */
 static bool better(const struct as_setting *cur,
                    const struct as_setting *best, bool found)
 {
     if (!found)
         return true;
+    if (fits(cur) != fits(best))
+        return fits(cur);
     if (cur->uac == 1)
         return cur->subslot > best->subslot;
     return best->subslot != 2 && cur->subslot == 2;
@@ -655,6 +672,7 @@ bool usb_host_audio_start(void)
     status.subslot = as.subslot;
     status.bits = as.bits;
     status.ep_rate = as.uac == 1 && as.rate_ctl ? as.ep_out : 0;
+    STEP("too many channels", fits(&as));
     sof_per_second = usb_drv_host_high_speed() ? 8000 : 1000;
 
     if (as.uac == 2)

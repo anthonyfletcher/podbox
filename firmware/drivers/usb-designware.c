@@ -1481,6 +1481,22 @@ void usb_drv_init(void)
 static bool host_active;
 static bool host_reset_done;
 static int host_resets;
+/* Held by whoever drives channel 0 or the port, as these may sleep and the
+ * USB, UI and audio threads all reach them; recursive, as the poll
+ * enumerates through usb_drv_host_control() */
+static struct mutex host_mtx;
+static bool host_mtx_ready;
+
+/* One wait between reads of the core: 100 us for the first millisecond,
+ * which is all a transfer usually takes, then a tick at a time, so a slow
+ * or refusing device lets the other threads run */
+static void host_wait(int polls)
+{
+    if (polls < 10)
+        udelay(100);
+    else
+        sleep(1);
+}
 
 /* Host channel registers */
 #define HCCHAR_MPS(x)       (x)
@@ -1561,10 +1577,11 @@ static int host_stage(int addr, int pid, bool in, void *buf, int len)
     int pkts = len ? (len + mps - 1) / mps : 1;
     int size = in ? pkts * mps : len;
     uint32_t hcint = 0;
-
     /* About a quarter of a second of NAKs: a DAC can refuse the rate's
      * data stage for a while after its interface is selected */
-    for (int attempt = 0; attempt < 250; attempt++)
+    long naks_end = current_tick + HZ / 4;
+
+    for (int attempt = 0; ; attempt++)
     {
         DWC_HCINT(0) = HCINT_ALL;
         DWC_HCTSIZ(0) = size | HCTSIZ_PKTCNT(pkts) | HCTSIZ_PID(pid) |
@@ -1574,12 +1591,13 @@ static int host_stage(int addr, int pid, bool in, void *buf, int len)
                         (in ? HCCHAR_EPDIR_IN : 0) | HCCHAR_EPTYPE(0) |
                         HCCHAR_MC(1) | HCCHAR_DEVADDR(addr) | HCCHAR_CHENA;
 
-        for (int t = 0; t < 5000; t++)
+        long end = current_tick + HZ / 2;
+        for (int t = 0; ; t++)
         {
             hcint = DWC_HCINT(0);
-            if (hcint & HCINT_CHH)
+            if ((hcint & HCINT_CHH) || TIME_AFTER(current_tick, end))
                 break;
-            udelay(100);
+            host_wait(t);
         }
         if (attempt < 2 || (hcint & (HCINT_XFERC | HCINT_ERRORS)) ||
             !(hcint & HCINT_CHH))
@@ -1599,16 +1617,16 @@ static int host_stage(int addr, int pid, bool in, void *buf, int len)
             (!(hcint & HCINT_ERRORS) &&
              HCTSIZ_PKTS_LEFT(DWC_HCTSIZ(0)) == 0))
             return in ? size - (int)(DWC_HCTSIZ(0) & 0x7ffff) : len;
-        if (hcint & HCINT_ERRORS)
+        if ((hcint & HCINT_ERRORS) || TIME_AFTER(current_tick, naks_end))
             break;
-        udelay(1000);
+        sleep(1);
     }
     host_last_status = hcint;
     return -1;
 }
 
-int usb_drv_host_control(int addr, int reqtype, int req, int value,
-                         int index, void *data, int len)
+static int host_control(int addr, int reqtype, int req, int value,
+                        int index, void *data, int len)
 {
     bool in = reqtype & USB_DIR_IN;
     int n = 0;
@@ -1637,6 +1655,19 @@ int usb_drv_host_control(int addr, int reqtype, int req, int value,
     if (in && n > 0)
         memcpy(data, hdw->data, MIN(n, len));
     return MIN(n, len);
+}
+
+int usb_drv_host_control(int addr, int reqtype, int req, int value,
+                         int index, void *data, int len)
+{
+    int n;
+
+    if (!host_active)
+        return -1;
+    mutex_lock(&host_mtx);
+    n = host_control(addr, reqtype, req, value, index, data, len);
+    mutex_unlock(&host_mtx);
+    return n;
 }
 
 /* The isochronous stream. This core in buffer DMA mode has no schedule of
@@ -1858,6 +1889,12 @@ void usb_drv_host_iso_set_nominal(uint32_t nominal)
     restore_irq(oldlevel);
 }
 
+int usb_drv_host_iso_max_packet(int interval_out)
+{
+    (void)interval_out;
+    return ISO_BUF_BYTES;
+}
+
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st)
 {
     *st = iso_stats;
@@ -1872,6 +1909,12 @@ void usb_drv_host_start(void)
     uint32_t gusbcfg = usb_dw_config.phytype | TRDT(USB_DW_TURNAROUND) |
                        USB_DW_TOUTCAL;
 
+    if (!host_mtx_ready)
+    {
+        mutex_init(&host_mtx);
+        host_mtx_ready = true;
+    }
+    mutex_lock(&host_mtx);
     usb_dw_target_disable_irq();
     usb_dw_target_enable_clocks();
     DWC_PCGCCTL = 0;
@@ -1906,16 +1949,19 @@ void usb_drv_host_start(void)
     host_reset_done = false;
     host_resets = 0;
     host_active = true;
+    mutex_unlock(&host_mtx);
 }
 
 void usb_drv_host_stop(void)
 {
+    mutex_lock(&host_mtx);
     usb_drv_host_iso_stop();
     host_active = false;
     DWC_HPRT = 0;
     DWC_GUSBCFG &= ~FHMOD;
     DWC_PCGCCTL = 1;
     usb_dw_target_disable_clocks();
+    mutex_unlock(&host_mtx);
 }
 
 void usb_drv_host_poll(struct usb_drv_host_status *st)
@@ -1926,6 +1972,13 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     st->active = host_active;
     if (!host_active)
         return;
+    mutex_lock(&host_mtx);
+    st->active = host_active;
+    if (!host_active)
+    {
+        mutex_unlock(&host_mtx);
+        return;
+    }
 
     hprt = DWC_HPRT;
     if (!(hprt & HPRT_CONN_STS))
@@ -1946,11 +1999,11 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
         for (int attempt = 0; attempt < 3; attempt++)
         {
             host_resets++;
-            udelay(100000);
+            sleep(HZ / 10);
             DWC_HPRT = (DWC_HPRT & ~HPRT_WRITE_MASK) | HPRT_RST;
-            udelay(60000);
+            sleep(HZ * 60 / 1000);
             DWC_HPRT = DWC_HPRT & ~(HPRT_WRITE_MASK | HPRT_RST);
-            udelay(20000);
+            sleep(HZ / 50);
             hprt = DWC_HPRT;
             usb_log(USB_LOG_HOST_PORT, attempt, 0, hprt, DWC_HFIR);
 #ifdef HAVE_USB_HOST
@@ -1983,6 +2036,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     st->regs[3].name = "GUSBCFG";
     st->regs[3].val = DWC_GUSBCFG;
     st->nregs = 4;
+    mutex_unlock(&host_mtx);
 }
 
 void usb_drv_exit(void)

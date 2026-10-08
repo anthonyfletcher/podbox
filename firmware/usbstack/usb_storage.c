@@ -353,13 +353,15 @@ static bool set_transfer_range(uint64_t sector, uint32_t count,
     return true;
 }
 
-/* Did the host write to us during this connect? Cleared on each new connect.
+/* Did the host write to us since the cable went in? Cleared when the stack
+ * starts, not on SET_CONFIGURATION, so a host that writes and then
+ * re-enumerates (sleep and resume, error recovery) still reports the write
+ * when the cable comes out.
  *
- * The app layer rebuilds the database and dircache on every USB disconnect,
- * because the host may have changed the files. If it only ever read, none of
- * that work is needed -- and Windows produces a spurious disconnect/reconnect
- * on every single connect, which used to trigger the full rebuild and then
- * leave the tagcache thread mid-scan when the reconnect arrived. */
+ * The app layer rebuilds the database and dircache after USB only when the
+ * host wrote, because a read-only session changes nothing. Windows
+ * disconnects and reconnects once on every connect, and a rebuild started by
+ * that blip leaves the tagcache thread mid-scan when the reconnect arrives. */
 static bool host_wrote;
 
 bool usb_storage_host_wrote(void)
@@ -489,17 +491,17 @@ static int usb_handle = 0;
  * Called at boot it lands before audio_init(), so there is nothing to shrink
  * and nothing to wait for.
  *
- * Both later moments are fatal, in different ways, and both were tried:
+ * Trap: either later placement is fatal.
  *
  *  - usb_storage_init_connection() (upstream's placement) runs inside the
  *    host's SET_CONFIGURATION. The USB thread stalls mid-control-transfer, the
  *    host gives up, and usb_request_exclusive_storage() -- which sits *after*
  *    the driver loop in usb_core_do_set_config() -- is never reached, so no
  *    thread is ever asked to release storage.
- *  - usb_storage_init(), i.e. usb_core_init(), is worse: usb_core_init() calls
- *    usb_drv_init() first, which sets USBCMD_RUN and attaches the device. A
- *    stall there is before SET_ADDRESS, so enumeration never starts at all --
- *    the host just bus-resets until it gives up.
+ *  - usb_storage_init(), i.e. usb_core_init(), runs after usb_drv_init() has
+ *    set USBCMD_RUN and attached the device. A stall there is before
+ *    SET_ADDRESS, so enumeration never starts and the host bus-resets until
+ *    it gives up.
  *
  * Not freed on disconnect either, or the next connection would pay for it.
  *
@@ -538,6 +540,7 @@ void usb_storage_alloc_buffers(void)
  * nothing expensive belongs here. See usb_storage_alloc_buffers(). */
 static void usb_storage_init(void)
 {
+    host_wrote = false;
     logf("usb_storage_init done");
 }
 
@@ -546,7 +549,6 @@ static int usb_storage_init_connection(void)
     logf("ums: set config");
     /* prime rx endpoint. We only need room for commands */
     state = WAITING_FOR_COMMAND;
-    host_wrote = false;
 
 #ifdef USB_STATIC_ALLOC
     static unsigned char _cbw_buffer[MAX_CBW_SIZE]
