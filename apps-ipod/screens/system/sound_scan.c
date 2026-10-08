@@ -521,17 +521,34 @@ static bool ss_gate(bool *fresh)
     return true;
 }
 
-bool sound_scan_screen(bool rebuild)
+/* The result, left up until a button: the run takes hours, so whoever reads
+ * this is coming back to it, and a splash that times out is usually gone
+ * before they look. */
+static void ss_result(const char *msg)
+{
+    int button;
+
+    backlight_on();
+    splash(0, msg);
+    action_wait_for_release();
+    do
+    {
+        button = get_action(CONTEXT_STD, TIMEOUT_BLOCK);
+        if (IS_SYSEVENT(button)
+            && default_event_handler(button) == SYS_USB_CONNECTED)
+            break;
+    }
+    while (button == ACTION_NONE || IS_SYSEVENT(button));
+}
+
+static void ss_run(bool fresh)
 {
     struct tagcache_search tcs;
     char path[MAX_PATH];
-    bool fresh = rebuild;
+    char msg[64];
+    int index_size;
     bool complete;
-    int written;
     int rc;
-
-    if (!ss_gate(&fresh))
-        return false;
 
     audio_stop();
 
@@ -565,6 +582,12 @@ bool sound_scan_screen(bool rebuild)
         ss_live = marks.deleted_ct >= 0 && marks.deleted_ct <= ss_total
                   ? ss_total - marks.deleted_ct : 0;
     }
+    /* The total sizes the index; what the screen counts to is what the walk
+     * yields, or the counter stops short of it on any library that has lost
+     * a track and the run looks stuck at the end. */
+    index_size = ss_total;
+    if (ss_live > 0)
+        ss_total = ss_live;
 
     ss_done = ss_skipped = ss_failed = 0;
     ss_work = 0;
@@ -581,16 +604,16 @@ bool sound_scan_screen(bool rebuild)
     {
         usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Not enough memory");
-        return true;
+        return;
     }
 
-    rc = sound_index_begin(ss_total + 1, fresh);
+    rc = sound_index_begin(index_size + 1, fresh);
     if (rc != SOUND_OK)
     {
         core_free(ss_handle);
         usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Could not open the index");
-        return true;
+        return;
     }
 
     /* Asked for after the explanation, not before it: someone who does not
@@ -602,7 +625,7 @@ bool sound_scan_screen(bool rebuild)
         sound_index_close();
         core_free(ss_handle);
         usb_set_mode(global_settings.usb_mode);
-        return true;
+        return;
     }
 
     ss_draw(NULL);
@@ -613,7 +636,7 @@ bool sound_scan_screen(bool rebuild)
         core_free(ss_handle);
         usb_set_mode(global_settings.usb_mode);
         splash(HZ * 3, "Database busy");
-        return true;
+        return;
     }
 
     while (tagcache_get_next(&tcs, path, sizeof (path)))
@@ -676,10 +699,6 @@ bool sound_scan_screen(bool rebuild)
     core_free(ss_handle);
     usb_set_mode(global_settings.usb_mode);
 
-    /* Before either of the calls below: closing and finishing both drop the
-     * index's table, and the count goes with it. */
-    written = sound_index_count();
-
     /* Whether the walk reached every track the database holds, which is what
      * lets finish() drop the records of tracks that have left the player.
      *
@@ -707,9 +726,17 @@ bool sound_scan_screen(bool rebuild)
         if (ss_usb)
             default_event_handler(SYS_USB_CONNECTED);
         else
-            splashf(HZ * 4, "Stopped. %d of %d done", written, ss_total);
+            splashf(HZ * 4, "Stopped. %d of %d done",
+                    ss_done + ss_skipped, ss_total);
+        return;
     }
-    else if (sound_index_finish(complete) == SOUND_OK)
+
+    /* Saving and calibrating take a while on a large index, and the box
+     * would otherwise sit on the last track's name as if nothing moved. */
+    strlcpy(ss_now, "Saving the results...", sizeof (ss_now));
+    ss_draw(NULL);
+
+    if (sound_index_finish(complete) == SOUND_OK)
     {
         /* Here rather than on first use, where sound_cal_ensure() would
          * otherwise reach it: this is a screen the user is already waiting
@@ -717,14 +744,32 @@ bool sound_scan_screen(bool rebuild)
          * against the hours behind it. */
         sound_cal_update();
 
-        splashf(HZ * 4, "Done. %d measured, %d unreadable",
-                written, ss_failed);
+        snprintf(msg, sizeof (msg), "Done. %d measured, %d unreadable",
+                 ss_done, ss_failed);
+        ss_result(msg);
     }
     else
     {
         sound_index_close();
-        splash(HZ * 4, "Could not write the index");
+        ss_result("Could not write the index");
     }
+}
 
+bool sound_scan_screen(bool rebuild)
+{
+    bool fresh = rebuild;
+
+    if (!ss_gate(&fresh))
+        return false;
+
+    /* Off for the run: the theme's status bar is redrawn on every button the
+     * run reads, over the box, which then stays gone until the next track
+     * ends. It would also show the depth question's title, which the dialog
+     * leaves behind. */
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_enable(i, false, NULL);
+    ss_run(fresh);
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_undo(i, true);
     return true;
 }
