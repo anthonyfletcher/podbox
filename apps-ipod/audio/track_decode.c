@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "config.h"
+#include "kernel.h"          /* create_thread, thread_wait */
 #include "audio.h"
 #include "file.h"
 #include "system.h"
@@ -331,6 +332,40 @@ static void cb_pcmbuf_insert(const void *ch1, const void *ch2, int count)
 
 /** Running one track **/
 
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE)
+/* The codec runs on a thread of its own, with the codec thread's stack size,
+ * and the caller waits for it. A codec is built against that stack. Trap: run
+ * on the caller's thread instead, the MP3 decoder overflows the main thread's
+ * 8 KB on the iPod Video, writes over the idle stacks and kernel data below it
+ * in IRAM, and the player freezes with interrupts dead a moment later. The
+ * simulator and the desktop tool have stacks to spare and run it inline. */
+static long decode_stack[(DEFAULT_STACK_SIZE + 0x2000) / sizeof(long)];
+static int decode_status;
+
+static void decode_thread(void)
+{
+    decode_status = codec_run_proc();
+}
+
+static int run_codec(void)
+{
+    unsigned int id = create_thread(decode_thread, decode_stack,
+                                    sizeof(decode_stack), 0, "track decode"
+                                    IF_PRIO(, PRIORITY_USER_INTERFACE)
+                                    IF_COP(, CPU));
+
+    if (id == 0)
+        return CODEC_ERROR;
+    thread_wait(id);
+    return decode_status;
+}
+#else
+static int run_codec(void)
+{
+    return codec_run_proc();
+}
+#endif
+
 int track_decode_run(const char *path,
                      unsigned long start_ms, unsigned long length_ms,
                      void *buf, size_t bufsz,
@@ -461,7 +496,7 @@ int track_decode_run(const char *path,
      * time on the 5G, which makes a library scan take as long as playing the
      * library. */
     cpu_boost(true);
-    status = codec_run_proc();
+    status = run_codec();
     cpu_boost(false);
 
     codec_close();
