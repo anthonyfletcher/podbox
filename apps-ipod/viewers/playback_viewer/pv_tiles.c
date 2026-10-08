@@ -23,6 +23,7 @@
 #include <string.h>
 #include <string-extra.h>
 #include "config.h"
+#include "lang.h"
 #include "draw/card_row.h"
 #include "draw/card_paint.h"
 #include "draw/card_text.h"
@@ -1223,7 +1224,7 @@ void pv_tiles_content(int idx, struct card_content *out)
     }
 
     case T_CALTITLE:
-        out->title = "By week";
+        out->title = str(LANG_PV_BY_WEEK);
         break;
 
     case T_CALWEEK:
@@ -1405,7 +1406,8 @@ void pv_tiles_content(int idx, struct card_content *out)
     }
 
     case T_SKIPNEVER:
-        out->title = n_loyal ? "Never skipped" : "You skip everything?!";
+        out->title = str(n_loyal ? LANG_PV_NEVER_SKIPPED
+                                 : LANG_PV_SKIP_EVERYTHING);
         break;
 
     case T_TOPLOYAL:

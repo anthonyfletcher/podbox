@@ -2974,12 +2974,12 @@ void carousel_reload(int (*compare)(const void *, const void *))
     if (empty_slide_hid < 0)
     {
         empty_slide_hid = 0;
-        splash(HZ, "Could not load the placeholder cover");
+        splash(HZ, ID2P(LANG_CAROUSEL_NO_PLACEHOLDER));
     }
 
     initialize_slide_cache();
     if (!create_pf_thread())
-        splash(HZ, "Could not start the carousel");
+        splash(HZ, ID2P(LANG_CAROUSEL_NO_START));
 }
 
 /**
@@ -3669,7 +3669,7 @@ static void error_wait(const char *message)
 {
     int button;
 
-    splashf(0, "%s -- press any button to continue", message);
+    splashf(0, "%s -- %s", message, str(LANG_PRESS_ANY_BUTTON));
     while ((button = get_action(CONTEXT_STD, 1)) == ACTION_NONE)
         yield();
     /* A USB connect has to reach the handler, or it is never acknowledged */
@@ -3849,7 +3849,11 @@ static bool init(void)
     {
         if (mkdir(CACHE_PREFIX) < 0)
         {
-            error_wait("Could not create directory " CACHE_PREFIX);
+            char msg[MAX_PATH];
+
+            snprintf(msg, sizeof(msg), "%s " CACHE_PREFIX,
+                     str(LANG_CAROUSEL_NO_DIR));
+            error_wait(msg);
             return false;
         }
     }
@@ -3864,17 +3868,17 @@ static bool init(void)
      * library fills: from about 12,000 albums on a 5G. */
     if (ret == ERROR_BUFFER_FULL)
     {
-        error_wait("Library too large for this screen");
+        error_wait(str(LANG_CAROUSEL_TOO_LARGE));
         return false;
     }
     else if (ret == ERROR_NO_ALBUMS)
     {
-        error_wait("No albums found -- turn the database on");
+        error_wait(str(LANG_CAROUSEL_NO_ALBUMS));
         return false;
     }
     else if (ret == ERROR_NO_ARTISTS)
     {
-        error_wait("No artists found -- turn the database on");
+        error_wait(str(LANG_CAROUSEL_NO_ARTISTS));
         return false;
     }
     else if (ret == ERROR_USER_ABORT)
@@ -3907,7 +3911,7 @@ static bool init(void)
      * nothing for the screen to show. */
     if (carousel_idx.buf_sz < placeholder_sz + 2 * slide_max)
     {
-        error_wait("Library too large for this screen");
+        error_wait(str(LANG_CAROUSEL_TOO_LARGE));
         return false;
     }
 
@@ -3929,7 +3933,7 @@ static bool init(void)
             pf_cfg.cache_version = CACHE_REBUILD;
             pf_config_save();
         }
-        error_wait("Could not load the placeholder cover");
+        error_wait(str(LANG_CAROUSEL_NO_PLACEHOLDER));
         return false;
     }
 
@@ -3940,13 +3944,13 @@ static bool init(void)
 
     if ((empty_slide_hid = read_pfraw(EMPTY_SLIDE, 0)) < 0)
     {
-        error_wait("Could not load the placeholder cover");
+        error_wait(str(LANG_CAROUSEL_NO_PLACEHOLDER));
         return false;
     }
 
     if (!create_pf_thread())
     {
-        error_wait("Could not start the carousel");
+        error_wait(str(LANG_CAROUSEL_NO_START));
         return false;
     }
 

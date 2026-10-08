@@ -356,7 +356,7 @@ static int id3_get_index(struct mp3entry *id3)
             return pf_cfg.last_album;
     }
 
-    splash(HZ * 2, "Album not found");
+    splash(HZ * 2, ID2P(LANG_ALBUM_NOT_FOUND));
     return pf_cfg.last_album;
 }
 

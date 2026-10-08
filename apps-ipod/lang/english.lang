@@ -23244,3 +23244,185 @@
     *: "Library too large to hold in memory"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_ALBUM_NOT_FOUND
+  desc: Album Covers, when the album playing is not among the covers
+  user: core
+  <source>
+    *: "Album not found"
+  </source>
+  <dest>
+    *: "Album not found"
+  </dest>
+  <voice>
+    *: "Album not found"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_PLACEHOLDER
+  desc: carousel, when the cover shown for an album without art cannot be read
+  user: core
+  <source>
+    *: "Could not load the placeholder cover"
+  </source>
+  <dest>
+    *: "Could not load the placeholder cover"
+  </dest>
+  <voice>
+    *: "Could not load the placeholder cover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_START
+  desc: carousel, when its drawing thread cannot be started
+  user: core
+  <source>
+    *: "Could not start the carousel"
+  </source>
+  <dest>
+    *: "Could not start the carousel"
+  </dest>
+  <voice>
+    *: "Could not start the carousel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_DIR
+  desc: carousel, followed by the folder it could not make
+  user: core
+  <source>
+    *: "Could not create directory"
+  </source>
+  <dest>
+    *: "Could not create directory"
+  </dest>
+  <voice>
+    *: "Could not create directory"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TOO_LARGE
+  desc: carousel, when the library has more albums or artists than it can hold
+  user: core
+  <source>
+    *: "Library too large for this screen"
+  </source>
+  <dest>
+    *: "Library too large for this screen"
+  </dest>
+  <voice>
+    *: "Library too large for this screen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ALBUMS
+  desc: Album Covers, when the database holds no albums
+  user: core
+  <source>
+    *: "No albums found -- turn the database on"
+  </source>
+  <dest>
+    *: "No albums found -- turn the database on"
+  </dest>
+  <voice>
+    *: "No albums found -- turn the database on"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ARTISTS
+  desc: Artist Portraits, when the database holds no artists
+  user: core
+  <source>
+    *: "No artists found -- turn the database on"
+  </source>
+  <dest>
+    *: "No artists found -- turn the database on"
+  </dest>
+  <voice>
+    *: "No artists found -- turn the database on"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PRESS_ANY_BUTTON
+  desc: after a carousel error, before it closes
+  user: core
+  <source>
+    *: "press any button to continue"
+  </source>
+  <dest>
+    *: "press any button to continue"
+  </dest>
+  <voice>
+    *: "press any button to continue"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYBACK_REPORT
+  desc: title of the Playback Report
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "Playback Report"
+  </dest>
+  <voice>
+    *: "Playback Report"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_BY_WEEK
+  desc: Playback Report, heading of the calendar of weeks
+  user: core
+  <source>
+    *: "By week"
+  </source>
+  <dest>
+    *: "By week"
+  </dest>
+  <voice>
+    *: "By week"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NEVER_SKIPPED
+  desc: Playback Report, heading of the tracks never skipped
+  user: core
+  <source>
+    *: "Never skipped"
+  </source>
+  <dest>
+    *: "Never skipped"
+  </dest>
+  <voice>
+    *: "Never skipped"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SKIP_EVERYTHING
+  desc: Playback Report, the same heading when every track has been skipped
+  user: core
+  <source>
+    *: "You skip everything?!"
+  </source>
+  <dest>
+    *: "You skip everything?!"
+  </dest>
+  <voice>
+    *: "You skip everything?!"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGE_VIEWER
+  desc: title of the Image Viewer menu
+  user: core
+  <source>
+    *: "Image Viewer"
+  </source>
+  <dest>
+    *: "Image Viewer"
+  </dest>
+  <voice>
+    *: "Image Viewer"
+  </voice>
+</phrase>

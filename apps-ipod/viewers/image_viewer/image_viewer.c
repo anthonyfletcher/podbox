@@ -1182,12 +1182,12 @@ static int show_menu(void)
      *
      * The rows above it are identical in both, so one set of ids serves both
      * and MIID_QUIT can only ever come back from the second. */
-    MENUITEM_STRINGLIST(menu, "Image Viewer", NULL,
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_IMAGE_VIEWER), NULL,
                         ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME),
                         ID2P(LANG_DITHERING));
-    MENUITEM_STRINGLIST(menu_zoom, "Image Viewer", NULL,
+    MENUITEM_STRINGLIST(menu_zoom, ID2P(LANG_IMAGE_VIEWER), NULL,
                         ID2P(LANG_IV_ZOOM_PAN),
                         ID2P(LANG_SLIDESHOW_MODE),
                         ID2P(LANG_SLIDESHOW_TIME),

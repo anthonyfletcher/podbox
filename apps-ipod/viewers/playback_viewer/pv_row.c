@@ -744,7 +744,7 @@ static int year_menu(int cur, bool *to_root, bool *reload)
      * position, so without this the lines are written into a full buffer with
      * nothing remaining and every row comes out empty. Every caller that adds
      * lines resets first. */
-    simplelist_info_init(&info, "Playback Report", 0, NULL);
+    simplelist_info_init(&info, str(LANG_PLAYBACK_REPORT), 0, NULL);
     simplelist_reset_lines();
 
     for (y = hi; y >= lo && lo != 0; y--, n++)
