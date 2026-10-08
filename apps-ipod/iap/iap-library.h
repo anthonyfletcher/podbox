@@ -32,8 +32,15 @@ bool iap_library_tracks_are_queue(void);
 /* Whether a chosen song list is still being made into the Queue; it plays
  * when that finishes, so there is nothing to press Play on meanwhile. */
 bool iap_library_building(void);
-/* Frees the lists; called when the accessory goes. */
-void iap_library_close(void);
+/* Whether the Music Quiz has the Queue, which an accessory must then neither
+ * replace nor reorder. */
+bool iap_library_queue_lent(void);
+/* The dock's serial line and USB share the lists. Each claims them while its
+ * accessory is there, and close lets go of that claim; the lists are freed
+ * once neither holds one. */
+enum { IAP_LIBRARY_SERIAL = 1, IAP_LIBRARY_USB = 2 };
+void iap_library_claim(int transport);
+void iap_library_close(int transport);
 
 /* The library as iAP2 sends it: every track, while the database is in RAM.
  * A track's key is path_key() of its file, so it survives a rebuild and
@@ -89,7 +96,9 @@ const struct iap_library_list *iap_library_queue(void);
 void iap_library_queue_done(void);
 
 /* A track's artwork, a JPEG as the file holds it, read on the library's
- * worker: find starts it (false when the worker cannot take it now); state
+ * worker: find starts it (false when the worker cannot take it now, and
+ * busy then says whether that is a cover still being read, which a stop
+ * cuts short, so the find is worth asking again); state
  * says whether it was found and how big it is; chunk gives the bytes read
  * so far, none until more are, and next frees them for the worker; stop
  * gives up. Prefetch, called while no cover is being sent, encodes the next
@@ -97,6 +106,7 @@ void iap_library_queue_done(void);
 enum { IAP_ART_NONE, IAP_ART_FINDING, IAP_ART_FOUND, IAP_ART_FAILED };
 struct mp3entry;
 bool iap_library_artwork_find(const struct mp3entry *id3);
+bool iap_library_artwork_busy(void);
 int iap_library_artwork_state(uint32_t *size);
 size_t iap_library_artwork_chunk(const uint8_t **data);
 void iap_library_artwork_next(void);

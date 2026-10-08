@@ -75,6 +75,7 @@
 #include "rbpaths.h"
 #include "iap-library.h"
 #include "iap-core.h"
+#include "games/quiz/quiz.h"
 
 /* iAP's database categories */
 enum {
@@ -606,11 +607,12 @@ static bool insert_songs(struct playlist_insert_context *context,
         if (!tagcache_retrieve(tcs, block->entries[i].idx, tag_filename,
                                block->name, sizeof(block->name)))
             continue;
-        if (left_at && *left_at < 0
-            && path_key(block->name) == block->resume.track)
-            *left_at = context->count;
+        bool resumes = left_at && *left_at < 0
+                       && path_key(block->name) == block->resume.track;
         if (playlist_insert_context_add(context, block->name) < 0)
             return false;
+        if (resumes)
+            *left_at = context->count - 1;
         playlist_insert_context_yield(context);
     }
     return true;
@@ -665,7 +667,7 @@ static void play_tracks(uint32_t start)
     struct playlist_insert_context context;
     bool resume;
 
-    if (leaving || !tagcache_search_ready())
+    if (leaving || iap_library_queue_lent() || !tagcache_search_ready())
         return;
     resume = play_book && start == 0 && find_book_position();
     if (!tagcache_search(tcs, tag_filename))
@@ -735,7 +737,8 @@ static bool start_playing(uint32_t start)
 {
     if (!build(TYPE_TRACK) || start >= list_count)
         return false;
-    if (global_settings.party_mode && audio_status())
+    if ((global_settings.party_mode && audio_status())
+        || iap_library_queue_lent())
         return false;
 
     play_book = chose_book;
@@ -820,8 +823,10 @@ static void play_mix(int mix)
 {
     int lang, from, to;
 
-    if (!leaving && mix_moods(mix, &lang, &from, &to))
-        sound_mix_mood_unasked(from, to, global_settings.mix_length);
+    if (!leaving && !iap_library_queue_lent()
+        && mix_moods(mix, &lang, &from, &to))
+        sound_mix_mood_unasked(from, to, global_settings.mix_length,
+                               &leaving);
 }
 
 static bool is_playlist_file(const char *name)
@@ -973,7 +978,8 @@ static bool playlist_record_select(uint32_t index)
         folder = rows[index - PLAYLIST_QUEUE - 1];
         return true;
     }
-    if (global_settings.party_mode && audio_status())
+    if ((global_settings.party_mode && audio_status())
+        || iap_library_queue_lent())
         return false;
     return play_catalog_playlist(index - PLAYLIST_QUEUE - folders);
 }
@@ -1031,7 +1037,8 @@ static bool folder_select(uint32_t index)
 
     if (index == INDEX_UP || !folder_count(&count) || index >= count)
         return false;
-    if (global_settings.party_mode && audio_status())
+    if ((global_settings.party_mode && audio_status())
+        || iap_library_queue_lent())
         return false;
 
     if (was == FOLDER_BOOKS)
@@ -1151,8 +1158,23 @@ bool iap_library_building(void)
     return building;
 }
 
-void iap_library_close(void)
+bool iap_library_queue_lent(void)
 {
+    return music_quiz_has_playlist();
+}
+
+static int claims;
+
+void iap_library_claim(int transport)
+{
+    claims |= transport;
+}
+
+void iap_library_close(int transport)
+{
+    claims &= ~transport;
+    if (claims)
+        return;
     if (worker_id)
     {
         leaving = true;
@@ -1279,7 +1301,8 @@ bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
 {
     if (building || !open_block(true) || !n)
         return false;
-    if (global_settings.party_mode && audio_status())
+    if ((global_settings.party_mode && audio_status())
+        || iap_library_queue_lent())
         return false;
 
     uint32_t count = 0, first = 0;
@@ -1353,7 +1376,7 @@ static int find_books(void)
     if (!tagcache_search(tcs, tag_album))
         return 0;
     tagcache_search_add_clause(tcs, &only_spoken);
-    while (n < BOOKS_MAX
+    while (n < BOOKS_MAX && !leaving
            && tagcache_get_next(tcs, block->name, sizeof(block->name)))
     {
         int i = 0;
@@ -1412,7 +1435,7 @@ static uint32_t book_keys(int32_t seek, uint64_t *keys, uint32_t room)
         return 0;
     tagcache_search_add_filter(tcs, tag_album, seek);
     tagcache_search_add_clause(tcs, &only_spoken);
-    while (n < room
+    while (n < room && !leaving
            && tagcache_get_next(tcs, block->name, sizeof(block->name)))
     {
         const uint32_t order =
@@ -1655,7 +1678,7 @@ struct aat_read
 {
     int fd;
     int width;
-    bool prefetch;  /* stopped by prefetch_stop */
+    bool prefetch;  /* stopped by prefetch_stop, else by cancel */
 };
 
 static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
@@ -1663,7 +1686,7 @@ static bool aat_rows(void *ctx, fb_data *band, int y, int rows)
     const struct aat_read *a = ctx;
     const ssize_t n = (ssize_t)rows * a->width * FB_DATA_SZ;
     (void)y;    /* the rows come in order */
-    if (a->prefetch && (art.prefetch_stop || leaving))
+    if (leaving || (a->prefetch ? art.prefetch_stop : art.cancel))
         return false;
     return read(a->fd, band, n) == n;
 }
@@ -1756,7 +1779,8 @@ static void read_artwork(intptr_t request)
         left = cache_jpeg(art_source.path, false);
         /* Unreadable, or too busy even at 60: the image itself, if any */
         if (!left &&
-            (!albumart_find_source(&art_track, AA_PREFER_EMBEDDED, true,
+            (art.cancel || leaving ||
+             !albumart_find_source(&art_track, AA_PREFER_EMBEDDED, true,
                                    &art_source) ||
              art_source.kind == AA_SOURCE_CACHE))
             art_source.kind = AA_SOURCE_NONE;
@@ -1825,6 +1849,11 @@ bool iap_library_artwork_find(const struct mp3entry *id3)
     art.state = IAP_ART_FINDING;
     queue_post(&worker_q, EV_ARTWORK, ++art.request);
     return true;
+}
+
+bool iap_library_artwork_busy(void)
+{
+    return art.reading;
 }
 
 static void prefetch_artwork(void)

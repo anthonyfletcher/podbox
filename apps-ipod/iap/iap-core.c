@@ -884,11 +884,14 @@ void iap_periodic(void)
     bool present = last_frame_tick
                    && TIME_BEFORE(current_tick, last_frame_tick + 60 * HZ);
 
-    /* A dock that browsed leaves its lists behind; undocking frees them. A
+    /* A dock that browsed leaves its lists behind; undocking frees them
+     * unless a USB accessory holds them too. A
      * minute's silence rather than iap_accessory_present()'s five seconds,
      * so a quiet dock is not made to rebuffer playback each time it browses */
-    if (docked && !present)
-        iap_library_close();
+    if (present)
+        iap_library_claim(IAP_LIBRARY_SERIAL);
+    else if (docked)
+        iap_library_close(IAP_LIBRARY_SERIAL);
     docked = present;
 
     if(!iap_setupflag || !iap_enabled) return;
@@ -1521,6 +1524,8 @@ static int iap_move_callback(int handle, void* current, void* new)
 /* Change the shuffle state */
 void iap_shuffle_state(const bool state)
 {
+    if (iap_library_queue_lent())
+        return;
     /* Set shuffle to enabled */
     if(state && !global_settings.playlist_shuffle)
     {

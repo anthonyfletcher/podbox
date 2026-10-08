@@ -106,8 +106,8 @@
 
 #define DEVICE_UUID "50F0D0B0-6E2B-4F8A-9C1D-0000000006C0"
 /* In an iPhone's form: a UUID, then -MPN- for the device's own library, then
- * a version. An ID ending -PODBOX was the last thing this car took before
- * going silent; unconfirmed as the cause. */
+ * a version. Keep that form: an ID ending otherwise, such as -PODBOX, may be
+ * what silences this car, and nothing has ruled it out. */
 #define LIBRARY_ID  "50F0D0B0-6E2B-4F8A-9C1D-0000000006C1-MPN-26.6.2"
 
 /* The player's name, read as the car identifies. */
@@ -386,6 +386,7 @@ static struct
     uint8_t id;             /* 0 while a late cover has no transfer yet */
     uint8_t blank;          /* an empty transfer awaiting the car, or 0 */
     bool late;              /* the cover missed the first transfer */
+    bool pending;           /* the worker was busy: the find is asked again */
     uint32_t size, sent;
     long started;
 } aw;
@@ -495,9 +496,11 @@ void usb_iap2_control_reset(void)
     now_playing = false;
     n_controls = 0;
     memset(last_report_id, 0, sizeof(last_report_id));
+    /* Paused as well: the track would otherwise go on unheard at the jack */
     if (audio_on)
     {
         audio_on = false;
+        audio_pause();
         mixer_switch_sink(PCM_SINK_BUILTIN);
     }
 }
@@ -1183,9 +1186,16 @@ static void start_artwork(uint8_t id, const struct mp3entry *id3)
     aw.id = id;
     aw.sent = 0;
     aw.late = false;
+    aw.pending = false;
     if (iap_library_artwork_find(id3))
     {
         aw.phase = ART_FINDING;
+        aw.started = current_tick;
+    }
+    else if (iap_library_artwork_busy())
+    {
+        aw.phase = ART_FINDING;
+        aw.pending = true;
         aw.started = current_tick;
     }
     else
@@ -1225,10 +1235,26 @@ static bool announce_late_artwork(uint32_t size)
 
 static void artwork_pump(void)
 {
-    uint32_t size;
+    uint32_t size = 0;
+    if (aw.phase == ART_FINDING && aw.pending)
+    {
+        const struct mp3entry *id3 = audio_current_track();
+        if (id3 && iap_library_artwork_find(id3))
+            aw.pending = false;
+        else if (!iap_library_artwork_busy())
+        {
+            aw.pending = false;
+            if (aw.late)
+                aw.phase = ART_IDLE;
+            else
+                announce_artwork(0);
+        }
+    }
     if (aw.phase == ART_FINDING)
     {
-        const int state = iap_library_artwork_state(&size);
+        /* Still pending, the state is the last cover's, not this one's */
+        const int state = aw.pending ? IAP_ART_FINDING :
+                          iap_library_artwork_state(&size);
         if (state == IAP_ART_FOUND)
         {
             if (!aw.late)

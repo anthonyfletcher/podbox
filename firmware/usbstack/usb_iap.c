@@ -439,6 +439,7 @@ static int usb_iap_init_connection(void) {
     /* register timer */
     timeout_register(&tick_tmo, tick_callback, HZ / 10, 0);
 
+    iap_library_claim(IAP_LIBRARY_USB);
     iap_initialized = true;
     LOG("initialized");
     return 0;
@@ -497,7 +498,7 @@ static void usb_iap_disconnect(void) {
     check_act(iap_deinit_ctx(ctx), );
     _iap_release_ctx();
     check_act(iap_audio_deinit(), );
-    iap_library_close();
+    iap_library_close(IAP_LIBRARY_USB);
     LOG("disconnected");
 }
 

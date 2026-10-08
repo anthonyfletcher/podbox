@@ -224,6 +224,9 @@ IAPBool iap_platform_get_shuffle_setting(struct IAPContext* iap_ctx, uint8_t* st
 IAPBool iap_platform_set_shuffle_setting(struct IAPContext* iap_ctx, uint8_t status) {
     (void)iap_ctx;
 
+    if(iap_library_queue_lent()) {
+        return iap_false;
+    }
     if(status == IAPIPodStateShuffleSettingState_Tracks && !global_settings.playlist_shuffle) {
         global_settings.playlist_shuffle = true;
         settings_save();

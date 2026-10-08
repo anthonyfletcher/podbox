@@ -2164,6 +2164,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
+            if(iap_library_queue_lent())
+            {
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                break;
+            }
             if(buf[3] && !global_settings.playlist_shuffle)
             {
                 global_settings.playlist_shuffle = 1;

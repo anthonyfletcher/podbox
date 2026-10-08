@@ -95,6 +95,8 @@ static size_t syn_ack_len;
 static uint8_t control_session;
 static uint8_t file_session;      /* the file transfer session, or 0 */
 static unsigned window;     /* the accessory's outstanding packets, capped */
+static size_t peer_max;     /* the longest packet the accessory takes */
+static uint8_t last_ack;    /* the accessory's latest acknowledgement */
 static long rto;            /* retransmission timeout, ticks; 0 never */
 static unsigned max_sends;  /* sends of one packet before giving up */
 
@@ -341,6 +343,8 @@ static void send_next(void)
     }
 }
 
+static void drop_acked(void);
+
 bool usb_iap2_sent(int status, int length)
 {
     if (!tx_busy)
@@ -358,6 +362,8 @@ bool usb_iap2_sent(int status, int length)
             count--;
         }
         tx_slot = NULL;
+        if (rto)
+            drop_acked();
     }
     send_next();
     if (link_up && count < SLOTS)
@@ -374,7 +380,7 @@ uint8_t *usb_iap2_message_start(size_t *room)
 {
     if (!link_up || count == SLOTS)
         return NULL;
-    *room = MAX_PACKET - HEADER_LEN - 1;
+    *room = peer_max - HEADER_LEN - 1;
     return slots[(head + count) % SLOTS].packet + HEADER_LEN;
 }
 
@@ -411,6 +417,7 @@ static void reset_link(void)
     link_up = false;
     count = 0;
     tx_slot = NULL;
+    last_ack = my_seq;
     cs_len = 0;
     pending &= ~SEND_SYN_ACK;
     usb_iap2_control_reset();
@@ -423,6 +430,8 @@ static void take_syn(uint8_t seq, const uint8_t *payload, size_t n)
         return;
     memcpy(syn_ack, payload, n);
     syn_ack_len = n;
+    peer_max = MIN(MAX(payload[2] << 8 | payload[3], HEADER_LEN + 2),
+                   MAX_PACKET);
     if ((syn_ack[2] << 8 | syn_ack[3]) > MAX_PACKET)
     {
         syn_ack[2] = MAX_PACKET >> 8;
@@ -452,7 +461,21 @@ static void take_syn(uint8_t seq, const uint8_t *payload, size_t n)
     pending |= SEND_SYN_ACK;
 }
 
-/* Everything the accessory has acknowledged leaves the ring. */
+/* Everything the accessory has acknowledged leaves the ring, except the
+ * packet still going out: the endpoint reads it until usb_iap2_sent(). */
+static void drop_acked(void)
+{
+    while (count)
+    {
+        struct slot *s = &slots[head];
+        if (!s->tries || s == tx_slot
+            || (uint8_t)(last_ack - s->packet[5]) >= 128)
+            break;
+        head = (head + 1) % SLOTS;
+        count--;
+    }
+}
+
 static void take_ack(uint8_t ack)
 {
     if (!link_up && ack == syn_seq)
@@ -462,14 +485,8 @@ static void take_ack(uint8_t ack)
                 control_session, window);
         usb_iap2_control_link_up();
     }
-    while (count)
-    {
-        struct slot *s = &slots[head];
-        if (!s->tries || (uint8_t)(ack - s->packet[5]) >= 128)
-            break;
-        head = (head + 1) % SLOTS;
-        count--;
-    }
+    last_ack = ack;
+    drop_acked();
 }
 
 /* Whole messages off the front of the control session's bytes. */
