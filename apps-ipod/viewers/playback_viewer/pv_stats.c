@@ -1066,12 +1066,6 @@ static void derive(struct pv_totals *o, bool year_only)
 
 /* ------------------------------------------------------------- calendar */
 
-const char *const pv_month_abbr[13] =
-{
-    "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
-
 /* Howard Hinnant's civil-from-days, which treats March as the first month so
  * the leap day lands at the end of a year and the arithmetic stays branchless.
  * Kept in its published form: it is easy to verify against the original and

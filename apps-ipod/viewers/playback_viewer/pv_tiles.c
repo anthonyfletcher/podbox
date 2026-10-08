@@ -292,7 +292,7 @@ static const char *date_of(long day)
     int y, m, d;
 
     pv_civil_from_days(day, &y, &m, &d);
-    return pfmt("%d %s", d, pv_month_abbr[m]);
+    return pfmt("%d %s", d, str(LANG_MONTH_JANUARY + m - 1));
 }
 
 /* A stored name as a card shows it. A name that fills its slot was cut to
@@ -334,14 +334,14 @@ const char *pv_tiles_section_name(enum pv_sec sec)
 {
     switch (sec)
     {
-    case PV_SEC_NEW:     return "Newly unlocked";
-    case PV_SEC_NUMBERS: return "In numbers";
-    case PV_SEC_WEEKS:   return "Week by week";
-    case PV_SEC_ARTISTS: return "Top artists";
-    case PV_SEC_SONGS:   return "Top songs";
-    case PV_SEC_ALBUMS:  return "Top albums";
-    case PV_SEC_SKIPS:   return "Skips";
-    case PV_SEC_ACH:     return "Achievements";
+    case PV_SEC_NEW:     return str(LANG_PV_SEC_NEW);
+    case PV_SEC_NUMBERS: return str(LANG_PV_SEC_NUMBERS);
+    case PV_SEC_WEEKS:   return str(LANG_PV_SEC_WEEKS);
+    case PV_SEC_ARTISTS: return str(LANG_PV_SEC_ARTISTS);
+    case PV_SEC_SONGS:   return str(LANG_PV_SEC_SONGS);
+    case PV_SEC_ALBUMS:  return str(LANG_PV_SEC_ALBUMS);
+    case PV_SEC_SKIPS:   return str(LANG_PV_SEC_SKIPS);
+    case PV_SEC_ACH:     return str(LANG_PV_SEC_ACH);
     default:             return "";
     }
 }
@@ -891,14 +891,14 @@ void pv_tiles_open(int idx)
  * so each names its own rather than taking the card's. */
 static const struct
 {
-    const char *name;
+    int name;                   /* a LANG_ id */
     enum card_gen gen;
 } quarter[4] =
 {
-    { "Morning",   CARD_GEN_SUNRISE },
-    { "Afternoon", CARD_GEN_NOON    },
-    { "Evening",   CARD_GEN_DUSK    },
-    { "Night",     CARD_GEN_NIGHT   },
+    { LANG_PV_MORNING,   CARD_GEN_SUNRISE },
+    { LANG_PV_AFTERNOON, CARD_GEN_NOON    },
+    { LANG_PV_EVENING,   CARD_GEN_DUSK    },
+    { LANG_PV_NIGHT,     CARD_GEN_NIGHT   },
 };
 
 /* One card's series, grid and table. Filled per resolve and handed over by
@@ -1034,7 +1034,8 @@ static void name_card(struct card_content *c, const struct pv_agg *row,
 
     if (!row || !row->name[0])
     {
-        card_text_add(&c->text, row ? "No name" : "No plays yet",
+        card_text_add(&c->text,
+                      str(row ? LANG_PV_NO_NAME : LANG_PV_NO_PLAYS_YET),
                       card_paint_body_font(), ink.dim);
         return;
     }
@@ -1074,11 +1075,11 @@ static void figures(struct card_content *c, const struct pv_agg *row,
 {
     if (!row)
         return;
-    kv_add(c, "Minutes", num((long)(row->y_seconds / 60)));
-    kv_add(c, "Plays", num(row->y_count));
+    kv_add(c, str(LANG_PV_K_MINUTES), num((long)(row->y_seconds / 60)));
+    kv_add(c, str(LANG_PV_K_PLAYS), num(row->y_count));
     if (songs >= 0)
-        kv_add(c, "Songs", num(songs));
-    kv_add(c, "Skips", num(row->y_skips));
+        kv_add(c, str(LANG_PV_K_SONGS), num(songs));
+    kv_add(c, str(LANG_PV_K_SKIPS), num(row->y_skips));
 }
 
 void pv_tiles_content(int idx, struct card_content *out)
@@ -1126,19 +1127,19 @@ void pv_tiles_content(int idx, struct card_content *out)
     switch (id)
     {
     case T_YEARMINS:
-        figure(out, num(totals->seconds / 60), "minutes");
+        figure(out, num(totals->seconds / 60), str(LANG_PV_F_MINUTES));
         break;
 
     case T_YEARPLAYS:
-        figure(out, num(totals->plays), "plays");
+        figure(out, num(totals->plays), str(LANG_PV_F_PLAYS));
         break;
 
     case T_YEARTRACKS:
-        figure(out, num(totals->titles), "tracks");
+        figure(out, num(totals->titles), str(LANG_PV_F_TRACKS));
         break;
 
     case T_YEARSKIPPED:
-        figure(out, num(totals->skips), "plays skipped");
+        figure(out, num(totals->skips), str(LANG_PV_F_PLAYS_SKIPPED));
         break;
 
     case T_YEARTIME:
@@ -1150,7 +1151,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         for (int h = 1; h < 24; h++)
             if (totals->hour_hist[h] > totals->hour_hist[best])
                 best = h;
-        figure(out, pfmt("%02d:00", best), "peak hour");
+        figure(out, pfmt("%02d:00", best), str(LANG_PV_F_PEAK_HOUR));
         break;
     }
 
@@ -1172,10 +1173,10 @@ void pv_tiles_content(int idx, struct card_content *out)
         out->accent   = card_paint_accent(tile_sec);
         out->series   = series;
         out->n_series = 6;
-        out->title    = quarter[arg].name;
+        out->title    = str(quarter[arg].name);
         card_text_add(&out->text, num(n), card_paint_figure_font(),
                       card_paint_gen_ink(out->gen));
-        card_text_add_line(&out->text, "plays", body,
+        card_text_add_line(&out->text, str(LANG_PV_F_PLAYS), body,
                            card_paint_gen_ink(out->gen));
         break;
     }
@@ -1183,17 +1184,18 @@ void pv_tiles_content(int idx, struct card_content *out)
     case T_NIGHTPLAYS:
         if (totals->night == 0)
         {
-            card_text_add(&out->text, "Your nights are quiet. Respect.",
+            card_text_add(&out->text, str(LANG_PV_QUIET_NIGHTS),
                           body, ink.text);
             break;
         }
-        figure(out, num(totals->night), "plays after midnight");
+        figure(out, num(totals->night), str(LANG_PV_F_AFTER_MIDNIGHT));
         break;
 
     /* ------------------------------------------------------ week by week */
 
     case T_ACTIVEWEEKS:
-        figure(out, num(pv_stats_active_weeks()), "weeks with music");
+        figure(out, num(pv_stats_active_weeks()),
+               str(LANG_PV_F_WEEKS_WITH_MUSIC));
         break;
 
     case T_LONGESTDAY:
@@ -1202,12 +1204,12 @@ void pv_tiles_content(int idx, struct card_content *out)
 
         if (!pv_stats_longest_day(&d))
             break;
-        figure(out, num(d.secs / 60), "minutes on your best day");
+        figure(out, num(d.secs / 60), str(LANG_PV_F_BEST_DAY));
         break;
     }
 
     case T_STREAK:
-        figure(out, num(totals->streak), "day streak");
+        figure(out, num(totals->streak), str(LANG_PV_F_DAY_STREAK));
         break;
 
     case T_SUBSTREAK:
@@ -1217,9 +1219,9 @@ void pv_tiles_content(int idx, struct card_content *out)
 
         if (!pv_stats_streak_span(&from, &to, &secs))
             break;
-        kv_add(out, "From", date_of(from));
-        kv_add(out, "To", date_of(to));
-        kv_add(out, "Minutes", num(secs / 60));
+        kv_add(out, str(LANG_PV_K_FROM), date_of(from));
+        kv_add(out, str(LANG_PV_K_TO), date_of(to));
+        kv_add(out, str(LANG_PV_K_MINUTES), num(secs / 60));
         break;
     }
 
@@ -1235,7 +1237,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (!pv_stats_week(arg, &w))
             break;
         out->tag = pfmt("%d", arg + 1);
-        figure(out, num(w.secs / 60), "minutes");
+        figure(out, num(w.secs / 60), str(LANG_PV_F_MINUTES));
 
         /* The week's days along its own foot, squashed to a strip.
          *
@@ -1260,11 +1262,11 @@ void pv_tiles_content(int idx, struct card_content *out)
 
         if (!pv_stats_week(arg, &w))
             break;
-        kv_add(out, "Minutes", num(w.secs / 60));
-        kv_add(out, "Plays", num(w.plays));
+        kv_add(out, str(LANG_PV_K_MINUTES), num(w.secs / 60));
+        kv_add(out, str(LANG_PV_K_PLAYS), num(w.plays));
         if (wk_week == arg)
-            kv_add(out, "Songs", num(wk_songs));
-        kv_add(out, "Skips", num(w.skips));
+            kv_add(out, str(LANG_PV_K_SONGS), num(wk_songs));
+        kv_add(out, str(LANG_PV_K_SKIPS), num(w.skips));
         break;
     }
 
@@ -1275,11 +1277,12 @@ void pv_tiles_content(int idx, struct card_content *out)
          * so better than a progress message nobody sees. */
         if (wk_week != arg || !wk_top_artist[0])
             break;
-        card_text_add(&out->text, "Top artist", body, ink.dim);
+        card_text_add(&out->text, str(LANG_PV_TOP_ARTIST), body, ink.dim);
         card_text_add_line(&out->text, shown(wk_top_artist), name, ink.text);
         if (wk_top_track[0])
         {
-            card_text_add_line(&out->text, "Top song", body, ink.dim);
+            card_text_add_line(&out->text, str(LANG_PV_TOP_SONG), body,
+                               ink.dim);
             card_text_add_line(&out->text, shown(wk_top_track), name,
                                ink.text);
         }
@@ -1304,12 +1307,13 @@ void pv_tiles_content(int idx, struct card_content *out)
 
         if (al)
         {
-            card_text_add(&out->text, "Top album", body, ink.dim);
+            card_text_add(&out->text, str(LANG_PV_TOP_ALBUM), body, ink.dim);
             card_text_add_line(&out->text, shown(al->name), name, ink.text);
         }
         if (so)
         {
-            card_text_add_line(&out->text, "Top song", body, ink.dim);
+            card_text_add_line(&out->text, str(LANG_PV_TOP_SONG), body,
+                               ink.dim);
             card_text_add_line(&out->text, shown(so->name), name, ink.text);
         }
         break;
@@ -1333,7 +1337,7 @@ void pv_tiles_content(int idx, struct card_content *out)
            ? pv_stats_row(PV_T_ALBUM, r->album) : NULL;
         if (al && al->name[0])
         {
-            card_text_add_line(&out->text, "from", body, ink.dim);
+            card_text_add_line(&out->text, str(LANG_PV_FROM), body, ink.dim);
             card_text_add(&out->text, shown(al->name), name, ink.text);
         }
         break;
@@ -1360,7 +1364,8 @@ void pv_tiles_content(int idx, struct card_content *out)
         by_artist(out, arg < n_album ? top_album[arg] : NULL);
         if (so)
         {
-            card_text_add_line(&out->text, "Top song", body, ink.dim);
+            card_text_add_line(&out->text, str(LANG_PV_TOP_SONG), body,
+                               ink.dim);
             card_text_add_line(&out->text, shown(so->name), name, ink.text);
         }
         break;
@@ -1372,7 +1377,7 @@ void pv_tiles_content(int idx, struct card_content *out)
     {
         int pct = (int)(totals->skips * 100 / (totals->plays + totals->skips));
 
-        figure(out, pfmt("%d%%", pct), "of plays skipped");
+        figure(out, pfmt("%d%%", pct), str(LANG_PV_F_OF_PLAYS_SKIPPED));
         break;
     }
 
@@ -1400,8 +1405,8 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (!r)
             break;
         by_artist(out, r);
-        kv_add(out, "Skips", num(r->y_skips));
-        kv_add(out, "Plays", num(r->y_count));
+        kv_add(out, str(LANG_PV_K_SKIPS), num(r->y_skips));
+        kv_add(out, str(LANG_PV_K_PLAYS), num(r->y_count));
         break;
     }
 
@@ -1432,8 +1437,8 @@ void pv_tiles_content(int idx, struct card_content *out)
         if (!r)
             break;
         by_artist(out, r);
-        kv_add(out, "Plays", num(r->y_count));
-        kv_add(out, "Minutes", num((long)(r->y_seconds / 60)));
+        kv_add(out, str(LANG_PV_K_PLAYS), num(r->y_count));
+        kv_add(out, str(LANG_PV_K_MINUTES), num((long)(r->y_seconds / 60)));
         break;
     }
 
@@ -1441,7 +1446,7 @@ void pv_tiles_content(int idx, struct card_content *out)
 
     case T_NEWCOUNT:
         out->tag_icon = ICON_CELEBRATION;
-        figure(out, num(pv_badges_new_count()), "new badges");
+        figure(out, num(pv_badges_new_count()), str(LANG_PV_F_NEW_BADGES));
         break;
 
     case T_NEWBADGE:
@@ -1494,7 +1499,7 @@ void pv_tiles_content(int idx, struct card_content *out)
         card_text_add(&out->text, b->desc, body, ink.text);
         if (pv_badges_unlocked(arg) && when)
         {
-            card_text_add_line(&out->text, "Earned:", body, ink.dim);
+            card_text_add_line(&out->text, str(LANG_PV_EARNED), body, ink.dim);
             card_text_add(&out->text, date_of((long)(when / 86400UL)), name,
                           ink.text);
         }
@@ -1514,5 +1519,5 @@ void pv_tiles_content(int idx, struct card_content *out)
      * wherever they apply, and the cases above set them. */
     if (!out->text.n && !out->title && !out->level && !out->series
         && !out->art && !out->n_table)
-        card_text_add(&out->text, "Nothing to show yet", body, ink.dim);
+        card_text_add(&out->text, str(LANG_PV_NOTHING_YET), body, ink.dim);
 }

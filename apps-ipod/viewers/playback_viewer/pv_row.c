@@ -651,8 +651,9 @@ static void draw_title(int year)
      * applies to everything below and "2026 in numbers" is a heading, where
      * a number on the right is a label nobody asked for. */
     if (sec == PV_SEC_NUMBERS)
-        snprintf(line, sizeof(line), "%s in numbers",
-                 year == PV_YEAR_ALL ? "All time" : pfmt_year(year));
+        snprintf(line, sizeof(line), str(LANG_PV_YEAR_IN_NUMBERS),
+                 year == PV_YEAR_ALL ? (const char *)str(LANG_PV_ALL_TIME)
+                                     : pfmt_year(year));
     else
         snprintf(line, sizeof(line), "%s", pv_tiles_section_name(sec));
 
@@ -753,7 +754,7 @@ static int year_menu(int cur, bool *to_root, bool *reload)
         if (y == cur)
             at = n;
     }
-    simplelist_addline("All time");
+    simplelist_addline("%s", str(LANG_PV_ALL_TIME));
     if (cur == PV_YEAR_ALL)
         at = n;
 
@@ -761,7 +762,7 @@ static int year_menu(int cur, bool *to_root, bool *reload)
      * a held Menu is for are then one press away, and the alternative -- a
      * menu whose two rows are "which year" and "settings" -- makes the year,
      * which is the reason this gesture exists, two presses deep. */
-    simplelist_addline("Settings");
+    simplelist_addline("%s", str(LANG_PV_SETTINGS));
 
     info.selection = at;
     info.hide_theme = false;

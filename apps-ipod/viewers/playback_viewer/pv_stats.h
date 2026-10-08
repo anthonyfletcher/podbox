@@ -312,7 +312,4 @@ const struct pv_agg *pv_stats_best_child(enum pv_table child,
 void pv_civil_from_days(long day, int *y, int *m, int *d);
 long pv_days_from_civil(int y, int m, int d);
 
-/* "Jan".."Dec"; index 0 is empty so a month number indexes directly. */
-extern const char *const pv_month_abbr[13];
-
 #endif /* _PV_STATS_H */
