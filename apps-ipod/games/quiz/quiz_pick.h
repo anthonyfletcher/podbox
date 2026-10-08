@@ -36,6 +36,7 @@ struct quiz_round
 #define QUIZ_PICK_NO_DB    -1   /* the database would not answer */
 #define QUIZ_PICK_TOO_FEW  -2   /* not enough music to make ten rounds */
 #define QUIZ_PICK_NO_MEM   -3
+#define QUIZ_PICK_STOPPED  -4   /* USB or a shutdown, in *event */
 
 /* Fill all QUIZ_ROUNDS of 'rounds'. A QUIZ_PICK_* code.
  *
@@ -44,7 +45,8 @@ struct quiz_round
  * where the Sound Index has measured the track, by genre and decade where it
  * has not, and for a year by how many years apart. A kind that cannot make a
  * round gives it to another kind that is on; QUIZ_PICK_TOO_FEW means none
- * could. */
-int quiz_pick(struct quiz_round *rounds);
+ * could. QUIZ_PICK_STOPPED leaves the event in *event for the caller to
+ * pass to default_event_handler(). */
+int quiz_pick(struct quiz_round *rounds, long *event);
 
 #endif /* _QUIZ_PICK_H */

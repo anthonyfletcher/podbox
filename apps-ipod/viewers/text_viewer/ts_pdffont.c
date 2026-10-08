@@ -24,6 +24,7 @@ typedef struct { int contents, res0, resn; } page_t;
 struct ts_pdffonts {
     font_t *f; int nf;
     page_t *p; int np;
+    int    more_pages;   /* a content stream past MAX_PAGE was seen */
     res_t  *r; int nr;
     cmap_t *c; int nc;
 };
@@ -254,6 +255,8 @@ static int scan_structure(ts_pdffonts *F, const ts_io *io)
                         p->contents = (int)n2;
                         p->res0 = res0;
                         p->resn = F->nr - res0;
+                    } else {
+                        F->more_pages = 1;
                     }
                 }
                 continue;
@@ -587,6 +590,7 @@ int ts_pdffonts_is_content(ts_pdffonts *F, int obj)
 {
     int i;
     if (!F || !F->np) return 1;              /* no pages found: try them all */
+    if (F->more_pages) return 1;             /* the table is partial: likewise */
     for (i = 0; i < F->np; i++)
         if (F->p[i].contents == obj) return 1;
     return 0;

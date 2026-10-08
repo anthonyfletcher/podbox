@@ -169,7 +169,10 @@ static int load_image(char *filename, struct image_info *info,
 
     if (!(status & DHT)) /* if no Huffman table present: */
         default_huff_tbl(p_jpg); /* use default */
-    build_lut(p_jpg); /* derive Huffman and other lookup-tables */
+    /* derive Huffman and other lookup-tables; a sampling this decoder has
+     * no layout for goes to the progressive one, which takes any */
+    if (build_lut(p_jpg) < 0)
+        return PLUGIN_JPEG_PROGRESSIVE;
 
     info->x_size = p_jpg->x_size;
     info->y_size = p_jpg->y_size;
@@ -234,6 +237,11 @@ static int get_image_fit(struct image_info *info, int frame)
     int stride = fit_stride();
     int csub_x = fit_csub_x(), csub_y = fit_csub_y();
     int src_w, src_h, status, i;
+
+    /* Even an emptied cache may not hold the source and the fit rendering
+     * together. */
+    if (root_size < img_mem(src_ds) + img_mem(DS_FIT))
+        return PLUGIN_OUTOFMEM;
 
     if (buf_images_size <= img_mem(src_ds) + img_mem(DS_FIT))
     {

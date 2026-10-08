@@ -1053,6 +1053,16 @@ static bool spike_confirm_exit(void)
  * The field does not have to be redrawn to freeze: the clock is the audio's
  * and a stopped report stops the grid. Returns true where the player left
  * from here. */
+/* Set once USB or the menu has sent the player to the root, so the game
+ * leaves and tells its caller to go there too. */
+static bool spike_to_root;
+
+static void spike_event(int button)
+{
+    if (default_event_handler(button) == SYS_USB_CONNECTED)
+        spike_to_root = true;
+}
+
 static bool spike_paused(bool by_hold)
 {
     bool quit = false;
@@ -1068,9 +1078,17 @@ static bool spike_paused(bool by_hold)
         int button = get_action(CONTEXT_SPIKE, HZ / 4);
 
         /* A pause the hold switch forced ends when the switch does, and can
-         * end no other way: no button reaches here while it is on. */
+         * end no other way: no button reaches here while it is on. System
+         * events still do, and a poweroff or USB left unhandled here is
+         * lost. */
         if (by_hold)
         {
+            spike_event(button);
+            if (spike_to_root)
+            {
+                quit = true;
+                break;
+            }
             if (!button_hold())
                 break;
             continue;
@@ -1094,7 +1112,12 @@ static bool spike_paused(bool by_hold)
         if (button == ACTION_SPIKE_PAUSE || button == ACTION_SPIKE_JUMP)
             break;
 
-        default_event_handler(button);
+        spike_event(button);
+        if (spike_to_root)
+        {
+            quit = true;
+            break;
+        }
     }
 
     spike_set_paused(false);
@@ -1124,6 +1147,7 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
 {
     struct viewport vp;
     struct spk_menu m;
+    int old_shift = tempo_shift;
     bool root;
 
     m.offset_ms = &global_settings.spike_offset;
@@ -1177,10 +1201,13 @@ static bool spike_menu(int fps, int draw_ms, int flush_ms)
      * music is stopped and nothing is crossing one. */
     if (m.tempo_changed)
     {
-        int unshifted = tempo_shift < 0 ? beat_ms << -tempo_shift
-                                        : beat_ms >> tempo_shift;
+        /* beat_ms carries the shift it was taken with, not the one the
+         * menu has just stored. */
+        int unshifted = old_shift < 0 ? beat_ms << -old_shift
+                                      : beat_ms >> old_shift;
 
         beat_ms = spike_shifted(unshifted);
+        spk_gen_set_tempo(beat_ms);
         spike_anchor((long)spk_clock_ms());
     }
 
@@ -1206,12 +1233,17 @@ static void spike_summary_screen(struct spk_summary *s)
     s->first = 0;
     s->shown = 0;
 
+    /* Nothing here is timed against the music, so the backlight keeps the
+     * user's timeout, and the figure stops dancing once it is out. */
+    spike_backlight(false);
+
     while (1)
     {
         long t = current_tick;
         long beat = t / SPK_RESULT_BEAT;
         int phase = (int)((t % SPK_RESULT_BEAT) * SPK_PHASE
                           / SPK_RESULT_BEAT);
+        bool lit = is_backlight_on(false);
         int button;
 
         if (beat != last_beat)
@@ -1220,9 +1252,10 @@ static void spike_summary_screen(struct spk_summary *s)
             last_beat = beat;
         }
 
-        spk_draw_summary(s, phase, move);
+        if (lit)
+            spk_draw_summary(s, phase, move);
 
-        button = get_action(CONTEXT_SPIKE, HZ / 20);
+        button = get_action(CONTEXT_SPIKE, lit ? HZ / 20 : HZ / 2);
 
         if (button == ACTION_SPIKE_JUMP || button == ACTION_SPIKE_EXIT
             || button == ACTION_SPIKE_PAUSE)
@@ -1234,8 +1267,14 @@ static void spike_summary_screen(struct spk_summary *s)
                  && s->first + s->shown < s->rows)
             s->first++;
         else
-            default_event_handler(button);
+        {
+            spike_event(button);
+            if (spike_to_root)
+                break;
+        }
     }
+
+    spike_backlight(true);      /* the record returns to the game's menu */
 }
 
 /* The record, on the same screen a finished run is shown on -- because that
@@ -1279,6 +1318,7 @@ bool spike_screen(void)
         return false;
     }
 
+    spike_to_root = false;
     push_current_activity(ACTIVITY_SPIKE);
 
     /* The screen owns the whole display: the status bar has nothing to say
@@ -1375,6 +1415,18 @@ bool spike_screen(void)
 
         button = get_action(CONTEXT_SPIKE, wait);
 
+        /* The exit dialog, the pause, the menu and a system event's own
+         * screen all hold the loop away from the field, and none of them
+         * comes back through the boost below until it is over. */
+        if (boosted && (button == ACTION_SPIKE_EXIT
+                        || button == ACTION_SPIKE_PAUSE
+                        || button == ACTION_SPIKE_OPTIONS
+                        || button_hold() || (button & SYS_EVENT)))
+        {
+            cpu_boost(false);
+            boosted = false;
+        }
+
         if (button == ACTION_SPIKE_EXIT)
         {
             /* The music is still playing here, so the run carries on
@@ -1436,18 +1488,24 @@ bool spike_screen(void)
         if (button == ACTION_SPIKE_OPTIONS)
         {
             spike_set_paused(true);
-            if (spike_menu(fps, draw_ms, flush_ms))
+            if (spike_menu(fps, draw_ms, flush_ms) || spike_to_root)
+            {
+                spike_to_root = true;
                 break;
+            }
 
             spike_set_paused(false);
             next_frame = current_tick + frame_ticks;
             continue;
         }
 
-        default_event_handler(button);
+        spike_event(button);
+        if (spike_to_root)
+            break;
 
-        /* Boosted only while the field is moving. Unboosted the 5G runs at
-         * 30MHz against 80 and the bus drops with it; nothing else asks for
+        /* Boosted only while the field is moving: whatever stops it has
+         * dropped the boost above. Unboosted the 5G runs at 30MHz against
+         * 80 and the bus drops with it; nothing else asks for
          * the boost, since the codec raises it to refill and drops it
          * again. Tied to playback rather than to the achieved frame rate,
          * because unboosting makes frames several times slower and a
@@ -1709,7 +1767,7 @@ bool spike_screen(void)
         sum.log = SPK_LOG_RUN;
         sum.rows = spk_score_tracks(SPK_LOG_RUN);
 
-        if (run_state == SPK_RUN_OVER)
+        if (run_state == SPK_RUN_OVER && !spike_to_root)
             spike_summary_screen(&sum);
     }
 
@@ -1730,5 +1788,5 @@ bool spike_screen(void)
     viewportmanager_theme_undo(SCREEN_MAIN, true);
     pop_current_activity();
 
-    return false;
+    return spike_to_root;
 }

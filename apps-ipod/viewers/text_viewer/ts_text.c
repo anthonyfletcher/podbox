@@ -25,6 +25,7 @@ struct flt_st {
     int at_bol, fence, tick, link, esc;
     /* rtf */
     int depth, skip_depth, ctrl, ctrl_len, uc_skip, hexd, hexv;
+    int uc_pend;                    /* fallback chars a \uN has still to eat */
     char ctrl_word[32];
     ts_charset cp;
 };
@@ -196,7 +197,7 @@ static int is_skip_dest(const char *w)
 static void rtf_char(flt_st *s, uint32_t cp)
 {
     if (s->skip_depth) return;
-    if (s->uc_skip < 0) { s->uc_skip++; return; }   /* swallowed by \uN */
+    if (s->uc_pend > 0) { s->uc_pend--; return; }   /* swallowed by \uN */
     ts_emit_cp(&s->out, cp);
 }
 
@@ -217,12 +218,15 @@ static void rtf_ctrl_done(flt_st *s, int has_arg, long arg)
     if (!strcmp(w, "ldblquote")) { rtf_char(s, 0x201C); return; }
     if (!strcmp(w, "rdblquote")) { rtf_char(s, 0x201D); return; }
     if (!strcmp(w, "bullet")) { rtf_char(s, 0x2022); return; }
-    if (!strcmp(w, "uc") && has_arg) { s->uc_skip = (int)arg; return; }
+    if (!strcmp(w, "uc") && has_arg) {
+        s->uc_skip = arg < 0 ? 0 : (int)arg;    /* \uc0: no fallback follows */
+        return;
+    }
     if (!strcmp(w, "u") && has_arg) {
         uint32_t cp = (arg < 0) ? (uint32_t)(arg + 65536) : (uint32_t)arg;
+        s->uc_pend = 0;                         /* a \u ends the last fallback */
         rtf_char(s, cp);
-        s->uc_skip = -s->uc_skip;               /* negative = swallow N chars */
-        if (!s->uc_skip) s->uc_skip = 1;
+        s->uc_pend = s->uc_skip;
         return;
     }
     for (i = 0; rtf_cp[i].w; i++)

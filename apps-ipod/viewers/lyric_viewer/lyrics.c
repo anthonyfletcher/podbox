@@ -816,6 +816,11 @@ static void parse_sylt(int fd)
             framelen = bytes2int(0, header[3], header[4], header[5]);
         }
 
+        /* A size outside the tag would seek back over this header, or out
+         * of the tag, and loop on it. */
+        if (framelen < 0 || framelen > size)
+            return;
+
         if (framelen == 0)
         {
             /* all-zero header means padding: the frames are done */

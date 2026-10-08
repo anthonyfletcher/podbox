@@ -23,10 +23,12 @@
  *     while the first image decodes, and draws decode progress as a dialog over
  *     the retained image rather than blanking the screen.
  *
- * Memory: one core_alloc_maximum() block holds both the file-name list and the
- * decoded image, carved up by get_pic_list() advancing `buf` past the list. It
- * is pinned for the whole session, so a USB connect would deadlock on it --
- * iv_usb_inserted() drops it from the USB thread before that can happen.
+ * Memory: one block holds both the file-name list and the decoded image,
+ * carved up by get_pic_list() advancing `buf` past the list. Album art tries
+ * the app buffer first, which leaves playback alone; a file, or a cover too
+ * large for it, takes a core_alloc_maximum() block. That is pinned for the
+ * whole session, so a USB connect would deadlock on it -- iv_usb_inserted()
+ * drops it from the USB thread before that can happen.
  *
  * Parts, in order:
  *   - session state and the shared iv_settings
@@ -63,6 +65,7 @@
 #include "root_menu.h"       /* GO_TO_*, MENU_ATTACHED_USB */
 #include "screens/browse/browser.h"            /* browser_get_context/entries */
 #include "core_alloc.h"
+#include "system/app_buffer.h"
 #include "events.h"          /* add_event/remove_event, SYS_EVENT_USB_INSERTED */
 #include "audio.h"           /* audio_current_track, audio_status, audio_hard_stop */
 #include "metadata/albumart.h"        /* search_albumart_files */
@@ -98,9 +101,12 @@ static int buf_handle = 0;
 static unsigned char* buf;
 static size_t buf_size;
 
-/* True only while the main thread sits in button_get() with no decode in
- * flight -- the one window where another thread may free the buffer, because
- * nothing is holding a pointer into it. */
+/* True while `buf` is the app buffer rather than buf_handle's block. */
+static bool iv_app_buf = false;
+
+/* True only while the main thread sits in button_get() or the menu with no
+ * decode in flight -- the windows where another thread may free the buffer,
+ * because nothing is holding a pointer into it. */
 static volatile bool iv_buf_idle = false;
 
 /* Set by the USB hook once it has freed the buffer; the main thread must then
@@ -152,6 +158,11 @@ static int show_menu(void); /* MENU_ATTACHED_USB, IV_MENU_QUIT, or 0 */
 /* Release the image buffer, once. */
 static void iv_release_buffer(void)
 {
+    if (iv_app_buf)
+    {
+        app_release_buffer("image viewer");
+        iv_app_buf = false;
+    }
     if (buf_handle > 0)
     {
         core_unpin(buf_handle);
@@ -536,9 +547,16 @@ static int scroll_bmp(struct image_info *info)
         iv_buf_idle = false;
 
         /* USB took the buffer while we waited: `info` and everything else
-         * pointing into it is dangling now, so leave without drawing. */
+         * pointing into it is dangling now, so leave without drawing. The
+         * event that woke us can be SYS_USB_CONNECTED itself, and USB never
+         * mounts unless it is acknowledged, so system events still go to the
+         * handler. */
         if (iv_usb_dropped)
+        {
+            if (button & SYS_EVENT)
+                default_event_handler(button);
             return PLUGIN_USB_CONNECTED;
+        }
 
         iv_running_slideshow = false;
 
@@ -646,9 +664,17 @@ static int scroll_bmp(struct image_info *info)
         case IMGVIEW_MENU:
         {
             bool was_zoom_mode = iv_zoom_mode;
-            int menu = show_menu();
+            int menu;
 
-            if (menu == MENU_ATTACHED_USB)
+            /* The menu holds no pointer into the buffer either, and the USB
+             * screen it may run needs the heap unpinned. A setting's own
+             * screen can take USB without the menu reporting it, so the
+             * flag, not the result, says whether the buffer is gone. */
+            iv_buf_idle = true;
+            menu = show_menu();
+            iv_buf_idle = false;
+
+            if (iv_usb_dropped || menu == MENU_ATTACHED_USB)
                 return PLUGIN_USB_CONNECTED;
             if (menu == IV_MENU_QUIT)
                 return PLUGIN_OK;
@@ -786,6 +812,16 @@ int iv_fit_source_ds(int x_size, int y_size)
     return MAX(downscale, ds_min);
 }
 
+/* Whether a rung's rendering fits in what loading left. A decoder short of
+ * room starts again from the root of that space, so a rung larger than it is
+ * written past the end of the buffer. */
+static bool rung_fits(int downscale, ssize_t remaining)
+{
+    if (downscale == 1 && imgdec->unscaled_avail)
+        return true;
+    return imgdec->img_mem(downscale) <= remaining;
+}
+
 /* Displayed size at a given downscale, DS_FIT included. */
 static void scaled_size(struct image_info *info, int downscale,
                         int *p_w, int *p_h)
@@ -865,7 +901,20 @@ reload_decoder:
      * over a spinning disk it is the part that is worth watching. */
     splash_progress_set_delay(HZ/4);
 
-    if (button_get(false) == IMGVIEW_MENU)
+    /* A tap of Menu cancels. Whatever else is queued is read here too, so a
+     * system event goes to the handler rather than being lost; USB needs the
+     * buffer gone first, as in scroll_bmp(). */
+    long button = button_get(false);
+    if (button == SYS_USB_CONNECTED)
+    {
+        iv_release_buffer();
+        default_event_handler(button);
+        return PLUGIN_USB_CONNECTED;
+    }
+    if (button & SYS_EVENT)
+        default_event_handler(button);
+
+    if (button == IMGVIEW_MENU)
         status = PLUGIN_ABORT;
     else
         status = imgdec->load_image(filename, info, buf, &remaining, offset, filesize);
@@ -878,6 +927,8 @@ reload_decoder:
 
     if (status == PLUGIN_OUTOFMEM)
     {
+        if (iv_app_buf)
+            return PLUGIN_OUTOFMEM;     /* image_viewer() retries in the heap */
         splash(HZ * 2, "Image too large");
         file_pt[curfile] = NULL;
         return change_filename(direction);
@@ -892,6 +943,14 @@ reload_decoder:
         return PLUGIN_OK;
     }
 
+    /* A header can declare a zero width or height, and every scale below
+     * divides by it. */
+    if (info->x_size < 1 || info->y_size < 1)
+    {
+        file_pt[curfile] = NULL;
+        return change_filename(direction);
+    }
+
     ds_max = max_downscale(info);       /* check display constraint */
     ds_min = min_downscale(remaining);  /* check memory constraint */
     if (ds_min == 0)
@@ -903,6 +962,8 @@ reload_decoder:
         }
         else
         {
+            if (iv_app_buf)
+                return PLUGIN_OUTOFMEM;
             splash(HZ * 2, "Image too large");
             file_pt[curfile] = NULL;
             return change_filename(direction);
@@ -936,7 +997,20 @@ reload_decoder:
          * quickly never flashes one up. */
         splash_progress_set_delay(HZ/4);
         status = imgdec->get_image(info, frame, ds); /* decode or fetch from cache */
-        if (status == PLUGIN_ERROR)
+        if (status == PLUGIN_OUTOFMEM && ds == DS_FIT)
+        {
+            /* A fit rendering made from a larger rung needs room for both,
+             * which the memory check above cannot see. Drop the rung. */
+            iv_fit_width = iv_fit_height = 0;
+            ds = ds_max;
+            scaled_size(info, ds, &cx, &cy);
+            cx /= 2;
+            cy /= 2;
+            status = imgdec->get_image(info, frame, ds);
+        }
+        if (status == PLUGIN_OUTOFMEM && iv_app_buf)
+            return PLUGIN_OUTOFMEM;
+        if (status == PLUGIN_ERROR || status == PLUGIN_OUTOFMEM)
         {
             file_pt[curfile] = NULL;
             return change_filename(direction);
@@ -965,7 +1039,7 @@ reload_decoder:
                 if (ds == DS_FIT)
                 {
                     int step = ds_above_fit(info);
-                    if (step < ds_min)
+                    if (step < ds_min || !rung_fits(step, remaining))
                         continue; /* memory allows nothing larger */
                     ds = step;
                     /* the fit view showed all of it, so zoom to the middle */
@@ -976,6 +1050,8 @@ reload_decoder:
                 {
                     /* if 1/1 is always available, jump ds from ds_min to 1. */
                     int zoom = (ds == ds_min)? ds_min: 2;
+                    if (!rung_fits(ds / zoom, remaining))
+                        continue;
                     ds /= zoom; /* reduce downscaling to zoom in */
                     get_view(info, &cx, &cy);
                     cx *= zoom; /* prepare the position in the new image */
@@ -994,12 +1070,14 @@ reload_decoder:
                 {
                     /* if ds is 1 and ds_min is > 1, jump ds to ds_min. */
                     int zoom = (ds < ds_min)? ds_min: 2;
+                    if (!rung_fits(ds * zoom, remaining))
+                        continue;
                     ds *= zoom; /* increase downscaling to zoom out */
                     get_view(info, &cx, &cy);
                     cx /= zoom; /* prepare the position in the new image */
                     cy /= zoom;
                 }
-                else if (iv_fit_width)
+                else if (iv_fit_width && rung_fits(DS_FIT, remaining))
                 {
                     ds = DS_FIT; /* the rung below the integer ladder */
                     cx = iv_fit_width/2;
@@ -1162,9 +1240,9 @@ static int show_menu(void)
     lcd_set_foreground(LCD_WHITE);
     lcd_set_background(LCD_BLACK);
 
-    /* USB arriving while the menu was up has already freed the buffer, so the
-     * caller must leave rather than redraw from it. Quit is the other answer
-     * the caller has to act on; everything else is a setting it redraws for. */
+    /* USB arriving while the menu was up has freed the buffer, so the caller
+     * must leave rather than redraw from it. Quit is the other answer the
+     * caller has to act on; everything else is a setting it redraws for. */
     if (result == MENU_ATTACHED_USB)
         return MENU_ATTACHED_USB;
     return (result == MIID_QUIT) ? IV_MENU_QUIT : 0;
@@ -1195,6 +1273,38 @@ static void iv_setup_screen(void)
 
 /** Core entry point **/
 
+/* Takes the buffer: the app buffer when 'try_app' and no other screen holds
+ * it, otherwise the largest block the heap has. */
+static bool iv_take_buffer(bool try_app)
+{
+    if (try_app)
+    {
+        buf = app_try_claim_buffer(&buf_size, "image viewer");
+        iv_app_buf = (buf != NULL);
+        if (iv_app_buf)
+            return true;
+    }
+
+    /* Grab the largest free block, so large images decode at full quality.
+     * This costs: core_alloc_maximum() runs buflib_compact_and_shrink() first,
+     * invoking playback.c's shrink callback on the audio buffer -- so PLAYBACK
+     * STOPS as the viewer opens. Held pinned, it also blocks buflib
+     * compaction, which deadlocks the USB connect path; iv_usb_inserted()
+     * drops it before that can happen. */
+    buf_handle = core_alloc_maximum(&buf_size, NULL);
+    if (buf_handle <= 0)
+        return false;
+
+    /* PIN IT. Passing NULL ops does not make an allocation immovable -- it
+     * makes it freely movable, because buflib's move_block() treats a missing
+     * move_callback as "no one needs telling" and relocates the block. We hold
+     * `buf` and every pointer derived from it for the whole session, and the
+     * session yields constantly, so a compaction would leave them dangling. */
+    core_pin(buf_handle);
+    buf = core_get_data(buf_handle);
+    return true;
+}
+
 /* file == NULL requests the current track's album art. */
 int image_viewer(const char *file)
 {
@@ -1223,26 +1333,13 @@ int image_viewer(const char *file)
         }
     }
 
-    /* Grab the largest free buffer for the file list + decoded images, so large
-     * images decode at full quality. This costs: core_alloc_maximum() runs
-     * buflib_compact_and_shrink() first, invoking playback.c's shrink callback
-     * on the audio buffer -- so PLAYBACK STOPS as the viewer opens. Held
-     * pinned, it also blocks buflib compaction, which deadlocked the USB
-     * connect path; iv_usb_inserted() below drops it before that can happen. */
-    buf_handle = core_alloc_maximum(&buf_size, NULL);
-    if (buf_handle <= 0)
+    /* A cover is small enough for the app buffer, and that keeps the music
+     * playing. */
+    if (!iv_take_buffer(is_album_art))
     {
         splash(HZ * 2, "Out of memory");
         return GO_TO_PREVIOUS;
     }
-
-    /* PIN IT. Passing NULL ops does not make an allocation immovable -- it
-     * makes it freely movable, because buflib's move_block() treats a missing
-     * move_callback as "no one needs telling" and relocates the block. We hold
-     * `buf` and every pointer derived from it for the whole session, and the
-     * session yields constantly, so a compaction would leave them dangling. */
-    core_pin(buf_handle);
-    buf = core_get_data(buf_handle);
 
     /* Fires on the USB thread before the exclusive-storage request, so the
      * pinned buffer is gone before anything can deadlock on it. */
@@ -1274,6 +1371,19 @@ int image_viewer(const char *file)
     do
     {
         condition = load_and_show(np_file, &image_info, offset, filesize, status);
+        if (condition == PLUGIN_OUTOFMEM && iv_app_buf)
+        {
+            /* Too large for the app buffer: again, in the heap. */
+            iv_release_buffer();
+            if (!iv_take_buffer(false))
+            {
+                splash(HZ * 2, "Out of memory");
+                condition = PLUGIN_ERROR;
+                break;
+            }
+            get_pic_list(true);
+            continue;
+        }
         if (condition >= PLUGIN_OTHER)
         {
             if(!is_album_art)

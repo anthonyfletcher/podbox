@@ -110,8 +110,10 @@ static int load_image(char *filename, struct image_info *info,
         POS(offset);
     }
 
-    /* the actual decoding */
+    /* the actual decoding, boosted like every other decoder's */
+    cpu_boost(true);
     status = JPEGDecode(p_jpg);
+    cpu_boost(false);
 
     CLOSE();
 
@@ -132,7 +134,9 @@ static int load_image(char *filename, struct image_info *info,
     if ( 3 != p_jpg->Nf )
         return PLUGIN_ERROR;
 
+    cpu_boost(true);
     scaled_dequantization_and_idct();
+    cpu_boost(false);
 
     *buf_size = freeze_mem_pool();
     return PLUGIN_OK;
@@ -250,6 +254,7 @@ static int get_image(struct image_info *info, int frame, int ds)
     int x, y;
     int max_y = info->height * ds;
     int max_x = info->width * ds;
+    cpu_boost(true);
     for (y = 0; y < max_y; y += ds)
     {
         TCOEF *C0 =
@@ -306,6 +311,7 @@ static int get_image(struct image_info *info, int frame, int ds)
             }
         }
     }
+    cpu_boost(false);
     return 0;
 }
 

@@ -19,7 +19,8 @@
  * climbed anywhere worth reaching and every track handed the player the
  * opening again. The unit is the run.
  *
- * Returns false, so it can sit in a menu table beside the rest. */
+ * True when USB or the game's menu sent the player to the root, which
+ * the caller passes on. */
 bool spike_screen(void);
 
 /* The best run there has been, on the same screen a finished one is shown

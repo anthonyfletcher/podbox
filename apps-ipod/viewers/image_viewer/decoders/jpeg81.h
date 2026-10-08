@@ -33,6 +33,11 @@ enum JPEGENUM {
 	JPEGENUMERR_MARKERDNL,			// DNL marker found (not supported)
 	JPEGENUMERR_ZEROY,				// Y in SOFn is zero (DNL?)
 	JPEGENUMERR_COMPNOTFOUND,		// Scan component selector (Csj) not found among Component identifiers (Ci)
+	JPEGENUMERR_ZEROX,				/* X in SOFn is zero */
+	JPEGENUMERR_BADSAMPLING,		/* no components, or a zero sampling factor */
+	JPEGENUMERR_BADHUFF,			/* a DHT table out of range or overfull */
+	JPEGENUMERR_BADSCAN,			/* an SOS whose selectors or band are out of range */
+	JPEGENUMERR_BADSEGMENT,			/* a bad segment length, or the file ends before EOI */
 };
 
 typedef short TCOEF;	// 16-bit coefficients

@@ -267,6 +267,8 @@ static int sp_pull(ts_stream *st, uint8_t *buf, size_t n, size_t *out)
 
         if (!s->opened) {
             rc = sp_next(s);
+            /* A member that will not open is skipped, like a damaged one. */
+            if (rc == TS_ERR_FORMAT || rc == TS_ERR_UNSUP) continue;
             if (rc < 0) return rc;
             if (rc == 0) break;               /* spine exhausted */
         }

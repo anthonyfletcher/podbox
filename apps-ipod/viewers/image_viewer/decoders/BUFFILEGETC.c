@@ -13,8 +13,15 @@ extern int GETC(void)
     if (cur_buff_pos >= length)
     {
         length = read(fd, buff, sizeof(buff));
-        file_pos += length;
         cur_buff_pos = 0;
+        /* -1 at the end: a stale byte here keeps the marker loop going
+         * forever on a file that stops short of EOI. */
+        if (length <= 0)
+        {
+            length = 0;
+            return -1;
+        }
+        file_pos += length;
     }
 
     return buff[cur_buff_pos++];

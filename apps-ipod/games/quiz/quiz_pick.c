@@ -37,6 +37,8 @@
 #include "system.h"
 #include "kernel.h"
 #include "cpu.h"                      /* cpu_boost */
+#include "button.h"                   /* button_get */
+#include "system/shutdown.h"          /* default_event_handler */
 #include "system/app_buffer.h"
 #include "database/tagcache.h"
 #include "database/path_key.h"
@@ -129,6 +131,30 @@ static int answer_pool[QUIZ_ROUNDS];
  * wrong year goes past. */
 static bool kind_on[QUIZ_KINDS];
 static int year_max;
+
+/* SYS_USB_CONNECTED, SYS_POWEROFF or SYS_REBOOT, once one has stopped the
+ * walks. */
+static long stop_event;
+
+/* Yields, and reads the button queue, so a USB connection or a shutdown does
+ * not wait behind a walk of the database on disk. Either one stops the walks
+ * and is held, unhandled, until the search is closed and the buffer given
+ * back. Other system events are handled here; keypresses are dropped. */
+static bool stopping(void)
+{
+    long ev;
+
+    yield();
+    if (stop_event != 0)
+        return true;
+
+    ev = button_get(false);
+    if (ev == SYS_USB_CONNECTED || ev == SYS_POWEROFF || ev == SYS_REBOOT)
+        stop_event = ev;
+    else if (ev & SYS_EVENT)
+        default_event_handler(ev);
+    return stop_event != 0;
+}
 
 static bool claim(void)
 {
@@ -291,8 +317,14 @@ static int sample_library(struct quiz_round *rounds)
         }
         seen++;
 
-        if ((seen & 63) == 0)
-            yield();
+        if ((seen & 63) == 0 && stopping())
+            break;
+    }
+
+    if (stop_event != 0)
+    {
+        tagcache_search_finish(&tcs);
+        return -1;
     }
 
     pool_ct = 0;
@@ -456,8 +488,8 @@ static bool index_pass(const struct quiz_round *rounds)
     {
         struct sound_axes ax;
 
-        if ((n & 63) == 0)
-            yield();
+        if ((n & 63) == 0 && stopping())
+            break;
         if (!sound_index_read(&r, n, &rec) || !sound_record_usable(&rec))
             continue;
 
@@ -579,8 +611,8 @@ static bool resolve_near(void)
     {
         struct resolved *e;
 
-        if ((++n & 15) == 0)
-            yield();
+        if ((++n & 15) == 0 && stopping())
+            break;
 
         e = find_res(path_key(path));
         if (e == NULL || e->found)
@@ -712,8 +744,8 @@ static int add_own_albums(struct quiz_round *r, const char *artist, int ct)
 
     while (ct < QUIZ_CHOICES && tagcache_get_next(&tcs, album, sizeof(album)))
     {
-        if ((++n & 63) == 0)
-            yield();
+        if ((++n & 63) == 0 && stopping())
+            break;
         if (text_usable(album) && !choice_taken(r, ct, album))
             strmemccpy(r->choice[ct++], album, QUIZ_TITLE_MAX);
     }
@@ -782,7 +814,7 @@ static int fill_round(struct quiz_round *r, int round, enum quiz_kind kind,
  * the way in                                                         *
  * ------------------------------------------------------------------ */
 
-int quiz_pick(struct quiz_round *rounds)
+int quiz_pick(struct quiz_round *rounds, long *event)
 {
     const struct sound_answer *near_of[QUIZ_ROUNDS] = { NULL };
     int ret = QUIZ_PICK_OK;
@@ -800,6 +832,7 @@ int quiz_pick(struct quiz_round *rounds)
         && !kind_on[QUIZ_KIND_YEAR])
         kind_on[QUIZ_KIND_TITLE] = true;
     year_max = 0;
+    stop_event = 0;
 
     srand(current_tick);
     cpu_boost(true);
@@ -822,6 +855,8 @@ int quiz_pick(struct quiz_round *rounds)
         for (int i = 0; i < answer_ct; i++)
             near_of[answers[i].round] = &answers[i];
     }
+    if (stop_event != 0)
+        goto out;
 
     /* The kind a round was dealt first, then any other that is on. */
     for (int i = 0; i < QUIZ_ROUNDS; i++)
@@ -838,6 +873,8 @@ int quiz_pick(struct quiz_round *rounds)
                 && fill_round(r, i, kind, near_of[i]) >= QUIZ_CHOICES)
                 break;
         }
+        if (stop_event != 0)
+            goto out;
         if (k == QUIZ_KINDS)
         {
             ret = QUIZ_PICK_TOO_FEW;
@@ -849,5 +886,10 @@ int quiz_pick(struct quiz_round *rounds)
 out:
     cpu_boost(false);
     release();
+    if (stop_event != 0)
+    {
+        *event = stop_event;
+        ret = QUIZ_PICK_STOPPED;
+    }
     return ret;
 }

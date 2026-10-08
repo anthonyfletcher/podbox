@@ -48,7 +48,7 @@ struct jpeg
 
 /* various helper functions */
 void default_huff_tbl(struct jpeg* p_jpeg);
-void build_lut(struct jpeg* p_jpeg);
+int build_lut(struct jpeg* p_jpeg); /* -1 for an unsupported sampling */
 int process_markers(unsigned char* p_src, long size, struct jpeg* p_jpeg);
 
 /* the main decode function */

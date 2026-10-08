@@ -147,8 +147,11 @@ static int ReadDiff(struct JPEGD *j, int s)	// JPEG magnitude stuff. One way to 
 
 static int ReadHuffmanCode(struct JPEGD *j, int *pb)	// index into the sym-table
 {
-	int v= GetBit(j);
-	while ( v >= *pb ) v= 2*v + GetBit(j) - *pb++;
+	int v= GetBit(j), i= 0;
+	while ( v >= pb[i] ) {
+		if (++i == 16) return 0;	/* no code that long: the stream is corrupt */
+		v= 2*v + GetBit(j) - pb[i-1];
+	}
 	return v;
 }	
 
@@ -179,11 +182,12 @@ static void ac_decode_huff(struct JPEGD *j, struct COMP *sc, TCOEF *coef)
 				}//else ZRL
 			}
 			k+=r; 
+			if (k > j->Se) return;	/* a run past the band: corrupt */
 			coef[k]= s;
 			if (k==j->Se) return;
 		}
 	}
-	else sc->EOBRUN--; 
+	else sc->EOBRUN--;
 }
 
 static int ac_refine(struct JPEGD *j, TCOEF *coef)
@@ -206,7 +210,8 @@ static void ac_succ_huff(struct JPEGD *j, struct COMP *sc, TCOEF *coef)
 					break;				
 				}//else ZRL
 			}
-			for (; ;k++) if (!ac_refine(j, coef+k)) if (!r--) break;
+			for (; k<=j->Se; k++) if (!ac_refine(j, coef+k)) if (!r--) break;
+			if (k > j->Se) return;	/* a run past the band: corrupt */
 			coef[k]= s;
 			if (k==j->Se) return;
 		}
@@ -221,6 +226,7 @@ static void du_sequential_huff(struct JPEGD *j, struct COMP *sc, TCOEF *coef)
 	dc_decode_huff(j, sc, coef);
 	for (k=1; (s=sc->ACS[ReadHuffmanCode(j, sc->ACB)]); k++) { // EOB?
 		k+= s>>4;
+		if (k > 63) return;	/* a run past the block: corrupt */
 		if (s==0xf0) continue; // ZRL
 		coef[k]= ReadDiff(j, s&15);
 		if (k==63) return;
@@ -637,10 +643,13 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 
 			if ( C->Hi > j->Hmax ) j->Hmax = C->Hi;
 			if ( C->Vi > j->Vmax ) j->Vmax = C->Vi;
+			if (!C->Hi || !C->Vi) return -1;	/* the layout divides by these */
 
 			printf("    Ci=%3d HV=%dx%d Qi=%d\n", C->Ci, C->Hi, C->Vi, C->Qi);				
 		}
 		printf("\n");	
+
+		if (!j->Hmax || !j->Vmax) return -1;	/* no components */
 
 		// Full Image MCU cover: 
 		j->mcu_width= div_up(j->X, j->Hmax*d);
@@ -702,18 +711,20 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 	for (;;)
 	{
 		marker = NextMarker(j);
+		if (marker < 0) return JPEGENUMERR_BADSEGMENT;	/* the file ended before EOI */
 
 		if ( marker == 0xCC )	// DAC
 		{
 			int La= GETWbi();
 			printf("DAC\n");
 			printf("  Arithmetic Conditioning\n  parameters:\n");
-			for (La-=2; La; La-=2) 
+			for (La-=2; La > 0; La-=2)
 			{
 				int CB= GETC();
 				int Tc= CB>>4;
 				int Tb= CB&15;
 				int Cs= GETC();
+				if (Tb > 3) return JPEGENUMERR_BADSEGMENT;
 				if (Tc)		// AC
 				{
 					printf("  AC%d Kx=%d\n", Tb, Cs);
@@ -738,13 +749,16 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			int N;
 			int Lh= GETWbi();
 			printf("DHT\n");
-			for (Lh-=2; Lh; Lh -= 17 + N) 
+			for (Lh-=2; Lh > 0; Lh -= 17 + N)
 			{
 				int CH= GETC();
 				int Tc= CH>>4;
 				int Th= CH&15;
-				int *B= j->HTB[Tc][Th];
-				unsigned char *S= j->HTS[Tc][Th];
+				int *B;
+				unsigned char *S;
+				if (Tc > 1 || Th > 3) return JPEGENUMERR_BADHUFF;
+				B= j->HTB[Tc][Th];
+				S= j->HTS[Tc][Th];
 				printf("  %s%d\n", Tc?"AC":"DC", Th);
 				printf("    N: ");
 				for (i=N=0; i<16; i++) {
@@ -754,6 +768,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 					B[i]= N;	// running total				
 				}
 				printf("\n");
+				if (N > 256) return JPEGENUMERR_BADHUFF;
 				printf("    S: %d symbol bytes\n", N);
 				for (i=0; i<N; i++) S[i]= GETC();
 			}
@@ -773,11 +788,13 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			if (*SOFSTRING[marker&15] == '-') return JPEGENUMERR_UNKNOWN_SOF;
 			if (j->Nf>4) return JPEGENUMERR_COMP4;
 			if (!j->Y) return JPEGENUMERR_ZEROY;		// I have no idea about this DNL stuff
+			if (!j->X) return JPEGENUMERR_ZEROX;	/* every scale divides by it */
 			j->SOF= marker;
 
 			if ( (j->SOF&3)==3 ) // LOSSLESS-mode
 			{
 				int TotalDU= set_dim(j, 1);		// for malloc: in samples as coeff;
+				if (TotalDU < 0) return JPEGENUMERR_BADSAMPLING;
 
 				if (j->SOF > 0xC8) {	// arithmetic:
 
@@ -818,6 +835,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			else // DCT-mode
 			{
 				int TotalDU= set_dim(j, 8);		// for malloc in DU;
+				if (TotalDU < 0) return JPEGENUMERR_BADSAMPLING;
 
 				printf("  %d MCU (%d x %d)\n", j->mcu_total, j->mcu_width, j->mcu_height);				
 
@@ -864,6 +882,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			GETWbi();	//Ls
 			printf("SOS\n");
 			j->Ns= GETC();//Ns
+			if (j->Ns < 1 || j->Ns > 4) return JPEGENUMERR_BADSCAN;
 			printf("  Ns: %d (%s scan)\n", j->Ns, (j->Ns>1)?"Interleaved":"Single");
 
 			for (ci=0; ci<j->Ns; ci++) 
@@ -874,6 +893,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 				int Td= T>>4;
 				int Ta= T&15;
 				printf("    Cs=%d Td=%d Ta=%d\n", Cs, Td, Ta);
+				if (Td > 3 || Ta > 3) return JPEGENUMERR_BADSCAN;
 
 				{// safe search
 					for ( i=0; i<4 && j->Components[i].Ci != Cs; i++ ) ;
@@ -907,6 +927,8 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			j->Ah= j->Al>>4;
 			j->Al&= 15;
 			j->Al2= 1<<j->Al;//pre-computed
+			if ((j->SOF&3)!=3 && (j->Se > 63 || j->Ss > j->Se))
+				return JPEGENUMERR_BADSCAN;	/* the band indexes a 64-entry block */
 
 			printf("  %s: %d\n", ((j->SOF&3)==3)?"Px":"Ss", j->Ss);
 			printf("  Se: %d\n", j->Se);
@@ -983,12 +1005,15 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 		else if ( (marker & 0xf0) == 0xE0 ) // APPn E0..EF
 		{
 			int La= GETWbi();
+			if (La < 2) return JPEGENUMERR_BADSEGMENT;	/* would seek back onto itself */
 			SEEK(La-2);
 			printf("APP%d\n", marker&15);
 		}
 		else if ( marker == 0xFE ) // COM
 		{
-			SEEK(GETWbi()-2);
+			int Lc= GETWbi();
+			if (Lc < 2) return JPEGENUMERR_BADSEGMENT;
+			SEEK(Lc-2);
 			printf("COM\n");
 		}
 		else 

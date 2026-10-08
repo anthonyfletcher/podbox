@@ -395,11 +395,17 @@ static void lv_setup_screen(void)
 
 /* Keep the screen lit, and put the user's timeouts back afterwards. Matches
  * cr_backlight_ignore_timeout() in credits.c -- a timeout of 0 means "never",
- * and only a timeout that was actually running is overridden. */
+ * and only a timeout that was actually running is overridden. What is held is
+ * tracked rather than read off the setting, so turning the setting off in the
+ * menu still gives the timeouts back. */
 static void lv_backlight_hold(bool hold)
 {
-    if (!global_settings.lyric_backlight)
+    static bool held;
+
+    hold = hold && global_settings.lyric_backlight;
+    if (hold == held)
         return;
+    held = hold;
 
     if (hold)
     {
@@ -443,8 +449,7 @@ static unsigned lv_fade(int opacity)
  * ------------------------------------------------------------------------ */
 
 /* Cut `line` down so that it plus "..." fits maxwidth, then append the "...".
- * Modelled on wt_ellipsize() in skin/skin_render.c; when stage 2 adds word
- * wrapping the pair is worth sharing rather than copying again. */
+ * Modelled on wt_ellipsize() in skin/skin_render.c. */
 static void lv_ellipsize(char *line, int size, struct font *pf, int maxwidth)
 {
     const unsigned char *start = (const unsigned char *)line;
@@ -1038,9 +1043,8 @@ static void lv_draw(void)
 
   done:
 
-    /* A whole-screen flush, which is right while a redraw happens once per
-     * lyric line. The animation in stage 3 redraws per frame and will want the
-     * full-width dirty band described in the spec instead. */
+    /* A whole-screen flush: this runs once per lyric line. The slide redraws
+     * per frame through lv_anim_draw(), which flushes only its band. */
     d->update_viewport();
     d->set_viewport(last);
 }
@@ -1073,7 +1077,9 @@ static int lv_ticks_to_next(long elapsed)
         /* round up, so waking lands on or after the boundary rather than a
          * few milliseconds short of it and having to sleep again */
         long ms = due - elapsed;
-        ticks = (int)((ms * HZ + 999) / 1000);
+        /* capped first: ms * HZ overflows a long for a line hours away */
+        ticks = (ms >= (long)LV_POLL * 1000 / HZ)? LV_POLL
+              : (int)((ms * HZ + 999) / 1000);
     }
 
     if (ticks < 1)
@@ -1355,9 +1361,9 @@ int lyric_viewer(void)
     }
 
   done:
-    /* The model's buffer is immovable, so it should not outlive the screen --
-     * least of all into the USB path, where an immovable block in the middle
-     * of the arena is exactly what compaction cannot work around. */
+    /* The model's buffer is immovable, so it should not outlive the screen.
+     * It does sit through a USB connection: the USB screen runs inside
+     * default_event_handler(), before this. */
     lyrics_close();
     if (lv.user_font >= 0)
     {

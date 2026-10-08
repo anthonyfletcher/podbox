@@ -13,6 +13,11 @@
  * to resume, not playing. Returns a GO_TO_* code. */
 int music_quiz_screen(void);
 
+/* Whether the playlist is the quiz's own while a game runs. Anything that
+ * would replace or reorder it -- a car or dock choosing what plays -- must
+ * refuse until it is false again. */
+bool music_quiz_has_playlist(void);
+
 /* Rewrites the best score an older firmware kept as text; the first boot of
  * a new layout calls it. */
 bool quiz_scores_convert(const char *text_file);

@@ -182,14 +182,15 @@ static int get_image(struct image_info *info, int frame, int ds)
                 /* leave unscaled pointer allone,
                  * set rest to NULL
                  */
-                p_disp = disp + i*DISP_SLOTS + 1;
-                memset(p_disp, 0, (DISP_SLOTS-1)*sizeof(unsigned char *));
+                memset(disp + i*DISP_SLOTS + 1, 0,
+                       (DISP_SLOTS-1)*sizeof(unsigned char *));
             }
 
-            /* start again from the beginning of the buffer */
-            disp_buf = p_decoder->mem +
-                       p_decoder->native_img_size*p_decoder->frames_count +
-                       sizeof(unsigned char *)*p_decoder->frames_count*DISP_SLOTS;
+            /* start again from the beginning of the buffer, which is past
+             * the disp matrix as load_image() rounded it */
+            disp_buf = (unsigned char *)disp +
+                       ((sizeof(unsigned char *)*p_decoder->frames_count*
+                         DISP_SLOTS + 3) & ~3);
         }
 
         *p_disp = disp_buf;

@@ -419,6 +419,7 @@ void ts_tags_rewind(ts_stream *st)
 
     s->started = 0;
     s->nl_pending = s->sp_pending = 0;
+    ts_pend_reset(&s->out);     /* text not yet taken would shift offsets */
 }
 
 ts_stream *ts_tags_stream(ts_arena *a, ts_stream *src, ts_tag_profile p,

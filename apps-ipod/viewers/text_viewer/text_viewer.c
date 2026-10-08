@@ -26,6 +26,7 @@
 #include "input/action.h"
 #include "draw/screen_access.h"   /* screens[] */
 #include "kernel.h"          /* HZ, SYS_USB_CONNECTED */
+#include "system.h"          /* cpu_boost */
 #include "core_alloc.h"
 #include "settings/settings.h"
 #include "lang.h"
@@ -145,7 +146,11 @@ static bool tv_extract_more(void)
     if (room < 8)                            /* ts_read() needs at least 8 */
         return false;
 
+    /* Boosted: a PDF's per-glyph CMap search and a re-extract from the
+     * start both run in here, and the 6G idles at a quarter speed. */
+    cpu_boost(true);
     got = ts_read(tv.src, (char *)tv.win + tv.win_len, room);
+    cpu_boost(false);
     if (got <= 0)
     {
         tv.eof = true;                       /* clean EOF and errors alike:
@@ -462,10 +467,15 @@ static bool tv_at_end(void)
  * of the window means re-extracting from byte zero. */
 static bool tv_reach(off_t target)
 {
+    int rc;
+
     if (target < tv.win_start)
     {
         tv_splash_loading();
-        if (ts_rewind(tv.src) != TS_OK)
+        cpu_boost(true);
+        rc = ts_rewind(tv.src);
+        cpu_boost(false);
+        if (rc != TS_OK)
             return false;
         tv.win_start = 0;
         tv.win_len = 0;
@@ -507,6 +517,7 @@ static void tv_prev_page(void)
 static void tv_resume_to(off_t target)
 {
     tv_splash_loading();
+    cpu_boost(true);
 
     while (1)
     {
@@ -519,6 +530,7 @@ static void tv_resume_to(off_t target)
             tv.stack[tv.sp++] = tv.pos;
         tv.pos = next;
     }
+    cpu_boost(false);
 }
 
 /* ---- resume ----------------------------------------------------------- */
@@ -563,22 +575,35 @@ static off_t tv_resume_load(const char *file, off_t size)
 }
 
 /* Rewrites the list with `file` at the front, streaming the old entries past
- * a single line buffer rather than holding them all on the stack. */
+ * a single line buffer rather than holding them all on the stack. Every write
+ * is checked: the new list replaces the old one, so a short one would lose
+ * every other document's place. */
 static void tv_resume_save(const char *file, off_t off, off_t size)
 {
     char line[MAX_PATH + 32];
-    int old, new_fd, kept = 1;
+    int old, new_fd, kept = 1, len;
+    bool ok;
+
+    /* The player's own documents, such as the licence, are not reading, so
+     * they never become "Continue reading". */
+    if (!strncasecmp(file, ROCKBOX_DIR "/docs/",
+                     sizeof(ROCKBOX_DIR "/docs/") - 1))
+        return;
 
     new_fd = open(TV_RESUME_FILE ".tmp", O_CREAT|O_WRONLY|O_TRUNC, 0666);
     if (new_fd < 0)
         return;
 
-    fdprintf(new_fd, "%ld %ld %s\n", (long)off, (long)size, file);
+    len = snprintf(line, sizeof line, "%ld %ld %s\n", (long)off, (long)size,
+                   file);
+    ok = len > 0 && len < (int)sizeof line
+         && write(new_fd, line, len) == len;
 
     old = open(TV_RESUME_FILE, O_RDONLY);
     if (old >= 0)
     {
-        while (kept < TV_RESUME_MAX && read_line(old, line, sizeof line) > 0)
+        while (ok && kept < TV_RESUME_MAX
+               && read_line(old, line, sizeof line) > 0)
         {
             char *end_off = strchr(line, ' ');
             char *end_size;
@@ -591,12 +616,19 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
             if (!strcmp(end_size + 1, file))
                 continue;                    /* superseded by the new entry */
 
-            fdprintf(new_fd, "%s\n", line);
+            /* read_line() leaves room for its NUL, so the newline fits. */
+            len = strlen(line);
+            line[len++] = '\n';
+            ok = write(new_fd, line, len) == len;
             kept++;
         }
         close(old);
     }
-    close(new_fd);
+    if (close(new_fd) < 0 || !ok)
+    {
+        remove(TV_RESUME_FILE ".tmp");
+        return;
+    }
 
     remove(TV_RESUME_FILE);
     rename(TV_RESUME_FILE ".tmp", TV_RESUME_FILE);
@@ -677,7 +709,10 @@ static bool tv_open(const char *file)
      * descriptor's position and keeps its cached copy honest. */
     tv.file_size = io.size(io.ctx);
 
+    /* Boosted for the whole-file scans a PDF or zip opens with. */
+    cpu_boost(true);
     rc = ts_open(&tv.src, &io, file, arena, TS_ARENA_RECOMMENDED, &cfg);
+    cpu_boost(false);
     if (rc != TS_OK)
     {
         /* ts_open() takes the fd on success only, so close it ourselves. */
@@ -828,6 +863,14 @@ static int tv_menu(void)
     return ret;
 }
 
+/* A power-off never returns to the save below, so the event handler saves the
+ * position itself before shutting down. */
+static void tv_event_save(void *param)
+{
+    (void)param;
+    tv_resume_save(tv.path, tv.pos, tv.file_size);
+}
+
 int text_viewer(const char *file)
 {
     int ret = GO_TO_PREVIOUS;
@@ -886,7 +929,8 @@ int text_viewer(const char *file)
                 /* The scroll wheel (ACTION_STD_NEXT/PREV) is deliberately
                  * ignored -- paging is on the forward/back buttons. Still let
                  * the framework handle USB and other system events. */
-                if (default_event_handler(action) == SYS_USB_CONNECTED)
+                if (default_event_handler_ex(action, tv_event_save, NULL)
+                    == SYS_USB_CONNECTED)
                 {
                     ret = GO_TO_ROOT;
                     goto done;

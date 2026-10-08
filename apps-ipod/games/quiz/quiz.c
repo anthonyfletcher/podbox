@@ -554,8 +554,9 @@ static void screen_give_back(void)
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 }
 
-/* A yes/no over the quiz, drawn with the theme's dialog. YESNO_USB means the
- * dialog has already been through a USB connection of its own. */
+/* A yes/no over the quiz, drawn with the theme's dialog. YESNO_USB means a
+ * USB connection the caller has still to handle: the user's playlist has to
+ * be back on disk before the host takes the player. */
 static enum yesno_res ask(int lang_id)
 {
     const char *lines[] = { (const char *)str(lang_id) };
@@ -564,7 +565,7 @@ static enum yesno_res ask(int lang_id)
 
     viewportmanager_theme_undo(SCREEN_MAIN, true);
     lcd_setfont(FONT_UI);
-    res = gui_syncyesno_run(&message, NULL, NULL);
+    res = gui_syncyesno_run_defer_usb(&message);
     FOR_NB_SCREENS(i)
         screens[i].clear_viewport();
     screen_take();
@@ -693,12 +694,16 @@ static enum round_end play_round(int round, int *score)
                     pause_tick = current_tick;
                     audio_pause();
                 }
-                /* Out after a USB connection too: the quiz cannot carry on
-                 * over a library the host may have changed. */
-                if (ask(LANG_QUIZ_LEAVE) != YESNO_NO)
+                switch (ask(LANG_QUIZ_LEAVE))
                 {
-                    audio_stop();
-                    return ROUND_LEAVE;
+                    case YESNO_NO:
+                        break;
+                    case YESNO_USB:
+                        audio_stop();
+                        return ROUND_USB;
+                    default:
+                        audio_stop();
+                        return ROUND_LEAVE;
                 }
                 if (!paused)
                 {
@@ -902,6 +907,13 @@ static bool show_result(int score, bool record)
     }
 }
 
+static bool has_playlist;
+
+bool music_quiz_has_playlist(void)
+{
+    return has_playlist;
+}
+
 enum game_end {
     GAME_AGAIN,         /* played through, and another wanted */
     GAME_DONE,          /* played through, or left partway */
@@ -914,9 +926,15 @@ static enum game_end play_game(void)
     enum round_end end = ROUND_ANSWERED;
     bool again = false;
     int score = 0, res;
+    long event = 0;
 
     splash(0, ID2P(LANG_WAIT));
-    res = quiz_pick(rounds);
+    res = quiz_pick(rounds, &event);
+    if (res == QUIZ_PICK_STOPPED)
+    {
+        default_event_handler(event);
+        return event == SYS_USB_CONNECTED ? GAME_USB : GAME_DONE;
+    }
     if (res != QUIZ_PICK_OK)
     {
         /* Chosen before ID2P rather than inside it: the macro does arithmetic
@@ -929,6 +947,7 @@ static enum game_end play_game(void)
         return GAME_FAILED;
     }
 
+    has_playlist = true;
     playlist_set_aside();
     audio_set_unrecorded(true);
 
@@ -936,6 +955,7 @@ static enum game_end play_game(void)
     {
         audio_set_unrecorded(false);
         playlist_bring_back();
+        has_playlist = false;
         splash(HZ * 2, ID2P(LANG_TAGCACHE_BUSY));
         return GAME_FAILED;
     }
@@ -955,6 +975,7 @@ static enum game_end play_game(void)
     audio_stop();
     audio_set_unrecorded(false);
     playlist_bring_back();
+    has_playlist = false;
 
     if (end == ROUND_ANSWERED)
     {
