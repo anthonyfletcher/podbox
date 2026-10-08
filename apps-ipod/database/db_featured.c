@@ -30,6 +30,7 @@
 #include "system/library_files.h"
 #include "system/hash.h"
 #include "system.h"
+#include "kernel.h"
 #include "rbpaths.h"
 #include "file.h"
 #include "settings/settings.h"
@@ -69,6 +70,19 @@ static int pair_ct;
 
 static int titles_scanned;
 static bool truncated;
+
+/* The build runs on the UI thread and, from RAM, never blocks; this hands
+ * the processor round every HZ/25 so playback and the screen keep up. */
+static void timed_yield(void)
+{
+    static long next;
+
+    if (TIME_AFTER(current_tick, next))
+    {
+        yield();
+        next = current_tick + HZ/25;
+    }
+}
 
 /* FNV-1a over a name, folded to lower case and trimmed, so that it stands for
  * the same identity db_featured_name_eq() does. Never returns 0: the artist
@@ -330,6 +344,7 @@ static void scan_titles(void)
     while (tagcache_get_next(&tcs, buf, sizeof(buf)))
     {
         titles_scanned++;
+        timed_yield();
 
         if (db_featured_parse(buf, known_artist, NULL, &names) == 0)
             continue;
@@ -359,8 +374,11 @@ static void add_artist_tracks(int32_t seek,
 
     if (tagcache_search_add_filter(&tcs, tag_artist, seek))
         while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+        {
             for (int i = 0; i < names->count; i++)
                 credit(names->name[i], names->len[i], tcs.idx_id);
+            timed_yield();
+        }
 
     tagcache_search_finish(&tcs);
 }
@@ -377,8 +395,11 @@ static void scan_track_artists(void)
         return;
 
     while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+    {
         if (db_featured_parse(buf, known_artist, NULL, &names) > 0)
             add_artist_tracks(tcs.result_seek, &names);
+        timed_yield();
+    }
 
     tagcache_search_finish(&tcs);
 }
@@ -403,9 +424,12 @@ static void resolve_owners(void)
         return;
 
     for (int i = 0; i < pair_ct; i++)
+    {
         if (tagcache_retrieve(&tcs, pairs[i].idx_id, tag_albumartist,
                               buf, sizeof(buf)))
             pairs[i].owner = name_hash(buf, (int)strlen(buf));
+        timed_yield();
+    }
 
     tagcache_search_finish(&tcs);
 }
@@ -426,6 +450,7 @@ static void resolve_artist_seeks(void)
         int len = (int)strlen(buf);
         uint32_t key = name_hash(buf, len);
 
+        timed_yield();
         for (int i = 0; i < guest_ct; i++)
             if (guests[i].key == key && guests[i].artist_seek < 0 &&
                 db_featured_name_eq(guest_arena + guests[i].name_off,
@@ -460,13 +485,19 @@ bool db_featured_build(void)
     if (!global_settings.featured_artists || !tagcache_is_in_ram())
         return false;
 
-    scan_album_artists();
+    cpu_boost(true);
+
+    /* The user's names first: the set is capped, and the album artists
+     * past the cap are the ones to go. */
     read_known_artists();
+    scan_album_artists();
     scan_titles();
     scan_track_artists();
 
     resolve_owners();
     resolve_artist_seeks();
+
+    cpu_boost(false);
 
     return true;
 }
@@ -493,6 +524,7 @@ void db_featured_ensure(void)
     tagcache_get_marks(&now);
 
     if (built && now.commitid == built_marks.commitid &&
+        now.generation == built_marks.generation &&
         now.deleted_ct == built_marks.deleted_ct)
         return;
 

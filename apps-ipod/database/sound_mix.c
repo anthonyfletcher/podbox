@@ -918,6 +918,15 @@ static bool mix_resolve_ram(struct tagcache_search *tcs, char *buf,
 static struct mutex mix_mutex;
 static bool mix_mutex_ready;
 
+/* The flag that calls the build off, set only while sound_mix_mood_unasked()
+ * holds mix_mutex. NULL for a build nobody can call off. */
+static const volatile bool *mix_stop;
+
+static bool mix_stopped(void)
+{
+    return mix_stop != NULL && *mix_stop;
+}
+
 static void mix_lock(void)
 {
     /* Threads here are cooperative, so nothing runs between the test and
@@ -1027,7 +1036,11 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
          * records rather than every record, so the yield lands where the
          * read does and costs nothing in between. */
         if ((i & 63) == 0)
+        {
             yield();
+            if (mix_stopped())
+                break;
+        }
 
         mix_progress(ask, 0, i, r.count);
 
@@ -1070,6 +1083,12 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
 
     sound_index_reader_close(&r);
 
+    if (mix_stopped())
+    {
+        cpu_boost(false);
+        return SOUND_MIX_CANCELLED;
+    }
+
     if (held == 0)
     {
         cpu_boost(false);
@@ -1090,7 +1109,7 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     bool ram = mix_resolve_ram(&tcs, buf, sizeof (buf), cand, held, skip_key,
                                seed_path, &seed_len, &seed_artist);
 
-    while (!ram && tagcache_get_next(&tcs, buf, sizeof (buf)))
+    while (!ram && !mix_stopped() && tagcache_get_next(&tcs, buf, sizeof (buf)))
     {
         uint64_t key = path_key(buf);
         long len = tagcache_get_numeric(&tcs, tag_length);
@@ -1134,6 +1153,12 @@ static int mix_build_held(const struct mix_goal *g, uint64_t skip_key,
     }
 
     tagcache_search_finish(&tcs);
+
+    if (mix_stopped())
+    {
+        cpu_boost(false);
+        return SOUND_MIX_CANCELLED;
+    }
 
     /* The seed again under another path. Both tests, for the reason on
      * MIX_SEED_EPSILON. */
@@ -1422,9 +1447,18 @@ int sound_mix_journey(int from, int to, int want)
     return mood_mix(from, to, want, true);
 }
 
-int sound_mix_mood_unasked(int from, int to, int want)
+int sound_mix_mood_unasked(int from, int to, int want,
+                           const volatile bool *stop)
 {
-    return mood_mix(from, to, want, false);
+    int added;
+
+    /* Recursive, so mix_build() takes it again inside */
+    mix_lock();
+    mix_stop = stop;
+    added = mood_mix(from, to, want, false);
+    mix_stop = NULL;
+    mutex_unlock(&mix_mutex);
+    return added;
 }
 
 /** Carrying on **/

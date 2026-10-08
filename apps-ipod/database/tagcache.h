@@ -114,6 +114,7 @@ struct tagcache_marks {
     int32_t commitid;   /* commits so far; tag_commitid stamps each entry */
     int32_t serial;     /* one per logged play, and the lastplayed value */
     int32_t deleted_ct; /* entries flagged deleted, or -1 if not countable */
+    uint32_t generation; /* moves at a rebuild, as tagcache_generation() */
 };
 
 enum source_type {source_constant, 
@@ -209,6 +210,10 @@ long tagcache_increase_serial(void);
 bool tagcache_import_changelog(void);
 bool tagcache_create_changelog(struct tagcache_search *tcs);
 void tagcache_update_numeric(int idx_id, int tag, long data);
+/* Moves whenever a Rebuild renumbers the entries. An idx_id is good only
+ * under the generation it was read in: keep the two together, and drop an
+ * update whose generation has moved on. */
+uint32_t tagcache_generation(void);
 
 struct tagcache_stat* tagcache_get_stat(void);
 /* Fill in the change counters above. Cheap enough to ask on a timer; the
@@ -293,6 +298,9 @@ int  tagcache_find_key(uint64_t key);
  * -1. False past the end, and whenever the RAM copy is not in use. */
 bool tagcache_path_slot(int n, uint64_t *key, int *idx_id);
 int  tagcache_path_slots(void);
+/* path_key() of entry idx_id, which a Rebuild renumbers. 0 when the RAM copy
+ * is not in use or idx_id has no slot. */
+uint64_t tagcache_entry_key(int idx_id);
 /* Commits so far: it changes whenever the database does. */
 int32_t tagcache_commit_id(void);
 /* A string tag of a found entry. False for <Untagged>, and for tag_filename:
@@ -311,6 +319,10 @@ bool tagcache_path_index_info(int *slots, int *found, int *missed);
 void tagcache_unload_ramcache(void);
 void tagcache_reload_ramcache(void);
 bool tagcache_reinstate_ramcache(void);
+/* True when the RAM copy was refused for want of room: it will not load this
+ * session unless a later reload finds room. False while it may still load,
+ * and while it is loaded. */
+bool tagcache_ram_refused(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
 bool tagcache_is_initialized(void);

@@ -187,9 +187,14 @@ int sound_index_finish(bool prune);
 /* Stop, keeping the working file so the next run resumes from it. */
 void sound_index_close(void);
 
-/* Whether a scan is part-finished, and how far it got. For the screen that
- * offers to continue rather than start again. */
-bool sound_index_partial(int *done);
+/* Whether a scan is part-finished, how many tracks this run has measured,
+ * and whether it is an update -- one seeded from a finished index -- rather
+ * than a rebuild. For the screen that offers to continue or start again. */
+bool sound_index_partial(int *done, bool *update);
+
+/* Throw away a part-finished scan, so the next sound_index_begin() starts
+ * over. sound_index_begin(.., true) does this too, and also skips the seed. */
+void sound_index_discard_part(void);
 
 /* Whether there is a finished index to read. Cheap enough for a menu item to
  * ask on every draw, which is what it is for. */

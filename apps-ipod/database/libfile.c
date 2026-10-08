@@ -15,6 +15,7 @@
 #include <string.h>
 #include "config.h"
 #include "file.h"
+#include "errno.h"
 #include "crc32.h"
 #include "database/libfile.h"
 
@@ -169,10 +170,14 @@ bool libfile_append(const char *path, uint32_t magic, uint16_t version,
     bool ok;
     int fd = open(path, O_RDWR);
 
+    /* Created only when absent: any other failure leaves the file alone
+     * rather than replacing it with these records. */
     if (fd < 0)
     {
         struct libfile_writer w;
 
+        if (errno != ENOENT)
+            return false;
         return libfile_begin(&w, path, magic, version, record_size, NULL)
                && libfile_finish(&w, libfile_write(&w, records, size, n));
     }
@@ -193,6 +198,9 @@ bool libfile_append(const char *path, uint32_t magic, uint16_t version,
         hdr.checksum = crc_32(records, size, hdr.checksum);
         ok = lseek(fd, 0, SEEK_SET) == 0
              && write(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr);
+        /* The old header's count and checksum describe the old end. */
+        if (!ok)
+            ftruncate(fd, end);
     }
     close(fd);
     return ok;

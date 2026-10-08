@@ -103,7 +103,8 @@ int sound_mix_distance(const struct sound_axes *a, const struct sound_axes *b);
 #define SOUND_MIX_NO_DB        -3   /* The database would not open */
 #define SOUND_MIX_NO_PLAYLIST  -4   /* Tracks were chosen, none reached the
                                        playlist */
-#define SOUND_MIX_CANCELLED    -5   /* The erase warning was declined */
+#define SOUND_MIX_CANCELLED    -5   /* The erase warning was declined, or
+                                       the build was called off */
 #define SOUND_MIX_TOO_LONG     -6   /* More tracks than a reorder can hold */
 
 /* Build a playlist of tracks that sound like the one at 'path', and start it.
@@ -150,8 +151,10 @@ int sound_mix_journey(int from, int to, int want);
 
 /* Either of the two, for a caller with no screen to ask on: a mood when
  * 'from' and 'to' are the same mood. The playlist is replaced without the
- * erase warning. */
-int sound_mix_mood_unasked(int from, int to, int want);
+ * erase warning. The build stops, leaving the playlist alone, once *stop
+ * turns true; stop may be NULL. */
+int sound_mix_mood_unasked(int from, int to, int want,
+                           const volatile bool *stop);
 
 /* A journey that ends calm, starting from where 'path' already sits.
  *

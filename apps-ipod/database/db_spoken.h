@@ -48,8 +48,8 @@ bool db_spoken_is_spoken_seek(long genre_seek);
  * mixed album reads as music either way. db_spoken_group_tag() says whether a
  * tag has a table at all; anything else is false, i.e. music.
  *
- * Album and album artist are answered from tagcache's album tables, and
- * read as music while the database is not in RAM. For canonical artist, call
+ * Album and album artist are answered from tagcache's album tables, and have
+ * no table while the database is not in RAM. For canonical artist, call
  * db_spoken_group_ensure() first, and believe it. Everything is music until
  * it has run, so a caller that forgets hides nothing rather than everything. */
 bool db_spoken_group_tag(int tag);

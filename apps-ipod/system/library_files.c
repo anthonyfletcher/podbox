@@ -31,6 +31,7 @@
 #include "dir.h"
 #include "string-extra.h"
 #include "rbpaths.h"
+#include "general.h"
 #include "system/strutil.h"
 #include "system/library_files.h"
 #include "database/libfile.h"
@@ -251,6 +252,10 @@ static bool move_playback_logs(void)
             char from[MAX_PATH], to[MAX_PATH];
             snprintf(from, sizeof(from), ROCKBOX_DIR "/%s", names[i]);
             snprintf(to, sizeof(to), LIB_USER_DIR "/%s", names[i]);
+            /* Same name, different log: it goes in under a free number */
+            if (exists(to))
+                create_numbered_filename(to, LIB_USER_DIR, "playback_",
+                                         ".log", 4 IF_CNFN_NUM_(, NULL));
             /* One that stays behind would be found again for ever */
             if (!move_file(from, to) || exists(from))
                 return false;
@@ -301,14 +306,12 @@ static void database_name(int i, char *name, size_t size)
         snprintf(name, size, "database_%d.tcd", i);
 }
 
-static bool has_database(const char *dir)
+static bool has_db_file(const char *dir, int i)
 {
-    char path[MAX_PATH];
+    char name[32], path[MAX_PATH];
 
-    snprintf(path, sizeof(path), "%s/database_idx.tcd", dir);
-    if (file_exists(path))
-        return true;
-    snprintf(path, sizeof(path), "%s/database_tmp.tcd", dir);
+    database_name(i, name, sizeof(name));
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
     return file_exists(path);
 }
 
@@ -334,22 +337,29 @@ enum db_move {
 };
 
 /* Every database file in dir, into library/database or away. A database is
- * all of a piece, so a replacing one also removes a file only the old one
- * had. */
+ * all of a piece, so a replacing one that has not started also removes a file
+ * only the old one had; once started, a destination file may be one already
+ * moved, so only one with a source still to come goes. The tag files go
+ * first and the master last: a master still in dir is a move to redo, and
+ * tag files without one are a move to finish. */
 static bool move_database_from(const char *dir, enum db_move how)
 {
     char name[32], from[MAX_PATH], to[MAX_PATH];
     bool ok = true;
+    bool started = !has_db_file(dir, 0);
 
     upgrade_log("database in %s: %s", dir, how == DB_REPLACE ? "moving"
                 : how == DB_FINISH ? "finishing the move" : "stale, dropped");
-    for (int i = -2; i < 32; i++)
+    for (int k = 0; k < 34; k++)
     {
+        int i = k < 32 ? k : 31 - k;    /* 0..31, then -1, then -2 */
+
         database_name(i, name, sizeof(name));
         snprintf(from, sizeof(from), "%s/%s", dir, name);
         snprintf(to, sizeof(to), LIB_DB_DIR "/%s", name);
 
-        if (how == DB_REPLACE && file_exists(to))
+        if (how == DB_REPLACE && file_exists(to)
+            && (!started || file_exists(from)))
             remove(to);
         if (!file_exists(from))
             continue;
@@ -368,9 +378,10 @@ static bool move_database(void)
     char dir[MAX_PATH], from[MAX_PATH], name[32];
     bool ok = true;
 
-    if (old_database_dir(dir, sizeof(dir)) && has_database(dir))
+    if (old_database_dir(dir, sizeof(dir)) && has_database_file(dir))
     {
-        ok = move_database_from(dir, DB_REPLACE);
+        ok = move_database_from(dir, has_db_file(dir, -2) ? DB_REPLACE
+                                                          : DB_FINISH);
         for (int i = -2; i < 32; i++)
         {
             database_name(i, name, sizeof(name));
@@ -387,10 +398,10 @@ static bool move_database(void)
     }
 
     /* A whole database in /.rockbox moves, unless library/database already
-     * has one, which is newer. Tag files without a master are a move cut
+     * has a master, which is newer. Files without a master are a move cut
      * short, finished now. */
-    if (has_database(ROCKBOX_DIR))
-        ok = move_database_from(ROCKBOX_DIR, has_database(LIB_DB_DIR)
+    if (has_db_file(ROCKBOX_DIR, -2))
+        ok = move_database_from(ROCKBOX_DIR, has_db_file(LIB_DB_DIR, -2)
                                              ? DB_DROP : DB_REPLACE);
     else if (has_database_file(ROCKBOX_DIR))
         ok = move_database_from(ROCKBOX_DIR, DB_FINISH);
@@ -511,10 +522,19 @@ static bool convert_badges(void)
     {
         unsigned char rec[8] = { 0 };
 
-        ok = read(fd, &when, sizeof(when)) == (ssize_t)sizeof(when);
+        if (read(fd, &when, sizeof(when)) != (ssize_t)sizeof(when))
+        {
+            /* Cut short in the dates: dropped as above, or every boot would
+             * fail here and show the upgrade again */
+            close(fd);
+            libfile_finish(&w, false);
+            remove(LIB_BADGES_FILE);
+            upgrade_log("dropped unreadable %s", LIB_BADGES_FILE);
+            return true;
+        }
         memcpy(rec, &when, sizeof(when));
         rec[4] = (seen[i / 8] >> (i % 8)) & 1;
-        ok = ok && libfile_write(&w, rec, sizeof(rec), 1);
+        ok = libfile_write(&w, rec, sizeof(rec), 1);
     }
     close(fd);
     ok = libfile_finish(&w, ok);

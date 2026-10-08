@@ -64,11 +64,12 @@ bool db_featured_name_eq(const char *a, int alen, const char *b, int blen);
 #define DB_FEATURED_ARENA      (8 * 1024)
 
 /* Build the table, discarding whatever was there. False, and an empty table,
- * if it cannot be built: the setting off, the database not loaded to RAM, or
- * a commit in progress.
+ * if the setting is off or the database is not loaded to RAM, as it is not
+ * during a commit. A commit that starts part way through leaves the table
+ * short and still returns true; db_featured_ensure() rebuilds it after.
  *
- * This crawls three tag files and does not yield. Call it where a screen is
- * entered, not from a redraw. */
+ * This crawls three tag files, yielding as it goes. Call it where a screen
+ * is entered, not from a redraw. */
 bool db_featured_build(void);
 
 /* Build it if it has not been built, or if the database has changed since it

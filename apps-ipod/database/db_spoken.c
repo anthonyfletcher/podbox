@@ -134,7 +134,7 @@ static void groups_invalidate(void);
  * on an arbitrary stack is not worth the byte count it saves. Only one build
  * runs at a time -- tagcache.c guarantees it. */
 static struct tagcache_search build_tcs;
-static char build_buf[SPOKEN_GENRE_BUFSZ];
+static char build_buf[TAGCACHE_BUFSZ];
 
 bool db_spoken_build(void)
 {
@@ -167,7 +167,8 @@ bool db_spoken_build(void)
 
     logf("db_spoken: %d spoken genres", spoken_ct);
 
-    return true;
+    /* A partial table would class the genres past the failure as music. */
+    return !build_tcs.failed;
 }
 
 bool db_spoken_is_spoken_seek(long genre_seek)
@@ -361,8 +362,9 @@ bool db_spoken_group_ensure(int tag)
 
     /* One build at a time, and the loser goes away rather than waiting.
      *
-     * Both passes yield -- build_lookup_list() in tagcache.c does, once per
-     * entry it accepts -- so another thread can arrive while one is building.
+     * A pass can yield -- build_lookup_list() in tagcache.c does once per
+     * entry it accepts from the disk, though not while it walks the RAM copy
+     * -- so another thread can arrive while one is building.
      * A second entrant would memset group_tcs out from under the first, so it
      * is turned away instead, with the table left invalid for it to try again
      * on its next visit. Blocking would put a browse behind a background pass,
@@ -405,7 +407,12 @@ bool db_spoken_group_ensure(int tag)
 
 bool db_spoken_group_tag(int tag)
 {
-    return tag == tag_album || tag == tag_albumartist || group_for(tag);
+    /* Their tables come and go with the RAM copy. A tag without one leaves
+     * the browse unfiltered, rather than listing books as music and then
+     * filtering their tracks away a level down. */
+    if (tag == tag_album || tag == tag_albumartist)
+        return tagcache_is_in_ram();
+    return group_for(tag) != NULL;
 }
 
 /* Every album of that name is spoken word throughout, whoever it is by */

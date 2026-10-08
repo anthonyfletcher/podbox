@@ -68,7 +68,7 @@
 #define LIB_BADGES_MAGIC    0x53474442u     /* "BDGS" */
 #define LIB_BADGES_VERSION  1
 #define LIB_MOVES_MAGIC     0x45564f4du     /* "MOVE" */
-#define LIB_MOVES_VERSION   2       /* 1: no unplaced count */
+#define LIB_MOVES_VERSION   3       /* 1: no unplaced count; 2: no key */
 #define LIB_PLAYS_MAGIC     0x53594c50u     /* "PLYS" */
 #define LIB_PLAYS_VERSION   1
 #define LIB_BOOKS_MAGIC     0x4b4f4f42u     /* "BOOK" */

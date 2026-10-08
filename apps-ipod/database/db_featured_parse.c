@@ -335,6 +335,7 @@ int db_featured_parse(const char *s, db_featured_known_fn known, void *ctx,
                       struct db_featured_names *out)
 {
     const char *guests, *end;
+    int rejected = 0;
 
     out->count = 0;
 
@@ -344,19 +345,25 @@ int db_featured_parse(const char *s, db_featured_known_fn known, void *ctx,
 
     end = guest_list_end(s, guests);
 
-    while (out->count < DB_FEATURED_MAX_GUESTS)
+    /* Rejected fragments are bounded too: each pass rescans the rest of the
+     * list, so a long run of them would cost the cube of its length. */
+    while (out->count < DB_FEATURED_MAX_GUESTS
+           && rejected < DB_FEATURED_MAX_GUESTS)
     {
-        int seplen;
+        int seplen, before = out->count;
         const char *cut = find_cut(guests, end, known, ctx, &seplen);
 
         if (cut == NULL)
             break;
 
         add_name(out, guests, cut);
+        if (out->count == before)
+            rejected++;
         guests = cut + seplen;
     }
 
-    if (out->count < DB_FEATURED_MAX_GUESTS)
+    if (out->count < DB_FEATURED_MAX_GUESTS
+        && rejected < DB_FEATURED_MAX_GUESTS)
         add_name(out, guests, end);
 
     return out->count;

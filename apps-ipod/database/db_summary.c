@@ -418,14 +418,20 @@ int db_summary_play_album(const struct album_data *album)
 
     if (!warn_on_pl_erase())
         return -1;
-    if (playlist_create(NULL, NULL) < 0)
-        return -1;
 
+    /* The search first: refused while a commit runs, and the playlist is
+     * not to be emptied for nothing. */
     cpu_boost(true);
     if (!tagcache_search(&tcs, tag_filename))
     {
         cpu_boost(false);
         splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return -1;
+    }
+    if (playlist_create(NULL, NULL) < 0)
+    {
+        tagcache_search_finish(&tcs);
+        cpu_boost(false);
         return -1;
     }
     if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
@@ -439,10 +445,9 @@ int db_summary_play_album(const struct album_data *album)
         return -1;
     }
 
-    /* The album's tracks: its name, and its artist where it has one. */
+    /* The album's tracks: its name and its artist. */
     tagcache_search_add_filter(&tcs, tag_album, album->seek);
-    if (album->artist_idx >= 0)
-        tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);
+    tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);
 
     /* A search returns entries in master-index order -- the order the files
      * were scanned, which is close to track order for most rips and wrong for
@@ -501,9 +506,8 @@ int db_summary_play_album(const struct album_data *album)
         if (tagcache_search(&tcs, tag_filename))
         {
             tagcache_search_add_filter(&tcs, tag_album, album->seek);
-            if (album->artist_idx >= 0)
-                tagcache_search_add_filter(&tcs, tag_albumartist,
-                                           album->artist_seek);
+            tagcache_search_add_filter(&tcs, tag_albumartist,
+                                       album->artist_seek);
             while (tagcache_get_next(&tcs, buf, sizeof(buf)))
             {
                 if (playlist_insert_context_add(&context, buf) < 0)

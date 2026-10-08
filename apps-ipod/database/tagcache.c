@@ -106,13 +106,13 @@
 #include "errno.h"
 
 #include "lang.h"
+#include "widgets/splash.h"
 #include "eeprom_settings.h"
-/* Whether the commit in progress should give up. It is honoured only where
- * nothing has been written yet: build_index() stops while it is still reading,
- * before it truncates a tag file, and otherwise finishes the tag it started;
- * commit() then skips the numeric pass and the master header. The master stays
- * dirty and TAGCACHE_FILE_TEMP stays, and the retry starts over from it --
- * build_index() drops what an earlier attempt already appended. */
+/* Whether the commit in progress should give up. It is honoured up to the
+ * swap: until then the merge writes only .new files and the filename file's
+ * tail, which commit() cuts back, so a cancel leaves the database as it was
+ * and TAGCACHE_FILE_TEMP stays for the retry. Past the swap the commit
+ * finishes, cancel or not. */
 static bool usr_cancel(void);
 #define USR_CANCEL usr_cancel()
 /*
@@ -284,6 +284,10 @@ static volatile int command_queue_widx = 0;
 static volatile int command_queue_ridx = 0;
 static struct mutex command_queue_mutex SHAREDBSS_ATTR;
 
+/* Moves whenever entry numbers stop meaning what they did: remove_files()
+ * bumps it. */
+static volatile uint32_t db_generation;
+
 /* Tag database structures. */
 
 /* Variable-length tag entry in tag files. */
@@ -355,7 +359,7 @@ static struct tcramcache
 {
     struct ramcache_header *hdr;      /* allocated ramcache_header */
     int handle;                       /* buffer handle */
-    bool current;   /* holds the files as they are; a commit clears it */
+    bool current;   /* holds the files as they are; a merge clears it */
 } tcramcache;
 
 static inline void tcrc_buffer_lock(void)
@@ -510,7 +514,7 @@ read_tagfile_entry_and_tag(int fd, struct tagfile_entry *tfe,
         return e_ENTRY_SIZEMISMATCH;
 
     long tag_length = tfe->tag_length;
-    if (tag_length >= bufsz)
+    if (tag_length < 0 || tag_length >= bufsz)
         return e_TAG_TOOLONG;
 
     if (tag_length > 0 && read(fd, buf, tag_length) != tag_length)
@@ -705,6 +709,7 @@ static void remove_files(void)
     tc_stat.ready = false;
     tc_stat.ramcache = false;
     tc_stat.econ = false;
+    db_generation++;
     remove_db_file(TAGCACHE_FILE_MASTER);
     for (i = 0; i < TAG_COUNT; i++)
     {
@@ -1264,8 +1269,9 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
 
     bool found = false;
 
-    const char *filename = filename_raw;
-
+    /* Matched as path_key() matches: without a volume specifier, and
+     * ignoring case, as FAT does. */
+    const char *filename = path_key_strip(filename_raw);
 
     /* The scan (!localfd) still looks, or a dirty database would have every
      * file added again. */
@@ -1317,7 +1323,7 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
                         last_pos = -1;
                         return -3;
                     }
-                    if (!strncmp(filename, buf, tag_length))
+                    if (!strncasecmp(filename, buf, tag_length))
                     {
                         last_pos = pos_history[pos_history_idx];
                         found = true;
@@ -1932,6 +1938,10 @@ static bool check_clauses(struct tagcache_search *tcs,
                 if (clause->tag == tag_filename
                     || clause->tag == tag_virt_basename)
                 {
+                    /* The RAM copy keeps no filenames, so this is a disk
+                     * read per entry, the RAM copy pinned throughout: a
+                     * filename or basename clause over a large library
+                     * takes seconds. */
                     if (!retrieve(tcs, idx,
                                   clause->tag, buf, bufsz))
                     {
@@ -2225,9 +2235,9 @@ static bool build_lookup_list(struct tagcache_search *tcs)
  * db_spoken_build() runs a search of its own and so arrives back here. Without
  * the flag that is unbounded recursion rather than a wasted rebuild.
  *
- * The build sleeps while another thread holds the read lock, so a commit can
- * land while it runs. Recording the commitid read *before* it means such a
- * build is rebuilt next time rather than standing as current.
+ * The build's searches are refused while a commit holds the read lock, and a
+ * commit can land between them. Recording the commitid read *before* it means
+ * such a build is rebuilt next time rather than standing as current.
  *
  * A build that could not read the database records nothing, so it is retried
  * rather than leaving an empty table looking authoritative.
@@ -2237,20 +2247,28 @@ static bool build_lookup_list(struct tagcache_search *tcs)
  * may call an audiobook music. A lock would trade that for blocking a UI
  * search behind a background one, which is the worse of the two. */
 static int32_t spoken_commitid = -1;
+static uint32_t spoken_generation;
 static bool spoken_building;
 
 static void spoken_table_update(void)
 {
     int32_t built_at;
+    uint32_t built_gen;
 
-    if (spoken_building || spoken_commitid == current_tcmh.commitid)
+    /* The generation too: a rebuild can leave commitid where it was. */
+    if (spoken_building || (spoken_commitid == current_tcmh.commitid
+                            && spoken_generation == db_generation))
         return;
 
     built_at = current_tcmh.commitid;
+    built_gen = db_generation;
 
     spoken_building = true;
     if (db_spoken_build())
+    {
         spoken_commitid = built_at;
+        spoken_generation = built_gen;
+    }
     spoken_building = false;
 }
 
@@ -2711,6 +2729,20 @@ bool tagcache_path_slot(int n, uint64_t *key, int *idx_id)
     return true;
 }
 
+/* Linear: the index is sorted by key, not by idx_id. Nothing here yields. */
+uint64_t tagcache_entry_key(int idx_id)
+{
+    if (!tc_stat.ramcache || idx_id < 0
+        || idx_id >= current_tcmh.tch.entry_count)
+        return 0;
+
+    const struct path_slot *s = tcrc_path_slots;
+    for (int n = tcramcache.hdr->path_count; n > 0; n--, s++)
+        if (s->idx_id == idx_id)
+            return (uint64_t)s->key_hi << 32 | s->key_lo;
+    return 0;
+}
+
 int tagcache_path_slots(void)
 {
     return tc_stat.ramcache ? tcramcache.hdr->path_count : 0;
@@ -2741,7 +2773,7 @@ bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size)
     const struct index_entry *entry = ram_entry(idx_id);
     const char *s;
 
-    /* tag_filename's block holds dircache references, not paths. */
+    /* The RAM copy keeps no filenames, only their keys. */
     if (!entry || tag < 0 || tag >= TAG_COUNT || TAGCACHE_IS_NUMERIC(tag)
         || tag == tag_filename)
         return false;
@@ -2875,14 +2907,17 @@ static int folder_name_year(const char *path)
 }
 
 /* The entries the walk found, one bit each. After a walk that completed,
- * every live entry left unmarked is a file that has gone, and is deleted
- * before the commit -- which is also what lets a moved file keep its figures.
- * That replaces a second pass over every path asking the filesystem. Static,
- * so it costs no allocation; a larger library, or a database that is not
- * ready, falls back to check_deleted_files(). */
+ * every live entry left unmarked is deleted before the commit -- a file that
+ * has gone, or one outside the scan paths or under a database.ignore -- which
+ * is also what lets a moved file keep its figures. Static, so it costs no
+ * allocation; a larger library, or a database that is not ready, falls back
+ * to check_deleted_files(). */
 #define WALK_SEEN_MAX 65536
 static uint32_t walk_seen[WALK_SEEN_MAX / 32];
 static long walk_seen_count;
+/* Set when the walk skipped a folder or could not look a file up, so an
+ * unmarked entry may still exist: the deletion pass is skipped. */
+static bool walk_incomplete;
 
 static bool walk_checks_deletions(void)
 {
@@ -2931,6 +2966,10 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         idx_id = find_entry_ram(path);
     else if (filenametag_fd >= 0)
         idx_id = find_entry_disk(path, false);
+
+    /* find_entry_disk() drops the descriptor on a read error. */
+    if (!tc_stat.ramcache && filenametag_fd < 0)
+        walk_incomplete = true;
 
     if (idx_id >= 0 && idx_id < walk_seen_count)
         walk_seen[idx_id / 32] |= 1u << (idx_id % 32);
@@ -3320,8 +3359,8 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
         return false;
     }
 
-    /* Not cancelled part way: commit() decides before it starts, and a retry
-     * after a half-done pass would find the deleted entries already marked
+    /* Not cancelled part way: it runs after the swap, and a retry after a
+     * half-done pass would find the deleted entries already marked
      * resurrected and copy their figures to nothing. */
     while (entries_processed < h->entry_count)
     {
@@ -4080,18 +4119,19 @@ static bool swap_renames(void)
  * replaces its target whole, but a cut between two would pair new tag files
  * with the old master. So the marker goes down first, once every .new file
  * is complete, and finish_interrupted_swap() completes a swap it finds at
- * the next boot. */
-static bool merge_swap(void)
+ * the next boot. Returns 1 when done, 0 when a rename failed part way, and
+ * -1 when the marker could not be made and nothing was renamed. */
+static int merge_swap(void)
 {
     int fd = open_db_fd(TAGCACHE_FILE_SWAP, O_WRONLY | O_CREAT | O_TRUNC);
 
     if (fd < 0)
-        return false;
+        return -1;
     close(fd);
     if (!swap_renames())
-        return false;
+        return 0;
     remove_db_file(TAGCACHE_FILE_SWAP);
-    return true;
+    return 1;
 }
 
 /* At boot, before anything opens the database: a swap that was cut short is
@@ -4211,12 +4251,27 @@ static bool commit(void)
     struct tagcache_header filename_hdr;
     off_t filename_size = 0;
     bool filename_hdr_ok = false;
+    const bool ram_was_on = tc_stat.ramcache;
+    const bool ram_was_current = tcramcache.current;
+    const bool dirty_before = current_tcmh.dirty;
+    bool db_untouched = false;
+    int swapped;
     logf("committing tagcache");
 
     commit_cancelled = false;
 
     while (write_lock)
         sleep(1);
+
+    /* A swap the marker says is unfinished leaves old and new files mixed;
+     * a merge over them would build on the mix. */
+    finish_interrupted_swap();
+    if (db_file_exists(TAGCACHE_FILE_SWAP))
+    {
+        logf("swap unfinished, delaying commit");
+        tc_stat.commit_delayed = true;
+        return false;
+    }
 
     int fd = open_db_fd(TAGCACHE_FILE_NOCOMMIT, O_RDONLY);
     if (fd >= 0)
@@ -4282,7 +4337,16 @@ static bool commit(void)
 
     /* Beyond here, jump to commit_error to undo locks and restore dircache */
     rc = false;
+    /* Under the queue's mutex, so a flush already writing the master
+     * finishes before the merge reads it, and none starts after. */
+    mutex_lock(&command_queue_mutex);
     read_lock++;
+    mutex_unlock(&command_queue_mutex);
+
+    /* Again under read_lock: a search can start between the wait at the top
+     * and here, and may be walking the RAM copy lent out below. */
+    while (write_lock)
+        sleep(1);
 
     /* Try to steal every buffer we can :) */
     if (tempbuf_size == 0)
@@ -4318,6 +4382,7 @@ static bool commit(void)
         logf("delaying commit until next boot");
         tc_stat.commit_delayed = true;
         close(tmpfd);
+        db_untouched = true;
         goto commit_error;
     }
 
@@ -4329,6 +4394,7 @@ static bool commit(void)
         logf("no room for the merge maps");
         tc_stat.commit_delayed = true;
         close(tmpfd);
+        db_untouched = true;
         goto commit_error;
     }
 
@@ -4386,11 +4452,23 @@ static bool commit(void)
         goto merge_error;
     }
 
-    if (!merge_swap())
+    swapped = merge_swap();
+    if (swapped < 0)
     {
+        logf("swap marker failed");
+        close(tmpfd);
+        tc_stat.commit_step = 0;
+        goto merge_error;
+    }
+    if (swapped == 0)
+    {
+        /* Old and new files are mixed until the next boot finishes the
+         * swap; nothing may read or write them meanwhile. */
         logf("merge swap failed");
         close(tmpfd);
         tc_stat.commit_step = 0;
+        tc_stat.ready = false;
+        tc_stat.ramcache = false;
         goto commit_error;
     }
 
@@ -4460,7 +4538,17 @@ merge_error:
             ftruncate(ffd, filename_size);
             write_tagcache_header(ffd, &filename_hdr);
             close(ffd);
+            db_untouched = true;
         }
+    }
+    else
+        db_untouched = true;
+
+    /* The database is as it was before the commit, so it is clean again. */
+    if (db_untouched)
+    {
+        current_tcmh.dirty = dirty_before;
+        update_master_header();
     }
 
 commit_error:
@@ -4487,6 +4575,19 @@ commit_error:
     /* Resume the dircache, if we stole the buffer. */
     if (dircache_buffer_stolen)
         dircache_resume();
+
+    /* A commit that changed nothing hands back the RAM copy it switched off,
+     * or reloads it when its buffer served as scratch. */
+    if (db_untouched && ram_was_current)
+    {
+        if (!ramcache_buffer_stolen)
+        {
+            tcramcache.current = true;
+            tc_stat.ramcache = ram_was_on;
+        }
+        else if (ram_was_on && tc_stat.ramcache_allocated > 0)
+            queue_post(&tagcache_queue, Q_RELOAD_RAMCACHE, 0);
+    }
 
     return rc;
 }
@@ -4600,6 +4701,23 @@ static void queue_command(int cmd, long idx_id, int tag, long data)
         int next;
 
         mutex_lock(&command_queue_mutex);
+
+        /* A header write stores the header as it is when flushed, so one
+         * queued is enough. */
+        if (cmd == CMD_UPDATE_MASTER_HEADER)
+        {
+            int ridx;
+            for (ridx = command_queue_ridx; ridx != command_queue_widx;
+                 ridx = (ridx + 1) % TAGCACHE_COMMAND_QUEUE_LENGTH)
+            {
+                if (command_queue[ridx].command == CMD_UPDATE_MASTER_HEADER)
+                {
+                    mutex_unlock(&command_queue_mutex);
+                    return;
+                }
+            }
+        }
+
         next = command_queue_widx + 1;
         if (next >= TAGCACHE_COMMAND_QUEUE_LENGTH)
             next = 0;
@@ -4622,9 +4740,23 @@ static void queue_command(int cmd, long idx_id, int tag, long data)
             break;
         }
 
-        /* Queue is full, try again later... */
+        /* Full during a commit: nothing flushes until the merge ends, minutes
+         * on a large library, and the caller is the audio thread at a track
+         * change. The change is dropped rather than stopping playback. */
+        if (read_lock)
+        {
+            mutex_unlock(&command_queue_mutex);
+            logf("command queue full during commit, dropped %d", cmd);
+            return;
+        }
+
+        /* Full outside a commit: flush it here rather than wait for a thread
+         * that may not flush until a scan ends, and wait only if that could
+         * not drain it. */
         mutex_unlock(&command_queue_mutex);
-        sleep(1);
+        command_queue_sync_callback();
+        if (command_queue_is_full())
+            sleep(1);
     }
 }
 
@@ -4645,9 +4777,18 @@ long tagcache_increase_serial(void)
     return old;
 }
 
+/* Dropped while the database is not ready: an index taken before a rebuild
+ * would land on whichever track holds that number afterwards. */
 void tagcache_update_numeric(int idx_id, int tag, long data)
 {
+    if (!tc_stat.ready)
+        return;
     queue_command(CMD_UPDATE_NUMERIC, idx_id, tag, data);
+}
+
+uint32_t tagcache_generation(void)
+{
+    return db_generation;
 }
 
 static bool write_tag(int fd, const char *tagstr, const char *datastr)
@@ -4670,6 +4811,7 @@ static bool write_tag(int fd, const char *tagstr, const char *datastr)
         {
             buf[i++] = '\\';
             buf[i] = 'n';
+            datastr++;
             continue;
         }
 
@@ -4679,9 +4821,7 @@ static bool write_tag(int fd, const char *tagstr, const char *datastr)
     str_setlen(buf, bufsz - 1);
     strmemccpy(&buf[i], "\" ", (bufsz - i - 1));
 
-    write(fd, buf, i + 2);
-
-    return true;
+    return write(fd, buf, i + 2) == i + 2;
 }
 
 
@@ -4723,8 +4863,8 @@ static bool read_tag(char *dest, long size,
         if (*src == '\0' || *(++src) == '\0')
             return false;
 
-        /* Read the data. */
-        for (pos = 0; pos < size; pos++)
+        /* Read the data, leaving room for the terminator. */
+        for (pos = 0; pos < size - 1; pos++)
         {
             if (*src == '\0')
                 break;
@@ -4732,6 +4872,8 @@ static bool read_tag(char *dest, long size,
             if (*src == '\\')
             {
                 src++;
+                if (*src == '\0')
+                    break;
                 if (*src == 'n')
                     dest[pos] = '\n';
                 else
@@ -4857,7 +4999,6 @@ static bool import_runtime_records(int fd, int masterfd)
 static bool import_runtime_data(bool from_export)
 {
     struct master_header myhdr;
-    struct tagcache_header tch;
     struct libfile_header lh;
     int fd;
     long masterfd;
@@ -4888,8 +5029,8 @@ static bool import_runtime_data(bool from_export)
 
     write_lock++;
 
-    filenametag_fd = open_tag_fd(&tch, tag_filename, false);
-
+    /* Trap: filenametag_fd belongs to a scan that may be running on the
+     * tagcache thread. find_index() opens its own descriptor. */
     if (from_export)
         fast_readline(fd, buf, sizeof(buf), (void *)(intptr_t)masterfd,
                       parse_changelog_line);
@@ -4898,12 +5039,6 @@ static bool import_runtime_data(bool from_export)
 
     close(fd);
     close(masterfd);
-
-    if (filenametag_fd >= 0)
-    {
-        close(filenametag_fd);
-        filenametag_fd = -1;
-    }
 
     write_lock--;
 
@@ -4925,10 +5060,11 @@ bool tagcache_import_changelog(void)
  *
  * Read from the files directly rather than through a search, so it works on a
  * database that is not ready -- the state an interrupted merge leaves, and the
- * one the automatic rebuild starts from. A master that cannot be read leaves an
- * earlier file as it was; a readable one replaces it, so an old copy is never
- * imported over a newer library. */
-static bool save_runtime_data(bool as_export)
+ * one the automatic rebuild starts from. Returns 1 when saved. A master that
+ * cannot be read returns -1 and leaves an earlier file as it was. A file that
+ * cannot be written returns 0, and a Rebuild stops there rather than import
+ * the older copy over a newer library. */
+static int save_runtime_data(bool as_export)
 {
     struct master_header hdr;
     struct tagcache_header tch;
@@ -4939,6 +5075,7 @@ static bool save_runtime_data(bool as_export)
     char num[16];
     int masterfd, fnfd, clfd = -1;
     bool ok = true;
+    bool unreadable = false;
     long i;
     int t;
 
@@ -4947,13 +5084,13 @@ static bool save_runtime_data(bool as_export)
 
     masterfd = open_master_fd(&hdr, false);
     if (masterfd < 0)
-        return false;
+        return -1;
 
     fnfd = open_tag_fd(&tch, tag_filename, false);
     if (fnfd < 0)
     {
         close(masterfd);
-        return false;
+        return -1;
     }
 
     if (as_export)
@@ -4971,7 +5108,7 @@ static bool save_runtime_data(bool as_export)
             close(clfd);
         close(fnfd);
         close(masterfd);
-        return false;
+        return 0;
     }
 
     for (i = 0; ok && i < hdr.tch.entry_count; i++)
@@ -4979,6 +5116,7 @@ static bool save_runtime_data(bool as_export)
         if (read_index_entries(masterfd, &idx, 1) != (ssize_t)sizeof(idx))
         {
             ok = false;
+            unreadable = true;
             break;
         }
 
@@ -5032,14 +5170,14 @@ static bool save_runtime_data(bool as_export)
     else
         ok = libfile_finish(&w, ok);
     debug_log(DEBUG_LOG_TAGCACHE, "runtime data: %s", ok ? "saved" : "failed");
-    return ok;
+    return ok ? 1 : (unreadable ? -1 : 0);
 }
 
 /* Export Modifications */
 bool tagcache_create_changelog(struct tagcache_search *tcs)
 {
     (void)tcs;
-    return save_runtime_data(true);
+    return save_runtime_data(true) > 0;
 }
 
 static bool delete_entry(long idx_id)
@@ -5358,6 +5496,15 @@ static size_t ramcache_size(struct master_header *tcmh)
     return size;
 }
 
+/* Set by the last allocate_tagcache() that found no room for the RAM copy;
+ * cleared by one that did. */
+static bool ram_refused;
+
+bool tagcache_ram_refused(void)
+{
+    return ram_refused;
+}
+
 static bool allocate_tagcache(void)
 {
     tc_stat.ramcache_allocated = 0;
@@ -5396,6 +5543,7 @@ static bool allocate_tagcache(void)
                   (unsigned long)(alloc_size / 1024),
                   (unsigned long)(available / 1024),
                   (unsigned long)(TAGCACHE_MIN_AUDIO_RESERVE / 1024));
+        ram_refused = true;
         return false;
     }
 
@@ -5404,8 +5552,10 @@ static bool allocate_tagcache(void)
     {
         debug_log(DEBUG_LOG_TAGCACHE, "ramcache: alloc of %luKB refused",
                   (unsigned long)(alloc_size / 1024));
+        ram_refused = true;
         return false;
     }
+    ram_refused = false;
 
     tcramcache.handle = handle;
     tcramcache.hdr = core_get_data(handle);
@@ -5568,7 +5718,7 @@ static bool load_tagcache(void)
                 goto failure;
             }
 
-            int idx_id = fe->idx_id; /* dircache reference clobbers *fe */
+            int idx_id = fe->idx_id; /* fe is scratch for tag_filename */
             struct index_entry *idx = &tcramcache.hdr->indices[idx_id];
 
             if (idx_id != -1 || tag == tag_filename) /* filename NOT optional */
@@ -5951,8 +6101,8 @@ static bool check_dir(const char *dirname, int add_files, int depth)
              * this makes able to avoid looping in recursive symlinks */
             if (info.attribute & ATTR_LINK)
                 add_search_root(curpath);
-            else
-                check_dir(curpath, add_files, depth + 1);
+            else if (!check_dir(curpath, add_files, depth + 1))
+                walk_incomplete = true;
         }
         else if (add_files)
         {
@@ -6039,12 +6189,16 @@ void do_tagcache_build(const char *path[])
 
     logf("updating tagcache");
 
-    cachefd = open_db_fd(TAGCACHE_FILE_TEMP, O_RDONLY);
-    if (cachefd >= 0)
+    /* A temp file left by a cancelled commit is committed first. Left
+     * waiting, it would stop every scan until the next boot. */
+    if (db_file_exists(TAGCACHE_FILE_TEMP))
     {
-        logf("skipping, cache already waiting for commit");
-        close(cachefd);
-        return ;
+        commit();
+        if (db_file_exists(TAGCACHE_FILE_TEMP))
+        {
+            logf("skipping, cache already waiting for commit");
+            return ;
+        }
     }
 
     cachefd = open_db_fd(TAGCACHE_FILE_TEMP, O_RDWR | O_CREAT | O_TRUNC);
@@ -6121,6 +6275,7 @@ void do_tagcache_build(const char *path[])
     walk_seen_count = walk_checks_deletions() ? current_tcmh.tch.entry_count
                                               : 0;
     memset(walk_seen, 0, (walk_seen_count + 31) / 32 * sizeof(walk_seen[0]));
+    walk_incomplete = false;
 
     struct search_roots_ll * this;
     /* check_dir might add new roots */
@@ -6164,8 +6319,10 @@ void do_tagcache_build(const char *path[])
         return ;
     }
 
-    if (walk_seen_count)
+    if (walk_seen_count && !walk_incomplete)
         delete_unseen_entries();
+    else if (walk_seen_count)
+        debug_log(DEBUG_LOG_TAGCACHE, "walk: incomplete, no deletions");
     walk_seen_count = 0;
 
     /* Commit changes to the database. */
@@ -6431,8 +6588,22 @@ static void tagcache_thread(void)
                 break;
 
             case Q_REBUILD:
-                save_runtime_data(false);
+                /* The master is the only copy of the figures; a save that
+                 * could not write keeps it. Splashed from this thread, as
+                 * playlist.c reports its control-file errors. */
+                if (save_runtime_data(false) == 0)
+                {
+                    splashf(HZ*2, "%s %s", str(LANG_TAGCACHE_FORCE_UPDATE),
+                            str(LANG_FAILED));
+                    break;
+                }
                 remove_files();
+                /* What the save could not flush names entries that no
+                 * longer exist. */
+                mutex_lock(&command_queue_mutex);
+                command_queue_ridx = command_queue_widx;
+                tc_stat.queue_length = 0;
+                mutex_unlock(&command_queue_mutex);
                 remove_db_file(TAGCACHE_FILE_TEMP);
                 tagcache_build();
                 /* Load it back, as Q_UPDATE below does. commit() unloads the
@@ -6595,6 +6766,7 @@ void tagcache_get_marks(struct tagcache_marks *m)
 
     m->commitid = current_tcmh.commitid;
     m->serial = current_tcmh.serial;
+    m->generation = db_generation;
     m->deleted_ct = -1;
 
     /* Deletions are only ever marked in the index -- delete_entry() sets the

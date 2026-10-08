@@ -44,7 +44,10 @@
  *   2: pitch[12], tonic, mode, mode_margin, tonal_clarity, harmonic_change.
  *      40 bytes to 56.
  *   3: size, so a record written on a desktop can be checked for staleness
- *      without an mtime the desktop cannot reproduce. 56 bytes to 64. */
+ *      without an mtime the desktop cannot reproduce. 56 bytes to 64.
+ *
+ * A working file's reserved field counts the records seeded into it from the
+ * finished index; 0 in a finished index. */
 #define SOUND_MAGIC    0x534E4431  /* "SND1" */
 #define SOUND_VERSION  3
 
@@ -83,6 +86,9 @@ static bool         table_sorted;   /* Of the first table_used entries */
 static int          table_sorted_upto; /* Entries [0, this) ascend by key.
                                           What find_entry() may binary
                                           search; the rest it scans. */
+static uint32_t     part_seeded;    /* Records carried in from the finished
+                                       index, kept in the working file's
+                                       reserved field. 0 on a rebuild */
 
 
 /** Keys **/
@@ -214,6 +220,13 @@ static bool header_ok(const struct sound_header *h)
     return h->magic == SOUND_MAGIC &&
            h->version == SOUND_VERSION &&
            h->record_bytes == sizeof (struct sound_record);
+}
+
+/* The working file's header, which also records how much of it was seeded. */
+static void part_header_init(struct sound_header *h, uint32_t count)
+{
+    header_init(h, count);
+    h->reserved = part_seeded;
 }
 
 /* Records in one of our files, or 0 for a file that is absent or not ours.
@@ -360,7 +373,8 @@ static bool seed_from_finished(void)
 
     close(fd);
 
-    header_init(&h, (uint32_t)table_used);
+    part_seeded = (uint32_t)table_used;
+    part_header_init(&h, (uint32_t)table_used);
     lseek(part_fd, 0, SEEK_SET);
     write(part_fd, &h, sizeof (h));
 
@@ -394,7 +408,8 @@ static bool load_part(bool seed)
         !header_ok(&h) || h.count == 0)
     {
         lseek(part_fd, 0, SEEK_SET);
-        header_init(&h, 0);
+        part_seeded = 0;
+        part_header_init(&h, 0);
 
         if (write(part_fd, &h, sizeof (h)) != (ssize_t)sizeof (h))
             return false;
@@ -422,7 +437,13 @@ static bool load_part(bool seed)
 
     /* A count that ran past what the file holds is a run that was cut off
      * mid-write. What was read is sound; the header is corrected on the next
-     * add, and until then only the table is consulted. */
+     * add, and until then only the table is consulted. Records past the count
+     * are orphans of a header write that failed: add() addresses records by
+     * ordinal, so the file is cut back to what the table describes. */
+    part_seeded = h.reserved < (uint32_t)table_used ? h.reserved
+                                                    : (uint32_t)table_used;
+    ftruncate(part_fd, (off_t)sizeof (h)
+                       + (off_t)table_used * (off_t)sizeof (r));
     table_sorted = false;
     table_measure_sorted();
 
@@ -600,8 +621,9 @@ bool sound_index_add(const struct sound_record *r)
     if (table_used >= table_max)
         return false;
 
-    before = lseek(part_fd, 0, SEEK_END);
-    if (before < (off_t)sizeof (h))
+    /* At the offset the ordinal names rather than the end of the file. */
+    before = (off_t)sizeof (h) + (off_t)table_used * (off_t)sizeof (*r);
+    if (lseek(part_fd, before, SEEK_SET) != before)
         return false;
 
     if (write(part_fd, r, sizeof (*r)) != (ssize_t)sizeof (*r))
@@ -625,7 +647,7 @@ bool sound_index_add(const struct sound_record *r)
      * only thing that outruns the file system's own cache, and it costs at
      * most sixteen tracks, which are simply measured again. Flushing per
      * track would wake the disk twenty thousand times for that. */
-    header_init(&h, (uint32_t)table_used);
+    part_header_init(&h, (uint32_t)table_used);
     lseek(part_fd, 0, SEEK_SET);
     write(part_fd, &h, sizeof (h));
 
@@ -743,7 +765,7 @@ void sound_index_close(void)
     table_sorted_upto = 0;
 }
 
-bool sound_index_partial(int *done)
+bool sound_index_partial(int *done, bool *update)
 {
     struct sound_header h;
     int fd = open(SOUND_PART, O_RDONLY);
@@ -755,14 +777,23 @@ bool sound_index_partial(int *done)
     if (read(fd, &h, sizeof (h)) == (ssize_t)sizeof (h) && header_ok(&h) &&
         h.count > 0)
     {
+        uint32_t seeded = h.reserved < h.count ? h.reserved : h.count;
+
         if (done != NULL)
-            *done = (int)h.count;
+            *done = (int)(h.count - seeded);
+        if (update != NULL)
+            *update = seeded > 0;
         ok = true;
     }
 
     close(fd);
 
     return ok;
+}
+
+void sound_index_discard_part(void)
+{
+    remove(SOUND_PART);
 }
 
 bool sound_index_exists(void)
@@ -783,7 +814,8 @@ int sound_index_reader_open(struct sound_index_reader *r)
     if (r->fd < 0)
         return SOUND_ERR_NONE;
 
-    if (read(r->fd, &h, sizeof (h)) != (ssize_t)sizeof (h) || !header_ok(&h))
+    if (read(r->fd, &h, sizeof (h)) != (ssize_t)sizeof (h) ||
+        !header_ok(&h))
     {
         close(r->fd);
         r->fd = -1;
