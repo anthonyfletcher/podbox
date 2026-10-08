@@ -104,17 +104,15 @@ enum charge_state_type charge_state = DISCHARGING;
 
 /* Charging has finished, with the charger still plugged in.
  *
- * Deliberately separate from charge_state, because the two answer different
- * questions and one variable cannot do both. charge_state follows the
- * *debounced charger presence*: it selects the voltage-to-percentage curve,
- * and driving that from the raw !CHRG pin made the reading jump between the
- * charge and discharge curves every time the pin oscillated -- which it does
- * on weak USB supplies near a full battery.
+ * Separate from charge_state, which answers a different question.
+ * charge_state follows the *debounced charger presence*: it selects the
+ * voltage-to-percentage curve, and driven from the raw !CHRG pin the reading
+ * jumps between the charge and discharge curves every time the pin
+ * oscillates -- which it does on weak USB supplies near a full battery.
  *
  * The 99% cap below needs the other question, "is charge still going in?".
- * Answering it from charge_state too is what left a full battery showing 99%
- * for as long as it stayed on the charger, since charge_state says CHARGING
- * from the moment the cable goes in until it comes out again.
+ * charge_state says CHARGING from the moment the cable goes in until it comes
+ * out, so a cap taken from it holds a full battery at 99% on the charger.
  *
  * Debounced over the same number of samples as the charger detection, then
  * held until the charger is removed -- so a flickering pin cannot flicker the
@@ -385,9 +383,8 @@ static int voltage_to_battery_level(int millivolts)
 
 #if CONFIG_CHARGING >= CHARGING_MONITOR
     if (charge_state > DISCHARGING) {
-        /* battery level is defined to be < 100% until charging is finished --
-         * but only until then. Capping for as long as the charger is present
-         * is what stopped a full battery ever reading 100%. */
+        /* battery level is defined to be < 100% until charging is finished,
+         * and only until then: a full battery on the charger reads 100%. */
         level = voltage_to_percent(millivolts, percent_to_volt_charge);
         if (level > 99 && !charge_finished)
             level = 99;

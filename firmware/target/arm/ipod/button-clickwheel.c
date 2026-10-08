@@ -492,7 +492,12 @@ int button_read_device(void)
 #ifdef HAVE_MIKEY_REMOTE
     /* not gated by the hold switch, matching the OF: the inline remote
      * keeps working while the device is locked */
-    btn |= mikey_button_read();
+    int remote = mikey_button_read();
+    /* A multimedia code reuses the wheel buttons' bits (PLAYPAUSE carries
+     * SELECT's, VOLUME_UP PLAY's), so it replaces them rather than mixing
+     * into a code that means neither. */
+    if (remote)
+        btn = (btn & ~BUTTON_MAIN) | remote;
 #endif
     return btn;
 }

@@ -84,6 +84,8 @@ static bool ata_powered;
  * other, so the difference is noted at both declarations. */
 static bool ata_ssd_mode = false;
 static long ssd_sleep_tick;
+/* True when the next power-up must be a full init: the drive is unpowered
+ * (any power-down, not only the SSD deep sleep) or is being hard reset. */
 static bool ssd_deep_asleep;
 static struct semaphore mmc_wakeup;
 static struct semaphore mmc_comp_wakeup;
@@ -675,7 +677,6 @@ static int ata_power_up(void)
             ata_powered = true;
             return 0;
         }
-        ssd_deep_asleep = false;
         /* Fall through to full PATA init below */
     }
 
@@ -796,6 +797,7 @@ static int ata_power_up(void)
     }
 
     ata_powered = true;
+    ssd_deep_asleep = false;
     ata_set_active();
     return 0;
 }
@@ -814,6 +816,7 @@ static void ata_power_down(void)
     PCON(11) &= ~0xf;
     ide_power_enable(false);
     ata_powered = false;
+    ssd_deep_asleep = true;
 }
 
 static int ata_rw_chunk_internal(uint64_t sector, uint32_t cnt, void* buffer, bool write)
@@ -1020,6 +1023,7 @@ int ata_soft_reset(void)
 int ata_hard_reset(void)
 {
     mutex_lock(&ata_mutex);
+    ssd_deep_asleep = true; /* a reset is a full init, never the fast path */
     PASS_RC(ata_power_up(), 0, 0);
     ata_set_active();
     mutex_unlock(&ata_mutex);
@@ -1154,7 +1158,6 @@ void ata_sleepnow(void)
         logf("ata SSD SLEEP %ld", current_tick);
         PWRCON(0) |= (1 << 5);
         ata_powered = false;
-        ssd_deep_asleep = false;
         ssd_sleep_tick = current_tick;
     } else if (ata_disk_can_sleep()) {
         logf("ata SLEEP %ld", current_tick);
@@ -1356,7 +1359,7 @@ int ata_event(long id, intptr_t data)
         if (!ata_powered ||
             TIME_BEFORE(current_tick, ata_last_activity_value + ata_sleep_timeout))
         {
-            /* Phase 2: SSD deep sleep — cut AUTOLDO after 30s of
+            /* Phase 2: SSD deep sleep — cut AUTOLDO after 10s of
              * clock-gate sleep when backlight is off */
             if (ata_ssd_mode && !ata_powered && !ssd_deep_asleep
                 && !is_backlight_on(true)

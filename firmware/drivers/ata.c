@@ -120,7 +120,8 @@ static long sleep_timeout = 5*HZ;
  * simply stops the interface being powered off. The iPod Classic's own driver
  * (target/arm/s5l8702/ipod6g/storage_ata-6g.c) instead makes the first sleep
  * stage cheaper (clock-gating rather than STANDBY IMMEDIATE) and still powers
- * off afterwards, once ten further seconds have passed with the backlight off.
+ * off afterwards: at the first moment the backlight is off, ten or more
+ * seconds after that sleep began.
  *
  * That difference is why Q_STORAGE_PRE_WAKE exists and why only that driver
  * handles it: it has a power-off to hide, and this one does not. backlight.c

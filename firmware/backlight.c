@@ -356,7 +356,8 @@ static void backlight_dim(int value)
     if (bl_timer_active)
         return ;
 
-    if (timer_register(0, backlight_release_timer, 2, backlight_isr
+    /* Priority 1: above the 5G's wheel click, which gives the timer up. */
+    if (timer_register(1, backlight_release_timer, 2, backlight_isr
                        IF_COP(, CPU)))
     {
 #ifdef _BACKLIGHT_FADE_BOOST
@@ -484,18 +485,15 @@ static void backlight_setup_fade_down(void)
 /* Set when the backlight goes off in SSD mode, cleared by the first wake that
  * acts on it, so exactly one Q_STORAGE_PRE_WAKE is posted per off->on cycle.
  *
- * backlight_on() runs from the button tick for *every* button event, repeats
- * included, so posting there unconditionally put one event on the storage
- * queue per press. That queue holds 16, queue_post() wraps silently when it is
- * full, and KERNEL_ASSERT is compiled out of a release build -- so a burst had
- * no way to announce itself and could quietly overwrite an unread event.
- * SYS_USB_CONNECTED arrives on that same queue.
+ * Trap: backlight_on() runs from the button tick for *every* button event,
+ * repeats included, so posting there unconditionally puts one event on the
+ * storage queue per press. That queue holds 16, queue_post() wraps silently
+ * when it is full, and KERNEL_ASSERT is compiled out of a release build, so a
+ * burst quietly overwrites unread events -- SYS_USB_CONNECTED among them.
  *
- * Posting on the transition is also what the event means: pre-waking storage
- * while the backlight is already on asks for something that was asked for when
- * it came on. Read and written from both the backlight thread and the tick, so
- * volatile; the worst a race can do is one extra post, which the handler
- * already treats as idempotent. */
+ * Read and written from both the backlight thread and the tick, so volatile;
+ * the worst a race can do is one extra post, which the handler treats as
+ * idempotent. */
 static volatile bool ssd_wants_prewake;
 
 static inline void do_backlight_off(void)

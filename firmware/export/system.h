@@ -40,8 +40,11 @@ extern void system_init(void);
 
 extern long cpu_frequency;
 
+/* The 6G keeps logf for its log viewer, which does not show the boost log:
+ * outside a debug build that log is 16 KB of .bss nothing reads. */
 #if defined(HAVE_ADJUSTABLE_CPU_FREQ) \
-        && defined(ROCKBOX_HAS_LOGF) && (NUM_CORES == 1)
+        && defined(ROCKBOX_HAS_LOGF) && (NUM_CORES == 1) \
+        && (defined(DEBUG) || !defined(IPOD_6G))
 #define CPU_BOOST_LOGGING
 #endif
 

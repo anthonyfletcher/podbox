@@ -76,6 +76,14 @@ static void piezo_click_off(void)
     click_timer = false;
 }
 
+/* Another owner has taken the timer, so piezo_click_off() will never run. */
+static void piezo_click_lost(void)
+{
+    piezo_hw_stop();
+    beeping = false;
+    click_timer = false;
+}
+
 static void piezo_click_cancel(void)
 {
     int oldlevel = disable_irq_save();
@@ -117,14 +125,16 @@ static void piezo_thread(void)
             case Q_PIEZO_BEEP_FOR_USEC:
                 piezo_hw_tick((unsigned int)ev.data);
                 beeping = true;
-                if (timer_register(1, NULL,
+                /* Priority 0, the backlight fade's, so a click cannot take
+                 * the timer from a fade and cut it short. */
+                if (timer_register(0, piezo_click_lost,
                                    (long)duration * (TIMER_FREQ / 1000000),
                                    piezo_click_off IF_COP(, CPU)))
                 {
                     click_timer = true;
                     break;
                 }
-                /* The timer is taken: wait the click out as before. */
+                /* The timer is taken: wait the click out here. */
                 piezo_usec_off = USEC_TIMER + duration;
                 while (TIME_BEFORE(USEC_TIMER, piezo_usec_off))
                     if (duration >= 5000) yield();

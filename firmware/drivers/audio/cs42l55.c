@@ -144,16 +144,6 @@ void audiohw_enable_lineout(bool enable)
                         PWRCTL2_PDN_LINA_ALWAYS | PWRCTL2_PDN_LINB_ALWAYS);
 }
 
-void audiohw_set_hp_power(bool enable)
-{
-    if (enable)
-        cscodec_setbits(PWRCTL2, PWRCTL2_PDN_HPA_MASK | PWRCTL2_PDN_HPB_MASK,
-                        PWRCTL2_PDN_HPA_NEVER | PWRCTL2_PDN_HPB_NEVER);
-    else
-        cscodec_setbits(PWRCTL2, PWRCTL2_PDN_HPA_MASK | PWRCTL2_PDN_HPB_MASK,
-                        PWRCTL2_PDN_HPA_ALWAYS | PWRCTL2_PDN_HPB_ALWAYS);
-}
-
 void audiohw_idle_powerdown(void)
 {
     audiohw_mute(true);

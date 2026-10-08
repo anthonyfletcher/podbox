@@ -85,13 +85,13 @@ extern int rec_hw_ver;   /* capture hardware version, gpio-s5l8702.c */
  * reads at the 10ms button tick) still accepts the click. */
 #define MIKEY_CLICK_POLLS   2
 
-/* Center-button handling: click-only. reg4's rising edge is always
- * immediate, but after ~5s of button inactivity the chip's event engine
- * naps and reports the release (reg4 fall, reg6 events) ~1.8s late, so
- * the press duration is unreliable. Every press is therefore reported
- * as a fixed-length click at the rise; there is no hold/long-press. A
- * release must be seen for several consecutive polls before a new rise
- * counts, so bounce or an I2C NAK can't double-fire a click. */
+/* Center-button handling: click-only. Every press is reported as a
+ * fixed-length click at reg4's rise, so there is no hold or long-press and
+ * the release time is never used. Upstream records the release arriving
+ * ~1.8s late after ~5s of inactivity; a 7G trace shows every edge prompt,
+ * so that delay is unconfirmed. A release must be seen for several
+ * consecutive polls before a new rise counts, so bounce or an I2C NAK can't
+ * double-fire a click. */
 #define MIKEY_CENTER_PULSE_POLLS  3     /* reported click length */
 /* Release debounce. The two clicks of a double land about 90ms apart, so
  * this has to stay well under that or the second rise is swallowed. */
@@ -207,6 +207,7 @@ static void mikey_decode_vol(unsigned char evt, unsigned char dn,
 /* A generic headset names its button 30-60ms after release; see
  * mikey_line_gate(). */
 #define MIKEY_LINE_WINDOW   (HZ*15/100)
+#define MIKEY_LINE_OWED     4       /* released holds still to be named */
 
 /* Per-poll decode state, kept apart from the thread's power/mode
  * bookkeeping so the register-to-button logic is a pure function of
@@ -227,7 +228,10 @@ struct mikey_decode {
     bool line_window;    /* a hold, or MIKEY_LINE_WINDOW after one */
     long line_until;     /* when that window closes */
     bool line_center;    /* the hold was the centre button */
-    bool line_used;      /* its one volume step has been given */
+    bool line_named;     /* this hold's name has already arrived */
+    bool line_tail;      /* the next lone release edge ends a pair */
+    int owed;            /* released holds whose name is still to come */
+    unsigned owed_center; /* bit i: owed hold i, oldest first, was centre */
 };
 
 /* The edge state only. A re-arm or a stray NAK drops this, because both
@@ -243,7 +247,9 @@ static void mikey_decode_reset(struct mikey_decode *d)
     d->up_suppressed = d->dn_suppressed = false;
     d->center_down = false;
     d->center_off = MIKEY_CENTER_OFF_POLLS;
-    d->line_held = d->line_window = false;
+    d->line_held = d->line_window = d->line_tail = false;
+    d->owed = 0;
+    d->owed_center = 0;
 }
 
 /* The click state, dropped only when the jack empties. */
@@ -277,8 +283,10 @@ static unsigned char mikey_vol_gate(struct mikey_decode *d, unsigned char evt,
  * names the button only after release, as a volume press+release pair in
  * reg5 -- and its centre button gets a false pair, in either direction. So
  * from the start of such a hold until MIKEY_LINE_WINDOW after it, reg5's
- * volume bits are replaced: the first event after an up or down becomes
- * one press+release of that button, and everything else is dropped. Apple
+ * volume bits are replaced: each pair names the oldest released hold still
+ * unnamed and becomes one press+release of that button, or nothing for the
+ * centre. A name can arrive after the next tap has begun, so names are
+ * matched to holds in order rather than to the hold in progress. Apple
  * volume buttons never set MIKEY_BTN_LINE, so their events pass through
  * and a held button still ramps. On a generic headset every press is one
  * step: the chip says which button only once it has been let go. */
@@ -290,7 +298,7 @@ static unsigned char mikey_line_gate(struct mikey_decode *d,
         if (!d->line_held)
         {
             d->line_center = false;
-            d->line_used = false;
+            d->line_named = false;
         }
         if (btn & MIKEY_BTN_CENTER)
             d->line_center = true;
@@ -300,29 +308,60 @@ static unsigned char mikey_line_gate(struct mikey_decode *d,
     }
     else
     {
+        if (d->line_held && !d->line_named && d->owed < MIKEY_LINE_OWED)
+        {
+            d->owed_center &= ~(1u << d->owed);
+            d->owed_center |= (unsigned)d->line_center << d->owed;
+            d->owed++;
+        }
         d->line_held = false;
         if (d->line_window && TIME_AFTER(current_tick, d->line_until))
-            d->line_window = false;
+        {
+            d->line_window = d->line_tail = false;
+            d->owed = 0;
+        }
     }
 
     if (!d->line_window)
         return evt;
 
     unsigned char vol = evt & (MIKEY_EVT_VOLUP | MIKEY_EVT_VOLDN);
+    bool center;
+
     evt &= ~vol;
-    if (vol && !d->line_center && !d->line_used)
+    if (!vol)
+        return evt;
+    if (d->line_tail &&
+        !(vol & (MIKEY_EVT_VOLUP_DN | MIKEY_EVT_VOLDN_DN)))
     {
-        d->line_used = true;
-        evt |= (vol & MIKEY_EVT_VOLUP) ? MIKEY_EVT_VOLUP : MIKEY_EVT_VOLDN;
+        d->line_tail = false;           /* the second half of a named pair */
+        return evt;
     }
+    d->line_tail = !(vol & (MIKEY_EVT_VOLUP_UP | MIKEY_EVT_VOLDN_UP));
+
+    if (d->owed > 0)
+    {
+        center = d->owed_center & 1;
+        d->owed_center >>= 1;
+        d->owed--;
+    }
+    else if (d->line_held && !d->line_named)
+    {
+        center = d->line_center;
+        d->line_named = true;
+    }
+    else
+        return evt;
+
+    if (!center)
+        evt |= (vol & MIKEY_EVT_VOLUP) ? MIKEY_EVT_VOLUP : MIKEY_EVT_VOLDN;
     return evt;
 }
 
-/* Decode one poll's register pair into a button mask. Volume is NOT
- * gated on the reg4 identified-remote bit: that bit proved to be
- * unit-dependent (reliably latched on one 6G, never seen on two other
- * 120GB units where gating on it broke volume entirely), so it is
- * only surfaced in the hardware debug screen for now. */
+/* Decode one poll's register pair into a button mask. Volume is not gated
+ * on reg4's what-is-plugged-in bits: they differ between units and can
+ * drop mid-session, and gating on them silences volume wherever they read
+ * zero. The hardware debug screen shows them. */
 static int mikey_decode_poll(struct mikey_decode *d,
                              unsigned char btn, unsigned char evt)
 {

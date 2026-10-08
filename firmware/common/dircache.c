@@ -2871,6 +2871,7 @@ int dircache_foreach_name(bool (*cb)(const char *name, int idx,
 ssize_t dircache_get_index_path(int idx, char *buf, size_t size)
 {
     ssize_t rc;
+    struct dircache_entry *ce;
 
     if (!buf)
         size = 0;
@@ -2881,6 +2882,8 @@ ssize_t dircache_get_index_path(int idx, char *buf, size_t size)
 
     if (!dircache_runinfo.handle)
         rc = -2;
+    else if (idx > 0 && (!(ce = get_entry(idx)) || !ce->serialnum))
+        rc = -1; /* out of range, or a freed entry */
     else
     {
         struct get_path_sub_data data =

@@ -65,6 +65,14 @@
 #define MP4_mp4a FOURCC('m', 'p', '4', 'a')
 #define MP4_soun FOURCC('s', 'o', 'u', 'n')
 #define MP4_vide FOURCC('v', 'i', 'd', 'e')
+#define MP4_avc1 FOURCC('a', 'v', 'c', '1')
+#define MP4_avc3 FOURCC('a', 'v', 'c', '3')
+#define MP4_hvc1 FOURCC('h', 'v', 'c', '1')
+#define MP4_hev1 FOURCC('h', 'e', 'v', '1')
+#define MP4_mp4v FOURCC('m', 'p', '4', 'v')
+#define MP4_av01 FOURCC('a', 'v', '0', '1')
+#define MP4_vp09 FOURCC('v', 'p', '0', '9')
+#define MP4_encv FOURCC('e', 'n', 'c', 'v')
 #define MP4_stbl FOURCC('s', 't', 'b', 'l')
 #define MP4_stsd FOURCC('s', 't', 's', 'd')
 #define MP4_stts FOURCC('s', 't', 't', 's')
@@ -605,6 +613,47 @@ static bool read_mp4_tags(int fd, struct mp3entry* id3,
     return true;
 }
 
+/* Whether a 'vide' track's minf describes moving video, judged by its first
+ * sample entry. Chapter pictures and cover tracks are 'vide' tracks too, of
+ * still images ('jpeg', 'png '), and must not keep a file out of the
+ * database. Leaves fd at the end of the minf. */
+static bool read_mp4_video_minf(int fd, uint32_t size_left)
+{
+    off_t end = lseek(fd, 0, SEEK_CUR) + size_left;
+    uint32_t size;
+    uint32_t type;
+    uint32_t entry = 0;
+
+    while (size_left > 0 && errno == 0)
+    {
+        type = 0;   /* a short read must not repeat the last type */
+        size_left = read_mp4_atom(fd, &size, &type, size_left);
+        if (type == MP4_stbl)
+        {
+            size_left = size;   /* descend */
+        }
+        else if (type == MP4_stsd)
+        {
+            /* version, flags and entry count, then the first entry */
+            if (size >= 16)
+            {
+                lseek(fd, 8, SEEK_CUR);
+                read_mp4_atom(fd, &size, &entry, size - 8);
+            }
+            break;
+        }
+        else
+        {
+            lseek(fd, size, SEEK_CUR);
+        }
+    }
+
+    lseek(fd, end, SEEK_SET);
+    return entry == MP4_avc1 || entry == MP4_avc3 || entry == MP4_hvc1
+        || entry == MP4_hev1 || entry == MP4_mp4v || entry == MP4_av01
+        || entry == MP4_vp09 || entry == MP4_encv;
+}
+
 static bool read_mp4_container(int fd, struct mp3entry* id3,
                                uint32_t size_left)
 {
@@ -664,6 +713,12 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
                 rc = read_mp4_container(fd, id3, size);
                 size = 0;
             }
+            else if (handler == MP4_vide)
+            {
+                if (read_mp4_video_minf(fd, size))
+                    id3->has_video = true;
+                size = 0;
+            }
             break;
 
         case MP4_stsd:
@@ -677,8 +732,6 @@ static bool read_mp4_container(int fd, struct mp3entry* id3,
             lseek(fd, 8, SEEK_CUR);
             read_uint32be(fd, &handler);
             size -= 12;
-            if (handler == MP4_vide)
-                id3->has_video = true;
             /* DEBUGF("    Handler '%c%c%c%c'\n", handler >> 24 & 0xff,
                 handler >> 16 & 0xff, handler >> 8 & 0xff,handler & 0xff); */
             break;

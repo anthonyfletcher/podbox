@@ -349,6 +349,12 @@ bool pcm_switch_sink(enum pcm_sink_ids sink)
 
     /* save current sink before switching */
     struct pcm_sink* old_sink = sinks[cur_sink];
+    struct pcm_sink* new_sink = sinks[sink];
+
+    /* Both sinks stay locked until the old one has stopped: a buffer either
+     * interrupt took in between would never play. */
+    old_sink->ops.lock();
+    new_sink->ops.lock();
 
     /* update sink index */
     cur_sink = sink;
@@ -368,6 +374,9 @@ bool pcm_switch_sink(enum pcm_sink_ids sink)
             pcm_play_stop_int();
         }
     }
+
+    new_sink->ops.unlock();
+    old_sink->ops.unlock();
 
     return true;
 }
