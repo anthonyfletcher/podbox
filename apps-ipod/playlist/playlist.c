@@ -506,6 +506,7 @@ static void empty_playlist_unlocked(struct playlist_info* playlist, bool resume)
     playlist->last_insert_pos = -1;
 
     playlist->started = false;
+    playlist->changes++;
 
     if (!resume && playlist == &current_playlist)
     {
@@ -799,6 +800,7 @@ static int add_indices_to_playlist(struct playlist_info* playlist,
     }
 
 exit:
+    playlist->changes++;
     playlist_write_unlock(playlist);
     return result;
 }
@@ -1200,6 +1202,7 @@ static int remove_all_tracks_unlocked(struct playlist_info *playlist)
     playlist->first_index = 0;
     playlist->index = 0;
     playlist->amount = 1;
+    playlist->changes++;
     if (playlist == &current_playlist)
         iap_on_tracks_count(playlist->amount);
     playlist->indices[0] |= PLAYLIST_QUEUED;
@@ -1414,6 +1417,7 @@ static int add_track_to_playlist_unlocked(struct playlist_info* playlist,
     dc_init_filerefs(playlist, insert_position, 1);
 
     playlist->amount++;
+    playlist->changes++;
     if (playlist == &current_playlist)
         iap_on_tracks_count(playlist->amount);
 
@@ -1457,6 +1461,7 @@ static int remove_track_unlocked(struct playlist_info* playlist,
     }
 
     playlist->amount--;
+    playlist->changes++;
 
     /* update stored indices if needed */
     if (position < playlist->index)
@@ -1551,6 +1556,7 @@ static int randomise_playlist_unlocked(struct playlist_info* playlist,
     playlist->last_insert_pos = -1;
 
     playlist->seed = seed;
+    playlist->changes++;
 
     if (write)
     {
@@ -1612,6 +1618,7 @@ static int sort_playlist_unlocked(struct playlist_info* playlist,
 
     /* indices have been moved so last insert position is no longer valid */
     playlist->last_insert_pos = -1;
+    playlist->changes++;
 
     if (write && playlist->control_fd >= 0)
     {
@@ -3833,6 +3840,7 @@ int playlist_set_current(struct playlist_info* playlist)
     current_playlist.last_insert_pos = playlist->last_insert_pos;
     current_playlist.seed = playlist->seed;
     current_playlist.flags = playlist->flags;
+    current_playlist.changes++;
 
     result = 0;
 
@@ -4215,6 +4223,7 @@ static int pl_save_update_control(struct playlist_info* playlist,
         playlist->index = rotate_index(playlist, playlist->index);
         playlist->last_insert_pos = rotate_index(playlist, playlist->last_insert_pos);
         playlist->first_index = 0;
+        playlist->changes++;
     }
 
     for (int index = 0; index < playlist->amount; ++index)

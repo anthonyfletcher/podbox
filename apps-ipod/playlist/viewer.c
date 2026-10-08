@@ -118,9 +118,7 @@ struct playlist_viewer {
     unsigned long loading_tick; /* when to next splash while entries load    */
     bool is_open;               /* false until the viewer is on screen       */
     /* The playlist the buffer was loaded from; see playlist_changed()       */
-    unsigned long loaded_tick;
-    int loaded_amount;
-    int loaded_seed;
+    unsigned int loaded_changes;
 };
 
 struct playlist_search_data
@@ -136,22 +134,19 @@ static void note_playlist(void)
     const struct playlist_info *pl = viewer.playlist ? viewer.playlist
                                                      : playlist_get_current();
 
-    viewer.loaded_tick = pl->created_tick;
-    viewer.loaded_amount = pl->amount;
-    viewer.loaded_seed = pl->seed;
+    viewer.loaded_changes = pl->changes;
 }
 
 /* An index the viewer holds is good only for the playlist it was loaded from,
- * which another thread can shuffle or replace -- the car, or an iAP Queue.
+ * which another thread can move, shuffle or replace tracks in -- the car, or
+ * an iAP Queue.
  * Checked before acting on one. A changed playlist cancels a move. */
 static bool playlist_changed(void)
 {
     const struct playlist_info *pl = viewer.playlist ? viewer.playlist
                                                      : playlist_get_current();
 
-    if (pl->created_tick == viewer.loaded_tick
-        && pl->amount == viewer.loaded_amount
-        && pl->seed == viewer.loaded_seed)
+    if (pl->changes == viewer.loaded_changes)
         return false;
     viewer.moving_track = -1;
     viewer.moving_playlist_index = -1;

@@ -62,6 +62,9 @@ struct playlist_info
     /* stamped on creation; part of the signature %pX uses to notice that the
      * playlist it measured has been replaced */
     unsigned long created_tick;
+    /* bumped under the lock once any change to the track order or contents
+     * is complete, so a holder of an index can tell it has gone stale */
+    unsigned int changes;
     bool utf8;           /* playlist is in .m3u8 format             */
     bool control_created; /* has control file been created?         */
     unsigned int flags;  /* flags for misc. state */
