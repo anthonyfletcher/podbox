@@ -13,8 +13,8 @@ Bands whose gain is exactly zero are skipped entirely (lib/rbcodec/dsp/eq.c,
 dsp_set_eq_coefs), so the cost already scales with bands actually used. This
 script takes an existing preset, measures the frequency response it produces,
 and searches for the smallest set of bands that reproduces that response to
-within a stated tolerance in dB. Broad, smooth curves -- which is what all the
-shipped presets are -- fit comfortably in three or four bands.
+within a stated tolerance in dB. Broad, smooth curves -- which is what most
+presets are -- fit comfortably in three or four bands.
 
 The filter math below mirrors lib/rbcodec/dsp/dsp_filter.c, which implements
 the Robert Bristow-Johnson Audio EQ Cookbook formulas in fixed point:
@@ -39,7 +39,7 @@ the rate it was fitted for; 44.1 kHz is the default and covers most material.
 
 Usage:
 ```
-py tools/eq_refit.py mypreset.cfg
-py tools/eq_refit.py presets/*.cfg --out-dir refitted
-py tools/eq_refit.py mypreset.cfg --bands 3 --quiet
+py tools/eq_refit/eq_refit.py mypreset.cfg
+py tools/eq_refit/eq_refit.py presets/*.cfg --out-dir refitted
+py tools/eq_refit/eq_refit.py mypreset.cfg --bands 3 --quiet
 ```

@@ -392,6 +392,9 @@ corrects the delay below the player's own buffer -- headphones and the codec
 Records what was played and when. On feeds the listening statistics; the
 Last.fm setting writes a scrobble log a computer can upload.
 
+In Last.fm mode the Playback Report reads that log, so an uploader that empties
+it after sending also restarts the Report's totals and streaks.
+
 [scan min step]
 How far the first press of fast forward or rewind moves. Smaller is better for
 finding a moment in a song, larger for crossing a long file.
@@ -646,7 +649,8 @@ decade.
 Restricts scanning to chosen folders, so spoken-word or sample libraries stay
 out of the music database.
 
-Changing it is best followed by a rebuild, or entries from the old set linger.
+The next update removes the tracks that are now outside the chosen folders, or
+inside a folder holding a database.ignore file.
 
 [year from folder]
 Takes the year from the track's folder when its name starts with one, as in
@@ -901,6 +905,19 @@ Whether the status bar shows the volume as a bar or as a number.
 [battery display]
 Whether the status bar shows the battery as an icon or as a percentage.
 
+[show disk activity]
+Lets the theme show an indicator while the disk is being read or written.
+While music plays the disk is read often enough to keep it on, and every frame
+it animates repaints the status bar, which slows the screen underneath.
+
+[show background tasks]
+Lets the theme show an indicator while the database, the artwork cache or the
+document index is being built in the background.
+
+[show working]
+Lets the theme show an indicator while the screen is busy loading something
+it was asked for.
+
 [show icons]
 Draws an icon beside each row in lists and menus. Turning them off gives the
 text more room.
@@ -1123,6 +1140,11 @@ How long it takes to go down. A slow fade is gentler in the dark.
 The press that wakes the screen does nothing else, so you cannot change a
 setting you could not see. Costs one extra press each time.
 
+[No Backlight On Selected Actions]
+Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume
+on the Now Playing screen and main menu -- work without lighting the screen.
+Saves battery when you control playback blind.
+
 [lcd sleep after backlight off]
 Powers the panel down entirely a while after the backlight goes out. Saves more
 than the backlight alone, and costs a moment to wake.
@@ -1326,6 +1348,10 @@ speaking its name.
 [talk filetype]
 Speaks the file's type along with its name.
 
+[Announce Battery Level]
+Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs
+a voice file on the player.
+
 [talk mixer level]
 How loud speech is relative to the music underneath it.
 
@@ -1366,8 +1392,7 @@ How much of the album or artist you are standing on has been heard, and which
 of its tracks have not. An artist lists their albums with a figure each;
 opening one of those shows the tracks still unplayed.
 
-The figures are the database's own play counts, so this needs Gather Runtime
-Data switched on and knows nothing about plays from before it was.
+The figures are the database's own play counts.
 
 [action: Update Art Cache]
 Generates thumbnails for artwork that does not have one yet, and redoes any
@@ -1606,7 +1631,7 @@ Chooses which folders the database reads when it scans.
 
 Leaving out folders of podcasts or audiobooks keeps them out of the album and
 artist lists while still letting you play them from Files. Changing this offers
-a rebuild, because the database has to be built again to honour it.
+a rebuild; the next update honours it too.
 
 [action: Export Modifications]
 Writes play counts, ratings and last-played times to

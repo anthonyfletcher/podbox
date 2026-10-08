@@ -215,7 +215,9 @@ to it. A lone trailing argument (odd one out) is the default when nothing
 matches; with no default and no match, `%sel` produces nothing.
 
 Keys and values may each be a literal, a number, or a tag. `%sel` can be nested
-(a value may itself be a `%sel`).
+(a value may itself be a `%sel`). Nesting `%sel` and the other tags here that
+take a tag as an argument (such as `%sf`, `%pd`, `%trm`, `%ma`, `%wr`) stops at five
+levels deep: a tag below that produces nothing.
 
 ```
 # Map a list title to an icon glyph, falling back to 'x'.
@@ -672,7 +674,7 @@ into one lookup table and all the colour ones into one matrix, so
 cheapest chain that touches every pixel, not the dearest, because it works on a
 decimated copy and the later stages fold into its upscale.
 
-Three things worth knowing before building a theme around it:
+Four things worth knowing before building a theme around it:
 
 - **The work happens once per cover**, not per frame, so a blurred backdrop is
   free to draw. It runs when the artwork is loaded and is cached until it is
@@ -684,6 +686,10 @@ Three things worth knowing before building a theme around it:
 - **Dynamic colours read the unfiltered art**, so a `bw` chain greys the artwork
   you draw and leaves the derived colours alone. The palette describes the
   album, not your treatment of it.
+- **A chain without `blur` costs a buffered cover of its own.** It filters
+  that cover in place, so it shares it only with `%Cl` tags of the same size
+  and the same chain. Each different treatment counts as another size against
+  the limit in the next section.
 
 ### Rounded corners
 

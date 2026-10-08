@@ -386,8 +386,9 @@ Touch all five, in this order:
 1. `apps-ipod/settings/settings_list.c` -- the setting itself, and its cfg name.
 2. `apps-ipod/lang/english.lang` -- the name shown on screen.
 3. `apps-ipod/settings/settings_tags.c` -- the topic it is about, and whether
-   it is advanced. **Untagged means unfindable**: Search skips it, and the
-   completeness check below goes blind to it.
+   it is advanced. **Untagged means half-findable**: Search still matches
+   its name, but never its topic, and the completeness check below goes
+   blind to it.
 4. `docs/podbox/settings-help.txt` -- the **Explain** text, keyed by cfg name.
 5. `docs/podbox/settings-guide.md` -- one table row, in the section for the
    screen the setting sits on, in menu order.

@@ -18,8 +18,9 @@ nothing for those.
 
 `apps/`, `manual/`, `android/`, `backdrops/`, `screenshots/` and every
 unconverted `themes/` entry are upstream-identical and unbuilt, kept so merges
-apply without delete/modify conflicts. `uisimulator/` is upstream-identical and
-built. The `firmware/` changes are RockPod's hardware work and this fork's USB
+apply without delete/modify conflicts. `uisimulator/` is built, and
+upstream-identical apart from the `--screenshot` argument (see *The
+simulator*). The `firmware/` changes are RockPod's hardware work and this fork's USB
 work; the `tools/` changes are this fork's.
 
 ---
@@ -30,6 +31,7 @@ work; the `tools/` changes are this fork's.
 | --- | --- | --- |
 | `backlight.c` | `#include "../apps/gui/skin_engine/skin_engine.h"` → `"gui/skin_engine/skin_engine.h"` | Upstream's relative path lands in the unbuilt `apps/`. This resolves through the `apps-ipod/api/` stub. |
 | `backlight.c` | Backlight off calls `storage_sleep()`; both wake paths post `Q_STORAGE_PRE_WAKE` | The SSD sleeps with the backlight, and starts waking before the UI has handled the button. Only under `storage_get_ssd_mode()`. |
+| `backlight.c` | The fade registers the user timer at priority 1, not 0 | Above the 5G's wheel click (`piezo.c`), which gives the timer up instead of switching the backlight straight on or off. |
 | `backlight.c` | `power_input_present()` → `charger_inserted()` in `backlight_get_current_timeout()` | A data-only USB port should not get the plugged-in timeout. |
 | `drivers/ata.c`, `export/ata.h` | New `ata_set_storage_mode(int)` / `ata_get_ssd_mode()` (0 auto, 1 HDD, 2 SSD). In SSD mode `ata_sleepnow()` does not arm `power_off_tick` | The 5G's generic driver powered the interface off after seven idle seconds, and waking it costs ~780 ms. See *SSD mode* below. |
 | `export/storage.h`, `storage.c` | `Q_STORAGE_PRE_WAKE`, stubs and dispatch for the two calls above | Reaches SSD mode through the generic `storage_*` interface. |
@@ -44,7 +46,9 @@ work; the `tools/` changes are this fork's.
 | `drivers/lcd-16bit-common.c` | `lcd_alpha_bitmap_part_mix()`'s `DRMODE_FG` case skips fully transparent pixels | Every anti-aliased glyph gets cheaper. The local must not be named `alpha`, which `READ_ALPHA()` uses. |
 | `drivers/rtc/rtc_pcf50605.c` | Alarm code wrapped in `#ifdef HAVE_RTC_ALARM` | The 5G undefines it, and this was the one RTC driver without the guard. |
 | `export/system.h`, `target/arm/pp/debug-pp.c` | New `dbg_hw_info_lines()` for `IPOD_6G` and `IPOD_VIDEO`; `debug-pp.c`'s `dbg_hw_info()` becomes it | Hardware info as a themed list. `debug-pp.c` is shared by every PP target, and the others now have no `dbg_hw_info()`. |
-| `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()`, `dircache_get_index_path()` | Whole-player search from the cache. The sweep takes the filesystem lock as **reader**, so audio buffering is not held off, and `dircache_is_ready()` reads unlocked so it does not wait out a scan. |
+| `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()`, `dircache_get_index_path()` | Whole-player search from the cache. The sweep takes the filesystem lock as **reader**, so audio buffering is not held off, and `dircache_is_ready()` reads unlocked so it does not wait out a scan. `dircache_get_index_path()` returns -1 for an out-of-range or freed index, which a caller holding one across a rebuild can have. |
+| `target/arm/ipod/piezo.c` | A timed click (`Q_PIEZO_BEEP_FOR_USEC`) is ended by the user timer (`timer_register()`); the old busy-wait stays as the fallback when the timer is taken. Registered at priority 0, with an unregister callback that ends the click | The 5G's wheel click spun the real-time piezo thread for 4 ms a click, which nothing else could use while scrolling. The 6G's driver already ends its click from a timer interrupt. A click must not take the timer from a backlight fade. |
+| `pcm.c` | `pcm_switch_sink()` locks both the old and the new sink across the swap, the frequency change and the stop/restart | Neither sink's interrupt takes a mixer buffer mid-switch that never plays; the fork's USB host sink made the window reachable. Upstream bug, not yet reported upstream. |
 
 ## firmware/ — USB, device side
 
@@ -64,6 +68,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | File | What changed | Why |
 | --- | --- | --- |
 | `usbstack/usb_storage.c`, `.h`; `usbstack/usb_core.c`; `export/usb_core.h` | `host_wrote`, set by `WRITE_10`/`WRITE_16`, reached as `usb_core_host_wrote_storage()` | The app layer skips the database and dircache rebuild after a host that only read. Windows disconnects and reconnects on every connect. |
+| `usbstack/usb_storage.c` | `host_wrote` is cleared once per cable insertion, not per `SET_CONFIGURATION` | A host that re-enumerates after writing the firmware still gets the reboot prompt at unplug. |
 | `usbstack/usb_storage.c` | The LUN is bounds-checked; `set_transfer_range()` makes the LBA arithmetic overflow-safe; a zero `block_size_mult` is refused | Host-supplied values upstream uses unchecked. |
 | `usbstack/usb_storage.c`, `usb.c`, `export/usb.h` | Ejecting every drive gives the disk back to the player (`usb_storage_ejected()`) until unplug; the drive then answers "medium not present" without waiting for storage, and `usb_host_is_present()` turns false | The player is usable while it charges from the computer, as Apple's firmware is. Upstream records the eject and keeps the disk until the cable is pulled. |
 
@@ -83,6 +88,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | `usbstack/usb_audio.c` | The receive ring is full one slot early and always re-arms; a bad packet is dropped and the endpoint re-armed | Upstream stops receiving when the ring fills. |
 | `usbstack/usb_audio.c` | The receive buffer is cache-line aligned and read through `UNCACHED_ADDR` | On the 5G a cached read plays as silence. |
 | `usbstack/usb_audio.c` | An unanswered endpoint request is stalled | Upstream leaves the host waiting. |
+| `usbstack/usb_audio.c` | `start_mixer()` powers the CS42L55 up (6G) | `pcmbuf_play_stop()` powers the codec down, and a USB connect stops playback, so the sound card otherwise plays into a powered-down codec. |
 | `usbstack/usb_core.c` | `driver_rank()` / `driver_to_leave_out()`: short of endpoints, HID goes first, then the sound card, then the disk | Upstream can leave out the disk on the 5G's four endpoints. |
 | `usbstack/usb_core.c`, `export/config/ipod6g.h` | Product ID `USB_PRODUCT_ID_AUDIO` (0x1209) while the sound card is on | iTunes' driver claims the 6G's own ID and passes on only the disk. |
 | `usb.c` | The audio driver is enabled whenever the setting is on, in both USB modes | The setting is off/on here. |
@@ -95,12 +101,12 @@ Upstream's libiap, on both players. An Onkyo ND-S1 plays both over S/PDIF.
 | File | What changed | Why |
 | --- | --- | --- |
 | `usb.c`, `export/usb.h` | New `usb_set_iap(bool)`; the iAP driver is enabled on `USB_INSERTED` only while it is on | The **Accessory Protocol** setting, which takes effect at the next connection. Off also gives a computer the disk whatever **iAP2 Accessories** says. |
-| `usbstack/iap/platform.c`, `platform.h` | Broadcasts `SYS_ACCESSORY_CONNECTED` once the sample rates are accepted; answers libiap's four database callbacks from `iap_library.h`, and holds a play back while that library builds the Queue | The "Accessory connected" splash, and browsing the library from an accessory. |
+| `usbstack/iap/platform.c`, `platform.h` | Broadcasts `SYS_ACCESSORY_CONNECTED` once the sample rates are accepted; answers libiap's four database callbacks from `iap_library.h`, and holds a play back while that library builds the Queue; refuses a shuffle change while the Music Quiz has the playlist (`iap_library_queue_lent()`) | The "Accessory connected" splash, and browsing the library from an accessory. |
 | `usbstack/iap/libiap/iap.c`, `context.h`, `platform.h`, `spec/lingoes/extended-interface/database.h` | The database commands go to four new platform callbacks; Enter/ExitExtendedInterfaceMode are acked | Upstream answers them with fixed counts, so there is nothing to browse. Onkyo receivers retry the mode commands until acked. |
 | `usbstack/iap/libiap/iap.c`, `fid-token-values.c`, `spec/lingoes/general/identify-device-lingoes.h` | The identify options are compared under a new `AuthMask`, bits 1:0 | Bits 3:2 are the accessory's power requirement. Upstream compares the whole word, so a dock asking for authentication and power is acked and never authenticated. |
 | `usbstack/iap/libiap/iap.c`, `context.h` | Authentication 1.0: a version-only certificate reply is accepted and answered with a 16-byte challenge; any version but 1 or 2 is answered *unsupported* | Upstream reads every reply as 2.0, so a 1.0 accessory is refused and authentication stops. |
 | `usbstack/usb_core.c` | Manufacturer and product strings `PodBox` and `PodBox media player` | The name a computer shows. iAP's name comes from `/.rockbox/library/user/player_name.txt`, which the app layer keeps set. |
-| `usbstack/usb_iap.c` | While iAP2 is offered, the stream lists an iPhone's nine rates; reports, ticks and send completions go to `usb_iap2_*` first; `iap_library_close()` on disconnect; a disconnect pauses playback only if the iAP sink had it | An iAP2 car names rates as indexes into an iPhone's list. An accessory that never took the audio, such as the connection dropped to come back without the sound card, leaves playback alone. |
+| `usbstack/usb_iap.c` | While iAP2 is offered, the stream lists an iPhone's nine rates; reports, ticks and send completions go to `usb_iap2_*` first; claims the iAP library on connect and lets its claim go on disconnect (`iap_library_claim`/`iap_library_close(IAP_LIBRARY_USB)`), since the dock's serial line may still be using the lists; a disconnect pauses playback only if the iAP sink had it | An iAP2 car names rates as indexes into an iPhone's list. An accessory that never took the audio, such as the connection dropped to come back without the sound card, leaves playback alone. |
 | `usbstack/iap/audio.c`, `audio.h` | A rate change goes to iAP2 while it holds the connection; new `iap_audio_sampr()`; the stream's state goes to the USB log; new `iap_audio_take_counts()`, what the stream took from playback | The counters are logged every 5 s while a car takes the audio. |
 
 ### USB iAP2
@@ -134,11 +140,12 @@ no VBUS.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_host.c` (new) | Enumeration over `usb_drv_host_control()` | Root port only; no hubs. |
+| `usbstack/usb_host.c` (new) | Enumeration over `usb_drv_host_control()`; the SET_ADDRESS recovery wait sleeps | Root port only; no hubs. |
 | `export/config.h` | `HAVE_USB_HOST` and `HAVE_USB_HOST_AUDIO` for the ARC and DesignWare controllers | Both players get the host probe and the DAC output. |
-| `usbstack/usb_host_audio.c`, `export/usb_host_audio.h` (new) | USB Audio Class 1 and 2 playback as `PCM_SINK_USB_HOST`, 44.1 and 48 kHz, software volume capped at 0 dB | The DAC output. |
-| `usb.c`, `export/usb.h` | The host probe, `USB_HOST_AUTO` and the DAC state calls | **USB DAC Output**. A cable still only powered after 2 s is polled for a DAC, unless a serial iAP accessory is talking, which the search would starve on the 5G. |
-| `export/usb_drv.h` | The host API | Implemented by both controller drivers. |
+| `usbstack/usb_host_audio.c`, `export/usb_host_audio.h` (new) | USB Audio Class 1 and 2 playback as `PCM_SINK_USB_HOST`, 44.1 and 48 kHz, software volume capped at 0 dB; a setting whose packets do not fit the controller is passed over, and "too many channels" reported when none fits | The DAC output. |
+| `export/usb_drv.h`, `target/arm/usb-drv-arc.c`, `drivers/usb-designware.c` | `usb_drv_host_iso_max_packet()`; the ARC driver carries owed samples over between packets | The 5G's high-speed microframe holds 64 bytes, so a wide setting cannot keep up there. |
+| `usb.c`, `export/usb.h` | The host probe, `USB_HOST_AUTO` and the DAC state calls | **USB DAC Output**. A cable still only powered after 2 s is polled for a DAC, unless a serial iAP accessory is talking, which the search would starve on the 5G. **Turn On** refuses while a host answers or a serial accessory is present. |
+| `export/usb_drv.h` | The host API | Implemented by both controller drivers. The host calls take a lock and may sleep, so they must run in a thread. |
 | `export/pcm_sink.h`, `pcm.c` | `PCM_SINK_USB_HOST` registered | `PCM_SINK_NUM` is 3 on both targets. |
 | `kernel/include/queue.h` | `SYS_USB_DAC_ON` / `_OFF` (plug events 8, 9) and `SYS_ACCESSORY_CONNECTED` (10) | Past upstream's plug events, which run to 7. |
 | `target/arm/s5l8702/ipod6g/power-6g.c` | Taking the port as host commits 500 mA | At 100 mA the 6G would not charge while playing to a DAC. |
@@ -149,8 +156,8 @@ no VBUS.
 | --- | --- | --- |
 | `target/arm/usb-drv-arc.c` (5G) | `USBCMD_ITC` 1 microframe | Upstream's 8 loses one sound-card packet in eight. |
 | `target/arm/usb-drv-arc.c` | `prime_transfer()`'s timeout reads `USEC_TIMER` | `current_tick` stops with interrupts off. |
-| `target/arm/usb-drv-arc.c` | EHCI host mode, isochronous through the transaction translator; `read_hw_info()`; `usb_log` calls | The 5G's host side. `HWHOST` reports no translator, but full-speed DACs play through one. |
-| `drivers/usb-designware.c` (6G) | Host channels; NYET/NAK handling with PING; one isochronous packet per microframe from the SOF interrupt; hardware info; `usb_log` calls | The 6G's host side. A high-speed DAC is silent without a packet every microframe. |
+| `target/arm/usb-drv-arc.c` | EHCI host mode, isochronous through the transaction translator; `read_hw_info()`; `usb_log` calls; host waits sleep, and the control schedule and the port are serialised by a mutex | The 5G's host side. `HWHOST` reports no translator, but full-speed DACs play through one. Control and port waits yield, so a slow DAC does not stall playback. |
+| `drivers/usb-designware.c` (6G) | Host channels; NYET/NAK handling with PING; one isochronous packet per microframe from the SOF interrupt; hardware info; `usb_log` calls; host-side waits sleep, and channel 0 and the port are serialised by a mutex | The 6G's host side. A high-speed DAC is silent without a packet every microframe. Control and port waits yield, so a slow DAC does not stall playback. |
 | `export/usb-designware.h` | `FHMOD` bit | Forces host mode. |
 | `target/arm/pp/usb-fw-pp502x.c`, `target/arm/s5l8702/usb-s5l8702.c` | New `usb_host_probe_enable()` | Stops device detection while the probe owns the port. |
 
@@ -158,10 +165,9 @@ no VBUS.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `target/arm/s5l8702/ipod6g/storage_ata-6g.c` | SSD storage mode, ~150 lines: clock-gate instead of `STANDBY IMMEDIATE`, deep sleep after 10 s more with the backlight off, eager wake on `ata_spin()` and `Q_STORAGE_PRE_WAKE`, no HDD power/noise features, ranged cache maintenance, auto-detection in `ata_init()` | Flash mods are common on this player, and upstream treats every device as a spinning disk. |
+| `target/arm/s5l8702/ipod6g/storage_ata-6g.c` | SSD storage mode, ~150 lines: clock-gate instead of `STANDBY IMMEDIATE`, deep sleep once the backlight is off, 10 s or more after the clock-gate sleep, eager wake on `ata_spin()` and `Q_STORAGE_PRE_WAKE`, no HDD power/noise features, ranged cache maintenance, auto-detection in `ata_init()`; any power-down or hard reset forces the next power-up to be a full init, so the clock-ungate fast path runs only after a clock-gate sleep | Flash mods are common on this player, and upstream treats every device as a spinning disk. |
 | `target/arm/s5l8702/ipod6g/power-6g.c` | Charger classification, ~100 lines: with the backlight off, charging is disabled unless a charger is confirmed or 500 mA is committed; a 10 ms watch on the charge-status line with the backlight on; an asymmetric 8-sample debounce | Upstream calls any USB insertion a charger, and a source that cannot supply device + charge current oscillates. A configured computer, **USB Charging = Force** and the DAC host all commit 500 mA. |
-| `target/arm/s5l8702/system-s5l8702.c`, `system-target.h` | A 108 MHz level between boost and unboost, selected by `set_ahb_boost(bool)` | For AHB-bound work. Nothing calls it yet. |
-| `drivers/audio/cs42l55.c`, `export/cs42l55.h` | `audiohw_set_hp_power()`, `audiohw_idle_powerdown()`, `audiohw_idle_powerup()` | Idle codec power-down, muted first to avoid a pop. `HPACTL`/`HPBCTL` are left alone. |
+| `drivers/audio/cs42l55.c`, `export/cs42l55.h` | `audiohw_idle_powerdown()`, `audiohw_idle_powerup()` | Idle codec power-down, muted first to avoid a pop. `HPACTL`/`HPBCTL` are left alone. |
 | `target/arm/s5l8702/ipod6g/cscodec-6g.c` | `cscodec_power()` switches LDO 3 | Upstream is a stub. |
 | `target/arm/s5l8702/ipod6g/mikey-6g.c` | `mikey_init()` returns early on `rec_hw_ver == 0` | The 80GB and fat 160GB have no Mikey to poll. |
 | `target/arm/s5l8702/ipod6g/mikey-6g.c`, `mikey-target.h` | New `mikey_probe()` | Returns the I2C status, so the debug screen can tell an empty jack from a missing chip. |
@@ -175,7 +181,7 @@ no VBUS.
 | | `drivers/ata.c` (5G) | `storage_ata-6g.c` (6G) |
 | --- | --- | --- |
 | What SSD mode changes | The interface is never powered off | The first sleep stage gates the clock instead of `STANDBY IMMEDIATE` |
-| Power-off still happens? | No | Yes, 10 s later with the backlight off |
+| Power-off still happens? | No | Yes, once the backlight is off, 10 s or more after it sleeps |
 | Wake cost hidden by | Nothing to hide | `Q_STORAGE_PRE_WAKE` |
 
 `backlight.c` posts `Q_STORAGE_PRE_WAKE` on both targets, and only the 6G
@@ -192,7 +198,8 @@ other decline sits in a file this fork edits, so it conflicts on merge.
 | --- | --- | --- |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | No recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | The core scratch buffer (`apps-ipod/system/app_buffer.c`) keeps the name. |
-| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` for non-bootloader builds | Upstream defines it only in the bootloader block. Raising `MAX_LOGF_SIZE` costs that much `.bss`. |
+| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` for non-bootloader builds | Upstream defines it only in the bootloader block. It feeds **Debug > Log file**; `MAX_LOGF_SIZE` stays upstream's 16 KB. |
+| `export/system.h` | `CPU_BOOST_LOGGING` off on `IPOD_6G` outside a `DEBUG` build | Nothing shows the boost log, which costs 16 KB of `.bss` and a `snprintf` on every boost. |
 | `export/config/ipod6g.h` | `TARGET_EXTRA_THREADS` 2 with both `IPOD_ACCESSORY_PROTOCOL` and `HAVE_MIKEY_REMOTE`, else 1 | Upstream adds the remote's poller without a thread for it. Short by one, the feature is silently absent. `__threads` should measure 19. |
 | `export/config/ipod6g.h` | `HAVE_COMPOSITE_VIDEO_OUT` commented out | Nothing outputs video, and the driver reserves 112.5 KB. `serial-6g.c` and `power-6g.c` test the define. |
 | `export/config/ipodvideo.h` | `HAVE_RECORDING` commented out | As above. |
@@ -207,6 +214,7 @@ Serial iAP is `apps-ipod/iap/`. It reaches two firmware headers:
 | --- | --- | --- |
 | `export/iap.h` | New `iap_enable(bool)` and `iap_accessory_present()` | The serial half of **Accessory Protocol**, and whether frames are arriving, which the DAC search checks. |
 | `target/arm/ipod/button-target.h`, `target/arm/s5l8702/ipod6g/button-target.h` | `BUTTON_REMOTE` includes `BUTTON_RC_MENU`; new `BUTTON_RC_NEXT_ALBUM`, `_PREV_ALBUM`, `_NEXT_PLAYLIST`, `_PREV_PLAYLIST` (0x4000–0x800) | Upstream lists `BUTTON_RC_PLAY` twice and omits Menu. The new codes carry the album and playlist buttons an Onkyo DS-A3 remote sends. |
+| `target/arm/ipod/button-clickwheel.c` | `button_read_device()` lets the inline remote's multimedia code replace the wheel button bits rather than ORing into them | Those codes reuse the wheel's bit values, so SELECT plus the remote read as PLAYPAUSE and PLAY plus the remote as VOLUME_UP. Upstream bug, not yet reported upstream. |
 
 ---
 
@@ -214,11 +222,12 @@ Serial iAP is `apps-ipod/iap/`. It reaches two firmware headers:
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `rbcodec/metadata/mp4.c`, `metadata.h` | `has_video` on `struct mp3entry` | Tagcache skips music videos. |
+| `rbcodec/metadata/mp4.c`, `metadata.h` | `has_video` on `struct mp3entry`, set only when a `vide` track's first sample entry is moving video (`avc1`/`avc3`/`hvc1`/`hev1`/`mp4v`/`av01`/`vp09`/`encv`) | Tagcache skips music videos, but keeps M4B/M4A files whose `vide` tracks hold only chapter pictures or covers. |
 | `rbcodec/metadata/mp4.c` | `chpl`: reads the version-0 header, and takes a lead trim only from a single record | A chapter list whose first chapter starts after 0:00 had that much audio cut from the start of the book. |
 | `skin_parser/tag_table.c` | `find_custom_tag()` declared **weak** and tried **first** in `find_tag()` | Custom tags are registered from the app layer. First, because upstream's shortest-match search would read `%sel` as `%s`. Weak, so the parser links standalone. |
 | `skin_parser/tag_table.h` | Six new `SKIN_TOKEN_*` members | The token field is a 1-byte enum; the table rows stay in `custom_tags.c`. |
 | `skin_parser/tag_table.h` | `SKIN_REFRESH_SPECTRUM`, in `SKIN_REFRESH_NON_STATIC` | Spectrum lines redraw with time. |
+| `rbcodec/codecs/libffmpegFLAC/arm.S`, `arm.h`, `decoder.c` | New `lpc_decode_arm_wide()`, the 64-bit (`smlal`) LPC filter for streams too wide for a 32-bit sum; `flac_lpc_32()` runs it 1024 samples at a time with a yield between, and `flac_lpc_32_c()` stays for other CPUs | 24-bit FLAC took the C loop, and one channel of a frame ran ~50 ms without yielding on the 5G -- a visible stutter in anything animating while it played. |
 
 ---
 
@@ -266,15 +275,24 @@ build.
 | `checkwps/checkwps.make` | Include path around `$(COREAPPSDIR)/api` and `$(COREAPPSDIR)`; `-DSYSFONT_HEIGHT=8` | Mirrors `apps-ipod/apps.make`. |
 | `checkwps/include/` | Shadows of `storage.h`, `usb.h`, `powermgmt.h` | They declare nothing under `__PCTOOL__`. |
 | `checkwps/stubs.c` | The allocator, status bar, settings lookups and every settings callback | A new setting whose callback is missing here fails the link. |
-| `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line | A missing font or bitmap prints nothing without `-v`. |
+| `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line; a `playback_claim_aa_slot_keyed()` stub | A missing font or bitmap prints nothing without `-v`. The skin parser keys an in-place `%Cl` chain's slot. |
 | `apps-ipod/skin/wps_internals.h` | `VP_DEFAULT_LABEL` is `NULL` under `__PCTOOL__` | As upstream has it. |
 | `apps-ipod/features.txt` | `usb_hid` also under `__PCTOOL__` | `settings_list.c` registers it unconditionally. |
 | `configure` | The SDL check is a real test | It was always true, so `--type=c` demanded SDL. |
 
 ### The simulator
 
-Nothing outside `apps-ipod/` changed for it; see `apps-ipod/sim/README.md`. Two
-upstream files reach the app layer by bare include name, through `api/` stubs:
+Everything it needed to build is inside `apps-ipod/`; see
+`apps-ipod/sim/README.md`. Three files outside it carry one addition, for
+screenshots:
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `firmware/target/hosted/sdl/system-sdl.c` | `--screenshot` argument, setting `sim_screenshot` | Screenshots that show the same clock and battery every time. |
+| `firmware/target/hosted/rtc.c` | Under `SIMULATOR`, `sim_screenshot` makes `rtc_read_datetime()` return Monday 2024-01-01 09:00:00 | Every clock and date in the UI reads it. |
+| `uisimulator/common/powermgmt-sim.c` | `sim_screenshot` stops `battery_status_update()`, so the battery stays at 4300 mV, 100 %, not charging | Otherwise the simulated battery drains 1 % a second and cycles through charging. |
+
+Two upstream files reach the app layer by bare include name, through `api/` stubs:
 
 - `uisimulator/common/stubs.c` includes `"screens.h"`, an empty stub. If
   upstream starts using it, forward the stub to the `apps-ipod/screens/`
@@ -294,7 +312,7 @@ upstream files reach the app layer by bare include name, through `api/` stubs:
 | `bundle-theme.sh` | Adds Scrim, `default-config.cfg` and the default iconset to the zip. Deletes `classic_statusbar` (the directory and the loose `.sbs`/`.rsbs` beside it) and the plugin data `buildzip.pl` copies from `apps/plugins/`. The theme is named, not globbed, so a merge cannot start shipping stock themes. |
 | `bundle-help.sh` | Ships `settings-help.txt`. Without it every **Explain** is empty and nothing else looks wrong. |
 | `bundle-trim.sh` | Ships `trim.config`, the whole of what **Trim Titles** trims. |
-| `bundle-tools.sh` | Adds `soundscan.exe` and the host-built codecs it loads, as `.rockbox/tools/`. A missing tool is reported, not fatal; `release.sh` requires it. |
+| `bundle-tools.sh` | Adds `soundscan.exe`, rebuilt by make on each run, and the host-built codecs it loads, as `.rockbox/tools/`. A missing Windows simulator is reported, not fatal; a failed tool build is fatal; `release.sh` requires it. |
 | `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator` and `latest` releases, in that order. |
 | `docs/CREDITS` | PodBox, RockPod and Spun blocks above `For RockBox:`. Upstream's list below is untouched, trailing newline included, so merges apply. |
 | `.gitignore` | `/build*` narrowed to the build directories; local drafts, `dist/` and editor state added. |

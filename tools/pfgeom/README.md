@@ -15,13 +15,17 @@ pixel**. That is the exact test: the topmost writer is what picks the colour, so
 if the two renders agree everywhere then the cull removed only pixels that were
 going to be painted over anyway.
 
-**The clear and the flush.** Neither covers the whole viewport any more; both
-are sized to the rows the covers can reach, worked out up front by
-`slide_rows()`. `pfgeom` checks that band against the rows a render really
-wrote. It found the first version of that bound one row short — `dy` dips just
-under `PFREAL_ONE` at the outer edge of a cover as wide as `DISPLAY_WIDTH`, and
-the lower loop's ceiling turns any shortfall into a whole extra row. Hence
-`PF_ROW_MARGIN`.
+**The clear and the flush.** Both are sized to the rows the covers can reach,
+worked out up front by `slide_rows()`, rather than to the whole viewport.
+`pfgeom` checks that band against the rows a render really wrote. The bound
+carries `PF_ROW_MARGIN` because `dy` dips just under `PFREAL_ONE` at the outer
+edge of a cover as wide as `DISPLAY_WIDTH`, and the lower loop's ceiling turns
+any shortfall into a whole extra row.
+
+**The divisions.** The render's column walk divides by multiplying, and a
+quotient one out moves a row or a column. Before the sweep, `pfgeom` checks both
+helpers against plain division over every value the render can reach and well
+beyond it.
 
 It sweeps the settings that move the geometry (centre margin, slide tuck,
 parallel slides), the two things that resize the viewport (status bar height and

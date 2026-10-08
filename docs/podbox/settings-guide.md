@@ -164,7 +164,7 @@ report rebuilds them itself the next time you open it.
 | Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. | 5 | **Adv** |
 | Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | auto | **Adv** |
-| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. | on | **Adv** |
+| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | on | **Adv** |
 | Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
 
 ### Playback — Fast-Forward/Rewind
@@ -324,7 +324,7 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 |---|---|---|---|
 | Scan on Startup | Rescans the library at every boot. Mostly redundant if Scan on Eject is on, since that is when the music can actually have changed, and it costs time at every start. | off | **Adv** |
 | Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | on | **Adv** |
-| Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. | / | **Adv** |
+| Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. The next update removes the tracks that are now outside the chosen folders, or inside a folder holding a database.ignore file. | / | **Adv** |
 | Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
 | Write Debug Log | Writes scan progress to a log file. For working out why a track is missing from the database. | off | **Adv** |
 
@@ -417,6 +417,14 @@ shadow to colour.
 | Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
 | Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 
+### Appearance — Elements — Activity Indicators
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Show Disk Activity | Lets the theme show an indicator while the disk is being read or written. While music plays the disk is read often enough to keep it on, and every frame it animates repaints the status bar, which slows the screen underneath. | off |  |
+| Show Background Tasks | Lets the theme show an indicator while the database, the artwork cache or the document index is being built in the background. | on |  |
+| Show Working | Lets the theme show an indicator while the screen is busy loading something it was asked for. | on |  |
+
 ### Appearance — Dialogs
 
 | Setting | What it does | Default | |
@@ -489,6 +497,7 @@ shadow to colour.
 | Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
 | Backlight Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
 | First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. | on | **Adv** |
+| Backlight Exemptions ▸ Enabled | Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | off | **Adv** |
 | Sleep (After Backlight Off) | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
 | Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
 | Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
@@ -591,6 +600,7 @@ A car is not offered Playlist Engine moods through **Accessory Browsing**.
 | Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | off | **Adv** |
 | Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | off | **Adv** |
 | Say File Type | Speaks the file's type along with its name. | off | **Adv** |
+| Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | off | **Adv** |
 | Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100 | **Adv** |
 
 ---
