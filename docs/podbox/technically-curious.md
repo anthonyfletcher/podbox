@@ -142,7 +142,7 @@ character at a time, and only `A` forwards the rest.
 |---|---|
 | `--debugwps` | Traces skin parsing: which `.wps` and `.sbs` loaded, and what every `%Sx()` lang lookup resolved to |
 | `F5` | Screendump — a pixel-exact 320x240 BMP written into `simdisk/` |
-| System > Debug (Keep Out!) | The portable debug screens, including **Skin memory**. The row is hidden until you turn on Settings > System > Show Debug Menu |
+| System > Debug | The portable debug screens, including **Skin memory**. The row is hidden until you turn on Settings > System > Show Debug Menu |
 
 Controls are the arrow keys, Enter, Esc and Space, or the numeric keypad laid
 out like the click wheel. Note that **Right**, not Enter, opens a list item —

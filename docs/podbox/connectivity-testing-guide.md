@@ -20,7 +20,7 @@ one that does.
    it slows every USB connection
 
 If `usb.log` has nothing after its `== USB Log` lines, your dock uses the
-serial pins instead. Take a photo of `System > Debug (Keep Out!) > Serial iAP`
+serial pins instead. Take a photo of `System > Debug > Serial iAP`
 while docked.
 
 ## 3. Capture an iPhone's log (cars and USB docks)

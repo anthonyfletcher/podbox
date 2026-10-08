@@ -142,7 +142,6 @@ files/file_ops.c
 files/file_index.c
 files/filetypes.c
 files/path_list.c
-screens/system/runtime_info.c
 screens/shortcuts.c
 screens/system/time_set.c
 screens/playback/sound_props.c

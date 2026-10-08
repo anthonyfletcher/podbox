@@ -6229,13 +6229,13 @@
   desc: in the info menu
   user: core
   <source>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </source>
   <dest>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </dest>
   <voice>
-    *: "Debug, keep out!"
+    *: "Debug"
   </voice>
 </phrase>
 <phrase>

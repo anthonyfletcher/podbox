@@ -1757,11 +1757,10 @@ The place to look when the disk is busy and nothing on screen says why.
 What this firmware is, what it is built on and who made it.
 
 [action: System Info]
-Shows the version, how much memory and disk is free, and the battery reading.
+Shows the version, how much memory and disk is free, the battery reading, and
+how long the player has been running.
 
-[action: Running Time]
-How long the player has been running and how long it has been playing, both
-since the counter was last reset.
+Select a running time to reset it.
 
 [action: Credits]
 The people who wrote Rockbox.
@@ -1770,7 +1769,7 @@ The people who wrote Rockbox.
 The GNU General Public License, version 2, which this firmware is released
 under.
 
-[action: Debug (Keep Out!)]
+[action: Debug]
 Diagnostic screens for developers. Nothing in here is needed to use the player,
 and some of it can lock it up.
 

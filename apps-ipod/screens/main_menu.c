@@ -4,8 +4,8 @@
  * Copyright (C) 2007 Jonathan Gordon
  * GNU General Public License (version 2+)
  *
- * The main menu: system info, version, running time, credits, the licence,
- * and the manage-settings submenu.
+ * The main menu: system info (version, disk, running time), credits, the
+ * licence, and the manage-settings submenu.
  ****************************************************************************/
 
 #include <stdbool.h>
@@ -30,7 +30,7 @@
 #include "storage.h"
 #include "widgets/yesno.h"
 #include "widgets/keyboard.h"
-#include "screens/system/runtime_info.h"
+#include "system/format_time.h"
 #include "speech/talk.h"
 #include "widgets/splash.h"
 #include "screens/system/debug_menu.h"
@@ -139,6 +139,8 @@ enum infoscreenorder
     INFO_VERSION,
     INFO_DATE,
     INFO_TIME,
+    INFO_RUNTIME,
+    INFO_TOPTIME,
     INFO_DISK1, /* capacity/free on internal */
     INFO_COUNT
 };
@@ -236,6 +238,14 @@ static int info_speak_item(int selected_item, void * data)
             }
             else talk_id(VOICE_BLANK, false);
             break;
+        case INFO_RUNTIME:
+            talk_ids(false, LANG_RUNNING_TIME,
+                     TALK_ID(global_status.runtime, UNIT_TIME));
+            break;
+        case INFO_TOPTIME:
+            talk_ids(false, LANG_TOP_TIME,
+                     TALK_ID(global_status.topruntime, UNIT_TIME));
+            break;
         case INFO_DISK1: /* disk 1 */
         default:
             i = selected_item - INFO_DISK1;
@@ -266,7 +276,26 @@ static int info_action_callback(int action, struct gui_synclist *lists)
         return action;
     }
     else if (action == ACTION_STD_OK
-        )
+             && (gui_synclist_get_sel_pos(lists) == INFO_RUNTIME
+                 || gui_synclist_get_sel_pos(lists) == INFO_TOPTIME))
+    {
+        static const char *lines[] = { ID2P(LANG_RUNNING_TIME),
+                                       ID2P(LANG_CLEAR_TIME),
+                                       ID2P(LANG_TOP_TIME),
+                                       ID2P(LANG_CLEAR_TIME) };
+        bool top = gui_synclist_get_sel_pos(lists) == INFO_TOPTIME;
+        const struct text_message message = { lines + (top ? 2 : 0), 2 };
+
+        if (gui_syncyesno_run(&message, NULL, NULL) == YESNO_YES)
+        {
+            if (top)
+                global_status.topruntime = 0;
+            else
+                global_status.runtime = 0;
+        }
+        action = ACTION_REDRAW;
+    }
+    else if (action == ACTION_STD_OK)
     {
         action = ACTION_REDRAW;
         info->new_data = true;
@@ -278,9 +307,10 @@ static int info_action_callback(int action, struct gui_synclist *lists)
     else if (action == ACTION_NONE)
     {
         static int last_redraw = 0;
-        if (TIME_AFTER(current_tick, last_redraw + HZ*5))
+        if (TIME_AFTER(current_tick, last_redraw + HZ))
         {
             last_redraw = current_tick;
+            action = ACTION_REDRAW;
         }
         else
             return action;
@@ -337,6 +367,14 @@ static int info_action_callback(int action, struct gui_synclist *lists)
 /* INFO_TIME */
         simplelist_setline("--:--:--");
     }
+/* INFO_RUNTIME */
+    update_runtime();
+    format_time_auto(s1, sizeof(s1), global_status.runtime, UNIT_SEC, false);
+    simplelist_addline("%s: %s", str(LANG_RUNNING_TIME), s1);
+/* INFO_TOPTIME */
+    format_time_auto(s1, sizeof(s1), global_status.topruntime, UNIT_SEC,
+                     false);
+    simplelist_addline("%s: %s", str(LANG_TOP_TIME), s1);
 /* INFO_DISK, capacity/free on internal */
     for (int i = 0; i < NUM_VOLUMES ; i++) {
         if (info->size[i]) {
@@ -380,10 +418,6 @@ MENUITEM_FUNCTION(show_about_item, 0, ID2P(LANG_ABOUT),
 MENUITEM_FUNCTION(show_credits_item, 0, ID2P(LANG_CREDITS),
                   show_credits, NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION(show_runtime_item, MENU_FUNC_CHECK_RETVAL,
-                  ID2P(LANG_RUNNING_TIME),
-                  view_runtime, NULL, Icon_NOICON);
-
 /* Hide the Debug entry unless the "Show Debug Menu" setting is on (default off:
  * a menu item whose callback returns ACTION_EXIT_MENUITEM for the count request
  * is left out of the list -- see init_menu_lists() in menu.c). */
@@ -419,7 +453,7 @@ MENUITEM_FUNCTION(bg_task_info, MENU_FUNC_CHECK_RETVAL,
 
 MAKE_MENU(info_menu, ID2P(LANG_SYSTEM), 0, Icon_System_menu,
           &show_about_item, &show_info_item, &show_credits_item,
-          &show_runtime_item, &bg_task_info, &show_license_item,
+          &bg_task_info, &show_license_item,
           &debug_menu_item);
 
 MENUITEM_FUNCTION(main_menu_config_item, 0, ID2P(LANG_MAIN_MENU_SETTINGS),
