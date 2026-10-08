@@ -462,15 +462,18 @@ static bool usable(const struct as_setting *s)
            s->interval_out >= 1 && s->interval_out <= 8 && s->rates;
 }
 
-/* Whether a 48 kHz packet at the top of the feedback window fits the
- * endpoint and the controller. One that does not is cut short every
- * packet, and the DAC plays slow. */
+/* Whether a 48 kHz packet fits the endpoint and the controller: at the top
+ * of the feedback window when there is a feedback endpoint, and at the
+ * nominal rate, which is all a stream without one ever sends, when there is
+ * not. One that does not fit is cut short every packet, and the DAC plays
+ * slow. */
 static bool fits(const struct as_setting *s)
 {
     bool hs = usb_drv_host_high_speed();
     int sof = hs ? 8000 : 1000;
-    int frames = (SAMPR_48 * 9 / 8 * (hs ? s->interval_out : 1) + sof - 1) /
-                 sof;
+    int window = s->ep_fb ? 9 : 8;      /* eighths of the nominal rate */
+    int frames = (SAMPR_48 * window / 8 * (hs ? s->interval_out : 1) +
+                  sof - 1) / sof;
     int limit = MIN(s->mps_out,
                     usb_drv_host_iso_max_packet(s->interval_out));
 
