@@ -154,6 +154,8 @@ struct tagcache_search {
     int list_position;
     int seek_pos;
     int seek_end;        /* The master entry the walk stops before */
+    const int *id_list;  /* Set: the only master entries walked */
+    int id_count;
     long position;
     int entry_count;
     int master_entry_count; /* Index entries the master header claims */
@@ -197,6 +199,11 @@ bool tagcache_search_add_filter(struct tagcache_search *tcs,
 /* Walks only master entries first to last, for a caller that knows every
  * match lies there -- an album's, from its row. */
 void tagcache_search_set_range(struct tagcache_search *tcs, int first, int last);
+/* Walks only the listed master entries, for a caller that already knows
+ * which can match. Refused, leaving the search whole, unless it is over the
+ * RAM copy. The list must outlive the search. */
+bool tagcache_search_set_ids(struct tagcache_search *tcs,
+                             const int *ids, int count);
 bool tagcache_search_add_clause(struct tagcache_search *tcs,
                                 struct tagcache_search_clause *clause);
 bool tagcache_get_next(struct tagcache_search *tcs, char *buf, long size);

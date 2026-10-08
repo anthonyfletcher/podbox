@@ -90,6 +90,8 @@ static uint32_t     part_seeded;    /* Records carried in from the finished
                                        index, kept in the working file's
                                        reserved field. 0 on a rebuild */
 
+bool (*sound_index_genre_of)(uint64_t key, char *buf, size_t size);
+
 
 /** Keys **/
 
@@ -118,9 +120,10 @@ uint32_t sound_index_genre_key(const char *genre)
      *
      * Trap: this changes the key a genre hashes to, so records written
      * before it do not group with records written after it. The layout is
-     * unchanged, so the version is not moved and no rescan is forced -- what
-     * a stale record loses is the genre term, which is soft, and it comes
-     * back when the track is next measured. */
+     * unchanged, so the version is not moved and no rescan is forced: an
+     * update refolds each record it carries forward from the database's
+     * genre (seed_from_finished()), and without the database in RAM the
+     * record keeps its key until the track is next measured. */
     while (n + 1 < sizeof (first) && genre[n] != '\0'
            && genre[n] != '/' && genre[n] != ';' && genre[n] != ',')
     {
@@ -322,6 +325,7 @@ static bool seed_from_finished(void)
     struct key_entry *t = table();
     int fd = open(SOUND_FILE, O_RDONLY);
     uint64_t last_key = 0;
+    char genre[48];     /* As the scan reads it */
     unsigned int i;
 
     if (fd < 0)
@@ -359,6 +363,14 @@ static bool seed_from_finished(void)
         if (r.key == last_key)
             continue;
         last_key = r.key;
+
+        /* The same fold the scan applies, so a record keyed by an older
+         * fold groups with ones measured since. */
+        if (sound_index_genre_of != NULL
+            && sound_index_genre_of(r.key, genre, sizeof (genre)))
+        {
+            r.genre_key = sound_index_genre_key(genre);
+        }
 
         if (write(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
             break;

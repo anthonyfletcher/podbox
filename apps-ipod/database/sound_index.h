@@ -8,6 +8,7 @@
 #define _SOUND_INDEX_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "audio/beat_probe.h"
 
@@ -122,6 +123,12 @@ bool sound_record_usable(const struct sound_record *r);
 
 /* The first genre a field names, folded and hashed to 32 bits. */
 uint32_t sound_index_genre_key(const char *genre);
+
+/* The genre the database's RAM copy holds for a path key; false when it is
+ * not loaded, the file is not in it, or the genre is <Untagged>. Set by the
+ * database. The desktop tool builds this file without one and leaves it
+ * NULL. */
+extern bool (*sound_index_genre_of)(uint64_t key, char *buf, size_t size);
 
 /* Fill a record from one measurement. */
 void sound_index_fill(struct sound_record *out, uint64_t key, uint32_t mtime,

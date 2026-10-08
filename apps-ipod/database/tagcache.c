@@ -92,9 +92,11 @@
 #include "metadata.h"
 #include "tagcache.h"
 #include "database/path_key.h"
+#include "database/sound_index.h"
 #include "db_spoken.h"
 #include "metadata/art_cache.h"   /* art_cache_dir_hash */
 #include "core_alloc.h"
+#include "audio.h"
 #include "crc32.h"
 #include "system/strutil.h"
 #include "settings/settings.h"
@@ -161,6 +163,10 @@ static bool usr_cancel(void);
 
 /* Temporary database containing new tags to be committed to the main db. */
 #define TAGCACHE_FILE_TEMP       "database_tmp.tcd"
+
+/* Leads the stamp a commit writes past the temp file's last entry: the
+ * commit id its merge produces. */
+#define TAGCACHE_TEMP_STAMP      0x54435354
 
 /* The main database master index and numeric data. */
 #define TAGCACHE_FILE_MASTER     "database_idx.tcd"
@@ -658,12 +664,13 @@ static int open_tag_fd(struct tagcache_header *hdr, int tag, bool write)
     return fd;
 }
 
-static int open_master_fd(struct master_header *hdr, bool write)
+static int open_master_file(const char *name, struct master_header *hdr,
+                            bool write)
 {
     int fd;
     int rc;
 
-    fd = open_db_fd(TAGCACHE_FILE_MASTER, write ? O_RDWR : O_RDONLY);
+    fd = open_db_fd(name, write ? O_RDWR : O_RDONLY);
     if (fd < 0)
     {
         logf("master file open failed for R/W");
@@ -697,6 +704,11 @@ static int open_master_fd(struct master_header *hdr, bool write)
     }
 
     return fd;
+}
+
+static int open_master_fd(struct master_header *hdr, bool write)
+{
+    return open_master_file(TAGCACHE_FILE_MASTER, hdr, write);
 }
 
 static void remove_files(void)
@@ -2090,14 +2102,27 @@ static bool build_lookup_list(struct tagcache_search *tcs)
         tcrc_buffer_lock(); /* lock because below makes a pointer to movable data */
 
         int end = MIN(tcs->seek_end, current_tcmh.tch.entry_count);
+        int pos;
 
-        for (i = tcs->seek_pos; i < end; i++)
+        /* With an id list, seek_pos counts through the list rather than the
+         * index. */
+        if (tcs->id_list)
+            end = tcs->id_count;
+
+        for (pos = tcs->seek_pos; pos < end; pos++)
         {
             struct tagcache_seeklist_entry *seeklist;
-            /* idx points to movable data, don't yield or reload */
-            struct index_entry *idx = &tcramcache.hdr->indices[i];
+            struct index_entry *idx;
+
             if (tcs->seek_list_count == SEEK_LIST_SIZE)
                 break ;
+
+            i = tcs->id_list ? tcs->id_list[pos] : pos;
+            if (i < 0 || i >= current_tcmh.tch.entry_count)
+                continue;
+
+            /* idx points to movable data, don't yield or reload */
+            idx = &tcramcache.hdr->indices[i];
 
             /* Skip deleted files. */
             if (idx->flag & FLAG_DELETED)
@@ -2139,7 +2164,7 @@ static bool build_lookup_list(struct tagcache_search *tcs)
 
         tcrc_buffer_unlock();
 
-        tcs->seek_pos = i;
+        tcs->seek_pos = pos;
 
         return tcs->seek_list_count > 0;
     }
@@ -2359,6 +2384,18 @@ void tagcache_search_set_range(struct tagcache_search *tcs, int first, int last)
     tcs->seek_end = last + 1;
 }
 
+bool tagcache_search_set_ids(struct tagcache_search *tcs,
+                             const int *ids, int count)
+{
+    if (!tcs->ramsearch)
+        return false;
+
+    tcs->id_list = ids;
+    tcs->id_count = count;
+    tcs->seek_pos = 0;
+    return true;
+}
+
 bool tagcache_search_add_filter(struct tagcache_search *tcs,
                                 int tag, int seek)
 {
@@ -2430,6 +2467,7 @@ static bool get_next(struct tagcache_search *tcs, bool is_numeric, char *buf, lo
 
     /* Relative fetch. */
     if (tcs->filter_count > 0 || tcs->clause_count > 0 || is_numeric
+        || tcs->id_list
         /* RAM holds no filenames: the index walk reads them from disk and
          * skips deleted entries */
         || (tcs->ramsearch && tcs->type == tag_filename)
@@ -2784,6 +2822,13 @@ bool tagcache_entry_string(int idx_id, int tag, char *buf, size_t size)
 
     strmemccpy(buf, s, size);
     return true;
+}
+
+/* sound_index_genre_of(), for the sound index's update to refold its
+ * records' genre keys. */
+static bool genre_by_key(uint64_t key, char *buf, size_t size)
+{
+    return tagcache_entry_string(path_index_find(key), tag_genre, buf, size);
 }
 
 bool tagcache_seek_string(int tag, long seek, char *buf, size_t size)
@@ -3347,7 +3392,8 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
     logf("Building numeric indices...");
     lseek(tmpfd, sizeof(struct tagcache_header), SEEK_SET);
 
-    if ( (masterfd = open_master_fd(&tcmh, true)) < 0)
+    masterfd = open_master_file(TAGCACHE_FILE_MASTER ".new", &tcmh, true);
+    if (masterfd < 0)
         return false;
 
     masterfd_pos = lseek(masterfd, tcmh.tch.entry_count * sizeof(struct index_entry),
@@ -3359,9 +3405,10 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
         return false;
     }
 
-    /* Not cancelled part way: it runs after the swap, and a retry after a
-     * half-done pass would find the deleted entries already marked
-     * resurrected and copy their figures to nothing. */
+    /* Into the master's .new file, before the swap: the resurrected flags
+     * and the figures they gave reach the database together or not at all.
+     * Marked in the live master, a cut part way would leave entries marked
+     * whose figures a retry then copies to nothing. */
     while (entries_processed < h->entry_count)
     {
         int count = MIN(h->entry_count - entries_processed, max_entries);
@@ -4237,12 +4284,41 @@ static size_t commit_need(const struct tagcache_header *tmp)
            + (biggest / 2 + tmp->entry_count * 4) * TAG_COUNT;
 }
 
+/* The commit id stamped past the temp file's last entry, at `end`, or -1
+ * for an unstamped file. Every reader of the file stops at its last entry,
+ * so the stamp is invisible to them. */
+static int32_t temp_stamp_read(int tmpfd, off_t end)
+{
+    int32_t stamp[2];
+
+    if (lseek(tmpfd, end, SEEK_SET) != end
+        || read(tmpfd, stamp, sizeof(stamp)) != (ssize_t)sizeof(stamp)
+        || stamp[0] != TAGCACHE_TEMP_STAMP)
+        return -1;
+    return stamp[1];
+}
+
+/* Unstamped on failure, which costs only the guard: a cut between the swap
+ * and removing the file then merges it twice. */
+static void temp_stamp_write(off_t end, int32_t commitid)
+{
+    int32_t stamp[2] = { TAGCACHE_TEMP_STAMP, commitid };
+    int fd = open_db_fd(TAGCACHE_FILE_TEMP, O_WRONLY);
+
+    if (fd < 0)
+        return;
+    if (lseek(fd, end, SEEK_SET) == end)
+        write(fd, stamp, sizeof(stamp));
+    close(fd);
+}
+
 static bool commit(void)
 {
     struct tagcache_header tch;
     struct master_header   tcmh;
     int i, len, rc;
     int tmpfd;
+    off_t tmp_end;
     int masterfd;
     bool dircache_buffer_stolen = false;
     bool ramcache_buffer_stolen = false;
@@ -4306,6 +4382,20 @@ static bool commit(void)
 
     /* Fully initialize existing headers (if any) before going further. */
     tc_stat.ready = check_all_headers();
+
+    /* A temp file stamped with the master's own commit id was merged by a
+     * commit cut short between the swap and removing the file. */
+    tmp_end = sizeof(struct tagcache_header)
+              + (off_t)tch.entry_count * sizeof(struct temp_file_entry)
+              + tch.datasize;
+    if (tc_stat.ready
+        && temp_stamp_read(tmpfd, tmp_end) == current_tcmh.commitid)
+    {
+        logf("tmpfile already merged");
+        close(tmpfd);
+        remove_db_file(TAGCACHE_FILE_TEMP);
+        return true;
+    }
 
     if (tch.entry_count == 0 && tc_stat.ready)
     {
@@ -4452,11 +4542,48 @@ static bool commit(void)
         goto merge_error;
     }
 
+    if (!build_numeric_indices(&tch, tmpfd))
+    {
+        logf("Failure to commit numeric indices");
+        close(tmpfd);
+        tc_stat.commit_step = 0;
+        goto merge_error;
+    }
+
+    close(tmpfd);
+
+    /* The master's .new file is finished whole, header included, so the
+     * swap alone commits: a cut before it leaves the old database, one
+     * after it the new, which the temp file's stamp then identifies. */
+    masterfd = open_master_file(TAGCACHE_FILE_MASTER ".new", &tcmh, true);
+    if (masterfd < 0)
+    {
+        tc_stat.commit_step = 0;
+        goto merge_error;
+    }
+
+    tcmh.tch.entry_count += tch.entry_count;
+    tcmh.tch.datasize = sizeof(struct master_header)
+        + sizeof(struct index_entry) * tcmh.tch.entry_count
+        + tch.datasize;
+    tcmh.dirty = false;
+    tcmh.commitid++;
+
+    lseek(masterfd, 0, SEEK_SET);
+    if (write_master_header(masterfd, &tcmh) != sizeof(struct master_header))
+    {
+        close(masterfd);
+        tc_stat.commit_step = 0;
+        goto merge_error;
+    }
+    close(masterfd);
+
+    temp_stamp_write(tmp_end, tcmh.commitid);
+
     swapped = merge_swap();
     if (swapped < 0)
     {
         logf("swap marker failed");
-        close(tmpfd);
         tc_stat.commit_step = 0;
         goto merge_error;
     }
@@ -4465,44 +4592,17 @@ static bool commit(void)
         /* Old and new files are mixed until the next boot finishes the
          * swap; nothing may read or write them meanwhile. */
         logf("merge swap failed");
-        close(tmpfd);
         tc_stat.commit_step = 0;
         tc_stat.ready = false;
         tc_stat.ramcache = false;
         goto commit_error;
     }
 
-    if (!build_numeric_indices(&tch, tmpfd))
-    {
-        logf("Failure to commit numeric indices");
-        close(tmpfd);
-        tc_stat.commit_step = 0;
-        goto commit_error;
-    }
-
-    close(tmpfd);
-
     tc_stat.commit_step = 0;
 
     /* Past the swap the commit finishes, cancel or not. */
     {
-        /* Update the master index headers. */
-        if ( (masterfd = open_master_fd(&tcmh, true)) < 0)
-            goto commit_error;
-
-        tcmh.tch.entry_count += tch.entry_count;
-        tcmh.tch.datasize = sizeof(struct master_header)
-            + sizeof(struct index_entry) * tcmh.tch.entry_count
-            + tch.datasize;
-        tcmh.dirty = false;
-        tcmh.commitid++;
-
-        lseek(masterfd, 0, SEEK_SET);
-        write_master_header(masterfd, &tcmh);
-        close(masterfd);
-
-        /* Only now: without it a cut here leaves a dirty master and no temp,
-         * and the next scan treats the whole library as new. */
+        /* Only now: the next boot needs it until the swap is done. */
         remove_db_file(TAGCACHE_FILE_TEMP);
 
         logf("tagcache committed");
@@ -5530,9 +5630,15 @@ static bool allocate_tagcache(void)
      * giving up on its first line for want of a buffer.
      *
      * Nothing is lost by standing aside: shrinking is negotiated, and
-     * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE. */
+     * playback's own shrink_callback() refuses below AUDIO_BUFFER_RESERVE.
+     *
+     * The reserve is for an audio buffer still to be laid out. Once one is,
+     * free space is the slack it left, and taking from it costs playback
+     * nothing: holding the reserve back would refuse even a small RAM copy
+     * after every update made while music plays. */
     size_t available = core_available();
-    if (alloc_size <= available
+    if (audio_buffer_size() == 0
+        && alloc_size <= available
         && alloc_size + TAGCACHE_MIN_AUDIO_RESERVE > available)
     {
         logf("tagcache: ramcache %luKB exceeds budget (%luKB avail)",
@@ -6854,6 +6960,7 @@ void tagcache_init(void)
 
     strmemccpy(tc_stat.db_path, LIB_DB_DIR, sizeof(tc_stat.db_path));
     mutex_init(&command_queue_mutex);
+    sound_index_genre_of = genre_by_key;
     queue_init(&tagcache_queue, true);
     create_thread(tagcache_thread, tagcache_stack,
                   sizeof(tagcache_stack), 0, tagcache_thread_name
