@@ -481,9 +481,14 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
     hash = browser_db_get_art_hash(local_tc, selected_item);
     if (hash == 0)
     {
-        browser_aa_no_hash[browser_aa_no_hash_next] = selected_item;
-        browser_aa_no_hash_next =
-            (browser_aa_no_hash_next + 1) % TREE_AA_NO_HASH;
+        /* Not recorded while the RAM copy may still load: an artist row
+         * resolves through it, so its miss until then is not the answer. */
+        if (tagcache_is_in_ram() || tagcache_ram_refused())
+        {
+            browser_aa_no_hash[browser_aa_no_hash_next] = selected_item;
+            browser_aa_no_hash_next =
+                (browser_aa_no_hash_next + 1) % TREE_AA_NO_HASH;
+        }
         return NULL;
     }
 

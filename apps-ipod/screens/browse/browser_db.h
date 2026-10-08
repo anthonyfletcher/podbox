@@ -98,7 +98,9 @@ bool browser_db_get_book_album(struct browser_context* c, int item,
  * source. */
 bool browser_db_current_under_artist_level(void);
 /* The art-cache key of album or artist row 'item': its album folder, or the
- * artist folder above it. 0 for any other row, or one with no folder. */
+ * artist folder above it. A track-artist row takes the album artist of the
+ * same name, from the RAM copy only. 0 for any other row, or one with no
+ * folder. */
 unsigned int browser_db_get_art_hash(struct browser_context* c, int item);
 int browser_db_get_icon(struct browser_context* c);
 /* %Lk and %LP for row 'id' of the level on screen. */

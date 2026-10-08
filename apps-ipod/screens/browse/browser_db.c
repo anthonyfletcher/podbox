@@ -86,6 +86,7 @@
 #include "system/appevents.h"
 #include "storage.h"
 #include "dir.h"
+#include "dircache.h"                 /* whether a folder listing is free */
 #include "audio/playback.h"
 #include "strnatcmp.h"
 #include "panic.h"
@@ -2285,6 +2286,68 @@ static bool row_kept(enum spoken_keep keep, int tag, long seek, int level)
     return true;
 }
 
+/* The database entries in the playing track's folder, answering a
+ * `filename ^ "#directory#"` clause ANDed with the rest ("Same as currently
+ * played track > Directory") from the dircache and the path index, where the
+ * clause reads every entry's filename from disk. Subfolders are not listed.
+ * -1 leaves the clause to answer: no RAM copy, no dircache, any "|", any
+ * other use of "#directory#", or more tracks than dir_ids holds. */
+static int dir_ids[512];
+
+static int dir_ids_fill(int level)
+{
+    const char *folder = NULL;
+    static char path[MAX_PATH];   /* off retrieve_entries()' large frame */
+    DIR *dir;
+    struct dirent *ent;
+    int i, j, count = 0;
+
+    for (i = 0; i <= level; i++)
+        for (j = 0; j < csi->clause_count[i]; j++)
+        {
+            struct tagcache_search_clause *cl = csi->clause[i][j];
+
+            if (cl->type == clause_logical_or)
+                return -1;
+            if (cl->source != source_current_path)
+                continue;
+            if (cl->tag != tag_filename
+                || (cl->type & ~CLAUSE_SORT_NAME) != clause_begins_with)
+                return -1;
+            folder = cl->str;
+        }
+
+    if (!folder || !folder[0] || !tagcache_is_in_ram() || !dircache_is_ready())
+        return -1;
+
+    dir = opendir(folder);
+    if (!dir)
+        return -1;
+
+    while ((ent = readdir(dir)))
+    {
+        int idx_id;
+
+        if (dir_get_info(dir, ent).attribute & ATTR_DIRECTORY)
+            continue;
+
+        snprintf(path, sizeof(path), "%s/%s", folder, ent->d_name);
+        idx_id = tagcache_find_path(path);
+        if (idx_id < 0)
+            continue;
+
+        if (count == (int)ARRAYLEN(dir_ids))
+        {
+            count = -1;
+            break;
+        }
+        dir_ids[count++] = idx_id;
+    }
+
+    closedir(dir);
+    return count;
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2351,11 +2414,16 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
              && tagcache_album_count() > 0)
         keep = KEEP_BOOKS;
 
+    int dir_count = dir_ids_fill(level);
+
     if (!tagcache_search(&tcs, tag))
         return -1;
 
     /* Prevent duplicate entries in the search list. */
     tagcache_search_set_uniqbuf(&tcs, uniqbuf, UNIQBUF_SIZE);
+
+    if (dir_count >= 0 && !tagcache_search_set_ids(&tcs, dir_ids, dir_count))
+        dir_count = -1;
 
     if (level || is_basename|| csi->clause_count[0] || TAGCACHE_IS_NUMERIC(tag))
         sort = true;
@@ -2421,6 +2489,11 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
 
             for (j = 0; j < csi->clause_count[i]; j++)
             {
+                /* The id list already holds only the folder's entries. */
+                if (dir_count >= 0
+                    && csi->clause[i][j]->source == source_current_path)
+                    continue;
+
                 tagcache_search_add_clause(&tcs, csi->clause[i][j]);
 
                 if (exclude_by_clause
@@ -5374,8 +5447,43 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
     return ok;
 }
 
-/* The art key of a row tagcache's album tables can place: an album artist, or
- * an album table_album_row() finds. 0 for any other row. */
+/* The art key of the album artist named as row 'seek' of a 'tag' list is, the
+ * name matched without regard to case, as the database matches names. The
+ * artist table is in seek order, which is name order because the album-artist
+ * tag file is sorted that way, <Untagged> first. 0 when no album artist has
+ * the name, and always without the RAM copy. */
+static unsigned int artist_name_art_hash(int tag, long seek)
+{
+    char name[MAX_PATH], other[MAX_PATH];
+    struct tagcache_artist ar;
+    int lo = 0, hi = tagcache_artist_count() - 1;
+
+    if (!tagcache_seek_string(tag, seek, name, sizeof(name)))
+        return 0;
+
+    while (lo <= hi)
+    {
+        int mid = (lo + hi) / 2;
+        int cmp;
+
+        if (!tagcache_artist_get(mid, &ar))
+            return 0;
+        cmp = tagcache_seek_string(tag_albumartist, ar.seek,
+                                   other, sizeof(other))
+              ? strcasecmp(other, name) : -1;
+        if (cmp == 0)
+            return ar.art_hash;
+        if (cmp < 0)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+/* The art key of a row tagcache's album tables can place: an album artist, an
+ * artist named as one, or an album table_album_row() finds. 0 for any other
+ * row. */
 static unsigned int table_art_hash(struct browser_context* c,
                                    const struct tagentry *entry)
 {
@@ -5383,6 +5491,8 @@ static unsigned int table_art_hash(struct browser_context* c,
     int tag = csi->tagorder[level];
     int n;
 
+    if (tag == tag_artist || tag == tag_virt_canonicalartist)
+        return artist_name_art_hash(tag, entry->extraseek);
     if (tag == tag_albumartist)
     {
         struct tagcache_artist ar;
@@ -5410,7 +5520,10 @@ unsigned int browser_db_get_art_hash(struct browser_context* c, int item)
         || !(entry = browser_db_get_entry(c, item)))
         return 0;
     hash = table_art_hash(c, entry);
+    /* A track-artist row has no folder search: it would read the disk for
+     * every row in view, and its folder is a guess. */
     if (hash == 0
+        && (album || csi->tagorder[c->currextra] == tag_albumartist)
         && browser_db_get_track_dir(c, item, dir, sizeof(dir), album ? 0 : 1))
         hash = art_cache_dir_hash(dir);
     return hash;
