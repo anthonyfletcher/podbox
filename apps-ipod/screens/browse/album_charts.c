@@ -108,22 +108,22 @@ static struct chart_stats stats_of(int i)
     return s;
 }
 
-static const char *entry_name(int i)
+static const char *entry_name(int i, char *buf, size_t size)
 {
     if (CHART_IS_ARTIST(chart_kind))
-        return idx.artist_names + idx.artist_index[i].name_idx;
-    return idx.album_names + idx.album_index[i].name_idx;
+        return db_summary_name(&idx, tag_albumartist,
+                               idx.artist_index[i].seek, buf, size);
+    return db_summary_name(&idx, tag_album, idx.album_index[i].seek,
+                           buf, size);
 }
 
 /* Albums show who they are by; an artist row is already the artist. */
-static const char *entry_subtitle(int i)
+static const char *entry_subtitle(int i, char *buf, size_t size)
 {
-    int a;
-
     if (CHART_IS_ARTIST(chart_kind))
         return NULL;
-    a = idx.album_index[i].artist_idx;
-    return a >= 0 ? idx.artist_names + a : NULL;
+    return db_summary_name(&idx, tag_albumartist,
+                           idx.album_index[i].artist_seek, buf, size);
 }
 
 /* ---- ranking ----------------------------------------------------------- */
@@ -226,6 +226,7 @@ static const char *chart_get_name(int selected_item, void *data,
                                   char *buffer, size_t buffer_len)
 {
     const char *name, *sub;
+    char name_buf[MAX_PATH], sub_buf[MAX_PATH];
     struct chart_stats s;
     int i;
     (void)data;
@@ -237,8 +238,8 @@ static const char *chart_get_name(int selected_item, void *data,
     }
 
     i = chart[selected_item];
-    name = entry_name(i);
-    sub = entry_subtitle(i);
+    name = entry_name(i, name_buf, sizeof(name_buf));
+    sub = entry_subtitle(i, sub_buf, sizeof(sub_buf));
     s = stats_of(i);
 
     if (rank_of(chart_kind) == RANK_RECENTLY_PLAYED)
@@ -351,6 +352,9 @@ int album_charts_show(enum album_chart kind)
 
         if (simplelist_show_list(&info))
             ret = GO_TO_ROOT;
+        else if (info.selection >= 0 && !db_summary_current(&idx))
+            /* A commit while the list was up: its seeks name other entries */
+            splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
         else if (info.selection >= 0)
         {
             /* The same handoffs Album covers and Artist portraits use: arm the
@@ -359,14 +363,16 @@ int album_charts_show(enum album_chart kind)
              * browser's own buffer, so releasing the index does not strand
              * it. An artist opens their album list, an album its tracks. */
             int i = chart[info.selection];
+            char title[MAX_PATH];
 
             if (CHART_IS_ARTIST(kind))
                 browser_db_enter_artist_albums_on_next_load(
-                    idx.artist_index[i].seek, entry_name(i));
+                    idx.artist_index[i].seek,
+                    entry_name(i, title, sizeof(title)));
             else
                 browser_db_enter_artist_album_tracks_on_next_load(
                     idx.album_index[i].seek, idx.album_index[i].artist_seek,
-                    entry_name(i));
+                    entry_name(i, title, sizeof(title)));
             ret = GO_TO_ALBUM_COVERS_TRACKS;
         }
     }
@@ -384,12 +390,9 @@ int album_charts_show(enum album_chart kind)
  * playlist and starts it rather than dropping the user in a track list. It
  * needs no playback history.
  *
- * One record is all this needs. The names in the index are for display and
- * nothing here displays anything, so it reads that record straight out of the
- * saved file rather than acquiring the whole index -- which would cost the
- * audio buffer 384K and the current track a rebuffer, moments before playback
- * is told to go somewhere else entirely. The charts still acquire; they read
- * every entry.
+ * One record is all this needs, so it reads that record straight out of the
+ * database's album table rather than acquiring the whole index. The charts
+ * still acquire; they read every entry.
  *
  * The reader holds the build lock, so it is closed before anything slow
  * happens: db_summary_play_album() searches the database and starts playback,

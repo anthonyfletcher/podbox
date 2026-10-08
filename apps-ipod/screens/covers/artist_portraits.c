@@ -33,10 +33,10 @@
 static int  artist_resume_index;
 static bool artist_resume_valid = false;
 
-static char *artist_name(int index)
+static char *artist_name(int index, char *buf, size_t size)
 {
-    return carousel_idx.artist_names
-         + carousel_idx.artist_index[index].name_idx;
+    return db_summary_name(&carousel_idx, tag_albumartist,
+                           carousel_idx.artist_index[index].seek, buf, size);
 }
 
 /* The slide for the album-artist of `id3`, or -1 if this list has no such
@@ -46,6 +46,7 @@ static char *artist_name(int index)
 static int artist_find_index(const struct mp3entry *id3)
 {
     const char *current = UNTAGGED;
+    char name[TAGCACHE_BUFSZ];
 
     if (!id3)
         return -1;
@@ -58,7 +59,7 @@ static int artist_find_index(const struct mp3entry *id3)
         current = id3->artist;
 
     for (int i = 0; i < carousel_idx.artist_ct; i++)
-        if (!strcasecmp(artist_name(i), current))
+        if (!strcasecmp(artist_name(i, name, sizeof(name)), current))
             return i;
 
     return -1;
@@ -85,10 +86,13 @@ static int compare_artists_by_name(const void *a_v, const void *b_v)
 {
     const struct artist_data *a = a_v;
     const struct artist_data *b = b_v;
+    char an[TAGCACHE_BUFSZ], bn[TAGCACHE_BUFSZ];
 
     return strcasecmp(
-        tagcache_sort_name(carousel_idx.artist_names + a->name_idx),
-        tagcache_sort_name(carousel_idx.artist_names + b->name_idx));
+        tagcache_sort_name(db_summary_name(&carousel_idx, tag_albumartist,
+                                           a->seek, an, sizeof(an))),
+        tagcache_sort_name(db_summary_name(&carousel_idx, tag_albumartist,
+                                           b->seek, bn, sizeof(bn))));
 }
 
 static int artist_build_index(void)
@@ -137,26 +141,31 @@ static unsigned int artist_art_key(int index)
  * the first one. */
 static int artist_enter(int index)
 {
+    char name[TAGCACHE_BUFSZ];
+
     artist_resume_index = index;
     artist_resume_valid = true;
     browser_db_enter_artist_albums_on_next_load(
                                 carousel_idx.artist_index[index].seek,
-                                artist_name(index));
+                                artist_name(index, name, sizeof(name)));
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
 
-/* The name an artist sorts by, which is what the letter jumps compare. */
-static const char *artist_sort_name(int index)
+/* The first letter of the name an artist sorts by, which is what the letter
+ * jumps compare. */
+static char artist_initial(int index)
 {
-    return tagcache_sort_name(artist_name(index));
+    char name[TAGCACHE_BUFSZ];
+
+    return tagcache_sort_name(artist_name(index, name, sizeof(name)))[0];
 }
 
 /* Jump to the next/previous artist whose name starts with a different letter. */
 static int artist_jump_next(void)
 {
-    const char *current = artist_sort_name(center_index);
+    char current = artist_initial(center_index);
     for (int i = center_index + 1; i < carousel_idx.artist_ct; i++)
-        if (strncmp(artist_sort_name(i), current, 1))
+        if (artist_initial(i) != current)
             return i;
     return carousel_idx.artist_ct - 1;
 }
@@ -166,14 +175,14 @@ static int artist_jump_next(void)
  * into these three lines, and for where the shape came from. */
 static int artist_jump_prev(void)
 {
-    const char *current = artist_sort_name(center_index);
+    char current = artist_initial(center_index);
     int i = center_index - 1;
 
     if (i > 0)
     {
-        if (strncmp(artist_sort_name(i), current, 1))
-            current = artist_sort_name(i);
-        while (i > 0 && strncmp(artist_sort_name(i - 1), current, 1) == 0)
+        if (artist_initial(i) != current)
+            current = artist_initial(i);
+        while (i > 0 && artist_initial(i - 1) == current)
             i--;
         return i;
     }
@@ -186,12 +195,12 @@ static void artist_draw_text(void)
 {
     struct pf_caption cap;
     int txt_x, txt_y;
-    char *name;
+    char name[TAGCACHE_BUFSZ];
 
     if (global_settings.album_covers_show_album_name == ALBUM_NAME_HIDE)
         return;
 
-    name = artist_name(center_index);
+    artist_name(center_index, name, sizeof(name));
     struct viewport *saved_vp = carousel_text_begin();
     lcd_set_foreground(pf_fg_color);
     lcd_setfont(pf_bold_font);
@@ -227,12 +236,11 @@ static int artist_on_menu(void)
     int old_sort = global_settings.album_covers_sort_artists_by;
     int old_filter[CAROUSEL_FILTER_SLOTS];
     char old_chain[CAROUSEL_FILTER_MAX];
-    char name[128];
+    long seek = carousel_idx.artist_index[center_index].seek;
 
     memcpy(old_filter, global_settings.album_covers_filter, sizeof(old_filter));
     strmemccpy(old_chain, global_settings.album_covers_filter_chain,
                sizeof(old_chain));
-    strmemccpy(name, artist_name(center_index), sizeof(name));
 
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
@@ -248,7 +256,7 @@ static int artist_on_menu(void)
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;
         for (int i = 0; i < carousel_idx.artist_ct; i++)
-            if (!strcmp(artist_name(i), name))
+            if (carousel_idx.artist_index[i].seek == seek)
             {
                 set_current_slide(i);
                 break;

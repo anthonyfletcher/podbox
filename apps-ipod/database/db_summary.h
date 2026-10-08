@@ -2,7 +2,8 @@
  * GNU General Public License (version 2+)
  *
  * Interface to db_summary.c: the album and artist lists, copied out of the
- * tables tagcache keeps with the database in RAM.
+ * tables tagcache keeps with the database in RAM. Names are not copied; they
+ * are read by seek with db_summary_name().
  ****************************************************************************/
 #ifndef _DB_SUMMARY_H
 #define _DB_SUMMARY_H
@@ -27,9 +28,6 @@
  * index's own order and nobody's display order: a screen that wants some
  * other arrangement qsort()s the array itself. */
 struct album_data {
-    int name_idx;     /* offset to the album name */
-    int artist_idx;   /* offset to the artist name */
-    uint32_t key;     /* hashed from the two names */
     int year;         /* the latest of its tracks' */
     /* Playback history over the album's tracks. Both are 0 for an album that
      * has never been played, which is why the charts exclude 0 rather than
@@ -45,8 +43,6 @@ struct album_data {
 };
 
 struct artist_data {
-    int name_idx; /* offset to the artist name */
-    uint32_t key; /* hashed from the name */
     /* As struct album_data's pair, over everything by this album artist, so a
      * guest appearance counts towards the record's artist, not the guest */
     int playcount;
@@ -63,15 +59,10 @@ struct db_summary_t {
     int32_t             commitid;
     int32_t             serial;
     int32_t             deleted;
+    uint32_t            generation;
 
-    char               *artist_names;
     struct artist_data *artist_index;
-    size_t              artist_len;
-
-    unsigned int        album_untagged_idx;
-    char               *album_names;
     struct album_data  *album_index;
-    size_t              album_len;
     long                album_untagged_seek;    /* -1 for none */
 
     /* What is left of the caller's buffer past the lists */
@@ -88,6 +79,17 @@ int db_summary_build_into(struct db_summary_t *target, void *buf, size_t buf_sz)
 int db_summary_load_artists(struct db_summary_t *target,
                             void **buf, size_t *bufsz);
 
+/* Whether the lists' seeks still name what they named: false once a commit or
+ * a rebuild has moved the database on, and while its RAM copy is down. A list
+ * that is not current is built again before a seek in it is used. */
+bool db_summary_current(const struct db_summary_t *t);
+
+/* The name behind an album's or an artist's seek (tag_album or
+ * tag_albumartist), into buf: UNTAGGED for <Untagged>, and empty while 't' is
+ * not current rather than whatever the seek names now. Returns buf. */
+char *db_summary_name(const struct db_summary_t *t, int tag, long seek,
+                      char *buf, size_t size);
+
 /* Single albums, for a caller with no buffer to hold the list. Open, take
  * what you need, close. */
 struct db_summary_reader {
@@ -97,8 +99,7 @@ struct db_summary_reader {
 int db_summary_reader_open(struct db_summary_reader *r);
 void db_summary_reader_close(struct db_summary_reader *r);
 
-/* Album n of r->album_ct into *out, its names left unset. False if there is
- * no such album. */
+/* Album n of r->album_ct into *out. False if there is no such album. */
 bool db_summary_read_album(struct db_summary_reader *r, int n,
                            struct album_data *out);
 

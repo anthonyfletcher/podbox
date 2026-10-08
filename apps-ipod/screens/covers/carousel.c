@@ -3848,7 +3848,7 @@ static bool init(void)
     ret = model->build_index();
 
     /* The index and the slides share the app buffer, which a big enough
-     * library fills: from about 6,000 albums on a 5G. */
+     * library fills: from about 12,000 albums on a 5G. */
     if (ret == ERROR_BUFFER_FULL)
     {
         error_wait("Library too large for this screen");
@@ -4170,6 +4170,35 @@ static int album_covers_loop(void)
         skin_inhibit_flush(true);
         button = get_custom_action(CONTEXT_PLUGIN, timeout, get_context_map);
         skin_inhibit_flush(false);
+
+        /* The index's seeks, and the captions read through them, hold only
+         * for the commit they were read in. Checked here, between the wait and
+         * anything that uses a seek: after a commit or a rebuild the index is
+         * built again and the button dropped; while the tables are down the
+         * screen closes, as it would refuse to open. */
+        if (!db_summary_current(&carousel_idx))
+        {
+            if (!check_database())
+            {
+                splash(HZ, tagcache_ram_refused()
+                           ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
+                           : ID2P(LANG_TAGCACHE_BUSY));
+                return GO_TO_PREVIOUS;
+            }
+            if (!carousel_reinit())
+                return GO_TO_PREVIOUS;
+            model->set_initial(NULL);
+            sb_set_persistent_title(model->title, Icon_NOICON, SCREEN_MAIN);
+            lcd_set_viewport(&pf_vp);
+            lcd_set_background(pf_bg_color);
+            lcd_set_foreground(pf_fg_color);
+            lcd_set_drawmode(DRMODE_FG);
+            button = ACTION_NONE;
+            art_owed = true;
+            caption_owed = true;
+            full_repaint_owed = true;
+            full_flush_owed = true;
+        }
 
         /* What the status bar drew during that call, and where. Taking the
          * rectangles takes responsibility for flushing them, which is this

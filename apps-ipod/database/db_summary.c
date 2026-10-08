@@ -7,13 +7,14 @@
  *
  * tagcache keeps the album and artist tables with the database in RAM (see
  * tagcache_album_get()), current with every commit and every play. This
- * copies them out into a caller's buffer as names and records the screens
- * read, leaving out spoken word when Segregate Audiobooks keeps it apart.
+ * copies them out into a caller's buffer as the records the screens read,
+ * leaving out spoken word when Segregate Audiobooks keeps it apart. Names stay
+ * in the database and are read by seek, which holds only for one commit.
  * Nothing is built in the background or kept on disk; the lists exist while
  * the database is in RAM.
  *
  * Parts, in order:
- *   - what is left out, and copying names
+ *   - what is left out, and reading names
  *   - the artist and album lists
  *   - single albums, for a caller with no buffer
  *   - the order table for album lists
@@ -26,7 +27,6 @@
 #include <stddef.h>
 #include "string-extra.h"
 #include "config.h"
-#include "system/hash.h"
 #include "system.h"          /* ALIGN_BUFFER */
 #include "kernel.h"
 #include "lang.h"
@@ -38,7 +38,7 @@
 #include "playlist/playlist.h"
 #include "db_summary.h"
 
-/* ---- what is left out, and copying names ------------------------------- */
+/* ---- what is left out, and reading names ------------------------------- */
 
 /* Spoken word, when Segregate Audiobooks keeps it out of the music: an album
  * all of whose tracks are spoken, and an artist all of whose albums are */
@@ -54,45 +54,29 @@ static bool artist_hidden(const struct tagcache_artist *r)
            && r->spoken_albums == r->albums;
 }
 
-/* Identity hashed from the names: an album's from its name and its artist's,
- * an artist's from its name alone */
-static uint32_t name_key(const char *a, const char *b)
+bool db_summary_current(const struct db_summary_t *t)
 {
-    uint32_t h = FNV1A_BASIS;
-
-    for (; a && *a; a++)
-        h = fnv1a_byte(h, (unsigned char)*a);
-    h = fnv1a_byte(h, 0);
-    for (; b && *b; b++)
-        h = fnv1a_byte(h, (unsigned char)*b);
-    return h;
+    return tagcache_is_in_ram() && t->commitid == tagcache_commit_id()
+           && t->generation == tagcache_generation();
 }
 
-/* A name at the end of the blob being filled; its offset into the blob, or
- * -1 when it does not fit. A value with no tag is UNTAGGED. */
-static int add_name(int tag, long seek, char *blob, size_t *len, size_t cap)
+char *db_summary_name(const struct db_summary_t *t, int tag, long seek,
+                      char *buf, size_t size)
 {
-    char name[TAGCACHE_BUFSZ];
-    size_t n;
-
-    if (!tagcache_seek_string(tag, seek, name, sizeof(name)))
-        strmemccpy(name, UNTAGGED, sizeof(name));
-    n = strlen(name) + 1;
-    if (*len + n > cap)
-        return -1;
-    memcpy(blob + *len, name, n);
-    *len += n;
-    return *len - n;
+    if (!db_summary_current(t))
+        buf[0] = '\0';
+    else if (!tagcache_seek_string(tag, seek, buf, size))
+        strmemccpy(buf, UNTAGGED, size);
+    return buf;
 }
 
 /* ---- the artist and album lists ---------------------------------------- */
 
-/* The artist half into *buf, advancing it: the array, then its names */
+/* The artist half into *buf, advancing it */
 static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
 {
     struct tagcache_artist r;
     int nr = tagcache_artist_count(), n = 0;
-    size_t len = 0, cap;
     char *p = ALIGN_UP(*buf, sizeof(long));
     size_t left = *bufsz - (p - *buf);
 
@@ -105,22 +89,14 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
         return ERROR_BUFFER_FULL;
 
     t->artist_index = (struct artist_data *)p;
-    t->artist_names = p + n * sizeof(struct artist_data);
-    cap = left - n * sizeof(struct artist_data);
 
     n = 0;
     for (int i = 0; i < nr; i++)
     {
         struct artist_data *d = &t->artist_index[n];
-        int at;
 
         if (!tagcache_artist_get(i, &r) || artist_hidden(&r))
             continue;
-        at = add_name(tag_albumartist, r.seek, t->artist_names, &len, cap);
-        if (at < 0)
-            return ERROR_BUFFER_FULL;
-        d->name_idx = at;
-        d->key = name_key(t->artist_names + at, NULL);
         d->playcount = r.playcount;
         d->lastplayed = r.lastplayed;
         d->seek = r.seek;
@@ -128,40 +104,23 @@ static int fill_artists(struct db_summary_t *t, char **buf, size_t *bufsz)
         n++;
     }
     t->artist_ct = n;
-    t->artist_len = len;
-    *bufsz -= (t->artist_names + len) - *buf;
-    *buf = t->artist_names + len;
+    p += n * sizeof(struct artist_data);
+    *bufsz -= p - *buf;
+    *buf = p;
     return SUCCESS;
 }
 
-/* The listed artist with this seek, by its place in seek order */
-static const struct artist_data *find_artist(const struct db_summary_t *t,
-                                             long seek)
-{
-    int lo = 0, hi = t->artist_ct - 1;
-
-    while (lo <= hi)
-    {
-        int mid = (lo + hi) / 2;
-
-        if (t->artist_index[mid].seek == seek)
-            return &t->artist_index[mid];
-        if (t->artist_index[mid].seek < seek)
-            lo = mid + 1;
-        else
-            hi = mid - 1;
-    }
-    return NULL;
-}
-
-/* The index's own order: by artist, then by album name */
+/* The index's own order: by artist, then by album name. A tag file is in name
+ * order, so seek order is name order. */
 static int compare_index_order(const void *a_v, const void *b_v)
 {
     const struct album_data *a = a_v, *b = b_v;
 
-    if (a->artist_idx != b->artist_idx)
-        return a->artist_idx < b->artist_idx ? -1 : 1;
-    return a->name_idx - b->name_idx;
+    if (a->artist_seek != b->artist_seek)
+        return a->artist_seek < b->artist_seek ? -1 : 1;
+    if (a->seek != b->seek)
+        return a->seek < b->seek ? -1 : 1;
+    return 0;
 }
 
 static void stamp(struct db_summary_t *t)
@@ -172,13 +131,14 @@ static void stamp(struct db_summary_t *t)
     t->commitid = marks.commitid;
     t->serial = marks.serial;
     t->deleted = marks.deleted_ct;
+    t->generation = marks.generation;
 }
 
 int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
 {
     struct tagcache_album a;
     char *p = buf;
-    size_t left = buf_sz, len = 0, cap;
+    size_t left = buf_sz;
     int na = tagcache_album_count(), n = 0, ret;
 
     memset(t, 0, sizeof(*t));
@@ -204,26 +164,15 @@ int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
     if (left < n * sizeof(struct album_data))
         return ERROR_BUFFER_FULL;
     t->album_index = (struct album_data *)p;
-    t->album_names = p + n * sizeof(struct album_data);
-    cap = left - n * sizeof(struct album_data);
 
     n = 0;
     for (int i = 0; i < na; i++)
     {
         struct album_data *d = &t->album_index[n];
-        const struct artist_data *ar;
-        int at;
+        char c[2];
 
         if (!tagcache_album_get(i, &a) || album_hidden(&a))
             continue;
-        at = add_name(tag_album, a.album_seek, t->album_names, &len, cap);
-        if (at < 0)
-            return ERROR_BUFFER_FULL;
-        ar = find_artist(t, a.artist_seek);
-        d->name_idx = at;
-        d->artist_idx = ar ? ar->name_idx : 0;
-        d->key = name_key(t->album_names + at,
-                          ar ? t->artist_names + ar->name_idx : NULL);
         d->year = a.year;
         d->playcount = a.playcount;
         d->lastplayed = a.lastplayed;
@@ -231,19 +180,16 @@ int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
         d->seek = a.album_seek;
         d->art_hash = a.art_hash;
         d->artist_art_hash = a.artist_art_hash;
+        /* False only for <Untagged>: the RAM copy is up while the table is */
         if (t->album_untagged_seek < 0
-            && !strcmp(t->album_names + at, UNTAGGED))
-        {
+            && !tagcache_seek_string(tag_album, a.album_seek, c, sizeof(c)))
             t->album_untagged_seek = a.album_seek;
-            t->album_untagged_idx = at;
-        }
         n++;
     }
     t->album_ct = n;
-    t->album_len = len;
     qsort(t->album_index, n, sizeof(*t->album_index), compare_index_order);
 
-    t->buf = t->album_names + len;
+    t->buf = p + n * sizeof(struct album_data);
     t->buf_sz = buf_sz - ((char *)t->buf - (char *)buf);
     return SUCCESS;
 }
