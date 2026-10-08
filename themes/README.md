@@ -36,6 +36,10 @@ firmware instead.
 
 [Click for more information](iclassic_square_dark/README.md)
 
+## iclassic_square_light
+
+[Click for more information](iclassic_square_light/README.md)
+
 ## jive
 
 <img src="jive/ss_1.png"/>

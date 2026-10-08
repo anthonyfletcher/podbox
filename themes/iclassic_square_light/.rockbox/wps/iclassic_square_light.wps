@@ -1,0 +1,109 @@
+#-----------------------------------------------#
+#iclassic_square_light
+#(CC-BY-SA 3.0) by Humberto Santana
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#Colours: vivid is the album's most colourful colour, and
+#iClassic blue (186dbd, toned to suit) with none. Bars take
+#it at tone 60 or darker and icons and text at 50, so both
+#read on white; vivid<60.75 is the bars' lower, darker half.
+#The title bar takes it at 60 or lighter, so black text reads
+#on it. Every other colour is pinned with !. Each word
+#carries the blue as its fallback, already at its tone.
+#
+#Which parts take vivid is set in
+#themes/iclassic_square_light.preferences, read at load. An
+#entry that is missing reads as its default: the tests for a
+#yes default ask for no, and those for a no ask for yes.
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,24x24-icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+%Fl(4,16-noto-sans-bold.fnt)
+%Fl(5,16-noto-sans.fnt)
+#
+#Background layer
+#
+#- Title bar
+%V(0,0,-,-,-)%VB%Vb(!ffffff)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid>60:3c8cde,vivid>60.85:3377bd)|%dr(0,0,320,23,!ebebeb,!d3d3d3)>
+%dr(0,23,320,1,!afafaf)
+#
+#- Progress track. Here, not %Vb: %pb clears to the backdrop
+%dr(60,214,200,6,!d5d5d5)
+%dr(60,220,200,6,!dfdfdf)
+#
+#- Reflection fade under the cover
+%dr(8,184,150,22,!e3e3e3,!ffffff)
+#
+#Foreground layer
+#
+#- Volume or progress. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%?mv(2)<%Vd(Volume)|%Vd(Progress)>
+%?mh<%Vd(Status)|%?mp<%Vd(StatusWide)|%Vd(Status)|%Vd(Status)|%Vd(Status)|%Vd(Status)>>
+#
+#- Title
+%V(6,3,190,19,4)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_text:),=,yes)<%Vf(vivid<50:186dbd)|>%Sx(Now Playing)
+#
+#- Status icons, in 24px slots: battery rightmost, then hold or
+#  transport, then the rest, which close up when there is no
+#  transport icon. Split so the two can take their own colours
+%Vl(Status,198,0,72,23,2)%Vf(!000000)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(StatusWide,198,0,96,23,2)%Vf(!000000)
+%ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%V(270,0,24,23,2)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid<50:186dbd)|>%?mh<À|%?mp<|A|B|G|F>>
+%V(294,0,24,23,2)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid<50:186dbd)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
+#  nothing here copies to screen once the art arrives
+%V(8,32,150,150,2)%Vy%Vg(!c5c5c5,!dfdfdf,!6f6f6f)
+%?C<|%ac%Vs(gradient)b>
+%Cl(0,0,150,150,c,c)%Cd
+#
+#Track
+#
+#- Title, artist, album
+%V(170,36,146,22,3)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_song_text:),=,yes)<%Vf(vivid<50:186dbd)|>%s%?it<%it|%fn>
+%V(170,60,146,20,4)%Vf(!6f6f6f)
+%s%?ia<%ia|%?d(2)<%d(2)|>>
+%V(170,80,146,20,5)%Vf(!6f6f6f)
+%s%?id<%id|%?d(1)<%d(1)|>>
+#
+#- Rating
+%V(170,102,146,24,2)%Vf(!6f6f6f)
+%sel(%rr,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)
+#
+#- Playlist position
+%V(170,128,146,20,5)%Vf(!6f6f6f)
+%pp %Sx(of) %pe
+#
+#Progress, in two tones: vivid over a shade of it, or black
+#over dark grey
+%Vl(Progress,2,210,52,20,4)%Vf(!000000)
+%ar%pc
+%Vl(Progress,60,214,200,6,-)%Vf(vivid<60:186dbd)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_progress_bar:),=,no)<%Vf(!000000)|>%pb(0,0,-,-,noborder)
+%Vl(Progress,60,220,200,6,-)%Vf(vivid<60.75:12528e)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_progress_bar:),=,no)<%Vf(!404040)|>%pb(0,0,-,-,noborder)
+%Vl(Progress,266,210,52,20,4)%Vf(!000000)
+%al-%pr
+#
+#Volume
+%Vl(Volume,32,208,24,24,2)%Vf(vivid<50:186dbd)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_volume_icons:),=,no)<%Vf(!000000)|>N
+%Vl(Volume,60,214,200,6,-)%Vf(vivid<60:186dbd)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_volume_bar:),=,no)<%Vf(!000000)|>%pv(0,0,-,-,noborder)
+%Vl(Volume,60,220,200,6,-)%Vf(vivid<60.75:12528e)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_volume_bar:),=,no)<%Vf(!404040)|>%pv(0,0,-,-,noborder)
+%Vl(Volume,264,208,24,24,2)%Vf(vivid<50:186dbd)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_volume_icons:),=,no)<%Vf(!000000)|>O

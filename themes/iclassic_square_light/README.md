@@ -1,4 +1,4 @@
-# iClassic Square Dark
+# iClassic Square Light
 
 ## Details
 
@@ -6,9 +6,9 @@
 - Created by: Humberto Santana
 - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 
-A dark version of iClassic Square: white and grey on black. The progress bar,
-the volume bar and the selected row take their colour from the album playing;
-the preferences below choose which parts do. With no cover art to take a
+iClassic Square Dark turned the other way round: black and grey on white. The
+progress bar, the volume bar and the selected row take their colour from the
+album playing; the preferences below choose which parts do. With no cover art to take a
 colour from, they are iClassic blue.
 
 Modified to support dynamic colours and album/artist art.
@@ -25,17 +25,11 @@ Modified to support dynamic colours and album/artist art.
 - Copyright 2026 Micro Noto Sans Authors (https://github.com/D0-0K/MicroNotoSans)
 - Full text: `/.rockbox/fonts/LICENSE-Noto.txt`
 
-## Screenshots
-
-<img src="ss_1.png"/>
-<img src="ss_2.png"/>
-<img src="ss_3.png"/>
-
 ## Preferences
 
-Edit `/.rockbox/themes/iclassic_square_dark.preferences` on the player, then
+Edit `/.rockbox/themes/iclassic_square_light.preferences` on the player, then
 load the theme again to pick the change up. `yes` gives a part the album's
-colour and `no` keeps it white.
+colour and `no` keeps it black.
 
 | Preference | Values | Default | What it colours |
 |---|---|---|---|
@@ -44,10 +38,9 @@ colour and `no` keeps it white.
 | `vivid_volume_bar` | `yes`, `no` | `yes` | The volume bar, shown in place of the progress bar while the volume changes. |
 | `vivid_transport_icon` | `yes`, `no` | `no` | The play, pause, fast-forward, rewind and hold icon in the title bar. |
 | `vivid_battery_icon` | `yes`, `no` | `no` | The battery icon in the title bar. |
-| `vivid_title_bar` | `yes`, `no` | `no` | The bar along the top of the screen. `no` keeps it grey. |
 | `vivid_title_text` | `yes`, `no` | `no` | The title bar's text: the list's name, or Now Playing. |
 | `vivid_song_text` | `yes`, `no` | `no` | The song's title, on the playing screen and in the pane beside lists. |
-| `vivid_selection` | `yes`, `no` | `yes` | The bar behind the selected row. `no` makes it white. |
+| `vivid_selection` | `yes`, `no` | `yes` | The bar behind the selected row. `no` makes it black. |
 
 ## Installation
 
@@ -55,4 +48,4 @@ Download the ZIP file from the release page [here](https://github.com/anthonyfle
 
 Unzip and copy the .rockbox folder to the root of your iPod drive.
 
-Select `Settings > Appearance > Load Theme` and then `iclassic_square_dark` from the list
+Select `Settings > Appearance > Load Theme` and then `iclassic_square_light` from the list

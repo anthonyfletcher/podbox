@@ -4,10 +4,13 @@
 #CC BY-SA 3.0
 #-----------------------------------------------#
 #
-#Colours: vivid is the album's most colourful colour, white
-#with none. Bars take it at tone 40 or lighter and icons and
-#text at 50, so both read on black; vivid>40.75 is the bars'
-#lower, darker half. Every other colour is pinned with !.
+#Colours: vivid is the album's most colourful colour, and
+#iClassic blue (186dbd, toned to suit) with none. Bars take
+#it at tone 40 or lighter and icons and text at 50, so both
+#read on black; vivid>40.75 is the bars' lower, darker half.
+#The title bar takes it at 40 or darker, so white text reads
+#on it. Every other colour is pinned with !. Each word
+#carries the blue as its fallback, already at its tone.
 #
 #Which parts take vivid is set in
 #themes/iclassic_square_dark.preferences, read at load. An
@@ -27,7 +30,7 @@
 #
 #- Title bar
 %V(0,0,-,-,-)%VB%Vb(!000000)%Vf(!ffffff)
-%dr(0,0,320,23,!2c2c2c,!141414)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid<40:0056a5,vivid<40.50:002b52)|%dr(0,0,320,23,!2c2c2c,!141414)>
 %dr(0,23,320,1,!505050)
 #
 #- Progress track. Here, not %Vb: %pb clears to the backdrop
@@ -46,7 +49,7 @@
 #
 #- Title
 %V(6,3,190,19,4)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50)|>%Sx(Now Playing)
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_title_text:),=,yes)<%Vf(vivid>50:1d71c1)|>%Sx(Now Playing)
 #
 #- Status icons, in 24px slots: battery rightmost, then hold or
 #  transport, then the rest, which close up when there is no
@@ -56,9 +59,9 @@
 %Vl(StatusWide,198,0,96,23,2)%Vf(!ffffff)
 %ar%?ps<I|>%?mm<|K|L|H|K>%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
 %V(270,0,24,23,2)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid>50)|>%?mh<À|%?mp<|A|B|G|F>>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid>50:1d71c1)|>%?mh<À|%?mp<|A|B|G|F>>
 %V(294,0,24,23,2)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid>50)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid>50:1d71c1)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
 #
 #- Cover or grey tile. Same size as the .sbs cover. Not in %VB, which
 #  nothing here copies to screen once the art arrives
@@ -70,7 +73,7 @@
 #
 #- Title, artist, album
 %V(170,36,146,22,3)%Vf(!ffffff)
-%?if(%ft(themes/iclassic_square_dark.preferences,vivid_song_text:),=,yes)<%Vf(vivid>50)|>%s%?it<%it|%fn>
+%?if(%ft(themes/iclassic_square_dark.preferences,vivid_song_text:),=,yes)<%Vf(vivid>50:1d71c1)|>%s%?it<%it|%fn>
 %V(170,60,146,20,4)%Vf(!909090)
 %s%?ia<%ia|%?d(2)<%d(2)|>>
 %V(170,80,146,20,5)%Vf(!909090)
@@ -88,19 +91,19 @@
 #over grey
 %Vl(Progress,2,210,52,20,4)%Vf(!ffffff)
 %ar%pc
-%Vl(Progress,60,214,200,6,-)%Vf(vivid>40)
+%Vl(Progress,60,214,200,6,-)%Vf(vivid>40:186dbd)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!ffffff)|>%pb(0,0,-,-,noborder)
-%Vl(Progress,60,220,200,6,-)%Vf(vivid>40.75)
+%Vl(Progress,60,220,200,6,-)%Vf(vivid>40.75:12528e)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_progress_bar:),=,no)<%Vf(!bfbfbf)|>%pb(0,0,-,-,noborder)
 %Vl(Progress,266,210,52,20,4)%Vf(!ffffff)
 %al-%pr
 #
 #Volume
-%Vl(Volume,32,208,24,24,2)%Vf(vivid>50)
+%Vl(Volume,32,208,24,24,2)%Vf(vivid>50:1d71c1)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>N
-%Vl(Volume,60,214,200,6,-)%Vf(vivid>40)
+%Vl(Volume,60,214,200,6,-)%Vf(vivid>40:186dbd)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!ffffff)|>%pv(0,0,-,-,noborder)
-%Vl(Volume,60,220,200,6,-)%Vf(vivid>40.75)
+%Vl(Volume,60,220,200,6,-)%Vf(vivid>40.75:12528e)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_bar:),=,no)<%Vf(!bfbfbf)|>%pv(0,0,-,-,noborder)
-%Vl(Volume,264,208,24,24,2)%Vf(vivid>50)
+%Vl(Volume,264,208,24,24,2)%Vf(vivid>50:1d71c1)
 %?if(%ft(themes/iclassic_square_dark.preferences,vivid_volume_icons:),=,no)<%Vf(!ffffff)|>O

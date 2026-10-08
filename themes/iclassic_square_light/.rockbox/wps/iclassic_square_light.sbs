@@ -1,0 +1,150 @@
+#-----------------------------------------------#
+#iclassic_square_light
+#(CC-BY-SA 3.0) by Humberto Santana
+#CC BY-SA 3.0
+#-----------------------------------------------#
+#
+#Colours: vivid is the album's most colourful colour, and
+#iClassic blue (186dbd, toned to suit) with none. Icons and
+#text take it at tone 50 or darker, so they read on white;
+#the selection bar at 40 or darker, so white text reads on
+#it; the title bar at 60 or lighter, so black text does.
+#Every other colour is pinned with !. Each word carries the
+#blue as its fallback, already at its tone.
+#
+#Which parts take vivid is set in
+#themes/iclassic_square_light.preferences, read at load. An
+#entry that is missing reads as its default: the tests for a
+#yes default ask for no, and those for a no ask for yes.
+#
+#Status bar off
+%wd
+#
+#Preload fonts
+%Fl(2,24x24-icons.fnt)
+%Fl(3,18-noto-sans-bold.fnt)
+%Fl(4,16-noto-sans-bold.fnt)
+%Fl(5,16-noto-sans.fnt)
+#
+#Background layer
+#
+#- Title bar and list rule
+%V(0,0,-,-,-)%VB%Vb(!ffffff)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid>60:3c8cde,vivid>60.85:3377bd)|%dr(0,0,320,23,!ebebeb,!d3d3d3)>
+%dr(0,23,320,1,!afafaf)
+%dr(160,24,1,216,!cfcfcf)
+#
+#Foreground layer
+#
+#- Empty pane: its clear repaints the margins after Cover Flow
+%Vl(Pane,160,24,160,216,-)
+#
+#- Cover or grey tile. Not in %VB, which nothing here copies to screen
+%Vl(Pane,166,30,150,150,2)%Vy%Vg(!c5c5c5,!dfdfdf,!6f6f6f)
+%?C<|%ac%Vs(gradient)b>
+%Cl(0,0,150,150,c,c)%Cd
+#
+#- Screen switches. 1x1 because a flip clears its line
+%V(319,239,1,1,-)
+%Vd(Chrome)
+%?mh<%Vd(Status)|%?mp<%Vd(StatusWide)|%Vd(Status)|%Vd(Status)|%Vd(Status)|%Vd(Status)>>
+%?if(%cs,=,10)<%Vd(QuickBg)%?if(%QT,!=,ERR)<%Vd(QuickT)>%?if(%QL,!=,ERR)<%Vd(QuickL)>%?if(%QR,!=,ERR)<%Vd(QuickR)>%?if(%QB,!=,ERR)<%Vd(QuickB)>>
+%?if(%cs,=,22)<|%Vd(Pane)>
+#
+#Rows: plain 24, art 46
+%Lb(Rows,160,24,-,46)
+#
+#Set up list
+%Vi(list,0,24,160,216,3)%Vb(!ffffff)%Vf(!000000)
+#
+#- Hidden list for the quick screen
+%Vi(qsblank,0,0,1,1,-)
+#
+%V(318,239,1,1,-)%Vb(!ffffff)%Vf(!000000)%?if(%cs,=,10)<%VI(qsblank)|%VI(list)>
+#
+#- Title
+%Vl(Chrome,6,3,196,19,4)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_text:),=,yes)<%Vf(vivid<50:186dbd)|>%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<iPod|%s%Lt>>
+#
+#- Status icons, in 24px slots: battery rightmost, then hold or
+#  transport, then the rest, which close up when there is no
+#  transport icon. Split so the two can take their own colours
+%Vl(Status,222,0,48,23,2)%Vf(!000000)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(StatusWide,222,0,72,23,2)%Vf(!000000)
+%ar%?or(%lh,%lb,%lw)<%?la<á|â|ã|ä|å|æ|ç|è>|>
+%Vl(Chrome,270,0,24,23,2)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_transport_icon:),=,yes)<%Vf(vivid<50:186dbd)|>%?mh<À|%?mp<|A|B|G|F>>
+%Vl(Chrome,294,0,24,23,2)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_battery_icon:),=,yes)<%Vf(vivid<50:186dbd)|>%?bc<%?bl<·|·|¸|¸|¸|¸|¹|º>|%?bl<1|1|2|3|4|5|6|7>>
+#
+#- Selected row: a vivid bar with white text, or a black one
+#
+#- Plain row, the full width where there is no chevron
+%Vl(Rows,0,0,160,24,3)%Vy
+%?La<|%?and(%or(%if(%cs,!=,6),%and(%if(%LI,!=,19),%if(%LI,!=,0),%if(%LI,!=,2),%if(%LI,!=,4),%if(%LI,!=,7),%if(%LI,!=,10),%if(%LI,!=,22),%if(%LI,!=,24),%if(%LI,!=,25),%if(%LI,!=,26),%if(%LI,!=,29),%if(%LI,!=,30))),%or(%and(%if(%cs,!=,7),%if(%cs,!=,8),%if(%cs,!=,13),%if(%cs,!=,27),%if(%cs,!=,28)),%if(%LI,!=,1)),%or(%if(%cs,!=,13),%if(%LI,!=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+#
+#- Plain row beside a chevron. Only one of the two draws a
+#  given row, so neither clears the other's text
+%Vl(Rows,0,0,136,24,3)%Vy
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)>>
+#
+#- Plain row chevron
+%Vl(Rows,136,0,24,24,2)%Vy
+%?La<|%?or(%and(%if(%cs,=,6),%or(%if(%LI,=,19),%if(%LI,=,0),%if(%LI,=,2),%if(%LI,=,4),%if(%LI,=,7),%if(%LI,=,10),%if(%LI,=,22),%if(%LI,=,24),%if(%LI,=,25),%if(%LI,=,26),%if(%LI,=,29),%if(%LI,=,30))),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>Þ>>
+#
+#- Art row special icon. Must stay above the cover
+%Vl(Rows,10,11,24,24,2)
+%?La<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vf(!000000)|%Vf(vivid<50:186dbd)>|%Vf(!000000)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([Finished]),×,%Sx([Not Started]),Ö,%Sx([In Progress]),q)>
+#
+#- Art row cover
+%Vl(Rows,1,1,44,44,-)
+%?and(%La,%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([Random])),%if(%LT,!=,%Sx([Resume])),%if(%LT,!=,%Sx([Featured In])),%if(%LT,!=,%Sx([Untagged])),%if(%LT,!=,%Sx([By album])),%if(%LT,!=,%Sx([Finished])),%if(%LT,!=,%Sx([Not Started])),%if(%LT,!=,%Sx([In Progress])))<%La>
+#
+#- Art row text
+%Vl(Rows,46,0,114,46,3)%Vy
+%?La<%?Lc<%?if(%ft(themes/iclassic_square_light.preferences,vivid_selection:),=,no)<%Vg(!000000,!000000,!ffffff)|%Vg(vivid<40:0056a5,vivid<40:0056a5,!ffffff)>%Vs(gradient)|%Vf(!000000)>%s %sel(%LT,%Sx([All Tracks]),%ss(1,10,%LT),%Sx([Random]),%ss(1,6,%LT),%Sx([Resume]),%ss(1,6,%LT),%Sx([Featured In]),%ss(1,11,%LT),%Sx([Untagged]),%ss(1,8,%LT),%Sx([By album]),%ss(1,8,%LT),%Sx([Finished]),%ss(1,8,%LT),%Sx([Not Started]),%ss(1,11,%LT),%Sx([In Progress]),%ss(1,11,%LT),%LT)|>
+#
+#Now-playing pane
+%Vl(Pane,166,184,150,22,3)%Vf(!000000)
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_song_text:),=,yes)<%Vf(vivid<50:186dbd)|>%s%?it<%it|%fn>
+%Vl(Pane,166,206,150,20,4)%Vf(!6f6f6f)
+%s%?ia<%ia|%?d(2)<%d(2)|>>
+#
+#Quick screen
+#
+#- Background
+%Vl(QuickBg,0,24,160,216,-)
+%dr(0,0,160,216,!ffffff)
+#
+#- Up
+%Vl(QuickT,4,30,24,24,2)%Vf(vivid<50:186dbd)
+Ý
+%Vl(QuickT,32,30,124,20,4)%Vf(!6f6f6f)
+%s%QT
+%Vl(QuickT,32,50,124,22,3)%Vf(!000000)
+%s%Qt
+#
+#- Left
+%Vl(QuickL,4,82,24,24,2)%Vf(vivid<50:186dbd)
+à
+%Vl(QuickL,32,82,124,20,4)%Vf(!6f6f6f)
+%s%QL
+%Vl(QuickL,32,102,124,22,3)%Vf(!000000)
+%s%Ql
+#
+#- Right
+%Vl(QuickR,4,134,24,24,2)%Vf(vivid<50:186dbd)
+Þ
+%Vl(QuickR,32,134,124,20,4)%Vf(!6f6f6f)
+%s%QR
+%Vl(QuickR,32,154,124,22,3)%Vf(!000000)
+%s%Qr
+#
+#- Down
+%Vl(QuickB,4,186,24,24,2)%Vf(vivid<50:186dbd)
+ß
+%Vl(QuickB,32,186,124,20,4)%Vf(!6f6f6f)
+%s%QB
+%Vl(QuickB,32,206,124,22,3)%Vf(!000000)
+%s%Qb
