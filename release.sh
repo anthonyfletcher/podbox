@@ -1,16 +1,16 @@
 #!/bin/sh
 # Build the current commit on the build server and publish it as the rolling
-# `latest` release, plus the Windows simulator as `Simulator` and the extra
-# themes as `Themes`.
+# `latest` release, plus the Windows simulator as `Simulator`, the extra
+# themes as `Themes` and the bootloader installer as `Bootloader`.
 #
-# There are no version tags. Every run replaces all three releases and moves
+# There are no version tags. Every run replaces all four releases and moves
 # their tags to the commit that was built, so the release page always shows the
 # current build and nothing else.
 #
-# Three releases rather than one page of assets: the firmware zips unpack onto
-# a player, the simulator zips unpack onto a PC and the theme zips are optional
-# extras, and a page that offers them all side by side invites unpacking the
-# wrong one.
+# Four releases rather than one page of assets: the firmware zips unpack onto
+# a player, the simulator zips unpack onto a PC, the theme zips are optional
+# extras and the bootloader is installed once from a PC, and a page that
+# offers them all side by side invites unpacking the wrong one.
 #
 # `latest` is published last. GitHub features whichever release was created
 # most recently, and that is the one the repository's front page links to, so
@@ -47,9 +47,9 @@
 #   --no-sim      skip the simulator; leave the Simulator release as it is
 #
 # Requires: ssh to the build server (key-based, non-interactive), and `gh`
-# installed and authenticated THERE -- see the --repo note further down. The
-# simulator also needs mingw-w64 and the SDL2 mingw wrapper on the server;
-# --no-sim is the way past a box without them.
+# installed and authenticated THERE -- see the --repo note further down, and
+# mingw-w64 for the bootloader installer's tools. The simulator also needs the
+# SDL2 mingw wrapper on the server; --no-sim is the way past a box without it.
 
 set -eu
 
@@ -65,10 +65,14 @@ REMOTE_ROOT=${PODBOX_BUILD_ROOT:-podbox-release}
 
 TARGETS="ipod6g ipodvideo"
 
-# The three releases, reused forever. Their tags are moved to each commit built.
+# The four releases, reused forever. Their tags are moved to each commit built.
 RELEASE=latest
 SIM_RELEASE=Simulator
 THEMES_RELEASE=Themes
+BOOT_RELEASE=Bootloader
+
+# What build-bootloader.sh makes, under the name it is published as.
+BOOT_ASSET=podbox-bootloader.zip
 
 # The themes published as their own download. Scrim is not among them: it is
 # the theme the firmware ships with, and bundle-theme.sh puts it in the build.
@@ -192,9 +196,9 @@ ssh -o BatchMode=yes "$SERVER" 'command -v arm-elf-eabi-gcc >/dev/null' ||
 # build-sim.sh checks this too, but only after configure has wiped and
 # recreated the build directory -- and finding out here costs two firmware
 # builds less.
+ssh -o BatchMode=yes "$SERVER" 'command -v x86_64-w64-mingw32-gcc >/dev/null' ||
+    die "no x86_64-w64-mingw32-gcc on $SERVER -- the bootloader installer's tools need it"
 if [ -n "$WITH_SIM" ]; then
-    ssh -o BatchMode=yes "$SERVER" 'command -v x86_64-w64-mingw32-gcc >/dev/null' ||
-        die "no x86_64-w64-mingw32-gcc on $SERVER -- pass --no-sim to skip the simulator"
     ssh -o BatchMode=yes "$SERVER" \
         'PATH=$HOME/bin:$PATH command -v x86_64-w64-mingw32-sdl2-config >/dev/null' ||
         die "no x86_64-w64-mingw32-sdl2-config on $SERVER (\$HOME/bin holds the
@@ -254,7 +258,8 @@ echo "  $(printf '%s\n' "$CHANGES" | wc -l | tr -d ' ') commits to list"
 NOTES=$(mktemp)
 SIM_NOTES=$(mktemp)
 THEMES_NOTES=$(mktemp)
-trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
+BOOT_NOTES=$(mktemp)
+trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES"' EXIT
 
 {
     printf 'Built from `%s` on `%s`.\n\n' "$(git rev-parse HEAD)" "$BRANCH"
@@ -307,11 +312,24 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES"' EXIT
     printf 'installed in any order and on their own.\n'
 } > "$THEMES_NOTES"
 
+# No commit list here either: the bootloader changes rarely, and is installed
+# once rather than with every build.
+{
+    printf 'The PodBox bootloader for both players, with the Windows tools that\n'
+    printf 'install it. From `%s`.\n\n' "$(git rev-parse HEAD)"
+    printf 'With it the player starts PodBox even when the hold switch is on.\n'
+    printf 'Hold Menu while it starts for Apple'"'"'s firmware.\n\n'
+    printf 'Unzip `%s` anywhere and follow its `README.txt`:\n' "$BOOT_ASSET"
+    printf 'run `install-5g.cmd` for an iPod Video 5G/5.5G, or\n'
+    printf '`install-6g.cmd` for an iPod Classic 6G/7G. It is installed once;\n'
+    printf 'updating PodBox does not replace it.\n'
+} > "$BOOT_NOTES"
+
 # ------------------------------------------------------------------- plan ---
 
 cat <<PLAN
 
-  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} then $RELEASE${DRAFT:+  (draft)}
+  releases   $THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $BOOT_RELEASE, then $RELEASE${DRAFT:+  (draft)}
   commit     $COMMIT on $BRANCH
   repo       $SLUG
   targets    $TARGETS${WITH_SIM:+  (firmware and Windows simulator)}
@@ -336,11 +354,16 @@ echo "--------------------"
 cat "$THEMES_NOTES"
 echo
 
+echo "bootloader release notes"
+echo "------------------------"
+cat "$BOOT_NOTES"
+echo
+
 if [ -n "$DRY_RUN" ]; then
     echo "(--dry-run: will build and verify, then stop before publishing)"
 elif [ -z "$ASSUME_YES" ]; then
     printf 'Build this and replace the %s releases? [y/N] ' \
-        "$THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $RELEASE"
+        "$THEMES_RELEASE,${WITH_SIM:+ $SIM_RELEASE,} $BOOT_RELEASE, $RELEASE"
     read -r reply
     case "$reply" in
         y|Y|yes|YES) ;;
@@ -388,6 +411,10 @@ for target in $SIM_TARGETS; do
     ssh "$SERVER" "cd '$REMOTE_DIR' && ./bundle-tools.sh build-hw-$target"
     TOOL_WANT=.rockbox/tools/soundscan.exe
 done
+
+# The script checks its own zip's contents.
+say "Building the bootloader installer"
+ssh "$SERVER" "cd '$REMOTE_DIR' && ./build-bootloader.sh"
 
 # ----------------------------------------------------------------- verify ---
 # A themeless zip installs happily and leaves the player looking broken, so each
@@ -516,6 +543,7 @@ for theme in $EXTRA_THEMES; do
     scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
 done
 scp "$SERVER:$REMOTE_DIR/$ALL_THEMES_ASSET" "dist/$ALL_THEMES_ASSET"
+scp "$SERVER:$REMOTE_DIR/$BOOT_ASSET" "dist/$BOOT_ASSET"
 
 if [ -n "$DRY_RUN" ]; then
     say "Dry run: built and verified, nothing published"
@@ -526,15 +554,16 @@ fi
 # ---------------------------------------------------------------- publish ---
 # Everything below this line is visible outside, and is deliberately last.
 #
-# The order is themes, then simulator, then firmware, and it is the firmware
-# being LAST that matters: GitHub features the most recently created release,
-# and that is the one the repository's front page offers. A visitor who follows
-# it must land on the build, not on a theme or the simulator.
+# The order is themes, then simulator, then bootloader, then firmware, and it
+# is the firmware being LAST that matters: GitHub features the most recently
+# created release, and that is the one the repository's front page offers. A
+# visitor who follows it must land on the build, not on a theme, the simulator
+# or the bootloader.
 #
-# The cost of that order is that a failure in the last step leaves fresh Themes
-# and Simulator releases beside a stale `latest`. Everything is built and
-# verified before any of this runs, so what remains is a network or gh failure;
-# re-running the script republishes all three.
+# The cost of that order is that a failure in the last step leaves fresh Themes,
+# Simulator and Bootloader releases beside a stale `latest`. Everything is
+# built and verified before any of this runs, so what remains is a network or
+# gh failure; re-running the script republishes all four.
 
 SHA=$(git rev-parse HEAD)
 
@@ -598,6 +627,25 @@ if [ -n "$SIM_TARGETS" ]; then
     say "Published $COMMIT as $SIM_RELEASE"
     echo "  https://github.com/$SLUG/releases/tag/$SIM_RELEASE"
 fi
+
+say "Replacing the $BOOT_RELEASE release"
+ssh "$SERVER" "gh release delete '$BOOT_RELEASE' --repo '$SLUG' --yes \
+    --cleanup-tag || true"
+ssh "$SERVER" "gh api --method DELETE --silent \
+    'repos/$SLUG/git/refs/tags/$BOOT_RELEASE' 2>/dev/null || true"
+
+scp -q "$BOOT_NOTES" "$SERVER:$REMOTE_DIR/bootloader-notes.md"
+ssh "$SERVER" "cd '$REMOTE_DIR' && \
+    gh release create '$BOOT_RELEASE' \
+    --repo '$SLUG' \
+    --target '$SHA' \
+    --title 'Bootloader installer' \
+    --notes-file bootloader-notes.md \
+    $DRAFT \
+    $BOOT_ASSET"
+
+say "Published $COMMIT as $BOOT_RELEASE"
+echo "  https://github.com/$SLUG/releases/tag/$BOOT_RELEASE"
 
 # The firmware is uploaded as a draft under $STAGING_TAG while the old release
 # still stands, so a failed upload leaves the old `latest` and its tag -- and

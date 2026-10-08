@@ -4,6 +4,8 @@
 /build-hw/
 /build-sim-*/
 /build-sim/
+/build-bl-*/
+/podbox-bootloader.zip
 /sim*
 /output
 /iconsources/
@@ -115,6 +117,7 @@ __pycache__
 
 # More target-specific utilities
 /utils/*/buildposix
+/utils/*/buildmingw
 /utils/*/uninstall_script.[ch]
 /utils/*/install_script.[ch]
 /utils/e200tool/e200load

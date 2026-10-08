@@ -551,8 +551,11 @@ export PODBOX_BUILD_SERVER=user@host   # or pass --server; never committed
 
 It builds both targets on the build server from a `git archive` of HEAD, checks
 each zip really contains the theme and the binary, and only then replaces the
-releases -- so a failed build leaves the previous ones standing. Three releases
-go out: `Themes`, `Simulator` and then `latest`. **`latest` is published last
+releases -- so a failed build leaves the previous ones standing. Four releases
+go out: `Themes`, `Simulator`, `Bootloader` and then `latest`. `Bootloader` is
+`build-bootloader.sh`'s zip: both bootloaders, `ipodpatcher.exe` and
+`mks5lboot.exe` built from `utils/`, and the scripts and README in
+`tools/bootloader-installer/`. **`latest` is published last
 on purpose** -- GitHub features the release created most recently, and that is
 the one the repository's front page offers.
 Release notes list every commit since the last release, using the `latest` tag
