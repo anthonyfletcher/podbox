@@ -76,10 +76,12 @@ enum cue_browse_result {
     CUE_BROWSE_START,      /* start the book at curr_track; the caller acts,
                               because how a book is played depends on how it
                               was reached and this screen does not know */
+    CUE_BROWSE_USB,        /* left for a USB connect; the caller goes to
+                              the root */
 };
 
 /* Display a cuesheet struct. Anything but NONE is the caller's cue to close
-   the menu behind it and show the WPS. */
+   the menu behind it; PLAYED, RESUME and START then show the WPS. */
 enum cue_browse_result browse_cuesheet(struct cuesheet *cue);
 
 /* display a cuesheet file after parsing and loading it to the plugin buffer */

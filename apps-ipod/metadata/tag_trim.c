@@ -84,6 +84,16 @@ static void read_patterns(const char *file, int *n_io, int *used_io)
                 p += BOM_UTF_8_SIZE;
         }
 
+        /* A line that fills the buffer is dropped to its end, or its tail
+         * would be read as a line of its own -- a long comment's included. */
+        if (strlen(line) == sizeof(line) - 1)
+        {
+            while (read_line(fd, line, sizeof(line)) > 0
+                   && strlen(line) == sizeof(line) - 1)
+                ;
+            continue;
+        }
+
         while (*p == ' ' || *p == '\t')
             p++;
         if (*p == '#' || *p == '\0')

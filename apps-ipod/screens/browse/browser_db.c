@@ -1103,6 +1103,23 @@ static int compare_with_albums(const void *p1, const void *p2)
     return qsort_fn(e1->name, e2->name, MAX_PATH);
 }
 
+/* id3->tagcache_idx holds the entry's index + 1 in its low bits and the
+ * database generation it was read in above them. A Rebuild numbers entries
+ * afresh, so an index read before one names some other track after it. */
+#define TRACK_IDX_BITS 24
+#define TRACK_IDX_MASK ((1L << TRACK_IDX_BITS) - 1)
+#define TRACK_GEN(g)   ((long)((g) & 0x7f) << TRACK_IDX_BITS)
+
+long browser_db_track_idx(const struct mp3entry *id3)
+{
+    long v = id3 ? id3->tagcache_idx : 0;
+
+    if (!(v & TRACK_IDX_MASK)
+        || (v & ~TRACK_IDX_MASK) != TRACK_GEN(tagcache_generation()))
+        return -1;
+    return (v & TRACK_IDX_MASK) - 1;
+}
+
 static void browser_db_buffer_event(unsigned short id, void *ev_data)
 {
     (void)id;
@@ -1161,8 +1178,10 @@ static void browser_db_buffer_event(unsigned short id, void *ev_data)
         }
     }
 
-    /* Store our tagcache index pointer. */
-    id3->tagcache_idx = tcs.idx_id+1;
+    /* Store our tagcache index pointer, unless it does not fit the field. */
+    if (tcs.idx_id + 1 <= TRACK_IDX_MASK)
+        id3->tagcache_idx = TRACK_GEN(tagcache_generation())
+                            | (tcs.idx_id + 1);
 
     tagcache_search_finish(&tcs);
 }
@@ -1173,13 +1192,12 @@ static void browser_db_track_finish_event(unsigned short id, void *ev_data)
     struct track_event *te = (struct track_event *)ev_data;
     struct mp3entry *id3 = te->id3;
 
-    long tagcache_idx = id3->tagcache_idx;
-    if (!tagcache_idx)
+    long tagcache_idx = browser_db_track_idx(id3);
+    if (tagcache_idx < 0)
     {
         logf("No tagcache index pointer found");
         return;
     }
-    tagcache_idx--;
 
     bool auto_skip = te->flags & TEF_AUTO_SKIP;
     bool counted = true;
@@ -1284,6 +1302,12 @@ static bool alloc_menu_parse_buf(char *buf, int type)
     /* allocate a new menu item (if needed) initialize it with data parsed
        from buf Note: allows setting menu type, type ignored when < 0
     */
+    if (menu->itemcount >= TAGMENU_MAX_ITEMS)
+    {
+        logf("max itemcount reached");
+        return false;
+    }
+
     /* Allocate */
     if (menu->items[menu->itemcount] == NULL)
         menu->items[menu->itemcount] = browser_db_alloc0(sizeof(struct menu_entry));
@@ -1569,13 +1593,11 @@ static void browser_db_unload(struct browser_context *c)
         browser_lock_cache(c);
         struct tagentry *dptr = core_get_data(c->cache.entries_handle);
         menu = menus[c->currextra];
+        /* No menu still frees the buffer and unlocks the cache below. */
         if (!menu)
-        {
             logf("browser_db menu doesn't exist");
-            return;
-        }
 
-        for (int i = 0; i < menu->itemcount; i++)
+        for (int i = 0; menu && i < menu->itemcount; i++)
         {
             dptr->name = NULL;
             dptr->newtable = 0;
@@ -1673,6 +1695,9 @@ static int format_str(struct tagcache_search *tcs, struct display_format *fmt,
     int parpos = 0;
     int buf_pos = 0;
     int i;
+
+    if (buf_size <= 0)
+        return -4;
 
     /* memset(buf, 0, buf_size); probably uneeded */
     for (i = 0; fmt->formatstr[i] != '\0'; i++)
@@ -2044,6 +2069,14 @@ static struct tagcache_search_clause exclude_spoken_clause = {
  * one album by name with an empty list. Cleared by load_root(), i.e. as soon
  * as any menu is drawn again. */
 static bool browse_picked_by_name;
+
+/* Set while goto_allsubentries() loads a level the user does not see. */
+static bool loading_hidden;
+
+/* Set while an album opened from a cover or chart is shown through the Album
+ * Artist row, which makes it an album browse to under_artist_level() rather
+ * than an artist one. Cleared by load_root(). */
+static bool album_via_artist_row;
 
 /* Whether a search on 'tag' can afford to be told by clause.
  *
@@ -2462,7 +2495,9 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                                     global_settings.sort_ignore_articles);
         if (order_count <= 0)
             order_tab = NULL;
-        else if (album_order != DB_SORT_ALBUMS_NAME)
+        /* A %format row is written without the prefix, so a level that has
+         * one keeps the format's own sort. */
+        else if (album_order != DB_SORT_ALBUMS_NAME && !fmt)
         {
             order_prefix = order_prefix_len(album_order);
             strip = order_prefix;
@@ -2538,8 +2573,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
 
     /* Neither over spoken word: a book is heard whole and in order, so
      * every track of an author, or of a book shuffled, is not something to
-     * offer. */
-    if (tag != tag_title && tag != tag_filename && !csi_mentions_spoken())
+     * offer. A hidden load still gets <All tracks>, because
+     * goto_allsubentries() descends through it to act on every book. */
+    if (tag != tag_title && tag != tag_filename
+        && (!csi_mentions_spoken() || loading_hidden))
     {
         if (offset <= sidx)
         {
@@ -3057,6 +3094,7 @@ static int load_root(struct browser_context *c)
      * which showed up as a searched-for book opening an empty list. */
     if (!loading_for_shortcut)
         browse_picked_by_name = false;
+    album_via_artist_row = false;
     /* Before the rows are enumerated, because one of them asks the table
      * whether it is empty. The crawl happens once per boot; after that this
      * is a comparison against what the database looked like then. */
@@ -3345,6 +3383,7 @@ static int loaded_row_for_label(struct browser_context *c, int rows,
 /* Set by browser_db_enter_album_tracks_on_next_load(); consumed on the next
  * fresh root load. -1 means none armed. */
 static long pending_album_seek = -1;
+static long pending_album_artist_seek = -1;
 static char pending_album_title[MENUENTRY_MAX_NAME];
 
 /* Arms a direct jump straight from the root into a specific album's own
@@ -3368,10 +3407,21 @@ void browser_db_enter_album_tracks_on_next_load(long album_seek,
                                              const char *album_title)
 {
     pending_album_seek = album_seek;
+    pending_album_artist_seek = -1;
     browse_picked_by_name = true;
     strlcpy(pending_album_title, album_title ? album_title : "",
             sizeof(pending_album_title));
     browser_db_enter_by_tag_on_next_load(tag_album);
+}
+
+/* The album tables hold one album per album artist, so a cover or chart row
+ * is one artist's album, and its track list filters on both. */
+void browser_db_enter_artist_album_tracks_on_next_load(long album_seek,
+                                                   long albumartist_seek,
+                                                   const char *album_title)
+{
+    browser_db_enter_album_tracks_on_next_load(album_seek, album_title);
+    pending_album_artist_seek = albumartist_seek;
 }
 
 /* Set by browser_db_enter_artist_albums_on_next_load(); consumed on the next fresh
@@ -3426,8 +3476,9 @@ static int browser_db_find_root_entry_by_tag(int tag)
 
 /* Consumes pending_album_seek: points csi straight at the root's "Album"
  * row's own search_instruction (same one a normal two-level Album browse
- * uses) but jumps directly to its title level, filtered by album_seek,
- * without ever entering/displaying the grouping level itself.
+ * uses) -- or, given an album artist, the "Album Artist" row's -- but jumps
+ * directly to its title level, filtered by album_seek, without ever
+ * entering/displaying the grouping levels themselves.
  *
  * Deliberately does NOT touch dirlevel/table_history/extra_history the way
  * browser_db_enter() would (leaves dirlevel at the 0 the caller entered with)
@@ -3445,11 +3496,35 @@ static int browser_db_find_root_entry_by_tag(int tag)
  * "album -> title" chain (e.g. tagnavi_user.config was customized away
  * from the shipped shape) -- caller falls back to just loading the root. */
 static bool enter_album_tracks_directly(struct browser_context *c, long album_seek,
-                                        const char *album_title)
+                                        long artist_seek, const char *album_title)
 {
-    int idx = browser_db_find_root_entry_by_tag(tag_album);
+    int idx;
     struct search_instruction *si;
 
+    /* With an album artist, its own row's albumartist -> album -> title
+     * chain, two levels down; without one, or without that row, the album
+     * row's one level down. */
+    if (artist_seek >= 0
+        && (idx = browser_db_find_root_entry_by_tag(tag_albumartist)) >= 0)
+    {
+        si = &menus[rootmenu]->items[idx]->si;
+        if (si->tagorder_count >= 3 && si->tagorder[1] == tag_album
+            && si->tagorder[2] == tag_title)
+        {
+            csi = si;
+            csi->result_seek[0] = artist_seek;
+            csi->result_seek[1] = album_seek;
+            c->currtable = TABLE_NAVIBROWSE;
+            c->currextra = 2;
+            c->selected_item = 0;
+            strmemccpy(current_title[c->currextra], album_title,
+                       sizeof(current_title[0]));
+            album_via_artist_row = true;
+            return true;
+        }
+    }
+
+    idx = browser_db_find_root_entry_by_tag(tag_album);
     if (idx < 0)
         return false;
 
@@ -3507,9 +3582,12 @@ static bool enter_artist_albums_directly(struct browser_context *c,
  *
  * Both kinds qualify: a "->" row that browses a tag (pass 0), and a "==>" row
  * that opens a submenu (pass 1). What rules a row out is having no stable
- * identity to arm a jump with: a tag browse with no tags, or a submenu that
- * leads nowhere.
+ * identity to arm a jump with: a tag browse with no tags.
  * Everything else (shuffle songs) is an action rather than a place.
+ *
+ * A submenu that leads nowhere still takes its slot, so writing
+ * tagnavi_custom.config moves no other row's number; the slot reports no row
+ * (see browser_db_get_main_menu_row()) and root_menu.c hides it.
  *
  * The two passes are the point, not a tidiness. A row's position in this
  * enumeration is its *slot number*, and the slot number is what a saved
@@ -3525,7 +3603,7 @@ static bool root_row_eligible(const struct menu_entry *item, int pass)
 {
     if (pass == 0)
         return item->type == menu_next && item->si.tagorder_count > 0;
-    return item->type == menu_load && row_submenu_has_items(item);
+    return item->type == menu_load;
 }
 
 #define ROOT_ROW_PASSES 2
@@ -3559,6 +3637,10 @@ bool browser_db_get_main_menu_row(int index, int *out_tag,
 
             if (count == index)
             {
+                if (root->items[i]->type == menu_load
+                    && !row_submenu_has_items(root->items[i]))
+                    return false;
+
                 if (root->items[i]->type == menu_next)
                 {
                     if (out_tag)
@@ -3766,11 +3848,14 @@ int browser_db_load(struct browser_context* c)
         if (target_tag == tag_album && pending_album_seek != -1)
         {
             long album_seek = pending_album_seek;
+            long artist_seek = pending_album_artist_seek;
             char album_title[MENUENTRY_MAX_NAME];
             strlcpy(album_title, pending_album_title, sizeof(album_title));
             pending_album_seek = -1;
+            pending_album_artist_seek = -1;
 
-            if (enter_album_tracks_directly(c, album_seek, album_title))
+            if (enter_album_tracks_directly(c, album_seek, artist_seek,
+                                            album_title))
                 return browser_db_load(c);
             /* Root has no plain tag_album row to anchor on (e.g. tagnavi
              * customized away from the shipped shape) -- fall through to
@@ -4126,6 +4211,9 @@ static int open_single_book(const char *path, const char *book,
         case CUE_BROWSE_PLAYED:
             return GO_TO_WPS;
 
+        case CUE_BROWSE_USB:
+            return GO_TO_ROOT;
+
         default:
             return 0;
     }
@@ -4163,7 +4251,11 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         if (!warn_on_pl_erase())
             return 0;
 
-        resume_armed = true;
+        /* Read again: warn_on_pl_erase() saves the book being played, and
+         * the position read when the list loaded predates that save. A book
+         * with nothing left to resume plays from its start. */
+        resume_armed = book_resume_row(c, c->currextra,
+                                       csi->tagorder[c->currextra]);
         if (browser_db_play_folder(c) < 0)
         {
             resume_armed = false;
@@ -4264,6 +4356,9 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         book[0] = '\0';
         name[0] = '\0';
 
+        /* single_track_path() searches and yields, and dptr points into the
+         * entries, which a core_alloc on another thread could move. */
+        browser_lock_cache(c);
         core_pin(browser_db_handle);
         one = single_track_path(c, seek, path, sizeof(path));
         /* The row's name titles the chapter list whatever the row is; only a
@@ -4277,6 +4372,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
                                   sizeof(book)))
             book[0] = '\0';
         core_unpin(browser_db_handle);
+        browser_unlock_cache(c);
 
         if (one)
         {
@@ -4742,7 +4838,9 @@ static bool goto_allsubentries(int newtable)
         || newtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS))
     {
         browser_db_enter(tc, false);
+        loading_hidden = true;
         browser_db_load(tc);
+        loading_hidden = false;
 
         /* The next descent goes through <All tracks> where the level has it,
          * and through the first real row where it does not -- never through
@@ -5197,7 +5295,7 @@ bool browser_db_is_artist_list(struct browser_context* c)
  * source. */
 static bool under_artist_level(struct browser_context* c)
 {
-    if (c->currtable == TABLE_ROOT || !csi)
+    if (c->currtable == TABLE_ROOT || !csi || album_via_artist_row)
         return false;
 
     for (int i = 0; i <= c->currextra && i < csi->tagorder_count; i++)
@@ -5474,11 +5572,12 @@ bool browser_db_entry_is_playing(struct browser_context *c, int id)
     if (browser_db_get_entry_kind(c, id) != LIST_ROW_TRACK)
         return false;
     if (!(audio_status() & AUDIO_STATUS_PLAY)
-        || (id3 = audio_current_track()) == NULL || id3->tagcache_idx == 0)
+        || (id3 = audio_current_track()) == NULL
+        || browser_db_track_idx(id3) < 0)
         return false;
 
     entry = loaded_entry(c, id);
-    return entry && entry->idx_id + 1 == id3->tagcache_idx;
+    return entry && entry->idx_id == browser_db_track_idx(id3);
 }
 
 int browser_db_get_icon(struct browser_context* c)

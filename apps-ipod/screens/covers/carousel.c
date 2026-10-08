@@ -412,6 +412,9 @@ static bool pf_show_statusbar;  /* this session's album_covers_statusbar */
 /* Theme state left pushed for cleanup() to pop. cleanup() also runs after a
  * failed init(), so it cannot assume there is one. */
 static bool pf_theme_pushed;
+/* Whether this screen holds a cpu_boost(). init() takes one for the load;
+ * album_covers_loop() keeps it only while there is drawing to do. */
+static bool pf_boosted;
 
 static struct slide_data center_slide;
 static struct slide_data left_slides[MAX_SLIDES_COUNT];
@@ -546,7 +549,6 @@ static unsigned long pf_px;
     performing buffer-shifting operations.
 */
 static struct mutex buf_ctx_mutex;
-static bool buf_ctx_locked;
 
 static struct pf_scroll_line_info scroll_line_info;
 static struct pf_scroll_line scroll_lines[PF_MAX_SCROLL_LINES];
@@ -588,13 +590,11 @@ static const struct carousel_model *model = NULL;
 static inline void buf_ctx_lock(void)
 {
     mutex_lock(&buf_ctx_mutex);
-    buf_ctx_locked = true;
 }
 
 static inline void buf_ctx_unlock(void)
 {
     mutex_unlock(&buf_ctx_mutex);
-    buf_ctx_locked = false;
 }
 
 /* The carousel's own settings file, kept apart from global_settings because
@@ -724,7 +724,9 @@ static bool check_database(void)
 
     struct tagcache_stat *stat = tagcache_get_stat();
 
-    while ( !(stat->initialized && stat->ready) )
+    /* The album and artist tables come with the RAM copy, not with the
+     * database, and every model reads them. */
+    while ( !(stat->initialized && stat->ready && tagcache_is_in_ram()) )
     {
         if (--spin > 0)
         {
@@ -1281,6 +1283,8 @@ static bool create_pf_thread(void)
                                IF_COP(, CPU)
                                       )
         ) == 0) {
+        /* A queue left registered blocks every USB connect unacknowledged */
+        queue_delete(&thread_q);
         return false;
     }
     thread_is_running = true;
@@ -1490,7 +1494,13 @@ static bool free_slide_prio(int prio)
 */
 void carousel_drop_slides(void)
 {
-    free_all_slide_prio(0);
+    /* Every slide, the centre one included, under the lock the loader reads
+     * the cache with; the wakeup has it load them again at once. */
+    buf_ctx_lock();
+    free_all_slide_prio(-1);
+    buf_ctx_unlock();
+    queue_remove_from_head(&thread_q, EV_WAKEUP);
+    queue_post(&thread_q, EV_WAKEUP, 0);
 }
 
 static void free_all_slide_prio(int prio)
@@ -2955,7 +2965,8 @@ void carousel_reload(int (*compare)(const void *, const void *))
     }
 
     initialize_slide_cache();
-    create_pf_thread();
+    if (!create_pf_thread())
+        splash(HZ, "Could not start the carousel");
 }
 
 /**
@@ -3601,8 +3612,6 @@ static void update_scroll_animation(void)
 static void cleanup(void)
 {
     wants_to_quit = true;
-    if (buf_ctx_locked)
-        buf_ctx_unlock();
 
     /* Give the theme back. Whatever comes next draws itself, so no forced
      * redraw from here. */
@@ -3613,7 +3622,11 @@ static void cleanup(void)
         pf_theme_pushed = false;
     }
 
-    cpu_boost(false);
+    if (pf_boosted)
+    {
+        cpu_boost(false);
+        pf_boosted = false;
+    }
     end_pf_thread();
 
     /* Turn on backlight timeout (revert to settings) -- inlined equivalent
@@ -3641,9 +3654,14 @@ enum {
 
 static void error_wait(const char *message)
 {
+    int button;
+
     splashf(0, "%s -- press any button to continue", message);
-    while (get_action(CONTEXT_STD, 1) == ACTION_NONE)
+    while ((button = get_action(CONTEXT_STD, 1)) == ACTION_NONE)
         yield();
+    /* A USB connect has to reach the handler, or it is never acknowledged */
+    if (default_event_handler(button) == SYS_USB_CONNECTED)
+        return;
     sleep(2 * HZ);
 }
 
@@ -3654,6 +3672,7 @@ static bool init(void)
     size_t buf_size;
 
     cpu_boost(true); /* revert in cleanup */
+    pf_boosted = true;
 
     wants_to_quit = false;
 
@@ -3828,9 +3847,11 @@ static bool init(void)
 
     ret = model->build_index();
 
+    /* The index and the slides share the app buffer, which a big enough
+     * library fills: from about 6,000 albums on a 5G. */
     if (ret == ERROR_BUFFER_FULL)
     {
-        error_wait("Out of memory");
+        error_wait("Library too large for this screen");
         return false;
     }
     else if (ret == ERROR_NO_ALBUMS)
@@ -3838,10 +3859,19 @@ static bool init(void)
         error_wait("No albums found -- turn the database on");
         return false;
     }
+    else if (ret == ERROR_NO_ARTISTS)
+    {
+        error_wait("No artists found -- turn the database on");
+        return false;
+    }
     else if (ret == ERROR_USER_ABORT)
         return false;
 
     number_of_slides = model->count();
+    /* slide_frame holds a slide index << 16 in an int, so slides past 32767
+     * would overflow it; those are not offered. */
+    if (number_of_slides > 0x7fff)
+        number_of_slides = 0x7fff;
 
     /* Reserve the scratch the placeholder is drawn into. Sized by its only
      * user: create_empty_slide() fills DISPLAY_WIDTH squared and save_pfraw()
@@ -3864,7 +3894,7 @@ static bool init(void)
      * nothing for the screen to show. */
     if (carousel_idx.buf_sz < placeholder_sz + 2 * slide_max)
     {
-        error_wait("Out of memory");
+        error_wait("Library too large for this screen");
         return false;
     }
 
@@ -4073,6 +4103,7 @@ static int album_covers_loop(void)
     /* Far enough back that the first frame is due immediately. */
     long last_frame_tick = current_tick - PF_FRAME_TICKS;
     unsigned int seen_slides_loaded = pf_slides_loaded;
+    long boost_until = current_tick + HZ;
 
     while (true) {
         /* An artwork pass finished while the carousel was open. Slides loaded
@@ -4224,6 +4255,18 @@ static int album_covers_loop(void)
          * Timed from the start of the frame, so the cap is a rate and not a
          * gap: a frame that overruns its own interval simply makes the next one
          * due immediately, rather than having its cost added to the wait. */
+        /* Boosted while there is drawing to do and for a second after, so a
+         * caption step or a slide arriving does not switch the clock each
+         * time; an idle screen gives the boost back. */
+        if (pf_state == pf_scrolling || art_owed || caption_owed
+            || caption_scrolling)
+            boost_until = current_tick + HZ;
+        if (TIME_BEFORE(current_tick, boost_until) != pf_boosted)
+        {
+            pf_boosted = !pf_boosted;
+            cpu_boost(pf_boosted);
+        }
+
         if ((art_owed || caption_owed)
             && current_tick - last_frame_tick >= PF_FRAME_TICKS)
         {
@@ -4471,8 +4514,11 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
     {
         /* Said out loud: the working indicator check_database() raises while
          * it waits stops with it, so without this the screen simply hands
-         * back to whatever opened it and the press reads as ignored. */
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+         * back to whatever opened it and the press reads as ignored. A
+         * refused RAM copy never loads, so that says why instead. */
+        splash(HZ, tagcache_ram_refused()
+                   ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
+                   : ID2P(LANG_TAGCACHE_BUSY));
         pop_current_activity();
         return GO_TO_PREVIOUS;
     }

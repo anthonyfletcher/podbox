@@ -60,8 +60,9 @@ void art_cache_init(void);
 
 /* Load a cached .aat thumbnail from an open fd, area-average downscaled to
  * bm->width x bm->height (bm->data must hold that many fb_data). Returns the
- * pixel byte count, or <= 0 on failure. Used by the buffering path so the WPS
- * renders the 300px cache instead of re-decoding source art.
+ * pixel byte count, or <= 0 on failure, which includes a non-square
+ * thumbnail. Used by the buffering path so the WPS renders the 300px cache
+ * instead of re-decoding source art.
  *
  * `filter` is the chain to run on the way out, or NULL for none. It is the
  * caller's rather than this function's, because each consumer treats cached art

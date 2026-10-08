@@ -11,10 +11,9 @@
 #include <stdint.h>
 #include "file.h"           /* MAX_PATH */
 
-/* As much of a book's album or album artist as identifies it. The browser
- * knows a book by the title of the level it is on, which it holds in a buffer
- * of this size, so a longer name is cut to the same length before it is keyed
- * or the two would never match. */
+/* As much of a book's album or album artist as identifies it. A book's id is
+ * built both from the database and from the playing track's tags, so each
+ * name is cut to this length either way or the two would never match. */
 #define BOOK_KEY_MAX    128
 
 /* A book's id, which every call below takes as 'book': its album and its
@@ -104,5 +103,9 @@ bool book_resume_convert(const char *text_file);
 typedef bool (*book_resume_fn)(uint64_t book, const char *path,
                                const struct book_resume *pos, void *data);
 void book_resume_each(book_resume_fn fn, void *data);
+
+/* Moves whenever the file is rewritten, so a caller may keep what it worked
+ * out from the file until this changes. */
+unsigned book_resume_writes(void);
 
 #endif /* _BOOK_RESUME_H */

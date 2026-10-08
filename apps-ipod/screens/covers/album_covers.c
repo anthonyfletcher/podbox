@@ -116,7 +116,7 @@ enum ePFS{ePFS_ARTIST = 0, ePFS_ALBUM};
 /*
  * States: pf_idle <-> pf_scrolling (browsing covers); SELECT on a cover
  * jumps straight into the core database's track list for that album (see
- * browser_db_enter_album_tracks_on_next_load(), called from
+ * browser_db_enter_artist_album_tracks_on_next_load(), called from
  * album_covers_loop()). There is no in-house cover-zoom or track-list
  * browsing state; the database browser is the track list.
  */
@@ -724,7 +724,8 @@ static int album_enter(int index)
     pf_resume_album_index = index;
     pf_resume_last_album = true;
 
-    browser_db_enter_album_tracks_on_next_load(album_seek, album);
+    browser_db_enter_artist_album_tracks_on_next_load(album_seek,
+        carousel_idx.album_index[index].artist_seek, album);
     return GO_TO_ALBUM_COVERS_TRACKS;
 }
 

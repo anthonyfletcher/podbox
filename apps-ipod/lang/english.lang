@@ -23146,3 +23146,17 @@
     *: "Performing maintenance"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_REFUSED
+  desc: album screens, when the database is too large to load into memory this session
+  user: core
+  <source>
+    *: "Library too large to hold in memory"
+  </source>
+  <dest>
+    *: "Library too large to hold in memory"
+  </dest>
+  <voice>
+    *: "Library too large to hold in memory"
+  </voice>
+</phrase>

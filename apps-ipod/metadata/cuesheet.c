@@ -652,7 +652,10 @@ enum cue_browse_result browse_cuesheet(struct cuesheet *cue)
                  * default_event_handler() sends, and leaves the host looking
                  * at an empty drive until it arrives. */
                 if (default_event_handler(action) == SYS_USB_CONNECTED)
+                {
+                    chose = CUE_BROWSE_USB;
                     done = true;
+                }
                 break;
         }
     }

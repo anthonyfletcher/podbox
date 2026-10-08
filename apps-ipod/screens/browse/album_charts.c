@@ -364,8 +364,9 @@ int album_charts_show(enum album_chart kind)
                 browser_db_enter_artist_albums_on_next_load(
                     idx.artist_index[i].seek, entry_name(i));
             else
-                browser_db_enter_album_tracks_on_next_load(
-                    idx.album_index[i].seek, entry_name(i));
+                browser_db_enter_artist_album_tracks_on_next_load(
+                    idx.album_index[i].seek, idx.album_index[i].artist_seek,
+                    entry_name(i));
             ret = GO_TO_ALBUM_COVERS_TRACKS;
         }
     }

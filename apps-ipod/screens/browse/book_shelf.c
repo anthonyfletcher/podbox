@@ -299,6 +299,7 @@ static bool collect_books(void)
         if (al.spoken != al.tracks
             || !tagcache_seek_string(tag_album, al.album_seek, name,
                                      sizeof(name))
+            || !strcmp(name, UNTAGGED)
             || !book_resume_id_of(al.album_seek, al.artist_seek, id,
                                   sizeof(id)))
             continue;
@@ -954,13 +955,20 @@ static bool book_menu(const char *book, const char *name)
     if (menu_seek < 0)
     {
         choice = do_menu(&file_menu, NULL, NULL, false);
-        choice = choice >= 0 && choice < (int)ARRAYLEN(file_rows)
-                 ? file_rows[choice] : -1;
+        if (choice != MENU_ATTACHED_USB)
+            choice = choice >= 0 && choice < (int)ARRAYLEN(file_rows)
+                     ? file_rows[choice] : -1;
     }
     else
         choice = do_menu(&menu, NULL, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
+
+    if (choice == MENU_ATTACHED_USB)
+    {
+        menu_exit = GO_TO_ROOT;
+        return false;
+    }
 
     /* Led by a slash, as the browser does, so a new playlist is offered the
      * book's name */
@@ -1069,10 +1077,31 @@ static bool load(void)
     return ok;
 }
 
+/* The last counts, kept while neither the resume file nor the database has
+ * changed: a browse back to the Audiobooks list then reads neither. Only
+ * counts made from the database in RAM are kept, since that is what names a
+ * book's author. */
+static struct
+{
+    bool valid;
+    unsigned writes;
+    struct tagcache_marks marks;
+    int counts[3];
+} counted;
+
 bool book_shelf_count(int counts[3])
 {
     enum book_shelf kind = shelf_kind;
+    struct tagcache_marks marks;
     bool ok;
+
+    tagcache_get_marks(&marks);
+    if (counted.valid && counted.writes == book_resume_writes()
+        && !memcmp(&counted.marks, &marks, sizeof(marks)))
+    {
+        memcpy(counts, counted.counts, sizeof(counted.counts));
+        return true;
+    }
 
     if (!claim())
         return false;
@@ -1092,6 +1121,15 @@ bool book_shelf_count(int counts[3])
     }
     release();
     shelf_kind = kind;
+
+    counted.valid = ok && tagcache_is_in_ram();
+    if (counted.valid)
+    {
+        /* Read after the count, which may have rekeyed the file */
+        counted.writes = book_resume_writes();
+        counted.marks = marks;
+        memcpy(counted.counts, counts, sizeof(counted.counts));
+    }
     return ok;
 }
 

@@ -331,11 +331,21 @@ static struct {
     uint32_t filter_hash;
 } browser_aa_slot[TREE_AA_SLOTS];
 
+/* Items that resolved to no art hash, which stays true until the list
+ * reloads: finding that out costs a filtered search and a disk read, which a
+ * redraw must not repeat for every such row in view. */
+#define TREE_AA_NO_HASH 16
+static int browser_aa_no_hash[TREE_AA_NO_HASH];
+static int browser_aa_no_hash_next;
+
 static void browser_aa_reset(void)
 {
     for (int i = 0; i < TREE_AA_SLOTS; i++)
         browser_aa_slot[i].item = -1;
     browser_aa_victim = 0;
+    for (int i = 0; i < TREE_AA_NO_HASH; i++)
+        browser_aa_no_hash[i] = -1;
+    browser_aa_no_hash_next = 0;
 }
 
 void browser_albumart_invalidate(void)
@@ -464,9 +474,18 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
             browser_aa_slot[slot].filter_hash == filter_hash)
             goto hit;
 
+    for (slot = 0; slot < TREE_AA_NO_HASH; slot++)
+        if (browser_aa_no_hash[slot] == selected_item)
+            return NULL;
+
     hash = browser_db_get_art_hash(local_tc, selected_item);
     if (hash == 0)
+    {
+        browser_aa_no_hash[browser_aa_no_hash_next] = selected_item;
+        browser_aa_no_hash_next =
+            (browser_aa_no_hash_next + 1) % TREE_AA_NO_HASH;
         return NULL;
+    }
 
     /* Both kinds of row want the placeholder returned transparently, so a row
      * with no art still fills its viewport; album and artist rows share one. */
@@ -1574,6 +1593,11 @@ void browser_mem_init(void)
     cache->entries_handle =
             core_alloc_ex(cache->max_entries*(sizeof(struct entry)
                                               + sizeof(int16_t)), &ops);
+
+    /* At boot, ahead of the audio buffer: taken at the first art-row draw,
+     * it would shrink the buffer under the playing track and rebuffer it. */
+    browser_aa_handle = core_alloc_ex(TREE_AA_SLOTS * browser_aa_slot_bytes(),
+                                      &browser_aa_ops);
 }
 
 bool bookmark_play(char *resume_file, int index, unsigned long elapsed,
@@ -1762,8 +1786,8 @@ void browser_restore(void)
         return;
 
     /* The cable really is out, so release this session's suspend. Always --
-     * leaving it standing is what kept the directory cache empty and every
-     * listing on the disk for the rest of the run. */
+     * left standing, it keeps the directory cache empty and every listing on
+     * the disk for the rest of the run. */
     int dircache_rc = 0;
     if (dircache_suspended_for_usb)
     {

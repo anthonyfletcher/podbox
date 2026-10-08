@@ -249,6 +249,30 @@ static bool wait_for_tagcache_ready(void)
     return tagcache_reachable();
 }
 
+/* The album and artist tables come with the RAM copy, which loads some time
+ * after the database is usable. A held RAM buffer means a load is coming; with
+ * none, the copy was refused for this session and waiting cannot help. */
+static bool wait_for_album_tables(void)
+{
+    if (!wait_for_tagcache_ready())
+        return false;
+
+    while (!tagcache_is_in_ram())
+    {
+        if (tagcache_get_stat()->ramcache_allocated <= 0)
+        {
+            splash(HZ*2, tagcache_ram_refused()
+                       ? ID2P(LANG_TAGCACHE_RAM_REFUSED)
+                       : ID2P(LANG_TAGCACHE_BUSY));
+            return false;
+        }
+        splashf(0, "%s (%s)", str(LANG_WAIT), str(LANG_OFF_ABORT));
+        if (action_userabort(HZ/2))
+            return false;
+    }
+    return true;
+}
+
 static int browser(void* param)
 {
     int ret_val;
@@ -682,6 +706,8 @@ static int load_bmarks(void* param)
 static int album_covers_scrn(void* param)
 {
     (void)param;
+    if (!wait_for_album_tables())
+        return GO_TO_PREVIOUS;
     return album_covers(NULL);
 }
 
@@ -721,6 +747,8 @@ static int featured_tracks_scrn(void* param)
 static int artist_portraits_scrn(void* param)
 {
     (void)param;
+    if (!wait_for_album_tables())
+        return GO_TO_PREVIOUS;
     return artist_portraits(NULL);
 }
 
@@ -744,12 +772,11 @@ static int lastdoc_scrn(void* param)
 }
 
 /* Both read the album tables, which come with the database in RAM -- so they
- * need the same wait the database screens do, not merely a database that
- * exists. */
+ * wait for the RAM copy, not merely for a database that exists. */
 static int album_charts_scrn(void* param)
 {
     (void)param;
-    if (!wait_for_tagcache_ready())
+    if (!wait_for_album_tables())
         return GO_TO_PREVIOUS;
     return album_charts_run();
 }
@@ -757,7 +784,7 @@ static int album_charts_scrn(void* param)
 static int random_album_scrn(void* param)
 {
     (void)param;
-    if (!wait_for_tagcache_ready())
+    if (!wait_for_album_tables())
         return GO_TO_PREVIOUS;
     return album_random();
 }
@@ -765,7 +792,7 @@ static int random_album_scrn(void* param)
 static int book_shelf_scrn(void* param)
 {
     (void)param;
-    if (!wait_for_tagcache_ready())
+    if (!wait_for_album_tables())
         return GO_TO_PREVIOUS;
     return book_shelf_run();
 }
@@ -1218,12 +1245,15 @@ static int tagnavi_slot_of_item(const struct menu_item_ex *item)
 static void root_menu_fixup_tagnavi_slots(void)
 {
     unsigned count = MENU_GET_COUNT(root_menu_.flags);
-    int real = browser_db_get_main_menu_tag_row_count();
     unsigned i, out = 0;
 
     for (i = 0; i < count; i++)
-        if (tagnavi_slot_of_item(root_menu__[i]) < real)
+    {
+        int slot = tagnavi_slot_of_item(root_menu__[i]);
+
+        if (slot < 0 || browser_db_get_main_menu_row(slot, NULL, NULL, NULL))
             root_menu__[out++] = root_menu__[i];
+    }
 
     if (out != count)
         root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
@@ -1297,11 +1327,22 @@ void root_menu_set_audiobooks_row(bool on)
                         | MENU_ITEM_COUNT(count);
 }
 
+/* menu_table[] less the tagnavi slots whose row is hidden, such as Custom
+ * menu with no tagnavi_custom.config: the slot keeps its number, but Customize
+ * Main Menu does not offer it. */
 struct menu_table *root_menu_get_options(int *nb_options)
 {
-    *nb_options = root_menu_active_count();
+    static struct menu_table shown[MAX_MENU_ITEMS];
+    int tagnavi_start = MAX_MENU_ITEMS - TAGNAVI_MAIN_MENU_SLOTS;
+    int i, n = 0;
 
-    return menu_table;
+    for (i = 0; i < root_menu_active_count(); i++)
+        if (i < tagnavi_start
+            || browser_db_get_main_menu_row(i - tagnavi_start, NULL, NULL, NULL))
+            shown[n++] = menu_table[i];
+
+    *nb_options = n;
+    return shown;
 }
 
 /* The menu_table[] index a config token names, or -1. Tagnavi slots match
@@ -1695,7 +1736,10 @@ void root_menu(void)
     int previous_browser = browser_default();
     int selected = 0;
 
-    root_menu_fixup_tagnavi_slots();
+    /* A failed tagnavi.config parse reports no rows at all, and the fixup
+     * would drop every database slot from the saved order for good. */
+    if (browser_db_ready())
+        root_menu_fixup_tagnavi_slots();
     /* Now that tagnavi.config has been parsed the slot can be found, which it
      * could not be when the setting was loaded. */
     root_menu_set_audiobooks_row(global_settings.segregate_audiobooks);

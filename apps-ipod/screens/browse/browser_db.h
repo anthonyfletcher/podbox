@@ -104,6 +104,10 @@ int browser_db_get_icon(struct browser_context* c);
 /* %Lk and %LP for row 'id' of the level on screen. */
 enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id);
 bool browser_db_entry_is_playing(struct browser_context *c, int id);
+/* The database entry 'id3' was read from, or -1 when it has none or was read
+ * before the last Rebuild. */
+struct mp3entry;
+long browser_db_track_idx(const struct mp3entry *id3);
 
 /* What the selected row of the current browse names, for a caller that wants
  * to ask the database about it rather than browse into it. NONE for a track
@@ -181,16 +185,21 @@ void browser_db_enter_menu_on_next_load(const char *menu_id);
  * exiting straight back out (no intermediate level to unwind through). */
 void browser_db_enter_album_tracks_on_next_load(long album_seek,
                                              const char *album_title);
+/* As above, but only that album artist's tracks of the album, where the root
+ * has an albumartist -> album -> title row to filter through. */
+void browser_db_enter_artist_album_tracks_on_next_load(long album_seek,
+                                                   long albumartist_seek,
+                                                   const char *album_title);
 /* As above, but jumps straight to a specific album-artist's album listing
  * (identified by seek), for Artist portraits
  * (screens/covers/artist_portraits.c). A single BACK returns to the carousel;
  * selecting an album descends into its tracks. */
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title);
-/* Number of direct tag-browse ("->") rows in the root ("main") menu -- rows
- * that load a nested sub-menu ("==>") or trigger an action (e.g. "~>"
- * shuffle) don't count. Used by root_menu.c to know how many of its reserved
- * GO_TO_TAGNAVI_FIRST..LAST slots are backed by a real row. */
+/* Number of main-menu slots the root ("main") menu numbers: its tag-browse
+ * ("->") and submenu ("==>") rows; action rows (e.g. "~>" shuffle) don't
+ * count. Used by root_menu.c to know how many of its reserved
+ * GO_TO_TAGNAVI_FIRST..LAST slots are numbered. */
 int browser_db_get_main_menu_tag_row_count(void);
 /* The main-menu slot index of the row opening the audiobooks menu, or -1.
  * Recognised by its rows asking about the `spoken` tag rather than by its
@@ -199,7 +208,8 @@ int browser_db_spoken_main_menu_slot(void);
 /* The Nth (0-based) such row: its raw (P2STR-resolvable) display name, and
  * whichever identity it has -- *out_tag for a tag-browse row, *out_menu_id for
  * a submenu row, the other left as -1/NULL. Feed whichever came back to the
- * matching enter_..._on_next_load() above. False if index is out of range. */
+ * matching enter_..._on_next_load() above. False if index is out of range,
+ * or names a submenu with nothing in it: that slot is numbered but hidden. */
 bool browser_db_get_main_menu_row(int index, int *out_tag,
                                   const char **out_menu_id,
                                   const unsigned char **out_name);

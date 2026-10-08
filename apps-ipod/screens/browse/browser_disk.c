@@ -672,8 +672,7 @@ int browser_disk_enter(struct browser_context* c)
             case FILE_ATTR_MOODS:
             case FILE_ATTR_JOURNEYS:
                 return mood_screen_pick((file_attr & FILE_ATTR_MASK)
-                                        == FILE_ATTR_JOURNEYS)
-                       ? GO_TO_WPS : GO_TO_PREVIOUS;
+                                        == FILE_ATTR_JOURNEYS);
 
             case FILE_ATTR_M3U:
                 play = browser_disk_play_playlist(buf, c->currdir, file->name);

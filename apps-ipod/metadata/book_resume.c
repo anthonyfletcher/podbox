@@ -67,6 +67,14 @@
  * stopped. Generous, because the position is sampled rather than exact. */
 #define BOOK_END_SLACK_MS 10000
 
+/* See book_resume_writes(). Moved by every change to the file. */
+static unsigned writes;
+
+unsigned book_resume_writes(void)
+{
+    return writes;
+}
+
 /* ------------------------------------------------------------------ *
  * the entry                                                          *
  * ------------------------------------------------------------------ */
@@ -289,7 +297,14 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
         old = true;
     }
     if (fd < 0)
+    {
+        /* A file that will not open is set aside, or every save, mark and
+         * rekey that copies it would fail until it was deleted by hand. */
+        if (file_exists(BOOK_RESUME_FILE)
+            && rename(BOOK_RESUME_FILE, BOOK_RESUME_FILE ".bad") == 0)
+            writes++;
         return !file_exists(BOOK_RESUME_FILE);
+    }
 
     while (read(fd, &r, sizeof(r)) == (ssize_t)sizeof(r))
     {
@@ -424,23 +439,37 @@ static bool find_named(const struct entry *e, void *data)
     return !e->named;
 }
 
-/* The key of the book whose album had the key 'named', or 0 */
-static uint64_t book_of_album(uint64_t named)
+/* The key of album-table row 'n' as a book, if it is a whole book whose
+ * album has the key 'named'; else 0. */
+static uint64_t book_of_row(int n, uint64_t named)
 {
     struct tagcache_album al;
     char album[BOOK_KEY_MAX];
     char id[BOOK_ID_MAX];
 
-    for (int n = 0; tagcache_album_get(n, &al); n++)
-    {
-        if (al.spoken == al.tracks
-            && tagcache_seek_string(tag_album, al.album_seek, album,
-                                    sizeof(album))
-            && book_resume_key(album) == named
-            && book_resume_id_of(al.album_seek, al.artist_seek, id,
-                                 sizeof(id)))
-            return book_resume_key(id);
-    }
+    if (tagcache_album_get(n, &al)
+        && al.spoken == al.tracks
+        && tagcache_seek_string(tag_album, al.album_seek, album,
+                                sizeof(album))
+        && book_resume_key(album) == named
+        && book_resume_id_of(al.album_seek, al.artist_seek, id, sizeof(id)))
+        return book_resume_key(id);
+    return 0;
+}
+
+/* The key of the book whose album had the key 'named', or 0. Two authors'
+ * books can share a title, so the album holding the saved track decides; the
+ * first of that name stands in when the track does not say. */
+static uint64_t book_of_album(uint64_t named, uint64_t track)
+{
+    uint64_t book;
+    int idx = track != 0 ? tagcache_find_key(track) : -1;
+
+    if (idx >= 0 && (book = book_of_row(tagcache_album_of(idx), named)) != 0)
+        return book;
+    for (int n = 0; n < tagcache_album_count(); n++)
+        if ((book = book_of_row(n, named)) != 0)
+            return book;
     return 0;
 }
 
@@ -452,8 +481,9 @@ struct rekey_ctx
     bool ok;
 };
 
-/* A position whose book has gone keeps its key; it then matches nothing,
- * and falls off the end of the file in time. */
+/* A position whose book is not found keeps its key and stays marked, so a
+ * later boot tries again; it matches nothing meanwhile, and falls off the end
+ * of the file in time. */
 static bool rekey_one(const struct entry *e, void *data)
 {
     struct rekey_ctx *ctx = data;
@@ -461,11 +491,13 @@ static bool rekey_one(const struct entry *e, void *data)
 
     if (n.named)
     {
-        uint64_t book = book_of_album(n.book);
+        uint64_t book = book_of_album(n.book, n.pos.track);
 
         if (book != 0)
+        {
             n.book = book;
-        n.named = false;
+            n.named = false;
+        }
     }
     ctx->ok = write_entry(ctx->out, &n);
     return ctx->ok;
@@ -487,6 +519,7 @@ static void rekey(void)
     if (!any || !libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
                                LIB_BOOKS_VERSION, 1, NULL))
         return;
+    writes++;
     ctx.ok = scan(rekey_one, &ctx) && ctx.ok;
     libfile_finish(&w, ctx.ok);
 }
@@ -610,6 +643,7 @@ static bool rewrite(const struct entry *first)
     if (!libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
                        LIB_BOOKS_VERSION, 1, NULL))
         return false;
+    writes++;
 
     ctx.ok = write_entry(&w, first) && scan(copy_one, &ctx) && ctx.ok;
     return libfile_finish(&w, ctx.ok);
@@ -631,6 +665,7 @@ bool book_resume_convert(const char *text_file)
     if (!libfile_begin(&w, BOOK_RESUME_FILE, LIB_BOOKS_MAGIC,
                        LIB_BOOKS_VERSION, 1, NULL))
         return false;
+    writes++;
     ctx.ok = scan_text(text_file, convert_one, &ctx) && ctx.ok;
     return libfile_finish(&w, ctx.ok);
 }

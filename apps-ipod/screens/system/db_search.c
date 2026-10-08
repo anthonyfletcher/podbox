@@ -174,6 +174,8 @@ static bool match_in_scope(int tag, const struct tagcache_search *tcs)
         return db_spoken_album_has_book(tcs->result_seek);
     if (db_spoken_group_tag(tag))
         spoken = db_spoken_group_is_book(tag, tcs->result_seek);
+    else if (tag == tag_album || tag == tag_albumartist)
+        spoken = false; /* no album tables: no track behind the result */
     else
         spoken = tagcache_get_numeric(tcs, tag_virt_spoken) > 0;
 

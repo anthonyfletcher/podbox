@@ -69,7 +69,8 @@
  * libfile. Later records override earlier ones, which is what lets
  * aa_handle_offer() append rather than rewrite. Its version is the
  * thumbnails' format, and its marks the library the last completed pass
- * covered. */
+ * covered. A record with folder hash 0, which no folder has, holds
+ * aa_marks_key for those marks. */
 #define AA_STAMP_FILE   THUMBCACHE_DIR "/stamps.dat"
 #define AA_STAMP_MAGIC  LIB_STAMPS_MAGIC
 
@@ -103,6 +104,15 @@ struct aa_stamp
 #define AA_STAMP_EMBEDDED 1u
 #define AA_STAMP_NO_EMBED 2u
 
+/* tagcache_entry_key() of the last entry the marks cover, folded to 32 bits;
+ * 0 for none. Read with the table. */
+static unsigned int aa_marks_key;
+
+static unsigned int aa_fold_key(uint64_t key)
+{
+    return (unsigned int)(key ^ key >> 32);
+}
+
 /* The table, while a pass holds it; NULL otherwise. */
 static struct aa_stamp *aa_stamps;
 static unsigned char *aa_visited;
@@ -135,6 +145,7 @@ static char aa_check_path[MAX_PATH];
 static char aa_out_path[MAX_PATH];
 static char aa_chain_path[MAX_PATH];
 static char aa_stat_dir[MAX_PATH];
+static char aa_tmp_path[MAX_PATH];
 
 /* Stamp-file records go through this a batch at a time. */
 #define AA_STAMP_BATCH 64
@@ -160,6 +171,12 @@ static struct
     unsigned long size;
     int           flags;
 } aa_offer;
+
+/* An offer is on the queue. A pass does not drain the queue, so each track
+ * change posting its own would overflow it; one queued offer reads whichever
+ * aa_offer holds when it is handled. The thread drops what is queued across a
+ * USB session, so a pass starting and the check after USB clear it too. */
+static volatile bool aa_offer_posted;
 
 bool art_cache_is_busy(void)
 {
@@ -256,6 +273,9 @@ static void aa_fallback_path(char *out, int out_len, int size_index)
  * so load_image can add sizeof(struct bitmap)), or <= 0 on failure. */
 #define AAT_BAND_MAX 8    /* source rows resident per output row */
 static fb_data aat_band[AAT_BAND_MAX * ART_CACHE_MAX_DIM];
+/* Held while aat_band[] is in use: buffering, the art pass and the Report
+ * all read thumbnails, and read() locks only the file. */
+static struct mutex aat_mutex;
 
 /* ---------------------------------------------------------------------- *
  * Reading a cached thumbnail                                              *
@@ -267,6 +287,7 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
     struct art_cache_header hdr;
     int dw = bm->width, dh = bm->height;
     int sw, sh, dy, dx;
+    int rc = dw * dh * FB_DATA_SZ;
 
     lseek(fd, 0, SEEK_SET);
     if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
@@ -286,14 +307,17 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
      * the row arithmetic below, and a header claiming a huge height
      * overflows dy * sh, which can leave sy1 behind sy0 -- `rows` is then
      * negative, the clamp above it only tests the high side, and read()
-     * takes it as a size_t. 300 is the largest the cache ever writes. */
+     * takes it as a size_t. 300 is the largest the cache ever writes.
+     * A source too elongated to crop is stored non-square, and is refused:
+     * scaling it to the size asked for would stretch it. */
     if (sw <= 0 || sh <= 0 || sw > ART_CACHE_MAX_DIM ||
-        sh > ART_CACHE_MAX_DIM ||
+        sh > ART_CACHE_MAX_DIM || sw != sh ||
         dw <= 0 || dh <= 0 || dw > sw || dh > sh)   /* downscale only */
         return -1;
     if ((size_t)dw * dh * FB_DATA_SZ > (size_t)max_size)
         return -1;
 
+    mutex_lock(&aat_mutex);
     for (dy = 0; dy < dh; dy++)
     {
         int sy0 = dy * sh / dh;
@@ -305,7 +329,10 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
             rows = AAT_BAND_MAX;    /* extreme ratios: sample the top of the band */
         if (read(fd, aat_band, (size_t)rows * sw * FB_DATA_SZ) !=
             (ssize_t)((size_t)rows * sw * FB_DATA_SZ))
-            return -1;
+        {
+            rc = -1;
+            break;
+        }
         /* skip the remainder of a clamped band so the file stays aligned */
         if (sy1 - sy0 > rows)
             lseek(fd, (off_t)(sy1 - sy0 - rows) * sw * FB_DATA_SZ, SEEK_CUR);
@@ -329,11 +356,12 @@ int art_cache_load_aat(int fd, struct bitmap *bm, int max_size,
             out[dx] = n ? LCD_RGBPACK(r / n, g / n, b / n) : 0;
         }
     }
+    mutex_unlock(&aat_mutex);
 
-    if (filter)
+    if (rc > 0 && filter)
         img_filter_apply_banded((fb_data *)bm->data, dw, dh, filter);
 
-    return dw * dh * FB_DATA_SZ;
+    return rc;
 }
 
 unsigned int art_cache_dir_hash(const char *dir)
@@ -400,7 +428,7 @@ static void aa_ensure_dirs(void)
 }
 
 /* An empty stamp file in this format: no folder stamped, and the format
- * recorded at once, so a pass cut short does not purge again */
+ * recorded, so a pass cut short after the purge does not purge again */
 static void aa_stamps_clear(void)
 {
     struct libfile_writer w;
@@ -410,8 +438,11 @@ static void aa_stamps_clear(void)
         libfile_finish(&w, true);
 }
 
+static bool aa_check_abort(void);
+
 /* Delete every cached thumbnail of every size (the directories themselves stay).
- * Used only when the on-disk format changes. */
+ * Stops for USB or a shutdown, with no stamp file, so the next pass purges the
+ * rest; the format is recorded only once every size is empty. */
 static void aa_purge_thumbs(void)
 {
     int i;
@@ -427,7 +458,7 @@ static void aa_purge_thumbs(void)
      * they go too rather than being left to describe a cache that is gone. */
     remove(AA_NOART_ALBUMS);
     remove(AA_NOART_ARTISTS);
-    aa_stamps_clear();
+    remove(AA_STAMP_FILE);
 
     debug_log(DEBUG_LOG_ARTCACHE, "purge: start");
 
@@ -473,6 +504,11 @@ static void aa_purge_thumbs(void)
                 if (remove(filepath) == 0)
                     removed++;
                 yield();
+                if (aa_check_abort())
+                {
+                    debug_log(DEBUG_LOG_ARTCACHE, "purge: interrupted");
+                    return;
+                }
             }
             total += removed;
         }
@@ -482,12 +518,14 @@ static void aa_purge_thumbs(void)
                   art_sizes[i].name, total);
     }
 
+    aa_stamps_clear();
     debug_log(DEBUG_LOG_ARTCACHE, "purge: done");
 }
 
 /* After a completed pass: every thumbnail of a folder the pass did not reach
  * belongs to one that has gone. fallback.aat, not a hash, is left alone.
- * Collected and removed a batch at a time, as aa_purge_thumbs() does. */
+ * Collected and removed a batch at a time, as aa_purge_thumbs() does; a stop
+ * for USB leaves the rest to the next completed pass. */
 static bool aa_was_visited(unsigned int h);
 
 static void aa_remove_orphans(void)
@@ -533,10 +571,17 @@ static void aa_remove_orphans(void)
                          aa_purge_names[k]);
                 if (remove(filepath) == 0)
                     removed++;
+                yield();
+                if (aa_check_abort())
+                {
+                    removed_all += removed;
+                    goto out;
+                }
             }
             removed_all += removed;
         } while (n == AA_PURGE_BATCH && removed > 0);
     }
+out:
     if (removed_all)
     {
         aa_generation++;
@@ -561,13 +606,14 @@ static bool aa_format_current(void)
  *
  * Being inside the pass, this only ever runs once the pass has been allowed to
  * start; art_cache_init() is what makes sure a bump allows it. */
-static void aa_check_format_version(void)
+static bool aa_check_format_version(void)
 {
     if (aa_format_current())
-        return;
+        return true;
 
     logf("albumart cache: new format %d, purging", ART_CACHE_FORMAT_VERSION);
     aa_purge_thumbs();
+    return aa_format_current();
 }
 
 /* bg_task.artifact_ok: whether the cache is still on disk. A cache deleted
@@ -579,6 +625,7 @@ static bool aa_artifact_ok(void)
     char p[MAX_PATH];
     int i;
 
+    aa_offer_posted = false;
     if (!aa_format_current())
         return false;
 
@@ -673,6 +720,10 @@ static bool aa_was_visited(unsigned int h)
     return false;
 }
 
+/* A folder this pass skipped for want of a slot. Its thumbnails are not
+ * orphans, so the pass then removes none. */
+static bool aa_table_full;
+
 /* The slot for 'h' the first time this pass reaches it; NULL if the pass has
  * been here already, or the table is full (the folder is then skipped). */
 static struct aa_stamp *aa_visit(unsigned int h)
@@ -681,7 +732,10 @@ static struct aa_stamp *aa_visit(unsigned int h)
     unsigned int i;
 
     if (!s)
+    {
+        aa_table_full = true;
         return NULL;
+    }
     i = s - aa_stamps;
     if (aa_visited[i / 8] & (1u << (i % 8)))
         return NULL;
@@ -698,6 +752,7 @@ static void aa_stamps_load(void)
 
     fd = libfile_open(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
                       sizeof(struct aa_stamp), &h, NULL);
+    aa_marks_key = 0;
     if (fd < 0)
         return;
     while ((n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
@@ -705,7 +760,14 @@ static void aa_stamps_load(void)
         n /= sizeof(aa_stamp_io[0]);
         for (i = 0; i < n; i++)
         {
-            struct aa_stamp *s = aa_slot(aa_stamp_io[i].key);
+            struct aa_stamp *s;
+
+            if (aa_stamp_io[i].key == 0)
+            {
+                aa_marks_key = aa_stamp_io[i].stamp;
+                continue;
+            }
+            s = aa_slot(aa_stamp_io[i].key);
             if (s)
                 s->stamp = aa_stamp_io[i].stamp;
         }
@@ -715,18 +777,31 @@ static void aa_stamps_load(void)
 
 /* Write the table back. A completed pass keeps only the folders it reached,
  * which drops those gone from the library; an interrupted one keeps every
- * stamp, since the folders it never reached still have their thumbnails. */
+ * stamp, since the folders it never reached still have their thumbnails.
+ * The header keeps the last completed pass's marks, which are what the file
+ * still covers: an interrupted pass that cleared them would have the next one
+ * visit every folder. */
 static void aa_stamps_save(bool completed)
 {
+    const struct bg_marks *done = &art_cache_task.done_marks;
+    struct libfile_marks lm;
     struct libfile_writer w;
     bool ok;
     int i, n = 0;
 
+    lm.entries = done->entries;
+    lm.commitid = done->commitid;
+    lm.deleted = done->deleted;
     if (!libfile_begin(&w, AA_STAMP_FILE, AA_STAMP_MAGIC,
                        ART_CACHE_FORMAT_VERSION, sizeof(struct aa_stamp),
-                       NULL))
+                       &lm))
         return;
     ok = true;
+    if (aa_marks_key)
+    {
+        aa_stamp_io[n].key = 0;
+        aa_stamp_io[n++].stamp = aa_marks_key;
+    }
 
     for (i = 0; ok && i < AA_SEEN_SLOTS; i++)
     {
@@ -751,7 +826,7 @@ static void aa_stamps_save(bool completed)
 /* Record one folder's stamp outside a pass, by appending to the file. */
 static void aa_stamp_append(unsigned int h, unsigned int stamp)
 {
-    struct aa_stamp rec = { h, stamp };
+    struct aa_stamp rec = { h ? h : 1, stamp };
 
     libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
                    sizeof(rec), &rec, 1);
@@ -949,7 +1024,14 @@ static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index
         layout = AA_COLUMNS;
     }
 
-    fd = open(out_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    /* Written whole under another name and renamed over the thumbnail, so a
+     * reader never sees one part-written. ".new" is not ".aat", so the orphan
+     * sweep passes it by. */
+    if (strlcpy(aa_tmp_path, out_path, sizeof(aa_tmp_path))
+            >= sizeof(aa_tmp_path))
+        return false;
+    strcpy(aa_tmp_path + strlen(aa_tmp_path) - 4, ".new");
+    fd = open(aa_tmp_path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (fd < 0)
         return false;
 
@@ -965,8 +1047,10 @@ static bool aa_write_aat(const char *out_path, struct bitmap *bm, int size_index
          (write(fd, bm->data, bytes) == (ssize_t)bytes);
     close(fd);
 
+    if (ok)
+        ok = rename(aa_tmp_path, out_path) == 0;
     if (!ok)
-        remove(out_path);
+        remove(aa_tmp_path);
     return ok;
 }
 
@@ -1464,17 +1548,6 @@ static enum bg_result aa_run_pass(void)
     aa_check_all = dircache_is_ready()
                 || art_cache_task.done_marks.entries < 0;
     aa_reread_tags = art_cache_task.done_marks.entries < 0;
-    {
-        const struct bg_marks *done = &art_cache_task.done_marks;
-        struct tagcache_marks now;
-
-        tagcache_get_marks(&now);
-        aa_added_only = done->entries >= 0 && done->deleted >= 0
-                     && now.deleted_ct == done->deleted
-                     && now.commitid >= done->commitid
-                     && tagcache_get_stat()->total_entries > done->entries;
-    }
-
     wh = core_alloc(worksz);
     if (wh <= 0)
         return BG_INTERRUPTED; /* not enough free memory right now */
@@ -1492,9 +1565,35 @@ static enum bg_result aa_run_pass(void)
     memset(aa_stamps, 0, AA_TABLE_BYTES);
 
     aa_ensure_dirs();
-    aa_check_format_version();
+    /* A purge cut short leaves no stamp file, which saving one would hide */
+    if (!aa_check_format_version())
+    {
+        aa_stamps = NULL;
+        aa_visited = NULL;
+        core_unpin(wh);
+        core_unpin(sh);
+        core_free(sh);
+        core_free(wh);
+        return BG_INTERRUPTED;
+    }
+    aa_table_full = false;
     aa_ensure_fallback(workbuf, worksz);
     aa_stamps_load();
+    /* A Rebuild renumbers the entries, which the file at the old last entry
+     * shows */
+    {
+        const struct bg_marks *done = &art_cache_task.done_marks;
+        struct tagcache_marks now;
+
+        tagcache_get_marks(&now);
+        aa_added_only = done->entries >= 0 && done->deleted >= 0
+                     && now.deleted_ct == done->deleted
+                     && now.commitid >= done->commitid
+                     && tagcache_get_stat()->total_entries > done->entries
+                     && aa_marks_key != 0
+                     && aa_fold_key(tagcache_entry_key(done->entries - 1))
+                        == aa_marks_key;
+    }
 
     if (!tagcache_search(&tcs, tag_filename))
     {
@@ -1600,7 +1699,7 @@ out:
     /* What the walk did not visit is not missing when it saw only the
      * added tracks */
     noart_close(completed && !aa_added_only);
-    if (completed && !aa_added_only)
+    if (completed && !aa_added_only && !aa_table_full)
         aa_remove_orphans();
     aa_stamps_save(completed && !aa_added_only);
     aa_stamps = NULL;
@@ -1631,6 +1730,7 @@ static void aa_handle_offer(void)
     struct aa_src src;
     bool need = false;
 
+    aa_offer_posted = false;
     if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
         return;
 
@@ -1655,8 +1755,24 @@ static void aa_handle_offer(void)
     }
     if (!need)
         return;   /* already cached (folder art wins) */
+    /* A pass removes the thumbnails of a folder outside the database, and a
+     * stamp file written now would record a format the purge has not reached */
+    if (!aa_format_current())
+        return;
+    {
+        struct tagcache_search tcs;
 
+        if (!tagcache_find_index(&tcs, path))
+            return;
+        tagcache_search_finish(&tcs);
+    }
+
+    /* Only from free memory: taking it from the audio buffer stops and
+     * rebuffers the track that is playing, which costs more than the offer
+     * saves. */
     worksz = aa_work_bytes();
+    if (core_allocatable() < worksz)
+        return;
     wh = core_alloc(worksz);
     if (wh <= 0)
         return;
@@ -1670,6 +1786,8 @@ static void aa_handle_offer(void)
 
     for (i = 0; i < ART_CACHE_NUM_SIZES; i++)
     {
+        if (aa_check_abort())
+            break;
         s = order[i];
         aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
         if (file_exists(aa_check_path))
@@ -1703,6 +1821,9 @@ static void aa_track_change_cb(unsigned short id, void *event_data)
     aa_offer.pos = id3->albumart.pos;
     aa_offer.size = id3->albumart.size;
     aa_offer.flags = id3->albumart.type;
+    if (aa_offer_posted)
+        return;
+    aa_offer_posted = true;
     bg_task_post(&art_cache_task, AA_EVENT_OFFER);
 }
 
@@ -1732,6 +1853,7 @@ static enum bg_result aa_task_run(void)
     enum bg_result result;
 
     debug_log(DEBUG_LOG_ARTCACHE, "starting pass");
+    aa_offer_posted = false;
     result = aa_run_pass();
     debug_log(DEBUG_LOG_ARTCACHE,
               result == BG_DONE   ? "pass complete, idle" :
@@ -1779,8 +1901,15 @@ static void aa_write_marks(const struct bg_marks *m)
         lm.commitid = m->commitid;
         lm.deleted = m->deleted;
     }
-    libfile_set_marks(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
-                      &lm);
+    if (libfile_set_marks(AA_STAMP_FILE, AA_STAMP_MAGIC,
+                          ART_CACHE_FORMAT_VERSION, &lm) && m)
+    {
+        struct aa_stamp rec =
+            { 0, aa_fold_key(tagcache_entry_key(m->entries - 1)) };
+
+        libfile_append(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
+                       sizeof(rec), &rec, 1);
+    }
 }
 
 struct bg_task art_cache_task =
@@ -1797,6 +1926,7 @@ struct bg_task art_cache_task =
 void art_cache_init(void)
 {
     cache_busy = false;
+    mutex_init(&aat_mutex);
 
     /* Start the log from a readable point once per boot, so it says what this
      * run did rather than every run since the setting went on -- and so the

@@ -218,26 +218,49 @@ static void carousel_sort_noop(void)
 }
 
 /* carousel_model.on_menu: the same Carousel settings menu the album carousel
- * opens. Only the caption-layout setting needs acting on here -- artists have
- * no sort order (sort_next/prev are no-ops) and no pfraw cache, so the album
- * model's sort and cache_version follow-ups have no artist equivalent. */
+ * opens. Artists have no pfraw cache, so the album model's cache_version
+ * follow-up has no artist equivalent. */
 static int artist_on_menu(void)
 {
     int old_show_name = global_settings.album_covers_show_album_name;
     bool old_statusbar = global_settings.album_covers_statusbar;
+    int old_sort = global_settings.album_covers_sort_artists_by;
+    int old_filter[CAROUSEL_FILTER_SLOTS];
+    char old_chain[CAROUSEL_FILTER_MAX];
+    char name[128];
+
+    memcpy(old_filter, global_settings.album_covers_filter, sizeof(old_filter));
+    strmemccpy(old_chain, global_settings.album_covers_filter_chain,
+               sizeof(old_chain));
+    strmemccpy(name, artist_name(center_index), sizeof(name));
 
     if (carousel_settings_menu() == MENU_ATTACHED_USB)
         return GO_TO_ROOT;
 
     /* The caption layout decides the text margin and the status bar decides
-     * the viewport, both computed during init() -- so a change to either needs
-     * a full rebuild, not just a redraw. */
+     * the viewport, both computed during init(), and init() sorts the index
+     * -- so a change to any of them needs a full rebuild, not just a redraw.
+     * The artist on screen stays on screen. */
     if (global_settings.album_covers_show_album_name != old_show_name
-        || global_settings.album_covers_statusbar != old_statusbar)
+        || global_settings.album_covers_statusbar != old_statusbar
+        || global_settings.album_covers_sort_artists_by != old_sort)
     {
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;
+        for (int i = 0; i < carousel_idx.artist_ct; i++)
+            if (!strcmp(artist_name(i), name))
+            {
+                set_current_slide(i);
+                break;
+            }
     }
+
+    /* A treatment reaches a slide only as it is loaded, so the decoded ones
+     * have to go */
+    if (memcmp(old_filter, global_settings.album_covers_filter,
+               sizeof(old_filter))
+        || strcmp(old_chain, global_settings.album_covers_filter_chain))
+        carousel_drop_slides();
 
     /* Re-apply the live geometry settings (zoom / margins / tilt). */
     carousel_refresh();
