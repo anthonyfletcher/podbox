@@ -31,6 +31,7 @@
 #include <stdbool.h>
 #endif
 
+#include <stdbool.h>
 #include "config.h"
 
 void rtc_init(void)
@@ -42,6 +43,16 @@ int rtc_read_datetime(struct tm *tm)
 {
     time_t now = time(NULL);
     *tm = *localtime(&now);
+
+#ifdef SIMULATOR
+    extern bool sim_screenshot;
+    if (sim_screenshot)
+    {
+        /* Monday 1 January 2024, 09:00:00 */
+        *tm = (struct tm){ .tm_year = 124, .tm_mon = 0, .tm_mday = 1,
+                           .tm_wday = 1, .tm_yday = 0, .tm_hour = 9 };
+    }
+#endif
 
     return 0;
 }

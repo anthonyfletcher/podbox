@@ -63,6 +63,7 @@ const char      *audiodev = NULL;
 bool            debug_buttons = false;
 
 bool            sim_alarm_wakeup = false;
+bool            sim_screenshot = false;
 const char     *sim_root_dir = SIMULATOR_DEFAULT_ROOT;
 
 static SDL_Thread *evt_thread = NULL;
@@ -361,6 +362,11 @@ void sys_handle_argv(int argc, char *argv[])
                 sim_alarm_wakeup = true;
                 printf("Simulating alarm wakeup.\n");
             }
+            else if (!strcmp("--screenshot", argv[x]))
+            {
+                sim_screenshot = true;
+                printf("Clock fixed at 2024-01-01 09:00, battery at 100%%.\n");
+            }
             else if (!strcmp("--root", argv[x]))
             {
                 x++;
@@ -403,6 +409,7 @@ void sys_handle_argv(int argc, char *argv[])
 #endif
                 printf("  --zoom [VAL]\t Window zoom (will disable backgrounds)\n");
                 printf("  --alarm \t Simulate a wake-up on alarm\n");
+                printf("  --screenshot \t Fix the clock at Mon 2024-01-01 09:00 and the battery at 100%%\n");
                 printf("  --root [DIR]\t Set root directory\n");
                 printf("  --mapping \t Output coordinates and radius for mapping backgrounds\n");
                 printf("  --audiodev [NAME] \t Audio device name to use\n");

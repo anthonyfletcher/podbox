@@ -55,6 +55,11 @@ static void battery_status_update(void)
     static unsigned int ext_power_until_tick = 0;
 #endif
 
+    /* --screenshot holds the battery full: 4300 mV, 100%, not charging */
+    extern bool sim_screenshot;
+    if(sim_screenshot)
+        return;
+
     if(TIME_BEFORE(current_tick, update_after_tick))
         return;
 
