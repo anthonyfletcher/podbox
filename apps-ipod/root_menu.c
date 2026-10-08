@@ -64,6 +64,9 @@
 #include "viewers/playback_viewer/pv_row.h"
 #include "disk.h"
 #include "sound.h"
+#ifdef USB_ENABLE_AUDIO
+#include "usbstack/usb_audio.h"
+#endif
 
 struct root_items {
     int (*function)(void* param);
@@ -591,6 +594,19 @@ static int wpsscrn(void* param)
     int ret_val = GO_TO_PREVIOUS;
     int audstatus = audio_status();
     (void)param;
+
+#ifdef USB_ENABLE_AUDIO
+    /* While a computer plays through the sound card, the player's own
+     * playback is refused, so there is nothing for the WPS to show. Said
+     * before the activity changes: pushing it redraws the screen for a WPS
+     * that would then not open. Not while the player streams to a DAC, where
+     * its playback carries on. */
+    if (usb_audio_get_active() && usb_audio_get_playing())
+    {
+        splash(HZ*2, ID2P(LANG_USB_DAC_ACTIVE));
+        return GO_TO_PREVIOUS;
+    }
+#endif
     push_current_activity(ACTIVITY_WPS);
 
     if (audstatus)
