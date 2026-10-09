@@ -262,11 +262,13 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
  * the pair; what Light gives up is the dark-accent rescue in extract_colors(),
  * since the colour that then reads over the artwork is the darker one.
  *
- * Dark lifts an accent below half scale to DARK_ACCENT_TONE. Turned over, the
- * accent is often the cover's own expanse -- orange text on an orange sleeve --
- * and the `scrim` filter stands down for text that dim, so nothing would part
- * the two. Lightening the lighter of the pair only widens its contrast. */
-#define DARK_ACCENT_TONE 70
+ * An accent lighter than the dominant but below half scale is lifted just past
+ * it, a tone at a time from LIGHT_TEXT_TONE. The `scrim` filter stands down for
+ * text that dim, reading it as dark text over light art, so nothing would part
+ * it from the picture -- teal over a dark sleeve, or under Dark, orange text on
+ * its own orange sleeve. Only just past: lifted further, an orange turns pink.
+ * Lightening the lighter of the pair only widens its contrast. */
+#define LIGHT_TEXT_TONE 40
 
 static void apply_oriented(void)
 {
@@ -283,8 +285,15 @@ static void apply_oriented(void)
         accent = cache.found_dominant;
         dominant = cache.found_accent;
     }
-    if (orientation == DYNAMIC_BG_DARK && 2 * color_luminance(accent) < 255)
-        accent = color_tone_bound(accent, DARK_ACCENT_TONE, 1);
+    if (color_contrast(accent, black) > color_contrast(dominant, black))
+    {
+        unsigned int found = accent;
+        int tone;
+
+        for (tone = LIGHT_TEXT_TONE; 2 * color_luminance(accent) < 255 &&
+                                     tone <= 100; tone += 2)
+            accent = color_tone_bound(found, tone, 1);
+    }
 
     cache.orientation = orientation;
     apply_colors(accent, dominant, false);
