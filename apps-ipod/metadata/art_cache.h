@@ -58,6 +58,12 @@ struct art_cache_header
 /* Start the background cache thread. Call once at startup, after tagcache. */
 void art_cache_init(void);
 
+#ifdef DBTOOL
+/* tools/artcache_pb: one caching pass with no thread, recording the
+ * database's marks when it completes; 'rebuild' purges first. */
+enum bg_result art_cache_tool_run(bool rebuild);
+#endif
+
 /* Load a cached .aat thumbnail from an open fd, area-average downscaled to
  * bm->width x bm->height (bm->data must hold that many fb_data). Returns the
  * pixel byte count, or <= 0 on failure, which includes a non-square

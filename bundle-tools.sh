@@ -1,9 +1,10 @@
 #!/bin/sh
 # Put the desktop tools into a rockbox.zip produced by `make zip`.
 #
-# database_pb.exe ships as .rockbox/tools/database_pb.exe. It brings the
-# player's database up to date from the computer, with the player's own
-# tagcache.c, so the files it writes are the ones the firmware beside it reads.
+# database_pb.exe and artcache_pb.exe ship in .rockbox/tools/. They bring the
+# player's database and art cache up to date from the computer, with the
+# player's own tagcache.c and art_cache.c, so the files they write are the
+# ones the firmware beside them reads.
 #
 # soundscan.exe ships as .rockbox/tools/soundscan.exe together with the codecs
 # it loads, which are the player's own decoders built for the host: the tool
@@ -49,12 +50,15 @@ echo "bundle-tools.sh: making soundscan.exe"
 make -C "$ROOT/tools/soundscan" win
 echo "bundle-tools.sh: making database_pb.exe"
 make -C "$ROOT/tools/database_pb" win
+echo "bundle-tools.sh: making artcache_pb.exe"
+make -C "$ROOT/tools/artcache_pb" win
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox/tools/codecs"
 cp "$TOOL" "$STAGE/.rockbox/tools/soundscan.exe"
 cp "$ROOT/tools/database_pb/database_pb.exe" "$STAGE/.rockbox/tools/"
+cp "$ROOT/tools/artcache_pb/artcache_pb.exe" "$STAGE/.rockbox/tools/"
 
 n=0
 for c in "$CODECS"/lib/rbcodec/codecs/*.codec; do
@@ -75,6 +79,7 @@ done
 if [ -n "$STRIP" ]; then
     "$STRIP" "$STAGE/.rockbox/tools/soundscan.exe" 2>/dev/null || true
     "$STRIP" "$STAGE/.rockbox/tools/database_pb.exe" 2>/dev/null || true
+    "$STRIP" "$STAGE/.rockbox/tools/artcache_pb.exe" 2>/dev/null || true
     for c in "$STAGE"/.rockbox/tools/codecs/*.codec; do
         "$STRIP" "$c" 2>/dev/null || true
     done

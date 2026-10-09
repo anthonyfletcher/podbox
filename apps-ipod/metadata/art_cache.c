@@ -1912,6 +1912,40 @@ static void aa_write_marks(const struct bg_marks *m)
     }
 }
 
+#ifdef DBTOOL
+/* tools/artcache_pb: one pass, run as the background task runs it, against
+ * the database tagcache_tool_open() loaded. The marks it records on success
+ * are the ones the player computes for the same database, so the player
+ * finds the cache covered and runs no pass of its own. 'rebuild' throws
+ * every thumbnail away first, as Rebuild Art Cache does. */
+enum bg_result art_cache_tool_run(bool rebuild)
+{
+    struct tagcache_marks tm;
+    struct bg_marks covered;
+    enum bg_result result;
+
+    if (rebuild)
+    {
+        aa_purge_thumbs();
+        aa_write_marks(NULL);
+    }
+    aa_read_marks(&art_cache_task.done_marks);
+
+    tagcache_get_marks(&tm);
+    covered.entries = tagcache_get_stat()->total_entries;
+    covered.commitid = tm.commitid;
+    covered.deleted = tm.deleted_ct;
+
+    result = aa_task_run();
+    if (result == BG_DONE)
+    {
+        art_cache_task.done_marks = covered;
+        aa_write_marks(&covered);
+    }
+    return result;
+}
+#endif /* DBTOOL */
+
 struct bg_task art_cache_task =
 {
     .read_marks   = aa_read_marks,

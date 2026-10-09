@@ -73,7 +73,9 @@ report rebuilds them itself the next time you open it.
 **Update Database** and **Rebuild Database** are much faster from a Windows PC:
 `database_pb.exe` in `.rockbox/tools/` does the same work on the connected
 player, or `database_pb.exe --rebuild` for a rebuild. The player restarts
-itself when ejected, to load the new database.
+itself when ejected, to load the new database. **Update Art Cache** and
+**Rebuild Art Cache** have `artcache_pb.exe` beside it, run the same way;
+after new music, run it after `database_pb.exe`.
 
 ---
 

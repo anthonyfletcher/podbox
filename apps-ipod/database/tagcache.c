@@ -7050,9 +7050,8 @@ void tagcache_stop_scan(void)
 
 
 #ifdef DBTOOL
-/* The desktop tool's run, in place of the thread: Q_UPDATE's work, or with
- * 'rebuild' Q_REBUILD's, done once against the mounted player. */
-bool tagcache_tool_run(bool rebuild)
+/* What tagcache_init() sets up, without the thread */
+static void tool_init(void)
 {
     memset(&tc_stat, 0, sizeof(struct tagcache_stat));
     memset(&current_tcmh, 0, sizeof(struct master_header));
@@ -7060,7 +7059,27 @@ bool tagcache_tool_run(bool rebuild)
     write_lock = read_lock = 0;
     strmemccpy(tc_stat.db_path, LIB_DB_DIR, sizeof(tc_stat.db_path));
     mutex_init(&command_queue_mutex);
+}
 
+/* The desktop art tool's view of the database: read as it stands, and held
+ * in RAM as the player holds it, which the deleted count and the art pass's
+ * marks need. Nothing is written. */
+bool tagcache_tool_open(void)
+{
+    tool_init();
+    tagcache_commit_finalize();
+    tc_stat.initialized = true;
+    if (!tc_stat.ready)
+        return false;
+    load_ramcache();
+    return tc_stat.ramcache;
+}
+
+/* The desktop tool's run, in place of the thread: Q_UPDATE's work, or with
+ * 'rebuild' Q_REBUILD's, done once against the mounted player. */
+bool tagcache_tool_run(bool rebuild)
+{
+    tool_init();
     finish_interrupted_swap();
     if (db_file_exists(TAGCACHE_FILE_TEMP))
         commit();

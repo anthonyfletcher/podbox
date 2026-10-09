@@ -285,6 +285,7 @@ and produces the wrong firmware.
 | `check-settings-docs.sh` | Whether `settings-help.txt` and `settings-guide.md` match the settings. Silence means they do. |
 | `soundscan/` | Runs the player's sound analysis over a music folder on a computer. Ships as `.rockbox/tools/soundscan.exe`; compiles the app layer's analysis sources. |
 | `database_pb/` | Runs the player's database Update or Rebuild against a mounted player. Ships as `.rockbox/tools/database_pb.exe`; compiles `apps-ipod/database/tagcache.c` with `DBTOOL`. Upstream's `database/`, the (D)atabase build, writes upstream's database and is left as it is. |
+| `artcache_pb/` | Runs the player's art cache pass against a mounted player. Ships as `.rockbox/tools/artcache_pb.exe`; compiles `apps-ipod/metadata/art_cache.c` and its image code with `DBTOOL`. |
 | `spun_testlog.pl` | Synthesises playback logs, and the expected parse, for Spun. |
 
 ### CheckWPS
@@ -336,7 +337,7 @@ Two upstream files reach the app layer by bare include name, through `api/` stub
 | `bundle-theme.sh` | Adds Scrim, `default-config.cfg` and the default iconset to the zip. Deletes `classic_statusbar` (the directory and the loose `.sbs`/`.rsbs` beside it) and the plugin data `buildzip.pl` copies from `apps/plugins/`. The theme is named, not globbed, so a merge cannot start shipping stock themes. |
 | `bundle-help.sh` | Ships `settings-help.txt`. Without it every **Explain** is empty and nothing else looks wrong. |
 | `bundle-trim.sh` | Ships `trim.config`, the whole of what **Trim Titles** trims. |
-| `bundle-tools.sh` | Adds `soundscan.exe` and `database_pb.exe`, rebuilt by make on each run, and the host-built codecs soundscan loads, as `.rockbox/tools/`. A missing Windows simulator is reported, not fatal; a failed tool build is fatal; `release.sh` requires it. |
+| `bundle-tools.sh` | Adds `soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`, rebuilt by make on each run, and the host-built codecs soundscan loads, as `.rockbox/tools/`. A missing Windows simulator is reported, not fatal; a failed tool build is fatal; `release.sh` requires it. |
 | `build-bootloader.sh`, `tools/bootloader-installer/` | Builds both bootloaders and Windows `ipodpatcher.exe` and `mks5lboot.exe` from `utils/`, unchanged, and zips them with the install scripts and README as `podbox-bootloader.zip`. The 5G bootloader is passed to ipodpatcher by `install-5g.cmd`: embedding it needs every iPod model's bootloader beside it. |
 | `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator`, `Bootloader` and `latest` releases, in that order. |
 | `docs/CREDITS` | PodBox, RockPod and Spun blocks above `For RockBox:`. Upstream's list below is untouched, trailing newline included, so merges apply. |

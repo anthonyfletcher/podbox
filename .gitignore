@@ -354,13 +354,14 @@ __pycache__
 # refuses to run unless the tree is clean.
 /dist/
 
-# What tools/soundscan/Makefile and tools/database_pb/Makefile build. The
+# What the Makefiles in tools/soundscan, database_pb and artcache_pb build. The
 # `/dist/` above is anchored to the root and does not reach soundscan's, and a
 # native binary has no extension for `*.exe` to catch -- so each is named here. Left behind they dirty the tree,
 # which is enough on its own to stop release.sh.
 /tools/soundscan/dist/
 /tools/soundscan/soundscan
 /tools/database_pb/database_pb
+/tools/artcache_pb/artcache_pb
 
 # Editor and assistant tooling -- local to whoever checked the tree out
 /.idea/

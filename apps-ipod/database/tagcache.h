@@ -347,6 +347,9 @@ void tagcache_init(void) INIT_ATTR;
 /* tools/database_pb: one Update, or Rebuild, of the database under the
  * filesystem root, with no thread. True when it ends ready. */
 bool tagcache_tool_run(bool rebuild);
+/* tools/artcache_pb: the database read as it stands and loaded into RAM.
+ * True when it is ready and loaded. */
+bool tagcache_tool_open(void);
 #endif
 bool tagcache_is_initialized(void);
 /* Boot has loaded the skins: the boot scan may build or update. */
