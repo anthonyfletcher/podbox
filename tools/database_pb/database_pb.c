@@ -33,6 +33,7 @@
 #include "config.h"
 #include "file.h"
 #include "dir.h"
+#include "pathfuncs.h"
 #include "system/library_files.h"
 #include "database/libfile.h"
 #include "database/tagcache.h"
@@ -44,6 +45,7 @@ extern const char *sim_root_dir;
 const char *sim_root_dir = ".";
 
 int database_pb_verbose;
+bool database_pb_rebuild;
 
 /* ------------------------------------------------------------------ *
  * finding the player                                                 *
@@ -60,7 +62,7 @@ static void usage(void)
 "                 Left out, the first drive with a .rockbox folder is used.\n"
 "  --rebuild      build the database again from nothing, as Rebuild does on\n"
 "                 the player. Play counts, ratings and positions are kept.\n"
-"  -v             say what is being done\n");
+"  -v             list each file that is new, changed, gone or unreadable\n");
 }
 
 #ifdef _WIN32
@@ -179,6 +181,26 @@ static int count_tracks(void)
     return n;
 }
 
+/* What the run did. A rebuild reads everything as new, so only its total
+ * means anything. */
+static void report(int tracks, long secs)
+{
+    const struct tagcache_stat *s = tagcache_get_stat();
+
+    if (secs < 60)
+        printf("Done in %ld s. ", secs);
+    else
+        printf("Done in %ld min %ld s. ", secs / 60, secs % 60);
+    if (database_pb_rebuild)
+        printf("%d tracks.\n", tracks);
+    else
+        printf("%d tracks: %d new, %d changed, %d gone.\n", tracks,
+               s->scan_added, s->scan_changed, s->scan_removed);
+    if (s->scan_unreadable > 0)
+        printf("%d music files could not be read%s.\n", s->scan_unreadable,
+               database_pb_verbose ? "" : "; -v lists them");
+}
+
 /* ------------------------------------------------------------------ *
  * the run                                                            *
  * ------------------------------------------------------------------ */
@@ -186,17 +208,19 @@ static int count_tracks(void)
 int main(int argc, char **argv)
 {
     const char *target = NULL;
-    bool rebuild = false;
     time_t t0;
     int tracks;
     bool ok;
 
     setvbuf(stdout, NULL, _IONBF, 0);
+    /* As the player does at boot: the scan names its root "/<HDD0>" from
+     * these, and stores that in every path */
+    init_volume_names();
 
     for (int i = 1; i < argc; i++)
     {
         if (!strcmp(argv[i], "--rebuild"))
-            rebuild = true;
+            database_pb_rebuild = true;
         else if (!strcmp(argv[i], "-v"))
             database_pb_verbose = 1;
         else if (argv[i][0] == '-')
@@ -233,17 +257,16 @@ int main(int argc, char **argv)
     }
 
     read_settings();
-    if (database_pb_verbose)
-        printf("Scanning %s%s\n", global_settings.tagcache_scan_paths,
-               global_settings.year_from_folder ? ", year from folder" : "");
 
     mkdir(LIB_DIR);
     mkdir(LIB_DB_DIR);
 
-    printf("%s the database on %s\n", rebuild ? "Rebuilding" : "Updating",
-           target);
+    printf("%s the database on %s\n",
+           database_pb_rebuild ? "Rebuilding" : "Updating", target);
+    printf("Music in %s%s\n", global_settings.tagcache_scan_paths,
+           global_settings.year_from_folder ? ", years from folder names" : "");
     t0 = time(NULL);
-    ok = tagcache_tool_run(rebuild);
+    ok = tagcache_tool_run(database_pb_rebuild);
     tracks = ok ? count_tracks() : 0;
     database_pb_progress_end();
 
@@ -252,7 +275,7 @@ int main(int argc, char **argv)
         printf("The database could not be brought up to date.\n");
         return 1;
     }
-    printf("Done in %ld s: %d tracks.\n", (long)(time(NULL) - t0), tracks);
+    report(tracks, (long)(time(NULL) - t0));
     printf("Eject the player. It restarts itself to load the new database.\n");
     return 0;
 }

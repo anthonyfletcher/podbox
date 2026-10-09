@@ -49,26 +49,85 @@ unsigned char *language_strings[LANG_LAST_INDEX_IN_ARRAY];
 /* ---- progress ---------------------------------------------------------- *
  *
  * The scan yields every few files on the player, which is where this tool
- * says how far it has got. */
+ * says how far it has got: one line, redrawn in place a few times a second,
+ * with the stage, the counts so far and the folder being read. */
+#define LINE_WIDTH 78
+
 volatile long current_tick;
-static time_t last_shown;
+static long last_shown_ms;
 static bool shown;
+static bool scan_seen;
+static char folder[MAX_PATH];
+
+static long now_ms(void)
+{
+    return (long)(clock() * 1000 / CLOCKS_PER_SEC);
+}
+
+/* tagcache.c yields on a tick deadline, so the tick has to move between
+ * yields as well as at them */
+static void tick(void)
+{
+    current_tick = now_ms() * HZ / 1000;
+}
+
+/* The tail of 'path' that fits in 'width', marked as cut */
+static const char *tail(const char *path, int width)
+{
+    static char buf[MAX_PATH];
+    int len = strlen(path);
+
+    if (len <= width)
+        return path;
+    snprintf(buf, sizeof(buf), "...%s", path + len - (width - 3));
+    return buf;
+}
 
 void yield(void)
 {
-    const struct tagcache_stat *s = tagcache_get_stat();
-    time_t now = time(NULL);
+    const struct tagcache_stat *s;
+    char line[LINE_WIDTH + 1];
+    long now;
 
-    current_tick = (long)(clock() * HZ / CLOCKS_PER_SEC);
-    if (now == last_shown)
+    tick();
+    now = now_ms();
+    if (shown && now - last_shown_ms < 250)
         return;
-    last_shown = now;
-    shown = true;
+    last_shown_ms = now;
+
+    s = tagcache_get_stat();
     if (s->commit_step > 0)
-        printf("\r  committing, step %d of %d        ", s->commit_step,
-               tagcache_get_max_commit_step());
+        snprintf(line, sizeof(line), "Writing the database: step %d of %d",
+                 s->commit_step, tagcache_get_max_commit_step());
+    else if (s->scanning)
+    {
+        int n;
+        const char *cur = (const char *)s->curentry;
+
+        scan_seen = true;
+        if (cur != NULL)
+        {
+            const char *slash = strrchr(cur, '/');
+            int len = slash != NULL && slash != cur ? slash - cur : 1;
+
+            snprintf(folder, sizeof(folder), "%.*s", len, cur);
+        }
+        n = snprintf(line, sizeof(line), "Reading: %d checked, %d new, "
+                     "%d changed  ", s->processed_entries, s->scan_added,
+                     s->scan_changed);
+        if (n < LINE_WIDTH)
+            snprintf(line + n, sizeof(line) - n, "%s",
+                     tail(folder, LINE_WIDTH - n));
+    }
+    else if (scan_seen)
+        snprintf(line, sizeof(line), "Finishing");
+    else if (database_pb_rebuild)
+        snprintf(line, sizeof(line), "Saving play counts");
     else
-        printf("\r  %d files read", s->processed_entries);
+        snprintf(line, sizeof(line), "Checking the database");
+
+    printf("\r%-*s", LINE_WIDTH, line);
+    shown = true;
 }
 
 /* tagcache.c sleeps a tick at a time to let the player breathe; here that
@@ -83,15 +142,16 @@ unsigned sleep(unsigned ticks)
 void database_pb_progress_end(void)
 {
     if (shown)
-        printf("\n");
+        printf("\r%-*s\r", LINE_WIDTH, "");
     shown = false;
 }
 
 /* ---- memory ------------------------------------------------------------ *
  *
- * The commit takes all it can get for its merge, so the pool is generous: a
+ * The RAM copy of the database and the commit's merge buffer both come from
+ * here, and the commit takes all it can get, so the pool is generous: a
  * desktop has it to spare, and a bigger merge buffer is a faster commit. */
-#define POOL_SIZE (64 * 1024 * 1024)
+#define POOL_SIZE (256 * 1024 * 1024)
 
 struct buflib_context core_ctx;
 
@@ -219,19 +279,41 @@ unsigned int create_thread(void (*function)(void), void *stack,
 
 /* ---- the rest of the player -------------------------------------------- */
 
-/* The player's tracing goes to its own log files; here it is -v's */
+static void say(const char *kind, const char *what)
+{
+    database_pb_progress_end();
+    printf("  %-11s%s\n", kind, what);
+}
+
+/* The player's tracing goes to its own log files; here it is -v's, cut down
+ * to the files that changed something. The scan names every file before it
+ * says what it did with one, so the name is held until then. */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
 {
+    static char file[MAX_PATH];
+    char msg[MAX_PATH + 64];
     va_list ap;
 
     (void)id;
     if (!database_pb_verbose)
         return;
-    database_pb_progress_end();
     va_start(ap, fmt);
-    vprintf(fmt, ap);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
-    printf("\n");
+
+    if (!strncmp(msg, "file: ", 6))
+        snprintf(file, sizeof(file), "%s", msg + 6);
+    else if (!strcmp(msg, "info: added"))
+        say("new", file);
+    else if (!strcmp(msg, "info: re-adding"))
+        say("changed", file);
+    else if (!strcmp(msg, "error: get_metadata failed"))
+        say("unreadable", file);
+    else if (!strncmp(msg, "refs: gone ", 11))
+        say("gone", msg + 11);
+    else if (strncmp(msg, "del ", 4) && strncmp(msg, "walk: ", 6)
+             && strncmp(msg, "refs: done", 10))
+        say("", msg);
 }
 
 void debug_log_restart(enum debug_log_id id)
@@ -296,9 +378,12 @@ void dircache_get_info(struct dircache_info *info)
     memset(info, 0, sizeof(*info));
 }
 
-/* The player is the one mounted; nothing is plugged into it */
+/* The player is the one mounted; nothing is plugged into it. The scan asks
+ * this for every file, which makes it the place the tick moves between
+ * yields. */
 bool usb_host_is_present(void)
 {
+    tick();
     return false;
 }
 
@@ -317,12 +402,14 @@ void register_storage_idle_func(void (*function)(void))
     (void)function;
 }
 
-/* The root is scanned as "/", as on the player, whose one volume is not
- * named in its paths */
+/* The player's disk is visible as a volume, so a scan of "/" walks it as
+ * "/<HDD0>" and every stored path carries that prefix. Art thumbnails are
+ * keyed on those paths, and a resurrected track is matched on its filename
+ * first. Trap: the simulator hides the volume and stores bare paths, so a
+ * simulator-built database is no test of this. */
 bool ns_volume_is_visible(IF_MV_NONVOID(int volume))
 {
-    IF_MV((void)volume;)
-    return false;
+    return IF_MV_VOL(volume) == 0;
 }
 
 /* The RAM copy's album tables key art by folder; there is no RAM copy */
@@ -335,16 +422,36 @@ unsigned int art_cache_dir_hash(const char *dir)
 /* Set by tagcache_init(), which the tool does not call */
 bool (*sound_index_genre_of)(uint64_t key, char *buf, size_t size);
 
-/* MinGW has no localtime_r, and the simulator's filesystem layer wants one
- * for directory timestamps. One thread, so the copy is safe. */
+/* A file's time as the player stores it, which every unchanged track is
+ * matched on. The player reads a FAT entry's local time and makes it a number
+ * as if it were UTC. Windows turns that local time into UTC with the offset
+ * in force now -- not the one on the file's date -- so adding that offset
+ * back gives the player's number exactly. These two are what the simulator's
+ * filesystem layer calls on each directory entry; nothing else in the tool
+ * does. Trap: the C library's localtime and mktime instead come out an hour
+ * off in summer time, and every track then looks changed. */
 #ifdef _WIN32
+static time_t utc_offset_now(void)
+{
+    time_t now = time(NULL);
+    struct tm local = *localtime(&now);
+
+    return _mkgmtime(&local) - now;
+}
+
 struct tm *localtime_r(const time_t *t, struct tm *out)
 {
-    struct tm *tmp = localtime(t);
+    time_t shifted = *t + utc_offset_now();
+    struct tm *tmp = gmtime(&shifted);
 
     if (tmp == NULL)
         return NULL;
     *out = *tmp;
     return out;
+}
+
+time_t mktime(struct tm *tm)
+{
+    return _mkgmtime(tm);
 }
 #endif

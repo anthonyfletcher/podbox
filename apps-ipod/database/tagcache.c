@@ -3076,6 +3076,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     {
         logf("get_metadata failed: %s", path);
         DB_LOG("error", "get_metadata failed");
+        tc_stat.scan_unreadable++;
         return ;
     }
 
@@ -3159,6 +3160,13 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     write_item(id3.grouping);
 
     total_entry_count++;
+    if (idx_id >= 0)
+        tc_stat.scan_changed++;
+    else
+    {
+        tc_stat.scan_added++;
+        DB_LOG("info", "added");
+    }
 
     #undef ADD_TAG
 }
@@ -6089,6 +6097,7 @@ static bool check_deleted_files(void)
             debug_log(DEBUG_LOG_TAGCACHE, "refs: gone %s", buf);
             delete_entry(idx_id);
             deleted_ct++;
+            tc_stat.scan_removed++;
         }
         else if (rc_cache < 0)
         {
@@ -6289,6 +6298,7 @@ static void delete_unseen_entries(void)
     }
 
     close(fd);
+    tc_stat.scan_removed += deleted;
     debug_log(DEBUG_LOG_TAGCACHE, "walk: %d deleted", deleted);
 }
 
@@ -7045,8 +7055,14 @@ bool tagcache_tool_run(bool rebuild)
         remove_files();
         remove_db_file(TAGCACHE_FILE_TEMP);
     }
-    else if (tc_stat.ready && !walk_checks_deletions())
-        check_deleted_files();
+    else if (tc_stat.ready)
+    {
+        /* Without the RAM copy's path index each file new to the database
+         * costs a read of the whole filename file */
+        load_ramcache();
+        if (!walk_checks_deletions())
+            check_deleted_files();
+    }
 
     tagcache_build();
     tagcache_commit_finalize();

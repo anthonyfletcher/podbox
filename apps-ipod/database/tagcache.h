@@ -99,6 +99,12 @@ struct tagcache_stat {
     int  total_entries;      /* Total entries in tagcache */
     int  queue_length;       /* Command queue length */
 
+    /* What scans have found since start-up, in tracks */
+    int  scan_added;         /* new files */
+    int  scan_changed;       /* files changed since they were read */
+    int  scan_unreadable;    /* music files whose tags could not be read */
+    int  scan_removed;       /* files gone */
+
     /* const char *uimessage;   Pending error message. Implement soon. */
 };
 
