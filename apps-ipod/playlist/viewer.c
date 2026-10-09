@@ -1028,7 +1028,18 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
         else
             track = -1;
 
+        bool moving = viewer.moving_track >= 0;
         bool changed = playlist_changed();
+
+        /* Said, and the keys pressed meanwhile dropped: the OK that would
+         * have placed the cancelled move otherwise plays the track. */
+        if (changed && moving)
+        {
+            cond_talk_ids_fq(LANG_MOVE, LANG_FAILED);
+            splashf(HZ, (unsigned char *)"%s %s", str(LANG_MOVE),
+                                                  str(LANG_FAILED));
+            button_clear_queue();
+        }
 
         if (track != viewer.current_playing_track ||
             playlist_amount_ex(viewer.playlist) != viewer.num_tracks ||
