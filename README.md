@@ -117,18 +117,13 @@ the whole update.
 > [Rockbox installation guide](https://www.rockbox.org/manual.shtml) for your
 > model first. If you are already running Rockbox or RockPod, unzipping is all
 > you need.
-
-## First run
-
-When you first load PodBox it will be building your music and art database which will
-affect performance initially (particularly on the 5G).  You can check progress of the 
-background tasks by going to `System > Background Tasks`.
-
-The database can be built much faster from a Windows PC.  Once PodBox has started once, connect
-the iPod and run `database_pb.exe` from `.rockbox/tools/`.  It does what
-`Settings > Library > Maintenance > Update Database` does, keeping play counts, ratings and
-positions; `database_pb.exe --rebuild` does what `Rebuild Database` does.  When it finishes,
-eject the iPod; it restarts itself to load the new database.
+>
+> **Optional: the PodBox bootloader.** With it the player starts PodBox even
+> when the hold switch is on, and holding Menu as it starts gives you Apple's
+> firmware. Download `podbox-bootloader.zip` from the
+> [Bootloader release](https://github.com/anthonyfletcher/podbox/releases/tag/Bootloader),
+> unzip it on a Windows PC and follow its `README.txt`. It installs over the
+> Rockbox bootloader.
 
 # Setting up your music library
 
@@ -166,19 +161,15 @@ e.g. `Artist/folder.jpg`. Artist art only ever comes from image files. An artist
 no image of its own borrows one from the folder above it, so if your albums are grouped one
 level deeper, as in `Artist/Albums/Album One`, artist art can stay in `Artist/folder.jpg`; an
 image in the grouping folder (`Artist/Albums/folder.jpg`) takes precedence for the albums
-under it. The same borrowing means an image in a folder that holds your artists (e.g.
-`Music/folder.jpg` or a genre folder) becomes the picture of every artist without one, so
-keep them out of there. If that happens, delete the image and run
-`Settings > Library > Maintenance > Update Art Cache`.
+under it. 
 
 All artwork should be:
 
-- stored as a baseline / non-progressive JPEG file
+- stored as a JPEG file (baseline or progressive).
 - embedded as JPEG, if embedded at all. PNG art in tags is skipped, and the cache reads one
 track per album, so put the cover in every track.
 - stored at a "reasonable" resolution - the cache stores 300x300px copies, and anything much
-larger takes longer to process. A car is sent the cache's copy unless `Car Artwork` is set to
-send the original.
+larger takes longer to process.
 
 Artwork is processed quietly in the background while the database is idle, so browsing stays
 fast.  As such, it can take a while to see the art appear.  You can check the cache activity by
@@ -204,6 +195,22 @@ machine.
  each track and store the findings in an index. 
 - Turn on the playlist engine by going to `Settings > Library > Playlist Engine > Enabled`
 
+# First run
+
+When you first load PodBox it will be building your music and art database which will
+affect performance initially (particularly on the 5G).  You can check progress of the
+background tasks by going to `System > Background Tasks`.
+
+The database can be built much faster from a Windows PC.  Once PodBox has started once, connect
+the iPod and run `database_pb.exe` from `.rockbox/tools/`.  It does what
+`Settings > Library > Maintenance > Update Database` does, keeping play counts, ratings and
+positions; `database_pb.exe --rebuild` does what `Rebuild Database` does.  When it finishes,
+eject the iPod; it restarts itself to load the new database.
+
+The art cache can also be made on the PC: run `artcache_pb.exe` from `.rockbox/tools/`, after
+`database_pb.exe` if you have added music.  It does what `Update Art Cache` does, and
+`artcache_pb.exe --rebuild` what `Rebuild Art Cache` does.
+
 # Installing themes
 
 PodBox will support all Rockbox themes, however without modification they will **not** support dynamic
@@ -217,8 +224,7 @@ in all-themes.zip, from the [Themes release](https://github.com/anthonyfletcher/
 - [themify 2](themes/themify_2/README.md)
 - [obsede 2](themes/obsede_2/README.md)
 - [bony](themes/bony/README.md)
-- [iclassic square](themes/iclassic_square/README.md)
-- [iclassic square dark](themes/iclassic_square_dark/README.md)
+- [iclassic square](themes/iclassic_square/README.md) - classic, dark and light
 - [jive](themes/jive/README.md)
 
 **Make sure to update your themes whenever you update PodBox. Themes are rebuilt for each release, 
@@ -244,18 +250,20 @@ they can be installed in any order and on their own.
 - Album art displayed next to album rows
   - Theme dependent
   - See above for artwork setup
-  - Control visibility via `Settings > Appearance > Elements > Album Art Rows`
-- Artist profile displayed next to artist rows
+  - Control visibility via `Settings > Appearance > Interface Elements > Art Rows > Album Art Rows`
+- Artist portrait displayed next to artist rows
   - Theme dependent
   - See above for artwork setup
-  - Control visibility via `Settings > Appearance > Elements > Artist Art Rows`
-- Show the album release year after each album name
+  - Control visibility via `Settings > Appearance > Interface Elements > Art Rows > Artist Art Rows`
+- Show the album release year before or after each album name
   - `Settings > Library > Music > Show Year in Album Lists`, off by default
 - Control the sort order of the albums  chosen from name, year (oldest or newest first), 
   or artist then name or year
   - `Settings > Library > Music > Sort Albums By`
 - Sort artists and albums ignoring a leading "The", "A" or "An"
   - Off by default.  Turn it on in `Settings > Library > Music > Sort Ignoring The/A/An`
+- Sort artists by name or by most played
+  - `Settings > Library > Music > Sort Artists By`
 - Start playing a random album
   - `Music > Random Album`
 - Search with live results across track, album or artist names
@@ -268,6 +276,7 @@ they can be installed in any order and on their own.
   - Change via `Settings > Library > Music > Edit Music Menu`
 - Trim noise from track and album names (like featuring information)
   - Off by default.  Turn the feature on by going to `Settings > Library > Music > Trim Titles`
+  - Add your own patterns in `.rockbox/library/user/trim.txt`, which an update leaves alone
 - View listening progress against albums and artists
   - Hold `Select` on an Album or Artist and select `Listening Progress`
 - Play the Music Quiz
@@ -295,12 +304,14 @@ from the Music menu and carousels
   - Audiobooks should have a genre of "audiobook", "spoken word", "book", "podcast" or "podcasts".
 - Audiobooks automatically receive a "resume" function - you don't need to bookmark
 your position.
+- Book covers and author photos next to their rows
+  - Theme dependent
+  - `Settings > Appearance > Interface Elements > Art Rows > Audiobook Art Rows`/`Author Art Rows`, off by default
 - See which books you have finished, not started or are part-way through
   - Scroll up above the first book in `Audiobooks > Book` for `Finished`, `Not Started`
   and `In Progress`; a list with no books in it is not shown
   - Choosing a book plays it, from where you left off if you have started it
-  - Hold `Select` on a book, on a shelf or in any Audiobooks list, for Add to Queue, Add to Playlist, Show Track Info,
-  Listening Progress, Show in Files and Mark as..., which moves it to In Progress, Not Started or 
+  - Hold `Select` on a book and select Mark as... to move it to In Progress, Not Started or 
   Finished. The mark lasts until the book is next played.
 - Books held in a single file show their chapters.
   - Off by default.  Turn the feature on by going to `Settings > Playback > Chapter Marks`
@@ -309,19 +320,21 @@ into `.mp3` ones
   - Also available while playing - hold `Select` on the Now Playing screen and choose
 `Browse Chapters`
 
-## Album Covers/Artist Profiles
+## Album Covers/Artist Portraits
 
 - Simplified implementation which links to Music for tracks/albums
-- Significantly improved performance (particularly on iPod 5)
+- Significantly improved performance (particularly on iPod video)
 - Control whether opening an album lists the album tracks or starts playing the album
   - `Settings > Library > Carousel > On Album Select`
-- Display the covers/profiles in a flat top-down mode
-  - `Settings > Library > Carousel > View Mode`
+- Display the covers/portraits flat, face-on either side of the current one
+  - `Settings > Appearance > Carousel > View Mode`
+- Sort the covers/portraits independently of Music, or the same way
+  - `Settings > Library > Carousel > Sort Same as Music`, off by default
 - Give the carousel a fixed background colour that dynamic colours leave alone
-  - `Settings > Library > Carousel > Background > Custom`
+  - `Settings > Appearance > Carousel > Background > Custom`
 - Spin to a random album or artist
   - Hold `Play`
-  - `Settings > Library > Carousel > Random Spin Length` to control the speed
+  - `Settings > Library > Carousel > Random Spin Length` to control how far it spins
 
 ## What's playing
 
@@ -331,6 +344,7 @@ into `.mp3` ones
   - `Settings > Library > Viewers > Lyrics Viewer`
 - Show either album art or artist art in the now playing screen
   - Theme dependent (must currently show album art)
+  - `Settings > Appearance > Now Playing Screen > Now Playing Artwork`
   - In auto mode the art will be shown depending on how you arrived at playing the track. If
 you opened `Music > Artist > Album > Track` the artist art would show - if you opened `Music >
  Album > Track` the album art would show.
@@ -351,7 +365,7 @@ you opened `Music > Artist > Album > Track` the artist art would show - if you o
 - Put a playlist in an order where each track leads into the next
   - Hold `Select` in the playlist viewer and select `Order by Sound`
 - See what a track sounds like, in words -- its moods, energy, pace, tone, key and more
-  - Hold `Select` on the track, select `Track Info` and open the `Sound` row
+  - Hold `Select` on the track, select `Show Track Info` and open the `Sound` row
 - See what an album or folder sounds like as a whole
   - Hold `Select` on the album or folder and select `Album Sound`
 - See what the analysis found across your whole library, and how much of it is measured
@@ -395,9 +409,9 @@ song is by, the album it came from
 - Dynamic colouring of the UI based on the album/artist art including transformation of all theme 
 colours
   - Theme dependent
-  - `Settings > Appearance > Colours > Dynamic Colors`
+  - `Settings > Appearance > Interface Colours > Dynamic Colors`
 - Choose whether the album's lighter or darker colour becomes the background
-  - `Settings > Appearance > Colours > Dynamic Colors Background`
+  - `Settings > Appearance > Interface Colours > Dynamic Colors Background`
 - Control whether scrolling is enabled across the UI or whether long text is cut short with "..." 
 instead. 
   - `Settings > Appearance > Scrolling > Enabled`, on by default
@@ -407,7 +421,7 @@ themes your settings follow, and themes don't inherit settings they don't set
   - To reset to default
   - `Settings > Appearance > Forget My Changes`
 - Art filters available to modify art in the carousel
-  - `Settings > Library > Carousel > Artwork Filter`
+  - `Settings > Appearance > Carousel > Artwork Filter`
 
 ## Language
 
@@ -415,6 +429,8 @@ themes your settings follow, and themes don't inherit settings they don't set
   - See [`language-override-guide.md`](docs/podbox/language-override-guide.md)
 
 ## Settings
+
+<img src="docs/podbox/images/ss_grid_settings.png"/>
 
 - Settings reworked
   - See [`settings-guide.md`](docs/podbox/settings-guide.md)
@@ -427,6 +443,8 @@ themes your settings follow, and themes don't inherit settings they don't set
   - `Settings > Changed Settings`
 - View a description of each setting from the setting menu
   - Hold `Select` to open the context menu then select `Explain`
+- Shut down or reboot from the menu
+  - `Settings > System > Startup/Shutdown`
 
 ## Behind the scenes
 
@@ -435,11 +453,12 @@ themes your settings follow, and themes don't inherit settings they don't set
   - `Settings > Library > Art Cache` for settings
   - `Settings > Library > Maintenance > Update Art Cache`/`Rebuild Art Cache` for tasks
   - `System > Background Tasks` for monitoring
+- Your library data - database, play history and caches - now lives in `.rockbox/library/`
 - Information about albums, artists and play counts now centralised in a database summary index
-  - `Settings > Library > Maintenance > Update Index`/`Rebuild Index` for tasks
+  - `Settings > Library > Maintenance > Update Index` for tasks
   - `System > Background Tasks` for monitoring
 - Dialogs reworked to provide consistent and "themed" message, input, confirmation, search, colour, date/time and folder select boxes
-  - `Settings > Appearance > Colours` for settings
+  - `Settings > Appearance > Dialogs` for settings
 - Additional theme tags to provide richer graphics and support easier theme development
   - See [`custom-skin-tags.md`](docs/podbox/custom-skin-tags.md)
 
@@ -449,7 +468,7 @@ All connectivity described below works on both the iPod video and the iPod class
 earphone remote (see Headphones) - however testing has only been completed on a small number of
 accessories.  If you'd like to support testing, please follow [this guide](docs/podbox/connectivity-testing-guide.md).
 
-The USB and accessory settings below are under `Settings > System`, and most are shown only with
+The USB and accessory settings below are under `Settings > System`, and some are shown only with
 `Settings > Settings Mode` set to `Everything`.
 
 ### Sound card (New)
@@ -493,6 +512,12 @@ and play your library from its own screen and remote
 - `Settings > System > Accessories > Accessory Browsing` sets how many songs a list can hold -
   10,000 by default.
 
+Your iPod can mirror its screen on a TV - through a dock with a video output
+- `Settings > System > Accessories > TV Out > Turn On` - always off after a restart
+- `Size` - `1x` (sharp, in the middle of the TV) or `2x` (fills most of it)
+- `Standard` - PAL or NTSC, iPod Video only
+- On an iPod Video the iPod's own screen goes black while it's on
+
 ### Modern Cars (New/Experimental)
 
 <img src="docs/podbox/images/conn_car.svg" alt="The iPod plugged into a car's USB socket; the car's screen shows the track playing"/>
@@ -504,12 +529,12 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
 - Title, artist, album, cover art and a moving progress bar on the car's screen
 - Your whole library in the car's own browser - pick an artist, album, playlist or song there and the iPod
   plays it
-- `Settings > System > Accessories > iAP2 Accessories` - `Auto` by default. Auto recognises a car,
+- `Settings > System > Accessories > iPhone Accessories` - `Auto` by default. Auto recognises a car,
   and a computer still mounts the iPod as a disk, about a second later than it otherwise would.
-  Needs `Accessory Protocol` on
+  Shown only while `Accessory Protocol` is on
 - `Settings > System > Accessories > Car Artwork` specifies where the cover comes from.
-  `Prefer Cache` by default, which appears almost at once. The other choices send the original
-  image - sharper, but slower to appear and more work for a 5G. Only JPEGs under 512 KB are sent
+  `Prefer Cache` by default, which appears almost at once. `Prefer Embedded` and `Prefer Image File`
+  send the original image - sharper, but slower to appear and more work for a 5G. Only JPEGs under 512 KB are sent
   as they are
   
 ### Headphones (Improved)
@@ -518,6 +543,7 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
 
 You can control your iPod using the earphone remote (supported on the iPod classic
 120GB - Late 2008 and 160GB - Late 2009 thin versions only)
+- Works on all types of headphones - not just the Apple earpods.
 - Click for play/pause, two clicks for the next track, three for the previous
   one, and the volume buttons
 - Always on. The multi-click skips are `Settings > System > Accessories > Remote Track Skip`, on
@@ -571,7 +597,7 @@ Built on the work of:
 - Bony
   - Based on BONES created by: Chuck Lardo
   - License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/deed.en)
-- iClassic Square and iClassic Square Dark
+- iClassic Square (and its Dark and Light versions)
   - Created by: Humberto Santana
   - License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/deed.en)
 - Jive
