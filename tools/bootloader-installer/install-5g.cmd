@@ -13,7 +13,12 @@ if "%~1"=="elevated" (
 rem The path goes through the environment, not the command line, so a folder
 rem name with a quote or a bracket in it survives.
 set "PODBOX_INSTALLER=%~f0"
-powershell -NoProfile -Command "Start-Process -FilePath cmd.exe -ArgumentList ('/c \"\"' + $env:PODBOX_INSTALLER + '\" elevated\"') -Verb RunAs"
+powershell -NoProfile -Command "try { Start-Process -FilePath cmd.exe -ArgumentList ('/c \"\"' + $env:PODBOX_INSTALLER + '\" elevated\"') -Verb RunAs -ErrorAction Stop } catch { exit 1 }"
+if errorlevel 1 (
+    echo Administrator rights were not granted, so nothing was written.
+    pause
+    exit /b 1
+)
 exit /b
 :admin
 cd /d "%~dp0"

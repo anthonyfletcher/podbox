@@ -6,8 +6,9 @@ on. To start Apple's firmware instead, hold Menu while the player starts.
 
 On an iPod Classic whose disk is larger than 128 GB, Apple's firmware is
 started only if it can address the whole disk. If it cannot, the screen says
-"OF does not support LBA48" and stops. Holding Menu and Left together starts
-it anyway, at the risk of it writing to the wrong part of the disk.
+"OF does not support LBA48" and stops. Holding Menu and Left together while
+the player starts, until the screen says "Executing OF", starts it anyway,
+at the risk of it writing to the wrong part of the disk.
 
 The bootloader is installed once. Updating PodBox does not replace it.
 

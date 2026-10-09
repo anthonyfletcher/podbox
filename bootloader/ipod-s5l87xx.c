@@ -288,7 +288,7 @@ void fatal_error(int err)
             break;
         case ERR_LBA28:
             printf("Hold MENU+SELECT to reboot");
-            printf("and LEFT if you are REALLY sure");
+            printf("then MENU+LEFT if you are REALLY sure");
             break;
     }
 
@@ -1012,8 +1012,9 @@ void main(void)
             btn = button_read_device();
         }
         /* The OF waits for storage, to pass the LBA48 check below.
-         * Diagmode and diskmode do not address the disk as the OF does. */
-        menu_held = (btn == BUTTON_MENU);
+         * Diagmode and diskmode do not address the disk as the OF does.
+         * Menu with Left is the LBA28 override, so Left does not count. */
+        menu_held = ((btn & ~BUTTON_LEFT) == BUTTON_MENU);
         /* Enter diagmode and diskmode using ONB */
         if ((btn == (BUTTON_SELECT|BUTTON_LEFT))
                 || (btn == (BUTTON_SELECT|BUTTON_PLAY))) {
@@ -1128,25 +1129,30 @@ void main(void)
                         break;
                     }
                 }
+            }
 
-                int btn = button_read_device();
+            /* An unreadable SysCfg counts as no LBA48 support */
+            int btn = button_read_device();
 
-                struct storage_info sinfo;
-                storage_get_info(0, &sinfo);
-                if (sinfo.num_sectors < (1 << 28) || lba48 || btn & BUTTON_LEFT) {
-                    printf("Executing OF...");
+            struct storage_info sinfo;
+            storage_get_info(0, &sinfo);
+            if (sinfo.num_sectors < (1 << 28) || lba48 || btn & BUTTON_LEFT) {
+                printf("Executing OF...");
 #if (CONFIG_STORAGE & STORAGE_ATA)
-                    ata_sleepnow();
+                /* SSD mode only clock-gates the drive; the OF needs it off */
+                ata_set_storage_mode(1);
+                ata_sleepnow();
 #endif
-                    rc = kernel_launch_onb();
-                } else {
-                    printf("OF does not support LBA48");
-                    fatal_error(ERR_LBA28);
-                }
+                rc = kernel_launch_onb();
+            } else {
+                printf("OF does not support LBA48");
+                fatal_error(ERR_LBA28);
             }
 #else
             printf("Executing OF...");
 #if (CONFIG_STORAGE & STORAGE_ATA)
+            /* SSD mode only clock-gates the drive; the OF needs it off */
+            ata_set_storage_mode(1);
             ata_sleepnow();
 #endif
             rc = kernel_launch_onb();
