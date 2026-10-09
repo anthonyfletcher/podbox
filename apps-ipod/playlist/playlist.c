@@ -1268,8 +1268,12 @@ static int add_track_to_playlist_unlocked(struct playlist_info* playlist,
             break;
         case PLAYLIST_INSERT:
             /* if there are already inserted tracks then add track to end of
-               insertion list else add after current playing track */
-            if (playlist->last_insert_pos >= 0 &&
+               insertion list else add after current playing track. A
+               playlist being built to play keeps no insert chain (below),
+               so it is filled in order at its end. */
+            if (!playlist->started && playlist->first_index <= 0)
+                position = insert_position = playlist->amount;
+            else if (playlist->last_insert_pos >= 0 &&
                 playlist->last_insert_pos < playlist->amount &&
                 (playlist->indices[playlist->last_insert_pos]&
                     PLAYLIST_INSERT_TYPE_MASK) == PLAYLIST_INSERT_TYPE_INSERT)
