@@ -90,6 +90,15 @@ asset_name() {
     esac
 }
 
+# The same zip without .rockbox/tools/, for anyone whose browser, network or
+# antivirus will not let a zip holding Windows executables through.
+notools_asset_name() {
+    case "$1" in
+        ipod6g)    echo "rockbox-ipod6g-no-tools.zip" ;;
+        ipodvideo) echo "rockbox-ipodvideo-5g-no-tools.zip" ;;
+    esac
+}
+
 # Each build's link map rides with the release rather than in the zip, which
 # is synced onto the player. A panic address resolves only against the build
 # that crashed, and this is the one copy of it kept. Named to sort after the
@@ -268,6 +277,10 @@ trap 'rm -f "$NOTES" "$SIM_NOTES" "$THEMES_NOTES" "$BOOT_NOTES"' EXIT
     printf '| `%s` | iPod Video 5G/5.5G |\n\n' "$(asset_name ipodvideo)"
     printf 'Unzip onto the root of the player. The `.map` files resolve a\n'
     printf 'crash address from this build and are not installed.\n\n'
+    printf 'If your browser or antivirus will not download those, take\n'
+    printf '`%s` or `%s` instead: the same\n' \
+        "$(notools_asset_name ipod6g)" "$(notools_asset_name ipodvideo)"
+    printf 'firmware without the Windows desktop tools in `.rockbox/tools/`.\n\n'
     printf '**Update your themes too.** If you use any theme from the\n'
     printf '[%s release](https://github.com/%s/releases/tag/%s), download it\n' \
         "$THEMES_RELEASE" "$SLUG" "$THEMES_RELEASE"
@@ -448,6 +461,27 @@ for target in $TARGETS; do
     "
 done
 
+# Cut from the zip just checked, so the two differ by .rockbox/tools/ and
+# nothing else. Under --no-sim there are no tools, and the copy is the same zip.
+say "Packing the zips without the desktop tools"
+for target in $TARGETS; do
+    asset=$(notools_asset_name "$target")
+    ssh "$SERVER" "
+        set -e
+        cd '$REMOTE_DIR'
+        cp build-hw-$target/rockbox.zip '$asset'
+        if unzip -Z1 '$asset' | grep -q '^\.rockbox/tools/'; then
+            zip -dq '$asset' '.rockbox/tools/*'
+        fi
+        if unzip -Z1 '$asset' | grep -qiE '\.(exe|dll)\$|^\.rockbox/tools/'; then
+            echo '$asset still carries the desktop tools' >&2; exit 1
+        fi
+        unzip -l '$asset' | grep -q .rockbox/rockbox.ipod ||
+            { echo '$asset is missing .rockbox/rockbox.ipod' >&2; exit 1; }
+        printf '  %-10s ok  (%s)\n' '$target' \"\$(du -h '$asset' | cut -f1)\"
+    "
+done
+
 # Packed from the extracted archive, like everything else here -- not zipped
 # from the dev tree, whose checkout is CRLF and would ship skins the player
 # reads with a stray carriage return on every line.
@@ -533,6 +567,8 @@ scp "$SERVER:$REMOTE_DIR/build-hw-ipodvideo/rockbox.zip" \
 for target in $TARGETS; do
     scp "$SERVER:$REMOTE_DIR/build-hw-$target/rockbox.map" \
         "dist/$(map_name "$target")"
+    asset=$(notools_asset_name "$target")
+    scp "$SERVER:$REMOTE_DIR/$asset" "dist/$asset"
 done
 for target in $SIM_TARGETS; do
     asset=$(sim_asset_name "$target")
@@ -678,6 +714,7 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     --notes-file release-notes.md \
     --draft \
     $(asset_name ipod6g) $(asset_name ipodvideo) \
+    $(notools_asset_name ipod6g) $(notools_asset_name ipodvideo) \
     $(map_name ipod6g) $(map_name ipodvideo)"
 
 say "Replacing the $RELEASE release"
