@@ -30,7 +30,7 @@
 #
 #- Title bar
 %V(0,0,-,-,-)%VB%Vb(!ffffff)%Vf(!000000)
-%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid>60:3c8cde,vivid>60.85:3377bd)|%dr(0,0,320,23,!ebebeb,!d3d3d3)>
+%?if(%ft(themes/iclassic_square_light.preferences,vivid_title_bar:),=,yes)<%dr(0,0,320,23,vivid>60:4d96e1,vivid>60.85:4180bf)|%dr(0,0,320,23,!ebebeb,!d3d3d3)>
 %dr(0,23,320,1,!afafaf)
 #
 #- Progress track. Here, not %Vb: %pb clears to the backdrop
