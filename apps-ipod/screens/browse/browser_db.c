@@ -2291,15 +2291,22 @@ static bool row_has_book(int tag, long seek, int level)
 
 /* Which rows a list keeps: a music browse drops the books, and a spoken-word
  * one keeps only the rows holding one -- its clause alone would keep any
- * album with one spoken track. */
-enum spoken_keep { KEEP_ALL, KEEP_MUSIC, KEEP_BOOKS };
+ * album with one spoken track. Its <All tracks> keeps the tracks of albums
+ * that are books, by the test the album list applies. */
+enum spoken_keep { KEEP_ALL, KEEP_MUSIC, KEEP_BOOKS, KEEP_BOOK_TRACKS };
 
-static bool row_kept(enum spoken_keep keep, int tag, long seek, int level)
+static bool row_kept(enum spoken_keep keep, int tag, long seek, int level,
+                     int idx_id)
 {
+    struct tagcache_album al;
+
     if (keep == KEEP_MUSIC)
         return !row_is_book(tag, seek, level);
     if (keep == KEEP_BOOKS)
         return row_has_book(tag, seek, level);
+    if (keep == KEEP_BOOK_TRACKS)
+        return tagcache_album_get(tagcache_album_of(idx_id), &al)
+               && al.spoken == al.tracks;
     return true;
 }
 
@@ -2430,6 +2437,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
              && csi_mentions_spoken() && !browse_picked_by_name
              && tagcache_album_count() > 0)
         keep = KEEP_BOOKS;
+    else if (tag == tag_title && c->currtable != TABLE_NAVIBROWSE
+             && csi_mentions_spoken() && !browse_picked_by_name
+             && tagcache_album_count() > 0)
+        keep = KEEP_BOOK_TRACKS;
 
     int dir_count = dir_ids_fill(level);
 
@@ -2757,7 +2768,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     {
         /* Ahead of the offset count, or a page would be short by however
          * many rows fell inside it. */
-        if (!row_kept(keep, tag, tcs.result_seek, level))
+        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id))
             continue;
 
         if (total_count++ < offset)
@@ -2983,7 +2994,7 @@ entry_skip_formatter:
 
     while (tagcache_get_next(&tcs, tcs_buf, tcs_bufsz))
     {
-        if (!row_kept(keep, tag, tcs.result_seek, level))
+        if (!row_kept(keep, tag, tcs.result_seek, level, tcs.idx_id))
             continue;
 
         total_count++;
@@ -5164,6 +5175,11 @@ static int browser_db_play_folder(struct browser_context* c)
     int start_index = c->selected_item - c->special_entry_count;
     if (start_index < 0)
         start_index = 0;
+    long album_seek, artist_seek;
+    /* A book plays in order whatever Shuffle says */
+    bool book = browser_db_is_spoken_list(c)
+                || browser_db_get_book_album(c, c->selected_item,
+                                             &album_seek, &artist_seek);
 
     if (playlist_create(NULL, NULL) < 0)
     {
@@ -5217,7 +5233,7 @@ static int browser_db_play_folder(struct browser_context* c)
         start_index = percentage_start_index * playlist_get_current()->amount / 100;
     }
 
-    if (global_settings.playlist_shuffle)
+    if (global_settings.playlist_shuffle && !book)
     {
         start_index = playlist_shuffle(current_tick, start_index);
         if (!global_settings.play_selected)

@@ -844,8 +844,8 @@ static int add_to_playlist(void* arg)
     if (new_playlist && (playlist_amount() > 0))
     {
         /* nothing is currently playing so begin playing what we just
-           inserted */
-        if (global_settings.playlist_shuffle)
+           inserted; a book plays in order whatever Shuffle says */
+        if (global_settings.playlist_shuffle && !ctx_in_order)
             playlist_shuffle(current_tick, -1);
         playlist_start(0, 0, 0);
         context_menu_result = ONPLAY_START_PLAY;
@@ -1839,7 +1839,7 @@ static int hotkey_tree_pl_insert_shuffled(void)
         (selected_file.attr & ATTR_DIRECTORY) ||
         ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_M3U))
     {
-        add_to_playlist(&addtopl_insert_shuf);
+        add_to_playlist(ctx_in_order ? &addtopl_insert : &addtopl_insert_shuf);
     }
     return ONPLAY_RELOAD_DIR;
 }
