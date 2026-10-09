@@ -2989,12 +2989,27 @@ static long walk_seen_count;
 /* Set when the walk skipped a folder or could not look a file up, so an
  * unmarked entry may still exist: deletions are checked on storage instead. */
 static bool walk_incomplete;
-/* The folders the walk could not open. Storage cannot answer for the files
- * under them either, so their entries are kept; past WALK_UNREAD_MAX the
- * storage check is skipped altogether. */
+/* The folders the walk could not open or read to the end. Storage cannot
+ * answer for the files under them either, so their entries are kept; past
+ * WALK_UNREAD_MAX the storage check is skipped altogether. */
 #define WALK_UNREAD_MAX 4
 static char walk_unread[WALK_UNREAD_MAX][MAX_PATH];
 static int walk_unread_count;
+
+static void walk_note_unread(const char *dirname)
+{
+    if (walk_unread_count < WALK_UNREAD_MAX)
+    {
+        char *p = walk_unread[walk_unread_count];
+        size_t len = strlcpy(p, dirname, MAX_PATH);
+
+        /* A search root may end in '/'; the test below adds its own */
+        if (len > 1 && len < MAX_PATH && p[len - 1] == '/')
+            p[len - 1] = '\0';
+    }
+    if (walk_unread_count <= WALK_UNREAD_MAX)
+        walk_unread_count++;
+}
 
 static bool walk_unread_holds(const char *path)
 {
@@ -6249,10 +6264,7 @@ static bool check_dir(const char *dirname, int add_files, int depth)
     if (!dir)
     {
         logf("tagcache: opendir(%s) failed", dirname);
-        if (walk_unread_count < WALK_UNREAD_MAX)
-            strmemccpy(walk_unread[walk_unread_count], dirname, MAX_PATH);
-        if (walk_unread_count <= WALK_UNREAD_MAX)
-            walk_unread_count++;
+        walk_note_unread(dirname);
         return false;
     }
 
@@ -6267,10 +6279,15 @@ static bool check_dir(const char *dirname, int add_files, int depth)
     /* Recursively scan the dir. */
     while (!check_event_queue())
     {
+        /* A read error ends the folder as its end does, but sets errno */
+        errno = 0;
         struct dirent *entry = readdir(dir);
         if (entry == NULL)
         {
-            success = true;
+            if (errno == 0)
+                success = true;
+            else
+                walk_note_unread(dirname);
             break;
         }
 
@@ -6476,8 +6493,16 @@ void do_tagcache_build(const char *path[])
 
         if (ret)
         {
+            /* A root that is gone loses its entries; one that cannot be
+             * read keeps them, as an unread folder's are kept */
+            errno = 0;
             if (dir_exists(this->path))
                 ret = check_dir(this->path, true, 0);
+            else if (errno != 0 && errno != ENOENT && errno != ENOTDIR)
+            {
+                walk_note_unread(this->path);
+                walk_incomplete = true;
+            }
             else
                 logf("Dir not found %s", this->path);
         }

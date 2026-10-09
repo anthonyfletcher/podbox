@@ -53,6 +53,9 @@
 #ifdef BOOTFILE
 /* True once this cable session's "before" BOOTFILE mtime has been recorded. */
 static bool bootfile_baseline_taken = false;
+/* A cable session ended before the cable was seen to be out: its comparison
+ * waits for the first event that sees it out or the disk ejected. */
+static bool bootfile_check_pending = false;
 #endif
 
 static void system_flush(void)
@@ -304,15 +307,29 @@ static void restart_if_database_replaced(void)
         rolo_load(BOOTDIR "/" BOOTFILE);
     }
 }
+
+/* Once the host has let go of the disk: a prompt any earlier would pop while
+ * the disk is still mounted */
+static void bootfile_session_end(void)
+{
+    bootfile_check_pending = false;
+    bootfile_baseline_taken = false;
+    if (usb_core_host_wrote_storage())
+        check_bootfile(true);
+}
 #endif
 
 long default_event_handler_ex(long event, void (*callback)(void *), void *parameter)
 {
 #ifdef BOOTFILE
-    /* The end-of-session test below can run before the cable is seen to be
+    /* The end-of-session tests below can run before the cable is seen to be
      * out, so every event looks again once it is. */
     if (!usb_inserted() || usb_storage_is_ejected())
+    {
+        if (bootfile_check_pending && event != SYS_USB_CONNECTED)
+            bootfile_session_end();
         restart_if_database_replaced();
+    }
 #endif
 
     switch(event)
@@ -344,6 +361,8 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
                 bootfile_baseline_taken = true;
                 check_bootfile(false); /* gets initial size */
             }
+            /* This session's end compares against the same baseline */
+            bootfile_check_pending = false;
 #endif
             gui_usb_screen_run(false, seqnum);
 #ifdef BOOTFILE
@@ -354,11 +373,11 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
              * is still mounted. */
             if (!usb_inserted() || usb_storage_is_ejected())
             {
-                bootfile_baseline_taken = false;
-                if (usb_core_host_wrote_storage())
-                    check_bootfile(true);
+                bootfile_session_end();
                 restart_if_database_replaced();
             }
+            else
+                bootfile_check_pending = true;
 #endif
             system_restore();
             return SYS_USB_CONNECTED;

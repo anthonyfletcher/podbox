@@ -7,6 +7,9 @@
 #     ./build-sim.sh 5g win         (or 5g, for a native simulator)
 #     make -C tools/artcache_pb win (or make, to match)
 #
+# Only the .exe is for a player. The native build is for testing: its file
+# times come out an hour off in summer, so every image looks replaced.
+#
 # DBTOOL gives tagcache.c and art_cache.c the entry points the tool calls in
 # place of their threads.
 

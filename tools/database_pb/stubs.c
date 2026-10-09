@@ -5,9 +5,9 @@
  * analysis.
  *
  * tagcache.c is the player's, and reaches for things only a running player
- * has. The tool calls tagcache_tool_run() alone, on one thread, with no RAM
- * copy, no dircache, no playback and no USB host, so most of what is here is
- * the answer a player in that state would give. The allocator is the one
+ * has. The tool calls tagcache_tool_run() alone, on one thread, with no
+ * dircache, no playback and no USB host, so most of what is here is the
+ * answer a player in that state would give. The allocator is the one
  * real piece: a pool of the tool's own under the player's buflib, so a commit
  * borrows, pins and frees its buffers exactly as it does on the player.
  *
@@ -431,7 +431,8 @@ bool ns_volume_is_visible(IF_MV_NONVOID(int volume))
     return IF_MV_VOL(volume) == 0;
 }
 
-/* The RAM copy's album tables key art by folder; there is no RAM copy */
+/* Keys art for the RAM copy's album rows, which only the player's screens
+ * read: the tool's RAM copy serves its own lookups */
 unsigned int art_cache_dir_hash(const char *dir)
 {
     (void)dir;

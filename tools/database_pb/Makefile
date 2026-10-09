@@ -8,6 +8,9 @@
 #     ./build-sim.sh 5g win          (or 5g, for a native simulator)
 #     make -C tools/database_pb win  (or make, to match)
 #
+# Only the .exe is for a player. The native build is for testing: its file
+# times come out an hour off in summer, so every track looks changed.
+#
 # The defines are the simulator's own, so the structures it writes are laid
 # out as the player's are. tagcache.c is built with DBTOOL, which gives it the
 # one entry point the tool calls in place of the database thread.
