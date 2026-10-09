@@ -1109,7 +1109,7 @@ static int shrink_callback(int handle, unsigned hints, void* start, size_t old_s
 
     /* don't call audio_hard_stop() as it frees this handle */
     if (thread_self() == audio_thread_id)
-    {   /* inline case Q_AUDIO_STOP (audio_hard_stop() response
+    {   /* inline case Q_AUDIO_STOP (the forced-stop response)
          * if we're in the audio thread */
         audio_stop_playback(false);   /* buflib is waiting: no fade */
         queue_clear(&audio_queue);
@@ -3928,8 +3928,8 @@ void audio_playback_handler(struct queue_event *ev)
         case Q_AUDIO_STOP:
             LOGFQUEUE("playback < Q_AUDIO_STOP");
             /* No fade for USB, nor for a forced stop -- data != 0 marks the
-             * ones nobody asked for (audio_hard_stop(), the buflib shrink
-             * callback), where a caller is blocked waiting on us. */
+             * one nobody asked for (the buflib shrink callback), where a
+             * caller is blocked waiting on us. */
             audio_stop_playback(ev->id != SYS_USB_CONNECTED && ev->data == 0);
             if (ev->data != 0)
                 queue_clear(&audio_queue);
@@ -3992,6 +3992,18 @@ void audio_playback_handler(struct queue_event *ev)
 
         /** Miscellaneous messages **/
         case Q_AUDIO_REMAKE_AUDIO_BUFFER:
+            if (ev->data != 0)
+            {
+                /* audio_release_buffer(): free before replying, or a
+                 * Q_AUDIO_PLAY behind the reply buffers into freed memory.
+                 * This message is routed here when idle; Q_AUDIO_STOP is not. */
+                LOGFQUEUE("playback < Q_AUDIO_REMAKE_AUDIO_BUFFER: release");
+                audio_stop_playback(false);
+                queue_clear(&audio_queue);
+                buffer_state = AUDIOBUF_STATE_TRASHED;
+                audiobuf_handle = core_free(audiobuf_handle);
+                return;
+            }
             /* buffer needs to be reinitialized */
             LOGFQUEUE("playback < Q_AUDIO_REMAKE_AUDIO_BUFFER");
             audio_start_playback(NULL, AUDIO_START_RESTART | AUDIO_START_NEWBUF);
@@ -4317,12 +4329,9 @@ void audio_pause(void)
  * the USB sound card may be playing through the mixer. */
 void audio_release_buffer(void)
 {
-    LOGFQUEUE("audio >| audio Q_AUDIO_STOP: 1");
-    audio_queue_send(Q_AUDIO_STOP, 1);
+    LOGFQUEUE("audio >| audio Q_AUDIO_REMAKE_AUDIO_BUFFER: release");
+    audio_queue_send(Q_AUDIO_REMAKE_AUDIO_BUFFER, 1);
     voice_stop();
-    /* The next play has to lay out a new buffer, not run on the freed one */
-    buffer_state = AUDIOBUF_STATE_TRASHED;
-    audiobuf_handle = core_free(audiobuf_handle);
 }
 
 void audio_hard_stop(void)
