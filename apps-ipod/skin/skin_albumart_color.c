@@ -260,7 +260,14 @@ static void apply_colors(unsigned int new_accent, unsigned int new_dominant,
  * the background is the lighter or the darker of the two. Contrast is
  * symmetric, so either way round keeps every guarantee extraction made about
  * the pair; what Light gives up is the dark-accent rescue in extract_colors(),
- * since the colour that then reads over the artwork is the darker one. */
+ * since the colour that then reads over the artwork is the darker one.
+ *
+ * Dark lifts an accent below half scale to DARK_ACCENT_TONE. Turned over, the
+ * accent is often the cover's own expanse -- orange text on an orange sleeve --
+ * and the `scrim` filter stands down for text that dim, so nothing would part
+ * the two. Lightening the lighter of the pair only widens its contrast. */
+#define DARK_ACCENT_TONE 70
+
 static void apply_oriented(void)
 {
     unsigned int black = LCD_RGBPACK(0, 0, 0);
@@ -276,6 +283,8 @@ static void apply_oriented(void)
         accent = cache.found_dominant;
         dominant = cache.found_accent;
     }
+    if (orientation == DYNAMIC_BG_DARK && 2 * color_luminance(accent) < 255)
+        accent = color_tone_bound(accent, DARK_ACCENT_TONE, 1);
 
     cache.orientation = orientation;
     apply_colors(accent, dominant, false);
