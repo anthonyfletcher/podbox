@@ -112,6 +112,7 @@ static int Predx(struct JPEGD *j, struct COMP *C, int x, int y, TSAMP *samp)
 static int Byte_in_huff(struct JPEGD *j)
 {
 	j->ScanByte = GETC();
+	if ( j->ScanByte < 0 ) j->ScanByte = 0;	/* past the end of file: zero bits */
 	if ( 0xFF == j->ScanByte )
 	{
 		int marker = GETC();
@@ -263,10 +264,13 @@ static void Reset_decoder_huff_lossless(struct JPEGD *j)
 static int Byte_in_arith(struct JPEGD *j)
 {
 	j->ScanByte = GETC();
+	if ( j->ScanByte < 0 ) j->ScanByte = 0;	/* past the end of file: zero bits */
 	if ( 0xFF == j->ScanByte )
 	{
-		if ( GETC() ) {		// Marker detection
-			SEEK(-2);		// Arith: "zero byte fed to decoder"
+		int marker = GETC();
+		if ( marker ) {		// Marker detection
+			/* back to the FF, which at end of file was the last byte read */
+			SEEK( marker < 0 ? -1 : -2 );		// Arith: "zero byte fed to decoder"
 			j->ScanBit=~0;	// Seems like 8 was not enough.. TODO
 			j->ScanByte=0;
 		}

@@ -134,6 +134,15 @@ static int load_image(char *filename, struct image_info *info,
     if ( 3 != p_jpg->Nf )
         return PLUGIN_ERROR;
 
+    /* get_image() maps pixels to samples by Hmax/Hi and Vmax/Vi, so a
+       factor that does not divide the largest would read past a row */
+    for (int c = 0; c < 3; c++)
+    {
+        if (p_jpg->Hmax % p_jpg->Components[c].Hi ||
+            p_jpg->Vmax % p_jpg->Components[c].Vi)
+            return PLUGIN_ERROR;
+    }
+
     cpu_boost(true);
     scaled_dequantization_and_idct();
     cpu_boost(false);
