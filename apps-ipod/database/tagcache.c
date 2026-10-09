@@ -2987,8 +2987,25 @@ static int folder_name_year(const char *path)
 static uint32_t walk_seen[WALK_SEEN_MAX / 32];
 static long walk_seen_count;
 /* Set when the walk skipped a folder or could not look a file up, so an
- * unmarked entry may still exist: the deletion pass is skipped. */
+ * unmarked entry may still exist: deletions are checked on storage instead. */
 static bool walk_incomplete;
+/* The folders the walk could not open. Storage cannot answer for the files
+ * under them either, so their entries are kept; past WALK_UNREAD_MAX the
+ * storage check is skipped altogether. */
+#define WALK_UNREAD_MAX 4
+static char walk_unread[WALK_UNREAD_MAX][MAX_PATH];
+static int walk_unread_count;
+
+static bool walk_unread_holds(const char *path)
+{
+    for (int i = 0; i < MIN(walk_unread_count, WALK_UNREAD_MAX); i++)
+    {
+        size_t len = strlen(walk_unread[i]);
+        if (!strncasecmp(path, walk_unread[i], len) && path[len] == '/')
+            return true;
+    }
+    return false;
+}
 
 static bool walk_checks_deletions(void)
 {
@@ -4774,12 +4791,26 @@ static bool command_queue_is_full(void)
     return (next == command_queue_ridx);
 }
 
+static bool usb_stamp_changed(void);
+static void usb_restamp(void);
+
 static void command_queue_sync_callback(void)
 {
     struct master_header myhdr;
     int masterfd;
 
     mutex_lock(&command_queue_mutex);
+
+    /* While a USB stamp is held, a host's change is looked for before this
+     * writes, and the stamp moves past this write after. A changed database
+     * has no entries these name. */
+    if (usb_stamp_changed())
+    {
+        command_queue_ridx = command_queue_widx;
+        tc_stat.queue_length = 0;
+        mutex_unlock(&command_queue_mutex);
+        return;
+    }
 
     /* A commit rewriting the master would write over these, so they wait for
      * the next flush; so does a missing master, which a rebuild deletes until
@@ -4804,6 +4835,7 @@ static void command_queue_sync_callback(void)
                 /* Re-open the masterfd. */
                 if ( (masterfd = open_master_fd(&myhdr, true)) < 0)
                 {
+                    usb_restamp();
                     mutex_unlock(&command_queue_mutex);
                     return;
                 }
@@ -4822,6 +4854,7 @@ static void command_queue_sync_callback(void)
     }
 
     close(masterfd);
+    usb_restamp();
 
     tc_stat.queue_length = 0;
     mutex_unlock(&command_queue_mutex);
@@ -6008,7 +6041,8 @@ failure:
 }
 
 /* Deletes the entries whose files have gone, asking the directory cache and
- * then the disk for each path. */
+ * then the disk for each path. Entries under a folder the walk could not open
+ * are kept. */
 static bool check_deleted_files(void)
 {
     int fd;
@@ -6110,6 +6144,8 @@ static bool check_deleted_files(void)
          * stat, but only for entries that already failed to resolve -- 43 on
          * the library this was found on, against 3502 scanned -- and deleting
          * an entry is destructive enough to be worth confirming directly. */
+        else if (walk_unread_holds(buf))
+        {;}
         else if (!file_exists(buf))
         {
             logf("Entry no longer valid.");
@@ -6213,6 +6249,10 @@ static bool check_dir(const char *dirname, int add_files, int depth)
     if (!dir)
     {
         logf("tagcache: opendir(%s) failed", dirname);
+        if (walk_unread_count < WALK_UNREAD_MAX)
+            strmemccpy(walk_unread[walk_unread_count], dirname, MAX_PATH);
+        if (walk_unread_count <= WALK_UNREAD_MAX)
+            walk_unread_count++;
         return false;
     }
 
@@ -6425,6 +6465,7 @@ void do_tagcache_build(const char *path[])
                                               : 0;
     memset(walk_seen, 0, (walk_seen_count + 31) / 32 * sizeof(walk_seen[0]));
     walk_incomplete = false;
+    walk_unread_count = 0;
 
     struct search_roots_ll * this;
     /* check_dir might add new roots */
@@ -6463,6 +6504,7 @@ void do_tagcache_build(const char *path[])
          * be committed, incomplete, at the next boot. */
         logf("Aborted.");
         walk_seen_count = 0;
+        walk_unread_count = 0;
         remove_db_file(TAGCACHE_FILE_TEMP);
         cpu_boost(false);
         return ;
@@ -6470,14 +6512,18 @@ void do_tagcache_build(const char *path[])
 
     if (walk_seen_count && !walk_incomplete)
         delete_unseen_entries();
-    else if (walk_seen_count)
+    else if (walk_seen_count && walk_unread_count <= WALK_UNREAD_MAX)
     {
         /* An unmarked entry may still exist, and the Update arms skipped
          * the storage check because the walk was to do it: do it here. */
         debug_log(DEBUG_LOG_TAGCACHE, "walk: incomplete, checking storage");
         check_deleted_files();
     }
+    else if (walk_seen_count)
+        debug_log(DEBUG_LOG_TAGCACHE, "walk: over %d folders unread, "
+                  "no deletions", WALK_UNREAD_MAX);
     walk_seen_count = 0;
+    walk_unread_count = 0;
 
     /* Commit changes to the database. */
     if (commit())
@@ -6579,16 +6625,44 @@ static unsigned int db_dir_stamp(void)
     return stamp;
 }
 
-/* Taken by the database thread before it hands the disk over */
+/* Taken by the database thread before it hands the disk over, and held until
+ * it has the disk back */
 static unsigned int usb_stamp;
 static bool usb_stamp_taken;
+/* A host changed the database: this run writes nothing more to it, and the
+ * UI restarts. Never cleared. */
+static bool usb_db_replaced;
+
+/* A change closes the database to this run: its header and track numbers are
+ * the old database's. A folder that cannot be read answers nothing -- the
+ * UI's test can run after an eject and before the disk is mounted again. */
+static bool usb_stamp_changed(void)
+{
+    unsigned int stamp;
+
+    if (!usb_db_replaced && usb_stamp_taken
+        && (stamp = db_dir_stamp()) != 0 && stamp != usb_stamp)
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "usb: database changed by the host");
+        usb_db_replaced = true;
+        tc_stat.ready = false;
+        tc_stat.ramcache = false;
+    }
+    return usb_db_replaced;
+}
+
+/* After this run's own write while a stamp is held */
+static void usb_restamp(void)
+{
+    unsigned int stamp;
+
+    if (usb_stamp_taken && (stamp = db_dir_stamp()) != 0)
+        usb_stamp = stamp;
+}
 
 bool tagcache_changed_over_usb(void)
 {
-    bool changed = usb_stamp_taken && db_dir_stamp() != usb_stamp;
-
-    usb_stamp_taken = false;
-    return changed;
+    return usb_stamp_changed();
 }
 
 /* After a USB session that wrote to the disk: switch the RAM copy back on if
@@ -6759,6 +6833,12 @@ static void tagcache_thread(void)
         queue_wait_w_tmo(&tagcache_queue, &ev, first_wait ? 0 : HZ);
         first_wait = false;
 
+        /* A database a host replaced is not this run's: a scan of it with
+         * ready clear would build it again. Only USB is answered until the
+         * UI restarts. */
+        if (usb_db_replaced && ev.id != SYS_USB_CONNECTED)
+            continue;
+
         switch (ev.id)
         {
             case Q_RELOAD_RAMCACHE:
@@ -6904,18 +6984,20 @@ static void tagcache_thread(void)
 
             case SYS_USB_CONNECTED:
                 logf("USB: TagCache");
-                /* Once per cable session: a mid-connect reconfigure brings
-                 * this round again, after the host may have written. The
-                 * flush is the UI's too, which would otherwise race this:
-                 * the mutex puts both before the stamp. */
-                if (!usb_stamp_taken)
-                {
-                    run_command_queue(true);
-                    usb_stamp = db_dir_stamp();
-                    usb_stamp_taken = true;
-                }
+                /* Every round, a mid-connect reconfigure's included: the
+                 * disconnect before it compared first, so no host write is
+                 * stamped over. A flush after the stamp moves it past
+                 * itself. */
+                run_command_queue(true);
+                usb_stamp = db_dir_stamp();
+                usb_stamp_taken = true;
                 usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
                 usb_wait_for_disconnect(&tagcache_queue);
+                /* Here, before this thread can write again, and not only in
+                 * the UI: its end-of-session test can run before the cable
+                 * is seen to be out. */
+                usb_stamp_changed();
+                usb_stamp_taken = false;
                 break ;
         }
     }
@@ -7079,16 +7161,27 @@ bool tagcache_tool_open(void)
  * 'rebuild' Q_REBUILD's, done once against the mounted player. */
 bool tagcache_tool_run(bool rebuild)
 {
+    struct master_header hdr;
+    int fd;
+
     tool_init();
+    /* A master of a kind this build does not know, a later version's say, is
+     * not this tool's to finish, update or rebuild over. */
+    fd = open_master_fd(&hdr, false);
+    if (fd == -2)
+        return false;
+    if (fd >= 0)
+        close(fd);
     finish_interrupted_swap();
     if (db_file_exists(TAGCACHE_FILE_TEMP))
         commit();
     tagcache_commit_finalize();
     tc_stat.initialized = true;
 
-    if (rebuild && tc_stat.ready)
+    if (rebuild)
     {
-        /* The master is the only copy of the figures */
+        /* The master is the only copy of the figures. One that cannot be
+         * read has none to save; a save that could not write keeps it. */
         if (save_runtime_data(false) == 0)
             return false;
         remove_files();

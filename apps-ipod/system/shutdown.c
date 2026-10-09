@@ -289,8 +289,31 @@ static void hp_unplug_change(bool inserted)
 
 }
 
+#ifdef BOOTFILE
+/* A computer rewrote the database (tools/database_pb). This run holds the old
+ * one's track numbers, in the playlist and the buffered tracks, so start
+ * again. Tried once: a failed load leaves the database closed to this run. */
+static void restart_if_database_replaced(void)
+{
+    static bool tried = false;
+
+    if (!tried && tagcache_changed_over_usb())
+    {
+        tried = true;
+        audio_hard_stop();
+        rolo_load(BOOTDIR "/" BOOTFILE);
+    }
+}
+#endif
+
 long default_event_handler_ex(long event, void (*callback)(void *), void *parameter)
 {
+#ifdef BOOTFILE
+    /* The end-of-session test below can run before the cable is seen to be
+     * out, so every event looks again once it is. */
+    if (!usb_inserted() || usb_storage_is_ejected())
+        restart_if_database_replaced();
+#endif
 
     switch(event)
     {
@@ -334,15 +357,7 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
                 bootfile_baseline_taken = false;
                 if (usb_core_host_wrote_storage())
                     check_bootfile(true);
-                /* A computer rewrote the database (tools/database_pb). This
-                 * run holds the old one's header and track numbers and would
-                 * write them back over it, so start again rather than shut
-                 * down: a clean shutdown is one of the writers. */
-                if (tagcache_changed_over_usb())
-                {
-                    audio_hard_stop();
-                    rolo_load(BOOTDIR "/" BOOTFILE);
-                }
+                restart_if_database_replaced();
             }
 #endif
             system_restore();

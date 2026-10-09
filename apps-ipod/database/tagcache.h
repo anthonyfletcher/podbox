@@ -334,8 +334,9 @@ bool tagcache_path_index_info(int *slots, int *found, int *missed);
 void tagcache_unload_ramcache(void);
 void tagcache_reload_ramcache(void);
 bool tagcache_reinstate_ramcache(void);
-/* At the end of a cable session: whether the host changed any database file.
- * Starts the next session afresh. */
+/* Once the disk is back from the host: whether it changed any database file.
+ * True stays true, and the database is closed to this run until a restart.
+ * Cheap when no cable session is pending. */
 bool tagcache_changed_over_usb(void);
 /* True when the RAM copy was refused for want of room: it will not load this
  * session unless a later reload finds room. False while it may still load,
