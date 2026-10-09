@@ -4313,18 +4313,24 @@ void audio_pause(void)
 
 /* This sends a stop message and the audio thread will dump all its
    subsequent messages */
-void audio_hard_stop(void)
+/* Stop playback and free the audio buffer, leaving the PCM sink running:
+ * the USB sound card may be playing through the mixer. */
+void audio_release_buffer(void)
 {
-    /* Stop playback */
     LOGFQUEUE("audio >| audio Q_AUDIO_STOP: 1");
     audio_queue_send(Q_AUDIO_STOP, 1);
     voice_stop();
-    /* Stopping the playback and voice paths does not idle the PCM sink,
-     * and a late callback must not fire during a ROLO */
-    pcm_play_stop();
     /* The next play has to lay out a new buffer, not run on the freed one */
     buffer_state = AUDIOBUF_STATE_TRASHED;
     audiobuf_handle = core_free(audiobuf_handle);
+}
+
+void audio_hard_stop(void)
+{
+    audio_release_buffer();
+    /* Stopping the playback and voice paths does not idle the PCM sink,
+     * and a late callback must not fire during a ROLO */
+    pcm_play_stop();
 }
 
 /* Resume playback if paused */

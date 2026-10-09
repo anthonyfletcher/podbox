@@ -125,8 +125,8 @@ static void piezo_thread(void)
             case Q_PIEZO_BEEP_FOR_USEC:
                 piezo_hw_tick((unsigned int)ev.data);
                 beeping = true;
-                /* Priority 0, the backlight fade's, so a click cannot take
-                 * the timer from a fade and cut it short. */
+                /* Priority 0, below the backlight fade's 1, so a fade takes
+                 * the timer from a click and never the reverse. */
                 if (timer_register(0, piezo_click_lost,
                                    (long)duration * (TIMER_FREQ / 1000000),
                                    piezo_click_off IF_COP(, CPU)))

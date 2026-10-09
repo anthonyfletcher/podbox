@@ -78,6 +78,9 @@ size_t audio_get_filebuflen(void);
 /* From buffering, which has found a damaged handle list: rebuild the buffer.
    Safe from any thread and with the list lock held -- it only posts. */
 void audio_buffer_damaged(void);
+/* audio_hard_stop() without stopping the PCM sink, for a caller that only
+   needs the memory back. */
+void audio_release_buffer(void);
 
 unsigned int playback_status(void);
 

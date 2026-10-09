@@ -1660,12 +1660,15 @@ static int host_control(int addr, int reqtype, int req, int value,
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len)
 {
-    int n;
+    int n = -1;
 
     if (!host_active)
         return -1;
     mutex_lock(&host_mtx);
-    n = host_control(addr, reqtype, req, value, index, data, len);
+    /* again under the lock: the USB thread may have stopped the core while
+     * this call waited */
+    if (host_active)
+        n = host_control(addr, reqtype, req, value, index, data, len);
     mutex_unlock(&host_mtx);
     return n;
 }
@@ -1696,6 +1699,7 @@ static struct host_dw_iso_dma *iso_dma;
 static struct usb_drv_host_iso iso_cfg;
 static struct usb_drv_host_iso_stats iso_stats;
 static uint32_t iso_acc;                /* samples owed, 16.16 */
+static uint32_t iso_fb_ceiling;         /* the most a packet carries, 16.16 */
 static bool iso_out_armed[2], iso_fb_armed;
 
 #define ISO_PHYS(p) \
@@ -1725,7 +1729,8 @@ static void iso_halt(int ch)
 }
 
 /* A feedback value is 16.16 samples per microframe. One more than an
- * eighth away from nominal is taken as noise, not a rate. */
+ * eighth away from nominal is taken as noise, not a rate, and one above what
+ * the packets carry is held at that, or the owed samples grow unbounded. */
 static void iso_take_feedback(uint32_t v)
 {
     uint32_t nom = iso_cfg.nominal;
@@ -1733,7 +1738,7 @@ static void iso_take_feedback(uint32_t v)
     iso_stats.fb_raw = v;
     if (v > nom - nom / 8 && v < nom + nom / 8)
     {
-        iso_stats.feedback = v;
+        iso_stats.feedback = MIN(v, iso_fb_ceiling);
         iso_stats.fb_ok++;
     }
     else
@@ -1854,6 +1859,8 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
     iso_cfg.mps_fb = MIN(iso->mps_fb, (int)sizeof iso_dma->fb);
     memset(&iso_stats, 0, sizeof iso_stats);
     iso_stats.feedback = iso->nominal;
+    iso_fb_ceiling = (uint32_t)(MIN(iso->mps_out, ISO_BUF_BYTES) /
+                                iso->frame_bytes << 16) / iso->interval_out;
     iso_acc = 0;
     iso_out_armed[0] = iso_out_armed[1] = iso_fb_armed = false;
     iso_stats.running = true;

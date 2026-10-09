@@ -388,6 +388,7 @@ static struct
     bool late;              /* the cover missed the first transfer */
     bool pending;           /* the worker was busy: the find is asked again */
     uint32_t size, sent;
+    uint32_t off;           /* how much of the worker's chunk has gone */
     long started;
 } aw;
 /* The library on its way to the car: see the media library part */
@@ -877,8 +878,9 @@ static void list_done(void)
     lx.phase = LX_IDLE;
 }
 
-static void file_packet(uint8_t id, uint8_t op, const uint8_t *data,
+static bool file_packet(uint8_t id, uint8_t op, const uint8_t *data,
                         size_t n);
+static size_t file_room(void);
 
 /* [ID, 04, size, 00 type], and for a playlist its ID and the library's */
 static void start_transfer(uint8_t id, const struct iap_library_list *l,
@@ -1012,13 +1014,18 @@ static void list_pump(void)
     while (lx.phase == LX_SENDING && usb_iap2_room() > 1)
     {
         const struct iap_library_list *l = lx.l;
-        const uint32_t n = MIN(l->count - lx.sent, sizeof(piece) / 8);
+        const uint32_t n = MIN(MIN(l->count - lx.sent, sizeof(piece) / 8),
+                               file_room() / 8);
+        if (!n)
+            break;
         for (uint32_t i = 0; i < n; i++)
             for (int b = 0; b < 8; b++)
                 piece[i * 8 + b] = l->keys[lx.sent + i] >> (56 - b * 8);
         const bool first = !lx.sent, last = lx.sent + n >= l->count;
-        file_packet(lx.id, first ? (last ? 0xC0 : 0x80) : (last ? 0x40 : 0x00),
-                    piece, n * 8);
+        if (!file_packet(lx.id,
+                         first ? (last ? 0xC0 : 0x80) : (last ? 0x40 : 0x00),
+                         piece, n * 8))
+            break;
         lx.sent += n;
         if (last)
             list_done();
@@ -1151,18 +1158,28 @@ static int play_state(void)
  * pieces after the first from Nocturne (session/file_transfer.rs), facts
  * only. */
 
-static void file_packet(uint8_t id, uint8_t op, const uint8_t *data,
+/* False when it did not go: no free slot, or more than a packet holds */
+static bool file_packet(uint8_t id, uint8_t op, const uint8_t *data,
                         size_t n)
 {
     size_t room;
     uint8_t *b = usb_iap2_message_start(&room);
     if (!b || n + 2 > room)
-        return;
+        return false;
     b[0] = id;
     b[1] = op;
     if (n)
         memcpy(b + 2, data, n);
     usb_iap2_file_send(n + 2);
+    return true;
+}
+
+/* The data bytes the next file packet has room for, after its [ID, op]. An
+ * accessory's packets can be shorter than a piece the library hands out. */
+static size_t file_room(void)
+{
+    size_t room;
+    return usb_iap2_message_start(&room) && room > 2 ? room - 2 : 0;
 }
 
 static void announce_artwork(uint32_t size)
@@ -1185,6 +1202,7 @@ static void start_artwork(uint8_t id, const struct mp3entry *id3)
     }
     aw.id = id;
     aw.sent = 0;
+    aw.off = 0;
     aw.late = false;
     aw.pending = false;
     if (iap_library_artwork_find(id3))
@@ -1287,11 +1305,21 @@ static void artwork_pump(void)
             }
             break;
         }
-        const bool first = !aw.sent, last = aw.sent + n >= aw.size;
-        file_packet(aw.id, first ? (last ? 0xC0 : 0x80) : (last ? 0x40 : 0x00),
-                    data, n);
-        iap_library_artwork_next();
-        aw.sent += n;
+        const size_t take = MIN(n - aw.off, file_room());
+        if (!take)
+            break;
+        const bool first = !aw.sent, last = aw.sent + take >= aw.size;
+        if (!file_packet(aw.id,
+                         first ? (last ? 0xC0 : 0x80) : (last ? 0x40 : 0x00),
+                         data + aw.off, take))
+            break;
+        aw.off += take;
+        if (aw.off == n)
+        {
+            iap_library_artwork_next();
+            aw.off = 0;
+        }
+        aw.sent += take;
         if (last)
             aw.phase = ART_IDLE;    /* the car's 05 needs no answer */
     }

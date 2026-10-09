@@ -29,6 +29,7 @@
 #include "skin_albumart_color.h"
 #include "draw/color.h"                /* color_words_reset */
 #include "metadata/book_resume.h"
+#include "audio/playback.h"           /* audio_release_buffer */
 
 #define FAILSAFENAME "rockbox_failsafe"
 
@@ -137,9 +138,10 @@ void settings_apply_skins(void)
      * good, and one allocated while the audio buffer holds the pool is cut
      * from its back -- the top of the pool -- where no compaction can move
      * it. The next play then cannot lay out a buffer and panics. Released
-     * first, the skins land low, where the boot load puts them. */
+     * first, the skins land low, where the boot load puts them. Not a hard
+     * stop: that would silence a USB sound card playing through the mixer. */
     if (skins_initialised)
-        audio_hard_stop();
+        audio_release_buffer();
 
     bool first_run = skin_backdrop_init();
     

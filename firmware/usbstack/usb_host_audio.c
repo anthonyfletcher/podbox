@@ -462,36 +462,41 @@ static bool usable(const struct as_setting *s)
            s->interval_out >= 1 && s->interval_out <= 8 && s->rates;
 }
 
-/* Whether a 48 kHz packet fits the endpoint and the controller: at the top
- * of the feedback window when there is a feedback endpoint, and at the
- * nominal rate, which is all a stream without one ever sends, when there is
- * not. One that does not fit is cut short every packet, and the DAC plays
- * slow. */
-static bool fits(const struct as_setting *s)
+/* Whether a 48 kHz packet fits the endpoint and the controller. With
+ * headroom, a stream with a feedback endpoint also has room for the one
+ * extra frame a DAC running fast asks for; a stream without one only ever
+ * sends the nominal rate. A setting that fails without headroom is cut short
+ * every packet, and the DAC plays slow. */
+static bool fits(const struct as_setting *s, bool headroom)
 {
     bool hs = usb_drv_host_high_speed();
     int sof = hs ? 8000 : 1000;
-    int window = s->ep_fb ? 9 : 8;      /* eighths of the nominal rate */
-    int frames = (SAMPR_48 * window / 8 * (hs ? s->interval_out : 1) +
-                  sof - 1) / sof;
+    int frames = (SAMPR_48 * (hs ? s->interval_out : 1) + sof - 1) / sof +
+                 (headroom && s->ep_fb ? 1 : 0);
     int limit = MIN(s->mps_out,
                     usb_drv_host_iso_max_packet(s->interval_out));
 
     return frames * s->channels * s->subslot <= limit;
 }
 
+/* 0, 1 or 2: fits neither way, only at the nominal rate, or with headroom */
+static int fit_level(const struct as_setting *s)
+{
+    return fits(s, false) + fits(s, true);
+}
+
 /* Class 2: a 16-bit setting where there is one. Class 1: the widest
  * samples, the format a desktop host streams in and so the one a class 1
  * DAC's firmware is tested with -- a Fosi DAC-Q4's 16-bit setting plays
  * noise on its left channel. The player's samples go in the top of the
- * slot. Any setting that fits() comes before one that does not. */
+ * slot. A setting that fits better comes first, by fit_level(). */
 static bool better(const struct as_setting *cur,
                    const struct as_setting *best, bool found)
 {
     if (!found)
         return true;
-    if (fits(cur) != fits(best))
-        return fits(cur);
+    if (fit_level(cur) != fit_level(best))
+        return fit_level(cur) > fit_level(best);
     if (cur->uac == 1)
         return cur->subslot > best->subslot;
     return best->subslot != 2 && cur->subslot == 2;
@@ -675,7 +680,7 @@ bool usb_host_audio_start(void)
     status.subslot = as.subslot;
     status.bits = as.bits;
     status.ep_rate = as.uac == 1 && as.rate_ctl ? as.ep_out : 0;
-    STEP("too many channels", fits(&as));
+    STEP("too many channels", fits(&as, false));
     sof_per_second = usb_drv_host_high_speed() ? 8000 : 1000;
 
     if (as.uac == 2)

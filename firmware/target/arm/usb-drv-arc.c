@@ -814,6 +814,7 @@ static unsigned int iso_next;          /* next frame to fill */
 static bool iso_full_speed;            /* siTDs, one packet a frame */
 static uint32_t iso_acc;               /* samples owed, 16.16 */
 static bool iso_fb_armed[ISO_SLOTS];
+static uint32_t iso_fb_ceiling;        /* the most a packet carries, 16.16 */
 
 static void itd_init(struct ehci_itd *itd, void *buf, int ep, int dir,
                      int mps)
@@ -826,7 +827,8 @@ static void itd_init(struct ehci_itd *itd, void *buf, int ep, int dir,
 }
 
 /* A feedback value is 16.16 samples per microframe. One more than an
- * eighth away from nominal is taken as noise, not a rate. */
+ * eighth away from nominal is taken as noise, not a rate, and one above what
+ * the packets carry is held at that, or the owed samples grow unbounded. */
 static void iso_take_feedback(int slot)
 {
     uint32_t t = iso_dma->fb[slot].trans[0];
@@ -844,7 +846,7 @@ static void iso_take_feedback(int slot)
     iso_stats.fb_raw = v;
     if (v > nom - nom / 8 && v < nom + nom / 8)
     {
-        iso_stats.feedback = v;
+        iso_stats.feedback = MIN(v, iso_fb_ceiling);
         iso_stats.fb_ok++;
     }
     else
@@ -977,6 +979,10 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
     iso_acc = 0;
 
     iso_full_speed = !usb_drv_host_high_speed();
+    iso_fb_ceiling = (uint32_t)(MIN(iso->mps_out,
+                          usb_drv_host_iso_max_packet(iso->interval_out)) /
+                      iso->frame_bytes << 16) /
+                     (iso_full_speed ? 1 : iso->interval_out);
     for (int s = 0; s < ISO_SLOTS; s++)
     {
         struct ehci_sitd *st = &iso_dma->sout[s];
