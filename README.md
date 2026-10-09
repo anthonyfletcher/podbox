@@ -177,7 +177,8 @@ checking `System > Background Tasks`. After adding art to your tags, run
 `Settings > Library > Maintenance > Update Art Cache` to pick it up.
 
 A tool is available [here](tools/art_fetch/README.md) to fill your library with album and artist
-artwork.
+artwork.  Alternatively there's a tool that's much easier to use available 
+[here](https://github.com/cyberdeliaAI/rockbox-library-manager).
 
 ## Lyrics
 
