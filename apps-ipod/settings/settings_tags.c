@@ -364,7 +364,6 @@ static const struct tag_row tag_rows[] = {
 /* --- system -------------------------------------------------------------- */
 { "start in screen",     TAG_SYSTEM|TAG_APPEARANCE,              "start screen boot" },
 { "show shutdown message", TAG_ADVANCED|TAG_SYSTEM,                           "shutdown splash" },
-{ "clear settings on hold",TAG_ADVANCED|TAG_SYSTEM,              "reset recovery" },
 { "spun artwork",        TAG_ARTWORK | TAG_LIBRARY,           "spun playback report statistics cards album art sleeves memory" },
 { "spun top count",      TAG_LIBRARY,                            "spun playback report statistics top ten artists songs albums how many rows" },
 { "spun badge order",    TAG_LIBRARY,                            "spun playback report statistics achievements badges sort order earned date progress" },

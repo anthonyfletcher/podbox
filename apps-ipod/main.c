@@ -727,19 +727,6 @@ static void init(void)
     settings_load();
     CHART("<settings_load");
 
-    if (global_settings.clear_settings_on_hold &&
-#ifdef SETTINGS_RESET
-    /* Reset settings if holding the reset button. (Rec on Archos,
-       A on Gigabeat) */
-    ((button_status() & SETTINGS_RESET) == SETTINGS_RESET))
-#else
-    /* Reset settings if the hold button is turned on */
-    (button_hold()))
-#endif
-    {
-        splash(HZ*2, str(LANG_RESET_DONE_CLEAR));
-        settings_reset();
-    }
     CHART(">init_battery_tables");
     init_battery_tables();
     CHART("<init_battery_tables");

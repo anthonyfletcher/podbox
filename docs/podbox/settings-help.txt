@@ -1217,10 +1217,6 @@ a player that cannot switch off on the charger.
 [action: Reboot]
 Restarts the player now. Refused while charging, as Shut Down is.
 
-[clear settings on hold]
-Holding a button during startup clears the settings. A way back from a
-configuration that makes the player unusable.
-
 [settings mode]
 How much of the settings tree is shown. Standard hides the advanced rows;
 Everything shows all of them.

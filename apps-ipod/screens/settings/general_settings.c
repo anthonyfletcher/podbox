@@ -648,10 +648,6 @@ MENUITEM_SETTING(keypress_restarts_sleeptimer,
                  &global_settings.keypress_restarts_sleeptimer, NULL);
 MENUITEM_SETTING(show_shutdown_message, &global_settings.show_shutdown_message, NULL);
 
-#define SETTINGS_CLEAR_ON_HOLD
-MENUITEM_SETTING(clear_settings_on_hold,
-                 &global_settings.clear_settings_on_hold, NULL);
-
 /* The same calls as the Shut Down and Reboot shortcuts, and the same refusal
  * on the charger. */
 static int menu_shutdown(void)
@@ -698,10 +694,6 @@ MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
           0, Icon_System_menu,
             &show_shutdown_message,
             &start_screen,
-#if defined(SETTINGS_CLEAR_ON_HOLD)
-            &clear_settings_on_hold,
-#undef SETTINGS_CLEAR_ON_HOLD
-#endif
             &shutdown_item,
             &reboot_item,
          );

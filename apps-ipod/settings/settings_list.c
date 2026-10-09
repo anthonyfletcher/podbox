@@ -1915,6 +1915,11 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),
+    /* No menu row: marks that settings_load() has carried Music's Sort
+     * Ignoring The/A/An into the carousel's own. */
+    OFFON_SETTING(F_BANFROMQS, album_covers_articles_carried,
+                  LANG_SORT_IGNORE_ARTICLES, false,
+                  "album covers articles carried", NULL),
     /* No longer shown: its descending half is now part of the sort list above.
      * Read only so that settings_load() can carry a saved "descending" into
      * that list; nothing else consults it. */
@@ -2120,8 +2125,6 @@ const struct settings_list settings[] = {
                    ID2P(LANG_USB_MODE_MASS_STORAGE),
                    ID2P(LANG_USB_MODE_CHARGE)
         ),
-    OFFON_SETTING(0, clear_settings_on_hold, LANG_CLEAR_SETTINGS_ON_HOLD,
-                  false, "clear settings on hold", NULL),
     CHOICE_SETTING(0, playback_log, LANG_LOGGING, 1, "play log",
                    "off,on,last.fm", NULL, 3,
                    ID2P(LANG_OFF), ID2P(LANG_ON), ID2P(LANG_AUDIOSCROBBLER)),

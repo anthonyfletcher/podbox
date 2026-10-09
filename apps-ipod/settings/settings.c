@@ -242,6 +242,19 @@ static void carry_year_sort_order(void)
     global_settings.album_covers_year_sort_order = ASCENDING;
 }
 
+/* The carousel's Sort Ignoring The/A/An starts from the Music lists' value,
+ * so a player with Music's on keeps its carousel order. Once only: an "off"
+ * leaves no line in config.cfg, so the flag is what tells a choice from an
+ * upgrade. */
+static void carry_carousel_articles(void)
+{
+    if (global_settings.album_covers_articles_carried)
+        return;
+    if (global_settings.sort_ignore_articles)
+        global_settings.album_covers_sort_ignore_articles = true;
+    global_settings.album_covers_articles_carried = true;
+}
+
 /*
  * load settings from disk
  */
@@ -285,6 +298,7 @@ void settings_load(void)
 
     /* After the CRC, so the next save writes the result out. */
     carry_year_sort_order();
+    carry_carousel_articles();
 
     mark_theme_overlay();
 }

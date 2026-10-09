@@ -729,6 +729,9 @@ struct user_settings
      * own. See carousel_album_order(). */
     bool album_covers_sort_same_as_music;
     int  album_covers_year_sort_order;
+    /* Set once settings_load() has given the carousel's Sort Ignoring
+     * The/A/An the Music lists' value */
+    bool album_covers_articles_carried;
     int  album_covers_show_year;  /* ALBUM_YEAR_*, as album_show_year */
     int  album_covers_background; /* CAROUSEL_BG_*: the colour it fills with */
     int  album_covers_custom_color; /* ...when that is CAROUSEL_BG_CUSTOM */
@@ -982,7 +985,6 @@ struct user_settings
     int afr_enabled;
 
     int usb_mode;
-    bool clear_settings_on_hold;
     int playback_log; /* 0=off, 1=generic (ROCKBOX_DIR/playback.log),
                          2=Audioscrobbler (/.scrobbler.log) */
 

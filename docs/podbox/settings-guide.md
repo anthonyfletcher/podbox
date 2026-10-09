@@ -534,7 +534,6 @@ shadow to colour.
 | Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Direct mode never reads it, which is why the row is listed only in Perceptual. | 50 | **Adv** |
 | Start Screen | Which screen opens at power-on. | root |  |
 | Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
-| Clear Settings on Reset-Button Hold | Holding a button during startup clears the settings. A way back from a configuration that makes the player unusable. | off | **Adv** |
 | Shut Down | Switches the player off now, as holding Play does. Refused while charging, on a player that cannot switch off on the charger. | |  |
 | Reboot | Restarts the player now. Refused while charging, as Shut Down is. | |  |
 | Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | standard |  |

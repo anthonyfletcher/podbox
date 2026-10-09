@@ -38,7 +38,7 @@ done
 # strings check 2's regexp cannot tell from a cfg name. None of these want a
 # stanza. Selective Backlight Actions is the exemption mask, set through an
 # action row rather than shown as a setting.
-KNOWN_UNDOCUMENTED='^(album covers year sort order|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order)$'
+KNOWN_UNDOCUMENTED='^(album covers articles carried|album covers year sort order|Selective Backlight Actions|context_wps|database album sort contexts|music menu hidden|music menu signature|qs (bottom|left|right|top)|root menu order)$'
 
 # Byte order throughout, because sort and comm have to agree about what "in
 # order" means. Under a UTF-8 locale sort collates "usb hid", "usb keypad
