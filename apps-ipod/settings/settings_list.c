@@ -1099,8 +1099,8 @@ const struct settings_list settings[] = {
         INT(DEFAULT_THEME_SELECTOR_TEXT),"line selector text color",UNUSED},
 
 
-    /* Modal dialog chrome: the metrics under Appearance -> Dialogs, the
-     * colours under Appearance -> Colours, or a theme .cfg names them all.
+    /* Modal dialog chrome: the metrics and colours under Appearance ->
+     * Dialogs, or a theme .cfg names them all.
      * The metric defaults are the chrome a theme gets for saying nothing, so
      * they are the shipped look rather than dialog_style_default()'s bare
      * 1px square borders.
@@ -1993,7 +1993,7 @@ const struct settings_list settings[] = {
     OFFON_SETTING(F_THEMESETTING|F_THEMERESET, album_covers_statusbar,
                   LANG_STATUS_BAR,
                   false, "album covers statusbar", NULL),
-    /* A theme sets these, and Appearance > Elements shows them. Off
+    /* A theme sets these, and Appearance > Interface Elements shows them. Off
      * unless asked for, because they make album rows grow to the tall height
      * to fit a cover -- a theme whose list config doesn't draw the %La cover
      * gets the tall rows with nothing in them. F_THEMERESET so a theme that

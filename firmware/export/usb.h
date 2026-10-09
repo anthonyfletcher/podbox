@@ -379,7 +379,7 @@ void usb_set_hid(bool enable);
 #ifdef USB_ENABLE_IAP
 /* enable or disable USB iAP, from the next connection */
 void usb_set_iap(bool enable);
-/* iAP2 Accessories: 0 off, 1 auto, 2 on (USB_IAP2_MODE_*) */
+/* iPhone Accessories: 0 off, 1 auto, 2 on (USB_IAP2_MODE_*) */
 void usb_set_iap2_mode(int mode);
 /* The host has sent Apple's 0x53, as a car does; from the USB stack */
 void usb_car_found(void);

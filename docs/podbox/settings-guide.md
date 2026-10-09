@@ -172,7 +172,6 @@ after new music, run it after `database_pb.exe`.
 | Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | auto | **Adv** |
 | Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | on | **Adv** |
-| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
 
 ### Playback — Fast-Forward/Rewind
 
@@ -233,9 +232,10 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 | Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
 | Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
+
+**Appearance** opens Appearance — Now Playing Screen, below.
 
 ### Library — Files
 
@@ -249,6 +249,7 @@ after new music, run it after `database_pb.exe`.
 | Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | view_all |  |
 | Follow Playlist | Opens the browser at the folder the playing track came from, rather than where you last were. | off |  |
 | Show Path | Puts the current folder, or the whole path to it, in the title bar. | current directory |  |
+| Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
 | Hotkey | What the hotkey button does in the file browser. | Off, | **Adv** |
 
 ### Library — Music
@@ -273,6 +274,8 @@ after new music, run it after `database_pb.exe`.
 | Quiz Questions ▸ Name the Artist | Music Quiz rounds that play a clip and ask who it is by. The wrong answers are artists that sound alike, or share the genre and decade, as the game goes on. | on |  |
 | Quiz Questions ▸ Name the Album | Music Quiz rounds that play a clip and ask which album it is from. In the later rounds the wrong answers are the same artist's other albums. | on |  |
 | Quiz Questions ▸ Name the Year | Music Quiz rounds that play a clip and ask what year it is from. Off by default: the answers start five years apart and end one apart, and they are only as right as the year tags. | off |  |
+
+**Appearance** opens Art Rows, from Appearance — Interface Elements.
 
 **Segregate Audiobooks in full.** A genre counts as spoken word if it contains
 "audiobook", "audio book" or "spoken word" anywhere -- so Audiobooks,
@@ -306,27 +309,14 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | show tracks |  |
-| Show Album Title | Whether the album name is drawn over the covers, and where. | both bottom |  |
-| Show Year in Album Title | Shows the release year in the caption, before or after the album's name. | no |  |
-| Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
-| Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
-| Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | off |  |
 | Sort Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | off |  |
 | Sort Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | artist+name |  |
 | Sort Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
 | Sort Ignoring The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | off |  |
-| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
-| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
-| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
-| View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3d |  |
-| 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
-| 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |
-| 3D Parallel Slides | Draws the side covers face-on rather than angled, which reads as a row of covers rather than a tunnel. | on | **Adv** |
-| 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
-| Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
-| Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175 |  |
 | Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | medium |  |
+
+**Appearance** opens Appearance — Carousel, below.
 
 ### Library — Database
 
@@ -376,7 +366,7 @@ about two times in three.
 | While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | none |  |
 | Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | none |  |
 
-### Appearance — Colours
+### Appearance — Interface Colours
 
 | Setting | What it does | Default | |
 |---|---|---|---|
@@ -388,53 +378,68 @@ about two times in three.
 | Line Selector Colours ▸ Secondary Colour | The colour at the bottom of the graduated bar behind the highlighted row. Setting it the same as the start colour gives a flat bar instead of a fade. | b58e00 |  |
 | Line Selector Colours ▸ Text Colour | The colour of the text on the highlighted row, which has to read against the bar rather than against the background. | 000000 |  |
 | Line Separator Colour | The colour of the rule drawn between rows in lists. Only visible where the separator has a height to draw. | 848284 |  |
-| Carousel ▸ Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
-| Carousel ▸ Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
-| Dialog Elements ▸ Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
-| Dialog Elements ▸ Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
-| Dialog Elements ▸ Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
-| Dialog Elements ▸ Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
-| Dialog Elements ▸ Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
-| Dialog Elements ▸ Button Text | The text colour of an unselected dialog button. | e7f3ef |  |
-| Dialog Elements ▸ Button Background | The fill colour of an unselected dialog button. | 000c21 |  |
-| Dialog Elements ▸ Button Border | The border colour of an unselected dialog button. | e7f3ef |  |
-| Dialog Elements ▸ Selected Button Text | The text colour of the selected dialog button. | 000c21 |  |
-| Dialog Elements ▸ Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
-| Dialog Elements ▸ Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
 
 Several rows here are listed only while something reads them, whatever Settings
-Mode says. The nine palette rows -- everything from Box Text down -- need
-Dialog Colour Mode on On. Line Selector Colours needs a selector type that
-draws a coloured bar, and its Secondary Colour needs the gradient. Separator
-Colour needs Line Separator set above zero, and Box Shadow Colour needs a
-shadow to colour.
+Mode says. Line Selector Colours needs a selector type that draws a coloured
+bar, and its Secondary Colour needs the gradient. Separator Colour needs Line
+Separator set above zero.
 
-### Appearance — Elements
+### Appearance — Interface Elements
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | off |  |
+| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
+| Art Rows ▸ Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | off |  |
 | `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Cfg** |
-| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 | Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
 | Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
-| Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
-| Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
+| Scroll Bar ▸ Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
+| Scroll Bar ▸ Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
 | Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
 | Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
 | Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
 | Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
 
-### Appearance — Elements — Activity Indicators
+### Appearance — Interface Elements — Activity Indicators
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Show Disk Activity | Lets the theme show an indicator while the disk is being read or written. While music plays the disk is read often enough to keep it on, and every frame it animates repaints the status bar, which slows the screen underneath. | off |  |
 | Show Background Tasks | Lets the theme show an indicator while the database, the artwork cache or the document index is being built in the background. | on |  |
 | Show Working | Lets the theme show an indicator while the screen is busy loading something it was asked for. | on |  |
+
+### Appearance — Now Playing Screen
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
+| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
+
+Also reached as **Appearance** under Playback — Now Playing Screen.
+
+### Appearance — Carousel
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Show Album Title | Whether the album name is drawn over the covers, and where. | both bottom |  |
+| Show Year in Album Title | Shows the release year in the caption, before or after the album's name. | no |  |
+| Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
+| Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
+| Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | off |  |
+| View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3d |  |
+| 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
+| 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |
+| 3D Parallel Slides | Draws the side covers face-on rather than angled, which reads as a row of covers rather than a tunnel. | on | **Adv** |
+| 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
+| Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
+| Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
+| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
+| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
+| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
+
+Also reached as **Appearance** under Library — Carousel.
 
 ### Appearance — Dialogs
 
@@ -443,8 +448,23 @@ shadow to colour.
 | Box Border Width | The thickness of that border, in pixels. Zero draws none. | 2 | **Adv** |
 | Box Margin | How far the dialog is inset from the edges of the screen. | 10 | **Adv** |
 | Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
+| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
 | Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
 | Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
+| Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
+| Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
+| Button Text | The text colour of an unselected dialog button. | e7f3ef |  |
+| Button Background | The fill colour of an unselected dialog button. | 000c21 |  |
+| Button Border | The border colour of an unselected dialog button. | e7f3ef |  |
+| Selected Button Text | The text colour of the selected dialog button. | 000c21 |  |
+| Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
+| Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
+
+The nine palette rows -- everything from Box Text down -- are listed only
+while Dialog Colour Mode is On, whatever Settings Mode says, and Box
+Shadow Colour only while there is a shadow to colour.
 
 ### Appearance — Scrolling
 
@@ -536,7 +556,6 @@ shadow to colour.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
-| Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
 | Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
 | Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Direct mode never reads it, which is why the row is listed only in Perceptual. | 50 | **Adv** |
 | Start Screen | Which screen opens at power-on. | root |  |
@@ -566,16 +585,19 @@ shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
 | Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
-| iAP2 Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. Needs Accessory Protocol on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
+| iPhone Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. Shown only while Accessory Protocol is on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
+| Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, or with a car's first cover, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
 | Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. | prefer cache |  |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
-| Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
-| Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
 | Remote Track Skip | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
 
 A car is not offered Playlist Engine moods through **Accessory Browsing**.
+
+iPhone Accessories, Accessory Browsing, Car Artwork and Serial Bitrate are
+listed only while Accessory Protocol is On.
 
 ### System — Accessories — TV Out
 

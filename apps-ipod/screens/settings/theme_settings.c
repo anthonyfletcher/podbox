@@ -331,15 +331,19 @@ MENUITEM_SETTING(dialog_btn_border_width,
 MENUITEM_SETTING(dialog_btn_border_radius,
                  &global_settings.dialog_btn_border_radius, NULL);
 
-/* Shape only. Every colour a dialog uses -- the mode, the shadow and the nine
-   -- is under Colours with the rest of the palette, because someone deciding
-   what the player looks like thinks in colours before they think in widgets. */
+/* Shape first, then colour: the shadow's colour sits beside the shadow, and
+   the nine follow the mode that reveals them. */
 MAKE_MENU(dialog_settings, ID2P(LANG_DIALOGS_MENU), NULL, Icon_Display_menu,
             &dialog_box_border_width,
             &dialog_box_margin,
             &dialog_box_shadow,
+            &set_dlg_box_shadow_col,
             &dialog_btn_border_width,
-            &dialog_btn_border_radius);
+            &dialog_btn_border_radius,
+            &dialog_colors,                /* Dialog Colour Mode */
+            &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
+            &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
+            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel);
 
 
 
@@ -520,32 +524,33 @@ MENUITEM_SETTING(db_artistart, &global_settings.db_artistart, NULL);
 MENUITEM_SETTING(db_bookart, &global_settings.db_bookart, NULL);
 MENUITEM_SETTING(db_authorart, &global_settings.db_authorart, NULL);
 
+/* One list under two names: Appearance > Interface Elements > Art Rows, and
+ * Appearance inside Library > Music. */
+#define ART_ROWS_ITEMS &db_albumart, &db_artistart, &db_bookart, &db_authorart
+MAKE_MENU(art_rows_menu, ID2P(LANG_ART_ROWS), NULL, Icon_NOICON,
+            ART_ROWS_ITEMS);
+MAKE_MENU(music_appearance_menu, ID2P(LANG_APPEARANCE), NULL, Icon_NOICON,
+            ART_ROWS_ITEMS);
+
+MAKE_MENU(scrollbar_menu, ID2P(LANG_SCROLL_BAR), NULL, Icon_NOICON,
+            &scrollbar_item,
+            &scrollbar_width);
+
 /* Appearance is split by what a setting does, not by which layer implements
  * it: Skins picks the layouts, Colours picks the palette, Elements decides
- * which pieces of chrome are drawn at all. There is no screen holding a
- * mixture of the three, and a new setting belongs under whichever of the
- * three questions it answers -- a theme sets all of them at once anyway, so
- * grouping by layer would only read as "the leftovers". */
+ * which pieces of chrome are drawn at all. A new setting belongs under
+ * whichever of the three questions it answers -- a theme sets all of them at
+ * once anyway, so grouping by layer would only read as "the leftovers". The
+ * exceptions are screens with a look of their own (Now Playing Screen,
+ * Carousel, Dialogs), which keep all of it together. */
 MAKE_MENU(skins_menu, ID2P(LANG_SKINS), NULL, Icon_Wps,
             &browse_wps,
             &browse_sbs,
             &clear_main_bd);
 
-MAKE_MENU(carousel_colours_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL,
-            Icon_NOICON,
-            &album_covers_background,
-            &album_covers_custom_color_item);
-
-MAKE_MENU(dialog_colours_menu, ID2P(LANG_DIALOG_ELEMENTS), NULL, Icon_NOICON,
-            &dialog_colors,                /* Dialog Colour Mode */
-            &set_dlg_box_shadow_col,
-            &set_dlg_box_fg, &set_dlg_box_bg, &set_dlg_box_border,
-            &set_dlg_btn_fg, &set_dlg_btn_bg, &set_dlg_btn_border,
-            &set_dlg_btn_fg_sel, &set_dlg_btn_bg_sel, &set_dlg_btn_border_sel);
-
-/* Every colour the interface uses, in one screen, most often changed first:
- * the dynamic colours, then the theme's palette, then the carousel and the
- * dialogs in submenus of their own. */
+/* The colours of the interface itself, most often changed first: the dynamic
+ * colours, then the theme's palette. The carousel's and the dialogs' colours
+ * are on their own screens. */
 MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
             &dynamic_colors,
             &dynamic_colors_background,
@@ -553,8 +558,6 @@ MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
             &set_bg_col,
             &lss_settings,
             &set_sep_col,
-            &carousel_colours_menu,
-            &dialog_colours_menu,
             &reset_colors);
 
 /* The bars are here rather than in a Bars submenu of their own: three of the
@@ -562,16 +565,10 @@ MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
    Most often changed first -- the art, then the icons and bars, then the
    marks drawn between and around the rows. */
 MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
-            &db_albumart,
-            &db_artistart,
-            &db_bookart,
-            &db_authorart,
-            &wps_art_source,          /* general_settings.c, also under
-                                         Playback with the rest of that screen */
+            &art_rows_menu,
             &show_icons,
             &statusbar,
-            &scrollbar_item,
-            &scrollbar_width,
+            &scrollbar_menu,
             &battery_display,
             &volume_type,
             &activity_indicators_menu,
@@ -590,6 +587,8 @@ MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             &skins_menu,
             &colours_menu,
             &elements_menu,
+            &wps_appearance_menu,     /* general_settings.c */
+            &carousel_appearance_menu, /* album_covers_settings.c */
             &dialog_settings,
             &scroll_settings_menu,
             &viewers_menu,

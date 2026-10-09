@@ -110,7 +110,7 @@ Upstream's libiap, on both players. An Onkyo ND-S1 plays both over S/PDIF.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usb.c`, `export/usb.h` | New `usb_set_iap(bool)`; the iAP driver is enabled on `USB_INSERTED` only while it is on | The **Accessory Protocol** setting, which takes effect at the next connection. Off also gives a computer the disk whatever **iAP2 Accessories** says. |
+| `usb.c`, `export/usb.h` | New `usb_set_iap(bool)`; the iAP driver is enabled on `USB_INSERTED` only while it is on | The **Accessory Protocol** setting, which takes effect at the next connection. Off also gives a computer the disk whatever **iPhone Accessories** says. |
 | `usbstack/iap/platform.c`, `platform.h` | Broadcasts `SYS_ACCESSORY_CONNECTED` once the sample rates are accepted, and announces the rate then (`iap_audio_connected()`); answers libiap's four database callbacks from `iap_library.h`, and holds a play back while that library builds the Queue; refuses a shuffle change while the Music Quiz has the playlist (`iap_library_queue_lent()`) | The "Accessory connected" splash, and browsing the library from an accessory. A dock with no library browsing, such as a Zeppelin Mini, sends no button until the rate is announced, and upstream announces it only when playback starts. |
 | `usbstack/iap/libiap/iap.c`, `context.h`, `platform.h`, `spec/lingoes/extended-interface/database.h` | The database commands go to four new platform callbacks; Enter/ExitExtendedInterfaceMode are acked | Upstream answers them with fixed counts, so there is nothing to browse. Onkyo receivers retry the mode commands until acked. |
 | `usbstack/iap/libiap/iap.c`, `fid-token-values.c`, `spec/lingoes/general/identify-device-lingoes.h` | The identify options are compared under a new `AuthMask`, bits 1:0 | Bits 3:2 are the accessory's power requirement. Upstream compares the whole word, so a dock asking for authentication and power is acked and never authenticated. |
@@ -126,7 +126,7 @@ iAP2.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_iap2.c`, `usb_iap2.h` (new) | iAP2's transport and link layer over the iAP configuration's HID interface, on the USB thread | **iAP2 Accessories**. |
+| `usbstack/usb_iap2.c`, `usb_iap2.h` (new) | iAP2's transport and link layer over the iAP configuration's HID interface, on the USB thread | **iPhone Accessories**. |
 | `usbstack/usb_iap2_control.c` (new) | The control session: identification, USB audio, power, the library and its playlists, the queue, now playing, the car's buttons with shuffle and repeat, and cover art | Covers come from the art cache, encoded by `apps-ipod/draw/jpeg_enc.c`. |
 | `usbstack/usb_core.c` | Vendor request 0x53 answered as an iPhone answers it, four zero bytes, marking the host a car; under Auto the disk handover waits a second (`storage_hold()`) | A car moves on to the iAP configuration within that second and is never handed the disk; a computer stays, and is. |
 | `usb.c`, `export/usb.h` | New `usb_set_iap2_mode()`; the disk withheld while iAP2 is answered; new `usb_car_found()` and the `USB_CAR_RECONNECT` event: a car found while the sound card is on makes the player leave the bus and come back without it, until unplugged | The Mazda stops with an authentication error when it finds the sound card beside the disk. |

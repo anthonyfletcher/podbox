@@ -297,9 +297,8 @@ or paint the specific strips that nothing else covers. `%dr` fills with the
 
 Modal dialogs (yes/no prompts, messages) draw with a shared style you can set
 from the `.cfg`. They also appear under **Settings ▸ Appearance ▸
-Dialogs** — the metrics there, the shadow colour and the nine palette colours
-under **Appearance ▸ Colours**. Every one of them is advanced, so Dialogs shows
-up only with Settings Mode on Everything.
+Dialogs**, the metrics and colours together. The five size rows are advanced,
+so they show only with Settings Mode on Everything.
 
 All of them reset when a theme loads, so your `.cfg` is what makes a value
 stick for everyone who loads your theme. A value the *user* sets through those

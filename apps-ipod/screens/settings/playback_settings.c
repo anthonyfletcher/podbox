@@ -155,7 +155,6 @@ MENUITEM_SETTING(rewind_across_tracks, &global_settings.rewind_across_tracks, NU
 MENUITEM_SETTING(resume_rewind, &global_settings.resume_rewind, NULL);
 MENUITEM_SETTING(pause_rewind, &global_settings.pause_rewind, NULL);
 MENUITEM_SETTING(play_frequency, &global_settings.play_frequency, NULL);
-MENUITEM_SETTING(album_art, &global_settings.album_art, NULL);
 
 MENUITEM_SETTING(playback_log, &global_settings.playback_log, NULL);
 
@@ -178,7 +177,6 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
           ,&resume_rewind
           ,&pause_rewind
           ,&play_frequency
-          ,&album_art
         ,&playback_log
           /* All three were under General Settings, which is where anything
              that was not obviously Sound or Theme ended up. They are playback

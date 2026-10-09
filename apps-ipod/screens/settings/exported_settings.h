@@ -22,10 +22,8 @@ extern const struct menu_item_ex
         theme_menu                  /* theme_menu.c     */
         , album_covers_menu         /* album_covers_settings.c */
         , art_cache_menu            /* album_covers_settings.c */
-        , album_covers_background   /* album_covers_settings.c -- these two
-                                       listed under both Carousel and
-                                       Appearance > Colours */
-        , album_covers_custom_color_item
+        , carousel_appearance_menu  /* album_covers_settings.c -- under
+                                       Appearance */
         , text_viewer_menu          /* text_viewer_settings.c */
         , lyric_viewer_menu         /* lyric_viewer_settings.c */
         , spun_menu                 /* spun_settings.c */
@@ -33,9 +31,10 @@ extern const struct menu_item_ex
                                        Playback, defined beside the browser and
                                        hotkey settings it shares a screen
                                        with */
-        , wps_art_source            /* general_settings.c -- listed under both
-                                       Playback > Now Playing Screen and
-                                       Appearance > Elements */
+        , wps_appearance_menu       /* general_settings.c -- under
+                                       Appearance */
+        , music_appearance_menu     /* theme_settings.c -- under
+                                       Library > Music */
         , scroll_settings_menu      /* display_settings.c -- shown under UI
                                        Settings, defined beside the other
                                        LCD scroll settings it configures */

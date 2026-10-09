@@ -323,6 +323,30 @@ static int clear_start_directory(void)
 MENUITEM_FUNCTION(clear_start_directory_item, 0, ID2P(LANG_RESET_START_DIR),
                   clear_start_directory, NULL, Icon_file_view_menu);
 
+static int dircache_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    switch (action)
+    {
+        case ACTION_EXIT_MENUITEM: /* on exit */
+            if (global_settings.dircache)
+            {
+                if (dircache_enable() < 0)
+                    splash(HZ*2, ID2P(LANG_PLEASE_REBOOT));
+            }
+            else
+            {
+                dircache_disable();
+            }
+            break;
+    }
+    return action;
+}
+MENUITEM_SETTING(dircache, &global_settings.dircache, dircache_callback);
+
 static int filemenu_callback(int action,
                              const struct menu_item_ex *this_item,
                              struct gui_synclist *this_list);
@@ -331,6 +355,7 @@ MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
                 &sort_case, &sort_dir, &sort_file, &interpret_numbers,
                 &dirfilter, &show_filename_ext, &browse_current,
                 &show_path_in_browser,
+                &dircache,
                 &clear_start_directory_item
                 ,&hotkey_tree_item
                 );
@@ -380,29 +405,6 @@ MENUITEM_SETTING(usb_mode, &global_settings.usb_mode, NULL);
 /* Disk */
 MENUITEM_SETTING(disk_spindown, &global_settings.disk_spindown, NULL);
 MENUITEM_SETTING(storage_mode, &global_settings.storage_mode, NULL);
-static int dircache_callback(int action,
-                             const struct menu_item_ex *this_item,
-                             struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-    switch (action)
-    {
-        case ACTION_EXIT_MENUITEM: /* on exit */
-            if (global_settings.dircache)
-            {
-                if (dircache_enable() < 0)
-                    splash(HZ*2, ID2P(LANG_PLEASE_REBOOT));
-            }
-            else
-            {
-                dircache_disable();
-            }
-            break;
-    }
-    return action;
-}
-MENUITEM_SETTING(dircache, &global_settings.dircache, dircache_callback);
 
 /* Limits menu */
 MENUITEM_SETTING(max_files_in_dir, &global_settings.max_files_in_dir, NULL);
@@ -449,12 +451,27 @@ MENUITEM_SETTING(car_adapter_mode_delay, &global_settings.car_adapter_mode_delay
 MAKE_MENU(car_adapter_mode_menu, ID2P(LANG_CAR_ADAPTER_MODE), 0, Icon_NOICON,
            &car_adapter_mode, &car_adapter_mode_delay);
 MENUITEM_SETTING(iap_enabled, &global_settings.iap_enabled, NULL);
-MENUITEM_SETTING(iap_browse_size, &global_settings.iap_browse_size, NULL);
-MENUITEM_SETTING(car_artwork, &global_settings.car_artwork, NULL);
+/* Accessory Protocol off silences every accessory transport, iAP2 included,
+ * so the rows that only shape what an accessory is told are hidden while it
+ * is off. */
+static int iap_only_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM && !global_settings.iap_enabled)
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+MENUITEM_SETTING(iap_browse_size, &global_settings.iap_browse_size,
+                 iap_only_callback);
+MENUITEM_SETTING(car_artwork, &global_settings.car_artwork, iap_only_callback);
 #ifdef USB_ENABLE_IAP
-MENUITEM_SETTING(iap2_mode, &global_settings.iap2_mode, NULL);
+MENUITEM_SETTING(iap2_mode, &global_settings.iap2_mode, iap_only_callback);
 #endif
-MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate, NULL);
+MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate,
+                 iap_only_callback);
 MENUITEM_SETTING(accessory_supply, &global_settings.accessory_supply, NULL);
 MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
@@ -618,16 +635,16 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 
 /* The dock connector's other pins, and the headphone jack's remote. */
 MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
+            &lineout_onoff,
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+            &tv_out_menu,
+#endif
             &iap_enabled,
 #ifdef USB_ENABLE_IAP
             &iap2_mode,
 #endif
-            &iap_browse_size, &car_artwork, &serial_bitrate,
             &accessory_supply,
-            &lineout_onoff
-#ifdef HAVE_COMPOSITE_VIDEO_OUT
-            , &tv_out_menu
-#endif
+            &iap_browse_size, &car_artwork, &serial_bitrate
 #ifdef HAVE_MIKEY_REMOTE
             , &remote_track_skip
 #endif
@@ -979,16 +996,21 @@ static void reset_wps_items(void)
 MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET_CONTEXT_ITEMS), reset_wps_items,
                   NULL, Icon_Queued);
 
-/* Which picture the screen shows. A property of this screen rather than of the
- * theme: no skin sets it, and a theme that wanted to could not.
- *
- * Exported because it is the one row here that is also about how the player
- * looks, so Appearance lists it too -- the same item in both places rather
- * than two items over one variable. */
-MENUITEM_SETTING_EXPORTED(wps_art_source, &global_settings.wps_art_source, NULL);
+/* Which picture the screen shows, and where its album cover is looked for
+ * first. Properties of this screen rather than of the theme: no skin sets
+ * either, and a theme that wanted to could not. */
+MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
+MENUITEM_SETTING(album_art, &global_settings.album_art, NULL);
+
+/* One list under two names: Appearance > Now Playing Screen, and Appearance
+ * inside Playback > Now Playing Screen. */
+#define WPS_APPEARANCE_ITEMS &wps_art_source, &album_art
+MAKE_MENU(wps_appearance_menu, ID2P(LANG_WPS), 0, Icon_NOICON,
+            WPS_APPEARANCE_ITEMS);
+MAKE_MENU(wps_appearance_link, ID2P(LANG_APPEARANCE), 0, Icon_NOICON,
+            WPS_APPEARANCE_ITEMS);
 
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
-            ,&wps_art_source
             ,&browser_default
             ,&wps_select_action
             ,&hotkey_wps_item /* this is item 0 */
@@ -996,6 +1018,7 @@ MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&wps_set_context_item_2
             ,&wps_set_context_item_3
             ,&wps_set_context_item_4
+            ,&wps_appearance_link
             ,&reset_wps_item
             );
 
@@ -1125,9 +1148,10 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles,
           &album_show_year,
-          &music_menu_config_item,
           &featured_artists, &segregate_audiobooks, &trim_titles,
-          &search_menu, &quiz_menu
+          &music_menu_config_item,
+          &search_menu, &quiz_menu,
+          &music_appearance_menu    /* theme_settings.c */
           );
 
 /** The branches built here **/
@@ -1176,12 +1200,11 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
             &shortcuts_replaces_quickscreen,
             &keyclick_menu,
             &limits_menu,
-            &dircache,
             &volume_adjust_mode,
             &volume_adjust_norm_steps,
+            &timedate_item,
             &startup_shutdown_menu,
             &language_menu,
-            &timedate_item,
             &manage_settings,
             &show_debug_menu,
          );

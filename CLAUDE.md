@@ -160,7 +160,7 @@ is the one-page state of it, and names the specification for each:
   of every protocol fact in `carplay-provenance.md`.
 
 All three iAP transports sit behind **Accessory Protocol**, on by default;
-iAP2 also behind its own **iAP2 Accessories** (Off/Auto/On, Auto by
+iAP2 also behind its own **iPhone Accessories** (Off/Auto/On, Auto by
 default). **Debug > USB log** and **Debug > Serial iAP** are the diagnostics;
 keep them.
 

@@ -137,8 +137,7 @@ static int custom_colour_callback(int action,
     return action;
 }
 
-/* Both are listed under Appearance > Colours as well. */
-MENUITEM_SETTING_EXPORTED(album_covers_background,
+MENUITEM_SETTING(album_covers_background,
                  &global_settings.album_covers_background, background_callback);
 MENUITEM_FUNCTION(album_covers_custom_color_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_CAROUSEL_CUSTOM_COLOR), pick_custom_colour,
@@ -197,26 +196,34 @@ MAKE_MENU(album_covers_filter_menu, ID2P(LANG_ARTWORK_FILTER), NULL, Icon_NOICON
             &album_covers_filter_2,
             &album_covers_filter_3);
 
+/* How the carousel looks: one list under two names, Appearance > Carousel and
+ * Appearance inside Library > Carousel. */
+#define CAROUSEL_APPEARANCE_ITEMS                                         \
+            &album_covers_show_album_name,                              \
+            &album_covers_show_year,                                    \
+            &album_covers_background,                                   \
+            &album_covers_custom_color_item,                            \
+            &album_covers_statusbar,                                    \
+            &album_covers_view_mode,                                    \
+            /* Whichever mode is selected, its own settings follow it. */ \
+            &album_covers_center_margin,                                \
+            &album_covers_slide_tuck,                                   \
+            &album_covers_parallel_slides,                              \
+            &album_covers_transition_speed,                             \
+            &album_covers_pile_fade,                                    \
+            &album_covers_pile_offset,                                  \
+            &album_covers_filter_menu
+MAKE_MENU(carousel_appearance_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL,
+            Icon_NOICON, CAROUSEL_APPEARANCE_ITEMS);
+MAKE_MENU(carousel_appearance_link, ID2P(LANG_APPEARANCE), NULL, Icon_NOICON,
+            CAROUSEL_APPEARANCE_ITEMS);
+
 MAKE_MENU(album_covers_menu, ID2P(LANG_CAROUSEL_SETTINGS), NULL, Icon_NOICON,
             &album_covers_on_select,
-            &album_covers_show_album_name,
-            &album_covers_show_year,
-            &album_covers_background,
-            &album_covers_custom_color_item,
-            &album_covers_statusbar,
             &album_covers_sort_same_as_music,
             &album_covers_sort_albums_by,
             &album_covers_sort_artists_by,
             &album_covers_sort_ignore_articles,
-            &album_covers_view_mode,
-            /* Whichever mode is selected, its own settings follow it. */
-            &album_covers_center_margin,
-            &album_covers_slide_tuck,
-            &album_covers_parallel_slides,
-            &album_covers_transition_speed,
-            &album_covers_pile_fade,
-            &album_covers_pile_offset,
-            &album_covers_filter_menu,
-            /* Shared, so last. */
             &album_covers_scroll_speed,
-            &album_covers_random_spin);
+            &album_covers_random_spin,
+            &carousel_appearance_link);
