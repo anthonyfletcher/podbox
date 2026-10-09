@@ -28,6 +28,8 @@
 #include "database/path_key.h"
 #include "database/sound_index.h"
 #include "screens/system/probe_debug.h"
+#include "draw/screen_access.h"
+#include "draw/viewport.h"
 #include "widgets/list.h"
 #include "widgets/splash.h"
 #include "input/action.h"
@@ -48,12 +50,14 @@
 
 static unsigned long pd_last_draw;
 static unsigned long pd_analysed;
-static bool pd_usb;         /* pd_abort() took SYS_USB_CONNECTED */
+static int pd_event;        /* System event pd_abort() took, or 0 */
 
 /* Called from inside the codec, often. Doubles as the progress display,
  * since nothing else is running to draw one. */
 static bool pd_abort(void)
 {
+    int button;
+
     if (TIME_AFTER(current_tick, pd_last_draw + HZ / 2))
     {
         char line[32];
@@ -64,14 +68,16 @@ static bool pd_abort(void)
         splash(0, line);
     }
 
-    /* On the decode thread: a USB connect is noted and left to the screen,
-     * since the USB screen would run on the codec's stack. */
-    switch (get_action(CONTEXT_STD, TIMEOUT_NOBLOCK))
+    /* On the decode thread: a USB connect, power-off or reboot is noted and
+     * left to the screen, since its handler would run on the codec's stack. */
+    switch (button = get_action(CONTEXT_STD, TIMEOUT_NOBLOCK))
     {
         case ACTION_STD_CANCEL:
             return true;
         case SYS_USB_CONNECTED:
-            pd_usb = true;
+        case SYS_POWEROFF:
+        case SYS_REBOOT:
+            pd_event = button;
             return true;
         default:
             return false;
@@ -122,7 +128,9 @@ bool probe_debug_screen(void)
     if (length_ms < start_ms + 5000)
         start_ms = 0;
 
-    handle = core_alloc(PD_WINDOW_BYTES);
+    /* Immovable: track_decode.c holds the window's address for the whole
+     * decode. */
+    handle = core_alloc_ex(PD_WINDOW_BYTES, &buflib_ops_locked);
     if (handle <= 0)
     {
         splash(HZ * 2, "No memory");
@@ -131,22 +139,28 @@ bool probe_debug_screen(void)
 
     pd_last_draw = current_tick;
     pd_analysed = 0;
-    pd_usb = false;
+    pd_event = 0;
     beat_probe_start();
 
+    /* Off for the decode: the theme's status bar would otherwise be drawn
+     * from pd_abort(), on the codec's stack. */
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_enable(i, false, NULL);
     tick = current_tick;
     rc = track_decode_run(path, start_ms, PD_WINDOW_MS,
                           core_get_data(handle), PD_WINDOW_BYTES,
                           pd_sink, beat_probe_settled, pd_abort,
                           &analysed);
     tick = current_tick - tick;
+    FOR_NB_SCREENS(i)
+        viewportmanager_theme_undo(i, true);
 
     beat_probe_result(&s);
     core_free(handle);
 
-    if (pd_usb)
+    if (pd_event)
     {
-        default_event_handler(SYS_USB_CONNECTED);
+        default_event_handler(pd_event);
         return true;
     }
 

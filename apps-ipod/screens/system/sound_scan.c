@@ -106,7 +106,7 @@ static char          ss_now[64];
 
 static bool          ss_stop;      /* The user asked */
 static bool          ss_unplugged;
-static bool          ss_usb;       /* ss_abort() took SYS_USB_CONNECTED */
+static int           ss_event;     /* System event ss_abort() took, or 0 */
 
 
 /** Progress **/
@@ -301,11 +301,13 @@ static bool ss_abort(void)
         return true;
     }
 
-    /* Acknowledged once the walk has closed the index; until then every
-     * thread waits on the connection. */
-    if (button == SYS_USB_CONNECTED)
+    /* Handled once the walk has closed the index; until then every thread
+     * waits on a USB connection, and a shutdown would leave the index open. */
+    if (button == SYS_USB_CONNECTED || button == SYS_POWEROFF ||
+        button == SYS_REBOOT)
     {
-        ss_stop = ss_usb = true;
+        ss_event = button;
+        ss_stop = true;
         return true;
     }
 
@@ -599,7 +601,8 @@ static void ss_run(bool fresh)
     ss_done = ss_skipped = ss_failed = 0;
     ss_work = 0;
     ss_audio_ms = 0;
-    ss_stop = ss_unplugged = ss_usb = false;
+    ss_stop = ss_unplugged = false;
+    ss_event = 0;
     strlcpy(ss_now, "", sizeof (ss_now));
 
     /* Immovable. The window's address is handed to track_decode.c, which
@@ -730,8 +733,8 @@ static void ss_run(bool fresh)
     if (ss_stop)
     {
         sound_index_close();
-        if (ss_usb)
-            default_event_handler(SYS_USB_CONNECTED);
+        if (ss_event)
+            default_event_handler(ss_event);
         else
             splashf(HZ * 4, "Stopped. %d of %d done",
                     ss_done + ss_skipped, ss_total);
