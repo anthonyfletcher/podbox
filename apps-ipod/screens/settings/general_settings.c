@@ -29,6 +29,10 @@
 #ifdef IPOD_ACCESSORY_PROTOCOL
 #include "iap.h"                 /* iap_accessory_present */
 #endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+#include "videoout.h"
+#include "lcd.h"                 /* FBADDR */
+#endif
 #include "widgets/splash.h"
 #include "widgets/yesno.h"
 #include "speech/talk.h"
@@ -453,6 +457,43 @@ MENUITEM_SETTING(iap2_mode, &global_settings.iap2_mode, NULL);
 MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate, NULL);
 MENUITEM_SETTING(accessory_supply, &global_settings.accessory_supply, NULL);
 MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+/* Turn On starts the picture with the format set below it, and nothing
+ * saves it: a restart always comes back with the TV off. */
+static int tv_out_toggle(void)
+{
+    if (!videoout_active())
+        settings_apply_tv_out();
+    videoout_set_mode(videoout_active() ? VIDEOOUT_OFF : VIDEOOUT_ON,
+                      FBADDR(0, 0), LCD_WIDTH, LCD_HEIGHT);
+    return 0;
+}
+
+static char *tv_out_toggle_name(int selected_item, void *data,
+                                char *buffer, size_t buffer_len)
+{
+    (void)selected_item;
+    (void)data;
+    (void)buffer;
+    (void)buffer_len;
+    return (char *)str(videoout_active() ? LANG_TV_OUT_TURN_OFF
+                                         : LANG_TV_OUT_TURN_ON);
+}
+
+MENUITEM_FUNCTION_DYNTEXT(tv_out_toggle_item, 0, tv_out_toggle,
+                          tv_out_toggle_name, NULL, NULL, NULL,
+                          Icon_NOICON);
+MENUITEM_SETTING(tv_out_size, &global_settings.tv_out_size, NULL);
+#ifdef HAVE_VIDEOOUT_STANDARD
+MENUITEM_SETTING(tv_standard, &global_settings.tv_standard, NULL);
+#endif
+MAKE_MENU(tv_out_menu, ID2P(LANG_TV_OUT), 0, Icon_NOICON,
+          &tv_out_toggle_item, &tv_out_size
+#ifdef HAVE_VIDEOOUT_STANDARD
+          , &tv_standard
+#endif
+         );
+#endif
 #ifdef HAVE_MIKEY_REMOTE
 /* Hidden where the board has no Mikey to read a remote with -- the same
  * units whose poller never starts. */
@@ -584,6 +625,9 @@ MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
             &iap_browse_size, &car_artwork, &serial_bitrate,
             &accessory_supply,
             &lineout_onoff
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+            , &tv_out_menu
+#endif
 #ifdef HAVE_MIKEY_REMOTE
             , &remote_track_skip
 #endif

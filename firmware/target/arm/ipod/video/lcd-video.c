@@ -35,6 +35,11 @@
 /* Included only for lcd_awake() prototype */
 #include "backlight-target.h"
 #endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+#include <string.h>
+#include "core_alloc.h"
+#include "videoout.h"
+#endif
 
 /* The BCM bus width is 16 bits. But since the low address bits aren't decoded
  * by the chip (the 3 BCM address bits are mapped to address bits 16..18 of the
@@ -109,6 +114,16 @@ struct
     struct semaphore initwakeup;
 #endif
 } lcd_state IBSS_ATTR;
+
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+/* True while the TV is kept current: LCD updates then go to the TV. */
+static bool tv_on;
+/* True once the BCM has been put in TV mode, until the next boot. Taking it
+ * out again hangs the player, whether by the LCD sleep path or by cutting
+ * its power and booting it, so the LCD does not sleep after. */
+static bool tv_bcm_mode;
+static void tv_mark_dirty(int y, int height);
+#endif
 
 #ifdef HAVE_LCD_SLEEP
 const fb_data *flash_vmcs_offset;
@@ -246,6 +261,23 @@ static inline void lcd_block_tick(void)
 #endif
     restore_irq(oldlevel);
 }
+
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+/* Lets the tick run again without starting an LCD update. */
+static inline void lcd_unblock_tick(void)
+{
+    int oldlevel = disable_irq_save();
+
+#if NUM_CORES > 1
+    corelock_lock(&lcd_state.cl);
+    lcd_state.blocked = false;
+    corelock_unlock(&lcd_state.cl);
+#else
+    lcd_state.blocked = false;
+#endif
+    restore_irq(oldlevel);
+}
+#endif
 
 static void lcd_unblock_and_update(void)
 {
@@ -401,6 +433,14 @@ void lcd_update_rect(int x, int y, int width, int height)
     if ((width <= 0) || (height <= 0))
         return; /* Nothing left to do. */
 
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    if (tv_on)
+    {
+        tv_mark_dirty(y, height);
+        return;
+    }
+#endif
+
     /* Ensure x and width are both even. The BCM doesn't like small unaligned
      * writes and would just ignore them. */
     width = (width + (x & 1) + 1) & ~1;
@@ -505,6 +545,357 @@ static void bcm_command(unsigned cmd)
         yield();
     }
 }
+
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+/*** TV output ***
+ * One bitmap command puts the BCM's TV encoder in PAL or NTSC mode. From
+ * then on whatever is in its TV framebuffer is on the TV, so the picture is
+ * kept current by writing that memory; another command would drop the
+ * signal. The framebuffer is 24-bit BGR at TV levels (16-235), one line of
+ * 704 pixels every 2112 bytes, whatever the bitmap's width. An LCD update
+ * command disturbs the TV, so the LCD is blanked while the TV runs.
+ *
+ * Parts: format and state; RGB565 conversion; the writer thread; start and
+ * stop; the videoout interface.
+ */
+#define TV_LINE           (704 * 3)
+#define TV_BMP_WIDTH      720
+/* The BCM holds back about the last 16 KB written until more arrives. */
+#define TV_FLUSH_WORDS    4096
+
+static bool tv_double, tv_pal;          /* the format the next start uses */
+static unsigned tv_scale;               /* 1 or 2, while tv_on */
+static unsigned tv_first_line, tv_left; /* picture origin: line, bytes */
+static unsigned tv_height;              /* lines in the running TV frame */
+/* A copy of the LCD framebuffer, taken from core memory while the TV runs:
+ * taking it rebuffers playback once. NULL sends from the LCD's own. */
+static fb_data *tv_snapshot;
+static int tv_snapshot_handle;
+/* Rows changed since the writer last ran, [top, bottom). */
+static int tv_dirty_top = LCD_HEIGHT, tv_dirty_bottom;
+static struct semaphore tv_wake;
+/* Held while the TV framebuffer is written or the TV mode is changed. */
+static struct mutex tv_lock;
+static long tv_stack[DEFAULT_STACK_SIZE / sizeof(long)];
+static bool tv_thread_running;
+
+/* RGB565 channels to 8 bits at TV levels. */
+static unsigned char tv_lvl5[32] IBSS_ATTR, tv_lvl6[64] IBSS_ATTR;
+
+/* One LCD row, 4 pixels to 3 words. */
+static void ICODE_ATTR __attribute__((noinline))
+tv_write_row_1x(const fb_data *p)
+{
+    const unsigned long *in = (const unsigned long *)p;
+    const unsigned char *l5 = tv_lvl5, *l6 = tv_lvl6;
+
+    for (int n = LCD_WIDTH / 4; n > 0; n--)
+    {
+        unsigned long a = *in++, b = *in++;
+        BCM_DATA32 = l5[a & 31] | l6[(a >> 5) & 63] << 8 |
+                     l5[(a >> 11) & 31] << 16 | l5[(a >> 16) & 31] << 24;
+        BCM_DATA32 = l6[(a >> 21) & 63] | l5[a >> 27] << 8 |
+                     l5[b & 31] << 16 | l6[(b >> 5) & 63] << 24;
+        BCM_DATA32 = l5[(b >> 11) & 31] | l5[(b >> 16) & 31] << 8 |
+                     l6[(b >> 21) & 63] << 16 | l5[b >> 27] << 24;
+    }
+}
+
+/* One LCD row with every pixel doubled, 2 pixels to 3 words. */
+static void ICODE_ATTR __attribute__((noinline))
+tv_write_row_2x(const fb_data *p)
+{
+    const unsigned long *in = (const unsigned long *)p;
+    const unsigned char *l5 = tv_lvl5, *l6 = tv_lvl6;
+
+    for (int n = LCD_WIDTH / 2; n > 0; n--)
+    {
+        unsigned long a = *in++;
+        unsigned b0 = l5[a & 31], g0 = l6[(a >> 5) & 63],
+                 r0 = l5[(a >> 11) & 31];
+        unsigned b1 = l5[(a >> 16) & 31], g1 = l6[(a >> 21) & 63],
+                 r1 = l5[a >> 27];
+        BCM_DATA32 = b0 | g0 << 8 | r0 << 16 | b0 << 24;
+        BCM_DATA32 = g0 | r0 << 8 | b1 << 16 | g1 << 24;
+        BCM_DATA32 = r1 | b1 << 8 | g1 << 16 | r1 << 24;
+    }
+}
+
+/* Copies LCD rows to the TV, from the snapshot when there is one. At 2x it
+ * lets other threads run every 16 TV lines, since threads switch only when
+ * one yields and a full frame takes over 100 ms. A 1x pass runs straight
+ * through, to finish inside the two fields that keep it from tearing. */
+static void tv_write_rows(int y, int height)
+{
+    unsigned line = tv_first_line + y * tv_scale;
+
+    for (int row = y; row < y + height; row++)
+    {
+        const fb_data *p = tv_snapshot ? tv_snapshot + row * LCD_WIDTH
+                                       : FBADDR(0, row);
+        for (unsigned k = 0; k < tv_scale; k++, line++)
+        {
+            bcm_write_addr(BCMA_TV_FB + line * TV_LINE + tv_left);
+            if (tv_scale == 2)
+                tv_write_row_2x(p);
+            else
+                tv_write_row_1x(p);
+        }
+        if (tv_scale == 2 && (line & 15) < tv_scale)
+            yield();
+    }
+
+    bcm_write_addr(BCMA_TV_FB +
+                   (tv_first_line + LCD_HEIGHT * tv_scale) * TV_LINE);
+    for (int n = 0; n < TV_FLUSH_WORDS; n++)
+        BCM_DATA32 = 0;
+}
+
+static void tv_mark_dirty(int y, int height)
+{
+    int oldlevel = disable_irq_save();
+    if (y < tv_dirty_top)
+        tv_dirty_top = y;
+    if (y + height > tv_dirty_bottom)
+        tv_dirty_bottom = y + height;
+    restore_irq(oldlevel);
+    semaphore_release(&tv_wake);
+}
+
+/* The BCM's TV scan line is in bits 16-25 of this register. It counts up
+ * through each field and starts again at 0 with the next. */
+#define BCMA_TV_SCANLINE  0x100008ac
+
+/* Returns at the start of a field, or after a field's time if the scan line
+ * never wraps. A pass started here and finished within two fields does not
+ * tear: the field being drawn stays ahead of the writing and shows only the
+ * old picture, and the next field starts behind it and shows only the new.
+ * Other threads run while it waits. */
+static void tv_wait_field_start(void)
+{
+    unsigned prev = (bcm_read32(BCMA_TV_SCANLINE) >> 16) & 0x3ff;
+    long end = current_tick + HZ/20 + 1;
+
+    while (TIME_BEFORE(current_tick, end))
+    {
+        unsigned line = (bcm_read32(BCMA_TV_SCANLINE) >> 16) & 0x3ff;
+        if (line < prev)
+            return;
+        prev = line;
+        yield();
+    }
+}
+
+/* Copies changed rows to the TV, boosted. A pass waits a tick for the UI to
+ * finish a burst of updates, and after it the thread rests at least as long
+ * as the pass took, and to a 30th of a second: a screen that is still being
+ * built, like the WPS, updates over and over, and back-to-back passes
+ * starve it. Changes that arrive meanwhile are merged into the next pass.
+ *
+ * Each pass first copies the changed rows into the snapshot without
+ * yielding, so it sends one whole UI frame. Sent straight from the LCD
+ * framebuffer, a pass that yields while the carousel animates puts bands of
+ * several frames on the TV at once. */
+static void tv_thread(void)
+{
+    while (1)
+    {
+        semaphore_wait(&tv_wake, TIMEOUT_BLOCK);
+        sleep(1);
+
+        long start = current_tick;
+        mutex_lock(&tv_lock);
+        if (tv_on && tv_scale == 1)
+            tv_wait_field_start();
+
+        int oldlevel = disable_irq_save();
+        int top = tv_dirty_top, bottom = tv_dirty_bottom;
+        tv_dirty_top = LCD_HEIGHT;
+        tv_dirty_bottom = 0;
+        restore_irq(oldlevel);
+
+        if (tv_on && top < bottom)
+        {
+            if (tv_snapshot)
+                for (int row = top; row < bottom; row++)
+                    memcpy(tv_snapshot + row * LCD_WIDTH, FBADDR(0, row),
+                           LCD_WIDTH * sizeof(fb_data));
+            cpu_boost(true);
+            lcd_block_tick();
+            tv_write_rows(top, bottom - top);
+            lcd_unblock_tick();
+            cpu_boost(false);
+        }
+        mutex_unlock(&tv_lock);
+
+        long took = current_tick - start;
+        long wait = MAX(took, start + HZ/30 - current_tick);
+        if (wait > 0)
+            sleep(wait);
+    }
+}
+
+/* A black 24-bit bitmap of the TV's size at BCMA_TV_BMPDATA: the bitmap
+ * command reads its size and standard from here. */
+static void tv_write_black_bmp(int height)
+{
+    unsigned size = TV_BMP_WIDTH * height * 3;
+    const unsigned hdr[14] =
+    {
+        /* "BM", file size, reserved, data offset 54, header size 40, width,
+         * height (positive: bottom-up; top-down crashes the BCM), 1 plane,
+         * 24 bpp, uncompressed, data size, 2835 px/m twice, no palette.
+         * Packed little-endian into words, with 2 bytes of the data. */
+        0x4d42 | (54 + size) << 16, (54 + size) >> 16, 54 << 16,
+        40 << 16, TV_BMP_WIDTH << 16, height << 16, 1 << 16,
+        24, size << 16, size >> 16 | 2835 << 16, 2835 << 16, 0, 0, 0
+    };
+
+    bcm_write_addr(BCMA_TV_BMPDATA);
+    for (unsigned i = 0; i < ARRAYLEN(hdr); i++)
+        BCM_DATA32 = hdr[i];
+    for (unsigned i = 56; i < 54 + size; i += 4)
+        BCM_DATA32 = 0;
+}
+
+/* Black over the whole TV frame. The bitmap command leaves stray lines
+ * outside the picture, and only a 2x picture covers them. Rewriting the
+ * frame's first 16 KB, already black, pushes its last lines out of the BCM's
+ * cache. */
+static void tv_wipe(unsigned height)
+{
+    bcm_write_addr(BCMA_TV_FB);
+    for (unsigned i = 0; i < height * TV_LINE / 4; i++)
+        BCM_DATA32 = 0x10101010;
+    bcm_write_addr(BCMA_TV_FB);
+    for (int n = 0; n < TV_FLUSH_WORDS; n++)
+        BCM_DATA32 = 0x10101010;
+}
+
+static void tv_start(void)
+{
+    unsigned height = tv_pal ? 576 : 480;
+
+    if (!tv_thread_running)
+    {
+        for (int i = 0; i < 32; i++)
+            tv_lvl5[i] = 16 + (i * 219 + 15) / 31;
+        for (int i = 0; i < 64; i++)
+            tv_lvl6[i] = 16 + (i * 219 + 31) / 63;
+        semaphore_init(&tv_wake, 1, 0);
+        mutex_init(&tv_lock);
+        create_thread(tv_thread, tv_stack, sizeof(tv_stack), 0, "tv out"
+                      IF_PRIO(, PRIORITY_BACKGROUND) IF_COP(, CPU));
+        tv_thread_running = true;
+    }
+
+    if (tv_snapshot == NULL)
+    {
+        int handle = core_alloc(LCD_WIDTH * LCD_HEIGHT * sizeof(fb_data));
+        if (handle > 0)
+        {
+            core_pin(handle);
+            tv_snapshot_handle = handle;
+            tv_snapshot = core_get_data_pinned(handle);
+        }
+    }
+
+    /* A sleeping BCM is powered down and would never answer a command. */
+    if (!lcd_state.display_on)
+        lcd_awake();
+
+    mutex_lock(&tv_lock);
+    lcd_block_tick();
+    while (lcd_state.state == LCD_UPDATING &&
+           !TIME_AFTER(current_tick, lcd_state.update_timeout))
+    {
+        unsigned d = bcm_read32(BCMA_COMMAND);
+        if (d != BCMCMD_LCD_UPDATE && d != 0xFFFF)
+            break;
+        yield();
+    }
+    lcd_state.state = LCD_IDLE;
+
+    /* The LCD keeps its last picture, so give it a black one first: once
+     * the TV runs, an LCD update would disturb it. BCMCMD_LCD_SLEEP is no
+     * substitute: it turns the panel white. */
+    bcm_write_addr(BCMA_CMDPARAM);
+    for (int i = 0; i < LCD_WIDTH * LCD_HEIGHT / 2; i++)
+        BCM_DATA32 = 0;
+    bcm_command(BCMCMD_LCD_UPDATE);
+
+    tv_write_black_bmp(height);
+    bcm_command(tv_pal ? BCMCMD_TV_PALBMP : BCMCMD_TV_NTSCBMP);
+    tv_wipe(height);
+    tv_height = height;
+
+    tv_bcm_mode = true;
+    tv_scale = tv_double ? 2 : 1;
+    tv_first_line = (height - LCD_HEIGHT * tv_scale) / 2;
+    tv_left = (704 - LCD_WIDTH * tv_scale) / 2 * 3;
+    tv_on = true;
+    lcd_unblock_tick();
+    mutex_unlock(&tv_lock);
+
+    tv_mark_dirty(0, LCD_HEIGHT);
+}
+
+/* No command ends TV output, so the TV is blacked out and the LCD is
+ * updated again: it takes updates in TV mode, at the cost of disturbing a
+ * picture that is now black. */
+static void tv_stop(void)
+{
+    mutex_lock(&tv_lock);
+    lcd_block_tick();
+    tv_wipe(tv_height);
+    tv_on = false;
+    if (tv_snapshot)
+    {
+        tv_snapshot = NULL;
+        core_free(tv_snapshot_handle);
+    }
+    lcd_unblock_tick();
+    mutex_unlock(&tv_lock);
+
+    lcd_update();
+}
+
+void videoout_set_mode(enum videoout_mode mode, const void *framebuffer,
+                       int width, int height)
+{
+    (void)framebuffer;
+    (void)width;
+    (void)height;
+
+    if (mode != VIDEOOUT_OFF && !tv_on)
+        tv_start();
+    else if (mode == VIDEOOUT_OFF && tv_on)
+        tv_stop();
+}
+
+void videoout_set_format(bool double_size, bool pal)
+{
+    bool changed = double_size != tv_double || pal != tv_pal;
+
+    tv_double = double_size;
+    tv_pal = pal;
+    /* A bitmap command switches a running TV to the new standard. */
+    if (changed && tv_on)
+        tv_start();
+}
+
+bool videoout_active(void)
+{
+    return tv_on;
+}
+
+bool videoout_disable(void)
+{
+    if (tv_on)
+        tv_stop();
+    return true;
+}
+#endif /* HAVE_COMPOSITE_VIDEO_OUT */
 
 static void bcm_powerdown(void)
 {
@@ -627,6 +1018,10 @@ void lcd_awake(void)
 
 void lcd_sleep(void)
 {
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    if (tv_bcm_mode)
+        return;
+#endif
     if (lcd_state.display_on && flash_vmcs_length != 0)
     {
         lcd_state.display_on = false;

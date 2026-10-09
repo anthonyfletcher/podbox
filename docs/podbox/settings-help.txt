@@ -1302,6 +1302,15 @@ constant drain if nothing is attached.
 Enables the dock's line output, which bypasses the volume control and feeds an
 amplifier at a fixed level.
 
+[tv out size]
+How large the screen is on the TV. 1x shows it pixel for pixel, sharp but
+small in the middle. 2x fills most of the TV; on an iPod Video it is slower to
+follow the screen, and on an iPod Classic it is softer.
+
+[tv standard]
+The video standard the TV expects. Most TVs take either; use the one that
+looks steadier. iPod Video only: an iPod Classic always sends NTSC.
+
 [remote track skip]
 Two clicks on the earphone remote's centre button skip to the next track, and
 three go back to the previous one. The cost is that a single click waits about

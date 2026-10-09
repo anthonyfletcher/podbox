@@ -70,6 +70,31 @@ bool mikey_supported(void)
 }
 #endif
 
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+#include "videoout.h"
+/* No dock connector, so no TV: settings_apply(), the TV Out settings and
+ * Turn On call these, and the picture never starts. */
+void videoout_set_mode(enum videoout_mode mode, const void *framebuffer,
+                       int width, int height)
+{
+    (void)mode;
+    (void)framebuffer;
+    (void)width;
+    (void)height;
+}
+
+void videoout_set_format(bool double_size, bool pal)
+{
+    (void)double_size;
+    (void)pal;
+}
+
+bool videoout_active(void)
+{
+    return false;
+}
+#endif
+
 /* The keyclick beep. misc.c calls this when keyclick_hardware is set; the
  * sim's own SOUND_KEYCLICK path covers the audible half. */
 void piezo_button_beep(bool beep, bool force)

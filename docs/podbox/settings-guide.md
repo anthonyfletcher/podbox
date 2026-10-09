@@ -575,6 +575,17 @@ shadow to colour.
 
 A car is not offered Playlist Engine moods through **Accessory Browsing**.
 
+### System — Accessories — TV Out
+
+**Turn On** shows the screen on a TV through a dock's video output, and
+**Turn Off** stops it. On an iPod Video the player's own screen goes black
+while it is on; an iPod Classic keeps both. Turning it on takes some memory,
+which briefly rebuffers playback. It is always off after a restart.
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Size | How large the screen is on the TV. 1x shows it pixel for pixel, sharp but small in the middle. 2x fills most of the TV; on an iPod Video it is slower to follow the screen, and on an iPod Classic it is softer. | 1x |  |
+| Standard | The video standard the TV expects. Most TVs take either; use the one that looks steadier. iPod Video only: an iPod Classic always sends NTSC. | NTSC | **Adv** |
 
 ### System — Keyclick
 

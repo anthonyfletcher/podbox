@@ -1006,6 +1006,19 @@ const struct settings_list settings[] = {
                   true, "accessory power supply", accessory_supply_set),
     OFFON_SETTING(0, lineout_active, LANG_LINEOUT,
                   true, "lineout", lineout_set),
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    /* Each change restarts the TV picture, so only a selected value does. */
+    CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, tv_out_size,
+                   LANG_TV_OUT_SIZE, 0, "tv out size",
+                   "1x,2x", tv_out_size_set, 2,
+                   ID2P(LANG_TV_OUT_SIZE_1X), ID2P(LANG_TV_OUT_SIZE_2X)),
+#ifdef HAVE_VIDEOOUT_STANDARD
+    CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, tv_standard,
+                   LANG_TV_STANDARD, 1, "tv standard",
+                   "pal,ntsc", tv_standard_set, 2,
+                   ID2P(LANG_TV_STANDARD_PAL), ID2P(LANG_TV_STANDARD_NTSC)),
+#endif
+#endif
 #ifdef HAVE_MIKEY_REMOTE
     OFFON_SETTING(0, remote_track_skip, LANG_REMOTE_TRACK_SKIP,
                   true, "remote track skip", mikey_set_track_skip),

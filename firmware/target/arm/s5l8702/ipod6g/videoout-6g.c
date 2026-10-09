@@ -25,6 +25,7 @@
 #include "adc-target.h"
 #include "pmu-target.h"
 #include "videoout.h"
+#include "core_alloc.h"
 #include <string.h>
 
 #include <stdint.h>
@@ -36,12 +37,18 @@
 /* The S5L8702 mixer predates the public S5P register layout.  RetailOS
  * 35.2.0.4 writes layer-0 base, position, and dimensions at 0x10, 0x14, and
  * 0x18.  Offset 0x14 is not a source stride. */
-/* Qualified on the DCP750: a centered 90% NTSC viewport keeps every
- * Rockbox UI pixel inside the panel's composite overscan area. */
-#define SVID_UI_DESTINATION_X      36u
-#define SVID_UI_DESTINATION_Y      24u
-#define SVID_UI_DESTINATION_WIDTH  648u
-#define SVID_UI_DESTINATION_HEIGHT 432u
+/* Where the VP puts the picture, set by videoout_set_format(): the LCD
+ * pixel for pixel, centred, or scaled to a centred 90% NTSC viewport, which
+ * keeps every UI pixel inside the panel's composite overscan area (qualified
+ * on the DCP750). Read when the output starts. */
+static unsigned svid_ui_destination_x = (720u - LCD_WIDTH) / 2;
+static unsigned svid_ui_destination_y = (480u - LCD_HEIGHT) / 2;
+static unsigned svid_ui_destination_width = LCD_WIDTH;
+static unsigned svid_ui_destination_height = LCD_HEIGHT;
+#define SVID_UI_DESTINATION_X      svid_ui_destination_x
+#define SVID_UI_DESTINATION_Y      svid_ui_destination_y
+#define SVID_UI_DESTINATION_WIDTH  svid_ui_destination_width
+#define SVID_UI_DESTINATION_HEIGHT svid_ui_destination_height
 /* RetailOS's nominal 4:3 movie path supplies private format 8 with a native
  * 320x240 planar source.  The VP, not software, scales that source into the
  * 720x480 NTSC destination.  This exact source geometry matters: the DCP750
@@ -89,8 +96,16 @@ static bool svid_bus_boosted;
 static uint8_t svid_rgb5_to_8[32];
 static uint8_t svid_rgb6_to_8[64];
 static bool svid_rgb_expansion_ready;
-static uint8_t svid_output_framebuffer[SVID_PLANAR_FRAME_SIZE]
-                                       CACHEALIGN_ATTR;
+/* Two output frames, taken from core memory, pinned and cache-aligned, only
+ * while the mode is not Off: taking them rebuffers playback once, which
+ * beats holding 225 KB on every player that never sees a dock. Updates are
+ * written to svid_output_framebuffer, the frame not on show, which then
+ * replaces the other at the next field, so the TV never shows a frame being
+ * written. NULL keeps the output off. */
+static uint8_t *svid_frames[2];
+static uint8_t *svid_output_framebuffer;
+static int svid_framebuffer_handle;
+static void svid_frames_start(void);
 static const void *svid_policy_framebuffer;
 static int svid_policy_width;
 static int svid_policy_height;
@@ -583,6 +598,7 @@ static bool svid_show_framebuffer(const void *framebuffer,
     svid_layer_planar = true;
     svid_mirror_enabled = true;
     svid_layer_active = true;
+    svid_frames_start();
     return true;
 }
 
@@ -656,6 +672,92 @@ static void svid_copy_yuv_plane(uint8_t *destination,
     }
 }
 
+/* Encoder register whose bits 0-1 change with every field. */
+#define SVID_ENC_FIELD 0x040u
+
+/* The field showing when the last frame was handed over, or -1. */
+static int svid_flip_field = -1;
+/* What the last update changed, which the frame now hidden lacks. */
+static int svid_last_x, svid_last_y, svid_last_w, svid_last_h;
+
+/* The hidden frame starts as a copy of the one on show. */
+static void svid_frames_start(void)
+{
+    uint8_t *shown = svid_output_framebuffer;
+
+    svid_output_framebuffer =
+        shown == svid_frames[0] ? svid_frames[1] : svid_frames[0];
+    memcpy(svid_output_framebuffer, shown, SVID_PLANAR_FRAME_SIZE);
+    commit_dcache_range(svid_output_framebuffer, SVID_PLANAR_FRAME_SIZE);
+    svid_flip_field = -1;
+    svid_last_w = 0;
+}
+
+/* Before an update: waits until the frame last handed over is on show, so
+ * the hidden one is no longer being read -- at most a field -- then copies
+ * in what the last update changed. Rectangles are widened to even edges,
+ * as chroma covers 2x2 pixels. */
+static void svid_frames_prepare(void)
+{
+    if (svid_flip_field >= 0)
+    {
+        unsigned start = USEC_TIMER;
+        while ((int)(SVID_REG(SVID_ENCODER_BASE, SVID_ENC_FIELD) & 3) ==
+                   svid_flip_field &&
+               USEC_TIMER - start < 40000)
+            ;
+        svid_flip_field = -1;
+    }
+
+    if (svid_last_w == 0)
+        return;
+
+    uint8_t *to = svid_output_framebuffer;
+    const uint8_t *from = to == svid_frames[0] ? svid_frames[1]
+                                                : svid_frames[0];
+    int x0 = svid_last_x & ~1, y0 = svid_last_y & ~1;
+    int x1 = MIN((svid_last_x + svid_last_w + 1) & ~1, LCD_WIDTH);
+    int y1 = MIN((svid_last_y + svid_last_h + 1) & ~1, LCD_HEIGHT);
+
+    for (int row = y0; row < y1; row++)
+        memcpy(to + row * SVID_PLANAR_Y_WIDTH + x0,
+               from + row * SVID_PLANAR_Y_WIDTH + x0, x1 - x0);
+    for (int plane = 0; plane < 2; plane++)
+    {
+        unsigned base = SVID_PLANAR_Y_SIZE + plane * SVID_PLANAR_C_SIZE;
+        for (int row = y0 / 2; row < y1 / 2; row++)
+            memcpy(to + base + row * SVID_PLANAR_C_WIDTH + x0 / 2,
+                   from + base + row * SVID_PLANAR_C_WIDTH + x0 / 2,
+                   (x1 - x0) / 2);
+    }
+    svid_commit_planar_rect(x0, y0, x1 - x0, y1 - y0);
+}
+
+/* After an update: hands the frame over. The mixer runs in sync mode, so
+ * the VP takes the new planes at the next field rather than mid-picture. */
+static void svid_frames_flip(int x, int y, int width, int height)
+{
+    uint8_t *shown = svid_output_framebuffer;
+    uintptr_t luma = (uintptr_t)shown;
+
+    int oldlevel = disable_irq_save();
+    SVID_REG(SVID_COMPOSITOR_BASE, SVID_VP_PLANE0_PTR) = luma;
+    SVID_REG(SVID_COMPOSITOR_BASE, SVID_VP_PLANE2_PTR) =
+        luma + SVID_PLANAR_Y_SIZE;
+    SVID_REG(SVID_COMPOSITOR_BASE, SVID_VP_PLANE1_PTR) =
+        luma + SVID_PLANAR_Y_SIZE + SVID_PLANAR_C_SIZE;
+    svid_mixer_commit();
+    restore_irq(oldlevel);
+
+    svid_flip_field = SVID_REG(SVID_ENCODER_BASE, SVID_ENC_FIELD) & 3;
+    svid_output_framebuffer =
+        shown == svid_frames[0] ? svid_frames[1] : svid_frames[0];
+    svid_last_x = x;
+    svid_last_y = y;
+    svid_last_w = width;
+    svid_last_h = height;
+}
+
 bool videoout_mirror_yuv420(const unsigned char *source_luma,
                             const unsigned char *source_cb,
                             const unsigned char *source_cr,
@@ -663,9 +765,7 @@ bool videoout_mirror_yuv420(const unsigned char *source_luma,
                             int source_stride,
                             int x, int y, int width, int height)
 {
-    uint8_t *luma = (uint8_t *)svid_output_framebuffer;
-    uint8_t *cb = luma + SVID_PLANAR_Y_SIZE;
-    uint8_t *cr = cb + SVID_PLANAR_C_SIZE;
+    uint8_t *luma, *cb, *cr;
 
     if (!videoout_active() || !svid_mirror_enabled ||
         !svid_layer_planar || source_luma == NULL || source_cb == NULL ||
@@ -676,6 +776,10 @@ bool videoout_mirror_yuv420(const unsigned char *source_luma,
         ((source_x | source_y | source_stride | x | y | width | height) & 1))
         return false;
 
+    svid_frames_prepare();
+    luma = (uint8_t *)svid_output_framebuffer;
+    cb = luma + SVID_PLANAR_Y_SIZE;
+    cr = cb + SVID_PLANAR_C_SIZE;
     source_luma += source_y * source_stride + source_x;
     source_cb += (source_y / 2) * (source_stride / 2) + source_x / 2;
     source_cr += (source_y / 2) * (source_stride / 2) + source_x / 2;
@@ -690,6 +794,7 @@ bool videoout_mirror_yuv420(const unsigned char *source_luma,
                         SVID_PLANAR_C_WIDTH, source_cr, source_stride / 2,
                         width / 2, height / 2);
     svid_commit_planar_rect(x, y, width, height);
+    svid_frames_flip(x, y, width, height);
     return true;
 }
 
@@ -818,7 +923,9 @@ void videoout_mirror_rgb565(const void *source, int x, int y,
         y + height > LCD_HEIGHT)
         return;
 
+    svid_frames_prepare();
     svid_mirror_rgb565_planar(src, x, y, width, height, stride);
+    svid_frames_flip(x, y, width, height);
 }
 
 bool videoout_disable(void)
@@ -861,12 +968,12 @@ static void svid_apply_policy(void)
      * after accessory identification has completed; PENDING must not bypass
      * the startup window and start SVID while the connector/iAP state is still
      * settling. NONE must never retain CPU/LCD clocks while undocked. */
-    bool enable =
+    bool enable = svid_output_framebuffer != NULL && (
         (svid_mode == VIDEOOUT_AUTO &&
          svid_accessory == VIDEOOUT_ACCESSORY_VIDEO) ||
         (svid_mode == VIDEOOUT_ON &&
          (svid_accessory == VIDEOOUT_ACCESSORY_VIDEO ||
-          svid_accessory == VIDEOOUT_ACCESSORY_OTHER));
+          svid_accessory == VIDEOOUT_ACCESSORY_OTHER)));
 
     svid_policy_pending = false;
 
@@ -899,12 +1006,52 @@ void videoout_set_mode(enum videoout_mode mode,
     if (mode > VIDEOOUT_ON)
         mode = VIDEOOUT_OFF;
 
+    if (mode != VIDEOOUT_OFF && svid_output_framebuffer == NULL)
+    {
+        /* The frame size is a whole number of cache lines, so the second
+         * frame is aligned too. */
+        int handle = core_alloc(2 * SVID_PLANAR_FRAME_SIZE +
+                                CACHEALIGN_SIZE);
+        if (handle > 0)
+        {
+            core_pin(handle);
+            svid_framebuffer_handle = handle;
+            svid_frames[0] =
+                CACHEALIGN_UP((uint8_t *)core_get_data_pinned(handle));
+            svid_frames[1] = svid_frames[0] + SVID_PLANAR_FRAME_SIZE;
+            svid_output_framebuffer = svid_frames[0];
+        }
+    }
+
     svid_mode = mode;
     svid_policy_framebuffer = framebuffer;
     svid_policy_width = width;
     svid_policy_height = height;
     svid_policy_pending = true;
     svid_apply_policy();
+
+    if (mode == VIDEOOUT_OFF && svid_output_framebuffer != NULL)
+    {
+        svid_output_framebuffer = NULL;
+        core_free(svid_framebuffer_handle);
+    }
+}
+
+void videoout_set_format(bool double_size, bool pal)
+{
+    (void)pal;
+
+    svid_ui_destination_x = double_size ? 36u : (720u - LCD_WIDTH) / 2;
+    svid_ui_destination_y = double_size ? 24u : (480u - LCD_HEIGHT) / 2;
+    svid_ui_destination_width = double_size ? 648u : LCD_WIDTH;
+    svid_ui_destination_height = double_size ? 432u : LCD_HEIGHT;
+
+    /* The VP reads its geometry when the output starts, so restart it. */
+    if (svid_active)
+    {
+        videoout_disable();
+        svid_apply_policy();
+    }
 }
 
 void videoout_accessory_state(enum videoout_accessory accessory)

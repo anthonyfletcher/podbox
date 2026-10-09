@@ -95,12 +95,9 @@
 /* Define this if your LCD can be enabled/disabled */
 #define HAVE_LCD_ENABLE
 
-/* Define this if the target supports composite video output.
- * PODBOX: declined -- nothing here turns it on, and the driver reserves a
- * 112.5 KB framebuffer whenever it is built. */
-#if 0
+/* Define this if the target supports composite video output. NTSC only, so
+ * no HAVE_VIDEOOUT_STANDARD. */
 #define HAVE_COMPOSITE_VIDEO_OUT
-#endif
 
 /* Define this if your LCD can be put to sleep. HAVE_LCD_ENABLE
    should be defined as well. */

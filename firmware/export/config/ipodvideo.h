@@ -118,6 +118,9 @@
 #define HAVE_LCD_SLEEP_SETTING
 /* The same code may also be used when shutting down the iPod */
 #define HAVE_LCD_SHUTDOWN
+/* Composite TV output through the BCM, PAL or NTSC */
+#define HAVE_COMPOSITE_VIDEO_OUT
+#define HAVE_VIDEOOUT_STANDARD
 #endif
 
 /* We can fade the backlight by using PWM */

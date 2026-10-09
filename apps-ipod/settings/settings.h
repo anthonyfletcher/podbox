@@ -371,6 +371,13 @@ void settings_apply_skins(void);
 
 void settings_apply(bool read_disk);
 void settings_apply_pm_range(void);
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+void settings_apply_tv_out(void);
+void tv_out_size_set(int size);
+#ifdef HAVE_VIDEOOUT_STANDARD
+void tv_standard_set(int standard);
+#endif
+#endif
 
 /* Shared "bold UI font" -- the theme's configured bold font (settings
  * 'font bold' / global_settings.bold_font_file), loaded once by settings_apply()
@@ -910,6 +917,12 @@ struct user_settings
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
     bool lineout_active;
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    int tv_out_size;      /* 0 the LCD pixel for pixel, 1 doubled */
+#ifdef HAVE_VIDEOOUT_STANDARD
+    int tv_standard;      /* 0 PAL, 1 NTSC */
+#endif
+#endif
 #ifdef HAVE_MIKEY_REMOTE
     bool remote_track_skip; /* inline earphone remote: count centre clicks */
 #endif

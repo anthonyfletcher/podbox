@@ -23994,3 +23994,129 @@
     *: "Settings"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_TV_OUT
+  desc: in accessories settings: the menu of TV output settings
+  user: core
+  <source>
+    *: "TV Out"
+  </source>
+  <dest>
+    *: "TV Out"
+  </dest>
+  <voice>
+    *: "T V Out"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE
+  desc: in the TV Out menu: the screen's size on the TV
+  user: core
+  <source>
+    *: "Size"
+  </source>
+  <dest>
+    *: "Size"
+  </dest>
+  <voice>
+    *: "T V Out Size"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_1X
+  desc: TV Out Size choice: the screen pixel for pixel
+  user: core
+  <source>
+    *: "1x"
+  </source>
+  <dest>
+    *: "1x"
+  </dest>
+  <voice>
+    *: "Actual size"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_2X
+  desc: TV Out Size choice: the screen doubled
+  user: core
+  <source>
+    *: "2x"
+  </source>
+  <dest>
+    *: "2x"
+  </dest>
+  <voice>
+    *: "Double size"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD
+  desc: in the TV Out menu: the TV's video standard
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "T V Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_PAL
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "PAL"
+  </source>
+  <dest>
+    *: "PAL"
+  </dest>
+  <voice>
+    *: "Pal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_NTSC
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "NTSC"
+  </source>
+  <dest>
+    *: "NTSC"
+  </dest>
+  <voice>
+    *: "N T S C"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_ON
+  desc: in the TV Out menu: start showing the screen on a TV through the dock
+  user: core
+  <source>
+    *: "Turn On"
+  </source>
+  <dest>
+    *: "Turn On"
+  </dest>
+  <voice>
+    *: "Turn T V Out On"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_OFF
+  desc: in the TV Out menu: stop showing the screen on the TV
+  user: core
+  <source>
+    *: "Turn Off"
+  </source>
+  <dest>
+    *: "Turn Off"
+  </dest>
+  <voice>
+    *: "Turn T V Out Off"
+  </voice>
+</phrase>

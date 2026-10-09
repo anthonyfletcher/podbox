@@ -199,6 +199,18 @@ no VBUS.
 handles it. Give the 5G driver a power-off path and its ~780 ms wake returns,
 unhidden.
 
+---
+
+## firmware/ — TV output
+
+| File | What changed | Why |
+| --- | --- | --- |
+| `export/videoout.h` | New `videoout_set_format(double_size, pal)` | **TV Out > Size** and **TV Out > Standard**. |
+| `target/arm/ipod/video/lcd-video.c` | TV output for the 5G. One 24-bit bitmap command puts the BCM's TV encoder in PAL or NTSC; a background thread then copies changed LCD rows into its TV framebuffer, 1x or doubled, at most 30 times a second and resting as long as each pass took, from a 150 KB snapshot taken from core memory while it runs, so each pass is one whole UI frame. A 1x pass starts at the beginning of a TV field, read from the BCM's scan-line register at `0x100008ac`, and runs straight through, so it does not tear. The LCD is given a black frame while it runs. Turning it off blacks the TV picture and updates the LCD again; the BCM stays in TV mode until the next boot, and `lcd_sleep()` refuses until then. Implements `videoout_set_mode()`, `_set_format()`, `_active()` and `_disable()` | Upstream has no 5G video output. The framebuffer is 24-bit BGR at TV levels, 2112 bytes a line whatever the bitmap's width, measured on hardware. Another bitmap command drops the signal, and an LCD update disturbs it. Taking the BCM out of TV mode hangs the player, by the sleep path or by cutting its power. The commands come from Rockbox FS#9787; the scan-line register was found by searching the register area for bits that change at the field rate. |
+| `target/arm/s5l8702/ipod6g/videoout-6g.c` | Two output frames, 225 KB, taken from `core_alloc()`, pinned, while the mode is not Off. Each update is written to the frame not on show, which the VP takes at the next field; the next update waits for the encoder's field bits (`0x39300040`, bits 0-1) to change before writing to the other. The VP's destination is the LCD at 1x, centred, or upstream's 648x432 | Upstream reserves one frame on every 6G, written while the TV shows it, so a fast-changing screen tears. Taking the frames rebuffers playback once. |
+
+---
+
 ## firmware/ — config headers
 
 A feature this fork declines, whose wiring is in files this fork never edits,
@@ -212,7 +224,7 @@ other decline sits in a file this fork edits, so it conflicts on merge.
 | `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` for non-bootloader builds | Upstream defines it only in the bootloader block. It feeds **Debug > Log file**; `MAX_LOGF_SIZE` stays upstream's 16 KB. |
 | `export/system.h` | `CPU_BOOST_LOGGING` off on `IPOD_6G` outside a `DEBUG` build | Nothing shows the boost log, which costs 16 KB of `.bss` and a `snprintf` on every boost. |
 | `export/config/ipod6g.h` | `TARGET_EXTRA_THREADS` 2 with both `IPOD_ACCESSORY_PROTOCOL` and `HAVE_MIKEY_REMOTE`, else 1 | Upstream adds the remote's poller without a thread for it. Short by one, the feature is silently absent. `__threads` should measure 19. |
-| `export/config/ipod6g.h` | `HAVE_COMPOSITE_VIDEO_OUT` commented out | Nothing outputs video, and the driver reserves 112.5 KB. `serial-6g.c` and `power-6g.c` test the define. |
+| `export/config/ipodvideo.h` | `HAVE_COMPOSITE_VIDEO_OUT` and new `HAVE_VIDEOOUT_STANDARD`, outside the bootloader | **TV Out**, and the 5G's PAL/NTSC choice. See *TV output*. |
 | `export/config/ipodvideo.h` | `HAVE_RECORDING` commented out | As above. |
 | `export/config/ipodvideo.h` | `CONFIG_TUNER`, `HAVE_RDS_CAP`, `CONFIG_RDS` commented out | No FM accessory. Matches `ipod6g.h`. |
 | `export/config/ipodvideo.h` | `HAVE_RTC_ALARM` commented out | The Apple bootloader clears the alarm flag, so a wake is guessed and usually missed. The apps-side alarm is removed. |

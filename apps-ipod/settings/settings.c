@@ -87,6 +87,9 @@
 #include "bootchart.h"
 #include "scroll_engine.h"
 #include "widgets/dialog.h"
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+#include "videoout.h"
+#endif
 
 struct user_settings global_settings;
 struct system_status global_status;
@@ -1284,6 +1287,37 @@ static void settings_apply_dialog_style(void)
     dialog_set_default_style(&s);
 }
 
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+/* TV Out's format, which the next Turn On uses and a running picture
+ * switches to at once. The picture itself is never saved: it starts only
+ * from the TV Out menu, so a player restarted away from its dock is never
+ * left with a black screen. */
+void settings_apply_tv_out(void)
+{
+    videoout_set_format(global_settings.tv_out_size != 0,
+#ifdef HAVE_VIDEOOUT_STANDARD
+                        global_settings.tv_standard == 0
+#else
+                        false
+#endif
+                        );
+}
+
+void tv_out_size_set(int size)
+{
+    global_settings.tv_out_size = size;
+    settings_apply_tv_out();
+}
+
+#ifdef HAVE_VIDEOOUT_STANDARD
+void tv_standard_set(int standard)
+{
+    global_settings.tv_standard = standard;
+    settings_apply_tv_out();
+}
+#endif
+#endif /* HAVE_COMPOSITE_VIDEO_OUT */
+
 void settings_apply(bool read_disk)
 {
     logf("%s", __func__);
@@ -1463,6 +1497,9 @@ void settings_apply(bool read_disk)
 #ifdef USB_ENABLE_IAP
     usb_set_iap(global_settings.iap_enabled);
     usb_set_iap2_mode(global_settings.iap2_mode);
+#endif
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+    settings_apply_tv_out();
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
     usb_set_dac_output(global_settings.usb_dac_output);

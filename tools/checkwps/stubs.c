@@ -327,6 +327,12 @@ void lcd_scroll_speed(int speed) { (void)speed; }
 void lcd_scroll_step(int pixels) { (void)pixels; }
 void lcd_set_sleep_after_backlight_off(int seconds) { (void)seconds; }
 void lineout_set(bool on) { (void)on; }
+#ifdef HAVE_COMPOSITE_VIDEO_OUT
+void tv_out_size_set(int size) { (void)size; }
+#ifdef HAVE_VIDEOOUT_STANDARD
+void tv_standard_set(int standard) { (void)standard; }
+#endif
+#endif
 #ifdef HAVE_MIKEY_REMOTE
 void mikey_set_track_skip(bool on) { (void)on; }
 #endif
