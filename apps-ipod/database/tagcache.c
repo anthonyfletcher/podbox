@@ -6974,6 +6974,46 @@ void tagcache_stop_scan(void)
 
 
 
+#ifdef DBTOOL
+/* The desktop tool's run, in place of the thread: Q_UPDATE's work, or with
+ * 'rebuild' Q_REBUILD's, done once against the mounted player. */
+bool tagcache_tool_run(bool rebuild)
+{
+    memset(&tc_stat, 0, sizeof(struct tagcache_stat));
+    memset(&current_tcmh, 0, sizeof(struct master_header));
+    filenametag_fd = -1;
+    write_lock = read_lock = 0;
+    strmemccpy(tc_stat.db_path, LIB_DB_DIR, sizeof(tc_stat.db_path));
+    mutex_init(&command_queue_mutex);
+
+    finish_interrupted_swap();
+    if (db_file_exists(TAGCACHE_FILE_TEMP))
+        commit();
+    tagcache_commit_finalize();
+    tc_stat.initialized = true;
+
+    if (rebuild && tc_stat.ready)
+    {
+        /* The master is the only copy of the figures */
+        if (save_runtime_data(false) == 0)
+            return false;
+        remove_files();
+        remove_db_file(TAGCACHE_FILE_TEMP);
+    }
+    else if (tc_stat.ready && !walk_checks_deletions())
+        check_deleted_files();
+
+    tagcache_build();
+    tagcache_commit_finalize();
+
+    /* A database built new takes back the saved figures, as the thread does
+     * on the Q_IMPORT_CHANGELOG do_tagcache_build() posts */
+    if (tc_stat.ready && current_tcmh.serial == 0)
+        import_runtime_data(false);
+    return tc_stat.ready;
+}
+#endif /* DBTOOL */
+
 void tagcache_init(void)
 {
     /* Per boot, for the same reason art_cache_init() does it. */

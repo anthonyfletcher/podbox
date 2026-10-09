@@ -124,6 +124,12 @@ When you first load PodBox it will be building your music and art database which
 affect performance initially (particularly on the 5G).  You can check progress of the 
 background tasks by going to `System > Background Tasks`.
 
+The database can be built much faster from a Windows PC.  Once PodBox has started once, connect
+the iPod and run `database_pb.exe` from `.rockbox/tools/`.  It does what
+`Settings > Library > Maintenance > Update Database` does, keeping play counts, ratings and
+positions; `database_pb.exe --rebuild` does what `Rebuild Database` does.  When it finishes,
+eject the iPod and restart it (hold `Menu` and `Select`) before playing anything.
+
 # Setting up your music library
 
 For best results, your music library should be set up in the following structure:

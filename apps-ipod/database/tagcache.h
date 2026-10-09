@@ -334,6 +334,11 @@ bool tagcache_reinstate_ramcache(void);
 bool tagcache_ram_refused(void);
 void tagcache_commit_finalize(void);
 void tagcache_init(void) INIT_ATTR;
+#ifdef DBTOOL
+/* tools/database_pb: one Update, or Rebuild, of the database under the
+ * filesystem root, with no thread. True when it ends ready. */
+bool tagcache_tool_run(bool rebuild);
+#endif
 bool tagcache_is_initialized(void);
 /* Boot has loaded the skins: the boot scan may build or update. */
 void tagcache_boot_finished(void);

@@ -407,9 +407,9 @@ done
 # have it.
 TOOL_WANT=
 for target in $SIM_TARGETS; do
-    say "Adding the analysis tool to $target"
+    say "Adding the desktop tools to $target"
     ssh "$SERVER" "cd '$REMOTE_DIR' && ./bundle-tools.sh build-hw-$target"
-    TOOL_WANT=.rockbox/tools/soundscan.exe
+    TOOL_WANT=".rockbox/tools/soundscan.exe .rockbox/tools/database_pb.exe"
 done
 
 # The script checks its own zip's contents.

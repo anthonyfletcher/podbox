@@ -70,6 +70,11 @@ unlike the rest they hold the player rather than queueing work. **Rebuild
 Playback Report** queues nothing either: it clears two cached files, and the
 report rebuilds them itself the next time you open it.
 
+**Update Database** and **Rebuild Database** are much faster from a Windows PC:
+`database_pb.exe` in `.rockbox/tools/` does the same work on the connected
+player, or `database_pb.exe --rebuild` for a rebuild. Restart the player after
+ejecting it.
+
 ---
 
 ### Sound Settings

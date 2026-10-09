@@ -24,6 +24,13 @@
 #define LIB_ART_DIR         LIB_CACHE_DIR "/art"
 #define LIB_LOGS_DIR        ROCKBOX_DIR "/logs"
 
+/* The layout these sources expect, which format.dat's version records. A
+ * change to it adds upgrade steps and bumps this.
+ *   1: library/, logs/, the libfile .dat files.
+ *   2: the database in library/database; every file the player owns a .dat.
+ *   3: no album index on disk: tagcache keeps the album tables. */
+#define LIBRARY_FORMAT 3
+
 #define LIB_FORMAT_FILE     LIB_DIR "/format.dat"
 #define LIB_SOUND_FILE      LIB_DIR "/sound.dat"
 #define LIB_SOUND_PART      LIB_DIR "/sound.part"

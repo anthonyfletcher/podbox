@@ -39,12 +39,6 @@
 #include "games/quiz/quiz.h"
 #include "games/spike/spike_score.h"
 
-/* The layout these sources expect. A change to it adds steps and bumps this.
- *   1: library/, logs/, the libfile .dat files.
- *   2: the database in library/database; every file the player owns a .dat.
- *   3: no album index on disk: tagcache keeps the album tables. */
-#define LIBRARY_FORMAT 3
-
 /* Where layout 1 kept its version, as text */
 #define FORMAT_FILE_1  LIB_DIR "/format.txt"
 

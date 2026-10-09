@@ -211,8 +211,9 @@ zip straight from `make zip` has **no Scrim, no first-boot `config.cfg`, no
 setting explanations and no title trimming patterns**. Follow it with the
 bundle scripts -- `../bundle-theme.sh`, `../bundle-help.sh`,
 `../bundle-trim.sh`, and for the player `../bundle-tools.sh`, which adds the
-desktop sound-scan tool as `.rockbox/tools/soundscan.exe`. `./build-hw.sh` runs
-all four and `./build-sim.sh` the first three; a bare `make zip` runs none.
+desktop tools as `.rockbox/tools/soundscan.exe` and `database_pb.exe`.
+`./build-hw.sh` runs all four and `./build-sim.sh` the first three; a bare
+`make zip` runs none.
 
 Scrim is the only theme in the build. The others in `themes/` are published
 as their own release by `release.sh`, one zip each.
@@ -265,8 +266,12 @@ nothing about any of them:
 The `--type=c` build needs no SDL, and `configure` checks for SDL only for the
 builds that use it, so CheckWPS and warble skip the check.
 
-The database tool runs from the top level of a mounted player and writes the
-database files itself, so the player does not have to scan.
+The (D)atabase build is upstream's tool and writes upstream's database, which
+this firmware does not read. The one that ships is `tools/database_pb/`: it
+compiles `apps-ipod/database/tagcache.c` with `-DDBTOOL` against a Windows
+simulator build, like soundscan, and runs one Update (or `--rebuild`) against
+a mounted player. `tagcache_tool_run()` is its whole entry point, so a change
+to the database thread's Update or Rebuild sequence belongs there too.
 
 **Sanitizers:** `--with-address-sanitizer` and `--with-ubsan` flags to configure.
 

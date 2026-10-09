@@ -1,5 +1,9 @@
 #!/bin/sh
-# Put the desktop analysis tool into a rockbox.zip produced by `make zip`.
+# Put the desktop tools into a rockbox.zip produced by `make zip`.
+#
+# database_pb.exe ships as .rockbox/tools/database_pb.exe. It brings the
+# player's database up to date from the computer, with the player's own
+# tagcache.c, so the files it writes are the ones the firmware beside it reads.
 #
 # soundscan.exe ships as .rockbox/tools/soundscan.exe together with the codecs
 # it loads, which are the player's own decoders built for the host: the tool
@@ -7,12 +11,12 @@
 # would not mean what the player reads. Without that directory beside it the
 # tool loads no decoder at all and reports every track as unreadable.
 #
-# The tool is made from the same tree every time, so it writes the paths and
+# Each tool is made from the same tree every time, so it writes the paths and
 # record layout the firmware beside it reads. A failed make stops the script:
 # shipping the previous binary would ship one out of step with the firmware.
 #
-# It is a Windows binary and needs a Windows simulator build to link against,
-# which not every machine has. A missing simulator is reported and the tool
+# They are Windows binaries and need a Windows simulator build to link against,
+# which not every machine has. A missing simulator is reported and the tools
 # skipped rather than fatal: the firmware in the zip is complete without it.
 # release.sh checks for it, so a published zip still cannot go out without one.
 #
@@ -34,7 +38,7 @@ TOOL="$ROOT/tools/soundscan/soundscan.exe"
 # the codecs it loads, which are the player's own built for the host.
 CODECS="$ROOT/build-sim-ipodvideo-win32"
 if [ ! -f "$CODECS/autoconf.h" ]; then
-    echo "bundle-tools.sh: NOT shipping the analysis tool -- no Windows simulator" >&2
+    echo "bundle-tools.sh: NOT shipping the desktop tools -- no Windows simulator" >&2
     echo "bundle-tools.sh: build one first: ./build-sim.sh 5g win" >&2
     exit 0
 fi
@@ -43,11 +47,14 @@ fi
 # its own output, ends the script before anything is added to the zip.
 echo "bundle-tools.sh: making soundscan.exe"
 make -C "$ROOT/tools/soundscan" win
+echo "bundle-tools.sh: making database_pb.exe"
+make -C "$ROOT/tools/database_pb" win
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/.rockbox/tools/codecs"
 cp "$TOOL" "$STAGE/.rockbox/tools/soundscan.exe"
+cp "$ROOT/tools/database_pb/database_pb.exe" "$STAGE/.rockbox/tools/"
 
 n=0
 for c in "$CODECS"/lib/rbcodec/codecs/*.codec; do
@@ -59,7 +66,7 @@ done
 # Stripped in the staging directory and never in the tree: these carry debug
 # symbols the player has no use for, and they are most of the size -- a codec
 # goes from 155K to 20K, the whole directory from twelve megabytes to under
-# two. What stays behind in tools/soundscan/ keeps its symbols for debugging.
+# two. What stays behind in tools/ keeps its symbols for debugging.
 STRIP=""
 for s in x86_64-w64-mingw32-strip strip; do
     command -v "$s" >/dev/null 2>&1 && { STRIP="$s"; break; }
@@ -67,16 +74,17 @@ done
 
 if [ -n "$STRIP" ]; then
     "$STRIP" "$STAGE/.rockbox/tools/soundscan.exe" 2>/dev/null || true
+    "$STRIP" "$STAGE/.rockbox/tools/database_pb.exe" 2>/dev/null || true
     for c in "$STAGE"/.rockbox/tools/codecs/*.codec; do
         "$STRIP" "$c" 2>/dev/null || true
     done
 fi
 
 if [ "$n" -eq 0 ]; then
-    echo "bundle-tools.sh: NOT shipping the analysis tool -- no host codecs" >&2
+    echo "bundle-tools.sh: NOT shipping the desktop tools -- no host codecs" >&2
     exit 0
 fi
 
 (cd "$STAGE" && zip -qr "$ZIP" .rockbox)
 
-echo "bundled the analysis tool ($n codecs) into $ZIP"
+echo "bundled the desktop tools ($n codecs) into $ZIP"
