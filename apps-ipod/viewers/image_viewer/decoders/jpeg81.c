@@ -387,7 +387,11 @@ static int Decode_V(struct JPEGD *j, struct CABACSTATE *ST, int SNSP, int X1, in
 	if ( !DecodeBin(j, ST+SNSP) ) return 1;
 	if ( !DecodeBin(j, ST+X1) ) return 2;
 	M=2, ST+=X2;
-	while ( DecodeBin(j, ST) ) M <<= 1, ST++;
+	while ( DecodeBin(j, ST) ) {
+		/* 14 X contexts: one more is past the area, and the stream corrupt */
+		if ((M <<= 1) == 0x8000) return 1;
+		ST++;
+	}
 	Sz= M;
 	ST += 14;
 	while (M>>=1) if (DecodeBin(j, ST)) Sz |= M;
@@ -418,7 +422,8 @@ static void ac_band(struct JPEGD *j, struct COMP *sc, TCOEF *coef, int k)		// NB
 	while ( !DecodeBin(j, sc->ACST+k) )			//	EOB?
 	{
 		int V, sign;
-		while ( !DecodeBin(j, sc->ACST+k+63) ) k++;	// S0
+		while ( !DecodeBin(j, sc->ACST+k+63) )	// S0
+			if (++k > j->Se) return;	/* a run past the band: corrupt */
 		sign= DecodeFIX(j);
 		V= Decode_V(j, sc->ACST, k+126, k+126, (k>sc->Kx)? (217+1) : (189+1) );
 		if (sign) V = -V;
@@ -465,7 +470,8 @@ static void ac_succ_arith(struct JPEGD *j, struct COMP *sc, TCOEF *coef)
 
 	for (; k <= j->Se && !DecodeBin(j, sc->ACST+k); k++)	// SE: EOB?
 	{
-		while (!DecodeBin(j, sc->ACST+k+63)) k++;
+		while (!DecodeBin(j, sc->ACST+k+63))
+			if (++k > j->Se) return;	/* a run past the band: corrupt */
 		coef[k]= DecodeFIX(j)? -j->Al2 : j->Al2;
 	}
 }
@@ -795,6 +801,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			{
 				int TotalDU= set_dim(j, 1);		// for malloc: in samples as coeff;
 				if (TotalDU < 0) return JPEGENUMERR_BADSAMPLING;
+				if (j->P < 1 || j->P > 16) return JPEGENUMERR_BADPRECISION;	/* P0 is 1<<(P-1) in a TSAMP */
 
 				if (j->SOF > 0xC8) {	// arithmetic:
 
@@ -924,11 +931,14 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			j->Ss= GETC();//Ss (DCT) or Px (LL)
 			j->Se= GETC();//Se
 			j->Al= GETC();//AhAl
+			if (j->Al < 0) return JPEGENUMERR_BADSEGMENT;	/* the file ended inside the header */
 			j->Ah= j->Al>>4;
 			j->Al&= 15;
 			j->Al2= 1<<j->Al;//pre-computed
 			if ((j->SOF&3)!=3 && (j->Se > 63 || j->Ss > j->Se))
 				return JPEGENUMERR_BADSCAN;	/* the band indexes a 64-entry block */
+			if ((j->SOF&3)==3 && (j->Ss < 1 || j->Ss > 7))
+				return JPEGENUMERR_BADSCAN;	/* Px indexes the seven predictors */
 
 			printf("  %s: %d\n", ((j->SOF&3)==3)?"Px":"Ss", j->Ss);
 			printf("  Se: %d\n", j->Se);

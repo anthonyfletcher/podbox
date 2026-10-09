@@ -38,6 +38,7 @@ enum JPEGENUM {
 	JPEGENUMERR_BADHUFF,			/* a DHT table out of range or overfull */
 	JPEGENUMERR_BADSCAN,			/* an SOS whose selectors or band are out of range */
 	JPEGENUMERR_BADSEGMENT,			/* a bad segment length, or the file ends before EOI */
+	JPEGENUMERR_BADPRECISION,		/* a lossless sample precision outside 1..16 bits */
 };
 
 typedef short TCOEF;	// 16-bit coefficients
