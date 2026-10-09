@@ -61,14 +61,21 @@ void track_decode_get_stats(struct track_decode_stats *out);
 #define TRACK_DECODE_NO_CODEC  -2
 #define TRACK_DECODE_FAILED    -3
 #define TRACK_DECODE_ABORTED   -4
+#define TRACK_DECODE_NO_THREAD -5   /* every thread slot taken: try later */
 
 /* Decode 'path' from 'start_ms', for at most 'length_ms' of audio, handing
  * every block to 'sink'.
  *
- * Runs on the calling thread and does not return until the window is done,
- * the file ends, 'enough' says it has what it came for, or 'abort' says to
- * stop. One codec may be loaded at a time and this loads it, so it stops
- * playback and holds it off until the codec is closed.
+ * Does not return until the window is done, the file ends, 'enough' says it
+ * has what it came for, or 'abort' says to stop. One codec may be loaded at a
+ * time and this loads it, so it stops playback and holds it off until the
+ * codec is closed.
+ *
+ * On the player the codec runs on a thread of its own, deep in a stack sized
+ * for the codec alone, and 'sink', 'enough' and 'abort' are called there.
+ * 'abort' must not handle a system event itself -- default_event_handler()
+ * on SYS_USB_CONNECTED runs the whole USB screen on that stack. Note it,
+ * return true, and act on it once this has returned.
  *
  * The two callbacks are separate because they mean opposite things. 'enough'
  * is success arriving early -- a measurement that has settled needs no more

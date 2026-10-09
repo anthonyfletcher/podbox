@@ -25,7 +25,8 @@ bool spike_screen(void);
 
 /* The best run there has been, on the same screen a finished one is shown
  * on. 'font' is the face the track names are set in: the game has one open
- * and the menu this is reached from is inside the game. */
-void spike_best_screen(int font);
+ * and the menu this is reached from is inside the game. True when USB took
+ * the screen. */
+bool spike_best_screen(int font);
 
 #endif /* SPIKE_H */

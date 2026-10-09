@@ -1023,6 +1023,16 @@ static void spike_fill_frame(struct spk_frame *f, long grid_ms)
     f->frozen = f->death_phase >= 0;
 }
 
+/* Set once USB or the menu has sent the player to the root, so the game
+ * leaves and tells its caller to go there too. */
+static bool spike_to_root;
+
+static void spike_event(int button)
+{
+    if (default_event_handler(button) == SYS_USB_CONNECTED)
+        spike_to_root = true;
+}
+
 /* Leaving costs a run, so it is asked rather than taken -- Menu is one
  * button away from the jump and a run is an evening's work.
  *
@@ -1045,6 +1055,8 @@ static bool spike_confirm_exit(void)
     lcd_setfont(FONT_SYSFIXED);
     spk_draw_full_flush();
 
+    if (res == YESNO_USB)
+        spike_to_root = true;
     return res == YESNO_YES || res == YESNO_USB;
 }
 
@@ -1054,16 +1066,6 @@ static bool spike_confirm_exit(void)
  * The field does not have to be redrawn to freeze: the clock is the audio's
  * and a stopped report stops the grid. Returns true where the player left
  * from here. */
-/* Set once USB or the menu has sent the player to the root, so the game
- * leaves and tells its caller to go there too. */
-static bool spike_to_root;
-
-static void spike_event(int button)
-{
-    if (default_event_handler(button) == SYS_USB_CONNECTED)
-        spike_to_root = true;
-}
-
 static bool spike_paused(bool by_hold)
 {
     bool quit = false;
@@ -1102,7 +1104,7 @@ static bool spike_paused(bool by_hold)
         if (button == ACTION_SPIKE_UP || button == ACTION_SPIKE_DOWN)
             adjust_volume(button == ACTION_SPIKE_UP ? 1 : -1);
         if (button == ACTION_SPIKE_UP || button == ACTION_SPIKE_DOWN
-            || (meter_up
+            || (meter_up && button == ACTION_NONE
                 && !TIME_BEFORE(current_tick,
                                 global_status.last_volume_change
                                 + SPK_VOL_TICKS)))
@@ -1303,14 +1305,14 @@ static void spike_summary_screen(struct spk_summary *s)
  * is what it is: a run that ended some other evening. Reached from the
  * game's own menu, which is why the face the names are set in is handed in
  * rather than loaded: the game has it open. */
-void spike_best_screen(int font)
+bool spike_best_screen(int font)
 {
     struct spk_summary s;
 
     if (!spk_score_best(&s.run))
     {
         splash(HZ, "No runs yet");
-        return;
+        return false;
     }
 
     s.best = 0;
@@ -1321,6 +1323,7 @@ void spike_best_screen(int font)
     s.rows = spk_score_tracks(SPK_LOG_BEST);
 
     spike_summary_screen(&s);
+    return spike_to_root;
 }
 
 bool spike_screen(void)

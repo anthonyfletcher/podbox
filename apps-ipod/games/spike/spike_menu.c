@@ -47,17 +47,18 @@ static struct spk_menu *state;
 static int spk_scores_screen(void)
 {
     struct viewport vp;
+    bool usb;
 
     viewportmanager_theme_enable(SCREEN_MAIN, false, &vp);
     lcd_set_backdrop(NULL);
     lcd_setfont(FONT_SYSFIXED);
 
-    spike_best_screen(state->font);
+    usb = spike_best_screen(state->font);
 
     lcd_setfont(FONT_UI);
     viewportmanager_theme_undo(SCREEN_MAIN, true);
 
-    return 0;
+    return usb ? MENU_ATTACHED_USB : 0;
 }
 
 
@@ -151,8 +152,9 @@ static int spk_tempo_setting(void)
     return 0;
 }
 
-MENUITEM_FUNCTION(spk_scores_item, 0, ID2P(LANG_SPIKE_SCORES),
-                  spk_scores_screen, NULL, Icon_NOICON);
+MENUITEM_FUNCTION(spk_scores_item, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_SPIKE_SCORES), spk_scores_screen, NULL,
+                  Icon_NOICON);
 MENUITEM_FUNCTION(spk_offset_item, 0, ID2P(LANG_SPIKE_OFFSET),
                   spk_offset_setting, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(spk_tempo_item, 0, ID2P(LANG_SPIKE_TEMPO),

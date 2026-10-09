@@ -372,6 +372,13 @@ static bool ss_measure(const char *path, uint32_t mtime, uint32_t genre_key,
     if (ss_stop || ss_unplugged)
         return false;
 
+    /* No record: the file was never tried, and the next run measures it. */
+    if (rc == TRACK_DECODE_NO_THREAD)
+    {
+        ss_skipped++;
+        return true;
+    }
+
     beat_probe_result(&s);
     sound_index_fill(&rec, key, mtime, size, genre_key, year, &s, rc);
 
@@ -745,7 +752,7 @@ static void ss_run(bool fresh)
         sound_cal_update();
 
         snprintf(msg, sizeof (msg), "Done. %d measured, %d unreadable",
-                 ss_done, ss_failed);
+                 ss_done - ss_failed, ss_failed);
         ss_result(msg);
     }
     else

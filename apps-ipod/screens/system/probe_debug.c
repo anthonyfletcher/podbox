@@ -31,6 +31,7 @@
 #include "widgets/list.h"
 #include "widgets/splash.h"
 #include "input/action.h"
+#include "api/misc.h"
 
 /* The window, as the library scan will take it: past the intro, and long
  * enough to fill the tempo envelope and then hold. */
@@ -47,6 +48,7 @@
 
 static unsigned long pd_last_draw;
 static unsigned long pd_analysed;
+static bool pd_usb;         /* pd_abort() took SYS_USB_CONNECTED */
 
 /* Called from inside the codec, often. Doubles as the progress display,
  * since nothing else is running to draw one. */
@@ -62,7 +64,18 @@ static bool pd_abort(void)
         splash(0, line);
     }
 
-    return action_userabort(TIMEOUT_NOBLOCK);
+    /* On the decode thread: a USB connect is noted and left to the screen,
+     * since the USB screen would run on the codec's stack. */
+    switch (get_action(CONTEXT_STD, TIMEOUT_NOBLOCK))
+    {
+        case ACTION_STD_CANCEL:
+            return true;
+        case SYS_USB_CONNECTED:
+            pd_usb = true;
+            return true;
+        default:
+            return false;
+    }
 }
 
 static void pd_sink(const void *ch1, const void *ch2, int count,
@@ -118,6 +131,7 @@ bool probe_debug_screen(void)
 
     pd_last_draw = current_tick;
     pd_analysed = 0;
+    pd_usb = false;
     beat_probe_start();
 
     tick = current_tick;
@@ -129,6 +143,12 @@ bool probe_debug_screen(void)
 
     beat_probe_result(&s);
     core_free(handle);
+
+    if (pd_usb)
+    {
+        default_event_handler(SYS_USB_CONNECTED);
+        return true;
+    }
 
     simplelist_info_init(&info, "Sound probe", 0, NULL);
     info.scroll_all = true;

@@ -347,7 +347,8 @@ static void decode_thread(void)
     decode_status = codec_run_proc();
 }
 
-static int run_codec(void)
+/* False when every thread slot is taken, which is not the file's fault. */
+static bool run_codec(int *status)
 {
     unsigned int id = create_thread(decode_thread, decode_stack,
                                     sizeof(decode_stack), 0, "track decode"
@@ -355,14 +356,16 @@ static int run_codec(void)
                                     IF_COP(, CPU));
 
     if (id == 0)
-        return CODEC_ERROR;
+        return false;
     thread_wait(id);
-    return decode_status;
+    *status = decode_status;
+    return true;
 }
 #else
-static int run_codec(void)
+static bool run_codec(int *status)
 {
-    return codec_run_proc();
+    *status = codec_run_proc();
+    return true;
 }
 #endif
 
@@ -375,7 +378,8 @@ int track_decode_run(const char *path,
                      unsigned long *analysed_ms)
 {
     const char *codec_fn;
-    int status;
+    int status = CODEC_ERROR;
+    bool started;
     int rc = TRACK_DECODE_OK;
 
     if (analysed_ms != NULL)
@@ -496,7 +500,7 @@ int track_decode_run(const char *path,
      * time on the 5G, which makes a library scan take as long as playing the
      * library. */
     cpu_boost(true);
-    status = run_codec();
+    started = run_codec(&status);
     cpu_boost(false);
 
     codec_close();
@@ -507,7 +511,9 @@ int track_decode_run(const char *path,
     stats.last_pos = (unsigned long)dci.curpos;
     stats.file_len = (unsigned long)file_len;
 
-    if (gave_up)
+    if (!started)
+        rc = TRACK_DECODE_NO_THREAD;
+    else if (gave_up)
         rc = TRACK_DECODE_ABORTED;
     else if (status != CODEC_OK && !done && !had_enough)
         rc = TRACK_DECODE_FAILED;
