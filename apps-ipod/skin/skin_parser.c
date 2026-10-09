@@ -793,6 +793,8 @@ static int parse_viewporttextstyle(struct skin_element *element,
     (void)wps_data;
     char *mode = get_param_text(element, 0);
     struct line_desc *line = skin_buffer_alloc(sizeof(*line));
+    if (!line)
+        return 1;
     *line = (struct line_desc)LINE_DESC_DEFINIT;
     unsigned colour;
 
@@ -2453,6 +2455,8 @@ static int skin_element_callback(struct skin_element* element, void* data)
         case TAG:
         {
             token = skin_buffer_alloc(sizeof(*token));
+            if (!token)
+                return CALLBACK_ERROR;
             memset(token, 0, sizeof(*token));
             token->type = element->tag->type;
             token->value.data = INVALID_OFFSET;
