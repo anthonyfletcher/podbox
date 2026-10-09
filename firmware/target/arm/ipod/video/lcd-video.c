@@ -118,6 +118,10 @@ struct
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
 /* True while the TV is kept current: LCD updates then go to the TV. */
 static bool tv_on;
+/* True while tv_start() sends its BCM commands: they yield, and an LCD
+ * update written meanwhile would land between them, so it is only marked
+ * dirty. Set after lcd_awake(), whose first LCD update must reach the BCM. */
+static bool tv_starting;
 /* True once the BCM has been put in TV mode, until the next boot. Taking it
  * out again hangs the player, whether by the LCD sleep path or by cutting
  * its power and booting it, so the LCD does not sleep after. */
@@ -434,7 +438,7 @@ void lcd_update_rect(int x, int y, int width, int height)
         return; /* Nothing left to do. */
 
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
-    if (tv_on)
+    if (tv_on || tv_starting)
     {
         tv_mark_dirty(y, height);
         return;
@@ -804,6 +808,7 @@ static void tv_start(void)
     if (!lcd_state.display_on)
         lcd_awake();
 
+    tv_starting = true;
     mutex_lock(&tv_lock);
     lcd_block_tick();
     while (lcd_state.state == LCD_UPDATING &&
@@ -834,6 +839,7 @@ static void tv_start(void)
     tv_first_line = (height - LCD_HEIGHT * tv_scale) / 2;
     tv_left = (704 - LCD_WIDTH * tv_scale) / 2 * 3;
     tv_on = true;
+    tv_starting = false;
     lcd_unblock_tick();
     mutex_unlock(&tv_lock);
 
@@ -885,6 +891,12 @@ void videoout_set_format(bool double_size, bool pal)
 }
 
 bool videoout_active(void)
+{
+    return tv_on;
+}
+
+/* On starts the picture at once here, with no dock to wait for. */
+bool videoout_requested(void)
 {
     return tv_on;
 }

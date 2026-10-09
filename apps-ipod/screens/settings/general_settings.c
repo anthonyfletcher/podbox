@@ -479,9 +479,9 @@ MENUITEM_SETTING(lineout_onoff, &global_settings.lineout_active, NULL);
  * saves it: a restart always comes back with the TV off. */
 static int tv_out_toggle(void)
 {
-    if (!videoout_active())
+    if (!videoout_requested())
         settings_apply_tv_out();
-    videoout_set_mode(videoout_active() ? VIDEOOUT_OFF : VIDEOOUT_ON,
+    videoout_set_mode(videoout_requested() ? VIDEOOUT_OFF : VIDEOOUT_ON,
                       FBADDR(0, 0), LCD_WIDTH, LCD_HEIGHT);
     return 0;
 }
@@ -493,8 +493,8 @@ static char *tv_out_toggle_name(int selected_item, void *data,
     (void)data;
     (void)buffer;
     (void)buffer_len;
-    return (char *)str(videoout_active() ? LANG_TV_OUT_TURN_OFF
-                                         : LANG_TV_OUT_TURN_ON);
+    return (char *)str(videoout_requested() ? LANG_TV_OUT_TURN_OFF
+                                            : LANG_TV_OUT_TURN_ON);
 }
 
 MENUITEM_FUNCTION_DYNTEXT(tv_out_toggle_item, 0, tv_out_toggle,

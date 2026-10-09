@@ -604,7 +604,10 @@ listed only while Accessory Protocol is On.
 **Turn On** shows the screen on a TV through a dock's video output, and
 **Turn Off** stops it. On an iPod Video the player's own screen goes black
 while it is on; an iPod Classic keeps both. Turning it on takes some memory,
-which briefly rebuffers playback. It is always off after a restart.
+which briefly rebuffers playback. It is always off after a restart. On an
+iPod Classic with no dock attached, Turn On waits for one until turned off.
+On an iPod Video, using TV Out keeps the screen powered until the next
+restart, which costs battery life: restart the player afterwards.
 
 | Setting | What it does | Default | |
 |---|---|---|---|

@@ -93,6 +93,11 @@ bool videoout_active(void)
 {
     return false;
 }
+
+bool videoout_requested(void)
+{
+    return false;
+}
 #endif
 
 /* The keyclick beep. misc.c calls this when keyclick_hardware is set; the

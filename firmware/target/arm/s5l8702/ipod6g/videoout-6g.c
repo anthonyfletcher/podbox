@@ -622,6 +622,11 @@ bool videoout_active(void)
     return svid_active && svid_layer_active;
 }
 
+bool videoout_requested(void)
+{
+    return svid_mode != VIDEOOUT_OFF;
+}
+
 bool videoout_lcd_clock_required(void)
 {
     return svid_platform_saved;
@@ -694,10 +699,11 @@ static void svid_frames_start(void)
 }
 
 /* Before an update: waits until the frame last handed over is on show, so
- * the hidden one is no longer being read -- at most a field -- then copies
- * in what the last update changed. Rectangles are widened to even edges,
- * as chroma covers 2x2 pixels. */
-static void svid_frames_prepare(void)
+ * the hidden one is no longer being read -- at most a field, yielding --
+ * then copies in what the last update changed. Rectangles are widened to
+ * even edges, as chroma covers 2x2 pixels. False when the output stopped
+ * during the wait: the caller then writes nothing. */
+static bool svid_frames_prepare(void)
 {
     if (svid_flip_field >= 0)
     {
@@ -705,12 +711,15 @@ static void svid_frames_prepare(void)
         while ((int)(SVID_REG(SVID_ENCODER_BASE, SVID_ENC_FIELD) & 3) ==
                    svid_flip_field &&
                USEC_TIMER - start < 40000)
-            ;
+            yield();
         svid_flip_field = -1;
+        if (!svid_active || !svid_layer_active ||
+            svid_output_framebuffer == NULL)
+            return false;
     }
 
     if (svid_last_w == 0)
-        return;
+        return true;
 
     uint8_t *to = svid_output_framebuffer;
     const uint8_t *from = to == svid_frames[0] ? svid_frames[1]
@@ -731,6 +740,7 @@ static void svid_frames_prepare(void)
                    (x1 - x0) / 2);
     }
     svid_commit_planar_rect(x0, y0, x1 - x0, y1 - y0);
+    return true;
 }
 
 /* After an update: hands the frame over. The mixer runs in sync mode, so
@@ -776,7 +786,8 @@ bool videoout_mirror_yuv420(const unsigned char *source_luma,
         ((source_x | source_y | source_stride | x | y | width | height) & 1))
         return false;
 
-    svid_frames_prepare();
+    if (!svid_frames_prepare())
+        return false;
     luma = (uint8_t *)svid_output_framebuffer;
     cb = luma + SVID_PLANAR_Y_SIZE;
     cr = cb + SVID_PLANAR_C_SIZE;
@@ -923,7 +934,8 @@ void videoout_mirror_rgb565(const void *source, int x, int y,
         y + height > LCD_HEIGHT)
         return;
 
-    svid_frames_prepare();
+    if (!svid_frames_prepare())
+        return;
     svid_mirror_rgb565_planar(src, x, y, width, height, stride);
     svid_frames_flip(x, y, width, height);
 }

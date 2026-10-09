@@ -31,6 +31,9 @@ enum videoout_accessory
 
 bool videoout_disable(void);
 bool videoout_active(void);
+/* True while the mode is not Off, whether or not a picture is showing: On
+ * can be waiting for a dock. */
+bool videoout_requested(void);
 bool videoout_lcd_clock_required(void);
 bool videoout_mirror_yuv420(const unsigned char *luma,
                             const unsigned char *cb,
