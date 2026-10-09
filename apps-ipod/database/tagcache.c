@@ -6526,6 +6526,41 @@ static void record_loaded_sizes(void)
                                                         : db_file_size(tag);
 }
 
+/* Every file in the database directory -- name, size and time -- hashed. Any
+ * write a computer makes there, a desktop update's included, changes it. */
+static unsigned int db_dir_stamp(void)
+{
+    unsigned int stamp = 2166136261u;
+    DIR *d = opendir(tc_stat.db_path);
+    struct dirent *e;
+
+    if (d == NULL)
+        return 0;
+    while ((e = readdir(d)) != NULL)
+    {
+        struct dirinfo info = dir_get_info(d, e);
+
+        for (const char *p = e->d_name; *p; p++)
+            stamp = (stamp ^ (unsigned char)*p) * 16777619u;
+        stamp = (stamp ^ (unsigned int)info.size) * 16777619u;
+        stamp = (stamp ^ (unsigned int)info.mtime) * 16777619u;
+    }
+    closedir(d);
+    return stamp;
+}
+
+/* Taken by the database thread before it hands the disk over */
+static unsigned int usb_stamp;
+static bool usb_stamp_taken;
+
+bool tagcache_changed_over_usb(void)
+{
+    bool changed = usb_stamp_taken && db_dir_stamp() != usb_stamp;
+
+    usb_stamp_taken = false;
+    return changed;
+}
+
 /* After a USB session that wrote to the disk: switch the RAM copy back on if
  * the database files are the ones it was loaded from. A reload would take
  * seconds, and browsing during the scan that follows would be served from
@@ -6839,6 +6874,16 @@ static void tagcache_thread(void)
 
             case SYS_USB_CONNECTED:
                 logf("USB: TagCache");
+                /* Once per cable session: a mid-connect reconfigure brings
+                 * this round again, after the host may have written. The
+                 * flush is the UI's too, which would otherwise race this:
+                 * the mutex puts both before the stamp. */
+                if (!usb_stamp_taken)
+                {
+                    run_command_queue(true);
+                    usb_stamp = db_dir_stamp();
+                    usb_stamp_taken = true;
+                }
                 usb_acknowledge(SYS_USB_CONNECTED_ACK, ev.data);
                 usb_wait_for_disconnect(&tagcache_queue);
                 break ;

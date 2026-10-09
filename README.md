@@ -128,7 +128,7 @@ The database can be built much faster from a Windows PC.  Once PodBox has starte
 the iPod and run `database_pb.exe` from `.rockbox/tools/`.  It does what
 `Settings > Library > Maintenance > Update Database` does, keeping play counts, ratings and
 positions; `database_pb.exe --rebuild` does what `Rebuild Database` does.  When it finishes,
-eject the iPod and restart it (hold `Menu` and `Select`) before playing anything.
+eject the iPod; it restarts itself to load the new database.
 
 # Setting up your music library
 

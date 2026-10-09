@@ -253,9 +253,6 @@ int main(int argc, char **argv)
         return 1;
     }
     printf("Done in %ld s: %d tracks.\n", (long)(time(NULL) - t0), tracks);
-    /* The player holds the old database's header and track numbers until it
-     * starts again, and would write them back over these files */
-    printf("Eject the player, then restart it (hold MENU and SELECT)\n"
-           "before playing anything.\n");
+    printf("Eject the player. It restarts itself to load the new database.\n");
     return 0;
 }

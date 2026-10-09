@@ -334,6 +334,15 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
                 bootfile_baseline_taken = false;
                 if (usb_core_host_wrote_storage())
                     check_bootfile(true);
+                /* A computer rewrote the database (tools/database_pb). This
+                 * run holds the old one's header and track numbers and would
+                 * write them back over it, so start again rather than shut
+                 * down: a clean shutdown is one of the writers. */
+                if (tagcache_changed_over_usb())
+                {
+                    audio_hard_stop();
+                    rolo_load(BOOTDIR "/" BOOTFILE);
+                }
             }
 #endif
             system_restore();

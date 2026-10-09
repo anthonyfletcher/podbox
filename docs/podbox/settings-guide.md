@@ -72,8 +72,8 @@ report rebuilds them itself the next time you open it.
 
 **Update Database** and **Rebuild Database** are much faster from a Windows PC:
 `database_pb.exe` in `.rockbox/tools/` does the same work on the connected
-player, or `database_pb.exe --rebuild` for a rebuild. Restart the player after
-ejecting it.
+player, or `database_pb.exe --rebuild` for a rebuild. The player restarts
+itself when ejected, to load the new database.
 
 ---
 
