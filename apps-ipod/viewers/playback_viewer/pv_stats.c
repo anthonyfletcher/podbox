@@ -49,9 +49,9 @@
 #include "system.h"      /* cpu_boost */
 #include "lang.h"
 #include "widgets/splash.h"
+#include "audio/playback.h"  /* playback_log_flush() */
 #ifdef HAVE_ALBUMART
 #include "metadata/art_cache.h"
-#include "audio/playback.h"  /* playback_log_flush() */
 #endif
 #include "pv_badges.h"
 #include "pv_index.h"

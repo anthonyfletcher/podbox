@@ -542,21 +542,22 @@ static bool added_matches(int from, int to)
 /* The table's header, if the table still serves this database: the one it
  * was worked out for, or that one with tracks only added since, none of them
  * named like a file the table could not place. A Rebuild renumbers the
- * entries, which the file at the old last entry shows. */
+ * entries and can restore the commit id and count, so both cases test the
+ * file at the old last entry; a key of 0 (off RAM) matches only itself. */
 static bool read_hdr(struct libfile_header *h, const struct pv_moves_db *db)
 {
     uint64_t last_key;
     uint32_t tail;
     int fd;
-    bool ok;
+    bool ok, same;
 
     if (!libfile_peek(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION, h)
         || h->count > MOVES_MAX)
         return false;
-    if (h->marks.entries == db->entries && h->marks.commitid == db->commit)
-        return true;
-    if (db->deleted < 0 || h->marks.deleted != db->deleted
-        || db->entries <= h->marks.entries || db->commit < h->marks.commitid)
+    same = h->marks.entries == db->entries && h->marks.commitid == db->commit;
+    if (h->marks.deleted != db->deleted
+        || (!same && (db->deleted < 0 || db->entries <= h->marks.entries
+                      || db->commit < h->marks.commitid)))
         return false;
 
     fd = libfile_open(PV_MOVES_PATH, PV_MOVES_MAGIC, PV_MOVES_VERSION,
@@ -566,15 +567,16 @@ static bool read_hdr(struct libfile_header *h, const struct pv_moves_db *db)
     ok = tail >= sizeof(last_key) + sizeof(unplaced_n)
          && lseek(fd, (off_t)h->count * sizeof(struct move), SEEK_CUR) >= 0
          && read(fd, &last_key, sizeof(last_key)) == (ssize_t)sizeof(last_key)
-         && last_key != 0
+         && (same || last_key != 0)
          && tagcache_entry_key(h->marks.entries - 1) == last_key
-         && read(fd, &unplaced_n, sizeof(unplaced_n))
-                == (ssize_t)sizeof(unplaced_n)
-         && unplaced_n <= UNPLACED_MAX
-         && read(fd, unplaced, unplaced_n * sizeof(uint32_t))
-                == (ssize_t)(unplaced_n * sizeof(uint32_t));
+         && (same
+             || (read(fd, &unplaced_n, sizeof(unplaced_n))
+                     == (ssize_t)sizeof(unplaced_n)
+                 && unplaced_n <= UNPLACED_MAX
+                 && read(fd, unplaced, unplaced_n * sizeof(uint32_t))
+                     == (ssize_t)(unplaced_n * sizeof(uint32_t))));
     close(fd);
-    return ok && (unplaced_n == 0
+    return ok && (same || unplaced_n == 0
                   || !added_matches(h->marks.entries, db->entries));
 }
 
