@@ -131,7 +131,7 @@ unsigned char *lang_spare_buffer(int *size)
     return language_buffer + language_buffer_used;
 }
 
-/* Eighteen english strings are used by two phrases each, so a caller that
+/* Many english strings are used by more than one phrase, so a caller that
    wants all of them resumes the scan rather than stopping at the first. */
 int lang_english_to_id_from(const char *english, int start_id)
 {

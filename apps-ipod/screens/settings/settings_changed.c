@@ -73,6 +73,12 @@ static bool collect_changed(const struct menu_item_ex *item,
     if (!settings_is_changed(setting))
         return true;
 
+    /* A menu listed in two places (Viewers) is walked twice: the first
+     * place found names the row. */
+    for (int i = 0; i < row_count; i++)
+        if (rows[i].item->variable == item->variable)
+            return true;
+
     rows[row_count].item = item;
     rows[row_count].parent = parent;
     row_count++;

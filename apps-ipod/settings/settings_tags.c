@@ -147,7 +147,7 @@ static const struct tag_row tag_rows[] = {
 { "seek acceleration",   TAG_ADVANCED|TAG_PLAYBACK,              "fast forward rewind" },
 { "pause on headphone unplug", TAG_PLAYBACK,                     "headphone unplug" },
 { "disable autoresume if phones not present", TAG_ADVANCED|TAG_PLAYBACK, "headphone resume" },
-{ "album art",           TAG_PLAYBACK|TAG_ARTWORK,               "cover art artwork" },
+{ "album art",           TAG_PLAYBACK|TAG_ARTWORK|TAG_APPEARANCE, "cover art artwork" },
 
 /* crossfade: the first row turns it on, the rest shape it */
 { "crossfade",                     TAG_PLAYBACK,                 "overlap gapless" },

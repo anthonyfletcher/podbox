@@ -16,8 +16,8 @@
  * the new text up, because they all resolve to the same id.
  *
  * The key is matched against the built-in English blob, never against what is
- * on screen, so it stays English under a translation. Eighteen english strings
- * are shared by two phrases each; every one of them is renamed, which is
+ * on screen, so it stays English under a translation. Many english strings
+ * are shared by more than one phrase; every one of them is renamed, which is
  * usually what was meant since they read the same on screen. Where it is not,
  * a "Date#2" suffix picks a single occurrence.
  *

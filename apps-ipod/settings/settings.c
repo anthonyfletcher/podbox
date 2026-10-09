@@ -1406,18 +1406,21 @@ void settings_apply(bool read_disk)
         }
         /* Loadable keyboard layouts are gone (click-wheel editor); the
          * kbd_file setting is inert. */
+        /* With no .lng, or one that fails to load, the strings are reset to
+         * the built-in ones, as a successful load does first. Without it a
+         * phrase dropped from overrides.cfg keeps pointing into the spare
+         * buffer, which the load below rewrites. */
         if ( global_settings.lang_file[0]) {
             snprintf(buf, sizeof buf, LANG_DIR "/%s.lng",
                      global_settings.lang_file);
             CHART(">lang_core_load");
-            lang_core_load(buf);
+            if (lang_core_load(buf))
+                lang_init(core_language_builtin, language_strings,
+                          LANG_LAST_INDEX_IN_ARRAY);
             CHART("<lang_core_load");
         }
         else
         {
-            /* What a .lng load does first. Without it a phrase dropped from
-             * overrides.cfg keeps pointing into the spare buffer, which the
-             * load below rewrites. */
             lang_init(core_language_builtin, language_strings,
                       LANG_LAST_INDEX_IN_ARRAY);
         }

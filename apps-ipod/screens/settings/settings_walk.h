@@ -22,9 +22,9 @@
  * or a setting whose effect lives in its menu callback will change value and do
  * nothing.
  *
- * Cross-listing means one setting can sit in two menus; the walk visits each
- * row it finds, so a caller that does not want duplicates dedupes on
- * `item->variable`.
+ * Cross-listing means one setting can sit in two menus. The walk skips the
+ * second copies of the Appearance screens but visits every other row it finds,
+ * so a caller that does not want duplicates dedupes on `item->variable`.
  */
 
 #ifndef _SETTINGS_WALK_H_

@@ -16,6 +16,23 @@
 /* The full settings tree, as the root Settings entry opens it. */
 extern const struct menu_item_ex main_menu_;
 
+/* Second copies of an Appearance screen, shown again beside the settings they
+ * style. The walk skips them so each setting has one path, the one under
+ * Appearance: Changed Settings lists it once and Search names its screen. */
+extern const struct menu_item_ex wps_appearance_link, carousel_appearance_link,
+                                 music_appearance_menu;
+static const struct menu_item_ex * const second_copies[] = {
+    &wps_appearance_link, &carousel_appearance_link, &music_appearance_menu,
+};
+
+static bool is_second_copy(const struct menu_item_ex *menu)
+{
+    for (unsigned i = 0; i < ARRAYLEN(second_copies); i++)
+        if (second_copies[i] == menu)
+            return true;
+    return false;
+}
+
 /* The tree is about five deep. The guard is against a menu that ends up
  * containing itself, which would otherwise recurse until the stack gives out. */
 #define MAX_DEPTH 12
@@ -55,6 +72,9 @@ static bool walk(const struct menu_item_ex *menu, const char *parent,
 
         if (type == MT_MENU)
         {
+            if (is_second_copy(item))
+                continue;
+
             /* Only MT_MENU carries submenus. A string list keeps its item
              * count in the same bits but holds strings in the union, so
              * recursing into one would walk whatever those pointers happen

@@ -560,8 +560,8 @@ MAKE_MENU(colours_menu, ID2P(LANG_COLORS_MENU), NULL, Icon_Display_menu,
             &set_sep_col,
             &reset_colors);
 
-/* The bars are here rather than in a Bars submenu of their own: three of the
-   five are one-line on/off choices, and burying them cost more than it saved.
+/* The bars sit here directly rather than in a Bars submenu: most are one-line
+   choices, and only the scroll bar, with two settings, earns a submenu.
    Most often changed first -- the art, then the icons and bars, then the
    marks drawn between and around the rows. */
 MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
@@ -597,8 +597,8 @@ MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             /* At the foot of Appearance rather than inside Theme Settings.
                What it forgets is every appearance setting the user has changed
                by hand, and those reach well past this screen -- the carousel's
-               geometry under Library, the playlist viewer's chrome under
-               Playback, the scrolling. A reset belongs at least as high as the
+               geometry, the playlist viewer's chrome under Playback, the
+               scrolling. A reset belongs at least as high as the
                things it resets. */
             &forget_tweaks_item,
 );
