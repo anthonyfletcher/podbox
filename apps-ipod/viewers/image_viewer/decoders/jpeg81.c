@@ -43,6 +43,7 @@ jpeg81.c
 #include "GETC.h"
 #include "jpegp_glue.h"
 #include "jpeg81.h"
+#include <limits.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -633,8 +634,9 @@ static int div_up(int a, int b)		//  ~ciel([a/b])
 
 static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 {
-	int i, TotalDU=0;
-	
+	int i;
+	long long TotalDU=0;
+
 	j->Hmax= j->Vmax= 0;
 
 		for (i=0; i<j->Nf; i++)		// read component data, set Hmax/Vmax
@@ -649,7 +651,10 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 
 			if ( C->Hi > j->Hmax ) j->Hmax = C->Hi;
 			if ( C->Vi > j->Vmax ) j->Vmax = C->Vi;
-			if (!C->Hi || !C->Vi) return -1;	/* the layout divides by these */
+			/* the layout divides by Hi and Vi, diffLeft holds Vi+1 entries,
+			   and Qi selects one of the four quant tables */
+			if (C->Hi < 1 || C->Hi > 4 || C->Vi < 1 || C->Vi > 4) return -1;
+			if (C->Qi < 0 || C->Qi > 3) return -1;
 
 			printf("    Ci=%3d HV=%dx%d Qi=%d\n", C->Ci, C->Hi, C->Vi, C->Qi);				
 		}
@@ -660,6 +665,7 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 		// Full Image MCU cover: 
 		j->mcu_width= div_up(j->X, j->Hmax*d);
 		j->mcu_height= div_up(j->Y, j->Vmax*d);
+		if ((long long)j->mcu_width * j->mcu_height > INT_MAX) return -1;
 		j->mcu_total= j->mcu_width * j->mcu_height;
 
 		// now set parameters based on Hmax/Vmax
@@ -670,6 +676,11 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 			int xi= div_up(j->X*C->Hi, j->Hmax);	// as Standard: sample rectangle (from image X,Y and Sampling factors)
 			int yi= div_up(j->Y*C->Vi, j->Vmax);	// used to compute single scan 'coverage'
 
+			/* refuse a frame whose allocation would not fit in an int; du_size
+			   is at most du_total, and the lossless DIFF lines fit beside it */
+			TotalDU+= (long long)j->mcu_width*C->Hi * j->mcu_height*C->Vi;
+			if (TotalDU > (long long)(INT_MAX / sizeof(DU))) return -1;
+
 			// Single scan DU-cover (LL: d=1)
 			C->du_w= div_up(xi, d);
 			C->du_h= div_up(yi, d);
@@ -679,8 +690,6 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 			C->du_width= j->mcu_width*C->Hi; 
 			C->du_total= C->du_width * j->mcu_height*C->Vi;
 
-			TotalDU+= C->du_total;
-
 					//printf("  %d\n", i);				
 					//printf("    Sample: x=%d+%d (1:%d) y=%d+%d (1:%d)\n", C->xi, C->dux*8-C->xi, j->Hmax/C->Hi, C->yi, C->duy*8-C->yi, j->Vmax/C->Vi);				
 					//printf("    8x8 Data Unit: %d (X=%d Y=%d)\n", C->duN, C->dux, C->duy); 
@@ -689,7 +698,7 @@ static int set_dim(struct JPEGD *j, int d)		// d= 1 (LL) or 8 (DCT)
 					//printf("    Sample: x=%d (1:%d) y=%d (1:%d)\n", C->du_xi, j->Hmax/C->Hi, C->du_yi, j->Vmax/C->Vi);				
 		}
 
-	return TotalDU;
+	return (int)TotalDU;
 }
 
 
@@ -888,6 +897,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			int ci;
 			GETWbi();	//Ls
 			printf("SOS\n");
+			if (!j->SOF) return JPEGENUMERR_BADSCAN;	/* no frame: no decoder or buffers yet */
 			j->Ns= GETC();//Ns
 			if (j->Ns < 1 || j->Ns > 4) return JPEGENUMERR_BADSCAN;
 			printf("  Ns: %d (%s scan)\n", j->Ns, (j->Ns>1)?"Interleaved":"Single");
@@ -903,8 +913,8 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 				if (Td > 3 || Ta > 3) return JPEGENUMERR_BADSCAN;
 
 				{// safe search
-					for ( i=0; i<4 && j->Components[i].Ci != Cs; i++ ) ;
-					if ( 4 == i ) return JPEGENUMERR_COMPNOTFOUND;
+					for ( i=0; i<j->Nf && j->Components[i].Ci != Cs; i++ ) ;
+					if ( j->Nf == i ) return JPEGENUMERR_COMPNOTFOUND;
 					j->ScanComponents[ci]= sc= j->Components+i;
 				}
 

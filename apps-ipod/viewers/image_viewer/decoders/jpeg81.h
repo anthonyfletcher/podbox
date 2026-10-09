@@ -34,7 +34,7 @@ enum JPEGENUM {
 	JPEGENUMERR_ZEROY,				// Y in SOFn is zero (DNL?)
 	JPEGENUMERR_COMPNOTFOUND,		// Scan component selector (Csj) not found among Component identifiers (Ci)
 	JPEGENUMERR_ZEROX,				/* X in SOFn is zero */
-	JPEGENUMERR_BADSAMPLING,		/* no components, or a zero sampling factor */
+	JPEGENUMERR_BADSAMPLING,		/* no components, a sampling factor outside 1..4, a quant table past 3, or a frame too large */
 	JPEGENUMERR_BADHUFF,			/* a DHT table out of range or overfull */
 	JPEGENUMERR_BADSCAN,			/* an SOS whose selectors or band are out of range */
 	JPEGENUMERR_BADSEGMENT,			/* a bad segment length, or the file ends before EOI */
