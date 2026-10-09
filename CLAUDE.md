@@ -568,9 +568,9 @@ releases -- so a failed build leaves the previous ones standing. Four releases
 go out: `Themes`, `Simulator`, `Bootloader` and then `latest`. `Bootloader` is
 `build-bootloader.sh`'s zip: both bootloaders, `ipodpatcher.exe` and
 `mks5lboot.exe` built from `utils/`, and the scripts and README in
-`tools/bootloader-installer/`. **`latest` is published last
-on purpose** -- GitHub features the release created most recently, and that is
-the one the repository's front page offers.
+`tools/bootloader-installer/`. **`latest` is the only release
+marked Latest** -- the other three pass `--latest=false` -- and GitHub features
+that one on the repository's front page.
 Release notes list every commit since the last release, using the `latest` tag
 itself as the start point -- read from origin, since nothing is tagged locally
 (a rolling tag in the dev checkout only goes stale). That tag always names a

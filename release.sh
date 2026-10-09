@@ -12,10 +12,9 @@
 # extras and the bootloader is installed once from a PC, and a page that
 # offers them all side by side invites unpacking the wrong one.
 #
-# `latest` is published last. GitHub features whichever release was created
-# most recently, and that is the one the repository's front page links to, so
-# the order of the publish steps at the bottom decides what a visitor is
-# offered first. It has to be the firmware.
+# Only `latest` is marked Latest. GitHub features that release and the
+# repository's front page links to it, so the other three are created with
+# --latest=false: what a visitor is offered first has to be the firmware.
 #
 # The build server is not recorded here -- see PODBOX_BUILD_SERVER below.
 #
@@ -590,16 +589,16 @@ fi
 # ---------------------------------------------------------------- publish ---
 # Everything below this line is visible outside, and is deliberately last.
 #
-# The order is themes, then simulator, then bootloader, then firmware, and it
-# is the firmware being LAST that matters: GitHub features the most recently
-# created release, and that is the one the repository's front page offers. A
-# visitor who follows it must land on the build, not on a theme, the simulator
-# or the bootloader.
+# The order is themes, then simulator, then bootloader, then firmware. Only
+# the firmware is marked Latest, the release the repository's front page
+# offers; the others pass --latest=false, because GitHub otherwise moves the
+# badge to each release as it is created. A visitor must land on the build,
+# not on a theme, the simulator or the bootloader.
 #
-# The cost of that order is that a failure in the last step leaves fresh Themes,
-# Simulator and Bootloader releases beside a stale `latest`. Everything is
-# built and verified before any of this runs, so what remains is a network or
-# gh failure; re-running the script republishes all four.
+# A failure in the last step leaves fresh Themes, Simulator and Bootloader
+# releases beside a stale `latest`. Everything is built and verified before
+# any of this runs, so what remains is a network or gh failure; re-running
+# the script republishes all four.
 
 SHA=$(git rev-parse HEAD)
 
@@ -636,6 +635,7 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     --target '$SHA' \
     --title 'Extra themes' \
     --notes-file themes-notes.md \
+    --latest=false \
     $DRAFT \
     $ALL_THEMES_ASSET \
     $(for t in $EXTRA_THEMES; do printf '%s ' "$(theme_asset_name "$t")"; done)"
@@ -657,6 +657,7 @@ if [ -n "$SIM_TARGETS" ]; then
         --target '$SHA' \
         --title 'Windows simulator' \
         --notes-file simulator-notes.md \
+        --latest=false \
         $DRAFT \
         $(sim_asset_name ipod6g) $(sim_asset_name ipodvideo)"
 
@@ -677,6 +678,7 @@ ssh "$SERVER" "cd '$REMOTE_DIR' && \
     --target '$SHA' \
     --title 'Bootloader installer' \
     --notes-file bootloader-notes.md \
+    --latest=false \
     $DRAFT \
     $BOOT_ASSET"
 
@@ -689,9 +691,9 @@ echo "  https://github.com/$SLUG/releases/tag/$BOOT_RELEASE"
 # it is published, so the swap deletes the old release and tag, then renames
 # and publishes the draft. A failure inside the swap leaves the build as the
 # draft; publish it by hand with
-#   gh release edit latest-next --repo <slug> --tag latest --draft=false
+#   gh release edit latest-next --repo <slug> --tag latest --draft=false --latest
 STAGING_TAG=$RELEASE-next
-PUBLISH=--draft=false
+PUBLISH='--draft=false --latest'
 [ -z "$DRAFT" ] || PUBLISH=
 
 say "Uploading the $RELEASE release as a draft"
