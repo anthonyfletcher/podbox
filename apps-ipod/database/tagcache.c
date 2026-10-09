@@ -1276,6 +1276,9 @@ static long find_entry_ram(const char *filename)
     return path_index_find(path_key(filename));
 }
 
+/* Longer than any "/<volume>" prefix a stored filename can carry */
+#define FIND_VOLUME_SLACK 16
+
 static long find_entry_disk(const char *filename_raw, bool localfd)
 {
     struct tagfile_entry tfe;
@@ -1336,10 +1339,16 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
             else
             {
                 pos += sizeof(struct tagfile_entry) + tfe.tag_length;
-                /* don't read the entry unless the length matches */
-                if (tfe.tag_length == tag_length)
+                /* Read only an entry the name could be: the stored name
+                 * keeps the volume the one sought was stripped of
+                 * ("/<HDD0>/Music/x" for "/Music/x"), so it is that much
+                 * longer. Trap: an exact length match never finds a stored
+                 * path with a volume in it. */
+                if (tfe.tag_length >= tag_length
+                    && tfe.tag_length <= tag_length + FIND_VOLUME_SLACK
+                    && tfe.tag_length < bufsz)
                 {
-                    if(read(fd, buf, tfe.tag_length) != tag_length)
+                    if(read(fd, buf, tfe.tag_length) != tfe.tag_length)
                     {
                         logf("read error #2");
                         close(fd);
@@ -1348,7 +1357,8 @@ static long find_entry_disk(const char *filename_raw, bool localfd)
                         last_pos = -1;
                         return -3;
                     }
-                    if (!strncasecmp(filename, buf, tag_length))
+                    buf[tfe.tag_length] = '\0';
+                    if (!strcasecmp(filename, path_key_strip(buf)))
                     {
                         last_pos = pos_history[pos_history_idx];
                         found = true;
@@ -3537,39 +3547,51 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
                  *
                  * For string hashes: tag_artist, tag_album, tag_title
                  * - All three of these must match
+                 *
+                 * The same album in two folders matches on all three, so a
+                 * filename match anywhere in the batch is taken over a tag
+                 * match earlier in it.
                  */
+                struct temp_file_entry *tfe = NULL;
+
                 for (j = 0; j < count; j++)
                 {
-                    struct temp_file_entry *tfe = &entrybuf[j];
+                    struct temp_file_entry *e = &entrybuf[j];
 
-                    /* Try to match numeric fields first. */
-                    if (tfe->tag_offset[tag_length]
-                        != idx->tag_seek[tag_length])
+                    if (e->tag_offset[tag_length] != idx->tag_seek[tag_length])
                         continue;
 
-                    /* Now it's time to do the hash matching. */
-                    if (tfe->tag_offset[tag_filename]
-                        != idx->tag_seek[tag_filename])
+                    if (e->tag_offset[tag_filename]
+                        == idx->tag_seek[tag_filename])
                     {
-                        int match_count = 0;
-
-                        /* No filename match: the other three tags must. */
-#define tmpdb_match(tag) \
-    if (tfe->tag_offset[tag] == idx->tag_seek[tag]) \
-        match_count++
-
-                        tmpdb_match(tag_artist);
-                        tmpdb_match(tag_album);
-                        tmpdb_match(tag_title);
-
-                        if (match_count < 3)
-                        {
-                            /* Still no match found, give up. */
-                            continue;
-                        }
+                        tfe = e;
+                        break;
                     }
 
-                    /* A match: copy and resurrect the statistical data. */
+                    if (tfe == NULL
+                        && e->tag_offset[tag_artist] == idx->tag_seek[tag_artist]
+                        && e->tag_offset[tag_album] == idx->tag_seek[tag_album]
+                        && e->tag_offset[tag_title] == idx->tag_seek[tag_title])
+                        tfe = e;
+                }
+
+                if (tfe == NULL)
+                    continue;
+
+                /* Two deleted entries can match one new entry -- the one this
+                 * update removed, and an older one for the same file that was
+                 * never resurrected. The figures last played win, then the
+                 * larger count; either way the loser is spent. Trap: taking
+                 * them in index order instead lets a later empty entry
+                 * overwrite a track's real figures with zeros. */
+                long new_lp = idx->tag_seek[tag_lastplayed];
+                long new_pc = idx->tag_seek[tag_playcount];
+                long have_lp = tfe->tag_offset[tag_lastplayed];
+                long have_pc = tfe->tag_offset[tag_playcount];
+
+                if (new_lp > have_lp
+                    || (new_lp == have_lp && new_pc >= have_pc))
+                {
 #define tmpdb_copy_tag(tag) \
     tfe->tag_offset[tag] = idx->tag_seek[tag]
 
@@ -3580,15 +3602,13 @@ static bool build_numeric_indices(struct tagcache_header *h, int tmpfd)
                     tmpdb_copy_tag(tag_commitid);
                     tmpdb_copy_tag(tag_lastelapsed);
                     tmpdb_copy_tag(tag_lastoffset);
-
-                    /* Avoid processing this entry again: one deleted entry
-                     * gives its figures to one new entry. */
-                    idx->flag |= FLAG_RESURRECTED;
-                    changed = true;
-
                     logf("Entry resurrected");
-                    break;
                 }
+
+                /* Not processed again: one deleted entry gives its figures
+                 * to one new entry at most. */
+                idx->flag |= FLAG_RESURRECTED;
+                changed = true;
             }
 
             if (changed)
