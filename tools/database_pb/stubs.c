@@ -48,9 +48,11 @@ unsigned char *language_strings[LANG_LAST_INDEX_IN_ARRAY];
 
 /* ---- progress ---------------------------------------------------------- *
  *
- * The scan yields every few files on the player, which is where this tool
- * says how far it has got: one line, redrawn in place a few times a second,
- * with the stage, the counts so far and the folder being read. */
+ * One line, redrawn in place a few times a second, with the stage, the counts
+ * so far and the folder being read. It is drawn from yield() and from the
+ * USB check the scan makes for every directory entry. Trap: yield() alone
+ * leaves it blank for minutes -- reading a changed file's tags never
+ * yields. */
 #define LINE_WIDTH 78
 
 volatile long current_tick;
@@ -83,7 +85,19 @@ static const char *tail(const char *path, int width)
     return buf;
 }
 
-void yield(void)
+/* The folder of a file the scan has reached, without the volume */
+static void set_folder(const char *path)
+{
+    const char *slash;
+
+    if (path[0] == '/' && path[1] == '<' && (slash = strchr(path + 1, '/')))
+        path = slash;
+    slash = strrchr(path, '/');
+    snprintf(folder, sizeof(folder), "%.*s",
+             slash != NULL && slash != path ? (int)(slash - path) : 1, path);
+}
+
+static void progress(void)
 {
     const struct tagcache_stat *s;
     char line[LINE_WIDTH + 1];
@@ -102,16 +116,8 @@ void yield(void)
     else if (s->scanning)
     {
         int n;
-        const char *cur = (const char *)s->curentry;
 
         scan_seen = true;
-        if (cur != NULL)
-        {
-            const char *slash = strrchr(cur, '/');
-            int len = slash != NULL && slash != cur ? slash - cur : 1;
-
-            snprintf(folder, sizeof(folder), "%.*s", len, cur);
-        }
         n = snprintf(line, sizeof(line), "Reading: %d checked, %d new, "
                      "%d changed  ", s->processed_entries, s->scan_added,
                      s->scan_changed);
@@ -128,6 +134,11 @@ void yield(void)
 
     printf("\r%-*s", LINE_WIDTH, line);
     shown = true;
+}
+
+void yield(void)
+{
+    progress();
 }
 
 /* tagcache.c sleeps a tick at a time to let the player breathe; here that
@@ -287,7 +298,8 @@ static void say(const char *kind, const char *what)
 
 /* The player's tracing goes to its own log files; here it is -v's, cut down
  * to the files that changed something. The scan names every file before it
- * says what it did with one, so the name is held until then. */
+ * says what it did with one, so the name is held until then -- and gives the
+ * progress line its folder, -v or not. */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
 {
     static char file[MAX_PATH];
@@ -295,15 +307,22 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     va_list ap;
 
     (void)id;
-    if (!database_pb_verbose)
-        return;
     va_start(ap, fmt);
+    if (!strcmp(fmt, "file: %s"))
+    {
+        const char *path = va_arg(ap, const char *);
+
+        va_end(ap);
+        set_folder(path);
+        snprintf(file, sizeof(file), "%s", path);
+        return;
+    }
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
+    if (!database_pb_verbose)
+        return;
 
-    if (!strncmp(msg, "file: ", 6))
-        snprintf(file, sizeof(file), "%s", msg + 6);
-    else if (!strcmp(msg, "info: added"))
+    if (!strcmp(msg, "info: added"))
         say("new", file);
     else if (!strcmp(msg, "info: re-adding"))
         say("changed", file);
@@ -379,11 +398,11 @@ void dircache_get_info(struct dircache_info *info)
 }
 
 /* The player is the one mounted; nothing is plugged into it. The scan asks
- * this for every file, which makes it the place the tick moves between
- * yields. */
+ * this for every directory entry, which makes it where the tick moves and
+ * the progress line is drawn between yields. */
 bool usb_host_is_present(void)
 {
-    tick();
+    progress();
     return false;
 }
 
