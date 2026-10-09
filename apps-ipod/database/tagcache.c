@@ -676,7 +676,11 @@ static int open_master_file(const char *name, struct master_header *hdr,
     if (fd < 0)
     {
         logf("master file open failed for R/W");
-        tc_stat.ready = false;
+        /* Only the live master's loss makes the database not ready. A
+         * commit's master.new failing is the commit's to report, and its
+         * error path needs ready to restore the live master's header. */
+        if (!strcmp(name, TAGCACHE_FILE_MASTER))
+            tc_stat.ready = false;
         return fd;
     }
 
@@ -713,6 +717,8 @@ static int open_master_fd(struct master_header *hdr, bool write)
     return open_master_file(TAGCACHE_FILE_MASTER, hdr, write);
 }
 
+static void merge_discard(void);
+
 static void remove_files(void)
 {
     int i;
@@ -724,6 +730,11 @@ static void remove_files(void)
     tc_stat.ramcache = false;
     tc_stat.econ = false;
     db_generation++;
+    /* A failed swap's files too, or the rebuild's commit would finish that
+     * swap over the new database. The marker first, so a cut between the two
+     * leaves only .new files, which no swap is waiting on. */
+    remove_db_file(TAGCACHE_FILE_SWAP);
+    merge_discard();
     remove_db_file(TAGCACHE_FILE_MASTER);
     for (i = 0; i < TAG_COUNT; i++)
     {
@@ -4034,7 +4045,7 @@ static int build_index(int index_type, struct tagcache_header *h, int tmpfd)
 /* After every tag is built: write the master once, with every old entry's
  * sorted seeks moved to where build_index() put their strings and every new
  * entry's seeks filled in, to TAGCACHE_FILE_MASTER ".new". The numeric pass
- * fills the new entries' figures after the swap. */
+ * then fills the new entries' figures into the same file, before the swap. */
 static bool merge_master(const struct tagcache_header *h)
 {
     struct master_header tcmh;
@@ -5504,7 +5515,15 @@ static bool delete_entry(long idx_id)
  */
 static bool check_event_queue(void)
 {
-    struct queue_event ev;
+    /* Searched past the head: a commit posts Q_RELOAD_RAMCACHE to this
+     * thread's own queue, and it is not drained until the scan returns. */
+    static const long stop_events[4][2] =
+    {
+        { Q_STOP_SCAN, Q_STOP_SCAN },
+        { SYS_POWEROFF, SYS_POWEROFF },
+        { SYS_REBOOT, SYS_REBOOT },
+        { SYS_USB_CONNECTED, SYS_USB_CONNECTED },
+    };
 
     /* An enumerating host counts. Trap: the queue alone is too late for one --
      * nothing arrives on it until SET_CONFIGURATION, by which point a scan
@@ -5512,19 +5531,8 @@ static bool check_event_queue(void)
     if (usb_host_is_present())
         return true;
 
-    if(!queue_peek(&tagcache_queue, &ev))
-        return false;
-
-    switch (ev.id)
-    {
-        case Q_STOP_SCAN:
-        case SYS_POWEROFF:
-        case SYS_REBOOT:
-        case SYS_USB_CONNECTED:
-            return true;
-    }
-
-    return false;
+    /* Count field is filters minus one. */
+    return queue_peek_ex(&tagcache_queue, NULL, 3, stop_events);
 }
 
 
@@ -6433,7 +6441,12 @@ void do_tagcache_build(const char *path[])
     if (walk_seen_count && !walk_incomplete)
         delete_unseen_entries();
     else if (walk_seen_count)
-        debug_log(DEBUG_LOG_TAGCACHE, "walk: incomplete, no deletions");
+    {
+        /* An unmarked entry may still exist, and the Update arms skipped
+         * the storage check because the walk was to do it: do it here. */
+        debug_log(DEBUG_LOG_TAGCACHE, "walk: incomplete, checking storage");
+        check_deleted_files();
+    }
     walk_seen_count = 0;
 
     /* Commit changes to the database. */

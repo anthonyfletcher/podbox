@@ -40,10 +40,15 @@ struct libfile_header {
 /* Marks meaning "made for no database in particular" */
 void libfile_no_marks(struct libfile_marks *m);
 
+/* What libfile_open() returns in place of a descriptor */
+#define LIBFILE_UNREAD (-1) /* absent, or open() or a read failed */
+#define LIBFILE_BAD    (-2) /* read, and not a good file of this version */
+#define LIBFILE_NEWER  (-3) /* this kind of file, from a later version */
+
 /* Opens path for reading, checking its magic, version, record size and
- * checksum. The descriptor is left at the first record; -1 if absent or not
- * a good file of this kind. tail, if given, gets the bytes after the
- * records. */
+ * checksum. The descriptor is left at the first record; one of the codes
+ * above if not. Only LIBFILE_BAD says the file itself is damaged. tail, if
+ * given, gets the bytes after the records. */
 int libfile_open(const char *path, uint32_t magic, uint16_t version,
                  uint16_t record_size, struct libfile_header *hdr,
                  uint32_t *tail);

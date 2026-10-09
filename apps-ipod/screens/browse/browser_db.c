@@ -2684,13 +2684,17 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     /* Neither over spoken word: a book is heard whole and in order, so
      * every track of an author, or of a book shuffled, is not something to
      * offer. A hidden load still gets <All tracks>, because
-     * goto_allsubentries() descends through it to act on every book. */
+     * goto_allsubentries() descends through it to act on every book, and
+     * sorted by album with the title level's disc and track, so each book
+     * is inserted whole and in order. */
     if (tag != tag_title && tag != tag_filename
         && (!csi_mentions_spoken() || loading_hidden))
     {
         if (offset <= sidx)
         {
-            dptr->newtable = TABLE_ALLSUBENTRIES;
+            dptr->newtable = csi_mentions_spoken()
+                             ? TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
+                             : TABLE_ALLSUBENTRIES;
             dptr->name = ID2P(LANG_TAGNAVI_ALL_TRACKS);
             dptr->extraseek = 0;
             dptr->customaction = ONPLAY_NO_CUSTOMACTION;
@@ -4970,7 +4974,9 @@ static bool goto_allsubentries(int newtable)
         int pick = tc->special_entry_count;
         for (int j = 0; j < tc->special_entry_count; j++)
         {
-            if (browser_db_get_entry(tc, j)->newtable == TABLE_ALLSUBENTRIES)
+            int t = browser_db_get_entry(tc, j)->newtable;
+            if (t == TABLE_ALLSUBENTRIES
+                || t == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
             {
                 pick = j;
                 break;

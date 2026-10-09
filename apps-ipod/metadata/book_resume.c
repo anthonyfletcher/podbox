@@ -291,16 +291,23 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
 
     fd = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, LIB_BOOKS_VERSION, 1,
                       &h, NULL);
-    if (fd < 0)
+    if (fd == LIBFILE_BAD)
     {
-        fd = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, 1, 1, &h, NULL);
-        old = true;
+        int fd1 = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, 1, 1, &h,
+                               NULL);
+        if (fd1 >= 0)
+        {
+            fd = fd1;
+            old = true;
+        }
     }
     if (fd < 0)
     {
-        /* A file that will not open is set aside, or every save, mark and
-         * rekey that copies it would fail until it was deleted by hand. */
-        if (file_exists(BOOK_RESUME_FILE)
+        /* A damaged file is set aside, or every save, mark and rekey that
+         * copies it would fail until it was deleted by hand. One that could
+         * not be read, or is from a later version, is kept and refused:
+         * those do not mean the positions in it are lost. */
+        if (fd == LIBFILE_BAD
             && rename(BOOK_RESUME_FILE, BOOK_RESUME_FILE ".bad") == 0)
             writes++;
         return !file_exists(BOOK_RESUME_FILE);

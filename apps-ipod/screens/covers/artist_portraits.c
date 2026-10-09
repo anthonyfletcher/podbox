@@ -229,6 +229,8 @@ static void carousel_sort_noop(void)
 {
 }
 
+static void artist_set_initial(const char *selected_file);
+
 /* carousel_model.on_menu: the same Carousel settings menu the album carousel
  * opens. Artists have no pfraw cache, so the album model's cache_version
  * follow-up has no artist equivalent. */
@@ -241,6 +243,8 @@ static int artist_on_menu(void)
     int old_filter[CAROUSEL_FILTER_SLOTS];
     char old_chain[CAROUSEL_FILTER_MAX];
     long seek = carousel_idx.artist_index[center_index].seek;
+    int32_t commitid = carousel_idx.commitid;
+    uint32_t generation = carousel_idx.generation;
 
     memcpy(old_filter, global_settings.album_covers_filter, sizeof(old_filter));
     strmemccpy(old_chain, global_settings.album_covers_filter_chain,
@@ -260,12 +264,17 @@ static int artist_on_menu(void)
     {
         if (!carousel_reinit())
             return GO_TO_PREVIOUS;
-        for (int i = 0; i < carousel_idx.artist_ct; i++)
-            if (carousel_idx.artist_index[i].seek == seek)
-            {
-                set_current_slide(i);
-                break;
-            }
+        /* The seek names the same artist only within one commit */
+        if (carousel_idx.commitid != commitid
+            || carousel_idx.generation != generation)
+            artist_set_initial(NULL);
+        else
+            for (int i = 0; i < carousel_idx.artist_ct; i++)
+                if (carousel_idx.artist_index[i].seek == seek)
+                {
+                    set_current_slide(i);
+                    break;
+                }
     }
 
     /* A treatment reaches a slide only as it is loaded, so the decoded ones

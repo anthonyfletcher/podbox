@@ -59,19 +59,34 @@ int libfile_open(const char *path, uint32_t magic, uint16_t version,
 {
     uint32_t crc;
     off_t body;
+    ssize_t n;
+    int rc = LIBFILE_BAD;
     int fd = open(path, O_RDONLY);
 
     if (fd < 0)
-        return -1;
+        return LIBFILE_UNREAD;
     body = ffilesize(fd) - (off_t)sizeof(*hdr);
-    if (!read_header(fd, magic, version, hdr)
-        || hdr->record_size != record_size
-        || body < (off_t)hdr->count * record_size
-        || !crc_rest(fd, &crc) || crc != hdr->checksum
-        || lseek(fd, sizeof(*hdr), SEEK_SET) != (off_t)sizeof(*hdr))
+    n = read(fd, hdr, sizeof(*hdr));
+    if (n < 0)
+        rc = LIBFILE_UNREAD;
+    else if (n == (ssize_t)sizeof(*hdr) && hdr->magic == magic
+             && hdr->version > version)
+        rc = LIBFILE_NEWER;
+    else if (n == (ssize_t)sizeof(*hdr) && hdr->magic == magic
+             && hdr->version == version
+             && hdr->record_size == record_size
+             && body >= (off_t)hdr->count * record_size)
+    {
+        if (!crc_rest(fd, &crc))
+            rc = LIBFILE_UNREAD;
+        else if (crc == hdr->checksum)
+            rc = lseek(fd, sizeof(*hdr), SEEK_SET) == (off_t)sizeof(*hdr)
+                 ? fd : LIBFILE_UNREAD;
+    }
+    if (rc != fd)
     {
         close(fd);
-        return -1;
+        return rc;
     }
     if (tail)
         *tail = body - (off_t)hdr->count * record_size;

@@ -546,6 +546,11 @@ static bool sort_albums(int new_sorting, bool from_settings)
         splash(HZ, sort_options[new_sorting]);
     }
 
+    /* After a commit the index's seeks and names are stale. The screen's loop
+     * rebuilds it, already in the new order, before it uses a seek. */
+    if (!db_summary_current(&carousel_idx))
+        return true;
+
     album_seek = carousel_idx.album_index[center_index].seek;
     artist_seek = carousel_idx.album_index[center_index].artist_seek;
 
