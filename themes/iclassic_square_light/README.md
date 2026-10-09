@@ -38,6 +38,7 @@ colour and `no` keeps it black.
 | `vivid_volume_bar` | `yes`, `no` | `yes` | The volume bar, shown in place of the progress bar while the volume changes. |
 | `vivid_transport_icon` | `yes`, `no` | `no` | The play, pause, fast-forward, rewind and hold icon in the title bar. |
 | `vivid_battery_icon` | `yes`, `no` | `no` | The battery icon in the title bar. |
+| `vivid_title_bar` | `yes`, `no` | `no` | The bar along the top of the screen. `no` keeps it grey. |
 | `vivid_title_text` | `yes`, `no` | `no` | The title bar's text: the list's name, or Now Playing. |
 | `vivid_song_text` | `yes`, `no` | `no` | The song's title, on the playing screen and in the pane beside lists. |
 | `vivid_selection` | `yes`, `no` | `yes` | The bar behind the selected row. `no` makes it black. |

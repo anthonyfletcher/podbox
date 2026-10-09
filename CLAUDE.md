@@ -367,8 +367,9 @@ conflicts. Do not prune them to tidy the tree -- being unused is not a reason
 to remove something here.
 
 `uisimulator/` is upstream-identical as well, but it is **built** -- the
-simulator uses it as-is, along with `firmware/target/hosted/sdl/`. Neither
-needed a fork change.
+simulator uses it, along with `firmware/target/hosted/sdl/`. Three files there
+carry the `--screenshot` argument and nothing else; `upstream-divergence.md`
+lists them under *The simulator*.
 
 ### Threading
 

@@ -54,7 +54,7 @@ reliably.
 looks right only because the previous one set something, it will not look right
 on a clean player.
 
-The reset covers 68 settings:
+The reset covers 72 settings:
 
 | Group | Settings |
 |---|---|
@@ -63,9 +63,9 @@ The reset covers 68 settings:
 | Chrome | `statusbar`, `scrollbar`, `scrollbar width`, `selector type`, `list separator height`, `show icons`, `volume display`, `battery display`, `ui viewport` |
 | Icons and files | `iconset`, `viewers iconset`, `filetype colours` |
 | Backdrop | `backdrop` |
-| Artwork | `database album art`, `database artist art`, `database audiobook art`, `database author art`, `database art row height`, `dynamic colors` |
+| Artwork | `database album art`, `database artist art`, `database audiobook art`, `database author art`, `database art row height`, `dynamic colors`, `dynamic colors background` |
 | Dialogs | the whole `dialog …` block (§4), plus `progress bar radius` |
-| Carousel | `album covers background`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, `album covers filter`, and the 3D and Flat geometry |
+| Carousel | `album covers background`, `album covers background color`, `album covers statusbar`, `album covers view mode`, `album covers show album name`, `album covers show year`, `album covers filter 1`–`3`, `album covers filter`, and the 3D and Flat geometry |
 | Scrolling | `scroll speed`, `scroll delay`, `scroll step`, `bidir limit`, `screen scroll step`, and the two main-menu scrolling switches |
 | Playlist viewer | `playlist viewer icons`, `playlist viewer indices`, `playlist viewer track display` |
 
