@@ -292,6 +292,12 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             alloc_response(IAPRetIPodPreferencesPayload);
             response->class_id   = request->class_id;
             response->setting_id = 0; /* TODO: return actual value */
+            if(request->class_id == IAPIPodPereferenceClassID_LineOutUsage) {
+                IAPBool used;
+                check_ret(iap_platform_get_lineout_usage(ctx, &used), -IAPAckStatus_ECommandFailed);
+                response->setting_id = used ? IAPIPodPreferenceLineOutUsageSettingID_Used
+                                            : IAPIPodPreferenceLineOutUsageSettingID_NotUsed;
+            }
             return IAPGeneralCommandID_RetIPodPreferences;
         } break;
         case IAPGeneralCommandID_SetIPodPreferences: {
@@ -549,6 +555,40 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 warn("invalid request type 0x%02" PRIX8, request->type);
                 return -IAPAckStatus_EBadParameter;
             }
+        } break;
+        case IAPDisplayRemoteCommandID_SetIPodStateInfo: {
+            /* play status only; some head units send Playing every few
+             * seconds while playing and hold their audio until it is acked */
+            read_request(IAPIPodStatePlayStatusPayload);
+            check_ret(request->type == IAPIPodStateType_PlayStatus, -IAPAckStatus_EBadParameter);
+            int control;
+            switch(request->status) {
+            case IAPIPodStatePlayStatus_PlaybackStopped:
+                control = IAPPlatformControl_Stop;
+                break;
+            case IAPIPodStatePlayStatus_Playing:
+                control = IAPPlatformControl_Play;
+                break;
+            case IAPIPodStatePlayStatus_PlaybackPaused:
+                control = IAPPlatformControl_Pause;
+                break;
+            case IAPIPodStatePlayStatus_FastForward:
+            case IAPIPodStatePlayStatus_FastRewind:
+            case IAPIPodStatePlayStatus_EndFastForwardRewind:
+                /* no seek, as PlayControl's StartFF and StartRew */
+                return ipod_ack(command, IAPAckStatus_Success, response_span, IAPDisplayRemoteCommandID_IPodAck);
+            default:
+                return -IAPAckStatus_EBadParameter;
+            }
+            const struct IAPPlatformPendingControl pending = {
+                .req_command = command,
+                .ack_command = IAPDisplayRemoteCommandID_IPodAck,
+                .trans_id    = ctx->handling_trans_id,
+                .lingo       = lingo,
+            };
+            iap_platform_control(ctx, control, pending);
+            response_span->ptr = NULL;
+            return 0;
         } break;
         case IAPDisplayRemoteCommandID_GetPlayStatus: {
             struct IAPPlatformPlayStatus status;

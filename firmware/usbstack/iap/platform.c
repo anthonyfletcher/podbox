@@ -303,6 +303,12 @@ IAPBool iap_platform_get_hold_switch_state(struct IAPContext* iap_ctx, IAPBool* 
     return iap_true;
 }
 
+IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used) {
+    (void)iap_ctx;
+    *used = global_settings.lineout_active ? iap_true : iap_false;
+    return iap_true;
+}
+
 /* taken from iap-core.c */
 static void get_trackinfo(const unsigned int track, struct mp3entry* id3) {
     int tracknum = track;
