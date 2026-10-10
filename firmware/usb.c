@@ -158,6 +158,9 @@ static bool usb_dac_auto = true;
 static bool usb_dac_tried = false;
 static int usb_dac_polls = 0;           /* >0 while a try is polling */
 static volatile bool usb_dac_requested; /* Turn On posted, not yet taken */
+/* This try came from Turn On, so no 5V is no reason to stop: a DAC on its
+ * own power puts none on the cable */
+static bool usb_dac_turned_on;
 static struct timeout usb_dac_tmo;
 static struct usb_dac_auto_record usb_dac_rec = { .step = "no cable yet" };
 /* The last poll of the port, for the log: USB_LOG_HOST_DAC's b and d */
@@ -649,6 +652,7 @@ static void usb_dac_turn(bool on)
             usb_host_probe_switch(true);
             usb_dac_polls = 1;
             usb_dac_port_bits = 0;
+            usb_dac_turned_on = true;
             usb_dac_note("polling (turned on)");
             usb_dac_requested = false;
             usb_dac_auto_step();
@@ -687,6 +691,7 @@ static void usb_dac_auto_step(void)
     if(usb_dac_polls == 0)
     {
         usb_dac_port_bits = 0;
+        usb_dac_turned_on = false;
         usb_dac_rec.bus_resets = usb_record.bus_resets;
         if(!usb_dac_auto)
             usb_dac_note("skipped: setting off");
@@ -735,7 +740,7 @@ static void usb_dac_auto_step(void)
 #endif
     else if(usb_dac_polls >= USB_DAC_MAX_POLLS)
         usb_dac_note("no device");
-    else if(usb_detect() == USB_EXTRACTED)
+    else if(!usb_dac_turned_on && usb_detect() == USB_EXTRACTED)
         usb_dac_note("cable out");
     else
     {
