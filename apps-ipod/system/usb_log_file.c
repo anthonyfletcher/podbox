@@ -207,6 +207,14 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
                      "not whole samples, the track moved %ld ms",
                      c, e->b, (long)d);
             break;
+        case USB_LOG_IAP2_AUDIO_USB:
+#ifdef USB_BATCH_NON_NATIVE
+            snprintf(p, size, "audio: %lu USB packets failed", d);
+#else
+            snprintf(p, size, "audio: the USB queue ran empty %lu times, "
+                     "%lu USB packets failed", c, d);
+#endif
+            break;
         case USB_LOG_IAP2_RECONNECT:
             snprintf(p, size, "iap2: a car, so connecting again without the "
                      "sound card");

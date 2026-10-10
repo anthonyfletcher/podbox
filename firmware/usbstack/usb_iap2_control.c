@@ -62,6 +62,7 @@
 #include "playlist.h"
 #include "powermgmt.h"
 #include "settings.h"
+#include "usb_drv.h"
 #include "usb_log.h"
 
 #include "iap/audio.h"
@@ -538,6 +539,7 @@ void usb_iap2_control_rate(unsigned long rate)
 static void start_audio(void)
 {
     struct iap_audio_counts c;
+    uint32_t ran_empty, failed;
     const struct mp3entry *id3;
 
     audio_on = true;
@@ -546,6 +548,7 @@ static void start_audio(void)
         rate_wanted = iap_audio_sampr();
     send_rate(rate_wanted);
     iap_audio_take_counts(&c);
+    usb_drv_batch_take_counts(&ran_empty, &failed);
     id3 = audio_current_track();
     counts_tick = current_tick;
     counts_elapsed = id3 ? id3->elapsed : 0;
@@ -559,15 +562,18 @@ static void start_audio(void)
 static void log_audio_counts(void)
 {
     struct iap_audio_counts c;
+    uint32_t ran_empty, failed;
     const struct mp3entry *id3 = audio_current_track();
     const unsigned long elapsed = id3 ? id3->elapsed : 0;
 
     iap_audio_take_counts(&c);
+    usb_drv_batch_take_counts(&ran_empty, &failed);
     usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_TAKEN,
             MIN((current_tick - counts_tick) * 1000 / HZ, 0xffff),
             c.bytes, c.chunks);
     usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_GAPS, MIN(c.odd, 0xffff),
             c.silent, elapsed - counts_elapsed);
+    usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_USB, 0, ran_empty, failed);
     counts_tick = current_tick;
     counts_elapsed = elapsed;
 }

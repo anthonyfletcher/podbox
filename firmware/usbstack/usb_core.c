@@ -579,6 +579,7 @@ void usb_core_hotswap_event(int volume, bool inserted)
 static uint8_t batch_ep = 0;
 static bool batch_stopped;
 static usb_drv_batch_get_more batch_get_more;
+static volatile uint32_t batch_failed;
 
 int usb_drv_batch_init(int ep, usb_drv_batch_get_more get_more)
 {
@@ -629,6 +630,15 @@ static void batch_xfer_complete(void) {
         return;
     }
     batch_get_and_send();
+}
+
+void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed)
+{
+    const int irq = disable_irq_save();
+    *ran_empty = 0;
+    *failed = batch_failed;
+    batch_failed = 0;
+    restore_irq(irq);
 }
 #endif
 
@@ -1412,6 +1422,8 @@ void usb_core_transfer_complete(int ep, int dir, int status, int length) {
 #ifdef USB_BATCH_NON_NATIVE
     /* batch api */
     if(batch_ep != 0 && (ep | dir) == batch_ep) {
+        if(status != 0)
+            batch_failed++;
         batch_xfer_complete();
         return;
     }

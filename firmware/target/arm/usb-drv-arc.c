@@ -1404,6 +1404,7 @@ static uint8_t batch_ep = 0;
 static uint8_t batch_write_cursor;
 static bool batch_stopped;
 static usb_drv_batch_get_more batch_get_more;
+static volatile uint32_t batch_ran_empty, batch_failed;
 
 static int ep_to_pipe_index(uint8_t ep) {
     const int ep_num = EP_NUM(ep);
@@ -1430,8 +1431,10 @@ int usb_drv_batch_deinit() {
     return 0;
 }
 
-/* returns whether priming is needed */
-static bool batch_fill_tds(void) {
+/* returns how many slots were refilled, or -1 when the queue was stopped and
+ * needs no priming */
+static int batch_fill_tds(void) {
+    int filled = 0;
     while(!(batch_td_array[batch_write_cursor].size_ioc_sts & DTD_STATUS_ACTIVE)) {
         /* batch_get_more may call batch_stop() through:
         *  - batch_get_more()
@@ -1442,15 +1445,18 @@ static bool batch_fill_tds(void) {
         size_t len;
         batch_get_more(&ptr, &len);
         if(len == 0 || batch_stopped) {
-            return false;
+            return -1;
         }
 
         struct transfer_descriptor* td = &batch_td_array[batch_write_cursor];
+        if(td->size_ioc_sts & DTD_ERROR_MASK)
+            batch_failed++;
         td_set_buf_ptr(td, ptr);
         td->size_ioc_sts = (len << DTD_LENGTH_BIT_POS) | DTD_STATUS_ACTIVE;
         batch_write_cursor = (batch_write_cursor + 1)  % USB_BATCH_SLOTS;
+        filled++;
     }
-    return true;
+    return filled;
 }
 
 int usb_drv_batch_start(void) {
@@ -1504,6 +1510,15 @@ int usb_drv_batch_stop(void) {
     while (REG_ENDPTFLUSH & mask);
 
     return 0;
+}
+
+void usb_drv_batch_take_counts(uint32_t *ran_empty, uint32_t *failed)
+{
+    const int irq = disable_irq_save();
+    *ran_empty = batch_ran_empty;
+    *failed = batch_failed;
+    batch_ran_empty = batch_failed = 0;
+    restore_irq(irq);
 }
 
 #if defined(LOGF_ENABLE) && defined(ROCKBOX_HAS_LOGF)
@@ -1566,8 +1581,12 @@ static void sof_received(void) {
         REG_ENDPTPRIME |= mask;
     }
 
-    /* do refill */
-    if(batch_fill_tds()) {
+    /* do refill. Every slot free means the last queued packet went out with
+     * nothing behind it. */
+    const int filled = batch_fill_tds();
+    if(filled == USB_BATCH_SLOTS)
+        batch_ran_empty++;
+    if(filled >= 0) {
         const int pipe = ep_to_pipe_index(batch_ep);
         const unsigned int mask = pipe2mask[pipe];
         REG_ENDPTPRIME |= mask;

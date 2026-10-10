@@ -159,6 +159,8 @@ enum usb_log_type
 #define USB_LOG_IAP2_AUDIO_GAPS  17 /* b = chunks not whole samples, c =
                                      * packets of silence, d = how far the
                                      * track's position moved, ms */
+#define USB_LOG_IAP2_AUDIO_USB   18 /* c = times the USB queue ran empty,
+                                     * d = packets that failed */
 
 #define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
 #define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */
