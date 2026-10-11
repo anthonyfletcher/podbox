@@ -909,7 +909,12 @@ static void NORETURN_ATTR usb_thread(void)
             usb_stack_enable(false);
             sleep(HZ / 5);      /* long enough for the car to see it go */
             usb_stack_enable(true);
+#ifdef HAVE_USB_POWER
+            /* charge only stays charge only */
+            usb_configure_drivers(usb_power_only ? USB_POWERED : USB_INSERTED);
+#else
             usb_configure_drivers(USB_INSERTED);
+#endif
             break;
 #endif
 
@@ -1349,9 +1354,9 @@ void usb_set_hid(bool enable)
 #endif /* USB_ENABLE_HID */
 
 #ifdef USB_ENABLE_IAP
-/* Takes effect at the next connection, either way: on here would offer the
- * driver charge-only, and off mid-connection would skip its disconnect at
- * unplug, leaving the mixer on the iAP sink. */
+/* Takes effect at the next connection, either way: off mid-connection would
+ * skip the driver's disconnect at unplug, leaving the mixer on the iAP
+ * sink. */
 void usb_set_iap(bool enable)
 {
     usb_iap = enable;
