@@ -727,8 +727,13 @@ static inline int do_backlight(action_last_t *last, action_cur_t *cur, int actio
     if (action != ACTION_NONE && bl_activate)
     {
         action_handle_backlight(true, true);
-        /* Handle first keypress enables backlight only */
-        if (has_flag(last->backlight_mask, SEL_ACTION_FFKEYPRESS) && bl_is_off)
+        /* Handle first keypress enables backlight only. Not for a remote
+         * with no screen of its own, as in button.c's filter. */
+        if (has_flag(last->backlight_mask, SEL_ACTION_FFKEYPRESS) && bl_is_off
+#if defined(BUTTON_REMOTE) && !defined(HAVE_REMOTE_LCD)
+            && !(cur->button & BUTTON_REMOTE)
+#endif
+           )
         {
             action       = ACTION_NONE;
             last->button = BUTTON_NONE;

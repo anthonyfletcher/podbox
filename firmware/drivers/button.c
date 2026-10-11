@@ -169,6 +169,13 @@ static bool filter_first_keypress_disabled(int button, int data)
 
 static bool filter_first_keypress_enabled(int button, int data)
 {
+#if defined(BUTTON_REMOTE) && !defined(HAVE_REMOTE_LCD)
+    /* A remote or accessory button is never swallowed: whoever presses it
+     * cannot see the screen it would wake, and expects it to act */
+    if (button & BUTTON_REMOTE)
+        return filter_first_keypress_disabled(button, data);
+#endif
+
 #if defined(HAVE_TRANSFLECTIVE_LCD) && defined(HAVE_LCD_SLEEP)
     if (is_backlight_on(false) && lcd_active())
 #else
