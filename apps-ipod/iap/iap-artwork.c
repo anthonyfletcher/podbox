@@ -6,6 +6,12 @@
  * reached, or one with no art, has none to send. A transfer is one packet
  * an iAP thread event, so the accessory's commands are answered between
  * them.
+ *
+ * Parts, in order:
+ *   - art_path(): the thumbnail a track's art is read from
+ *   - the queries: iap_artwork_format_valid(), _exists(), _put_formats(),
+ *     _put_counts()
+ *   - the transfer: iap_artwork_start(), _send_next(), _active(), _stop()
  ****************************************************************************/
 #include "config.h"
 #include "system.h"
@@ -21,6 +27,8 @@
 static const unsigned char art_dims[] = { 56, 128 };
 #define ART_FORMATS ((int)sizeof(art_dims))
 #define ART_PIXEL_RGB565LE 0x02
+/* The first packet's fields before the pixels, its index included */
+#define ART_HEADER 19
 
 static fb_data art_buf[128 * 128];
 
@@ -67,23 +75,40 @@ static bool art_path(uint32_t track, char *out, int out_len)
     return true;
 }
 
+/* Payload bytes a packet may carry, lingo and command included */
+static int art_limit(void)
+{
+    int cap = device.max_payload - (device.transid ? 2 : 0);
+
+    return (device.max_payload && cap < TX_BUFLEN) ? cap : TX_BUFLEN;
+}
+
 bool iap_artwork_format_valid(uint16_t format)
 {
     return format < ART_FORMATS;
 }
 
+/* Only a thumbnail art_cache_load_aat() can scale to every format counts,
+ * so a track reported as having art always has it to send */
 bool iap_artwork_exists(uint32_t track)
 {
     char path[MAX_PATH];
+    struct art_cache_header hdr;
     int fd;
+    bool ok;
 
     if (!art_path(track, path, sizeof(path)))
         return false;
     fd = open(path, O_RDONLY);
     if (fd < 0)
         return false;
+    ok = read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
+         && hdr.magic == ART_CACHE_MAGIC
+         && hdr.version == ART_CACHE_FORMAT_VERSION
+         && hdr.layout == AA_ROWS && hdr.width == hdr.height
+         && hdr.width >= art_dims[ART_FORMATS - 1];
     close(fd);
-    return true;
+    return ok;
 }
 
 void iap_artwork_put_formats(void)
@@ -120,7 +145,9 @@ bool iap_artwork_start(unsigned char lingo, uint16_t command,
     int fd, rc;
 
     iap_artwork_stop();
+    /* the first packet carries its header and at least one byte */
     if (!iap_artwork_format_valid(format)
+        || art_limit() <= (lingo == 0x04 ? 3 : 2) + ART_HEADER
         || !art_path(track, path, sizeof(path)))
         return false;
     fd = open(path, O_RDONLY);
@@ -150,7 +177,8 @@ bool iap_artwork_start(unsigned char lingo, uint16_t command,
 bool iap_artwork_send_next(void)
 {
     size_t size = (size_t)art_tx.dim * art_tx.dim * sizeof(fb_data);
-    size_t limit = TX_BUFLEN, used, chunk;
+    int limit = art_limit(), used;
+    size_t chunk;
 
     if (!art_tx.active)
         return false;
@@ -173,11 +201,8 @@ bool iap_artwork_send_next(void)
         IAP_TX_PUT_U32(art_tx.dim * sizeof(fb_data));
     }
 
-    /* No packet larger than the accessory takes, its transaction ID
-     * included */
-    if (device.max_payload && device.max_payload - (device.transid ? 2 : 0)
-                              < (int)limit)
-        limit = device.max_payload - (device.transid ? 2 : 0);
+    /* No packet larger than the accessory takes; a limit it lowers during
+     * the transfer can leave no room */
     used = iap_txnext - iap_txpayload;
     if (limit <= used)
     {
@@ -186,13 +211,18 @@ bool iap_artwork_send_next(void)
     }
 
     /* Native RGB565 is little-endian on both players, the format offered */
-    chunk = MIN(limit - used, size - art_tx.offset);
+    chunk = MIN((size_t)(limit - used), size - art_tx.offset);
     IAP_TX_PUT_DATA((unsigned char *)art_buf + art_tx.offset, chunk);
     iap_send_tx_tid(art_tx.tid);
 
     art_tx.offset += chunk;
     art_tx.index++;
     art_tx.active = art_tx.offset < size;
+    return art_tx.active;
+}
+
+bool iap_artwork_active(void)
+{
     return art_tx.active;
 }
 

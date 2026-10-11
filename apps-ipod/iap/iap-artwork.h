@@ -24,6 +24,7 @@ bool iap_artwork_start(unsigned char lingo, uint16_t command,
                        uint32_t track, uint16_t format);
 /* True while packets remain */
 bool iap_artwork_send_next(void);
+bool iap_artwork_active(void);
 void iap_artwork_stop(void);
 
 #endif /* _IAP_ARTWORK_H_ */

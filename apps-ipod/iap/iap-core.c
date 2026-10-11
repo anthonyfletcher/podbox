@@ -99,6 +99,11 @@ static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
 static volatile bool reset_pending;
 static long last_frame_tick;     /* 0 until a frame passes its checksum */
+/* The data of the one IAP_EV_ARTWORK that is live, and whether a packet
+ * went since the last tick; a tick that finds none sent posts a new one,
+ * so an event lost to a full queue does not end the transfer */
+static intptr_t art_seq;
+static bool art_sent;
 /* This is set to true if a SYS_POWEROFF message is received,
  * signalling impending power off
  */
@@ -526,6 +531,9 @@ static void iap_thread(void)
             case IAP_EV_TICK:
             {
                 iap_periodic();
+                if (iap_artwork_active() && !art_sent)
+                    iap_artwork_post();
+                art_sent = false;
                 /* pick up packets whose IAP_EV_MSG_RCVD event was lost
                    to a queue overflow, they would otherwise sit in the
                    RX buffer until the next packet arrives */
@@ -540,10 +548,18 @@ static void iap_thread(void)
                 break;
             }
 
+            /* queue_wait() does not block while the next one is queued,
+             * so the yield lets the other threads run between packets */
             case IAP_EV_ARTWORK:
             {
+                if (ev.data != art_seq)
+                    break;
+                art_sent = true;
                 if (iap_artwork_send_next())
+                {
+                    yield();
                     iap_artwork_post();
+                }
                 break;
             }
 
@@ -788,9 +804,10 @@ void iap_send_tx_tid(uint16_t tid)
     tid_override = -1;
 }
 
+/* Supersedes any IAP_EV_ARTWORK still queued */
 void iap_artwork_post(void)
 {
-    queue_post(&iap_queue, IAP_EV_ARTWORK, 0);
+    queue_post(&iap_queue, IAP_EV_ARTWORK, ++art_seq);
 }
 
 /* Send the current content of the TX buffer.
