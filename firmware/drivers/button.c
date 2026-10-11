@@ -175,6 +175,11 @@ static bool filter_first_keypress_enabled(int button, int data)
     if (button & BUTTON_REMOTE)
         return filter_first_keypress_disabled(button, data);
 #endif
+#ifdef HAVE_MIKEY_REMOTE
+    /* the inline remote reports multimedia codes, not BUTTON_REMOTE's */
+    if (button & BUTTON_MULTIMEDIA)
+        return filter_first_keypress_disabled(button, data);
+#endif
 
 #if defined(HAVE_TRANSFLECTIVE_LCD) && defined(HAVE_LCD_SLEEP)
     if (is_backlight_on(false) && lcd_active())
