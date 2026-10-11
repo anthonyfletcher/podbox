@@ -65,6 +65,77 @@ static void cmd_pending(const unsigned char cmd, const uint32_t msdelay)
     iap_send_tx();
 }
 
+/* An accessory names its lingoes, by IdentifyDeviceLingoes or by IDPS's
+ * IdentifyToken. A lingo the player lacks is left out of the set rather
+ * than failing the identification: an accessory that also speaks, say,
+ * Digital Audio still remotes the player. False for a combination to
+ * refuse. */
+static bool identify_valid(uint32_t *lingoes, uint32_t options,
+                           uint32_t deviceid)
+{
+    int i;
+
+    for (i = 0; i < 32; i++) {
+        if ((*lingoes & BIT_N(i)) && !LINGO_SUPPORTED(i))
+            *lingoes &= ~BIT_N(i);
+    }
+
+    /* Bit 0 _must_ be set by the device */
+    if (!(*lingoes & 1))
+        return false;
+
+    /* A deviceid needs authentication, and authentication a deviceid */
+    return !deviceid == !(options & 0x03);
+}
+
+/* The identified accessory's session starts: authentication if it asked
+ * for any, which the periodic handler begins with GetDevAuthenticationInfo,
+ * and otherwise straight to GetAccessoryInfo */
+static void identified(uint32_t lingoes, uint32_t options, uint32_t deviceid)
+{
+    device.lingoes = lingoes;
+
+    /* Devices using IdentifyDeviceLingoes get power off notifications */
+    device.do_power_notify = true;
+
+    if (deviceid && (options & 0x03) && !DEVICE_AUTH_RUNNING) {
+        device.auth.state = AUST_INIT;
+    } else {
+        /* Asked for none, so none is waited on */
+        device.auth.state = AUST_AUTH;
+        /* IDPS gave all of it in its tokens */
+        if (!device.identified_by_idps)
+            device.accinfo = ACCST_INIT;
+        queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
+    }
+}
+
+/* SetFIDTokenValues' IdentifyToken: the lingo count, the lingoes, then the
+ * options and device ID. Its acknowledgement status. */
+static unsigned char idps_identify_token(const unsigned char *p,
+                                         unsigned int len)
+{
+    uint32_t lingoes = 0, options, deviceid;
+    unsigned int i;
+
+    if (len < 1 || len < 1u + p[0] + 8)
+        return 0x01;    /* required token rejected */
+
+    for (i = 0; i < p[0]; i++) {
+        if (p[1 + i] < 32)
+            lingoes |= BIT_N(p[1 + i]);
+    }
+    options = get_u32(&p[1 + p[0]]);
+    deviceid = get_u32(&p[5 + p[0]]);
+    if (!identify_valid(&lingoes, options, deviceid))
+        return 0x01;
+
+    device.idps_lingoes = lingoes;
+    device.idps_options = options;
+    device.idps_deviceid = deviceid;
+    return 0x00;
+}
+
 void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
 {
     unsigned int cmd = buf[1];
@@ -474,14 +545,11 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          */
         case 0x13:
         {
-            unsigned char i;
-
             CHECKLEN(14);
 
             uint32_t lingoes = get_u32(&buf[2]);
             uint32_t options = get_u32(&buf[6]);
             uint32_t deviceid = get_u32(&buf[0x0A]);
-            bool seen_unsupported = false;
 
             /*
              * Actions by remote listed            Apple Firmware   Rockbox Firmware
@@ -536,32 +604,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
              * Bit 5: RF Transmitter lingo
              */
 
-            /* A lingo we do not support is left out of the negotiated set
-             * rather than failing the whole identification: an accessory
-             * that also speaks, say, Digital Audio still remotes the player.
-             */
-            for(i=0; i<32; i++) {
-                if ((lingoes & BIT_N(i)) && !LINGO_SUPPORTED(i))
-                    lingoes &= ~BIT_N(i);
-            }
-
-            /* Bit 0 _must_ be set by the device */
-            if (!(lingoes & 1)) {
-                seen_unsupported = true;
-            }
-
-            /* Specifying a deviceid without requesting authentication is
-             * an error
-             */
-            if (deviceid && !(options & 0x03))
-                seen_unsupported = true;
-
-            /* Specifying authentication without a deviceid is an error */
-            if (!deviceid && (options & 0x03))
-                seen_unsupported = true;
-
             device.lingoes = 0;
-            if (seen_unsupported) {
+            if (!identify_valid(&lingoes, options, deviceid)) {
                 cmd_ack(cmd, IAP_ACK_CMD_FAILED);
                 break;
             }
@@ -570,27 +614,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
              * Only once it is accepted: the change pauses playback. */
             iap_interface_state_change(IST_STANDARD);
             iap_reset_device(&device);
-            device.lingoes = lingoes;
-
-            /* Devices using IdentifyDeviceLingoes get power off notifications */
-            device.do_power_notify = true;
-
-            /* If a new authentication is requested, start the auth
-             * process.
-             * The periodic handler will take care of sending out the
-             * GetDevAuthenticationInfo packet
-             *
-             * If no authentication is requested, schedule the start of
-             * GetAccessoryInfo
-             */
-            if (deviceid && (options & 0x03) && !DEVICE_AUTH_RUNNING) {
-                device.auth.state = AUST_INIT;
-            } else {
-                /* Asked for none, so none is waited on */
-                device.auth.state = AUST_AUTH;
-                device.accinfo = ACCST_INIT;
-                queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
-            }
+            identified(lingoes, options, deviceid);
 
             cmd_ok(cmd);
 
@@ -761,11 +785,13 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
 
                 iap_send_tx();
 
-                /* GetAccessoryInfo*/
-                IAP_TX_INIT(0x00, 0x27);
-                IAP_TX_PUT(0x00);
+                /* GetAccessoryInfo: IDPS gave all of it in its tokens */
+                if (!device.identified_by_idps) {
+                    IAP_TX_INIT(0x00, 0x27);
+                    IAP_TX_PUT(0x00);
 
-                iap_send_tx();
+                    iap_send_tx();
+                }
 
                 device.auth.state = AUST_CERTDONE;
             }
@@ -1027,6 +1053,15 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                     break;
                 }
 
+                /* Maximum payload size */
+                case 0x09:
+                {
+                    CHECKLEN(5);
+
+                    device.max_payload = get_u16(&buf[0x03]);
+                    break;
+                }
+
                 /* For now, ignore all other information */
                 default:
                 {
@@ -1141,6 +1176,234 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                 cmd_ok(cmd);
             }
 
+            break;
+        }
+
+        /* RequestTransportMaxPayloadSize (0x11)
+         *
+         * Returns:
+         * ReturnTransportMaxPayloadSize (0x12), the largest payload the
+         * player accepts: 506, what an accessory assumes without asking
+         */
+        case 0x11:
+        {
+            IAP_TX_INIT(0x00, 0x12);
+            IAP_TX_PUT_U16(506);
+
+            iap_send_tx();
+            break;
+        }
+
+        /* StartIDPS (0x38)
+         *
+         * Identification by FID tokens instead of IdentifyDeviceLingoes.
+         * Transaction IDs are in force from this command on, iap-core.c
+         * adding and removing them. A second StartIDPS starts again, and
+         * one after a finished identification resets it.
+         *
+         * Returns:
+         * IAP_ACK_OK
+         */
+        case 0x38:
+        {
+            iap_interface_state_change(IST_STANDARD);
+            iap_reset_device(&device);
+            device.transid = true;
+            device.idps = true;
+
+            cmd_ok(cmd);
+            break;
+        }
+
+        /* SetFIDTokenValues (0x39)
+         *
+         * Packet format (offset in buf[]: Description)
+         * 0x00: Lingo ID: General Lingo, always 0x00
+         * 0x01: Command, always 0x39
+         * 0x02: Number of tokens
+         * 0x03-0xNN: Tokens, each a length not counting itself, the FID
+         *            type and subtype, and the token's data
+         *
+         * Only the IdentifyToken and the AccessoryInfoToken's maximum
+         * payload are used; every other token is accepted.
+         *
+         * Returns:
+         * RetFIDTokenValueACKs (0x3A), one acknowledgement a token
+         *
+         * Returns on failure:
+         * IAP_ACK_CMD_FAILED outside StartIDPS and EndIDPS
+         * IAP_ACK_BAD_PARAM for tokens that do not add up to their count,
+         *                   which accepts none of them
+         */
+        case 0x39:
+        {
+            unsigned int pos = 3, n, i;
+
+            CHECKLEN(3);
+            if (!device.idps) {
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                break;
+            }
+
+            n = buf[2];
+            for (i = 0; i < n && pos + 3 <= len; i++) {
+                if (buf[pos] < 2 || pos + 1 + buf[pos] > len)
+                    break;
+                pos += 1 + buf[pos];
+            }
+            /* five bytes at most an acknowledgement, after the count */
+            if (i != n || pos != len || 3 + 5 * n > TX_BUFLEN) {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+
+            IAP_TX_INIT(0x00, 0x3A);
+            IAP_TX_PUT(n);
+            for (pos = 3, i = 0; i < n; i++, pos += 1 + buf[pos]) {
+                const unsigned char *t = &buf[pos];
+                unsigned char status = 0x00;    /* accepted */
+
+                if (t[1] == 0x00 && t[2] == 0x00)
+                    status = idps_identify_token(&t[3], t[0] - 2);
+                else if (t[1] == 0x00 && t[2] == 0x02 && t[0] >= 5
+                         && t[3] == 0x09)
+                    device.max_payload = get_u16(&t[4]);
+
+                /* AccessoryInfo, iPodPreference and EAProtocol tokens'
+                 * acknowledgements name which one, by its first byte */
+                if (t[1] == 0x00 && t[2] >= 0x02 && t[2] <= 0x04
+                    && t[0] >= 3) {
+                    IAP_TX_PUT(0x04);
+                    IAP_TX_PUT(t[1]);
+                    IAP_TX_PUT(t[2]);
+                    IAP_TX_PUT(status);
+                    IAP_TX_PUT(t[3]);
+                } else {
+                    IAP_TX_PUT(0x03);
+                    IAP_TX_PUT(t[1]);
+                    IAP_TX_PUT(t[2]);
+                    IAP_TX_PUT(status);
+                }
+            }
+
+            iap_send_tx();
+            break;
+        }
+
+        /* EndIDPS (0x3B)
+         *
+         * Packet format (offset in buf[]: Description)
+         * 0x00: Lingo ID: General Lingo, always 0x00
+         * 0x01: Command, always 0x3B
+         * 0x02: 0x00 done, 0x01 start the tokens again, 0x02 abandon IDPS,
+         *       0x03 IDPS moves to another transport
+         *
+         * Returns:
+         * IDPSStatus (0x3C): 0x00 identified, 0x02 no IdentifyToken
+         * accepted, 0x04 for a restart, 0x06 for an abandon; nothing
+         * for 0x03, after which the accessory sends nothing here
+         *
+         * Returns on failure:
+         * IAP_ACK_CMD_FAILED outside StartIDPS and EndIDPS
+         */
+        case 0x3B:
+        {
+            CHECKLEN(3);
+            if (!device.idps) {
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                break;
+            }
+
+            switch (buf[2])
+            {
+                case 0x00:
+                {
+                    IAP_TX_INIT(0x00, 0x3C);
+                    IAP_TX_PUT(device.idps_lingoes ? 0x00 : 0x02);
+
+                    iap_send_tx();
+                    if (device.idps_lingoes) {
+                        device.idps = false;
+                        device.identified_by_idps = true;
+                        identified(device.idps_lingoes, device.idps_options,
+                                   device.idps_deviceid);
+                    }
+                    break;
+                }
+                case 0x01:
+                {
+                    device.idps_lingoes = 0;
+                    device.idps_options = 0;
+                    device.idps_deviceid = 0;
+                    device.max_payload = 0;
+
+                    IAP_TX_INIT(0x00, 0x3C);
+                    IAP_TX_PUT(0x04);
+
+                    iap_send_tx();
+                    break;
+                }
+                case 0x02:
+                {
+                    /* It may still identify with IdentifyDeviceLingoes */
+                    IAP_TX_INIT(0x00, 0x3C);
+                    IAP_TX_PUT(0x06);
+
+                    iap_send_tx();
+                    device.idps = false;
+                    break;
+                }
+                case 0x03:
+                {
+                    device.idps = false;
+                    device.transid = false;
+                    break;
+                }
+                default:
+                {
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    break;
+                }
+            }
+            break;
+        }
+
+        /* GetiPodOptionsForLingo (0x4B)
+         *
+         * Packet format (offset in buf[]: Description)
+         * 0x00: Lingo ID: General Lingo, always 0x00
+         * 0x01: Command, always 0x4B
+         * 0x02: Lingo
+         *
+         * Returns:
+         * RetiPodOptionsForLingo (0x4C): the lingo, then 8 bytes of options.
+         * General: line-out usage. Simple Remote: context and audio media
+         * buttons. Display Remote: volume control.
+         *
+         * Returns on failure:
+         * IAP_ACK_BAD_PARAM for a lingo the player lacks
+         */
+        case 0x4B:
+        {
+            uint32_t options = 0;
+
+            CHECKLEN(3);
+            if (buf[2] >= 32 || !LINGO_SUPPORTED(buf[2])) {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+
+            if (buf[2] == 0x00 || buf[2] == 0x03)
+                options = BIT_N(0);
+            else if (buf[2] == 0x02)
+                options = BIT_N(0) | BIT_N(1);
+
+            IAP_TX_INIT(0x00, 0x4C);
+            IAP_TX_PUT(buf[2]);
+            IAP_TX_PUT_U32(0x00);
+            IAP_TX_PUT_U32(options);
+
+            iap_send_tx();
             break;
         }
 

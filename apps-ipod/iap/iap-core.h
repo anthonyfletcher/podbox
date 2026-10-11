@@ -83,6 +83,7 @@ struct auth_t {
     unsigned char max_section;      /* The maximum number of certificate sections */
     unsigned char next_section;     /* The next expected section number */
     uint16_t version;               /* Authentication version */
+    uint16_t tid;                   /* the one transaction ID of the exchange */
 };
 
 /* State of GetAccessoryInfo */
@@ -139,6 +140,16 @@ struct device_t {
                                      * of GetAccessoryInfo
                                      */
     uint32_t capabilities_queried;  /* Capabilities already queried */
+    uint16_t max_payload;           /* the accessory's largest packet, or 0 */
+
+    /* IDPS. Transaction IDs are in force from StartIDPS to the next
+     * Identify or IdentifyDeviceLingoes; iap-core.c adds and strips them. */
+    bool transid;
+    bool idps;                      /* between StartIDPS and EndIDPS */
+    bool identified_by_idps;
+    uint32_t idps_lingoes;          /* the IdentifyToken's */
+    uint32_t idps_options;
+    uint32_t idps_deviceid;
 
     /* Extended Interface PlayStatusChangeNotification, a subscription of
      * its own: the bits of SetPlayStatusChangeNotification, and what was

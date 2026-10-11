@@ -139,9 +139,9 @@ static struct event_queue iap_queue;
  * iap_buffers points to the start of the complete buffer
  *
  * The buffer is partitioned as follows:
- * - TX_BUFLEN+6 bytes for the TX buffer
- *   The 6 extra bytes are for the sync byte, the SOP byte, the length indicators
- *   (3 bytes) and the checksum byte.
+ * - TX_AREA bytes for the TX buffer
+ *   The 8 extra bytes are for the sync byte, the SOP byte, the length indicators
+ *   (3 bytes), a transaction ID (2 bytes) and the checksum byte.
  *   iap_txstart points to the beginning of the TX buffer
  *   iap_txpayload points to the beginning of the payload portion of the TX buffer
  *   iap_txnext points to the position where the next byte will be placed
@@ -171,7 +171,8 @@ static struct event_queue iap_queue;
  * buffer overflow has some place to spill into where it will not cause
  * immediate damage. See the comments for IAP_TX_* and iap_send_tx()
  */
-#define IAP_MALLOC_SIZE (TX_BUFLEN+6+RX_BUFLEN+2)
+#define TX_AREA (TX_BUFLEN+8)
+#define IAP_MALLOC_SIZE (TX_AREA+RX_BUFLEN+2)
 #ifdef IAP_MALLOC_DYNAMIC
 static int iap_buffer_handle;
 #endif
@@ -284,7 +285,7 @@ static void iap_reset_buffers(void)
     iap_txstart = iap_buffers;
     iap_txpayload = iap_txstart+5;
     iap_txnext = iap_txpayload;
-    iap_rxstart = iap_buffers+(TX_BUFLEN+6);
+    iap_rxstart = iap_buffers+TX_AREA;
     iap_rxpayload = iap_rxstart;
     iap_rxnext = iap_rxpayload;
     iap_rxlen = RX_BUFLEN+2;
@@ -449,6 +450,13 @@ void iap_reset_device(struct device_t* device)
     device->accinfo = ACCST_NONE;
     device->capabilities = 0;
     device->capabilities_queried = 0;
+    device->max_payload = 0;
+    device->transid = false;
+    device->idps = false;
+    device->identified_by_idps = false;
+    device->idps_lingoes = 0;
+    device->idps_options = 0;
+    device->idps_deviceid = 0;
 }
 
 static int iap_task(struct timeout *tmo)
@@ -692,6 +700,67 @@ void iap_bitrate_set(const int ratenum)
    checksum (length+mode+parameters+checksum == 0)
 */
 
+/* The command being handled, whose transaction ID a reply carries */
+static bool rx_handling;
+static unsigned char rx_lingo;
+static uint16_t rx_tid;
+/* The next ID of a command the player sends */
+static uint16_t own_tid;
+
+/* Sent by the player of its own accord, not in answer: these take an ID of
+ * their own even while a command is being handled */
+static bool tx_unsolicited(const unsigned char *p)
+{
+    switch (p[0])
+    {
+        case 0x00: return p[1] == 0x23 || p[1] == 0x27;
+        case 0x03: return p[1] == 0x09;
+        case 0x04: return get_u16(&p[1]) == 0x0027;
+        default:   return false;
+    }
+}
+
+static uint16_t tx_tid(const unsigned char *p)
+{
+    /* One ID serves the whole authentication exchange */
+    if (p[0] == 0x00 && (p[1] == 0x14 || p[1] == 0x16
+                         || p[1] == 0x17 || p[1] == 0x19))
+        return device.auth.tid;
+    /* An iPodAck answers a command of any lingo */
+    if (rx_handling && !tx_unsolicited(p)
+        && (p[0] == rx_lingo || (p[0] == 0x00 && p[1] == 0x02)))
+        return rx_tid;
+    return own_tid++;
+}
+
+/* Called for every packet before its lingo's handler, which then reads it
+ * as though transaction IDs did not exist. False for one too short to
+ * carry the ID it owes, which is dropped. */
+static bool rx_take_tid(unsigned char **pkt, unsigned int *len)
+{
+    unsigned char *p = *pkt;
+    unsigned int hdr = (p[0] == 0x04) ? 3 : 2;
+
+    /* The two commands that carry none, and switch them off */
+    if (*len >= 2 && p[0] == 0x00 && (p[1] == 0x01 || p[1] == 0x13))
+    {
+        device.transid = false;
+        device.idps = false;
+        return true;
+    }
+    /* StartIDPS carries the first */
+    if (!device.transid && !(*len >= 2 && p[0] == 0x00 && p[1] == 0x38))
+        return true;
+    if (*len < hdr + 2)
+        return false;
+
+    rx_tid = get_u16(p + hdr);
+    memmove(p + 2, p, hdr);
+    *pkt = p + 2;
+    *len -= 2;
+    return true;
+}
+
 /* Send the current content of the TX buffer.
  * This will check for TX buffer overflow and panic, but it might
  * be too late by then (although one would have to overflow the complete
@@ -710,6 +779,21 @@ void iap_send_tx(void)
 
     if (txlen > TX_BUFLEN)
         panicf("IAP: TX buffer overflow");
+
+    /* The ID goes after the command, two bytes long for lingo 4; TX_AREA
+     * has the room */
+    if (device.transid)
+    {
+        int hdr = (iap_txpayload[0] == 0x04) ? 3 : 2;
+
+        if (txlen >= hdr)
+        {
+            memmove(iap_txpayload + hdr + 2, iap_txpayload + hdr, txlen - hdr);
+            put_u16(iap_txpayload + hdr, tx_tid(iap_txpayload));
+            iap_txnext += 2;
+            txlen += 2;
+        }
+    }
 
     /* A short-form length above 0xFC reads as the long form's marker */
     if (txlen <= 0xFC)
@@ -995,6 +1079,7 @@ void iap_periodic(void)
         case AUST_INIT:
         {
             /* Send out GetDevAuthenticationInfo */
+            device.auth.tid = own_tid++;
             IAP_TX_INIT(0x00, 0x14);
 
             iap_send_tx();
@@ -1601,21 +1686,28 @@ void iap_handlepkt(void)
         logf("R: %s", hexstring(iap_rxstart+2, (length)));
 #endif
 
-        if (length != 0) {
-            unsigned char mode = *(iap_rxstart+2);
+        unsigned char *pkt = iap_rxstart+2;
+        unsigned int plen = length;
+
+        if (length != 0 && rx_take_tid(&pkt, &plen)) {
+            unsigned char mode = pkt[0];
+
+            rx_handling = true;
+            rx_lingo = mode;
             switch (mode) {
-            case 0: iap_handlepkt_mode0(length, iap_rxstart+2); break;
+            case 0: iap_handlepkt_mode0(plen, pkt); break;
 #ifdef HAVE_LINE_REC
-            case 1: iap_handlepkt_mode1(length, iap_rxstart+2); break;
+            case 1: iap_handlepkt_mode1(plen, pkt); break;
 #endif
-            case 2: iap_handlepkt_mode2(length, iap_rxstart+2); break;
-            case 3: iap_handlepkt_mode3(length, iap_rxstart+2); break;
-            case 4: iap_handlepkt_mode4(length, iap_rxstart+2); break;
-            case 5: iap_handlepkt_mode5(length, iap_rxstart+2); break;
+            case 2: iap_handlepkt_mode2(plen, pkt); break;
+            case 3: iap_handlepkt_mode3(plen, pkt); break;
+            case 4: iap_handlepkt_mode4(plen, pkt); break;
+            case 5: iap_handlepkt_mode5(plen, pkt); break;
 #if CONFIG_TUNER
-            case 7: iap_handlepkt_mode7(length, iap_rxstart+2); break;
+            case 7: iap_handlepkt_mode7(plen, pkt); break;
 #endif
             }
+            rx_handling = false;
         }
 
         /* Remove the handled packet from the RX buffer
@@ -1658,7 +1750,7 @@ static int iap_move_callback(int handle, void* current, void* new)
     iap_txstart = new;
     iap_txpayload = iap_txstart+5;
     iap_txnext = iap_txpayload;
-    iap_rxstart = iap_buffers+(TX_BUFLEN+6);
+    iap_rxstart = iap_buffers+TX_AREA;
 
     return BUFLIB_CB_OK;
 }
@@ -1756,6 +1848,10 @@ static int dbg_iap_callback(int action, struct gui_synclist *lists)
     simplelist_reset_lines();
     simplelist_addline("auth: %d acc: %d", device.auth.state, device.accinfo);
     simplelist_addline("lin: %08lx", (unsigned long)device.lingoes);
+    simplelist_addline("idps: %s tid: %s max: %u",
+                       device.idps ? "running" :
+                       device.identified_by_idps ? "done" : "no",
+                       device.transid ? "yes" : "no", device.max_payload);
     simplelist_addline("notif: %08lx", (unsigned long)device.notifications);
     simplelist_addline("cap: %08lx/%08lx", (unsigned long)device.capabilities,
                        (unsigned long)device.capabilities_queried);
