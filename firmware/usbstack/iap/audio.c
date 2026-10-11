@@ -154,6 +154,9 @@ static void sink_set_freq(uint16_t freq) {
     if(freq != acked_freq) {
         asked_freq = freq;
         asked_tick = current_tick;
+    } else {
+        /* back to the acked rate: an ack still owed is for another */
+        asked_freq = -1;
     }
 
     struct IAPContext* ctx = _iap_acquire_ctx(true);
@@ -319,7 +322,7 @@ void iap_audio_attrs_ack(bool success) {
 }
 
 void iap_audio_tick(void) {
-    if(asked_freq >= 0 && TIME_AFTER(current_tick, asked_tick + HZ)) {
+    if(asked_freq >= 0 && asked_freq == set_freq && TIME_AFTER(current_tick, asked_tick + HZ)) {
         ERROR("no ack for rate %d, playing anyway", asked_freq);
         acked_freq = asked_freq;
         asked_freq = -1;
@@ -380,9 +383,11 @@ bool iap_audio_init(void) {
     check_act(usb_drv_batch_init(AS_EP_IN, batch_get_more) == 0, return false);
 
     /* every rate for a new connection; a sink kept through a bus reset keeps
-     * the dock's until they come again */
+     * the dock's until they come again, and its stream carries on from where
+     * it stopped once the dock has a rate */
     if(pcm_current_sink() != PCM_SINK_IAP) {
         offer_rates((1u << ARRAYLEN(samprs)) - 1);
+        exhausted = true;
     }
 
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
@@ -396,7 +401,6 @@ bool iap_audio_init(void) {
     set_freq         = -1;
     cur_freq         = -2; /* something <0 && !=set_freq */
     enabled          = false;
-    exhausted        = true;
     track_attrs_sent = false;
     track_changed    = false;
     accessory_ready  = false;
