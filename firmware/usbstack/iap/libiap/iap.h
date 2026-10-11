@@ -16,6 +16,8 @@ IAPBool        _iap_send_packet(struct IAPContext* ctx, uint8_t lingo, uint16_t 
 /* must be called after iap_platform_on_acc_samprs_received */
 IAPBool iap_select_sampr(struct IAPContext* ctx, uint32_t sampr);
 IAPBool iap_control_response(struct IAPContext* ctx, struct IAPPlatformPendingControl pending, IAPBool result);
+/* every tick: lets go of a remote's buttons 200ms after their last report */
+void    iap_remote_buttons_tick(struct IAPContext* ctx);
 
 /* hid.c */
 IAPBool iap_feed_hid_report(struct IAPContext* ctx, const uint8_t* data, size_t size);

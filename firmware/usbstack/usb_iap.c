@@ -436,6 +436,7 @@ static int usb_iap_init_connection(void) {
         ERROR("failed to claim albumart slot");
     }
     platform.control_pending = false;
+    platform.seek_direction  = 0;
 
     /* register timer */
     timeout_register(&tick_tmo, tick_callback, HZ / 10, 0);
@@ -499,6 +500,9 @@ static void usb_iap_disconnect(void) {
     iap_initialized = false;
     /* The stream stops before the sink changes or its buffers go. */
     check_act(iap_audio_disable(), );
+    /* and a scan ends where it has got to */
+    iap_platform_seek_stop(_iap_acquire_ctx(true));
+    _iap_release_ctx();
     /* A bus reset is not the dock leaving (Gerrit 7900). An iAP1 dock's sink
      * stays, so the track waits where it is, paused or playing, until the
      * dock's rates come back; another configuration or the cable going ends
@@ -719,6 +723,8 @@ static void usb_iap_notify_event(intptr_t data) {
         }
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         struct Platform*   plt = ctx->platform;
+        iap_remote_buttons_tick(ctx);
+        iap_platform_seek_tick(ctx);
         if(plt->control_pending && !iap_platform_library_play_done(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();

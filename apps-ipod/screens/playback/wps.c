@@ -1110,6 +1110,17 @@ struct wps_state *get_wps_state(void)
 }
 
 /* this is called from the playback thread so NO DRAWING! */
+void wps_set_seek_preview(struct mp3entry *id3, unsigned long position)
+{
+    struct wps_state *state = get_wps_state();
+    long offset = 0;
+
+    if (id3 && state->id3 == id3)
+        offset = (long)position - (long)id3->elapsed;
+    state->ff_rewind_count = offset;
+    skin_request_full_update(WPS);
+}
+
 static void track_info_callback(unsigned short id, void *param)
 {
     struct wps_state *state = get_wps_state();
@@ -1117,6 +1128,7 @@ static void track_info_callback(unsigned short id, void *param)
     if (id == PLAYBACK_EVENT_TRACK_CHANGE || id == PLAYBACK_EVENT_CUR_TRACK_READY)
     {
         state->id3 = ((struct track_event *)param)->id3;
+        state->ff_rewind_count = 0;
         if (state->id3->cuesheet)
         {
             cue_find_current_track(state->id3->cuesheet, state->id3->elapsed);

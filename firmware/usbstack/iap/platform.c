@@ -32,6 +32,7 @@
 #include "settings.h"
 #include "sound.h"
 #include "usb_drv.h"
+#include "wps.h"
 
 #include "../usb_iap.h"
 #include "debug.h"
@@ -93,6 +94,102 @@ IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* n
     return iap_span_append(name, buf, strlen(buf) + 1);
 }
 
+uint32_t iap_platform_get_time_ms(struct IAPContext* iap_ctx) {
+    (void)iap_ctx;
+    return (uint32_t)current_tick * (1000 / HZ);
+}
+
+/* A remote's scan moves only the WPS preview, and makes one codec seek when
+ * it ends: a seek per report, or WPS keys, would stop working once the user
+ * left the WPS. From Gerrit 7906. */
+void iap_platform_seek_stop(struct IAPContext* ctx) {
+    struct Platform* plt = ctx->platform;
+    if(!plt->seek_direction) {
+        return;
+    }
+    plt->seek_direction = 0;
+    if((audio_status() & AUDIO_STATUS_PLAY) && playlist_get_display_index() == plt->seek_track) {
+        /* as a WPS seek does, the position is set before the preview goes */
+        struct mp3entry* id3 = audio_current_track();
+        if(id3) {
+            id3->elapsed = plt->seek_position;
+        }
+        audio_ff_rewind(plt->seek_position);
+        iap_notify_track_time_position(ctx, plt->seek_position);
+    }
+    wps_set_seek_preview(NULL, 0);
+    iap_notify_play_status(ctx, IAPIPodStatePlayStatus_EndFastForwardRewind);
+}
+
+void iap_platform_seek_tick(struct IAPContext* ctx) {
+    struct Platform* plt = ctx->platform;
+    if(!plt->seek_direction) {
+        return;
+    }
+    if(!(audio_status() & AUDIO_STATUS_PLAY) || playlist_get_display_index() != plt->seek_track) {
+        plt->seek_direction = 0;
+        wps_set_seek_preview(NULL, 0);
+        return;
+    }
+    const uint32_t now = iap_platform_get_time_ms(ctx);
+    /* A lost EndFFRew must not leave playback paused for ever. Simple
+     * Remote buttons have their own 200ms release. */
+    if((uint32_t)(now - plt->seek_started) >= 60000) {
+        iap_platform_seek_stop(ctx);
+        return;
+    }
+    /* The WPS's own acceleration: each step 1 + 2^-(accel+3) larger, at
+     * most 3% of the way to the end (at least 500ms), at the button repeat
+     * rate of 160ms falling to 50ms */
+    while((uint32_t)(now - plt->seek_updated) >= plt->seek_interval) {
+        plt->seek_updated += plt->seek_interval;
+        uint32_t distance = plt->seek_direction > 0 ? plt->seek_length - plt->seek_position : plt->seek_position;
+        uint32_t max_step = MAX((uint64_t)distance * 3 / 100, 500);
+        uint32_t step     = MIN(plt->seek_step, max_step);
+        int64_t  pos      = (int64_t)plt->seek_position + (int64_t)plt->seek_direction * step;
+        if(pos < 0) {
+            pos = 0;
+        }
+        if(pos >= plt->seek_length) {
+            pos = plt->seek_length - 1;
+        }
+        plt->seek_position = pos;
+        plt->seek_step     = step + (step >> (global_settings.ff_rewind_accel + 3));
+        if(plt->seek_interval > 50) {
+            plt->seek_interval -= 10;
+        }
+    }
+    wps_set_seek_preview(audio_current_track(), plt->seek_position);
+    iap_notify_track_time_position(ctx, plt->seek_position);
+}
+
+static bool start_seek(struct IAPContext* ctx, int direction) {
+    struct Platform* plt = ctx->platform;
+    struct mp3entry* id3 = audio_current_track();
+    if(!(audio_status() & AUDIO_STATUS_PLAY) || !id3 || !id3->length) {
+        return false;
+    }
+    iap_platform_seek_tick(ctx);
+    if(!plt->seek_direction) {
+        plt->seek_position = MIN(id3->elapsed, id3->length - 1);
+        plt->seek_length   = id3->length;
+        plt->seek_track    = playlist_get_display_index();
+        audio_pre_ff_rewind();
+    }
+    const uint32_t now = iap_platform_get_time_ms(ctx);
+    if(plt->seek_direction != direction) {
+        plt->seek_step     = 1000 * global_settings.ff_rewind_min_step;
+        plt->seek_interval = 160;
+        plt->seek_updated  = now;
+    }
+    plt->seek_direction = direction;
+    /* a repeated Start renews the watchdog, not the acceleration */
+    plt->seek_started = now;
+    wps_set_seek_preview(id3, plt->seek_position);
+    iap_notify_play_status(ctx, direction > 0 ? IAPIPodStatePlayStatus_FastForward : IAPIPodStatePlayStatus_FastRewind);
+    return true;
+}
+
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
     struct Platform* plt = iap_ctx->platform;
 
@@ -105,6 +202,10 @@ IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatf
     check_act(id3 != NULL, return iap_false);
     status->track_total_ms = id3->length;
     status->track_pos_ms   = id3->elapsed;
+    if(plt->seek_direction) {
+        status->track_pos_ms = plt->seek_position;
+        status->state        = plt->seek_direction > 0 ? IAPIPodStatePlayStatus_FastForward : IAPIPodStatePlayStatus_FastRewind;
+    }
     status->track_index    = playlist_get_display_index() - 1;
     status->track_count    = playlist_amount();
     status->track_caps     = IAPIPodStateTrackCapBits_HasReleaseDate;
@@ -135,6 +236,12 @@ bool iap_platform_library_play_done(struct IAPContext* ctx) {
 void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl control, struct IAPPlatformPendingControl pending) {
     struct Platform* plt = iap_ctx->platform;
 
+    IAPBool ret = iap_true;
+    /* play, pause, stop and skip end a scan where it has got to */
+    if(control <= IAPPlatformControl_Prev) {
+        iap_platform_seek_tick(iap_ctx);
+        iap_platform_seek_stop(iap_ctx);
+    }
     long button = BUTTON_NONE;
     switch(control) {
     case IAPPlatformControl_TogglePlayPause:
@@ -149,12 +256,12 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
             library_play_held    = true;
             return;
         }
-        if(audio_status() != AUDIO_STATUS_PLAY) {
+        if(!(audio_status() & AUDIO_STATUS_PLAY) || (audio_status() & AUDIO_STATUS_PAUSE)) {
             button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         }
         break;
     case IAPPlatformControl_Pause:
-        if(audio_status() == AUDIO_STATUS_PLAY) {
+        if((audio_status() & AUDIO_STATUS_PLAY) && !(audio_status() & AUDIO_STATUS_PAUSE)) {
             button = BUTTON_MULTIMEDIA_PLAYPAUSE;
         }
         break;
@@ -165,7 +272,14 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
         button = BUTTON_MULTIMEDIA_NEXT;
         break;
     case IAPPlatformControl_Prev:
-        button = BUTTON_MULTIMEDIA_PREV;
+        /* Two seconds into a track, Previous goes back to its start, where
+         * the multimedia key always skips */
+        if((audio_status() & AUDIO_STATUS_PLAY) && audio_current_track() && audio_current_track()->elapsed > 2000) {
+            audio_pre_ff_rewind();
+            audio_ff_rewind(0);
+        } else {
+            button = BUTTON_MULTIMEDIA_PREV;
+        }
         break;
     case IAPPlatformControl_VolumeUp:
         adjust_volume(1);
@@ -176,10 +290,17 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
     case IAPPlatformControl_ToggleMute:
         /* rockbox has no mute/unmute */
         break;
+    case IAPPlatformControl_StartFF:
+    case IAPPlatformControl_StartRew:
+        ret = start_seek(iap_ctx, control == IAPPlatformControl_StartFF ? 1 : -1);
+        break;
+    case IAPPlatformControl_EndFFRew:
+        iap_platform_seek_tick(iap_ctx);
+        iap_platform_seek_stop(iap_ctx);
+        break;
     }
     logf("control=%d button=0x%04lX", control, button);
 
-    IAPBool ret = iap_true;
     if(button == BUTTON_NONE) {
         goto exit;
     }

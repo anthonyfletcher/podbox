@@ -36,8 +36,22 @@ struct Platform {
     struct IAPPlatformPendingControl pending_control;
     bool                             control_pending;
 
+    /* a remote's seek: the preview moves, and one codec seek is made at
+     * the end */
+    int      seek_direction;
+    int      seek_track;
+    uint32_t seek_position;
+    uint32_t seek_length;
+    uint32_t seek_updated;
+    uint32_t seek_started;
+    uint32_t seek_step;
+    uint32_t seek_interval;
+
     int aa_slot;
 };
+
+void iap_platform_seek_tick(struct IAPContext* ctx);
+void iap_platform_seek_stop(struct IAPContext* ctx);
 
 /* helper functions */
 uint8_t _iap_convert_play_status(int rb_audio_status);
