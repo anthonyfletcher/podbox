@@ -60,6 +60,7 @@
 #include "sound.h"
 #include "action.h"
 #include "powermgmt.h"
+#include "power.h"
 #include "usb.h"
 #include "system/volume.h"
 
@@ -707,7 +708,8 @@ void iap_send_tx(void)
     if (txlen > TX_BUFLEN)
         panicf("IAP: TX buffer overflow");
 
-    if (txlen < 256)
+    /* A short-form length above 0xFC reads as the long form's marker */
+    if (txlen <= 0xFC)
     {
         /* Short packet */
         txstart = iap_txstart+2;
@@ -1042,7 +1044,9 @@ void iap_periodic(void)
 
         iap_send_tx();
 
-        /* No further actions, we're going down */
+        /* No further actions, we're going down. Once: a shutdown that
+         * is called off must not send it again every tick. */
+        iap_shutdown = false;
         iap_reset_device(&device);
         return;
     }
@@ -1537,34 +1541,10 @@ void iap_interface_state_change(const enum interface_state new)
 
 static void iap_handlepkt_mode5(const unsigned int len, const unsigned char *buf)
 {
-    (void) len;
-    unsigned int cmd = buf[1];
-    switch (cmd)
-    {
-        /* Sent from iPod Begin Transmission */
-        case 0x02:
-        {
-            /* RF Transmitter: Begin High Power transmission */
-            unsigned char data0[] = {0x05, 0x02};
-            iap_send_pkt(data0, sizeof(data0));
-            break;
-        }
-
-        /* Sent from iPod End High Power Transmission */
-        case 0x03:
-        {
-            /* RF Transmitter: End High Power transmission */
-            unsigned char data1[] = {0x05, 0x03};
-            iap_send_pkt(data1, sizeof(data1));
-            break;
-        }
-        /* Return Version Number ?*/
-        case 0x04:
-        {
-            /* do nothing */
-            break;
-        }
-    }
+    /* Begin and EndHighPower are the player's to send; the lingo has no
+     * command from the accessory and no ack, so none is echoed back */
+    (void)len;
+    (void)buf;
 }
 
 void iap_handlepkt(void)
@@ -1735,7 +1715,8 @@ void iap_fill_power_state(void)
     power_state = charger_input_state;
     battery_l = battery_level();
 
-    if (power_state == NO_CHARGER) {
+    /* CHARGER_UNPLUGGED is the way out of CHARGER, so on battery */
+    if (power_state == NO_CHARGER || power_state == CHARGER_UNPLUGGED) {
         if (battery_l < 30) {
             IAP_TX_PUT(0x00);
         } else {
@@ -1743,7 +1724,9 @@ void iap_fill_power_state(void)
         }
         IAP_TX_PUT((char)((battery_l * 255)/100));
     } else {
-        IAP_TX_PUT(0x04);
+        /* Charging, or external power with the charger idle: charged
+         * once the level reads full, which on external power is 99 */
+        IAP_TX_PUT(charging_state() ? 0x04 : battery_l >= 99 ? 0x05 : 0x03);
         IAP_TX_PUT(0x00);
     }
 }
