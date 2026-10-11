@@ -755,6 +755,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                             break;
                         }
 
+                        device.auth.deadline = current_tick + IAP_AUTH_STEP_TIMEOUT;
                         /* Is this the last section? */
                         if (device.auth.next_section == device.auth.max_section) {
                             /* If we could really do authentication we'd have to
@@ -794,6 +795,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                 }
 
                 device.auth.state = AUST_CERTDONE;
+                device.auth.deadline = 0;
             }
             break;
         }

@@ -83,6 +83,7 @@ struct auth_t {
     unsigned char max_section;      /* The maximum number of certificate sections */
     unsigned char next_section;     /* The next expected section number */
     uint16_t version;               /* Authentication version */
+    long deadline;                  /* for the accessory's next step, or 0 */
     uint16_t tid;                   /* the one transaction ID of the exchange */
 };
 
@@ -165,6 +166,10 @@ struct device_t {
 };
 
 extern struct device_t device;
+/* How long the accessory has for each certificate step: more than the two
+ * seconds the specification gives, so a slow one is not failed */
+#define IAP_AUTH_STEP_TIMEOUT (5 * HZ)
+
 #define DEVICE_AUTHENTICATED (device.auth.state == AUST_AUTH)
 #define DEVICE_AUTH_RUNNING ((device.auth.state != AUST_NONE) && (device.auth.state != AUST_AUTH))
 #define DEVICE_LINGO_SUPPORTED(x) (device.lingoes & BIT_N((x)&0x1f))

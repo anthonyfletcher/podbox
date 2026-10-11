@@ -378,6 +378,7 @@ void iap_reset_auth(struct auth_t* auth)
     auth->state = AUST_NONE;
     auth->max_section = 0;
     auth->next_section = 0;
+    auth->deadline = 0;
 }
 
 /* Any context: the 6G's accessory tick calls this from the timer interrupt.
@@ -1073,6 +1074,19 @@ void iap_periodic(void)
 
     if(!iap_setupflag || !iap_enabled) return;
 
+    /* An accessory that stops answering mid-way is told it failed, and may
+     * identify again; until then nothing it is owed is sent */
+    if (DEVICE_AUTH_RUNNING && device.auth.deadline
+        && TIME_AFTER(current_tick, device.auth.deadline))
+    {
+        /* AckDevAuthenticationStatus: failed */
+        IAP_TX_INIT(0x00, 0x19);
+        IAP_TX_PUT(0x02);
+
+        iap_send_tx();
+        iap_reset_auth(&device.auth);
+    }
+
     /* Handle pending authentication tasks */
     switch (device.auth.state)
     {
@@ -1084,6 +1098,7 @@ void iap_periodic(void)
 
             iap_send_tx();
             device.auth.state = AUST_CERTREQ;
+            device.auth.deadline = current_tick + IAP_AUTH_STEP_TIMEOUT;
             break;
         }
 
@@ -1102,6 +1117,9 @@ void iap_periodic(void)
 
             iap_send_tx();
             device.auth.state = AUST_CHASENT;
+            /* the time Authentication 1.0 and 2.0 allow to sign */
+            device.auth.deadline = current_tick
+                + ((device.auth.version == 0x100) ? 7 * HZ : 75 * HZ);
             break;
         }
 
