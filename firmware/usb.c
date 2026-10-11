@@ -331,7 +331,9 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio_wanted());
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
-        usb_core_enable_driver(USB_DRIVER_IAP, false);
+        /* Charge only keeps the disk from a computer, not the audio from a
+         * dock, which has a configuration of its own (Gerrit 7940). */
+        usb_core_enable_driver(USB_DRIVER_IAP, usb_iap);
 #endif
 
 #ifdef USB_ENABLE_CHARGING_ONLY
