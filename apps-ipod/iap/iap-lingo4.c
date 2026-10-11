@@ -773,16 +773,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * height:2
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x0F,
-                                    0x04, 0x04, /* FormatID   */
-                                    0x02,       /* PixelFormat*/
-                                    0x00, 0x64, /* 100 pixels */
-                                    0x00, 0x64, /* 100 pixels */
-                                    0x04, 0x05, /* FormatID   */
-                                    0x02,       /* PixelFormat*/
-                                    0x00, 0xC8, /* 200 pixels */
-                                    0x00, 0xC8  /* 200 pixels */
-                                    };
+            /* No artwork is sent over serial, so no format is offered: an
+             * accessory offered one asks for images that never come */
+            unsigned char data[] = {0x04, 0x00, 0x0F};
             iap_send_pkt(data, sizeof(data));
             break;
         }
@@ -857,19 +850,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Subsequent packets omit bytes 8 - 24
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x11,
-                                    0x00, 0x00, /* DescriptorIndex */
-                                    0x00,       /* PixelFormat */
-                                    0x00, 0x00, /* ImageWidthPixels*/
-                                    0x00, 0x00, /* ImageHeightPixels*/
-                                    0x00, 0x00, /* InsetRectangleTopLeftX*/
-                                    0x00, 0x00, /* InsetRectangleTopLeftY*/
-                                    0x00, 0x00, /* InsetRectangleBotRightX*/
-                                    0x00, 0x00, /* InsetRectangleBotRoghtY*/
-                                    0x00, 0x00, 0x00, 0x00,/* RowSize*/
-                                    0x00        /* ImagePixelData Var Length*/
-                                   };
-            iap_send_pkt(data, sizeof(data));
+            /* GetArtworkFormats offers no format to ask for */
+            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x0011: /* RetTrackArtworkData. See Abobe */
@@ -2060,8 +2042,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x2B,
-                                    0x00, 0x00, 0x00, 0x00};
+            /* No images, so no times: one time of 0 said there was one */
+            unsigned char data[] = {0x04, 0x00, 0x2B};
             iap_send_pkt(data, sizeof(data));
             break;
         }
@@ -2220,6 +2202,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
+            CHECKLEN(4);
+            /* Off or tracks; the player has no album shuffle */
+            if(buf[3] > 0x01)
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             if(iap_library_queue_lent())
             {
                 cmd_ack(cmd, IAP_ACK_CMD_FAILED);
@@ -2349,6 +2338,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
+            CHECKLEN(4);
+            if (buf[3] > 0x02)
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             int oldmode = global_settings.repeat_mode;
             if (buf[3] == 0)
                 global_settings.repeat_mode = REPEAT_OFF;
