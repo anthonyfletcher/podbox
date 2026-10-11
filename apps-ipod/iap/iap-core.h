@@ -283,6 +283,7 @@ void iap_set_mute(bool mute);
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;
 extern bool iap_btnstop;
+extern bool iap_btnchapter;
 
 uint32_t iap_get_trackpos(void);
 uint32_t iap_get_trackindex(void);

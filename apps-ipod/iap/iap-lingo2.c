@@ -55,7 +55,6 @@ static void cmd_ack(const unsigned char cmd, const unsigned char status)
 void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
 {
     static bool poweron_pressed = false;
-    static bool chapter_pressed = false;
 #if CONFIG_TUNER
     static bool remote_mute = false;
 #endif
@@ -165,9 +164,9 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                 }
                 if(buf[3] & (8 | 16)) /* next or previous chapter */
                 {
-                    if (!chapter_pressed)
+                    if (!iap_btnchapter)
                         iap_skip_chapter((buf[3] & 8) ? 1 : -1);
-                    chapter_pressed = true;
+                    iap_btnchapter = true;
                 }
                 if(buf[3] & 32) /* next playlist */
                     btn |= BUTTON_RC_NEXT_PLAYLIST;
@@ -225,13 +224,13 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     btn |= BUTTON_RC_DOWN;
             }
 
-            /* Shuffle, Repeat and Stop act once a press: the latch ends when
-             * the button is let go, and only the timeout below ends it for a
-             * remote whose release was lost */
+            /* Shuffle, Repeat, Stop and the chapter buttons act once a
+             * press: the latch ends when the button is let go, and only the
+             * timeout below ends it for a remote whose release was lost */
             if (!(buf[2] & 128))
                 iap_btnstop = false;
             if (!(len >= 4 && (buf[3] & (8 | 16))))
-                chapter_pressed = false;
+                iap_btnchapter = false;
             if (!(len >= 4 && (buf[3] & 128)))
                 iap_btnshuffle = false;
             if (!(len >= 5 && (buf[4] & 1)))
@@ -259,8 +258,8 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
             else
             {
                 iap_remotebtn = BUTTON_NONE;
-                iap_timeoutbtn = (iap_btnstop || iap_btnshuffle || iap_btnrepeat)
-                                 ? 3 : 0;
+                iap_timeoutbtn = (iap_btnstop || iap_btnshuffle || iap_btnrepeat
+                                  || iap_btnchapter) ? 3 : 0;
             }
 
             /* power on released */

@@ -129,6 +129,7 @@ int iap_repeatbtn = 0;
  */
 unsigned int iap_timeoutbtn = 0;
 bool iap_btnrepeat = false, iap_btnshuffle = false, iap_btnstop = false;
+bool iap_btnchapter = false;
 
 /* The lingo 3 and 4 handlers each place a struct mp3entry (2760 bytes) on
  * the stack unconditionally, even for the commands that never look at
@@ -443,6 +444,7 @@ static void iap_do_reset(void)
     iap_btnshuffle = false;
     iap_btnrepeat = false;
     iap_btnstop = false;
+    iap_btnchapter = false;
     if (departed && interface_state == IST_EXTENDED
         && (audio_status() & AUDIO_STATUS_PLAY))
         audio_pause();
@@ -1208,6 +1210,7 @@ void iap_periodic(void)
         iap_btnshuffle = false;
         iap_btnrepeat = false;
         iap_btnstop = false;
+        iap_btnchapter = false;
     }
 
     /* Handle power down messages. */

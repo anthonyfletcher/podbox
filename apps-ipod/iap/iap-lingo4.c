@@ -640,10 +640,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     {
                         case 0x00:
                         {
-                            /* Track Capabilities 10Bytes Data: bit 2,
-                             * album artwork */
-                            IAP_TX_PUT_U32(iap_artwork_exists(index) ?
-                                           BIT_N(2) : 0);
+                            /* Track Capabilities 10Bytes Data: bit 1,
+                             * chapters; bit 2, album artwork */
+                            IAP_TX_PUT_U32((iap_artwork_exists(index) ?
+                                            BIT_N(2) : 0)
+                                           | (id3->cuesheet
+                                              && id3->cuesheet->track_count
+                                              ? BIT_N(1) : 0));
                             IAP_TX_PUT_U32(id3->length); /* Track Length */
                             /* Chapter Count: the playing track's is loaded */
                             IAP_TX_PUT_U16(id3->cuesheet ?

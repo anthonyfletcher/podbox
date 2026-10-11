@@ -1156,9 +1156,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 case 0x00:
                 {
                     iap_get_trackinfo(track_index, &id3);
-                    /* Track capabilities: bit 2, album artwork */
-                    IAP_TX_PUT_U32(iap_artwork_exists(track_index) ?
-                                   BIT_N(2) : 0);
+                    /* Track capabilities: bit 1, chapters; bit 2, album
+                     * artwork */
+                    IAP_TX_PUT_U32((iap_artwork_exists(track_index) ?
+                                    BIT_N(2) : 0)
+                                   | (id3.cuesheet && id3.cuesheet->track_count
+                                      ? BIT_N(1) : 0));
 
                     /* Track length in ms */
                     IAP_TX_PUT_U32(id3.length);
