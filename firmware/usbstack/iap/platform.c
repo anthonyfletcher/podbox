@@ -582,15 +582,7 @@ void iap_platform_dump_hex(const void* ptr, size_t size) {
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs) {
     (void)iap_ctx;
 
-    bool has_44k = false;
-    bool has_48k = false;
-    while(samprs->size > 0) {
-        uint32_t sample_rate;
-        check_act(iap_span_read_32(samprs, &sample_rate), return iap_false);
-        has_44k |= sample_rate == SAMPR_44;
-        has_48k |= sample_rate == SAMPR_48;
-    }
-    check_act(has_44k && has_48k, return iap_false, "accessory lacks mandatory freq support: 44k=%d 48k=%d", has_44k, has_48k);
+    check_act(iap_audio_accessory_rates(samprs), return iap_false);
     check_act(mixer_switch_sink(PCM_SINK_IAP), return false);
     usb_iap_end_reset_hold(false);
     iap_audio_connected();

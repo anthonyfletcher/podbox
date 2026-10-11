@@ -26,6 +26,10 @@ bool iap_audio_deinit(void);
 bool iap_audio_enable(void);
 bool iap_audio_disable(void);
 bool iap_audio_set_sampr(uint32_t sampr);
+/* RetAccessorySampleRateCaps: logged, and the sink offers only the listed
+ * rates. False, refusing the accessory, if 44.1 kHz is not among them. */
+struct IAPSpan;
+bool iap_audio_accessory_rates(struct IAPSpan* list);
 /* TrackNewAudioAttributes once the accessory's rates are accepted, if
  * nothing has sent it yet on this connection. */
 void iap_audio_connected(void);

@@ -107,6 +107,9 @@ enum usb_log_type
     USB_LOG_IAP2_PARAMS, /* a received message's parameters, raw: a = bytes
                           * valid, b = offset, c, d = eight bytes from it */
     USB_LOG_IAP2_EVENT,  /* a = USB_LOG_IAP2_* event, c, d as it says */
+    USB_LOG_IAP_RATES,   /* RetAccessorySampleRateCaps: a = accepted,
+                          * b = rates listed, c = which of 48, 44.1 and
+                          * 32 kHz, bits 0 to 2 */
 };
 
 #define USB_LOG_SETUP_DROPPED  1 /* arrived during a bus reset; ignored */

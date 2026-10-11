@@ -414,6 +414,13 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                 snprintf(p + n, size - n, ", %lu announced%s",
                          (unsigned long)e->d, e->a ? ": IGNORED" : "");
             break;
+        case USB_LOG_IAP_RATES:
+            snprintf(p, size, "iap: accessory lists %u rates, of ours%s%s%s"
+                     "%s: %s", e->b, e->c & 1 ? " 48000" : "",
+                     e->c & 2 ? " 44100" : "", e->c & 4 ? " 32000" : "",
+                     e->c & 7 ? "" : " none",
+                     e->a ? "accepted" : "REFUSED, no 44100");
+            break;
         case USB_LOG_IAP_STREAM:
             snprintf(p, size, "iap: stream now %s",
                      e->a == USB_LOG_IAP_STREAM_AUDIO ? "carries audio" :

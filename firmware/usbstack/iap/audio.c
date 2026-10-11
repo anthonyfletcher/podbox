@@ -21,6 +21,7 @@
 #include "events.h"
 #include "pcm-internal.h"
 #include "pcm_sampr.h"
+#include "pcm_mixer.h"
 #include "pcm_sink.h"
 #include "system.h"
 #include "usb_drv.h"
@@ -40,6 +41,12 @@ static const unsigned long samprs[] = {
     SAMPR_44,
     SAMPR_32,
 };
+
+/* The sink's rates: those of samprs[] the accessory lists, so the mixer
+ * resamples to one of them and nothing else is announced. Every freq below
+ * indexes this list, not samprs[]. */
+static unsigned long acc_samprs[ARRAYLEN(samprs)];
+#define RATE(freq) (iap_pcm_sink.caps.samprs[(freq)])
 
 struct StagingBuffer {
     struct IAPAllocResult buf;
@@ -83,12 +90,55 @@ static volatile uint32_t count_bytes, count_chunks, count_silent, count_odd;
 
 extern struct pcm_sink iap_pcm_sink;
 
+/* The sink offers the rates of samprs[] whose indexes are set in listed,
+ * 48 kHz the default where it is one. The list does not change under a sink
+ * in use, which gives way to the built-in one while it does. */
+static void offer_rates(unsigned listed) {
+    struct pcm_sink_caps* caps = &iap_pcm_sink.caps;
+    unsigned long         list[ARRAYLEN(samprs)];
+    uint8_t               n   = 0;
+    uint8_t               def = 0;
+
+    for(size_t i = 0; i < ARRAYLEN(samprs); i += 1) {
+        if(listed & (1u << i)) {
+            if(samprs[i] == SAMPR_48) {
+                def = n;
+            }
+            list[n++] = samprs[i];
+        }
+    }
+    if(n == caps->num_samprs && def == caps->default_freq && !memcmp(list, caps->samprs, n * sizeof(list[0]))) {
+        return;
+    }
+
+    const bool in_use = pcm_current_sink() == PCM_SINK_IAP;
+    if(in_use) {
+        mixer_switch_sink(PCM_SINK_BUILTIN);
+    }
+    /* the stream's packets are sized from it in the USB interrupt */
+    const int oldlevel = disable_irq_save();
+    memcpy(acc_samprs, list, sizeof(list));
+    caps->samprs       = acc_samprs;
+    caps->num_samprs   = n;
+    caps->default_freq = def;
+    set_freq           = -1;
+    cur_freq           = -2;
+    acked_freq         = -1;
+    asked_freq         = -1;
+    /* so iap_audio_connected() announces a rate from the new list */
+    track_attrs_sent   = false;
+    restore_irq(oldlevel);
+    if(in_use) {
+        mixer_switch_sink(PCM_SINK_IAP);
+    }
+}
+
 static void sink_set_freq(uint16_t freq) {
     LOG("freq=%d", freq);
 
     set_freq = freq;
 
-    if(usb_iap2_audio_rate(samprs[freq])) {
+    if(usb_iap2_audio_rate(RATE(freq))) {
         track_attrs_sent = true;
         track_changed    = false;
         acked_freq       = freq;
@@ -107,11 +157,11 @@ static void sink_set_freq(uint16_t freq) {
     }
 
     struct IAPContext* ctx = _iap_acquire_ctx(true);
-    check_act(iap_select_sampr(ctx, samprs[freq]), );
+    check_act(iap_select_sampr(ctx, RATE(freq)), );
     _iap_release_ctx();
 }
 
-static size_t calc_packet_size(uint8_t cur_sampr, uint8_t packet_count) {
+static size_t calc_packet_size(unsigned long cur_sampr, uint8_t packet_count) {
     /* packet size calculation
      * (4 = sizeof(int16_t) * channels)
      * (1000 = usb frames per second)
@@ -122,11 +172,9 @@ static size_t calc_packet_size(uint8_t cur_sampr, uint8_t packet_count) {
      *   44100 * 4 / 1000 = 176.4
      *   => (9 * 176 + 180) + (...
      */
-    if(cur_sampr == 0) {
-        /*48k*/
+    if(cur_sampr == SAMPR_48) {
         return 192;
-    } else if(cur_sampr == 2) {
-        /*32k*/
+    } else if(cur_sampr == SAMPR_32) {
         return 128;
     } else {
         /*44.1k*/
@@ -135,7 +183,7 @@ static size_t calc_packet_size(uint8_t cur_sampr, uint8_t packet_count) {
 }
 
 static void batch_get_more(const void** ptr, size_t* len) {
-    const size_t packet_size = calc_packet_size(cur_freq, packet_count);
+    const size_t packet_size = calc_packet_size(cur_freq >= 0 ? RATE(cur_freq) : 0, packet_count);
 #if 0
     const int cur_frame = usb_drv_get_frame_number();
     LOG("ex=%d set=%d cur=%d", exhausted, set_freq, cur_freq);
@@ -331,6 +379,12 @@ struct pcm_sink iap_pcm_sink = {
 bool iap_audio_init(void) {
     check_act(usb_drv_batch_init(AS_EP_IN, batch_get_more) == 0, return false);
 
+    /* every rate for a new connection; a sink kept through a bus reset keeps
+     * the dock's until they come again */
+    if(pcm_current_sink() != PCM_SINK_IAP) {
+        offer_rates((1u << ARRAYLEN(samprs)) - 1);
+    }
+
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
         check_act(iap_alloc_usb_send_buffer(AS_PACKET_SIZE, &staging_buffers[i].buf), goto error);
         staging_buffers[i].cursor = 0;
@@ -391,7 +445,28 @@ bool iap_audio_disable(void) {
 }
 
 unsigned long iap_audio_sampr(void) {
-    return samprs[iap_pcm_sink.configured_freq];
+    return RATE(iap_pcm_sink.configured_freq);
+}
+
+bool iap_audio_accessory_rates(struct IAPSpan* list) {
+    unsigned listed = 0;
+    unsigned count  = 0;
+    uint32_t rate;
+
+    while(iap_span_read_32(list, &rate)) {
+        count += 1;
+        for(size_t i = 0; i < ARRAYLEN(samprs); i += 1) {
+            if(samprs[i] == rate) {
+                listed |= 1u << i;
+            }
+        }
+    }
+    /* the rate every accessory must take */
+    const bool ok = (listed & (1u << 1)) != 0;
+    usb_log(USB_LOG_IAP_RATES, ok, count, listed, 0);
+    check_act(ok, return false, "accessory lacks 44.1 kHz");
+    offer_rates(listed);
+    return true;
 }
 
 void iap_audio_take_counts(struct iap_audio_counts *c) {
@@ -406,15 +481,15 @@ void iap_audio_take_counts(struct iap_audio_counts *c) {
 
 bool iap_audio_set_sampr(uint32_t sampr) {
     uint16_t freq = 0;
-    for(; freq < ARRAYLEN(samprs); freq += 1) {
-        if(samprs[freq] == sampr) {
+    for(; freq < iap_pcm_sink.caps.num_samprs; freq += 1) {
+        if(RATE(freq) == sampr) {
             break;
         }
     }
-    check_act(freq < ARRAYLEN(samprs), return false);
+    check_act(freq < iap_pcm_sink.caps.num_samprs, return false);
 
     usb_log(USB_LOG_IAP_RATE, set_freq >= 0 && freq != set_freq, 0, sampr,
-            set_freq >= 0 ? samprs[set_freq] : 0);
+            set_freq >= 0 ? RATE(set_freq) : 0);
 
     if(set_freq >= 0 && freq != set_freq) {
         /* Accessories should only set the frequency we requested via
