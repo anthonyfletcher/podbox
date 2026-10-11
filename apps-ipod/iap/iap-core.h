@@ -265,7 +265,8 @@ bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
 /* False with nothing playing, or a track with no chapters */
 bool iap_current_chapter(struct iap_chapter_info *chapter);
 bool iap_set_chapter(uint32_t index);
-/* Back goes to the chapter's start, or two seconds in, the one before */
+/* Back goes to the chapter's start, or within two seconds of it the one
+ * before. False with no chapter to go to. */
 bool iap_skip_chapter(int direction);
 
 /* Volume as the protocol's 0-255 over the codec's own range, and back */

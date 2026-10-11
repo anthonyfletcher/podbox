@@ -2031,9 +2031,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 case 0x07: /* end ffwd/frwd */
                     remote_seek_stop();
                     break;
-                case 0x08: /* next chapter */
-                case 0x09: /* previous chapter */
-                    ok = iap_skip_chapter(buf[3] == 0x08 ? 1 : -1);
+                case 0x08: /* next: the chapter, else the track */
+                    if (!iap_skip_chapter(1))
+                        audio_next();
+                    break;
+                case 0x09: /* previous: the chapter, else the track */
+                    if (!iap_skip_chapter(-1))
+                        audio_prev();
                     break;
                 default:
                     cmd_ack(cmd, IAP_ACK_BAD_PARAM);

@@ -1609,10 +1609,12 @@ bool iap_skip_chapter(int direction)
             return false;
         target = chapter.index + 1;
     }
-    else if (chapter.elapsed_ms > 2000 || chapter.index == 0)
+    else if (chapter.elapsed_ms > 2000)
         target = chapter.index;
-    else
+    else if (chapter.index > 0)
         target = chapter.index - 1;
+    else
+        return false;
     return iap_set_chapter(target);
 }
 
