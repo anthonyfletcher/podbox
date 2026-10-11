@@ -247,6 +247,8 @@
 #define ICODE_ATTR_TREMOR_NOT_MDCT
 
 #define IPOD_ACCESSORY_PROTOCOL
+/* The accessory detect is read through the PCF's I2C, so from a thread */
+#define HAVE_IAP_ACCESSORY_POLL
 #define HAVE_SERIAL
 
 /* DMA is used only for reading on PP502x because although reads are ~8x faster

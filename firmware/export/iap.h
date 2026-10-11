@@ -48,5 +48,11 @@ const unsigned char *iap_get_serbuf(void);
 extern bool iap_record(bool onoff);
 #endif
 void iap_reset_state(IF_IAP_MP_NONVOID(int port) ); /* 0 is dock, 1 is headphone */
+#ifdef HAVE_IAP_ACCESSORY_POLL
+/* Ten times a second from the iAP thread, on a target whose accessory
+ * detect can only be read from a thread: resets the session when the
+ * accessory goes. */
+void iap_accessory_poll(void);
+#endif
 bool dbg_iap(void);
 #endif

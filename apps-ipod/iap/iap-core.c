@@ -87,10 +87,12 @@
 #define IAP_EV_TICK         (1)     /* The regular task timeout */
 #define IAP_EV_MSG_RCVD     (2)     /* A complete message has been received from the device */
 #define IAP_EV_MALLOC       (3)     /* Allocate memory for the RX/TX buffers */
+#define IAP_EV_RESET        (4)     /* The accessory has gone, see iap_reset_state() */
 
 static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
+static volatile bool reset_pending;
 static long last_frame_tick;     /* 0 until a frame passes its checksum */
 /* This is set to true if a SYS_POWEROFF message is received,
  * signalling impending power off
@@ -374,8 +376,14 @@ void iap_reset_auth(struct auth_t* auth)
     auth->next_section = 0;
 }
 
+/* Any context: the 6G's accessory tick calls this from the timer interrupt.
+ * The session is reset on the iAP thread, and iap_handlepkt() does that
+ * before it reads another packet, so nothing the departed accessory left in
+ * the buffer reaches the next one. */
 void iap_reset_state(IF_IAP_MP_NONVOID(int port))
 {
+    int level;
+
     if (!iap_running)
         return;
 
@@ -383,16 +391,34 @@ void iap_reset_state(IF_IAP_MP_NONVOID(int port))
        when we eventually maintain independent state */
     IF_IAP_MP((void)port);
 
-    iap_reset_device(&device);
-    iap_bitrate_set(global_settings.serial_bitrate);
-
-#if 0  // XXX this is still screwed up
-    memset(&frame_state, 0, sizeof(frame_state));
-    interface_state = IST_STANDARD;
+    level = disable_irq_save();
     frame_state.state = ST_SYNC;
+    reset_pending = true;
+    restore_irq(level);
+    queue_post(&iap_queue, IAP_EV_RESET, 0);
+}
 
+/* iAP thread. An accessory in extended mode was playing the track through
+ * itself, so its leaving pauses it, as an Extended to Standard change does. */
+static void iap_do_reset(void)
+{
+    int level = disable_irq_save();
+    reset_pending = false;
+    frame_state.state = ST_SYNC;
     iap_reset_buffers();
-#endif
+    restore_irq(level);
+    last_frame_tick = 0;
+
+    iap_reset_device(&device);
+    iap_remotebtn = BUTTON_NONE;
+    iap_timeoutbtn = 0;
+    iap_repeatbtn = 0;
+    iap_btnshuffle = false;
+    iap_btnrepeat = false;
+    if (interface_state == IST_EXTENDED && (audio_status() & AUDIO_STATUS_PLAY))
+        audio_pause();
+    interface_state = IST_STANDARD;
+    iap_bitrate_set(global_settings.serial_bitrate);
 }
 
 void iap_reset_device(struct device_t* device)
@@ -453,6 +479,13 @@ static void iap_thread(void)
             case IAP_EV_MSG_RCVD:
             {
                 iap_handlepkt();
+                break;
+            }
+
+            case IAP_EV_RESET:
+            {
+                if (reset_pending)
+                    iap_do_reset();
                 break;
             }
 
@@ -893,6 +926,10 @@ void iap_periodic(void)
     else if (docked)
         iap_library_close(IAP_LIBRARY_SERIAL);
     docked = present;
+
+#ifdef HAVE_IAP_ACCESSORY_POLL
+    iap_accessory_poll();
+#endif
 
     if(!iap_setupflag || !iap_enabled) return;
 
@@ -1443,6 +1480,12 @@ void iap_handlepkt(void)
      */
     while (iap_rxpayload != iap_rxstart)
     {
+        if (reset_pending)
+        {
+            iap_do_reset();
+            return;
+        }
+
         /* if we are waiting for a remote button to go out,
            delay the handling of the new packet */
         if(iap_repeatbtn)
