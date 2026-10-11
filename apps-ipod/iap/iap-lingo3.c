@@ -33,6 +33,7 @@
 #include "settings.h"
 #include "metadata.h"
 #include "audio/playback.h"
+#include "system/volume.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
 #endif
@@ -69,21 +70,11 @@ static void cmd_ack(const unsigned char cmd, const unsigned char status)
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
 
-/* An accessory sends volume as a byte covering -90..+6 dB, a wider range
- * than the codec accepts. The value goes straight into global_status and is
- * re-applied on every cold start, so one below the minimum is a silent mute
- * that survives a reboot -- clamp it as the rest of the app layer does.
- */
+/* An accessory's volume byte covers the codec's whole range */
 static void set_accessory_volume(const unsigned char level)
 {
-    int vol = (int)(level/2.65625) - 90;
-
-    if (vol < sound_min(SOUND_VOLUME))
-        vol = sound_min(SOUND_VOLUME);
-    else if (vol > sound_max(SOUND_VOLUME))
-        vol = sound_max(SOUND_VOLUME);
-
-    global_status.volume = vol;
+    global_status.volume = iap_byte_to_volume(level);
+    setvol();
 }
 
 void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
@@ -275,9 +266,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             device.track_index = iap_get_trackindex();
             device.chapter_index = 0;
             device.play_status = audio_status();
-            /* TODO: Fix this */
-            device.mute = false;
-            device.volume = global_status.volume;
+            device.volume = device.mute ? 0
+                          : iap_volume_to_byte(global_status.volume);
+            device.volume_mute = device.mute;
             device.power_state = charger_input_state;
             device.battery_level = battery_level();
             /* TODO: Fix this */
@@ -453,7 +444,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
                         /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -519,7 +510,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                             break;
                         }
 
-                        case REPEAT_ALL:
+                        /* REPEAT_ALL, and the shuffle and A-B modes the protocol lacks */
+                        default:
                         {
                             IAP_TX_PUT(0x02);
                             break;
@@ -538,7 +530,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     tm = get_time();
 
                     /* Year */
-                    IAP_TX_PUT_U16(tm->tm_year);
+                    IAP_TX_PUT_U16(tm->tm_year + 1900);
 
                     /* Month */
                     IAP_TX_PUT(tm->tm_mon+1);
@@ -642,8 +634,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
                         /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -787,11 +779,11 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     CHECKLEN(5);
                     if (buf[0x03]==0x00){
                         /* Not Muted */
-                        set_accessory_volume(buf[0x04]);
                         device.mute = false;
+                        set_accessory_volume(buf[0x04]);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
                     cmd_ok(cmd);
                     break;
@@ -954,18 +946,18 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                 /* Volume/Mute/Absolute
                  * Data length: 4
-                 * TODO: Fix this
                  */
                 case 0x10:
                 {
                     CHECKLEN(7);
                     if (buf[0x03]==0x00){
-                        /* Not Muted */
-                        set_accessory_volume(buf[0x04]);
+                        /* Not Muted. A UI volume of 0 defers to the
+                         * absolute one. */
                         device.mute = false;
+                        set_accessory_volume(buf[0x04] ? buf[0x04] : buf[0x05]);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
 
                     cmd_ok(cmd);

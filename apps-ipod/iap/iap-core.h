@@ -119,7 +119,8 @@ struct device_t {
     uint32_t chapter_index;         /* if they change */
     unsigned char play_status;
     bool mute;
-    unsigned char volume;
+    unsigned char volume;           /* as last notified, iap_volume_to_byte() */
+    bool volume_mute;               /* the mute last notified with it */
     unsigned char power_state;
     unsigned char battery_level;
     uint32_t equalizer_index;
@@ -247,6 +248,12 @@ void iap_set_remote_volume(void);
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
 bool iap_play_or_resume(void);
+
+/* Volume as the protocol's 0-255 over the codec's own range, and back */
+unsigned char iap_volume_to_byte(int volume);
+int iap_byte_to_volume(unsigned char level);
+/* Muted, the codec is at its minimum and the volume setting kept */
+void iap_set_mute(bool mute);
 
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;

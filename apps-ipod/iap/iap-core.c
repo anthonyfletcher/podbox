@@ -61,6 +61,7 @@
 #include "action.h"
 #include "powermgmt.h"
 #include "usb.h"
+#include "system/volume.h"
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -428,6 +429,10 @@ void iap_reset_device(struct device_t* device)
     device->notifications = 0;
     device->changed_notifications = 0;
     device->do_notify = false;
+    /* An accessory that muted the player does not leave it silent. Every
+     * caller is on the iAP thread but iap_start(), before any could mute. */
+    if (device->mute)
+        iap_set_mute(false);
     device->pb_notifications = 0;
     device->pb_track_changed = false;
     device->pb_play_status = 0;
@@ -455,8 +460,37 @@ void iap_set_remote_volume(void)
     IAP_TX_INIT(0x03, 0x0D);
     IAP_TX_PUT(0x04);
     IAP_TX_PUT(0x00);
-    IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+    IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
     iap_send_tx();
+}
+
+unsigned char iap_volume_to_byte(int volume)
+{
+    const int min = sound_min(SOUND_VOLUME);
+    const int max = sound_max(SOUND_VOLUME);
+
+    if (volume <= min)
+        return 0;
+    if (volume >= max)
+        return 255;
+    return (volume - min) * 255 / (max - min);
+}
+
+int iap_byte_to_volume(unsigned char level)
+{
+    const int min = sound_min(SOUND_VOLUME);
+    const int max = sound_max(SOUND_VOLUME);
+
+    return min + (level * (max - min) + 127) / 255;
+}
+
+void iap_set_mute(bool mute)
+{
+    device.mute = mute;
+    if (mute)
+        sound_set_volume(sound_min(SOUND_VOLUME));
+    else
+        setvol();
 }
 
 /* This thread is waiting for events posted to iap_queue and calls
@@ -1104,16 +1138,34 @@ void iap_periodic(void)
     device.pb_track_changed = false;
 
     /* Volume change notifications are sent every 100ms */
+    /* Looked at every 100ms, sent only on a change */
     if (device.notifications & (BIT_N(4) | BIT_N(16))) {
-        /* Currently we do not track volume changes for BIT_N(16),
-         *
-         */
-        IAP_TX_INIT(0x03, 0x09);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT(0x00);
-        IAP_TX_PUT(0xFF &(int)((global_status.volume + 90) * 2.65625));
-        device.changed_notifications |= BIT_N(4);
-        iap_send_tx();
+        unsigned char level = device.mute ? 0
+                            : iap_volume_to_byte(global_status.volume);
+
+        if (level != device.volume || device.mute != device.volume_mute) {
+            device.volume = level;
+            device.volume_mute = device.mute;
+            /* Mute/UI volume, and Mute/UI/Absolute: each to the
+             * accessory that asked, both to one that asked for both */
+            if (device.notifications & BIT_N(4)) {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x04);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(level);
+                device.changed_notifications |= BIT_N(4);
+                iap_send_tx();
+            }
+            if (device.notifications & BIT_N(16)) {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x10);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(level);
+                IAP_TX_PUT(level);
+                device.changed_notifications |= BIT_N(16);
+                iap_send_tx();
+            }
+        }
     }
 
     /* All other events are sent every 500ms */
@@ -1164,7 +1216,7 @@ void iap_periodic(void)
     {
         uint32_t t;
         uint16_t ts;
-        bool changed;
+        bool changed = false;
 
         t = iap_get_trackpos();
         ts = (t / 1000) & 0xFFFF;
@@ -1272,23 +1324,12 @@ void iap_periodic(void)
             iap_send_tx();
 
             device.play_status = play_status;
-			if (play_status != 1) {
-			/* Not Playing */
-			   audio_pause();
+            /* A notification only reports the play state; the radio is the
+             * one thing that follows it */
 #if CONFIG_TUNER
-               if (radio_present==1) {
-                  tuner_set(RADIO_MUTE,1);
-			   }
+            if (radio_present == 1)
+                tuner_set(RADIO_MUTE, play_status != 1);
 #endif
-			} else {
-			/* Playing */
-			   audio_resume();
-#if CONFIG_TUNER
-			   if (radio_present==1) {
-                   tuner_set(RADIO_MUTE,0);
-               }
-#endif
-			}
         }
     }
 
@@ -1367,7 +1408,8 @@ void iap_periodic(void)
                     break;
                 }
 
-                case REPEAT_ALL:
+                /* REPEAT_ALL, and the shuffle and A-B modes the protocol lacks */
+                default:
                 {
                     IAP_TX_PUT(0x02);
                     break;
@@ -1392,7 +1434,7 @@ void iap_periodic(void)
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x09);
-            IAP_TX_PUT_U16(tm->tm_year);
+            IAP_TX_PUT_U16(tm->tm_year + 1900);
 
             /* Month */
             IAP_TX_PUT(tm->tm_mon+1);
