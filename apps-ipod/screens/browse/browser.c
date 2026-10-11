@@ -452,12 +452,12 @@ static bool browser_aa_load(const char *path, int slot,
     return ok;
 }
 
-static const struct bitmap *browser_get_albumart(int selected_item, void * data,
-                                              struct dim *size,
-                                              const struct img_filter *filter,
-                                              uint32_t filter_hash)
+const struct bitmap *browser_art_row(int selected_item, void *data,
+                                     browser_art_hash_fn *get_hash,
+                                     struct dim *size,
+                                     const struct img_filter *filter,
+                                     uint32_t filter_hash)
 {
-    struct browser_context *local_tc = (struct browser_context *)data;
     char aat[MAX_PATH];
     unsigned int hash;
     int slot;
@@ -465,7 +465,7 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
      * to fit the tighter of the two or it is cropped. */
     int want = size ? MIN(size->width, size->height) : TREE_AA_MAX_DIM;
 
-    if (selected_item < local_tc->special_entry_count || !browser_aa_ready(want))
+    if (!browser_aa_ready(want))
         return NULL;
 
     for (slot = 0; slot < TREE_AA_SLOTS; slot++)
@@ -478,7 +478,7 @@ static const struct bitmap *browser_get_albumart(int selected_item, void * data,
         if (browser_aa_no_hash[slot] == selected_item)
             return NULL;
 
-    hash = browser_db_get_art_hash(local_tc, selected_item);
+    hash = get_hash(selected_item, data);
     if (hash == 0)
     {
         /* Not recorded while the RAM copy may still load: an artist row
@@ -517,6 +517,25 @@ hit:
     if (size)
         size->width = size->height = browser_aa_dim;
     return &browser_aa_bm;
+}
+
+static unsigned int browser_row_art_hash(int selected_item, void *data)
+{
+    return browser_db_get_art_hash((struct browser_context *)data,
+                                   selected_item);
+}
+
+static const struct bitmap *browser_get_albumart(int selected_item, void * data,
+                                              struct dim *size,
+                                              const struct img_filter *filter,
+                                              uint32_t filter_hash)
+{
+    struct browser_context *local_tc = (struct browser_context *)data;
+
+    if (selected_item < local_tc->special_entry_count)
+        return NULL;
+    return browser_art_row(selected_item, data, browser_row_art_hash,
+                           size, filter, filter_hash);
 }
 
 
@@ -708,6 +727,20 @@ bool browser_showing_art(void)
     return db_showing_art;
 }
 
+/* A skin can pick its UI viewport by %?Ld, and the status bar only renders
+ * after the list has drawn -- so the list would open in the previous shape and
+ * stay there until something redrew it. Settle the bar first, so the draw
+ * that follows takes the viewport it chose. */
+void browser_set_showing_art(bool on)
+{
+    if (on != db_showing_art)
+    {
+        db_showing_art = on;
+        FOR_NB_SCREENS(i)
+            sb_skin_settle(i);
+    }
+}
+
 /*
  * Called when a new dir is loaded (for example when returning from other apps ...)
  * also completely redraws the tree
@@ -871,16 +904,7 @@ static int update_dir(void)
             else if (artist)
                 tall_rows = global_settings.db_artistart;
         }
-        /* A skin can pick its UI viewport by %?Ld, and the status bar only
-         * renders after the list has drawn -- so the list would open in the
-         * previous shape and stay there until something redrew it. Settle the
-         * bar first, so the draw below takes the viewport it chose. */
-        if (tall_rows != db_showing_art)
-        {
-            db_showing_art = tall_rows;
-            FOR_NB_SCREENS(i)
-                sb_skin_settle(i);
-        }
+        browser_set_showing_art(tall_rows);
         gui_synclist_set_albumart_callback(list,
                                     tall_rows ? browser_get_albumart : NULL);
         /* Uniform tall rows so a cover fits (special rows included); 0 = the

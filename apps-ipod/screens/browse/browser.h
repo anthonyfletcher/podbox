@@ -130,6 +130,23 @@ void browser_restore(void);
 void browser_albumart_invalidate(void);
 /* True while the on-screen browse level draws tall album/artist art rows. */
 bool browser_showing_art(void);
+/* Set by a list outside the browser that draws art rows the same way. */
+void browser_set_showing_art(bool on);
+
+struct bitmap;
+struct dim;
+struct img_filter;
+/* A row's art key, 0 for none. */
+typedef unsigned int browser_art_hash_fn(int selected_item, void *data);
+/* A list_get_albumart for any list whose rows have an art key: the browser's
+ * thumbnail cache, keyed by item. A list other than the browser's must call
+ * browser_albumart_invalidate() on the way in and out, or one list is drawn
+ * with the other's covers. */
+const struct bitmap *browser_art_row(int selected_item, void *data,
+                                     browser_art_hash_fn *get_hash,
+                                     struct dim *size,
+                                     const struct img_filter *filter,
+                                     uint32_t filter_hash);
 
 bool bookmark_play(char* resume_file, int index, unsigned long elapsed,
                    unsigned long offset, int seed, char *filename);

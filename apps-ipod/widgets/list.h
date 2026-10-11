@@ -390,6 +390,8 @@ struct simplelist_info {
     list_speak_item *get_talk; /* can be NULL to not speak */
     list_get_color *get_color;
     list_get_kind *get_kind; /* can be NULL; every row is then plain */
+    list_get_albumart *get_albumart; /* can be NULL for no art */
+    int row_height; /* 0 for the skin's own */
     struct list_selection_color *selection_color;
     void *callback_data; /* data for callbacks */
 };

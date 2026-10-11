@@ -68,6 +68,7 @@
 #include "system/strutil.h"           /* open_utf8 */
 #include "viewers/properties.h"
 #include "screens/browse/listen_progress.h"
+#include "screens/browse/browser.h"   /* browser_art_row */
 #include "root_menu.h"
 #include "book_shelf.h"
 
@@ -582,6 +583,28 @@ static const char *shelf_get_name(int n, void *data, char *buffer,
 
     snprintf(buffer, buffer_len, str(LANG_BOOK_SHELF_ROW), book_name(v), pct);
     return buffer;
+}
+
+/* The cover the database browser's list of books gives the same book. A
+ * resume line with no book behind it has none. */
+static unsigned int shelf_art_hash(int n, void *data)
+{
+    struct tagcache_album al;
+    int v = rows[n];
+    (void)data;
+
+    if (ROW_IS_RESUME(v) || !tagcache_album_get(books[v].row, &al))
+        return 0;
+    return al.art_hash;
+}
+
+static const struct bitmap *shelf_get_albumart(int n, void *data,
+                                               struct dim *size,
+                                               const struct img_filter *filter,
+                                               uint32_t filter_hash)
+{
+    return browser_art_row(n, data, shelf_art_hash, size, filter,
+                           filter_hash);
 }
 
 /* A book, as it is in the database browser's list of books. */
@@ -1188,6 +1211,15 @@ int book_shelf_run(void)
                              NULL);
         info.get_name = shelf_get_name;
         info.get_kind = shelf_get_kind;
+        /* Behind the setting that gives the browser's book list its covers.
+         * The thumbnails are cached by row, and every round has new rows. */
+        browser_albumart_invalidate();
+        browser_set_showing_art(global_settings.db_bookart);
+        if (global_settings.db_bookart)
+        {
+            info.get_albumart = shelf_get_albumart;
+            info.row_height = global_settings.db_art_row_height;
+        }
         info.action_callback = shelf_action_cb;
         info.selection = MIN(selection, row_ct - 1);
 
@@ -1218,6 +1250,9 @@ int book_shelf_run(void)
         rounds++;
     } while (marked_row >= 0 && menu_exit == GO_TO_PREVIOUS);
 
+    /* The browse this returns to keys the same cache by its own rows */
+    browser_albumart_invalidate();
+    browser_set_showing_art(false);
     pop_current_activity();
     if (held)
         release();

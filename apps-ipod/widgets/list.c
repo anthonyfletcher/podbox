@@ -1099,6 +1099,8 @@ bool simplelist_show_list(struct simplelist_info *info)
     gui_synclist_set_voice_callback(&lists, info->get_talk);
     gui_synclist_set_color_callback(&lists, info->get_color);
     gui_synclist_set_row_callbacks(&lists, info->get_kind, NULL, NULL);
+    gui_synclist_set_albumart_callback(&lists, info->get_albumart);
+    gui_synclist_set_row_height(&lists, info->row_height);
     if (info->selection_color)
         gui_synclist_set_sel_color(&lists, info->selection_color);
 
@@ -1217,6 +1219,8 @@ void simplelist_info_init(struct simplelist_info *info, char* title,
     info->get_talk = NULL;
     info->get_color = NULL;
     info->get_kind = NULL;
+    info->get_albumart = NULL;
+    info->row_height = 0;
     info->selection_color = NULL;
     info->callback_data = data;
     simplelist_line_count = 0;
