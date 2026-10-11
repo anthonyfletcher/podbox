@@ -915,7 +915,8 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     /* If the tracknumber is not the current one, or nothing is playing and
        the current one's tags are empty, take them from the database, or
        failing that read them from the file */
-    if(playlist_next(0) != tracknum || !(audio_status() & AUDIO_STATUS_PLAY))
+    if(playlist_get_current()->index != tracknum
+       || !(audio_status() & AUDIO_STATUS_PLAY))
     {
         playlist_get_track_info(NULL, tracknum, &info);
         /* Both clear id3 before filling it */

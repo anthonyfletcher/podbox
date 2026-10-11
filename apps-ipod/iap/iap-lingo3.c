@@ -1111,14 +1111,15 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
              * around this for now.
              */
             uint32_t track_index;
-            struct playlist_track_info track;
             struct mp3entry id3;
 
             CHECKLEN(0x09);
             CHECKAUTH;
 
+            /* Counted from the playlist's first track, as
+             * iap_get_trackinfo() reads it */
             track_index = get_u32(&buf[0x03]);
-            if (-1 == playlist_get_track_info(NULL, track_index, &track)) {
+            if (track_index >= (uint32_t)playlist_amount()) {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
