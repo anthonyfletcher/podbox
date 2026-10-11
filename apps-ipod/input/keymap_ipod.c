@@ -390,12 +390,25 @@ static const struct button_mapping remote_button_context_wps[]  = {
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
 }; /* remote_button_context_wps */
 
+/* A remote's volume buttons, in the contexts a list reads and nowhere else:
+ * the standard context ends every remote context, and a yes/no screen takes
+ * any action it does not know as No */
+static const struct button_mapping remote_button_context_list[]  = {
+    { ACTION_LIST_VOLUP,     BUTTON_RC_VOL_UP,                 BUTTON_NONE },
+    { ACTION_LIST_VOLUP,     BUTTON_RC_VOL_UP|BUTTON_REPEAT,   BUTTON_NONE },
+    { ACTION_LIST_VOLDOWN,   BUTTON_RC_VOL_DOWN,               BUTTON_NONE },
+    { ACTION_LIST_VOLDOWN,   BUTTON_RC_VOL_DOWN|BUTTON_REPEAT, BUTTON_NONE },
+
+    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
+}; /* remote_button_context_list */
+
 static const struct button_mapping remote_button_context_tree[]  = {
     { ACTION_TREE_WPS,          BUTTON_RC_PLAY|BUTTON_REL,    BUTTON_RC_PLAY },
     { ACTION_TREE_STOP,         BUTTON_RC_PLAY|BUTTON_REPEAT, BUTTON_RC_PLAY },
     { ACTION_TREE_HOTKEY,       BUTTON_RC_SELECT|BUTTON_PLAY,   BUTTON_NONE },
 
-    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
+    /* the browser is a list too */
+    LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_LIST)
 }; /* remote_button_context_tree */
 
 static const struct button_mapping remote_button_context_quickscreen[]  = {
@@ -435,6 +448,9 @@ static const struct button_mapping* get_context_mapping_remote( int context )
         case CONTEXT_MAINMENU:
         case CONTEXT_CUSTOM|CONTEXT_TREE:
             return remote_button_context_tree;
+        case CONTEXT_LIST:
+        case CONTEXT_BOOKMARKSCREEN:
+            return remote_button_context_list;
         case CONTEXT_QUICKSCREEN:
             return remote_button_context_quickscreen;
 

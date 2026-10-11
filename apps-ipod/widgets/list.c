@@ -47,6 +47,7 @@
 #include "system/app_util.h"
 #include "audio/sound_feedback.h"
 #include "system/shutdown.h"
+#include "system/volume.h"
 #include "speech/talk.h"
 #include "draw/viewport.h"
 #include "system/appevents.h"
@@ -852,6 +853,12 @@ bool gui_synclist_do_button(struct gui_synclist * lists, int *actionptr)
             gui_synclist_draw(lists);
             return true;
 
+        case ACTION_LIST_VOLUP:
+            adjust_volume(1);
+            return true;
+        case ACTION_LIST_VOLDOWN:
+            adjust_volume(-1);
+            return true;
 
         case ACTION_STD_PREVREPEAT:
             allow_wrap = false; /* Prevent list wraparound on repeating actions */
