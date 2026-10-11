@@ -62,6 +62,21 @@ static bool enabled;
 static bool exhausted;
 static bool track_attrs_sent;
 static volatile bool track_changed; /* since TrackNewAudioAttributes */
+static volatile unsigned int pcm_lock_count;
+
+/* A new rate plays only once the accessory acks its TrackNewAudioAttributes,
+ * or after a second with no ack (Gerrit 7900). A track start re-announcing
+ * the same rate is not held, nor is iAP2, which announces rates its own way.
+ * Options if a dock objects: drop the acked_freq test from batch_get_more(),
+ * or the reset keep from usb_iap_disconnect(). 7900 as written takes the
+ * sink at configuration and holds every rate for the ack, which silences an
+ * iAP1 accessory playing the line out and an iAP2 car. */
+static bool   accessory_ready; /* its rates accepted, so it can be told ours */
+static int8_t acked_freq; /* the rate the accessory has acked, or -1 */
+static int8_t asked_freq; /* a rate announced and not yet acked, or -1 */
+static long   asked_tick;
+
+extern bool iap_initialized;
 
 /* See iap_audio_take_counts() */
 static volatile uint32_t count_bytes, count_chunks, count_silent, count_odd;
@@ -71,13 +86,24 @@ extern struct pcm_sink iap_pcm_sink;
 static void sink_set_freq(uint16_t freq) {
     LOG("freq=%d", freq);
 
-    track_attrs_sent = true;
-    track_changed    = false;
-
     set_freq = freq;
 
     if(usb_iap2_audio_rate(samprs[freq])) {
+        track_attrs_sent = true;
+        track_changed    = false;
+        acked_freq       = freq;
         return;
+    }
+    if(!accessory_ready) {
+        /* announced once the rates arrive, by iap_audio_connected(): a sink
+         * kept through a bus reset hears rates before the dock is back */
+        return;
+    }
+    track_attrs_sent = true;
+    track_changed    = false;
+    if(freq != acked_freq) {
+        asked_freq = freq;
+        asked_tick = current_tick;
     }
 
     struct IAPContext* ctx = _iap_acquire_ctx(true);
@@ -118,14 +144,14 @@ static void batch_get_more(const void** ptr, size_t* len) {
 start:
     {
         const uint8_t stream = exhausted ? USB_LOG_IAP_STREAM_NOTHING
-                             : cur_freq != set_freq ? USB_LOG_IAP_STREAM_RATE_WAIT
+                             : cur_freq != set_freq || acked_freq != set_freq ? USB_LOG_IAP_STREAM_RATE_WAIT
                                                     : USB_LOG_IAP_STREAM_AUDIO;
         if(stream != logged_stream) {
             logged_stream = stream;
             usb_log(USB_LOG_IAP_STREAM, stream, 0, 0, 0);
         }
     }
-    if(exhausted || cur_freq != set_freq) {
+    if(pcm_lock_count || exhausted || cur_freq != set_freq || acked_freq != set_freq) {
         *ptr = zero_buffer.buf.ptr;
         *len = packet_size;
         packet_count = (packet_count + 1) % 10;
@@ -184,10 +210,17 @@ start:
 static void sink_play(const void* addr, size_t size) {
     LOG("play");
 
+    int oldlevel = disable_irq_save();
     pulled_buf        = addr;
     pulled_buf_size   = size;
     pulled_buf_cursor = 0;
     exhausted         = false;
+    staging_buffers[staging_buffer_index].cursor = 0;
+    restore_irq(oldlevel);
+
+    if(!iap_initialized) {
+        return;
+    }
 
     /* resolve pending play request before sending TrackNewAudioAttributes (by sink_set_freq).
      * some accessories will get confused when receiving it while waiting for an ack */
@@ -215,6 +248,7 @@ static void on_track_change(unsigned short id, void* data) {
 }
 
 void iap_audio_connected(void) {
+    accessory_ready = true;
     /* The sink keeps its rate between connections, so switching to it sets
      * no rate after the first, and a dock that waits for the announcement
      * before it sends any button would wait for ever. */
@@ -223,7 +257,25 @@ void iap_audio_connected(void) {
     }
 }
 
+void iap_audio_attrs_ack(bool success) {
+    LOG("attrs ack=%d asked=%d set=%d", success, asked_freq, set_freq);
+    if(asked_freq < 0) {
+        /* a track start's re-announcement */
+        return;
+    }
+    /* a refused rate stays silent: the accessory cannot play it */
+    if(success && asked_freq == set_freq) {
+        acked_freq = set_freq;
+    }
+    asked_freq = -1;
+}
+
 void iap_audio_tick(void) {
+    if(asked_freq >= 0 && TIME_AFTER(current_tick, asked_tick + HZ)) {
+        ERROR("no ack for rate %d, playing anyway", asked_freq);
+        acked_freq = asked_freq;
+        asked_freq = -1;
+    }
     if(track_changed && track_attrs_sent) {
         sink_set_freq(set_freq);
     }
@@ -233,6 +285,26 @@ static void sink_stop(void) {
     LOG("stop");
     /* we don't call usb_drv_batch_stop() here,
      * because we need to send something, even not playing. */
+    int oldlevel = disable_irq_save();
+    exhausted = true;
+    pulled_buf = NULL;
+    pulled_buf_size = pulled_buf_cursor = 0;
+    staging_buffers[staging_buffer_index].cursor = 0;
+    restore_irq(oldlevel);
+}
+
+/* The USB IRQ sends silence while a thread changes the mixer, rather than
+ * entering it. IRQs stay on: a rate change can take the iAP mutex. */
+static void sink_lock(void) {
+    int oldlevel = disable_irq_save();
+    pcm_lock_count++;
+    restore_irq(oldlevel);
+}
+
+static void sink_unlock(void) {
+    int oldlevel = disable_irq_save();
+    pcm_lock_count--;
+    restore_irq(oldlevel);
 }
 
 static void sink_nop(void) {
@@ -249,8 +321,8 @@ struct pcm_sink iap_pcm_sink = {
         .init     = sink_nop,
         .postinit = sink_nop,
         .set_freq = sink_set_freq,
-        .lock     = sink_nop,
-        .unlock   = sink_nop,
+        .lock     = sink_lock,
+        .unlock   = sink_unlock,
         .play     = sink_play,
         .stop     = sink_stop,
     },
@@ -273,6 +345,9 @@ bool iap_audio_init(void) {
     exhausted        = true;
     track_attrs_sent = false;
     track_changed    = false;
+    accessory_ready  = false;
+    acked_freq       = -1;
+    asked_freq       = -1;
     packet_count     = 0;
     logged_stream    = 0xff;
 
@@ -280,6 +355,7 @@ bool iap_audio_init(void) {
     return true;
 
 error:
+    usb_drv_batch_deinit();
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {
         if(staging_buffers[i].buf.ptr != NULL) {
             core_free(staging_buffers[i].buf.handle);
@@ -290,6 +366,7 @@ error:
 }
 
 bool iap_audio_deinit(void) {
+    accessory_ready = false;
     remove_event(PLAYBACK_EVENT_TRACK_CHANGE, on_track_change);
     check_act(usb_drv_batch_deinit() == 0, );
     for(size_t i = 0; i < ARRAYLEN(staging_buffers); i += 1) {

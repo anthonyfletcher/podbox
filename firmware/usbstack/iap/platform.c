@@ -506,9 +506,15 @@ IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct I
     }
     check_act(has_44k && has_48k, return iap_false, "accessory lacks mandatory freq support: 44k=%d 48k=%d", has_44k, has_48k);
     check_act(mixer_switch_sink(PCM_SINK_IAP), return false);
+    usb_iap_end_reset_hold(false);
     iap_audio_connected();
     queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
     return iap_true;
+}
+
+void iap_platform_on_audio_attrs_ack(struct IAPContext* iap_ctx, IAPBool success) {
+    (void)iap_ctx;
+    iap_audio_attrs_ack(success);
 }
 
 uint8_t _iap_convert_play_status(int rb_audio_status) {

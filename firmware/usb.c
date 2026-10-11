@@ -525,6 +525,9 @@ static void usb_set_host_present(bool present)
 
     if(!usb_host_present)
     {
+#ifdef USB_ENABLE_IAP
+        usb_iap_end_reset_hold(true);
+#endif
         usb_configure_drivers(USB_EXTRACTED);
         thread_set_priority(thread_self(), PRIORITY_SYSTEM);
         return;

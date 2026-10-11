@@ -115,6 +115,7 @@ void    iap_platform_reset_db_selection(struct IAPContext* iap_ctx);
 
 /* other callbacks */
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs);
+void    iap_platform_on_audio_attrs_ack(struct IAPContext* iap_ctx, IAPBool success);
 
 /* debugging */
 void iap_platform_dump_hex(const void* ptr, size_t size);

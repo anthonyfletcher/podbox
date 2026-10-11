@@ -25,6 +25,7 @@
 #include "playback.h"
 #include "powermgmt.h"
 #include "timefuncs.h"
+#include "usb.h"
 #include "usb_core.h"
 #include "usb_drv.h"
 
@@ -479,17 +480,46 @@ static void usb_iap_init(void) {
     LOG("init");
 }
 
+/* Set while a bus reset keeps an iAP1 dock's sink for its return. */
+static bool reset_hold;
+
+void usb_iap_end_reset_hold(bool give_back) {
+    if(!reset_hold) {
+        return;
+    }
+    reset_hold = false;
+    LOG("reset hold ends, give_back=%d", give_back);
+    if(give_back) {
+        audio_pause();
+        mixer_switch_sink(PCM_SINK_BUILTIN);
+    }
+}
+
 static void usb_iap_disconnect(void) {
     iap_initialized = false;
-    /* An accessory that had the audio takes it with it, as a dock does. A
-     * car that never took it leaves playback alone -- one that has only
-     * identified itself, or the connection the player drops to come back to
-     * it without the sound card -- but an iAP1 accessory playing the line
-     * out does not. */
-    if(pcm_current_sink() == PCM_SINK_IAP || !usb_iap2_keeps_playing()) {
-        audio_pause();
+    /* The stream stops before the sink changes or its buffers go. */
+    check_act(iap_audio_disable(), );
+    /* A bus reset is not the dock leaving (Gerrit 7900). An iAP1 dock's sink
+     * stays, so the track waits where it is, paused or playing, until the
+     * dock's rates come back; another configuration or the cable going ends
+     * the wait as an unplug would. To pause at a reset instead, drop this
+     * test. */
+    if(usb_core_bus_resetting() && usb_detect() == USB_INSERTED &&
+       pcm_current_sink() == PCM_SINK_IAP && !usb_iap2_keeps_playing()) {
+        reset_hold = true;
+        LOG("bus reset keeps the sink");
+    } else {
+        reset_hold = false;
+        /* An accessory that had the audio takes it with it, as a dock does. A
+         * car that never took it leaves playback alone -- one that has only
+         * identified itself, or the connection the player drops to come back to
+         * it without the sound card -- but an iAP1 accessory playing the line
+         * out does not. */
+        if(pcm_current_sink() == PCM_SINK_IAP || !usb_iap2_keeps_playing()) {
+            audio_pause();
+        }
+        mixer_switch_sink(PCM_SINK_BUILTIN);
     }
-    mixer_switch_sink(PCM_SINK_BUILTIN);
     timeout_cancel(&tick_tmo);
     if(platform.aa_slot >= 0) {
         playback_release_aa_slot(platform.aa_slot);

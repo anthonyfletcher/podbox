@@ -1012,6 +1012,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             if(request->id == IAPDigitalAudioCommandID_TrackNewAudioAttributes) {
                 check_ret(ctx->waiting_for_audio_attrs_ack, 0, "unexpected ack");
                 ctx->waiting_for_audio_attrs_ack = iap_false;
+                iap_platform_on_audio_attrs_ack(ctx, request->status == IAPAckStatus_Success);
             }
             check_ret(request->status == IAPAckStatus_Success, 0);
             return 0;
