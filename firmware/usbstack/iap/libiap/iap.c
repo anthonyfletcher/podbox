@@ -1136,6 +1136,8 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
     return -IAPAckStatus_EUnknownID;
 }
 
+static IAPBool send_sample_rate_caps_cb(struct IAPContext* ctx);
+
 static IAPBool transition_idps_to_auth_cb(struct IAPContext* ctx) {
     print("starting accessory authentication");
     ctx->phase = IAPPhase_Auth;
@@ -1151,6 +1153,14 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
             read_request(IAPIdentifyDeviceLingoesPayload);
             switch(swap_32(request->options) & IAPIdentifyDeviceLingoesOptions_AuthMask) {
             case IAPIdentifyDeviceLingoesOptions_NoAuth:
+                /* The rates are asked for once authenticated, so digital
+                 * audio without authentication would never hear one: one
+                 * with a device ID is authenticated all the same, as
+                 * ipod-gadget does, and one without is asked at once */
+                if(!(swap_32(request->lingoes_bits) & IAPIdentifyDeviceLingoesLingoBits_DigitalAudio)) {
+                    break;
+                }
+                ctx->on_send_complete = request->device_id != 0 ? transition_idps_to_auth_cb : send_sample_rate_caps_cb;
                 break;
             /* deferred is "when the iPod asks", which may be now */
             case IAPIdentifyDeviceLingoesOptions_DeferAuth:
