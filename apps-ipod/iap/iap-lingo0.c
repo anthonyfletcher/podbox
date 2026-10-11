@@ -111,18 +111,22 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          */
         case 0x01:
         {
-            unsigned char lingo = buf[2];
-
             /* This is sufficient even for Lingo 0x05, as we are
              * not actually reading from the extended bits for now
              */
             CHECKLEN(3);
+
+            unsigned char lingo = buf[2];
 
             /* Issuing this command exits any extended interface states
              * and resets authentication
              */
             iap_interface_state_change(IST_STANDARD);
             iap_reset_device(&device);
+
+            /* Identify has no authentication, so nothing it negotiates
+             * waits on one */
+            device.auth.state = AUST_AUTH;
 
             switch (lingo) {
                 case 0x04:
@@ -425,14 +429,14 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          */
         case 0x0F:
         {
-            unsigned char lingo = buf[2];
-
             CHECKLEN(3);
 
+            unsigned char lingo = buf[2];
+
             /* Supported lingos and versions are read from the lingo_versions
-             * array
+             * array, which LINGO_SUPPORTED() indexes modulo 32
              */
-            if (LINGO_SUPPORTED(lingo)) {
+            if (lingo < 32 && LINGO_SUPPORTED(lingo)) {
                 IAP_TX_INIT(0x00, 0x10);
                 IAP_TX_PUT(lingo);
                 IAP_TX_PUT(LINGO_MAJOR(lingo));
@@ -470,16 +474,14 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          */
         case 0x13:
         {
-            uint32_t lingoes = get_u32(&buf[2]);
-            uint32_t options = get_u32(&buf[6]);
-            uint32_t deviceid = get_u32(&buf[0x0A]);
-            bool seen_unsupported = false;
             unsigned char i;
 
             CHECKLEN(14);
 
-            /* Issuing this command exits any extended interface states */
-            iap_interface_state_change(IST_STANDARD);
+            uint32_t lingoes = get_u32(&buf[2]);
+            uint32_t options = get_u32(&buf[6]);
+            uint32_t deviceid = get_u32(&buf[0x0A]);
+            bool seen_unsupported = false;
 
             /*
              * Actions by remote listed            Apple Firmware   Rockbox Firmware
@@ -534,17 +536,13 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
              * Bit 5: RF Transmitter lingo
              */
 
-            /* Loop through the lingoes advertised by the device.
-             * If it tries to use a lingo we do not support, return
-             * a Command Failed ACK.
+            /* A lingo we do not support is left out of the negotiated set
+             * rather than failing the whole identification: an accessory
+             * that also speaks, say, Digital Audio still remotes the player.
              */
             for(i=0; i<32; i++) {
-                if (lingoes & BIT_N(i)) {
-                    /* Bit set by device */
-                    if (!LINGO_SUPPORTED(i)) {
-                        seen_unsupported = true;
-                    }
-                }
+                if ((lingoes & BIT_N(i)) && !LINGO_SUPPORTED(i))
+                    lingoes &= ~BIT_N(i);
             }
 
             /* Bit 0 _must_ be set by the device */
@@ -567,6 +565,10 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                 cmd_ack(cmd, IAP_ACK_CMD_FAILED);
                 break;
             }
+
+            /* Issuing this command exits any extended interface states.
+             * Only once it is accepted: the change pauses playback. */
+            iap_interface_state_change(IST_STANDARD);
             iap_reset_device(&device);
             device.lingoes = lingoes;
 
@@ -584,6 +586,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
             if (deviceid && (options & 0x03) && !DEVICE_AUTH_RUNNING) {
                 device.auth.state = AUST_INIT;
             } else {
+                /* Asked for none, so none is waited on */
+                device.auth.state = AUST_AUTH;
                 device.accinfo = ACCST_INIT;
                 queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
             }
@@ -829,7 +833,9 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                 iap_send_tx();
             }
 #endif
-            iap_set_remote_volume();
+            /* A Display Remote packet: only to one that speaks it */
+            if (DEVICE_LINGO_SUPPORTED(0x03))
+                iap_set_remote_volume();
 
             break;
         }
@@ -1016,7 +1022,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                     /* Type 0x00 was already queried, that's where this 
 		     * information comes from 
 		     */
-                    device.capabilities_queried = 0x01;
+                    device.capabilities_queried |= 0x01;
                     device.capabilities &= ~0x01;
                     break;
                 }
@@ -1062,7 +1068,9 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
         case 0x29:
         {
             CHECKLEN(3);
-            CHECKAUTH;
+            /* Line-out usage is asked before authentication completes */
+            if (buf[2] != 0x03)
+                CHECKAUTH;
 
             IAP_TX_INIT(0x00, 0x2A);
             /* The only information really supported is 0x03, Line-out usage.
@@ -1074,7 +1082,12 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
 
                 iap_send_tx();
             } else {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                /* Any other class reads as its first setting; an accessory
+                 * that is refused one disconnects */
+                IAP_TX_PUT(buf[2]);
+                IAP_TX_PUT(0x00);
+
+                iap_send_tx();
             }
 
             break;
@@ -1108,7 +1121,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
         case 0x2B:
         {
             CHECKLEN(5);
-            CHECKAUTH;
+            if (buf[2] != 0x03)
+                CHECKAUTH;
 
             /* The only information really supported is 0x03, Line-out usage.
              * All others are video related
@@ -1123,7 +1137,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
                     cmd_ok(cmd);
                 }
             } else {
-                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                /* Accepted and ignored, as GetiPodPreferences above */
+                cmd_ok(cmd);
             }
 
             break;
