@@ -63,6 +63,7 @@
 #include "power.h"
 #include "usb.h"
 #include "system/volume.h"
+#include "audio/remote_seek.h"
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -412,6 +413,7 @@ static void iap_do_reset(void)
     last_frame_tick = 0;
 
     iap_reset_device(&device);
+    remote_seek_stop();
     iap_remotebtn = BUTTON_NONE;
     iap_timeoutbtn = 0;
     iap_repeatbtn = 0;
@@ -982,6 +984,7 @@ void iap_periodic(void)
 #ifdef HAVE_IAP_ACCESSORY_POLL
     iap_accessory_poll();
 #endif
+    remote_seek_tick();
 
     if(!iap_setupflag || !iap_enabled) return;
 

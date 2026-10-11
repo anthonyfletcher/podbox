@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Boundary shim. USB iAP firmware includes "wps.h" by bare name for the
- * remote seek preview; the real PodBox header is screens/playback/wps.h.
+ * Boundary shim. USB iAP firmware includes "remote_seek.h" by bare name;
+ * the real PodBox header is audio/remote_seek.h.
  ****************************************************************************/
-#include "../screens/playback/wps.h"
+#include "../audio/remote_seek.h"

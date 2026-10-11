@@ -13,6 +13,7 @@
 
 #include "iap-core.h"
 #include "iap-lingo.h"
+#include "audio/remote_seek.h"
 #include "settings.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
@@ -1961,9 +1962,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             CHECKLEN(4);
 
             /* The playback engine directly: a button press acts on the
-             * screen that has focus. Seeking still holds the remote's
-             * button, until EndFFRew or ten seconds. */
+             * screen that has focus */
             bool ok = true;
+            /* anything but a seek ends one where it has got to */
+            if (buf[3] < 0x05 || buf[3] > 0x07)
+                remote_seek_stop();
             switch(buf[3])
             {
                 case 0x01: /* play/pause */
@@ -1983,16 +1986,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     audio_prev();
                     break;
                 case 0x05: /* ffwd */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    iap_timeoutbtn = 100;
-                    break;
                 case 0x06: /* frwd */
-                    iap_remotebtn = BUTTON_RC_LEFT;
-                    iap_timeoutbtn = 100;
+                    ok = remote_seek_start(buf[3] == 0x05 ? 1 : -1);
                     break;
                 case 0x07: /* end ffwd/frwd */
-                    iap_remotebtn = BUTTON_NONE;
-                    iap_timeoutbtn = 0;
+                    remote_seek_stop();
                     break;
                 case 0x08: /* next chapter */
                 case 0x09: /* previous chapter */

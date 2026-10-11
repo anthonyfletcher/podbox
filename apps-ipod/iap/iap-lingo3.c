@@ -34,6 +34,7 @@
 #include "metadata.h"
 #include "audio/playback.h"
 #include "system/volume.h"
+#include "audio/remote_seek.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
 #endif
@@ -761,6 +762,23 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         case 0x02:
                         {
                             audio_pause();
+                            cmd_ok(cmd);
+                            break;
+                        }
+
+                        /* Fast forward, rewind, and their end */
+                        case 0x03:
+                        case 0x04:
+                        {
+                            cmd_ack(cmd, remote_seek_start(
+                                buf[0x03] == 0x03 ? 1 : -1) ?
+                                IAP_ACK_OK : IAP_ACK_CMD_FAILED);
+                            break;
+                        }
+
+                        case 0x05:
+                        {
+                            remote_seek_stop();
                             cmd_ok(cmd);
                             break;
                         }

@@ -436,7 +436,6 @@ static int usb_iap_init_connection(void) {
         ERROR("failed to claim albumart slot");
     }
     platform.control_pending = false;
-    platform.seek_direction  = 0;
 
     /* register timer */
     timeout_register(&tick_tmo, tick_callback, HZ / 10, 0);
