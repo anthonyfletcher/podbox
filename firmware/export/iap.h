@@ -48,6 +48,11 @@ const unsigned char *iap_get_serbuf(void);
 extern bool iap_record(bool onoff);
 #endif
 void iap_reset_state(IF_IAP_MP_NONVOID(int port) ); /* 0 is dock, 1 is headphone */
+/* USB power went: the session resets, as for an accessory that has gone,
+ * but playback carries on */
+void iap_power_reset(void);
+/* The player set the codec's volume, which ends an accessory's mute */
+void iap_volume_set(void);
 #ifdef HAVE_IAP_ACCESSORY_POLL
 /* Ten times a second from the iAP thread, on a target whose accessory
  * detect can only be read from a thread: resets the session when the

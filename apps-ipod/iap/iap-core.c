@@ -98,6 +98,7 @@ static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
 static volatile bool reset_pending;
+static volatile bool reset_departed;    /* the reset pauses, see below */
 static long last_frame_tick;     /* 0 until a frame passes its checksum */
 /* The data of the one IAP_EV_ARTWORK that is live, and whether a packet
  * went since the last tick; a tick that finds none sent posts a new one,
@@ -392,30 +393,43 @@ void iap_reset_auth(struct auth_t* auth)
  * The session is reset on the iAP thread, and iap_handlepkt() does that
  * before it reads another packet, so nothing the departed accessory left in
  * the buffer reaches the next one. */
-void iap_reset_state(IF_IAP_MP_NONVOID(int port))
+static void post_reset(bool departed)
 {
     int level;
 
     if (!iap_running)
         return;
 
-    /* 0 is dock, 1 is headphone.  This is for
-       when we eventually maintain independent state */
-    IF_IAP_MP((void)port);
-
     level = disable_irq_save();
     frame_state.state = ST_SYNC;
     reset_pending = true;
+    reset_departed |= departed;
     restore_irq(level);
     queue_post(&iap_queue, IAP_EV_RESET, 0);
 }
 
+void iap_reset_state(IF_IAP_MP_NONVOID(int port))
+{
+    /* 0 is dock, 1 is headphone.  This is for
+       when we eventually maintain independent state */
+    IF_IAP_MP((void)port);
+    post_reset(true);
+}
+
+void iap_power_reset(void)
+{
+    post_reset(false);
+}
+
 /* iAP thread. An accessory in extended mode was playing the track through
- * itself, so its leaving pauses it, as an Extended to Standard change does. */
+ * itself, so its leaving pauses it, as an Extended to Standard change does;
+ * a reset for lost USB power does not, as the accessory may still be there. */
 static void iap_do_reset(void)
 {
     int level = disable_irq_save();
+    bool departed = reset_departed;
     reset_pending = false;
+    reset_departed = false;
     frame_state.state = ST_SYNC;
     iap_reset_buffers();
     restore_irq(level);
@@ -429,7 +443,8 @@ static void iap_do_reset(void)
     iap_btnshuffle = false;
     iap_btnrepeat = false;
     iap_btnstop = false;
-    if (interface_state == IST_EXTENDED && (audio_status() & AUDIO_STATUS_PLAY))
+    if (departed && interface_state == IST_EXTENDED
+        && (audio_status() & AUDIO_STATUS_PLAY))
         audio_pause();
     interface_state = IST_STANDARD;
     iap_bitrate_set(global_settings.serial_bitrate);
@@ -504,6 +519,11 @@ int iap_byte_to_volume(unsigned char level)
     const int max = sound_max(SOUND_VOLUME);
 
     return min + (level * (max - min) + 127) / 255;
+}
+
+void iap_volume_set(void)
+{
+    device.mute = false;
 }
 
 void iap_set_mute(bool mute)

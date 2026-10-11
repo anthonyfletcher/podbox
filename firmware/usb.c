@@ -561,7 +561,7 @@ static void usb_extract(void)
         usb_stack_enable(false);
 
 #ifdef IPOD_ACCESSORY_PROTOCOL
-    iap_reset_state(IF_IAP_MP(0));
+    iap_power_reset();
 #endif
 
     usb_state = USB_EXTRACTED;
