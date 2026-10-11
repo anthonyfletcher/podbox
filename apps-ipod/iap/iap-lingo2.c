@@ -129,8 +129,18 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     btn |= BUTTON_RC_NEXT_ALBUM;
                 if(buf[2] & 64)
                     btn |= BUTTON_RC_PREV_ALBUM;
+                if(buf[2] & 128) /* stop */
+                {
+                    if (!iap_btnstop)
+                    {
+                        audio_stop();
+                        iap_btnstop = true;
+                    }
+                }
             }
-            else if(len >= 4 && buf[3] != 0)
+            /* Each byte on its own: a remote may hold buttons from two at
+             * once, such as Volume Up with Menu */
+            if(len >= 4 && buf[3] != 0)
             {
                 if(buf[3] & 1) /* play */
                 {
@@ -165,7 +175,7 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     }
                 }
             }
-            else if(len >= 5 && buf[4] != 0)
+            if(len >= 5 && buf[4] != 0)
             {
                 if(buf[4] & 1) /* repeat */
                 {
@@ -200,13 +210,23 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                 if(buf[4] & 128) /* select */
                     btn |= BUTTON_RC_SELECT;
             }
-            else if(len >= 6 && buf[5] != 0)
+            if(len >= 6 && buf[5] != 0)
             {
                 if(buf[5] & 1) /* up */
                     btn |= BUTTON_RC_UP;
                 if (buf[5] & 2) /* down */
                     btn |= BUTTON_RC_DOWN;
             }
+
+            /* Shuffle, Repeat and Stop act once a press: the latch ends when
+             * the button is let go, and only the timeout below ends it for a
+             * remote whose release was lost */
+            if (!(buf[2] & 128))
+                iap_btnstop = false;
+            if (!(len >= 4 && (buf[3] & 128)))
+                iap_btnshuffle = false;
+            if (!(len >= 5 && (buf[4] & 1)))
+                iap_btnrepeat = false;
 
             /* Commit the new button state in one go. The button driver
              * reads iap_remotebtn from interrupt context, a transient
@@ -230,7 +250,8 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
             else
             {
                 iap_remotebtn = BUTTON_NONE;
-                iap_timeoutbtn = 0;
+                iap_timeoutbtn = (iap_btnstop || iap_btnshuffle || iap_btnrepeat)
+                                 ? 3 : 0;
             }
 
             /* power on released */
@@ -357,9 +378,29 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
              * So just route it through the handler again, with 0x00 as the
              * command
              */
-            memcpy(repeatbuf, buf, 6);
-            repeatbuf[1] = 0x00;
-            iap_handlepkt_mode2((len<6)?len:6, repeatbuf);
+            {
+                /* Bytes 0 and 1 mean what ContextButtonStatus's do. Byte 2
+                 * is repeat, Begin FF, Begin REW, then record and reserved,
+                 * so it is translated; byte 3 is reserved. Only what
+                 * arrived is copied: the trailing bytes are optional. */
+                unsigned int n = (len < 6) ? len : 6;
+
+                memset(repeatbuf, 0, sizeof(repeatbuf));
+                memcpy(repeatbuf, buf, n);
+                repeatbuf[1] = 0x00;
+                if (n > 4)
+                {
+                    unsigned char a2 = buf[4], c2 = 0;
+
+                    if (a2 & 0x01) c2 |= 0x01;  /* repeat advance */
+                    if (a2 & 0x02) c2 |= 0x10;  /* Begin FF */
+                    if (a2 & 0x04) c2 |= 0x20;  /* Begin REW */
+                    repeatbuf[4] = c2;
+                }
+                if (n > 5)
+                    repeatbuf[5] = 0;
+                iap_handlepkt_mode2(n, repeatbuf);
+            }
 
             cmd_ok(cmd);
             break;
