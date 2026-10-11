@@ -461,10 +461,10 @@ bool iap_audio_accessory_rates(struct IAPSpan* list) {
             }
         }
     }
-    /* the rate every accessory must take */
-    const bool ok = (listed & (1u << 1)) != 0;
+    /* one rate the player can send is enough */
+    const bool ok = listed != 0;
     usb_log(USB_LOG_IAP_RATES, ok, count, listed, 0);
-    check_act(ok, return false, "accessory lacks 44.1 kHz");
+    check_act(ok, return false, "accessory lists none of our rates");
     offer_rates(listed);
     return true;
 }
