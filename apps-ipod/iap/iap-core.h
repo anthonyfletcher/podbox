@@ -260,6 +260,12 @@ void iap_repeat_next(void);
 void iap_fill_power_state(void);
 
 void iap_send_tx(void);
+/* The transaction ID of the command being handled, and a send that answers
+ * it later, from outside its handler */
+uint16_t iap_rx_tid(void);
+void iap_send_tx_tid(uint16_t tid);
+/* iap_artwork_send_next() on the iAP thread */
+void iap_artwork_post(void);
 void iap_set_remote_volume(void);
 
 extern enum interface_state interface_state;

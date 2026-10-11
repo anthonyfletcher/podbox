@@ -57,6 +57,7 @@
 #include "metadata.h"
 #include "database/tagcache.h"
 #include "iap-library.h"
+#include "iap-artwork.h"
 #include "sound.h"
 #include "action.h"
 #include "powermgmt.h"
@@ -91,6 +92,7 @@
 #define IAP_EV_MSG_RCVD     (2)     /* A complete message has been received from the device */
 #define IAP_EV_MALLOC       (3)     /* Allocate memory for the RX/TX buffers */
 #define IAP_EV_RESET        (4)     /* The accessory has gone, see iap_reset_state() */
+#define IAP_EV_ARTWORK      (5)     /* The next packet of album art */
 
 static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
@@ -452,6 +454,7 @@ void iap_reset_device(struct device_t* device)
     device->capabilities = 0;
     device->capabilities_queried = 0;
     device->max_payload = 0;
+    iap_artwork_stop();
     device->transid = false;
     device->idps = false;
     device->identified_by_idps = false;
@@ -534,6 +537,13 @@ static void iap_thread(void)
             case IAP_EV_MSG_RCVD:
             {
                 iap_handlepkt();
+                break;
+            }
+
+            case IAP_EV_ARTWORK:
+            {
+                if (iap_artwork_send_next())
+                    iap_artwork_post();
                 break;
             }
 
@@ -707,6 +717,8 @@ static unsigned char rx_lingo;
 static uint16_t rx_tid;
 /* The next ID of a command the player sends */
 static uint16_t own_tid;
+/* The ID iap_send_tx_tid() gives its packet, or -1 */
+static int tid_override = -1;
 
 /* Sent by the player of its own accord, not in answer: these take an ID of
  * their own even while a command is being handled */
@@ -723,6 +735,8 @@ static bool tx_unsolicited(const unsigned char *p)
 
 static uint16_t tx_tid(const unsigned char *p)
 {
+    if (tid_override >= 0)
+        return tid_override;
     /* One ID serves the whole authentication exchange */
     if (p[0] == 0x00 && (p[1] == 0x14 || p[1] == 0x16
                          || p[1] == 0x17 || p[1] == 0x19))
@@ -760,6 +774,23 @@ static bool rx_take_tid(unsigned char **pkt, unsigned int *len)
     *pkt = p + 2;
     *len -= 2;
     return true;
+}
+
+uint16_t iap_rx_tid(void)
+{
+    return rx_tid;
+}
+
+void iap_send_tx_tid(uint16_t tid)
+{
+    tid_override = tid;
+    iap_send_tx();
+    tid_override = -1;
+}
+
+void iap_artwork_post(void)
+{
+    queue_post(&iap_queue, IAP_EV_ARTWORK, 0);
 }
 
 /* Send the current content of the TX buffer.

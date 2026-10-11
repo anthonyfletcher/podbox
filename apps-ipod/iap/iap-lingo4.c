@@ -20,6 +20,7 @@
 #include "audio/playback.h"
 #include "database/tagcache.h"
 #include "iap-library.h"
+#include "iap-artwork.h"
 #include "string-extra.h"
 
 /*
@@ -639,9 +640,10 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     {
                         case 0x00:
                         {
-                            /* Track Capabilities 10Bytes Data */
-                            IAP_TX_PUT_U32(0);   /* Track Capabilities. */
-                                                 /* Currently None Supported*/
+                            /* Track Capabilities 10Bytes Data: bit 2,
+                             * album artwork */
+                            IAP_TX_PUT_U32(iap_artwork_exists(index) ?
+                                           BIT_N(2) : 0);
                             IAP_TX_PUT_U32(id3->length); /* Track Length */
                             /* Chapter Count: the playing track's is loaded */
                             IAP_TX_PUT_U16(id3->cuesheet ?
@@ -665,10 +667,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                         }
                          case 0x07:
                         {
-                            /* Track Artwork Count */
-                            /* Currently not supported */
-                            IAP_TX_PUT_U16(0x00);        /* Format ID */
-                            IAP_TX_PUT_U16(0x00);        /* Image Count */
+                            /* Track Artwork Count: none for no art */
+                            iap_artwork_put_counts(index);
                             break;
                         }
                     }
@@ -813,10 +813,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * height:2
              */
         {
-            /* No artwork is sent over serial, so no format is offered: an
-             * accessory offered one asks for images that never come */
-            unsigned char data[] = {0x04, 0x00, 0x0F};
-            iap_send_pkt(data, sizeof(data));
+            IAP_TX_INIT4(0x04, 0x000F);
+            iap_artwork_put_formats();
+            iap_send_tx();
             break;
         }
         case 0x000F: /* RetArtworkFormats. See Above */
@@ -890,8 +889,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Subsequent packets omit bytes 8 - 24
              */
         {
-            /* GetArtworkFormats offers no format to ask for */
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            /* The time is ignored: a track has one image */
+            CHECKLEN(13);
+            if (!iap_artwork_start(0x04, 0x0011, get_u32(&buf[3]),
+                                   get_u16(&buf[7])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x0011: /* RetTrackArtworkData. See Abobe */
@@ -2082,9 +2084,14 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            /* No images, so no times: one time of 0 said there was one */
-            unsigned char data[] = {0x04, 0x00, 0x2B};
-            iap_send_pkt(data, sizeof(data));
+            /* A track's one image is at its start; none, no times */
+            CHECKLEN(13);
+            IAP_TX_INIT4(0x04, 0x002B);
+            if (get_u16(&buf[9]) == 0 && get_u16(&buf[11]) != 0
+                && iap_artwork_format_valid(get_u16(&buf[7]))
+                && iap_artwork_exists(get_u32(&buf[3])))
+                IAP_TX_PUT_U32(0);
+            iap_send_tx();
             break;
         }
         case 0x002B: /* ReturnTrackArtworkTimes. See Above */

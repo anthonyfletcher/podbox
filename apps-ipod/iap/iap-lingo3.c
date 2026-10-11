@@ -36,6 +36,7 @@
 #include "system/volume.h"
 #include "audio/remote_seek.h"
 #include "metadata/cuesheet.h"
+#include "iap-artwork.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
 #endif
@@ -1155,8 +1156,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 case 0x00:
                 {
                     iap_get_trackinfo(track_index, &id3);
-                    /* Track capabilities. None of these are supported, yet */
-                    IAP_TX_PUT_U32(0x00);
+                    /* Track capabilities: bit 2, album artwork */
+                    IAP_TX_PUT_U32(iap_artwork_exists(track_index) ?
+                                   BIT_N(2) : 0);
 
                     /* Track length in ms */
                     IAP_TX_PUT_U32(id3.length);
@@ -1277,7 +1279,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x08:
                 {
-                    /* No artwork, return packet containing just the type byte */
+                    /* Just the type byte for none */
+                    iap_artwork_put_counts(track_index);
                     iap_send_tx();
                     break;
                 }
@@ -1353,10 +1356,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
         {
             CHECKAUTH;
 
-            /* We return the empty list, meaning no artwork
-             * TODO: Fix to return actual artwork formats
-             */
             IAP_TX_INIT(0x03, 0x17);
+            iap_artwork_put_formats();
 
             iap_send_tx();
             break;
@@ -1405,8 +1406,10 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             CHECKAUTH;
             CHECKLEN(0x0C);
 
-            /* No artwork support currently */
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            /* The time is ignored: a track has one image */
+            if (!iap_artwork_start(0x03, 0x19, get_u32(&buf[0x02]),
+                                   get_u16(&buf[0x06])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
 
@@ -1545,9 +1548,6 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             CHECKAUTH;
             CHECKLEN(0x0C);
 
-            /* Artwork is currently unsuported, just check for a valid
-             * track index
-             */
             index = get_u32(&buf[0x02]);
             trackcount = playlist_amount();
 
@@ -1557,8 +1557,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 break;
             }
 
-            /* Send an empty list */
+            /* A track's one image is at its start; none, no times */
             IAP_TX_INIT(0x03, 0x20);
+            if (get_u16(&buf[0x08]) == 0 && get_u16(&buf[0x0A]) != 0
+                && iap_artwork_format_valid(get_u16(&buf[0x06]))
+                && iap_artwork_exists(index))
+                IAP_TX_PUT_U32(0);
 
             iap_send_tx();
             break;

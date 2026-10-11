@@ -344,6 +344,7 @@ system/volume.c
 
 #ifdef IPOD_ACCESSORY_PROTOCOL
 iap/iap-core.c
+iap/iap-artwork.c
 iap/iap-lingo0.c
 iap/iap-lingo2.c
 iap/iap-lingo3.c
