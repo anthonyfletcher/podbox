@@ -510,12 +510,20 @@ static void usb_iap_transfer_complete(int ep, int dir, int status, int length) {
             /* libiap did not send it, so is not told */
             return;
         }
-        check_act(status == 0, return);
+        if(!iap_initialized) {
+            /* cancelled by the disconnect, which has freed the context's buffers */
+            return;
+        }
 #if DEBUG_DUMP_TX
         LOG("ep=%d dir=%d state=%d length=%d", ep, dir, status, length);
 #endif
         struct IAPContext* ctx = _iap_acquire_ctx(true);
-        check_act(iap_notify_send_complete(ctx), );
+        if(status == 0) {
+            check_act(iap_notify_send_complete(ctx), );
+        } else {
+            ERROR("hid report failed, status=%d", status);
+            check_act(iap_notify_send_failed(ctx), );
+        }
         _iap_release_ctx();
     }
 }
@@ -595,10 +603,11 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
 
             struct IAPContext* ctx = _iap_acquire_ctx(true);
             iap_log_report(ctx, reqdata, req->wLength, false);
-            const bool         ret = iap_feed_hid_report(ctx, reqdata, req->wLength);
+            /* The report arrived whatever libiap makes of it. A STALL would
+             * tell the accessory the transfer failed, not the frame. */
+            iap_feed_hid_report(ctx, reqdata, req->wLength);
             _iap_release_ctx();
 
-            check_act(ret, return false);
             usb_core_control_response(USB_CONTROL_ACK, NULL, 0);
             return true;
         }

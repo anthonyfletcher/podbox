@@ -106,6 +106,12 @@ IAPBool iap_notify_send_complete(struct IAPContext* ctx) {
     return iap_true;
 }
 
+IAPBool iap_notify_send_failed(struct IAPContext* ctx) {
+    /* the accessory cannot rebuild a frame missing a report, so the rest of it goes too */
+    ctx->send_buf_sending_cursor = ctx->send_buf_sending_range_end;
+    return iap_notify_send_complete(ctx);
+}
+
 IAPBool _iap_send_hid_reports(struct IAPContext* ctx, size_t begin, size_t end) {
     if(ctx->send_buf_sending_cursor < ctx->send_buf_sending_range_end) {
         warn("another transmission in progress, aborting it");
@@ -175,7 +181,12 @@ IAPBool _iap_send_next_report(struct IAPContext* ctx) {
     ctx->send_busy = iap_true;
 
     const size_t send_size = 1 + report_size->size;
-    check_ret(iap_platform_send_hid_report(ctx, report, send_size) == (int)send_size, iap_false);
+    /* a report that never went out completes nothing, so must not leave the sender busy */
+    check_act(iap_platform_send_hid_report(ctx, report, send_size) == (int)send_size, {
+        ctx->send_buf_sending_cursor = ctx->send_buf_sending_range_end;
+        ctx->send_busy               = iap_false;
+        return iap_false;
+    });
 
     return iap_true;
 }

@@ -20,6 +20,7 @@ IAPBool iap_control_response(struct IAPContext* ctx, struct IAPPlatformPendingCo
 /* hid.c */
 IAPBool iap_feed_hid_report(struct IAPContext* ctx, const uint8_t* data, size_t size);
 IAPBool iap_notify_send_complete(struct IAPContext* ctx);
+IAPBool iap_notify_send_failed(struct IAPContext* ctx);
 IAPBool _iap_send_hid_reports(struct IAPContext* ctx, size_t begin, size_t end); /* data is passed by ctx->send_buf */
 IAPBool _iap_send_next_report(struct IAPContext* ctx);
 
