@@ -37,7 +37,9 @@ static struct usb_interface_descriptor __attribute__((aligned(2)))
     .bInterfaceNumber   = 0,
     .bAlternateSetting  = 0,
     .bNumEndpoints      = 0,
-    .bInterfaceClass    = USB_CLASS_VENDOR_SPEC,
+    /* Not vendor-specific: Linux passes over a configuration whose first
+     * interface is, and would choose the iAP one charge-only also offers */
+    .bInterfaceClass    = USB_CLASS_APP_SPEC,
     .bInterfaceSubClass = 0,
     .bInterfaceProtocol = 0,
     .iInterface         = 0
