@@ -1152,9 +1152,8 @@ static int32_t handle_in_connected(struct IAPContext* ctx, uint8_t lingo, uint16
             switch(swap_32(request->options) & IAPIdentifyDeviceLingoesOptions_AuthMask) {
             case IAPIdentifyDeviceLingoesOptions_NoAuth:
                 break;
+            /* deferred is "when the iPod asks", which may be now */
             case IAPIdentifyDeviceLingoesOptions_DeferAuth:
-                warn("unsupported option 0x%04" PRIX32, swap_32(request->options));
-                return -IAPAckStatus_EBadParameter;
             case IAPIdentifyDeviceLingoesOptions_ImmediateAuth:
                 ctx->on_send_complete = transition_idps_to_auth_cb;
                 break;

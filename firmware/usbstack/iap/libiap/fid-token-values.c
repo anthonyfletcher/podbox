@@ -40,7 +40,9 @@ int _iap_hanlde_set_fid_token_values(struct IAPSpan* request, struct IAPSpan* re
             const uint32_t opt = swap_32(token_tail->device_option);
             const uint32_t id  = swap_32(token_tail->device_id);
             pack_accepted(IAPFIDTokenValuesIdentifyAck);
-            if((opt & IAPIdentifyDeviceLingoesOptions_AuthMask) != IAPIdentifyDeviceLingoesOptions_ImmediateAuth) {
+            /* IDPS always authenticates, so deferred is as immediate */
+            const uint32_t auth = opt & IAPIdentifyDeviceLingoesOptions_AuthMask;
+            if(auth != IAPIdentifyDeviceLingoesOptions_ImmediateAuth && auth != IAPIdentifyDeviceLingoesOptions_DeferAuth) {
                 ack->status = IAPFIDTokenValuesIdentifyAckStatus_RequiredFailed;
             }
             (void)id;
