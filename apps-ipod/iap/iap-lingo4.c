@@ -1755,8 +1755,22 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7     0xNN   Telegram payload checksum byte
              */
         {
-            device.do_notify = buf[3] ? true : false;
-            /* respond with cmd ok packet */
+            /* The four-byte form is a mask, whose first byte is 0 in any
+             * accessory that follows the protocol, so it is told apart by
+             * length. The one-byte form's 1 is stop, track index, track
+             * time and chapter index. Neither touches the Display Remote's
+             * notifications. */
+            CHECKLEN(4);
+            if (len >= 7)
+                device.pb_notifications = get_u32(&buf[3]);
+            else if (buf[3] <= 0x01)
+                device.pb_notifications = buf[3] ?
+                    (BIT_N(0) | BIT_N(2) | BIT_N(3) | BIT_N(5)) : 0;
+            else
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             cmd_ok(cmd);
             break;
         }

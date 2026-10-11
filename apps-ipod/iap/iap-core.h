@@ -138,6 +138,17 @@ struct device_t {
                                      * of GetAccessoryInfo
                                      */
     uint32_t capabilities_queried;  /* Capabilities already queried */
+
+    /* Extended Interface PlayStatusChangeNotification, a subscription of
+     * its own: the bits of SetPlayStatusChangeNotification, and what was
+     * last sent */
+    uint32_t pb_notifications;
+    bool pb_track_changed;          /* set from the audio thread */
+    unsigned char pb_play_status;
+    unsigned char pb_ext_state;
+    uint32_t pb_trackpos_ms;
+    uint32_t pb_trackpos_s;
+    uint32_t pb_numtracks;
 };
 
 extern struct device_t device;

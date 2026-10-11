@@ -428,6 +428,13 @@ void iap_reset_device(struct device_t* device)
     device->notifications = 0;
     device->changed_notifications = 0;
     device->do_notify = false;
+    device->pb_notifications = 0;
+    device->pb_track_changed = false;
+    device->pb_play_status = 0;
+    device->pb_ext_state = 0xff;
+    device->pb_trackpos_ms = UINT32_MAX;
+    device->pb_trackpos_s = UINT32_MAX;
+    device->pb_numtracks = UINT32_MAX;
     device->do_power_notify = false;
     device->accinfo = ACCST_NONE;
     device->capabilities = 0;
@@ -516,24 +523,13 @@ static void iap_thread(void)
     }
 }
 
-/* called by playback when the next track starts */
+/* called by playback when the next track starts. On the audio thread, so
+ * only flagged: the iAP thread owns the TX buffer. */
 static void iap_track_changed(unsigned short id, void *ignored)
 {
     (void)id;
     (void)ignored;
-    if ((interface_state == IST_EXTENDED) && device.do_notify) {
-        long playlist_pos = playlist_next(0);
-        playlist_pos -= playlist_get_first_index(NULL);
-        if(playlist_pos < 0)
-            playlist_pos += playlist_amount();
-
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x01);
-        IAP_TX_PUT_U32(playlist_pos);
-
-        iap_send_tx();
-        return;
-    }
+    device.pb_track_changed = true;
 }
 
 /* Do general setup of the needed infrastructure.
@@ -903,11 +899,29 @@ uint32_t iap_get_trackpos(void)
     return id3->elapsed;
 }
 
+/* Counted from the playlist's first track, which with shuffle or a resumed
+ * playlist need not be index 0 */
 uint32_t iap_get_trackindex(void)
 {
     struct playlist_info* playlist = playlist_get_current();
+    int index = playlist->index - playlist->first_index;
 
-    return (playlist->index - playlist->first_index);
+    if (index < 0)
+        index += playlist->amount;
+    return index;
+}
+
+/* PlayStatusChangeNotification, from iap_periodic(), with a value of
+ * size bytes: 0, 1 or 4 */
+static void iap_send_pb(unsigned char type, int size, uint32_t value)
+{
+    IAP_TX_INIT4(0x04, 0x0027);
+    IAP_TX_PUT(type);
+    if (size == 1)
+        IAP_TX_PUT(value);
+    else if (size == 4)
+        IAP_TX_PUT_U32(value);
+    iap_send_tx();
 }
 
 void iap_periodic(void)
@@ -1079,8 +1093,15 @@ void iap_periodic(void)
         }
     }
 
-    if (!device.do_notify) return;
+    /* Two subscriptions: do_notify and notifications are the Display
+     * Remote's, pb_notifications the Extended Interface's */
+    if (!device.do_notify && device.pb_notifications == 0) return;
     if ((device.notifications == 0) && (interface_state != IST_EXTENDED)) return;
+
+    if ((interface_state == IST_EXTENDED) && device.pb_track_changed
+        && (device.pb_notifications & BIT_N(2)))
+        iap_send_pb(0x01, 4, iap_get_trackindex());
+    device.pb_track_changed = false;
 
     /* Volume change notifications are sent every 100ms */
     if (device.notifications & (BIT_N(4) | BIT_N(16))) {
@@ -1103,17 +1124,39 @@ void iap_periodic(void)
 
     /* RemoteEventNotification */
 
-    /* Mode 04 PlayStatusChangeNotification */
-    /* Are we in Extended Mode */
-    if (interface_state == IST_EXTENDED) {
-        /* Return Track Position */
-        struct mp3entry *id3 = audio_current_track();
-        unsigned long time_elapsed = id3->elapsed;
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT_U32(time_elapsed);
+    /* Mode 04 PlayStatusChangeNotification, each type only to an
+     * accessory that asked for it and only on a change */
+    if (interface_state == IST_EXTENDED && device.pb_notifications) {
+        uint32_t mask = device.pb_notifications;
+        int status = audio_status();
+        unsigned char ext = (status & AUDIO_STATUS_PAUSE) ? 0x0B
+                          : (status & AUDIO_STATUS_PLAY) ? 0x0A : 0x02;
+        uint32_t ms = iap_get_trackpos();
+        uint32_t n = playlist_amount();
 
-        iap_send_tx();
+        /* Bit 0: stopped */
+        if ((mask & BIT_N(0)) && !(status & AUDIO_STATUS_PLAY)
+            && (device.pb_play_status & AUDIO_STATUS_PLAY))
+            iap_send_pb(0x00, 0, 0);
+        device.pb_play_status = status;
+
+        /* Bit 1: playing, paused or stopped */
+        if ((mask & BIT_N(1)) && ext != device.pb_ext_state)
+            iap_send_pb(0x06, 1, ext);
+        device.pb_ext_state = ext;
+
+        /* Bits 3 and 4: the position, in ms and in seconds */
+        if ((mask & BIT_N(3)) && ms != device.pb_trackpos_ms)
+            iap_send_pb(0x04, 4, ms);
+        device.pb_trackpos_ms = ms;
+        if ((mask & BIT_N(4)) && ms / 1000 != device.pb_trackpos_s)
+            iap_send_pb(0x07, 4, ms / 1000);
+        device.pb_trackpos_s = ms / 1000;
+
+        /* Bit 12: the playback engine's contents */
+        if ((mask & BIT_N(12)) && n != device.pb_numtracks)
+            iap_send_pb(0x0E, 4, n);
+        device.pb_numtracks = n;
     }
 
     /* Track position (ms)  or Track position (s) */
