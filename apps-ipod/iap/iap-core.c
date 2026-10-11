@@ -460,7 +460,8 @@ void iap_reset_device(struct device_t* device)
     device->changed_notifications = 0;
     device->do_notify = false;
     /* An accessory that muted the player does not leave it silent. Every
-     * caller is on the iAP thread but iap_start(), before any could mute. */
+     * caller is on the iAP thread but iap_start(), before any could mute,
+     * and iap_enable(false), from the thread changing the setting. */
     if (device->mute)
         iap_set_mute(false);
     device->pb_notifications = 0;
@@ -1322,8 +1323,7 @@ void iap_periodic(void)
         iap_send_pb(0x01, 4, iap_get_trackindex());
     device.pb_track_changed = false;
 
-    /* Volume change notifications are sent every 100ms */
-    /* Looked at every 100ms, sent only on a change */
+    /* Volume: looked at every 100ms, sent only on a change */
     if (device.notifications & (BIT_N(4) | BIT_N(16))) {
         unsigned char level = device.mute ? 0
                             : iap_volume_to_byte(global_status.volume);
@@ -1700,8 +1700,8 @@ void iap_periodic(void)
 
 /* Play, from paused or stopped, for the commands that say "play" rather
  * than press a button: a button press acts on whatever screen has focus,
- * so outside the WPS it opened the highlighted row. False if there is
- * nothing to play. */
+ * and outside the WPS opens the highlighted row. False if there is nothing
+ * to play. */
 bool iap_play_or_resume(void)
 {
     if (audio_status() & AUDIO_STATUS_PLAY)

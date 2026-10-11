@@ -391,8 +391,8 @@ static const struct button_mapping remote_button_context_wps[]  = {
 }; /* remote_button_context_wps */
 
 /* A remote's volume buttons, in the contexts a list reads and nowhere else:
- * the standard context ends every remote context, and a yes/no screen takes
- * any action it does not know as No */
+ * the standard context ends every remote context, so a screen that is not a
+ * list would get an action it does not handle */
 static const struct button_mapping remote_button_context_list[]  = {
     { ACTION_LIST_VOLUP,     BUTTON_RC_VOL_UP,                 BUTTON_NONE },
     { ACTION_LIST_VOLUP,     BUTTON_RC_VOL_UP|BUTTON_REPEAT,   BUTTON_NONE },

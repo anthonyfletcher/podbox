@@ -831,10 +831,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
          * Returns on failure:
          * IAP_ACK_BAD_PARAM
          *
-         * TODO:
-         * There is a timeout of 75 seconds between GetDevAuthenticationSignature
-         * and RetDevAuthenticationSignature for Auth 2.0. This is currently not
-         * checked.
+         * The reply is due within 75 seconds for Auth 2.0 and 7 for 1.0, which
+         * iap_periodic() enforces.
          */
         case 0x18:
         {

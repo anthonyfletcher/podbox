@@ -1109,7 +1109,7 @@ struct wps_state *get_wps_state(void)
     return &wps_state;
 }
 
-/* this is called from the playback thread so NO DRAWING! */
+/* From the USB and iAP threads, so it only asks for a redraw */
 void wps_set_seek_preview(struct mp3entry *id3, unsigned long position)
 {
     struct wps_state *state = get_wps_state();
@@ -1121,6 +1121,7 @@ void wps_set_seek_preview(struct mp3entry *id3, unsigned long position)
     skin_request_full_update(WPS);
 }
 
+/* this is called from the playback thread so NO DRAWING! */
 static void track_info_callback(unsigned short id, void *param)
 {
     struct wps_state *state = get_wps_state();

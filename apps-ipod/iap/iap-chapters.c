@@ -1,7 +1,13 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * The playing track's chapters, for serial and USB iAP alike.
+ * The playing track's chapters, for serial and USB iAP alike: the lingo
+ * handlers call it from the iAP thread, platform.c from the USB thread.
+ *
+ * Parts, in order:
+ *   - iap_chapter_at(): one chapter of a track's cue sheet
+ *   - iap_current_chapter(): the playing one
+ *   - iap_set_chapter(), iap_skip_chapter(): seeking to one
  ****************************************************************************/
 #include "config.h"
 #include "audio.h"
