@@ -33,6 +33,7 @@
 #include "sound.h"
 #include "usb_drv.h"
 #include "remote_seek.h"
+#include "iap_chapters.h"
 
 #include "../usb_iap.h"
 #include "debug.h"
@@ -92,6 +93,30 @@ IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* n
     char buf[32];
     iap_player_name(buf, sizeof(buf));
     return iap_span_append(name, buf, strlen(buf) + 1);
+}
+
+IAPBool iap_platform_get_chapter(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformChapter* chapter) {
+    (void)iap_ctx;
+    struct iap_chapter_info info;
+    if(!iap_current_chapter(&info)) {
+        return iap_false;
+    }
+    if(index != 0xFFFFFFFF && !iap_chapter_at(audio_current_track(), index, &info)) {
+        return iap_false;
+    }
+    chapter->index      = info.index;
+    chapter->count      = info.count;
+    chapter->length_ms  = info.length_ms;
+    chapter->elapsed_ms = info.elapsed_ms;
+    if(chapter->name != NULL) {
+        return iap_span_append(chapter->name, info.name, strlen(info.name) + 1);
+    }
+    return iap_true;
+}
+
+IAPBool iap_platform_set_chapter(struct IAPContext* iap_ctx, uint32_t index) {
+    (void)iap_ctx;
+    return iap_set_chapter(index) ? iap_true : iap_false;
 }
 
 uint32_t iap_platform_get_time_ms(struct IAPContext* iap_ctx) {
@@ -230,6 +255,13 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
     case IAPPlatformControl_EndFFRew:
         iap_platform_seek_tick(iap_ctx);
         iap_platform_seek_stop(iap_ctx);
+        break;
+    case IAPPlatformControl_NextChapter:
+    case IAPPlatformControl_PrevChapter:
+        iap_platform_seek_stop(iap_ctx);
+        if(!iap_skip_chapter(control == IAPPlatformControl_NextChapter ? 1 : -1)) {
+            button = control == IAPPlatformControl_NextChapter ? BUTTON_MULTIMEDIA_NEXT : BUTTON_MULTIMEDIA_PREV;
+        }
         break;
     }
     logf("control=%d button=0x%04lX", control, button);

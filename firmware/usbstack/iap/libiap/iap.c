@@ -99,8 +99,8 @@ static void handle_remote_buttons(struct IAPContext* ctx, uint8_t bits[4], unsig
         {released.play, IAPPlatformControl_Play},
         {released.pause, IAPPlatformControl_Pause},
         {released.mute_toggle, IAPPlatformControl_ToggleMute},
-        {released.next_chapter, IAPPlatformControl_Next},
-        {released.prev_chapter, IAPPlatformControl_Prev},
+        {released.next_chapter, IAPPlatformControl_NextChapter},
+        {released.prev_chapter, IAPPlatformControl_PrevChapter},
         {released.next_playlist, IAPPlatformControl_Next},
         {released.prev_playlist, IAPPlatformControl_Prev},
     };
@@ -763,11 +763,62 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
     case IAPLingoID_ExtendedInterface:
         switch(command) {
         case IAPExtendedInterfaceCommandID_GetCurrentPlayingTrackChapterInfo: {
+            struct IAPPlatformChapter chapter = {0};
+            const IAPBool             has     = iap_platform_get_chapter(ctx, 0xFFFFFFFF, &chapter);
             alloc_response(IAPReturnCurrentPlayingTrackChapterInfoPayload);
-            /* no chapters */
-            response->count = 0;
-            response->index = -1;
+            response->count = swap_32(has ? chapter.count : 0);
+            response->index = swap_32(has ? chapter.index : 0xFFFFFFFF);
             return IAPExtendedInterfaceCommandID_ReturnCurrentPlayingTrackChapterInfo;
+        } break;
+        case IAPExtendedInterfaceCommandID_SetCurrentPlayingTrackChapter: {
+            read_request(IAPSetCurrentPlayingTrackChapterPayload);
+            check_ret(iap_platform_set_chapter(ctx, swap_32(request->index)), -IAPAckStatus_EBadParameter);
+            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
+        } break;
+        case IAPExtendedInterfaceCommandID_GetCurrentPlayingTrackChapterPlayStatus: {
+            read_request(IAPGetCurrentPlayingTrackChapterPlayStatusPayload);
+            struct IAPPlatformChapter chapter = {0};
+            check_ret(iap_platform_get_chapter(ctx, swap_32(request->index), &chapter), -IAPAckStatus_EBadParameter);
+            alloc_response(IAPReturnCurrentPlayingTrackChapterPlayStatusPayload);
+            response->length_ms  = swap_32(chapter.length_ms);
+            response->elapsed_ms = swap_32(chapter.elapsed_ms);
+            return IAPExtendedInterfaceCommandID_ReturnCurrentPlayingTrackChapterPlayStatus;
+        } break;
+        case IAPExtendedInterfaceCommandID_GetCurrentPlayingTrackChapterName: {
+            read_request(IAPGetCurrentPlayingTrackChapterNamePayload);
+            struct IAPPlatformChapter chapter = {.name = response_span};
+            check_ret(iap_platform_get_chapter(ctx, swap_32(request->index), &chapter), -IAPAckStatus_EBadParameter);
+            return IAPExtendedInterfaceCommandID_ReturnCurrentPlayingTrackChapterName;
+        } break;
+        case IAPExtendedInterfaceCommandID_SetAudiobookSpeed: {
+            /* normal speed only: the player has no other */
+            check_ret(request_span->size >= 1, -IAPAckStatus_EBadParameter);
+            return ipod_ack_ext(command, request_span->ptr[0] == IAPIPodStateAudiobookSpeeed_Normal ? IAPAckStatus_Success : IAPAckStatus_EBadParameter, response_span);
+        } break;
+        case IAPExtendedInterfaceCommandID_RequestProtocolVersion: {
+            /* deprecated; the version RequestLingoProtocolVersion gives */
+            check_ret(iap_span_append(response_span, (const uint8_t[]){1, 14}, 2), -IAPAckStatus_EOutOfResource);
+            return IAPExtendedInterfaceCommandID_ReturnProtocolVersion;
+        } break;
+        case IAPExtendedInterfaceCommandID_RequestIPodName: {
+            /* deprecated; General's RequestIPodName */
+            check_ret(iap_platform_get_ipod_name(ctx, response_span), -IAPAckStatus_EOutOfResource);
+            return IAPExtendedInterfaceCommandID_ReturnIPodName;
+        } break;
+        case IAPExtendedInterfaceCommandID_GetMonoDisplayImageLimits: {
+            /* SetDisplayImage's images are not shown */
+            alloc_response(IAPReturnMonoDisplayImageLimitsPayload);
+            response->max_width    = 0;
+            response->max_height   = 0;
+            response->pixel_format = IAPArtworkPixelFormats_Mono;
+            return IAPExtendedInterfaceCommandID_ReturnMonoDisplayImageLimits;
+        } break;
+        case IAPExtendedInterfaceCommandID_ResetDBSelectionHierarchy: {
+            read_request(IAPResetDBSelectionHierarchyPayload);
+            /* the library has music only */
+            check_ret(request->selection == IAPResetDBSelectionHierarchySelection_Audio, -IAPAckStatus_ECommandFailed);
+            iap_platform_reset_db_selection(ctx);
+            return ipod_ack_ext(command, IAPAckStatus_Success, response_span);
         } break;
         case IAPExtendedInterfaceCommandID_GetAudiobookSpeed: {
             alloc_response(IAPRetAudiobookSpeedPayload);
@@ -986,12 +1037,12 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
                 {IAPPlayControlCode_StartFF, IAPPlatformControl_StartFF},
                 {IAPPlayControlCode_StartRew, IAPPlatformControl_StartRew},
                 {IAPPlayControlCode_EndFFRew, IAPPlatformControl_EndFFRew},
-                {IAPPlayControlCode_Next, IAPPlatformControl_Next},
-                {IAPPlayControlCode_Prev, IAPPlatformControl_Prev},
+                {IAPPlayControlCode_Next, IAPPlatformControl_NextChapter},
+                {IAPPlayControlCode_Prev, IAPPlatformControl_PrevChapter},
                 {IAPPlayControlCode_Play, IAPPlatformControl_Play},
                 {IAPPlayControlCode_Pause, IAPPlatformControl_Pause},
-                {IAPPlayControlCode_NextChapter, IAPPlatformControl_Next},
-                {IAPPlayControlCode_PrevChapter, IAPPlatformControl_Prev},
+                {IAPPlayControlCode_NextChapter, IAPPlatformControl_NextChapter},
+                {IAPPlayControlCode_PrevChapter, IAPPlatformControl_PrevChapter},
                 {IAPPlayControlCode_ResumeIPod, -1},
             };
             int control = -1;

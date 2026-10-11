@@ -351,6 +351,7 @@ iap/iap-lingo4.c
 #endif
 
 #if defined(USB_ENABLE_IAP) || defined(IPOD_ACCESSORY_PROTOCOL)
+iap/iap-chapters.c
 iap/iap-library.c
 #endif
 

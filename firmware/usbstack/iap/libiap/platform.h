@@ -41,6 +41,9 @@ enum IAPPlatformControl {
     IAPPlatformControl_StartFF,
     IAPPlatformControl_StartRew,
     IAPPlatformControl_EndFFRew,
+    /* the chapter where the track has chapters, else the track */
+    IAPPlatformControl_NextChapter,
+    IAPPlatformControl_PrevChapter,
 };
 
 struct IAPPlatformPendingControl {
@@ -71,6 +74,15 @@ struct IAPPlatformTrackInfo {
     struct IAPSpan*     composer;
     struct IAPSpan*     album;
     struct IAPSpan*     title;
+};
+
+/* iap_platform_get_chapter */
+struct IAPPlatformChapter {
+    uint32_t        index;
+    uint32_t        count;
+    uint32_t        length_ms;
+    uint32_t        elapsed_ms;
+    struct IAPSpan* name; /* user, may be NULL */
 };
 
 /* iap_platform_open_artwork */
@@ -116,6 +128,10 @@ IAPBool iap_platform_get_db_record(struct IAPContext* iap_ctx, uint8_t type /* I
 /* an index of 0xFFFFFFFF steps back up a level; sort is SelectSortDBRecord's, 0xFF for none */
 IAPBool iap_platform_select_db_record(struct IAPContext* iap_ctx, uint8_t type /* IAPDatabaseType */, uint32_t index, uint8_t sort);
 void    iap_platform_reset_db_selection(struct IAPContext* iap_ctx);
+/* the playing track's chapter at index, or its current one for 0xFFFFFFFF;
+ * false with no such chapter */
+IAPBool iap_platform_get_chapter(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformChapter* chapter);
+IAPBool iap_platform_set_chapter(struct IAPContext* iap_ctx, uint32_t index);
 
 /* other callbacks */
 IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct IAPSpan* samprs);
