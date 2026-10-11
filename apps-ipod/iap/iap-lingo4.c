@@ -14,6 +14,7 @@
 #include "iap-core.h"
 #include "iap-lingo.h"
 #include "audio/remote_seek.h"
+#include "metadata/cuesheet.h"
 #include "settings.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
@@ -173,10 +174,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * (0x00000000)
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x03,
-                                    0xFF, 0xFF, 0xFF, 0xFF,
-                                    0x00, 0x00, 0x00, 0x00};
-            iap_send_pkt(data, sizeof(data));
+            struct iap_chapter_info chapter;
+            bool has = iap_current_chapter(&chapter);
+
+            IAP_TX_INIT4(0x04, 0x0003);
+            IAP_TX_PUT_U32(has ? chapter.index : UINT32_MAX);
+            IAP_TX_PUT_U32(has ? chapter.count : 0);
+            iap_send_tx();
             break;
         }
         case 0x0003: /* ReturnCurrentPlayingTrackChapterInfo. See Above */
@@ -246,7 +250,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            CHECKLEN(7);
+            if (!(audio_status() & AUDIO_STATUS_PLAY))
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+            else if (!iap_set_chapter(get_u32(&buf[3])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            else
+                cmd_ok(cmd);
             break;
         }
         case 0x0005: /* GetCurrentPlayingTrackChapterPlayStatus */
@@ -284,7 +294,20 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            struct iap_chapter_info chapter;
+
+            CHECKLEN(7);
+            if (!iap_current_chapter(&chapter)
+                || !iap_chapter_at(audio_current_track(), get_u32(&buf[3]),
+                                   &chapter))
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            IAP_TX_INIT4(0x04, 0x0006);
+            IAP_TX_PUT_U32(chapter.length_ms);
+            IAP_TX_PUT_U32(chapter.elapsed_ms);
+            iap_send_tx();
             break;
         }
         case 0x0006: /* ReturnCurrentPlayingTrackChapterPlayStatus. See Above */
@@ -348,7 +371,19 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            struct iap_chapter_info chapter;
+
+            CHECKLEN(7);
+            if (!iap_current_chapter(&chapter)
+                || !iap_chapter_at(audio_current_track(), get_u32(&buf[3]),
+                                   &chapter))
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            IAP_TX_INIT4(0x04, 0x0008);
+            iap_tx_strlcpy((const unsigned char *)chapter.name);
+            iap_send_tx();
             break;
         }
         case 0x0008: /* ReturnCurrentPlayingTrackChapterName. See Above */
@@ -484,7 +519,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            /* Normal speed only: the player has no other */
+            CHECKLEN(4);
+            cmd_ack(cmd, buf[3] == 0x00 ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x000C: /* GetIndexedPlayingTrackInfo */
@@ -606,7 +643,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                             IAP_TX_PUT_U32(0);   /* Track Capabilities. */
                                                  /* Currently None Supported*/
                             IAP_TX_PUT_U32(id3->length); /* Track Length */
-                            IAP_TX_PUT_U16(0x00);        /* Chapter Count */
+                            /* Chapter Count: the playing track's is loaded */
+                            IAP_TX_PUT_U16(id3->cuesheet ?
+                                           id3->cuesheet->track_count : 0);
                             break;
                         }
                         case 0x02:
@@ -1994,8 +2033,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                     break;
                 case 0x08: /* next chapter */
                 case 0x09: /* previous chapter */
-                    /* No chapters to step through */
-                    ok = false;
+                    ok = iap_skip_chapter(buf[3] == 0x08 ? 1 : -1);
                     break;
                 default:
                     cmd_ack(cmd, IAP_ACK_BAD_PARAM);

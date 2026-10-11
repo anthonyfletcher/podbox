@@ -35,6 +35,7 @@
 #include "audio/playback.h"
 #include "system/volume.h"
 #include "audio/remote_seek.h"
+#include "metadata/cuesheet.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
 #endif
@@ -265,7 +266,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             /* Save the current state of the various attributes we track */
             device.trackpos_ms = iap_get_trackpos();
             device.track_index = iap_get_trackindex();
-            device.chapter_index = 0;
+            device.chapter_index = UINT32_MAX;
             device.play_status = audio_status();
             device.volume = device.mute ? 0
                           : iap_volume_to_byte(global_status.volume);
@@ -404,11 +405,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x02:
                 {
-                    playlist = playlist_get_current();
-                    IAP_TX_PUT_U32(playlist->index - playlist->first_index);
-                    /* Indicate that track does not have chapters */
-                    IAP_TX_PUT_U16(0x0000);
-                    IAP_TX_PUT_U16(0xFFFF);
+                    struct iap_chapter_info chapter;
+                    bool has = iap_current_chapter(&chapter);
+
+                    IAP_TX_PUT_U32(iap_get_trackindex());
+                    IAP_TX_PUT_U16(has ? chapter.count : 0x0000);
+                    IAP_TX_PUT_U16(has ? chapter.index : 0xFFFF);
 
                     iap_send_tx();
                     break;
@@ -732,8 +734,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x02:
                 {
-                    /* This is not supported */
-                    cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                    CHECKLEN(5);
+                    cmd_ack(cmd, iap_set_chapter(get_u16(&buf[0x03])) ?
+                                 IAP_ACK_OK : IAP_ACK_CMD_FAILED);
                     break;
                 }
 
@@ -1158,8 +1161,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     /* Track length in ms */
                     IAP_TX_PUT_U32(id3.length);
 
-                    /* Chapter count, stays at 0 */
-                    IAP_TX_PUT_U16(0x00);
+                    /* Chapter count: only the playing track's cue sheet
+                     * is loaded */
+                    IAP_TX_PUT_U16(id3.cuesheet ? id3.cuesheet->track_count : 0);
 
                     iap_send_tx();
                     break;
@@ -1170,11 +1174,16 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x01:
                 {
-                    /* Chapter length, set at 0 (no chapters) */
-                    IAP_TX_PUT_U32(0x00);
+                    struct iap_chapter_info chapter;
+                    bool has;
 
-                    /* Chapter name, empty */
-                    IAP_TX_PUT_STRING("");
+                    iap_get_trackinfo(track_index, &id3);
+                    has = iap_chapter_at(&id3, get_u16(&buf[0x07]), &chapter);
+                    /* Chapter length */
+                    IAP_TX_PUT_U32(has ? chapter.length_ms : 0x00);
+
+                    /* Chapter name */
+                    iap_tx_strlcpy((const unsigned char *)(has ? chapter.name : ""));
 
                     iap_send_tx();
                     break;

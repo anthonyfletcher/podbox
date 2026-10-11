@@ -55,6 +55,7 @@ static void cmd_ack(const unsigned char cmd, const unsigned char status)
 void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
 {
     static bool poweron_pressed = false;
+    static bool chapter_pressed = false;
 #if CONFIG_TUNER
     static bool remote_mute = false;
 #endif
@@ -162,6 +163,12 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     }
 #endif
                 }
+                if(buf[3] & (8 | 16)) /* next or previous chapter */
+                {
+                    if (!chapter_pressed)
+                        iap_skip_chapter((buf[3] & 8) ? 1 : -1);
+                    chapter_pressed = true;
+                }
                 if(buf[3] & 32) /* next playlist */
                     btn |= BUTTON_RC_NEXT_PLAYLIST;
                 if(buf[3] & 64) /* previous playlist */
@@ -223,6 +230,8 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
              * remote whose release was lost */
             if (!(buf[2] & 128))
                 iap_btnstop = false;
+            if (!(len >= 4 && (buf[3] & (8 | 16))))
+                chapter_pressed = false;
             if (!(len >= 4 && (buf[3] & 128)))
                 iap_btnshuffle = false;
             if (!(len >= 5 && (buf[4] & 1)))

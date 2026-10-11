@@ -64,6 +64,7 @@
 #include "usb.h"
 #include "system/volume.h"
 #include "audio/remote_seek.h"
+#include "metadata/cuesheet.h"
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -444,6 +445,7 @@ void iap_reset_device(struct device_t* device)
     device->pb_trackpos_ms = UINT32_MAX;
     device->pb_trackpos_s = UINT32_MAX;
     device->pb_numtracks = UINT32_MAX;
+    device->pb_chapter_index = UINT32_MAX - 1;
     device->do_power_notify = false;
     device->accinfo = ACCST_NONE;
     device->capabilities = 0;
@@ -1215,6 +1217,16 @@ void iap_periodic(void)
             iap_send_pb(0x07, 4, ms / 1000);
         device.pb_trackpos_s = ms / 1000;
 
+        /* Bit 5: the chapter */
+        {
+            struct iap_chapter_info chapter;
+            uint32_t ch = iap_current_chapter(&chapter) ? chapter.index
+                                                        : UINT32_MAX;
+            if ((mask & BIT_N(5)) && ch != device.pb_chapter_index)
+                iap_send_pb(0x05, 4, ch);
+            device.pb_chapter_index = ch;
+        }
+
         /* Bit 12: the playback engine's contents */
         if ((mask & BIT_N(12)) && n != device.pb_numtracks)
             iap_send_pb(0x0E, 4, n);
@@ -1278,25 +1290,28 @@ void iap_periodic(void)
         }
     }
 
-    /* Chapter index */
+    /* Chapter index: the track, its chapter count and the chapter, on a
+     * change of either. Kept apart from the track index notification's
+     * value, which would otherwise hide every change from this one. */
     if (device.notifications & BIT_N(2))
     {
-        uint32_t index;
+        struct iap_chapter_info chapter;
+        bool has = iap_current_chapter(&chapter);
+        uint32_t index = iap_get_trackindex();
+        uint32_t key = (index << 16) | (has ? chapter.index : 0xFFFF);
 
-        index = iap_get_trackindex();
-
-        if (device.track_index != index)
+        if (device.chapter_index != key)
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x02);
             IAP_TX_PUT_U32(index);
-            IAP_TX_PUT_U16(0);
-            IAP_TX_PUT_U16(0xFFFF);
+            IAP_TX_PUT_U16(has ? chapter.count : 0);
+            IAP_TX_PUT_U16(has ? chapter.index : 0xFFFF);
             device.changed_notifications |= BIT_N(2);
 
             iap_send_tx();
 
-            device.track_index = index;
+            device.chapter_index = key;
         }
     }
 
@@ -1525,6 +1540,80 @@ bool iap_play_or_resume(void)
         return false;
     playlist_start(playlist_get_current()->index, 0, 0);
     return true;
+}
+
+bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
+                    struct iap_chapter_info *chapter)
+{
+    struct cuesheet *cue;
+    unsigned long start, end;
+
+    if (!id3 || !(cue = id3->cuesheet) || cue->track_count <= 0
+        || index >= (uint32_t)cue->track_count)
+        return false;
+
+    start = cue->tracks[index].offset;
+    end = index + 1 < (uint32_t)cue->track_count
+        ? cue->tracks[index + 1].offset : id3->length;
+    if (end < start)
+        end = start;
+
+    chapter->index = index;
+    chapter->count = cue->track_count;
+    chapter->offset_ms = start;
+    chapter->length_ms = end - start;
+    chapter->elapsed_ms = id3->elapsed > start ? id3->elapsed - start : 0;
+    if (chapter->elapsed_ms > chapter->length_ms)
+        chapter->elapsed_ms = chapter->length_ms;
+    chapter->name = cue->tracks[index].title;
+    return true;
+}
+
+bool iap_current_chapter(struct iap_chapter_info *chapter)
+{
+    struct mp3entry *id3 = audio_current_track();
+    struct cuesheet *cue;
+    uint32_t index = 0;
+
+    if (!(audio_status() & AUDIO_STATUS_PLAY) || !id3
+        || !(cue = id3->cuesheet) || cue->track_count <= 0)
+        return false;
+    while (index + 1 < (uint32_t)cue->track_count
+           && cue->tracks[index + 1].offset <= id3->elapsed)
+        index++;
+    return iap_chapter_at(id3, index, chapter);
+}
+
+bool iap_set_chapter(uint32_t index)
+{
+    struct iap_chapter_info chapter;
+
+    if (!(audio_status() & AUDIO_STATUS_PLAY)
+        || !iap_chapter_at(audio_current_track(), index, &chapter))
+        return false;
+    audio_pre_ff_rewind();
+    audio_ff_rewind(chapter.offset_ms);
+    return true;
+}
+
+bool iap_skip_chapter(int direction)
+{
+    struct iap_chapter_info chapter;
+    uint32_t target;
+
+    if (!iap_current_chapter(&chapter))
+        return false;
+    if (direction > 0)
+    {
+        if (chapter.index + 1 >= chapter.count)
+            return false;
+        target = chapter.index + 1;
+    }
+    else if (chapter.elapsed_ms > 2000 || chapter.index == 0)
+        target = chapter.index;
+    else
+        target = chapter.index - 1;
+    return iap_set_chapter(target);
 }
 
 /* Change the current interface state.

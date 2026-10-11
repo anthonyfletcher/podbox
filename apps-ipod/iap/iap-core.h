@@ -150,6 +150,7 @@ struct device_t {
     uint32_t pb_trackpos_ms;
     uint32_t pb_trackpos_s;
     uint32_t pb_numtracks;
+    uint32_t pb_chapter_index;
 };
 
 extern struct device_t device;
@@ -248,6 +249,24 @@ void iap_set_remote_volume(void);
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
 bool iap_play_or_resume(void);
+
+/* The playing track's chapters are its cue sheet's tracks, which an M4B's
+ * chapters become */
+struct iap_chapter_info {
+    uint32_t index;
+    uint32_t count;
+    uint32_t offset_ms;
+    uint32_t length_ms;
+    uint32_t elapsed_ms;
+    const char *name;
+};
+bool iap_chapter_at(const struct mp3entry *id3, uint32_t index,
+                    struct iap_chapter_info *chapter);
+/* False with nothing playing, or a track with no chapters */
+bool iap_current_chapter(struct iap_chapter_info *chapter);
+bool iap_set_chapter(uint32_t index);
+/* Back goes to the chapter's start, or two seconds in, the one before */
+bool iap_skip_chapter(int direction);
 
 /* Volume as the protocol's 0-255 over the codec's own range, and back */
 unsigned char iap_volume_to_byte(int volume);
