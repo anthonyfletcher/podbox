@@ -87,7 +87,8 @@ enum usb_log_type
                           * << 16 (0xffff for none), d = the payload's
                           * first four bytes, big-endian, zero-padded */
     USB_LOG_IAP_RATE,    /* the host set a rate: a = ignored as not the one
-                          * announced, c = rate, d = rate announced or 0 */
+                          * announced, c = rate, d = rate announced or 0;
+                          * or b = 1, it set none and c, announced, plays */
     USB_LOG_IAP_STREAM,  /* what the stream now carries: a =
                           * USB_LOG_IAP_STREAM_* */
     USB_LOG_IAP_IDENTIFY, /* IdentifyDeviceLingoes: c = lingoes,

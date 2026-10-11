@@ -82,6 +82,10 @@ static bool   accessory_ready; /* its rates accepted, so it can be told ours */
 static int8_t acked_freq; /* the rate the accessory has acked, or -1 */
 static int8_t asked_freq; /* a rate announced and not yet acked, or -1 */
 static long   asked_tick;
+/* An accessory that sets no rate on the stream within half a second of an
+ * announcement plays the announced one: some never set one */
+static bool   host_set_rate = true; /* a SET_CUR since the announcement */
+static long   announced_tick;
 
 extern bool iap_initialized;
 
@@ -139,6 +143,7 @@ static void sink_set_freq(uint16_t freq) {
     set_freq = freq;
 
     if(usb_iap2_audio_rate(RATE(freq))) {
+        host_set_rate    = true; /* iAP2 sets its rate its own way */
         track_attrs_sent = true;
         track_changed    = false;
         acked_freq       = freq;
@@ -151,6 +156,8 @@ static void sink_set_freq(uint16_t freq) {
     }
     track_attrs_sent = true;
     track_changed    = false;
+    host_set_rate    = false;
+    announced_tick   = current_tick;
     if(freq != acked_freq) {
         asked_freq = freq;
         asked_tick = current_tick;
@@ -330,6 +337,11 @@ void iap_audio_tick(void) {
     if(track_changed && track_attrs_sent) {
         sink_set_freq(set_freq);
     }
+    if(set_freq >= 0 && cur_freq != set_freq && !host_set_rate &&
+       TIME_AFTER(current_tick, announced_tick + HZ / 2)) {
+        usb_log(USB_LOG_IAP_RATE, 0, 1, RATE(set_freq), 0);
+        cur_freq = set_freq;
+    }
 }
 
 static void sink_stop(void) {
@@ -494,6 +506,7 @@ bool iap_audio_set_sampr(uint32_t sampr) {
 
     usb_log(USB_LOG_IAP_RATE, set_freq >= 0 && freq != set_freq, 0, sampr,
             set_freq >= 0 ? RATE(set_freq) : 0);
+    host_set_rate = true;
 
     if(set_freq >= 0 && freq != set_freq) {
         /* Accessories should only set the frequency we requested via
