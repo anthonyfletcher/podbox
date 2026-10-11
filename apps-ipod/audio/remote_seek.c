@@ -13,13 +13,13 @@
 #include "audio.h"
 #include "metadata.h"
 #include "settings/settings.h"
-#include "playlist/playlist.h"
 #include "screens/playback/wps.h"
+#include "system/appevents.h"
 #include "remote_seek.h"
 
 static struct {
     int direction;          /* 1 forward, -1 back, 0 none */
-    int track;              /* playlist_get_display_index() at the start */
+    unsigned int track;     /* track_changes at the start */
     unsigned long position; /* ms */
     unsigned long length;
     long updated;           /* ticks */
@@ -33,10 +33,27 @@ static struct {
 #define LAST_INTERVAL   (HZ * 5 / 100)
 #define INTERVAL_STEP   (HZ / 100)
 
+/* Counts track changes, which end a seek: a playlist index can come round
+ * again in a new playlist */
+static unsigned int track_changes;
+
+static void on_track_change(unsigned short id, void *data)
+{
+    (void)id;
+    (void)data;
+    track_changes++;
+}
+
 bool remote_seek_start(int direction)
 {
+    static bool registered;
     struct mp3entry *id3 = audio_current_track();
 
+    if (!registered)
+    {
+        add_event(PLAYBACK_EVENT_TRACK_CHANGE, on_track_change);
+        registered = true;
+    }
     if (!(audio_status() & AUDIO_STATUS_PLAY) || !id3 || !id3->length)
         return false;
     remote_seek_tick();
@@ -44,7 +61,7 @@ bool remote_seek_start(int direction)
     {
         seek.position = MIN(id3->elapsed, id3->length - 1);
         seek.length = id3->length;
-        seek.track = playlist_get_display_index();
+        seek.track = track_changes;
         audio_pre_ff_rewind();
     }
     if (seek.direction != direction)
@@ -64,8 +81,7 @@ void remote_seek_tick(void)
 {
     if (!seek.direction)
         return;
-    if (!(audio_status() & AUDIO_STATUS_PLAY)
-        || playlist_get_display_index() != seek.track)
+    if (!(audio_status() & AUDIO_STATUS_PLAY) || track_changes != seek.track)
     {
         seek.direction = 0;
         wps_set_seek_preview(NULL, 0);
@@ -105,8 +121,7 @@ bool remote_seek_stop(void)
     if (!seek.direction)
         return false;
     seek.direction = 0;
-    if ((audio_status() & AUDIO_STATUS_PLAY)
-        && playlist_get_display_index() == seek.track)
+    if ((audio_status() & AUDIO_STATUS_PLAY) && track_changes == seek.track)
     {
         /* as a WPS seek does, the position is set before the preview goes */
         struct mp3entry *id3 = audio_current_track();
