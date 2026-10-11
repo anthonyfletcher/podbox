@@ -985,6 +985,11 @@ const struct settings_list settings[] = {
     CHOICE_SETTING(0, iap2_mode, LANG_IAP2_ACCESSORIES, 1,
                    "iap2 accessories", "off,auto,on", usb_set_iap2_mode, 3,
                    ID2P(LANG_OFF), ID2P(LANG_AUTO), ID2P(LANG_ON)),
+    CHOICE_SETTING(0, iap_identity, LANG_IAP_IDENTITY, USB_IDENTITY_OWN,
+                   "identify as", "this player,ipod classic,iphone 4",
+                   usb_set_identity, 3, ID2P(LANG_IAP_IDENTITY_OWN),
+                   ID2P(LANG_IAP_IDENTITY_CLASSIC),
+                   ID2P(LANG_IAP_IDENTITY_IPHONE)),
 #endif
     CHOICE_SETTING(0, car_artwork, LANG_CAR_ARTWORK, CAR_ARTWORK_CACHE,
                    "car artwork",

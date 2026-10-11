@@ -102,6 +102,8 @@ int   iap_platform_send_hid_report(struct IAPContext* iap_ctx, const void* ptr, 
 /* system info */
 IAPBool iap_platform_get_ipod_serial_num(struct IAPContext* iap_ctx, struct IAPSpan* serial);
 IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* name);
+/* ReturniPodModelNum's payload: the model ID, big-endian, then its string */
+IAPBool iap_platform_get_ipod_model_num(struct IAPContext* iap_ctx, struct IAPSpan* model);
 
 /* audio controls */
 uint32_t iap_platform_get_time_ms(struct IAPContext* iap_ctx);

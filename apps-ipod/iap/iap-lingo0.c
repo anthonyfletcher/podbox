@@ -466,8 +466,8 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
         case 0x0D:
         {
             IAP_TX_INIT(0x00, 0x0E);
-            IAP_TX_PUT_U32(IAP_IPOD_MODEL);
-            IAP_TX_PUT_STRING(IAP_IPOD_VARIANT);
+            IAP_TX_PUT_U32(IAP_MODEL_ID);
+            IAP_TX_PUT_STRING(IAP_MODEL);
 
             iap_send_tx();
             break;

@@ -469,6 +469,8 @@ MENUITEM_SETTING(iap_browse_size, &global_settings.iap_browse_size,
 MENUITEM_SETTING(car_artwork, &global_settings.car_artwork, iap_only_callback);
 #ifdef USB_ENABLE_IAP
 MENUITEM_SETTING(iap2_mode, &global_settings.iap2_mode, iap_only_callback);
+MENUITEM_SETTING(iap_identity, &global_settings.iap_identity,
+                 iap_only_callback);
 #endif
 MENUITEM_SETTING(serial_bitrate, &global_settings.serial_bitrate,
                  iap_only_callback);
@@ -641,7 +643,7 @@ MAKE_MENU(accessories_menu, ID2P(LANG_ACCESSORIES), 0, Icon_NOICON,
 #endif
             &iap_enabled,
 #ifdef USB_ENABLE_IAP
-            &iap2_mode,
+            &iap2_mode, &iap_identity,
 #endif
             &accessory_supply,
             &iap_browse_size, &car_artwork, &serial_bitrate

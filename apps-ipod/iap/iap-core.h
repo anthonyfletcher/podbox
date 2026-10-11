@@ -25,8 +25,15 @@
 #include "logf.h"
 
 /* The Model ID of the iPod we emulate. Currently a 160GB classic */
-#define IAP_IPOD_MODEL (0x00130200U)
-#define IAP_IPOD_VARIANT "MC293"
+/* The model reported, Identify As's where USB has the setting */
+#ifdef USB_ENABLE_IAP
+#include "usb.h"
+#define IAP_MODEL_ID (usb_identity()->model_id)
+#define IAP_MODEL    (usb_identity()->model)
+#else
+#define IAP_MODEL_ID (0x00130200U)
+#define IAP_MODEL    "MC293"
+#endif
 
 /* The firmware version we emulate. Currently 2.0.3 */
 #define IAP_IPOD_FIRMWARE_MAJOR (2)

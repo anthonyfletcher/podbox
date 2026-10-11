@@ -24134,3 +24134,59 @@
     *: "After"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY
+  desc: in accessories settings: what model an accessory is told the player is
+  user: core
+  <source>
+    *: "Identify As"
+  </source>
+  <dest>
+    *: "Identify As"
+  </dest>
+  <voice>
+    *: "Identify As"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_OWN
+  desc: in Identify As: the player's own model
+  user: core
+  <source>
+    *: "This Player"
+  </source>
+  <dest>
+    *: "This Player"
+  </dest>
+  <voice>
+    *: "This Player"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_CLASSIC
+  desc: in Identify As: an iPod Classic
+  user: core
+  <source>
+    *: "iPod Classic"
+  </source>
+  <dest>
+    *: "iPod Classic"
+  </dest>
+  <voice>
+    *: "i Pod Classic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_IPHONE
+  desc: in Identify As: an iPhone 4
+  user: core
+  <source>
+    *: "iPhone 4"
+  </source>
+  <dest>
+    *: "iPhone 4"
+  </dest>
+  <voice>
+    *: "i Phone 4"
+  </voice>
+</phrase>

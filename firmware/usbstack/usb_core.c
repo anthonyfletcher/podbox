@@ -880,9 +880,15 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
 
     switch(type) {
         case USB_DT_DEVICE:
+            device_descriptor.idProduct = USB_PRODUCT_ID;
+#ifdef USB_ENABLE_IAP
+            /* Identify As; the sound card's own ID below still wins */
+            if(usb_identity()->product_id)
+                device_descriptor.idProduct = usb_identity()->product_id;
+#endif
 #if defined(USB_ENABLE_AUDIO) && defined(USB_PRODUCT_ID_AUDIO)
-            device_descriptor.idProduct = drivers[USB_DRIVER_AUDIO]->enabled ?
-                USB_PRODUCT_ID_AUDIO : USB_PRODUCT_ID;
+            if(drivers[USB_DRIVER_AUDIO]->enabled)
+                device_descriptor.idProduct = USB_PRODUCT_ID_AUDIO;
 #endif
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);

@@ -35,6 +35,7 @@
 #include "remote_seek.h"
 #include "iap_chapters.h"
 
+#include "usb.h"
 #include "../usb_iap.h"
 #include "debug.h"
 #include "libiap/iap.h"
@@ -86,6 +87,13 @@ IAPBool iap_platform_get_ipod_serial_num(struct IAPContext* iap_ctx, struct IAPS
     (void)iap_ctx;
     static const char* serial_num = "000000000000";
     return iap_span_append(serial, serial_num, strlen(serial_num) + 1);
+}
+
+IAPBool iap_platform_get_ipod_model_num(struct IAPContext* iap_ctx, struct IAPSpan* model) {
+    (void)iap_ctx;
+    const struct usb_identity* id    = usb_identity();
+    const uint8_t              be[4] = {id->model_id >> 24, id->model_id >> 16, id->model_id >> 8, id->model_id};
+    return iap_span_append(model, be, sizeof(be)) && iap_span_append(model, id->model, strlen(id->model) + 1);
 }
 
 IAPBool iap_platform_get_ipod_name(struct IAPContext* iap_ctx, struct IAPSpan* name) {

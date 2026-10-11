@@ -1288,7 +1288,7 @@ void iap_periodic(void)
                 {
                     IAP_TX_INIT(0x00, 0x27);
                     IAP_TX_PUT(2);
-                    IAP_TX_PUT_U32(IAP_IPOD_MODEL);
+                    IAP_TX_PUT_U32(IAP_MODEL_ID);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_MAJOR);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_MINOR);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_REV);
