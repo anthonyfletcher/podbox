@@ -19,7 +19,7 @@
 #--- Background layer ---#
 #
 # Album art
-%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim+dither,-,blurred)%Cd(blurred)%Cl(88,10,145,145,c,c,-,8,original)%Cd(original)
+%V(0,0,-,-,-)%VB%Vf(000000)%Cl(0,-40,320,320,c,c,blur12+scrim:ffffff+dither,-,blurred)%Cd(blurred)%Cl(88,10,145,145,c,c,-,8,original)%Cd(original)
 #
 # Paused: fade the cover, under the pause bars below
 %?mp<||%dr(88,10,145,145,!000000,-,8,8)||>
@@ -29,7 +29,7 @@
 %?ps<%?mm<%dr(286,2,32,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)|%dr(262,2,56,32,000000,-,10,6)>|%?mm<|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)|%dr(286,2,32,32,000000,-,10,6)>>
 #
 # Bottom band
-%dr(0,165,320,90,000000,-,8,6)
+%dr(0,165,320,90,dominant<15:000000,-,10,6)
 #
 # Progress tint
 %dr(50,226,220,3,!ffffff,-,6)
@@ -53,22 +53,22 @@
 # white text still reads over a white cover.
 #
 # - Track title
-%V(15,171,290,28,2)%Vt(000000,0,0,4,10)
+%V(15,171,290,28,2)%Vf(!ffffff)%Vt(dominant<15:000000,0,0,4,10)
 %s%ac%it
 #
 # - Sub-line: artist, album, artist-album, album-artist or
 #   playlist_name, per scrim.preferences
-%Vf(ffffff)%V(15,196,290,20,-)%Vt(000000,0,0,4,10)
+%V(15,196,290,20,-)%Vf(!ffffff)%Vt(dominant<15:000000,0,0,4,10)
 %s%ac%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist)<%ia|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,playlist_name)<%pn|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist-album)<%?ia<%ia%?id< - |>|>%id|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,album-artist)<%?id<%id%?ia< - |>|>%ia|%id>>>>
 #
 # Progress
-%Vf(ffffff)%V(50,226,220,3,-)%pb(0,0,-,-,noborder)
+%V(50,226,220,3,-)%Vf(vivid>60:ffffff)%pb(0,0,-,-,noborder)
 #
 # - Elapsed time
-%V(15,220,30,14,3)
+%V(15,220,30,14,3)%Vf(!ffffff)
 %al%pc
 # - Remaining time
-%V(275,220,30,14,3)
+%V(275,220,30,14,3)%Vf(!ffffff)
 %ar%pr
 #
 # Status icons - shuffle H, repeat J

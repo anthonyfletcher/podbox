@@ -22,7 +22,7 @@
 %V(0,0,-,-,-)%VB%Vf(000000)%Cl(80,0,240,240,c,c,-,-,original)%Cd(original)
 #
 # Album panel and progress tints, while the panel shows (see Auto-hide below)
-%?and(%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,5),%Tl(5)),%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,10),%Tl(10)),%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,30),%Tl(30)))<%?if(%tw(%it,2),>,230)<%dr(0,50,240,90,000000,-,10)|%dr(0,77,240,63,000000,-,10)>%dr(0,140,240,5,!ffffff,-,6)|>
+%?and(%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,5),%Tl(5)),%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,10),%Tl(10)),%or(%if(%ft(themes/scrim.preferences,auto-hide:),!=,30),%Tl(30)))<%?if(%tw(%it,2),>,230)<%dr(0,50,240,90,dominant<30:000000,-,10)|%dr(0,77,240,63,dominant<30:000000,-,10)>%dr(0,140,240,5,!ffffff,-,6)|>
 #
 #--- Foreground layer ---#
 #
@@ -43,17 +43,17 @@
 # Album panel contents
 #
 # - Track title
-%Vl(Short,5,85,230,28,2)
+%Vl(Short,5,85,230,28,2)%Vf(!ffffff)
 %it
-%Vl(Tall,5,58,230,55,2)%wt(%it,tl)
+%Vl(Tall,5,58,230,55,2)%Vf(!ffffff)%wt(%it,tl)
 #
 # - Sub-line: artist, album, artist-album, album-artist or
 #   playlist_name, per scrim.preferences
-%Vf(b3b3b3)%Vl(Panel,5,113,230,20,-)
+%Vl(Panel,5,113,230,20,-)%Vf(!ffffff)
 %s%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist)<%ia|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,playlist_name)<%pn|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,artist-album)<%?ia<%ia%?id< - |>|>%id|%?if(%ft(themes/scrim.preferences,sub-line mode:),=,album-artist)<%?id<%id%?ia< - |>|>%ia|%id>>>>
 #
 # Progress
-%Vf(ffffff)%Vl(Panel,0,140,240,5,-)%pb(0,0,-,-,noborder)
+%Vl(Panel,0,140,240,5,-)%Vf(vivid>60:ffffff)%pb(0,0,-,-,noborder)
 #
 # Under panel
 #

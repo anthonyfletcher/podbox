@@ -613,7 +613,7 @@ than quietly drawing nothing.
 | `brightness` | −100…100 | required | Toward white or black |
 | `lighter` | 0…300 | adaptive | Scale every channel up — see below |
 | `darker` | 0…100 | adaptive | Scale every channel down — see below |
-| `scrim` | — | — | Darken until the text over it reads — see below |
+| `scrim` | — | — | Bring the highlights down until the text over them reads — see below. `scrim:rrggbb` names that text's colour |
 | `contrast` | −100…100 | required | Away from or toward mid-grey |
 | `reduce` | 2…256 | `4` | Posterise to n levels per channel |
 | `bw` | 0…100 | `100` | Toward greyscale |
@@ -644,15 +644,20 @@ moving one way only, so a cover already past it is left alone rather than dragge
 back. `darker` measures the picture's brightest band rather than its average,
 because that is the band text has to be read against.
 
-**`scrim` darkens only as far as the text over it needs.** It is the one filter
-that reads something outside the picture: the colour that text will be drawn in,
+**`scrim` brings down only what the text over it cannot read against.** It is
+the one filter that reads something outside the picture: the colour that text will be drawn in,
 which is the theme's foreground — or the album's accent, while dynamic colours
-are running. Three things follow.
+are running. If your text is drawn in a pinned colour instead, such as
+`%Vf(!ffffff)`, name it: `scrim:ffffff`. Three things follow.
 
+- **It caps the highlights and leaves the rest.** Anything bright enough to
+  crowd the text is brought down until the text reads over it at 4.5:1; darker
+  parts of the picture are untouched. A bright colour keeps its colour and
+  loses only brightness, so white comes out a mid grey while a vivid orange
+  stays orange.
 - **It only ever darkens.** Facing dark text it does nothing at all, because a
   dark accent is itself evidence that the artwork is already light.
-- **It moves the picture the least it can.** A cover already clear of the text is
-  left as it is.
+- **A cover already clear of the text is left as it is.**
 - **On a chain without `blur` it is cut once.** A scrim is cut for one text
   colour, and the palette can move without the artwork changing — turning dynamic
   colours on, or the album's colours arriving a moment after the first draw. Only

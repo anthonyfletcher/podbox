@@ -47,6 +47,11 @@
  * every image pays a pass that does nothing. */
 #define IMG_ALLOW_ADAPTIVE  (1u << 5)
 
+/* Not a class either: the stage `scrim` runs as, set by img_filter_adapt()
+ * once it has seen a picture whose highlights the text needs brought down. It
+ * runs after the spatial stage and before the colour and levels stages. */
+#define IMG_STAGE_CAP       (1u << 6)
+
 /* The two tiers, as an `allowed` argument. Only the tier with a destination
  * of its own adapts, because only that one has a caller holding the picture
  * before the chain runs. */
@@ -126,6 +131,17 @@ struct img_filter
      * placeholder until it is refolded per image. */
     bool has_adaptive;
 
+    /* The luminance, 0..255, of the text colour a `scrim:rrggbb` named, or -1
+     * when it named none and the caller supplies the text colour instead. */
+    short text_lum;
+
+    /* `scrim`'s highlight cap, for IMG_STAGE_CAP. A pixel whose relative
+     * luminance (0..65025, the WCAG measure on a gamma of 2) is above
+     * cap_knee has all three channels scaled by cap_scale[lum >> 8] / 256,
+     * which keeps its hue and brings it under the text's ceiling. */
+    long           cap_knee;
+    unsigned short cap_scale[256];
+
     /* The blur window the chain asked for, in pixels of the decimated picture
      * the blur runs on, not of the finished one. 0 when it named no blur.
      * The finished picture is img_filter_source_divisor() times larger, so
@@ -177,17 +193,17 @@ void img_filter_measure(const fb_data *px, int w, int h,
  *
  * Call it once per image, before the passes below. A chain with nothing
  * adaptive in it is left alone, so calling it always is safe and costs a
- * branch. Rebuilding the table is 128 operations against the tens of
- * thousands the passes do, and a picture needing no scrim at all drops the
- * levels stage outright.
+ * branch. Rebuilding the tables is a few hundred operations against the tens
+ * of thousands the passes do, and a picture needing no scrim at all drops its
+ * stages outright.
  *
  *   lv     img_filter_measure() of the picture. NULL leaves the chain on its
  *          placeholder table, which is the identity.
  *   avoid  the luminance the picture has to stay clear of -- what text drawn
  *          over it will be, which on a themed screen is not a constant. Only
- *          `scrim` reads it, and it is the one filter that can lighten or
- *          darken depending on the answer. -1 for "nothing named", where
- *          `scrim` falls back to assuming light text.
+ *          `scrim` reads it: light text caps the picture's highlights, dark
+ *          text leaves it alone. -1 for "nothing named", where `scrim` falls
+ *          back to assuming light text.
  */
 void img_filter_adapt(struct img_filter *f, const struct img_levels *lv,
                       int avoid);

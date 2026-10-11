@@ -1271,13 +1271,14 @@ void skin_albumart_filter(int aa_slot, struct skin_albumart *aa)
     if (handle < 0)
         return;                                  /* not buffered yet */
 
-    /* What text over this art will be drawn in: the album's accent when
-     * dynamic colours are on and have a palette, the theme's own foreground
-     * otherwise. Reading the setting through the palette rather than the
-     * accent directly is what makes both cases one line. */
+    /* What text over this art will be drawn in: the colour `scrim:rrggbb`
+     * named, else the album's accent when dynamic colours are on and have a
+     * palette, the theme's own foreground otherwise. Reading the setting
+     * through the palette rather than the accent directly is what makes the
+     * last two one line. */
     if (filter->has_adaptive)
     {
-        avoid = color_luminance(
+        avoid = filter->text_lum >= 0 ? filter->text_lum : color_luminance(
                     dynamic_colors_resolve(global_settings.fg_color));
 
         /* A scrim is cut for one text colour, and the palette can move
