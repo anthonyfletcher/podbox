@@ -235,6 +235,7 @@ void iap_set_remote_volume(void);
 
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
+bool iap_play_or_resume(void);
 
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;

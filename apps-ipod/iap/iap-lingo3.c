@@ -761,8 +761,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                         case 0x01:
                         {
-                            audio_resume();
-                            cmd_ok(cmd);
+                            cmd_ack(cmd, iap_play_or_resume() ?
+                                         IAP_ACK_OK : IAP_ACK_CMD_FAILED);
                             break;
                         }
 

@@ -1415,6 +1415,23 @@ void iap_periodic(void)
      */
 }
 
+/* Play, from paused or stopped, for the commands that say "play" rather
+ * than press a button: a button press acts on whatever screen has focus,
+ * so outside the WPS it opened the highlighted row. False if there is
+ * nothing to play. */
+bool iap_play_or_resume(void)
+{
+    if (audio_status() & AUDIO_STATUS_PLAY)
+    {
+        audio_resume();
+        return true;
+    }
+    if (playlist_amount() <= 0)
+        return false;
+    playlist_start(playlist_get_current()->index, 0, 0);
+    return true;
+}
+
 /* Change the current interface state.
  * On a change from IST_EXTENDED to IST_STANDARD, or from IST_STANDARD
  * to IST_EXTENDED, pause playback, if playing
@@ -1424,9 +1441,7 @@ void iap_interface_state_change(const enum interface_state new)
     if (((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) ||
         ((interface_state == IST_STANDARD) && (new == IST_EXTENDED))) {
         if (audio_status() == AUDIO_STATUS_PLAY)
-        {
-            REMOTE_BUTTON(BUTTON_RC_PLAY);
-        }
+            audio_pause();
     }
 
     interface_state = new;

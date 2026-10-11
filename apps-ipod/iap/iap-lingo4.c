@@ -1936,36 +1936,52 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Reserved             0x0A - 0xFF
              *
              */
+            CHECKLEN(4);
+
+            /* The playback engine directly: a button press acts on the
+             * screen that has focus. Seeking still holds the remote's
+             * button, until EndFFRew or ten seconds. */
+            bool ok = true;
             switch(buf[3])
             {
                 case 0x01: /* play/pause */
-                    iap_remotebtn = BUTTON_RC_PLAY;
-                    iap_repeatbtn = 2;
+                    if ((audio_status() & (AUDIO_STATUS_PLAY|AUDIO_STATUS_PAUSE))
+                        == AUDIO_STATUS_PLAY)
+                        audio_pause();
+                    else
+                        ok = iap_play_or_resume();
                     break;
                 case 0x02: /* stop */
-                    iap_remotebtn = BUTTON_RC_PLAY|BUTTON_REPEAT;
-                    iap_repeatbtn = 2;
+                    audio_stop();
                     break;
                 case 0x03: /* skip++ */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    iap_repeatbtn = 2;
+                    audio_next();
                     break;
                 case 0x04: /* skip-- */
-                    iap_remotebtn = BUTTON_RC_LEFT;
-                    iap_repeatbtn = 2;
+                    audio_prev();
                     break;
                 case 0x05: /* ffwd */
                     iap_remotebtn = BUTTON_RC_RIGHT;
+                    iap_timeoutbtn = 100;
                     break;
                 case 0x06: /* frwd */
                     iap_remotebtn = BUTTON_RC_LEFT;
+                    iap_timeoutbtn = 100;
                     break;
                 case 0x07: /* end ffwd/frwd */
                     iap_remotebtn = BUTTON_NONE;
+                    iap_timeoutbtn = 0;
                     break;
+                case 0x08: /* next chapter */
+                case 0x09: /* previous chapter */
+                    /* No chapters to step through */
+                    ok = false;
+                    break;
+                default:
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    return;
             }
-            /* respond with cmd ok packet */
-            cmd_ok(cmd);
+            cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_CMD_FAILED);
             break;
         }
         case 0x002A: /* GetTrackArtworkTimes */
