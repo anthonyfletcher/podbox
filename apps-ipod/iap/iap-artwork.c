@@ -21,6 +21,7 @@
 #include "lcd.h"
 #include "playlist/playlist.h"
 #include "metadata/art_cache.h"
+#include "settings.h"
 #include "iap-core.h"
 #include "iap-artwork.h"
 
@@ -47,7 +48,8 @@ static struct {
 static int wps_size = -2;
 
 /* The thumbnail of the track's folder, keyed as the playback engine keys
- * it; there is a file at the path only if the folder has art */
+ * it; there is a file at the path only if the folder has art. None with
+ * Car Artwork off, so no track has art to send. */
 static bool art_path(uint32_t track, char *out, int out_len)
 {
     struct playlist_track_info info;
@@ -55,6 +57,8 @@ static bool art_path(uint32_t track, char *out, int out_len)
     const char *sep;
     int tracknum, dlen;
 
+    if (global_settings.car_artwork == CAR_ARTWORK_OFF)
+        return false;
     if (wps_size == -2)
         wps_size = art_cache_size_index("wps");
     if (wps_size < 0 || track >= (uint32_t)playlist_amount())

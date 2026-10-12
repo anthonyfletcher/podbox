@@ -165,7 +165,8 @@ static fb_data cached_art[IAP_ARTWORK_WIDTH * IAP_ARTWORK_HEIGHT];
 #define ART_CACHED ((uintptr_t)-1) /* an artwork's opaque: in cached_art */
 
 static bool slot_art(struct Platform* plt, uint32_t index) {
-    return (int)index == playlist_get_display_index() - 1 &&
+    return global_settings.car_artwork != CAR_ARTWORK_OFF &&
+           (int)index == playlist_get_display_index() - 1 &&
            plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
 }
 
