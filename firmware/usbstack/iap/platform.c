@@ -591,11 +591,15 @@ IAPBool iap_platform_on_acc_samprs_received(struct IAPContext* iap_ctx, struct I
     (void)iap_ctx;
 
     check_act(iap_audio_accessory_rates(samprs), return iap_false);
+    return iap_platform_take_sink() ? iap_true : iap_false;
+}
+
+bool iap_platform_take_sink(void) {
     check_act(mixer_switch_sink(PCM_SINK_IAP), return false);
     usb_iap_end_reset_hold(false);
     iap_audio_connected();
     queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
-    return iap_true;
+    return true;
 }
 
 void iap_platform_on_audio_attrs_ack(struct IAPContext* iap_ctx, IAPBool success) {

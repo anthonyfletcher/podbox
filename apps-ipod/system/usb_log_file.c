@@ -408,6 +408,12 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
             usb_log_format_iap(e, p, size);
             break;
         case USB_LOG_IAP_RATE:
+            if (e->b == 2)
+            {
+                snprintf(p, size, "iap: accessory lists no rates, playing "
+                         "the %lu Hz the host set", (unsigned long)e->c);
+                break;
+            }
             if (e->b)
             {
                 snprintf(p, size, "iap: host sets no rate, playing the "

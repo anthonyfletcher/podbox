@@ -29,6 +29,7 @@
 
 #include "../usb_iap.h"
 #include "buffer.h"
+#include "libiap/constants.h"
 #include "libiap/iap.h"
 #include "macros.h"
 #include "platform.h"
@@ -86,6 +87,10 @@ static long   asked_tick;
  * announcement plays the announced one: some never set one */
 static bool   host_set_rate = true; /* a SET_CUR since the announcement */
 static long   announced_tick;
+/* An accessory that never answers GetAccessorySampleRateCaps but sets a rate
+ * on the stream plays that rate, two seconds after its last SET_CUR */
+static int8_t host_rate = -1; /* index into samprs[], or -1 */
+static long   host_rate_tick;
 
 extern bool iap_initialized;
 
@@ -342,6 +347,19 @@ void iap_audio_tick(void) {
         usb_log(USB_LOG_IAP_RATE, 0, 1, RATE(set_freq), 0);
         cur_freq = set_freq;
     }
+    if(!accessory_ready && host_rate >= 0 &&
+       TIME_AFTER(current_tick, host_rate_tick + 2 * HZ)) {
+        /* not while it authenticates: the rates are asked for after that */
+        struct IAPContext* ctx     = _iap_acquire_ctx(true);
+        const bool         authing = ctx->phase == IAPPhase_Auth;
+        _iap_release_ctx();
+        if(!authing) {
+            usb_log(USB_LOG_IAP_RATE, 0, 2, samprs[host_rate], 0);
+            offer_rates(1u << host_rate);
+            host_rate = -1;
+            iap_platform_take_sink();
+        }
+    }
 }
 
 static void sink_stop(void) {
@@ -418,6 +436,7 @@ bool iap_audio_init(void) {
     accessory_ready  = false;
     acked_freq       = -1;
     asked_freq       = -1;
+    host_rate        = -1;
     packet_count     = 0;
     logged_stream    = 0xff;
 
@@ -496,6 +515,15 @@ void iap_audio_take_counts(struct iap_audio_counts *c) {
 }
 
 bool iap_audio_set_sampr(uint32_t sampr) {
+    if(!accessory_ready) {
+        for(size_t i = 0; i < ARRAYLEN(samprs); i += 1) {
+            if(samprs[i] == sampr) {
+                host_rate      = i;
+                host_rate_tick = current_tick;
+            }
+        }
+    }
+
     uint16_t freq = 0;
     for(; freq < iap_pcm_sink.caps.num_samprs; freq += 1) {
         if(RATE(freq) == sampr) {
