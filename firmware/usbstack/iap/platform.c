@@ -34,6 +34,8 @@
 #include "usb_drv.h"
 #include "remote_seek.h"
 #include "iap_chapters.h"
+#include "iap_artwork.h"
+#include "platform-macros.h"
 
 #include "usb.h"
 #include "../usb_iap.h"
@@ -156,6 +158,21 @@ static bool start_seek(struct IAPContext* ctx, int direction) {
     return true;
 }
 
+/* A track's art comes from the art cache, which has every track's. The
+ * playback engine's slot is the fallback, and has only the playing track's,
+ * and only once it is buffered after the accessory connected. */
+static fb_data cached_art[IAP_ARTWORK_WIDTH * IAP_ARTWORK_HEIGHT];
+#define ART_CACHED ((uintptr_t)-1) /* an artwork's opaque: in cached_art */
+
+static bool slot_art(struct Platform* plt, uint32_t index) {
+    return (int)index == playlist_get_display_index() - 1 &&
+           plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
+}
+
+static bool has_art(struct Platform* plt, uint32_t index) {
+    return iap_artwork_exists(index) || slot_art(plt, index);
+}
+
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
     struct Platform* plt = iap_ctx->platform;
 
@@ -175,7 +192,7 @@ IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatf
     status->track_index    = playlist_get_display_index() - 1;
     status->track_count    = playlist_amount();
     status->track_caps     = IAPIPodStateTrackCapBits_HasReleaseDate;
-    if(plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0) {
+    if(has_art(plt, status->track_index)) {
         status->track_caps |= IAPIPodStateTrackCapBits_HasAlbumArts;
     }
 
@@ -438,8 +455,7 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
     }
     if(info->caps != NULL) {
         *info->caps = IAPIPodStateTrackCapBits_HasReleaseDate;
-        /* FIXME: respect index */
-        if(plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0) {
+        if(has_art(plt, index)) {
             *info->caps |= IAPIPodStateTrackCapBits_HasAlbumArts;
         }
     }
@@ -519,8 +535,14 @@ void iap_platform_reset_db_selection(struct IAPContext* iap_ctx) {
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {
     struct Platform* plt = iap_ctx->platform;
-    /* only aa for currently playing track is available */
-    check_act((int)index == playlist_get_display_index() - 1, return iap_false);
+    if(iap_artwork_load(index, IAP_ARTWORK_WIDTH, cached_art, sizeof(cached_art))) {
+        artwork->color  = iap_true;
+        artwork->width  = IAP_ARTWORK_WIDTH;
+        artwork->height = IAP_ARTWORK_HEIGHT;
+        artwork->opaque = ART_CACHED;
+        return iap_true;
+    }
+    check_act(slot_art(plt, index), return iap_false);
     const int hid = playback_current_aa_hid(plt->aa_slot);
     check_act(hid >= 0, return iap_false, "%d %d", plt->aa_slot, hid);
     struct bitmap* bmp;
@@ -534,6 +556,12 @@ IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, st
 
 IAPBool iap_platform_get_artwork_ptr(struct IAPContext* iap_ctx, struct IAPPlatformArtwork* artwork, struct IAPSpan* span) {
     struct Platform* plt = iap_ctx->platform;
+
+    if(artwork->opaque == ART_CACHED) {
+        span->ptr  = (uint8_t*)cached_art;
+        span->size = sizeof(cached_art);
+        return iap_true;
+    }
 
     /* check the albumart has not reloaded */
     /* FIXME: not a correct check due to possibility of hid confliction */

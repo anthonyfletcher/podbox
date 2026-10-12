@@ -1,7 +1,7 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Album art for serial accessories, scaled from the art cache.
+ * Album art for accessories, scaled from the art cache.
  ****************************************************************************/
 #ifndef _IAP_ARTWORK_H_
 #define _IAP_ARTWORK_H_
@@ -16,6 +16,9 @@ void iap_artwork_put_counts(uint32_t track);
 /* Whether the track, counted from the playlist's first, has art */
 bool iap_artwork_exists(uint32_t track);
 bool iap_artwork_format_valid(uint16_t format);
+/* The track's art scaled to dim x dim native pixels into buf, of size
+ * bytes; false with none. Serial and USB iAP both send it. */
+bool iap_artwork_load(uint32_t track, int dim, void *buf, int size);
 
 /* Sends the track's art in that format as RetTrackArtworkData packets of
  * the lingo and command given, which iap_artwork_send_next() continues

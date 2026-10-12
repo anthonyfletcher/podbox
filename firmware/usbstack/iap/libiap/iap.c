@@ -718,7 +718,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             }
         } break;
         case IAPDisplayRemoteCommandID_GetArtworkFormats: {
-            alloc_response_extra(IAPArtworkFormat, sizeof(struct IAPArtworkFormat));
+            alloc_response(IAPArtworkFormat);
             response->format_id    = 0;
             response->pixel_format = IAP_COLOR_ARTWORK ? IAPArtworkPixelFormats_RGB565LE : IAPArtworkPixelFormats_Mono;
             response->image_width  = swap_16(IAP_ARTWORK_WIDTH);

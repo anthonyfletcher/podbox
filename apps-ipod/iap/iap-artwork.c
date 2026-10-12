@@ -1,17 +1,19 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Album art for serial accessories, scaled from the art cache. A track's
- * art is its folder's cached thumbnail, so a folder the cache has not
- * reached, or one with no art, has none to send. A transfer is one packet
- * an iAP thread event, so the accessory's commands are answered between
- * them.
+ * Album art for accessories, scaled from the art cache. A track's art is
+ * its folder's cached thumbnail, so a folder the cache has not reached, or
+ * one with no art, has none to send. A serial transfer is one packet an
+ * iAP thread event, so the accessory's commands are answered between them;
+ * USB iAP loads the art here and sends it itself.
  *
  * Parts, in order:
  *   - art_path(): the thumbnail a track's art is read from
  *   - the queries: iap_artwork_format_valid(), _exists(), _put_formats(),
  *     _put_counts()
- *   - the transfer: iap_artwork_start(), _send_next(), _active(), _stop()
+ *   - iap_artwork_load(): the art scaled, for either transport
+ *   - the serial transfer: iap_artwork_start(), _send_next(), _active(),
+ *     _stop()
  ****************************************************************************/
 #include "config.h"
 #include "system.h"
@@ -137,30 +139,36 @@ void iap_artwork_put_counts(uint32_t track)
     }
 }
 
-bool iap_artwork_start(unsigned char lingo, uint16_t command,
-                       uint32_t track, uint16_t format)
+bool iap_artwork_load(uint32_t track, int dim, void *buf, int size)
 {
     char path[MAX_PATH];
     struct bitmap bm;
     int fd, rc;
 
-    iap_artwork_stop();
-    /* the first packet carries its header and at least one byte */
-    if (!iap_artwork_format_valid(format)
-        || art_limit() <= (lingo == 0x04 ? 3 : 2) + ART_HEADER
-        || !art_path(track, path, sizeof(path)))
+    if (!art_path(track, path, sizeof(path)))
         return false;
     fd = open(path, O_RDONLY);
     if (fd < 0)
         return false;
 
     memset(&bm, 0, sizeof(bm));
-    bm.width = bm.height = art_dims[format];
+    bm.width = bm.height = dim;
     bm.format = FORMAT_NATIVE;
-    bm.data = (unsigned char *)art_buf;
-    rc = art_cache_load_aat(fd, &bm, sizeof(art_buf), NULL);
+    bm.data = buf;
+    rc = art_cache_load_aat(fd, &bm, size, NULL);
     close(fd);
-    if (rc <= 0)
+    return rc > 0;
+}
+
+bool iap_artwork_start(unsigned char lingo, uint16_t command,
+                       uint32_t track, uint16_t format)
+{
+    iap_artwork_stop();
+    /* the first packet carries its header and at least one byte */
+    if (!iap_artwork_format_valid(format)
+        || art_limit() <= (lingo == 0x04 ? 3 : 2) + ART_HEADER
+        || !iap_artwork_load(track, art_dims[format], art_buf,
+                             sizeof(art_buf)))
         return false;
 
     art_tx.lingo = lingo;
