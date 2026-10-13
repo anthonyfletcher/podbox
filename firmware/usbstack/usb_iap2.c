@@ -99,6 +99,14 @@ static size_t peer_max;     /* the longest packet the accessory takes */
 static uint8_t last_ack;    /* the accessory's latest acknowledgement */
 static long rto;            /* retransmission timeout, ticks; 0 never */
 static unsigned max_sends;  /* sends of one packet before giving up */
+/* A bare ACK goes only to an accessory whose SYN gives a cumulative
+ * acknowledgement timeout. Trap: one that gives 0 stops reading after a
+ * bare ACK; one that gives a timeout sends its packets again until
+ * acknowledged, and an iPhone acknowledges them bare when it has no reply. */
+static long cack;           /* cumulative acknowledgement timeout, ticks */
+static unsigned max_cacks;  /* its packets left unacknowledged at most */
+static unsigned unacked;    /* its packets taken since the player last sent */
+static long unacked_since;
 
 struct slot
 {
@@ -119,6 +127,7 @@ enum
 {
     SEND_ECHO    = 1 << 0,
     SEND_SYN_ACK = 1 << 1,
+    SEND_ACK     = 1 << 2,
 };
 static unsigned pending;
 static uint8_t ctl[HEADER_LEN + sizeof(syn_ack) + 1];
@@ -300,6 +309,9 @@ static void send_next(void)
         }
         else if (link_up && (s = next_queued()) != NULL)
         {
+            /* it names the accessory's last packet, as a bare ACK would */
+            pending &= ~SEND_ACK;
+            unacked = 0;
             s->packet[6] = peer_seq;
             s->packet[8] = checksum(s->packet, 8);
             s->queued = false;
@@ -310,6 +322,12 @@ static void send_next(void)
             tx_slot = s;
             log_packet(tx, tx_len, s->tries > 1 ? USB_LOG_IAP2_AGAIN
                                                 : USB_LOG_IAP2_OK, true);
+        }
+        else if (link_up && (pending & SEND_ACK))
+        {
+            pending &= ~SEND_ACK;
+            unacked = 0;
+            build_ctl(CTL_ACK, NULL, 0);
         }
         else
             return;
@@ -419,7 +437,8 @@ static void reset_link(void)
     tx_slot = NULL;
     last_ack = my_seq;
     cs_len = 0;
-    pending &= ~SEND_SYN_ACK;
+    unacked = 0;
+    pending &= ~(SEND_SYN_ACK | SEND_ACK);
     usb_iap2_control_reset();
 }
 
@@ -446,6 +465,11 @@ static void take_syn(uint8_t seq, const uint8_t *payload, size_t n)
     rto = payload[8] ? (payload[4] << 8 | payload[5]) * HZ / 1000 : 0;
     if (rto && rto < HZ / 10)
         rto = HZ / 10;
+    cack = (payload[6] << 8 | payload[7]) * HZ / 1000;
+    if (!cack && (payload[6] | payload[7]))
+        cack = 1;
+    max_cacks = payload[9];
+    unacked = 0;
     control_session = 0;
     file_session = 0;
     for (size_t i = SYN_FIXED; i + 3 <= n; i += 3)
@@ -556,15 +580,22 @@ static void take_packet(const uint8_t *p, size_t len)
     else if (n)
     {
         /* Out of order or repeated, the packet is dropped; the player's
-         * next packet names the last one taken. */
+         * next packet names the last one taken. One repeated, its
+         * acknowledgement lost, is acknowledged again. */
         if (seq == (uint8_t)(peer_seq + 1))
         {
             peer_seq = seq;
+            if (cack && !unacked++)
+                unacked_since = current_tick;
+            if (cack && max_cacks && unacked >= max_cacks)
+                pending |= SEND_ACK;
             if (link_up && session == control_session)
                 take_control(payload, n);
             else if (link_up && file_session && session == file_session)
                 usb_iap2_control_file(payload, n);
         }
+        else if (cack && (uint8_t)(peer_seq - seq) < 128)
+            pending |= SEND_ACK;
     }
 }
 
@@ -678,6 +709,8 @@ bool usb_iap2_tick(void)
                 s->queued = true;
         }
     }
+    if (unacked && TIME_AFTER(current_tick, unacked_since + cack))
+        pending |= SEND_ACK;
     if (tx_busy && !tx_stuck_logged &&
         TIME_AFTER(current_tick, tx_started + HZ))
     {

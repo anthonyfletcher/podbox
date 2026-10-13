@@ -1848,8 +1848,9 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
         take_identification(p, plen);
         break;
     case START_POWER_UPDATES:
-        if (car_takes(POWER_UPDATE))
-            send_power_update(wanted(p, plen, 0));
+        /* Whatever the car's identification lists: a Lexus lists neither
+         * message, sends this, and an iPhone answers it */
+        send_power_update(wanted(p, plen, 0));
         break;
     case POWER_SOURCE_UPDATE:
         /* CarPlayAvailability before this, or within a millisecond of it,
