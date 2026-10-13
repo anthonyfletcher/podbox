@@ -1016,6 +1016,11 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
     bool recolouring = dynamic_colors_needs_repaint();
     bool pending = dynamic_colors_pending();
 
+    /* None of the fast refreshes below is visible with the LCD asleep, and
+     * the spectrum's filters alone cost a fifth of an unboosted 5G. */
+    if (!lcd_active())
+        pm = sb = recolouring = pending = false;
+
     if (pm || sb || recolouring || pending) {
         long next_pm_refresh = current_tick;
         long next_sb_refresh = current_tick;

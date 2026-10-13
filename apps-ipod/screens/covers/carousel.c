@@ -4166,9 +4166,12 @@ static int album_covers_loop(void)
                       && !caption_scrolling
                       && !dynamic_colors_needs_repaint()
                       && !(audio_status() & AUDIO_STATUS_PLAY);
+        /* With the LCD asleep nothing is drawn or boosted: what is owed
+         * stays owed, and the wake's full update shows it. */
+        bool dark = !lcd_active();
         int timeout;
 
-        if (pf_state == pf_scrolling || art_owed || caption_owed)
+        if (!dark && (pf_state == pf_scrolling || art_owed || caption_owed))
         {
             /* There is a frame coming, so wait out the rest of its interval
              * rather than going round again to find it still not due. Trap:
@@ -4182,7 +4185,7 @@ static int album_covers_loop(void)
             timeout = (due_in < 0) ? 0 : (int)due_in;
         }
         else
-            timeout = quiescent ? HZ/2 : HZ/16;
+            timeout = (quiescent || dark) ? HZ/2 : HZ/16;
 
         skin_inhibit_flush(true);
         button = get_custom_action(CONTEXT_PLUGIN, timeout, get_context_map);
@@ -4304,8 +4307,9 @@ static int album_covers_loop(void)
         /* Boosted while there is drawing to do and for a second after, so a
          * caption step or a slide arriving does not switch the clock each
          * time; an idle screen gives the boost back. */
-        if (pf_state == pf_scrolling || art_owed || caption_owed
-            || caption_scrolling)
+        dark = !lcd_active();
+        if (!dark && (pf_state == pf_scrolling || art_owed || caption_owed
+                      || caption_scrolling))
             boost_until = current_tick + HZ;
         if (TIME_BEFORE(current_tick, boost_until) != pf_boosted)
         {
@@ -4313,7 +4317,7 @@ static int album_covers_loop(void)
             cpu_boost(pf_boosted);
         }
 
-        if ((art_owed || caption_owed)
+        if (!dark && (art_owed || caption_owed)
             && current_tick - last_frame_tick >= PF_FRAME_TICKS)
         {
             bool drew_art = art_owed;

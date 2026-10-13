@@ -2095,6 +2095,7 @@ static void skin_data_reset(struct wps_data *wps_data)
     wps_data->albumart = INVALID_OFFSET;   /* slots already released above */
 
     wps_data->peak_meter_enabled = false;
+    wps_data->spectrum_enabled = false;
     wps_data->draws_quickscreen = false;
     wps_data->wps_sb_tag = false;
     wps_data->show_sb_on_wps = false;

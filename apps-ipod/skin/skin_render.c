@@ -859,6 +859,10 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
             {
                 data->peak_meter_enabled = false;
             }
+            else if (token->type == SKIN_TOKEN_SPECTRUM_BARS)
+            {
+                data->spectrum_enabled = false;
+            }
             else if (token->type == SKIN_TOKEN_UIVIEWPORT_ENABLE)
             {
                 sb_set_info_vp(gwps->display->screen_type, VP_DEFAULT_LABEL);

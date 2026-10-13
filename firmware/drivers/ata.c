@@ -34,6 +34,7 @@
 #include "fs_defines.h"
 #include "storage.h"
 #include "logf.h"
+#include "backlight.h"
 
 #define SELECT_DEVICE1  0x10
 #define SELECT_LBA      0x40
@@ -71,6 +72,7 @@
 
 #ifdef HAVE_ATA_POWER_OFF
 #define ATA_POWER_OFF_TIMEOUT 2*HZ
+#define ATA_SSD_POWER_OFF_TIMEOUT 10*HZ
 #endif
 
 #if defined(HAVE_USBSTACK)
@@ -102,32 +104,19 @@ static long sleep_timeout = 5*HZ;
  * "storage mode" setting (auto/hdd/ssd). Auto asks the drive itself --
  * ata_disk_isssd() reads the IDENTIFY rotation-rate and form-factor fields.
  *
- * It decides one thing: whether the interface is ever powered OFF, as opposed
- * to merely put in standby. Cutting power saves a spinning disk its motor;
- * flash idles at almost nothing, so the saving is negligible while the cost
- * is not. Waking from off runs ata_power_on(), which spends a fixed HZ/4
- * letting the supply settle and then re-runs a hard reset, two IDENTIFYs,
- * set_features and set_multiple_mode -- measured at ~780 ms on an iPod Video
- * with an SD adapter, paid by the first file access after seven idle seconds.
- * From standby it is a soft reset instead.
+ * It decides when the interface is powered OFF rather than left in standby.
+ * A disk goes off ATA_POWER_OFF_TIMEOUT after it sleeps. Flash goes off only
+ * while the backlight is off, and not before ATA_SSD_POWER_OFF_TIMEOUT: an
+ * adapter's standby current is a real share of a 5G's playback draw, but
+ * waking from off runs ata_power_on() -- a fixed HZ/4 supply settle, a hard
+ * reset, two IDENTIFYs, set_features and set_multiple_mode, ~780 ms on an
+ * iPod Video with an SD adapter -- which browsing must not pay. The backlight
+ * coming on posts Q_STORAGE_PRE_WAKE, which powers it back up ahead of the
+ * first access. The Classic's driver (storage_ata-6g.c) follows the same rule.
  *
  * Set false rather than auto-detected at init: the drive has not been
  * identified yet when this file's statics are initialised, and settings_apply
- * calls ata_set_storage_mode() as soon as the settings are loaded.
- *
- * One setting, two mechanisms. Both drivers are after the same thing -- idling
- * flash more cheaply than a disk -- and go about it differently. Here, SSD mode
- * simply stops the interface being powered off. The iPod Classic's own driver
- * (target/arm/s5l8702/ipod6g/storage_ata-6g.c) instead makes the first sleep
- * stage cheaper (clock-gating rather than STANDBY IMMEDIATE) and still powers
- * off afterwards: at the first moment the backlight is off, ten or more
- * seconds after that sleep began.
- *
- * That difference is why Q_STORAGE_PRE_WAKE exists and why only that driver
- * handles it: it has a power-off to hide, and this one does not. backlight.c
- * posts the event on both targets, so if this driver is ever given a power-off
- * path, the pre-wake will not fire for it and the ~780 ms above returns
- * unhidden. */
+ * calls ata_set_storage_mode() as soon as the settings are loaded. */
 static bool ata_ssd_mode = false;
 
 static long last_disk_activity = -1;
@@ -727,10 +716,12 @@ void ata_sleepnow(void)
             if (!ata_perform_flush_cache() && !ata_perform_sleep()) {
                 ata_state = ATA_SLEEPING;
 #ifdef HAVE_ATA_POWER_OFF
-                /* Solid-state storage stays in standby rather than going all
-                 * the way off: see ata_ssd_mode. */
-                if (!ata_ssd_mode && (ata_disk_can_sleep() || canflush)) {
-                    power_off_tick = current_tick + ATA_POWER_OFF_TIMEOUT;
+                /* Solid-state storage waits longer, and for the backlight to
+                 * go off: see ata_ssd_mode. */
+                if (ata_disk_can_sleep() || canflush) {
+                    power_off_tick = current_tick + (ata_ssd_mode
+                                       ? ATA_SSD_POWER_OFF_TIMEOUT
+                                       : ATA_POWER_OFF_TIMEOUT);
                 }
 #endif
             }
@@ -1290,7 +1281,8 @@ int ata_event(long id, intptr_t data)
         /* won't see ATA_BOOT in here */
         if (ata_state != ATA_ON || !ata_sleep_timed_out()) {
 #ifdef HAVE_ATA_POWER_OFF
-            if (ata_state == ATA_SLEEPING && ata_power_off_timed_out()) {
+            if (ata_state == ATA_SLEEPING && ata_power_off_timed_out()
+                && (!ata_ssd_mode || !is_backlight_on(true))) {
                 power_off_tick = 0;
                 mutex_lock(&ata_mutex);
                 logf("ata OFF %ld", current_tick);
@@ -1308,6 +1300,22 @@ int ata_event(long id, intptr_t data)
     else if (id == Q_STORAGE_SLEEP) {
         last_disk_activity = current_tick - sleep_timeout + HZ / 5;
     }
+#ifdef HAVE_ATA_POWER_OFF
+    else if (id == Q_STORAGE_PRE_WAKE) {
+        if (ata_ssd_mode) {
+            mutex_lock(&ata_mutex);
+            if (ata_state == ATA_OFF) {
+                ata_led(true);
+                if (!ata_perform_wakeup(ata_state)) {
+                    ata_state = ATA_ON;
+                    keep_ata_active();
+                }
+                ata_led(false);
+            }
+            mutex_unlock(&ata_mutex);
+        }
+    }
+#endif
 #ifndef USB_NONE
     else if (id == SYS_USB_CONNECTED) {
         logf("deq USB %ld", current_tick);

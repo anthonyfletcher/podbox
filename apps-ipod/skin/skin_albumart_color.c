@@ -1101,9 +1101,17 @@ static bool palette_from_cache(void)
     if (miss_key != 0 && miss_key == palette_miss)
         return false;
 
+    /* A candidate whose palette is already the one in use is not read again:
+     * by the time a track changes the disk is usually asleep, and the next
+     * track of the same album would otherwise spin it up for nothing. */
     for (i = 0; i < n; i++)
+    {
+        if (cache.valid && cand[i] != 0 &&
+            cand[i] == global_status.resume_art_hash)
+            return true;
         if (palette_from_folder(cand[i], dim))
             return true;
+    }
 
     palette_miss = miss_key;
     return false;

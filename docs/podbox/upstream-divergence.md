@@ -42,7 +42,7 @@ work; the `tools/` changes are this fork's.
 | `backlight.c` | Backlight off calls `storage_sleep()`; both wake paths post `Q_STORAGE_PRE_WAKE` | The SSD sleeps with the backlight, and starts waking before the UI has handled the button. Only under `storage_get_ssd_mode()`. |
 | `backlight.c` | The fade registers the user timer at priority 1, not 0 | Above the 5G's wheel click (`piezo.c`), which gives the timer up instead of switching the backlight straight on or off. |
 | `backlight.c` | `power_input_present()` → `charger_inserted()` in `backlight_get_current_timeout()` | A data-only USB port should not get the plugged-in timeout. |
-| `drivers/ata.c`, `export/ata.h` | New `ata_set_storage_mode(int)` / `ata_get_ssd_mode()` (0 auto, 1 HDD, 2 SSD). In SSD mode `ata_sleepnow()` does not arm `power_off_tick` | The 5G's generic driver powered the interface off after seven idle seconds, and waking it costs ~780 ms. See *SSD mode* below. |
+| `drivers/ata.c`, `export/ata.h` | New `ata_set_storage_mode(int)` / `ata_get_ssd_mode()` (0 auto, 1 HDD, 2 SSD). In SSD mode the interface is powered off only while the backlight is off, 10 s or more after it sleeps, and `Q_STORAGE_PRE_WAKE` powers it back up | Waking it from off costs ~780 ms, which browsing must not pay, but a flash adapter's standby current is a real share of a 5G's playback draw. See *SSD mode* below. |
 | `export/storage.h`, `storage.c` | `Q_STORAGE_PRE_WAKE`, stubs and dispatch for the two calls above | Reaches SSD mode through the generic `storage_*` interface. |
 | `powermgmt.c` | The charger case sets `CHARGING` unconditionally; the battery-level test keys off `charge_state > DISCHARGING` | The 6G's charge-status line oscillates on weak USB sources, which flipped the voltage curve and moved the reading several points. |
 | `powermgmt.c` | New `charge_finished`, debounced over 8 samples and held until unplug; the 99 % cap needs it | Otherwise a full battery never shows 100 %. Other targets never set it, so they keep upstream's behaviour. |
@@ -178,7 +178,7 @@ no VBUS.
 | File | What changed | Why |
 | --- | --- | --- |
 | `target/arm/s5l8702/ipod6g/storage_ata-6g.c` | SSD storage mode, ~150 lines: clock-gate instead of `STANDBY IMMEDIATE`, deep sleep once the backlight is off, 10 s or more after the clock-gate sleep, eager wake on `ata_spin()` and `Q_STORAGE_PRE_WAKE`, no HDD power/noise features, ranged cache maintenance, auto-detection in `ata_init()`; any power-down or hard reset forces the next power-up to be a full init, so the clock-ungate fast path runs only after a clock-gate sleep | Flash mods are common on this player, and upstream treats every device as a spinning disk. |
-| `target/arm/s5l8702/ipod6g/power-6g.c` | Charger classification, ~100 lines: with the backlight off, charging is disabled unless a charger is confirmed or 500 mA is committed; a 10 ms watch on the charge-status line with the backlight on; an asymmetric 8-sample debounce | Upstream calls any USB insertion a charger, and a source that cannot supply device + charge current oscillates. A configured computer, **USB Charging = Force** and the DAC host all commit 500 mA. |
+| `target/arm/s5l8702/ipod6g/power-6g.c` | Charger classification, ~100 lines: with the backlight off, charging is disabled unless a charger is confirmed or 500 mA is committed, and a confirmed charger keeps it enabled when the stack's no-host timeout drops the commitment to 100 mA; a 10 ms watch on the charge-status line with the backlight on; an asymmetric 8-sample debounce | Upstream calls any USB insertion a charger, and a source that cannot supply device + charge current oscillates. A configured computer, **USB Charging = Force** and the DAC host all commit 500 mA. |
 | `drivers/audio/cs42l55.c`, `export/cs42l55.h` | `audiohw_idle_powerdown()`, `audiohw_idle_powerup()` | Idle codec power-down, muted first to avoid a pop. `HPACTL`/`HPBCTL` are left alone. |
 | `target/arm/s5l8702/ipod6g/cscodec-6g.c` | `cscodec_power()` switches LDO 3 | Upstream is a stub. |
 | `target/arm/s5l8702/ipod6g/audio-6g.c` | `audio_input_mux()` keeps its last source only with `HAVE_RECORDING` | Read only on the recording paths, it is a set-but-unused warning in a build without them. |
@@ -193,13 +193,9 @@ no VBUS.
 
 | | `drivers/ata.c` (5G) | `storage_ata-6g.c` (6G) |
 | --- | --- | --- |
-| What SSD mode changes | The interface is never powered off | The first sleep stage gates the clock instead of `STANDBY IMMEDIATE` |
-| Power-off still happens? | No | Yes, once the backlight is off, 10 s or more after it sleeps |
-| Wake cost hidden by | Nothing to hide | `Q_STORAGE_PRE_WAKE` |
-
-`backlight.c` posts `Q_STORAGE_PRE_WAKE` on both targets, and only the 6G
-handles it. Give the 5G driver a power-off path and its ~780 ms wake returns,
-unhidden.
+| First sleep stage | `STANDBY IMMEDIATE`, as for a disk | Gates the clock instead of `STANDBY IMMEDIATE` |
+| Power-off | Once the backlight is off, 10 s or more after it sleeps | The same |
+| Wake cost hidden by | `Q_STORAGE_PRE_WAKE` | `Q_STORAGE_PRE_WAKE` |
 
 ---
 

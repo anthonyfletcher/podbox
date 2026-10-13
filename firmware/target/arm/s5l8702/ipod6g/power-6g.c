@@ -114,6 +114,12 @@ bool ide_powered()
  * without probing it. */
 static int usb_committed_ma;
 
+/* A charger proven by power_input_status() with the backlight on. It keeps
+ * C1 low whatever the USB side commits to: the stack's no-host timeout drops
+ * the commitment to 100 mA, and blocking charging then would leave a wall
+ * charger unused until the screen next comes on. */
+static bool usb_charger_detected;
+
 #ifdef HAVE_USB_CHARGING_ENABLE
 void usb_charging_maxcurrent_change(int maxcurrent)
 {
@@ -137,7 +143,7 @@ void usb_charging_maxcurrent_change(int maxcurrent)
      * source can't deliver enough for device + charge current.
      * Device still draws operating power from USB; battery only
      * supplements if USB is insufficient. */
-    GPIOCMD = 0xc010e | (fast_charging ? 0 : 1);
+    GPIOCMD = 0xc010e | ((fast_charging || usb_charger_detected) ? 0 : 1);
 }
 #endif
 
@@ -158,7 +164,6 @@ static int chrg_monitor_cb(struct timeout *tmo)
 
 unsigned int power_input_status(void)
 {
-    static bool usb_charger_detected;
     static bool prev_bl_on;
     static bool monitoring;
     static int debounce;

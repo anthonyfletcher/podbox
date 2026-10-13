@@ -1209,10 +1209,11 @@ static void audio_update_filebuf_watermark(int seconds)
 
     if (storage_get_ssd_mode())
     {
-        /* SSD mode: no spinup delay, minimal watermark */
+        /* SSD mode: no spin-up, but storage powered off while the backlight
+         * is off still takes its wake time, which storage_spinup_time() measures. */
         if (seconds != 0)
             buffer_margin = seconds;
-        seconds = 1;
+        seconds = 1 + (storage_spinup_time() + HZ - 1) / HZ;
     }
     else
     {
