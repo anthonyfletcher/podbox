@@ -15,6 +15,8 @@ void iap_artwork_put_formats(void);
 void iap_artwork_put_counts(uint32_t track);
 /* Whether the track, counted from the playlist's first, has art */
 bool iap_artwork_exists(uint32_t track);
+/* The same, as why not: a USB_LOG_IAP_ART_CACHE_* value */
+int iap_artwork_check(uint32_t track);
 bool iap_artwork_format_valid(uint16_t format);
 /* The track's art scaled to dim x dim native pixels into buf, of size
  * bytes; false with none. Serial and USB iAP both send it. */

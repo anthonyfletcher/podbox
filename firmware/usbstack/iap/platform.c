@@ -36,6 +36,7 @@
 #include "iap_chapters.h"
 #include "iap_artwork.h"
 #include "platform-macros.h"
+#include "usb_log.h"
 
 #include "usb.h"
 #include "../usb_iap.h"
@@ -170,8 +171,20 @@ static bool slot_art(struct Platform* plt, uint32_t index) {
            plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
 }
 
+/* The playing track's answer goes in the USB log each time it changes */
 static bool has_art(struct Platform* plt, uint32_t index) {
-    return iap_artwork_exists(index) || slot_art(plt, index);
+    static uint32_t logged = UINT32_MAX;
+    const int       cache  = iap_artwork_check(index);
+    const bool      slot   = cache != USB_LOG_IAP_ART_CACHE_OK && slot_art(plt, index);
+
+    if((int)index == playlist_get_display_index() - 1) {
+        const uint32_t key = index << 4 | cache << 1 | slot;
+        if(key != logged) {
+            logged = key;
+            usb_log(USB_LOG_IAP_ART, USB_LOG_IAP_ART_REPORTED, index, cache, slot);
+        }
+    }
+    return cache == USB_LOG_IAP_ART_CACHE_OK || slot;
 }
 
 IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatformPlayStatus* status) {
@@ -535,23 +548,28 @@ void iap_platform_reset_db_selection(struct IAPContext* iap_ctx) {
 }
 
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork) {
-    struct Platform* plt = iap_ctx->platform;
-    if(iap_artwork_load(index, IAP_ARTWORK_WIDTH, cached_art, sizeof(cached_art))) {
+    struct Platform* plt   = iap_ctx->platform;
+    const int        cache = iap_artwork_check(index);
+    if(cache == USB_LOG_IAP_ART_CACHE_OK &&
+       iap_artwork_load(index, IAP_ARTWORK_WIDTH, cached_art, sizeof(cached_art))) {
         artwork->color  = iap_true;
         artwork->width  = IAP_ARTWORK_WIDTH;
         artwork->height = IAP_ARTWORK_HEIGHT;
         artwork->opaque = ART_CACHED;
+        usb_log(USB_LOG_IAP_ART, USB_LOG_IAP_ART_SENT, index, cache, 0);
         return iap_true;
     }
-    check_act(slot_art(plt, index), return iap_false);
-    const int hid = playback_current_aa_hid(plt->aa_slot);
-    check_act(hid >= 0, return iap_false, "%d %d", plt->aa_slot, hid);
+    const int      hid = slot_art(plt, index) ? playback_current_aa_hid(plt->aa_slot) : -1;
     struct bitmap* bmp;
-    check_act(bufgetdata(hid, 0, (void*)&bmp) > 0, return iap_false);
+    if(hid < 0 || bufgetdata(hid, 0, (void*)&bmp) <= 0) {
+        usb_log(USB_LOG_IAP_ART, USB_LOG_IAP_ART_REFUSED, index, cache, 0);
+        return iap_false;
+    }
     artwork->color  = iap_true;
     artwork->width  = bmp->width;
     artwork->height = bmp->height;
     artwork->opaque = hid;
+    usb_log(USB_LOG_IAP_ART, USB_LOG_IAP_ART_SENT, index, cache, 1);
     return iap_true;
 }
 

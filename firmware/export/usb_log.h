@@ -94,6 +94,10 @@ enum usb_log_type
                           * USB_LOG_IAP_STREAM_* */
     USB_LOG_IAP_IDENTIFY, /* IdentifyDeviceLingoes: c = lingoes,
                            * d = options */
+    USB_LOG_IAP_ART,     /* the playing track's art: a = USB_LOG_IAP_ART_*
+                          * what happened, b = track index, c = the art
+                          * cache's answer, USB_LOG_IAP_ART_CACHE_*, d = 1
+                          * where playback's art served instead */
     USB_LOG_IAP2,        /* an iAP2 report, raw: a = offset into it from
                           * the link-control byte | USB_LOG_IAP_FROM_PLAYER,
                           * b = report bytes, c, d = eight bytes from the
@@ -166,6 +170,16 @@ enum usb_log_type
                                      * track's position moved, ms */
 #define USB_LOG_IAP2_AUDIO_USB   18 /* c = times the USB queue ran empty,
                                      * d = packets that failed */
+
+#define USB_LOG_IAP_ART_REPORTED 0 /* told the accessory whether it has art */
+#define USB_LOG_IAP_ART_SENT     1 /* the accessory asked, and it is sent */
+#define USB_LOG_IAP_ART_REFUSED  2 /* the accessory asked; none to send */
+
+#define USB_LOG_IAP_ART_CACHE_OK       0 /* a usable thumbnail */
+#define USB_LOG_IAP_ART_CACHE_OFF      1 /* Car Artwork is off */
+#define USB_LOG_IAP_ART_CACHE_NO_TRACK 2 /* no such track, or no cache size */
+#define USB_LOG_IAP_ART_CACHE_NO_FILE  3 /* the folder has no thumbnail */
+#define USB_LOG_IAP_ART_CACHE_BAD_FILE 4 /* one the formats cannot use */
 
 #define USB_LOG_IAP_STREAM_AUDIO     0 /* the playing audio */
 #define USB_LOG_IAP_STREAM_NOTHING   1 /* silence: nothing to play */

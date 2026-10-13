@@ -440,6 +440,25 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          ? "silent, nothing playing"
                          : "silent, waiting for the host to set the rate");
             break;
+        case USB_LOG_IAP_ART:
+        {
+            static const char *const what[] = {
+                "playing", "art sent", "art asked for, none sent"
+            };
+            static const char *const cache[] = {
+                "a thumbnail", "Car Artwork off", "no track or size",
+                "no thumbnail", "an unusable thumbnail"
+            };
+            const bool has = e->c == USB_LOG_IAP_ART_CACHE_OK || e->d;
+            snprintf(p, size, "iap: track %u %s%s; art cache: %s%s", e->b,
+                     e->a < 3 ? what[e->a] : "?",
+                     e->a == USB_LOG_IAP_ART_REPORTED
+                         ? (has ? ", told it has art" : ", told it has none")
+                         : "",
+                     e->c < 5 ? cache[e->c] : "?",
+                     e->d ? ", playback's art used" : "");
+            break;
+        }
         case USB_LOG_IAP_IDENTIFY:
         {
             static const char *const auth[] = {

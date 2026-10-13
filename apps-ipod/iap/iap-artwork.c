@@ -22,6 +22,7 @@
 #include "playlist/playlist.h"
 #include "metadata/art_cache.h"
 #include "settings.h"
+#include "usb_log.h"
 #include "iap-core.h"
 #include "iap-artwork.h"
 
@@ -96,25 +97,32 @@ bool iap_artwork_format_valid(uint16_t format)
 
 /* Only a thumbnail art_cache_load_aat() can scale to every format counts,
  * so a track reported as having art always has it to send */
-bool iap_artwork_exists(uint32_t track)
+int iap_artwork_check(uint32_t track)
 {
     char path[MAX_PATH];
     struct art_cache_header hdr;
     int fd;
     bool ok;
 
+    if (global_settings.car_artwork == CAR_ARTWORK_OFF)
+        return USB_LOG_IAP_ART_CACHE_OFF;
     if (!art_path(track, path, sizeof(path)))
-        return false;
+        return USB_LOG_IAP_ART_CACHE_NO_TRACK;
     fd = open(path, O_RDONLY);
     if (fd < 0)
-        return false;
+        return USB_LOG_IAP_ART_CACHE_NO_FILE;
     ok = read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr)
          && hdr.magic == ART_CACHE_MAGIC
          && hdr.version == ART_CACHE_FORMAT_VERSION
          && hdr.layout == AA_ROWS && hdr.width == hdr.height
          && hdr.width >= art_dims[ART_FORMATS - 1];
     close(fd);
-    return ok;
+    return ok ? USB_LOG_IAP_ART_CACHE_OK : USB_LOG_IAP_ART_CACHE_BAD_FILE;
+}
+
+bool iap_artwork_exists(uint32_t track)
+{
+    return iap_artwork_check(track) == USB_LOG_IAP_ART_CACHE_OK;
 }
 
 void iap_artwork_put_formats(void)
