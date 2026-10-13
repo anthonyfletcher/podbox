@@ -343,6 +343,18 @@ static int tick_callback(struct timeout* tmo) {
     return HZ / 10;
 }
 
+static struct timeout soon_tmo;
+
+static int soon_callback(struct timeout* tmo) {
+    (void)tmo;
+    usb_signal_class_notify(USB_DRIVER_IAP, Notify_Tick);
+    return 0;
+}
+
+void usb_iap2_tick_soon(long ticks) {
+    timeout_register(&soon_tmo, soon_callback, MAX(ticks, 1), 0);
+}
+
 static int usb_iap_set_first_interface(int interface) {
     ctrl.interface   = interface + 0;
     stream.interface = interface + 1;
@@ -524,6 +536,7 @@ static void usb_iap_disconnect(void) {
         mixer_switch_sink(PCM_SINK_BUILTIN);
     }
     timeout_cancel(&tick_tmo);
+    timeout_cancel(&soon_tmo);
     if(platform.aa_slot >= 0) {
         playback_release_aa_slot(platform.aa_slot);
     }

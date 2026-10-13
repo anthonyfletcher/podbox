@@ -377,6 +377,19 @@ static uint16_t car_receives[64]; /* what identification says it takes */
 static size_t car_receives_n;
 static bool identified;
 static long availability_due;     /* when to send CarPlayAvailability, or 0 */
+static unsigned car_current;      /* mA PowerSourceUpdate offers, or 0 */
+/* An iPhone waits about 20 ms after the car's AuthenticationResponse to
+ * accept it, and 24 to 81 ms after its identification to accept that (its
+ * packet logs, the Mazda and a Lexus); the player does the same */
+static long auth_due, ident_due;  /* when to send each, or 0 */
+
+/* A time for the tick to act at, which is made to come then */
+static long due_in(long ticks)
+{
+    const long due = current_tick + ticks;
+    usb_iap2_tick_soon(ticks);
+    return due ? due : 1;
+}
 static uint8_t next_transfer = 0x80; /* file transfer IDs run 80 to FF */
 static uint8_t artwork;           /* the artwork transfer just named, or 0 */
 /* The artwork transfer under way: see the now playing part */
@@ -482,6 +495,8 @@ void usb_iap2_control_reset(void)
 {
     identified = false;
     availability_due = 0;
+    car_current = 0;
+    auth_due = ident_due = 0;
     artwork = 0;
     if (aw.phase != ART_IDLE)
         iap_library_artwork_stop();
@@ -594,7 +609,9 @@ static void stop_audio(void)
  * each one asked for in a message of its own, 4, 5, 0, 1 and then 6:
  * 4 `01`; 5 `02` at full charge, read as the charging state (0 none,
  * 1 charging, 2 charged); 0 `uint16` 1500; 1 `01`; 6 `uint16` 100 at full
- * charge, read as the battery percentage. */
+ * charge, read as the battery percentage. Attribute 0 is never more than
+ * the car's PowerSourceUpdate offers: an iPhone gives a Lexus offering
+ * 1000 mA 1000, and this car, offering 3000, 1500. */
 static void send_power_update(uint32_t wanted_mask)
 {
     static const uint8_t order[] = {4, 5, 0, 1, 6};
@@ -607,7 +624,7 @@ static void send_power_update(uint32_t wanted_mask)
         if (a == 5) /* on the car's power, not charging means charged */
             param_u8(a, charge_state == DISCHARGING ? 2 : 1);
         else if (a == 0)
-            param_u16(a, 1500);
+            param_u16(a, car_current ? MIN(car_current, 1500u) : 1500);
         else if (a == 6)
             param_u16(a, battery_level());
         else
@@ -1752,22 +1769,36 @@ static void send_carplay_availability(void)
 }
 
 
+static size_t car_sends_n;
+static int bt_component = -1;     /* the car's Bluetooth component, or -1 */
+
+/* The car's lists and Bluetooth component, kept for accept_identification()
+ * from the tick */
 static void take_identification(const uint8_t *p, size_t len)
 {
-    static long last_splash;
-    size_t n, sent_n = 0;
+    size_t n;
     const uint8_t *list = find(p, len, 7, &n);
     car_receives_n = 0;
     for (size_t i = 0; list && i + 1 < n &&
                        car_receives_n < ARRAYLEN(car_receives); i += 2)
         car_receives[car_receives_n++] = list[i] << 8 | list[i + 1];
-    if (find(p, len, 6, &sent_n))
-        sent_n /= 2;
+    car_sends_n = 0;
+    if (find(p, len, 6, &car_sends_n))
+        car_sends_n /= 2;
+    const uint8_t *bt = find(p, len, 17, &n);
+    bt_component = bt && (bt = find(bt, n, 0, &n)) && n == 2
+                       ? (int)get_be(bt, 2) : -1;
+    ident_due = due_in(HZ * 3 / 100);
+}
+
+static void accept_identification(void)
+{
+    static long last_splash;
 
     iap_player_name(device_name, sizeof(device_name));
     send_empty(IDENTIFICATION_ACCEPTED);
     identified = true;
-    event(USB_LOG_IAP2_IDENTIFIED, sent_n, car_receives_n);
+    event(USB_LOG_IAP2_IDENTIFIED, car_sends_n, car_receives_n);
     /* Once a connection: a car that resets and identifies again would
      * otherwise hold the screen with one splash after another. */
     if (!last_splash || TIME_AFTER(current_tick, last_splash + 30 * HZ))
@@ -1798,11 +1829,10 @@ static void take_identification(const uint8_t *p, size_t len)
 
     /* The iPhone then starts pairing with the car's Bluetooth component and
      * stops it at once, the stop carrying an empty parameter 2. */
-    const uint8_t *bt = find(p, len, 17, &n);
-    if (bt && (bt = find(bt, n, 0, &n)) && n == 2 &&
+    if (bt_component >= 0 &&
         car_takes(START_BLUETOOTH_PAIRING) && car_takes(STOP_BLUETOOTH_PAIRING))
     {
-        const uint16_t component = get_be(bt, 2);
+        const uint16_t component = bt_component;
         if (msg_start(START_BLUETOOTH_PAIRING))
         {
             param_u16(0, component);
@@ -1841,15 +1871,15 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
         send_challenge(find(p, plen, 0, &n) ? n : 0);
         break;
     case CHALLENGE_RESPONSE:
-        send_empty(AUTHENTICATION_SUCCEEDED);
-        send_empty(START_IDENTIFICATION);
+        auth_due = due_in(HZ / 50);
         break;
     case IDENTIFICATION_INFORMATION:
         take_identification(p, plen);
         break;
     case START_POWER_UPDATES:
-        /* Whatever the car's identification lists: a Lexus lists neither
-         * message, sends this, and an iPhone answers it */
+        /* This and the other Start requests are answered whatever the car's
+         * identification lists, as an iPhone does: a Lexus lists neither
+         * power message, sends this, and an iPhone answers it */
         send_power_update(wanted(p, plen, 0));
         break;
     case POWER_SOURCE_UPDATE:
@@ -1858,14 +1888,15 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
          * StartHID, and it goes on to StartPowerUpdates. An iPhone sends it
          * 8 to 115 ms after accepting identification. Sent from the tick,
          * 50 to 150 ms on, or at StartHID if that comes first. */
+        if ((v = find(p, plen, 0, &n)) && n == 2)
+            car_current = get_be(v, 2);
         if (identified && car_takes(CARPLAY_AVAILABILITY))
             availability_due = current_tick + HZ / 20;
         break;
     case START_BT_CONNECTION:
         /* An iPhone answers with the component and an empty parameter 1,
          * no Bluetooth profile connected. */
-        if (car_takes(BT_CONNECTION_UPDATE) &&
-            (v = find(p, plen, 0, &n)) && n == 2 &&
+        if ((v = find(p, plen, 0, &n)) && n == 2 &&
             msg_start(BT_CONNECTION_UPDATE))
         {
             param_u16(0, get_be(v, 2));
@@ -1874,11 +1905,9 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
         }
         break;
     case START_LIBRARY_INFORMATION:
-        if (car_takes(LIBRARY_INFORMATION))
-            send_library_information();
+        send_library_information();
         break;
     case START_LIBRARY_UPDATES:
-        if (car_takes(LIBRARY_UPDATE))
         {
             const uint8_t *rev = find(p, plen, 1, &n);
             const bool has_rev = rev && n && !rev[n - 1];
@@ -1952,6 +1981,17 @@ void usb_iap2_control_receive(const uint8_t *msg, size_t len)
 
 void usb_iap2_control_tick(void)
 {
+    if (auth_due && !TIME_BEFORE(current_tick, auth_due))
+    {
+        auth_due = 0;
+        send_empty(AUTHENTICATION_SUCCEEDED);
+        send_empty(START_IDENTIFICATION);
+    }
+    if (ident_due && !TIME_BEFORE(current_tick, ident_due))
+    {
+        ident_due = 0;
+        accept_identification();
+    }
     if (availability_due && TIME_AFTER(current_tick, availability_due))
         send_carplay_availability();
     if (audio_on && rate_wanted && rate_wanted != rate_sent)
