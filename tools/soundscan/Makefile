@@ -69,7 +69,12 @@ OSFILE_WIN  := $(FIRM)/target/hosted/filesystem-win32.c
 # Warnings that belong to the host's libc rather than to the code: it marks
 # write() and ftruncate() warn_unused_result, and the places sound_index.c
 # ignores them are ignoring them deliberately -- see the comments there.
-WARN := -Wall -Wextra -Wno-unused-result -Wno-unused-parameter
+# The other three are tools/configure's for a Windows simulator, which the
+# shared firmware and codec sources are written to; without them those sources
+# raise a hundred and more warnings. mingw's printf does not know %zd.
+WARN := -Wall -Wextra -Wno-unused-result -Wno-unused-parameter \
+        -Wno-pointer-sign -Wno-override-init
+WINWARN := $(WARN) -Wno-format
 
 # Overridable so a crash can be looked at: make native OPT="-g -O0"
 OPT  ?= -O2
@@ -96,7 +101,7 @@ soundscan.exe: BUILD := $(SIMDIR)
 soundscan.exe: $(SRC) $(OSFILE_WIN) $(DEPS) $(wildcard $(SIMDIR)/autoconf.h)
 	@test -f $(SIMDIR)/autoconf.h || \
 	  (echo "No simulator build at $(SIMDIR) -- run ./build-sim.sh 5g win"; false)
-	$(WINCC) $(OPT) -std=gnu11 $(WARN) $(DEFINES) $(INCLUDES) \
+	$(WINCC) $(OPT) -std=gnu11 $(WINWARN) $(DEFINES) $(INCLUDES) \
 	      -o soundscan.exe $(SRC) $(OSFILE_WIN) -lm -static
 
 # The tool loads the player's own codecs, built for the host by the simulator.

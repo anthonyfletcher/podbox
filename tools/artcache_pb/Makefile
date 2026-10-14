@@ -68,7 +68,13 @@ BITMAPS = $(BUILD)/apps-ipod/bitmaps/native/podboxnoart.c
 OSFILE_UNIX := $(FIRM)/target/hosted/filesystem-unix.c
 OSFILE_WIN  := $(FIRM)/target/hosted/filesystem-win32.c
 
-WARN := -Wall -Wextra -Wno-unused-result -Wno-unused-parameter
+# The -Wno- flags past the first two are tools/configure's for a Windows
+# simulator, which the shared firmware and metadata sources are written to;
+# without them those sources raise a hundred and more warnings. mingw's printf
+# does not know %zd.
+WARN := -Wall -Wextra -Wno-unused-result -Wno-unused-parameter \
+        -Wno-pointer-sign -Wno-override-init
+WINWARN := $(WARN) -Wno-format
 
 OPT  ?= -O2
 
@@ -96,7 +102,7 @@ artcache_pb.exe: BUILD := $(SIMDIR)
 artcache_pb.exe: $(SRC) $(OSFILE_WIN) $(DEPS) $(wildcard $(SIMDIR)/autoconf.h)
 	@test -f $(SIMDIR)/autoconf.h || \
 	  (echo "No simulator build at $(SIMDIR) -- run ./build-sim.sh 5g win"; false)
-	$(WINCC) $(OPT) -std=gnu11 $(WARN) $(DEFINES) $(INCLUDES) \
+	$(WINCC) $(OPT) -std=gnu11 $(WINWARN) $(DEFINES) $(INCLUDES) \
 	      -o artcache_pb.exe $(SRC) $(BITMAPS) $(OSFILE_WIN) -lm -static $(LDFLAGS)
 
 clean:
