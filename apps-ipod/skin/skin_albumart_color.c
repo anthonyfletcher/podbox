@@ -659,10 +659,18 @@ static bool pick_vivid(const fb_data *pixels, int total_pixels, int stride,
     return true;
 }
 
-static void extract_colors(const struct bitmap *bmp)
+/* A palette as extracted, before anything is applied. */
+struct found_palette {
+    unsigned int accent;
+    unsigned int dominant;
+    unsigned int vivid;
+    bool has_vivid;
+};
+
+static bool compute_palette(const struct bitmap *bmp, struct found_palette *out)
 {
     if (!bmp->data || bmp->width <= 0 || bmp->height <= 0)
-        return;
+        return false;
 
     fb_data *pixels = (fb_data *)bmp->data;
     int width = bmp->width;
@@ -744,7 +752,7 @@ static void extract_colors(const struct bitmap *bmp)
     if (best_bucket < 0)
         best_bucket = fallback_bucket;
     if (best_bucket < 0)
-        return; /* empty image? */
+        return false; /* empty image? */
 
     /* Pass 2: average full-precision RGB for dominant bucket */
     int dom_r, dom_g, dom_b;
@@ -867,10 +875,27 @@ static void extract_colors(const struct bitmap *bmp)
         }
     }
 
-    cache.found_accent = accent;
-    cache.found_dominant = dominant;
-    cache.has_vivid = pick_vivid(pixels, total_pixels, stride, &cache.vivid);
+    out->accent = accent;
+    out->dominant = dominant;
+    out->has_vivid = pick_vivid(pixels, total_pixels, stride, &out->vivid);
+    return true;
+}
+
+static void apply_found(const struct found_palette *p)
+{
+    cache.found_accent = p->accent;
+    cache.found_dominant = p->dominant;
+    cache.vivid = p->vivid;
+    cache.has_vivid = p->has_vivid;
     apply_oriented();
+}
+
+static void extract_colors(const struct bitmap *bmp)
+{
+    struct found_palette p;
+
+    if (compute_palette(bmp, &p))
+        apply_found(&p);
 }
 
 /* ---------------------------------------------------------------------- *
@@ -910,6 +935,19 @@ static void extract_colors(const struct bitmap *bmp)
 #define PALETTE_MAX_DIM 128
 
 static fb_data palette_px[PALETTE_MAX_DIM * PALETTE_MAX_DIM];
+/* palette_px has two readers: the screen, and the prefetch on the audio
+ * thread. Both read a file into it, which yields. */
+static struct mutex palette_lock;
+
+/* Palettes worked out as their track was buffered, while the disk was already
+ * running, so the track change can apply one without reading anything. Two:
+ * the next track and the one after it can each be from a new album. */
+#define PREFETCH_SLOTS 2
+static struct {
+    unsigned int hash;
+    struct found_palette p;
+} prefetched[PREFETCH_SLOTS];
+static int prefetch_next;
 static int palette_size_idx = -2;      /* -2 not looked up, -1 no such size */
 
 /* The folder last found to have no cached thumbnail. Without this, a track
@@ -969,15 +1007,17 @@ static int palette_dim(void)
     return (dim > 0 && dim <= PALETTE_MAX_DIM) ? dim : 0;
 }
 
-/* Read one folder's cached thumbnail and take the palette from it. False means
+/* Read one folder's cached thumbnail and work out its palette. False means
  * there is none to read: no database yet, a folder the caching pass has not
  * reached, or one with no art at all. */
-static bool palette_from_folder(unsigned int hash, int dim)
+static bool read_folder_palette(unsigned int hash, int dim,
+                                struct found_palette *out)
 {
     struct art_cache_header hdr;
     struct bitmap bmp;
     char aat[MAX_PATH];
     size_t bytes;
+    bool got = false;
     int fd;
 
     if (hash == 0)
@@ -988,30 +1028,57 @@ static bool palette_from_folder(unsigned int hash, int dim)
      * with no art has no file here, which is what keeps the shared "no art"
      * placeholder from becoming somebody's palette. */
     art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
+    mutex_lock(&palette_lock);
     fd = open(aat, O_RDONLY);
-    if (fd < 0)
-        return false;
-
-    bytes = (size_t)dim * dim * sizeof(fb_data);
-    if (read(fd, &hdr, sizeof(hdr)) != (ssize_t)sizeof(hdr) ||
-        hdr.magic != ART_CACHE_MAGIC ||
-        hdr.version != ART_CACHE_FORMAT_VERSION ||
-        hdr.width != dim || hdr.height != dim ||
-        read(fd, palette_px, bytes) != (ssize_t)bytes)
+    if (fd >= 0)
     {
+        bytes = (size_t)dim * dim * sizeof(fb_data);
+        if (read(fd, &hdr, sizeof(hdr)) == (ssize_t)sizeof(hdr) &&
+            hdr.magic == ART_CACHE_MAGIC &&
+            hdr.version == ART_CACHE_FORMAT_VERSION &&
+            hdr.width == dim && hdr.height == dim &&
+            read(fd, palette_px, bytes) == (ssize_t)bytes)
+        {
+            /* Pixel order is not checked because a histogram does not care:
+             * this size is stored column-major for the carousel, and every
+             * pixel is counted whichever way round they sit. */
+            bmp.width = dim;
+            bmp.height = dim;
+            bmp.format = FORMAT_NATIVE;
+            bmp.data = (unsigned char *)palette_px;
+            got = compute_palette(&bmp, out);
+        }
         close(fd);
-        return false;
     }
-    close(fd);
+    mutex_unlock(&palette_lock);
+    return got;
+}
 
-    /* Pixel order is not checked because a histogram does not care: this
-     * size is stored column-major for the carousel, and every pixel is
-     * counted whichever way round they sit. */
-    bmp.width = dim;
-    bmp.height = dim;
-    bmp.format = FORMAT_NATIVE;
-    bmp.data = (unsigned char *)palette_px;
-    extract_colors(&bmp);
+static bool prefetched_find(unsigned int hash, struct found_palette *out)
+{
+    for (int i = 0; i < PREFETCH_SLOTS; i++)
+    {
+        if (prefetched[i].hash == hash)
+        {
+            if (out)
+                *out = prefetched[i].p;
+            return true;
+        }
+    }
+    return false;
+}
+
+/* One folder's palette, applied: from the prefetch if it is there, else
+ * from its thumbnail on disk. */
+static bool palette_from_folder(unsigned int hash, int dim)
+{
+    struct found_palette p;
+
+    if (hash == 0)
+        return false;
+    if (!prefetched_find(hash, &p) && !read_folder_palette(hash, dim, &p))
+        return false;
+    apply_found(&p);
     /* Remembered for the next boot, which has a resume point but no playing
      * track to derive a folder from. */
     global_status.resume_art_hash = hash;
@@ -1061,24 +1128,9 @@ static bool palette_from_slot(int handle)
  * asks for a portrait only for a playlist built from an artist browse and falls
  * back to the cover, while the explicit Artist setting does not fall back,
  * because a missing portrait is meant to be visible rather than papered over. */
-static bool palette_from_cache(void)
+static int palette_candidates(const char *path, unsigned int cand[2])
 {
-    unsigned int cand[2];
-    char path[MAX_PATH];
-    struct mp3entry *id3;
-    unsigned int miss_key;
-    int n = 0, i, dim;
-
-    dim = palette_dim();
-    if (dim == 0)
-        return false;
-
-    /* audio_current_track() hands back the engine's live entry, not a copy,
-     * so take what is needed out of it before doing anything else. */
-    id3 = audio_current_track();
-    if (!id3 || !id3->path[0])
-        return false;
-    strmemccpy(path, id3->path, sizeof(path));
+    int n = 0;
 
     if (global_settings.wps_art_source == WPS_ART_ARTIST)
         cand[n++] = track_folder_hash(path, true);
@@ -1091,6 +1143,28 @@ static bool palette_from_cache(void)
         }
         cand[n++] = track_folder_hash(path, false);
     }
+    return n;
+}
+
+static bool palette_from_cache(void)
+{
+    unsigned int cand[2];
+    char path[MAX_PATH];
+    struct mp3entry *id3;
+    unsigned int miss_key;
+    int n, i, dim;
+
+    dim = palette_dim();
+    if (dim == 0)
+        return false;
+
+    /* audio_current_track() hands back the engine's live entry, not a copy,
+     * so take what is needed out of it before doing anything else. */
+    id3 = audio_current_track();
+    if (!id3 || !id3->path[0])
+        return false;
+    strmemccpy(path, id3->path, sizeof(path));
+    n = palette_candidates(path, cand);
 
     /* The negative cache is keyed on the album folder whichever candidate was
      * tried, because that is the one hash every setting can compute: it only has
@@ -1362,6 +1436,47 @@ static void track_change_cb(unsigned short id, void *param)
         cache.track_change_tick = current_tick;
 }
 
+/* A track has been buffered, so the disk is running: work out its palette
+ * now, while reading the thumbnail costs no spin-up, rather than at the track
+ * change -- with the screen dark that read would land on the first render
+ * after it wakes and hold the screen up for a spin-up. Runs on the audio
+ * thread. The first candidate that reads is the one palette_from_cache()
+ * would settle on too. */
+static void track_buffer_cb(unsigned short id, void *param)
+{
+    struct mp3entry *id3 = ((struct track_event *)param)->id3;
+    struct found_palette p;
+    unsigned int cand[2];
+    char path[MAX_PATH];
+    int n, i, dim;
+
+    (void)id;
+    if (!global_settings.dynamic_colors || audio_is_unrecorded() ||
+        !id3 || !id3->path[0])
+        return;
+    dim = palette_dim();
+    if (dim == 0)
+        return;
+
+    strmemccpy(path, id3->path, sizeof(path));
+    n = palette_candidates(path, cand);
+    for (i = 0; i < n; i++)
+    {
+        if (cand[i] == 0)
+            continue;
+        if (cand[i] == global_status.resume_art_hash ||
+            prefetched_find(cand[i], NULL))
+            return;
+        if (read_folder_palette(cand[i], dim, &p))
+        {
+            prefetched[prefetch_next].hash = cand[i];
+            prefetched[prefetch_next].p = p;
+            prefetch_next = (prefetch_next + 1) % PREFETCH_SLOTS;
+            return;
+        }
+    }
+}
+
 static void save_all_theme_colors(void)
 {
     cache.theme_fg  = global_settings.fg_color;
@@ -1380,6 +1495,8 @@ void dynamic_colors_init(void)
 
     if (!events_registered)
     {
+        mutex_init(&palette_lock);
+        add_event(PLAYBACK_EVENT_TRACK_BUFFER, track_buffer_cb);
         add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_change_cb);
         add_event(PLAYBACK_EVENT_CUR_TRACK_READY, track_change_cb);
         events_registered = true;
