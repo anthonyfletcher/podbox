@@ -51,6 +51,16 @@ const int spectrum_band_freq_hz[SPECTRUM_MAX_BANDS] =
     60, 150, 400, 1000, 2500, 4000, 7000, 12000
 };
 
+/* Each band's gain in Q8: sqrt(freq / 500Hz), doubled for the long-window
+ * bands. A band reads one Goertzel bin, as wide in Hz at 12kHz as at 60Hz,
+ * while music spreads its energy evenly per octave, so +3dB an octave levels
+ * pink noise across the bars; a bin a quarter as wide holds half the
+ * amplitude. Recompute it with the table above. */
+static const short band_gain_q8[SPECTRUM_MAX_BANDS] =
+{
+    177, 280, 229, 362, 572, 724, 958, 1254
+};
+
 /* Smoothed 0-100 level per band, held apart for each channel (0 = left,
  * 1 = right). Both banks always run: a stereo display reads them apart,
  * and the mono one averages them. */
@@ -294,6 +304,7 @@ void spectrum_meter_peek(void)
             int raw = spectrum_goertzel_at(pcm + channel,
                                            SPECTRUM_BLOCK_SIZE, 2,
                                            band_coeff[band]);
+            raw = (raw * band_gain_q8[band]) >> 8;
 
             advance_band(channel, band, spectrum_scale_to_level(raw));
         }
@@ -306,6 +317,7 @@ void spectrum_meter_peek(void)
             int raw = spectrum_goertzel_at(pcm + channel,
                                            SPECTRUM_LOW_BLOCK, 2,
                                            band_coeff[band]);
+            raw = (raw * band_gain_q8[band]) >> 8;
 
             advance_band(channel, band, spectrum_scale_to_level(raw));
         }

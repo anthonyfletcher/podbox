@@ -190,7 +190,8 @@ static void draw_rounded_rect(struct screen *display,
 #define WT_MAX_LINES 8
 #define WT_BUF 512
 
-/* Truncate line so line + "..." fits maxwidth, then append the "...". */
+/* Truncate line so line + "..." fits maxwidth, then append the "..." after
+ * the last character that is not a space or ,;:. ("York..." not "York...."). */
 static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
 {
     int ellw = 3 * font_get_width(pf, '.');
@@ -213,6 +214,8 @@ static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
         width += font_get_width(pf, ch);
         cut = p;
     }
+    while (cut > (unsigned char *)line && strchr(" ,;:.", cut[-1]))
+        cut--;
     if ((cut - (unsigned char *)line) + 4 <= size)
         strcpy((char *)cut, "...");
     else if (size >= 4)
@@ -223,6 +226,9 @@ static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
  * (valign t/c/b) and each line horizontally (halign l/c/r), ellipsise if it
  * overflows the height, and draw it. Wrapping is one forward pass (as %wr):
  * accumulate pixel width, remember the last space, break there on overflow.
+ * A line break in the text (\n, \r\n or \r) ends a line, so a tag can carry
+ * paragraphs. On overflow the last line runs on to the end of its paragraph
+ * and wt_ellipsize() cuts it at the width, mid-word if need be.
  *
  * noinline and with its own buffers so the ~1KB of scratch lives here, on the
  * stack only while a %wt actually renders -- NOT baked into do_non_text_tags's
@@ -244,6 +250,7 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     const char *text;
     const unsigned char *p;
     bool overflow;
+    int len;
 
     display->set_viewport(vp);
     display->clear_viewport();          /* box may have held a longer title */
@@ -261,6 +268,12 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
         return;
     if (text != src)
         strmemccpy(src, text, sizeof(src));
+    /* a trailing line break would draw as an empty last line */
+    len = strlen(src);
+    while (len > 0 && (src[len - 1] == '\n' || src[len - 1] == '\r'))
+        src[--len] = '\0';
+    if (!len)
+        return;
 
     maxlines = vp->height / fh;
     if (maxlines < 1) maxlines = 1;
@@ -278,6 +291,12 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
             const unsigned char *prev = cursor;
             cursor = utf8decode(cursor, &ch);
             if (ch == 0) { lend = next = prev; break; }
+            if (ch == '\n' || ch == '\r')
+            {
+                lend = prev;
+                next = (ch == '\r' && *cursor == '\n') ? cursor + 1 : cursor;
+                break;
+            }
             if (IS_DIACRITIC(ch)) continue;
             if (ch == ' ') last_space = prev;
             width += font_get_width(pf, ch);
@@ -304,10 +323,13 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     for (i = 0; i < nlines; i++)
     {
         int w, h, x = 0;
-        int len = llen[i] < WT_BUF ? llen[i] : WT_BUF - 1;
+        bool last = overflow && i == nlines - 1;
+        len = last ? (int)strcspn(lstart[i], "\r\n") : llen[i];
+        if (len >= WT_BUF)
+            len = WT_BUF - 1;
         memcpy(line, lstart[i], len);
         line[len] = '\0';
-        if (overflow && i == nlines - 1)
+        if (last)
             wt_ellipsize(line, WT_BUF, pf, vp->width);
         display->getstringsize((const unsigned char *)line, &w, &h);
         if (tb->halign == 'r')      x = vp->width - w;

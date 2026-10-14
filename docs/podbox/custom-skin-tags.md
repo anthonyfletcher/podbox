@@ -188,6 +188,11 @@ alignment possible.
 **Eight lines at most.** A block that wraps past eight is cut there whatever the
 viewport has room for, so a tall box wanting more lines than that needs `%wr`.
 
+**Line breaks in the text are kept**, so a multi-paragraph comment shows as
+paragraphs, and a blank line between them shows as a blank line. Each one counts
+towards the eight. When the text overflows, the last line runs right up to the
+`...`, so a word may be cut partway.
+
 Because it fills the viewport, `%wt` goes *on* the viewport, not on its own
 content line:
 
