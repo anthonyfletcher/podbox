@@ -524,6 +524,17 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
         case USB_LOG_IAP2_EVENT:
             usb_log_format_iap2_event(e, p, size);
             break;
+        case USB_LOG_IAP_ERROR:
+        {
+            const char *fmt = (const char *)(uintptr_t)e->d;
+
+            /* libiap's warn() puts its own location first */
+            if (!strncmp(fmt, "%s:%d: ", 7))
+                fmt += 7;
+            snprintf(p, size, "iap ERROR %s:%u: %s",
+                     (const char *)(uintptr_t)e->c, e->b, fmt);
+            break;
+        }
 #endif
         case USB_LOG_SYNC:
             snprintf(p, size, "log on disk after %lu ms%s",

@@ -153,6 +153,7 @@ iAP2.
 | `export/usb.h`, `usb.c` | The insertion record and waypoints | **Debug → USB info**: whether a connect that did nothing was charging-only or a stuck handover. |
 | `usbstack/usb_core.c` | `usb_log()` calls and waypoints in the handlers | Not on the notify path: the ARC driver calls `usb_core_bus_reset()` from its ISR and posts nothing. |
 | `usbstack/iap/debug.c`, `debug.h` | New `iap_log_report()`: the iAP packet a HID report starts, to the USB log, with an IdentifyDeviceLingoes's options on a line of their own | The log decodes iAP. |
+| `usbstack/iap/macros.h`, `platform-macros.h`, `export/usb_log.h` | USB iAP's `ERROR()` and libiap's `IAP_ERRORF()` write a `USB_LOG_IAP_ERROR` entry -- function, line and format string -- instead of a `logf` | Neither player has logf. The message's arguments are dropped: the ring holds only static strings. |
 
 ## firmware/ — USB, host side
 
@@ -228,7 +229,6 @@ other decline sits in a file this fork edits, so it conflicts on merge.
 | --- | --- | --- |
 | `export/config/ipod6g.h` | `HAVE_RECORDING` commented out | No recording UI ships. |
 | `export/config/ipod6g.h` | `PLUGIN_BUFFER_SIZE` 2 MiB → 3 MiB | The core scratch buffer (`apps-ipod/system/app_buffer.c`) keeps the name. |
-| `export/config/ipod6g.h` | `ROCKBOX_HAS_LOGF` for non-bootloader builds | Upstream defines it only in the bootloader block. It feeds **Debug > Log file**; `MAX_LOGF_SIZE` stays upstream's 16 KB. |
 | `export/system.h` | `CPU_BOOST_LOGGING` off on `IPOD_6G` outside a `DEBUG` build | Nothing shows the boost log, which costs 16 KB of `.bss` and a `snprintf` on every boost. |
 | `export/config/ipod6g.h` | `TARGET_EXTRA_THREADS` 2 with both `IPOD_ACCESSORY_PROTOCOL` and `HAVE_MIKEY_REMOTE`, else 1 | Upstream adds the remote's poller without a thread for it. Short by one, the feature is silently absent. `__threads` should measure 19. |
 | `export/config/ipodvideo.h` | `HAVE_COMPOSITE_VIDEO_OUT` and new `HAVE_VIDEOOUT_STANDARD`, outside the bootloader | **TV Out**, and the 5G's PAL/NTSC choice. See *TV output*. |

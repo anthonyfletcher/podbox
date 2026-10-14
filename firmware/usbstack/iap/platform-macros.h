@@ -20,6 +20,7 @@
 #pragma once
 #include <usb_drv.h>
 
+#include "usb_log.h"
 #include "debug.h"
 
 #if DEBUG_ENABLE_INFO == 1
@@ -27,7 +28,7 @@
 #endif
 
 #if DEBUG_ENABLE_ERROR == 1
-#define IAP_ERRORF(fmt, ...) logf("%lu " fmt, iap_debug_timestamp() __VA_OPT__(, __VA_ARGS__))
+#define IAP_ERRORF(fmt, ...) USB_LOG_IAP_ERROR_AT(fmt __VA_OPT__(, __VA_ARGS__))
 #endif
 
 #define IAP_ARTWORK_WIDTH  128

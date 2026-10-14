@@ -116,7 +116,24 @@ enum usb_log_type
     USB_LOG_IAP_RATES,   /* RetAccessorySampleRateCaps: a = accepted,
                           * b = rates listed, c = which of 48, 44.1 and
                           * 32 kHz, bits 0 to 2 */
+    USB_LOG_IAP_ERROR,   /* USB iAP's error report: b = line, c = function,
+                          * d = format, both static strings; the format's
+                          * arguments are not kept */
 };
+
+/* An error report from USB iAP. The arguments go to a call that never runs,
+ * so a variable kept only for the message stays used. */
+static inline void usb_log_iap_error_args(int unused, ...)
+{
+    (void)unused;
+}
+#define USB_LOG_IAP_ERROR_AT(fmt, ...)                                      \
+    do {                                                                    \
+        if (0)                                                              \
+            usb_log_iap_error_args(0 __VA_OPT__(, __VA_ARGS__));            \
+        usb_log(USB_LOG_IAP_ERROR, 0, __LINE__,                             \
+                (uint32_t)(uintptr_t)__func__, (uint32_t)(uintptr_t)(fmt)); \
+    } while (0)
 
 #define USB_LOG_SETUP_DROPPED  1 /* arrived during a bus reset; ignored */
 #define USB_LOG_SETUP_QUEUED   2 /* arrived mid-request; handled after it */
