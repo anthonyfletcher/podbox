@@ -28,8 +28,9 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
  * only to produce a log line. */
 bool debug_log_enabled(enum debug_log_id id);
 
-/* Truncate the file and write a session header. Called when the setting is
- * switched on, so each run starts from a readable point. */
-void debug_log_restart(enum debug_log_id id);
+/* Append a session header, `what` saying what began it ("started" at boot,
+ * "switched on" from the setting). The file keeps every earlier session, so
+ * a run that ended in a crash is still there after the reboot. */
+void debug_log_header(enum debug_log_id id, const char *what);
 
 #endif /* _DEBUG_LOG_H */

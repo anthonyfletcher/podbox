@@ -21,6 +21,7 @@
 #include "usb_ch9.h"
 #include "usb_log.h"
 #include "version.h"
+#include "timefuncs.h"
 #include "settings/settings.h"
 #include "usb_log_file.h"
 
@@ -234,8 +235,9 @@ static void usb_log_format_iap2_event(const struct usb_log_entry *e, char *p,
 }
 #endif
 
-void usb_log_file_format(const struct usb_log_entry *e, char *buf,
-                         size_t size)
+/* us is the entry's stamp, widened by the caller where it can be. */
+static void format_entry(const struct usb_log_entry *e, uint64_t us,
+                         char *buf, size_t size)
 {
     static const char * const eptypes[] = { "ctl", "iso", "bulk", "int" };
     static const char * const audio[] = {
@@ -243,8 +245,8 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
         "stream stop", "first packet", "prebuffered, playing",
         "UNDERFLOW", "OVERFLOW", "playback started on USB thread" };
     int n = snprintf(buf, size, "%4lu.%06lu ",
-                     (unsigned long)(e->us / 1000000),
-                     (unsigned long)(e->us % 1000000));
+                     (unsigned long)(us / 1000000),
+                     (unsigned long)(us % 1000000));
     char *p = buf + n;
     size -= n;
 
@@ -532,11 +534,31 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
     }
 }
 
+void usb_log_file_format(const struct usb_log_entry *e, char *buf,
+                         size_t size)
+{
+    format_entry(e, e->us, buf, size);
+}
+
 /* ---- the file ----------------------------------------------------------- */
 
 /* The screen writes from the UI thread and the writer from its own; the lock
  * keeps one from appending lines the other is about to write again. */
 static struct mutex file_mutex;
+
+/* The entries' 32-bit stamps wrap every 71.6 minutes; the file carries the
+ * wraps so its times keep rising through a long car session. A gap of more
+ * than 71 minutes between two written entries hides a wrap. */
+static uint32_t last_us;
+static uint32_t us_wraps;
+
+static uint64_t widen_us(uint32_t us)
+{
+    if (us < last_us)
+        us_wraps++;
+    last_us = us;
+    return (uint64_t)us_wraps << 32 | us;
+}
 
 void usb_log_file_write(void)
 {
@@ -562,7 +584,7 @@ void usb_log_file_write(void)
     {
         if (!usb_log_read(seq, &e))
             continue;
-        usb_log_file_format(&e, line, sizeof line);
+        format_entry(&e, widen_us(e.us), line, sizeof line);
         fdprintf(fd, "%s\n", line);
     }
     close(fd);
@@ -581,9 +603,13 @@ static void write_header(const char *what)
     fd = open(USB_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0666);
     if (fd >= 0)
     {
-        fdprintf(fd, "== USB Log %s: %s %s, USB mode %d, USB HID %d",
-                 what, MODEL_NAME, rbversion, global_settings.usb_mode,
-                 (int)global_settings.usb_hid);
+        struct tm *tm = get_time();
+
+        fdprintf(fd, "== USB Log %s: %s %s, %04d-%02d-%02d %02d:%02d:%02d, "
+                 "USB mode %d, USB HID %d", what, MODEL_NAME, rbversion,
+                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+                 tm->tm_hour, tm->tm_min, tm->tm_sec,
+                 global_settings.usb_mode, (int)global_settings.usb_hid);
 #ifdef USB_ENABLE_AUDIO
         fdprintf(fd, ", USB Sound Card %d%s", global_settings.usb_audio,
                  usb_audio_buffers_ready() ? "" : " (no buffers)");
@@ -591,7 +617,14 @@ static void write_header(const char *what)
 #ifdef HAVE_USB_HOST_AUDIO
         fdprintf(fd, ", USB DAC Output %d", global_settings.usb_dac_output);
 #endif
-        fdprintf(fd, "\n");
+        /* What a dock or a car is offered */
+        fdprintf(fd, ", Accessory Protocol %d",
+                 (int)global_settings.iap_enabled);
+#ifdef USB_ENABLE_IAP
+        fdprintf(fd, ", iPhone Accessories %d, Identify As %d",
+                 global_settings.iap2_mode, global_settings.iap_identity);
+#endif
+        fdprintf(fd, ", Car Artwork %d\n", global_settings.car_artwork);
         close(fd);
     }
     mutex_unlock(&file_mutex);

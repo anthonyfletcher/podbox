@@ -370,9 +370,10 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
         say("", msg);
 }
 
-void debug_log_restart(enum debug_log_id id)
+void debug_log_header(enum debug_log_id id, const char *what)
 {
     (void)id;
+    (void)what;
 }
 
 /* A broken invariant in buflib or the pass: stop before writing more */

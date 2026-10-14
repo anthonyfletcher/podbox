@@ -695,13 +695,13 @@ static void wps_art_source_callback(int mode)
 static void debug_log_tagcache_callback(bool on)
 {
     if (on)
-        debug_log_restart(DEBUG_LOG_TAGCACHE);
+        debug_log_header(DEBUG_LOG_TAGCACHE, "switched on");
 }
 
 static void debug_log_artcache_callback(bool on)
 {
     if (on)
-        debug_log_restart(DEBUG_LOG_ARTCACHE);
+        debug_log_header(DEBUG_LOG_ARTCACHE, "switched on");
 }
 
 /* perform shuffle/unshuffle of the current playlist based on the boolean provided */

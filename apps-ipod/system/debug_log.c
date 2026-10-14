@@ -67,14 +67,7 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     close(fd);
 }
 
-void debug_log_restart(enum debug_log_id id)
+void debug_log_header(enum debug_log_id id, const char *what)
 {
-    if (id >= DEBUG_LOG_COUNT || !debug_log_enabled(id))
-        return;
-
-    int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd >= 0)
-        close(fd);
-
-    debug_log(id, "--- log started, %s ---", log_info[id].name);
+    debug_log(id, "--- log %s, %s ---", what, log_info[id].name);
 }
