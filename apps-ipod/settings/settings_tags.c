@@ -206,7 +206,7 @@ static const struct tag_row tag_rows[] = {
 { "generated playlist length", TAG_LIBRARY|TAG_PLAYLIST,         "tracks how many size mood similar" },
 { "mix starts with selected",  TAG_LIBRARY|TAG_PLAYLIST,         "similar wind down first seed" },
 { "continue playing",          TAG_LIBRARY|TAG_PLAYLIST,         "keep going endless extend never stop" },
-{ "debug log tagcache",        TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE, "log debug" },
+{ "debug log tagcache",        TAG_ADVANCED|TAG_LIBRARY|TAG_DATABASE|TAG_SYSTEM, "log debug scan" },
 { "search max rows",     TAG_LIBRARY,                            "search find results" },
 { "search min letters",  TAG_LIBRARY,                            "search find letters" },
 { "search order",        TAG_LIBRARY,                            "search find order" },
@@ -221,7 +221,7 @@ static const struct tag_row tag_rows[] = {
 /* --- artwork ------------------------------------------------------------- */
 { "art cache album source", TAG_ARTWORK,                         "thumbnail cache embedded cover folder" },
 { "art cache fast build",TAG_ADVANCED|TAG_ARTWORK,               "thumbnail cache" },
-{ "debug log artcache",  TAG_ADVANCED|TAG_ARTWORK,               "log debug thumbnail" },
+{ "debug log artcache",  TAG_ADVANCED|TAG_ARTWORK|TAG_SYSTEM,    "log debug thumbnail cover" },
 { "database album art",  TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows cover thumbnail" },
 { "database artist art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows photo thumbnail" },
 { "database audiobook art", TAG_ARTWORK|TAG_APPEARANCE|TAG_LIBRARY, "art rows book cover thumbnail" },
@@ -401,6 +401,7 @@ static const struct tag_row tag_rows[] = {
 { "usb-dac",             TAG_ADVANCED|TAG_USB|TAG_SYSTEM|TAG_SOUND, "usb dac audio sound card computer" },
 { "usb dac output",      TAG_USB|TAG_SYSTEM|TAG_PLAYBACK,        "usb dac audio dongle amp headphone output start automatically" },
 { "debug log usb",       TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "log debug usb car accessory" },
+{ "debug log expiry",    TAG_ADVANCED|TAG_SYSTEM,                "log debug switch off expire hours" },
 
 /* --- voice --------------------------------------------------------------- */
 { "talk menu",           TAG_VOICE,                              "voice speak menus" },

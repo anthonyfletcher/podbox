@@ -158,7 +158,6 @@ MENUITEM_SETTING(art_cache_fast_build, &global_settings.art_cache_fast_build,
 MENUITEM_SETTING(art_cache_album_source,
                  &global_settings.art_cache_album_source, NULL);
 
-MENUITEM_SETTING(debug_log_artcache, &global_settings.debug_log_artcache, NULL);
 
 /* What the last completed pass could find no artwork for. The counts have
  * always been in Background Tasks; these are the folders behind them. */
@@ -182,8 +181,7 @@ MAKE_MENU(art_cache_menu, ID2P(LANG_ART_CACHE_MENU), NULL, Icon_NOICON,
             &art_cache_album_source,
             &art_cache_fast_build,
             &art_health_albums_item,
-            &art_health_artists_item,
-            &debug_log_artcache);
+            &art_health_artists_item);
 
 /* The chain the slides are drawn through, one slot at a time in the order
  * listed. Cover Flow's own rather than shared with the browser rows: it is not

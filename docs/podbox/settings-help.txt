@@ -104,7 +104,8 @@ the backlight or screen on, and with the disk running. For working out what a
 fast drain was spent on.
 
 The log waits until the disk is about to sleep, so it never spins the disk up
-itself. It costs a little CPU every tick; leave it off otherwise.
+itself. It costs a little CPU every tick, and switches itself off after the
+time set in Switch Off After.
 
 [storage mode]
 Tells power management what kind of drive is fitted, which decides whether it
@@ -695,8 +696,11 @@ Shows each album's release year in the Music lists, before or after its name,
 so a discography reads in order at a glance. The carousel has its own setting.
 
 [debug log tagcache]
-Writes scan progress to a log file. For working out why a track is missing from
-the database.
+Writes database scan progress to tagcache.log in the .rockbox/logs folder. For
+working out why a track is missing from the database.
+
+Lines wait in memory until the disk is about to sleep, so a crash can lose the
+last few. Switches itself off after the time set in Switch Off After.
 
 [search max rows]
 How many results a search keeps. More results take longer to scroll than to
@@ -768,8 +772,11 @@ from it, instead of decoding once per size.
 Much faster, slightly softer. Applies only to thumbnails made from now on.
 
 [debug log artcache]
-Writes thumbnail generation to a log file. For working out why a particular
-album has no art.
+Writes thumbnail generation to art.log in the .rockbox/logs folder, with a line
+for each album or artist left without art and the reason. For working out why
+a particular album has no art.
+
+Switches itself off after the time set in Switch Off After.
 
 [database album art]
 Draws album thumbnails beside the rows in the database browser. Needs a theme
@@ -1377,9 +1384,22 @@ Turn On beside this. Off leaves every cable to the computer and charging.
 Writes every USB connection step to usb.log in the .rockbox/logs folder,
 without the USB Log debug screen open. For working out why a computer, dock or
 car will not connect. It writes to the disk whenever the log grows, and
-connection steps wait for the log to reach the disk, which can slow them; leave
-it off otherwise. With a car, it also records every five seconds how much audio
-the car took.
+connection steps wait for the log to reach the disk, which can slow them. With
+a car, it also records every five seconds how much audio the car took.
+
+Switches itself off after the time set in Switch Off After.
+
+[debug log expiry]
+How long the debug logs stay on, counted only while the player is on. When the
+time is up every log switches itself off, and a message says so. Switching a
+log on starts the count again.
+
+Never keeps them on until they are switched off by hand, for chasing a fault
+that comes and goes.
+
+[action: Turn All Off]
+Switches every debug log off at once. The files stay in the .rockbox/logs
+folder.
 
 [talk menu]
 Speaks menu entries aloud. Needs a voice file on the player.

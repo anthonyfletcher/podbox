@@ -2,8 +2,9 @@
  * GNU General Public License (version 2+)
  *
  * The diagnostic logs in .rockbox/logs, and what they share: one header
- * format, rotation at DEBUG_LOG_CAP, a "lines lost" marker, and a switch per
- * log that a setting holds.
+ * format, rotation at DEBUG_LOG_CAP, a "lines lost" marker, a switch per
+ * log that a setting holds, and Switch Off After, which turns every log off
+ * once they have been on for that long with the player on.
  *
  * Two ways to write. debug_log() is for a worker's progress lines: each is
  * stamped with the tick and held in RAM until the disk is about to sleep or
@@ -23,6 +24,7 @@ enum debug_log_id {
     DEBUG_LOG_USB,
     DEBUG_LOG_BATTERY,
     DEBUG_LOG_MIKEY,
+    DEBUG_LOG_METADATA,
     DEBUG_LOG_COUNT,
 };
 
@@ -55,9 +57,26 @@ void debug_log_lost(enum debug_log_id id, int fd, unsigned long n,
                     const char *why);
 
 /* Bring every log into line with its setting: a header for one switched on,
- * its held lines for one switched off. The settings' callback, and run after
- * Reset Settings, which calls no callback. */
+ * its held lines and a last line for one switched off. The settings'
+ * callback, and run after Reset Settings, which calls no callback. Switching
+ * one on starts the count towards Switch Off After again. */
 void debug_log_apply(void);
+
+/* Every log off, as Turn All Off does */
+void debug_log_all_off(void);
+
+bool debug_log_any_on(void);
+
+/* Minutes before the logs switch themselves off; -1 if none is on or they
+ * never do */
+int debug_log_minutes_left(void);
+
+/* Bytes in every log file and its rotated copy */
+unsigned long debug_log_files_size(void);
+
+/* From the root menu: the splash for logs that have just switched themselves
+ * off, or at `boot`, the reminder that some are on. */
+void debug_log_notice(bool boot);
 
 /* After settings_load(), before anything logs. */
 void debug_log_init(void);

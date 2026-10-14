@@ -52,6 +52,7 @@
 #include "system/format_time.h"
 #include "system/volume.h"
 #include "system/app_util.h"     /* charging_splash */
+#include "system/debug_log.h"
 #include "pathfuncs.h"
 #include "screens/system/sound_library.h"
 #include "screens/system/sound_scan.h"
@@ -95,11 +96,10 @@ MENUITEM_FUNCTION(tc_import, MENU_ADVANCED, ID2P(LANG_TAGCACHE_IMPORT),
 MENUITEM_FUNCTION(tc_paths, MENU_ADVANCED, ID2P(LANG_SELECT_DATABASE_DIRS),
                   dirs_to_scan, NULL, Icon_NOICON);
 
-MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
 MAKE_MENU(tagcache_menu, ID2P(LANG_TAGCACHE), 0, Icon_NOICON,
                 &tagcache_scan_on_startup, &tagcache_scan_on_eject,
                 &tc_paths, &year_from_folder,
-                &tc_export, &tc_import, &debug_log_tagcache
+                &tc_export, &tc_import
                 );
 
 /** Library maintenance **/
@@ -385,7 +385,6 @@ static int filemenu_callback(int action,
 #if BATTERY_CAPACITY_INC > 0
 MENUITEM_SETTING(battery_capacity, &global_settings.battery_capacity, NULL);
 #endif
-MENUITEM_SETTING(debug_log_battery, &global_settings.debug_log_battery, NULL);
 
 static int usbcharging_callback(int action,
                                 const struct menu_item_ex *this_item,
@@ -613,12 +612,77 @@ static int usb_audio_callback(int action,
 }
 MENUITEM_SETTING(usb_audio, &global_settings.usb_audio, usb_audio_callback);
 #endif
+
+MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
+
+/* Every diagnostic log's switch in one place, and how long they stay on */
+MENUITEM_SETTING(debug_log_tagcache, &global_settings.debug_log_tagcache, NULL);
+MENUITEM_SETTING(debug_log_artcache, &global_settings.debug_log_artcache, NULL);
 #ifdef HAVE_USBSTACK
 MENUITEM_SETTING(debug_log_usb, &global_settings.debug_log_usb, NULL);
 #endif
+MENUITEM_SETTING(debug_log_battery, &global_settings.debug_log_battery, NULL);
+MENUITEM_SETTING(debug_log_expiry, &global_settings.debug_log_expiry, NULL);
 
+static char *debug_log_left_name(int selected_item, void *data, char *buffer,
+                                 size_t buffer_len)
+{
+    int left = debug_log_minutes_left();
 
-MENUITEM_SETTING(show_debug_menu, &global_settings.show_debug_menu, NULL);
+    (void)selected_item;
+    (void)data;
+    if (left >= 0)
+    {
+        snprintf(buffer, buffer_len, str(LANG_DEBUG_LOG_LEFT),
+                 left / 60, left % 60);
+        return buffer;
+    }
+    return str(debug_log_any_on() ? LANG_DEBUG_LOG_STAY_ON
+                                  : LANG_DEBUG_LOG_NONE_ON);
+}
+
+static char *debug_log_files_name(int selected_item, void *data, char *buffer,
+                                  size_t buffer_len)
+{
+    char size[16];
+
+    (void)selected_item;
+    (void)data;
+    output_dyn_value(size, sizeof size, debug_log_files_size(), byte_units,
+                     4, true);
+    snprintf(buffer, buffer_len, str(LANG_DEBUG_LOG_FILES), size);
+    return buffer;
+}
+
+static int debug_log_nothing(void)
+{
+    return 0;
+}
+
+static int debug_log_all_off_item(void)
+{
+    debug_log_all_off();
+    return 0;
+}
+
+MENUITEM_FUNCTION_DYNTEXT(debug_log_left, 0, debug_log_nothing,
+                          debug_log_left_name, NULL, NULL, NULL, Icon_NOICON);
+MENUITEM_FUNCTION_DYNTEXT(debug_log_files, 0, debug_log_nothing,
+                          debug_log_files_name, NULL, NULL, NULL, Icon_NOICON);
+MENUITEM_FUNCTION(debug_log_all_off_func, 0, ID2P(LANG_DEBUG_LOG_ALL_OFF),
+                  debug_log_all_off_item, NULL, Icon_NOICON);
+
+MAKE_MENU(debug_logs_menu, ID2P(LANG_DEBUG_LOG), 0, Icon_NOICON,
+            &debug_log_tagcache,
+            &debug_log_artcache,
+#ifdef HAVE_USBSTACK
+            &debug_log_usb,
+#endif
+            &debug_log_battery,
+            &debug_log_expiry,
+            &debug_log_left,
+            &debug_log_files,
+            &debug_log_all_off_func);
 
 /* What the player does when something is plugged into it. */
 MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
@@ -630,9 +694,6 @@ MAKE_MENU(usb_menu, ID2P(LANG_USB), 0, Icon_NOICON,
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
             &usb_dac_menu,
-#endif
-#ifdef HAVE_USBSTACK
-            &debug_log_usb,
 #endif
          );
 
@@ -797,8 +858,7 @@ MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
 #if BATTERY_CAPACITY_INC > 0
             &battery_capacity,
 #endif
-            &car_adapter_mode_menu,
-            &debug_log_battery);
+            &car_adapter_mode_menu);
 
 
 /** Bookmark menu **/
@@ -1211,4 +1271,5 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
             &language_menu,
             &manage_settings,
             &show_debug_menu,
+            &debug_logs_menu,
          );

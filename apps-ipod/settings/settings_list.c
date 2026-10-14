@@ -800,6 +800,7 @@ const struct settings_list settings[] = {
     SYSTEM_STATUS(0, runtime,         0,     "CRT"),
     SYSTEM_STATUS(0, topruntime,      0,     "TRT"),
     SYSTEM_STATUS(0, last_screen,    -1,     "PVS"),
+    SYSTEM_STATUS(0, debug_log_minutes, 0,   "DLM"),
 /* sound settings */
     CUSTOM_SETTING(F_NO_WRAP, volume_limit, LANG_VOLUME_LIMIT,
                   NULL, "volume limit",
@@ -969,7 +970,7 @@ const struct settings_list settings[] = {
 #endif
     /* Diagnostics: .rockbox/logs/battery.csv, one line a minute. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
-                  debug_log_battery, LANG_DEBUG_LOG, false,
+                  debug_log_battery, LANG_DEBUG_LOG_BATTERY, false,
                   "debug log battery", debug_log_callback),
     OFFON_SETTING(0, car_adapter_mode,
                   LANG_CAR_ADAPTER_MODE, false, "car adapter mode", NULL),
@@ -1837,11 +1838,17 @@ const struct settings_list settings[] = {
      * .rockbox/logs/tagcache.log and art.log. Both drive the same
      * "Building" indicator, so when it will not go away these say which. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
-                  debug_log_tagcache, LANG_DEBUG_LOG, false,
+                  debug_log_tagcache, LANG_DEBUG_LOG_TAGCACHE, false,
                   "debug log tagcache", debug_log_callback),
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
-                  debug_log_artcache, LANG_DEBUG_LOG, false,
+                  debug_log_artcache, LANG_DEBUG_LOG_ARTCACHE, false,
                   "debug log artcache", debug_log_callback),
+    STRINGCHOICE_SETTING(0, debug_log_expiry, LANG_DEBUG_LOG_EXPIRY, 2,
+                         "debug log expiry",
+                         "1 hour,6 hours,24 hours,7 days,never", NULL, 5,
+                         TALK_ID(1, UNIT_HOUR), TALK_ID(6, UNIT_HOUR),
+                         TALK_ID(24, UNIT_HOUR), TALK_ID(168, UNIT_HOUR),
+                         LANG_NEVER),
     INT_SETTING(0, album_covers_scroll_speed, LANG_SCROLL_SPEED, 175,
                 "album covers scroll speed", UNIT_PERCENT, 100, 400, 25,
                 NULL, NULL, NULL),
@@ -2099,7 +2106,7 @@ const struct settings_list settings[] = {
     /* Diagnostics: keep .rockbox/logs/usb.log current without the debug
      * menu's USB Log screen open. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
-                  debug_log_usb, LANG_DEBUG_LOG, false,
+                  debug_log_usb, LANG_DEBUG_LOG_USB, false,
                   "debug log usb", debug_log_callback),
 #endif
 

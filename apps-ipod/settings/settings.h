@@ -491,6 +491,9 @@ struct system_status
     int font_id[NB_SCREENS]; /* font id of the settings font for each screen */
 
     int resume_modified; /* playlist is modified (=> warn before erase) */
+    /* Minutes the player has been on with a debug log on, towards Switch
+       Off After */
+    int debug_log_minutes;
 };
 
 struct user_settings
@@ -711,6 +714,7 @@ struct user_settings
      * sort_albums_by_values and year_sort_order_values. */
     bool debug_log_tagcache;   /* append tag-database progress to a file */
     bool debug_log_artcache;   /* append art-cache progress to a file */
+    int debug_log_expiry;      /* Switch Off After: 1 h, 6 h, 24 h, 7 d, never */
     int  album_covers_view_mode;  /* CAROUSEL_VIEW_*: tilted, or flat piles */
     /* Flat view only: how far the two piles are blended toward the background,
      * so the cover in the middle stands out. Per cent; 0 leaves them solid. */

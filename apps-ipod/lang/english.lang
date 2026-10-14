@@ -892,16 +892,16 @@
 </phrase>
 <phrase>
   id: LANG_DEBUG_LOG
-  desc: in database, art cache, USB and battery settings
+  desc: in System settings: the menu of diagnostic logs
   user: core
   <source>
-    *: "Write Debug Log"
+    *: "Debug Logs"
   </source>
   <dest>
-    *: "Write Debug Log"
+    *: "Debug Logs"
   </dest>
   <voice>
-    *: "Write Debug Log"
+    *: "Debug Logs"
   </voice>
 </phrase>
 <phrase>
@@ -24188,5 +24188,187 @@
   </dest>
   <voice>
     *: "i Phone 4"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TAGCACHE
+  desc: in Debug Logs: the database's switch
+  user: core
+  <source>
+    *: "Database Log"
+  </source>
+  <dest>
+    *: "Database Log"
+  </dest>
+  <voice>
+    *: "Database Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ARTCACHE
+  desc: in Debug Logs: the art cache's switch
+  user: core
+  <source>
+    *: "Album Art Log"
+  </source>
+  <dest>
+    *: "Album Art Log"
+  </dest>
+  <voice>
+    *: "Album Art Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_USB
+  desc: in Debug Logs: the USB and accessory log's switch
+  user: core
+  <source>
+    *: "USB and Accessory Log"
+  </source>
+  <dest>
+    *: "USB and Accessory Log"
+  </dest>
+  <voice>
+    *: "USB and Accessory Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BATTERY
+  desc: in Debug Logs: the battery log's switch
+  user: core
+  <source>
+    *: "Battery Log"
+  </source>
+  <dest>
+    *: "Battery Log"
+  </dest>
+  <voice>
+    *: "Battery Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRY
+  desc: in Debug Logs: how long logs stay on
+  user: core
+  <source>
+    *: "Switch Off After"
+  </source>
+  <dest>
+    *: "Switch Off After"
+  </dest>
+  <voice>
+    *: "Switch Off After"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ALL_OFF
+  desc: in Debug Logs: switch every log off
+  user: core
+  <source>
+    *: "Turn All Off"
+  </source>
+  <dest>
+    *: "Turn All Off"
+  </dest>
+  <voice>
+    *: "Turn All Off"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_LEFT
+  desc: in Debug Logs: hours and minutes until the logs switch off
+  user: core
+  <source>
+    *: "Switches Off In %d:%02d"
+  </source>
+  <dest>
+    *: "Switches Off In %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_NONE_ON
+  desc: in Debug Logs: no log is on
+  user: core
+  <source>
+    *: "No Log Is On"
+  </source>
+  <dest>
+    *: "No Log Is On"
+  </dest>
+  <voice>
+    *: "No Log Is On"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_STAY_ON
+  desc: in Debug Logs: Switch Off After is Never
+  user: core
+  <source>
+    *: "Logs Stay On"
+  </source>
+  <dest>
+    *: "Logs Stay On"
+  </dest>
+  <voice>
+    *: "Logs Stay On"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_FILES
+  desc: in Debug Logs: the size of every log file together
+  user: core
+  <source>
+    *: "Log Files: %s"
+  </source>
+  <dest>
+    *: "Log Files: %s"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRED
+  desc: splash when the debug logs switch themselves off
+  user: core
+  <source>
+    *: "Debug logs switched off"
+  </source>
+  <dest>
+    *: "Debug logs switched off"
+  </dest>
+  <voice>
+    *: "Debug logs switched off"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT
+  desc: splash at boot: a debug log is on, and off in hours:minutes
+  user: core
+  <source>
+    *: "Debug logs on, off in %d:%02d"
+  </source>
+  <dest>
+    *: "Debug logs on, off in %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT_NEVER
+  desc: splash at boot: a debug log is on and stays on
+  user: core
+  <source>
+    *: "Debug logs on"
+  </source>
+  <dest>
+    *: "Debug logs on"
+  </dest>
+  <voice>
+    *: "Debug logs on"
   </voice>
 </phrase>

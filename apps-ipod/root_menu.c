@@ -25,6 +25,7 @@
 #include "debug.h"
 #include "system/activity.h"
 #include "system/strutil.h"
+#include "system/debug_log.h"
 #include "rolo.h"
 #include "powermgmt.h"
 #include "power.h"
@@ -1701,9 +1702,11 @@ void root_menu(void)
     root_menu_set_audiobooks_row(global_settings.segregate_audiobooks);
     push_current_activity(ACTIVITY_MAINMENU);
     next_screen = root_menu_setup_screens();
+    debug_log_notice(true);
 
     while (true)
     {
+        debug_log_notice(false);
         /* A playlist that ran out, extended here rather than where it ended:
          * this is the UI thread, and the work is seconds of disk. Silent
          * either way -- nobody is looking at the screen when the music

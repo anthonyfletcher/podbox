@@ -509,7 +509,8 @@ bool get_metadata_afmt(struct mp3entry* id3, int fd, const char* trackname, int 
 log_on_exit:
     if (write_metadata_log)
     {
-        logfd = open("/metadata.log", O_WRONLY | O_APPEND | O_CREAT, 0666);
+        logfd = open("/.rockbox/logs/metadata.log",
+                     O_WRONLY | O_APPEND | O_CREAT, 0666);
         if (logfd >= 0)
         {
             write(logfd, trackname, strlen(trackname));

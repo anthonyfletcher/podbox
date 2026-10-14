@@ -101,8 +101,8 @@
 #include "usb_log.h"
 #include "usb_ch9.h"
 #include "system/usb_log_file.h"
-#include "system/debug_log.h"
 #endif
+#include "system/debug_log.h"
 #ifdef HAVE_USB_HOST_AUDIO
 #include "usb_host_audio.h"
 #endif
@@ -1716,6 +1716,7 @@ extern bool write_metadata_log;
 static bool dbg_metadatalog(void)
 {
     write_metadata_log = !write_metadata_log;
+    debug_log_apply();
     splashf(HZ, "Metadata log %sabled", write_metadata_log ? "en" : "dis");
     return false;
 }

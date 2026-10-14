@@ -6,7 +6,8 @@
  * handle kept open over one of those stops the disk being released.
  *
  * Parts: the table of logs and their own header lines; the file (rotation,
- * the common header); the held lines and their flush; the switches.
+ * the common header); the held lines and their flush; the switches; the
+ * count towards switching off.
  ****************************************************************************/
 #include <stdio.h>
 #include <stdarg.h>
@@ -24,6 +25,9 @@
 #include "ata_idle_notify.h"
 #include "dircache.h"
 #include "settings/settings.h"
+#include "lang.h"
+#include "widgets/splash.h"
+#include "system/appevents.h"
 #include "database/tagcache.h"
 #include "system/usb_log_file.h"
 #include "system/battery_log.h"
@@ -69,6 +73,9 @@ static void mikey_state(int fd, const char *m)
 }
 #endif
 
+/* The upstream metadata parser's switch, from the debug menu; not saved */
+extern bool write_metadata_log;
+
 /* Held lines: enough for some fifty, so a scan reaches the disk every fifty
  * files rather than every one. A hang loses what is held. */
 #define HELD_SIZE 4096
@@ -80,7 +87,7 @@ static const struct debug_log_info {
     const char *path;
     const char *name;
     const char *mark;           /* starts every header line */
-    const bool *setting;        /* NULL: written only while a screen is open */
+    bool *setting;              /* NULL: written only while a screen is open */
     void (*state)(int fd, const char *mark);   /* the log's own header */
     void (*switched)(bool on);  /* the owner's, after the module's part */
     char *held;                 /* NULL: written through */
@@ -103,6 +110,9 @@ static const struct debug_log_info {
     [DEBUG_LOG_MIKEY]    = { LIB_LOGS_DIR "/mikey.log", "Mikey remote", "==",
                              NULL, mikey_state, NULL, NULL },
 #endif
+    /* Written by the parser itself: the header is all that comes from here */
+    [DEBUG_LOG_METADATA] = { LIB_METADATA_LOG, "metadata", "==",
+                             &write_metadata_log, NULL, NULL, NULL },
 };
 
 static struct {
@@ -113,6 +123,33 @@ static struct {
 } logs[DEBUG_LOG_COUNT];
 
 static bool ready;              /* debug_log_init() has run */
+
+/* Minutes on, by Switch Off After's index; 0 never */
+static const unsigned short expiry_minutes[] = { 60, 6*60, 24*60, 7*24*60, 0 };
+
+static int expiry_limit(void)
+{
+    unsigned i = global_settings.debug_log_expiry;
+
+    return i < ARRAYLEN(expiry_minutes) ? expiry_minutes[i] : 0;
+}
+
+bool debug_log_any_on(void)
+{
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+        if (debug_log_enabled(id))
+            return true;
+    return false;
+}
+
+int debug_log_minutes_left(void)
+{
+    int limit = expiry_limit();
+
+    if (!limit || !debug_log_any_on())
+        return -1;
+    return MAX(limit - global_status.debug_log_minutes, 0);
+}
 
 bool debug_log_enabled(enum debug_log_id id)
 {
@@ -137,6 +174,16 @@ static void write_header(int fd, enum debug_log_id id, const char *what)
              tm->tm_min, tm->tm_sec,
              tm->tm_year + 1900 < 2020 ? " (clock not set)" : "",
              (long)current_tick, up / 3600, up / 60 % 60);
+    if (debug_log_enabled(id))
+    {
+        int left = debug_log_minutes_left();
+
+        if (left >= 0)
+            fdprintf(fd, "%s switches itself off in %d:%02d\n", m,
+                     left / 60, left % 60);
+        else
+            fdprintf(fd, "%s does not switch itself off\n", m);
+    }
     fdprintf(fd, "%s battery %d%% %d mV, %s\n", m, battery_level(),
              battery_voltage(),
              charging_state() ? "charging"
@@ -302,6 +349,9 @@ void debug_log_header(enum debug_log_id id, const char *what)
 
 /* ---- the switches ------------------------------------------------------- */
 
+/* Why the next log to go off went off, for its last line */
+static const char *off_reason = "";
+
 void debug_log_apply(void)
 {
     if (!ready)
@@ -309,21 +359,143 @@ void debug_log_apply(void)
     for (int id = 0; id < DEBUG_LOG_COUNT; id++)
     {
         bool on = debug_log_enabled(id);
+        int fd;
 
         if (!log_info[id].setting || on == logs[id].on)
             continue;
         logs[id].on = on;
         if (on)
-            debug_log_header(id, "switched on");
-        else if (log_info[id].held)
         {
-            mutex_lock(&logs[id].lock);
-            flush_locked(id);
-            mutex_unlock(&logs[id].lock);
+            /* A log switched on late in another's time gets its own */
+            global_status.debug_log_minutes = 0;
+            status_save(false);
+            debug_log_header(id, "switched on");
+            if (log_info[id].switched)
+                log_info[id].switched(true);
+            continue;
         }
+        /* Off: what it was still holding, then the line saying so */
         if (log_info[id].switched)
-            log_info[id].switched(on);
+            log_info[id].switched(false);
+        fd = debug_log_open(id);
+        if (fd < 0)
+            continue;
+        if (log_info[id].held)
+            flush_into(id, fd);
+        fdprintf(fd, "%s %s log switched off%s\n", log_info[id].mark,
+                 log_info[id].name, off_reason);
+        debug_log_close(id, fd);
     }
+    off_reason = "";
+}
+
+static void all_off(const char *reason)
+{
+    off_reason = reason;
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+        if (log_info[id].setting)
+            *log_info[id].setting = false;
+    settings_save();
+    debug_log_apply();
+}
+
+void debug_log_all_off(void)
+{
+    all_off(" from the menu");
+}
+
+/* ---- the count towards switching off ------------------------------------ */
+
+static struct timeout minute_tmo;
+static volatile bool expire_due;
+static bool expired_notice;     /* a splash is owed */
+static int minutes_saved;
+
+/* In the tick interrupt: counts and flags, and leaves the switching to the UI
+ * thread */
+static int minute_cb(struct timeout *tmo)
+{
+    int limit = expiry_limit();
+
+    (void)tmo;
+    if (limit && debug_log_any_on()
+        && ++global_status.debug_log_minutes >= limit)
+        expire_due = true;
+    return 60*HZ;
+}
+
+/* Every get_action(), so a log expires within a moment of its time even on a
+ * screen left open for hours */
+static void action_cb(unsigned short id, void *data)
+{
+    (void)id;
+    (void)data;
+    if (expire_due)
+    {
+        static char reason[40];
+        int limit = expiry_limit();
+
+        expire_due = false;
+        if (limit && debug_log_any_on())
+        {
+            snprintf(reason, sizeof reason, ", expired after %d:%02d on",
+                     limit / 60, limit % 60);
+            all_off(reason);
+            expired_notice = true;
+        }
+    }
+    /* The count survives a reboot to within ten minutes, without a write
+     * every minute */
+    if (global_status.debug_log_minutes - minutes_saved >= 10
+        || global_status.debug_log_minutes < minutes_saved)
+    {
+        minutes_saved = global_status.debug_log_minutes;
+        status_save(false);
+    }
+}
+
+void debug_log_notice(bool boot)
+{
+    if (expired_notice)
+    {
+        expired_notice = false;
+        splash(2*HZ, ID2P(LANG_DEBUG_LOG_EXPIRED));
+    }
+    else if (boot && debug_log_any_on())
+    {
+        int left = debug_log_minutes_left();
+
+        if (left >= 0)
+            splashf(2*HZ, str(LANG_DEBUG_LOG_BOOT), left / 60, left % 60);
+        else
+            splash(2*HZ, ID2P(LANG_DEBUG_LOG_BOOT_NEVER));
+    }
+}
+
+unsigned long debug_log_files_size(void)
+{
+    unsigned long total = 0;
+    char old[MAX_PATH];
+
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+    {
+        const char *paths[2] = { log_info[id].path, old };
+
+        if (!log_info[id].path)
+            continue;
+        old_path(id, old, sizeof old);
+        for (int i = 0; i < 2; i++)
+        {
+            int fd = open(paths[i], O_RDONLY);
+
+            if (fd >= 0)
+            {
+                total += ffilesize(fd);
+                close(fd);
+            }
+        }
+    }
+    return total;
 }
 
 void debug_log_init(void)
@@ -333,6 +505,9 @@ void debug_log_init(void)
         mutex_init(&logs[id].lock);
         logs[id].on = debug_log_enabled(id);
     }
+    minutes_saved = global_status.debug_log_minutes;
     add_event(DISK_EVENT_SPINUP, disk_idle_cb);
+    add_event(GUI_EVENT_ACTIONUPDATE, action_cb);
+    timeout_register(&minute_tmo, minute_cb, 60*HZ, 0);
     ready = true;
 }

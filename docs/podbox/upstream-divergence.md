@@ -149,7 +149,7 @@ iAP2.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/logs/usb.log` while the debug screen is open or **System → USB → Write Debug Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
+| `usbstack/usb_log.c`, `export/usb_log.h` | A 512-event ring filled from interrupts, written to `/.rockbox/logs/usb.log` while the debug screen is open or **System → Debug Logs → USB and Accessory Log** is on; `usb_log_sync()` waits for the file before a configuration change or stream start | A USB fault is gone by the time anything could look at it. |
 | `export/usb.h`, `usb.c` | The insertion record and waypoints | **Debug → USB info**: whether a connect that did nothing was charging-only or a stuck handover. |
 | `usbstack/usb_core.c` | `usb_log()` calls and waypoints in the handlers | Not on the notify path: the ARC driver calls `usb_core_bus_reset()` from its ISR and posts nothing. |
 | `usbstack/iap/debug.c`, `debug.h` | New `iap_log_report()`: the iAP packet a HID report starts, to the USB log, with an IdentifyDeviceLingoes's options on a line of their own | The log decodes iAP. |
@@ -257,6 +257,7 @@ Serial iAP is `apps-ipod/iap/`. It reaches these firmware files:
 | --- | --- | --- |
 | `rbcodec/metadata/mp4.c`, `metadata.h` | `has_video` on `struct mp3entry`, set only when a `vide` track's first sample entry is moving video (`avc1`/`avc3`/`hvc1`/`hev1`/`mp4v`/`av01`/`vp09`/`encv`) | Tagcache skips music videos, but keeps M4B/M4A files whose `vide` tracks hold only chapter pictures or covers. |
 | `rbcodec/metadata/mp4.c` | `chpl`: reads the version-0 header, and takes a lead trim only from a single record | A chapter list whose first chapter starts after 0:00 had that much audio cut from the start of the book. |
+| `rbcodec/metadata/metadata.c` | **Debug > Metadata log** writes `/.rockbox/logs/metadata.log` instead of `/metadata.log` | Beside the other logs, which head it with the time and version when it is switched on. |
 | `skin_parser/tag_table.c` | `find_custom_tag()` declared **weak** and tried **first** in `find_tag()` | Custom tags are registered from the app layer. First, because upstream's shortest-match search would read `%sel` as `%s`. Weak, so the parser links standalone. |
 | `skin_parser/tag_table.h` | Six new `SKIN_TOKEN_*` members | The token field is a 1-byte enum; the table rows stay in `custom_tags.c`. |
 | `skin_parser/tag_table.h` | `SKIN_REFRESH_SPECTRUM`, in `SKIN_REFRESH_NON_STATIC` | Spectrum lines redraw with time. |

@@ -13,11 +13,12 @@ one that does.
 
 1. Turn on `Settings > Settings Mode` **Everything**, then
    `Settings > System > Show Debug Menu` and
-   `Settings > System > USB > Write Debug Log`
+   `Settings > System > Debug Logs > USB and Accessory Log`
 2. Delete `.rockbox/logs/usb.log` from the iPod if it's there
 3. Connect to the accessory and repeat the problem
-4. Copy `.rockbox/logs/usb.log` off the iPod, then turn `Write Debug Log` off -
-   it slows every USB connection
+4. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
+   one), then turn `USB and Accessory Log` off - it slows every USB
+   connection. It switches itself off after a day if you forget
 
 If `usb.log` has nothing after its `==` header lines, your dock uses the
 serial pins instead. Take a photo of `System > Debug > Serial iAP`

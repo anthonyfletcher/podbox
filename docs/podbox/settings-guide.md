@@ -40,7 +40,8 @@ Settings
 │                              and Maintenance
 ├─ Appearance                  themes, fonts, colours, scrolling and the menus
 ├─ Battery & Power             backlight, brightness, sleep, disk and charging
-├─ System                      USB, accessories, language, time, settings files
+├─ System                      USB, accessories, language, time, settings
+│                              files, and the debug logs
 ├─ Settings Mode               Standard or Everything
 └─ Changed Settings…           everything no longer at its default
 ```
@@ -326,7 +327,6 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | on | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. The next update removes the tracks that are now outside the chosen folders, or inside a folder holding a database.ignore file. | / | **Adv** |
 | Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
-| Write Debug Log | Writes scan progress to a log file. For working out why a track is missing from the database. | off | **Adv** |
 
 ### Library — Playlist Engine
 
@@ -351,7 +351,6 @@ about two times in three.
 |---|---|---|---|
 | Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | image files, then embedded | |
 | Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
-| Write Debug Log | Writes thumbnail generation to a log file. For working out why a particular album has no art. | off | **Adv** |
 
 ### Appearance
 
@@ -535,7 +534,6 @@ Shadow Colour only while there is a shadow to colour.
 | Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
 | Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
 | Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
-| Write Debug Log | Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery voltage and level, and how much of the minute was spent playing, boosted, with the backlight or screen on, and with the disk running. For working out what a fast drain was spent on. The log waits until the disk is about to sleep, so it never spins the disk up itself. It costs a little CPU every tick; leave it off otherwise. | off | **Adv** |
 
 ### Battery & Power — Sleep Timer
 
@@ -574,7 +572,6 @@ Shadow Colour only while there is a shadow to colour.
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
 | USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
-| Write Debug Log | Writes every USB connection step to usb.log in the .rockbox/logs folder, without the USB Log debug screen open. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, and connection steps wait for the log to reach the disk, which can slow them; leave it off otherwise. With a car, it also records every five seconds how much audio the car took. | off | **Adv** |
 
 ### System — USB — USB DAC Output
 
@@ -652,6 +649,22 @@ restart, which costs battery life: restart the player afterwards.
 | Say File Type | Speaks the file's type along with its name. | off | **Adv** |
 | Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | off | **Adv** |
 | Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100 | **Adv** |
+
+### System — Debug Logs
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Database Log | Writes database scan progress to tagcache.log in the .rockbox/logs folder. For working out why a track is missing from the database. Lines wait in memory until the disk is about to sleep, so a crash can lose the last few. Switches itself off after the time set in Switch Off After. | off | **Adv** |
+| Album Art Log | Writes thumbnail generation to art.log in the .rockbox/logs folder, with a line for each album or artist left without art and the reason. For working out why a particular album has no art. Switches itself off after the time set in Switch Off After. | off | **Adv** |
+| USB and Accessory Log | Writes every USB connection step to usb.log in the .rockbox/logs folder, without the USB Log debug screen open. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, and connection steps wait for the log to reach the disk, which can slow them. With a car, it also records every five seconds how much audio the car took. Switches itself off after the time set in Switch Off After. | off | **Adv** |
+| Battery Log | Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery voltage and level, and how much of the minute was spent playing, boosted, with the backlight or screen on, and with the disk running. For working out what a fast drain was spent on. The log waits until the disk is about to sleep, so it never spins the disk up itself. It costs a little CPU every tick, and switches itself off after the time set in Switch Off After. | off | **Adv** |
+| Switch Off After | How long the debug logs stay on, counted only while the player is on. When the time is up every log switches itself off, and a message says so. Switching a log on starts the count again. Never keeps them on until they are switched off by hand, for chasing a fault that comes and goes. | 24 hours | **Adv** |
+| Turn All Off | Switches every debug log off at once. The files stay in the .rockbox/logs folder. | |  |
+
+Below the switches, the menu shows how long is left before the logs switch
+off, and how much space their files take. A log file that reaches 256 KB is
+renamed with `.1` before its extension, replacing the last one, and a new file
+starts; send both when asked for a log.
 
 ---
 
