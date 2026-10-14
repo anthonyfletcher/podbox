@@ -724,7 +724,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                         break;
                     }
-                    audio_skip(index-iap_get_trackindex());
+                    iap_skip_to(index);
 
                     cmd_ok(cmd);
                     break;
@@ -1093,7 +1093,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            audio_skip(index-iap_get_trackindex());
+            iap_skip_to(index);
             cmd_ok(cmd);
 
             break;

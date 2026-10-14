@@ -538,6 +538,11 @@ bool option_screen(const struct settings_list *setting,
                              &selected, &function);
             gui_synclist_select_item(&lists, selected);
             gui_synclist_draw(&lists);
+            /* The remote has set the volume already, and Cancel is not to
+             * undo it */
+            if (function == sound_get_fn(SOUND_VOLUME))
+                oldvalue = *variable;
+            continue;
         }
         else if (handled)
         {

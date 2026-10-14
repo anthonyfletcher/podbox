@@ -24,7 +24,6 @@
 //#define LOGF_ENABLE
 #include "logf.h"
 
-/* The Model ID of the iPod we emulate. Currently a 160GB classic */
 /* The model reported, Identify As's where USB has the setting */
 #ifdef USB_ENABLE_IAP
 #include "usb.h"
@@ -278,6 +277,8 @@ void iap_set_remote_volume(void);
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
 bool iap_play_or_resume(void);
+/* index below playlist_amount(): audio_skip() locks up past the end */
+bool iap_skip_to(uint32_t index);
 
 #include "iap-chapters.h"
 

@@ -460,8 +460,7 @@ void iap_reset_device(struct device_t* device)
     device->changed_notifications = 0;
     device->do_notify = false;
     /* An accessory that muted the player does not leave it silent. Every
-     * caller is on the iAP thread but iap_start(), before any could mute,
-     * and iap_enable(false), from the thread changing the setting. */
+     * caller is on the iAP thread but iap_start(), before any could mute. */
     if (device->mute)
         iap_set_mute(false);
     device->pb_notifications = 0;
@@ -553,6 +552,10 @@ static void iap_thread(void)
              */
             case IAP_EV_TICK:
             {
+                /* the queue drops its oldest event when full, which can be
+                 * an IAP_EV_RESET posted while this thread was blocked */
+                if (reset_pending)
+                    iap_do_reset();
                 iap_periodic();
                 if (iap_artwork_active() && !art_sent)
                     iap_artwork_post();
@@ -705,16 +708,15 @@ bool iap_accessory_present(void)
            TIME_BEFORE(current_tick, last_frame_tick + 5*HZ);
 }
 
-/* Off, the serial line is ignored and an attached accessory forgotten */
+/* Off, the serial line is ignored and an attached accessory forgotten, with
+ * whatever it left in the buffer and any seek it held */
 void iap_enable(bool enable)
 {
     iap_enabled = enable;
     if (!enable)
     {
-        frame_state.state = ST_SYNC;
         iap_remotebtn = BUTTON_NONE;
-        if (iap_started)
-            iap_reset_device(&device);
+        post_reset(false);
     }
 }
 
@@ -1702,6 +1704,20 @@ void iap_periodic(void)
  * than press a button: a button press acts on whatever screen has focus,
  * and outside the WPS opens the highlighted row. False if there is nothing
  * to play. */
+/* Playing or paused, a skip to index; stopped, a skip has nothing to move
+ * (audio_skip() drops it), so playback starts there. True if it started. */
+bool iap_skip_to(uint32_t index)
+{
+    if (!(audio_status() & AUDIO_STATUS_PLAY))
+    {
+        playlist_start((playlist_get_first_index(NULL) + index)
+                       % playlist_amount(), 0, 0);
+        return true;
+    }
+    audio_skip(index - iap_get_trackindex());
+    return false;
+}
+
 bool iap_play_or_resume(void)
 {
     if (audio_status() & AUDIO_STATUS_PLAY)

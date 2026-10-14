@@ -81,7 +81,7 @@ static void select_record(const unsigned int cmd, const unsigned char *buf,
         /* audio_skip() locks up on an offset past the end */
         ok = index < (uint32_t)playlist_amount();
         if (ok)
-            audio_skip(index - iap_get_trackindex());
+            iap_skip_to(index);
     }
     else
         ok = iap_library_select(type, index, sort);
@@ -1952,11 +1952,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
             else if (iap_library_tracks_are_queue())
             {
                 ok = index < (uint32_t)playlist_amount();
-                if (ok)
-                {
-                    audio_skip(index - iap_get_trackindex());
+                if (ok && !iap_skip_to(index))
                     ok = iap_play_or_resume();
-                }
             }
             else
                 /* The library starts it once the Queue is built */
@@ -2798,6 +2795,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
+            CHECKLEN(7);
             int paused = !!(audio_status() & AUDIO_STATUS_PAUSE);
             long tracknum = get_u32(&buf[3]);
 
@@ -3059,6 +3057,7 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * enable an unsupported hierarchy, such as a video hierarchy on an
              * iPod  model that does not support video.
              */
+            CHECKLEN(4);
             iap_library_reset();
             switch (buf[3])
             {
