@@ -59,6 +59,7 @@
 #include "system/appevents.h"
 #include "core_alloc.h"
 #include "file.h"
+#include "storage.h"
 #include "string-extra.h"
 #include "metadata/art_cache.h"      /* the palette's own source */
 #include "playlist/playlist.h"       /* playlist_is_from_artist -- Auto's rule */
@@ -939,9 +940,10 @@ static fb_data palette_px[PALETTE_MAX_DIM * PALETTE_MAX_DIM];
  * thread. Both read a file into it, which yields. */
 static struct mutex palette_lock;
 
-/* Palettes worked out as their track was buffered, while the disk was already
+/* Palettes worked out ahead of their track, while the disk was already
  * running, so the track change can apply one without reading anything. Two:
- * the next track and the one after it can each be from a new album. */
+ * the next track and the one after it can each be from a new album. A slot is
+ * used once, so a cover the art pass replaces is read afresh next time. */
 #define PREFETCH_SLOTS 2
 static struct {
     unsigned int hash;
@@ -1061,7 +1063,10 @@ static bool prefetched_find(unsigned int hash, struct found_palette *out)
         if (prefetched[i].hash == hash)
         {
             if (out)
+            {
                 *out = prefetched[i].p;
+                prefetched[i].hash = 0;
+            }
             return true;
         }
     }
@@ -1436,13 +1441,14 @@ static void track_change_cb(unsigned short id, void *param)
         cache.track_change_tick = current_tick;
 }
 
-/* A track has been buffered, so the disk is running: work out its palette
- * now, while reading the thumbnail costs no spin-up, rather than at the track
- * change -- with the screen dark that read would land on the first render
- * after it wakes and hold the screen up for a spin-up. Runs on the audio
- * thread. The first candidate that reads is the one palette_from_cache()
- * would settle on too. */
-static void track_buffer_cb(unsigned short id, void *param)
+/* A track about to play: work out its palette now if the disk is running,
+ * rather than at the track change -- with the screen dark that read would land
+ * on the first render after it wakes and hold the screen up for a spin-up.
+ * Runs on the audio thread, so a disk that is not running is left alone: a
+ * spin-up here stalls playback's queue. Asked when the next track's metadata
+ * loads, which is buffering, and when its decoding starts. The first
+ * candidate that reads is the one palette_from_cache() would settle on too. */
+static void prefetch_cb(unsigned short id, void *param)
 {
     struct mp3entry *id3 = ((struct track_event *)param)->id3;
     struct found_palette p;
@@ -1452,7 +1458,7 @@ static void track_buffer_cb(unsigned short id, void *param)
 
     (void)id;
     if (!global_settings.dynamic_colors || audio_is_unrecorded() ||
-        !id3 || !id3->path[0])
+        !id3 || !id3->path[0] || !storage_disk_is_active())
         return;
     dim = palette_dim();
     if (dim == 0)
@@ -1496,7 +1502,8 @@ void dynamic_colors_init(void)
     if (!events_registered)
     {
         mutex_init(&palette_lock);
-        add_event(PLAYBACK_EVENT_TRACK_BUFFER, track_buffer_cb);
+        add_event(PLAYBACK_EVENT_TRACK_BUFFER, prefetch_cb);
+        add_event(PLAYBACK_EVENT_NEXTTRACKID3_AVAILABLE, prefetch_cb);
         add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_change_cb);
         add_event(PLAYBACK_EVENT_CUR_TRACK_READY, track_change_cb);
         events_registered = true;
