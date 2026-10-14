@@ -31,6 +31,7 @@
 #include "powermgmt.h"
 #include "settings.h"
 #include "sound.h"
+#include "string-extra.h"
 #include "usb_drv.h"
 #include "remote_seek.h"
 #include "iap_chapters.h"
@@ -171,13 +172,36 @@ static bool slot_art(struct Platform* plt, uint32_t index) {
            plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
 }
 
+/* The playing track's art cache answer is kept until the track or Car Artwork
+ * changes: the play status carries it, accessories poll that about once a
+ * second, and each check opens a file, which keeps the disk from sleeping */
+static int playing_art_check(uint32_t index) {
+    static char     path[MAX_PATH];
+    static uint32_t checked = UINT32_MAX;
+    static int      setting = -1;
+    static int      result;
+    struct mp3entry* id3 = audio_current_track();
+
+    if(id3 == NULL) {
+        return iap_artwork_check(index);
+    }
+    if(checked != index || setting != global_settings.car_artwork || strcmp(path, id3->path)) {
+        result  = iap_artwork_check(index);
+        checked = index;
+        setting = global_settings.car_artwork;
+        strlcpy(path, id3->path, sizeof(path));
+    }
+    return result;
+}
+
 /* The playing track's answer goes in the USB log each time it changes */
 static bool has_art(struct Platform* plt, uint32_t index) {
-    static uint32_t logged = UINT32_MAX;
-    const int       cache  = iap_artwork_check(index);
-    const bool      slot   = cache != USB_LOG_IAP_ART_CACHE_OK && slot_art(plt, index);
+    static uint32_t logged  = UINT32_MAX;
+    const bool      playing = (int)index == playlist_get_display_index() - 1;
+    const int       cache   = playing ? playing_art_check(index) : iap_artwork_check(index);
+    const bool      slot    = cache != USB_LOG_IAP_ART_CACHE_OK && slot_art(plt, index);
 
-    if((int)index == playlist_get_display_index() - 1) {
+    if(playing) {
         const uint32_t key = index << 4 | cache << 1 | slot;
         if(key != logged) {
             logged = key;
@@ -215,19 +239,30 @@ IAPBool iap_platform_get_play_status(struct IAPContext* iap_ctx, struct IAPPlatf
 
 static bool library_play_held;
 
-bool iap_platform_library_play_done(struct IAPContext* ctx) {
+bool iap_platform_control_waits(struct IAPContext* ctx) {
     struct Platform* plt = ctx->platform;
-    if(!library_play_held || iap_library_building()) {
+    bool             ok  = true;
+    if(!plt->control_pending) {
         return false;
     }
-    /* playback starting has usually answered it already, but not where it
-     * was playing before and the stream never stopped */
-    library_play_held = false;
-    if(plt->control_pending) {
-        check_act(iap_control_response(ctx, plt->pending_control, true), );
-        plt->control_pending = false;
+    if(library_play_held) {
+        if(iap_library_building()) {
+            return true;
+        }
+        /* playback starting has usually answered it already, but not where
+         * it was playing before and the stream never stopped */
+        library_play_held = false;
+    } else if(!(audio_status() & AUDIO_STATUS_PLAY)) {
+        /* the iAP sink's play answers it first; playback on the built-in
+         * sink, or none at all, is answered from here */
+        if(!TIME_AFTER(current_tick, plt->pending_tick + 5 * HZ)) {
+            return true;
+        }
+        ok = false;
     }
-    return true;
+    check_act(iap_control_response(ctx, plt->pending_control, ok), );
+    plt->control_pending = false;
+    return false;
 }
 
 void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl control, struct IAPPlatformPendingControl pending) {
@@ -250,6 +285,7 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
              * accessory told before then asks about a Queue half made */
             plt->control_pending = true;
             plt->pending_control = pending;
+            plt->pending_tick    = current_tick;
             library_play_held    = true;
             return;
         }
@@ -314,6 +350,7 @@ void iap_platform_control(struct IAPContext* iap_ctx, enum IAPPlatformControl co
          * to maintain synchronization with accessories, do not send an ack until playback actually begins. */
         plt->control_pending = true;
         plt->pending_control = pending;
+        plt->pending_tick    = current_tick;
         library_play_held    = false;
         return;
     }

@@ -91,6 +91,11 @@ static long   announced_tick;
  * on the stream plays that rate, two seconds after its last SET_CUR */
 static int8_t host_rate = -1; /* index into samprs[], or -1 */
 static long   host_rate_tick;
+/* libiap sends no notification while a TrackNewAudioAttributes ack is owed,
+ * so one owed for a second is written off: an accessory that never acks
+ * still hears of track changes */
+static bool   attrs_owed;
+static long   attrs_owed_tick;
 
 extern bool iap_initialized;
 
@@ -339,6 +344,20 @@ void iap_audio_tick(void) {
         acked_freq = asked_freq;
         asked_freq = -1;
     }
+    {
+        struct IAPContext* ctx = _iap_acquire_ctx(true);
+        if(!ctx->waiting_for_audio_attrs_ack) {
+            attrs_owed = false;
+        } else if(!attrs_owed) {
+            attrs_owed      = true;
+            attrs_owed_tick = current_tick;
+        } else if(TIME_AFTER(current_tick, attrs_owed_tick + HZ)) {
+            ERROR("no ack for audio attributes, notifying anyway");
+            ctx->waiting_for_audio_attrs_ack = iap_false;
+            attrs_owed                       = false;
+        }
+        _iap_release_ctx();
+    }
     if(track_changed && track_attrs_sent) {
         sink_set_freq(set_freq);
     }
@@ -437,6 +456,7 @@ bool iap_audio_init(void) {
     acked_freq       = -1;
     asked_freq       = -1;
     host_rate        = -1;
+    attrs_owed       = false;
     packet_count     = 0;
     logged_stream    = 0xff;
 

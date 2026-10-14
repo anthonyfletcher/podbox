@@ -734,10 +734,9 @@ static void usb_iap_notify_event(intptr_t data) {
             return;
         }
         struct IAPContext* ctx = _iap_acquire_ctx(true);
-        struct Platform*   plt = ctx->platform;
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
-        if(plt->control_pending && !iap_platform_library_play_done(ctx)) {
+        if(iap_platform_control_waits(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();
             return;

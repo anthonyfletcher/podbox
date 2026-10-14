@@ -1367,8 +1367,8 @@ void usb_set_iap2_mode(int mode)
     usb_iap_set_iap2_mode(mode);
 }
 
-/* The iPod Classic's are the 160 GB model's, which serial iAP has always
- * reported; the iPhone 4's are those ipod-gadget answers cars with */
+/* The iPod Classic's are the 160 GB model's, which serial iAP reports where
+ * USB has no setting; the iPhone 4's are those ipod-gadget answers cars with */
 static const struct usb_identity identities[] = {
     [USB_IDENTITY_OWN]          = { 0,      0x00130200, "MC293" },
     [USB_IDENTITY_IPOD_CLASSIC] = { 0x1261, 0x00130200, "MC293" },

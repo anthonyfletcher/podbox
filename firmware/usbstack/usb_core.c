@@ -882,8 +882,9 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
         case USB_DT_DEVICE:
             device_descriptor.idProduct = USB_PRODUCT_ID;
 #ifdef USB_ENABLE_IAP
-            /* Identify As; the sound card's own ID below still wins */
-            if(usb_identity()->product_id)
+            /* Identify As, only with Accessory Protocol on; the sound
+             * card's own ID below still wins */
+            if(drivers[USB_DRIVER_IAP]->enabled && usb_identity()->product_id)
                 device_descriptor.idProduct = usb_identity()->product_id;
 #endif
 #if defined(USB_ENABLE_AUDIO) && defined(USB_PRODUCT_ID_AUDIO)

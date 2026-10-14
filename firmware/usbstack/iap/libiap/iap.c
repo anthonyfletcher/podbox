@@ -198,7 +198,9 @@ static uint32_t play_stage_change_notification_set_mask_to_type_mask(uint32_t ma
     return ret;
 }
 
-static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
+static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx);
+
+static IAPBool send_artwork_chunk(struct IAPContext* ctx) {
     struct IAPSpan request = _iap_get_buffer_for_send_payload(ctx);
     if(ctx->artwork_chunk_index == 0) {
         struct IAPRetTrackArtworkDataFirstPayload* payload = iap_span_alloc(&request, sizeof(*payload));
@@ -239,6 +241,18 @@ static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
         print("track artwork done");
     }
     return iap_true;
+}
+
+/* A transfer that fails ends there, or every later request is refused */
+static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
+    if(send_artwork_chunk(ctx)) {
+        return iap_true;
+    }
+    if(ctx->artwork.valid) {
+        iap_platform_close_artwork(ctx, &ctx->artwork);
+        ctx->artwork.valid = iap_false;
+    }
+    return iap_false;
 }
 
 static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
