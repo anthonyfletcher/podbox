@@ -56,8 +56,12 @@ trap 'rm -rf "$tmp"' EXIT
 git grep -n -E 'was:[[:space:]]*apps/' -- apps-ipod ':(exclude)*.md' |
 awk '{
     file = $0; sub(/:.*/, "", file)
-    path = $0; sub(/.*was:[ \t]*/, "", path); sub(/[ \t*`,;)].*/, "", path)
-    print path "\t" file
+    rest = $0; sub(/.*was:/, "", rest)
+    # every path the marker names, as in "apps/a.c (f) + apps/b.c (g)"
+    while (match(rest, /apps\/[^ \t*`,;)]+/)) {
+        print substr(rest, RSTART, RLENGTH) "\t" file
+        rest = substr(rest, RSTART + RLENGTH)
+    }
 }' > "$tmp/map"
 git ls-files apps-ipod > "$tmp/ours"
 
