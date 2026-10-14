@@ -385,6 +385,7 @@ static int filemenu_callback(int action,
 #if BATTERY_CAPACITY_INC > 0
 MENUITEM_SETTING(battery_capacity, &global_settings.battery_capacity, NULL);
 #endif
+MENUITEM_SETTING(debug_log_battery, &global_settings.debug_log_battery, NULL);
 
 static int usbcharging_callback(int action,
                                 const struct menu_item_ex *this_item,
@@ -794,7 +795,8 @@ MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
 #if BATTERY_CAPACITY_INC > 0
             &battery_capacity,
 #endif
-            &car_adapter_mode_menu);
+            &car_adapter_mode_menu,
+            &debug_log_battery);
 
 
 /** Bookmark menu **/

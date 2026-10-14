@@ -329,6 +329,7 @@ system/app_util.c
 system/bg_task.c
 system/library_files.c
 system/debug_log.c
+system/battery_log.c
 #ifdef HAVE_USBSTACK
 system/usb_log_file.c
 #endif

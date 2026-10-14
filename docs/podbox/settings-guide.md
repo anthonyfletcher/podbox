@@ -535,6 +535,7 @@ Shadow Colour only while there is a shadow to colour.
 | Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
 | Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
 | Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
+| Write Debug Log | Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery voltage and level, and how much of the minute was spent playing, boosted, with the backlight or screen on, and with the disk running. For working out what a fast drain was spent on. The log waits until the disk is about to sleep, so it never spins the disk up itself. It costs a little CPU every tick; leave it off otherwise. | off | **Adv** |
 
 ### Battery & Power — Sleep Timer
 

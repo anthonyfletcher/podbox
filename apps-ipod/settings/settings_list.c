@@ -55,6 +55,7 @@
 #include "system/strutil.h"     /* skip_whitespace() */
 #include "system/debug_log.h"
 #include "system/usb_log_file.h"
+#include "system/battery_log.h"
 #include "audio/playback.h"
 #include "widgets/list.h"
 #include "rbunicode.h"
@@ -974,6 +975,10 @@ const struct settings_list settings[] = {
                 BATTERY_CAPACITY_INC, NULL, NULL, set_battery_capacity),
 #endif /* IPOD_VIDEO */
 #endif
+    /* Diagnostics: .rockbox/logs/battery.csv, one line a minute. */
+    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
+                  debug_log_battery, LANG_DEBUG_LOG, false,
+                  "debug log battery", battery_log_enable),
     OFFON_SETTING(0, car_adapter_mode,
                   LANG_CAR_ADAPTER_MODE, false, "car adapter mode", NULL),
     INT_SETTING_NOWRAP(0, car_adapter_mode_delay, LANG_CAR_ADAPTER_MODE_DELAY,

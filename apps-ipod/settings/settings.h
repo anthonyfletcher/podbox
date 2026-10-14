@@ -849,6 +849,7 @@ struct user_settings
     int battery_capacity; /* in mAh */
 #endif
     int usb_charging;
+    bool debug_log_battery;     /* the battery log, one line a minute */
     /* device settings */
 
     int  cursor_style; /* style of the selection cursor */

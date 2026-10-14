@@ -355,6 +355,7 @@ static const struct tag_row tag_rows[] = {
 { "sleeptimer on startup", TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM,  "sleep timer boot" },
 { "keypress restarts sleeptimer", TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM, "sleep timer" },
 { "battery capacity",    TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM,    "battery mah cell" },
+{ "debug log battery",   TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM,    "log debug battery drain runtime" },
 { "usb charging",        TAG_BATTERY|TAG_USB|TAG_SYSTEM,         "charge charging usb" },
 { "disk spindown",       TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM,    "disk drive spin idle" },
 { "storage mode",        TAG_ADVANCED|TAG_BATTERY|TAG_SYSTEM,    "disk ssd hdd drive" },

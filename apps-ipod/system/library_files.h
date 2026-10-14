@@ -64,6 +64,7 @@
 #define LIB_TAGCACHE_LOG    LIB_LOGS_DIR "/tagcache.log"
 #define LIB_ART_LOG         LIB_LOGS_DIR "/art.log"
 #define LIB_USB_LOG         LIB_LOGS_DIR "/usb.log"
+#define LIB_BATTERY_LOG     LIB_LOGS_DIR "/battery.csv"
 #define LIB_BUFFER_LOG      LIB_LOGS_DIR "/buffer_damage.log"
 #define LIB_UPGRADE_LOG     LIB_LOGS_DIR "/upgrade.log"
 

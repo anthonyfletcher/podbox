@@ -97,6 +97,15 @@ Only affects the runtime estimate, not charging. Worth correcting after a
 battery replacement, since a new cell is often a different size from the
 original.
 
+[debug log battery]
+Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery
+voltage and level, and how much of the minute was spent playing, boosted, with
+the backlight or screen on, and with the disk running. For working out what a
+fast drain was spent on.
+
+The log waits until the disk is about to sleep, so it never spins the disk up
+itself. It costs a little CPU every tick; leave it off otherwise.
+
 [storage mode]
 Tells power management what kind of drive is fitted, which decides whether it
 is worth spinning down and how aggressively.
