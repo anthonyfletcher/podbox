@@ -24372,3 +24372,17 @@
     *: "Debug logs on"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_PLAYBACK
+  desc: in Debug Logs: the playback error log's switch
+  user: core
+  <source>
+    *: "Playback Error Log"
+  </source>
+  <dest>
+    *: "Playback Error Log"
+  </dest>
+  <voice>
+    *: "Playback Error Log"
+  </voice>
+</phrase>

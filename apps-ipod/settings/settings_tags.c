@@ -402,6 +402,7 @@ static const struct tag_row tag_rows[] = {
 { "usb dac output",      TAG_USB|TAG_SYSTEM|TAG_PLAYBACK,        "usb dac audio dongle amp headphone output start automatically" },
 { "debug log usb",       TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "log debug usb car accessory" },
 { "debug log expiry",    TAG_ADVANCED|TAG_SYSTEM,                "log debug switch off expire hours" },
+{ "debug log playback",  TAG_ADVANCED|TAG_SYSTEM|TAG_PLAYBACK,   "log debug skip codec error track" },
 
 /* --- voice --------------------------------------------------------------- */
 { "talk menu",           TAG_VOICE,                              "voice speak menus" },

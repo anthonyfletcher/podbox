@@ -49,6 +49,7 @@
 #include "widgets/splash.h"
 #include "general.h"
 #include "rbpaths.h"
+#include "system/debug_log.h"
 
 #define LOGF_ENABLE
 #include "logf.h"
@@ -192,6 +193,7 @@ static int codec_load_ram(struct codec_api *api)
         )
     {
         logf("codec header error");
+        debug_log(DEBUG_LOG_PLAYBACK, "codec load: bad header");
         lc_close(curr_handle);
         curr_handle = NULL;
         return CODEC_ERROR;
@@ -201,6 +203,8 @@ static int codec_load_ram(struct codec_api *api)
         c_hdr->api_size > sizeof(struct codec_api))
     {
         logf("codec api version error");
+        debug_log(DEBUG_LOG_PLAYBACK, "codec load: API version %d, not %d",
+                  hdr->api_version, CODEC_API_VERSION);
         lc_close(curr_handle);
         curr_handle = NULL;
         return CODEC_ERROR;
@@ -233,6 +237,7 @@ int codec_load_buf(int hid, struct codec_api *api)
 
     if (rc < 0) {
         logf("Codec: cannot read buf handle");
+        debug_log(DEBUG_LOG_PLAYBACK, "codec load: buffer read %d", rc);
         return CODEC_ERROR;
     }
 
@@ -240,6 +245,7 @@ int codec_load_buf(int hid, struct codec_api *api)
 
     if (curr_handle == NULL) {
         logf("Codec: load error");
+        debug_log(DEBUG_LOG_PLAYBACK, "codec load: not a codec");
         return CODEC_ERROR;
     }
 
@@ -257,6 +263,7 @@ int codec_load_file(const char *plugin, struct codec_api *api)
 
     if (curr_handle == NULL) {
         logf("Codec: cannot read file");
+        debug_log(DEBUG_LOG_PLAYBACK, "codec load: cannot read %s", path);
         return CODEC_ERROR;
     }
 

@@ -67,6 +67,7 @@
 #define LIB_BATTERY_LOG     LIB_LOGS_DIR "/battery.csv"
 #define LIB_BUFFER_LOG      LIB_LOGS_DIR "/buffer_damage.log"
 #define LIB_UPGRADE_LOG     LIB_LOGS_DIR "/upgrade.log"
+#define LIB_PLAYBACK_ERRORS_LOG LIB_LOGS_DIR "/playback_errors.log"
 /* Written by lib/rbcodec/metadata/metadata.c, which spells the path out */
 #define LIB_METADATA_LOG    LIB_LOGS_DIR "/metadata.log"
 

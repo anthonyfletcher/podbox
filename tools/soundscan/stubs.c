@@ -20,6 +20,7 @@
 #include "config.h"
 #include "metadata.h"
 #include "codecs.h"
+#include "system/debug_log.h"
 
 /* ---- the codec buffer ------------------------------------------------- *
  *
@@ -123,6 +124,14 @@ void debugf(const char *fmt, ...)
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+}
+
+/* The player's codec loader reports failures to its playback log; a scan
+ * says what failed on its own terms */
+void debug_log(enum debug_log_id id, const char *fmt, ...)
+{
+    (void)id;
+    (void)fmt;
 }
 
 void panicf(const char *fmt, ...)

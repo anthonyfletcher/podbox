@@ -63,6 +63,7 @@
 #include "storage.h"
 #include "system/app_util.h"
 #include "system/bg_task.h"    /* the headroom a background pass needs */
+#include "system/debug_log.h"
 #include "audio/sound_feedback.h"
 #include "audio/track_decode.h"
 #include "settings/settings.h"
@@ -2440,6 +2441,7 @@ static int audio_load_track(void)
             break;
 
         logf("Open failed %s", path);
+        debug_log(DEBUG_LOG_PLAYBACK, "skipped, will not open: %s", path);
 
         /* only skip if failed track has a successor in playlist */
         if (!playlist_peek(playlist_peek_offset + 1, NULL, 0))
@@ -2563,6 +2565,7 @@ static int audio_finish_load_track(struct track_info *infop)
         /* This is an error condition. Track cannot be played without valid
            metadata; skip the track. */
         logf("No metadata");
+        debug_log(DEBUG_LOG_PLAYBACK, "skipped, no metadata");
         trackstat = LOAD_TRACK_ERR_FINISH_FAILED;
         goto audio_finish_load_track_exit;
     }
@@ -2634,6 +2637,8 @@ static int audio_finish_load_track(struct track_info *infop)
                reading the codec file failed part way through, either way,
                skip the track */
             logf("No codec for: %s", track_id3->path);
+            debug_log(DEBUG_LOG_PLAYBACK, "skipped, no codec (type %d): %s",
+                      track_id3->codectype, track_id3->path);
             trackstat = LOAD_TRACK_ERR_FINISH_FAILED;
         }
 
@@ -2711,6 +2716,8 @@ static int audio_finish_load_track(struct track_info *infop)
         {
             /* Nothing to play if no audio handle - skip this */
             logf("Could not add audio data handle");
+            debug_log(DEBUG_LOG_PLAYBACK, "skipped, buffering refused it "
+                      "(%d): %s", hid, track_id3->path);
             trackstat = LOAD_TRACK_ERR_FINISH_FAILED;
         }
     }
@@ -3208,6 +3215,10 @@ static bool audio_can_change_track(int *trackstat, int *id3_hid)
 static void audio_on_codec_complete(int status)
 {
     logf("%s(%d)", __func__, status);
+
+    if (status < 0 && audio_scratch_memory)
+        debug_log(DEBUG_LOG_PLAYBACK, "codec failed (%d): %s", status,
+                  id3_get(CODEC_ID3)->path);
 
     if (play_status == PLAY_STOPPED)
         return;

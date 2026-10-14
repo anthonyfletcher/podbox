@@ -1390,6 +1390,14 @@ a car, it also records every five seconds how much audio the car took.
 
 Switches itself off after the time set in Switch Off After.
 
+[debug log playback]
+Writes a line to playback_errors.log in the .rockbox/logs folder for every
+track playback skips or cannot finish, saying why: the file would not open,
+had no codec, or the codec failed. For working out why tracks skip.
+
+Costs nothing until a track fails. Switches itself off after the time set in
+Switch Off After.
+
 [debug log expiry]
 How long the debug logs stay on, counted only while the player is on. When the
 time is up every log switches itself off, and a message says so. Switching a

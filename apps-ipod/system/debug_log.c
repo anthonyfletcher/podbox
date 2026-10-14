@@ -82,6 +82,7 @@ extern bool write_metadata_log;
 
 static char tagcache_held[HELD_SIZE];
 static char art_held[HELD_SIZE];
+static char playback_held[HELD_SIZE];
 
 static const struct debug_log_info {
     const char *path;
@@ -106,6 +107,9 @@ static const struct debug_log_info {
     [DEBUG_LOG_BATTERY]  = { LIB_BATTERY_LOG, "battery", "#",
                              &global_settings.debug_log_battery,
                              battery_log_state, battery_log_enable, NULL },
+    [DEBUG_LOG_PLAYBACK] = { LIB_PLAYBACK_ERRORS_LOG, "playback errors", "==",
+                             &global_settings.debug_log_playback,
+                             NULL, NULL, playback_held },
 #if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
     [DEBUG_LOG_MIKEY]    = { LIB_LOGS_DIR "/mikey.log", "Mikey remote", "==",
                              NULL, mikey_state, NULL, NULL },
