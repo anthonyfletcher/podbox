@@ -20,9 +20,9 @@ one that does.
    one), then turn `USB and Accessory Log` off - it slows every USB
    connection. It switches itself off after a day if you forget
 
-If `usb.log` has nothing after its `==` header lines, your dock uses the
-serial pins instead. Take a photo of `System > Debug > Serial iAP`
-while docked.
+Lines starting `iap serial` came over the dock connector's serial pins; the
+rest came over USB. If a dock leaves nothing after the `==` header lines,
+take a photo of `System > Debug > Serial iAP` while docked.
 
 ## 3. Capture an iPhone's log (cars and USB docks)
 

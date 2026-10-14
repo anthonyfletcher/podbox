@@ -1382,8 +1382,9 @@ Turn On beside this. Off leaves every cable to the computer and charging.
 
 [debug log usb]
 Writes every USB connection step to usb.log in the .rockbox/logs folder,
-without the USB Log debug screen open. For working out why a computer, dock or
-car will not connect. It writes to the disk whenever the log grows, and
+without the USB Log debug screen open, and every message a dock or car
+exchanges, over USB or the dock connector's serial pins. For working out why a
+computer, dock or car will not connect. It writes to the disk whenever the log grows, and
 connection steps wait for the log to reach the disk, which can slow them. With
 a car, it also records every five seconds how much audio the car took.
 

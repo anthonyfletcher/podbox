@@ -19,6 +19,10 @@
 
 struct usb_log_entry;
 
+/* In a USB_LOG_IAP entry's `a`, beside the lingo and
+ * USB_LOG_IAP_FROM_PLAYER: the frame came over the serial link */
+#define USB_LOG_IAP_SERIAL 0x40
+
 /* One entry as a line of text, without the newline. */
 void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          size_t size);

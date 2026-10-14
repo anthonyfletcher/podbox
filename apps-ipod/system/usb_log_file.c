@@ -101,11 +101,13 @@ static const char *usb_log_request_name(int type, int req, int value)
 static void usb_log_format_iap(const struct usb_log_entry *e, char *p,
                                size_t size)
 {
-    int lingo = e->a & ~USB_LOG_IAP_FROM_PLAYER;
+    int lingo = e->a & ~(USB_LOG_IAP_FROM_PLAYER | USB_LOG_IAP_SERIAL);
     const char *name = usb_log_iap_command(lingo, e->b);
     unsigned len = e->c & 0xffff, trans = e->c >> 16;
-    int n = snprintf(p, size, "iap %c %s:%s", e->a & USB_LOG_IAP_FROM_PLAYER
-                     ? '<' : '>', usb_log_iap_lingo(lingo), name);
+    int n = snprintf(p, size, "iap%s %c %s:%s",
+                     e->a & USB_LOG_IAP_SERIAL ? " serial" : "",
+                     e->a & USB_LOG_IAP_FROM_PLAYER ? '<' : '>',
+                     usb_log_iap_lingo(lingo), name);
     if (n < 0 || (size_t)n >= size)
         return;
     p += n;

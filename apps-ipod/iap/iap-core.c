@@ -65,6 +65,10 @@
 #include "usb.h"
 #include "system/volume.h"
 #include "audio/remote_seek.h"
+#ifdef USB_ENABLE_IAP
+#include "usb_log.h"
+#include "system/usb_log_file.h"
+#endif
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -789,6 +793,37 @@ static uint16_t tx_tid(const unsigned char *p)
     return own_tid++;
 }
 
+/* A frame into the USB log's ring, beside USB iAP's, so usb.log holds a
+ * dock on either link. `pkt` starts at the lingo; `tid` says a transaction
+ * ID follows the command. */
+static void serial_log(const unsigned char *pkt, unsigned int len,
+                       bool from_player, bool tid)
+{
+#ifdef USB_ENABLE_IAP
+    unsigned int command, hdr = 2, trans = 0xffff, payload;
+    uint32_t first = 0;
+
+    if (len < 2 || (pkt[0] == 0x04 && len < 3))
+        return;
+    command = pkt[1];
+    if (pkt[0] == 0x04)
+        command = command << 8 | pkt[hdr++];
+    if (tid && len >= hdr + 2)
+    {
+        trans = get_u16(pkt + hdr);
+        hdr += 2;
+    }
+    payload = len > hdr ? len - hdr : 0;
+    for (unsigned int i = 0; i < 4; i++)
+        first = first << 8 | (i < payload ? pkt[hdr + i] : 0);
+    usb_log(USB_LOG_IAP, pkt[0] | USB_LOG_IAP_SERIAL
+            | (from_player ? USB_LOG_IAP_FROM_PLAYER : 0), command,
+            payload | trans << 16, first);
+#else
+    (void)pkt; (void)len; (void)from_player; (void)tid;
+#endif
+}
+
 /* Called for every packet before its lingo's handler, which then reads it
  * as though transaction IDs did not exist. False for one too short to
  * carry the ID it owes, which is dropped. */
@@ -892,6 +927,7 @@ void iap_send_tx(void)
         chksum += iap_txpayload[i];
     }
     *(iap_txnext) = 0x100 - (chksum & 0xFF);
+    serial_log(iap_txpayload, txlen, true, device.transid);
 
 #if defined(LOGF_ENABLE) && defined(ROCKBOX_HAS_LOGF)
     logf("T: %s", hexstring(txstart+3, (iap_txnext - txstart)-3));
@@ -1793,6 +1829,13 @@ void iap_handlepkt(void)
 
         unsigned char *pkt = iap_rxstart+2;
         unsigned int plen = length;
+
+        /* The ID is where rx_take_tid() is about to look for it */
+        serial_log(pkt, plen, false,
+                   plen >= 2 && !(pkt[0] == 0x00
+                                  && (pkt[1] == 0x01 || pkt[1] == 0x13))
+                   && (device.transid
+                       || (pkt[0] == 0x00 && pkt[1] == 0x38)));
 
         if (length != 0 && rx_take_tid(&pkt, &plen)) {
             unsigned char mode = pkt[0];
