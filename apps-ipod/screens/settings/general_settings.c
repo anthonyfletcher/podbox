@@ -643,6 +643,10 @@ static char *debug_log_left_name(int selected_item, void *data, char *buffer,
                                   : LANG_DEBUG_LOG_NONE_ON);
 }
 
+/* Measured once a visit: it opens every log file, and the getter runs on
+ * every redraw. -1 until measured. */
+static long debug_log_files_bytes = -1;
+
 static char *debug_log_files_name(int selected_item, void *data, char *buffer,
                                   size_t buffer_len)
 {
@@ -650,7 +654,9 @@ static char *debug_log_files_name(int selected_item, void *data, char *buffer,
 
     (void)selected_item;
     (void)data;
-    output_dyn_value(size, sizeof size, debug_log_files_size(), byte_units,
+    if (debug_log_files_bytes < 0)
+        debug_log_files_bytes = debug_log_files_size();
+    output_dyn_value(size, sizeof size, debug_log_files_bytes, byte_units,
                      4, true);
     snprintf(buffer, buffer_len, str(LANG_DEBUG_LOG_FILES), size);
     return buffer;
@@ -674,7 +680,19 @@ MENUITEM_FUNCTION_DYNTEXT(debug_log_files, 0, debug_log_nothing,
 MENUITEM_FUNCTION(debug_log_all_off_func, 0, ID2P(LANG_DEBUG_LOG_ALL_OFF),
                   debug_log_all_off_item, NULL, Icon_NOICON);
 
-MAKE_MENU(debug_logs_menu, ID2P(LANG_DEBUG_LOG), 0, Icon_NOICON,
+static int debug_logs_menu_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
+    if (action == ACTION_ENTER_MENUITEM)
+        debug_log_files_bytes = -1;
+    return action;
+}
+
+MAKE_MENU(debug_logs_menu, ID2P(LANG_DEBUG_LOG), debug_logs_menu_callback,
+          Icon_NOICON,
             &debug_log_tagcache,
             &debug_log_artcache,
 #ifdef HAVE_USBSTACK

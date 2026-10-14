@@ -414,7 +414,8 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
             if (e->b == 2)
             {
                 snprintf(p, size, "iap: accessory lists no rates, playing "
-                         "the %lu Hz the host set", (unsigned long)e->c);
+                         "the %lu Hz the host set%s", (unsigned long)e->c,
+                         e->d ? ", though it is still talking" : "");
                 break;
             }
             if (e->b)

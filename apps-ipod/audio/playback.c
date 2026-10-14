@@ -1211,7 +1211,8 @@ static void audio_update_filebuf_watermark(int seconds)
     if (storage_get_ssd_mode())
     {
         /* SSD mode: no spin-up, but storage powered off while the backlight
-         * is off still takes its wake time, which storage_spinup_time() measures. */
+         * is off still takes its wake time, which storage_spinup_time()
+         * measures. */
         if (seconds != 0)
             buffer_margin = seconds;
         seconds = 1 + (storage_spinup_time() + HZ - 1) / HZ;
@@ -4250,6 +4251,27 @@ bool audio_peek_track(struct mp3entry *id3, int offset)
         id3->path[0] = '\0'; /* Null path means it should be filled now */
         retval = audio_get_track_metadata(offset + skip_offset, id3) &&
                 id3->path[0] != '\0';
+    }
+
+    id3_mutex_unlock();
+
+    return retval;
+}
+
+/* audio_peek_track() for a track already on the buffer only: false, rather
+ * than the playlist and database lookups, for one that is not. */
+bool audio_peek_buffered_track(struct mp3entry *id3, int offset)
+{
+    struct track_info info;
+    bool retval = false;
+
+    id3_mutex_lock();
+
+    if (play_status != PLAY_STOPPED &&
+        track_list_user_current(offset + skip_offset, &info))
+    {
+        retval = bufreadid3(info.id3_hid, id3) && id3->path[0] != '\0';
+        id3->cuesheet = NULL;
     }
 
     id3_mutex_unlock();

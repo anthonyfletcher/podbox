@@ -127,6 +127,7 @@ static struct {
 } logs[DEBUG_LOG_COUNT];
 
 static bool ready;              /* debug_log_init() has run */
+static struct mutex rotate_lock; /* rotate_path */
 
 /* Minutes on, by Switch Off After's index; 0 never */
 static const unsigned short expiry_minutes[] = { 60, 6*60, 24*60, 7*24*60, 0 };
@@ -211,12 +212,16 @@ static int open_locked(enum debug_log_id id)
 
     if (fd >= 0 && ffilesize(fd) >= DEBUG_LOG_CAP)
     {
-        char old[MAX_PATH];
+        /* Static: the storage thread rotates too, from disk_idle_cb(), and
+         * its stack has no room for a path beside the rename */
+        static char rotate_path[MAX_PATH];
 
         close(fd);
-        old_path(id, old, sizeof old);
-        remove(old);
-        rename(log_info[id].path, old);
+        mutex_lock(&rotate_lock);
+        old_path(id, rotate_path, sizeof rotate_path);
+        remove(rotate_path);
+        rename(log_info[id].path, rotate_path);
+        mutex_unlock(&rotate_lock);
         fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd >= 0)
             write_header(fd, id, "rotated");
@@ -509,9 +514,13 @@ void debug_log_init(void)
         mutex_init(&logs[id].lock);
         logs[id].on = debug_log_enabled(id);
     }
+    mutex_init(&rotate_lock);
     minutes_saved = global_status.debug_log_minutes;
     add_event(DISK_EVENT_SPINUP, disk_idle_cb);
     add_event(GUI_EVENT_ACTIONUPDATE, action_cb);
     timeout_register(&minute_tmo, minute_cb, 60*HZ, 0);
     ready = true;
+    /* The other logs' owners write their own when they start */
+    if (debug_log_enabled(DEBUG_LOG_PLAYBACK))
+        debug_log_header(DEBUG_LOG_PLAYBACK, "started");
 }

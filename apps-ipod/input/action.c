@@ -143,11 +143,9 @@ static inline bool has_flag(unsigned int value, unsigned int flag)
 */
 static bool is_action_filtered(int action, unsigned int mask, int context)
 {
-    /* context is now only read by the logf() in the default case below, which
-     * compiles away on targets without ROCKBOX_HAS_LOGF (ipodvideo). It used
-     * to be read unconditionally by the CONTEXT_FM test, which is gone with
-     * the tuner. Keep the parameter -- callers pass it and logf builds use it
-     * -- but silence the unused warning on the builds that do not. */
+    /* context is read only by the logf() in the default case below, which
+     * compiles away without ROCKBOX_HAS_LOGF -- on both players. Callers pass
+     * it and logf builds use it, so it stays. */
     (void)context;
 
     bool match = false;

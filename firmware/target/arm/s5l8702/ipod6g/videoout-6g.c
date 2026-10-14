@@ -1053,6 +1053,11 @@ void videoout_set_format(bool double_size, bool pal)
 {
     (void)pal;
 
+    /* Every settings_apply() calls this: the same size again must not
+     * restart a picture that is showing */
+    if (svid_ui_destination_width == (double_size ? 648u : LCD_WIDTH))
+        return;
+
     svid_ui_destination_x = double_size ? 36u : (720u - LCD_WIDTH) / 2;
     svid_ui_destination_y = double_size ? 24u : (480u - LCD_HEIGHT) / 2;
     svid_ui_destination_width = double_size ? 648u : LCD_WIDTH;

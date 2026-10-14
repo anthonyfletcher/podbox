@@ -89,7 +89,8 @@ enum usb_log_type
     USB_LOG_IAP_RATE,    /* the host set a rate: a = ignored as not the one
                           * announced, c = rate, d = rate announced or 0;
                           * or b = 1, it set none and c, announced, plays;
-                          * or b = 2, no rate list came and c, set, plays */
+                          * or b = 2, no rate list came and c, set, plays,
+                          * d = 1 if the accessory was still talking */
     USB_LOG_IAP_STREAM,  /* what the stream now carries: a =
                           * USB_LOG_IAP_STREAM_* */
     USB_LOG_IAP_IDENTIFY, /* IdentifyDeviceLingoes: c = lingoes,

@@ -1736,10 +1736,6 @@ void iap_periodic(void)
      */
 }
 
-/* Play, from paused or stopped, for the commands that say "play" rather
- * than press a button: a button press acts on whatever screen has focus,
- * and outside the WPS opens the highlighted row. False if there is nothing
- * to play. */
 /* Playing or paused, a skip to index; stopped, a skip has nothing to move
  * (audio_skip() drops it), so playback starts there. True if it started. */
 bool iap_skip_to(uint32_t index)
@@ -1754,6 +1750,10 @@ bool iap_skip_to(uint32_t index)
     return false;
 }
 
+/* Play, from paused or stopped, for the commands that say "play" rather
+ * than press a button: a button press acts on whatever screen has focus,
+ * and outside the WPS opens the highlighted row. False if there is nothing
+ * to play. */
 bool iap_play_or_resume(void)
 {
     if (audio_status() & AUDIO_STATUS_PLAY)

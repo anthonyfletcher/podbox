@@ -3011,12 +3011,20 @@ static void walk_note_unread(const char *dirname)
         walk_unread_count++;
 }
 
+/* Compared without the volume, as find_entry_*() compare: a stored path and
+ * the walk's can differ in it. A root -- "/" or a bare volume -- holds
+ * everything. */
 static bool walk_unread_holds(const char *path)
 {
+    path = path_key_strip(path);
     for (int i = 0; i < MIN(walk_unread_count, WALK_UNREAD_MAX); i++)
     {
-        size_t len = strlen(walk_unread[i]);
-        if (!strncasecmp(path, walk_unread[i], len) && path[len] == '/')
+        const char *dir = path_key_strip(walk_unread[i]);
+        size_t len = strlen(dir);
+
+        if (len <= 1 || (dir[1] == '<' && !strchr(dir + 1, '/')))
+            return true;
+        if (!strncasecmp(path, dir, len) && path[len] == '/')
             return true;
     }
     return false;
@@ -6144,6 +6152,9 @@ static bool check_deleted_files(void)
 
         if (rc_cache >= 0)          /* there */
         {;}
+        /* Under a folder the walk could not read: storage cannot answer */
+        else if (walk_unread_holds(buf))
+        {;}
         /* A negative return means the lookup did not succeed; it does not say
          * why in any form worth trusting. Upstream read absence out of the
          * return value (`rc_cache == ENOENT`), which compares it against 2 --
@@ -6159,8 +6170,6 @@ static bool check_deleted_files(void)
          * stat, but only for entries that already failed to resolve -- 43 on
          * the library this was found on, against 3502 scanned -- and deleting
          * an entry is destructive enough to be worth confirming directly. */
-        else if (walk_unread_holds(buf))
-        {;}
         else if (!file_exists(buf))
         {
             logf("Entry no longer valid.");
@@ -6627,8 +6636,20 @@ static void record_loaded_sizes(void)
                                                         : db_file_size(tag);
 }
 
+static unsigned int stamp_bytes(unsigned int stamp, const void *p, size_t n)
+{
+    const unsigned char *b = p;
+
+    while (n--)
+        stamp = (stamp ^ *b++) * 16777619u;
+    return stamp;
+}
+
 /* Every file in the database directory -- name, size and time -- hashed. Any
- * write a computer makes there, a desktop update's included, changes it. */
+ * write a computer makes there, a desktop update's included, changes it.
+ * The master stands in by its header instead of its time: closing the master
+ * that tagcache_search() opens read-write sets its time with nothing written,
+ * and every commit, a desktop one's included, moves the header. */
 static unsigned int db_dir_stamp(void)
 {
     unsigned int stamp = 2166136261u;
@@ -6641,10 +6662,24 @@ static unsigned int db_dir_stamp(void)
     {
         struct dirinfo info = dir_get_info(d, e);
 
-        for (const char *p = e->d_name; *p; p++)
-            stamp = (stamp ^ (unsigned char)*p) * 16777619u;
+        stamp = stamp_bytes(stamp, e->d_name, strlen(e->d_name));
         stamp = (stamp ^ (unsigned int)info.size) * 16777619u;
-        stamp = (stamp ^ (unsigned int)info.mtime) * 16777619u;
+        if (strcasecmp(e->d_name, TAGCACHE_FILE_MASTER))
+        {
+            stamp = (stamp ^ (unsigned int)info.mtime) * 16777619u;
+        }
+        else
+        {
+            struct master_header hdr;
+            int fd = open_db_fd(TAGCACHE_FILE_MASTER, O_RDONLY);
+
+            if (fd >= 0)
+            {
+                if (read(fd, &hdr, sizeof hdr) == sizeof hdr)
+                    stamp = stamp_bytes(stamp, &hdr, sizeof hdr);
+                close(fd);
+            }
+        }
     }
     closedir(d);
     return stamp;

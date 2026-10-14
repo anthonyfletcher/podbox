@@ -1502,16 +1502,20 @@ static void prefetch_cb(unsigned short id, void *param)
  * costs no spin-up. Every track buffered ahead is covered here, where
  * prefetch_cb() only ever sees the next one while the disk runs -- the
  * others reach their decode start with it asleep. Static because an
- * mp3entry is too big for the storage thread's stack. */
+ * mp3entry is too big for the storage thread's stack, and buffered tracks
+ * only: audio_peek_track() looks an unbuffered one up in the playlist and
+ * the database, deeper than that stack goes. */
 static void prefetch_idle_cb(unsigned short id, void *param)
 {
     static struct mp3entry id3;
 
     (void)id;
     (void)param;
+    if (!global_settings.dynamic_colors || palette_dim() == 0)
+        return;
     for (int offset = 1; offset <= PREFETCH_SLOTS; offset++)
     {
-        if (!audio_peek_track(&id3, offset))
+        if (!audio_peek_buffered_track(&id3, offset))
             break;
         prefetch_path(id3.path);
     }

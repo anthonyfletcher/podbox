@@ -295,11 +295,10 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
     {
         int fd1 = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, 1, 1, &h,
                                NULL);
-        if (fd1 >= 0)
-        {
+        /* A version-1 file's own answer, unless it is not one either */
+        if (fd1 != LIBFILE_BAD)
             fd = fd1;
-            old = true;
-        }
+        old = fd1 >= 0;
     }
     if (fd < 0)
     {

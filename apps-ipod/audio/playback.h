@@ -81,6 +81,8 @@ void audio_buffer_damaged(void);
 /* audio_hard_stop() without stopping the PCM sink, for a caller that only
    needs the memory back. */
 void audio_release_buffer(void);
+/* audio_peek_track() that reads only the buffer: safe on a small stack. */
+bool audio_peek_buffered_track(struct mp3entry *id3, int offset);
 
 unsigned int playback_status(void);
 

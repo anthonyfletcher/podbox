@@ -69,6 +69,9 @@ static int reset_settings(void)
     {
         case YESNO_YES:
             settings_reset();
+            /* Defaults now, not an upgrade: the next boot carries nothing
+             * from the Music lists into the carousel */
+            global_settings.album_covers_articles_carried = true;
             settings_save();
             settings_apply(true);
             settings_apply_skins();

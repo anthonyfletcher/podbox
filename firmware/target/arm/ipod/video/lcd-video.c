@@ -438,7 +438,9 @@ void lcd_update_rect(int x, int y, int width, int height)
         return; /* Nothing left to do. */
 
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
-    if (tv_on || tv_starting)
+    /* With interrupts off -- a panic -- the TV thread never runs again, so
+     * the LCD shows it: the BCM takes LCD updates in TV mode */
+    if ((tv_on || tv_starting) && irq_enabled())
     {
         tv_mark_dirty(y, height);
         return;
@@ -788,8 +790,11 @@ static void tv_start(void)
             tv_lvl6[i] = 16 + (i * 219 + 31) / 63;
         semaphore_init(&tv_wake, 1, 0);
         mutex_init(&tv_lock);
-        create_thread(tv_thread, tv_stack, sizeof(tv_stack), 0, "tv out"
-                      IF_PRIO(, PRIORITY_BACKGROUND) IF_COP(, CPU));
+        /* With no thread slot free nothing would copy to the TV, so the
+         * LCD is left showing rather than both going black */
+        if (!create_thread(tv_thread, tv_stack, sizeof(tv_stack), 0, "tv out"
+                           IF_PRIO(, PRIORITY_BACKGROUND) IF_COP(, CPU)))
+            return;
         tv_thread_running = true;
     }
 

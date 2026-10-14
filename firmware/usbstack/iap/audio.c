@@ -90,9 +90,12 @@ static long   announced_tick;
 /* An accessory that never answers GetAccessorySampleRateCaps but sets a rate
  * on the stream plays that rate, once it has sent nothing for two seconds,
  * neither a SET_CUR nor a report: one still identifying lists its rates
- * after */
+ * after. One that keeps talking, polling the play status, plays it four
+ * seconds after the SET_CUR or the end of authentication, whichever is
+ * later. */
 static int8_t host_rate = -1; /* index into samprs[], or -1 */
-static long   host_rate_tick;
+static long   host_rate_tick;     /* the last SET_CUR or report */
+static long   host_rate_set_tick; /* the last SET_CUR, or authentication */
 /* libiap sends no notification while a TrackNewAudioAttributes ack is owed,
  * so one owed for a second is written off: an accessory that never acks
  * still hears of track changes */
@@ -368,14 +371,18 @@ void iap_audio_tick(void) {
         usb_log(USB_LOG_IAP_RATE, 0, 1, RATE(set_freq), 0);
         cur_freq = set_freq;
     }
-    if(!accessory_ready && host_rate >= 0 &&
-       TIME_AFTER(current_tick, host_rate_tick + 2 * HZ)) {
-        /* not while it authenticates: the rates are asked for after that */
+    if(!accessory_ready && host_rate >= 0) {
+        /* not while it authenticates: the rates are asked for after that,
+         * so the limit counts from its end */
         struct IAPContext* ctx     = _iap_acquire_ctx(true);
         const bool         authing = ctx->phase == IAPPhase_Auth;
         _iap_release_ctx();
-        if(!authing) {
-            usb_log(USB_LOG_IAP_RATE, 0, 2, samprs[host_rate], 0);
+        if(authing) {
+            host_rate_set_tick = current_tick;
+        } else if(TIME_AFTER(current_tick, host_rate_tick + 2 * HZ) ||
+                  TIME_AFTER(current_tick, host_rate_set_tick + 4 * HZ)) {
+            usb_log(USB_LOG_IAP_RATE, 0, 2, samprs[host_rate],
+                    !TIME_AFTER(current_tick, host_rate_tick + 2 * HZ));
             offer_rates(1u << host_rate);
             host_rate = -1;
             iap_platform_take_sink();
@@ -544,8 +551,9 @@ bool iap_audio_set_sampr(uint32_t sampr) {
     if(!accessory_ready) {
         for(size_t i = 0; i < ARRAYLEN(samprs); i += 1) {
             if(samprs[i] == sampr) {
-                host_rate      = i;
-                host_rate_tick = current_tick;
+                host_rate          = i;
+                host_rate_tick     = current_tick;
+                host_rate_set_tick = current_tick;
             }
         }
     }
