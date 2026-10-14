@@ -1096,6 +1096,10 @@ static void lv_set_state(enum lv_state state, const struct mp3entry *id3)
 {
     char name[MAX_PATH];
 
+    /* Lit only while there are lyrics to read: a track without them lets the
+     * screen go dark on the user's own timeout. */
+    lv_backlight_hold(state == LV_SHOWING);
+
     name[0] = '\0';
     if (id3)
     {
@@ -1178,7 +1182,6 @@ static int lv_menu(void)
     viewportmanager_theme_undo(SCREEN_MAIN, false);
 
     lv_setup_screen();          /* re-reads font, colours, spacing */
-    lv_backlight_hold(true);    /* the setting may have just been turned on */
     lv.state = LV_SHOWING;      /* so the reload's lv_set_state() redraws */
     lv_clear();
     if (lv.font_error[0])
@@ -1200,7 +1203,6 @@ int lyric_viewer(void)
     lv.state = LV_SHOWING;   /* forces the first lv_set_state() to draw */
 
     push_current_activity(ACTIVITY_LYRICS);
-    lv_backlight_hold(true);
     lv_setup_screen();
     lv_clear();
     if (lv.font_error[0])

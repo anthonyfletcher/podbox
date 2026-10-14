@@ -513,7 +513,7 @@ Shadow Colour only while there is a shadow to colour.
 | Lyrics Viewer ▸ Next Line            | How far lines still to come fade back. | 55 | **Adv** |
 | Lyrics Viewer ▸ Animation            | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
 | Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
-| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. Costs battery. | on |  |
+| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. A track without lyrics goes dark as usual. Costs battery. | on |  |
 | Lyrics Viewer ▸ Font                 | A font used only by the lyrics screen. Unset uses the interface font. |  |  |
 
 ### Battery & Power

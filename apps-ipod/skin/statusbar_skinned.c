@@ -283,10 +283,11 @@ bool sb_show_working(void)
  *
  * The pace is a real choice, not a consequence: force_waiting bypasses
  * sb_skin_update()'s own next_update throttle, so this sets the bar's refresh
- * rate outright while it runs. update_delay is what that rate would otherwise
- * be, which makes it the cheapest pace that still animates -- about 7 frames a
- * second. A spinner with more frames than that drops some, which is invisible
- * when consecutive frames differ only slightly. */
+ * rate outright while it runs. DEFAULT_UPDATE_DELAY is the cheapest pace that
+ * still animates -- about 7 frames a second. A spinner with more frames than
+ * that drops some, which is invisible when consecutive frames differ only
+ * slightly. Not update_delay: the WPS sets that to 0, which would poke on
+ * every tick. */
 static void sb_busy_tick(void)
 {
     static long next_poke = 0;
@@ -295,7 +296,7 @@ static void sb_busy_tick(void)
 
     if (TIME_BEFORE(current_tick, next_poke))
         return;
-    next_poke = current_tick + update_delay;
+    next_poke = current_tick + DEFAULT_UPDATE_DELAY;
 
     /* Nothing to animate on a bar that is not drawn, or a dark screen: the
      * update would be skipped anyway and the wakeup wasted. */

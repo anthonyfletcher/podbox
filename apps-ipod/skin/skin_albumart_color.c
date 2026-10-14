@@ -60,6 +60,7 @@
 #include "core_alloc.h"
 #include "file.h"
 #include "storage.h"
+#include "ata_idle_notify.h"         /* DISK_EVENT_SPINUP */
 #include "string-extra.h"
 #include "metadata/art_cache.h"      /* the palette's own source */
 #include "playlist/playlist.h"       /* playlist_is_from_artist -- Auto's rule */
@@ -941,10 +942,11 @@ static fb_data palette_px[PALETTE_MAX_DIM * PALETTE_MAX_DIM];
 static struct mutex palette_lock;
 
 /* Palettes worked out ahead of their track, while the disk was already
- * running, so the track change can apply one without reading anything. Two:
- * the next track and the one after it can each be from a new album. A slot is
- * used once, so a cover the art pass replaces is read afresh next time. */
-#define PREFETCH_SLOTS 2
+ * running, so the track change can apply one without reading anything. One
+ * per buffered track that may be from a new album, as on shuffle, up to the
+ * number the disk-idle walk looks ahead. A slot is used once, so a cover the
+ * art pass replaces is read afresh next time. */
+#define PREFETCH_SLOTS 8
 static struct {
     unsigned int hash;
     struct found_palette p;
@@ -1015,9 +1017,11 @@ static int palette_dim(void)
 static bool read_folder_palette(unsigned int hash, int dim,
                                 struct found_palette *out)
 {
+    /* Static, and only touched under palette_lock: the storage thread's
+     * stack has room for the open() below, not for this as well. */
+    static char aat[MAX_PATH];
     struct art_cache_header hdr;
     struct bitmap bmp;
-    char aat[MAX_PATH];
     size_t bytes;
     bool got = false;
     int fd;
@@ -1029,8 +1033,8 @@ static bool read_folder_palette(unsigned int hash, int dim,
      * whether it exists first -- the open is the existence test. A folder
      * with no art has no file here, which is what keeps the shared "no art"
      * placeholder from becoming somebody's palette. */
-    art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
     mutex_lock(&palette_lock);
+    art_cache_thumb_path(hash, palette_size_idx, aat, sizeof(aat));
     fd = open(aat, O_RDONLY);
     if (fd >= 0)
     {
@@ -1444,27 +1448,27 @@ static void track_change_cb(unsigned short id, void *param)
 /* A track about to play: work out its palette now if the disk is running,
  * rather than at the track change -- with the screen dark that read would land
  * on the first render after it wakes and hold the screen up for a spin-up.
- * Runs on the audio thread, so a disk that is not running is left alone: a
- * spin-up here stalls playback's queue. Asked when the next track's metadata
- * loads, which is buffering, and when its decoding starts. The first
- * candidate that reads is the one palette_from_cache() would settle on too. */
-static void prefetch_cb(unsigned short id, void *param)
+ * Runs on the audio and storage threads, so a disk that is not running is left
+ * alone: a spin-up here stalls playback's queue. The first candidate that
+ * reads is the one palette_from_cache() would settle on too. */
+static void prefetch_path(const char *track_path)
 {
-    struct mp3entry *id3 = ((struct track_event *)param)->id3;
+    /* Static for the storage thread's stack, as in read_folder_palette().
+     * Shared safely: nothing between the copy and palette_candidates()
+     * finishing with it yields. */
+    static char path[MAX_PATH];
     struct found_palette p;
     unsigned int cand[2];
-    char path[MAX_PATH];
     int n, i, dim;
 
-    (void)id;
     if (!global_settings.dynamic_colors || audio_is_unrecorded() ||
-        !id3 || !id3->path[0] || !storage_disk_is_active())
+        !track_path[0] || !storage_disk_is_active())
         return;
     dim = palette_dim();
     if (dim == 0)
         return;
 
-    strmemccpy(path, id3->path, sizeof(path));
+    strmemccpy(path, track_path, sizeof(path));
     n = palette_candidates(path, cand);
     for (i = 0; i < n; i++)
     {
@@ -1480,6 +1484,36 @@ static void prefetch_cb(unsigned short id, void *param)
             prefetch_next = (prefetch_next + 1) % PREFETCH_SLOTS;
             return;
         }
+    }
+}
+
+/* Asked when the next track's metadata loads, which is buffering, and when
+ * its decoding starts. */
+static void prefetch_cb(unsigned short id, void *param)
+{
+    struct mp3entry *id3 = ((struct track_event *)param)->id3;
+
+    (void)id;
+    if (id3)
+        prefetch_path(id3->path);
+}
+
+/* The disk about to sleep, on the storage thread: the last moment a read
+ * costs no spin-up. Every track buffered ahead is covered here, where
+ * prefetch_cb() only ever sees the next one while the disk runs -- the
+ * others reach their decode start with it asleep. Static because an
+ * mp3entry is too big for the storage thread's stack. */
+static void prefetch_idle_cb(unsigned short id, void *param)
+{
+    static struct mp3entry id3;
+
+    (void)id;
+    (void)param;
+    for (int offset = 1; offset <= PREFETCH_SLOTS; offset++)
+    {
+        if (!audio_peek_track(&id3, offset))
+            break;
+        prefetch_path(id3.path);
     }
 }
 
@@ -1504,6 +1538,7 @@ void dynamic_colors_init(void)
         mutex_init(&palette_lock);
         add_event(PLAYBACK_EVENT_TRACK_BUFFER, prefetch_cb);
         add_event(PLAYBACK_EVENT_NEXTTRACKID3_AVAILABLE, prefetch_cb);
+        add_event(DISK_EVENT_SPINUP, prefetch_idle_cb);
         add_event(PLAYBACK_EVENT_TRACK_CHANGE, track_change_cb);
         add_event(PLAYBACK_EVENT_CUR_TRACK_READY, track_change_cb);
         events_registered = true;

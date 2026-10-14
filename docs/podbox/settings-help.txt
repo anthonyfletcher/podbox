@@ -1137,7 +1137,8 @@ timings. Files with only line timings are unaffected.
 
 [lyric backlight]
 Holds the backlight on while lyrics are showing, since a screen that keeps
-going dark defeats the point. Costs battery.
+going dark defeats the point. A track without lyrics goes dark as usual.
+Costs battery.
 
 [lyric font]
 A font used only by the lyrics screen. Unset uses the interface font.

@@ -114,7 +114,7 @@ bool ide_powered()
  * without probing it. */
 static int usb_committed_ma;
 
-/* A charger proven by power_input_status() with the backlight on. It keeps
+/* A charger proven by power_input_status() while it probes. It keeps
  * C1 low whatever the USB side commits to: the stack's no-host timeout drops
  * the commitment to 100 mA, and blocking charging then would leave a wall
  * charger unused until the screen next comes on. */
@@ -162,19 +162,34 @@ static int chrg_monitor_cb(struct timeout *tmo)
     return 1;  /* re-run next tick (10ms) */
 }
 
+/* How long a cable just plugged in is probed for with the screen dark. A wall
+ * charger is only reported as one once proven, and only a reported charger
+ * turns the backlight on, so without this a player plugged in dark is never
+ * charged. Eight samples plus room for the charger's own start-up. */
+#define CHRG_PROBE_ON_INSERT (10*HZ)
+
 unsigned int power_input_status(void)
 {
-    static bool prev_bl_on;
+    static bool was_probing;
     static bool monitoring;
+    static bool inserted;
+    static long probe_until;
     static int debounce;
     unsigned int status = POWER_INPUT_NONE;
     if (usb_detect() == USB_INSERTED)
     {
         status |= POWER_INPUT_USB;
-        bool bl_on = is_backlight_on(true);
-        if (bl_on && !prev_bl_on)
+        if (!inserted)
         {
-            /* BL just turned on: probe C1, start monitor */
+            inserted = true;
+            probe_until = current_tick + CHRG_PROBE_ON_INSERT;
+        }
+        /* Probe while the screen is on, or a cable has just gone in */
+        bool probing = is_backlight_on(true) ||
+                       TIME_BEFORE(current_tick, probe_until);
+        if (probing && !was_probing)
+        {
+            /* Probing starts: C1 low, start monitor */
             GPIOCMD = 0xc010e | 0;  /* C1 LOW */
             chrg_saw_discharge = false;
             debounce = 0;
@@ -185,7 +200,7 @@ unsigned int power_input_status(void)
                 monitoring = true;
             }
         }
-        else if (bl_on)
+        else if (probing)
         {
             /* Check high-frequency monitor flag */
             if (chrg_saw_discharge)
@@ -218,7 +233,7 @@ unsigned int power_input_status(void)
         }
         else
         {
-            /* BL off: stop monitor, control C1 */
+            /* Not probing: stop monitor, control C1 */
             if (monitoring)
             {
                 timeout_cancel(&chrg_monitor_tmo);
@@ -227,11 +242,11 @@ unsigned int power_input_status(void)
             if (!usb_charger_detected && usb_committed_ma < 500)
                 GPIOCMD = 0xc010e | 1;  /* C1 HIGH: block */
         }
-        /* BL off + charger detected: C1 stays LOW, charging
+        /* Not probing + charger detected: C1 stays LOW, charging
          * continues from the real charger source. */
         if (usb_charger_detected)
             status |= POWER_INPUT_USB_CHARGER;
-        prev_bl_on = bl_on;
+        was_probing = probing;
     }
     else
     {
@@ -241,7 +256,8 @@ unsigned int power_input_status(void)
             monitoring = false;
         }
         usb_charger_detected = false;
-        prev_bl_on = false;
+        was_probing = false;
+        inserted = false;
         debounce = 0;
     }
     if (pmu_firewire_present())
