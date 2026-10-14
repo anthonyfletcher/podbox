@@ -647,6 +647,7 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
                 return true;
             }
 
+            iap_audio_accessory_heard();
             struct IAPContext* ctx = _iap_acquire_ctx(true);
             iap_log_report(ctx, reqdata, req->wLength, false);
             /* The report arrived whatever libiap makes of it. A STALL would

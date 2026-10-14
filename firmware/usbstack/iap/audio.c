@@ -88,7 +88,9 @@ static long   asked_tick;
 static bool   host_set_rate = true; /* a SET_CUR since the announcement */
 static long   announced_tick;
 /* An accessory that never answers GetAccessorySampleRateCaps but sets a rate
- * on the stream plays that rate, two seconds after its last SET_CUR */
+ * on the stream plays that rate, once it has sent nothing for two seconds,
+ * neither a SET_CUR nor a report: one still identifying lists its rates
+ * after */
 static int8_t host_rate = -1; /* index into samprs[], or -1 */
 static long   host_rate_tick;
 /* libiap sends no notification while a TrackNewAudioAttributes ack is owed,
@@ -532,6 +534,10 @@ void iap_audio_take_counts(struct iap_audio_counts *c) {
     c->odd    = count_odd;
     count_bytes = count_chunks = count_silent = count_odd = 0;
     restore_irq(irq);
+}
+
+void iap_audio_accessory_heard(void) {
+    host_rate_tick = current_tick;
 }
 
 bool iap_audio_set_sampr(uint32_t sampr) {

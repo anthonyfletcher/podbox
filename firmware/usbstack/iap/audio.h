@@ -36,6 +36,8 @@ bool iap_audio_accessory_rates(struct IAPSpan* list);
 void iap_audio_connected(void);
 /* The accessory's ack of TrackNewAudioAttributes, which lets a new rate play. */
 void iap_audio_attrs_ack(bool success);
+/* USB thread: an iAP1 report has arrived, which holds back the rate fallback */
+void iap_audio_accessory_heard(void);
 /* USB thread: TrackNewAudioAttributes again if a track has started since. */
 void iap_audio_tick(void);
 /* The rate the iAP sink is configured for. */
