@@ -1311,6 +1311,10 @@ int ata_event(long id, intptr_t data)
                     keep_ata_active();
                 }
                 ata_led(false);
+            } else if (ata_state == ATA_SLEEPING && power_off_tick) {
+                /* the backlight reads on only once its thread has run, and
+                 * a storage tick before then would cut the power */
+                power_off_tick = current_tick + ATA_SSD_POWER_OFF_TIMEOUT;
             }
             mutex_unlock(&ata_mutex);
         }

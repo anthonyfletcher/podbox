@@ -163,8 +163,13 @@ static void write_minutes(void)
     {
         if (lost)
         {
+            int level;
+
             fdprintf(fd, "# %u minutes lost: the disk did not sleep\n", lost);
+            /* the tick counts on meanwhile */
+            level = disable_irq_save();
             dropped -= lost;
+            restore_irq(level);
         }
         while (ring_tail != ring_head)
         {

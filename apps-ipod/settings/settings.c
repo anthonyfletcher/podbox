@@ -107,6 +107,7 @@ static long lasttime = 0;
 #include "screens/covers/album_covers.h" /* the year sort carry-over */
 #include "metadata/book_resume.h"
 #include "metadata/art_cache.h"
+#include "system/battery_log.h"
 #include "pcm_sampr.h"
 
 #ifdef LOGF_ENABLE
@@ -1362,6 +1363,8 @@ void settings_apply(bool read_disk)
 
     settings_apply_dialog_style();
     art_cache_settings_applied();
+    /* Reset Settings runs no setting's callback */
+    battery_log_enable(global_settings.debug_log_battery);
 
     if (read_disk)
     {
