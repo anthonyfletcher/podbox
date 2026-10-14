@@ -1158,7 +1158,8 @@ How long it takes to go down. A slow fade is gentler in the dark.
 
 [backlight filters first keypress]
 The press that wakes the screen does nothing else, so you cannot change a
-setting you could not see. Costs one extra press each time.
+setting you could not see. Costs one extra press each time. A remote's or
+dock's buttons always act.
 
 [No Backlight On Selected Actions]
 Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume
@@ -1271,6 +1272,13 @@ Off answers none, as an iPod does. Shown only while Accessory Protocol is on.
 With USB Sound Card on, a car makes the player drop off USB for a moment and come back
 without the sound card.
 
+[identify as]
+The model a car or dock is told the player is. Try another if an accessory
+takes control but plays nothing: some judge what a player can do by its model.
+Changes over USB take effect at the next connection. A computer with Apple's
+drivers may not show the disk with iPhone 4. Shown only while Accessory
+Protocol is on.
+
 [accessory browsing]
 Lets a receiver, car or dock browse artists, albums, genres, composers and
 audiobooks, up to this many songs in a list; a dock or receiver can also play
@@ -1289,6 +1297,9 @@ send the image itself: sharper on a large screen, but a large one takes
 seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album
 Art follows the Album Art setting. Off sends none,
 and a car that looks covers up itself shows its own.
+
+An older car or a dock gets the art cache's cover whichever is chosen, and none
+with Off.
 
 [serial bitrate]
 The speed of the dock connector's serial line. Auto suits every accessory that
@@ -1322,7 +1333,7 @@ Off, every click is play/pause and acts at once.
 [usb mode]
 What a USB connection does: present the disk to the computer, or charge only.
 Charge only suits a plug that would otherwise take the disk and interrupt
-playback, but it also stops docks and cars that play from the player over USB.
+playback. Docks and cars that play from the player over USB still work.
 
 [usb hid]
 Presents the player as a keyboard or remote control to the computer, so its

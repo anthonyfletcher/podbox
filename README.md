@@ -501,8 +501,7 @@ headphone amp or DAC, which does the conversion instead of the iPod.
 Your iPod can output digital audio out to a dock - a dock that takes the iPod's audio
 digitally, over the USB pins of the dock connector
 - On by default, through `Settings > System > Accessories > Accessory Protocol`
-- Needs `Settings > System > USB > USB Mode` set to `Mass Storage` - in `Charge Only` the iPod
-  doesn't talk to docks or cars over USB
+- Works with `Settings > System > USB > USB Mode` set to either `Mass Storage` or `Charge Only`
 - Remote support improved to match click-wheel actions
 
 A receiver or dock that browses an iPod shows what is playing and can browse 
@@ -582,7 +581,9 @@ how I use my iPod. I'm sharing it in the hope that others might find it useful t
 
 Built on the work of:
 - the [Rockbox](https://www.rockbox.org/) project
-- the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes))
+- the [RockPod](https://github.com/nuxcodes/rockpod) project (Nux Li: aka [@nuxcodes](https://github.com/nuxcodes)),
+  the starting point for the app layer, the iPod hardware work in `firmware/`, and much of
+  the serial accessory protocol
 - the [Spun](https://github.com/majorsiebe/Stats_for_iPod) project (Siebe Majoor: aka [@majorsiebe](https://github.com/majorsiebe))
 
 ## Other credits
@@ -639,6 +640,22 @@ its own `.rockbox/fonts/`. The links below point at one copy of each.
   - Copyright 2014 Andrew Welch, Carl R. Osterwald, Stephen C. Gilardi
   - Licensed under the MIT License —
     [full text](themes/bony/.rockbox/fonts/LICENSE-ProFont.txt)
+
+### Docks, receivers and remotes (iAP)
+
+Thank you to the following, whose code or findings the dock and remote support is built on.
+Which came from where is in [`iap-sources.md`](docs/podbox/iap-sources.md).
+
+- RockPod by Nux Li aka [@nuxcodes](https://github.com/nuxcodes) (https://github.com/nuxcodes/rockpod)
+  - The serial accessory protocol overhaul: identification, playback control, notifications,
+    volume, chapters, authentication and album art
+- Paul Sauro's Rockbox changes 7900, 7906, 7938 and 7940 (https://gerrit.rockbox.org)
+  - Digital audio to docks: rate changes, charge-only mode and seeking from a remote
+- libiap by mojyack (https://github.com/mojyack/libiap)
+  - The USB accessory protocol core
+- ipod-gadget and ipod by Andrew Onyshchuk aka [@oandrew](https://github.com/oandrew)
+  (https://github.com/oandrew/ipod-gadget)
+  - How cars behave, and the identities behind `Identify As`
 
 ### Modern cars (iAP2)
 
