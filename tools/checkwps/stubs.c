@@ -402,6 +402,7 @@ void usb_set_dac_output(int mode) { (void)mode; }
 void usb_set_hid(bool enable) { (void)enable; }
 void usb_set_iap(bool enable) { (void)enable; }
 void usb_set_iap2_mode(int mode) { (void)mode; }
+void usb_set_identity(int identity) { (void)identity; }
 void usb_set_mode(int mode) { (void)mode; }
 void voice_set_mixer_level(int percent) { (void)percent; }
 
