@@ -386,6 +386,7 @@ static const struct tag_row tag_rows[] = {
 { "keyclick repeats",    TAG_ADVANCED|TAG_SYSTEM,                "keyclick click" },
 { "accessory protocol",  TAG_ADVANCED|TAG_SYSTEM,                "accessory dock iap car remote protocol" },
 { "iap2 accessories",    TAG_ADVANCED|TAG_SYSTEM,                "iap2 car iphone accessory carplay usb" },
+{ "identify as",         TAG_ADVANCED|TAG_SYSTEM,                "model ipod iphone car dock accessory usb product" },
 { "car artwork",         TAG_SYSTEM|TAG_ARTWORK,                 "car cover art artwork iap accessory" },
 { "accessory browsing",  TAG_ADVANCED|TAG_SYSTEM,                "accessory receiver car library browse usb iap" },
 { "serial bitrate",      TAG_ADVANCED|TAG_SYSTEM,                "accessory serial dock" },

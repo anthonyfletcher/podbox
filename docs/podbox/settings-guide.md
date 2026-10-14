@@ -527,7 +527,7 @@ Shadow Colour only while there is a shadow to colour.
 | Caption Backlight | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
 | Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
 | Backlight Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
-| First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. | on | **Adv** |
+| First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. A remote's or dock's buttons always act. | on | **Adv** |
 | Backlight Exemptions ▸ Enabled | Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | off | **Adv** |
 | Sleep (After Backlight Off) | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
 | Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
@@ -570,7 +570,7 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only suits a plug that would otherwise take the disk and interrupt playback, but it also stops docks and cars that play from the player over USB. | mass storage |  |
+| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only suits a plug that would otherwise take the disk and interrupt playback. Docks and cars that play from the player over USB still work. | mass storage |  |
 | USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
 | USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
 | USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
@@ -589,16 +589,17 @@ Shadow Colour only while there is a shadow to colour.
 | Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
 | Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
 | iPhone Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk. Off answers none, as an iPod does. Shown only while Accessory Protocol is on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
+| Identify As | The model a car or dock is told the player is. Try another if an accessory takes control but plays nothing: some judge what a player can do by its model. Changes over USB take effect at the next connection. A computer with Apple's drivers may not show the disk with iPhone 4. Shown only while Accessory Protocol is on. | this player | **Adv** |
 | Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
 | Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, or with a car's first cover, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
-| Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. | prefer cache |  |
+| Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. An older car or a dock gets the art cache's cover whichever is chosen, and none with Off. | prefer cache |  |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
 | Remote Track Skip | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
 
 A car is not offered Playlist Engine moods through **Accessory Browsing**.
 
-iPhone Accessories, Accessory Browsing, Car Artwork and Serial Bitrate are
-listed only while Accessory Protocol is On.
+iPhone Accessories, Identify As, Accessory Browsing, Car Artwork and Serial
+Bitrate are listed only while Accessory Protocol is On.
 
 ### System — Accessories — TV Out
 

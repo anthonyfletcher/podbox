@@ -28,6 +28,9 @@
 #include "lcd.h"
 #include "serial.h"
 #include "iap.h"
+#ifdef HAVE_IAP_ACCESSORY_POLL
+#include "adc.h"
+#endif
 
 #if defined(IPOD_ACCESSORY_PROTOCOL)
 struct ppuart {
@@ -50,10 +53,37 @@ static void set_bitrate(volatile struct ppuart *port, unsigned int rate)
     unsigned int divisor;
 
     divisor = 24000000L / rate / 16;
+    /* RBR and DLL share an address. With the latch enabled, the receive
+     * interrupt's drain loop reads the divisor and never empties the FIFO,
+     * so it spins for ever: the window is kept from it. */
+    int level = disable_irq_save();
     *port->LCR = 0x80; /* Divisor latch enable */
     *port->RBR_THR_DLL = (divisor >> 0) & 0xFF;
     *port->LCR = 0x03; /* Divisor latch disable, 8-N-1 */
+    restore_irq(level);
 }
+
+#ifdef HAVE_IAP_ACCESSORY_POLL
+/* iAP thread only: the accessory-detect ADC is behind the PCF's I2C, which
+ * takes a mutex. Below 10 is an accessory, as ipod_remote_tuner.c reads it;
+ * the reading must stay above for a second before it counts as gone. */
+void iap_accessory_poll(void)
+{
+    static bool plugged;
+    static int absent;
+
+    if (adc_read(ADC_ACCESSORY) < 10)
+    {
+        plugged = true;
+        absent = 0;
+    }
+    else if (plugged && ++absent >= 10)
+    {
+        plugged = false;
+        iap_reset_state(IF_IAP_MP(0));
+    }
+}
+#endif
 
 void serial_setup (void)
 {

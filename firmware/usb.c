@@ -331,7 +331,9 @@ static inline void usb_configure_drivers(int for_state)
         usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio_wanted());
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
-        usb_core_enable_driver(USB_DRIVER_IAP, false);
+        /* Charge only keeps the disk from a computer, not the audio from a
+         * dock, which has a configuration of its own (Gerrit 7940). */
+        usb_core_enable_driver(USB_DRIVER_IAP, usb_iap);
 #endif
 
 #ifdef USB_ENABLE_CHARGING_ONLY
@@ -523,6 +525,9 @@ static void usb_set_host_present(bool present)
 
     if(!usb_host_present)
     {
+#ifdef USB_ENABLE_IAP
+        usb_iap_end_reset_hold(true);
+#endif
         usb_configure_drivers(USB_EXTRACTED);
         thread_set_priority(thread_self(), PRIORITY_SYSTEM);
         return;
@@ -556,7 +561,7 @@ static void usb_extract(void)
         usb_stack_enable(false);
 
 #ifdef IPOD_ACCESSORY_PROTOCOL
-    iap_reset_state(IF_IAP_MP(0));
+    iap_power_reset();
 #endif
 
     usb_state = USB_EXTRACTED;
@@ -904,7 +909,12 @@ static void NORETURN_ATTR usb_thread(void)
             usb_stack_enable(false);
             sleep(HZ / 5);      /* long enough for the car to see it go */
             usb_stack_enable(true);
+#ifdef HAVE_USB_POWER
+            /* charge only stays charge only */
+            usb_configure_drivers(usb_power_only ? USB_POWERED : USB_INSERTED);
+#else
             usb_configure_drivers(USB_INSERTED);
+#endif
             break;
 #endif
 
@@ -1344,9 +1354,9 @@ void usb_set_hid(bool enable)
 #endif /* USB_ENABLE_HID */
 
 #ifdef USB_ENABLE_IAP
-/* Takes effect at the next connection, either way: on here would offer the
- * driver charge-only, and off mid-connection would skip its disconnect at
- * unplug, leaving the mixer on the iAP sink. */
+/* Takes effect at the next connection, either way: off mid-connection would
+ * skip the driver's disconnect at unplug, leaving the mixer on the iAP
+ * sink. */
 void usb_set_iap(bool enable)
 {
     usb_iap = enable;
@@ -1355,6 +1365,26 @@ void usb_set_iap(bool enable)
 void usb_set_iap2_mode(int mode)
 {
     usb_iap_set_iap2_mode(mode);
+}
+
+/* The iPod Classic's are the 160 GB model's, which serial iAP has always
+ * reported; the iPhone 4's are those ipod-gadget answers cars with */
+static const struct usb_identity identities[] = {
+    [USB_IDENTITY_OWN]          = { 0,      0x00130200, "MC293" },
+    [USB_IDENTITY_IPOD_CLASSIC] = { 0x1261, 0x00130200, "MC293" },
+    [USB_IDENTITY_IPHONE_4]     = { 0x1297, 0x00111349, "MC676" },
+};
+static int identity = USB_IDENTITY_OWN;
+
+void usb_set_identity(int new_identity)
+{
+    if(new_identity >= 0 && new_identity < (int)ARRAYLEN(identities))
+        identity = new_identity;
+}
+
+const struct usb_identity* usb_identity(void)
+{
+    return &identities[identity];
 }
 
 /* Any thread or an interrupt */

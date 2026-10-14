@@ -57,10 +57,14 @@
 #include "metadata.h"
 #include "database/tagcache.h"
 #include "iap-library.h"
+#include "iap-artwork.h"
 #include "sound.h"
 #include "action.h"
 #include "powermgmt.h"
+#include "power.h"
 #include "usb.h"
+#include "system/volume.h"
+#include "audio/remote_seek.h"
 
 #include "tuner.h"
 #if CONFIG_TUNER
@@ -87,11 +91,20 @@
 #define IAP_EV_TICK         (1)     /* The regular task timeout */
 #define IAP_EV_MSG_RCVD     (2)     /* A complete message has been received from the device */
 #define IAP_EV_MALLOC       (3)     /* Allocate memory for the RX/TX buffers */
+#define IAP_EV_RESET        (4)     /* The accessory has gone, see iap_reset_state() */
+#define IAP_EV_ARTWORK      (5)     /* The next packet of album art */
 
 static bool iap_started = false;
 static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
+static volatile bool reset_pending;
+static volatile bool reset_departed;    /* the reset pauses, see below */
 static long last_frame_tick;     /* 0 until a frame passes its checksum */
+/* The data of the one IAP_EV_ARTWORK that is live, and whether a packet
+ * went since the last tick; a tick that finds none sent posts a new one,
+ * so an event lost to a full queue does not end the transfer */
+static intptr_t art_seq;
+static bool art_sent;
 /* This is set to true if a SYS_POWEROFF message is received,
  * signalling impending power off
  */
@@ -115,7 +128,8 @@ int iap_repeatbtn = 0;
  * it reaches 0
  */
 unsigned int iap_timeoutbtn = 0;
-bool iap_btnrepeat = false, iap_btnshuffle = false;
+bool iap_btnrepeat = false, iap_btnshuffle = false, iap_btnstop = false;
+bool iap_btnchapter = false;
 
 /* The lingo 3 and 4 handlers each place a struct mp3entry (2760 bytes) on
  * the stack unconditionally, even for the commands that never look at
@@ -134,9 +148,9 @@ static struct event_queue iap_queue;
  * iap_buffers points to the start of the complete buffer
  *
  * The buffer is partitioned as follows:
- * - TX_BUFLEN+6 bytes for the TX buffer
- *   The 6 extra bytes are for the sync byte, the SOP byte, the length indicators
- *   (3 bytes) and the checksum byte.
+ * - TX_AREA bytes for the TX buffer
+ *   The 8 extra bytes are for the sync byte, the SOP byte, the length indicators
+ *   (3 bytes), a transaction ID (2 bytes) and the checksum byte.
  *   iap_txstart points to the beginning of the TX buffer
  *   iap_txpayload points to the beginning of the payload portion of the TX buffer
  *   iap_txnext points to the position where the next byte will be placed
@@ -166,7 +180,8 @@ static struct event_queue iap_queue;
  * buffer overflow has some place to spill into where it will not cause
  * immediate damage. See the comments for IAP_TX_* and iap_send_tx()
  */
-#define IAP_MALLOC_SIZE (TX_BUFLEN+6+RX_BUFLEN+2)
+#define TX_AREA (TX_BUFLEN+8)
+#define IAP_MALLOC_SIZE (TX_AREA+RX_BUFLEN+2)
 #ifdef IAP_MALLOC_DYNAMIC
 static int iap_buffer_handle;
 #endif
@@ -279,7 +294,7 @@ static void iap_reset_buffers(void)
     iap_txstart = iap_buffers;
     iap_txpayload = iap_txstart+5;
     iap_txnext = iap_txpayload;
-    iap_rxstart = iap_buffers+(TX_BUFLEN+6);
+    iap_rxstart = iap_buffers+TX_AREA;
     iap_rxpayload = iap_rxstart;
     iap_rxnext = iap_rxpayload;
     iap_rxlen = RX_BUFLEN+2;
@@ -372,27 +387,69 @@ void iap_reset_auth(struct auth_t* auth)
     auth->state = AUST_NONE;
     auth->max_section = 0;
     auth->next_section = 0;
+    auth->deadline = 0;
+}
+
+/* Any context: the 6G's accessory tick calls this from the timer interrupt.
+ * The session is reset on the iAP thread, and iap_handlepkt() does that
+ * before it reads another packet, so nothing the departed accessory left in
+ * the buffer reaches the next one. */
+static void post_reset(bool departed)
+{
+    int level;
+
+    if (!iap_running)
+        return;
+
+    level = disable_irq_save();
+    frame_state.state = ST_SYNC;
+    reset_pending = true;
+    reset_departed |= departed;
+    restore_irq(level);
+    queue_post(&iap_queue, IAP_EV_RESET, 0);
 }
 
 void iap_reset_state(IF_IAP_MP_NONVOID(int port))
 {
-    if (!iap_running)
-        return;
-
     /* 0 is dock, 1 is headphone.  This is for
        when we eventually maintain independent state */
     IF_IAP_MP((void)port);
+    post_reset(true);
+}
+
+void iap_power_reset(void)
+{
+    post_reset(false);
+}
+
+/* iAP thread. An accessory in extended mode was playing the track through
+ * itself, so its leaving pauses it, as an Extended to Standard change does;
+ * a reset for lost USB power does not, as the accessory may still be there. */
+static void iap_do_reset(void)
+{
+    int level = disable_irq_save();
+    bool departed = reset_departed;
+    reset_pending = false;
+    reset_departed = false;
+    frame_state.state = ST_SYNC;
+    iap_reset_buffers();
+    restore_irq(level);
+    last_frame_tick = 0;
 
     iap_reset_device(&device);
-    iap_bitrate_set(global_settings.serial_bitrate);
-
-#if 0  // XXX this is still screwed up
-    memset(&frame_state, 0, sizeof(frame_state));
+    remote_seek_stop();
+    iap_remotebtn = BUTTON_NONE;
+    iap_timeoutbtn = 0;
+    iap_repeatbtn = 0;
+    iap_btnshuffle = false;
+    iap_btnrepeat = false;
+    iap_btnstop = false;
+    iap_btnchapter = false;
+    if (departed && interface_state == IST_EXTENDED
+        && (audio_status() & AUDIO_STATUS_PLAY))
+        audio_pause();
     interface_state = IST_STANDARD;
-    frame_state.state = ST_SYNC;
-
-    iap_reset_buffers();
-#endif
+    iap_bitrate_set(global_settings.serial_bitrate);
 }
 
 void iap_reset_device(struct device_t* device)
@@ -402,10 +459,31 @@ void iap_reset_device(struct device_t* device)
     device->notifications = 0;
     device->changed_notifications = 0;
     device->do_notify = false;
+    /* An accessory that muted the player does not leave it silent. Every
+     * caller is on the iAP thread but iap_start(), before any could mute,
+     * and iap_enable(false), from the thread changing the setting. */
+    if (device->mute)
+        iap_set_mute(false);
+    device->pb_notifications = 0;
+    device->pb_track_changed = false;
+    device->pb_play_status = 0;
+    device->pb_ext_state = 0xff;
+    device->pb_trackpos_ms = UINT32_MAX;
+    device->pb_trackpos_s = UINT32_MAX;
+    device->pb_numtracks = UINT32_MAX;
+    device->pb_chapter_index = UINT32_MAX - 1;
     device->do_power_notify = false;
     device->accinfo = ACCST_NONE;
     device->capabilities = 0;
     device->capabilities_queried = 0;
+    device->max_payload = 0;
+    iap_artwork_stop();
+    device->transid = false;
+    device->idps = false;
+    device->identified_by_idps = false;
+    device->idps_lingoes = 0;
+    device->idps_options = 0;
+    device->idps_deviceid = 0;
 }
 
 static int iap_task(struct timeout *tmo)
@@ -422,8 +500,42 @@ void iap_set_remote_volume(void)
     IAP_TX_INIT(0x03, 0x0D);
     IAP_TX_PUT(0x04);
     IAP_TX_PUT(0x00);
-    IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+    IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
     iap_send_tx();
+}
+
+unsigned char iap_volume_to_byte(int volume)
+{
+    const int min = sound_min(SOUND_VOLUME);
+    const int max = sound_max(SOUND_VOLUME);
+
+    if (volume <= min)
+        return 0;
+    if (volume >= max)
+        return 255;
+    return (volume - min) * 255 / (max - min);
+}
+
+int iap_byte_to_volume(unsigned char level)
+{
+    const int min = sound_min(SOUND_VOLUME);
+    const int max = sound_max(SOUND_VOLUME);
+
+    return min + (level * (max - min) + 127) / 255;
+}
+
+void iap_volume_set(void)
+{
+    device.mute = false;
+}
+
+void iap_set_mute(bool mute)
+{
+    device.mute = mute;
+    if (mute)
+        sound_set_volume(sound_min(SOUND_VOLUME));
+    else
+        setvol();
 }
 
 /* This thread is waiting for events posted to iap_queue and calls
@@ -442,6 +554,9 @@ static void iap_thread(void)
             case IAP_EV_TICK:
             {
                 iap_periodic();
+                if (iap_artwork_active() && !art_sent)
+                    iap_artwork_post();
+                art_sent = false;
                 /* pick up packets whose IAP_EV_MSG_RCVD event was lost
                    to a queue overflow, they would otherwise sit in the
                    RX buffer until the next packet arrives */
@@ -453,6 +568,28 @@ static void iap_thread(void)
             case IAP_EV_MSG_RCVD:
             {
                 iap_handlepkt();
+                break;
+            }
+
+            /* queue_wait() does not block while the next one is queued,
+             * so the yield lets the other threads run between packets */
+            case IAP_EV_ARTWORK:
+            {
+                if (ev.data != art_seq)
+                    break;
+                art_sent = true;
+                if (iap_artwork_send_next())
+                {
+                    yield();
+                    iap_artwork_post();
+                }
+                break;
+            }
+
+            case IAP_EV_RESET:
+            {
+                if (reset_pending)
+                    iap_do_reset();
                 break;
             }
 
@@ -483,24 +620,13 @@ static void iap_thread(void)
     }
 }
 
-/* called by playback when the next track starts */
+/* called by playback when the next track starts. On the audio thread, so
+ * only flagged: the iAP thread owns the TX buffer. */
 static void iap_track_changed(unsigned short id, void *ignored)
 {
     (void)id;
     (void)ignored;
-    if ((interface_state == IST_EXTENDED) && device.do_notify) {
-        long playlist_pos = playlist_next(0);
-        playlist_pos -= playlist_get_first_index(NULL);
-        if(playlist_pos < 0)
-            playlist_pos += playlist_amount();
-
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x01);
-        IAP_TX_PUT_U32(playlist_pos);
-
-        iap_send_tx();
-        return;
-    }
+    device.pb_track_changed = true;
 }
 
 /* Do general setup of the needed infrastructure.
@@ -624,6 +750,89 @@ void iap_bitrate_set(const int ratenum)
    checksum (length+mode+parameters+checksum == 0)
 */
 
+/* The command being handled, whose transaction ID a reply carries */
+static bool rx_handling;
+static unsigned char rx_lingo;
+static uint16_t rx_tid;
+/* The next ID of a command the player sends */
+static uint16_t own_tid;
+/* The ID iap_send_tx_tid() gives its packet, or -1 */
+static int tid_override = -1;
+
+/* Sent by the player of its own accord, not in answer: these take an ID of
+ * their own even while a command is being handled */
+static bool tx_unsolicited(const unsigned char *p)
+{
+    switch (p[0])
+    {
+        case 0x00: return p[1] == 0x23 || p[1] == 0x27;
+        case 0x03: return p[1] == 0x09;
+        case 0x04: return get_u16(&p[1]) == 0x0027;
+        default:   return false;
+    }
+}
+
+static uint16_t tx_tid(const unsigned char *p)
+{
+    if (tid_override >= 0)
+        return tid_override;
+    /* One ID serves the whole authentication exchange */
+    if (p[0] == 0x00 && (p[1] == 0x14 || p[1] == 0x16
+                         || p[1] == 0x17 || p[1] == 0x19))
+        return device.auth.tid;
+    /* An iPodAck answers a command of any lingo */
+    if (rx_handling && !tx_unsolicited(p)
+        && (p[0] == rx_lingo || (p[0] == 0x00 && p[1] == 0x02)))
+        return rx_tid;
+    return own_tid++;
+}
+
+/* Called for every packet before its lingo's handler, which then reads it
+ * as though transaction IDs did not exist. False for one too short to
+ * carry the ID it owes, which is dropped. */
+static bool rx_take_tid(unsigned char **pkt, unsigned int *len)
+{
+    unsigned char *p = *pkt;
+    unsigned int hdr = (p[0] == 0x04) ? 3 : 2;
+
+    /* The two commands that carry none, and switch them off */
+    if (*len >= 2 && p[0] == 0x00 && (p[1] == 0x01 || p[1] == 0x13))
+    {
+        device.transid = false;
+        device.idps = false;
+        return true;
+    }
+    /* StartIDPS carries the first */
+    if (!device.transid && !(*len >= 2 && p[0] == 0x00 && p[1] == 0x38))
+        return true;
+    if (*len < hdr + 2)
+        return false;
+
+    rx_tid = get_u16(p + hdr);
+    memmove(p + 2, p, hdr);
+    *pkt = p + 2;
+    *len -= 2;
+    return true;
+}
+
+uint16_t iap_rx_tid(void)
+{
+    return rx_tid;
+}
+
+void iap_send_tx_tid(uint16_t tid)
+{
+    tid_override = tid;
+    iap_send_tx();
+    tid_override = -1;
+}
+
+/* Supersedes any IAP_EV_ARTWORK still queued */
+void iap_artwork_post(void)
+{
+    queue_post(&iap_queue, IAP_EV_ARTWORK, ++art_seq);
+}
+
 /* Send the current content of the TX buffer.
  * This will check for TX buffer overflow and panic, but it might
  * be too late by then (although one would have to overflow the complete
@@ -643,7 +852,23 @@ void iap_send_tx(void)
     if (txlen > TX_BUFLEN)
         panicf("IAP: TX buffer overflow");
 
-    if (txlen < 256)
+    /* The ID goes after the command, two bytes long for lingo 4; TX_AREA
+     * has the room */
+    if (device.transid)
+    {
+        int hdr = (iap_txpayload[0] == 0x04) ? 3 : 2;
+
+        if (txlen >= hdr)
+        {
+            memmove(iap_txpayload + hdr + 2, iap_txpayload + hdr, txlen - hdr);
+            put_u16(iap_txpayload + hdr, tx_tid(iap_txpayload));
+            iap_txnext += 2;
+            txlen += 2;
+        }
+    }
+
+    /* A short-form length above 0xFC reads as the long form's marker */
+    if (txlen <= 0xFC)
     {
         /* Short packet */
         txstart = iap_txstart+2;
@@ -852,7 +1077,8 @@ void iap_get_trackinfo(const unsigned int track, struct mp3entry* id3)
     /* If the tracknumber is not the current one, or nothing is playing and
        the current one's tags are empty, take them from the database, or
        failing that read them from the file */
-    if(playlist_next(0) != tracknum || !(audio_status() & AUDIO_STATUS_PLAY))
+    if(playlist_get_current()->index != tracknum
+       || !(audio_status() & AUDIO_STATUS_PLAY))
     {
         playlist_get_track_info(NULL, tracknum, &info);
         /* Both clear id3 before filling it */
@@ -870,11 +1096,29 @@ uint32_t iap_get_trackpos(void)
     return id3->elapsed;
 }
 
+/* Counted from the playlist's first track, which with shuffle or a resumed
+ * playlist need not be index 0 */
 uint32_t iap_get_trackindex(void)
 {
     struct playlist_info* playlist = playlist_get_current();
+    int index = playlist->index - playlist->first_index;
 
-    return (playlist->index - playlist->first_index);
+    if (index < 0)
+        index += playlist->amount;
+    return index;
+}
+
+/* PlayStatusChangeNotification, from iap_periodic(), with a value of
+ * size bytes: 0, 1 or 4 */
+static void iap_send_pb(unsigned char type, int size, uint32_t value)
+{
+    IAP_TX_INIT4(0x04, 0x0027);
+    IAP_TX_PUT(type);
+    if (size == 1)
+        IAP_TX_PUT(value);
+    else if (size == 4)
+        IAP_TX_PUT_U32(value);
+    iap_send_tx();
 }
 
 void iap_periodic(void)
@@ -894,7 +1138,25 @@ void iap_periodic(void)
         iap_library_close(IAP_LIBRARY_SERIAL);
     docked = present;
 
+#ifdef HAVE_IAP_ACCESSORY_POLL
+    iap_accessory_poll();
+#endif
+    remote_seek_tick();
+
     if(!iap_setupflag || !iap_enabled) return;
+
+    /* An accessory that stops answering mid-way is told it failed, and may
+     * identify again; until then nothing it is owed is sent */
+    if (DEVICE_AUTH_RUNNING && device.auth.deadline
+        && TIME_AFTER(current_tick, device.auth.deadline))
+    {
+        /* AckDevAuthenticationStatus: failed */
+        IAP_TX_INIT(0x00, 0x19);
+        IAP_TX_PUT(0x02);
+
+        iap_send_tx();
+        iap_reset_auth(&device.auth);
+    }
 
     /* Handle pending authentication tasks */
     switch (device.auth.state)
@@ -902,10 +1164,12 @@ void iap_periodic(void)
         case AUST_INIT:
         {
             /* Send out GetDevAuthenticationInfo */
+            device.auth.tid = own_tid++;
             IAP_TX_INIT(0x00, 0x14);
 
             iap_send_tx();
             device.auth.state = AUST_CERTREQ;
+            device.auth.deadline = current_tick + IAP_AUTH_STEP_TIMEOUT;
             break;
         }
 
@@ -924,6 +1188,9 @@ void iap_periodic(void)
 
             iap_send_tx();
             device.auth.state = AUST_CHASENT;
+            /* the time Authentication 1.0 and 2.0 allow to sign */
+            device.auth.deadline = current_tick
+                + ((device.auth.version == 0x100) ? 7 * HZ : 75 * HZ);
             break;
         }
 
@@ -943,6 +1210,8 @@ void iap_periodic(void)
         iap_repeatbtn = 0;
         iap_btnshuffle = false;
         iap_btnrepeat = false;
+        iap_btnstop = false;
+        iap_btnchapter = false;
     }
 
     /* Handle power down messages. */
@@ -954,7 +1223,9 @@ void iap_periodic(void)
 
         iap_send_tx();
 
-        /* No further actions, we're going down */
+        /* No further actions, we're going down. Once: a shutdown that
+         * is called off must not send it again every tick. */
+        iap_shutdown = false;
         iap_reset_device(&device);
         return;
     }
@@ -1017,7 +1288,7 @@ void iap_periodic(void)
                 {
                     IAP_TX_INIT(0x00, 0x27);
                     IAP_TX_PUT(2);
-                    IAP_TX_PUT_U32(IAP_IPOD_MODEL);
+                    IAP_TX_PUT_U32(IAP_MODEL_ID);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_MAJOR);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_MINOR);
                     IAP_TX_PUT(IAP_IPOD_FIRMWARE_REV);
@@ -1042,20 +1313,44 @@ void iap_periodic(void)
         }
     }
 
-    if (!device.do_notify) return;
+    /* Two subscriptions: do_notify and notifications are the Display
+     * Remote's, pb_notifications the Extended Interface's */
+    if (!device.do_notify && device.pb_notifications == 0) return;
     if ((device.notifications == 0) && (interface_state != IST_EXTENDED)) return;
 
-    /* Volume change notifications are sent every 100ms */
+    if ((interface_state == IST_EXTENDED) && device.pb_track_changed
+        && (device.pb_notifications & BIT_N(2)))
+        iap_send_pb(0x01, 4, iap_get_trackindex());
+    device.pb_track_changed = false;
+
+    /* Volume: looked at every 100ms, sent only on a change */
     if (device.notifications & (BIT_N(4) | BIT_N(16))) {
-        /* Currently we do not track volume changes for BIT_N(16),
-         *
-         */
-        IAP_TX_INIT(0x03, 0x09);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT(0x00);
-        IAP_TX_PUT(0xFF &(int)((global_status.volume + 90) * 2.65625));
-        device.changed_notifications |= BIT_N(4);
-        iap_send_tx();
+        unsigned char level = device.mute ? 0
+                            : iap_volume_to_byte(global_status.volume);
+
+        if (level != device.volume || device.mute != device.volume_mute) {
+            device.volume = level;
+            device.volume_mute = device.mute;
+            /* Mute/UI volume, and Mute/UI/Absolute: each to the
+             * accessory that asked, both to one that asked for both */
+            if (device.notifications & BIT_N(4)) {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x04);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(level);
+                device.changed_notifications |= BIT_N(4);
+                iap_send_tx();
+            }
+            if (device.notifications & BIT_N(16)) {
+                IAP_TX_INIT(0x03, 0x09);
+                IAP_TX_PUT(0x10);
+                IAP_TX_PUT(device.mute ? 0x01 : 0x00);
+                IAP_TX_PUT(level);
+                IAP_TX_PUT(level);
+                device.changed_notifications |= BIT_N(16);
+                iap_send_tx();
+            }
+        }
     }
 
     /* All other events are sent every 500ms */
@@ -1066,17 +1361,49 @@ void iap_periodic(void)
 
     /* RemoteEventNotification */
 
-    /* Mode 04 PlayStatusChangeNotification */
-    /* Are we in Extended Mode */
-    if (interface_state == IST_EXTENDED) {
-        /* Return Track Position */
-        struct mp3entry *id3 = audio_current_track();
-        unsigned long time_elapsed = id3->elapsed;
-        IAP_TX_INIT4(0x04, 0x0027);
-        IAP_TX_PUT(0x04);
-        IAP_TX_PUT_U32(time_elapsed);
+    /* Mode 04 PlayStatusChangeNotification, each type only to an
+     * accessory that asked for it and only on a change */
+    if (interface_state == IST_EXTENDED && device.pb_notifications) {
+        uint32_t mask = device.pb_notifications;
+        int status = audio_status();
+        unsigned char ext = (status & AUDIO_STATUS_PAUSE) ? 0x0B
+                          : (status & AUDIO_STATUS_PLAY) ? 0x0A : 0x02;
+        uint32_t ms = iap_get_trackpos();
+        uint32_t n = playlist_amount();
 
-        iap_send_tx();
+        /* Bit 0: stopped */
+        if ((mask & BIT_N(0)) && !(status & AUDIO_STATUS_PLAY)
+            && (device.pb_play_status & AUDIO_STATUS_PLAY))
+            iap_send_pb(0x00, 0, 0);
+        device.pb_play_status = status;
+
+        /* Bit 1: playing, paused or stopped */
+        if ((mask & BIT_N(1)) && ext != device.pb_ext_state)
+            iap_send_pb(0x06, 1, ext);
+        device.pb_ext_state = ext;
+
+        /* Bits 3 and 4: the position, in ms and in seconds */
+        if ((mask & BIT_N(3)) && ms != device.pb_trackpos_ms)
+            iap_send_pb(0x04, 4, ms);
+        device.pb_trackpos_ms = ms;
+        if ((mask & BIT_N(4)) && ms / 1000 != device.pb_trackpos_s)
+            iap_send_pb(0x07, 4, ms / 1000);
+        device.pb_trackpos_s = ms / 1000;
+
+        /* Bit 5: the chapter */
+        {
+            struct iap_chapter_info chapter;
+            uint32_t ch = iap_current_chapter(&chapter) ? chapter.index
+                                                        : UINT32_MAX;
+            if ((mask & BIT_N(5)) && ch != device.pb_chapter_index)
+                iap_send_pb(0x05, 4, ch);
+            device.pb_chapter_index = ch;
+        }
+
+        /* Bit 12: the playback engine's contents */
+        if ((mask & BIT_N(12)) && n != device.pb_numtracks)
+            iap_send_pb(0x0E, 4, n);
+        device.pb_numtracks = n;
     }
 
     /* Track position (ms)  or Track position (s) */
@@ -1084,7 +1411,7 @@ void iap_periodic(void)
     {
         uint32_t t;
         uint16_t ts;
-        bool changed;
+        bool changed = false;
 
         t = iap_get_trackpos();
         ts = (t / 1000) & 0xFFFF;
@@ -1136,25 +1463,28 @@ void iap_periodic(void)
         }
     }
 
-    /* Chapter index */
+    /* Chapter index: the track, its chapter count and the chapter, on a
+     * change of either. Kept apart from the track index notification's
+     * value, which would otherwise hide every change from this one. */
     if (device.notifications & BIT_N(2))
     {
-        uint32_t index;
+        struct iap_chapter_info chapter;
+        bool has = iap_current_chapter(&chapter);
+        uint32_t index = iap_get_trackindex();
+        uint32_t key = (index << 16) | (has ? chapter.index : 0xFFFF);
 
-        index = iap_get_trackindex();
-
-        if (device.track_index != index)
+        if (device.chapter_index != key)
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x02);
             IAP_TX_PUT_U32(index);
-            IAP_TX_PUT_U16(0);
-            IAP_TX_PUT_U16(0xFFFF);
+            IAP_TX_PUT_U16(has ? chapter.count : 0);
+            IAP_TX_PUT_U16(has ? chapter.index : 0xFFFF);
             device.changed_notifications |= BIT_N(2);
 
             iap_send_tx();
 
-            device.track_index = index;
+            device.chapter_index = key;
         }
     }
 
@@ -1192,23 +1522,12 @@ void iap_periodic(void)
             iap_send_tx();
 
             device.play_status = play_status;
-			if (play_status != 1) {
-			/* Not Playing */
-			   audio_pause();
+            /* A notification only reports the play state; the radio is the
+             * one thing that follows it */
 #if CONFIG_TUNER
-               if (radio_present==1) {
-                  tuner_set(RADIO_MUTE,1);
-			   }
+            if (radio_present == 1)
+                tuner_set(RADIO_MUTE, play_status != 1);
 #endif
-			} else {
-			/* Playing */
-			   audio_resume();
-#if CONFIG_TUNER
-			   if (radio_present==1) {
-                   tuner_set(RADIO_MUTE,0);
-               }
-#endif
-			}
         }
     }
 
@@ -1287,7 +1606,8 @@ void iap_periodic(void)
                     break;
                 }
 
-                case REPEAT_ALL:
+                /* REPEAT_ALL, and the shuffle and A-B modes the protocol lacks */
+                default:
                 {
                     IAP_TX_PUT(0x02);
                     break;
@@ -1312,7 +1632,7 @@ void iap_periodic(void)
         {
             IAP_TX_INIT(0x03, 0x09);
             IAP_TX_PUT(0x09);
-            IAP_TX_PUT_U16(tm->tm_year);
+            IAP_TX_PUT_U16(tm->tm_year + 1900);
 
             /* Month */
             IAP_TX_PUT(tm->tm_mon+1);
@@ -1378,6 +1698,23 @@ void iap_periodic(void)
      */
 }
 
+/* Play, from paused or stopped, for the commands that say "play" rather
+ * than press a button: a button press acts on whatever screen has focus,
+ * and outside the WPS opens the highlighted row. False if there is nothing
+ * to play. */
+bool iap_play_or_resume(void)
+{
+    if (audio_status() & AUDIO_STATUS_PLAY)
+    {
+        audio_resume();
+        return true;
+    }
+    if (playlist_amount() <= 0)
+        return false;
+    playlist_start(playlist_get_current()->index, 0, 0);
+    return true;
+}
+
 /* Change the current interface state.
  * On a change from IST_EXTENDED to IST_STANDARD, or from IST_STANDARD
  * to IST_EXTENDED, pause playback, if playing
@@ -1387,9 +1724,7 @@ void iap_interface_state_change(const enum interface_state new)
     if (((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) ||
         ((interface_state == IST_STANDARD) && (new == IST_EXTENDED))) {
         if (audio_status() == AUDIO_STATUS_PLAY)
-        {
-            REMOTE_BUTTON(BUTTON_RC_PLAY);
-        }
+            audio_pause();
     }
 
     interface_state = new;
@@ -1397,34 +1732,10 @@ void iap_interface_state_change(const enum interface_state new)
 
 static void iap_handlepkt_mode5(const unsigned int len, const unsigned char *buf)
 {
-    (void) len;
-    unsigned int cmd = buf[1];
-    switch (cmd)
-    {
-        /* Sent from iPod Begin Transmission */
-        case 0x02:
-        {
-            /* RF Transmitter: Begin High Power transmission */
-            unsigned char data0[] = {0x05, 0x02};
-            iap_send_pkt(data0, sizeof(data0));
-            break;
-        }
-
-        /* Sent from iPod End High Power Transmission */
-        case 0x03:
-        {
-            /* RF Transmitter: End High Power transmission */
-            unsigned char data1[] = {0x05, 0x03};
-            iap_send_pkt(data1, sizeof(data1));
-            break;
-        }
-        /* Return Version Number ?*/
-        case 0x04:
-        {
-            /* do nothing */
-            break;
-        }
-    }
+    /* Begin and EndHighPower are the player's to send; the lingo has no
+     * command from the accessory and no ack, so none is echoed back */
+    (void)len;
+    (void)buf;
 }
 
 void iap_handlepkt(void)
@@ -1443,6 +1754,12 @@ void iap_handlepkt(void)
      */
     while (iap_rxpayload != iap_rxstart)
     {
+        if (reset_pending)
+        {
+            iap_do_reset();
+            return;
+        }
+
         /* if we are waiting for a remote button to go out,
            delay the handling of the new packet */
         if(iap_repeatbtn)
@@ -1458,21 +1775,28 @@ void iap_handlepkt(void)
         logf("R: %s", hexstring(iap_rxstart+2, (length)));
 #endif
 
-        if (length != 0) {
-            unsigned char mode = *(iap_rxstart+2);
+        unsigned char *pkt = iap_rxstart+2;
+        unsigned int plen = length;
+
+        if (length != 0 && rx_take_tid(&pkt, &plen)) {
+            unsigned char mode = pkt[0];
+
+            rx_handling = true;
+            rx_lingo = mode;
             switch (mode) {
-            case 0: iap_handlepkt_mode0(length, iap_rxstart+2); break;
+            case 0: iap_handlepkt_mode0(plen, pkt); break;
 #ifdef HAVE_LINE_REC
-            case 1: iap_handlepkt_mode1(length, iap_rxstart+2); break;
+            case 1: iap_handlepkt_mode1(plen, pkt); break;
 #endif
-            case 2: iap_handlepkt_mode2(length, iap_rxstart+2); break;
-            case 3: iap_handlepkt_mode3(length, iap_rxstart+2); break;
-            case 4: iap_handlepkt_mode4(length, iap_rxstart+2); break;
-            case 5: iap_handlepkt_mode5(length, iap_rxstart+2); break;
+            case 2: iap_handlepkt_mode2(plen, pkt); break;
+            case 3: iap_handlepkt_mode3(plen, pkt); break;
+            case 4: iap_handlepkt_mode4(plen, pkt); break;
+            case 5: iap_handlepkt_mode5(plen, pkt); break;
 #if CONFIG_TUNER
-            case 7: iap_handlepkt_mode7(length, iap_rxstart+2); break;
+            case 7: iap_handlepkt_mode7(plen, pkt); break;
 #endif
             }
+            rx_handling = false;
         }
 
         /* Remove the handled packet from the RX buffer
@@ -1515,7 +1839,7 @@ static int iap_move_callback(int handle, void* current, void* new)
     iap_txstart = new;
     iap_txpayload = iap_txstart+5;
     iap_txnext = iap_txpayload;
-    iap_rxstart = iap_buffers+(TX_BUFLEN+6);
+    iap_rxstart = iap_buffers+TX_AREA;
 
     return BUFLIB_CB_OK;
 }
@@ -1589,7 +1913,8 @@ void iap_fill_power_state(void)
     power_state = charger_input_state;
     battery_l = battery_level();
 
-    if (power_state == NO_CHARGER) {
+    /* CHARGER_UNPLUGGED is the way out of CHARGER, so on battery */
+    if (power_state == NO_CHARGER || power_state == CHARGER_UNPLUGGED) {
         if (battery_l < 30) {
             IAP_TX_PUT(0x00);
         } else {
@@ -1597,7 +1922,9 @@ void iap_fill_power_state(void)
         }
         IAP_TX_PUT((char)((battery_l * 255)/100));
     } else {
-        IAP_TX_PUT(0x04);
+        /* Charging, or external power with the charger idle: charged
+         * once the level reads full, which on external power is 99 */
+        IAP_TX_PUT(charging_state() ? 0x04 : battery_l >= 99 ? 0x05 : 0x03);
         IAP_TX_PUT(0x00);
     }
 }
@@ -1610,6 +1937,10 @@ static int dbg_iap_callback(int action, struct gui_synclist *lists)
     simplelist_reset_lines();
     simplelist_addline("auth: %d acc: %d", device.auth.state, device.accinfo);
     simplelist_addline("lin: %08lx", (unsigned long)device.lingoes);
+    simplelist_addline("idps: %s tid: %s max: %u",
+                       device.idps ? "running" :
+                       device.identified_by_idps ? "done" : "no",
+                       device.transid ? "yes" : "no", device.max_payload);
     simplelist_addline("notif: %08lx", (unsigned long)device.notifications);
     simplelist_addline("cap: %08lx/%08lx", (unsigned long)device.capabilities,
                        (unsigned long)device.capabilities_queried);

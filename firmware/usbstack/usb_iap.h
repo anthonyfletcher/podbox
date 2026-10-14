@@ -52,3 +52,9 @@ void usb_iap2_host_new(void);
 
 /* Whether the probe is answered now, by the mode above. */
 bool usb_iap_answer_iap2(void);
+
+/* A bus reset keeps an iAP1 dock's sink, its track waiting where it is. The
+ * dock's rates coming back end the wait (false); another configuration or
+ * the cable going end it as an unplug would, pausing and giving playback
+ * back to the built-in output (true). */
+void usb_iap_end_reset_hold(bool give_back);

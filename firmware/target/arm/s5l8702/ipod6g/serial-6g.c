@@ -74,14 +74,31 @@ struct uartc_port ser_port IDATA_ATTR =
 /*
  * serial driver API
  */
+#ifdef IPOD_ACCESSORY_PROTOCOL
+static volatile bool acc_plugged = false;
+#endif
+
+/* With the accessory gone the port is closed, and a byte the iAP thread is
+ * still sending goes nowhere rather than waiting on it. */
 int tx_rdy(void)
 {
+#ifdef IPOD_ACCESSORY_PROTOCOL
+    if (!acc_plugged)
+        return 1;
+#endif
     return uartc_port_tx_ready(&ser_port) ? 1 : 0;
 }
 
 void tx_writec(unsigned char c)
 {
+#ifdef IPOD_ACCESSORY_PROTOCOL
+    int oldlevel = disable_irq_save();
+    if (acc_plugged)
+        uartc_port_tx_byte(&ser_port, c);
+    restore_irq(oldlevel);
+#else
     uartc_port_tx_byte(&ser_port, c);
+#endif
 }
 
 #ifndef IPOD_ACCESSORY_PROTOCOL
@@ -117,7 +134,6 @@ static enum {
 } abr_status;
 
 static int bitrate = 0;
-static bool acc_plugged = false;
 static unsigned int acc_absent_ticks;
 #if defined(HAVE_COMPOSITE_VIDEO_OUT) && !defined(BOOTLOADER)
 static long videoout_identify_tick;
@@ -185,6 +201,7 @@ static void serial_acc_tick(void)
         {
             uartc_port_close(&ser_port);
             uartc_close(ser_port.uartc);
+            iap_reset_state(IF_IAP_MP(0));
         }
     }
 

@@ -915,6 +915,7 @@ struct user_settings
     int iap_browse_size; /* 0=off, else index into 5000,10000,20000,40000 */
     int car_artwork;     /* CAR_ARTWORK_*: the art an iAP2 car is sent */
     int iap2_mode;       /* 0 off, 1 auto, 2 on: answering iAP2 over USB */
+    int iap_identity;    /* USB_IDENTITY_*: the model accessories are told */
     int serial_bitrate; /* 0=auto 1=9600 2=19200 3=38400 4=57600 */
     bool accessory_supply; /* 0=off 1=on, accessory power supply for iPod */
     bool lineout_active;

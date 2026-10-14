@@ -40,6 +40,10 @@ void wps_do_action(enum wps_do_action_type, bool updatewps);
 
 struct wps_state *get_wps_state(void);
 
+/* A remote's seek, shown on the progress bar without drawing from the
+ * caller's thread. A NULL track clears it. Position in milliseconds. */
+void wps_set_seek_preview(struct mp3entry *id3, unsigned long position);
+
 /* in milliseconds */
 #define DEFAULT_SKIP_THRESH          3000l
 

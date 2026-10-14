@@ -19,6 +19,7 @@ audio/codecs.c
 audio/pcmbuf.c
 audio/play_status.c
 audio/playback.c
+audio/remote_seek.c
 audio/rbcodec_helpers.c
 audio/voice_thread.c
 #ifndef HAVE_HARDWARE_BEEP
@@ -344,6 +345,7 @@ system/volume.c
 
 #ifdef IPOD_ACCESSORY_PROTOCOL
 iap/iap-core.c
+iap/iap-artwork.c
 iap/iap-lingo0.c
 iap/iap-lingo2.c
 iap/iap-lingo3.c
@@ -351,6 +353,7 @@ iap/iap-lingo4.c
 #endif
 
 #if defined(USB_ENABLE_IAP) || defined(IPOD_ACCESSORY_PROTOCOL)
+iap/iap-chapters.c
 iap/iap-library.c
 #endif
 

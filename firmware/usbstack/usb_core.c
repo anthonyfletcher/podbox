@@ -880,9 +880,15 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
 
     switch(type) {
         case USB_DT_DEVICE:
+            device_descriptor.idProduct = USB_PRODUCT_ID;
+#ifdef USB_ENABLE_IAP
+            /* Identify As; the sound card's own ID below still wins */
+            if(usb_identity()->product_id)
+                device_descriptor.idProduct = usb_identity()->product_id;
+#endif
 #if defined(USB_ENABLE_AUDIO) && defined(USB_PRODUCT_ID_AUDIO)
-            device_descriptor.idProduct = drivers[USB_DRIVER_AUDIO]->enabled ?
-                USB_PRODUCT_ID_AUDIO : USB_PRODUCT_ID;
+            if(drivers[USB_DRIVER_AUDIO]->enabled)
+                device_descriptor.idProduct = USB_PRODUCT_ID_AUDIO;
 #endif
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);
@@ -1103,6 +1109,10 @@ static int usb_core_do_set_config(uint8_t new_config)
      * If the host never sends SET_CONFIGURATION again, local storage stays
      * unavailable until unplug. We expect reconfiguration promptly after a
      * reset, but deliberately do not remount on a timer. */
+#ifdef USB_ENABLE_IAP
+    if(usb_config != 0 && usb_config != usb_cdrv_iap.config)
+        usb_iap_end_reset_hold(true);
+#endif
     if(require_cpu_boost) {
         trigger_cpu_boost();
         thread_set_priority(thread_self(), PRIORITY_REALTIME);
@@ -1337,6 +1347,11 @@ static void usb_core_control_request_handler(struct usb_ctrlrequest* req, uint8_
             usb_core_control_response(USB_CONTROL_STALL, NULL, 0);
             break;
     }
+}
+
+bool usb_core_bus_resetting(void)
+{
+    return bus_reset_pending;
 }
 
 static void do_bus_reset(void) {

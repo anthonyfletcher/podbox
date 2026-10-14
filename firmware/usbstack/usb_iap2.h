@@ -40,6 +40,9 @@ bool usb_iap2_keeps_playing(void);
 /* The iAP sink's new rate, from the audio thread. True when iAP2 announces
  * it, and libiap is not asked to. */
 bool usb_iap2_audio_rate(unsigned long rate);
+/* The other way, usb_iap.c's: a tick in that many ticks, ahead of the next
+ * tenth of a second. */
+void usb_iap2_tick_soon(long ticks);
 
 /* Between the link layer, usb_iap2.c, and the control session,
  * usb_iap2_control.c. */

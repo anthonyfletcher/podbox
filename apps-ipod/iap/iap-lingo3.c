@@ -33,6 +33,10 @@
 #include "settings.h"
 #include "metadata.h"
 #include "audio/playback.h"
+#include "system/volume.h"
+#include "audio/remote_seek.h"
+#include "metadata/cuesheet.h"
+#include "iap-artwork.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
 #endif
@@ -69,21 +73,11 @@ static void cmd_ack(const unsigned char cmd, const unsigned char status)
 
 #define cmd_ok(cmd) cmd_ack((cmd), IAP_ACK_OK)
 
-/* An accessory sends volume as a byte covering -90..+6 dB, a wider range
- * than the codec accepts. The value goes straight into global_status and is
- * re-applied on every cold start, so one below the minimum is a silent mute
- * that survives a reboot -- clamp it as the rest of the app layer does.
- */
+/* An accessory's volume byte covers the codec's whole range */
 static void set_accessory_volume(const unsigned char level)
 {
-    int vol = (int)(level/2.65625) - 90;
-
-    if (vol < sound_min(SOUND_VOLUME))
-        vol = sound_min(SOUND_VOLUME);
-    else if (vol > sound_max(SOUND_VOLUME))
-        vol = sound_max(SOUND_VOLUME);
-
-    global_status.volume = vol;
+    global_status.volume = iap_byte_to_volume(level);
+    setvol();
 }
 
 void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
@@ -273,11 +267,11 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             /* Save the current state of the various attributes we track */
             device.trackpos_ms = iap_get_trackpos();
             device.track_index = iap_get_trackindex();
-            device.chapter_index = 0;
+            device.chapter_index = UINT32_MAX;
             device.play_status = audio_status();
-            /* TODO: Fix this */
-            device.mute = false;
-            device.volume = global_status.volume;
+            device.volume = device.mute ? 0
+                          : iap_volume_to_byte(global_status.volume);
+            device.volume_mute = device.mute;
             device.power_state = charger_input_state;
             device.battery_level = battery_level();
             /* TODO: Fix this */
@@ -412,11 +406,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x02:
                 {
-                    playlist = playlist_get_current();
-                    IAP_TX_PUT_U32(playlist->index - playlist->first_index);
-                    /* Indicate that track does not have chapters */
-                    IAP_TX_PUT_U16(0x0000);
-                    IAP_TX_PUT_U16(0xFFFF);
+                    struct iap_chapter_info chapter;
+                    bool has = iap_current_chapter(&chapter);
+
+                    IAP_TX_PUT_U32(iap_get_trackindex());
+                    IAP_TX_PUT_U16(has ? chapter.count : 0x0000);
+                    IAP_TX_PUT_U16(has ? chapter.index : 0xFFFF);
 
                     iap_send_tx();
                     break;
@@ -453,7 +448,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
                         /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -519,7 +514,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                             break;
                         }
 
-                        case REPEAT_ALL:
+                        /* REPEAT_ALL, and the shuffle and A-B modes the protocol lacks */
+                        default:
                         {
                             IAP_TX_PUT(0x02);
                             break;
@@ -538,7 +534,7 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     tm = get_time();
 
                     /* Year */
-                    IAP_TX_PUT_U16(tm->tm_year);
+                    IAP_TX_PUT_U16(tm->tm_year + 1900);
 
                     /* Month */
                     IAP_TX_PUT(tm->tm_mon+1);
@@ -642,8 +638,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                         /* Mute status False*/
                         IAP_TX_PUT(0x00);
                         /* Volume */
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
-                        IAP_TX_PUT(0xFF & (int)((global_status.volume + 90) * 2.65625));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
+                        IAP_TX_PUT(iap_volume_to_byte(global_status.volume));
 
                     } else {
                         /* Mute status True*/
@@ -739,8 +735,9 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x02:
                 {
-                    /* This is not supported */
-                    cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+                    CHECKLEN(5);
+                    cmd_ack(cmd, iap_set_chapter(get_u16(&buf[0x03])) ?
+                                 IAP_ACK_OK : IAP_ACK_CMD_FAILED);
                     break;
                 }
 
@@ -761,14 +758,31 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                         case 0x01:
                         {
-                            audio_resume();
-                            cmd_ok(cmd);
+                            cmd_ack(cmd, iap_play_or_resume() ?
+                                         IAP_ACK_OK : IAP_ACK_CMD_FAILED);
                             break;
                         }
 
                         case 0x02:
                         {
                             audio_pause();
+                            cmd_ok(cmd);
+                            break;
+                        }
+
+                        /* Fast forward, rewind, and their end */
+                        case 0x03:
+                        case 0x04:
+                        {
+                            cmd_ack(cmd, remote_seek_start(
+                                buf[0x03] == 0x03 ? 1 : -1) ?
+                                IAP_ACK_OK : IAP_ACK_CMD_FAILED);
+                            break;
+                        }
+
+                        case 0x05:
+                        {
+                            remote_seek_stop();
                             cmd_ok(cmd);
                             break;
                         }
@@ -787,11 +801,11 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                     CHECKLEN(5);
                     if (buf[0x03]==0x00){
                         /* Not Muted */
-                        set_accessory_volume(buf[0x04]);
                         device.mute = false;
+                        set_accessory_volume(buf[0x04]);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
                     cmd_ok(cmd);
                     break;
@@ -954,18 +968,18 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
 
                 /* Volume/Mute/Absolute
                  * Data length: 4
-                 * TODO: Fix this
                  */
                 case 0x10:
                 {
                     CHECKLEN(7);
                     if (buf[0x03]==0x00){
-                        /* Not Muted */
-                        set_accessory_volume(buf[0x04]);
+                        /* Not Muted. A UI volume of 0 defers to the
+                         * absolute one. */
                         device.mute = false;
+                        set_accessory_volume(buf[0x04] ? buf[0x04] : buf[0x05]);
                     }
                     else {
-                        device.mute = true;
+                        iap_set_mute(true);
                     }
 
                     cmd_ok(cmd);
@@ -1119,14 +1133,15 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
              * around this for now.
              */
             uint32_t track_index;
-            struct playlist_track_info track;
             struct mp3entry id3;
 
             CHECKLEN(0x09);
             CHECKAUTH;
 
+            /* Counted from the playlist's first track, as
+             * iap_get_trackinfo() reads it */
             track_index = get_u32(&buf[0x03]);
-            if (-1 == playlist_get_track_info(NULL, track_index, &track)) {
+            if (track_index >= (uint32_t)playlist_amount()) {
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
@@ -1141,14 +1156,19 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 case 0x00:
                 {
                     iap_get_trackinfo(track_index, &id3);
-                    /* Track capabilities. None of these are supported, yet */
-                    IAP_TX_PUT_U32(0x00);
+                    /* Track capabilities: bit 1, chapters; bit 2, album
+                     * artwork */
+                    IAP_TX_PUT_U32((iap_artwork_exists(track_index) ?
+                                    BIT_N(2) : 0)
+                                   | (id3.cuesheet && id3.cuesheet->track_count
+                                      ? BIT_N(1) : 0));
 
                     /* Track length in ms */
                     IAP_TX_PUT_U32(id3.length);
 
-                    /* Chapter count, stays at 0 */
-                    IAP_TX_PUT_U16(0x00);
+                    /* Chapter count: only the playing track's cue sheet
+                     * is loaded */
+                    IAP_TX_PUT_U16(id3.cuesheet ? id3.cuesheet->track_count : 0);
 
                     iap_send_tx();
                     break;
@@ -1159,11 +1179,16 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x01:
                 {
-                    /* Chapter length, set at 0 (no chapters) */
-                    IAP_TX_PUT_U32(0x00);
+                    struct iap_chapter_info chapter;
+                    bool has;
 
-                    /* Chapter name, empty */
-                    IAP_TX_PUT_STRING("");
+                    iap_get_trackinfo(track_index, &id3);
+                    has = iap_chapter_at(&id3, get_u16(&buf[0x07]), &chapter);
+                    /* Chapter length */
+                    IAP_TX_PUT_U32(has ? chapter.length_ms : 0x00);
+
+                    /* Chapter name */
+                    iap_tx_strlcpy((const unsigned char *)(has ? chapter.name : ""));
 
                     iap_send_tx();
                     break;
@@ -1257,7 +1282,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                  */
                 case 0x08:
                 {
-                    /* No artwork, return packet containing just the type byte */
+                    /* Just the type byte for none */
+                    iap_artwork_put_counts(track_index);
                     iap_send_tx();
                     break;
                 }
@@ -1333,10 +1359,8 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
         {
             CHECKAUTH;
 
-            /* We return the empty list, meaning no artwork
-             * TODO: Fix to return actual artwork formats
-             */
             IAP_TX_INIT(0x03, 0x17);
+            iap_artwork_put_formats();
 
             iap_send_tx();
             break;
@@ -1385,8 +1409,10 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             CHECKAUTH;
             CHECKLEN(0x0C);
 
-            /* No artwork support currently */
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            /* The time is ignored: a track has one image */
+            if (!iap_artwork_start(0x03, 0x19, get_u32(&buf[0x02]),
+                                   get_u16(&buf[0x06])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
 
@@ -1525,9 +1551,6 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
             CHECKAUTH;
             CHECKLEN(0x0C);
 
-            /* Artwork is currently unsuported, just check for a valid
-             * track index
-             */
             index = get_u32(&buf[0x02]);
             trackcount = playlist_amount();
 
@@ -1537,8 +1560,12 @@ void iap_handlepkt_mode3(const unsigned int len, const unsigned char *buf)
                 break;
             }
 
-            /* Send an empty list */
+            /* A track's one image is at its start; none, no times */
             IAP_TX_INIT(0x03, 0x20);
+            if (get_u16(&buf[0x08]) == 0 && get_u16(&buf[0x0A]) != 0
+                && iap_artwork_format_valid(get_u16(&buf[0x06]))
+                && iap_artwork_exists(index))
+                IAP_TX_PUT_U32(0);
 
             iap_send_tx();
             break;

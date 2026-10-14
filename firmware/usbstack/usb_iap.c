@@ -25,6 +25,7 @@
 #include "playback.h"
 #include "powermgmt.h"
 #include "timefuncs.h"
+#include "usb.h"
 #include "usb_core.h"
 #include "usb_drv.h"
 
@@ -342,6 +343,18 @@ static int tick_callback(struct timeout* tmo) {
     return HZ / 10;
 }
 
+static struct timeout soon_tmo;
+
+static int soon_callback(struct timeout* tmo) {
+    (void)tmo;
+    usb_signal_class_notify(USB_DRIVER_IAP, Notify_Tick);
+    return 0;
+}
+
+void usb_iap2_tick_soon(long ticks) {
+    timeout_register(&soon_tmo, soon_callback, MAX(ticks, 1), 0);
+}
+
 static int usb_iap_set_first_interface(int interface) {
     ctrl.interface   = interface + 0;
     stream.interface = interface + 1;
@@ -479,18 +492,51 @@ static void usb_iap_init(void) {
     LOG("init");
 }
 
+/* Set while a bus reset keeps an iAP1 dock's sink for its return. */
+static bool reset_hold;
+
+void usb_iap_end_reset_hold(bool give_back) {
+    if(!reset_hold) {
+        return;
+    }
+    reset_hold = false;
+    LOG("reset hold ends, give_back=%d", give_back);
+    if(give_back) {
+        audio_pause();
+        mixer_switch_sink(PCM_SINK_BUILTIN);
+    }
+}
+
 static void usb_iap_disconnect(void) {
     iap_initialized = false;
-    /* An accessory that had the audio takes it with it, as a dock does. A
-     * car that never took it leaves playback alone -- one that has only
-     * identified itself, or the connection the player drops to come back to
-     * it without the sound card -- but an iAP1 accessory playing the line
-     * out does not. */
-    if(pcm_current_sink() == PCM_SINK_IAP || !usb_iap2_keeps_playing()) {
-        audio_pause();
+    /* The stream stops before the sink changes or its buffers go. */
+    check_act(iap_audio_disable(), );
+    /* and a scan ends where it has got to */
+    iap_platform_seek_stop(_iap_acquire_ctx(true));
+    _iap_release_ctx();
+    /* A bus reset is not the dock leaving (Gerrit 7900). An iAP1 dock's sink
+     * stays, so the track waits where it is, paused or playing, until the
+     * dock's rates come back; another configuration or the cable going ends
+     * the wait as an unplug would. To pause at a reset instead, drop this
+     * test. */
+    if(usb_core_bus_resetting() && usb_detect() == USB_INSERTED &&
+       pcm_current_sink() == PCM_SINK_IAP && !usb_iap2_keeps_playing()) {
+        reset_hold = true;
+        LOG("bus reset keeps the sink");
+    } else {
+        reset_hold = false;
+        /* An accessory that had the audio takes it with it, as a dock does. A
+         * car that never took it leaves playback alone -- one that has only
+         * identified itself, or the connection the player drops to come back to
+         * it without the sound card -- but an iAP1 accessory playing the line
+         * out does not. */
+        if(pcm_current_sink() == PCM_SINK_IAP || !usb_iap2_keeps_playing()) {
+            audio_pause();
+        }
+        mixer_switch_sink(PCM_SINK_BUILTIN);
     }
-    mixer_switch_sink(PCM_SINK_BUILTIN);
     timeout_cancel(&tick_tmo);
+    timeout_cancel(&soon_tmo);
     if(platform.aa_slot >= 0) {
         playback_release_aa_slot(platform.aa_slot);
     }
@@ -510,12 +556,20 @@ static void usb_iap_transfer_complete(int ep, int dir, int status, int length) {
             /* libiap did not send it, so is not told */
             return;
         }
-        check_act(status == 0, return);
+        if(!iap_initialized) {
+            /* cancelled by the disconnect, which has freed the context's buffers */
+            return;
+        }
 #if DEBUG_DUMP_TX
         LOG("ep=%d dir=%d state=%d length=%d", ep, dir, status, length);
 #endif
         struct IAPContext* ctx = _iap_acquire_ctx(true);
-        check_act(iap_notify_send_complete(ctx), );
+        if(status == 0) {
+            check_act(iap_notify_send_complete(ctx), );
+        } else {
+            ERROR("hid report failed, status=%d", status);
+            check_act(iap_notify_send_failed(ctx), );
+        }
         _iap_release_ctx();
     }
 }
@@ -595,10 +649,11 @@ static bool control_request_if_class(struct usb_ctrlrequest* req, uint8_t* reqda
 
             struct IAPContext* ctx = _iap_acquire_ctx(true);
             iap_log_report(ctx, reqdata, req->wLength, false);
-            const bool         ret = iap_feed_hid_report(ctx, reqdata, req->wLength);
+            /* The report arrived whatever libiap makes of it. A STALL would
+             * tell the accessory the transfer failed, not the frame. */
+            iap_feed_hid_report(ctx, reqdata, req->wLength);
             _iap_release_ctx();
 
-            check_act(ret, return false);
             usb_core_control_response(USB_CONTROL_ACK, NULL, 0);
             return true;
         }
@@ -680,6 +735,8 @@ static void usb_iap_notify_event(intptr_t data) {
         }
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         struct Platform*   plt = ctx->platform;
+        iap_remote_buttons_tick(ctx);
+        iap_platform_seek_tick(ctx);
         if(plt->control_pending && !iap_platform_library_play_done(ctx)) {
             /* waiting for playback begins */
             _iap_release_ctx();

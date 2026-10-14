@@ -34,6 +34,9 @@ reaches in by bare name exactly the way `firmware/` does:
 | `playlist.h` | `firmware/usbstack/usb_iap2_control.c`, `firmware/usbstack/iap/platform.c` |
 | `iap_library.h` | `firmware/usbstack/{usb_iap,usb_iap2_control}.c`, `firmware/usbstack/iap/platform.c` |
 | `buffering.h` | `firmware/usbstack/iap/platform.c`, `lib/rbcodec/metadata/metadata.c` |
+| `remote_seek.h` | `firmware/usbstack/iap/platform.c` |
+| `iap_chapters.h` | `firmware/usbstack/iap/platform.c` |
+| `iap_artwork.h` | `firmware/usbstack/iap/platform.c` |
 | `fracmul.h` | `lib/rbcodec/dsp/*.c` (10 files) |
 | `rbcodecconfig.h` | `lib/rbcodec/codecs/codecs.h`, `lib/rbcodec/dsp/*.c`, `lib/rbcodec/platform.h` |
 | `rbcodecplatform.h` | `lib/rbcodec/platform.h` |

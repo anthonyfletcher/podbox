@@ -44,6 +44,15 @@ struct IAPContextButtons {
 
 struct IAPActiveEvent;
 
+struct IAPRemoteButtons {
+    struct IAPContextButtons buttons;
+    uint32_t                 held_since;
+    uint32_t                 last_packet;
+    int8_t                   direction;
+    IAPBool                  seeking;
+    IAPBool                  active;
+};
+
 typedef IAPBool (*IAPActiveEventReadyCallback)(struct IAPContext* ctx, struct IAPActiveEvent* event);
 
 struct IAPActiveEvent {
@@ -78,7 +87,8 @@ struct IAPContext {
     /* _iap_feed_packet */
     int32_t handling_trans_id;
     /* iap.c */
-    struct IAPContextButtons context_button_state;
+    /* Context and Audio buttons keep separate states */
+    struct IAPRemoteButtons      remote_buttons[2];
     struct IAPPlatformArtwork    artwork;
     size_t                       artwork_cursor;
     uint16_t                     trans_id;

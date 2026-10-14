@@ -31,13 +31,14 @@
  *   that hold it. The echo and the SYN+ACK are flags, built when the
  *   endpoint is free; the player's data packets wait in a ring of slots
  *   until acknowledged, and each carries the acknowledgement of the last
- *   accessory packet taken. There is no bare acknowledgement: an iPhone
- *   never sends one, and this car stops reading the HID endpoint after one;
+ *   accessory packet taken. A bare acknowledgement goes only to an
+ *   accessory whose SYN asks for one in time (see cack);
  * - the link layer: packets start FF 5A, with a 9-byte header (length,
  *   control bits, sequence, acknowledgement, session, header checksum) and a
  *   checksummed payload. The accessory opens with a SYN carrying its link
  *   parameters; the player answers SYN+ACK with the same parameters, the
- *   packet length capped at what it can take, as the phone side does. Once
+ *   packet length capped at what it can take and, to an accessory that
+ *   retransmits, a window of 0x7F, as an iPhone does. Once
  *   the accessory acknowledges that, the link is up. Accessory packets are
  *   acknowledged on the player's next packet; the player's are sent again
  *   only as the accessory's link parameters allow, which for this car is
@@ -72,10 +73,12 @@ static const uint8_t probe[] = {0xFF, 0x55, 0x02, 0x00, 0xEE, 0x10};
 #define HEADER_LEN 9
 #define SYN_FIXED  10   /* link parameters ahead of the session list */
 
-/* The longest packet the player accepts, offered in its SYN+ACK, and the
- * longest it sends. Holds the accessory's certificate, about 950 bytes, in
- * one packet. */
+/* The longest packet the player sends. Holds the accessory's certificate,
+ * about 950 bytes, in one packet. */
 #define MAX_PACKET 1024
+/* The longest it accepts, offered in its SYN+ACK. An iPhone offers 0xFFFF;
+ * an identification with many languages or protocols outgrows MAX_PACKET. */
+#define RX_PACKET  8192
 
 #define SLOTS   8       /* the player's packets awaiting acknowledgement */
 
@@ -99,6 +102,14 @@ static size_t peer_max;     /* the longest packet the accessory takes */
 static uint8_t last_ack;    /* the accessory's latest acknowledgement */
 static long rto;            /* retransmission timeout, ticks; 0 never */
 static unsigned max_sends;  /* sends of one packet before giving up */
+/* A bare ACK goes only to an accessory whose SYN gives a cumulative
+ * acknowledgement timeout. Trap: one that gives 0 stops reading after a
+ * bare ACK; one that gives a timeout sends its packets again until
+ * acknowledged, and an iPhone acknowledges them bare when it has no reply. */
+static long cack;           /* cumulative acknowledgement timeout, ticks */
+static unsigned max_cacks;  /* its packets left unacknowledged at most */
+static unsigned unacked;    /* its packets taken since the player last sent */
+static long unacked_since;
 
 struct slot
 {
@@ -112,13 +123,14 @@ static struct slot slots[SLOTS];
 static unsigned head, count; /* the ring: oldest unacknowledged, and how many */
 
 /* The control session's bytes, until a whole message is in. */
-static uint8_t cs[MAX_PACKET + 256];
+static uint8_t cs[RX_PACKET + 256];
 static size_t cs_len;
 
 enum
 {
     SEND_ECHO    = 1 << 0,
     SEND_SYN_ACK = 1 << 1,
+    SEND_ACK     = 1 << 2,
 };
 static unsigned pending;
 static uint8_t ctl[HEADER_LEN + sizeof(syn_ack) + 1];
@@ -137,7 +149,7 @@ static bool tx_stuck_logged;
  * unaligned one goes out shifted. */
 static uint8_t report[96] USB_DEVBSS_ATTR __attribute__((aligned(32)));
 
-static uint8_t rx[MAX_PACKET + 256];
+static uint8_t rx[RX_PACKET + 256];
 static size_t rx_len;
 
 bool usb_iap_answer_iap2(void)
@@ -300,6 +312,9 @@ static void send_next(void)
         }
         else if (link_up && (s = next_queued()) != NULL)
         {
+            /* it names the accessory's last packet, as a bare ACK would */
+            pending &= ~SEND_ACK;
+            unacked = 0;
             s->packet[6] = peer_seq;
             s->packet[8] = checksum(s->packet, 8);
             s->queued = false;
@@ -310,6 +325,12 @@ static void send_next(void)
             tx_slot = s;
             log_packet(tx, tx_len, s->tries > 1 ? USB_LOG_IAP2_AGAIN
                                                 : USB_LOG_IAP2_OK, true);
+        }
+        else if (link_up && (pending & SEND_ACK))
+        {
+            pending &= ~SEND_ACK;
+            unacked = 0;
+            build_ctl(CTL_ACK, NULL, 0);
         }
         else
             return;
@@ -419,7 +440,8 @@ static void reset_link(void)
     tx_slot = NULL;
     last_ack = my_seq;
     cs_len = 0;
-    pending &= ~SEND_SYN_ACK;
+    unacked = 0;
+    pending &= ~(SEND_SYN_ACK | SEND_ACK);
     usb_iap2_control_reset();
 }
 
@@ -428,15 +450,31 @@ static void take_syn(uint8_t seq, const uint8_t *payload, size_t n)
 {
     if (n < SYN_FIXED || n > sizeof(syn_ack) || payload[0] != 1)
         return;
+    /* the whole of it, sessions included, eight bytes a line */
+    for (size_t off = 0; off < n; off += 8)
+    {
+        uint32_t c = 0, d = 0;
+        for (size_t i = 0; i < 4; i++)
+        {
+            c = c << 8 | (off + i < n ? payload[off + i] : 0);
+            d = d << 8 | (off + 4 + i < n ? payload[off + 4 + i] : 0);
+        }
+        usb_log(USB_LOG_IAP2_PARAMS, MIN(n - off, 8), off, c, d);
+    }
     memcpy(syn_ack, payload, n);
     syn_ack_len = n;
     peer_max = MIN(MAX(payload[2] << 8 | payload[3], HEADER_LEN + 2),
                    MAX_PACKET);
-    if ((syn_ack[2] << 8 | syn_ack[3]) > MAX_PACKET)
+    if ((syn_ack[2] << 8 | syn_ack[3]) > RX_PACKET)
     {
-        syn_ack[2] = MAX_PACKET >> 8;
-        syn_ack[3] = MAX_PACKET & 0xff;
+        syn_ack[2] = RX_PACKET >> 8;
+        syn_ack[3] = RX_PACKET & 0xff;
     }
+    /* The player holds nothing it receives, so takes any number of packets
+     * unacknowledged; an iPhone offers 0x7F to an accessory that
+     * retransmits and echoes the window to one that does not. */
+    if (payload[8])
+        syn_ack[1] = 0x7F;
     window = MAX(1, MIN(payload[1], SLOTS));
     /* The accessory's retransmission timeout and retransmissions, as it
      * gives them. Trap: this car gives 0 for both and leaves packets
@@ -446,6 +484,11 @@ static void take_syn(uint8_t seq, const uint8_t *payload, size_t n)
     rto = payload[8] ? (payload[4] << 8 | payload[5]) * HZ / 1000 : 0;
     if (rto && rto < HZ / 10)
         rto = HZ / 10;
+    cack = (payload[6] << 8 | payload[7]) * HZ / 1000;
+    if (!cack && (payload[6] | payload[7]))
+        cack = 1;
+    max_cacks = payload[9];
+    unacked = 0;
     control_session = 0;
     file_session = 0;
     for (size_t i = SYN_FIXED; i + 3 <= n; i += 3)
@@ -556,25 +599,45 @@ static void take_packet(const uint8_t *p, size_t len)
     else if (n)
     {
         /* Out of order or repeated, the packet is dropped; the player's
-         * next packet names the last one taken. */
-        if (seq == (uint8_t)(peer_seq + 1))
+         * next packet names the last one taken. One repeated, its
+         * acknowledgement lost, is acknowledged again. One before the link
+         * is up is not taken, so not acknowledged either. */
+        if (link_up && seq == (uint8_t)(peer_seq + 1))
         {
             peer_seq = seq;
-            if (link_up && session == control_session)
+            if (cack && !unacked++)
+                unacked_since = current_tick;
+            if (cack && max_cacks && unacked >= max_cacks)
+                pending |= SEND_ACK;
+            if (session == control_session)
                 take_control(payload, n);
-            else if (link_up && file_session && session == file_session)
+            else if (file_session && session == file_session)
                 usb_iap2_control_file(payload, n);
         }
+        else if (link_up && cack && (uint8_t)(peer_seq - seq) < 128)
+            pending |= SEND_ACK;
     }
 }
 
 /* ---- receiving ---------------------------------------------------------- */
 
+/* A packet begun in a transfer that ended before it did: kept for the next
+ * transfer, unless that opens a packet of its own */
+static bool rx_partial;
+
+static bool opens_packet(const uint8_t *p, size_t n)
+{
+    return n >= HEADER_LEN && p[0] == SOP1 && p[1] == SOP2 &&
+           checksum(p, HEADER_LEN) == 0;
+}
+
 /* Whole packets off the front of rx. What is left of the last report of a
- * transfer is padding, or a packet cut short, and goes. */
+ * transfer is padding, which goes, or a packet the accessory finishes in
+ * its next transfer without marking it continued. */
 static void take_packets(bool last)
 {
     size_t off = 0;
+    bool waiting = false;
     while (rx_len - off >= HEADER_LEN)
     {
         const uint8_t *p = rx + off;
@@ -589,24 +652,35 @@ static void take_packets(bool last)
             off++;
             continue;
         }
-        if (len > MAX_PACKET)
+        if (len > RX_PACKET)
         {
             log_packet(p, len, USB_LOG_IAP2_TOO_LONG, false);
             off = rx_len;
             break;
         }
         if (rx_len - off < len)
+        {
+            waiting = true;
             break;
+        }
         take_packet(p, len);
         off += len;
     }
-    if (last)
+    rx_partial = last && waiting;
+    if (last && !waiting)
         rx_len = 0;
     else
     {
         memmove(rx, rx + off, rx_len - off);
         rx_len -= off;
     }
+}
+
+/* From the tick and on each report, so a bare ACK is late by a tick at most */
+static void check_ack_due(void)
+{
+    if (unacked && !TIME_BEFORE(current_tick, unacked_since + cack))
+        pending |= SEND_ACK;
 }
 
 bool usb_iap2_report(const uint8_t *r, size_t len)
@@ -630,18 +704,21 @@ bool usb_iap2_report(const uint8_t *r, size_t len)
         seen = true;
         reset_link();
         rx_len = 0;
+        rx_partial = false;
         pending |= SEND_ECHO;
     }
     else
     {
-        if (first)
+        if (first && !(rx_partial && !opens_packet(data, n)))
             rx_len = 0;
+        rx_partial = false;
         n = MIN(n, sizeof(rx) - rx_len);
         memcpy(rx + rx_len, data, n);
         rx_len += n;
         take_packets(!(hr->link_control &
                        IAPHIDReportLinkControlBits_MoreToFollow));
     }
+    check_ack_due();
     send_next();
     return true;
 }
@@ -678,6 +755,7 @@ bool usb_iap2_tick(void)
                 s->queued = true;
         }
     }
+    check_ack_due();
     if (tx_busy && !tx_stuck_logged &&
         TIME_AFTER(current_tick, tx_started + HZ))
     {

@@ -408,11 +408,30 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
             usb_log_format_iap(e, p, size);
             break;
         case USB_LOG_IAP_RATE:
+            if (e->b == 2)
+            {
+                snprintf(p, size, "iap: accessory lists no rates, playing "
+                         "the %lu Hz the host set", (unsigned long)e->c);
+                break;
+            }
+            if (e->b)
+            {
+                snprintf(p, size, "iap: host sets no rate, playing the "
+                         "%lu Hz announced", (unsigned long)e->c);
+                break;
+            }
             n = snprintf(p, size, "iap: host sets %lu Hz",
                          (unsigned long)e->c);
             if (e->d)
                 snprintf(p + n, size - n, ", %lu announced%s",
                          (unsigned long)e->d, e->a ? ": IGNORED" : "");
+            break;
+        case USB_LOG_IAP_RATES:
+            snprintf(p, size, "iap: accessory lists %u rates, of ours%s%s%s"
+                     "%s: %s", e->b, e->c & 1 ? " 48000" : "",
+                     e->c & 2 ? " 44100" : "", e->c & 4 ? " 32000" : "",
+                     e->c & 7 ? "" : " none",
+                     e->a ? "accepted" : "REFUSED");
             break;
         case USB_LOG_IAP_STREAM:
             snprintf(p, size, "iap: stream now %s",
@@ -421,6 +440,25 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
                          ? "silent, nothing playing"
                          : "silent, waiting for the host to set the rate");
             break;
+        case USB_LOG_IAP_ART:
+        {
+            static const char *const what[] = {
+                "playing", "art sent", "art asked for, none sent"
+            };
+            static const char *const cache[] = {
+                "a thumbnail", "Car Artwork off", "no track or size",
+                "no thumbnail", "an unusable thumbnail"
+            };
+            const bool has = e->c == USB_LOG_IAP_ART_CACHE_OK || e->d;
+            snprintf(p, size, "iap: track %u %s%s; art cache: %s%s", e->b,
+                     e->a < 3 ? what[e->a] : "?",
+                     e->a == USB_LOG_IAP_ART_REPORTED
+                         ? (has ? ", told it has art" : ", told it has none")
+                         : "",
+                     e->c < 5 ? cache[e->c] : "?",
+                     e->d ? ", playback's art used" : "");
+            break;
+        }
         case USB_LOG_IAP_IDENTIFY:
         {
             static const char *const auth[] = {

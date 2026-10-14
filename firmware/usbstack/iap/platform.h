@@ -39,6 +39,11 @@ struct Platform {
     int aa_slot;
 };
 
+void iap_platform_seek_tick(struct IAPContext* ctx);
+void iap_platform_seek_stop(struct IAPContext* ctx);
+/* Playback moves to the iAP sink, from the rates the sink offers */
+bool iap_platform_take_sink(void);
+
 /* helper functions */
 uint8_t _iap_convert_play_status(int rb_audio_status);
 uint8_t _iap_convert_volume(int rb_volume);

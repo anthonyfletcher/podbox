@@ -48,7 +48,8 @@ documentation was not consulted.
 | Control bits SYN, ACK, EAK, RST | carplayd (SYN, ACK); carplay-wifi-extractor (EAK, RST) |
 | The link sync payload, and the phone answering with the accessory's own parameters | carplay-wifi-extractor; observed |
 | Session types: 0 control, 1 file transfer | carplayd; observed |
-| An iPhone sends no bare acknowledgement and never retransmits; this car stops reading after a bare one | observed |
+| An iPhone sends the Mazda no bare acknowledgement and never retransmits; the Mazda stops reading after a bare one | observed |
+| A car whose link settings give an acknowledgement timeout, such as a Lexus, gets a bare acknowledgement from an iPhone when there is no reply to carry one, and sends its packets again until acknowledged | observed |
 
 ### Authentication, identification and power
 

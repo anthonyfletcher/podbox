@@ -26,9 +26,16 @@ bool iap_audio_deinit(void);
 bool iap_audio_enable(void);
 bool iap_audio_disable(void);
 bool iap_audio_set_sampr(uint32_t sampr);
+/* RetAccessorySampleRateCaps: logged, and the sink offers only the listed
+ * rates. False, refusing the accessory, if none of 48, 44.1 and 32 kHz is
+ * among them. */
+struct IAPSpan;
+bool iap_audio_accessory_rates(struct IAPSpan* list);
 /* TrackNewAudioAttributes once the accessory's rates are accepted, if
  * nothing has sent it yet on this connection. */
 void iap_audio_connected(void);
+/* The accessory's ack of TrackNewAudioAttributes, which lets a new rate play. */
+void iap_audio_attrs_ack(bool success);
 /* USB thread: TrackNewAudioAttributes again if a track has started since. */
 void iap_audio_tick(void);
 /* The rate the iAP sink is configured for. */

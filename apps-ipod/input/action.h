@@ -316,6 +316,10 @@ enum {
     ACTION_WPS_NEXT_ALBUM,
     ACTION_WPS_PREV_ALBUM,
 
+    /* A remote's volume buttons in a list. */
+    ACTION_LIST_VOLUP,
+    ACTION_LIST_VOLDOWN,
+
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };
 

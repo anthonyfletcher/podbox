@@ -1500,6 +1500,7 @@ void settings_apply(bool read_disk)
 #ifdef USB_ENABLE_IAP
     usb_set_iap(global_settings.iap_enabled);
     usb_set_iap2_mode(global_settings.iap2_mode);
+    usb_set_identity(global_settings.iap_identity);
 #endif
 #ifdef HAVE_COMPOSITE_VIDEO_OUT
     settings_apply_tv_out();

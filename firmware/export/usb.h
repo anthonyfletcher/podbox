@@ -383,6 +383,21 @@ void usb_set_iap(bool enable);
 void usb_set_iap2_mode(int mode);
 /* The host has sent Apple's 0x53, as a car does; from the USB stack */
 void usb_car_found(void);
+
+/* Identify As: what an accessory is told the player is -- the USB product ID
+ * from the next connection, and the iAP model number over USB and serial */
+enum {
+    USB_IDENTITY_OWN,           /* the player's own product ID */
+    USB_IDENTITY_IPOD_CLASSIC,
+    USB_IDENTITY_IPHONE_4,
+};
+struct usb_identity {
+    uint16_t    product_id;     /* 0 for the player's own */
+    uint32_t    model_id;       /* ReturniPodModelNum's */
+    const char* model;
+};
+void usb_set_identity(int identity);
+const struct usb_identity* usb_identity(void);
 #endif
 
 #ifdef USB_ENABLE_SERIAL

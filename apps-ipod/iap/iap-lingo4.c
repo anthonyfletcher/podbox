@@ -13,11 +13,14 @@
 
 #include "iap-core.h"
 #include "iap-lingo.h"
+#include "audio/remote_seek.h"
+#include "metadata/cuesheet.h"
 #include "settings.h"
 #include "screens/playback/wps.h"
 #include "audio/playback.h"
 #include "database/tagcache.h"
 #include "iap-library.h"
+#include "iap-artwork.h"
 #include "string-extra.h"
 
 /*
@@ -78,7 +81,7 @@ static void select_record(const unsigned int cmd, const unsigned char *buf,
         /* audio_skip() locks up on an offset past the end */
         ok = index < (uint32_t)playlist_amount();
         if (ok)
-            audio_skip(index - playlist_next(0));
+            audio_skip(index - iap_get_trackindex());
     }
     else
         ok = iap_library_select(type, index, sort);
@@ -89,9 +92,11 @@ static void select_record(const unsigned int cmd, const unsigned char *buf,
 
 void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
 {
-    unsigned int cmd = (buf[1] << 8) | buf[2];
-    /* Lingo 0x04 commands are at least 3 bytes in length */
+    /* Lingo 0x04 commands are at least 3 bytes in length. Until the
+     * command is read, the ack names none. */
+    unsigned int cmd = 0;
     CHECKLEN(3);
+    cmd = (buf[1] << 8) | buf[2];
 
     /* Lingo 0x04 must have been negotiated */
     if (!DEVICE_LINGO_SUPPORTED(0x04)) {
@@ -170,10 +175,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * (0x00000000)
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x03,
-                                    0xFF, 0xFF, 0xFF, 0xFF,
-                                    0x00, 0x00, 0x00, 0x00};
-            iap_send_pkt(data, sizeof(data));
+            struct iap_chapter_info chapter;
+            bool has = iap_current_chapter(&chapter);
+
+            IAP_TX_INIT4(0x04, 0x0003);
+            IAP_TX_PUT_U32(has ? chapter.index : UINT32_MAX);
+            IAP_TX_PUT_U32(has ? chapter.count : 0);
+            iap_send_tx();
             break;
         }
         case 0x0003: /* ReturnCurrentPlayingTrackChapterInfo. See Above */
@@ -243,7 +251,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            CHECKLEN(7);
+            if (!(audio_status() & AUDIO_STATUS_PLAY))
+                cmd_ack(cmd, IAP_ACK_CMD_FAILED);
+            else if (!iap_set_chapter(get_u32(&buf[3])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            else
+                cmd_ok(cmd);
             break;
         }
         case 0x0005: /* GetCurrentPlayingTrackChapterPlayStatus */
@@ -281,7 +295,20 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            struct iap_chapter_info chapter;
+
+            CHECKLEN(7);
+            if (!iap_current_chapter(&chapter)
+                || !iap_chapter_at(audio_current_track(), get_u32(&buf[3]),
+                                   &chapter))
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            IAP_TX_INIT4(0x04, 0x0006);
+            IAP_TX_PUT_U32(chapter.length_ms);
+            IAP_TX_PUT_U32(chapter.elapsed_ms);
+            iap_send_tx();
             break;
         }
         case 0x0006: /* ReturnCurrentPlayingTrackChapterPlayStatus. See Above */
@@ -345,7 +372,19 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            struct iap_chapter_info chapter;
+
+            CHECKLEN(7);
+            if (!iap_current_chapter(&chapter)
+                || !iap_chapter_at(audio_current_track(), get_u32(&buf[3]),
+                                   &chapter))
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            IAP_TX_INIT4(0x04, 0x0008);
+            iap_tx_strlcpy((const unsigned char *)chapter.name);
+            iap_send_tx();
             break;
         }
         case 0x0008: /* ReturnCurrentPlayingTrackChapterName. See Above */
@@ -481,7 +520,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * so just return BAD_PARAM
              */
         {
-            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            /* Normal speed only: the player has no other */
+            CHECKLEN(4);
+            cmd_ack(cmd, buf[3] == 0x00 ? IAP_ACK_OK : IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x000C: /* GetIndexedPlayingTrackInfo */
@@ -556,55 +597,81 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                 break;
             }
-            struct mp3entry *id3 = audio_current_track();
+            uint32_t index = get_u32(&buf[4]);
+            struct mp3entry track;
+            struct mp3entry *id3 = &track;
+
+            if (index >= (uint32_t)playlist_amount())
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            iap_get_trackinfo(index, id3);
 
             switch(buf[3])
             {
                 case 0x01: /* Podcast Not Supported */
                 case 0x04: /* Lyrics Not Supported */
                 case 0x03: /* Description */
-                case 0x05: /* Genre */
-                case 0x06: /* Composer */
                 {
                     cmd_ack(cmd, IAP_ACK_BAD_PARAM);
                     break;
                 }
+                case 0x05: /* Genre */
+                case 0x06: /* Composer */
+                {
+                    IAP_TX_INIT4(0x04, 0x000D);
+                    IAP_TX_PUT(buf[3]);
+                    iap_tx_strlcpy((const unsigned char *)(buf[3] == 0x05 ?
+                        id3->genre_string : id3->composer));
+                    iap_send_tx();
+                    break;
+                }
                 default:
                 {
+                    if (buf[3] > 0x07)
+                    {
+                        cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                        break;
+                    }
                     IAP_TX_INIT4(0x04, 0x000D);
                     IAP_TX_PUT(buf[3]);
                     switch(buf[3])
                     {
                         case 0x00:
                         {
-                            /* Track Capabilities 10Bytes Data */
-                            IAP_TX_PUT_U32(0);   /* Track Capabilities. */
-                                                 /* Currently None Supported*/
+                            /* Track Capabilities 10Bytes Data: bit 1,
+                             * chapters; bit 2, album artwork */
+                            IAP_TX_PUT_U32((iap_artwork_exists(index) ?
+                                            BIT_N(2) : 0)
+                                           | (id3->cuesheet
+                                              && id3->cuesheet->track_count
+                                              ? BIT_N(1) : 0));
                             IAP_TX_PUT_U32(id3->length); /* Track Length */
-                            IAP_TX_PUT_U16(0x00);        /* Chapter Count */
+                            /* Chapter Count: the playing track's is loaded */
+                            IAP_TX_PUT_U16(id3->cuesheet ?
+                                           id3->cuesheet->track_count : 0);
                             break;
                         }
                         case 0x02:
                         {
-                            /* Track Release Date 7 Bytes Data
-                             * Currently only returns a fixed value,
-                             * Sunday 1st Feb 2011 3Hr 4Min 5Secs
-                             */
-                            IAP_TX_PUT(5);               /* Seconds 0-59 */
-                            IAP_TX_PUT(4);               /* Minutes 0-59 */
-                            IAP_TX_PUT(3);               /* Hours 0-23 */
-                            IAP_TX_PUT(1);               /* Day Of Month 1-31 */
-                            IAP_TX_PUT(2);               /* Month 1-12 */
-                            IAP_TX_PUT_U16(2011);        /* Year */
+                            /* Track Release Date 7 Bytes Data: the tags
+                             * carry a year only, sent as 1 January; all 0
+                             * for none */
+                            bool year = id3->year > 0;
+                            IAP_TX_PUT(0);               /* Seconds 0-59 */
+                            IAP_TX_PUT(0);               /* Minutes 0-59 */
+                            IAP_TX_PUT(0);               /* Hours 0-23 */
+                            IAP_TX_PUT(year ? 1 : 0);    /* Day Of Month 1-31 */
+                            IAP_TX_PUT(year ? 1 : 0);    /* Month 1-12 */
+                            IAP_TX_PUT_U16(year ? id3->year : 0); /* Year */
                             IAP_TX_PUT(0);               /* Day 0=Sunday */
                             break;
                         }
                          case 0x07:
                         {
-                            /* Track Artwork Count */
-                            /* Currently not supported */
-                            IAP_TX_PUT_U16(0x00);        /* Format ID */
-                            IAP_TX_PUT_U16(0x00);        /* Image Count */
+                            /* Track Artwork Count: none for no art */
+                            iap_artwork_put_counts(index);
                             break;
                         }
                     }
@@ -749,17 +816,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * height:2
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x0F,
-                                    0x04, 0x04, /* FormatID   */
-                                    0x02,       /* PixelFormat*/
-                                    0x00, 0x64, /* 100 pixels */
-                                    0x00, 0x64, /* 100 pixels */
-                                    0x04, 0x05, /* FormatID   */
-                                    0x02,       /* PixelFormat*/
-                                    0x00, 0xC8, /* 200 pixels */
-                                    0x00, 0xC8  /* 200 pixels */
-                                    };
-            iap_send_pkt(data, sizeof(data));
+            IAP_TX_INIT4(0x04, 0x000F);
+            iap_artwork_put_formats();
+            iap_send_tx();
             break;
         }
         case 0x000F: /* RetArtworkFormats. See Above */
@@ -833,19 +892,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Subsequent packets omit bytes 8 - 24
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x11,
-                                    0x00, 0x00, /* DescriptorIndex */
-                                    0x00,       /* PixelFormat */
-                                    0x00, 0x00, /* ImageWidthPixels*/
-                                    0x00, 0x00, /* ImageHeightPixels*/
-                                    0x00, 0x00, /* InsetRectangleTopLeftX*/
-                                    0x00, 0x00, /* InsetRectangleTopLeftY*/
-                                    0x00, 0x00, /* InsetRectangleBotRightX*/
-                                    0x00, 0x00, /* InsetRectangleBotRoghtY*/
-                                    0x00, 0x00, 0x00, 0x00,/* RowSize*/
-                                    0x00        /* ImagePixelData Var Length*/
-                                   };
-            iap_send_pkt(data, sizeof(data));
+            /* The time is ignored: a track has one image */
+            CHECKLEN(13);
+            if (!iap_artwork_start(0x04, 0x0011, get_u32(&buf[3]),
+                                   get_u16(&buf[7])))
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
             break;
         }
         case 0x0011: /* RetTrackArtworkData. See Abobe */
@@ -1479,13 +1530,9 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[] = {0x04, 0x00, 0x1F,
                                     0xFF, 0xFF, 0xFF, 0xFF};
-            long playlist_pos = playlist_next(0);
             int status = audio_status();
-            playlist_pos -= playlist_get_first_index(NULL);
-            if(playlist_pos < 0)
-                playlist_pos += playlist_amount();
-            if ((status == AUDIO_STATUS_PLAY) || (status & AUDIO_STATUS_PAUSE))
-                put_u32(&data[3], playlist_pos);
+            if (status & AUDIO_STATUS_PLAY)
+                put_u32(&data[3], iap_get_trackindex());
             iap_send_pkt(data, sizeof(data));
             break;
         }
@@ -1647,24 +1694,25 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
         {
             unsigned char data[70] = {0x04, 0x00, 0xFF};
             struct mp3entry id3;
-            size_t len;
-            long tracknum = get_u32(&buf[3]);
+            size_t slen;
+
+            /* The Return labels above share this body; those are the
+             * player's to send */
+            if (cmd != 0x20 && cmd != 0x22 && cmd != 0x24)
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
+            CHECKLEN(7);
+            uint32_t tracknum = get_u32(&buf[3]);
+            if (tracknum >= (uint32_t)playlist_amount())
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
 
             data[2] = cmd + 1;
-            memcpy(&id3, audio_current_track(), sizeof(id3));
-            tracknum += playlist_get_first_index(NULL);
-            if(tracknum >= playlist_amount())
-                tracknum -= playlist_amount();
-            /* If the tracknumber is not the current one, take its tags
-               from the database, or failing that read them from the file */
-            if(playlist_next(0) != tracknum)
-            {
-                struct playlist_track_info info;
-                playlist_get_track_info(NULL, tracknum, &info);
-                /* Both clear id3 before filling it */
-                if (!tagcache_fill_tags(&id3, info.filename))
-                    get_metadata(&id3, -1, info.filename);
-            }
+            iap_get_trackinfo(tracknum, &id3);
             /* Return the requested track data */
             switch(cmd)
             {
@@ -1677,25 +1725,25 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                  * is NULL, which strlcpy() would dereference.
                  */
                 case 0x20:
-                    len = strlcpy((char *)&data[3],
+                    slen = strlcpy((char *)&data[3],
                                   id3.title ? id3.title : "", 64);
-                    if (len > 63)
-                        len = 63;
-                    iap_send_pkt(data, 4+len);
+                    if (slen > 63)
+                        slen = 63;
+                    iap_send_pkt(data, 4+slen);
                     break;
                 case 0x22:
-                    len = strlcpy((char *)&data[3],
+                    slen = strlcpy((char *)&data[3],
                                   id3.artist ? id3.artist : "", 64);
-                    if (len > 63)
-                        len = 63;
-                    iap_send_pkt(data, 4+len);
+                    if (slen > 63)
+                        slen = 63;
+                    iap_send_pkt(data, 4+slen);
                     break;
                 case 0x24:
-                    len = strlcpy((char *)&data[3],
+                    slen = strlcpy((char *)&data[3],
                                   id3.album ? id3.album : "", 64);
-                    if (len > 63)
-                        len = 63;
-                    iap_send_pkt(data, 4+len);
+                    if (slen > 63)
+                        slen = 63;
+                    iap_send_pkt(data, 4+slen);
                     break;
             }
             break;
@@ -1755,8 +1803,22 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7     0xNN   Telegram payload checksum byte
              */
         {
-            device.do_notify = buf[3] ? true : false;
-            /* respond with cmd ok packet */
+            /* The four-byte form is a mask, whose first byte is 0 in any
+             * accessory that follows the protocol, so it is told apart by
+             * length. The one-byte form's 1 is stop, track index, track
+             * time and chapter index. Neither touches the Display Remote's
+             * notifications. */
+            CHECKLEN(4);
+            if (len >= 7)
+                device.pb_notifications = get_u32(&buf[3]);
+            else if (buf[3] <= 0x01)
+                device.pb_notifications = buf[3] ?
+                    (BIT_N(0) | BIT_N(2) | BIT_N(3) | BIT_N(5)) : 0;
+            else
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             cmd_ok(cmd);
             break;
         }
@@ -1846,6 +1908,11 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
          * 11   0xNN  Telegram payload checksum byte
          *
          */
+        {
+            /* The player's to send, not the accessory's */
+            cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+            break;
+        }
         case 0x0028: /* PlayCurrentSelection */
             /* The following is the description for the Apple Firmware
              *
@@ -1887,8 +1954,8 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 ok = index < (uint32_t)playlist_amount();
                 if (ok)
                 {
-                    audio_skip(index - playlist_next(0));
-                    audio_resume();
+                    audio_skip(index - iap_get_trackindex());
+                    ok = iap_play_or_resume();
                 }
             }
             else
@@ -1936,36 +2003,52 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              * Reserved             0x0A - 0xFF
              *
              */
+            CHECKLEN(4);
+
+            /* The playback engine directly: a button press acts on the
+             * screen that has focus */
+            bool ok = true;
+            /* anything but a seek ends one where it has got to */
+            if (buf[3] < 0x05 || buf[3] > 0x07)
+                remote_seek_stop();
             switch(buf[3])
             {
                 case 0x01: /* play/pause */
-                    iap_remotebtn = BUTTON_RC_PLAY;
-                    iap_repeatbtn = 2;
+                    if ((audio_status() & (AUDIO_STATUS_PLAY|AUDIO_STATUS_PAUSE))
+                        == AUDIO_STATUS_PLAY)
+                        audio_pause();
+                    else
+                        ok = iap_play_or_resume();
                     break;
                 case 0x02: /* stop */
-                    iap_remotebtn = BUTTON_RC_PLAY|BUTTON_REPEAT;
-                    iap_repeatbtn = 2;
+                    audio_stop();
                     break;
                 case 0x03: /* skip++ */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    iap_repeatbtn = 2;
+                    audio_next();
                     break;
                 case 0x04: /* skip-- */
-                    iap_remotebtn = BUTTON_RC_LEFT;
-                    iap_repeatbtn = 2;
+                    audio_prev();
                     break;
                 case 0x05: /* ffwd */
-                    iap_remotebtn = BUTTON_RC_RIGHT;
-                    break;
                 case 0x06: /* frwd */
-                    iap_remotebtn = BUTTON_RC_LEFT;
+                    ok = remote_seek_start(buf[3] == 0x05 ? 1 : -1);
                     break;
                 case 0x07: /* end ffwd/frwd */
-                    iap_remotebtn = BUTTON_NONE;
+                    remote_seek_stop();
                     break;
+                case 0x08: /* next: the chapter, else the track */
+                    if (!iap_skip_chapter(1))
+                        audio_next();
+                    break;
+                case 0x09: /* previous: the chapter, else the track */
+                    if (!iap_skip_chapter(-1))
+                        audio_prev();
+                    break;
+                default:
+                    cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                    return;
             }
-            /* respond with cmd ok packet */
-            cmd_ok(cmd);
+            cmd_ack(cmd, ok ? IAP_ACK_OK : IAP_ACK_CMD_FAILED);
             break;
         }
         case 0x002A: /* GetTrackArtworkTimes */
@@ -2004,9 +2087,14 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *
              */
         {
-            unsigned char data[] = {0x04, 0x00, 0x2B,
-                                    0x00, 0x00, 0x00, 0x00};
-            iap_send_pkt(data, sizeof(data));
+            /* A track's one image is at its start; none, no times */
+            CHECKLEN(13);
+            IAP_TX_INIT4(0x04, 0x002B);
+            if (get_u16(&buf[9]) == 0 && get_u16(&buf[11]) != 0
+                && iap_artwork_format_valid(get_u16(&buf[7]))
+                && iap_artwork_exists(get_u32(&buf[3])))
+                IAP_TX_PUT_U32(0);
+            iap_send_tx();
             break;
         }
         case 0x002B: /* ReturnTrackArtworkTimes. See Above */
@@ -2164,6 +2252,13 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
+            CHECKLEN(4);
+            /* Off or tracks; the player has no album shuffle */
+            if(buf[3] > 0x01)
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             if(iap_library_queue_lent())
             {
                 cmd_ack(cmd, IAP_ACK_CMD_FAILED);
@@ -2293,6 +2388,12 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
              *  7   0xNN  Telegram payload checksum byte
              *
              */
+            CHECKLEN(4);
+            if (buf[3] > 0x02)
+            {
+                cmd_ack(cmd, IAP_ACK_BAD_PARAM);
+                break;
+            }
             int oldmode = global_settings.repeat_mode;
             if (buf[3] == 0)
                 global_settings.repeat_mode = REPEAT_OFF;
@@ -2710,8 +2811,16 @@ void iap_handlepkt_mode4(const unsigned int len, const unsigned char *buf)
                 break;
             }
 
+            /* Stopped, a skip has nothing to move: start there */
+            if (!(audio_status() & AUDIO_STATUS_PLAY))
+            {
+                playlist_start((playlist_get_first_index(NULL) + tracknum)
+                               % playlist_amount(), 0, 0);
+                cmd_ok(cmd);
+                break;
+            }
             audio_pause();
-            audio_skip(tracknum - playlist_next(0));
+            audio_skip(tracknum - iap_get_trackindex());
             if (!paused)
                 audio_resume();
 

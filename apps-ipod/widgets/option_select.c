@@ -527,8 +527,19 @@ bool option_screen(const struct settings_list *setting,
         if (!allow_wrap)
             lists.wraparound = false;
 
-        if (list_do_action(CONTEXT_LIST, HZ, /* HZ so the status bar redraws */
-                           &lists, &action))
+        /* HZ so the status bar redraws */
+        bool handled = list_do_action(CONTEXT_LIST, HZ, &lists, &action);
+        if (handled
+            && (action == ACTION_LIST_VOLUP || action == ACTION_LIST_VOLDOWN))
+        {
+            /* A remote's volume moved global_status.volume, not the
+             * selection; the Volume setting's selection follows it */
+            val_to_selection(setting, *variable, &nb_items,
+                             &selected, &function);
+            gui_synclist_select_item(&lists, selected);
+            gui_synclist_draw(&lists);
+        }
+        else if (handled)
         {
             /* setting changed */
             selected = gui_synclist_get_sel_pos(&lists);

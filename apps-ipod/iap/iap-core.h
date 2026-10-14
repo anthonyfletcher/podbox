@@ -25,8 +25,15 @@
 #include "logf.h"
 
 /* The Model ID of the iPod we emulate. Currently a 160GB classic */
-#define IAP_IPOD_MODEL (0x00130200U)
-#define IAP_IPOD_VARIANT "MC293"
+/* The model reported, Identify As's where USB has the setting */
+#ifdef USB_ENABLE_IAP
+#include "usb.h"
+#define IAP_MODEL_ID (usb_identity()->model_id)
+#define IAP_MODEL    (usb_identity()->model)
+#else
+#define IAP_MODEL_ID (0x00130200U)
+#define IAP_MODEL    "MC293"
+#endif
 
 /* The firmware version we emulate. Currently 2.0.3 */
 #define IAP_IPOD_FIRMWARE_MAJOR (2)
@@ -83,6 +90,8 @@ struct auth_t {
     unsigned char max_section;      /* The maximum number of certificate sections */
     unsigned char next_section;     /* The next expected section number */
     uint16_t version;               /* Authentication version */
+    long deadline;                  /* for the accessory's next step, or 0 */
+    uint16_t tid;                   /* the one transaction ID of the exchange */
 };
 
 /* State of GetAccessoryInfo */
@@ -119,7 +128,8 @@ struct device_t {
     uint32_t chapter_index;         /* if they change */
     unsigned char play_status;
     bool mute;
-    unsigned char volume;
+    unsigned char volume;           /* as last notified, iap_volume_to_byte() */
+    bool volume_mute;               /* the mute last notified with it */
     unsigned char power_state;
     unsigned char battery_level;
     uint32_t equalizer_index;
@@ -138,9 +148,35 @@ struct device_t {
                                      * of GetAccessoryInfo
                                      */
     uint32_t capabilities_queried;  /* Capabilities already queried */
+    uint16_t max_payload;           /* the accessory's largest packet, or 0 */
+
+    /* IDPS. Transaction IDs are in force from StartIDPS to the next
+     * Identify or IdentifyDeviceLingoes; iap-core.c adds and strips them. */
+    bool transid;
+    bool idps;                      /* between StartIDPS and EndIDPS */
+    bool identified_by_idps;
+    uint32_t idps_lingoes;          /* the IdentifyToken's */
+    uint32_t idps_options;
+    uint32_t idps_deviceid;
+
+    /* Extended Interface PlayStatusChangeNotification, a subscription of
+     * its own: the bits of SetPlayStatusChangeNotification, and what was
+     * last sent */
+    uint32_t pb_notifications;
+    bool pb_track_changed;          /* set from the audio thread */
+    unsigned char pb_play_status;
+    unsigned char pb_ext_state;
+    uint32_t pb_trackpos_ms;
+    uint32_t pb_trackpos_s;
+    uint32_t pb_numtracks;
+    uint32_t pb_chapter_index;
 };
 
 extern struct device_t device;
+/* How long the accessory has for each certificate step: more than the two
+ * seconds the specification gives, so a slow one is not failed */
+#define IAP_AUTH_STEP_TIMEOUT (5 * HZ)
+
 #define DEVICE_AUTHENTICATED (device.auth.state == AUST_AUTH)
 #define DEVICE_AUTH_RUNNING ((device.auth.state != AUST_NONE) && (device.auth.state != AUST_AUTH))
 #define DEVICE_LINGO_SUPPORTED(x) (device.lingoes & BIT_N((x)&0x1f))
@@ -231,13 +267,30 @@ void iap_repeat_next(void);
 void iap_fill_power_state(void);
 
 void iap_send_tx(void);
+/* The transaction ID of the command being handled, and a send that answers
+ * it later, from outside its handler */
+uint16_t iap_rx_tid(void);
+void iap_send_tx_tid(uint16_t tid);
+/* iap_artwork_send_next() on the iAP thread */
+void iap_artwork_post(void);
 void iap_set_remote_volume(void);
 
 extern enum interface_state interface_state;
 void iap_interface_state_change(const enum interface_state new);
+bool iap_play_or_resume(void);
+
+#include "iap-chapters.h"
+
+/* Volume as the protocol's 0-255 over the codec's own range, and back */
+unsigned char iap_volume_to_byte(int volume);
+int iap_byte_to_volume(unsigned char level);
+/* Muted, the codec is at its minimum and the volume setting kept */
+void iap_set_mute(bool mute);
 
 extern bool iap_btnrepeat;
 extern bool iap_btnshuffle;
+extern bool iap_btnstop;
+extern bool iap_btnchapter;
 
 uint32_t iap_get_trackpos(void);
 uint32_t iap_get_trackindex(void);
