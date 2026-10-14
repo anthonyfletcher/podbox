@@ -370,13 +370,28 @@ fork changes what its features need: mostly the USB stack (`firmware/usbstack/`,
 `firmware/usb.c` and the two players' USB controller drivers), drivers and
 firmware core for the two targets, `lib/skin_parser` and `lib/rbcodec/metadata`,
 and its own tools under `tools/`; `docs/podbox/upstream-divergence.md` lists
-every file. Ask before changing anything outside `apps-ipod/`.** `manual/`,
+every file. Ask before changing anything outside `apps-ipod/`.**
+
+**Outside `apps-ipod/`, put a feature in a file of its own and call it from
+upstream's code, rather than writing it into upstream's functions.** A new
+file never conflicts in a merge; every edited line of an upstream file can.
+Keep the hook small, and move existing fork code out when you are already
+working in it, not as a refactor of its own. `manual/`,
 `android/`, `backdrops/`, `screenshots/`, the stock `wps/` themes and every
 `themes/` entry this fork did not convert are all still present and all
 unbuilt. They are
 kept deliberately so `git merge rockbox/master` applies without delete/modify
 conflicts. Do not prune them to tidy the tree -- being unused is not a reason
 to remove something here.
+
+**At every upstream merge, run `sh tools/upstream-apps-port.sh` before
+building.** A merge lands upstream's `apps/` changes where nothing compiles
+them, so each must be ported to `apps-ipod/` by hand. The script lists the
+upstream commits that touch a file `apps-ipod/` has, mapped through the `was:`
+markers, and marks `!!` the ones whose `firmware/` or `lib/` half merges in
+and builds -- a fix that looks landed while its `apps/` half is missing. Its
+default range is exactly what the next merge brings in; after a merge, pass
+`--since` the old merge base and `--to` the merged commit.
 
 `uisimulator/` is upstream-identical as well, but it is **built** -- the
 simulator uses it, along with `firmware/target/hosted/sdl/`. Three files there

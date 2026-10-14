@@ -281,6 +281,7 @@ and produces the wrong firmware.
 | `pfgeom/` | Mirrors the carousel's projection and cull on the host. Change it with `screens/covers/carousel.c`, or it proves nothing. |
 | `dbfeat/` | Runs `apps-ipod/database/db_featured_parse.c`, unmodified, over a table of tags and the guests each must yield. |
 | `check-settings-docs.sh` | Whether `settings-help.txt` and `settings-guide.md` match the settings. Silence means they do. |
+| `upstream-apps-port.sh` | Lists the upstream commits to `apps/` in a range, each touched file mapped to its `apps-ipod/` counterpart through the `was:` markers, and marks those that also touch `firmware/` or `lib/`. Run at every upstream merge. |
 | `soundscan/` | Runs the player's sound analysis over a music folder on a computer. Ships as `.rockbox/tools/soundscan.exe`; compiles the app layer's analysis sources. |
 | `database_pb/` | Runs the player's database Update or Rebuild against a mounted player. Ships as `.rockbox/tools/database_pb.exe`; compiles `apps-ipod/database/tagcache.c` with `DBTOOL`. Upstream's `database/`, the (D)atabase build, writes upstream's database and is left as it is. |
 | `artcache_pb/` | Runs the player's art cache pass against a mounted player. Ships as `.rockbox/tools/artcache_pb.exe`; compiles `apps-ipod/metadata/art_cache.c` and its image code with `DBTOOL`. |
