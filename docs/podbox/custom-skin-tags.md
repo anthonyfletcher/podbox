@@ -653,7 +653,7 @@ because that is the band text has to be read against.
 the one filter that reads something outside the picture: the colour that text will be drawn in,
 which is the theme's foreground — or the album's accent, while dynamic colours
 are running. If your text is drawn in a pinned colour instead, such as
-`%Vf(!ffffff)`, name it: `scrim:ffffff`. Three things follow.
+`%Vf(!ffffff)`, name it: `scrim:ffffff`. Four things follow.
 
 - **It caps the highlights and leaves the rest.** Anything bright enough to
   crowd the text is brought down until the text reads over it at 4.5:1; darker

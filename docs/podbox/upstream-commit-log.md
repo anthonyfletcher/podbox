@@ -275,7 +275,7 @@ later address.
 | Date | RockPod | Summary | Status | Note |
 | --- | --- | --- | --- | --- |
 | 2026-07-13 | `9e30268` | fix empty list on LCD wake | **Declined** | Removing `current_lists = NULL` in `widgets/list.c` crashes: the NULL is all that bounds the pointer's lifetime, and a status-bar refresh after the owning screen exits calls through reused stack. The empty list is fixed here instead by `skin_flush_dirty()` in the list's update callback. |
-| 2026-07-30 | `3b6fd8d` | iap: adopt upstream's remote fixes and tighten spec conformance | **N/A** | Builds on IDPS state this copy of `iap/` does not have. |
+| 2026-07-30 | `3b6fd8d` | iap: adopt upstream's remote fixes and tighten spec conformance | **Adopted (independently)** | Its IDPS and spec conformance came with `951d17c057`, in the iap-parity merge `6ce19aab46`. |
 | 2026-07-30 | `4d80394` | fix PictureFlow track list highlight using wrong text color | **N/A** | No track list. |
 | 2026-07-30 | `3e29bfa` | revert PictureFlow track list to the selector text colour | **N/A** | Same. |
 | 2026-07-30 | `82d6fa2` | PictureFlow: full line of spacing on the album/artist lines | **Adopted** | As part of `320c006b4f`. |
@@ -287,7 +287,7 @@ later address.
 | 2026-07-31 | `77fe839` | iap: fix a panic on long track tags and an unbounded database loop | **Adopted** | The record bound clamps the count rather than adding it to the start. |
 | 2026-07-31 | `53bdc10` | iap: stop an accessory locking the device up via audio_skip() | **Adopted** | Extended to the Simple Remote track-index command in `iap-lingo3.c`, which RockPod has not fixed. |
 | 2026-07-31 | `99b21cd` | iap: enlarge the thread stack | **Adopted** | 12K. At 6K the overflow corrupted packets silently. |
-| 2026-07-31 | `be4fb2f` `b09947a` `ebd26f4` `e605740` `9815533` `feb1924` | iap: IDPS session state, transaction IDs, lingo version | **N/A** | Build on `3b6fd8d`. |
+| 2026-07-31 | `be4fb2f` `b09947a` `ebd26f4` `e605740` `9815533` `feb1924` | iap: IDPS session state, transaction IDs, lingo version | **Adopted** | With `951d17c057`: serial iAP identifies by IDPS, with transaction IDs. |
 | 2026-07-31 | `8655fb3` | Themify 2: match the PictureFlow selector to the menu highlight | **N/A** | No track list. |
 | 2026-07-31 | `af38f7e` | PictureFlow: honour "selector type" instead of assuming one style | **N/A** | No track list. |
 | 2026-07-31 | `2b3dbc1` `42e80a7` `82f13a0` | PictureFlow selector draw mode and mode classification | **N/A** | Follow `af38f7e`. |
@@ -296,13 +296,16 @@ later address.
 | 2026-07-31 | `0a3446e` | PictureFlow: fix the centre-slide flash properly, and bound the advance | **Adopted** | `320c006b4f` for the bound; the flash was fixed separately in `bdb8a73e8d`. |
 | 2026-08-28 | `3b6d477` | iap: overhaul accessory protocol support | **Adopted (in part)** | 154 files, taken in parts: see below. |
 
-Complete through `3b6d477` (2026-08-28). Check with `git ls-remote`, not a
+Complete through `3b6d477` (2026-08-28), which RockPod's rewritten history now
+calls `951d17c057`. Check with `git ls-remote`, not a
 local clone, which reads as "nothing new" whether or not it is.
 
 ## What was taken from `3b6d477`
 
-The Extended Interface browsing it adds — `iap-db.c`, `iap-media.c`, the
-artwork and chapter readers and the test rig — is **Declined**. The hardening
+The Extended Interface browsing it adds — `iap-db.c`, `iap-media.c` and the
+test rig — is **Declined**: `iap-library.c` serves every transport here. Its
+chapters, album art and IDPS were taken later, in the iap-parity merge
+(`6ce19aab46`); `iap-sources.md` says which part came from where. The hardening
 underneath was judged against this tree, since RockPod's `firmware/` and
 `lib/` are pre-rebase.
 
@@ -312,7 +315,7 @@ underneath was judged against this tree, since RockPod's `firmware/` and
 | `database/tagcache.c`, `.h` | **Adopted (in part)** | A read error is no longer taken for "no match", so a truncated index cannot pass a short list off as the whole one. Snapshot accessors declined. |
 | `usbstack/usb_storage.c` | **Adopted (independently)** | `set_transfer_range()` makes the LBA arithmetic overflow-safe for all four READ/WRITE commands, and the CBW's LUN is bounds-checked. |
 | `playlist/playlist.c` | **Adopted (in part)** | `get_track_filename()` and `playlist_get_track_info()` read the indices under the lock; the control file checks `fsync()` and `lseek()`. Staged/snapshot API declined. |
-| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | `iap_getc()` drops a malformed length. Not RockPod's long-form check, though: the Onkyo DS-A3 sends its certificate in long frames below 0xFD. The rest is IDPS and EI browsing. |
+| `iap/iap-core.c`, `iap-lingo*.c` | **Adopted (in part)** | `iap_getc()` drops a malformed length. Not RockPod's long-form check, though: the Onkyo DS-A3 sends its certificate in long frames below 0xFD. IDPS came later with the iap-parity merge; EI browsing is declined. |
 | `s5l8702/ipod6g/storage_ata-6g.c` | **Declined** | A second implementation of the SSD sleep this fork already has. |
 | `usbstack/usb_audio.c`, `usb-designware.c` | **Declined** | RockPod's USB audio source. Here USB iAP's configuration 2 is the source. |
 
@@ -339,6 +342,11 @@ git log --oneline <base>..rockbox/master -- <file>
 # Already in the application layer? Never trust a clean merge.
 grep -rn "<identifier>" apps-ipod/
 ```
+
+`sh tools/upstream-apps-port.sh` lists the upstream commits to port, each
+`apps/` file already mapped to its `apps-ipod/` counterpart, and marks `!!`
+those whose `firmware/` or `lib/` half merges in and builds. After a merge,
+pass `--since <old merge base> --to <merged commit>`.
 
 To list which `apps-ipod/` file each upstream `apps/` file became:
 

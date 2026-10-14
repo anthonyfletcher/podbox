@@ -130,7 +130,7 @@ menu editors behind it (main_menu_config, music_menu_config).
 
 | Directory | Contents |
 |---|---|
-| `iap/` | Apple accessory protocol. `iap-library` is the library every iAP transport browses — serial, USB iAP and iAP2 — reached from `firmware/usbstack` through `api/iap_library.h`. |
+| `iap/` | Apple accessory protocol. `iap-library` is the library every iAP transport browses — serial, USB iAP and iAP2 — reached from `firmware/usbstack` through `api/iap_library.h`. `iap-artwork` and `iap-chapters` are shared the same way, through `api/iap_artwork.h` and `api/iap_chapters.h`. |
 | `sim/` | What the desktop simulator needs and hardware does not. Built only in a simulator build, and **read `sim/README.md` before adding a `#ifdef SIMULATOR` anywhere** — the rule is that a shim fails the way the caller already handles. |
 | `api/` | The headers that `firmware/` and `lib/` include by name. **Read `api/README.md` before touching anything here** — moving a header inside `apps-ipod/` can break a file outside it that you cannot edit. |
 

@@ -161,8 +161,9 @@ is the one-page state of it, and names the specification for each:
 
 All three iAP transports sit behind **Accessory Protocol**, on by default;
 iAP2 also behind its own **iPhone Accessories** (Off/Auto/On, Auto by
-default). **Debug > USB log** and **Debug > Serial iAP** are the diagnostics;
-keep them.
+default). **Debug > USB log**, **Debug > Serial iAP** and **System > Debug
+Logs > USB and Accessory Log** (both transports' frames, in `usb.log`) are the
+diagnostics; keep them.
 
 ## Build Commands
 

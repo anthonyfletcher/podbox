@@ -665,7 +665,8 @@ restart, which costs battery life: restart the player afterwards.
 Below the switches, the menu shows how long is left before the logs switch
 off, and how much space their files take. A log file that reaches 256 KB is
 renamed with `.1` before its extension, replacing the last one, and a new file
-starts; send both when asked for a log.
+starts; send both when asked for a log. While any log is on, a message at
+startup says so, and how long is left.
 
 ---
 

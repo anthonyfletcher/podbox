@@ -18,10 +18,10 @@ one that does.
 3. Connect to the accessory and repeat the problem
 4. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
    one), then turn `USB and Accessory Log` off - it slows every USB
-   connection. It switches itself off after a day if you forget
+   connection. It switches itself off after 24 hours of use if you forget
 
-Lines starting `iap serial` came over the dock connector's serial pins; the
-rest came over USB. If a dock leaves nothing after the `==` header lines,
+Lines with `iap serial` after the time came over the dock connector's serial
+pins; the rest came over USB. If a dock leaves nothing after the `==` header lines,
 take a photo of `System > Debug > Serial iAP` while docked.
 
 ## 3. Capture an iPhone's log (cars and USB docks)

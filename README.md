@@ -503,6 +503,8 @@ digitally, over the USB pins of the dock connector
 - On by default, through `Settings > System > Accessories > Accessory Protocol`
 - Works with `Settings > System > USB > USB Mode` set to either `Mass Storage` or `Charge Only`
 - Remote support improved to match click-wheel actions
+- If an accessory takes control but plays nothing, try another model under
+  `Settings > System > Accessories > Identify As` - some judge what a player can do by its model
 
 A receiver or dock that browses an iPod shows what is playing and can browse 
 and play your library from its own screen and remote
@@ -533,9 +535,10 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
   and a computer still mounts the iPod as a disk, about a second later than it otherwise would.
   Shown only while `Accessory Protocol` is on
 - `Settings > System > Accessories > Car Artwork` specifies where the cover comes from.
-  `Prefer Cache` by default, which appears almost at once. `Prefer Embedded` and `Prefer Image File`
-  send the original image - sharper, but slower to appear and more work for a 5G. Only JPEGs under 512 KB are sent
-  as they are
+  `Prefer Cache` by default, which appears almost at once. `As Album Art`, `Prefer Embedded` and
+  `Prefer Image File` send the original image - sharper, but slower to appear and more work for a 5G.
+  Only JPEGs under 512 KB are sent as they are. A dock or older car gets the art cache's cover
+  whichever is chosen; `Off` sends no cover to anything
   
 ### Headphones (Improved)
 
