@@ -54,8 +54,6 @@
 #include "system/volume.h"
 #include "system/strutil.h"     /* skip_whitespace() */
 #include "system/debug_log.h"
-#include "system/usb_log_file.h"
-#include "system/battery_log.h"
 #include "audio/playback.h"
 #include "widgets/list.h"
 #include "rbunicode.h"
@@ -689,19 +687,13 @@ static void wps_art_source_callback(int mode)
     playback_update_aa_dims();
 }
 
-/* Switching a diagnostic log on starts it from a readable point, and gives
- * the file at once -- so an empty log after a run means the worker never
- * reached its first marker, rather than that logging was never on. */
-static void debug_log_tagcache_callback(bool on)
+/* Switching a diagnostic log on gives it a header at once -- so an empty log
+ * after a run means the worker never reached its first line, rather than
+ * that logging was never on. */
+static void debug_log_callback(bool on)
 {
-    if (on)
-        debug_log_header(DEBUG_LOG_TAGCACHE, "switched on");
-}
-
-static void debug_log_artcache_callback(bool on)
-{
-    if (on)
-        debug_log_header(DEBUG_LOG_ARTCACHE, "switched on");
+    (void)on;
+    debug_log_apply();
 }
 
 /* perform shuffle/unshuffle of the current playlist based on the boolean provided */
@@ -978,7 +970,7 @@ const struct settings_list settings[] = {
     /* Diagnostics: .rockbox/logs/battery.csv, one line a minute. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_battery, LANG_DEBUG_LOG, false,
-                  "debug log battery", battery_log_enable),
+                  "debug log battery", debug_log_callback),
     OFFON_SETTING(0, car_adapter_mode,
                   LANG_CAR_ADAPTER_MODE, false, "car adapter mode", NULL),
     INT_SETTING_NOWRAP(0, car_adapter_mode_delay, LANG_CAR_ADAPTER_MODE_DELAY,
@@ -1846,10 +1838,10 @@ const struct settings_list settings[] = {
      * "Building" indicator, so when it will not go away these say which. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_tagcache, LANG_DEBUG_LOG, false,
-                  "debug log tagcache", debug_log_tagcache_callback),
+                  "debug log tagcache", debug_log_callback),
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_artcache, LANG_DEBUG_LOG, false,
-                  "debug log artcache", debug_log_artcache_callback),
+                  "debug log artcache", debug_log_callback),
     INT_SETTING(0, album_covers_scroll_speed, LANG_SCROLL_SPEED, 175,
                 "album covers scroll speed", UNIT_PERCENT, 100, 400, 25,
                 NULL, NULL, NULL),
@@ -2108,7 +2100,7 @@ const struct settings_list settings[] = {
      * menu's USB Log screen open. */
     OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
                   debug_log_usb, LANG_DEBUG_LOG, false,
-                  "debug log usb", usb_log_file_enable),
+                  "debug log usb", debug_log_callback),
 #endif
 
 

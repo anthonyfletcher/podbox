@@ -1,13 +1,16 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * Opt-in file logging for the two background workers whose progress is
- * otherwise invisible: the tag database and the album-art cache. Both drive
- * the same "Building" indicator, so when it stays up there is no way from the
- * UI to tell which one is busy, or why it decided it had work to do.
+ * The diagnostic logs in .rockbox/logs, and what they share: one header
+ * format, rotation at DEBUG_LOG_CAP, a "lines lost" marker, and a switch per
+ * log that a setting holds.
  *
- * Off unless the matching setting is on. When off a call costs one test of a
- * global and a return, so call sites can sit in hot loops.
+ * Two ways to write. debug_log() is for a worker's progress lines: each is
+ * stamped with the tick and held in RAM until the disk is about to sleep or
+ * the buffer is three-quarters full, so a scan that logs every file does not
+ * open the file for every line. A log that must be on disk before it goes on
+ * -- the USB log's last line before a hang -- or that keeps its own ring
+ * writes through debug_log_open() and debug_log_close() instead.
  ****************************************************************************/
 #ifndef _DEBUG_LOG_H
 #define _DEBUG_LOG_H
@@ -17,10 +20,19 @@
 enum debug_log_id {
     DEBUG_LOG_TAGCACHE = 0,
     DEBUG_LOG_ARTCACHE,
+    DEBUG_LOG_USB,
+    DEBUG_LOG_BATTERY,
+    DEBUG_LOG_MIKEY,
     DEBUG_LOG_COUNT,
 };
 
-/* Append one timestamped line. Newline is added; do not pass one. */
+/* A file at this size is renamed to <name>.1.<ext>, replacing the last one,
+ * and a new one starts with a header. */
+#define DEBUG_LOG_CAP (256*1024)
+
+/* Append one tick-stamped line. Newline is added; do not pass one. When the
+ * log is off a call costs a test and a return, so call sites can sit in hot
+ * loops. */
 void debug_log(enum debug_log_id id, const char *fmt, ...)
     ATTRIBUTE_PRINTF(2, 3);
 
@@ -29,8 +41,25 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
 bool debug_log_enabled(enum debug_log_id id);
 
 /* Append a session header, `what` saying what began it ("started" at boot,
- * "switched on" from the setting). The file keeps every earlier session, so
- * a run that ended in a crash is still there after the reboot. */
+ * "switched on" from the setting). Written whether or not the log is on, so
+ * a debug screen can head the lines it writes. */
 void debug_log_header(enum debug_log_id id, const char *what);
+
+/* The file for appending, rotated first if it has reached the cap; -1 if it
+ * cannot be opened. Holds the log's lock until debug_log_close(). */
+int debug_log_open(enum debug_log_id id);
+void debug_log_close(enum debug_log_id id, int fd);
+
+/* The marker for lines a ring dropped before they reached the file. */
+void debug_log_lost(enum debug_log_id id, int fd, unsigned long n,
+                    const char *why);
+
+/* Bring every log into line with its setting: a header for one switched on,
+ * its held lines for one switched off. The settings' callback, and run after
+ * Reset Settings, which calls no callback. */
+void debug_log_apply(void);
+
+/* After settings_load(), before anything logs. */
+void debug_log_init(void);
 
 #endif /* _DEBUG_LOG_H */

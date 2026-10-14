@@ -19,11 +19,10 @@
 #include "backlight.h"
 #include "powermgmt.h"
 #include "ata_idle_notify.h"
-#include "timefuncs.h"
-#include "version.h"
 #include "settings/settings.h"
 #include "skin/skin_engine.h"
 #include "system/activity.h"
+#include "system/debug_log.h"
 #include "battery_log.h"
 
 #define SAMPLE_TICKS (60*HZ)
@@ -140,7 +139,6 @@ static int battery_log_tick(struct timeout *tmo)
 
 /* ---- the writer --------------------------------------------------------- */
 
-static struct mutex file_mutex;
 static bool started;            /* battery_log_init() has run */
 static bool running;
 
@@ -157,15 +155,15 @@ static void write_minutes(void)
     if (ring_tail == ring_head && lost == 0)
         return;
 
-    mutex_lock(&file_mutex);
-    fd = open(BATTERY_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0666);
+    fd = debug_log_open(DEBUG_LOG_BATTERY);
     if (fd >= 0)
     {
         if (lost)
         {
             int level;
 
-            fdprintf(fd, "# %u minutes lost: the disk did not sleep\n", lost);
+            debug_log_lost(DEBUG_LOG_BATTERY, fd, lost,
+                           "the disk did not sleep");
             /* the tick counts on meanwhile */
             level = disable_irq_save();
             dropped -= lost;
@@ -182,9 +180,8 @@ static void write_minutes(void)
                      s->spinups, s->frames, s->activity);
             ring_tail = (ring_tail + 1) % RING_SIZE;
         }
-        close(fd);
+        debug_log_close(DEBUG_LOG_BATTERY, fd);
     }
-    mutex_unlock(&file_mutex);
 }
 
 /* DISK_EVENT_SPINUP is sent as the disk is about to sleep, despite its name */
@@ -195,37 +192,32 @@ static void disk_idle_cb(unsigned short id, void *data)
     write_minutes();
 }
 
-static void write_header(const char *what)
+/* What the columns measure the effect of, then the columns, so a rotated
+ * file reads as a CSV on its own */
+void battery_log_state(int fd, const char *mark)
 {
-    struct tm *tm = get_time();
-    int fd;
-
-    mutex_lock(&file_mutex);
-    fd = open(BATTERY_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0666);
-    if (fd >= 0)
-    {
-        fdprintf(fd, "# Battery log %s: %s %s, %04d-%02d-%02d %02d:%02d\n",
-                 what, MODEL_NAME, rbversion, tm->tm_year + 1900,
-                 tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min);
-        fdprintf(fd, "# storage %s, dynamic colors %d, theme %s\n",
-                 storage_get_ssd_mode() ? "ssd" : "hdd",
-                 (int)global_settings.dynamic_colors,
-                 global_settings.wps_file);
-        fdprintf(fd, "minute,mV,level,charging,playing%%,paused%%,boost%%,"
-                     "MHz,backlight%%,lcd%%,disk%%,spinups,frames,"
-                     "activity\n");
-        close(fd);
-    }
-    mutex_unlock(&file_mutex);
+    fdprintf(fd, "%s storage %s, dynamic colors %d, theme %s\n", mark,
+             storage_get_ssd_mode() ? "ssd" : "hdd",
+             (int)global_settings.dynamic_colors, global_settings.wps_file);
+#if BATTERY_CAPACITY_INC > 0
+    fdprintf(fd, "%s capacity %d mAh\n", mark,
+             global_settings.battery_capacity);
+#endif
+    fdprintf(fd, "%s backlight %d s, %d s plugged, brightness %d\n", mark,
+             global_settings.backlight_timeout,
+             global_settings.backlight_timeout_plugged,
+             global_settings.brightness);
+    fdprintf(fd, "minute,mV,level,charging,playing%%,paused%%,boost%%,"
+                 "MHz,backlight%%,lcd%%,disk%%,spinups,frames,"
+                 "activity\n");
 }
 
 /* ---- the setting's hooks ------------------------------------------------ */
 
-static void start(const char *what)
+static void start(void)
 {
     if (running)
         return;
-    write_header(what);
     minute = 0;
     memset(&acc, 0, sizeof acc);
     acc.frames_at_start = skin_flush_count();
@@ -247,19 +239,20 @@ static void stop(void)
 
 void battery_log_enable(bool on)
 {
-    /* settings_load() calls this before init */
     if (!started)
         return;
     if (on)
-        start("switched on");
+        start();
     else
         stop();
 }
 
 void battery_log_init(void)
 {
-    mutex_init(&file_mutex);
     started = true;
     if (global_settings.debug_log_battery)
-        start("started");
+    {
+        debug_log_header(DEBUG_LOG_BATTERY, "started");
+        start();
+    }
 }

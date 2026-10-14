@@ -376,6 +376,12 @@ void debug_log_header(enum debug_log_id id, const char *what)
     (void)what;
 }
 
+bool debug_log_enabled(enum debug_log_id id)
+{
+    (void)id;
+    return false;
+}
+
 /* A broken invariant in buflib or the pass: stop before writing more */
 void panicf(const char *fmt, ...)
 {

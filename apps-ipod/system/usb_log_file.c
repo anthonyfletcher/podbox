@@ -5,9 +5,9 @@
  * See usb_log_file.h. The ring lives in firmware (usb_log.c); this is the
  * side that turns it into text and puts it on disk.
  *
- * Parts: the entry formatter; the file (one writer at a time, under
- * file_mutex); the background writer thread; the screen's and the setting's
- * hooks.
+ * Parts: the entry formatter; the file, through debug_log's, whose lock
+ * keeps one writer at a time; the background writer thread; the screen's and
+ * the setting's hooks.
  ****************************************************************************/
 #include <stdio.h>
 #include <string.h>
@@ -20,9 +20,8 @@
 #include "usb_core.h"
 #include "usb_ch9.h"
 #include "usb_log.h"
-#include "version.h"
-#include "timefuncs.h"
 #include "settings/settings.h"
+#include "system/debug_log.h"
 #include "usb_log_file.h"
 
 /* ---- the entry formatter ------------------------------------------------ */
@@ -542,10 +541,6 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
 
 /* ---- the file ----------------------------------------------------------- */
 
-/* The screen writes from the UI thread and the writer from its own; the lock
- * keeps one from appending lines the other is about to write again. */
-static struct mutex file_mutex;
-
 /* The entries' 32-bit stamps wrap every 71.6 minutes; the file carries the
  * wraps so its times keep rising through a long car session. A gap of more
  * than 71 minutes between two written entries hides a wrap. */
@@ -567,17 +562,19 @@ void usb_log_file_write(void)
     char line[112];
     int fd;
 
-    mutex_lock(&file_mutex);
+    /* The log's lock is held from open to close: the screen writes from the
+     * UI thread and the writer from its own, and neither may append lines
+     * the other is about to write again. Read again under it. */
+    if (usb_log_written() == usb_log_head())
+        return;
+    fd = debug_log_open(DEBUG_LOG_USB);
+    if (fd < 0)
+        return;
     seq = usb_log_written();
     head = usb_log_head();
-    if (seq == head)
-        goto out;
-    fd = open(USB_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0666);
-    if (fd < 0)
-        goto out;
     if (head - seq > USB_LOG_SIZE)
     {
-        fdprintf(fd, "-- %lu entries lost --\n", head - seq - USB_LOG_SIZE);
+        debug_log_lost(DEBUG_LOG_USB, fd, head - seq - USB_LOG_SIZE, NULL);
         seq = head - USB_LOG_SIZE;
     }
     for (; seq < head; seq++)
@@ -587,47 +584,29 @@ void usb_log_file_write(void)
         format_entry(&e, widen_us(e.us), line, sizeof line);
         fdprintf(fd, "%s\n", line);
     }
-    close(fd);
     usb_log_set_written(head);
-out:
-    mutex_unlock(&file_mutex);
+    debug_log_close(DEBUG_LOG_USB, fd);
 }
 
-/* Starts each session in the file: what opened it, and the settings that
- * decide which drivers the host is offered. */
-static void write_header(const char *what)
+void usb_log_file_state(int fd, const char *mark)
 {
-    int fd;
-
-    mutex_lock(&file_mutex);
-    fd = open(USB_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0666);
-    if (fd >= 0)
-    {
-        struct tm *tm = get_time();
-
-        fdprintf(fd, "== USB Log %s: %s %s, %04d-%02d-%02d %02d:%02d:%02d, "
-                 "USB mode %d, USB HID %d", what, MODEL_NAME, rbversion,
-                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                 tm->tm_hour, tm->tm_min, tm->tm_sec,
-                 global_settings.usb_mode, (int)global_settings.usb_hid);
+    fdprintf(fd, "%s USB mode %d, USB HID %d", mark, global_settings.usb_mode,
+             (int)global_settings.usb_hid);
 #ifdef USB_ENABLE_AUDIO
-        fdprintf(fd, ", USB Sound Card %d%s", global_settings.usb_audio,
-                 usb_audio_buffers_ready() ? "" : " (no buffers)");
+    fdprintf(fd, ", USB Sound Card %d%s", global_settings.usb_audio,
+             usb_audio_buffers_ready() ? "" : " (no buffers)");
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
-        fdprintf(fd, ", USB DAC Output %d", global_settings.usb_dac_output);
+    fdprintf(fd, ", USB DAC Output %d", global_settings.usb_dac_output);
 #endif
-        /* What a dock or a car is offered */
-        fdprintf(fd, ", Accessory Protocol %d",
-                 (int)global_settings.iap_enabled);
+    /* What a dock or a car is offered */
+    fdprintf(fd, "\n%s Accessory Protocol %d", mark,
+             (int)global_settings.iap_enabled);
 #ifdef USB_ENABLE_IAP
-        fdprintf(fd, ", iPhone Accessories %d, Identify As %d",
-                 global_settings.iap2_mode, global_settings.iap_identity);
+    fdprintf(fd, ", iPhone Accessories %d, Identify As %d",
+             global_settings.iap2_mode, global_settings.iap_identity);
 #endif
-        fdprintf(fd, ", Car Artwork %d\n", global_settings.car_artwork);
-        close(fd);
-    }
-    mutex_unlock(&file_mutex);
+    fdprintf(fd, ", Car Artwork %d\n", global_settings.car_artwork);
 }
 
 /* ---- the background writer ---------------------------------------------- */
@@ -688,19 +667,16 @@ static void writer_thread(void)
 void usb_log_file_screen(bool open)
 {
     if (open)
-        write_header("opened");
+        debug_log_header(DEBUG_LOG_USB, "opened");
     screen_open = open;
     update_attach();
 }
 
 void usb_log_file_enable(bool on)
 {
-    /* settings_load() calls this before init, which applies the setting
-     * once the sound card's buffers exist for the header to report */
+    (void)on;
     if (!started)
         return;
-    if (on)
-        write_header("switched on");
     update_attach();
     if (have_writer)
         queue_post(&writer_queue, Q_WRITER_WAKE, 0);
@@ -708,7 +684,6 @@ void usb_log_file_enable(bool on)
 
 void usb_log_file_init(void)
 {
-    mutex_init(&file_mutex);
     queue_init(&writer_queue, true);
 
     /* Above the background workers, so a sync is not left waiting behind a
@@ -721,7 +696,9 @@ void usb_log_file_init(void)
     else
         have_writer = true;
     started = true;
+    /* Here rather than in debug_log_init(): the sound card's buffers exist
+     * now, for the header to report */
     if (global_settings.debug_log_usb)
-        write_header("started");
+        debug_log_header(DEBUG_LOG_USB, "started");
     update_attach();
 }

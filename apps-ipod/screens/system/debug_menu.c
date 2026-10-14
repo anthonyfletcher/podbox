@@ -101,6 +101,7 @@
 #include "usb_log.h"
 #include "usb_ch9.h"
 #include "system/usb_log_file.h"
+#include "system/debug_log.h"
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
 #include "usb_host_audio.h"
@@ -1763,12 +1764,9 @@ static bool dbg_scrollwheel(void)
  * mikey_scope in button.h). Values on top, eight to a line with "--" for a
  * NAK, each over the OR of every value it has held since the last clear;
  * then the changes, newest first. Every change is also appended to
- * LIB_MIKEY_LOG while the screen is open. Long SELECT clears the OR. */
+ * mikey.log while the screen is open. Long SELECT clears the OR. */
 #if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
-#define LIB_MIKEY_LOG LIB_LOGS_DIR "/mikey.log"
-
 static struct {
-    int fd;
     long opened;
     unsigned long written;      /* log entries already in the file */
 } mikey_dbg;
@@ -1816,21 +1814,26 @@ static void mikey_dbg_write(void)
     const struct mikey_scope *s = mikey_scope_get();
     unsigned long head = s->head;
     char line[64];
+    int fd;
 
-    if (mikey_dbg.fd < 0)
+    if (mikey_dbg.written == head)
+        return;
+    fd = debug_log_open(DEBUG_LOG_MIKEY);
+    if (fd < 0)
         return;
     if (head - mikey_dbg.written > MIKEY_SCOPE_LOG)
     {
-        fdprintf(mikey_dbg.fd, "lost %lu changes\n",
-                 head - mikey_dbg.written - MIKEY_SCOPE_LOG);
+        debug_log_lost(DEBUG_LOG_MIKEY, fd,
+                       head - mikey_dbg.written - MIKEY_SCOPE_LOG, NULL);
         mikey_dbg.written = head - MIKEY_SCOPE_LOG;
     }
     for (; mikey_dbg.written < head; mikey_dbg.written++)
     {
         mikey_dbg_change(line, sizeof line,
                          &s->log[mikey_dbg.written % MIKEY_SCOPE_LOG]);
-        fdprintf(mikey_dbg.fd, "%s\n", line);
+        fdprintf(fd, "%s\n", line);
     }
+    debug_log_close(DEBUG_LOG_MIKEY, fd);
 }
 
 static int mikey_dbg_callback(int action, struct gui_synclist *lists)
@@ -1874,16 +1877,11 @@ static bool dbg_mikey(void)
 {
     struct simplelist_info info;
     bool ret;
-    struct tm *tm = get_time();
 
     mikey_dbg.opened = current_tick;
     mikey_dbg.written = mikey_scope_get()->head;
-    mikey_dbg.fd = open(LIB_MIKEY_LOG, O_WRONLY | O_CREAT | O_APPEND, 0666);
-    if (mikey_dbg.fd >= 0)
-        fdprintf(mikey_dbg.fd, "\n%04d-%02d-%02d %02d:%02d:%02d opened, "
-                 "times from here; changes from the values before\n",
-                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                 tm->tm_hour, tm->tm_min, tm->tm_sec);
+    /* Times are from this header's tick; changes from the values before */
+    debug_log_header(DEBUG_LOG_MIKEY, "opened");
     mikey_scope_clear();
     mikey_scope_enable(true);
 
@@ -1895,8 +1893,6 @@ static bool dbg_mikey(void)
 
     mikey_scope_enable(false);
     mikey_dbg_write();
-    if (mikey_dbg.fd >= 0)
-        close(mikey_dbg.fd);
     return ret;
 }
 #endif /* HAVE_MIKEY_REMOTE && !SIMULATOR */

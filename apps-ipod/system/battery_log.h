@@ -15,8 +15,11 @@
 
 #define BATTERY_LOG_FILE LIB_BATTERY_LOG
 
-/* The setting's callback. */
+/* The setting switched, after debug_log has written its part. */
 void battery_log_enable(bool on);
+
+/* The header lines of the log's own, and the CSV's column names. */
+void battery_log_state(int fd, const char *mark);
 
 void battery_log_init(void);
 

@@ -1,73 +1,338 @@
 /***************************************************************************
  * GNU General Public License (version 2+)
  *
- * See debug_log.h. Each log is opened, appended to and closed per line rather
- * than held open: these run on background threads across USB connects and
- * unmounts, and a handle kept open over one of those is a handle that stops
- * the disk being released.
+ * See debug_log.h. A file is opened per write rather than held open: the
+ * writers run on background threads across USB connects and unmounts, and a
+ * handle kept open over one of those stops the disk being released.
+ *
+ * Parts: the table of logs and their own header lines; the file (rotation,
+ * the common header); the held lines and their flush; the switches.
  ****************************************************************************/
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include "config.h"
 #include "system/library_files.h"
 #include "system.h"
 #include "file.h"
 #include "kernel.h"
 #include "rbpaths.h"
+#include "timefuncs.h"
+#include "version.h"
+#include "powermgmt.h"
+#include "power.h"
+#include "ata_idle_notify.h"
+#include "dircache.h"
 #include "settings/settings.h"
+#include "database/tagcache.h"
+#include "system/usb_log_file.h"
+#include "system/battery_log.h"
 #include "debug_log.h"
 
-/* Path and display name together, so adding a log means adding one row rather
- * than remembering to extend a second list somewhere else. */
-static const struct {
+/* ---- the table ---------------------------------------------------------- */
+
+static void tagcache_state(int fd, const char *m)
+{
+    const struct tagcache_stat *st = tagcache_get_stat();
+
+    fdprintf(fd, "%s %d entries, %s, ramcache %s (%dKB), dircache %s\n", m,
+             st->total_entries, st->ready ? "ready" : "not ready",
+             st->ramcache ? "loaded" : "not loaded", st->ramcache_used / 1024,
+             !global_settings.dircache ? "off"
+             : dircache_is_ready() ? "built" : "not built");
+    fdprintf(fd, "%s scan at startup %d, after USB %d, audiobooks apart %d, "
+             "layout %d%s\n", m, (int)global_settings.tagcache_scan_on_startup,
+             (int)global_settings.tagcache_scan_on_eject,
+             (int)global_settings.segregate_audiobooks, LIBRARY_FORMAT,
+             library_files_need_upgrade() ? ", format.dat older" : "");
+    fdprintf(fd, "%s scan paths %s\n", m, global_settings.tagcache_scan_paths);
+}
+
+static void art_state(int fd, const char *m)
+{
+    fdprintf(fd, "%s album art %d, artist art %d, book art %d, author art %d, "
+             "fast build %d, album source %d, car artwork %d\n", m,
+             (int)global_settings.db_albumart,
+             (int)global_settings.db_artistart,
+             (int)global_settings.db_bookart,
+             (int)global_settings.db_authorart,
+             (int)global_settings.art_cache_fast_build,
+             global_settings.art_cache_album_source,
+             global_settings.car_artwork);
+}
+
+#if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
+static void mikey_state(int fd, const char *m)
+{
+    fdprintf(fd, "%s count centre clicks %d\n", m,
+             (int)global_settings.remote_track_skip);
+}
+#endif
+
+/* Held lines: enough for some fifty, so a scan reaches the disk every fifty
+ * files rather than every one. A hang loses what is held. */
+#define HELD_SIZE 4096
+
+static char tagcache_held[HELD_SIZE];
+static char art_held[HELD_SIZE];
+
+static const struct debug_log_info {
     const char *path;
     const char *name;
+    const char *mark;           /* starts every header line */
+    const bool *setting;        /* NULL: written only while a screen is open */
+    void (*state)(int fd, const char *mark);   /* the log's own header */
+    void (*switched)(bool on);  /* the owner's, after the module's part */
+    char *held;                 /* NULL: written through */
 } log_info[DEBUG_LOG_COUNT] = {
-    [DEBUG_LOG_TAGCACHE] = { LIB_TAGCACHE_LOG, "tagcache"  },
-    [DEBUG_LOG_ARTCACHE] = { LIB_ART_LOG,      "art cache" },
+    [DEBUG_LOG_TAGCACHE] = { LIB_TAGCACHE_LOG, "tagcache", "==",
+                             &global_settings.debug_log_tagcache,
+                             tagcache_state, NULL, tagcache_held },
+    [DEBUG_LOG_ARTCACHE] = { LIB_ART_LOG, "art cache", "==",
+                             &global_settings.debug_log_artcache,
+                             art_state, NULL, art_held },
+#ifdef HAVE_USBSTACK
+    [DEBUG_LOG_USB]      = { LIB_USB_LOG, "USB", "==",
+                             &global_settings.debug_log_usb,
+                             usb_log_file_state, usb_log_file_enable, NULL },
+#endif
+    [DEBUG_LOG_BATTERY]  = { LIB_BATTERY_LOG, "battery", "#",
+                             &global_settings.debug_log_battery,
+                             battery_log_state, battery_log_enable, NULL },
+#if defined(HAVE_MIKEY_REMOTE) && !defined(SIMULATOR)
+    [DEBUG_LOG_MIKEY]    = { LIB_LOGS_DIR "/mikey.log", "Mikey remote", "==",
+                             NULL, mikey_state, NULL, NULL },
+#endif
 };
+
+static struct {
+    struct mutex lock;
+    size_t used;                /* of held */
+    unsigned long lost;         /* held lines dropped */
+    bool on;                    /* the setting, as last applied */
+} logs[DEBUG_LOG_COUNT];
+
+static bool ready;              /* debug_log_init() has run */
 
 bool debug_log_enabled(enum debug_log_id id)
 {
-    switch (id)
+    return id < DEBUG_LOG_COUNT && log_info[id].setting
+           && *log_info[id].setting;
+}
+
+/* ---- the file ----------------------------------------------------------- */
+
+static void write_header(int fd, enum debug_log_id id, const char *what)
+{
+    const struct debug_log_info *li = &log_info[id];
+    const char *m = li->mark;
+    struct tm *tm = get_time();
+    long up = current_tick / HZ;
+
+    fdprintf(fd, "%s %s log %s: %s %s\n", m, li->name, what, MODEL_NAME,
+             rbversion);
+    /* A 6G whose clock reset reads 2000-01-01, which passes for a date */
+    fdprintf(fd, "%s %04d-%02d-%02d %02d:%02d:%02d%s, tick %ld, up %ld:%02ld\n",
+             m, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
+             tm->tm_min, tm->tm_sec,
+             tm->tm_year + 1900 < 2020 ? " (clock not set)" : "",
+             (long)current_tick, up / 3600, up / 60 % 60);
+    fdprintf(fd, "%s battery %d%% %d mV, %s\n", m, battery_level(),
+             battery_voltage(),
+             charging_state() ? "charging"
+             : charger_inserted() ? "on the charger" : "on battery");
+    if (li->state)
+        li->state(fd, m);
+}
+
+/* <name>.1.<ext> beside the file */
+static void old_path(enum debug_log_id id, char *buf, size_t size)
+{
+    const char *path = log_info[id].path;
+    const char *dot = strrchr(path, '.');
+
+    snprintf(buf, size, "%.*s.1%s", (int)(dot - path), path, dot);
+}
+
+static int open_locked(enum debug_log_id id)
+{
+    int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_APPEND, 0666);
+
+    if (fd >= 0 && ffilesize(fd) >= DEBUG_LOG_CAP)
     {
-        case DEBUG_LOG_TAGCACHE: return global_settings.debug_log_tagcache;
-        case DEBUG_LOG_ARTCACHE: return global_settings.debug_log_artcache;
-        default:                 return false;
+        char old[MAX_PATH];
+
+        close(fd);
+        old_path(id, old, sizeof old);
+        remove(old);
+        rename(log_info[id].path, old);
+        fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd >= 0)
+            write_header(fd, id, "rotated");
     }
+    return fd;
+}
+
+int debug_log_open(enum debug_log_id id)
+{
+    int fd;
+
+    if (!ready || id >= DEBUG_LOG_COUNT || !log_info[id].path)
+        return -1;
+    mutex_lock(&logs[id].lock);
+    fd = open_locked(id);
+    if (fd < 0)
+        mutex_unlock(&logs[id].lock);
+    return fd;
+}
+
+void debug_log_close(enum debug_log_id id, int fd)
+{
+    close(fd);
+    mutex_unlock(&logs[id].lock);
+}
+
+void debug_log_lost(enum debug_log_id id, int fd, unsigned long n,
+                    const char *why)
+{
+    fdprintf(fd, "%s %lu lines lost%s%s\n", log_info[id].mark, n,
+             why ? ": " : "", why ? why : "");
+}
+
+/* ---- the held lines ----------------------------------------------------- */
+
+/* With the log's lock held. Lines stay held if the file will not open --
+ * the disk is with a USB host -- until the next try. */
+static void flush_into(enum debug_log_id id, int fd)
+{
+    if (logs[id].lost)
+    {
+        debug_log_lost(id, fd, logs[id].lost, "the buffer filled");
+        logs[id].lost = 0;
+    }
+    if (logs[id].used)
+    {
+        write(fd, log_info[id].held, logs[id].used);
+        logs[id].used = 0;
+    }
+}
+
+static void flush_locked(enum debug_log_id id)
+{
+    int fd;
+
+    if (!logs[id].used && !logs[id].lost)
+        return;
+    fd = open_locked(id);
+    if (fd < 0)
+        return;
+    flush_into(id, fd);
+    close(fd);
+}
+
+static void flush_all(void)
+{
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+    {
+        if (!log_info[id].held || !logs[id].used)
+            continue;
+        mutex_lock(&logs[id].lock);
+        flush_locked(id);
+        mutex_unlock(&logs[id].lock);
+    }
+}
+
+/* DISK_EVENT_SPINUP is sent as the disk is about to sleep, despite its name,
+ * and at shutdown and USB connect */
+static void disk_idle_cb(unsigned short id, void *data)
+{
+    (void)id;
+    (void)data;
+    flush_all();
 }
 
 void debug_log(enum debug_log_id id, const char *fmt, ...)
 {
-    if (id >= DEBUG_LOG_COUNT || !debug_log_enabled(id))
-        return;
+    char line[256];
+    int len, n;
+    va_list ap;
 
-    int fd = open(log_info[id].path, O_WRONLY | O_CREAT | O_APPEND, 0666);
-    if (fd < 0)
+    if (!ready || !debug_log_enabled(id) || !log_info[id].held)
         return;
 
     /* Ticks since boot rather than the clock: what matters here is how long
-     * something took and in what order, and the RTC may not be set. */
-    char line[256];
-    int len = snprintf(line, sizeof line, "[%8ld] ", (long)current_tick);
-    if (len < 0 || len >= (int)sizeof line)
-        len = 0;
-
-    va_list ap;
+     * something took and in what order, and every header gives the tick
+     * against the clock. */
+    len = snprintf(line, sizeof line, "[%8ld] ", (long)current_tick);
     va_start(ap, fmt);
-    int n = vsnprintf(line + len, sizeof line - len, fmt, ap);
+    n = vsnprintf(line + len, sizeof line - len, fmt, ap);
     va_end(ap);
+    if (n < 0)
+        return;
+    len += MIN(n, (int)(sizeof line - len - 1));
+    line[len++] = '\n';
 
-    if (n > 0)
+    mutex_lock(&logs[id].lock);
+    if (logs[id].used + len > HELD_SIZE)
+        flush_locked(id);
+    if (logs[id].used + len > HELD_SIZE)
+        logs[id].lost++;
+    else
     {
-        len += MIN(n, (int)(sizeof line - len - 1));
-        line[len++] = '\n';
-        write(fd, line, len);
+        memcpy(log_info[id].held + logs[id].used, line, len);
+        logs[id].used += len;
+        if (logs[id].used >= HELD_SIZE * 3 / 4)
+            flush_locked(id);
     }
-    close(fd);
+    mutex_unlock(&logs[id].lock);
 }
 
 void debug_log_header(enum debug_log_id id, const char *what)
 {
-    debug_log(id, "--- log %s, %s ---", what, log_info[id].name);
+    int fd = debug_log_open(id);
+
+    if (fd < 0)
+        return;
+    /* Lines held from before go above it */
+    if (log_info[id].held)
+        flush_into(id, fd);
+    write_header(fd, id, what);
+    debug_log_close(id, fd);
+}
+
+/* ---- the switches ------------------------------------------------------- */
+
+void debug_log_apply(void)
+{
+    if (!ready)
+        return;
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+    {
+        bool on = debug_log_enabled(id);
+
+        if (!log_info[id].setting || on == logs[id].on)
+            continue;
+        logs[id].on = on;
+        if (on)
+            debug_log_header(id, "switched on");
+        else if (log_info[id].held)
+        {
+            mutex_lock(&logs[id].lock);
+            flush_locked(id);
+            mutex_unlock(&logs[id].lock);
+        }
+        if (log_info[id].switched)
+            log_info[id].switched(on);
+    }
+}
+
+void debug_log_init(void)
+{
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+    {
+        mutex_init(&logs[id].lock);
+        logs[id].on = debug_log_enabled(id);
+    }
+    add_event(DISK_EVENT_SPINUP, disk_idle_cb);
+    ready = true;
 }

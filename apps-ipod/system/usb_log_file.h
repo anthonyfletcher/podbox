@@ -26,11 +26,15 @@ void usb_log_file_format(const struct usb_log_entry *e, char *buf,
 /* Append everything not yet in the file. */
 void usb_log_file_write(void);
 
-/* The screen opening and closing. Opening writes a header line. */
+/* The screen opening and closing. Opening writes a header. */
 void usb_log_file_screen(bool open);
 
-/* The setting's callback. */
+/* The setting switched, after debug_log has written its part. */
 void usb_log_file_enable(bool on);
+
+/* The header lines of the log's own: the settings that decide which drivers
+ * the host is offered. */
+void usb_log_file_state(int fd, const char *mark);
 
 void usb_log_file_init(void);
 

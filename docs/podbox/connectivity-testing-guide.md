@@ -19,7 +19,7 @@ one that does.
 4. Copy `.rockbox/logs/usb.log` off the iPod, then turn `Write Debug Log` off -
    it slows every USB connection
 
-If `usb.log` has nothing after its `== USB Log` lines, your dock uses the
+If `usb.log` has nothing after its `==` header lines, your dock uses the
 serial pins instead. Take a photo of `System > Debug > Serial iAP`
 while docked.
 

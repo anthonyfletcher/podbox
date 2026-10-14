@@ -1341,6 +1341,11 @@ static bool aa_find_embedded(const char *path, struct aa_src *src)
     return true;
 }
 
+/* Why the last folder aa_cache_dir() gave no art has none, for the log; and
+ * the image it tried, or NULL */
+static const char *aa_miss;
+static const char *aa_miss_src;
+
 /* Bring one folder's thumbnails in line with `src`, whose stamp is `stamp`:
  * replace the lot if they were made from something else, and render the sizes
  * that don't exist yet. */
@@ -1391,7 +1396,11 @@ static bool aa_fill(const struct aa_src *src, unsigned int stamp,
     }
     /* An image that would not decode leaves the folder bare, and is counted
      * and listed as one with no art. */
-    return aa_thumbs_exist(dh);
+    if (aa_thumbs_exist(dh))
+        return true;
+    aa_miss = "would not decode";
+    aa_miss_src = src->path;
+    return false;
 }
 
 /* Resolve one folder's cover art and bring its thumbnails in line with it.
@@ -1470,6 +1479,10 @@ static bool aa_cache_dir(const char *probe_path, unsigned int dh,
      * Unstamped thumbnails never came from anything here to lose. */
     if (slot->stamp == AA_STAMP_EMBEDDED || slot->stamp > AA_STAMP_NO_EMBED)
         aa_remove_thumbs(dh);
+    aa_miss = !embedded ? "no image file"
+              : aa_reread_tags ? "no image file or embedded JPEG"
+              : "no image file; tags not read again until an Update";
+    aa_miss_src = NULL;
     slot->stamp = embedded ? AA_STAMP_NO_EMBED : AA_STAMP_NONE;
     return false;
 
@@ -1480,6 +1493,16 @@ from_file:
     src.emb_flags = 0;
     return aa_fill(&src, aa_art_stamp(aa_artpath), dh, slot,
                    workbuf, worksz, aborted);
+}
+
+static void aa_log_miss(const char *kind, const char *dir)
+{
+    if (aa_miss_src)
+        debug_log(DEBUG_LOG_ARTCACHE, "no art: %s %s: %s %s", kind, dir,
+                  aa_miss_src, aa_miss);
+    else
+        debug_log(DEBUG_LOG_ARTCACHE, "no art: %s %s: %s", kind, dir,
+                  aa_miss);
 }
 
 /* One full generation pass: walk every track filename, dedup by directory,
@@ -1651,7 +1674,10 @@ static enum bg_result aa_run_pass(void)
                              &aborted))
                 aa_counts.album_art++;
             else if (!aborted)
+            {
                 path_list_write_record(&noart_albums, aa_dir);
+                aa_log_miss("album", aa_dir);
+            }
         }
         if (aborted)
             break;
@@ -1673,7 +1699,10 @@ static enum bg_result aa_run_pass(void)
                                  &aborted))
                     aa_counts.artist_art++;
                 else if (!aborted)
+                {
                     path_list_write_record(&noart_artists, aa_artist_dir);
+                    aa_log_miss("artist", aa_artist_dir);
+                }
             }
         }
         if (aborted)
@@ -1966,7 +1995,8 @@ void art_cache_init(void)
      * and so the file exists from boot however the setting was set. Settings
      * are loaded before init_tagcache() reaches here, so the gate reads the
      * real value. */
-    debug_log_header(DEBUG_LOG_ARTCACHE, "started");
+    if (debug_log_enabled(DEBUG_LOG_ARTCACHE))
+        debug_log_header(DEBUG_LOG_ARTCACHE, "started");
 
     /* A format bump leaves every cached thumbnail unreadable without moving
      * the database's marks. The stamp file carries the format as its version,

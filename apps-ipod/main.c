@@ -81,6 +81,7 @@
 #include "iap/iap-library.h"
 #include "system/usb_log_file.h"
 #include "system/battery_log.h"
+#include "system/debug_log.h"
 
 #include "audio/audio_thread.h"
 #include "audio/playback.h"
@@ -732,6 +733,7 @@ static void init(void)
     init_battery_tables();
     CHART("<init_battery_tables");
     init_library_files();
+    debug_log_init();
 
     CHART(">init_dircache(true)");
     init_dircache(true);
