@@ -12,6 +12,7 @@
  * decoder in draw/.
  ****************************************************************************/
 
+#include <limits.h>
 #include <string.h>
 #include "system.h"
 #include "lcd.h"
@@ -87,7 +88,8 @@ static int fit_stride(void)
 
 static int img_mem(int ds)
 {
-    int size;
+    /* in 64 bits: a huge image overflows an int and would seem to fit */
+    long long size;
     struct jpeg *p_jpg = &jpg;
 
     if (ds == DS_FIT)
@@ -101,16 +103,16 @@ static int img_mem(int ds)
         return size;
     }
 
-    size = (p_jpg->x_phys/ds/p_jpg->subsample_x[0])
+    size = (long long)(p_jpg->x_phys/ds/p_jpg->subsample_x[0])
          * (p_jpg->y_phys/ds/p_jpg->subsample_y[0]);
     if (p_jpg->blocks > 1) /* colour, add requirements for chroma */
     {
-        size += (p_jpg->x_phys/ds/p_jpg->subsample_x[1])
+        size += (long long)(p_jpg->x_phys/ds/p_jpg->subsample_x[1])
               * (p_jpg->y_phys/ds/p_jpg->subsample_y[1]);
-        size += (p_jpg->x_phys/ds/p_jpg->subsample_x[2])
+        size += (long long)(p_jpg->x_phys/ds/p_jpg->subsample_x[2])
               * (p_jpg->y_phys/ds/p_jpg->subsample_y[2]);
     }
-    return size;
+    return size > INT_MAX ? INT_MAX : size;
 }
 
 static int load_image(char *filename, struct image_info *info,
@@ -161,7 +163,7 @@ static int load_image(char *filename, struct image_info *info,
     /* process markers, unstuffing */
     status = process_markers(buf_jpeg, file_size, p_jpg);
 
-    if (status < 0 || (status & (DQT | SOF0)) != (DQT | SOF0))
+    if (status < 0 || (status & (DQT | SOF0 | SOS)) != (DQT | SOF0 | SOS))
     {   /* bad format or minimum components not contained.
          * on colour targets, retry with the progressive decoder. */
         return PLUGIN_JPEG_PROGRESSIVE;

@@ -35,6 +35,7 @@
 #include "file.h"
 #include "font.h"
 #include "misc.h"
+#include "rbpaths.h"
 
 bool debug_wps = false;
 int wps_verbose_level = 0;

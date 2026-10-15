@@ -16,6 +16,7 @@
 #include "logf.h"
 #include "../image_viewer.h"
 
+#include "draw/jpeg_common.h"
 #include "jpeg81.h"
 #include "idct.h"
 #include "GETC.h"
@@ -253,6 +254,8 @@ static int get_image(struct image_info *info, int frame, int ds)
 
     /* Based on RAINBOW lib jpeg2bmp example.
      * Primitive yuv-rgb converter for all sub-sampling types. */
+    bool rgb = jpeg_is_rgb(j->jfif, j->adobe, j->Components[0].Ci,
+                           j->Components[1].Ci, j->Components[2].Ci);
     int h0 = j->Hmax / j->Components[0].Hi;
     int v0 = j->Vmax / j->Components[0].Vi;
     int h1 = j->Hmax / j->Components[1].Hi;
@@ -307,6 +310,9 @@ static int get_image(struct image_info *info, int frame, int ds)
                 c2 = (sumV + area/2) / area;
             }
 
+            if (rgb) /* components are R, G, B: no conversion */
+                *bmp++= FB_RGBPACK(c0, c1, c2);
+            else
             /* ITU BT.601 full-range YUV-to-RGB integer approximation */
             {
                 int yy = (c0 << 5) + 16;

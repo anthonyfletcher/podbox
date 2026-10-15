@@ -15,7 +15,7 @@
  * Parts, in order:
  *   - the allocator, which always fails, and the bitmap loader, which does not
  *   - screen furniture: the status bar, the skinned list, the theme
- *   - the two settings lookups the parser makes
+ *   - the two settings lookups the parser makes, and the .cfg line check
  *   - the settings table's callbacks, which are addresses and nothing more
  ****************************************************************************/
 
@@ -264,6 +264,15 @@ const struct settings_list *find_setting_by_cfgname(const char *name)
             return &settings[i];
 
     return NULL;
+}
+
+/* A theme .cfg line. checkwps.c warns on false, so a name not in the table is
+ * reported; the value is not checked, and nothing is applied. */
+bool string_to_cfg(const char *name, char *value, bool *theme_changed)
+{
+    (void)value;
+    (void)theme_changed;
+    return find_setting_by_cfgname(name) != NULL;
 }
 
 /* ------------------------------------------------------------------------

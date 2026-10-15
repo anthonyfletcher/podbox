@@ -6434,6 +6434,12 @@ void do_tagcache_build(const char *path[])
 
     ret = true;
 
+    if (path[0] == NULL)
+    {
+        logf("tagcache path empty, skipping...");
+        goto commit;
+    }
+
     roots_ll[0].path = path[0];
     roots_ll[0].next = NULL;
 
@@ -6518,6 +6524,7 @@ void do_tagcache_build(const char *path[])
     }
     free_search_roots(&roots_ll[0]);
 
+commit:
     /* Write the header. */
     header.magic = TAGCACHE_MAGIC;
     header.datasize = data_size;

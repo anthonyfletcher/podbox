@@ -64,7 +64,8 @@ void srand(unsigned int seed) {
 	s[0] = z & 0xFFFFFFFF;
 	s[1] = (z >> 32) & 0xFFFFFFFF;
 
-	next_reseed = current_tick;
+	/* a fixed seed holds until the periodic reseed */
+	next_reseed = current_tick + RESEED_PERIOD;
 }
 
 

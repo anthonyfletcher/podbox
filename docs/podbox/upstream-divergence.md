@@ -58,6 +58,7 @@ work; the `tools/` changes are this fork's.
 | `common/dircache.c`, `include/dircache.h` | New `dircache_is_ready()`, `dircache_foreach_name()`, `dircache_get_index_path()` | Whole-player search from the cache. The sweep takes the filesystem lock as **reader**, so audio buffering is not held off, and `dircache_is_ready()` reads unlocked so it does not wait out a scan. `dircache_get_index_path()` returns -1 for an out-of-range or freed index, which a caller holding one across a rebuild can have. |
 | `target/arm/ipod/piezo.c` | A timed click (`Q_PIEZO_BEEP_FOR_USEC`) is ended by the user timer (`timer_register()`); the old busy-wait stays as the fallback when the timer is taken. Registered at priority 0, with an unregister callback that ends the click | The 5G's wheel click spun the real-time piezo thread for 4 ms a click, which nothing else could use while scrolling. The 6G's driver already ends its click from a timer interrupt. A click must not take the timer from a backlight fade. |
 | `pcm.c` | `pcm_switch_sink()` locks both the old and the new sink across the swap, the frequency change and the stop/restart | Neither sink's interrupt takes a mixer buffer mid-switch that never plays; the fork's USB host sink made the window reachable. Upstream bug, not yet reported upstream. |
+| `libc/random.c` | `srand()` holds off the periodic reseed for its full period | Upstream's lets the first `rand()` of the next tick replace the seed, so a shuffle replayed from its seed at resume, or the Weekly mix, comes out different. |
 | `buflib_mempool.c` | `buflib_allocatable()` subtracts the block header from a hole, as `free_space_at_end()` already does at the tail | A request for exactly the size reported never fitted a hole, so `core_alloc_maximum()` failed whenever the largest free space sat below an unmovable block -- the audio buffer's OOM panic after a theme load, with the pinned skin buffer at the top of the pool. Upstream bug, not yet reported upstream. |
 
 ## firmware/ — USB, device side
@@ -70,8 +71,6 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | --- | --- | --- |
 | `usb.c`, `export/usb.h` | New `usb_host_is_present()` under `USB_FULL_INIT`, and a `USB_NONE` stub | Background work — database scan, album index, file index — stands down while a host enumerates. `usb_inserted()` is true on a charger too; `usb_host_present` turns true on the first control transfer or `SET_ADDRESS` (both targets define `USB_DETECT_BY_REQUEST`) and never for a charger. |
 | `usb.c` | `usb_set_host_present()` raises the USB thread to `PRIORITY_REALTIME` until the host goes | Upstream raises it only at `SET_CONFIGURATION`, leaving enumeration below the UI thread. |
-| `usb.c` | The `SET_ADDRESS` notification sets `USB_INSERTED` and the host present | Since `841007dfa1` the driver answers `SET_ADDRESS` itself, so a host that sends it first — an Onkyo ND-S1 — never enabled the drivers. Not yet reported upstream. |
-| `usbstack/usb_core.c` | `usb_core_set_address()` assigns interfaces and endpoints if the core is still `DEFAULT` | The same host otherwise got every interface numbered 0. |
 
 ### Mass storage
 
@@ -86,7 +85,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_storage.c` | The ~128K transfer buffer is allocated by `usb_storage_alloc_buffers()` and never freed | Upstream allocates it at `SET_CONFIGURATION`, after `audio_init()`, where only shrinking the audio buffer can meet it — and that stops playback with a blocking `queue_send` mid-transfer. |
+| `usbstack/usb_storage.c` | The ~128K transfer buffer is allocated by `usb_storage_alloc_buffers()` and never freed, so `usb_storage_init_connection()` primes the endpoint at once | Upstream allocates it at the storage handover and frees it at unplug, after `audio_init()`, where only shrinking the audio buffer can meet it. |
 | `usbstack/usb_audio.c` | `usb_audio_alloc_buffers()` replaces `usb_audio_request_buf()` / `usb_audio_free_buf()` | The same, for the sound card. |
 | `usb.c`, `export/usb_core.h`, `export/usb.h` | `usb_init()` calls both, before `audio_init()` | **Not in the drivers' `init()`**: that runs after the device is attached, so a stall lands before `SET_ADDRESS`. PP502x cannot use `USB_STATIC_ALLOC` because 128K does not fit in IRAM. |
 
@@ -261,7 +260,7 @@ Serial iAP is `apps-ipod/iap/`. It reaches these firmware files:
 | `skin_parser/tag_table.c` | `find_custom_tag()` declared **weak** and tried **first** in `find_tag()` | Custom tags are registered from the app layer. First, because upstream's shortest-match search would read `%sel` as `%s`. Weak, so the parser links standalone. |
 | `skin_parser/tag_table.h` | Six new `SKIN_TOKEN_*` members | The token field is a 1-byte enum; the table rows stay in `custom_tags.c`. |
 | `skin_parser/tag_table.h` | `SKIN_REFRESH_SPECTRUM`, in `SKIN_REFRESH_NON_STATIC` | Spectrum lines redraw with time. |
-| `rbcodec/codecs/libffmpegFLAC/arm.S`, `arm.h`, `decoder.c` | New `lpc_decode_arm_wide()`, the 64-bit (`smlal`) LPC filter for streams too wide for a 32-bit sum; `flac_lpc_32()` runs it 1024 samples at a time with a yield between, and `flac_lpc_32_c()` stays for other CPUs | 24-bit FLAC took the C loop, and one channel of a frame ran ~50 ms without yielding on the 5G -- a visible stutter in anything animating while it played. |
+| `rbcodec/codecs/libffmpegFLAC/decoder.c` | New `flac_lpc_32()` runs the 64-bit LPC filter (`flac_lpc_32_arm()`, or `flac_lpc_32_c()` elsewhere) 1024 samples at a time with a yield between; upstream's ARMv5E `FLAC_LPC32_NARROW_ASM` kernel, off by default, is not wired | 24-bit FLAC took the C loop, and one channel of a frame ran ~50 ms without yielding on the 5G -- a visible stutter in anything animating while it played. |
 
 ---
 
@@ -311,8 +310,8 @@ build.
 | `checkwps/SOURCES` | Application files from `apps-ipod/`, plus `stubs.c` | |
 | `checkwps/checkwps.make` | Include path around `$(COREAPPSDIR)/api` and `$(COREAPPSDIR)`; `-DSYSFONT_HEIGHT=8` | Mirrors `apps-ipod/apps.make`. |
 | `checkwps/include/` | Shadows of `storage.h`, `usb.h`, `powermgmt.h` | They declare nothing under `__PCTOOL__`. |
-| `checkwps/stubs.c` | The allocator, status bar, settings lookups and every settings callback | A new setting whose callback is missing here fails the link. |
-| `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line; a `playback_claim_aa_slot_keyed()` stub | A missing font or bitmap prints nothing without `-v`. The skin parser keys an in-place `%Cl` chain's slot. |
+| `checkwps/stubs.c` | The allocator, status bar, settings lookups, a `string_to_cfg()` that checks the name only, and every settings callback | A new setting whose callback is missing here fails the link. A theme `.cfg` is checked from the theme's root folder, a skin from inside `.rockbox`. |
+| `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line; a `playback_claim_aa_slot_keyed()` stub; `rbpaths.h` included | A missing font or bitmap prints nothing without `-v`. The skin parser keys an in-place `%Cl` chain's slot. |
 | `apps-ipod/skin/wps_internals.h` | `VP_DEFAULT_LABEL` is `NULL` under `__PCTOOL__` | As upstream has it. |
 | `apps-ipod/features.txt` | `usb_hid` also under `__PCTOOL__` | `settings_list.c` registers it unconditionally. |
 | `configure` | The SDL check is a real test | It was always true, so `--type=c` demanded SDL. |

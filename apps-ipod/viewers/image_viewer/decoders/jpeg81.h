@@ -41,6 +41,8 @@ enum JPEGENUM {
 	JPEGENUMERR_BADPRECISION,		/* a lossless sample precision outside 1..16 bits */
 };
 
+#include <stdbool.h>
+
 typedef short TCOEF;	// 16-bit coefficients
 typedef TCOEF DU[64];	// The DATA UNIT
 typedef unsigned short TSAMP;	// Lossless 'coefficients' are unsigned 
@@ -110,6 +112,9 @@ struct JPEGD {		// The JPEG DECODER OBJECT
 	void *jpeg_mem;				// <-- free me
 
 	int Hmax, Vmax;	// for conversion
+	int scans;		/* scans decoded: none means no image data */
+	bool jfif;				/* saw a JFIF APP0 marker */
+	unsigned char adobe;	/* Adobe APP14 transform flag + 1, 0 if none */
 	int mcu_width;
 	int mcu_height;
 	int mcu_total;	// covers the whole image
