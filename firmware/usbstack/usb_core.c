@@ -59,6 +59,8 @@
 /* include order matters, include driver header before usb_drv.h */
 #if CONFIG_USBOTG == USBOTG_DESIGNWARE
 #include "usb-designware.h"
+#elif CONFIG_USBOTG == USBOTG_RK27XX
+#include "usb-rk27xx.h"
 #endif
 #include "usb_drv.h"
 
@@ -992,6 +994,15 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
     }
 }
 
+static void usb_core_init_interfaces(void)
+{
+    if(usb_state == DEFAULT) {
+        set_serial_descriptor();
+        usb_core_set_serial_function_id();
+        allocate_interfaces_and_endpoints();
+    }
+}
+
 static void usb_core_set_address(uint8_t address)
 {
 #ifndef BOOTLOADER
@@ -1001,15 +1012,10 @@ static void usb_core_set_address(uint8_t address)
 #endif
     logf("usb_core: SET_ADR %d", address);
     usb_log(USB_LOG_SET_ADDR, address, usb_state, 0, 0);
-    /* A host that addresses the device before any other request -- an iAP
-     * dock does -- would otherwise leave DEFAULT without the core having
-     * seen a request in it, and the interfaces and endpoints would never be
-     * assigned. */
-    if(usb_state == DEFAULT) {
-        set_serial_descriptor();
-        usb_core_set_serial_function_id();
-        allocate_interfaces_and_endpoints();
-    }
+    /* A host may address the device before making any other request;
+      * the driver answers SET_ADDRESS itself, so nothing has been
+      * allocated yet. */
+    usb_core_init_interfaces();
     usb_address = address;
     usb_state = ADDRESS;
 }
@@ -1326,12 +1332,7 @@ static void usb_core_control_request_handler(struct usb_ctrlrequest* req, uint8_
         usb_charging_maxcurrent_change(usb_charging_maxcurrent());
     }
 #endif
-    if(usb_state == DEFAULT) {
-        set_serial_descriptor();
-        usb_core_set_serial_function_id();
-
-        allocate_interfaces_and_endpoints();
-    }
+    usb_core_init_interfaces();
 
     switch(req->bRequestType & USB_RECIP_MASK) {
         case USB_RECIP_DEVICE:
@@ -1459,7 +1460,7 @@ void usb_core_transfer_complete(int ep, int dir, int status, int length) {
 
     /* Control packet handling */
     switch(dir | ep0_state) {
-    /* EXPECT_TX_DATA_STATUS_COMP -(status comp)-> EXPECT_TX_DATA_COMP -(data comp)-> READY 
+    /* EXPECT_TX_DATA_STATUS_COMP -(status comp)-> EXPECT_TX_DATA_COMP -(data comp)-> READY
      *                            -(data comp)-> EXPECT_TX_STATUS_COMP -(status comp)-> READY */
     case USB_DIR_OUT | EP0_EXPECT_TX_DATA_STATUS_COMP:
         logf("usb_core: control-in done success=%d", status == 0 && length == 0);

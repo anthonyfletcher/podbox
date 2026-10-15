@@ -236,7 +236,7 @@ sub make_install {
 
     foreach my $_dir (@files) {
         my $dir = "wps/" . $_dir;
-        if ( -d "$src/$dir" && $_dir !~ /\.\.?/) {
+        if ( -d "$src/$dir" && $_dir !~ /^\.\.?$/) {
             unless (glob_mkdir("$userdir/$dir")) {
                 return 0;
             }
@@ -682,12 +682,11 @@ sub buildzip {
     } else {
         copy("$ROOT/wps/classic_statusbar.mono.sbs", "$temp_dir/wps/classic_statusbar.sbs");
     }
-    if ($remote_depth != $depth) {
-        copy("$ROOT/wps/classic_statusbar.mono.sbs", "$temp_dir/wps/classic_statusbar.rsbs");
-    } else {
+    if ($remote_depth == $depth) {
         copy("$temp_dir/wps/classic_statusbar.sbs", "$temp_dir/wps/classic_statusbar.rsbs");
+    } elsif ($remote_depth != 0) {
+        copy("$ROOT/wps/classic_statusbar.mono.sbs", "$temp_dir/wps/classic_statusbar.rsbs");
     }
-    copy("$temp_dir/wps/rockbox_none.sbs", "$temp_dir/wps/rockbox_none.rsbs");
 
     # and the info file
     copy("rockbox-info.txt", "$temp_dir/rockbox-info.txt");
