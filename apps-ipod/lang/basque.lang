@@ -2073,6 +2073,23 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_MUSIC_BROWSER
+  desc: "default browser" choice option, and the root menu's database
+        browser item -- deliberately distinct from LANG_TAGCACHE
+        ("Database"), which stays as-is for the Database *settings*
+        sub-menu (rebuild/initialize/etc.), a different context
+  user: core
+  <source>
+    *: "Music"
+  </source>
+  <dest>
+    *: "Musikakoak"
+  </dest>
+  <voice>
+    *: "Musikakoak"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_FOLLOW
   desc: in settings_menu
   user: core

@@ -1887,6 +1887,23 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_MUSIC_BROWSER
+  desc: "default browser" choice option, and the root menu's database
+        browser item -- deliberately distinct from LANG_TAGCACHE
+        ("Database"), which stays as-is for the Database *settings*
+        sub-menu (rebuild/initialize/etc.), a different context
+  user: core
+  <source>
+    *: "Music"
+  </source>
+  <dest>
+    *: "Hudobné"
+  </dest>
+  <voice>
+    *: "Hudobné"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_FOLLOW
   desc: in settings_menu
   user: core
@@ -16449,6 +16466,20 @@
 <phrase>
   id: LANG_SEARCH
   desc: Database menu
+  user: core
+  <source>
+    *: "Search"
+  </source>
+  <dest>
+    *: "Hľadať"
+  </dest>
+  <voice>
+    *: "Hľadať"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH
+  desc: the Search row, and the title of every search box
   user: core
   <source>
     *: "Search"
