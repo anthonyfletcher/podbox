@@ -18,7 +18,7 @@
 #
 # Album art, its highlights brought down until the list text reads. That text
 # is white in every Dynamic Colors Background mode, so the scrim is for white.
-%V(0,0,-,-,-)%VB%Vf(000000)%Vb(dominant<15:000000)%Cl(0,-40,320,320,c,c,blur8+scrim:ffffff+dither,-,blurred)%Cd(blurred)
+%V(0,0,-,-,-)%VB%Vf(000000)%Vb(dominant<15:000000)%Cl(0,-40,320,320,c,c,blur12+scrim:ffffff+dither,-,blurred)%Cd(blurred)
 #
 # Background panels: a light wash of the album's background colour. The scrim
 # on the art is what makes the white and tinted rows read.
@@ -100,9 +100,9 @@
 #
 # - Selection bar
 %Vl(Rows,36,0,3,30,-)
-%?La<|%?if(%vg(shape),!=,3)<%?Lc<%dr(0,0,3,30,vivid>60:ffffff,-,14)>>>
+%?La<|%?if(%vg(shape),!=,3)<%?Lc<%dr(0,0,3,30,vivid>60:ffffff,-,14,3)>>>
 %Vl(Rows,2,0,3,30,-)
-%?La<|%?if(%vg(shape),=,3)<%?Lc<%dr(0,0,3,30,vivid>60:ffffff,-,14)>>>
+%?La<|%?if(%vg(shape),=,3)<%?Lc<%dr(0,0,3,30,vivid>60:ffffff,-,14,3)>>>
 #
 # - Row text, the full width where there is no chevron, and
 #   short of it where there is. Only one of each pair draws a
@@ -132,7 +132,7 @@
 #
 # - Selection bar
 %Vl(Rows,50,0,3,46,-)
-%?and(%La,%Lc)<%dr(0,0,3,46,vivid>60:ffffff,-,14)>
+%?and(%La,%Lc)<%dr(0,0,3,46,vivid>60:ffffff,-,14,3)>
 #
 # - Row text
 %Vl(Rows,60,13,230,20,-)
