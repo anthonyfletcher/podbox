@@ -257,7 +257,7 @@ static IAPBool send_artwork_chunk_cb(struct IAPContext* ctx) {
 
 static int32_t start_artwork_data(struct IAPContext* ctx, struct IAPSpan* request_span, IAPBool ext) {
     read_request(IAPGetTrackArtworkDataPayload);
-    check_ret(request->format_id == 0, -IAPAckStatus_EBadParameter);
+    check_ret(swap_16(request->format_id) == IAP_ARTWORK_FORMAT_ID, -IAPAckStatus_EBadParameter);
     check_ret(request->offset_ms == 0, -IAPAckStatus_EBadParameter);
     check_ret(!ctx->artwork.valid, -IAPAckStatus_EBadParameter);
 
@@ -733,7 +733,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         } break;
         case IAPDisplayRemoteCommandID_GetArtworkFormats: {
             alloc_response(IAPArtworkFormat);
-            response->format_id    = 0;
+            response->format_id    = swap_16(IAP_ARTWORK_FORMAT_ID);
             response->pixel_format = IAP_COLOR_ARTWORK ? IAPArtworkPixelFormats_RGB565LE : IAPArtworkPixelFormats_Mono;
             response->image_width  = swap_16(IAP_ARTWORK_WIDTH);
             response->image_height = swap_16(IAP_ARTWORK_HEIGHT);

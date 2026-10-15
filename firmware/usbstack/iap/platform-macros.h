@@ -31,6 +31,9 @@
 #define IAP_ERRORF(fmt, ...) USB_LOG_IAP_ERROR_AT(fmt __VA_OPT__(, __VA_ARGS__))
 #endif
 
+/* RockPod's format ID. A car offered format 0 reads the formats with every
+ * track and never asks for a cover. */
+#define IAP_ARTWORK_FORMAT_ID 0x0404
 #define IAP_ARTWORK_WIDTH  128
 #define IAP_ARTWORK_HEIGHT 128
 #define IAP_COLOR_ARTWORK  iap_true
