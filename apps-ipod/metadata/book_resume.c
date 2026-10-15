@@ -296,7 +296,7 @@ static bool scan(bool (*fn)(const struct entry *e, void *data), void *data)
         int fd1 = libfile_open(BOOK_RESUME_FILE, LIB_BOOKS_MAGIC, 1, 1, &h,
                                NULL);
         /* A version-1 file's own answer, unless it is not one either */
-        if (fd1 != LIBFILE_BAD)
+        if (fd1 != LIBFILE_BAD && fd1 != LIBFILE_NEWER)
             fd = fd1;
         old = fd1 >= 0;
     }

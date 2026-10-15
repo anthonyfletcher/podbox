@@ -497,7 +497,9 @@ IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t
     struct Platform* plt = iap_ctx->platform;
 
     struct playlist_track_info track;
-    struct mp3entry            id3;
+    /* 3 KB, and only the USB thread asks: off its stack, which the metadata
+     * parse below already strains */
+    static struct mp3entry     id3;
     check_act(playlist_get_track_info(NULL, index, &track) == 0, return iap_false);
     get_trackinfo(index, &id3);
 

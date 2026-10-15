@@ -725,7 +725,7 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             } break;
             case IAPIndexedPlayingTrackInfoType_ArtworkCount: {
                 alloc_response_extra(IAPRetIndexedPlayingTrackInfoArtworkCountPayload, sizeof(struct IAPArtworkCount));
-                response->data[0].format = 0;
+                response->data[0].format = swap_16(IAP_ARTWORK_FORMAT_ID);
                 response->data[0].count  = swap_16(1);
                 return IAPDisplayRemoteCommandID_RetIndexedPlayingTrackInfo;
             } break;

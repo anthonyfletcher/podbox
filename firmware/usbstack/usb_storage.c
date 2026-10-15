@@ -491,7 +491,7 @@ static int usb_handle = 0;
  * Called at boot it lands before audio_init(), so there is nothing to shrink
  * and nothing to wait for.
  *
- * Trap: either later placement is fatal.
+ * Trap: two later placements are fatal.
  *
  *  - usb_storage_init_connection() runs inside the
  *    host's SET_CONFIGURATION. The USB thread stalls mid-control-transfer, the
@@ -502,6 +502,9 @@ static int usb_handle = 0;
  *    set USBCMD_RUN and attached the device. A stall there is before
  *    SET_ADDRESS, so enumeration never starts and the host bus-resets until
  *    it gives up.
+ *
+ * The storage handover, usb_storage_notify_event(), stalls nothing, but
+ * reshapes the audio buffer to fit the allocation on every connection.
  *
  * Not freed on disconnect either, or the next connection would pay for it.
  *

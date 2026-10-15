@@ -1115,7 +1115,9 @@ static int process_markers(struct jpeg* p_jpeg)
                 for (i=1; i<n; i++)
                 {   /* chroma must be one block per MCU, or sampled like
                        luma when that is 1x2 or 2x1 (2x2 on all components
-                       would exceed 10 blocks per MCU) */
+                       would exceed 10 blocks per MCU), and both chroma
+                       components alike: set_idct_scale() sizes them both
+                       from the first */
                     int h = p_jpeg->frameheader[i].horizontal_sampling;
                     int v = p_jpeg->frameheader[i].vertical_sampling;
                     if ((h != 1 || v != 1)
@@ -1123,6 +1125,9 @@ static int process_markers(struct jpeg* p_jpeg)
                       || v != p_jpeg->frameheader[0].vertical_sampling
                       || h == v))
                         return -3; /* Unsupported SOF0 subsampling */
+                    if (h != p_jpeg->frameheader[1].horizontal_sampling
+                     || v != p_jpeg->frameheader[1].vertical_sampling)
+                        return -3;
                 }
                 /* A single-component scan is non-interleaved: the MCU is one
                    8x8 block regardless of the sampling factors (T.81 A.2.2) */

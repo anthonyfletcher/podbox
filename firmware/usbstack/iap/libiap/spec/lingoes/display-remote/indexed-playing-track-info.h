@@ -75,7 +75,7 @@ struct IAPRetIndexedPlayingTrackInfoLyricsPayload {
 } __attribute__((packed));
 
 struct IAPArtworkCount {
-    uint16_t format; /* IAPArtworkPixelFormats */
+    uint16_t format; /* the format ID GetArtworkFormats lists */
     uint16_t count;
 } __attribute__((packed));
 
