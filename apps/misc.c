@@ -297,6 +297,8 @@ int fast_readline(int fd, char *buf, int buf_size, void *parameters,
     return 0;
 }
 
+#endif /* !defined(__PCTOOL__) */
+
 /* parse a line from a configuration file. the line format is:
 
    name: value
@@ -338,6 +340,8 @@ bool settings_parseline(char* line, char** name, char** value)
     return true;
 }
 
+#ifndef __PCTOOL__
+
 static void system_flush(void)
 {
     playlist_shutdown();
@@ -357,10 +361,7 @@ static bool clean_shutdown(enum shutdown_type sd_type,
     long msg_id = -1;
 
     if (!global_settings.show_shutdown_message && get_sleep_timer_active())
-    {
-        talk_force_shutup();
         talk_disable(true);
-    }
 
     status_save(true);
 

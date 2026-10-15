@@ -493,7 +493,7 @@ static int usb_handle = 0;
  *
  * Trap: either later placement is fatal.
  *
- *  - usb_storage_init_connection() (upstream's placement) runs inside the
+ *  - usb_storage_init_connection() runs inside the
  *    host's SET_CONFIGURATION. The USB thread stalls mid-control-transfer, the
  *    host gives up, and usb_request_exclusive_storage() -- which sits *after*
  *    the driver loop in usb_core_do_set_config() -- is never reached, so no
@@ -544,9 +544,10 @@ static void usb_storage_init(void)
     logf("usb_storage_init done");
 }
 
-static int usb_storage_init_connection(void)
+/* Primes the rx endpoint for the first command, which then waits in
+ * WAITING_FOR_STORAGE until Rockbox has handed the storage over. */
+static void start_receiving_commands(void)
 {
-    logf("ums: set config");
     /* prime rx endpoint. We only need room for commands */
     state = WAITING_FOR_COMMAND;
 
@@ -568,6 +569,23 @@ static int usb_storage_init_connection(void)
     usb_storage_alloc_buffers();
 #endif
     usb_drv_recv_nonblocking(EP_OUT, cbw_buffer, MAX_CBW_SIZE);
+}
+
+static bool receiving_commands(void)
+{
+#ifdef USB_STATIC_ALLOC
+    return true;
+#else
+    return usb_handle > 0;
+#endif
+}
+
+static int usb_storage_init_connection(void)
+{
+    logf("ums: set config");
+    state = WAITING_FOR_COMMAND;
+    /* the buffers exist from boot, so the endpoint can be primed at once */
+    start_receiving_commands();
 
     int i;
     for(i=0;i<storage_num_drives();i++) {
@@ -802,19 +820,19 @@ static void usb_storage_send_smart(uint8_t cmd)
 /* called by usb_core_control_request() */
 static bool usb_storage_control_request(struct usb_ctrlrequest* req, uint8_t* reqdata, size_t reqdata_size)
 {
-    (void)reqdata;
     (void)reqdata_size;
 
     bool handled = false;
 
     switch (req->bRequest) {
         case USB_BULK_GET_MAX_LUN: {
-            *tb.max_lun = storage_num_drives() - 1;
+            /* comes before the handover, without the transfer buffer */
+            reqdata[0] = storage_num_drives() - 1;
 #if defined(HAVE_MULTIDRIVE)
-            if(skip_first) (*tb.max_lun) --;
+            if(skip_first) reqdata[0]--;
 #endif
             logf("ums: getmaxlun");
-            usb_core_control_response(USB_CONTROL_ACK, tb.max_lun, 1);
+            usb_core_control_response(USB_CONTROL_ACK, reqdata, 1);
             handled = true;
             break;
         }
@@ -1137,6 +1155,13 @@ static void handle_scsi_ready(struct command_block_wrapper* cbw)
                 logf("scsi load/eject");
                 if((cbw->command_block[4] & 0x01) == 0) /* Don't start */
                 {
+#ifdef HAVE_STORAGE_FLUSH
+                    /* The host stops or ejects the unit when it is done with
+                     * it - "safely remove" - and may cut power next. Commit
+                     * what the storage driver still holds in RAM, such as a
+                     * flash translation layer's part-written pages. */
+                    storage_flush();
+#endif
                     if((cbw->command_block[4] & 0x02) != 0) /* eject */
                     {
                         logf("scsi eject");
@@ -1523,6 +1548,11 @@ static void handle_scsi(struct command_block_wrapper* cbw)
 static void usb_storage_notify_event(intptr_t data)
 {
     (void)data;
+    if(!receiving_commands()) {
+        if(usb_exclusive_storage())
+            start_receiving_commands();
+        return;
+    }
     if(state == WAITING_FOR_STORAGE && usb_exclusive_storage())
         handle_scsi((struct command_block_wrapper*)cbw_buffer);
 }

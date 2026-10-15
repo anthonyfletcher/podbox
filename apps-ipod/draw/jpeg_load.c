@@ -165,6 +165,9 @@ struct jpeg
     int cur_row; /* current row relative to top of image */
     int set_rows;
     int store_pos[4]; /* for Y block ordering */
+    bool jfif; /* saw a JFIF APP0 marker */
+    unsigned char adobe; /* Adobe APP14 transform flag + 1, 0 if none */
+    bool rgb; /* the components are R, G, B rather than Y, Cb, Cr */
     int last_dc_val[3];
     int h_scale[2]; /* horizontal scalefactor = (2**N) / 8 */
     int v_scale[2]; /* same as above, for vertical direction */
@@ -179,7 +182,7 @@ struct jpeg
     struct derived_tbl ac_derived_tbls[2];
 
     struct frame_component frameheader[3]; /* Component descriptor */
-    struct scan_component scanheader[3]; /* used by progressive scans only */
+    struct scan_component scanheader[3]; /* Huffman tables per component */
     int scan_comps; /* the scan header's component count, and its */
     int scan_ss, scan_se, scan_ah, scan_al; /* band and approximation */
     int ncomp; /* components in the frame */
@@ -187,10 +190,8 @@ struct jpeg
     bool progressive;
     struct prog prog;
 
-    int mcu_membership[6]; /* info per block */
-    int tab_membership[6];
-    int subsample_x[3]; /* info per component */
-    int subsample_y[3];
+    int mcu_membership[6]; /* component of each block */
+    unsigned char mcu_pos[6]; /* position of each block in its component */
     bool resize;
     unsigned char buf[JPEG_READ_BUF_SIZE];
     struct img_part part;
@@ -1055,6 +1056,7 @@ static int process_markers(struct jpeg* p_jpeg)
             break; /* discard */
 
         case 0xC0: /* SOF Huff  - Baseline DCT */
+        case 0xC1: /* SOF Huff  - Extended sequential DCT (8 bit samples) */
         case 0xC2: /* SOF Huff  - Progressive DCT*/
             {
                 JDEBUGF("SOF marker ");
@@ -1094,18 +1096,14 @@ static int process_markers(struct jpeg* p_jpeg)
                     p_jpeg->frameheader[i].vertical_sampling = c & 0x0F;
                     p_jpeg->frameheader[i].quanttable_select =
                         e_getc(p_jpeg, -1);
-                    /* Zero is rejected as firmly as too-large, and the low
-                     * bound is the load-bearing half: fix_headers() handles
-                     * (1,1), (1,2), (2,1) and (2,2) and its remaining `else`
-                     * is empty -- it is a void function and cannot report --
-                     * so anything else runs on with x_mbl and the membership
-                     * tables left at zero. A zero factor then drives
-                     * h_scale[1] to -1, which makes zero_need negative (a
-                     * MEMSET length), k_need an index before zig[], and
-                     * decode_buf_size zero for a buffer the decoder goes on
-                     * writing rows into. A sampling factor of 0 is not legal
-                     * JPEG; only a corrupt or hostile file carries one, and
-                     * the artwork cache decodes whatever the library holds. */
+                    if (p_jpeg->frameheader[i].quanttable_select > 3)
+                        return -8; /* Unsupported quantization table */
+                    /* Zero is rejected as firmly as too-large: fix_headers()
+                     * divides by the luma factors, and set_idct_scale()
+                     * subtracts the chroma ones. A sampling factor of 0 is
+                     * not legal JPEG; only a corrupt or hostile file carries
+                     * one, and the artwork cache decodes whatever the
+                     * library holds. */
                     if (p_jpeg->frameheader[i].horizontal_sampling > 2
                      || p_jpeg->frameheader[i].vertical_sampling > 2
                      || p_jpeg->frameheader[i].horizontal_sampling < 1
@@ -1114,10 +1112,28 @@ static int process_markers(struct jpeg* p_jpeg)
                 }
                 p_jpeg->blocks = n;
                 p_jpeg->ncomp = n;
+                for (i=1; i<n; i++)
+                {   /* chroma must be one block per MCU, or sampled like
+                       luma when that is 1x2 or 2x1 (2x2 on all components
+                       would exceed 10 blocks per MCU) */
+                    int h = p_jpeg->frameheader[i].horizontal_sampling;
+                    int v = p_jpeg->frameheader[i].vertical_sampling;
+                    if ((h != 1 || v != 1)
+                     && (h != p_jpeg->frameheader[0].horizontal_sampling
+                      || v != p_jpeg->frameheader[0].vertical_sampling
+                      || h == v))
+                        return -3; /* Unsupported SOF0 subsampling */
+                }
+                /* A single-component scan is non-interleaved: the MCU is one
+                   8x8 block regardless of the sampling factors (T.81 A.2.2) */
+                if (n == 1)
+                {
+                    p_jpeg->frameheader[0].horizontal_sampling = 1;
+                    p_jpeg->frameheader[0].vertical_sampling = 1;
+                }
             }
             break;
 
-        case 0xC1: /* SOF Huff  - Extended sequential DCT*/
         case 0xC3: /* SOF Huff  - Spatial (sequential) lossless*/
         case 0xC5: /* SOF Huff  - Differential sequential DCT*/
         case 0xC6: /* SOF Huff  - Differential progressive DCT*/
@@ -1226,6 +1242,9 @@ static int process_markers(struct jpeg* p_jpeg)
                 marker_size = e_getc(p_jpeg, -1) << 8; /* Highbyte */
                 marker_size |= e_getc(p_jpeg, -1); /* Lowbyte */
                 marker_size -= 2;
+                p_jpeg->rgb = p_jpeg->ncomp == 3 && jpeg_is_rgb(p_jpeg->jfif,
+                    p_jpeg->adobe, p_jpeg->frameheader[0].ID,
+                    p_jpeg->frameheader[1].ID, p_jpeg->frameheader[2].ID);
 
                 if (p_jpeg->progressive)
                 {
@@ -1240,10 +1259,13 @@ static int process_markers(struct jpeg* p_jpeg)
                     {
                         p_jpeg->scanheader[i].ID = e_getc(p_jpeg, -1);
                         c = e_getc(p_jpeg, -1);
-                        p_jpeg->scanheader[i].DC_select = c >> 4;
-                        p_jpeg->scanheader[i].AC_select = c & 0x0F;
+                        /* checked before it is stored: indexing stops at a
+                         * bad scan and decodes the scans before it, and the
+                         * selectors index the derived tables */
                         if ((c >> 4) > 1 || (c & 0x0F) > 1)
                             return -7;
+                        p_jpeg->scanheader[i].DC_select = c >> 4;
+                        p_jpeg->scanheader[i].AC_select = c & 0x0F;
                     }
                     p_jpeg->scan_comps = n;
                     p_jpeg->scan_ss = e_getc(p_jpeg, -1);
@@ -1262,7 +1284,10 @@ static int process_markers(struct jpeg* p_jpeg)
                 }
 
                 n = (marker_size-1-3)/2;
-                if (e_getc(p_jpeg, -1) != n || (n != 1 && n != 3))
+                if (e_getc(p_jpeg, -1) != n || (n != 1 && n != 3)
+                    /* one scan with all components; multi-scan files and
+                       SOS before SOF are not supported (blocks = Nf here) */
+                    || n != p_jpeg->blocks)
                 {
                     return (-7); /* Unsupported SOS component specification */
                 }
@@ -1270,10 +1295,19 @@ static int process_markers(struct jpeg* p_jpeg)
                 for (i=0; i<n; i++)
                 {
                     p_jpeg->scanheader[i].ID = e_getc(p_jpeg, -1);
+                    if (p_jpeg->scanheader[i].ID != p_jpeg->frameheader[i].ID)
+                    {
+                        return (-7); /* components out of frame order */
+                    }
                     p_jpeg->scanheader[i].DC_select = (c = e_getc(p_jpeg, -1))
                         >> 4;
                     p_jpeg->scanheader[i].AC_select = c & 0x0F;
                     marker_size -= 2;
+                    if (p_jpeg->scanheader[i].DC_select > 1
+                     || p_jpeg->scanheader[i].AC_select > 1)
+                    {
+                        return (-5); /* Huffman table index out of range */
+                    }
                 }
                 /* skip spectral information */
                 e_skip_bytes(p_jpeg, marker_size);
@@ -1288,20 +1322,25 @@ static int process_markers(struct jpeg* p_jpeg)
                 marker_size |= e_getc(p_jpeg, -1); /* Lowbyte */
                 marker_size -= 2;
 
-                n = (marker_size)/(QUANT_TABLE_LENGTH+1); /* # of tables */
-                for (i=0; i<n; i++)
+                while (marker_size > QUANT_TABLE_LENGTH) /* another table */
                 {
-                    int id = e_getc(p_jpeg, -1); /* ID */
-                    marker_size--;
-                    if (id >= 4)
+                    int id = e_getc(p_jpeg, -1); /* Pq: precision, Tq: ID */
+                    int pq = id >> 4;
+                    id &= 0x0F;
+                    marker_size -= 1 + QUANT_TABLE_LENGTH * (pq + 1);
+                    if (id >= 4 || pq > 1 || marker_size < 0)
                     {
                         return (-8); /* Unsupported quantization table */
                     }
                     /* Read Quantisation table: */
                     for (j=0; j<QUANT_TABLE_LENGTH; j++)
                     {
-                        p_jpeg->quanttable[id][j] = e_getc(p_jpeg, -1);
-                        marker_size--;
+                        int q = e_getc(p_jpeg, -1);
+                        if (pq) /* 16 bit entries (SOF1) */
+                            q = q << 8 | e_getc(p_jpeg, -1);
+                        if (q > 8191)
+                            return (-8); /* too big once scaled for the IDCT */
+                        p_jpeg->quanttable[id][j] = q;
                     }
                 }
                 e_skip_bytes(p_jpeg, marker_size);
@@ -1341,11 +1380,22 @@ static int process_markers(struct jpeg* p_jpeg)
         case 0xEF: /* Application Field 15*/
         case 0xFE: /* Comment */
             {
+                unsigned char id[12];
+                int marker = c;
                 marker_size = e_getc(p_jpeg, -1) << 8; /* Highbyte */
                 marker_size |= e_getc(p_jpeg, -1); /* Lowbyte */
                 marker_size -= 2;
+                n = 0;
+                if (marker == 0xE0 || marker == 0xEE)
+                {   /* JFIF or Adobe: may say which colour space is used */
+                    n = MIN(marker_size, (int)sizeof(id));
+                    for (i = 0; i < n; i++)
+                        id[i] = e_getc(p_jpeg, -1);
+                    jpeg_app_colorspace(marker, id, n, &p_jpeg->jfif,
+                                        &p_jpeg->adobe);
+                }
                 JDEBUGF("unhandled marker len %d\n", marker_size);
-                e_skip_bytes(p_jpeg, marker_size); /* skip segment */
+                e_skip_bytes(p_jpeg, marker_size - n); /* skip segment */
             }
             break;
 
@@ -1555,113 +1605,39 @@ static const unsigned char zig[] =
 /* Reformat some image header data so that the decoder can use it properly. */
 INLINE void fix_headers(struct jpeg* p_jpeg)
 {
-    int i;
+    int h = p_jpeg->frameheader[0].horizontal_sampling;
+    int v = p_jpeg->frameheader[0].vertical_sampling;
+    int ncomp = p_jpeg->ncomp;
+    int i, c, b;
 
     for (i=0; i<4; i++)
         p_jpeg->store_pos[i] = i; /* default ordering */
-
-    /* assignments for the decoding of blocks */
-    if (p_jpeg->frameheader[0].horizontal_sampling == 2
-        && p_jpeg->frameheader[0].vertical_sampling == 1)
-    {   /* 4:2:2 */
-        p_jpeg->blocks = 4;
-        p_jpeg->x_mbl = (p_jpeg->x_size+15) / 16;
-        p_jpeg->x_phys = p_jpeg->x_mbl * 16;
-        p_jpeg->y_mbl = (p_jpeg->y_size+7) / 8;
-        p_jpeg->y_phys = p_jpeg->y_mbl * 8;
-        p_jpeg->mcu_membership[0] = 0; /* Y1=Y2=0, U=1, V=2 */
-        p_jpeg->mcu_membership[1] = 0;
-        p_jpeg->mcu_membership[2] = 1;
-        p_jpeg->mcu_membership[3] = 2;
-        p_jpeg->tab_membership[0] = 0; /* DC, DC, AC, AC */
-        p_jpeg->tab_membership[1] = 0;
-        p_jpeg->tab_membership[2] = 1;
-        p_jpeg->tab_membership[3] = 1;
-        p_jpeg->subsample_x[0] = 1;
-        p_jpeg->subsample_x[1] = 2;
-        p_jpeg->subsample_x[2] = 2;
-        p_jpeg->subsample_y[0] = 1;
-        p_jpeg->subsample_y[1] = 1;
-        p_jpeg->subsample_y[2] = 1;
-    }
-    if (p_jpeg->frameheader[0].horizontal_sampling == 1
-        && p_jpeg->frameheader[0].vertical_sampling == 2)
-    {   /* 4:2:2 vertically subsampled */
-        p_jpeg->store_pos[1] = 2; /* block positions are mirrored */
+    if (h == 1 && v == 2)
+    {   /* the second block of a component goes below the first */
+        p_jpeg->store_pos[1] = 2;
         p_jpeg->store_pos[2] = 1;
-        p_jpeg->blocks = 4;
-        p_jpeg->x_mbl = (p_jpeg->x_size+7) / 8;
-        p_jpeg->x_phys = p_jpeg->x_mbl * 8;
-        p_jpeg->y_mbl = (p_jpeg->y_size+15) / 16;
-        p_jpeg->y_phys = p_jpeg->y_mbl * 16;
-        p_jpeg->mcu_membership[0] = 0; /* Y1=Y2=0, U=1, V=2 */
-        p_jpeg->mcu_membership[1] = 0;
-        p_jpeg->mcu_membership[2] = 1;
-        p_jpeg->mcu_membership[3] = 2;
-        p_jpeg->tab_membership[0] = 0; /* DC, DC, AC, AC */
-        p_jpeg->tab_membership[1] = 0;
-        p_jpeg->tab_membership[2] = 1;
-        p_jpeg->tab_membership[3] = 1;
-        p_jpeg->subsample_x[0] = 1;
-        p_jpeg->subsample_x[1] = 1;
-        p_jpeg->subsample_x[2] = 1;
-        p_jpeg->subsample_y[0] = 1;
-        p_jpeg->subsample_y[1] = 2;
-        p_jpeg->subsample_y[2] = 2;
-    }
-    else if (p_jpeg->frameheader[0].horizontal_sampling == 2
-        && p_jpeg->frameheader[0].vertical_sampling == 2)
-    {   /* 4:2:0 */
-        p_jpeg->blocks = 6;
-        p_jpeg->x_mbl = (p_jpeg->x_size+15) / 16;
-        p_jpeg->x_phys = p_jpeg->x_mbl * 16;
-        p_jpeg->y_mbl = (p_jpeg->y_size+15) / 16;
-        p_jpeg->y_phys = p_jpeg->y_mbl * 16;
-        p_jpeg->mcu_membership[0] = 0;
-        p_jpeg->mcu_membership[1] = 0;
-        p_jpeg->mcu_membership[2] = 0;
-        p_jpeg->mcu_membership[3] = 0;
-        p_jpeg->mcu_membership[4] = 1;
-        p_jpeg->mcu_membership[5] = 2;
-        p_jpeg->tab_membership[0] = 0;
-        p_jpeg->tab_membership[1] = 0;
-        p_jpeg->tab_membership[2] = 0;
-        p_jpeg->tab_membership[3] = 0;
-        p_jpeg->tab_membership[4] = 1;
-        p_jpeg->tab_membership[5] = 1;
-        p_jpeg->subsample_x[0] = 1;
-        p_jpeg->subsample_x[1] = 2;
-        p_jpeg->subsample_x[2] = 2;
-        p_jpeg->subsample_y[0] = 1;
-        p_jpeg->subsample_y[1] = 2;
-        p_jpeg->subsample_y[2] = 2;
-    }
-    else if (p_jpeg->frameheader[0].horizontal_sampling == 1
-        && p_jpeg->frameheader[0].vertical_sampling == 1)
-    {   /* 4:4:4 */
-        /* don't overwrite p_jpeg->blocks */
-        p_jpeg->x_mbl = (p_jpeg->x_size+7) / 8;
-        p_jpeg->x_phys = p_jpeg->x_mbl * 8;
-        p_jpeg->y_mbl = (p_jpeg->y_size+7) / 8;
-        p_jpeg->y_phys = p_jpeg->y_mbl * 8;
-        p_jpeg->mcu_membership[0] = 0;
-        p_jpeg->mcu_membership[1] = 1;
-        p_jpeg->mcu_membership[2] = 2;
-        p_jpeg->tab_membership[0] = 0;
-        p_jpeg->tab_membership[1] = 1;
-        p_jpeg->tab_membership[2] = 1;
-        p_jpeg->subsample_x[0] = 1;
-        p_jpeg->subsample_x[1] = 1;
-        p_jpeg->subsample_x[2] = 1;
-        p_jpeg->subsample_y[0] = 1;
-        p_jpeg->subsample_y[1] = 1;
-        p_jpeg->subsample_y[2] = 1;
-    }
-    else
-    {
-        /* error */
     }
 
+    p_jpeg->x_mbl = (p_jpeg->x_size + 8*h - 1) / (8*h);
+    p_jpeg->x_phys = p_jpeg->x_mbl * 8*h;
+    p_jpeg->y_mbl = (p_jpeg->y_size + 8*v - 1) / (8*v);
+    p_jpeg->y_phys = p_jpeg->y_mbl * 8*v;
+
+    /* Blocks in MCU order: each component's blocks in turn, H x V of them.
+       Chroma is either 1x1 or sampled like luma (checked in SOF), so an MCU
+       holds at most 6 blocks. */
+    b = 0;
+    for (c = 0; c < ncomp; c++)
+    {
+        int n = p_jpeg->frameheader[c].horizontal_sampling
+              * p_jpeg->frameheader[c].vertical_sampling;
+        for (i = 0; i < n; i++, b++)
+        {
+            p_jpeg->mcu_membership[b] = c;
+            p_jpeg->mcu_pos[b] = i;
+        }
+    }
+    p_jpeg->blocks = b;
 }
 
 INLINE void fix_huff_tables(struct jpeg *p_jpeg)
@@ -1681,19 +1657,56 @@ INLINE void fix_huff_tables(struct jpeg *p_jpeg)
  * quantization table when one of these IDCT routines is used, rather than
  * have the IDCT shift each value it processes.
  */
+/* Pre-scale the quantization tables for the IDCT. Luma and chroma can use
+ * different IDCT scales, so a table that both select is copied to a slot no
+ * component selects before scaling; each component's quanttable_select is
+ * rewritten to the slot it should use. There are 4 slots and at most 3
+ * components, so when a table is shared a free slot always exists. */
 INLINE void fix_quant_tables(struct jpeg *p_jpeg)
 {
-    int shift, i, j;
+    int want[4] = { -1, -1, -1, -1 }; /* scale shift wanted for each slot */
+    int orig[4] = { 0, 1, 2, 3 }; /* table each slot holds */
+    int c, c2, f, j;
 
-    const int k = 2;
+    const int nc = p_jpeg->ncomp;
 
-    for (i = 0; i < k; i++)
+    for (c = 0; c < nc; c++)
     {
-        shift = idct_tbl[p_jpeg->v_scale[i]].scale;
-        if (shift)
+        int t = p_jpeg->frameheader[c].quanttable_select;
+        int shift = idct_tbl[p_jpeg->v_scale[!!c]].scale;
+
+        for (f = 0; f < 4; f++) /* a slot already holding t at this scale? */
+            if (orig[f] == t && want[f] == shift)
+                break;
+        if (f == 4 && want[t] < 0)
+            f = t; /* first use of t */
+        if (f == 4)
+        {   /* t is in use at another scale: copy it to a free slot that no
+               later component still needs */
+            for (f = 0; f < 4; f++)
+            {
+                if (want[f] >= 0)
+                    continue;
+                for (c2 = c + 1; c2 < nc; c2++)
+                    if (p_jpeg->frameheader[c2].quanttable_select == f)
+                        break;
+                if (c2 == nc)
+                    break;
+            }
+            MEMCPY(p_jpeg->quanttable[f], p_jpeg->quanttable[t],
+                sizeof(p_jpeg->quanttable[f]));
+            orig[f] = t;
+        }
+        want[f] = shift;
+        p_jpeg->frameheader[c].quanttable_select = f;
+    }
+
+    for (f = 0; f < 4; f++)
+    {
+        if (want[f] > 0)
         {
             for (j = 0; j < 64; j++)
-                p_jpeg->quanttable[i][j] <<= shift;
+                p_jpeg->quanttable[f][j] <<= want[f];
         }
     }
 }
@@ -2056,10 +2069,9 @@ static bool prog_supported(struct jpeg *p_jpeg)
 
     if (p_jpeg->read_buf != read_buf)
         return false;
-    for (c = 0; c < p_jpeg->ncomp; c++)
-        if ((c || p_jpeg->ncomp == 1)
-            && (p_jpeg->frameheader[c].horizontal_sampling != 1
-                || p_jpeg->frameheader[c].vertical_sampling != 1))
+    for (c = 1; c < p_jpeg->ncomp; c++)
+        if (p_jpeg->frameheader[c].horizontal_sampling != 1
+            || p_jpeg->frameheader[c].vertical_sampling != 1)
             return false;
     return true;
 }
@@ -2424,7 +2436,8 @@ static void prog_fill_block(struct jpeg *p_jpeg, int16_t *block, int blkn,
     int h0 = ci ? 1 : p_jpeg->frameheader[0].horizontal_sampling;
     int b = ci ? x : (blkn / h0) * pr->stripe_w[0] + x * h0 + blkn % h0;
     const int16_t *coef = pr->coef[ci] + b * pr->nstore[ci];
-    const int16_t *q = p_jpeg->quanttable[!!ci];
+    const int16_t *q =
+        p_jpeg->quanttable[p_jpeg->frameheader[ci].quanttable_select];
     int k;
 
     block[0] = MULTIPLY16(coef[0], q[0]);
@@ -2437,8 +2450,10 @@ static void prog_fill_block(struct jpeg *p_jpeg, int16_t *block, int blkn,
 static struct img_part *store_row_jpeg(void *jpeg_args)
 {
     struct jpeg *p_jpeg = (struct jpeg*) jpeg_args;
-    int mcu_hscale = p_jpeg->h_scale[1];
-    int mcu_vscale = p_jpeg->v_scale[1];
+    int mcu_hscale = (p_jpeg->h_scale[0] +
+        p_jpeg->frameheader[0].horizontal_sampling - 1);
+    int mcu_vscale = (p_jpeg->v_scale[0] +
+        p_jpeg->frameheader[0].vertical_sampling - 1);
     unsigned int width = p_jpeg->x_mbl << mcu_hscale;
     unsigned int b_width = width * JPEG_PIX_SZ;
     int height = BIT_N(mcu_vscale);
@@ -2464,12 +2479,15 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
             for (blkn = 0; blkn < p_jpeg->blocks; blkn++)
             {
                 int ci = p_jpeg->mcu_membership[blkn]; /* component index */
-                int ti = p_jpeg->tab_membership[blkn]; /* table index */
                 bool transpose = p_jpeg->v_scale[!!ci] > 2;
                 int k = 1; /* coefficient index */
                 int s, r; /* huffman values */
-                struct derived_tbl* dctbl = &p_jpeg->dc_derived_tbls[ti];
-                struct derived_tbl* actbl = &p_jpeg->ac_derived_tbls[ti];
+                struct derived_tbl* dctbl =
+                    &p_jpeg->dc_derived_tbls[p_jpeg->scanheader[ci].DC_select];
+                struct derived_tbl* actbl =
+                    &p_jpeg->ac_derived_tbls[p_jpeg->scanheader[ci].AC_select];
+                const int16_t *qt = p_jpeg->quanttable[
+                    p_jpeg->frameheader[ci].quanttable_select];
 
                 if (p_jpeg->progressive)
                 {
@@ -2484,8 +2502,7 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
                     s = HUFF_EXTEND(r, s);
                     p_jpeg->last_dc_val[ci] += s;
                     /* output it (assumes zag[0] = 0) */
-                    block[0] = MULTIPLY16(p_jpeg->last_dc_val[ci],
-                        p_jpeg->quanttable[!!ci][0]);
+                    block[0] = MULTIPLY16(p_jpeg->last_dc_val[ci], qt[0]);
                     /* coefficient buffer must be cleared */
                     MEMSET(block+1, 0, p_jpeg->zero_need[!!ci] * sizeof(int));
                     /* Section F.2.2.2: decode the AC coefficients */
@@ -2502,7 +2519,7 @@ static struct img_part *store_row_jpeg(void *jpeg_args)
                                 goto skip_rest;
                             r = get_bits(p_jpeg, s);
                             r = HUFF_EXTEND(r, s);
-                            r = MULTIPLY16(r, p_jpeg->quanttable[!!ci][k]);
+                            r = MULTIPLY16(r, qt[k]);
                             block[zag[transpose ? k : k + 64]] = r ;
                         }
                         else
@@ -2538,7 +2555,10 @@ block_end:
                 {
                     int idct_cols = BIT_N(MIN(p_jpeg->h_scale[!!ci], 3));
                     int idct_rows = BIT_N(p_jpeg->v_scale[!!ci]);
-                    unsigned char *b_out = out + (ci ? ci : store_offs[blkn]);
+                    /* Y, Cb, Cr go to bytes 0-2 for the YUV conversion;
+                       R, G, B to their places in struct uint8_rgb */
+                    unsigned char *b_out = out + (p_jpeg->rgb ? 2 - ci : ci)
+                        + store_offs[p_jpeg->mcu_pos[blkn]];
                     if (idct_tbl[p_jpeg->v_scale[!!ci]].v_idct)
                         idct_tbl[p_jpeg->v_scale[!!ci]].v_idct(block,
                             transpose ? block + 8 * idct_cols
@@ -2638,10 +2658,15 @@ static int calc_scale(int in_size, int out_size)
  * scale in h_scale[0] and v_scale[0]. */
 static void set_idct_scale(struct jpeg *p_jpeg)
 {
+    /* chroma blocks are scaled up by the luma:chroma sampling ratio */
+    struct frame_component *chroma =
+        &p_jpeg->frameheader[p_jpeg->ncomp > 1 ? 1 : 0];
     p_jpeg->h_scale[1] = p_jpeg->h_scale[0] +
-        p_jpeg->frameheader[0].horizontal_sampling - 1;
+        p_jpeg->frameheader[0].horizontal_sampling -
+        chroma->horizontal_sampling;
     p_jpeg->v_scale[1] = p_jpeg->v_scale[0] +
-        p_jpeg->frameheader[0].vertical_sampling - 1;
+        p_jpeg->frameheader[0].vertical_sampling -
+        chroma->vertical_sampling;
     int decode_w = BIT_N(p_jpeg->h_scale[0]) - 1;
     int decode_h = BIT_N(p_jpeg->v_scale[0]) - 1;
     if (p_jpeg->v_scale[0] > 2)
@@ -2661,7 +2686,9 @@ static void set_idct_scale(struct jpeg *p_jpeg)
 /* One row of MCUs of decoded pixels, at the scale now set. */
 static int decode_buf_bytes(struct jpeg *p_jpeg)
 {
-    return ((p_jpeg->x_mbl << p_jpeg->h_scale[1]) << p_jpeg->v_scale[1])
+    return (((p_jpeg->x_mbl << p_jpeg->h_scale[0]) << p_jpeg->v_scale[0])
+            << (p_jpeg->frameheader[0].horizontal_sampling +
+                p_jpeg->frameheader[0].vertical_sampling - 2))
            * JPEG_PIX_SZ;
 }
 
@@ -2881,7 +2908,8 @@ int clip_jpeg_fd(int fd, int flags,
     if (resize)
     {
         if (resize_on_load(bm, dither, &src_dim, &rset, buf_start, maxsize,
-            cformat, IF_PIX_FMT(p_jpeg->blocks == 1 ? 0 : 1,) store_row_jpeg,
+            cformat, IF_PIX_FMT(p_jpeg->blocks == 1 || p_jpeg->rgb ? 0 : 1,)
+            store_row_jpeg,
             p_jpeg))
             return bm_size;
     } else {
@@ -2898,7 +2926,7 @@ int clip_jpeg_fd(int fd, int flags,
         for (row = 0; row < bm->height; row++)
         {
             part = store_row_jpeg(p_jpeg);
-            if (p_jpeg->blocks > 1)
+            if (p_jpeg->blocks > 1 && !p_jpeg->rgb)
             {
                 struct uint8_rgb *qp = part->buf;
                 struct uint8_rgb *end = qp + bm->width;

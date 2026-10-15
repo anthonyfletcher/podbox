@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`636ae404f7`**, merged 2026-09-27 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`f2eaa15ac2`**, merged 2026-10-15 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -254,9 +254,33 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-09-08 | `dd164cadb1` `0a0b877dc2` `3e996ec73e` `6719578e29` `7f01029439` `cbaf66f372` `d43cc0e829` | jztool, ingenic usbboot, rbutil, theme editor | **N/A** | `utils/`. |
 | 2026-08-30 | `95e9d227aa` `420537c864` `cbd8b68e06` `be35fdfe1a` `636ae404f7` | manual, CREDITS, forum URL | **N/A** | |
 | 2026-08-31 | `3664373ce7` `8e965d9159` `a70f30adf1` `54b26ac9f1` `a967c5a018` | translation updates | **N/A** | Translation. |
+| 2026-09-27 | `2745e0b973` | FS#14011: Handle usb hosts whose first request is SET_ADDRESS | **Adopted** | Upstream's version of this fork's `a0103fa46a`, which it replaces. The `usb_log()` line stays. |
+| 2026-09-25 | `9bcdd30293` | usb_storage: flush storage when the host stops or ejects the unit | **Adopted** | |
+| 2026-10-07 | `e61aa0cd37` | usb_storage: allocate the buffer at the storage handover | **Adopted (in part)** | `GET_MAX_LUN` from the control buffer, and the handover split. The buffer is still claimed at boot, so `SET_CONFIGURATION` primes the endpoint at once. |
+| 2026-10-03 | `a81fd7b77f` `04ecb3c645` `330236911b` `0ed3734e5e` `374f7c0334` `ccd9f7db7e` `aaa87a4d8e` `28b4225021` `eb884aba46` `339a4a061a` `640a002b1c` `5b91d79982` `6fa80f24ce` `b15d54d852` | flac: robustness fixes and ARM assembly for the Rice reader, decorrelation and the LPC filters | **Superseded** | Upstream's 64-bit LPC kernel replaces this fork's `lpc_decode_arm_wide()`; `flac_lpc_32()` still runs it 1024 samples at a time with a yield between. The ARMv5E narrow kernel is not wired. |
+| 2026-10-14 | `c47b2e1be2` `8f38274e90` `b6b2d95309` `15eec82d8f` `deaef503bb` `e45936397e` `5d8ce62b45` `aa7ebbe057` `a6b7321d9f` `4502948cd8` `6ffbee954b` `fb2ee6c08f` `11b12894ad` `9477e371a3` `d084219b9a` `34666474b8` `2890d4a40d` `f1d7ae3bbf` `1bae7e0e0a` `b7170e03c4` `8667af5cd7` `b8861e3f09` `3966b420a3` `02d5520c5f` `fc1d445d69` `619f2f1093` `5880b6111c` `8194d51c49` `eb4cad5208` `e2f6ada2c1` | opus, wma, wmapro, vorbis, atrac3, libdemac, a52, libtremor, DSP and metadata fixes | **Adopted** | |
+| 2026-10-11 | `f4c7e8b595` `e9ab4ab222` `f159003ddb` `f282ae203a` | Support DSF, DFF, and SACD playback | **Adopted** | `.dsf`, `.dff` and `.iso` join the file browser's audio types. |
+| 2026-09-30 | `89c38484ea` `2bb498b963` `c12f6ebacd` `b897766a7a` `0e50ed3c43` `e32bfaadb1` `142a6fbb39` `9936e65e6d` `5c74d20bce` `1488b30c62` `e430ecb607` `dcee3ce62f` | jpeg, jpegp: per-scan Huffman and per-component quant tables, RGB, 1x2/2x1 chroma, 16-bit quant tables, damaged files | **Adopted** | Into `draw/jpeg_load.c` and the image viewer's decoders. The progressive decoder takes the table, RGB and SOF1 fixes, and refuses chroma other than 1x1. jpegp keeps its own end-of-file handling and takes the checks it lacked. `89c38484ea` was already here. |
+| 2026-10-12 | `0a310d469c` `07d875ff74` `680ba7e88a` | qsort alignment, thread null pointer, `ata_set_phys_sector_mult()` for ATA only | **Adopted** | |
+| 2026-10-14 | `afe91f1dfb` `85f2d4613e` `e5092187c5` | xoroshiro64** PRNG, periodic reseed, `prng_newseed()` | **Adopted** | `srand()` here holds off the reseed for its full period: upstream's lets the next tick replace a fixed seed. |
+| 2026-10-13 | `2cb8e24519` `0ee5442559` `17e1765eef` | apps: seed with `prng_newseed()`, no manual reseeding | **Declined** | `apps-ipod/` still seeds with `srand(current_tick)`, which the new generator takes as it took the old. |
+| 2026-10-10 | `ecdeb02dda` `5a0fc3c6e9` `5fedaa2095` `d56211c7fc` | 44.1 kHz floor when guessing the frequency; empty database paths; talk shut-up on disable; close the playlist at shutdown | **Adopted** | |
+| 2026-10-14 | `f2eaa15ac2` | settings: list padding and separator height are theme settings | **Adopted (independently)** | |
+| 2026-10-13 | `f36a79fe80` | database: remove an unnecessary function wrapper | **Declined** | A rename; `check_deleted_files()` has its own callers here. |
+| 2026-10-07 | `7d090f24b9` | skin_engine: hold option for the peak meter bars | **Adopted** | |
+| 2026-10-07 | `a3227cadb5` `da4c218046` `13553bda06` `136e6b9953` | recording screen tags, FM screen, recording monitor | **N/A** | Neither player records or has a tuner. |
+| 2026-10-02 | `c0ae6c7cd1` `9910b2aebf` | FS#14019 outdated binary language files, and its revert | **N/A** | Cancel out. |
+| 2026-10-07 | `152c348537` `5dc5c4a06c` `025284d95a` `90506b8808` `bef221afd7` `9d3d2c6e67` `7ba413d87d` | checkwps: validate theme cfg files | **Adopted** | `stubs.c` checks a cfg line's setting name, not its value. Run on a `.cfg` from the theme's root folder. |
+| 2026-10-13 | `e9a6b58870` `0b2caf7338` `5f96d3f163` `39cc4a7605` `cc362a8ecd` `279e8524a6` `60935805a9` `82c5015209` `ca26081e58` `23f1f294b5` | toolchain, configure, buildzip, root.make, convbdf | **Adopted** | |
+| 2026-10-05 | `b0ad97add8` `59f15ca630` `4c78e98461` | wpsbuild and cabbiev2 | **N/A** | `wps/`. |
+| 2026-10-14 | `f5076456fe` `4dcb5bae9d` `d3893ead3a` `98f162b212` `8a53c15d1c` `0dc08e53a9` `2190a31dac` `f7655e226c` `a35f344eef` `c922ef98c3` `a33b0c7360` `3fbf975ecc` `3689292b28` `e1a18fa15c` `34368013c1` `bbe37187d8` `67ba9c3121` `19caf27567` `89e9ade855` `79329c8f7c` `475b4629b6` `70c546113d` `0e1952a4d1` `53bc6abc97` `c3356ac35f` `d8f099f937` `455b1bcbf8` `f428c491d1` `a0c1085f3f` `0db035d231` `6bf3eaff41` `efde59472e` `16492de569` `e83b7d6dc4` `c453f4fa8f` `01d18e42a9` `3b142f45ce` `2ce1cdcd8e` `17db971b66` `7e9d621f29` `cc7d8d07b2` `ae6c5eb8a8` `9605950788` `8dcf743951` `21d5dacdb8` `8eb47f474b` `5249466cc4` `5c5dac2dbc` `3fa27091f3` `69af17695d` `6350d3f7a0` `f61d379824` `ce968e7da1` `361913fdd2` `4b8ea97fa9` `31fac4c400` `9ce3fca4cb` `c3a62cee96` `406a28cc6a` `1669e49cd7` `776fe2ad9c` `aba3fe1d57` `be0153afbd` `cf204e59ce` `af9a81f5f6` `ef1b9d1984` `fd35cb31e4` `0d117dc62c` `2b12d568ff` `19b16908a0` | rk27xx and YP-CP3, YP-R0, imx233, x1000, 3DS, iPod Nano 3G, e200R, HibyOS, iriver | **N/A** | Other targets. |
+| 2026-10-12 | `e2efcb906a` `88f3d21890` `e28511a757` `626643b46d` `41be2016b8` `8036fda6f0` `860582a63a` `2facad7424` `966c1d7650` `eb39277d4a` `cea6fca67b` `2bef3237d2` `298d4a33ee` `246cde74df` `2fe4ab78e3` `a3fe0b12c2` `78a846dd52` `add3bb52b3` `3e02b10217` `a5f7d24290` `b11962221b` `d04b94f443` `a83ba8e5d8` `3b12c2b1c0` `26b67894d8` `683ef36238` `bbe7fb80bd` `418900340c` `8e0acd43f8` `6fd75b7ae0` `0be16b9349` `1f2e5488a7` `79e444d067` `76643a105e` `9b8f375d53` `65bfcd6e45` `ba6b252238` `8161720426` `212bb63ee4` `2986176bcb` `b3882fc65b` | `utils/`, manual, docs | **N/A** | |
+| 2026-10-14 | `d94e41bade` `02f54fc3a8` `f86be7dc42` `1896c2128b` `e27fb9a9f0` `4c08906670` `303c534022` `853274937c` `73b1afabd3` `49b4d8f2c9` `27a8ca3f55` `b34fcd602a` `b819e91000` `975d0519a2` | plugins | **N/A** | No plugin system. |
+| 2026-10-14 | `583f27d5e5` `3c09d4570f` `9ab4bdcf91` `f012c09eed` `bfab6a2276` `265cf7ac92` `50d8c4a58e` `70c5a4e9e9` `616989f6c4` | translation updates | **N/A** | Translation. |
 
-Complete through `636ae404f7` (2026-09-27), merged as `76df1a5859`. Both
-targets were built either side of that merge and compared object by object:
+Complete through `f2eaa15ac2` (2026-10-14), merged as `5c3e2b9aa4`. The
+merge before it, through `636ae404f7` (2026-09-27), was `76df1a5859`. Both
+targets were built either side of that one and compared object by object:
 only `version.o` and `panic.o` (the commit hash) and `credits.o` (a new name)
 differ. Compare objects, not sections, because a few changed bytes shift every
 later address.

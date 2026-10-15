@@ -41,6 +41,7 @@ jpeg81.c
 */
 
 #include "GETC.h"
+#include "draw/jpeg_common.h"
 #include "jpegp_glue.h"
 #include "jpeg81.h"
 #include <limits.h>
@@ -737,7 +738,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			int La= GETWbi();
 			printf("DAC\n");
 			printf("  Arithmetic Conditioning\n  parameters:\n");
-			for (La-=2; La > 0; La-=2)
+			for (La-=2; La > 1; La-=2)
 			{
 				int CB= GETC();
 				int Tc= CB>>4;
@@ -787,7 +788,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 					B[i]= N;	// running total				
 				}
 				printf("\n");
-				if (N > 256) return JPEGENUMERR_BADHUFF;
+				if (N > 256 || 17 + N > Lh) return JPEGENUMERR_BADHUFF;
 				printf("    S: %d symbol bytes\n", N);
 				for (i=0; i<N; i++) S[i]= GETC();
 			}
@@ -894,6 +895,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 		else if ( marker == 0xD9 ) // EOI
 		{
 			printf("EOI\n");
+			if (!j->scans) return JPEGENUMERR_BADSCAN;	/* no image data */
 			return JPEGENUM_OK;	
 		}
 		else if ( marker == 0xDA )	// SOS
@@ -902,6 +904,7 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			GETWbi();	//Ls
 			printf("SOS\n");
 			if (!j->SOF) return JPEGENUMERR_BADSCAN;	/* no frame: no decoder or buffers yet */
+			j->scans++;
 			j->Ns= GETC();//Ns
 			if (j->Ns < 1 || j->Ns > 4) return JPEGENUMERR_BADSCAN;
 			printf("  Ns: %d (%s scan)\n", j->Ns, (j->Ns>1)?"Interleaved":"Single");
@@ -949,8 +952,8 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 			j->Ah= j->Al>>4;
 			j->Al&= 15;
 			j->Al2= 1<<j->Al;//pre-computed
-			if ((j->SOF&3)!=3 && (j->Se > 63 || j->Ss > j->Se))
-				return JPEGENUMERR_BADSCAN;	/* the band indexes a 64-entry block */
+			if ((j->SOF&3)!=3 && (j->Se > 63 || j->Ss > j->Se || j->Al > 13))
+				return JPEGENUMERR_BADSCAN;	/* the band indexes a 64-entry block, and Al2 fits a TCOEF */
 			if ((j->SOF&3)==3 && (j->Ss < 1 || j->Ss > 7))
 				return JPEGENUMERR_BADSCAN;	/* Px indexes the seven predictors */
 
@@ -1028,9 +1031,16 @@ extern enum JPEGENUM JPEGDecode(struct JPEGD *j)
 		}
 		else if ( (marker & 0xf0) == 0xE0 ) // APPn E0..EF
 		{
-			int La= GETWbi();
-			if (La < 2) return JPEGENUMERR_BADSEGMENT;	/* would seek back onto itself */
-			SEEK(La-2);
+			int La= GETWbi()-2;
+			int n= 0;
+			if (La < 0) return JPEGENUMERR_BADSEGMENT;	/* would seek back onto itself */
+			if ( marker == 0xE0 || marker == 0xEE )	/* JFIF, Adobe: colour space */
+			{
+				unsigned char id[12];
+				for ( ; n < La && n < 12; n++ ) id[n]= GETC();
+				jpeg_app_colorspace(marker, id, n, &j->jfif, &j->adobe);
+			}
+			SEEK(La-n);
 			printf("APP%d\n", marker&15);
 		}
 		else if ( marker == 0xFE ) // COM

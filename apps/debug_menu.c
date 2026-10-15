@@ -2857,6 +2857,77 @@ static bool view_ram_info(void)
 }
 #endif
 
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) && defined(CONFIG_NAND) \
+    && (CONFIG_NAND == NAND_RK27XX) \
+    && !(CONFIG_STORAGE & STORAGE_NAND)
+#include "ftl-probe-rk27xx.h"
+
+/* The target does not know its NAND's FTL scheme yet: show what the
+ * finder sees, for the user to report */
+static bool dbg_ftl_scheme(void)
+{
+    struct ftl_probe p;
+    struct simplelist_info info;
+
+    ftl_probe(&p);
+    simplelist_info_init(&info, "FTL scheme", 0, NULL);
+    simplelist_reset_lines();
+    simplelist_addline("Scheme: %s", ftl_probe_scheme_name(p.scheme));
+    if (p.flash_error)
+    {
+        simplelist_addline("No usable NAND (%d)", p.flash_error);
+    }
+    else
+    {
+        simplelist_addline("Chip: %lu blocks", (unsigned long)p.blocks);
+        simplelist_addline("%u planes, %u/%u sec", p.planes, p.sec_per_page,
+                           p.sec_per_block);
+        if (p.idb_boot_blocks)
+        {
+            simplelist_addline("IDB: %u blk %u+%u MB", p.idb_boot_blocks,
+                               p.idb_sys_mb, p.idb_data_mb);
+            if (p.idb_rk27)
+                simplelist_addline("IDB: RK27, ECC t=%u", p.idb_ecc_t);
+            else
+                simplelist_addline("IDB: early layout");
+        }
+        else
+            simplelist_addline("IDB: none");
+        simplelist_addline("Scanned %u blocks, t=%u", p.scanned, p.scan_ecc_t);
+        simplelist_addline("Erased %u, bad ECC %u", p.erased, p.unreadable);
+        simplelist_addline("A: %u logs, %u used", p.a_logs, p.a_blocks);
+        simplelist_addline("B: %u tables at %u", p.b_tables,
+                           p.b_tables ? p.first_b_table : 0);
+        simplelist_addline("B: %u cache, %u data", p.b_cache, p.b_data);
+        if (p.b_other)
+            simplelist_addline("B: %u other, %04x", p.b_other, p.first_b_other);
+        if (p.other)
+            simplelist_addline("Other: %u, %u %02x%02x%02x", p.other,
+                               p.first_other, p.first_other_meta[0],
+                               p.first_other_meta[1], p.first_other_meta[2]);
+    }
+    return simplelist_show_list(&info);
+}
+#endif
+
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) && defined(CONFIG_NAND) \
+    && (CONFIG_NAND == NAND_RK27XX) \
+    && (CONFIG_STORAGE & STORAGE_NAND)
+#include "ftl-target.h"
+#endif
+
+#ifdef FTL_SYS_ON_USB
+/* The NAND's hidden SYS volume, shown to a USB host in place of USER for
+ * one connection */
+static bool dbg_nand_sys_usb(void)
+{
+    ftl_set_sys_on_usb(!ftl_get_sys_on_usb());
+    splashf(HZ, "NAND SYS on next USB %sabled",
+            ftl_get_sys_on_usb() ? "en" : "dis");
+    return false;
+}
+#endif
+
 /****** The menu *********/
 static const struct {
     unsigned char *desc; /* string or ID */
@@ -2908,6 +2979,14 @@ static const struct {
         { "Skin Engine RAM usage", dbg_skin_engine },
 #if ((CONFIG_PLATFORM & PLATFORM_NATIVE) || defined(SONY_NWZ_LINUX) || defined(HIBY_LINUX) || defined(FIIO_M3K_LINUX)) && !defined(SIMULATOR)
         { "View HW info", dbg_hw_info },
+#endif
+#if (CONFIG_PLATFORM & PLATFORM_NATIVE) && defined(CONFIG_NAND) \
+    && (CONFIG_NAND == NAND_RK27XX) \
+    && !(CONFIG_STORAGE & STORAGE_NAND)
+        { "View FTL scheme", dbg_ftl_scheme },
+#endif
+#ifdef FTL_SYS_ON_USB
+        { "NAND SYS on next USB", dbg_nand_sys_usb },
 #endif
 #if (CONFIG_PLATFORM & PLATFORM_NATIVE)
         { "View partitions", dbg_partitions },

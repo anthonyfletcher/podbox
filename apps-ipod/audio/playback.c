@@ -4665,7 +4665,8 @@ static unsigned long audio_guess_frequency(struct mp3entry *id3)
             have_44 = true;
         if (caps->samprs[i] == SAMPR_48)
             have_48 = true;
-        if (id3->frequency == caps->samprs[i])
+        /* Always upscale to 44.1 or better */
+        if (id3->frequency >= SAMPR_44 && id3->frequency == caps->samprs[i])
             return id3->frequency;
     }
 

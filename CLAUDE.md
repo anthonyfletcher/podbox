@@ -254,7 +254,9 @@ nothing about any of them:
 
 - **CheckWPS must run from inside a `.rockbox` directory.** Skin font paths are
   relative to the on-device layout and will not resolve from anywhere else --
-  it then fails on the fonts rather than the skin.
+  it then fails on the fonts rather than the skin. A theme `.cfg` is the
+  exception: check it from the theme's root folder, as
+  `checkwps .rockbox/themes/<name>.cfg`.
 - **It links this fork's skin engine, not upstream's**, so it accepts every tag
   the player does. `tools/checkwps/SOURCES`, `checkwps.make` and
   `tools/checkwps/include/` are all fork files now; `tools/checkwps/stubs.c`
