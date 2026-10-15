@@ -3676,11 +3676,13 @@ static bool enter_album_tracks_directly(struct browser_context *c, long album_se
 }
 
 /* Consumes pending_artist_seek: points csi at the root's "Album Artist" row's
- * search_instruction and jumps straight to its album level, filtered by the
- * album-artist's seek, without displaying the album-artist grouping itself. The
- * album-artist row's chain is albumartist -> album -> title, so currextra 1 is
- * the album listing. Leaves dirlevel at 0 (see enter_album_tracks_directly for
- * why). Returns false if the root has no such albumartist -> album chain. */
+ * search_instruction and jumps straight to its second level, filtered by the
+ * album-artist's seek, without displaying the album-artist grouping itself.
+ * That level is the albums in the shipped albumartist -> album -> title, or
+ * whatever a custom tagnavi puts first under the artist (grouping, say); any
+ * level above the tracks will do. Leaves dirlevel at 0 (see
+ * enter_album_tracks_directly for why). Returns false if the root has no
+ * albumartist row of at least three levels. */
 static bool enter_artist_albums_directly(struct browser_context *c,
                                          long artist_seek, const char *artist_title)
 {
@@ -3691,7 +3693,7 @@ static bool enter_artist_albums_directly(struct browser_context *c,
         return false;
 
     si = &menus[rootmenu]->items[idx]->si;
-    if (si->tagorder_count < 3 || si->tagorder[1] != tag_album)
+    if (si->tagorder_count < 3)
         return false;
 
     csi = si;
@@ -4005,7 +4007,7 @@ int browser_db_load(struct browser_context* c)
 
             if (enter_artist_albums_directly(c, artist_seek, artist_title))
                 return browser_db_load(c);
-            /* No albumartist -> album row to anchor on -- fall through. */
+            /* No albumartist row to anchor on -- fall through. */
         }
         else
         {
