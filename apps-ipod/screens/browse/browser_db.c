@@ -4184,9 +4184,7 @@ static bool album_has_tracks(struct browser_context *c, int seek)
  * there is exactly one.
  *
  * This is what lets a book held in a single file play when it is chosen
- * rather than opening a list holding only itself. Nothing about it is
- * particular to books: a music album of one track behaves the same way, which
- * is the right answer there too.
+ * rather than opening a list holding only itself.
  *
  * Filters and clauses are built the way retrieve_entries() builds them, and
  * for the same reason -- an album seek identifies a *name*, so counting
@@ -4468,7 +4466,9 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         return GO_TO_FEATURED_ARTISTS;
 
     /* A book held in one file is an album of one track, and descending into
-     * it opens a list holding only itself. Play it instead.
+     * it opens a list holding only itself. Play it instead. Only in the
+     * Audiobooks menus: a music album of one track opens as every other
+     * album does, and choosing it never replaces the Queue.
      *
      * Here with the synthetic rows above, and for their reason: this leaves
      * before the dirlevel and history bookkeeping, so coming back from the
@@ -4495,7 +4495,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
          * entries, which a core_alloc on another thread could move. */
         browser_lock_cache(c);
         core_pin(browser_db_handle);
-        one = single_track_path(c, seek, path, sizeof(path));
+        one = spoken && single_track_path(c, seek, path, sizeof(path));
         /* The row's name titles the chapter list whatever the row is; only a
          * book carries it as a key as well, since that is what a position is
          * remembered under. */
