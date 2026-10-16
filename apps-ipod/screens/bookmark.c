@@ -305,6 +305,13 @@ static int open_temp_bookmark(char *buf,
     return fd;
 }
 
+static bool write_bookmark_line(int fd, const char *line)
+{
+    ssize_t len = strlen(line);
+
+    return write(fd, line, len) == len && write(fd, "\n", 1) == 1;
+}
+
 /* ----------------------------------------------------------------------- */
 /* This function adds a bookmark to a file.                                */
 /* Returns true on successful bookmark add.                                */
@@ -322,6 +329,7 @@ static bool add_bookmark(const char* bookmark_file_name,
     bool equal;
     uint32_t pl_hash, pl_track_hash;
     uint32_t bm_pl_hash, bm_pl_track_hash;
+    bool ok;
 
     if (!bookmark)
         return false; /* no bookmark */
@@ -348,8 +356,7 @@ static bool add_bookmark(const char* bookmark_file_name,
 
     logf("adding bookmark to %s [%s]", fnamebuf, bookmark);
     /* Writing the new bookmark to the begining of the temp file */
-    write(temp_bookmark_file, bookmark, strlen(bookmark));
-    write(temp_bookmark_file, "\n", 1);
+    ok = write_bookmark_line(temp_bookmark_file, bookmark);
     bookmark_count++;
 
     /* WARNING underlying buffer to *bookmrk gets overwritten after this point! */
@@ -367,8 +374,9 @@ static bool add_bookmark(const char* bookmark_file_name,
             if (most_recent && (bookmark_count >= MAX_BOOKMARKS))
                 break;
 
+            /* One bad line is dropped, not every bookmark below it */
             if (!parse_bookmark(NULL, 0, global_temp_buffer, NULL, false))
-                break;
+                continue;
 
             equal = false;
             if (comp_playlist)
@@ -387,17 +395,22 @@ static bool add_bookmark(const char* bookmark_file_name,
             {
                 bookmark_count++;
                 /*logf("copying old bookmark [%s]", global_temp_buffer);*/
-                write(temp_bookmark_file, global_temp_buffer,
-                      strlen(global_temp_buffer));
-                write(temp_bookmark_file, "\n", 1);
+                if (!write_bookmark_line(temp_bookmark_file,
+                                         global_temp_buffer))
+                    ok = false;
             }
         }
         close(bookmark_file);
     }
     close(temp_bookmark_file);
 
-    remove(bookmark_file_name);
-    rename(fnamebuf, bookmark_file_name);
+    /* rename() replaces the old file, so there is no moment without one. A
+     * short write leaves the old file standing. */
+    if (!ok || rename(fnamebuf, bookmark_file_name) < 0)
+    {
+        remove(fnamebuf);
+        return false;
+    }
 
     return true;
 }

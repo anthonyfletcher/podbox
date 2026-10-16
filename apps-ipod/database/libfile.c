@@ -53,6 +53,29 @@ static bool crc_rest(int fd, uint32_t *crc)
     return n == 0;
 }
 
+/* Whether the header's records, and nothing past them, match its checksum.
+ * Only an append cut off before its header write leaves bytes past the
+ * records that the checksum does not cover; a tail is always covered. */
+static bool records_alone_match(int fd, const struct libfile_header *hdr)
+{
+    unsigned char buf[256];
+    off_t left = (off_t)hdr->count * hdr->record_size;
+    uint32_t crc = CRC_START;
+
+    if (lseek(fd, sizeof(*hdr), SEEK_SET) != (off_t)sizeof(*hdr))
+        return false;
+    while (left > 0)
+    {
+        ssize_t n = read(fd, buf, left < (off_t)sizeof(buf) ? (size_t)left
+                                                            : sizeof(buf));
+        if (n <= 0)
+            return false;
+        crc = crc_32(buf, n, crc);
+        left -= n;
+    }
+    return crc == hdr->checksum;
+}
+
 int libfile_open(const char *path, uint32_t magic, uint16_t version,
                  uint16_t record_size, struct libfile_header *hdr,
                  uint32_t *tail)
@@ -82,6 +105,14 @@ int libfile_open(const char *path, uint32_t magic, uint16_t version,
         else if (crc == hdr->checksum)
             rc = lseek(fd, sizeof(*hdr), SEEK_SET) == (off_t)sizeof(*hdr)
                  ? fd : LIBFILE_UNREAD;
+        else if (body > (off_t)hdr->count * record_size
+                 && records_alone_match(fd, hdr))
+        {
+            /* A torn append: the records stand and the rest is not there */
+            body = (off_t)hdr->count * record_size;
+            rc = lseek(fd, sizeof(*hdr), SEEK_SET) == (off_t)sizeof(*hdr)
+                 ? fd : LIBFILE_UNREAD;
+        }
     }
     if (rc != fd)
     {
@@ -199,8 +230,15 @@ bool libfile_append(const char *path, uint32_t magic, uint16_t version,
 
     end = ffilesize(fd);
     ok = read_header(fd, magic, version, &hdr)
-         && hdr.record_size == record_size
-         && end == (off_t)(sizeof(hdr) + hdr.count * record_size)
+         && hdr.record_size == record_size;
+    if (ok && end > (off_t)(sizeof(hdr) + hdr.count * record_size)
+        && records_alone_match(fd, &hdr))
+    {
+        /* What a torn append left past the records goes first */
+        end = sizeof(hdr) + hdr.count * record_size;
+        ok = ftruncate(fd, end) == 0;
+    }
+    ok = ok && end == (off_t)(sizeof(hdr) + hdr.count * record_size)
          && lseek(fd, 0, SEEK_END) == end;
     if (ok && write(fd, records, size) != (ssize_t)size)
     {

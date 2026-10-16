@@ -1422,8 +1422,10 @@ void allocate_playback_log(void)
 
 static void write_playbacklog(struct mp3entry *id3)
 {
+    /* Off logs nothing new, but lines already buffered are still plays and
+     * are flushed to the file of their own mode. */
     if (!global_settings.playback_log)
-        return;
+        id3 = NULL;
     unsigned long timestamp = 0;
     ssize_t used = 0;
     ssize_t bufsz = 0;

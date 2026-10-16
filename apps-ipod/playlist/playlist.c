@@ -3721,6 +3721,16 @@ int playlist_resume(void)
         {
             if ((total_read + count) >= control_file_size)
             {
+                /* A power cut mid-append leaves a last line with no newline:
+                 * a command that never finished being written. It is dropped,
+                 * and cut from the file so the next append starts a line. */
+                if (!newline && !exit_loop && pl_cmd == &pl_cmds_run)
+                {
+                    ftruncate(playlist->control_fd,
+                              total_read + last_newline + 1);
+                    break;
+                }
+
                 /* no newline at end of control file */
                 splashf(HZ * 2, "Err: EOF, %s", str(LANG_PLAYLIST_CONTROL_INVALID));
                 result = -15;

@@ -951,21 +951,33 @@ bool settings_is_changed(const struct settings_list *setting)
     return true;
 }
 
+#define CFG_HEADER_FMT "# .cfg file created by rockbox %s - " \
+                       "http://www.rockbox.org\r\n\r\n"
+
+/* Written as <filename>.part and renamed into place once every line is down,
+ * so a power cut or a full disk never leaves a short file under the name a
+ * boot promotes and loads -- a short config.cfg puts every setting past the
+ * cut back to its default. */
 static bool settings_write_config(const char* filename, int options)
 {
     logf("%s\r\n", __func__);
     int i;
     int fd;
+    char part[MAX_PATH];
+    bool ok = true;
     char *value = settings_line;   /* not the stack -- see settings_line */
-    fd = open(filename,O_CREAT|O_TRUNC|O_WRONLY, 0666);
+
+    if (snprintf(part, sizeof(part), "%s.part", filename) >= (int)sizeof(part))
+        return false;
+    fd = open(part,O_CREAT|O_TRUNC|O_WRONLY, 0666);
     if (fd < 0)
         return false;
 
     mutex_lock(&settings_line_mtx);
     if (options != SETTINGS_SAVE_RESUMEINFO)
     {
-        fdprintf(fd, "# .cfg file created by rockbox %s - "
-                 "http://www.rockbox.org\r\n\r\n", rbversion);
+        ok = fdprintf(fd, CFG_HEADER_FMT, rbversion)
+             == (int)(sizeof(CFG_HEADER_FMT) - 3 + strlen(rbversion));
     }
 
     for(i=0; i<nb_settings; i++)
@@ -1022,10 +1034,19 @@ static bool settings_write_config(const char* filename, int options)
         cfg_to_string(setting, value, SETTINGS_MAX_LINE);
         logf("Written: '%s: %s'\r\n",setting->cfg_name, value);
 
-        fdprintf(fd,"%s: %s\r\n",setting->cfg_name,value);
+        if (fdprintf(fd,"%s: %s\r\n",setting->cfg_name,value)
+            != (int)(strlen(setting->cfg_name) + strlen(value) + 4))
+            ok = false;
     } /* for(...) */
     mutex_unlock(&settings_line_mtx);
-    close(fd);
+    if (close(fd) < 0)
+        ok = false;
+
+    if (!ok || rename(part, filename) < 0)
+    {
+        remove(part);
+        return false;
+    }
     return true;
 }
 

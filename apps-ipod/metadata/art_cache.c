@@ -749,15 +749,21 @@ static void aa_stamps_load(void)
 {
     struct libfile_header h;
     int fd, n, i;
+    uint32_t left;
 
     fd = libfile_open(AA_STAMP_FILE, AA_STAMP_MAGIC, ART_CACHE_FORMAT_VERSION,
                       sizeof(struct aa_stamp), &h, NULL);
     aa_marks_key = 0;
     if (fd < 0)
         return;
-    while ((n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
+    /* By the count: a torn append can leave a record past it */
+    left = h.count;
+    while (left > 0 && (n = read(fd, aa_stamp_io, sizeof(aa_stamp_io))) > 0)
     {
         n /= sizeof(aa_stamp_io[0]);
+        if ((uint32_t)n > left)
+            n = left;
+        left -= n;
         for (i = 0; i < n; i++)
         {
             struct aa_stamp *s;

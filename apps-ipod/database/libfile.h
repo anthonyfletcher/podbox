@@ -75,7 +75,9 @@ bool libfile_write(struct libfile_writer *w, const void *data, size_t size,
 bool libfile_finish(struct libfile_writer *w, bool ok);
 
 /* Appends n records, creating the file if there is none. A file with a
- * tail cannot be appended to; one cut short is put back as it was. */
+ * tail cannot be appended to; one cut short is put back as it was. Records
+ * left past the count by an append cut off before its header write are
+ * ignored by libfile_open() and cut away here. */
 bool libfile_append(const char *path, uint32_t magic, uint16_t version,
                     uint16_t record_size, const void *records, uint32_t n);
 

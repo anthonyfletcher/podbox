@@ -31,8 +31,8 @@ static const struct pv_badge pv_badges_table[] = {
     { "Ear Conditioning",       "listen for 3,500 minutes",               PV_AM_MINUTES, 0, 3500, PV_TIER_GOLD },
     { "Audio Devotee",          "listen for 5,000 minutes",               PV_AM_MINUTES, 0, 5000, PV_TIER_GOLD },
     { "Wall of Sound",          "listen for 7,500 minutes",               PV_AM_MINUTES, 0, 7500, PV_TIER_GOLD },
-    /* WA4b insert at slot 13 (ACH_INS_9000) - the ONE sanctioned
-     * mid-table insert; ach_seen_load() remaps older save files */
+    /* The save file is read back by position, so a new badge goes at the
+     * end of the table, never in the middle. */
     { "It's Over 9000!",        "listen for more than 9,000 minutes",     PV_AM_MINUTES, 0, 9001, PV_TIER_GOLD },
     { "Five Figure Ears",       "listen for 10,000 minutes",              PV_AM_MINUTES, 0, 10000, PV_TIER_GOLD },
     { "Ten Days Solid",         "listen for 15,000 minutes",              PV_AM_MINUTES, 0, 15000, PV_TIER_GOLD },

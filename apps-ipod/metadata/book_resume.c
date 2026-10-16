@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "config.h"
+#include "kernel.h"
 #include "system/library_files.h"
 #include "database/libfile.h"
 #include "system.h"             /* ARRAYLEN */
@@ -69,6 +70,11 @@
 
 /* See book_resume_writes(). Moved by every change to the file. */
 static unsigned writes;
+
+/* The UI and the iAP library worker both read and rewrite the file, and both
+ * share the static buffers below. Recursive: a mark of the loaded book saves
+ * it. */
+static struct mutex book_mutex;
 
 unsigned book_resume_writes(void)
 {
@@ -406,9 +412,11 @@ bool book_resume_find(const char *book, struct book_resume *pos)
     if (book == NULL || book[0] == '\0')
         return false;
 
+    mutex_lock(&book_mutex);
     rekey();
     ctx.book = book_resume_key(book);
     scan(find_one, &ctx);
+    mutex_unlock(&book_mutex);
     return ctx.found;
 }
 
@@ -429,8 +437,10 @@ void book_resume_each(book_resume_fn fn, void *data)
 {
     struct each_ctx ctx = { .fn = fn, .data = data };
 
+    mutex_lock(&book_mutex);
     rekey();
     scan(each_one, &ctx);
+    mutex_unlock(&book_mutex);
 }
 
 /* ------------------------------------------------------------------ *
@@ -599,6 +609,7 @@ static void track_finish_event(unsigned short id, void *ev_data)
 
 void book_resume_init(void)
 {
+    mutex_init(&book_mutex);
     add_event(PLAYBACK_EVENT_TRACK_FINISH, track_finish_event);
 }
 
@@ -708,7 +719,9 @@ bool book_resume_mark(const char *book, enum book_left left)
     };
     const char *name;
     uint64_t loaded;
+    bool ok;
 
+    mutex_lock(&book_mutex);
     rekey();
     e.book = book_resume_key(book);
     if (global_settings.segregate_audiobooks
@@ -717,11 +730,14 @@ bool book_resume_mark(const char *book, enum book_left left)
         if (left == BOOK_LEFT_PARTWAY)
         {
             book_resume_save();
+            mutex_unlock(&book_mutex);
             return true;
         }
         audio_stop();
     }
-    return rewrite(&e);
+    ok = rewrite(&e);
+    mutex_unlock(&book_mutex);
+    return ok;
 }
 
 void book_resume_save(void)
@@ -733,6 +749,7 @@ void book_resume_save(void)
     if (!global_settings.segregate_audiobooks)
         return;
 
+    mutex_lock(&book_mutex);
     rekey();
     id3 = loaded_book(&name, &book);
 
@@ -778,4 +795,5 @@ void book_resume_save(void)
 
         rewrite(&e);
     }
+    mutex_unlock(&book_mutex);
 }
