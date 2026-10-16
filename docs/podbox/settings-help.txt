@@ -1364,6 +1364,7 @@ iPods as USB drives but does not see this one. It overrides Accessory Protocol,
 iPhone Accessories, Identify As, USB Sound Card, USB HID and USB DAC Output
 without changing them, so cars and docks that play from the player over USB
 do not work until it is switched back. Docks on the dock connector still do.
+A change takes effect at the next connection.
 
 [usb hid]
 Presents the player as a keyboard or remote control to the computer, so its
