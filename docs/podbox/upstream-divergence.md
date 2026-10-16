@@ -80,6 +80,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 | `usbstack/usb_storage.c` | `host_wrote` is cleared once per cable insertion, not per `SET_CONFIGURATION` | A host that re-enumerates after writing the firmware still gets the reboot prompt at unplug. |
 | `usbstack/usb_storage.c` | The LUN is bounds-checked; `set_transfer_range()` makes the LBA arithmetic overflow-safe; a zero `block_size_mult` is refused | Host-supplied values upstream uses unchecked. |
 | `usbstack/usb_storage.c`, `usb.c`, `export/usb.h` | Ejecting every drive gives the disk back to the player (`usb_storage_ejected()`) until unplug; the drive then answers "medium not present" without waiting for storage, and `usb_host_is_present()` turns false | The player is usable while it charges from the computer, as Apple's firmware is. Upstream records the eject and keeps the disk until the cable is pulled. |
+| `usb.c`, `export/usb.h`, `usbstack/usb_core.c`, `export/usb_core.h` | New `usb_host_wants_storage()`: a host is present and has asked for storage or not settled on a configuration; new `usb_core_configured()` behind it | Background work stands down on this, not `usb_host_is_present()`, which a car or dock keeps true all session -- a player booted plugged into a car would otherwise never load the database into RAM. |
 
 ### Buffers claimed at boot
 

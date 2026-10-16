@@ -217,6 +217,11 @@ bool usb_inserted(void);
  * unlike usb_inserted(), which a charger also satisfies. Use this to decide
  * whether to stand work down for an enumeration that is about to happen. */
 bool usb_host_is_present(void);
+/* Whether the host may yet take the disk: a host is present and has either
+ * asked for storage or not settled on a configuration. False through a
+ * session with a car, a dock or Charge Only, which usb_host_is_present()
+ * spans whole. Work that would hold the disk or the CPU waits on this. */
+bool usb_host_wants_storage(void);
 /* check whether USB is plugged, note that this is the raw hardware value */
 int usb_detect(void);
 

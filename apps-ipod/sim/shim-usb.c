@@ -45,6 +45,11 @@ bool usb_host_is_present(void)
     return false;
 }
 
+bool usb_host_wants_storage(void)
+{
+    return false;
+}
+
 /* Set by the stack when a host ejects the disk. */
 bool usb_storage_is_ejected(void)
 {

@@ -5603,7 +5603,7 @@ static bool check_event_queue(void)
     /* An enumerating host counts. Trap: the queue alone is too late for one --
      * nothing arrives on it until SET_CONFIGURATION, by which point a scan
      * holding the CPU has already cost the host SET_ADDRESS. */
-    if (usb_host_is_present())
+    if (usb_host_wants_storage())
         return true;
 
     /* Count field is filters minus one. */
@@ -5641,7 +5641,7 @@ static bool usr_cancel(void)
     if (commit_cancelled)
         return true;
 
-    if (usb_host_is_present() || (do_timed_yield() && check_event_queue()))
+    if (usb_host_wants_storage() || (do_timed_yield() && check_event_queue()))
         commit_cancelled = true;
 
     return commit_cancelled;
@@ -6986,7 +6986,7 @@ static void tagcache_thread(void)
                  * the rest of the session, which is why load_tagcache() uses
                  * check_event_queue_no_usb() once it is under way. Not
                  * starting costs nothing; stopping costs the RAM copy. */
-                if (usb_host_is_present())
+                if (usb_host_wants_storage())
                     break ;
 
                 /* Two different questions, so two different settings.

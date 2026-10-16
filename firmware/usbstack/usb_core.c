@@ -521,6 +521,11 @@ bool usb_core_host_wrote_storage(void)
 #endif
 }
 
+bool usb_core_configured(void)
+{
+    return usb_config != 0;
+}
+
 void usb_core_exit(void)
 {
     usb_core_do_set_config(0);

@@ -265,7 +265,7 @@ static void fi_tick(void)
      * back. The run is gated rather than the arming, so the request stays
      * pending and a real extraction still gets its scan however early the
      * question is asked. */
-    if (fi_wants_scan && !tagcache_is_busy() && !usb_host_is_present()
+    if (fi_wants_scan && !tagcache_is_busy() && !usb_host_wants_storage()
         && !bg_task_preempted(&file_index_task))
     {
         fi_wants_scan = false;

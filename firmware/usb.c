@@ -1235,6 +1235,19 @@ bool usb_host_is_present(void)
     return usb_host_present && !usb_disk_ejected;
 }
 
+/* Storage is requested at insertion and released at a configuration without
+ * it. An unconfigured host counts as wanting it: one that unconfigures us
+ * mid-session releases the disk before it asks again. */
+bool usb_host_wants_storage(void)
+{
+#if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
+    return usb_host_is_present()
+           && (exclusive_storage_requested || !usb_core_configured());
+#else
+    return usb_host_is_present();
+#endif
+}
+
 bool usb_exclusive_storage(void)
 {
     /* Storage isn't actually exclusive until slave mode has been entered */

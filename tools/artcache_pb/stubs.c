@@ -447,7 +447,7 @@ void dircache_get_info(struct dircache_info *info)
 }
 
 /* The player is the one mounted; nothing is plugged into it */
-bool usb_host_is_present(void)
+bool usb_host_wants_storage(void)
 {
     progress();
     return false;

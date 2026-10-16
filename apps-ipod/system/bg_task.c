@@ -229,9 +229,9 @@ bool bg_task_should_stop(const struct bg_task *task)
 
     /* Trap: the queue alone is too late for a host. Nothing arrives on it
      * until SET_CONFIGURATION, by which point a pass holding the CPU has
-     * already cost the host SET_ADDRESS. usb_host_is_present() is true from
+     * already cost the host SET_ADDRESS. usb_host_wants_storage() is true from
      * the moment the cable goes in. */
-    if (usb_host_is_present())
+    if (usb_host_wants_storage())
         return true;
 
     /* Count field is filters minus one. */
@@ -302,7 +302,7 @@ static bool bg_task_stale(struct bg_task *task)
      * Trap: acknowledging the connect is not the end of it. A host that
      * unconfigures us mid-session broadcasts a disconnect before re-requesting
      * the disk, so the thread's wait returns with the cable still in. */
-    if (usb_host_is_present())
+    if (usb_host_wants_storage())
         return false;
 
     /* Only ever work against a database that is readable and holding still. */

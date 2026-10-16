@@ -407,7 +407,7 @@ void dircache_get_info(struct dircache_info *info)
 /* The player is the one mounted; nothing is plugged into it. The scan asks
  * this for every directory entry, which makes it where the tick moves and
  * the progress line is drawn between yields. */
-bool usb_host_is_present(void)
+bool usb_host_wants_storage(void)
 {
     progress();
     return false;
