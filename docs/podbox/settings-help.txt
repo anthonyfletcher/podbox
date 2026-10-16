@@ -1290,8 +1290,9 @@ play or take its remote. Changes to USB take effect at the next connection.
 Answers cars and other accessories that expect an iPhone, over USB. Auto
 knows a car by a request of Apple's that a car sends and a computer does
 not, and waits a second before handing a computer the disk, so a car never
-takes it. On answers any accessory that asks and never offers the disk.
-Off answers none, as an iPod does. Shown only while Accessory Protocol is on.
+takes it. On answers any accessory that asks and never offers the disk: a
+computer gets none, and may retry the connection for a moment first. Off
+answers none, as an iPod does. Shown only while Accessory Protocol is on.
 With USB Sound Card on, a car makes the player drop off USB for a moment and come back
 without the sound card.
 
