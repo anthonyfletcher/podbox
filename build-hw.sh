@@ -27,16 +27,7 @@ cd "$BUILDDIR"
 JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 make -j"$JOBS"
 make zip
-
-# A clean build can write a language as a bare 10-byte header with no error
-# from GENLANG; the zip still has every file and only the size gives it away.
-EMPTY=$(unzip -l rockbox.zip '.rockbox/langs/*.lng' | awk '/\.lng$/ && $1 < 1000 { print $4 }')
-if [ -n "$EMPTY" ]; then
-    echo "Empty language files in the zip -- run the build again:" >&2
-    echo "$EMPTY" >&2
-    exit 1
-fi
-
+sh ../tools/check-zip-langs.sh rockbox.zip
 ../bundle-theme.sh
 ../bundle-help.sh
 ../bundle-trim.sh
