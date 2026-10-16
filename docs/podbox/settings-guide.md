@@ -39,7 +39,7 @@ Settings
 ├─ Library                     the browsers, the database, artwork, the viewers,
 │                              and Maintenance
 ├─ Appearance                  themes, fonts, colours, scrolling and the menus
-├─ Battery & Power             backlight, brightness, sleep, disk and charging
+├─ Battery & Power             brightness, backlight, sleep, disk and charging
 ├─ System                      USB, accessories, language, time, settings
 │                              files, and the debug logs
 ├─ Settings Mode               Standard or Everything
@@ -520,9 +520,9 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
+| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
 | Backlight | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
 | Backlight (While Plugged In) | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
-| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
 | Backlight on Hold | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
 | Caption Backlight | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
 | Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
