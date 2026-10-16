@@ -1943,6 +1943,8 @@ const struct settings_list settings[] = {
                    ALBUM_YEAR_OFF, "album show year", "off,before,on", NULL, 3,
                    ID2P(LANG_SET_BOOL_NO), ID2P(LANG_YEAR_BEFORE_NAME),
                    ID2P(LANG_YEAR_AFTER_NAME)),
+    OFFON_SETTING(0, skip_single_lists, LANG_SKIP_SINGLE_LISTS, false,
+                  "skip single item lists", NULL),
     CHOICE_SETTING(0, album_covers_sort_artists_by, LANG_SORT_ARTISTS_BY,
                   0, "album covers sort artists by", "name,most played", NULL, 2,
                   ID2P(LANG_NAME), ID2P(LANG_MOST_PLAYED_ARTISTS)),

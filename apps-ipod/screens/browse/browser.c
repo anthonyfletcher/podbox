@@ -1120,9 +1120,14 @@ static int exit_to_new_screen(int screen)
     return screen;
 }
 
+/* The database levels Skip One-Item Lists opened on its own, a bit per
+ * dirlevel. Kept across visits to the WPS, so Back still passes them. */
+static unsigned passed_levels;
+
 /* main loop, handles key events */
 static int dirbrowse(void)
 {
+    int entered_from = -1;      /* dirlevel a Select left, until reloaded */
     int numentries=0;
     char buf[MAX_PATH];
     int button;
@@ -1201,6 +1206,7 @@ static int dirbrowse(void)
                         return exit_to_new_screen(GO_TO_PREVIOUS);
                     }
                 }
+                entered_from = tc.dirlevel;
                 switch (id3db ? browser_db_enter(&tc, true) : browser_disk_enter(&tc))
                 {
                     case GO_TO_FILEBROWSER: reload_dir = true; break;
@@ -1259,7 +1265,17 @@ static int dirbrowse(void)
                 }
 
                 if (id3db)
+                {
                     browser_db_exit(&tc, true);
+                    /* A level Skip One-Item Lists passed through is passed
+                     * again on the way back */
+                    while (tc.dirlevel > 0
+                           && (passed_levels & (1u << tc.dirlevel)))
+                    {
+                        passed_levels &= ~(1u << tc.dirlevel);
+                        browser_db_exit(&tc, true);
+                    }
+                }
                 else
                     if (browser_disk_exit(&tc) == 3)
                         exit_func = true;
@@ -1446,6 +1462,7 @@ static int dirbrowse(void)
                 tc.currextra = 0;
                 lasttable = -1;
                 lastextra = -1;
+                passed_levels = 0;
                 reload_root = false;
             }
 
@@ -1476,6 +1493,25 @@ static int dirbrowse(void)
                 reload_root = true; /* try root */
                 goto check_rescan;
             }
+            /* Select opened a list of one row: open that row in its place.
+             * Entered hidden, so a single-file book under it opens as a list
+             * rather than playing. */
+            if (id3db && entered_from >= 0 && tc.dirlevel > entered_from)
+            {
+                passed_levels &= (1u << tc.dirlevel) - 1;
+                while (numentries > 0 && browser_db_pass_through(&tc))
+                {
+                    int level = tc.dirlevel;
+
+                    tc.selected_item = tc.special_entry_count;
+                    if (browser_db_enter(&tc, false) != 0
+                        || tc.dirlevel <= level)
+                        break;
+                    passed_levels |= 1u << level;
+                    numentries = update_dir();
+                }
+            }
+            entered_from = -1;
         }
     }
     return exit_to_new_screen(GO_TO_ROOT);
