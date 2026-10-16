@@ -324,11 +324,12 @@ build.
 
 Everything it needed to build is inside `apps-ipod/`; see
 `apps-ipod/sim/README.md`. Three files outside it carry one addition, for
-screenshots:
+screenshots, and three a fix for a crash at boot:
 
 | File | What changed | Why |
 | --- | --- | --- |
 | `firmware/target/hosted/sdl/system-sdl.c` | `--screenshot` argument, setting `sim_screenshot` | Screenshots that show the same clock and battery every time. |
+| `firmware/target/hosted/sdl/system-sdl.c`, `kernel-sdl.c`, `system-sdl.h` | `system_init()` calls `sim_kernel_init()`, no longer static, before it starts the event thread; `tick_start()` no longer does | The event thread enters the irq handler for every event. In upstream, an event that arrives before `tick_start()` waits on a condition not yet created, which in SDL 2.30 jumps to address 0: on Windows, 1 boot in 3 to 8 crashes with 0xC0000005. |
 | `firmware/target/hosted/rtc.c` | Under `SIMULATOR`, `sim_screenshot` makes `rtc_read_datetime()` return Monday 2024-01-01 09:00:00 | Every clock and date in the UI reads it. |
 | `uisimulator/common/powermgmt-sim.c` | `sim_screenshot` stops `battery_status_update()`, so the battery stays at 4300 mV, 100 %, not charging | Otherwise the simulated battery drains 1 % a second and cycles through charging. |
 
