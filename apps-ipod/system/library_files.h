@@ -72,6 +72,8 @@
 #define LIB_PLAYBACK_ERRORS_LOG LIB_LOGS_DIR "/playback_errors.log"
 /* Written by lib/rbcodec/metadata/metadata.c, which spells the path out */
 #define LIB_METADATA_LOG    LIB_LOGS_DIR "/metadata.log"
+#define LIB_SKIN_LOG        LIB_LOGS_DIR "/theme.log"
+#define LIB_TASKS_LOG       LIB_LOGS_DIR "/tasks.log"
 
 /* The libfile magic of each .dat, and the version of its records where the
  * file's own module does not set one. Records of size 1 are a byte stream

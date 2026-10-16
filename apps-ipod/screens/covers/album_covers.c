@@ -588,6 +588,7 @@ static void album_covers_request(bool rebuild)
 
 struct bg_task album_covers_task =
 {
+    .name    = "album covers",
     .request = album_covers_request,
 };
 

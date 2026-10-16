@@ -403,6 +403,8 @@ static const struct tag_row tag_rows[] = {
 { "debug log usb",       TAG_ADVANCED|TAG_USB|TAG_SYSTEM,        "log debug usb car accessory" },
 { "debug log expiry",    TAG_ADVANCED|TAG_SYSTEM,                "log debug switch off expire hours" },
 { "debug log playback",  TAG_ADVANCED|TAG_SYSTEM|TAG_PLAYBACK,   "log debug skip codec error track" },
+{ "debug log theme",     TAG_ADVANCED|TAG_SYSTEM|TAG_APPEARANCE, "log debug theme skin font bitmap memory" },
+{ "debug log tasks",     TAG_ADVANCED|TAG_SYSTEM,                "log debug background task database art scan" },
 
 /* --- voice --------------------------------------------------------------- */
 { "talk menu",           TAG_VOICE,                              "voice speak menus" },

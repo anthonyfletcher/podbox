@@ -716,6 +716,8 @@ struct user_settings
     bool debug_log_artcache;   /* append art-cache progress to a file */
     int debug_log_expiry;      /* Switch Off After: 1 h, 6 h, 24 h, 7 d, never */
     bool debug_log_playback;   /* a line per track playback gives up on */
+    bool debug_log_skin;       /* a line per skin file a theme loads */
+    bool debug_log_tasks;      /* background passes started and finished */
     int  album_covers_view_mode;  /* CAROUSEL_VIEW_*: tilted, or flat piles */
     /* Flat view only: how far the two piles are blended toward the background,
      * so the cover in the middle stands out. Per cent; 0 leaves them solid. */

@@ -11,7 +11,8 @@
  * the buffer is three-quarters full, so a scan that logs every file does not
  * open the file for every line. A log that must be on disk before it goes on
  * -- the USB log's last line before a hang -- or that keeps its own ring
- * writes through debug_log_open() and debug_log_close() instead.
+ * writes through debug_log_open() and debug_log_close() instead; so does
+ * debug_log() for a log registered with nothing held.
  ****************************************************************************/
 #ifndef _DEBUG_LOG_H
 #define _DEBUG_LOG_H
@@ -26,6 +27,8 @@ enum debug_log_id {
     DEBUG_LOG_PLAYBACK,
     DEBUG_LOG_MIKEY,
     DEBUG_LOG_METADATA,
+    DEBUG_LOG_SKIN,
+    DEBUG_LOG_TASKS,
     DEBUG_LOG_COUNT,
 };
 

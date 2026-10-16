@@ -1983,6 +1983,7 @@ enum bg_result art_cache_tool_run(bool rebuild)
 
 struct bg_task art_cache_task =
 {
+    .name         = "art cache",
     .read_marks   = aa_read_marks,
     .write_marks  = aa_write_marks,
     .rank         = BG_RANK_ART,

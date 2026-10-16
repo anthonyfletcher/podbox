@@ -1398,6 +1398,24 @@ had no codec, or the codec failed. For working out why tracks skip.
 Costs nothing until a track fails. Switches itself off after the time set in
 Switch Off After.
 
+[debug log theme]
+Writes a line to theme.log in the .rockbox/logs folder for each skin file a
+theme loads: whether it loaded and how much memory it took, and any font or
+bitmap that would not load. For working out why a theme looks wrong or will
+not load. A skin that does not parse is logged without its line; CheckWPS
+gives that.
+
+Each line reaches the disk at once, so a theme change is a little slower.
+Switches itself off after the time set in Switch Off After.
+
+[debug log tasks]
+Writes a line to tasks.log in the .rockbox/logs folder whenever a background
+task starts or finishes: database updates, album art and the documents and
+images index, with what each pass came to. For working out why the Building
+indicator will not go away, or why a pass keeps starting.
+
+Switches itself off after the time set in Switch Off After.
+
 [debug log expiry]
 How long the debug logs stay on, counted only while the player is on. When the
 time is up every log switches itself off, and a message says so. Switching a

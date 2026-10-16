@@ -41,6 +41,7 @@
 #include "draw/color.h"
 #include "system/strutil.h"
 #include "system/app_buffer.h"
+#include "system/debug_log.h"
 #include "draw/viewport.h"
 #include "draw/round_rect.h"
 #include "audio/spectrum_meter.h"   /* SPECTRUM_MAX_BANDS */
@@ -2184,11 +2185,14 @@ static int load_skin_bmp(struct wps_data *wps_data, struct gui_img *img, char* b
     {
         /* Abort if we can't load an image */
         DEBUGF("Couldn't load '%s' (%zu)\n", img_path, buf_reqd);
+        debug_log(DEBUG_LOG_SKIN, "bitmap %s: cannot read", img_path);
     }
     else
     {
         DEBUGF("Not enough skin buffer: need %zd more.\n",
                 buf_reqd - skin_buffer_freespace());
+        debug_log(DEBUG_LOG_SKIN, "bitmap %s: no room for %ld bytes",
+                  img_path, (long)buf_reqd);
     }
 
     return -1;
@@ -2295,6 +2299,8 @@ static bool skin_load_fonts(struct wps_data *data)
             {
                 splashf(HZ, ID2P(LANG_FONT_LOAD_ERROR), "(no name)");
                 DEBUGF("font %d not specified\n", font_id);
+                debug_log(DEBUG_LOG_SKIN, "font %d: used but not named",
+                          font_id);
             }
             success = false;
             continue;
@@ -2316,6 +2322,7 @@ static bool skin_load_fonts(struct wps_data *data)
         {
             splashf(HZ, ID2P(LANG_FONT_LOAD_ERROR), font->name);
             DEBUGF("Unable to load font %d: '%s'\n", font_id, font->name);
+            debug_log(DEBUG_LOG_SKIN, "font %s: cannot load", font->name);
             font->name = NULL; /* to stop trying to load it again if we fail */
             success = false;
             continue;
@@ -2731,9 +2738,10 @@ static int skin_element_callback(struct skin_element* element, void* data)
 
 /* to setup up the wps-data from a format-buffer (isfile = false)
    from a (wps-)file (isfile = true)*/
-bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
-                    struct wps_data *wps_data,
-                    const char *buf, bool isfile, struct skin_stats *stats)
+static bool load_skin_data(enum skinnable_screens skin,
+                           enum screen_type screen, struct wps_data *wps_data,
+                           const char *buf, bool isfile,
+                           struct skin_stats *stats)
 {
     char *wps_buffer = NULL;
     if (!wps_data || !buf)
@@ -2775,7 +2783,10 @@ bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
         int fd = open_utf8(buf, O_RDONLY);
 
         if (fd < 0)
+        {
+            debug_log(DEBUG_LOG_SKIN, "cannot open");
             return false;
+        }
         /* copy the file's content to the buffer for parsing,
            ensuring that every line ends with a newline char. */
         unsigned int start = 0;
@@ -2790,7 +2801,10 @@ bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
         }
         close(fd);
         if (start <= 0)
+        {
+            debug_log(DEBUG_LOG_SKIN, "empty");
             return false;
+        }
         start++;
         skin_buffer = &wps_buffer[start];
         buffersize -= start;
@@ -2814,6 +2828,9 @@ bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
         if (isfile && debug_wps)
             skin_error_format_message();
 #endif
+        /* The parser keeps no error position on the player; CheckWPS
+         * names the line */
+        debug_log(DEBUG_LOG_SKIN, "does not parse");
         skin_data_reset(wps_data);
         return false;
     }
@@ -2889,6 +2906,8 @@ bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
     }
     else
     {
+        debug_log(DEBUG_LOG_SKIN, "no room for a %lu byte copy: it draws "
+                  "nothing", (unsigned long)skin_buffer_usage());
         /* No buflib copy, so the chain the slots are recorded in dies with the
          * parse buffer this function is about to let go of -- and
          * skin_data_free_buflib_allocs() takes its `!skin_buffer` exit, having
@@ -2913,4 +2932,22 @@ bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
 
     skin_buffer = NULL;
     return true;
+}
+
+/* load_skin_data()'s own lines say why a load failed; this one says which
+ * load it was, and what it came to */
+bool skin_data_load(enum skinnable_screens skin, enum screen_type screen,
+                    struct wps_data *wps_data,
+                    const char *buf, bool isfile, struct skin_stats *stats)
+{
+    bool ok = load_skin_data(skin, screen, wps_data, buf, isfile, stats);
+
+    if (debug_log_enabled(DEBUG_LOG_SKIN))
+        debug_log(DEBUG_LOG_SKIN, "%s %s: %s, skin %lu bytes, images %lu",
+                  skin == WPS ? "wps" : "sbs",
+                  isfile ? buf : "built-in",
+                  !ok ? "FAILED" : wps_data->wps_loaded ? "loaded" : "blank",
+                  (unsigned long)stats->browser_size,
+                  (unsigned long)stats->images_size);
+    return ok;
 }

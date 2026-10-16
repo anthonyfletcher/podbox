@@ -23,6 +23,7 @@
 #include "usb.h"
 #include "panic.h"
 #include "database/tagcache.h"
+#include "system/debug_log.h"
 #include "bg_task.h"
 
 /* How long a task sleeps between checks. This is all deferred work with
@@ -259,6 +260,7 @@ const char *bg_task_state(const struct bg_task *task)
 
 void bg_task_rebuild(struct bg_task *task)
 {
+    debug_log(DEBUG_LOG_TASKS, "%s: rebuild asked for", task->name);
     if (task->request)
     {
         task->request(true);
@@ -269,6 +271,7 @@ void bg_task_rebuild(struct bg_task *task)
 
 void bg_task_update(struct bg_task *task)
 {
+    debug_log(DEBUG_LOG_TASKS, "%s: update asked for", task->name);
     if (task->request)
     {
         task->request(false);
@@ -358,6 +361,7 @@ static void bg_task_tick(struct bg_task *task)
 {
     struct bg_marks covered;
     enum bg_result result;
+    long started;
 
     /* A rebuild throws the artifacts away first; an update keeps them and
      * lets the pass fill in what is missing. Either way the task is stale
@@ -384,9 +388,16 @@ static void bg_task_tick(struct bg_task *task)
      * against. */
     covered = task->prev_marks;
 
+    debug_log(DEBUG_LOG_TASKS, "%s: pass started, %d entries, commit %d",
+              task->name, covered.entries, covered.commitid);
+    started = current_tick;
     task->running = true;
     result = task->run();
     task->running = false;
+    debug_log(DEBUG_LOG_TASKS, "%s: pass %s after %ld s", task->name,
+              result == BG_DONE ? "done" : result == BG_FAILED ? "FAILED"
+                                                             : "interrupted",
+              (long)(current_tick - started) / HZ);
 
     if (result == BG_DONE)
     {
@@ -416,6 +427,8 @@ static void bg_task_tick(struct bg_task *task)
      * never succeed does not starve everything below it. */
     if (++task->fails >= BG_MAX_PREEMPT_FAILS)
     {
+        debug_log(DEBUG_LOG_TASKS, "%s: gives way after %d tries", task->name,
+                  task->fails);
         task->wants_run = false;
         task->fails = 0;
         task->gave_way = true;
@@ -509,5 +522,6 @@ static void tagcache_request(bool rebuild)
 
 struct bg_task tagcache_task =
 {
+    .name    = "database",
     .request = tagcache_request,
 };

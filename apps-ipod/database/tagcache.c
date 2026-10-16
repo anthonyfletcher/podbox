@@ -4413,7 +4413,7 @@ static void temp_stamp_write(off_t end, int32_t commitid)
     close(fd);
 }
 
-static bool commit(void)
+static bool merge_temp(void)
 {
     struct tagcache_header tch;
     struct master_header   tcmh;
@@ -4791,6 +4791,19 @@ commit_error:
     }
 
     return rc;
+}
+
+/* The merge, as the Background Task Log shows it beside the other passes */
+static bool commit(void)
+{
+    long started = current_tick;
+    bool ok;
+
+    debug_log(DEBUG_LOG_TASKS, "database: merge started");
+    ok = merge_temp();
+    debug_log(DEBUG_LOG_TASKS, "database: merge %s after %ld s",
+              ok ? "done" : "not done", (long)(current_tick - started) / HZ);
+    return ok;
 }
 
 void tagcache_commit_finalize(void)
@@ -6396,6 +6409,7 @@ void do_tagcache_build(const char *path[])
 {
     struct tagcache_header header;
     bool ret;
+    long walk_started;
 
     str_setlen(curpath, 0);
     data_size = 0;
@@ -6435,6 +6449,8 @@ void do_tagcache_build(const char *path[])
     cache_write_failed = write(cachefd, &header, sizeof(struct tagcache_header))
                          != (ssize_t)sizeof(struct tagcache_header);
     unreadable_begin();
+    debug_log(DEBUG_LOG_TASKS, "database: walk started");
+    walk_started = current_tick;
 
     ret = true;
 
@@ -6554,6 +6570,9 @@ commit:
     }
 
     unreadable_end(ret && !walk_incomplete);
+    debug_log(DEBUG_LOG_TASKS, "database: walk %s after %ld s, %d files to add",
+              !ret ? "stopped" : walk_incomplete ? "incomplete" : "done",
+              (long)(current_tick - walk_started) / HZ, total_entry_count);
 
     if (!ret)
     {

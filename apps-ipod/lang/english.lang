@@ -24386,3 +24386,31 @@
     *: "Playback Error Log"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_SKIN
+  desc: in Debug Logs: the theme loading log's switch
+  user: core
+  <source>
+    *: "Theme Log"
+  </source>
+  <dest>
+    *: "Theme Log"
+  </dest>
+  <voice>
+    *: "Theme Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TASKS
+  desc: in Debug Logs: the background task log's switch
+  user: core
+  <source>
+    *: "Background Task Log"
+  </source>
+  <dest>
+    *: "Background Task Log"
+  </dest>
+  <voice>
+    *: "Background Task Log"
+  </voice>
+</phrase>

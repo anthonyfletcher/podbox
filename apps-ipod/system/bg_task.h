@@ -63,6 +63,8 @@ struct bg_task
 {
     /* ---- supplied by the task ---- */
 
+    const char *name;   /* in the Background Task Log */
+
     /* The marks of the last completed pass, kept in the header of the
      * task's own file so an unchanged library costs nothing at startup.
      * read_marks gives none when there is no such file; write_marks with

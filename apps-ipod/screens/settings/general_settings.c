@@ -624,6 +624,8 @@ MENUITEM_SETTING(debug_log_usb, &global_settings.debug_log_usb, NULL);
 MENUITEM_SETTING(debug_log_battery, &global_settings.debug_log_battery, NULL);
 MENUITEM_SETTING(debug_log_playback, &global_settings.debug_log_playback,
                  NULL);
+MENUITEM_SETTING(debug_log_skin, &global_settings.debug_log_skin, NULL);
+MENUITEM_SETTING(debug_log_tasks, &global_settings.debug_log_tasks, NULL);
 MENUITEM_SETTING(debug_log_expiry, &global_settings.debug_log_expiry, NULL);
 
 static char *debug_log_left_name(int selected_item, void *data, char *buffer,
@@ -700,6 +702,8 @@ MAKE_MENU(debug_logs_menu, ID2P(LANG_DEBUG_LOG), debug_logs_menu_callback,
 #endif
             &debug_log_battery,
             &debug_log_playback,
+            &debug_log_skin,
+            &debug_log_tasks,
             &debug_log_expiry,
             &debug_log_left,
             &debug_log_files,

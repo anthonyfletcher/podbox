@@ -297,6 +297,13 @@ void backlight_set_on_button_hold(int index) { (void)index; }
 void backlight_set_timeout(int value) { (void)value; }
 void backlight_set_timeout_plugged(int value) { (void)value; }
 void debug_log_apply(void) { }
+/* skin_parser.c logs each load; CheckWPS reports on its own */
+void debug_log(enum debug_log_id id, const char *fmt, ...)
+{
+    (void)id;
+    (void)fmt;
+}
+bool debug_log_enabled(enum debug_log_id id) { (void)id; return false; }
 void dsp_afr_enable(int var) { (void)var; }
 void dsp_dither_enable(bool enable) { (void)enable; }
 void dsp_pbe_enable(int var) { (void)var; }

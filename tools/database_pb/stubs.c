@@ -306,7 +306,9 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     char msg[MAX_PATH + 64];
     va_list ap;
 
-    (void)id;
+    /* The task log's walk and merge lines restate the summary */
+    if (id == DEBUG_LOG_TASKS)
+        return;
     va_start(ap, fmt);
     if (!strcmp(fmt, "file: %s"))
     {

@@ -83,6 +83,7 @@ extern bool write_metadata_log;
 static char tagcache_held[HELD_SIZE];
 static char art_held[HELD_SIZE];
 static char playback_held[HELD_SIZE];
+static char tasks_held[HELD_SIZE];
 
 static const struct debug_log_info {
     const char *path;
@@ -117,6 +118,14 @@ static const struct debug_log_info {
     /* Written by the parser itself: the header is all that comes from here */
     [DEBUG_LOG_METADATA] = { LIB_METADATA_LOG, "metadata", "==",
                              &write_metadata_log, NULL, NULL, NULL },
+    /* Written through: a theme change that runs out of memory can panic,
+     * and the lines before it are the ones wanted */
+    [DEBUG_LOG_SKIN]     = { LIB_SKIN_LOG, "theme", "==",
+                             &global_settings.debug_log_skin,
+                             NULL, NULL, NULL },
+    [DEBUG_LOG_TASKS]    = { LIB_TASKS_LOG, "background tasks", "==",
+                             &global_settings.debug_log_tasks,
+                             NULL, NULL, tasks_held },
 };
 
 static struct {
@@ -313,7 +322,7 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
     int len, n;
     va_list ap;
 
-    if (!ready || !debug_log_enabled(id) || !log_info[id].held)
+    if (!ready || !debug_log_enabled(id))
         return;
 
     /* Ticks since boot rather than the clock: what matters here is how long
@@ -327,6 +336,19 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
         return;
     len += MIN(n, (int)(sizeof line - len - 1));
     line[len++] = '\n';
+
+    /* A log with nothing held is on disk before the caller goes on */
+    if (!log_info[id].held)
+    {
+        int fd = debug_log_open(id);
+
+        if (fd >= 0)
+        {
+            write(fd, line, len);
+            debug_log_close(id, fd);
+        }
+        return;
+    }
 
     mutex_lock(&logs[id].lock);
     if (logs[id].used + len > HELD_SIZE)
@@ -523,4 +545,8 @@ void debug_log_init(void)
     /* The other logs' owners write their own when they start */
     if (debug_log_enabled(DEBUG_LOG_PLAYBACK))
         debug_log_header(DEBUG_LOG_PLAYBACK, "started");
+    if (debug_log_enabled(DEBUG_LOG_SKIN))
+        debug_log_header(DEBUG_LOG_SKIN, "started");
+    if (debug_log_enabled(DEBUG_LOG_TASKS))
+        debug_log_header(DEBUG_LOG_TASKS, "started");
 }

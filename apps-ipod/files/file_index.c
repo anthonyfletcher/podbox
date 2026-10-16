@@ -46,6 +46,7 @@
 #include "core_alloc.h"
 #include "database/tagcache.h"
 #include "system/bg_task.h"
+#include "system/debug_log.h"
 #include "files/filetypes.h"
 #include "files/path_list.h"
 #include "file_index.h"
@@ -224,6 +225,7 @@ static void fi_walk(int depth)
 static void fi_run_scan(void)
 {
     bool completed;
+    long started;
 
     fi_abort = false;
     fi_busy = true;
@@ -241,10 +243,15 @@ static void fi_run_scan(void)
         return;
     }
 
+    debug_log(DEBUG_LOG_TASKS, "%s: walk started", file_index_task.name);
+    started = current_tick;
     strcpy(fi_path, "/");
     fi_walk(0);
 
     completed = !fi_abort;
+    debug_log(DEBUG_LOG_TASKS, "%s: walk %s after %ld s",
+              file_index_task.name, completed ? "done" : "interrupted",
+              (long)(current_tick - started) / HZ);
     path_list_write_close(&fi_docs, completed);
     path_list_write_close(&fi_images, completed);
 
@@ -286,6 +293,7 @@ static void fi_request(bool rebuild)
 
 struct bg_task file_index_task =
 {
+    .name    = "documents & images",
     .rank    = BG_RANK_FILES,
     .request = fi_request,
     .tick    = fi_tick,
