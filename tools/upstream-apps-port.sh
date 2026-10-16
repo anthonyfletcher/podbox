@@ -7,8 +7,8 @@
 # defaults to the merge base of HEAD and rockbox/master up to rockbox/master,
 # so before a merge it lists exactly what the merge brings in; after one, pass
 # the old merge base as --since and the merged upstream commit as --to. The
-# last line names the upstream commit the run covered up to: note it, and
-# pass it as --since next time.
+# last line names the upstream commit the run covered up to, which is kept in
+# .git/upstream-apps-port.last and shown at the top of the next run.
 #
 # apps/ is upstream's copy and is not built, so a merge lands its changes
 # where nothing compiles them. Each apps/ file is mapped to apps-ipod/ by the
@@ -26,6 +26,8 @@
 #
 # `!!` marks a commit that also touches firmware/ or lib/. Those halves merge
 # straight in and build, so the fix looks landed while its apps/ half is not.
+# A firmware/ change only to another target's tree or model header does not
+# earn the mark: nothing here builds it.
 
 set -u
 
@@ -47,6 +49,12 @@ git rev-parse --verify --quiet "$to^{commit}" >/dev/null ||
     { echo "no merge base between HEAD and $to" >&2; exit 2; }
 git rev-parse --verify --quiet "$since^{commit}" >/dev/null ||
     { echo "no such revision: $since" >&2; exit 2; }
+
+last="$(git rev-parse --git-dir)/upstream-apps-port.last"
+if [ -s "$last" ]; then
+    echo "Last run covered up to: $(cat "$last")"
+    echo
+fi
 
 tmp=$(mktemp -d) || exit 2
 trap 'rm -rf "$tmp"' EXIT
@@ -84,6 +92,25 @@ FNR == 1 {
             n = split(f, p, "/")
             byname[p[n]] = (p[n] in byname) ? byname[p[n]] ", " f : f
         }
+}
+
+# The Video and Classic trees, the shared ARM files and the simulator are
+# ours; any other target directory or model header is not. No apostrophes
+# here: this program is a single-quoted shell string.
+function other_target(f,    d) {
+    if (f ~ /^firmware\/export\/config\//)
+        return f !~ /\/(ipod6g|ipodvideo)\.h$/
+    if (f ~ /^firmware\/target\/(coldfire|mips)\//)
+        return 1
+    if (match(f, /^firmware\/target\/arm\/[^\/]+\//)) {
+        d = substr(f, 21, RLENGTH - 21)
+        return d != "ipod" && d != "pp" && d != "s5l8702"
+    }
+    if (match(f, /^firmware\/target\/hosted\/[^\/]+\//)) {
+        d = substr(f, 24, RLENGTH - 24)
+        return d != "sdl"
+    }
+    return 0
 }
 
 function flush(    b) {
@@ -126,6 +153,10 @@ function flush(    b) {
     next
 }
 /^(firmware|lib)\// {
+    if (other_target($0)) {
+        files = files sprintf("    %s  (another target%ss)\n", $0, "\047")
+        next
+    }
     outside = 1
     files = files sprintf("    %s  (merges directly)\n", $0)
     next
@@ -153,3 +184,5 @@ END {
     printf "Covered up to: %s\nNext time: --since %s\n",
            tip, substr(tip, 1, index(tip, " ") - 1)
 }' "$tmp/map" "$tmp/ours" "$tmp/log"
+
+git log -1 --date=short --format='%h %ad %s' "$to" > "$last"
