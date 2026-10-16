@@ -270,7 +270,10 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      (e->d >> 16) & USB_LOG_SETUP_QUEUED ? " (queued)" : "");
             break;
         case USB_LOG_RESPONSE:
-            if (e->a == USB_LOG_RESP_ACK)
+            if (e->a == USB_LOG_RESP_ACK && e->d != 0)
+                snprintf(p, size, "< ack %lu, product %04lx",
+                         (unsigned long)e->c, (unsigned long)e->d);
+            else if (e->a == USB_LOG_RESP_ACK)
                 snprintf(p, size, "< ack %lu", (unsigned long)e->c);
             else if (e->a == USB_LOG_RESP_STALL)
                 snprintf(p, size, "< STALL");

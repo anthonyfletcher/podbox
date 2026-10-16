@@ -1591,8 +1591,15 @@ void usb_core_setup_received(struct usb_ctrlrequest* req) {
 
 void usb_core_control_response(enum usb_control_response response, const void* data, size_t size) {
     logf("usb_core: response ack=%d size=%u ep0_state=%d tick=%lu", response, size, ep0_state, current_tick);
+    /* d: which product a device descriptor named. Identify As and the sound
+     * card change it, and a host may judge the player by it. */
     usb_log(USB_LOG_RESPONSE, response == USB_CONTROL_STALL ? USB_LOG_RESP_STALL : USB_LOG_RESP_ACK,
-            handling_request.bRequest, size, 0);
+            handling_request.bRequest, size,
+            (response != USB_CONTROL_STALL
+             && (handling_request.bRequestType & USB_TYPE_MASK) == USB_TYPE_STANDARD
+             && handling_request.bRequest == USB_REQ_GET_DESCRIPTOR
+             && (handling_request.wValue >> 8) == USB_DT_DEVICE)
+                ? device_descriptor.idProduct : 0);
 
     int oldlevel = disable_irq_save();
     if(bus_reset_pending) {

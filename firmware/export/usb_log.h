@@ -35,7 +35,8 @@ enum usb_log_type
     USB_LOG_SETUP,       /* a = bmRequestType, b = bRequest,
                           * c = wValue | wIndex << 16,
                           * d = wLength | USB_LOG_SETUP_* << 16 */
-    USB_LOG_RESPONSE,    /* a = USB_LOG_RESP_*, b = bRequest, c = bytes */
+    USB_LOG_RESPONSE,    /* a = USB_LOG_RESP_*, b = bRequest, c = bytes,
+                          * d = product ID for a device descriptor, else 0 */
     USB_LOG_SET_ADDR,    /* a = address, b = core state before it */
     USB_LOG_SET_CONFIG,  /* a = configuration, b = high speed */
     USB_LOG_DRIVERS,     /* a = active mask, b = errored mask */
