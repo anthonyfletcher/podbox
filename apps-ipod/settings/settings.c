@@ -963,17 +963,23 @@ static bool settings_write_config(const char* filename, int options)
     logf("%s\r\n", __func__);
     int i;
     int fd;
-    char part[MAX_PATH];
+    static char part[MAX_PATH];    /* under settings_line_mtx, as below */
     bool ok = true;
     char *value = settings_line;   /* not the stack -- see settings_line */
 
+    mutex_lock(&settings_line_mtx);
     if (snprintf(part, sizeof(part), "%s.part", filename) >= (int)sizeof(part))
+    {
+        mutex_unlock(&settings_line_mtx);
         return false;
+    }
     fd = open(part,O_CREAT|O_TRUNC|O_WRONLY, 0666);
     if (fd < 0)
+    {
+        mutex_unlock(&settings_line_mtx);
         return false;
+    }
 
-    mutex_lock(&settings_line_mtx);
     if (options != SETTINGS_SAVE_RESUMEINFO)
     {
         ok = fdprintf(fd, CFG_HEADER_FMT, rbversion)
@@ -1038,16 +1044,16 @@ static bool settings_write_config(const char* filename, int options)
             != (int)(strlen(setting->cfg_name) + strlen(value) + 4))
             ok = false;
     } /* for(...) */
-    mutex_unlock(&settings_line_mtx);
     if (close(fd) < 0)
         ok = false;
 
     if (!ok || rename(part, filename) < 0)
     {
         remove(part);
-        return false;
+        ok = false;
     }
-    return true;
+    mutex_unlock(&settings_line_mtx);
+    return ok;
 }
 
 static void flush_global_status_callback(void)

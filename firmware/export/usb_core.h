@@ -59,8 +59,9 @@ void usb_core_exit(void);
  * False means the disk is byte-for-byte as we left it, so the post-USB
  * database and dircache rebuild can be skipped entirely. */
 bool usb_core_host_wrote_storage(void);
-/* True once the host has selected a configuration, until it unconfigures us */
-bool usb_core_configured(void);
+/* True while the host may yet ask for the disk without a new configuration:
+ * none is selected, or this one's storage handover is still held */
+bool usb_core_storage_pending(void);
 /* IRQ context, after both EP0 directions and their stale completions have
  * been cancelled. Does not release a request buffer still owned by a handler. */
 void usb_core_control_cancelled(void);

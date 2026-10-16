@@ -201,14 +201,17 @@ void unreadable_end(bool complete)
             remove(UNREADABLE_DAT);
     }
 
+    /* The list follows the records: left as it was when they could not be
+     * written, removed only when there are none to list */
     if (list_fd >= 0)
     {
         close(list_fd);
         list_fd = -1;
-        if (kept == 0 || rename(UNREADABLE_TXT ".new", UNREADABLE_TXT) < 0)
+        if (!ok || kept == 0
+            || rename(UNREADABLE_TXT ".new", UNREADABLE_TXT) < 0)
         {
             remove(UNREADABLE_TXT ".new");
-            if (kept == 0)
+            if (ok && kept == 0)
                 remove(UNREADABLE_TXT);
         }
     }

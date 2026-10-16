@@ -529,9 +529,13 @@ bool usb_core_host_wrote_storage(void)
 #endif
 }
 
-bool usb_core_configured(void)
+bool usb_core_storage_pending(void)
 {
-    return usb_config != 0;
+#ifdef USB_ENABLE_IAP
+    if(storage_held)
+        return true;
+#endif
+    return usb_config == 0;
 }
 
 void usb_core_exit(void)

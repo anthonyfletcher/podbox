@@ -952,6 +952,13 @@ static struct {
     struct found_palette p;
 } prefetched[PREFETCH_SLOTS];
 static int prefetch_next;
+/* Folders the prefetch found no thumbnail for, keyed as palette_miss is, so
+ * each upcoming track's absent file is opened once rather than at every track
+ * start. Oldest goes first; a folder the art pass reaches since is still read
+ * by the screen at its track change. */
+#define PREFETCH_MISSES 16
+static unsigned int prefetch_missed[PREFETCH_MISSES];
+static int prefetch_miss_next;
 static int palette_size_idx = -2;      /* -2 not looked up, -1 no such size */
 
 /* The folder last found to have no cached thumbnail. Without this, a track
@@ -1459,6 +1466,7 @@ static void prefetch_path(const char *track_path)
     static char path[MAX_PATH];
     struct found_palette p;
     unsigned int cand[2];
+    unsigned int miss_key;
     int n, i, dim;
 
     if (!global_settings.dynamic_colors || audio_is_unrecorded() ||
@@ -1470,6 +1478,12 @@ static void prefetch_path(const char *track_path)
 
     strmemccpy(path, track_path, sizeof(path));
     n = palette_candidates(path, cand);
+    miss_key = track_folder_hash(path, false);
+    for (i = 0; miss_key != 0 && i < PREFETCH_MISSES; i++)
+    {
+        if (prefetch_missed[i] == miss_key)
+            return;
+    }
     for (i = 0; i < n; i++)
     {
         if (cand[i] == 0)
@@ -1485,13 +1499,16 @@ static void prefetch_path(const char *track_path)
             return;
         }
     }
+    prefetch_missed[prefetch_miss_next] = miss_key;
+    prefetch_miss_next = (prefetch_miss_next + 1) % PREFETCH_MISSES;
 }
 
 /* Asked when the next track's metadata loads, which is buffering, and when
  * its decoding starts. Decoding start also covers the tracks after it by
  * their playlist paths, buffered or not: a skip lands on one of those, and
  * hi-res files leave little of it buffered. The playlist can read its file,
- * so only while the disk runs. */
+ * so only while the disk runs. Trap: the starting track takes a slot too, so
+ * looking a full PREFETCH_SLOTS ahead evicts the palette about to be shown. */
 static void prefetch_cb(unsigned short id, void *param)
 {
     struct mp3entry *id3 = ((struct track_event *)param)->id3;
@@ -1503,7 +1520,7 @@ static void prefetch_cb(unsigned short id, void *param)
     if (id != PLAYBACK_EVENT_TRACK_BUFFER || !global_settings.dynamic_colors
         || palette_dim() == 0 || !storage_disk_is_active())
         return;
-    for (int offset = 1; offset <= PREFETCH_SLOTS; offset++)
+    for (int offset = 1; offset < PREFETCH_SLOTS; offset++)
     {
         p = playlist_peek(offset, path, sizeof(path));
         if (!p)
@@ -1517,7 +1534,8 @@ static void prefetch_cb(unsigned short id, void *param)
  * whose decoding started with the disk asleep. Static because an
  * mp3entry is too big for the storage thread's stack, and buffered tracks
  * only: audio_peek_track() looks an unbuffered one up in the playlist and
- * the database, deeper than that stack goes. */
+ * the database, deeper than that stack goes. One fewer than the slots, which
+ * leaves the playing track's own standing until a dark screen shows it. */
 static void prefetch_idle_cb(unsigned short id, void *param)
 {
     static struct mp3entry id3;
@@ -1526,7 +1544,7 @@ static void prefetch_idle_cb(unsigned short id, void *param)
     (void)param;
     if (!global_settings.dynamic_colors || palette_dim() == 0)
         return;
-    for (int offset = 1; offset <= PREFETCH_SLOTS; offset++)
+    for (int offset = 1; offset < PREFETCH_SLOTS; offset++)
     {
         if (!audio_peek_buffered_track(&id3, offset))
             break;

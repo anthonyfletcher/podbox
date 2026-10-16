@@ -4508,13 +4508,13 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
         browser_lock_cache(c);
         core_pin(browser_db_handle);
         one = spoken && single_track_path(c, seek, path, sizeof(path));
-        /* The row's name titles the chapter list whatever the row is; only a
-         * book carries it as a key as well, since that is what a position is
-         * remembered under. */
+        /* The row's name titles the chapter list whatever level it is on;
+         * only an album row, the book itself, carries it as a key as well,
+         * since that is what a position is remembered under. */
         if (one)
             strmemccpy(name, (const char *)P2STR((unsigned char *)dptr->name),
                        sizeof(name));
-        if (one && spoken && csi->tagorder[c->currextra] == tag_album
+        if (one && csi->tagorder[c->currextra] == tag_album
             && !book_resume_id_of(seek, level_artist(c->currextra), book,
                                   sizeof(book)))
             book[0] = '\0';

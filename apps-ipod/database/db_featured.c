@@ -524,8 +524,8 @@ void db_featured_ensure(void)
     tagcache_get_marks(&now);
 
     /* The RAM copy is out for a moment around a commit or USB. The table
-     * holds only entry ids, which stay good until a commit or a rebuild
-     * renumbers them. */
+     * holds entry ids and artist seeks, which stay good until a commit, a
+     * rebuild or a database changed over USB renumbers them. */
     if (!tagcache_is_in_ram())
     {
         if (built && (now.commitid != built_marks.commitid ||

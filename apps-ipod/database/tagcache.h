@@ -120,7 +120,7 @@ struct tagcache_marks {
     int32_t commitid;   /* commits so far; tag_commitid stamps each entry */
     int32_t serial;     /* one per logged play, and the lastplayed value */
     int32_t deleted_ct; /* entries flagged deleted, or -1 if not countable */
-    uint32_t generation; /* moves at a rebuild, as tagcache_generation() */
+    uint32_t generation; /* as tagcache_generation() */
 };
 
 enum source_type {source_constant, 
@@ -225,9 +225,10 @@ long tagcache_increase_serial(void);
 bool tagcache_import_changelog(void);
 bool tagcache_create_changelog(struct tagcache_search *tcs);
 void tagcache_update_numeric(int idx_id, int tag, long data);
-/* Moves whenever a Rebuild renumbers the entries. An idx_id is good only
- * under the generation it was read in: keep the two together, and drop an
- * update whose generation has moved on. */
+/* Moves whenever a Rebuild renumbers the entries, or a host changes the
+ * database files over USB. An idx_id is good only under the generation it
+ * was read in: keep the two together, and drop an update whose generation
+ * has moved on. */
 uint32_t tagcache_generation(void);
 
 struct tagcache_stat* tagcache_get_stat(void);

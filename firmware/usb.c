@@ -90,10 +90,10 @@ static int usb_state = USB_EXTRACTED;
 static int usb_mmc_countdown = 0;
 #endif
 #if defined(HAVE_USB_POWER) || defined(HAVE_USB_ADB)
+static int usb_mode = USBMODE_DEFAULT;
 #ifdef USB_FULL_INIT
 static bool usb_power_only = false;
-#endif
-static int usb_mode = USBMODE_DEFAULT;
+static bool usb_drive_only_now = false;
 
 static bool usb_mode_drive_only(void)
 {
@@ -103,6 +103,7 @@ static bool usb_mode_drive_only(void)
     return false;
 #endif
 }
+#endif
 
 void usb_set_mode(int mode)
 {
@@ -845,6 +846,7 @@ static void NORETURN_ATTR usb_thread(void)
             if(button_status() & ~USBPOWER_BTN_IGNORE) {
                 usb_power_only = !usb_power_only;
             }
+            usb_drive_only_now = usb_mode_drive_only() && !usb_power_only;
 #endif
 
 #ifndef BOOTLOADER
@@ -1250,24 +1252,27 @@ bool usb_host_is_present(void)
     return usb_host_present && !usb_disk_ejected;
 }
 
-/* Storage is requested at insertion and released at a configuration without
- * it. An unconfigured host counts as wanting it: one that unconfigures us
- * mid-session releases the disk before it asks again. */
+/* Storage is requested at a configuration that needs it, or when that
+ * configuration's handover hold ends, and released at one without it. Until
+ * the host has settled it counts as wanting the disk: one that unconfigures
+ * us mid-session releases it before it asks again. */
 bool usb_host_wants_storage(void)
 {
 #if defined(HAVE_USBSTACK) && !defined(BOOTLOADER)
     return usb_host_is_present()
-           && (exclusive_storage_requested || !usb_core_configured());
+           && (exclusive_storage_requested || usb_core_storage_pending());
 #else
     return usb_host_is_present();
 #endif
 }
 
-/* A cable held to charge only stays charge only, as in Mass Storage */
+/* Fixed at insertion, as the drivers are: a setting changed mid-session would
+ * otherwise re-enumerate with a configuration count the enabled drivers do
+ * not match. A cable held to charge only stays charge only. */
 bool usb_drive_only(void)
 {
 #if defined(HAVE_USB_POWER) && defined(USB_FULL_INIT)
-    return usb_mode_drive_only() && !usb_power_only;
+    return usb_drive_only_now;
 #else
     return false;
 #endif

@@ -1335,8 +1335,11 @@ static int usb_info_callback(int btn, struct gui_synclist *lists)
 
     simplelist_addline("Last insert: %ld tick", r->tick);
     simplelist_addline("Mode wanted: %s",
-                       r->usb_mode == USB_MODE_MASS_STORAGE ? "Mass storage"
-                                                            : "Charge");
+                       r->usb_mode == USB_MODE_MASS_STORAGE ? "Mass storage" :
+#ifdef USB_MODE_DRIVE_ONLY
+                       r->usb_mode == USB_MODE_DRIVE_ONLY ? "Drive only" :
+#endif
+                       "Charge");
     simplelist_addline("Buttons: %08x (mask %08x)",
                        (unsigned)r->btn_status, (unsigned)r->btn_ignore);
     simplelist_addline("  -> inverted: %s",

@@ -3432,6 +3432,7 @@ int playlist_resume(void)
         int count;
         enum playlist_command current_command = PLAYLIST_COMMAND_COMMENT;
         int last_newline = 0;
+        bool seen_newline = false;
         int str_count = -1;
         bool newline = true;
         bool exit_loop = false;
@@ -3661,6 +3662,7 @@ int playlist_resume(void)
 
                 /* save last_newline in case we need to load more data */
                 last_newline = count;
+                seen_newline = true;
                 newline = true;
 
                 /* to ignore any extra newlines */
@@ -3723,11 +3725,13 @@ int playlist_resume(void)
             {
                 /* A power cut mid-append leaves a last line with no newline:
                  * a command that never finished being written. It is dropped,
-                 * and cut from the file so the next append starts a line. */
+                 * and cut from the file so the next append starts a line. A
+                 * chunk can begin on the torn line itself, with no newline of
+                 * its own to keep. */
                 if (!newline && !exit_loop && pl_cmd == &pl_cmds_run)
                 {
-                    ftruncate(playlist->control_fd,
-                              total_read + last_newline + 1);
+                    ftruncate(playlist->control_fd, total_read +
+                              (seen_newline ? last_newline + 1 : 0));
                     break;
                 }
 

@@ -1148,6 +1148,10 @@ static int dirbrowse(void)
         tc.selected_item = 0;
     lasttable = -1;
     lastextra = -1;
+    /* A fresh root, as a main-menu shortcut arrives on, has no level above
+     * it that Select passed */
+    if (id3db && tc.dirlevel == 0)
+        passed_levels = 0;
 
     start_wps = false;
     numentries = update_dir();
@@ -1269,7 +1273,7 @@ static int dirbrowse(void)
                     browser_db_exit(&tc, true);
                     /* A level Skip One-Item Lists passed through is passed
                      * again on the way back */
-                    while (tc.dirlevel > 0
+                    while (tc.dirlevel > 0 && !browser_db_back_exits(&tc)
                            && (passed_levels & (1u << tc.dirlevel)))
                     {
                         passed_levels &= ~(1u << tc.dirlevel);

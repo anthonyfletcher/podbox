@@ -857,12 +857,10 @@ MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
  * Nothing anywhere said "battery", which is the thing an iPod owner tunes
  * most.
  *
- * Ordered by how much difference each makes to runtime. */
-/* Brightness first, then every backlight row together -- how long the light
-   stays on is the biggest lever there is on runtime -- then the panel, then
-   everything else that spends the battery. They were behind an LCD Settings
-   submenu of their own; flattening costs a longer screen and saves the step
-   that hid the one setting most worth changing. */
+ * Brightness first, then every backlight row together -- how long the light
+ * stays on is the biggest lever there is on runtime -- then the panel, then
+ * everything else that spends the battery. Flat, with no submenu, so the one
+ * setting most worth changing is a single step away. */
 MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
             &brightness_item,
             &backlight_timeout,

@@ -328,7 +328,8 @@ void debug_log(enum debug_log_id id, const char *fmt, ...)
         say("new", file);
     else if (!strcmp(msg, "info: re-adding"))
         say("changed", file);
-    else if (!strcmp(msg, "error: get_metadata failed"))
+    else if (!strcmp(msg, "error: get_metadata failed")
+             || !strcmp(msg, "error: unreadable before"))
         say("unreadable", file);
     else if (!strncmp(msg, "refs: gone ", 11))
         say("gone", msg + 11);

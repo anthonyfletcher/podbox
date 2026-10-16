@@ -292,7 +292,7 @@ static volatile int command_queue_ridx = 0;
 static struct mutex command_queue_mutex SHAREDBSS_ATTR;
 
 /* Moves whenever entry numbers stop meaning what they did: remove_files()
- * bumps it. */
+ * and tagcache_reinstate_ramcache() bump it. */
 static volatile uint32_t db_generation;
 /* Set once boot has loaded the skins; the boot scan waits for it. */
 static volatile bool boot_finished;
@@ -3053,6 +3053,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     struct mp3entry id3;
     struct temp_file_entry entry;
     bool ret;
+    int fd;
     int idx_id = -1;
     char tracknumfix[3];
     int offset = 0;
@@ -3127,14 +3128,27 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     /* Refused before and unchanged since: not parsed again */
     if (unreadable_known(path, mtime))
     {
+        DB_LOG("error", "unreadable before");
         tc_stat.scan_unreadable++;
+        return ;
+    }
+
+    /* Opened here so a file that cannot be opened -- every descriptor in use,
+     * a read error -- is tried again next walk rather than remembered as one
+     * the parser refused. */
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+    {
+        logf("open failed: %s", path);
+        DB_LOG("error", "open failed");
         return ;
     }
 
     /*memset(&id3, 0, sizeof(struct mp3entry)); -- get_metadata does this for us */
     memset(&entry, 0, sizeof(struct temp_file_entry));
     memset(&tracknumfix, 0, sizeof(tracknumfix));
-    ret = get_metadata_ex(&id3, -1, path, METADATA_EXCLUDE_ID3_PATH);
+    ret = get_metadata_ex(&id3, fd, path,
+                          METADATA_EXCLUDE_ID3_PATH | METADATA_CLOSE_FD_ON_EXIT);
 
     if (!ret)
     {
@@ -5492,13 +5506,18 @@ static bool delete_entry(long idx_id)
      * statistics of a moved or altered file can be resurrected. All of them
      * are worked out before anything is written: the flag and the hashes go
      * to disk in one write, since an entry flagged deleted that still holds
-     * real seeks is never matched again.
+     * real seeks is never matched again. A tag that cannot be read keeps its
+     * seek, and the flag is written all the same: RAM already says deleted,
+     * and a disk that disagrees has the next walk add the file a second time.
      */
+    for (tag = 0; tag < TAG_COUNT; tag++)
+        old_seek[tag] = myidx.tag_seek[tag];
+
     for (tag = 0; tag < TAG_COUNT; tag++)
     {
         struct tagcache_header tch;
+        enum e_read_errors rc;
 
-        old_seek[tag] = myidx.tag_seek[tag];
         if (TAGCACHE_IS_NUMERIC(tag))
             continue;
 
@@ -5518,30 +5537,18 @@ static bool delete_entry(long idx_id)
 
         /* Open the index file, which contains the tag names. */
         if ((fd = open_tag_fd(&tch, tag, true)) < 0)
-            goto cleanup;
+            continue;
 
         lseek(fd, old_seek[tag], SEEK_SET);
-
-        switch (read_tagfile_entry_and_tag(fd, &tfe,
-                                           build_idx_buf, build_idx_bufsz))
-        {
-            case e_SUCCESS_LEN_ZERO:
-                logf("deleted_entry(): SUCCESS");
-                /* FALL THROUGH */
-            case e_SUCCESS:
-                 break;
-            case e_ENTRY_SIZEMISMATCH:
-                logf("delete_entry(): read error #3");
-                goto cleanup;
-            case e_TAG_TOOLONG:
-                logf("too long tag #4");
-                goto cleanup;
-            case e_TAG_SIZEMISMATCH:
-                logf("delete_entry(): read error #3");
-                goto cleanup;
-        }
+        rc = read_tagfile_entry_and_tag(fd, &tfe,
+                                        build_idx_buf, build_idx_bufsz);
         close(fd);
         fd = -1;
+        if (rc != e_SUCCESS && rc != e_SUCCESS_LEN_ZERO)
+        {
+            logf("delete_entry(): read error #3 (%d)", rc);
+            continue;
+        }
 
         myidx.tag_seek[tag] = crc_32(build_idx_buf,
                                      strlen(build_idx_buf), 0xffffffff);
@@ -6300,8 +6307,9 @@ static bool check_dir(const char *dirname, int add_files, int depth)
     if (ignore != unignore)
         add_files = unignore;
 
-    /* Recursively scan the dir. */
-    while (!check_event_queue())
+    /* Recursively scan the dir. A full disk ends it: the walk is discarded
+     * anyway, so parsing the rest of the library would buy nothing. */
+    while (!cache_write_failed && !check_event_queue())
     {
         /* A read error ends the folder as its end does, but sets errno */
         errno = 0;
@@ -6782,22 +6790,28 @@ bool tagcache_reinstate_ramcache(void)
 
     fd = open_master_fd(&hdr, false);
     if (fd < 0)
-        return false;
+        goto replaced;
     close(fd);
 
     if (hdr.tch.entry_count != current_tcmh.tch.entry_count
         || hdr.commitid != current_tcmh.commitid || hdr.dirty)
-        return false;
+        goto replaced;
 
     if (db_file_size(-1) != loaded_size[0])
-        return false;
+        goto replaced;
     for (int tag = 0; tag < TAG_COUNT; tag++)
         if (!TAGCACHE_IS_NUMERIC(tag)
             && db_file_size(tag) != loaded_size[1 + tag])
-            return false;
+            goto replaced;
 
     tc_stat.ramcache = true;
     return true;
+
+replaced:
+    /* The host changed the database files, as database_pb does: entry ids
+     * held anywhere may now name other tracks, even under an equal commitid */
+    db_generation++;
+    return false;
 }
 
 static void load_ramcache(void)
