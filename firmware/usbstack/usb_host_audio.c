@@ -455,11 +455,32 @@ static int hs_interval(int b)
     return (b >= 1 && b <= 16) ? 1 << (b - 1) : 0;
 }
 
+/* USB_LOG_HOST_SETTING_* reasons the setting cannot be played to, 0 if
+ * none */
+static int unusable(const struct as_setting *s)
+{
+    return (s->ep_out ? 0 : USB_LOG_HOST_SETTING_NO_OUT) |
+           (s->format_type == 1 ? 0 : USB_LOG_HOST_SETTING_NOT_TYPE_I) |
+           (s->formats & 1 ? 0 : USB_LOG_HOST_SETTING_NOT_PCM) |
+           (s->channels > 0 ? 0 : USB_LOG_HOST_SETTING_NO_CHANNELS) |
+           (s->subslot >= 2 && s->subslot <= 4 ?
+                0 : USB_LOG_HOST_SETTING_SUBSLOT) |
+           (s->interval_out >= 1 && s->interval_out <= 8 ?
+                0 : USB_LOG_HOST_SETTING_INTERVAL) |
+           (s->rates ? 0 : USB_LOG_HOST_SETTING_NO_RATE);
+}
+
+/* The verdict on a streaming setting, into the USB log. Alternate 0, with
+ * no endpoints, is the idle setting every streaming interface has. */
 static bool usable(const struct as_setting *s)
 {
-    return s->ep_out && s->format_type == 1 && (s->formats & 1) &&
-           s->channels > 0 && s->subslot >= 2 && s->subslot <= 4 &&
-           s->interval_out >= 1 && s->interval_out <= 8 && s->rates;
+    int why = unusable(s);
+
+    if (s->alt != 0)
+        usb_log(USB_LOG_HOST_SETTING, s->iface, s->alt, why,
+                s->channels | s->subslot << 8 | s->bits << 16 |
+                s->uac << 24);
+    return why == 0;
 }
 
 /* Whether a 48 kHz packet fits the endpoint and the controller. With

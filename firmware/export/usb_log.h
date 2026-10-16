@@ -67,7 +67,23 @@ enum usb_log_type
                           * halted, d = HCTSIZ after */
     USB_LOG_HOST_ENUM,   /* an enumeration step: a = passed,
                           * c = its name (a static string), d = status */
-    USB_LOG_HOST_EHCI,   /* an ARC control transfer: a = address,
+    USB_LOG_HOST_DEVICE, /* what enumerated, once a boot per device and
+                          * configuration length: a = class, b =
+                          * wTotalLength, c = VID << 16 | PID, d = subclass
+                          * | protocol << 8 | configurations << 16 | 1 << 24
+                          * if the configuration was cut short */
+    USB_LOG_HOST_IFACE,  /* one of its interface settings: a = interface,
+                          * b = alternate | endpoints << 8, c = class |
+                          * subclass << 8 | protocol << 16 */
+    USB_LOG_HOST_EP,     /* one of that setting's endpoints: a = address,
+                          * b = bmAttributes, c = wMaxPacketSize,
+                          * d = bInterval */
+    USB_LOG_HOST_SETTING, /* the DAC driver's verdict on a streaming
+                           * setting: a = interface, b = alternate, c =
+                           * USB_LOG_HOST_SETTING_* reasons, 0 if usable,
+                           * d = channels | subslot << 8 | bits << 16 |
+                           * audio class << 24 */
+    USB_LOG_HOST_EHCI,  /* an ARC control transfer: a = address,
                           * b = request | translator port << 8,
                           * c = token that failed, d = bytes or -1 */
     USB_LOG_HOST_ISO,    /* the stream: a = 0, one of the first packets:
@@ -154,6 +170,14 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_AUDIO_THREAD_START 7 /* playback started on the USB thread */
 
 #define USB_LOG_HOST_PORT_READ 0x80
+
+#define USB_LOG_HOST_SETTING_NO_OUT      0x01 /* no isochronous OUT endpoint */
+#define USB_LOG_HOST_SETTING_NOT_TYPE_I  0x02
+#define USB_LOG_HOST_SETTING_NOT_PCM     0x04
+#define USB_LOG_HOST_SETTING_NO_CHANNELS 0x08
+#define USB_LOG_HOST_SETTING_SUBSLOT     0x10 /* not 2 to 4 bytes */
+#define USB_LOG_HOST_SETTING_INTERVAL    0x20 /* longer than 8 microframes */
+#define USB_LOG_HOST_SETTING_NO_RATE     0x40 /* neither 44.1 nor 48 kHz */
 
 #define USB_LOG_IAP_FROM_PLAYER 0x80
 

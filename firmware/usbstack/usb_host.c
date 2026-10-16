@@ -64,6 +64,37 @@ static void get_string(int addr, int index, int langid, char *out,
     out[j] = '\0';
 }
 
+/* The device and its interface settings and endpoints, into the USB log.
+ * The DAC search enumerates on every poll, so a device is logged again only
+ * once its ID or configuration length changes. */
+static void log_descriptors(const struct usb_drv_host_enum *e)
+{
+    static uint32_t logged_id;
+    static int logged_total = -1;
+    const uint8_t *d = e->dev;
+    uint32_t id = (uint32_t)(d[8] | d[9] << 8) << 16 | (d[10] | d[11] << 8);
+
+    if (id == logged_id && e->cfg_total == logged_total)
+        return;
+    logged_id = id;
+    logged_total = e->cfg_total;
+    usb_log(USB_LOG_HOST_DEVICE, d[4], e->cfg_total, id,
+            d[5] | d[6] << 8 | d[17] << 16 |
+            (uint32_t)(e->cfg_len < e->cfg_total) << 24);
+    for (int i = 0; i + 2 <= e->cfg_len && e->cfg[i] >= 2; i += e->cfg[i])
+    {
+        const uint8_t *c = &e->cfg[i];
+
+        if (i + c[0] > e->cfg_len)
+            break;
+        if (c[1] == USB_DT_INTERFACE && c[0] >= 9)
+            usb_log(USB_LOG_HOST_IFACE, c[2], c[3] | c[4] << 8,
+                    c[5] | c[6] << 8 | c[7] << 16, 0);
+        else if (c[1] == USB_DT_ENDPOINT && c[0] >= 7)
+            usb_log(USB_LOG_HOST_EP, c[2], c[3], c[4] | c[5] << 8, c[6]);
+    }
+}
+
 void usb_host_enumerate(void)
 {
     struct usb_drv_host_enum *e = &host_enum;
@@ -102,6 +133,7 @@ void usb_host_enumerate(void)
     STEP("config", n > 0);
     e->cfg = host_cfg;
     e->cfg_len = n;
+    log_descriptors(e);
     /* Interfaces can only be selected once the device is configured */
     n = usb_drv_host_control(1, USB_DIR_OUT, USB_REQ_SET_CONFIGURATION,
                              host_cfg[5], 0, NULL, 0);

@@ -377,6 +377,58 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      e->b == 1 ? " left" : e->b == 2 ? " right" : "",
                      e->a ? "ok" : "FAILED", (unsigned long)e->d);
             break;
+        case USB_LOG_HOST_DEVICE:
+            snprintf(p, size, "host: device %04lx:%04lx class "
+                     "%02x/%02lx/%02lx, %lu configuration%s, %d bytes%s",
+                     (unsigned long)(e->c >> 16),
+                     (unsigned long)(e->c & 0xffff), e->a,
+                     (unsigned long)(e->d & 0xff),
+                     (unsigned long)((e->d >> 8) & 0xff),
+                     (unsigned long)((e->d >> 16) & 0xff),
+                     ((e->d >> 16) & 0xff) == 1 ? "" : "s", e->b,
+                     e->d >> 24 ? " (cut short)" : "");
+            break;
+        case USB_LOG_HOST_IFACE:
+            snprintf(p, size, "host:   IF%d.%d %02lx/%02lx/%02lx, "
+                     "%d endpoints", e->a, e->b & 0xff,
+                     (unsigned long)(e->c & 0xff),
+                     (unsigned long)((e->c >> 8) & 0xff),
+                     (unsigned long)((e->c >> 16) & 0xff), e->b >> 8);
+            break;
+        case USB_LOG_HOST_EP:
+        {
+            static const char * const sync[] =
+                { "", " async", " adaptive", " sync" };
+            static const char * const usage[] =
+                { "", " feedback", " implicit", " ?" };
+            snprintf(p, size, "host:     ep %02x %s%s%s, %lu bytes, "
+                     "interval %lu", e->a, eptypes[e->b & 3],
+                     (e->b & 3) == 1 ? sync[(e->b >> 2) & 3] : "",
+                     usage[(e->b >> 4) & 3],
+                     (unsigned long)(e->c & 0x7ff), (unsigned long)e->d);
+            break;
+        }
+        case USB_LOG_HOST_SETTING:
+        {
+            static const char * const why[] = {
+                "no OUT endpoint", "not type I", "not PCM", "no channels",
+                "sample not 2-4 bytes", "interval too long",
+                "no 44.1 or 48 kHz" };
+            n = snprintf(p, size, "host: DAC setting IF%d.%d UAC%lu "
+                         "%luch %lu/%lu bit:", e->a, e->b,
+                         (unsigned long)(e->d >> 24),
+                         (unsigned long)(e->d & 0xff),
+                         (unsigned long)((e->d >> 16) & 0xff),
+                         (unsigned long)((e->d >> 8) & 0xff) * 8);
+            if (e->c == 0)
+                snprintf(p + n, size - n, " usable");
+            for (int i = 0; i < (int)ARRAYLEN(why) && n < (int)size; i++)
+                if (e->c & (1u << i))
+                    n += snprintf(p + n, size - n, "%s %s",
+                                  e->c & ((1u << i) - 1) ? "," : "",
+                                  why[i]);
+            break;
+        }
         case USB_LOG_HOST_EHCI:
             snprintf(p, size, "host: @%d req %02x port %d: %ld bytes, "
                      "token %08lx", e->a, e->b & 0xff, e->b >> 8,
