@@ -89,6 +89,14 @@
 #define NUM_CONFIGS 1
 #endif
 
+/* How many configurations the host is told of: Drive Only offers the one, as
+ * Apple's own disk mode does -- a car that sees a second takes the player for
+ * a phone. */
+static int offered_configs(void)
+{
+    return usb_drive_only() ? 1 : NUM_CONFIGS;
+}
+
 /*-------------------------------------------------------------------------*/
 /* USB protocol descriptors: */
 
@@ -128,7 +136,7 @@ static struct usb_config_descriptor __attribute__((aligned(2)))
     .bMaxPower           = (USB_MAX_CURRENT + 1) / 2, /* In 2mA units */
 };
 
-static const struct usb_qualifier_descriptor __attribute__((aligned(2)))
+static struct usb_qualifier_descriptor __attribute__((aligned(2)))
                                              qualifier_descriptor =
 {
     .bLength            = sizeof(struct usb_qualifier_descriptor),
@@ -898,13 +906,14 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             if(drivers[USB_DRIVER_AUDIO]->enabled)
                 device_descriptor.idProduct = USB_PRODUCT_ID_AUDIO;
 #endif
+            device_descriptor.bNumConfigurations = offered_configs();
             ptr = &device_descriptor;
             size = sizeof(struct usb_device_descriptor);
             break;
 
         case USB_DT_OTHER_SPEED_CONFIG:
         case USB_DT_CONFIG: {
-            if(index >= NUM_CONFIGS) {
+            if(index >= offered_configs()) {
                 logf("invalid config dt index %u", index);
                 break;
             }
@@ -976,6 +985,7 @@ static void request_handler_device_get_descriptor(struct usb_ctrlrequest* req, u
             break;
 
         case USB_DT_DEVICE_QUALIFIER:
+            qualifier_descriptor.bNumConfigurations = offered_configs();
             ptr = &qualifier_descriptor;
             size = sizeof(struct usb_qualifier_descriptor);
             break;
@@ -1038,7 +1048,7 @@ static int usb_core_do_set_config(uint8_t new_config)
     logf("usb_core: SET_CONFIG %d to %d", usb_config, new_config);
     usb_log(USB_LOG_SET_CONFIG, new_config, usb_drv_port_speed(), 0, 0);
 
-    if(new_config > NUM_CONFIGS) {
+    if(new_config > offered_configs()) {
         logf("usb_core: invalid config number");
         return -1;
     }

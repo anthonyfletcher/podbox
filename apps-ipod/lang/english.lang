@@ -12438,6 +12438,20 @@
   </voice>
 </phrase>
 <phrase>
+  id: LANG_USB_MODE_DRIVE_ONLY
+  desc: in Settings -> General -> System -> USB Mode: the disk and nothing else
+  user: core
+  <source>
+    *: "Drive Only"
+  </source>
+  <dest>
+    *: "Drive Only"
+  </dest>
+  <voice>
+    *: "Drive Only"
+  </voice>
+</phrase>
+<phrase>
   id: LANG_USB_MODE_ADB
   desc: in Settings -> General -> System -> USB Mode: Android Debug Bridge
   user: core

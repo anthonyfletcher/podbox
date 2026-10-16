@@ -1359,6 +1359,12 @@ What a USB connection does: present the disk to the computer, or charge only.
 Charge only suits a plug that would otherwise take the disk and interrupt
 playback. Docks and cars that play from the player over USB still work.
 
+Drive Only presents the disk and nothing else, for a car stereo that reads
+iPods as USB drives but does not see this one. It overrides Accessory Protocol,
+iPhone Accessories, Identify As, USB Sound Card, USB HID and USB DAC Output
+without changing them, so cars and docks that play from the player over USB
+do not work until it is switched back. Docks on the dock connector still do.
+
 [usb hid]
 Presents the player as a keyboard or remote control to the computer, so its
 buttons can drive playback there. On an iPod Video in mass-storage mode, USB

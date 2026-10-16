@@ -2151,12 +2151,13 @@ const struct settings_list settings[] = {
                    LANG_USB_MODE,
                    USBMODE_DEFAULT,
                    "usb mode",
-                   "mass storage,charge"
+                   "mass storage,charge,drive only"
                    ,
                    usb_set_mode,
-                   2,
+                   3,
                    ID2P(LANG_USB_MODE_MASS_STORAGE),
-                   ID2P(LANG_USB_MODE_CHARGE)
+                   ID2P(LANG_USB_MODE_CHARGE),
+                   ID2P(LANG_USB_MODE_DRIVE_ONLY)
         ),
     CHOICE_SETTING(0, playback_log, LANG_LOGGING, 1, "play log",
                    "off,on,last.fm", NULL, 3,

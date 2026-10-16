@@ -148,6 +148,14 @@ enum
     USB_MODE_ADB
 };
 
+#ifndef HAVE_USB_ADB
+/* Drive Only: mass storage and nothing else -- one configuration, the
+ * player's own product ID, no accessory, audio or HID interface. The USB
+ * Mode setting stores its place in the list, which is ADB's value; a target
+ * with ADB has no Drive Only. */
+#define USB_MODE_DRIVE_ONLY USB_MODE_ADB
+#endif
+
 #ifdef HAVE_USB_POWER
 /*allow people to define this in config-target.h if they need it*/
 #if !defined(USBPOWER_BTN_IGNORE)
@@ -222,6 +230,8 @@ bool usb_host_is_present(void);
  * session with a car, a dock or Charge Only, which usb_host_is_present()
  * spans whole. Work that would hold the disk or the CPU waits on this. */
 bool usb_host_wants_storage(void);
+/* USB Mode is Drive Only, and this connection is not charge only */
+bool usb_drive_only(void);
 /* check whether USB is plugged, note that this is the raw hardware value */
 int usb_detect(void);
 

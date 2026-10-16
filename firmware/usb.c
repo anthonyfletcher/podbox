@@ -94,6 +94,16 @@ static int usb_mmc_countdown = 0;
 static bool usb_power_only = false;
 #endif
 static int usb_mode = USBMODE_DEFAULT;
+
+static bool usb_mode_drive_only(void)
+{
+#ifdef USB_MODE_DRIVE_ONLY
+    return usb_mode == USB_MODE_DRIVE_ONLY;
+#else
+    return false;
+#endif
+}
+
 void usb_set_mode(int mode)
 {
     usb_mode = mode;
@@ -345,6 +355,8 @@ static inline void usb_configure_drivers(int for_state)
         /* USB_POWERED: */
 
     case USB_INSERTED:
+        /* Drive Only overrides the settings below rather than changing
+         * them, so switching back to Mass Storage restores each as set */
 #ifdef USB_ENABLE_STORAGE
         /* Answering iAP2, no disk: a car selects configuration 1 before the
          * iAP one, and an iPhone's is PTP, so it takes nothing. Handing the
@@ -352,7 +364,7 @@ static inline void usb_configure_drivers(int for_state)
          * moves on. Accessory Protocol off answers no iAP2 at all. */
         usb_core_enable_driver(USB_DRIVER_MASS_STORAGE,
 #ifdef USB_ENABLE_IAP
-                               !usb_iap ||
+                               usb_drive_only() || !usb_iap ||
                                !usb_iap_answer_iap2()
 #else
                                true
@@ -360,16 +372,18 @@ static inline void usb_configure_drivers(int for_state)
                                );
 #endif
 #ifdef USB_ENABLE_HID
-        usb_core_enable_driver(USB_DRIVER_HID, usb_hid);
+        usb_core_enable_driver(USB_DRIVER_HID, usb_hid && !usb_drive_only());
 #endif
 #ifdef USB_ENABLE_SERIAL
-        usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
+        usb_core_enable_driver(USB_DRIVER_SERIAL,
+                               usb_serial && !usb_drive_only());
 #endif
 #ifdef USB_ENABLE_AUDIO
-        usb_core_enable_driver(USB_DRIVER_AUDIO, usb_audio_wanted());
+        usb_core_enable_driver(USB_DRIVER_AUDIO,
+                               usb_audio_wanted() && !usb_drive_only());
 #endif /* USB_ENABLE_AUDIO */
 #ifdef USB_ENABLE_IAP
-        usb_core_enable_driver(USB_DRIVER_IAP, usb_iap);
+        usb_core_enable_driver(USB_DRIVER_IAP, usb_iap && !usb_drive_only());
 #endif
 #ifdef USB_ENABLE_CHARGING_ONLY
         usb_core_enable_driver(USB_DRIVER_CHARGING_ONLY, false);
@@ -826,7 +840,8 @@ static void NORETURN_ATTR usb_thread(void)
 #endif
 #ifdef HAVE_USB_POWER
             /* Power (charging-only) button */
-            usb_power_only = usb_mode != USB_MODE_MASS_STORAGE;
+            usb_power_only = usb_mode != USB_MODE_MASS_STORAGE
+                             && !usb_mode_drive_only();
             if(button_status() & ~USBPOWER_BTN_IGNORE) {
                 usb_power_only = !usb_power_only;
             }
@@ -856,7 +871,7 @@ static void NORETURN_ATTR usb_thread(void)
             usb_set_host_present(true);
 #endif
 #ifdef HAVE_USB_HOST_AUDIO
-            if(usb_dac_auto && !usb_dac_tried)
+            if(usb_dac_auto && !usb_dac_tried && !usb_drive_only())
             {
                 timeout_register(&usb_dac_tmo, usb_dac_tmo_cb,
                                  USB_DAC_WAIT, 0);
@@ -1248,6 +1263,16 @@ bool usb_host_wants_storage(void)
 #endif
 }
 
+/* A cable held to charge only stays charge only, as in Mass Storage */
+bool usb_drive_only(void)
+{
+#if defined(HAVE_USB_POWER) && defined(USB_FULL_INIT)
+    return usb_mode_drive_only() && !usb_power_only;
+#else
+    return false;
+#endif
+}
+
 bool usb_exclusive_storage(void)
 {
     /* Storage isn't actually exclusive until slave mode has been entered */
@@ -1361,7 +1386,7 @@ bool usb_storage_is_ejected(void)
 void usb_set_hid(bool enable)
 {
     usb_hid = enable;
-    usb_core_enable_driver(USB_DRIVER_HID, usb_hid);
+    usb_core_enable_driver(USB_DRIVER_HID, usb_hid && !usb_drive_only());
 }
 #endif /* USB_ENABLE_HID */
 
@@ -1411,7 +1436,7 @@ void usb_car_found(void)
 void usb_set_serial(bool enable)
 {
     usb_serial = enable;
-    usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial);
+    usb_core_enable_driver(USB_DRIVER_SERIAL, usb_serial && !usb_drive_only());
 }
 
 bool usb_get_serial(void)
