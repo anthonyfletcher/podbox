@@ -943,8 +943,8 @@ static struct mutex palette_lock;
 
 /* Palettes worked out ahead of their track, while the disk was already
  * running, so the track change can apply one without reading anything. One
- * per buffered track that may be from a new album, as on shuffle, up to the
- * number the disk-idle walk looks ahead. A slot is used once, so a cover the
+ * per upcoming track that may be from a new album, as on shuffle, up to the
+ * number the prefetch looks ahead. A slot is used once, so a cover the
  * art pass replaces is read afresh next time. */
 #define PREFETCH_SLOTS 8
 static struct {
@@ -1488,20 +1488,33 @@ static void prefetch_path(const char *track_path)
 }
 
 /* Asked when the next track's metadata loads, which is buffering, and when
- * its decoding starts. */
+ * its decoding starts. Decoding start also covers the tracks after it by
+ * their playlist paths, buffered or not: a skip lands on one of those, and
+ * hi-res files leave little of it buffered. The playlist can read its file,
+ * so only while the disk runs. */
 static void prefetch_cb(unsigned short id, void *param)
 {
     struct mp3entry *id3 = ((struct track_event *)param)->id3;
+    static char path[MAX_PATH]; /* only the audio thread asks */
+    const char *p;
 
-    (void)id;
     if (id3)
         prefetch_path(id3->path);
+    if (id != PLAYBACK_EVENT_TRACK_BUFFER || !global_settings.dynamic_colors
+        || palette_dim() == 0 || !storage_disk_is_active())
+        return;
+    for (int offset = 1; offset <= PREFETCH_SLOTS; offset++)
+    {
+        p = playlist_peek(offset, path, sizeof(path));
+        if (!p)
+            break;
+        prefetch_path(p);
+    }
 }
 
 /* The disk about to sleep, on the storage thread: the last moment a read
- * costs no spin-up. Every track buffered ahead is covered here, where
- * prefetch_cb() only ever sees the next one while the disk runs -- the
- * others reach their decode start with it asleep. Static because an
+ * costs no spin-up. Every track buffered ahead is covered here, for those
+ * whose decoding started with the disk asleep. Static because an
  * mp3entry is too big for the storage thread's stack, and buffered tracks
  * only: audio_peek_track() looks an unbuffered one up in the playlist and
  * the database, deeper than that stack goes. */
