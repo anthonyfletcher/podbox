@@ -371,9 +371,10 @@ static bool item_hidden(const struct menu_item_ex *item, int depth)
 static bool explain(const char *key, const char *title)
 {
     /* Static rather than automatic: view_text() below runs a whole screen of
-     * its own from this frame, so half a kilobyte here sits under all of it.
-     * One explanation is on screen at a time, so one buffer is enough. */
-    static char text[512];
+     * its own from this frame, so a kilobyte here sits under all of it.
+     * One explanation is on screen at a time, so one buffer is enough. A
+     * stanza longer than this is cut short without a sign. */
+    static char text[1024];
 
     if (!key || !settings_help_lookup(key, text, sizeof text))
     {
