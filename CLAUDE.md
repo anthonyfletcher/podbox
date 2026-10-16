@@ -399,8 +399,8 @@ default range is exactly what the next merge brings in; after a merge, pass
 
 `uisimulator/` is upstream-identical as well, but it is **built** -- the
 simulator uses it, along with `firmware/target/hosted/sdl/`. Three files there
-carry the `--screenshot` argument and nothing else; `upstream-divergence.md`
-lists them under *The simulator*.
+carry the `--screenshot` argument, and three a fix for a crash at boot;
+`upstream-divergence.md` lists them under *The simulator*.
 
 ### Threading
 
@@ -448,7 +448,7 @@ sh tools/check-settings-docs.sh    # from the repository root
 
 Silence means the documents agree with the settings; every line it prints names
 a setting that has fallen out of step and the file it is missing from. It runs
-five checks, and check 2 is the one that earns its keep: check 1 asks
+six checks, and check 2 is the one that earns its keep: check 1 asks
 `settings_tags.c` what the settings are, so an untagged setting is absent from
 both sides of that comparison and passes it without ever having been looked at.
 That is how **Audiobook Art Rows** and **Segregate Audiobooks** shipped with no
@@ -474,7 +474,8 @@ Write for someone who has just found the setting and does not know what it
 does. Say what it changes, and where it is useful or costly. Two or three
 sentences: the screen is 320 pixels wide, and the reader truncates a line past
 160 characters. Wrap at the file's usual width -- lines within a paragraph are
-joined when read.
+joined when read. **Explain** shows no more than 1023 bytes of a stanza and
+cuts the rest without a sign; check 6 flags one that would not fit.
 
 `bundle-help.sh` ships the file as `/.rockbox/docs/settings-help.txt`. A bare
 `make zip` does not run it, and nothing else misbehaves without it, so a

@@ -373,7 +373,8 @@ static bool explain(const char *key, const char *title)
     /* Static rather than automatic: view_text() below runs a whole screen of
      * its own from this frame, so a kilobyte here sits under all of it.
      * One explanation is on screen at a time, so one buffer is enough. A
-     * stanza longer than this is cut short without a sign. */
+     * stanza longer than this is cut short without a sign, so
+     * tools/check-settings-docs.sh checks against this size. */
     static char text[1024];
 
     if (!key || !settings_help_lookup(key, text, sizeof text))

@@ -4,7 +4,7 @@
 # Run from the repository root. Silence means they agree; every line printed
 # names a setting that has fallen out of step, and the file it is missing from.
 #
-# Five checks, because no single one sees everything:
+# Six checks, because no single one sees everything:
 #
 #   1. every tagged setting has an Explain stanza
 #   2. every *named* setting has one, tagged or not -- an untagged setting is
@@ -12,6 +12,7 @@
 #   3. every stanza reached settings-guide.md
 #   4. nothing in settings-guide.md was invented there
 #   5. every "action: " stanza still names a row that exists
+#   6. every stanza fits what Explain reads, whole
 #
 # Check 2 reads settings_list.c with a regexp and so has a known tail of false
 # positives: the remembered-state settings, which carry a lang id the table
@@ -134,6 +135,23 @@ sed -n 's/^[[:space:]]*[^:]*:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$PHRASES" 
   | LC_ALL=C sort -u > "$tmp/phrases"
 LC_ALL=C comm -23 "$tmp/actions" "$tmp/phrases" \
   | sed 's/^/action stanza names no phrase: /' >> "$tmp/out"
+
+# ---- 6. every stanza fits what Explain reads -------------------------------
+
+# settings_help_lookup() reads a line into HELP_LINE (160) bytes and joins a
+# stanza into explain()'s buffer in widgets/menu.c (1024), each line taking one
+# byte more than its text, and cuts at either limit without a sign. Keep the
+# two numbers here in step with those.
+tr -d '\r' < "$HELP" | awk '
+    function done() { if (key != "" && n > 1023)
+                          print "stanza too long for Explain (" n " of 1023 bytes): " key }
+    /^#/  { next }
+    /^\[/ { done(); key = $0; n = 0; next }
+          { if (length($0) > 159)
+                print "line too long for Explain (" length($0) " of 159 bytes): " key
+            n += length($0) + 1 }
+    END   { done() }
+' >> "$tmp/out"
 
 cat "$tmp/out"
 [ -s "$tmp/out" ] && exit 1
