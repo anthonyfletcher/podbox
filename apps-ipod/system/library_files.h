@@ -57,6 +57,8 @@
 #define LIB_DOCUMENTS_FILE  LIB_CACHE_DIR "/documents.dat"
 #define LIB_IMAGES_FILE     LIB_CACHE_DIR "/images.dat"
 #define LIB_SPIKE_RUN_FILE  LIB_CACHE_DIR "/spike_run.dat"
+#define LIB_UNREADABLE_FILE LIB_CACHE_DIR "/unreadable.dat"
+#define LIB_UNREADABLE_LIST LIB_CACHE_DIR "/unreadable.txt"
 #define LIB_COVERS_EMPTY_FILE LIB_ART_DIR "/covers_empty.pfraw"
 #define LIB_NO_ART_ALBUMS_FILE  LIB_ART_DIR "/no_art_albums.dat"
 #define LIB_NO_ART_ARTISTS_FILE LIB_ART_DIR "/no_art_artists.dat"
@@ -91,6 +93,8 @@
 #define LIB_SPIKE_VERSION   1
 #define LIB_PATHS_MAGIC     0x48544150u     /* "PATH" */
 #define LIB_PATHS_VERSION   1
+#define LIB_UNREADABLE_MAGIC 0x44524e55u    /* "UNRD" */
+#define LIB_UNREADABLE_VERSION 1
 
 /* Whether this boot has files to move into the layout above */
 bool library_files_need_upgrade(void);

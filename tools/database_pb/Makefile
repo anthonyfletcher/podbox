@@ -44,6 +44,7 @@ SRC := database_pb.c stubs.c \
        $(APPS)/database/libfile.c \
        $(APPS)/database/path_key.c \
        $(APPS)/database/db_spoken.c \
+       $(APPS)/database/unreadable.c \
        $(APPS)/system/strutil.c \
        $(FIRM)/buflib_mempool.c \
        $(ROOT)/lib/fixedpoint/fixedpoint.c \

@@ -42,6 +42,7 @@ playlist/mood_screen.c
 database/db_featured.c
 database/db_featured_parse.c
 database/db_spoken.c
+database/unreadable.c
 metadata/book_resume.c
 screens/browse/browser_db.c
 screens/browse/album_charts.c

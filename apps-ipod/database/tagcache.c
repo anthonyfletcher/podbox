@@ -93,6 +93,7 @@
 #include "tagcache.h"
 #include "database/path_key.h"
 #include "database/sound_index.h"
+#include "database/unreadable.h"
 #include "db_spoken.h"
 #include "metadata/art_cache.h"   /* art_cache_dir_hash */
 #include "core_alloc.h"
@@ -739,6 +740,8 @@ static void remove_files(void)
     remove_db_file(TAGCACHE_FILE_SWAP);
     merge_discard();
     remove_db_file(TAGCACHE_FILE_MASTER);
+    /* A rebuild tries every file again */
+    unreadable_forget();
     for (i = 0; i < TAG_COUNT; i++)
     {
         if (TAGCACHE_IS_NUMERIC(i))
@@ -3121,6 +3124,13 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         }
     }
 
+    /* Refused before and unchanged since: not parsed again */
+    if (unreadable_known(path, mtime))
+    {
+        tc_stat.scan_unreadable++;
+        return ;
+    }
+
     /*memset(&id3, 0, sizeof(struct mp3entry)); -- get_metadata does this for us */
     memset(&entry, 0, sizeof(struct temp_file_entry));
     memset(&tracknumfix, 0, sizeof(tracknumfix));
@@ -3131,6 +3141,7 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
         logf("get_metadata failed: %s", path);
         DB_LOG("error", "get_metadata failed");
         tc_stat.scan_unreadable++;
+        unreadable_add(path, mtime);
         return ;
     }
 
@@ -6423,6 +6434,7 @@ void do_tagcache_build(const char *path[])
     memset(&header, 0, sizeof(struct tagcache_header));
     cache_write_failed = write(cachefd, &header, sizeof(struct tagcache_header))
                          != (ssize_t)sizeof(struct tagcache_header);
+    unreadable_begin();
 
     ret = true;
 
@@ -6540,6 +6552,8 @@ commit:
         debug_log(DEBUG_LOG_TAGCACHE, "walk: temp file write failed");
         ret = false;
     }
+
+    unreadable_end(ret && !walk_incomplete);
 
     if (!ret)
     {
