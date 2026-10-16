@@ -425,6 +425,9 @@ static int cachefd = -1, filenametag_fd;
 static int total_entry_count = 0;
 static int data_size = 0;
 static int processed_dir_count;
+/* A short write to the temp file, which on a full disk would otherwise leave
+ * a header promising entries the file does not hold */
+static bool cache_write_failed;
 
 /* Thread safe locking */
 static volatile int write_lock;
@@ -2899,7 +2902,8 @@ static inline void write_item(const char *item)
     int len = strlen(item) + 1;
 
     data_size += len;
-    write(cachefd, item, len);
+    if (write(cachefd, item, len) != len)
+        cache_write_failed = true;
 }
 
 static int check_if_empty(char **tag)
@@ -3188,7 +3192,9 @@ static void NO_INLINE add_tagcache(char *path, unsigned long mtime)
     entry.data_length = offset;
 
     /* Write the header */
-    write(cachefd, &entry, sizeof(struct temp_file_entry));
+    if (write(cachefd, &entry, sizeof(struct temp_file_entry))
+        != (ssize_t)sizeof(struct temp_file_entry))
+        cache_write_failed = true;
 
     /* And tags also... Correct order is critical */
     write_item(path);
@@ -5388,6 +5394,7 @@ static bool delete_entry(long idx_id)
     struct index_entry idx, myidx;
     struct master_header myhdr;
     int in_use[TAG_COUNT];
+    int32_t old_seek[TAG_COUNT];
 
     logf("delete_entry(): %ld", idx_id);
 
@@ -5421,15 +5428,7 @@ static bool delete_entry(long idx_id)
         goto cleanup;
     }
 
-    myidx.flag |= FLAG_DELETED;
-    lseek(masterfd, -(off_t)sizeof(struct index_entry), SEEK_CUR);
-    if (write_index_entries(masterfd, &myidx, 1) != sizeof(struct index_entry))
-    {
-        logf("delete_entry(): write_error #1");
-        goto cleanup;
-    }
-
-    /* Now check which tags are no longer in use (if any) */
+    /* Which tags no other entry uses */
     for (tag = 0; tag < TAG_COUNT; tag++)
         in_use[tag] = 0;
 
@@ -5451,7 +5450,7 @@ static bool delete_entry(long idx_id)
             idxp = &idx;
         }
 
-        if (idxp->flag & FLAG_DELETED)
+        if (i == idx_id || (idxp->flag & FLAG_DELETED))
             continue;
 
         for (tag = 0; tag < TAG_COUNT; tag++)
@@ -5464,115 +5463,107 @@ static bool delete_entry(long idx_id)
         }
     }
 
-    /* Now delete all tags no longer in use. */
+    /**
+     * Replace each tag seek with a hash of the field's string, so the runtime
+     * statistics of a moved or altered file can be resurrected. All of them
+     * are worked out before anything is written: the flag and the hashes go
+     * to disk in one write, since an entry flagged deleted that still holds
+     * real seeks is never matched again.
+     */
     for (tag = 0; tag < TAG_COUNT; tag++)
     {
         struct tagcache_header tch;
-        int oldseek = myidx.tag_seek[tag];
 
+        old_seek[tag] = myidx.tag_seek[tag];
         if (TAGCACHE_IS_NUMERIC(tag))
             continue;
 
-        /**
-         * Replace tag seek with a hash value of the field string data.
-         * That way runtime statistics of moved or altered files can be
-         * resurrected.
-         */
         if (tc_stat.ramcache && tag != tag_filename)
         {
             struct tagfile_entry *tfe;
-            int32_t *seek = &tcramcache.hdr->indices[idx_id].tag_seek[tag];
 
             /* crc_32 is assumed not to yield (why would it...?) */
-            tfe = (struct tagfile_entry *)&tcramcache.hdr->tags[tag][*seek];
-            *seek = crc_32(tfe->tag_data, strlen(tfe->tag_data), 0xffffffff);
-            myidx.tag_seek[tag] = *seek;
-        }
-        else
-        {
-            struct tagfile_entry tfe;
-
-            /* Open the index file, which contains the tag names. */
-            if ((fd = open_tag_fd(&tch, tag, true)) < 0)
-                goto cleanup;
-
-            /* Skip the header block */
-            lseek(fd, myidx.tag_seek[tag], SEEK_SET);
-
-            switch (read_tagfile_entry_and_tag(fd, &tfe,
-                                               build_idx_buf, build_idx_bufsz))
-            {
-                case e_SUCCESS_LEN_ZERO:
-                    logf("deleted_entry(): SUCCESS");
-                    /* FALL THROUGH */
-                case e_SUCCESS:
-                     break;
-                case e_ENTRY_SIZEMISMATCH:
-                    logf("delete_entry(): read error #3");
-                    goto cleanup;
-                case e_TAG_TOOLONG:
-                    logf("too long tag #4");
-                    goto cleanup;
-                case e_TAG_SIZEMISMATCH:
-                    logf("delete_entry(): read error #3");
-                    goto cleanup;
-            }
-
-            myidx.tag_seek[tag] = crc_32(build_idx_buf,
-                                         strlen(build_idx_buf), 0xffffffff);
-        }
-
-        if (in_use[tag])
-        {
-            logf("in use: %d/%d", tag, in_use[tag]);
-            if (fd >= 0)
-            {
-                close(fd);
-                fd = -1;
-            }
+            tfe = (struct tagfile_entry *)
+                    &tcramcache.hdr->tags[tag][old_seek[tag]];
+            myidx.tag_seek[tag] = crc_32(tfe->tag_data, strlen(tfe->tag_data),
+                                         0xffffffff);
             continue;
         }
 
-        /* Delete from ram. */
-        if (tc_stat.ramcache && tag != tag_filename)
-        {
-            struct tagfile_entry *tagentry =
-                    (struct tagfile_entry *)&tcramcache.hdr->tags[tag][oldseek];
-            str_setlen(tagentry->tag_data, 0);
-        }
+        struct tagfile_entry tfe;
 
         /* Open the index file, which contains the tag names. */
-        if (fd < 0)
+        if ((fd = open_tag_fd(&tch, tag, true)) < 0)
+            goto cleanup;
+
+        lseek(fd, old_seek[tag], SEEK_SET);
+
+        switch (read_tagfile_entry_and_tag(fd, &tfe,
+                                           build_idx_buf, build_idx_bufsz))
         {
-            if ((fd = open_tag_fd(&tch, tag, true)) < 0)
+            case e_SUCCESS_LEN_ZERO:
+                logf("deleted_entry(): SUCCESS");
+                /* FALL THROUGH */
+            case e_SUCCESS:
+                 break;
+            case e_ENTRY_SIZEMISMATCH:
+                logf("delete_entry(): read error #3");
+                goto cleanup;
+            case e_TAG_TOOLONG:
+                logf("too long tag #4");
+                goto cleanup;
+            case e_TAG_SIZEMISMATCH:
+                logf("delete_entry(): read error #3");
                 goto cleanup;
         }
-
-        /* Skip the header block */
-        lseek(fd, oldseek + sizeof(struct tagfile_entry), SEEK_SET);
-
-        /* Debug, print 10 first characters of the tag
-        read(fd, buf, 10);
-        buf[10]='\0';
-        logf("TAG:%s", buf);
-        lseek(fd, -10, SEEK_CUR);
-        */
-
-        /* Write first data byte in tag as \0 */
-        write(fd, "", 1);
-
-        /* Now tag data has been removed */
         close(fd);
         fd = -1;
+
+        myidx.tag_seek[tag] = crc_32(build_idx_buf,
+                                     strlen(build_idx_buf), 0xffffffff);
     }
 
-    /* Write index entry back into master index. */
+    myidx.flag |= FLAG_DELETED;
     lseek(masterfd, sizeof(struct master_header) +
           (idx_id * sizeof(struct index_entry)), SEEK_SET);
     if (write_index_entries(masterfd, &myidx, 1) != sizeof(struct index_entry))
     {
-        logf("delete_entry(): write_error #2");
+        logf("delete_entry(): write_error #1");
         goto cleanup;
+    }
+
+    if (tc_stat.ramcache)
+        for (tag = 0; tag < TAG_COUNT; tag++)
+            if (!TAGCACHE_IS_NUMERIC(tag) && tag != tag_filename)
+                tcramcache.hdr->indices[idx_id].tag_seek[tag] =
+                        myidx.tag_seek[tag];
+
+    /* Now blank the strings no other entry uses. A cut before this leaves
+     * them in place, which costs only space. */
+    for (tag = 0; tag < TAG_COUNT; tag++)
+    {
+        struct tagcache_header tch;
+
+        if (TAGCACHE_IS_NUMERIC(tag) || in_use[tag])
+            continue;
+
+        /* Delete from ram. */
+        if (tc_stat.ramcache && tag != tag_filename)
+        {
+            struct tagfile_entry *tagentry = (struct tagfile_entry *)
+                    &tcramcache.hdr->tags[tag][old_seek[tag]];
+            str_setlen(tagentry->tag_data, 0);
+        }
+
+        /* Open the index file, which contains the tag names. */
+        if ((fd = open_tag_fd(&tch, tag, true)) < 0)
+            goto cleanup;
+
+        /* Write first data byte in tag as \0 */
+        lseek(fd, old_seek[tag] + sizeof(struct tagfile_entry), SEEK_SET);
+        write(fd, "", 1);
+        close(fd);
+        fd = -1;
     }
 
     close(masterfd);
@@ -6430,7 +6421,8 @@ void do_tagcache_build(const char *path[])
     logf("Scanning files...");
     /* Scan for new files. */
     memset(&header, 0, sizeof(struct tagcache_header));
-    write(cachefd, &header, sizeof(struct tagcache_header));
+    cache_write_failed = write(cachefd, &header, sizeof(struct tagcache_header))
+                         != (ssize_t)sizeof(struct tagcache_header);
 
     ret = true;
 
@@ -6530,13 +6522,23 @@ commit:
     header.datasize = data_size;
     header.entry_count = total_entry_count;
     lseek(cachefd, 0, SEEK_SET);
-    write(cachefd, &header, sizeof(struct tagcache_header));
+    if (write(cachefd, &header, sizeof(struct tagcache_header))
+        != (ssize_t)sizeof(struct tagcache_header))
+        cache_write_failed = true;
     close(cachefd);
 
     if (filenametag_fd >= 0)
     {
         close(filenametag_fd);
         filenametag_fd = -1;
+    }
+
+    /* A temp file shorter than its header says would fail every commit, so
+     * it goes the way an aborted walk's does */
+    if (cache_write_failed)
+    {
+        debug_log(DEBUG_LOG_TAGCACHE, "walk: temp file write failed");
+        ret = false;
     }
 
     if (!ret)

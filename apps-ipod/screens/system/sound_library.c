@@ -168,7 +168,14 @@ static bool lib_scan(void)
 
     sound_index_reader_close(&rd);
 
+    /* The entry count keeps a deleted entry until the next rebuild. Without
+     * the RAM copy the deletions cannot be counted, and the total stands. */
+    struct tagcache_marks marks;
+
+    tagcache_get_marks(&marks);
     lc.library = tagcache_get_stat()->total_entries;
+    if (marks.deleted_ct > 0)
+        lc.library -= marks.deleted_ct;
 
     return lc.records > 0;
 }

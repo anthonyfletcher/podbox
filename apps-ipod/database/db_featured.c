@@ -511,7 +511,7 @@ void db_featured_ensure(void)
 {
     struct tagcache_marks now;
 
-    if (!global_settings.featured_artists || !tagcache_is_in_ram())
+    if (!global_settings.featured_artists)
     {
         /* The setting can go off while the table is standing, and the rows
          * drawn from it have to go with it. */
@@ -522,6 +522,20 @@ void db_featured_ensure(void)
     }
 
     tagcache_get_marks(&now);
+
+    /* The RAM copy is out for a moment around a commit or USB. The table
+     * holds only entry ids, which stay good until a commit or a rebuild
+     * renumbers them. */
+    if (!tagcache_is_in_ram())
+    {
+        if (built && (now.commitid != built_marks.commitid ||
+                      now.generation != built_marks.generation))
+        {
+            db_featured_build();    /* discard() then returns false */
+            built = false;
+        }
+        return;
+    }
 
     if (built && now.commitid == built_marks.commitid &&
         now.generation == built_marks.generation &&

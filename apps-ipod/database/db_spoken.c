@@ -224,8 +224,14 @@ static void groups_invalidate(void)
 {
     unsigned int i;
 
+    /* Emptied, not just marked: a list can ask before anything rebuilds it,
+     * and stale seeks match the wrong groups where an empty table hides
+     * nothing. */
     for (i = 0; i < ARRAYLEN(spoken_groups); i++)
+    {
         spoken_groups[i].valid = false;
+        spoken_groups[i].ct = 0;
+    }
 
     groups_disturbed = true;
 }
