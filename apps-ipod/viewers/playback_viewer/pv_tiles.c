@@ -261,11 +261,14 @@ static const char *pfmt(const char *fmt, ...)
 }
 
 /* Grouped in threes, because these figures reach six digits and a run of
- * them is what the figasis is for. */
+ * them is what the figasis is for. The separator is the language's, and may
+ * be more than one byte. */
 static const char *num(long v)
 {
     char digits[24];
     char *b = pool[pool_at];
+    const char *sep = str(LANG_THOUSANDS_SEPARATOR);
+    int sep_len = strlen(sep);
     int n, i, o = 0;
     bool neg = v < 0;
 
@@ -277,10 +280,13 @@ static const char *num(long v)
     if (neg)
         b[o++] = '-';
 
-    for (i = 0; i < n && o < POOL_W - 2; i++)
+    for (i = 0; i < n && o + sep_len < POOL_W - 2; i++)
     {
         if (i > 0 && ((n - i) % 3) == 0)
-            b[o++] = ',';
+        {
+            memcpy(b + o, sep, sep_len);
+            o += sep_len;
+        }
         b[o++] = digits[i];
     }
     b[o] = 0;

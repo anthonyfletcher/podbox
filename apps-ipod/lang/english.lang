@@ -24442,3 +24442,31 @@
     *: "Background Task Log"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_THOUSANDS_SEPARATOR
+  desc: between each group of three digits in a large number, as in 9,099 -- a full stop or a space in many languages
+  user: core
+  <source>
+    *: ","
+  </source>
+  <dest>
+    *: ","
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUICK_SETTINGS
+  desc: title a theme shows over the Quick Screen, through %Sx(Quick Settings)
+  user: core
+  <source>
+    *: "Quick Settings"
+  </source>
+  <dest>
+    *: "Quick Settings"
+  </dest>
+  <voice>
+    *: "Quick Settings"
+  </voice>
+</phrase>

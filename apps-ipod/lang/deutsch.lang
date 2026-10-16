@@ -252,7 +252,7 @@
   desc: confirm action
   user: core
   <source>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </source>
   <dest>
     *: "Sind Sie sicher?"
@@ -926,13 +926,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </source>
   <dest>
-    *: "Einfache EQ-Einstellungen"
+    *: "Einfacher EQ"
   </dest>
   <voice>
-    *: "Einfache Equalizer-Einstellungen"
+    *: "Einfacher Equalizer"
   </voice>
 </phrase>
 <phrase>
@@ -940,13 +940,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </source>
   <dest>
-    *: "Erweiterte EQ-Einstellungen"
+    *: "Erweiterter EQ"
   </dest>
   <voice>
-    *: "Erweiterte Equalizer-Einstellungen"
+    *: "Erweiterter Equalizer"
   </voice>
 </phrase>
 <phrase>
@@ -968,13 +968,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Browse EQ Presets"
+    *: "Load EQ"
   </source>
   <dest>
-    *: "Zeige EQ-Konfigurationen"
+    *: "EQ laden"
   </dest>
   <voice>
-    *: "Zeige Equalizer-Konfigurationen"
+    *: "Equalizer laden"
   </voice>
 </phrase>
 <phrase>
@@ -1010,13 +1010,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Peak Filter %d"
+    *: "Peak Filter"
   </source>
   <dest>
-    *: "Bandfilter %d"
+    *: "Peak-Filter"
   </dest>
   <voice>
-    *: "Bandfilter"
+    *: "Peak-Filter"
   </voice>
 </phrase>
 <phrase>
@@ -1741,13 +1741,13 @@
   desc: in settings_menu()
   user: core
   <source>
-    *: "File View"
+    *: "File Browser"
   </source>
   <dest>
-    *: "Dateiansicht"
+    *: "Dateibrowser"
   </dest>
   <voice>
-    *: "Dateiansicht"
+    *: "Dateibrowser"
   </voice>
 </phrase>
 <phrase>
@@ -1893,9 +1893,6 @@
 <phrase>
   id: LANG_MUSIC_BROWSER
   desc: "default browser" choice option, and the root menu's database
-        browser item -- deliberately distinct from LANG_TAGCACHE
-        ("Database"), which stays as-is for the Database *settings*
-        sub-menu (rebuild/initialize/etc.), a different context
   user: core
   <source>
     *: "Music"
@@ -1988,19 +1985,16 @@
 </phrase>
 <phrase>
   id: LANG_TAGCACHE_RAM
-  desc: in tag cache settings
+  desc: deprecated
   user: core
   <source>
     *: none
-    tc_ramcache: "Load to RAM"
   </source>
   <dest>
     *: none
-    tc_ramcache: "In RAM laden"
   </dest>
   <voice>
     *: none
-    tc_ramcache: "In Arbeitsspeicher laden"
   </voice>
 </phrase>
 <phrase>
@@ -2022,13 +2016,13 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </source>
   <dest>
-    *: "Neu generieren"
+    *: "Datenbank neu aufbauen"
   </dest>
   <voice>
-    *: "Neu generieren"
+    *: "Datenbank neu aufbauen"
   </voice>
 </phrase>
 <phrase>
@@ -2036,27 +2030,27 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Update Now"
+    *: "Update Database"
   </source>
   <dest>
-    *: "Jetzt aktualisieren"
+    *: "Datenbank aktualisieren"
   </dest>
   <voice>
-    *: "Jetzt aktualisieren"
+    *: "Datenbank aktualisieren"
   </voice>
 </phrase>
 <phrase>
   id: LANG_RUNTIMEDB_ACTIVE
-  desc: in settings_menu.
+  desc: deprecated
   user: core
   <source>
-    *: "Gather Runtime Data"
+    *: none
   </source>
   <dest>
-    *: "Spielzeitdaten sammeln"
+    *: none
   </dest>
   <voice>
-    *: "Spielzeitdaten sammeln"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -3417,7 +3411,7 @@
   user: core
   <source>
     *: none
-    rtc: "Time & Date"
+    rtc: "Time & Date Settings"
   </source>
   <dest>
     *: none
@@ -4382,13 +4376,13 @@
   desc: in the main menu
   user: core
   <source>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </source>
   <dest>
-    *: "Zeige Themen-Dateien"
+    *: "Thema laden"
   </dest>
   <voice>
-    *: "Zeige Themen-Dateien"
+    *: "Thema laden"
   </voice>
 </phrase>
 <phrase>
@@ -5631,13 +5625,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "View Current Playlist"
+    *: "View Queue"
   </source>
   <dest>
-    *: "Zeige aktuelle Wiedergabeliste"
+    *: "Warteschlange anzeigen"
   </dest>
   <voice>
-    *: "Zeige aktuelle Wiedergabeliste"
+    *: "Warteschlange anzeigen"
   </voice>
 </phrase>
 <phrase>
@@ -5715,13 +5709,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </source>
   <dest>
-    *: "Speichere aktuelle Wiedergabeliste"
+    *: "Warteschlange als Liste speichern"
   </dest>
   <voice>
-    *: "Speichere aktuelle Wiedergabeliste"
+    *: "Warteschlange als Liste speichern"
   </voice>
 </phrase>
 <phrase>
@@ -5771,13 +5765,13 @@
   desc: in playlist options menu, option to warn when erasing dynamic playlist
   user: core
   <source>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </source>
   <dest>
-    *: "Warnen beim Löschen einer dynamischen Wiedergabeliste"
+    *: "Vor Ersetzen der Warteschlange warnen"
   </dest>
   <voice>
-    *: "Warnen beim Löschen einer dynamischen Wiedergabeliste"
+    *: "Vor Ersetzen der Warteschlange warnen"
   </voice>
 </phrase>
 <phrase>
@@ -5785,13 +5779,13 @@
   desc: prompt shown when about to erase a modified dynamic playlist
   user: core
   <source>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </source>
   <dest>
-    *: "Dynamische Wiedergabeliste löschen?"
+    *: "Warteschlange ersetzen?"
   </dest>
   <voice>
-    *: "Dynamische Wiedergabeliste löschen?"
+    *: "Warteschlange ersetzen?"
   </voice>
 </phrase>
 <phrase>
@@ -5799,13 +5793,13 @@
   desc: displayed topmost on the info screen and in the info menu
   user: core
   <source>
-    *: "Rockbox Info"
+    *: "System Info"
   </source>
   <dest>
-    *: "Rockbox Information"
+    *: "Systeminfo"
   </dest>
   <voice>
-    *: "Rockbox Information"
+    *: "Systeminfo"
   </voice>
 </phrase>
 <phrase>
@@ -5973,13 +5967,13 @@
   desc: in the info menu
   user: core
   <source>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </source>
   <dest>
-    *: "Entwicklerbereich"
+    *: "~Debug"
   </dest>
   <voice>
-    *: "Entwicklerbereich"
+    *: "~Debug"
   </voice>
 </phrase>
 <phrase>
@@ -6001,13 +5995,13 @@
   desc: The verb/action Queue
   user: core
   <source>
-    *: "Queue"
+    *: "Play Once"
   </source>
   <dest>
-    *: "In Warteschlange stellen"
+    *: "Einmal abspielen"
   </dest>
   <voice>
-    *: "In Warteschlange stellen"
+    *: "Einmal abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -6015,13 +6009,13 @@
   desc: in onplay menu.  queue a track/playlist into dynamic playlist.
   user: core
   <source>
-    *: "Queue Next"
+    *: "Play Once Next"
   </source>
   <dest>
-    *: "Warteschlange als Nächsten"
+    *: "Einmal als Nächstes"
   </dest>
   <voice>
-    *: "Warteschlange als Nächsten"
+    *: "Einmal als Nächstes"
   </voice>
 </phrase>
 <phrase>
@@ -6029,13 +6023,13 @@
   desc: in onplay menu.  queue a track/playlist at end of playlist.
   user: core
   <source>
-    *: "Queue Last"
+    *: "Play Once at End"
   </source>
   <dest>
-    *: "Warteschlange als Letzten"
+    *: "Einmal am Ende"
   </dest>
   <voice>
-    *: "Warteschlange als Letzten"
+    *: "Einmal am Ende"
   </voice>
 </phrase>
 <phrase>
@@ -6043,13 +6037,13 @@
   desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
   user: core
   <source>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </source>
   <dest>
-    *: "Gemischt in Warteschlange"
+    *: "Einmal gemischt"
   </dest>
   <voice>
-    *: "Gemischt in Warteschlange"
+    *: "Einmal gemischt"
   </voice>
 </phrase>
 <phrase>
@@ -6057,13 +6051,13 @@
   desc: splash number of tracks inserted
   user: core
   <source>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </source>
   <dest>
-    *: "%d Titel eingefügt (%s)"
+    *: "%d Titel hinzugefügt (%s)"
   </dest>
   <voice>
-    *: "Titel eingefügt"
+    *: "Titel hinzugefügt"
   </voice>
 </phrase>
 <phrase>
@@ -6071,13 +6065,13 @@
   desc: splash number of tracks queued
   user: core
   <source>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "%d Titel in Warteschlange (%s)"
+    *: "Einmal abspielen: %d Titel (%s)"
   </dest>
   <voice>
-    *: "Titel in Warteschlange"
+    *: "Titel einmal abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -7118,8 +7112,7 @@
     gigabeatfx: "POWER to abort"
     gigabeats,sansafuzeplus: "BACK to abort"
     iaudiom5,iaudiox5: "Long PLAY to abort"
-    ipod*: "PLAY/PAUSE to abort"
-    iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
+    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
     iriverh100,iriverh120,iriverh300: "STOP to abort"
   </source>
   <dest>
@@ -7127,7 +7120,7 @@
     gigabeatfx: "POWER zum Abbrechen"
     gigabeats,sansafuzeplus: "BACK zum Abbrechen"
     iaudiom5,iaudiox5: "Long PLAY zum Abbrechen"
-    ipod*: "PLAY/PAUSE zum Abbrechen"
+    ipod*: "PREV zum Abbrechen"
     iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV zum Abbrechen"
     iriverh100,iriverh120,iriverh300: "STOP zum Abbrechen"
   </dest>
@@ -9004,13 +8997,13 @@
   desc: in the settings menu
   user: core
   <source>
-    *: "Theme Settings"
+    *: "UI Settings"
   </source>
   <dest>
-    *: "Themeneinstellungen"
+    *: "Oberfläche"
   </dest>
   <voice>
-    *: "Themeneinstellungen"
+    *: "Oberfläche"
   </voice>
 </phrase>
 <phrase>
@@ -9033,15 +9026,15 @@
   user: core
   <source>
     *: none
-    lcd_color: "Colours"
+    lcd_color: "Interface Colours"
   </source>
   <dest>
     *: none
-    lcd_color: "Farben"
+    lcd_color: "Oberflächenfarben"
   </dest>
   <voice>
     *: none
-    lcd_color: "Farben"
+    lcd_color: "Oberflächenfarben"
   </voice>
 </phrase>
 <phrase>
@@ -10160,13 +10153,13 @@
   desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
   user: core
   <source>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </source>
   <dest>
-    *: "Gemischt ans Ende der Warteschlange"
+    *: "Einmal gemischt am Ende"
   </dest>
   <voice>
-    *: "Gemischt ans Ende der Warteschlange"
+    *: "Einmal gemischt am Ende"
   </voice>
 </phrase>
 <phrase>
@@ -10676,15 +10669,15 @@
   user: core
   <source>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "Hotkeyfunktion im WPS"
+    hotkey: "Schnelltaste"
   </dest>
   <voice>
     *: none
-    hotkey: "Hotkeyfunktion im WPS"
+    hotkey: "Schnelltaste"
   </voice>
 </phrase>
 <phrase>
@@ -10795,15 +10788,15 @@
   user: core
   <source>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "Hotkeyfunktion im Browser"
+    hotkey: "Schnelltaste"
   </dest>
   <voice>
     *: none
-    hotkey: "Hotkeyfunktion im Browser"
+    hotkey: "Schnelltaste"
   </voice>
 </phrase>
 <phrase>
@@ -11200,13 +11193,13 @@
   desc: Used when you need to say playlist, also voiced
   user: core
   <source>
-    *: "Current Playlist"
+    *: "Queue"
   </source>
   <dest>
-    *: "Aktuelle Wiedergabeliste"
+    *: "Warteschlange"
   </dest>
   <voice>
-    *: "Aktuelle Wiedergabeliste"
+    *: "Warteschlange"
   </voice>
 </phrase>
 <phrase>
@@ -11493,15 +11486,15 @@
   user: core
   <source>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </source>
   <dest>
     *: none
-    quickscreen: "Verknüpfungsmenü statt Schnelleinstellung verwenden"
+    quickscreen: "Schnelleinstellungen"
   </dest>
   <voice>
     *: none
-    quickscreen: "Verknüpfungsmenü statt Schnelleinstellung verwenden"
+    quickscreen: "Schnelleinstellungen"
   </voice>
 </phrase>
 <phrase>
@@ -11790,13 +11783,13 @@
   desc: in sound settings
   user: core
   <source>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </source>
   <dest>
-    *: "NUR SEITE"
+    *: "Nur Seite"
   </dest>
   <voice>
-    *: "NUR SEITE"
+    *: "Nur Seite"
   </voice>
 </phrase>
 <phrase>
@@ -12129,10 +12122,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Path]"
+    *: "Path"
   </source>
   <dest>
-    *: "[Pfad]"
+    *: "Pfad"
   </dest>
   <voice>
     *: "Pfad"
@@ -12272,13 +12265,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Number of slides"
+    *: "3D Slide Tuck"
   </source>
   <dest>
-    *: "Anzahl der Slides"
+    *: "3D-Überlappung"
   </dest>
   <voice>
-    *: "Anzahl der Slides"
+    *: "3D-Überlappung"
   </voice>
 </phrase>
 <phrase>
@@ -12519,10 +12512,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Filename]"
+    *: "Filename"
   </source>
   <dest>
-    *: "[Dateiname]"
+    *: "Dateiname"
   </dest>
   <voice>
     *: "Dateiname"
@@ -12668,13 +12661,13 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Subdirs]"
+    *: "Subdirs"
   </source>
   <dest>
-    *: "[Unterverzeichnisse]"
+    *: "Unterordner"
   </dest>
   <voice>
-    *: "Unterverzeichnisse"
+    *: "Unterordner"
   </voice>
 </phrase>
 <phrase>
@@ -13005,13 +12998,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Spacing"
+    *: "3D Parallel Slides"
   </source>
   <dest>
-    *: "Abstand"
+    *: "3D-Cover parallel"
   </dest>
   <voice>
-    *: "Abstand"
+    *: "3D-Cover parallel"
   </voice>
 </phrase>
 <phrase>
@@ -13218,10 +13211,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Date]"
+    *: "Date"
   </source>
   <dest>
-    *: "[Datum]"
+    *: "Datum"
   </dest>
   <voice>
     *: "Datum"
@@ -13364,13 +13357,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </source>
   <dest>
-    *: "Mittelrand"
+    *: "3D-Mittelabstand"
   </dest>
   <voice>
-    *: "Mittelrand"
+    *: "3D-Mittelabstand"
   </voice>
 </phrase>
 <phrase>
@@ -13440,10 +13433,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Size]"
+    *: "Size"
   </source>
   <dest>
-    *: "[Größe]"
+    *: "Größe"
   </dest>
   <voice>
     *: "Größe"
@@ -13732,10 +13725,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Time]"
+    *: "Time"
   </source>
   <dest>
-    *: "[Zeit]"
+    *: "Zeit"
   </dest>
   <voice>
     *: "Zeit"
@@ -14145,13 +14138,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Rebuild cache"
+    *: "Rebuild Art Cache"
   </source>
   <dest>
-    *: "Cache neu erstellen"
+    *: "Cover-Cache neu aufbauen"
   </dest>
   <voice>
-    *: "Cache neu erstellen"
+    *: "Cover-Cache neu aufbauen"
   </voice>
 </phrase>
 <phrase>
@@ -14159,10 +14152,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Files]"
+    *: "Files"
   </source>
   <dest>
-    *: "[Dateien]"
+    *: "Dateien"
   </dest>
   <voice>
     *: "Dateien"
@@ -14622,13 +14615,13 @@
   desc: in pictureflow
   user: core
   <source>
-    *: "Update cache"
+    *: "Update Art Cache"
   </source>
   <dest>
-    *: "Zwischenspeicher aktualisieren"
+    *: "Cover-Cache aktualisieren"
   </dest>
   <voice>
-    *: "Zwischenspeicher aktualisieren"
+    *: "Cover-Cache aktualisieren"
   </voice>
 </phrase>
 <phrase>
@@ -14707,7 +14700,7 @@
   user: core
   <source>
     *: "Press LEFT to cancel."
-    android,hifietma*,zenvision: "Press BACK to cancel."
+    android,hifietma*: "Press BACK to cancel."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Press POWER to cancel."
     ihifi760,ihifi960: "Double tap RETURN to cancel."
     ihifi770,ihifi770c,ihifi800: "Press HOME to cancel."
@@ -14722,7 +14715,7 @@
   </source>
   <dest>
     *: "Zum Abbrechen LINKS drücken."
-    android,hifietma*,vibe500,zenvision: "Zum Abbrechen ZURÜCK drücken."
+    android,hifietma*,vibe500: "Zum Abbrechen ZURÜCK drücken."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Zum Abbrechen POWER drücken."
     ihifi760,ihifi960: "Zum Abbrechen ZURÜCK doppeldrücken."
     ihifi770,ihifi770c,ihifi800: "Zum Abbrechen STARTMENÜ drücken."
@@ -14736,7 +14729,7 @@
   </dest>
   <voice>
     *: "Zum Abbrechen LINKS drücken."
-    android,hifietma*,vibe500,zenvision: "Zum Abbrechen ZURÜCK drücken."
+    android,hifietma*,vibe500: "Zum Abbrechen ZURÜCK drücken."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Zum Abbrechen POWER drücken."
     ihifi760,ihifi960: "Zum Abbrechen ZURÜCK doppeldrücken."
     ihifi770,ihifi770c,ihifi800: "Zum Abbrechen STARTMENÜ drücken."
@@ -15023,13 +15016,13 @@
   desc:
   user: core
   <source>
-    *: "Add"
+    *: "Add to Queue"
   </source>
   <dest>
-    *: "Hinzufügen"
+    *: "Zur Warteschlange hinzufügen"
   </dest>
   <voice>
-    *: "Hinzufügen"
+    *: "Zur Warteschlange hinzufügen"
   </voice>
 </phrase>
 <phrase>
@@ -15121,13 +15114,13 @@
   desc: in onplay menu
   user: core
   <source>
-    *: "Queue..."
+    *: "Play Once..."
   </source>
   <dest>
-    *: "Warteschlange..."
+    *: "Einmal abspielen..."
   </dest>
   <voice>
-    *: "Warteschlange"
+    *: "Einmal abspielen"
   </voice>
 </phrase>
 <phrase>
@@ -15135,13 +15128,13 @@
   desc: in Current Playlist settings
   user: core
   <source>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "Zeige Warteschlangen Optionen"
+    *: "Einmal-abspielen-Optionen zeigen"
   </dest>
   <voice>
-    *: "Zeige Warteschlangen Optionen"
+    *: "Einmal-abspielen-Optionen zeigen"
   </voice>
 </phrase>
 <phrase>
@@ -15379,10 +15372,10 @@
     *: "Sort Albums By"
   </source>
   <dest>
-    *: "Sortiere Alben nach"
+    *: "Alben sortieren nach"
   </dest>
   <voice>
-    *: "Sortiere Alben nach"
+    *: "Alben sortieren nach"
   </voice>
 </phrase>
 <phrase>
@@ -15401,16 +15394,16 @@
 </phrase>
 <phrase>
   id: LANG_ARTIST_PLUS_YEAR
-  desc: in Settings
+  desc: "Sort Albums By" option: by artist, then release year, oldest first
   user: core
   <source>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </source>
   <dest>
-    *: "Künstler + Jahr"
+    *: "Künstler + Jahr (älteste zuerst)"
   </dest>
   <voice>
-    *: "Künstler und Jahr"
+    *: "Künstler und Jahr, älteste zuerst"
   </voice>
 </phrase>
 <phrase>
@@ -15513,22 +15506,16 @@
 </phrase>
 <phrase>
   id: LANG_CLEAR_SETTINGS_ON_HOLD
-  desc: in the system sub menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    clear_settings_on_hold,iriverh10: "Clear settings when reset button is held during startup"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Clear settings when hold switch is on during startup"
   </source>
   <dest>
     *: none
-    clear_settings_on_hold,iriverh10: "Einstellungen löschen, wenn die Reset-Taste während des Startvorgangs gedrückt gehalten wird"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Einstellungen löschen, wenn die Hold-Taste während des Startvorgangs gedrückt gehalten wird"
   </dest>
   <voice>
     *: none
-    clear_settings_on_hold,iriverh10: "Einstellungen löschen, wenn die Reset-Taste während des Startvorgangs gedrückt gehalten wird"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Einstellungen löschen, wenn die Hold-Taste während des Startvorgangs gedrückt gehalten wird"
   </voice>
 </phrase>
 <phrase>
@@ -15637,13 +15624,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </source>
   <dest>
-    *: "Nächster Titel..."
+    *: "Zur Warteschlange..."
   </dest>
   <voice>
-    *: "Nächster Titel"
+    *: "Zur Warteschlange"
   </voice>
 </phrase>
 <phrase>
@@ -15665,13 +15652,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </source>
   <dest>
-    *: "Gemischt hinzufügen"
+    *: "Gemischt in Warteschlange"
   </dest>
   <voice>
-    *: "Gemischt hinzufügen"
+    *: "Gemischt in Warteschlange"
   </voice>
 </phrase>
 <phrase>
@@ -15679,13 +15666,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last"
+    *: "Add to End"
   </source>
   <dest>
-    *: "Zuletzt wiedergeben"
+    *: "Ans Ende anfügen"
   </dest>
   <voice>
-    *: "Zuletzt wiedergeben"
+    *: "Ans Ende anfügen"
   </voice>
 </phrase>
 <phrase>
@@ -15693,13 +15680,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </source>
   <dest>
-    *: "Zuletzt gemischt wiedergeben"
+    *: "Gemischt ans Ende"
   </dest>
   <voice>
-    *: "Zuletzt gemischt wiedergeben"
+    *: "Gemischt ans Ende"
   </voice>
 </phrase>
 <phrase>
@@ -15783,16 +15770,16 @@
 </phrase>
 <phrase>
   id: LANG_DATABASE_DIR
-  desc: in database settings menu
+  desc: deprecated
   user: core
   <source>
-    *: "Database Directory"
+    *: none
   </source>
   <dest>
-    *: "Datenbankverzeichnis"
+    *: none
   </dest>
   <voice>
-    *: "Datenbankverzeichnis"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15800,27 +15787,27 @@
   desc: Confirmation dialog
   user: core
   <source>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "Titel in Warteschlange entfernen?"
+    *: "Einmal-abspielen-Titel entfernen?"
   </dest>
   <voice>
-    *: "Titel in Warteschlange entfernen?"
+    *: "Einmal-abspielen-Titel entfernen?"
   </voice>
 </phrase>
 <phrase>
   id: LANG_QUICK_IGNORE_DIRACHE
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </source>
   <dest>
-    *: "Schnell (Verzeichnis-Zwischenspeicher ignorieren)"
+    *: none
   </dest>
   <voice>
-    *: "Schnell (Verzeichnis-Zwischenspeicher ignorieren)"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15828,7 +15815,7 @@
   desc: in Settings
   user: core
   <source>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </source>
   <dest>
     *: "Wiedergabebildschirm"
@@ -16916,49 +16903,43 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </source>
   <dest>
     *: none
-    usbdac: "~USB-DAC"
+    usbdac: "USB-Soundkarte"
   </dest>
   <voice>
     *: none
-    usbdac: "USB Digital Analog Wandler"
+    usbdac: "U S B Soundkarte"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_USB_CHARGE_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </source>
   <dest>
     *: none
-    usbdac: "Während im Modus Nur USB Laden"
   </dest>
   <voice>
     *: none
-    usbdac: "Während im Modus Nur USB Laden"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_MASS_STORAGE_USB_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </source>
   <dest>
     *: none
-    usbdac: "Während im USB Massenspeicher Modus"
   </dest>
   <voice>
     *: none
-    usbdac: "Während im USB Massenspeicher Modus"
   </voice>
 </phrase>
 <phrase>
@@ -16967,15 +16948,15 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC Active"
+    usbdac: "USB Sound Card Active"
   </source>
   <dest>
     *: none
-    usbdac: "USB-Digital Analog Wandler Aktiv"
+    usbdac: "USB-Soundkarte aktiv"
   </dest>
   <voice>
     *: none
-    usbdac: "USB-Digital Analog Wandler Aktiv"
+    usbdac: "U S B Soundkarte aktiv"
   </voice>
 </phrase>
 <phrase>
@@ -17007,5 +16988,7417 @@
   </dest>
   <voice>
     *: "Status mitteilen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_SCAN_ON_EJECT
+  desc: in tag cache settings; rescan after a USB session that wrote to us
+  user: core
+  <source>
+    *: "Scan on Eject"
+  </source>
+  <dest>
+    *: "Nach Auswerfen scannen"
+  </dest>
+  <voice>
+    *: "Nach Auswerfen scannen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCAN_ON_STARTUP
+  desc: in database settings
+  user: core
+  <source>
+    *: "Scan on Startup"
+  </source>
+  <dest>
+    *: "Beim Start scannen"
+  </dest>
+  <voice>
+    *: "Beim Start scannen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTOCOMMIT_ON_STARTUP
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG
+  desc: in System settings: the menu of diagnostic logs
+  user: core
+  <source>
+    *: "Debug Logs"
+  </source>
+  <dest>
+    *: "Debug-Logs"
+  </dest>
+  <voice>
+    *: "Debug-Logs"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHANNEL_SWAP
+  desc: in sound_settings
+  user: core
+  <source>
+    *: "Swap Left & Right"
+  </source>
+  <dest>
+    *: "Links & Rechts tauschen"
+  </dest>
+  <voice>
+    *: "Links und Rechts tauschen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS
+  desc: chapter marks option
+  user: core
+  <source>
+    *: "Chapter Marks"
+  </source>
+  <dest>
+    *: "Kapitelmarken"
+  </dest>
+  <voice>
+    *: "Kapitelmarken"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BROWSE_CHAPTERS
+  desc: context menu entry for a book's chapter list
+  user: core
+  <source>
+    *: "Browse Chapters"
+  </source>
+  <dest>
+    *: "Kapitel durchsuchen"
+  </dest>
+  <voice>
+    *: "Kapitel durchsuchen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER
+  desc: spoken before a chapter number
+  user: core
+  <source>
+    *: "Chapter"
+  </source>
+  <dest>
+    *: "Kapitel"
+  </dest>
+  <voice>
+    *: "Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DEBUG_MENU
+  desc: in system settings menu
+  user: core
+  <source>
+    *: "Show Debug Menu"
+  </source>
+  <dest>
+    *: "Debug-Menü anzeigen"
+  </dest>
+  <voice>
+    *: "Debug-Menü anzeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_MODE_DRIVE_ONLY
+  desc: in Settings -> General -> System -> USB Mode: the disk and nothing else
+  user: core
+  <source>
+    *: "Drive Only"
+  </source>
+  <dest>
+    *: "Nur Laufwerk"
+  </dest>
+  <voice>
+    *: "Nur Laufwerk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_MENU
+  desc: General Settings submenu -- the cover-art thumbnail cache
+  user: core
+  <source>
+    *: "Art Cache"
+  </source>
+  <dest>
+    *: "Cover-Cache"
+  </dest>
+  <voice>
+    *: "Cover-Cache"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_FAST_BUILD
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Fast Build"
+  </source>
+  <dest>
+    *: "Schnell aufbauen"
+  </dest>
+  <voice>
+    *: "Schnell aufbauen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_ALBUM_SOURCE
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Album Art Source"
+  </source>
+  <dest>
+    *: "Quelle für Albumcover"
+  </dest>
+  <voice>
+    *: "Quelle für Albumcover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files Only"
+  </source>
+  <dest>
+    *: "Nur Bilddateien"
+  </dest>
+  <voice>
+    *: "Nur Bilddateien"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files, Then Embedded"
+  </source>
+  <dest>
+    *: "Bilddateien, dann eingebettet"
+  </dest>
+  <voice>
+    *: "Bilddateien, dann eingebettet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded, Then Image Files"
+  </source>
+  <dest>
+    *: "Eingebettet, dann Bilddateien"
+  </dest>
+  <voice>
+    *: "Eingebettet, dann Bilddateien"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded Only"
+  </source>
+  <dest>
+    *: "Nur eingebettet"
+  </dest>
+  <voice>
+    *: "Nur eingebettet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREFER_CACHE
+  desc: in Settings -- album art source, the pre-scaled thumbnail cache
+  user: core
+  <source>
+    *: "Prefer Cache"
+  </source>
+  <dest>
+    *: "Cache bevorzugen"
+  </dest>
+  <voice>
+    *: "Cache bevorzugen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_MODE
+  desc: in settings_menu, storage mode setting
+  user: core
+  <source>
+    *: none
+    disk_storage: "Storage Mode"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "Speichertyp"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "Speichertyp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_HDD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "HDD (Spinning Disk)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "HDD (Festplatte)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "H D D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_SSD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "SSD (Solid State)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "SSD (Flash-Speicher)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "S S D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_AUDIO_BOOST
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_SELECT_ACTION
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Select Action"
+  </source>
+  <dest>
+    *: "Aktion für Auswahltaste"
+  </dest>
+  <voice>
+    *: "Aktion für Auswahltaste"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_COVERFLOW
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Coverflow"
+  </source>
+  <dest>
+    *: "~Coverflow"
+  </dest>
+  <voice>
+    *: "~Coverflow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS
+  desc: in display settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dynamische Farben"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dynamische Farben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Artwork Filter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Coverfilter"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Coverfilter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_1
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 1"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 1"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 1"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_2
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 2"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 2"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 2"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_3
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 3"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 3"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 3"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BW
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Black and White"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Schwarzweiß"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Schwarzweiß"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_INVERT
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Invert Colours"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Farben umkehren"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Farben umkehren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BRIGHTER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Brighter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Heller"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Heller"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_DARKER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Darker"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dunkler"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dunkler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mehr Kontrast"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mehr Kontrast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Weniger Kontrast"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Weniger Kontrast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mehr Farbe"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mehr Farbe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Weniger Farbe"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Weniger Farbe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_HUE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Shift Hue"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Farbton verschieben"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Farbton verschieben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_POSTERISE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Posterise"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Tontrennung"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Tontrennung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_PIXELLATE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Pixellate"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Verpixeln"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Verpixeln"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_COVERS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Album Covers"
+  </source>
+  <dest>
+    *: "Albumcover"
+  </dest>
+  <voice>
+    *: "Albumcover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PORTRAITS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Artist Portraits"
+  </source>
+  <dest>
+    *: "Künstlerbilder"
+  </dest>
+  <voice>
+    *: "Künstlerbilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_SETTINGS
+  desc: in General Settings
+  user: core
+  <source>
+    *: "Carousel"
+  </source>
+  <dest>
+    *: "Karussell"
+  </dest>
+  <voice>
+    *: "Karussell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TRANSITION_SPEED
+  desc: in apps/menus/album_covers_menu.c
+  user: core
+  <source>
+    *: "3D Transition Speed"
+  </source>
+  <dest>
+    *: "3D-Übergangstempo"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_MODE
+  desc: in the Carousel settings menu -- how the covers are laid out
+  user: core
+  <source>
+    *: "View Mode"
+  </source>
+  <dest>
+    *: "Ansicht"
+  </dest>
+  <voice>
+    *: "Ansicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_OFFSET
+  desc: in the Carousel settings menu -- how far below the middle cover the
+  user: core
+  <source>
+    *: "Flat Pile Offset"
+  </source>
+  <dest>
+    *: "Stapelversatz (flach)"
+  </dest>
+  <voice>
+    *: "Stapelversatz (flach)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_FADE
+  desc: in the Carousel settings menu -- how far the flat view's piles are
+  user: core
+  <source>
+    *: "Flat Pile Fade"
+  </source>
+  <dest>
+    *: "Stapelabblendung (flach)"
+  </dest>
+  <voice>
+    *: "Stapelabblendung (flach)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_3D
+  desc: "view mode" choice option -- the tilted cover flow
+  user: core
+  <source>
+    *: "3D"
+  </source>
+  <dest>
+    *: "~3D"
+  </dest>
+  <voice>
+    *: "~3D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_FLAT
+  desc: "view mode" choice option -- covers face-on, in two piles
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "Flach"
+  </dest>
+  <voice>
+    *: "Flach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAIN_MENU_SETTINGS
+  desc: Settings menu row and the Customize Main Menu screen's own title --
+  user: core
+  <source>
+    *: "Edit Main Menu"
+  </source>
+  <dest>
+    *: "Hauptmenü bearbeiten"
+  </dest>
+  <voice>
+    *: "Hauptmenü bearbeiten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTHING_PLAYING
+  desc: Message shown when a "same as currently played track" style tagtree
+  user: core
+  <source>
+    *: "Nothing playing"
+  </source>
+  <dest>
+    *: "Keine Wiedergabe"
+  </dest>
+  <voice>
+    *: "Keine Wiedergabe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_CLICKWHEEL_CHARSET
+  desc: Ordered set of characters the click-wheel text editor cycles through
+  user: core
+  <source>
+    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+  </source>
+  <dest>
+    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß0123456789-_.'&"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_DISCARD
+  desc: Prompt shown when cancelling the text editor after changes were made
+  user: core
+  <source>
+    *: "Discard changes?"
+  </source>
+  <dest>
+    *: "Änderungen verwerfen?"
+  </dest>
+  <voice>
+    *: "Änderungen verwerfen?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_CONNECTED
+  desc: first line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "USB Connected"
+  </source>
+  <dest>
+    *: "USB verbunden"
+  </dest>
+  <voice>
+    *: "U S B verbunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_EJECT_BEFORE_DISCONNECT
+  desc: second line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "Eject before disconnecting"
+  </source>
+  <dest>
+    *: "Vor dem Trennen auswerfen"
+  </dest>
+  <voice>
+    *: "Vor dem Trennen auswerfen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER
+  desc: core text viewer settings menu title
+  user: core
+  <source>
+    *: "Text Viewer"
+  </source>
+  <dest>
+    *: "Textanzeige"
+  </dest>
+  <voice>
+    *: "Textanzeige"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR
+  desc: core text viewer colour mode setting
+  user: core
+  <source>
+    *: "Colour Mode"
+  </source>
+  <dest>
+    *: "Farbmodus"
+  </dest>
+  <voice>
+    *: "Farbmodus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_THEME
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme"
+  </source>
+  <dest>
+    *: "Thema"
+  </dest>
+  <voice>
+    *: "Thema"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_INVERTED
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme Inverted"
+  </source>
+  <dest>
+    *: "Thema invertiert"
+  </dest>
+  <voice>
+    *: "Thema invertiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_BOW
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Black on White"
+  </source>
+  <dest>
+    *: "Schwarz auf Weiß"
+  </dest>
+  <voice>
+    *: "Schwarz auf Weiß"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_WOB
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "White on Black"
+  </source>
+  <dest>
+    *: "Weiß auf Schwarz"
+  </dest>
+  <voice>
+    *: "Weiß auf Schwarz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_MARGIN
+  desc: core text viewer margin setting
+  user: core
+  <source>
+    *: "Margin"
+  </source>
+  <dest>
+    *: "Rand"
+  </dest>
+  <voice>
+    *: "Rand"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_LINE_SPACING
+  desc: core text viewer line spacing setting
+  user: core
+  <source>
+    *: "Line Spacing"
+  </source>
+  <dest>
+    *: "Zeilenabstand"
+  </dest>
+  <voice>
+    *: "Zeilenabstand"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_FONT_DEFAULT
+  desc: core text viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "Systemschrift verwenden"
+  </dest>
+  <voice>
+    *: "Systemschrift verwenden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGE_NUMBER
+  desc: core text viewer, show the page number at the foot
+  user: core
+  <source>
+    *: "Page Number"
+  </source>
+  <dest>
+    *: "Seitenzahl"
+  </dest>
+  <voice>
+    *: "Seitenzahl"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LICENSE
+  desc: in system menu, opens docs/COPYING (the GNU GPL)
+  user: core
+  <source>
+    *: "License"
+  </source>
+  <dest>
+    *: "Lizenz"
+  </dest>
+  <voice>
+    *: "Lizenz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_OK
+  desc: generic
+  user: core
+  <source>
+    *: "OK"
+  </source>
+  <dest>
+    *: "~OK"
+  </dest>
+  <voice>
+    *: "~OK"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_CANCEL
+  desc: generic
+  user: core
+  <source>
+    *: "Cancel"
+  </source>
+  <dest>
+    *: "Abbrechen"
+  </dest>
+  <voice>
+    *: "Abbrechen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SET_CONTEXT_ITEM
+  desc: WPS context item
+  user: core
+  <source>
+    *: "Set Context Item"
+  </source>
+  <dest>
+    *: "Kontextelement festlegen"
+  </dest>
+  <voice>
+    *: "Kontextelement festlegen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_IN_FILES
+  desc: Reveal item in File Browser
+  user: core
+  <source>
+    *: "Show in Files"
+  </source>
+  <dest>
+    *: "In Dateien anzeigen"
+  </dest>
+  <voice>
+    *: "In Dateien anzeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_NOT_FOUND
+  desc: When file does not exist
+  user: core
+  <source>
+    *: "File not found"
+  </source>
+  <dest>
+    *: "Datei nicht gefunden"
+  </dest>
+  <voice>
+    *: "Datei nicht gefunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ALBUM_ART
+  desc: in Settings, database browser album art rows
+  user: core
+  <source>
+    *: "Album Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen: Alben"
+  </dest>
+  <voice>
+    *: "Bildzeilen für Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_ART
+  desc: in Settings, database browser artist art rows
+  user: core
+  <source>
+    *: "Artist Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen: Künstler"
+  </dest>
+  <voice>
+    *: "Bildzeilen für Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_BOOK_ART
+  desc: in Settings, database browser audiobook art rows
+  user: core
+  <source>
+    *: "Audiobook Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen: Hörbücher"
+  </dest>
+  <voice>
+    *: "Bildzeilen für Hörbücher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_AUDIOBOOKS
+  desc: in Settings, keep audiobooks apart from the music
+  user: core
+  <source>
+    *: "Segregate Audiobooks"
+  </source>
+  <dest>
+    *: "Hörbücher getrennt halten"
+  </dest>
+  <voice>
+    *: "Hörbücher getrennt halten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOKS
+  desc: the Audiobooks menu, and its main-menu row
+  user: core
+  <source>
+    *: "Audiobooks"
+  </source>
+  <dest>
+    *: "Hörbücher"
+  </dest>
+  <voice>
+    *: "Hörbücher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK
+  desc: in the Audiobooks menu, browse by book
+  user: core
+  <source>
+    *: "Book"
+  </source>
+  <dest>
+    *: "Buch"
+  </dest>
+  <voice>
+    *: "Buch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR
+  desc: in the Audiobooks menu, browse by author
+  user: core
+  <source>
+    *: "Author"
+  </source>
+  <dest>
+    *: "Autor"
+  </dest>
+  <voice>
+    *: "Autor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED
+  desc: in the Audiobooks menu, books played lately
+  user: core
+  <source>
+    *: "Recently played"
+  </source>
+  <dest>
+    *: "Zuletzt gespielt"
+  </dest>
+  <voice>
+    *: "Zuletzt gespielt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_INDEX
+  desc: deprecated
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_INDEX
+  desc: in Carousel settings, update the album index
+  user: core
+  <source>
+    *: "Update Index"
+  </source>
+  <dest>
+    *: "Index aktualisieren"
+  </dest>
+  <voice>
+    *: "Index aktualisieren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BG_TASK_INFO
+  desc: in System settings, live status of the background tasks
+  user: core
+  <source>
+    *: "Background Tasks"
+  </source>
+  <dest>
+    *: "Hintergrundaufgaben"
+  </dest>
+  <voice>
+    *: "Hintergrundaufgaben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_READING
+  desc: in the main menu, reopen the most recently read document
+  user: core
+  <source>
+    *: "Continue Reading"
+  </source>
+  <dest>
+    *: "Weiterlesen"
+  </dest>
+  <voice>
+    *: "Weiterlesen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_SOURCE
+  desc: in Theme settings, which picture the now-playing screen shows
+  user: core
+  <source>
+    *: "Now Playing Artwork"
+  </source>
+  <dest>
+    *: "Bild bei Wiedergabe"
+  </dest>
+  <voice>
+    *: "Bild bei Wiedergabe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ALBUM
+  desc: in Theme settings, now-playing artwork option: the album cover
+  user: core
+  <source>
+    *: "Album Art"
+  </source>
+  <dest>
+    *: "Albumcover"
+  </dest>
+  <voice>
+    *: "Albumcover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ARTIST
+  desc: in Theme settings, now-playing artwork option: the artist portrait
+  user: core
+  <source>
+    *: "Artist Art"
+  </source>
+  <dest>
+    *: "Künstlerbild"
+  </dest>
+  <voice>
+    *: "Künstlerbild"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_AUTO
+  desc: in Theme settings, now-playing artwork option: chosen by how the playlist was started
+  user: core
+  <source>
+    *: "Auto"
+  </source>
+  <dest>
+    *: "~Auto"
+  </dest>
+  <voice>
+    *: "~Auto"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ALBUMS
+  desc: album chart: most played albums
+  user: core
+  <source>
+    *: "Most played albums"
+  </source>
+  <dest>
+    *: "Meistgespielte Alben"
+  </dest>
+  <voice>
+    *: "Meistgespielte Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ALBUMS
+  desc: album chart: most recently played albums
+  user: core
+  <source>
+    *: "Recently played albums"
+  </source>
+  <dest>
+    *: "Zuletzt gespielte Alben"
+  </dest>
+  <voice>
+    *: "Zuletzt gespielte Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ALBUMS
+  desc: album chart: played once but not for a long time
+  user: core
+  <source>
+    *: "Forgotten albums"
+  </source>
+  <dest>
+    *: "Vergessene Alben"
+  </dest>
+  <voice>
+    *: "Vergessene Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_ALBUM
+  desc: in the Music menu, play a random album
+  user: core
+  <source>
+    *: "Random Album"
+  </source>
+  <dest>
+    *: "Zufälliges Album"
+  </dest>
+  <voice>
+    *: "Zufälliges Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_ALBUM_HISTORY
+  desc: shown when no album has been played yet
+  user: core
+  <source>
+    *: "No listening history yet"
+  </source>
+  <dest>
+    *: "Noch kein Hörverlauf"
+  </dest>
+  <voice>
+    *: "Noch kein Hörverlauf"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OUT_OF_MEMORY
+  desc: shown when a screen could not claim the memory it needs
+  user: core
+  <source>
+    *: "Not enough memory"
+  </source>
+  <dest>
+    *: "Nicht genug Speicher"
+  </dest>
+  <voice>
+    *: "Nicht genug Speicher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RUNTIMEDB_OFF_PROMPT
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ALBUMS
+  desc: in Art cache settings, albums with no cover art found
+  user: core
+  <source>
+    *: "Missing Album Artwork"
+  </source>
+  <dest>
+    *: "Fehlende Albumcover"
+  </dest>
+  <voice>
+    *: "Fehlende Albumcover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ARTISTS
+  desc: in Art cache settings, artists with no portrait found
+  user: core
+  <source>
+    *: "Missing Artist Portraits"
+  </source>
+  <dest>
+    *: "Fehlende Künstlerbilder"
+  </dest>
+  <voice>
+    *: "Fehlende Künstlerbilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_NONE
+  desc: no missing-artwork list to show yet
+  user: core
+  <source>
+    *: "Nothing missing, or no scan yet"
+  </source>
+  <dest>
+    *: "Nichts fehlt, oder noch kein Scan"
+  </dest>
+  <voice>
+    *: "Nichts fehlt, oder noch kein Scan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ARTISTS
+  desc: chart: artists with the most plays
+  user: core
+  <source>
+    *: "Most played artists"
+  </source>
+  <dest>
+    *: "Meistgespielte Künstler"
+  </dest>
+  <voice>
+    *: "Meistgespielte Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ARTISTS
+  desc: chart: most recently played artists
+  user: core
+  <source>
+    *: "Recently played artists"
+  </source>
+  <dest>
+    *: "Zuletzt gespielte Künstler"
+  </dest>
+  <voice>
+    *: "Zuletzt gespielte Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ARTISTS
+  desc: chart: artists played least, never-played included
+  user: core
+  <source>
+    *: "Forgotten artists"
+  </source>
+  <dest>
+    *: "Vergessene Künstler"
+  </dest>
+  <voice>
+    *: "Vergessene Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY
+  desc: in Carousel settings, artist portraits ordering
+  user: core
+  <source>
+    *: "Sort Artists By"
+  </source>
+  <dest>
+    *: "Künstler sortieren nach"
+  </dest>
+  <voice>
+    *: "Künstler sortieren nach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DOCUMENTS
+  desc: main menu, every document on the player in one list
+  user: core
+  <source>
+    *: "Documents"
+  </source>
+  <dest>
+    *: "Dokumente"
+  </dest>
+  <voice>
+    *: "Dokumente"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGES
+  desc: main menu, every image on the player in one list
+  user: core
+  <source>
+    *: "Images"
+  </source>
+  <dest>
+    *: "Bilder"
+  </dest>
+  <voice>
+    *: "Bilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FLAT_LIST_EMPTY
+  desc: no documents or images have been found yet
+  user: core
+  <source>
+    *: "Nothing found, or no scan yet"
+  </source>
+  <dest>
+    *: "Nichts gefunden, oder noch kein Scan"
+  </dest>
+  <voice>
+    *: "Nichts gefunden, oder noch kein Scan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_FILE_INDEX
+  desc: in File View settings, rescan for documents and images
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Dokumente & Bilder neu scannen"
+  </dest>
+  <voice>
+    *: "Dokumente und Bilder neu scannen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BACKGROUND
+  desc: in Carousel settings, which theme colour fills the screen behind the
+  user: core
+  <source>
+    *: "Background"
+  </source>
+  <dest>
+    *: "Hintergrund"
+  </dest>
+  <voice>
+    *: "Hintergrund"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS
+  desc: WPS context menu and hotkey, opens the synchronised lyrics screen
+  user: core
+  <source>
+    *: "Lyrics"
+  </source>
+  <dest>
+    *: "Liedtext"
+  </dest>
+  <voice>
+    *: "Liedtext"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NONE
+  desc: lyric viewer, no lyrics file or SYLT tag was found for the track
+  user: core
+  <source>
+    *: "No lyrics"
+  </source>
+  <dest>
+    *: "Kein Liedtext"
+  </dest>
+  <voice>
+    *: "Kein Liedtext"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_WAITING
+  desc: lyric viewer, shown while nothing is playing or the track's metadata
+  user: core
+  <source>
+    *: "Waiting for track..."
+  </source>
+  <dest>
+    *: "Warte auf Titel..."
+  </dest>
+  <voice>
+    *: "Warte auf Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_MENU
+  desc: lyric viewer settings menu title
+  user: core
+  <source>
+    *: "Lyrics Viewer"
+  </source>
+  <dest>
+    *: "Liedtextanzeige"
+  </dest>
+  <voice>
+    *: "Liedtextanzeige"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_CENTRE
+  desc: lyric viewer alignment, centred
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "Mitte"
+  </dest>
+  <voice>
+    *: "Mitte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ALIGN
+  desc: lyric viewer, horizontal alignment of the lines
+  user: core
+  <source>
+    *: "Alignment"
+  </source>
+  <dest>
+    *: "Ausrichtung"
+  </dest>
+  <voice>
+    *: "Ausrichtung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_PREV_OPACITY
+  desc: lyric viewer, how visible the line above is
+  user: core
+  <source>
+    *: "Previous Line"
+  </source>
+  <dest>
+    *: "Vorherige Zeile"
+  </dest>
+  <voice>
+    *: "Vorherige Zeile"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NEXT_OPACITY
+  desc: lyric viewer, how visible the line below is
+  user: core
+  <source>
+    *: "Next Line"
+  </source>
+  <dest>
+    *: "Nächste Zeile"
+  </dest>
+  <voice>
+    *: "Nächste Zeile"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM
+  desc: lyric viewer, speed of the slide between lines
+  user: core
+  <source>
+    *: "Animation"
+  </source>
+  <dest>
+    *: "~Animation"
+  </dest>
+  <voice>
+    *: "~Animation"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_FAST
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Schnell"
+  </dest>
+  <voice>
+    *: "Schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_NORMAL
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Normal"
+  </source>
+  <dest>
+    *: "~Normal"
+  </dest>
+  <voice>
+    *: "~Normal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_SLOW
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Langsam"
+  </dest>
+  <voice>
+    *: "Langsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_HIGHLIGHT
+  desc: lyric viewer, light words as they are sung
+  user: core
+  <source>
+    *: "Highlight Sung Words"
+  </source>
+  <dest>
+    *: "Gesungene Wörter hervorheben"
+  </dest>
+  <voice>
+    *: "Gesungene Wörter hervorheben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_BACKLIGHT
+  desc: lyric viewer, keep the screen lit while open
+  user: core
+  <source>
+    *: "Keep Backlight On"
+  </source>
+  <dest>
+    *: "Beleuchtung anlassen"
+  </dest>
+  <voice>
+    *: "Beleuchtung anlassen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_FONT_DEFAULT
+  desc: lyric viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "Systemschrift verwenden"
+  </dest>
+  <voice>
+    *: "Systemschrift verwenden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE
+  desc: in Manage Settings, chooses the basic or the full settings tree
+  user: core
+  <source>
+    *: "Settings Mode"
+  </source>
+  <dest>
+    *: "Einstellungsmodus"
+  </dest>
+  <voice>
+    *: "Einstellungsmodus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_BASIC
+  desc: Settings Mode option: the short settings page
+  user: core
+  <source>
+    *: "Basic"
+  </source>
+  <dest>
+    *: "Einfach"
+  </dest>
+  <voice>
+    *: "Einfach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_ADVANCED
+  desc: Settings Mode option, and the entry that opens the full settings tree
+  user: core
+  <source>
+    *: "Advanced"
+  </source>
+  <dest>
+    *: "Erweitert"
+  </dest>
+  <voice>
+    *: "Erweitert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_SETTINGS_MENU
+  desc: in UI Settings, the group holding the parts a theme is built from
+  user: core
+  <source>
+    *: "Theme Settings"
+  </source>
+  <dest>
+    *: "Themeneinstellungen"
+  </dest>
+  <voice>
+    *: "Themeneinstellungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOGS_MENU
+  desc: in Edit Theme, the modal dialog chrome group
+  user: core
+  <source>
+    *: "Dialogs"
+  </source>
+  <dest>
+    *: "Dialoge"
+  </dest>
+  <voice>
+    *: "Dialoge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_COLORS
+  desc: dialog settings, whether the nine colours below are used
+  user: core
+  <source>
+    *: "Dialog Colour Mode"
+  </source>
+  <dest>
+    *: "Dialogfarbmodus"
+  </dest>
+  <voice>
+    *: "Dialogfarbmodus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER_WIDTH
+  desc: dialog settings, width of the box border
+  user: core
+  <source>
+    *: "Box Border Width"
+  </source>
+  <dest>
+    *: "Rahmenbreite (Box)"
+  </dest>
+  <voice>
+    *: "Rahmenbreite (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_MARGIN
+  desc: dialog settings, inset of the box from the screen edge
+  user: core
+  <source>
+    *: "Box Margin"
+  </source>
+  <dest>
+    *: "Randabstand (Box)"
+  </dest>
+  <voice>
+    *: "Randabstand (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW
+  desc: dialog settings, how far the drop shadow is offset
+  user: core
+  <source>
+    *: "Box Shadow"
+  </source>
+  <dest>
+    *: "Schatten (Box)"
+  </dest>
+  <voice>
+    *: "Schatten (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW_COLOR
+  desc: dialog settings, colour of the drop shadow
+  user: core
+  <source>
+    *: "Box Shadow Colour"
+  </source>
+  <dest>
+    *: "Schattenfarbe (Box)"
+  </dest>
+  <voice>
+    *: "Schattenfarbe (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_WIDTH
+  desc: dialog settings, width of a button border
+  user: core
+  <source>
+    *: "Button Border Width"
+  </source>
+  <dest>
+    *: "Rahmenbreite (Taste)"
+  </dest>
+  <voice>
+    *: "Rahmenbreite (Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_RADIUS
+  desc: dialog settings, corner radius of a button
+  user: core
+  <source>
+    *: "Button Corner Radius"
+  </source>
+  <dest>
+    *: "Eckenradius (Taste)"
+  </dest>
+  <voice>
+    *: "Eckenradius (Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_FG
+  desc: dialog colour, box text
+  user: core
+  <source>
+    *: "Box Text"
+  </source>
+  <dest>
+    *: "Text (Box)"
+  </dest>
+  <voice>
+    *: "Text (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BG
+  desc: dialog colour, box background
+  user: core
+  <source>
+    *: "Box Background"
+  </source>
+  <dest>
+    *: "Hintergrund (Box)"
+  </dest>
+  <voice>
+    *: "Hintergrund (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER
+  desc: dialog colour, box border
+  user: core
+  <source>
+    *: "Box Border"
+  </source>
+  <dest>
+    *: "Rahmen (Box)"
+  </dest>
+  <voice>
+    *: "Rahmen (Box)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG
+  desc: dialog colour, button text
+  user: core
+  <source>
+    *: "Button Text"
+  </source>
+  <dest>
+    *: "Text (Taste)"
+  </dest>
+  <voice>
+    *: "Text (Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG
+  desc: dialog colour, button background
+  user: core
+  <source>
+    *: "Button Background"
+  </source>
+  <dest>
+    *: "Hintergrund (Taste)"
+  </dest>
+  <voice>
+    *: "Hintergrund (Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER
+  desc: dialog colour, button border
+  user: core
+  <source>
+    *: "Button Border"
+  </source>
+  <dest>
+    *: "Rahmen (Taste)"
+  </dest>
+  <voice>
+    *: "Rahmen (Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG_SEL
+  desc: dialog colour, selected button text
+  user: core
+  <source>
+    *: "Selected Button Text"
+  </source>
+  <dest>
+    *: "Text (gewählte Taste)"
+  </dest>
+  <voice>
+    *: "Text (gewählte Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG_SEL
+  desc: dialog colour, selected button background
+  user: core
+  <source>
+    *: "Selected Button Background"
+  </source>
+  <dest>
+    *: "Hintergrund (gewählte Taste)"
+  </dest>
+  <voice>
+    *: "Hintergrund (gewählte Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_SEL
+  desc: dialog colour, selected button border
+  user: core
+  <source>
+    *: "Selected Button Border"
+  </source>
+  <dest>
+    *: "Rahmen (gewählte Taste)"
+  </dest>
+  <voice>
+    *: "Rahmen (gewählte Taste)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHORTCUTS_INSTEAD
+  desc: Quick Screen option: the long press opens the shortcuts menu instead
+  user: core
+  <source>
+    *: "Shortcuts instead"
+  </source>
+  <dest>
+    *: "Stattdessen Verknüpfungen"
+  </dest>
+  <voice>
+    *: "Stattdessen Verknüpfungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_ALBUM_SELECT
+  desc: Carousel option: what selecting an album does
+  user: core
+  <source>
+    *: "On Album Select"
+  </source>
+  <dest>
+    *: "Bei Albumauswahl"
+  </dest>
+  <voice>
+    *: "Bei Albumauswahl"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_TRACKS
+  desc: Carousel "On Album Select" option: open the album's track list
+  user: core
+  <source>
+    *: "Show tracks"
+  </source>
+  <dest>
+    *: "Titel zeigen"
+  </dest>
+  <voice>
+    *: "Titel zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_ALBUM
+  desc: Carousel "On Album Select" option: play the album straight away
+  user: core
+  <source>
+    *: "Play album"
+  </source>
+  <dest>
+    *: "Album abspielen"
+  </dest>
+  <voice>
+    *: "Album abspielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_ASC
+  desc: "Sort Albums By" option: release year, oldest first
+  user: core
+  <source>
+    *: "Year (oldest first)"
+  </source>
+  <dest>
+    *: "Jahr (älteste zuerst)"
+  </dest>
+  <voice>
+    *: "Jahr, älteste zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_DESC
+  desc: "Sort Albums By" option: release year, newest first
+  user: core
+  <source>
+    *: "Year (newest first)"
+  </source>
+  <dest>
+    *: "Jahr (neueste zuerst)"
+  </dest>
+  <voice>
+    *: "Jahr, neueste zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_MENU_SETTINGS
+  desc: General Settings > Music: opens the screen that turns Music menu rows on and off
+  user: core
+  <source>
+    *: "Edit Music Menu"
+  </source>
+  <dest>
+    *: "Musikmenü bearbeiten"
+  </dest>
+  <voice>
+    *: "Musikmenü bearbeiten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MAX_ROWS
+  desc: General Settings > Search: how many results the search keeps
+  user: core
+  <source>
+    *: "Maximum Results"
+  </source>
+  <dest>
+    *: "Maximale Treffer"
+  </dest>
+  <voice>
+    *: "Maximale Treffer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MIN_LETTERS
+  desc: General Settings > Search: how many letters must be typed before searching
+  user: core
+  <source>
+    *: "Minimum Letters"
+  </source>
+  <dest>
+    *: "Mindestanzahl Buchstaben"
+  </dest>
+  <voice>
+    *: "Mindestanzahl Buchstaben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER
+  desc: General Settings > Search: which kind of result is listed first
+  user: core
+  <source>
+    *: "Result Order"
+  </source>
+  <dest>
+    *: "Reihenfolge der Treffer"
+  </dest>
+  <voice>
+    *: "Reihenfolge der Treffer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Albums, Artists"
+  </source>
+  <dest>
+    *: "Titel, Alben, Künstler"
+  </dest>
+  <voice>
+    *: "Titel, Alben, Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Artists, Albums"
+  </source>
+  <dest>
+    *: "Titel, Künstler, Alben"
+  </dest>
+  <voice>
+    *: "Titel, Künstler, Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Tracks, Artists"
+  </source>
+  <dest>
+    *: "Alben, Titel, Künstler"
+  </dest>
+  <voice>
+    *: "Alben, Titel, Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Artists, Tracks"
+  </source>
+  <dest>
+    *: "Alben, Künstler, Titel"
+  </dest>
+  <voice>
+    *: "Alben, Künstler, Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Albums, Tracks"
+  </source>
+  <dest>
+    *: "Künstler, Alben, Titel"
+  </dest>
+  <voice>
+    *: "Künstler, Alben, Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Tracks, Albums"
+  </source>
+  <dest>
+    *: "Künstler, Titel, Alben"
+  </dest>
+  <voice>
+    *: "Künstler, Titel, Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_ARTISTS
+  desc: General Settings > Music: browse by the guests credited in track tags
+  user: core
+  <source>
+    *: "Featured Artists"
+  </source>
+  <dest>
+    *: "Gastkünstler"
+  </dest>
+  <voice>
+    *: "Gastkünstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRIM_TITLES
+  desc: General Settings > Music: drop "(feat. X)", "(Deluxe Edition)" and the
+  user: core
+  <source>
+    *: "Trim Titles"
+  </source>
+  <dest>
+    *: "Titel kürzen"
+  </dest>
+  <voice>
+    *: "Titel kürzen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_IN
+  desc: "[Featured In]" entry on an artist's album list in the tag browser
+  user: core
+  <source>
+    *: "[Featured In]"
+  </source>
+  <dest>
+    *: "[Zu Gast auf]"
+  </dest>
+  <voice>
+    *: "Zu Gast auf"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPLYING_THEME
+  desc: boot screen caption while the theme's skins are being loaded
+  user: core
+  <source>
+    *: "Applying theme..."
+  </source>
+  <dest>
+    *: "Thema wird geladen..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BAND
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter %d"
+  </source>
+  <dest>
+    *: "~Filter %d"
+  </dest>
+  <voice>
+    *: "~Filter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FILTER_TYPE
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter Type"
+  </source>
+  <dest>
+    *: "Filtertyp"
+  </dest>
+  <voice>
+    *: "Filtertyp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN
+  desc: root menu item for the playback-log statistics screen
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "Wiedergabebericht"
+  </dest>
+  <voice>
+    *: "Wiedergabebericht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_LOG
+  desc: the Playback Report found no playback log to read
+  user: core
+  <source>
+    *: "No listening history yet. Turn on Settings > Playback > Logging."
+  </source>
+  <dest>
+    *: "Noch kein Hörverlauf. Einstellungen > Wiedergabe > Protokollierung einschalten."
+  </dest>
+  <voice>
+    *: "Noch kein Hörverlauf"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_MEMORY
+  desc: the Playback Report could not get enough working memory for the log
+  user: core
+  <source>
+    *: "Not enough memory to read the log"
+  </source>
+  <dest>
+    *: "Nicht genug Speicher für das Protokoll"
+  </dest>
+  <voice>
+    *: "Nicht genug Speicher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOT_IN_LIBRARY
+  desc: the Playback Report could not find the artist, album or song a card names
+  user: core
+  <source>
+    *: "Not in your library under that name"
+  </source>
+  <dest>
+    *: "Unter diesem Namen nicht in der Bibliothek"
+  </dest>
+  <voice>
+    *: "Nicht in der Bibliothek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_CARD
+  desc: Playback Report menu item, saves a picture of the card on screen
+  user: core
+  <source>
+    *: "Save Current Card"
+  </source>
+  <dest>
+    *: "Aktuelle Karte speichern"
+  </dest>
+  <voice>
+    *: "Aktuelle Karte speichern"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_ALL
+  desc: Playback Report menu item, saves a picture of every card
+  user: core
+  <source>
+    *: "Save All Cards"
+  </source>
+  <dest>
+    *: "Alle Karten speichern"
+  </dest>
+  <voice>
+    *: "Alle Karten speichern"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_CHANGED
+  desc: title of the screen listing every setting that differs from its default
+  user: core
+  <source>
+    *: "Changed Settings"
+  </source>
+  <dest>
+    *: "Geänderte Einstellungen"
+  </dest>
+  <voice>
+    *: "Geänderte Einstellungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_ALL_DEFAULT
+  desc: splash when no setting differs from its default
+  user: core
+  <source>
+    *: "Nothing changed from defaults"
+  </source>
+  <dest>
+    *: "Alles auf Standardwerten"
+  </dest>
+  <voice>
+    *: "Alles auf Standardwerten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_FORGET_TWEAKS
+  desc: discard the appearance changes made by hand under the current theme
+  user: core
+  <source>
+    *: "Forget My Changes"
+  </source>
+  <dest>
+    *: "Meine Änderungen verwerfen"
+  </dest>
+  <voice>
+    *: "Meine Änderungen verwerfen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_NO_TWEAKS
+  desc: splash when the current theme has no hand-made changes to forget
+  user: core
+  <source>
+    *: "No changes to forget"
+  </source>
+  <dest>
+    *: "Keine Änderungen zu verwerfen"
+  </dest>
+  <voice>
+    *: "Keine Änderungen zu verwerfen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY
+  desc: settings branch: the file browser, the music browser and the database
+  user: core
+  <source>
+    *: "Library"
+  </source>
+  <dest>
+    *: "Bibliothek"
+  </dest>
+  <voice>
+    *: "Bibliothek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPEARANCE
+  desc: settings branch: themes, fonts, colours and how the screens look
+  user: core
+  <source>
+    *: "Appearance"
+  </source>
+  <dest>
+    *: "Darstellung"
+  </dest>
+  <voice>
+    *: "Darstellung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BATTERY_POWER
+  desc: settings branch: backlight, brightness, sleep and disk power
+  user: core
+  <source>
+    *: "Battery & Power"
+  </source>
+  <dest>
+    *: "Akku & Energie"
+  </dest>
+  <voice>
+    *: "Akku und Energie"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_VIEWERS
+  desc: settings submenu: the text and lyrics viewers
+  user: core
+  <source>
+    *: "Viewers"
+  </source>
+  <dest>
+    *: "Anzeigeprogramme"
+  </dest>
+  <voice>
+    *: "Anzeigeprogramme"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB
+  desc: settings submenu: what the player does when plugged into a host
+  user: core
+  <source>
+    *: "USB"
+  </source>
+  <dest>
+    *: "~USB"
+  </dest>
+  <voice>
+    *: "~U S B"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORIES
+  desc: settings submenu: the dock connector's serial, power and line-out pins
+  user: core
+  <source>
+    *: "Accessories"
+  </source>
+  <dest>
+    *: "Zubehör"
+  </dest>
+  <voice>
+    *: "Zubehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LANGUAGE_AND_TEXT
+  desc: settings submenu: language, voice and the default codepage
+  user: core
+  <source>
+    *: "Language & Text"
+  </source>
+  <dest>
+    *: "Sprache & Text"
+  </dest>
+  <voice>
+    *: "Sprache und Text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_MAINTENANCE
+  desc: settings submenu gathering every rebuild and update action
+  user: core
+  <source>
+    *: "Maintenance"
+  </source>
+  <dest>
+    *: "Wartung"
+  </dest>
+  <voice>
+    *: "Wartung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_DB
+  desc: maintenance action, find newly added tracks
+  user: core
+  <source>
+    *: "Update Database"
+  </source>
+  <dest>
+    *: "Datenbank aktualisieren"
+  </dest>
+  <voice>
+    *: "Datenbank aktualisieren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_DB
+  desc: maintenance action, rebuild the database from scratch
+  user: core
+  <source>
+    *: "Rebuild Database"
+  </source>
+  <dest>
+    *: "Datenbank neu aufbauen"
+  </dest>
+  <voice>
+    *: "Datenbank neu aufbauen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESCAN_FILES
+  desc: maintenance action, rebuild the flat Documents and Images lists
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Dokumente & Bilder neu scannen"
+  </dest>
+  <voice>
+    *: "Dokumente und Bilder neu scannen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAINT_STARTED
+  desc: splash after a maintenance action is queued to the background
+  user: core
+  <source>
+    *: "Started in the background"
+  </source>
+  <dest>
+    *: "Im Hintergrund gestartet"
+  </dest>
+  <voice>
+    *: "Im Hintergrund gestartet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT
+  desc: maintenance action, discard the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuild Playback Report"
+  </source>
+  <dest>
+    *: "Wiedergabebericht neu aufbauen"
+  </dest>
+  <voice>
+    *: "Wiedergabebericht neu aufbauen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT_SPLASH
+  desc: splash after clearing the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuilds next time it opens"
+  </source>
+  <dest>
+    *: "Wird beim nächsten Öffnen neu aufgebaut"
+  </dest>
+  <voice>
+    *: "Wird beim nächsten Öffnen neu aufgebaut"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_STANDARD
+  desc: settings mode showing everything except the advanced rows
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "~Standard"
+  </dest>
+  <voice>
+    *: "~Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_EVERYTHING
+  desc: settings mode showing every row including the advanced ones
+  user: core
+  <source>
+    *: "Everything"
+  </source>
+  <dest>
+    *: "Alles"
+  </dest>
+  <voice>
+    *: "Alles"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EXPLAIN
+  desc: setting context menu entry, shows what the setting does
+  user: core
+  <source>
+    *: "Explain"
+  </source>
+  <dest>
+    *: "Erklären"
+  </dest>
+  <voice>
+    *: "Erklären"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_EXPLANATION
+  desc: splash when a setting has no explanation written for it
+  user: core
+  <source>
+    *: "No explanation for this one"
+  </source>
+  <dest>
+    *: "Keine Erklärung vorhanden"
+  </dest>
+  <voice>
+    *: "Keine Erklärung vorhanden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKINS
+  desc: Appearance submenu holding the while-playing skin, base skin and backdrop
+  user: core
+  <source>
+    *: "Skins"
+  </source>
+  <dest>
+    *: "~Skins"
+  </dest>
+  <voice>
+    *: "~Skins"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ELEMENTS
+  desc: Appearance submenu holding which pieces of chrome are drawn
+  user: core
+  <source>
+    *: "Interface Elements"
+  </source>
+  <dest>
+    *: "Oberflächenelemente"
+  </dest>
+  <voice>
+    *: "Oberflächenelemente"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_CONTEXT_ITEMS
+  desc: clears the four while-playing context menu slots
+  user: core
+  <source>
+    *: "Reset Context Menu"
+  </source>
+  <dest>
+    *: "Kontextmenü zurücksetzen"
+  </dest>
+  <voice>
+    *: "Kontextmenü zurücksetzen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALL_ALBUMS
+  desc: album sort context: the Albums list with nothing above it
+  user: core
+  <source>
+    *: "All Albums"
+  </source>
+  <dest>
+    *: "Alle Alben"
+  </dest>
+  <voice>
+    *: "Alle Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OTHER_LISTS
+  desc: album sort context: every album list with no row of its own
+  user: core
+  <source>
+    *: "Other Lists"
+  </source>
+  <dest>
+    *: "Andere Listen"
+  </dest>
+  <voice>
+    *: "Andere Listen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_USE_DEFAULT
+  desc: album sort choice: follow the Other Lists order
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_ZOOM_PAN
+  desc: in the image viewer settings menu
+  user: core
+  <source>
+    *: "Zoom / Pan"
+  </source>
+  <dest>
+    *: "Zoomen / Verschieben"
+  </dest>
+  <voice>
+    *: "Zoomen und Verschieben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ABOUT
+  desc: in the System menu, opens the About page
+  user: core
+  <source>
+    *: "About"
+  </source>
+  <dest>
+    *: "Über"
+  </dest>
+  <voice>
+    *: "Über"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE
+  desc: title of the Spike menu, on held Menu in the game
+  user: core
+  <source>
+    *: "Spike"
+  </source>
+  <dest>
+    *: "~Spike"
+  </dest>
+  <voice>
+    *: "~Spike"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_PLAY
+  desc: in the context menus, starts the game
+  user: core
+  <source>
+    *: "Play with Spike"
+  </source>
+  <dest>
+    *: "Mit Spike spielen"
+  </dest>
+  <voice>
+    *: "Mit Spike spielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_LEAVE
+  desc: asked when Menu is pressed during a Spike run
+  user: core
+  <source>
+    *: "End this run?"
+  </source>
+  <dest>
+    *: "Diesen Lauf beenden?"
+  </dest>
+  <voice>
+    *: "Diesen Lauf beenden?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_SCORES
+  desc: in the Spike menu, the table of best scores
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "Bestenliste"
+  </dest>
+  <voice>
+    *: "Bestenliste"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_OFFSET
+  desc: in the Spike menu, the output delay the game is judged against
+  user: core
+  <source>
+    *: "Audio Offset"
+  </source>
+  <dest>
+    *: "Audioversatz"
+  </dest>
+  <voice>
+    *: "Audioversatz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION
+  desc: in the Spike menu, whether the track is named under the field
+  user: core
+  <source>
+    *: "Now Playing"
+  </source>
+  <dest>
+    *: "Aktueller Titel"
+  </dest>
+  <voice>
+    *: "Aktueller Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_TITLE
+  desc: in the Spike menu, the caption shows the title alone
+  user: core
+  <source>
+    *: "Title"
+  </source>
+  <dest>
+    *: "Titel"
+  </dest>
+  <voice>
+    *: "Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_BOTH
+  desc: in the Spike menu, the caption shows the title and the artist
+  user: core
+  <source>
+    *: "Title and Artist"
+  </source>
+  <dest>
+    *: "Titel und Künstler"
+  </dest>
+  <voice>
+    *: "Titel und Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_SCROLL
+  desc: in the Spike menu, whether the track name travels or is cropped
+  user: core
+  <source>
+    *: "Scroll Now Playing"
+  </source>
+  <dest>
+    *: "Aktuellen Titel scrollen"
+  </dest>
+  <voice>
+    *: "Aktuellen Titel scrollen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO
+  desc: in the Spike menu, half or double the detected tempo
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "~Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HALF
+  desc: the Tempo option, half the detected tempo
+  user: core
+  <source>
+    *: "Half"
+  </source>
+  <dest>
+    *: "Halb"
+  </dest>
+  <voice>
+    *: "Halb"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_DOUBLE
+  desc: the Tempo option, double the detected tempo
+  user: core
+  <source>
+    *: "Double"
+  </source>
+  <dest>
+    *: "Doppelt"
+  </dest>
+  <voice>
+    *: "Doppelt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HEARD
+  desc: the Tempo option, the tempo as the tracker found it
+  user: core
+  <source>
+    *: "As Heard"
+  </source>
+  <dest>
+    *: "Wie erkannt"
+  </dest>
+  <voice>
+    *: "Wie erkannt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_INFO
+  desc: in the Spike menu, what the game has to say about itself
+  user: core
+  <source>
+    *: "Spike Info"
+  </source>
+  <dest>
+    *: "Spike-Info"
+  </dest>
+  <voice>
+    *: "Spike-Info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_RESUME
+  desc: in the Audiobooks browser, the row that picks a book up where it was left
+  user: core
+  <source>
+    *: "[Resume]"
+  </source>
+  <dest>
+    *: "[Fortsetzen]"
+  </dest>
+  <voice>
+    *: "Fortsetzen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ARTWORK
+  desc: in Settings > Library > Viewers > Playback Report, whether cards show album art
+  user: core
+  <source>
+    *: "Artwork"
+  </source>
+  <dest>
+    *: "Cover"
+  </dest>
+  <voice>
+    *: "Cover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_TOP_COUNT
+  desc: in Settings > Library > Viewers > Playback Report, how many rows a top-ten section shows
+  user: core
+  <source>
+    *: "Top Rows"
+  </source>
+  <dest>
+    *: "Zeilen in Top-Listen"
+  </dest>
+  <voice>
+    *: "Zeilen in Top-Listen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_BADGE_ORDER
+  desc: in Settings > Library > Viewers > Playback Report, how achievements are sorted
+  user: core
+  <source>
+    *: "Achievement Order"
+  </source>
+  <dest>
+    *: "Reihenfolge der Erfolge"
+  </dest>
+  <voice>
+    *: "Reihenfolge der Erfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_BY
+  desc: in Settings > Library > Viewers > Playback Report, what the top lists are ordered on
+  user: core
+  <source>
+    *: "Ranked By"
+  </source>
+  <dest>
+    *: "Rangfolge nach"
+  </dest>
+  <voice>
+    *: "Rangfolge nach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_PLAYS
+  desc: Ranked By option: order the top lists by number of plays
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "Wiedergaben"
+  </dest>
+  <voice>
+    *: "Wiedergaben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_MINUTES
+  desc: Ranked By option: order the top lists by time listened
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "Minuten"
+  </dest>
+  <voice>
+    *: "Minuten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_TABLE
+  desc: Achievement Order option: the order the achievement table is written in
+  user: core
+  <source>
+    *: "As Listed"
+  </source>
+  <dest>
+    *: "Wie aufgelistet"
+  </dest>
+  <voice>
+    *: "Wie aufgelistet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_EARNED
+  desc: Achievement Order option: the ones already won come first
+  user: core
+  <source>
+    *: "Earned First"
+  </source>
+  <dest>
+    *: "Erreichte zuerst"
+  </dest>
+  <voice>
+    *: "Erreichte zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_RECENT
+  desc: Achievement Order option: most recently won first
+  user: core
+  <source>
+    *: "Newest First"
+  </source>
+  <dest>
+    *: "Neueste zuerst"
+  </dest>
+  <voice>
+    *: "Neueste zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_CLOSEST
+  desc: Achievement Order option: the ones nearest to being won first
+  user: core
+  <source>
+    *: "Closest First"
+  </source>
+  <dest>
+    *: "Knappste zuerst"
+  </dest>
+  <voice>
+    *: "Knappste zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REMOTE_TRACK_SKIP
+  desc: in the accessories settings menu
+  user: core
+  <source>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </source>
+  <dest>
+    *: none
+    mikey_remote: "Titelsprung per Fernbedienung"
+  </dest>
+  <voice>
+    *: none
+    mikey_remote: "Titelsprung per Fernbedienung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS
+  desc: context menu row on an album or artist: how much of it has been heard
+  user: core
+  <source>
+    *: "Listening Progress"
+  </source>
+  <dest>
+    *: "Hörfortschritt"
+  </dest>
+  <voice>
+    *: "Hörfortschritt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_SUMMARY
+  desc: top row of the Listening Progress screen: percent, played, total
+  user: core
+  <source>
+    *: "%d%% - %d of %d tracks"
+  </source>
+  <dest>
+    *: "%d%% - %d von %d Titeln"
+  </dest>
+  <voice>
+    *: "Hörfortschritt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_ALBUM
+  desc: album row on the Listening Progress screen: name, percent, tracks unheard
+  user: core
+  <source>
+    *: "%s - %d%% (%d left)"
+  </source>
+  <dest>
+    *: "%s - %d%% (%d übrig)"
+  </dest>
+  <voice>
+    *: "~Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX
+  desc: in the context menus, plays tracks that sound like the selected one
+  user: core
+  <source>
+    *: "Play Similar"
+  </source>
+  <dest>
+    *: "Ähnliches abspielen"
+  </dest>
+  <voice>
+    *: "Ähnliches abspielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NONE
+  desc: shown when nothing in the library sounds near enough to build a mix
+  user: core
+  <source>
+    *: "Nothing similar found"
+  </source>
+  <dest>
+    *: "Nichts Ähnliches gefunden"
+  </dest>
+  <voice>
+    *: "Nichts Ähnliches gefunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_INDEX
+  desc: Play Similar, when there is no analysis index to read
+  user: core
+  <source>
+    *: "The library has not been analysed"
+  </source>
+  <dest>
+    *: "Die Bibliothek wurde nicht analysiert"
+  </dest>
+  <voice>
+    *: "Die Bibliothek wurde nicht analysiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_RECORD
+  desc: Play Similar, when the index holds nothing for the selected track
+  user: core
+  <source>
+    *: "This track has not been analysed"
+  </source>
+  <dest>
+    *: "Dieser Titel wurde nicht analysiert"
+  </dest>
+  <voice>
+    *: "Dieser Titel wurde nicht analysiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_FAILED
+  desc: Play Similar, when tracks were chosen but the playlist could not be built
+  user: core
+  <source>
+    *: "Could not build the playlist"
+  </source>
+  <dest>
+    *: "Wiedergabeliste konnte nicht erstellt werden"
+  </dest>
+  <voice>
+    *: "Wiedergabeliste konnte nicht erstellt werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_TRACK
+  desc: Play Similar, when the selected row could not be resolved to a file
+  user: core
+  <source>
+    *: "Could not identify the track"
+  </source>
+  <dest>
+    *: "Titel konnte nicht ermittelt werden"
+  </dest>
+  <voice>
+    *: "Titel konnte nicht ermittelt werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYLIST_ENGINE
+  desc: in Library, switches the sound analysis and the playlists built from it on
+  user: core
+  <source>
+    *: "Playlist Engine"
+  </source>
+  <dest>
+    *: "Playlist-Generator"
+  </dest>
+  <voice>
+    *: "Playlist-Generator"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_PLAYLIST
+  desc: in Library - Playlist Engine, how a playlist built from a track is chosen
+  user: core
+  <source>
+    *: "Track Playlist"
+  </source>
+  <dest>
+    *: "Liste ab Titel"
+  </dest>
+  <voice>
+    *: "Liste ab Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_PREDICTABLE
+  desc: variation option: the same list until the library changes
+  user: core
+  <source>
+    *: "Predictable"
+  </source>
+  <dest>
+    *: "Vorhersehbar"
+  </dest>
+  <voice>
+    *: "Vorhersehbar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_VARIABLE
+  desc: variation option: a different list every run, from the same neighbourhood
+  user: core
+  <source>
+    *: "Variable"
+  </source>
+  <dest>
+    *: "Wechselnd"
+  </dest>
+  <voice>
+    *: "Wechselnd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_SOUND
+  desc: in Library - Maintenance, measures tracks the analysis has not covered
+  user: core
+  <source>
+    *: "Update Sound Analysis"
+  </source>
+  <dest>
+    *: "Klanganalyse aktualisieren"
+  </dest>
+  <voice>
+    *: "Klanganalyse aktualisieren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_SOUND
+  desc: in Library - Maintenance, measures the whole library again
+  user: core
+  <source>
+    *: "Rebuild Sound Analysis"
+  </source>
+  <dest>
+    *: "Klanganalyse neu aufbauen"
+  </dest>
+  <voice>
+    *: "Klanganalyse neu aufbauen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_WEEKLY
+  desc: variation option: the same list for a week, then a new one
+  user: core
+  <source>
+    *: "Weekly"
+  </source>
+  <dest>
+    *: "Wöchentlich"
+  </dest>
+  <voice>
+    *: "Wöchentlich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_DEPTH
+  desc: in Library - Playlist Engine, how much of each track the analysis listens to
+  user: core
+  <source>
+    *: "Analysis Depth"
+  </source>
+  <dest>
+    *: "Analysetiefe"
+  </dest>
+  <voice>
+    *: "Analysetiefe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_THOROUGH
+  desc: Analysis Depth option: listen to the whole window
+  user: core
+  <source>
+    *: "Thorough"
+  </source>
+  <dest>
+    *: "Gründlich"
+  </dest>
+  <voice>
+    *: "Gründlich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_QUICK
+  desc: Analysis Depth option: stop once the tempo has settled
+  user: core
+  <source>
+    *: "Quick"
+  </source>
+  <dest>
+    *: "Schnell"
+  </dest>
+  <voice>
+    *: "Schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOODS
+  desc: row on the Playlists screen: playlists built from a mood
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stimmungen"
+  </dest>
+  <voice>
+    *: "Stimmungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEYS
+  desc: row on the Playlists screen: playlists that travel between two moods
+  user: core
+  <source>
+    *: "Journeys"
+  </source>
+  <dest>
+    *: "Reisen"
+  </dest>
+  <voice>
+    *: "Reisen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN
+  desc: on a track context menu, builds a playlist that gets calmer and plays it
+  user: core
+  <source>
+    *: "Wind Down"
+  </source>
+  <dest>
+    *: "Ausklingen"
+  </dest>
+  <voice>
+    *: "Ausklingen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PLAYLIST
+  desc: in Library - Playlist Engine, how much a mood or journey varies between runs
+  user: core
+  <source>
+    *: "Mood Playlist"
+  </source>
+  <dest>
+    *: "Liste nach Stimmung"
+  </dest>
+  <voice>
+    *: "Liste nach Stimmung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_CALM
+  desc: mood name: quiet, sparse and unhurried
+  user: core
+  <source>
+    *: "Calm"
+  </source>
+  <dest>
+    *: "Ruhig"
+  </dest>
+  <voice>
+    *: "Ruhig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_ENERGETIC
+  desc: mood name: loud, busy and driving
+  user: core
+  <source>
+    *: "Energetic"
+  </source>
+  <dest>
+    *: "Energiegeladen"
+  </dest>
+  <voice>
+    *: "Energiegeladen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DARK
+  desc: mood name: minor, little treble, weighted low
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Düster"
+  </dest>
+  <voice>
+    *: "Düster"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_BRIGHT
+  desc: mood name: major, treble-forward and clear
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Hell"
+  </dest>
+  <voice>
+    *: "Hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_WARM
+  desc: mood name: mid and low heavy, treble pulled back
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "~Warm"
+  </dest>
+  <voice>
+    *: "~Warm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_RAW
+  desc: mood name: unpolished, narrow and transient-heavy
+  user: core
+  <source>
+    *: "Raw"
+  </source>
+  <dest>
+    *: "Roh"
+  </dest>
+  <voice>
+    *: "Roh"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_LUSH
+  desc: mood name: wide, clear and harmonically rich
+  user: core
+  <source>
+    *: "Lush"
+  </source>
+  <dest>
+    *: "Üppig"
+  </dest>
+  <voice>
+    *: "Üppig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PUNCHY
+  desc: mood name: strong transients and wide dynamics
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Druckvoll"
+  </dest>
+  <voice>
+    *: "Druckvoll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SMOOTH
+  desc: mood name: few transients, little harmonic movement
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Sanft"
+  </dest>
+  <voice>
+    *: "Sanft"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SPARSE
+  desc: mood name: few events, dynamic
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Spärlich"
+  </dest>
+  <voice>
+    *: "Spärlich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DENSE
+  desc: mood name: many events, compressed
+  user: core
+  <source>
+    *: "Dense"
+  </source>
+  <dest>
+    *: "Dicht"
+  </dest>
+  <voice>
+    *: "Dicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_HYPNOTIC
+  desc: mood name: steady tempo, little harmonic movement
+  user: core
+  <source>
+    *: "Hypnotic"
+  </source>
+  <dest>
+    *: "Hypnotisch"
+  </dest>
+  <voice>
+    *: "Hypnotisch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SLOW
+  desc: mood name: slow, where the tempo is trusted
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Langsam"
+  </dest>
+  <voice>
+    *: "Langsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_FAST
+  desc: mood name: fast, where the tempo is trusted
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Schnell"
+  </dest>
+  <voice>
+    *: "Schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_MELANCHOLY
+  desc: mood name: minor, slow and quiet
+  user: core
+  <source>
+    *: "Melancholy"
+  </source>
+  <dest>
+    *: "Melancholisch"
+  </dest>
+  <voice>
+    *: "Melancholisch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_UPLIFTING
+  desc: mood name: major, fast and bright
+  user: core
+  <source>
+    *: "Uplifting"
+  </source>
+  <dest>
+    *: "Beschwingt"
+  </dest>
+  <voice>
+    *: "Beschwingt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_CALM_ENERGETIC
+  desc: journey name
+  user: core
+  <source>
+    *: "Calm to Energetic"
+  </source>
+  <dest>
+    *: "Von ruhig zu energiegeladen"
+  </dest>
+  <voice>
+    *: "Von ruhig zu energiegeladen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_DARK_BRIGHT
+  desc: journey name
+  user: core
+  <source>
+    *: "Dark to Bright"
+  </source>
+  <dest>
+    *: "Von düster zu hell"
+  </dest>
+  <voice>
+    *: "Von düster zu hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SPARSE_DENSE
+  desc: journey name
+  user: core
+  <source>
+    *: "Sparse to Dense"
+  </source>
+  <dest>
+    *: "Von spärlich zu dicht"
+  </dest>
+  <voice>
+    *: "Von spärlich zu dicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SLOW_FAST
+  desc: journey name
+  user: core
+  <source>
+    *: "Slow to Fast"
+  </source>
+  <dest>
+    *: "Von langsam zu schnell"
+  </dest>
+  <voice>
+    *: "Von langsam zu schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_MELANCHOLY_UPLIFTING
+  desc: journey name
+  user: core
+  <source>
+    *: "Melancholy to Uplifting"
+  </source>
+  <dest>
+    *: "Von melancholisch zu beschwingt"
+  </dest>
+  <voice>
+    *: "Von melancholisch zu beschwingt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_LENGTH
+  desc: in Library - Playlist Engine, how many tracks a generated playlist holds
+  user: core
+  <source>
+    *: "Playlist Length"
+  </source>
+  <dest>
+    *: "Listenlänge"
+  </dest>
+  <voice>
+    *: "Listenlänge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_PLAYING
+  desc: in Library - Playlist Engine, keep playing after a playlist runs out
+  user: core
+  <source>
+    *: "Continue Playing"
+  </source>
+  <dest>
+    *: "Weiterspielen"
+  </dest>
+  <voice>
+    *: "Weiterspielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PROPERTIES
+  desc: in Track Info, the row opening the sound read-out, and its screen title
+  user: core
+  <source>
+    *: "Sound"
+  </source>
+  <dest>
+    *: "Klang"
+  </dest>
+  <voice>
+    *: "Klang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOODS
+  desc: sound read-out: the moods this track would be offered by
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stimmungen"
+  </dest>
+  <voice>
+    *: "Stimmungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_NEAREST_MOOD
+  desc: sound read-out: shown instead of Moods when no mood is near enough
+  user: core
+  <source>
+    *: "Nearest Mood"
+  </source>
+  <dest>
+    *: "Nächste Stimmung"
+  </dest>
+  <voice>
+    *: "Nächste Stimmung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY
+  desc: sound read-out: how much the track drives
+  user: core
+  <source>
+    *: "Energy"
+  </source>
+  <dest>
+    *: "Energie"
+  </dest>
+  <voice>
+    *: "Energie"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE
+  desc: sound read-out: tempo
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE
+  desc: sound read-out: the balance between treble, mid and bass
+  user: core
+  <source>
+    *: "Tone"
+  </source>
+  <dest>
+    *: "Klangfarbe"
+  </dest>
+  <voice>
+    *: "Klangfarbe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY
+  desc: sound read-out: how much is happening
+  user: core
+  <source>
+    *: "Activity"
+  </source>
+  <dest>
+    *: "Aktivität"
+  </dest>
+  <voice>
+    *: "Aktivität"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK
+  desc: sound read-out: how sharply the sound hits
+  user: core
+  <source>
+    *: "Attack"
+  </source>
+  <dest>
+    *: "Anschlag"
+  </dest>
+  <voice>
+    *: "Anschlag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE
+  desc: sound read-out: how clearly pitched the sound is
+  user: core
+  <source>
+    *: "Texture"
+  </source>
+  <dest>
+    *: "Textur"
+  </dest>
+  <voice>
+    *: "Textur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE
+  desc: sound read-out: stereo width
+  user: core
+  <source>
+    *: "Space"
+  </source>
+  <dest>
+    *: "Raum"
+  </dest>
+  <voice>
+    *: "Raum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER
+  desc: sound read-out: how compressed the master is
+  user: core
+  <source>
+    *: "Master"
+  </source>
+  <dest>
+    *: "Mastering"
+  </dest>
+  <voice>
+    *: "Mastering"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT
+  desc: sound read-out: how much the harmony moves
+  user: core
+  <source>
+    *: "Movement"
+  </source>
+  <dest>
+    *: "Bewegung"
+  </dest>
+  <voice>
+    *: "Bewegung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY
+  desc: sound read-out: musical key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Tonart"
+  </dest>
+  <voice>
+    *: "Tonart"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_BPM
+  desc: sound read-out: beats per minute, after the number
+  user: core
+  <source>
+    *: "BPM"
+  </source>
+  <dest>
+    *: "~BPM"
+  </dest>
+  <voice>
+    *: "~B P M"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_LOW
+  desc: sound read-out, energy: bottom quarter of the library
+  user: core
+  <source>
+    *: "Low"
+  </source>
+  <dest>
+    *: "Niedrig"
+  </dest>
+  <voice>
+    *: "Niedrig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_MODERATE
+  desc: sound read-out, energy: second quarter of the library
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Mäßig"
+  </dest>
+  <voice>
+    *: "Mäßig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_HIGH
+  desc: sound read-out, energy: third quarter of the library
+  user: core
+  <source>
+    *: "High"
+  </source>
+  <dest>
+    *: "Hoch"
+  </dest>
+  <voice>
+    *: "Hoch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_VERY_HIGH
+  desc: sound read-out, energy: top quarter of the library
+  user: core
+  <source>
+    *: "Very high"
+  </source>
+  <dest>
+    *: "Sehr hoch"
+  </dest>
+  <voice>
+    *: "Sehr hoch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_SLOW
+  desc: sound read-out, pace: under 70 BPM
+  user: core
+  <source>
+    *: "Very slow"
+  </source>
+  <dest>
+    *: "Sehr langsam"
+  </dest>
+  <voice>
+    *: "Sehr langsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_SLOW
+  desc: sound read-out, pace: 70 to 89 BPM
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Langsam"
+  </dest>
+  <voice>
+    *: "Langsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_RELAXED
+  desc: sound read-out, pace: 90 to 109 BPM
+  user: core
+  <source>
+    *: "Relaxed"
+  </source>
+  <dest>
+    *: "Gemächlich"
+  </dest>
+  <voice>
+    *: "Gemächlich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_MODERATE
+  desc: sound read-out, pace: 110 to 129 BPM
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Mäßig"
+  </dest>
+  <voice>
+    *: "Mäßig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_BRISK
+  desc: sound read-out, pace: 130 to 149 BPM
+  user: core
+  <source>
+    *: "Brisk"
+  </source>
+  <dest>
+    *: "Zügig"
+  </dest>
+  <voice>
+    *: "Zügig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_FAST
+  desc: sound read-out, pace: 150 to 169 BPM
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Schnell"
+  </dest>
+  <voice>
+    *: "Schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_FAST
+  desc: sound read-out, pace: 170 BPM and over
+  user: core
+  <source>
+    *: "Very fast"
+  </source>
+  <dest>
+    *: "Sehr schnell"
+  </dest>
+  <voice>
+    *: "Sehr schnell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_UNSTEADY
+  desc: sound read-out, pace: follows the tempo where it is not trusted
+  user: core
+  <source>
+    *: "unsteady"
+  </source>
+  <dest>
+    *: "unstet"
+  </dest>
+  <voice>
+    *: "unstet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_NONE
+  desc: sound read-out, pace: the analysis found no beat at all
+  user: core
+  <source>
+    *: "No steady beat"
+  </source>
+  <dest>
+    *: "Kein fester Takt"
+  </dest>
+  <voice>
+    *: "Kein fester Takt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_DARK
+  desc: sound read-out, tone: much less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Dunkel"
+  </dest>
+  <voice>
+    *: "Dunkel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_WARM
+  desc: sound read-out, tone: less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "~Warm"
+  </dest>
+  <voice>
+    *: "~Warm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BALANCED
+  desc: sound read-out, tone: treble about where the loudness predicts
+  user: core
+  <source>
+    *: "Balanced"
+  </source>
+  <dest>
+    *: "Ausgewogen"
+  </dest>
+  <voice>
+    *: "Ausgewogen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BRIGHT
+  desc: sound read-out, tone: more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Hell"
+  </dest>
+  <voice>
+    *: "Hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_VERY_BRIGHT
+  desc: sound read-out, tone: much more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Very bright"
+  </source>
+  <dest>
+    *: "Sehr hell"
+  </dest>
+  <voice>
+    *: "Sehr hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BASS_LED
+  desc: sound read-out, tone: appended where the low band leads
+  user: core
+  <source>
+    *: "bass-forward"
+  </source>
+  <dest>
+    *: "bassbetont"
+  </dest>
+  <voice>
+    *: "bassbetont"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_MID_LED
+  desc: sound read-out, tone: appended where the middle band leads
+  user: core
+  <source>
+    *: "mid-forward"
+  </source>
+  <dest>
+    *: "mittenbetont"
+  </dest>
+  <voice>
+    *: "mittenbetont"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_SPARSE
+  desc: sound read-out, activity: few onsets
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Spärlich"
+  </dest>
+  <voice>
+    *: "Spärlich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_OPEN
+  desc: sound read-out, activity: below average onsets
+  user: core
+  <source>
+    *: "Open"
+  </source>
+  <dest>
+    *: "Locker"
+  </dest>
+  <voice>
+    *: "Locker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_BUSY
+  desc: sound read-out, activity: above average onsets
+  user: core
+  <source>
+    *: "Busy"
+  </source>
+  <dest>
+    *: "Belebt"
+  </dest>
+  <voice>
+    *: "Belebt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_VERY_BUSY
+  desc: sound read-out, activity: many onsets
+  user: core
+  <source>
+    *: "Very busy"
+  </source>
+  <dest>
+    *: "Sehr belebt"
+  </dest>
+  <voice>
+    *: "Sehr belebt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_SMOOTH
+  desc: sound read-out, attack: very little transient
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Weich"
+  </dest>
+  <voice>
+    *: "Weich"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_EVEN
+  desc: sound read-out, attack: below average transient
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Gleichmäßig"
+  </dest>
+  <voice>
+    *: "Gleichmäßig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_PUNCHY
+  desc: sound read-out, attack: above average transient
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Druckvoll"
+  </dest>
+  <voice>
+    *: "Druckvoll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_VERY_PUNCHY
+  desc: sound read-out, attack: sharp transient
+  user: core
+  <source>
+    *: "Very punchy"
+  </source>
+  <dest>
+    *: "Sehr druckvoll"
+  </dest>
+  <voice>
+    *: "Sehr druckvoll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_NOISY
+  desc: sound read-out, texture: little clear pitch
+  user: core
+  <source>
+    *: "Noisy"
+  </source>
+  <dest>
+    *: "Geräuschhaft"
+  </dest>
+  <voice>
+    *: "Geräuschhaft"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_BLENDED
+  desc: sound read-out, texture: below average pitch clarity
+  user: core
+  <source>
+    *: "Blended"
+  </source>
+  <dest>
+    *: "Verschmolzen"
+  </dest>
+  <voice>
+    *: "Verschmolzen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_CLEAR
+  desc: sound read-out, texture: above average pitch clarity
+  user: core
+  <source>
+    *: "Clear"
+  </source>
+  <dest>
+    *: "Klar"
+  </dest>
+  <voice>
+    *: "Klar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_VERY_CLEAR
+  desc: sound read-out, texture: strongly pitched
+  user: core
+  <source>
+    *: "Very clear"
+  </source>
+  <dest>
+    *: "Sehr klar"
+  </dest>
+  <voice>
+    *: "Sehr klar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_MONO
+  desc: sound read-out, space: almost no stereo difference
+  user: core
+  <source>
+    *: "Almost mono"
+  </source>
+  <dest>
+    *: "Fast mono"
+  </dest>
+  <voice>
+    *: "Fast mono"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_NARROW
+  desc: sound read-out, space: below average stereo width
+  user: core
+  <source>
+    *: "Narrow"
+  </source>
+  <dest>
+    *: "Schmal"
+  </dest>
+  <voice>
+    *: "Schmal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_WIDE
+  desc: sound read-out, space: above average stereo width
+  user: core
+  <source>
+    *: "Wide"
+  </source>
+  <dest>
+    *: "Breit"
+  </dest>
+  <voice>
+    *: "Breit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_VERY_WIDE
+  desc: sound read-out, space: very wide stereo
+  user: core
+  <source>
+    *: "Very wide"
+  </source>
+  <dest>
+    *: "Sehr breit"
+  </dest>
+  <voice>
+    *: "Sehr breit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_DYNAMIC
+  desc: sound read-out, master: a large gap between peak and average
+  user: core
+  <source>
+    *: "Very dynamic"
+  </source>
+  <dest>
+    *: "Sehr dynamisch"
+  </dest>
+  <voice>
+    *: "Sehr dynamisch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_DYNAMIC
+  desc: sound read-out, master: an above average gap between peak and average
+  user: core
+  <source>
+    *: "Dynamic"
+  </source>
+  <dest>
+    *: "Dynamisch"
+  </dest>
+  <voice>
+    *: "Dynamisch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_EVEN
+  desc: sound read-out, master: an average gap between peak and average
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Ausgeglichen"
+  </dest>
+  <voice>
+    *: "Ausgeglichen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_COMPRESSED
+  desc: sound read-out, master: a small gap between peak and average
+  user: core
+  <source>
+    *: "Compressed"
+  </source>
+  <dest>
+    *: "Komprimiert"
+  </dest>
+  <voice>
+    *: "Komprimiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_COMPRESSED
+  desc: sound read-out, master: almost no gap between peak and average
+  user: core
+  <source>
+    *: "Very compressed"
+  </source>
+  <dest>
+    *: "Stark komprimiert"
+  </dest>
+  <voice>
+    *: "Stark komprimiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_STATIC
+  desc: sound read-out, movement: the harmony barely moves
+  user: core
+  <source>
+    *: "Static"
+  </source>
+  <dest>
+    *: "Statisch"
+  </dest>
+  <voice>
+    *: "Statisch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_GENTLE
+  desc: sound read-out, movement: the harmony moves a little
+  user: core
+  <source>
+    *: "Gentle"
+  </source>
+  <dest>
+    *: "Sanft"
+  </dest>
+  <voice>
+    *: "Sanft"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_SHIFTING
+  desc: sound read-out, movement: the harmony moves often
+  user: core
+  <source>
+    *: "Shifting"
+  </source>
+  <dest>
+    *: "Wechselnd"
+  </dest>
+  <voice>
+    *: "Wechselnd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_RESTLESS
+  desc: sound read-out, movement: the harmony moves constantly
+  user: core
+  <source>
+    *: "Restless"
+  </source>
+  <dest>
+    *: "Unruhig"
+  </dest>
+  <voice>
+    *: "Unruhig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MAJOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "major"
+  </source>
+  <dest>
+    *: "Dur"
+  </dest>
+  <voice>
+    *: "Dur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MINOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "minor"
+  </source>
+  <dest>
+    *: "Moll"
+  </dest>
+  <voice>
+    *: "Moll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_UNCLEAR
+  desc: sound read-out, key: the pitch content did not commit to one
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Unklar"
+  </dest>
+  <voice>
+    *: "Unklar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIBRARY
+  desc: on the Playlist Engine menu, the row opening the library read-out, and its screen title
+  user: core
+  <source>
+    *: "Library Sound"
+  </source>
+  <dest>
+    *: "Bibliotheksklang"
+  </dest>
+  <voice>
+    *: "Bibliotheksklang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MEASURED
+  desc: library read-out: tracks the analysis has measured, of the tracks there are
+  user: core
+  <source>
+    *: "Measured"
+  </source>
+  <dest>
+    *: "Gemessen"
+  </dest>
+  <voice>
+    *: "Gemessen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNREADABLE
+  desc: library read-out: tracks the analysis reached but could not decode
+  user: core
+  <source>
+    *: "Unreadable"
+  </source>
+  <dest>
+    *: "Nicht lesbar"
+  </dest>
+  <voice>
+    *: "Nicht lesbar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_TEMPO
+  desc: library read-out: measured tracks whose tempo the engine trusts
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "~Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEY
+  desc: library read-out: measured tracks that settled on a key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Tonart"
+  </dest>
+  <voice>
+    *: "Tonart"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_COMPARED
+  desc: library read-out: which music the per-track sound words are measured against
+  user: core
+  <source>
+    *: "Compared To"
+  </source>
+  <dest>
+    *: "Verglichen mit"
+  </dest>
+  <voice>
+    *: "Verglichen mit"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OWN
+  desc: library read-out, Compared To: the words are this library's own percentiles
+  user: core
+  <source>
+    *: "Your library"
+  </source>
+  <dest>
+    *: "Ihrer Bibliothek"
+  </dest>
+  <voice>
+    *: "Ihrer Bibliothek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_SHIPPED
+  desc: library read-out, Compared To: too few measured tracks, so the built-in numbers stand
+  user: core
+  <source>
+    *: "Built-in defaults"
+  </source>
+  <dest>
+    *: "Eingebauten Werten"
+  </dest>
+  <voice>
+    *: "Eingebauten Werten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OVERVIEW
+  desc: Library Sound menu: the counts of what has been measured
+  user: core
+  <source>
+    *: "Overview"
+  </source>
+  <dest>
+    *: "Übersicht"
+  </dest>
+  <voice>
+    *: "Übersicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MOODS
+  desc: Library Sound menu: how many tracks each mood playlist can draw on
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stimmungen"
+  </dest>
+  <voice>
+    *: "Stimmungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_PACE
+  desc: Library Sound menu: how many tracks fall in each tempo band
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEYS
+  desc: Library Sound menu: how many tracks are in each musical key
+  user: core
+  <source>
+    *: "Keys"
+  </source>
+  <dest>
+    *: "Tonarten"
+  </dest>
+  <voice>
+    *: "Tonarten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_DECADES
+  desc: Library Sound menu: the average loudness of the tracks from each decade
+  user: core
+  <source>
+    *: "Loudness by Decade"
+  </source>
+  <dest>
+    *: "Lautheit nach Jahrzehnt"
+  </dest>
+  <voice>
+    *: "Lautheit nach Jahrzehnt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_MOOD
+  desc: Library Sound, Moods: tracks that no mood playlist would offer
+  user: core
+  <source>
+    *: "In no mood"
+  </source>
+  <dest>
+    *: "Ohne Stimmung"
+  </dest>
+  <voice>
+    *: "Ohne Stimmung"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNCLEAR
+  desc: Library Sound, Pace and Keys: tracks with no tempo or no key the engine trusts
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Unklar"
+  </dest>
+  <voice>
+    *: "Unklar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_YEAR
+  desc: Library Sound, Loudness by Decade: tracks with no year in their tags
+  user: core
+  <source>
+    *: "No year"
+  </source>
+  <dest>
+    *: "Ohne Jahr"
+  </dest>
+  <voice>
+    *: "Ohne Jahr"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER
+  desc: in the playlist viewer's context menu, puts the playlist in an order where neighbouring tracks sound alike
+  user: core
+  <source>
+    *: "Order by Sound"
+  </source>
+  <dest>
+    *: "Nach Klang ordnen"
+  </dest>
+  <voice>
+    *: "Nach Klang ordnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_LONG
+  desc: Order by Sound: the playlist holds more tracks than one pass can order
+  user: core
+  <source>
+    *: "Too many tracks to order"
+  </source>
+  <dest>
+    *: "Zu viele Titel zum Ordnen"
+  </dest>
+  <voice>
+    *: "Zu viele Titel zum Ordnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_SOME
+  desc: Order by Sound: done, but this many tracks had no measurement and went to the end
+  user: core
+  <source>
+    *: "Ordered. %d not measured"
+  </source>
+  <dest>
+    *: "Geordnet. %d nicht gemessen"
+  </dest>
+  <voice>
+    *: "Geordnet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_NONE
+  desc: Order by Sound: none of the playlist's tracks has been measured
+  user: core
+  <source>
+    *: "None of these tracks has been analysed"
+  </source>
+  <dest>
+    *: "Keiner dieser Titel wurde analysiert"
+  </dest>
+  <voice>
+    *: "Keiner dieser Titel wurde analysiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_FAILED
+  desc: Order by Sound: the playlist could not be put in the new order
+  user: core
+  <source>
+    *: "Could not reorder the playlist"
+  </source>
+  <dest>
+    *: "Wiedergabeliste konnte nicht umsortiert werden"
+  </dest>
+  <voice>
+    *: "Wiedergabeliste konnte nicht umsortiert werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM
+  desc: on a folder's context menu, the row opening the sound read-out for the whole folder, and its screen title
+  user: core
+  <source>
+    *: "Album Sound"
+  </source>
+  <dest>
+    *: "Albumklang"
+  </dest>
+  <voice>
+    *: "Albumklang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM_NONE
+  desc: Album Sound: nothing in this folder has been measured yet
+  user: core
+  <source>
+    *: "Nothing here has been analysed"
+  </source>
+  <dest>
+    *: "Hier wurde noch nichts analysiert"
+  </dest>
+  <voice>
+    *: "Hier wurde noch nichts analysiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_IN_PROGRESS
+  desc: Audiobooks menu: the books started and not finished
+  user: core
+  <source>
+    *: "In progress"
+  </source>
+  <dest>
+    *: "Begonnen"
+  </dest>
+  <voice>
+    *: "Begonnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_NOT_STARTED
+  desc: Audiobooks menu: the books nothing of which has been played
+  user: core
+  <source>
+    *: "Not started"
+  </source>
+  <dest>
+    *: "Nicht begonnen"
+  </dest>
+  <voice>
+    *: "Nicht begonnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_FINISHED
+  desc: Audiobooks menu: the books played through to the end
+  user: core
+  <source>
+    *: "Finished"
+  </source>
+  <dest>
+    *: "Beendet"
+  </dest>
+  <voice>
+    *: "Beendet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW
+  desc: a row of the Audiobooks In progress list: book name, percent heard
+  user: core
+  <source>
+    *: "%s - %d%%"
+  </source>
+  <dest>
+    *: "~%s - %d%%"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_EMPTY
+  desc: splash when an Audiobooks In progress, Not started or Finished list is empty
+  user: core
+  <source>
+    *: "No books here"
+  </source>
+  <dest>
+    *: "Keine Bücher hier"
+  </dest>
+  <voice>
+    *: "Keine Bücher hier"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_QUIZ
+  desc: main menu: the Music Quiz, a name-that-track game
+  user: core
+  <source>
+    *: "Music Quiz"
+  </source>
+  <dest>
+    *: "Musikquiz"
+  </dest>
+  <voice>
+    *: "Musikquiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_STOP_PLAYBACK
+  desc: Music Quiz: asked before stopping what is playing
+  user: core
+  <source>
+    *: "Stop playback?"
+  </source>
+  <dest>
+    *: "Wiedergabe stoppen?"
+  </dest>
+  <voice>
+    *: "Wiedergabe stoppen?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE
+  desc: Music Quiz: asked on Menu during a round
+  user: core
+  <source>
+    *: "Leave the quiz?"
+  </source>
+  <dest>
+    *: "Quiz verlassen?"
+  </dest>
+  <voice>
+    *: "Quiz verlassen?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TOO_FEW
+  desc: Music Quiz: the library has too few tracks to make ten rounds
+  user: core
+  <source>
+    *: "Not enough music for a quiz"
+  </source>
+  <dest>
+    *: "Nicht genug Musik für ein Quiz"
+  </dest>
+  <voice>
+    *: "Nicht genug Musik für ein Quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_BEST
+  desc: Music Quiz: the best score so far, under a result that did not beat it
+  user: core
+  <source>
+    *: "Best %d"
+  </source>
+  <dest>
+    *: "Rekord %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_NEW_BEST
+  desc: Music Quiz result: the score beats the best so far
+  user: core
+  <source>
+    *: "New best"
+  </source>
+  <dest>
+    *: "Neuer Rekord"
+  </dest>
+  <voice>
+    *: "Neuer Rekord"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LISTENING
+  desc: Music Quiz: before the clip can be heard; nothing drains yet
+  user: core
+  <source>
+    *: "Listening..."
+  </source>
+  <dest>
+    *: "Hören..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_RIGHT
+  desc: Music Quiz: the title picked was the track's
+  user: core
+  <source>
+    *: "Right"
+  </source>
+  <dest>
+    *: "Richtig"
+  </dest>
+  <voice>
+    *: "Richtig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_WRONG
+  desc: Music Quiz: the title picked was not the track's
+  user: core
+  <source>
+    *: "Not that one"
+  </source>
+  <dest>
+    *: "Leider falsch"
+  </dest>
+  <voice>
+    *: "Leider falsch"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TIMES_UP
+  desc: Music Quiz: the round ran out before a title was picked
+  user: core
+  <source>
+    *: "Time's up"
+  </source>
+  <dest>
+    *: "Zeit abgelaufen"
+  </dest>
+  <voice>
+    *: "Zeit abgelaufen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED
+  desc: Music Quiz: the round is paused
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "Pausiert"
+  </dest>
+  <voice>
+    *: "Pausiert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED_HINT
+  desc: Music Quiz: under Paused, how to carry on
+  user: core
+  <source>
+    *: "Press Play to resume"
+  </source>
+  <dest>
+    *: "Play drücken zum Fortsetzen"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_OUT_OF
+  desc: Music Quiz result: beside the score, the most it could have been
+  user: core
+  <source>
+    *: "of %d"
+  </source>
+  <dest>
+    *: "von %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_EASIER
+  desc: Music Quiz result: under the first round's tile
+  user: core
+  <source>
+    *: "easier"
+  </source>
+  <dest>
+    *: "leichter"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_HARDER
+  desc: Music Quiz result: under the last round's tile
+  user: core
+  <source>
+    *: "harder"
+  </source>
+  <dest>
+    *: "schwerer"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_SELECT
+  desc: Music Quiz result: the name of the key that plays again
+  user: core
+  <source>
+    *: "Select"
+  </source>
+  <dest>
+    *: "Auswahl"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PLAY_AGAIN
+  desc: Music Quiz result: what the Select key does
+  user: core
+  <source>
+    *: "play again"
+  </source>
+  <dest>
+    *: "nochmal"
+  </dest>
+  <voice>
+    *: "Nochmal spielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_MENU
+  desc: Music Quiz result: the name of the key that leaves
+  user: core
+  <source>
+    *: "Menu"
+  </source>
+  <dest>
+    *: "Menü"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE_HINT
+  desc: Music Quiz result: what the Menu key does
+  user: core
+  <source>
+    *: "leave"
+  </source>
+  <dest>
+    *: "beenden"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ
+  desc: Music menu: the row that starts the Music Quiz
+  user: core
+  <source>
+    *: "Quiz"
+  </source>
+  <dest>
+    *: "~Quiz"
+  </dest>
+  <voice>
+    *: "~Quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_PROGRESS
+  desc: top of the Audiobooks Book list: the books started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[Begonnen]"
+  </dest>
+  <voice>
+    *: "Begonnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_NEW
+  desc: top of the Audiobooks Book list: the books not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[Nicht begonnen]"
+  </dest>
+  <voice>
+    *: "Nicht begonnen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_FINISHED
+  desc: top of the Audiobooks Book list: the books finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[Beendet]"
+  </dest>
+  <voice>
+    *: "Beendet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OUTPUT
+  desc: in the System > USB menu
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "USB DAC Output"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB-DAC-Ausgabe"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "U S B DAC Ausgabe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_ON
+  desc: splash: playback has moved to a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through USB DAC"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Wiedergabe über USB-DAC"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Wiedergabe über U S B DAC"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OFF
+  desc: splash: playback has moved back from a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Wiedergabe über Kopfhörer"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Wiedergabe über Kopfhörer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_AUTO
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Start Automatically"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Automatisch starten"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Automatisch starten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_ON
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn On"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Einschalten"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Einschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_OFF
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn Off"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Ausschalten"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Ausschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_NOT_FOUND
+  desc: splash: Turn On found no USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "No USB DAC found"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Kein USB-DAC gefunden"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Kein U S B DAC gefunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_PROTOCOL
+  desc: in accessories settings: answer iAP docks and car kits
+  user: core
+  <source>
+    *: "Accessory Protocol"
+  </source>
+  <dest>
+    *: "Zubehörprotokoll"
+  </dest>
+  <voice>
+    *: "Zubehörprotokoll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_BROWSING
+  desc: in accessories settings: how many entries a browsing accessory's lists hold
+  user: core
+  <source>
+    *: "Accessory Browsing"
+  </source>
+  <dest>
+    *: "Zubehör-Navigation"
+  </dest>
+  <voice>
+    *: "Zubehör-Navigation"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_CONNECTED
+  desc: splash: an iAP accessory has identified itself
+  user: core
+  <source>
+    *: "Accessory connected"
+  </source>
+  <dest>
+    *: "Zubehör verbunden"
+  </dest>
+  <voice>
+    *: "Zubehör verbunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES
+  desc: in Music settings: sort artists and albums past a leading The, A or An
+  user: core
+  <source>
+    *: "Sort Ignoring The/A/An"
+  </source>
+  <dest>
+    *: "Sortieren ohne The/A/An"
+  </dest>
+  <voice>
+    *: "Sortieren ohne The/A/An"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_FROM_FOLDER
+  desc: in Database settings: take the year from a "YYYY - Album" folder name
+  user: core
+  <source>
+    *: "Year From Folder Name"
+  </source>
+  <dest>
+    *: "Jahr aus Ordnername"
+  </dest>
+  <voice>
+    *: "Jahr aus Ordnername"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_STARTS_WITH_SELECTED
+  desc: in Playlist Engine settings: Play Similar and Wind Down lead with the chosen track
+  user: core
+  <source>
+    *: "Play Selected First"
+  </source>
+  <dest>
+    *: "Auswahl zuerst spielen"
+  </dest>
+  <voice>
+    *: "Auswahl zuerst spielen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BG_CUSTOM
+  desc: in Carousel settings: Carousel Background choice, a colour of your own
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Eigene"
+  </dest>
+  <voice>
+    *: "Eigene"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_CUSTOM_COLOR
+  desc: in Carousel settings: the colour Carousel Background uses when Custom
+  user: core
+  <source>
+    *: "Custom Colour"
+  </source>
+  <dest>
+    *: "Eigene Farbe"
+  </dest>
+  <voice>
+    *: "Eigene Farbe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_BACKGROUND
+  desc: in Colours settings: which of the album's two colours is the background
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Hintergrund dyn. Farben"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Hintergrund dynamische Farben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_LIGHT
+  desc: in Colours settings: Dynamic Colors Background choice, the lighter one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Light"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Hell"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Hell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_DARK
+  desc: in Colours settings: Dynamic Colors Background choice, the darker one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dark"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dunkel"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dunkel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_QUESTIONS
+  desc: in Music settings: the Music Quiz's kinds of question
+  user: core
+  <source>
+    *: "Quiz Questions"
+  </source>
+  <dest>
+    *: "Quizfragen"
+  </dest>
+  <voice>
+    *: "Quizfragen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_TITLE
+  desc: Music Quiz: a round asking for the track's title; also its setting
+  user: core
+  <source>
+    *: "Name the Track"
+  </source>
+  <dest>
+    *: "Titel erraten"
+  </dest>
+  <voice>
+    *: "Titel erraten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ARTIST
+  desc: Music Quiz: a round asking for the track's artist; also its setting
+  user: core
+  <source>
+    *: "Name the Artist"
+  </source>
+  <dest>
+    *: "Künstler erraten"
+  </dest>
+  <voice>
+    *: "Künstler erraten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ALBUM
+  desc: Music Quiz: a round asking for the track's album; also its setting
+  user: core
+  <source>
+    *: "Name the Album"
+  </source>
+  <dest>
+    *: "Album erraten"
+  </dest>
+  <voice>
+    *: "Album erraten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_YEAR
+  desc: Music Quiz: a round asking for the track's year; also its setting
+  user: core
+  <source>
+    *: "Name the Year"
+  </source>
+  <dest>
+    *: "Jahr erraten"
+  </dest>
+  <voice>
+    *: "Jahr erraten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_ONE_KIND
+  desc: splash: the last kind of quiz question cannot be turned off
+  user: core
+  <source>
+    *: "One kind of question has to stay on"
+  </source>
+  <dest>
+    *: "Eine Fragenart muss aktiv bleiben"
+  </dest>
+  <voice>
+    *: "Eine Fragenart muss aktiv bleiben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAR_ARTWORK
+  desc: in accessories settings: where the cover art sent to a car comes from
+  user: core
+  <source>
+    *: "Car Artwork"
+  </source>
+  <dest>
+    *: "Cover im Auto"
+  </dest>
+  <voice>
+    *: "Cover im Auto"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AS_ALBUM_ART
+  desc: in Car Artwork: the same sources, in the same order, as Album Art
+  user: core
+  <source>
+    *: "As Album Art"
+  </source>
+  <dest>
+    *: "Wie Albumcover"
+  </dest>
+  <voice>
+    *: "Wie Albumcover"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP2_ACCESSORIES
+  desc: in accessories settings: answering accessories that expect an iPhone (iAP2) over USB
+  user: core
+  <source>
+    *: "iPhone Accessories"
+  </source>
+  <dest>
+    *: "iPhone-Zubehör"
+  </dest>
+  <voice>
+    *: "i Phone Zubehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PLUS_YEAR_DESC
+  desc: "Sort Albums By" option: by artist, then release year, newest first
+  user: core
+  <source>
+    *: "Artist + Year (newest first)"
+  </source>
+  <dest>
+    *: "Künstler + Jahr (neueste zuerst)"
+  </dest>
+  <voice>
+    *: "Künstler und Jahr, neueste zuerst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MARK_AS
+  desc: a book's context menu: move a book to In progress, Not started or Finished
+  user: core
+  <source>
+    *: "Mark as..."
+  </source>
+  <dest>
+    *: "Markieren als..."
+  </dest>
+  <voice>
+    *: "Markieren als"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLLING_ENABLED
+  desc: in the Scrolling menu, off cuts long text to fit with "..." instead of scrolling it
+  user: core
+  <source>
+    *: "Enabled"
+  </source>
+  <dest>
+    *: "Aktiviert"
+  </dest>
+  <voice>
+    *: "Scrollen aktiviert"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_ELEMENTS
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_READING_HISTORY
+  desc: Playback Report, progress while the play log is read
+  user: core
+  <source>
+    *: "Reading play history"
+  </source>
+  <dest>
+    *: "Hörverlauf wird gelesen"
+  </dest>
+  <voice>
+    *: "Hörverlauf wird gelesen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MOVED_FOLDERS
+  desc: Playback Report, progress while it matches logged files to folders they have moved to
+  user: core
+  <source>
+    *: "Looking for moved folders"
+  </source>
+  <dest>
+    *: "Suche verschobene Ordner"
+  </dest>
+  <voice>
+    *: "Suche verschobene Ordner"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN_DEFAULT
+  desc: Wind Down length choice: the time left on the sleep timer, or Playlist Length with none running
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_YEAR_IN_ALBUM_LISTS
+  desc: in Library > Music: the release year after each album name in the browser's album lists
+  user: core
+  <source>
+    *: "Show Year in Album Lists"
+  </source>
+  <dest>
+    *: "Jahr in Albumlisten zeigen"
+  </dest>
+  <voice>
+    *: "Jahr in Albumlisten zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_SINGLE_LISTS
+  desc: in Library > Music: a list holding one row opens that row instead
+  user: core
+  <source>
+    *: "Skip One-Item Lists"
+  </source>
+  <dest>
+    *: "Listen mit einem Eintrag überspringen"
+  </dest>
+  <voice>
+    *: "Listen mit einem Eintrag überspringen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LENGTH
+  desc: in Carousel settings: how many covers a held PLAY spins past before the random pick
+  user: core
+  <source>
+    *: "Random Spin Length"
+  </source>
+  <dest>
+    *: "Länge des Zufallsdrehs"
+  </dest>
+  <voice>
+    *: "Länge des Zufallsdrehs"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_SHORT
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "Kurz"
+  </dest>
+  <voice>
+    *: "Kurz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_MEDIUM
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Medium"
+  </source>
+  <dest>
+    *: "Mittel"
+  </dest>
+  <voice>
+    *: "Mittel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LONG
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Long"
+  </source>
+  <dest>
+    *: "Lang"
+  </dest>
+  <voice>
+    *: "Lang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DISK_ACTIVITY
+  desc: Elements setting: show the disk activity indicator
+  user: core
+  <source>
+    *: "Show Disk Activity"
+  </source>
+  <dest>
+    *: "Laufwerksaktivität zeigen"
+  </dest>
+  <voice>
+    *: "Laufwerksaktivität zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_BACKGROUND_TASKS
+  desc: Elements setting: show the background tasks indicator
+  user: core
+  <source>
+    *: "Show Background Tasks"
+  </source>
+  <dest>
+    *: "Hintergrundaufgaben zeigen"
+  </dest>
+  <voice>
+    *: "Hintergrundaufgaben zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_WORKING
+  desc: Elements setting: show the working indicator
+  user: core
+  <source>
+    *: "Show Working"
+  </source>
+  <dest>
+    *: "Arbeitsanzeige zeigen"
+  </dest>
+  <voice>
+    *: "Arbeitsanzeige zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACTIVITY_INDICATORS
+  desc: Elements submenu holding the three Show indicator settings
+  user: core
+  <source>
+    *: "Activity Indicators"
+  </source>
+  <dest>
+    *: "Aktivitätsanzeigen"
+  </dest>
+  <voice>
+    *: "Aktivitätsanzeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_UPGRADE
+  desc: boot screen caption while the library's files are upgraded to a new layout, the database included
+  user: core
+  <source>
+    *: "Performing maintenance..."
+  </source>
+  <dest>
+    *: "Wartung läuft..."
+  </dest>
+  <voice>
+    *: "Wartung läuft"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_REFUSED
+  desc: album screens, when the database is too large to load into memory this session
+  user: core
+  <source>
+    *: "Library too large to hold in memory"
+  </source>
+  <dest>
+    *: "Bibliothek zu groß für den Arbeitsspeicher"
+  </dest>
+  <voice>
+    *: "Bibliothek zu groß für den Arbeitsspeicher"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_NOT_FOUND
+  desc: Album Covers, when the album playing is not among the covers
+  user: core
+  <source>
+    *: "Album not found"
+  </source>
+  <dest>
+    *: "Album nicht gefunden"
+  </dest>
+  <voice>
+    *: "Album nicht gefunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_PLACEHOLDER
+  desc: carousel, when the cover shown for an album without art cannot be read
+  user: core
+  <source>
+    *: "Could not load the placeholder cover"
+  </source>
+  <dest>
+    *: "Platzhalter-Cover konnte nicht geladen werden"
+  </dest>
+  <voice>
+    *: "Platzhalter-Cover konnte nicht geladen werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_START
+  desc: carousel, when its drawing thread cannot be started
+  user: core
+  <source>
+    *: "Could not start the carousel"
+  </source>
+  <dest>
+    *: "Karussell konnte nicht gestartet werden"
+  </dest>
+  <voice>
+    *: "Karussell konnte nicht gestartet werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_DIR
+  desc: carousel, followed by the folder it could not make
+  user: core
+  <source>
+    *: "Could not create directory"
+  </source>
+  <dest>
+    *: "Ordner konnte nicht erstellt werden"
+  </dest>
+  <voice>
+    *: "Ordner konnte nicht erstellt werden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TOO_LARGE
+  desc: carousel, when the library has more albums or artists than it can hold
+  user: core
+  <source>
+    *: "Library too large for this screen"
+  </source>
+  <dest>
+    *: "Bibliothek zu groß für diese Ansicht"
+  </dest>
+  <voice>
+    *: "Bibliothek zu groß für diese Ansicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ALBUMS
+  desc: Album Covers, when the database holds no albums
+  user: core
+  <source>
+    *: "No albums found -- turn the database on"
+  </source>
+  <dest>
+    *: "Keine Alben gefunden -- Datenbank einschalten"
+  </dest>
+  <voice>
+    *: "Keine Alben gefunden -- Datenbank einschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ARTISTS
+  desc: Artist Portraits, when the database holds no artists
+  user: core
+  <source>
+    *: "No artists found -- turn the database on"
+  </source>
+  <dest>
+    *: "Keine Künstler gefunden -- Datenbank einschalten"
+  </dest>
+  <voice>
+    *: "Keine Künstler gefunden -- Datenbank einschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PRESS_ANY_BUTTON
+  desc: after a carousel error, before it closes
+  user: core
+  <source>
+    *: "press any button to continue"
+  </source>
+  <dest>
+    *: "beliebige Taste drücken"
+  </dest>
+  <voice>
+    *: "beliebige Taste drücken"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYBACK_REPORT
+  desc: title of the Playback Report
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "Wiedergabebericht"
+  </dest>
+  <voice>
+    *: "Wiedergabebericht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_BY_WEEK
+  desc: Playback Report, heading of the calendar of weeks
+  user: core
+  <source>
+    *: "By week"
+  </source>
+  <dest>
+    *: "Nach Woche"
+  </dest>
+  <voice>
+    *: "Nach Woche"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NEVER_SKIPPED
+  desc: Playback Report, heading of the tracks never skipped
+  user: core
+  <source>
+    *: "Never skipped"
+  </source>
+  <dest>
+    *: "Nie übersprungen"
+  </dest>
+  <voice>
+    *: "Nie übersprungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SKIP_EVERYTHING
+  desc: Playback Report, the same heading when every track has been skipped
+  user: core
+  <source>
+    *: "You skip everything?!"
+  </source>
+  <dest>
+    *: "Sie überspringen alles?!"
+  </dest>
+  <voice>
+    *: "Sie überspringen alles?!"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGE_VIEWER
+  desc: title of the Image Viewer menu
+  user: core
+  <source>
+    *: "Image Viewer"
+  </source>
+  <dest>
+    *: "Bildanzeige"
+  </dest>
+  <voice>
+    *: "Bildanzeige"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NEW
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Newly unlocked"
+  </source>
+  <dest>
+    *: "Neu freigeschaltet"
+  </dest>
+  <voice>
+    *: "Neu freigeschaltet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NUMBERS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "In numbers"
+  </source>
+  <dest>
+    *: "In Zahlen"
+  </dest>
+  <voice>
+    *: "In Zahlen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_WEEKS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Week by week"
+  </source>
+  <dest>
+    *: "Woche für Woche"
+  </dest>
+  <voice>
+    *: "Woche für Woche"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ARTISTS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top artists"
+  </source>
+  <dest>
+    *: "Top-Künstler"
+  </dest>
+  <voice>
+    *: "Top-Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SONGS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top songs"
+  </source>
+  <dest>
+    *: "Top-Titel"
+  </dest>
+  <voice>
+    *: "Top-Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ALBUMS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top albums"
+  </source>
+  <dest>
+    *: "Top-Alben"
+  </dest>
+  <voice>
+    *: "Top-Alben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SKIPS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "Übersprungen"
+  </dest>
+  <voice>
+    *: "Übersprungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ACH
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "Erfolge"
+  </dest>
+  <voice>
+    *: "Erfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MORNING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Morning"
+  </source>
+  <dest>
+    *: "Morgens"
+  </dest>
+  <voice>
+    *: "Morgens"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_AFTERNOON
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Afternoon"
+  </source>
+  <dest>
+    *: "Nachmittags"
+  </dest>
+  <voice>
+    *: "Nachmittags"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EVENING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Evening"
+  </source>
+  <dest>
+    *: "Abends"
+  </dest>
+  <voice>
+    *: "Abends"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NIGHT
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Night"
+  </source>
+  <dest>
+    *: "Nachts"
+  </dest>
+  <voice>
+    *: "Nachts"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_NAME
+  desc: Playback Report, a ranked card whose name was not recorded
+  user: core
+  <source>
+    *: "No name"
+  </source>
+  <dest>
+    *: "Kein Name"
+  </dest>
+  <voice>
+    *: "Kein Name"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_PLAYS_YET
+  desc: Playback Report, a ranked card with nothing in it yet
+  user: core
+  <source>
+    *: "No plays yet"
+  </source>
+  <dest>
+    *: "Noch keine Wiedergaben"
+  </dest>
+  <voice>
+    *: "Noch keine Wiedergaben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOTHING_YET
+  desc: Playback Report, a card with no figures yet
+  user: core
+  <source>
+    *: "Nothing to show yet"
+  </source>
+  <dest>
+    *: "Noch nichts zu zeigen"
+  </dest>
+  <voice>
+    *: "Noch nichts zu zeigen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_MINUTES
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "Minuten"
+  </dest>
+  <voice>
+    *: "Minuten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_PLAYS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "Wiedergaben"
+  </dest>
+  <voice>
+    *: "Wiedergaben"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SONGS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Songs"
+  </source>
+  <dest>
+    *: "Titel"
+  </dest>
+  <voice>
+    *: "Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SKIPS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "Übersprungen"
+  </dest>
+  <voice>
+    *: "Übersprungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_FROM
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "From"
+  </source>
+  <dest>
+    *: "Von"
+  </dest>
+  <voice>
+    *: "Von"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_TO
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "To"
+  </source>
+  <dest>
+    *: "Bis"
+  </dest>
+  <voice>
+    *: "Bis"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_MINUTES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes"
+  </source>
+  <dest>
+    *: "Minuten"
+  </dest>
+  <voice>
+    *: "Minuten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays"
+  </source>
+  <dest>
+    *: "Mal gespielt"
+  </dest>
+  <voice>
+    *: "Mal gespielt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_TRACKS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "tracks"
+  </source>
+  <dest>
+    *: "Titel"
+  </dest>
+  <voice>
+    *: "Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays skipped"
+  </source>
+  <dest>
+    *: "Mal übersprungen"
+  </dest>
+  <voice>
+    *: "Mal übersprungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PEAK_HOUR
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "peak hour"
+  </source>
+  <dest>
+    *: "beste Stunde"
+  </dest>
+  <voice>
+    *: "beste Stunde"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_AFTER_MIDNIGHT
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays after midnight"
+  </source>
+  <dest>
+    *: "Mal nach Mitternacht"
+  </dest>
+  <voice>
+    *: "Mal nach Mitternacht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_WEEKS_WITH_MUSIC
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "weeks with music"
+  </source>
+  <dest>
+    *: "Wochen mit Musik"
+  </dest>
+  <voice>
+    *: "Wochen mit Musik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_BEST_DAY
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes on your best day"
+  </source>
+  <dest>
+    *: "Minuten am besten Tag"
+  </dest>
+  <voice>
+    *: "Minuten am besten Tag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_DAY_STREAK
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "day streak"
+  </source>
+  <dest>
+    *: "Tage in Folge"
+  </dest>
+  <voice>
+    *: "Tage in Folge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_OF_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "of plays skipped"
+  </source>
+  <dest>
+    *: "übersprungen"
+  </dest>
+  <voice>
+    *: "übersprungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_NEW_BADGES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "new badges"
+  </source>
+  <dest>
+    *: "neue Erfolge"
+  </dest>
+  <voice>
+    *: "neue Erfolge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ARTIST
+  desc: Playback Report, over the artist a week or year played most
+  user: core
+  <source>
+    *: "Top artist"
+  </source>
+  <dest>
+    *: "Top-Künstler"
+  </dest>
+  <voice>
+    *: "Top-Künstler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_SONG
+  desc: Playback Report, over the song a week, artist or album played most
+  user: core
+  <source>
+    *: "Top song"
+  </source>
+  <dest>
+    *: "Top-Titel"
+  </dest>
+  <voice>
+    *: "Top-Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ALBUM
+  desc: Playback Report, over the album an artist played most
+  user: core
+  <source>
+    *: "Top album"
+  </source>
+  <dest>
+    *: "Top-Album"
+  </dest>
+  <voice>
+    *: "Top-Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_FROM
+  desc: Playback Report, before the album a song is from
+  user: core
+  <source>
+    *: "from"
+  </source>
+  <dest>
+    *: "aus"
+  </dest>
+  <voice>
+    *: "aus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EARNED
+  desc: Playback Report, before the date a badge was earned
+  user: core
+  <source>
+    *: "Earned:"
+  </source>
+  <dest>
+    *: "Erreicht:"
+  </dest>
+  <voice>
+    *: "Erreicht"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_QUIET_NIGHTS
+  desc: Playback Report, when nothing was played after midnight
+  user: core
+  <source>
+    *: "Your nights are quiet. Respect."
+  </source>
+  <dest>
+    *: "Ihre Nächte sind ruhig. Respekt."
+  </dest>
+  <voice>
+    *: "Ihre Nächte sind ruhig. Respekt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_YEAR_IN_NUMBERS
+  desc: Playback Report heading; %s is a year or All time
+  user: core
+  <source>
+    *: "%s in numbers"
+  </source>
+  <dest>
+    *: "%s in Zahlen"
+  </dest>
+  <voice>
+    *: "In Zahlen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_ALL_TIME
+  desc: Playback Report, the report over every year
+  user: core
+  <source>
+    *: "All time"
+  </source>
+  <dest>
+    *: "Gesamt"
+  </dest>
+  <voice>
+    *: "Gesamt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SETTINGS
+  desc: Playback Report menu, the row that opens its settings
+  user: core
+  <source>
+    *: "Settings"
+  </source>
+  <dest>
+    *: "Einstellungen"
+  </dest>
+  <voice>
+    *: "Einstellungen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT
+  desc: in accessories settings: the menu of TV output settings
+  user: core
+  <source>
+    *: "TV Out"
+  </source>
+  <dest>
+    *: "TV-Ausgang"
+  </dest>
+  <voice>
+    *: "T V Ausgang"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE
+  desc: in the TV Out menu: the screen's size on the TV
+  user: core
+  <source>
+    *: "Size"
+  </source>
+  <dest>
+    *: "Größe"
+  </dest>
+  <voice>
+    *: "Größe am T V"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_1X
+  desc: TV Out Size choice: the screen pixel for pixel
+  user: core
+  <source>
+    *: "1x"
+  </source>
+  <dest>
+    *: "~1x"
+  </dest>
+  <voice>
+    *: "Originalgröße"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_2X
+  desc: TV Out Size choice: the screen doubled
+  user: core
+  <source>
+    *: "2x"
+  </source>
+  <dest>
+    *: "~2x"
+  </dest>
+  <voice>
+    *: "Doppelte Größe"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD
+  desc: in the TV Out menu: the TV's video standard
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "Norm"
+  </dest>
+  <voice>
+    *: "T V Norm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_PAL
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "PAL"
+  </source>
+  <dest>
+    *: "~PAL"
+  </dest>
+  <voice>
+    *: "~Pal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_NTSC
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "NTSC"
+  </source>
+  <dest>
+    *: "~NTSC"
+  </dest>
+  <voice>
+    *: "~N T S C"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_ON
+  desc: in the TV Out menu: start showing the screen on a TV through the dock
+  user: core
+  <source>
+    *: "Turn On"
+  </source>
+  <dest>
+    *: "Einschalten"
+  </dest>
+  <voice>
+    *: "T V Ausgang einschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_OFF
+  desc: in the TV Out menu: stop showing the screen on the TV
+  user: core
+  <source>
+    *: "Turn Off"
+  </source>
+  <dest>
+    *: "Ausschalten"
+  </dest>
+  <voice>
+    *: "T V Ausgang ausschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_ROWS
+  desc: in Appearance > Interface Elements, the submenu holding the database browser's art rows
+  user: core
+  <source>
+    *: "Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen"
+  </dest>
+  <voice>
+    *: "Bildzeilen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHUT_DOWN
+  desc: in System > Startup/Shutdown: switch the player off now
+  user: core
+  <source>
+    *: "Shut Down"
+  </source>
+  <dest>
+    *: "Ausschalten"
+  </dest>
+  <voice>
+    *: "Ausschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBOOT
+  desc: in System > Startup/Shutdown: restart the player now
+  user: core
+  <source>
+    *: "Reboot"
+  </source>
+  <dest>
+    *: "Neu starten"
+  </dest>
+  <voice>
+    *: "Neu starten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_ART
+  desc: in Settings, database browser audiobook author art rows
+  user: core
+  <source>
+    *: "Author Art Rows"
+  </source>
+  <dest>
+    *: "Bildzeilen: Autoren"
+  </dest>
+  <voice>
+    *: "Bildzeilen für Autoren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SAME_AS_MUSIC
+  desc: in Carousel settings: sort the carousels as the Music lists are sorted
+  user: core
+  <source>
+    *: "Sort Same as Music"
+  </source>
+  <dest>
+    *: "Wie Musik sortieren"
+  </dest>
+  <voice>
+    *: "Wie Musik sortieren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_BEFORE_NAME
+  desc: in Show Year in Album Lists: the year ahead of the album name
+  user: core
+  <source>
+    *: "Before"
+  </source>
+  <dest>
+    *: "Davor"
+  </dest>
+  <voice>
+    *: "Davor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_AFTER_NAME
+  desc: in Show Year in Album Lists: the year after the album name
+  user: core
+  <source>
+    *: "After"
+  </source>
+  <dest>
+    *: "Danach"
+  </dest>
+  <voice>
+    *: "Danach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY
+  desc: in accessories settings: what model an accessory is told the player is
+  user: core
+  <source>
+    *: "Identify As"
+  </source>
+  <dest>
+    *: "Ausgeben als"
+  </dest>
+  <voice>
+    *: "Ausgeben als"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_OWN
+  desc: in Identify As: the player's own model
+  user: core
+  <source>
+    *: "This Player"
+  </source>
+  <dest>
+    *: "Dieser Player"
+  </dest>
+  <voice>
+    *: "Dieser Player"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_CLASSIC
+  desc: in Identify As: an iPod Classic
+  user: core
+  <source>
+    *: "iPod Classic"
+  </source>
+  <dest>
+    *: "~iPod Classic"
+  </dest>
+  <voice>
+    *: "~i Pod Classic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_IPHONE
+  desc: in Identify As: an iPhone 4
+  user: core
+  <source>
+    *: "iPhone 4"
+  </source>
+  <dest>
+    *: "~iPhone 4"
+  </dest>
+  <voice>
+    *: "~i Phone 4"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TAGCACHE
+  desc: in Debug Logs: the database's switch
+  user: core
+  <source>
+    *: "Database Log"
+  </source>
+  <dest>
+    *: "Datenbank-Log"
+  </dest>
+  <voice>
+    *: "Datenbank-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ARTCACHE
+  desc: in Debug Logs: the art cache's switch
+  user: core
+  <source>
+    *: "Album Art Log"
+  </source>
+  <dest>
+    *: "Albumcover-Log"
+  </dest>
+  <voice>
+    *: "Albumcover-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_USB
+  desc: in Debug Logs: the USB and accessory log's switch
+  user: core
+  <source>
+    *: "USB and Accessory Log"
+  </source>
+  <dest>
+    *: "USB- und Zubehör-Log"
+  </dest>
+  <voice>
+    *: "U S B und Zubehör-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BATTERY
+  desc: in Debug Logs: the battery log's switch
+  user: core
+  <source>
+    *: "Battery Log"
+  </source>
+  <dest>
+    *: "Akku-Log"
+  </dest>
+  <voice>
+    *: "Akku-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRY
+  desc: in Debug Logs: how long logs stay on
+  user: core
+  <source>
+    *: "Switch Off After"
+  </source>
+  <dest>
+    *: "Ausschalten nach"
+  </dest>
+  <voice>
+    *: "Ausschalten nach"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ALL_OFF
+  desc: in Debug Logs: switch every log off
+  user: core
+  <source>
+    *: "Turn All Off"
+  </source>
+  <dest>
+    *: "Alle ausschalten"
+  </dest>
+  <voice>
+    *: "Alle ausschalten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_LEFT
+  desc: in Debug Logs: hours and minutes until the logs switch off
+  user: core
+  <source>
+    *: "Switches Off In %d:%02d"
+  </source>
+  <dest>
+    *: "Aus in %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_NONE_ON
+  desc: in Debug Logs: no log is on
+  user: core
+  <source>
+    *: "No Log Is On"
+  </source>
+  <dest>
+    *: "Kein Log aktiv"
+  </dest>
+  <voice>
+    *: "Kein Log aktiv"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_STAY_ON
+  desc: in Debug Logs: Switch Off After is Never
+  user: core
+  <source>
+    *: "Logs Stay On"
+  </source>
+  <dest>
+    *: "Logs bleiben an"
+  </dest>
+  <voice>
+    *: "Logs bleiben an"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_FILES
+  desc: in Debug Logs: the size of every log file together
+  user: core
+  <source>
+    *: "Log Files: %s"
+  </source>
+  <dest>
+    *: "Log-Dateien: %s"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRED
+  desc: splash when the debug logs switch themselves off
+  user: core
+  <source>
+    *: "Debug logs switched off"
+  </source>
+  <dest>
+    *: "Debug-Logs ausgeschaltet"
+  </dest>
+  <voice>
+    *: "Debug-Logs ausgeschaltet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT
+  desc: splash at boot: a debug log is on, and off in hours:minutes
+  user: core
+  <source>
+    *: "Debug logs on, off in %d:%02d"
+  </source>
+  <dest>
+    *: "Debug-Logs an, aus in %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT_NEVER
+  desc: splash at boot: a debug log is on and stays on
+  user: core
+  <source>
+    *: "Debug logs on"
+  </source>
+  <dest>
+    *: "Debug-Logs an"
+  </dest>
+  <voice>
+    *: "Debug-Logs an"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_PLAYBACK
+  desc: in Debug Logs: the playback error log's switch
+  user: core
+  <source>
+    *: "Playback Error Log"
+  </source>
+  <dest>
+    *: "Wiedergabefehler-Log"
+  </dest>
+  <voice>
+    *: "Wiedergabefehler-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_SKIN
+  desc: in Debug Logs: the theme loading log's switch
+  user: core
+  <source>
+    *: "Theme Log"
+  </source>
+  <dest>
+    *: "Themen-Log"
+  </dest>
+  <voice>
+    *: "Themen-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TASKS
+  desc: in Debug Logs: the background task log's switch
+  user: core
+  <source>
+    *: "Background Task Log"
+  </source>
+  <dest>
+    *: "Hintergrundaufgaben-Log"
+  </dest>
+  <voice>
+    *: "Hintergrundaufgaben-Log"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THOUSANDS_SEPARATOR
+  desc: between each group of three digits in a large number, as in 9,099 -- a full stop or a space in many languages
+  user: core
+  <source>
+    *: ","
+  </source>
+  <dest>
+    *: "."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUICK_SETTINGS
+  desc: title a theme shows over the Quick Screen, through %Sx(Quick Settings)
+  user: core
+  <source>
+    *: "Quick Settings"
+  </source>
+  <dest>
+    *: "Schnelleinstellungen"
+  </dest>
+  <voice>
+    *: "Schnelleinstellungen"
   </voice>
 </phrase>

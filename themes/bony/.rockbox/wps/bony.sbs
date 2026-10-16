@@ -54,7 +54,7 @@
 #
 #- Title
 %Vl(Chrome,88,3,180,24,3)%Vf(ffffff)
-%?if(%cs,=,10)<Quick Settings|%?if(%Lt,=,Rockbox)<Main Menu|%s%Lt>>
+%?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt>>
 #
 #- Status icons
 %Vl(Chrome,264,7,48,15,2)%Vf(ffffff)
