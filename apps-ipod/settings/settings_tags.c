@@ -250,6 +250,9 @@ static const struct tag_row tag_rows[] = {
 { "album covers transition speed",TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel 3d speed" },
 { "album covers pile fade",       TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel flat" },
 { "album covers pile offset",     TAG_ADVANCED|TAG_APPEARANCE|TAG_THEMEAUTHOR, "carousel flat" },
+{ "album covers filter 1",        TAG_ADVANCED|TAG_APPEARANCE|TAG_ARTWORK, "carousel artwork filter image" },
+{ "album covers filter 2",        TAG_ADVANCED|TAG_APPEARANCE|TAG_ARTWORK, "carousel artwork filter image" },
+{ "album covers filter 3",        TAG_ADVANCED|TAG_APPEARANCE|TAG_ARTWORK, "carousel artwork filter image" },
 
 /* --- the theme ----------------------------------------------------------- */
 { "wps",                 TAG_APPEARANCE,                         "theme while playing skin" },

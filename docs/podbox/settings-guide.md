@@ -434,9 +434,9 @@ Also reached as **Appearance** under Playback — Now Playing Screen.
 | 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
 | Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
 | Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
-| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off |  |
-| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off |  |
-| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off |  |
+| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
+| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
+| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
 
 Also reached as **Appearance** under Library — Carousel.
 
