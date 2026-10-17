@@ -890,6 +890,64 @@ static int check_subdir_for_music(char *dir, const char *subdir, bool recurse)
     return result;
 }
 
+/* Folder Navigation's Random: a walk down from the base directory, taking a
+ * subfolder at random at each level, or stopping, as one more choice, in a
+ * folder with music of its own. Folders at one level have equal odds, so an
+ * artist with one album comes up as often as one with twenty. dir holds the
+ * base directory ("" for the root) and is replaced only on success, which
+ * leaves the browser holding the folder found. */
+static bool get_random_dir(char *dir)
+{
+    struct browser_context *tc = browser_get_context();
+    char path[MAX_PATH + 1];
+
+    /* A walk can end in a folder with neither music nor subfolders */
+    for (int walks = 0; walks < 10; walks++)
+    {
+        strcpy(path, dir);
+        for (int depth = 0; depth < 16; depth++)
+        {
+            struct entry *files;
+            int dirs = 0, pick, i;
+            bool music = false, too_long;
+            size_t len = strlen(path);
+
+            if (browser_disk_load(tc, path[0] ? path : "/") < 0)
+                break;
+            browser_lock_cache(tc);
+            files = browser_get_entries(tc);
+            for (i = 0; i < tc->filesindir; i++)
+            {
+                if (files[i].attr & ATTR_DIRECTORY)
+                    dirs += files[i].name[0] != '.';
+                else if ((files[i].attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO)
+                    music = true;
+            }
+            if (dirs + music == 0)
+            {
+                browser_unlock_cache(tc);
+                break;
+            }
+            pick = rand() % (dirs + music);
+            if (pick == dirs)
+            {
+                browser_unlock_cache(tc);
+                strcpy(dir, path[0] ? path : "/");
+                return true;
+            }
+            for (i = 0; !(files[i].attr & ATTR_DIRECTORY)
+                        || files[i].name[0] == '.' || pick-- > 0; i++)
+                ;
+            too_long = path_append(path + len, PA_SEP_HARD, files[i].name,
+                                   sizeof path - len) >= sizeof path - len;
+            browser_unlock_cache(tc);
+            if (too_long)
+                break;
+        }
+    }
+    return false;
+}
+
 /*
  * search through all the directories (starting with the current) to find
  * one that has tracks to play
@@ -922,6 +980,17 @@ static int get_next_dir(char *dir, int direction)
         /* start from root directory */
         dir[0] = '\0';
         base_len = 0;
+    }
+
+    if (global_settings.next_folder == FOLDER_ADVANCE_RANDOM)
+    {
+        bool found;
+
+        *(tc->dirfilter) = SHOW_ALL;
+        found = get_random_dir(dir);
+        *(tc->dirfilter) = saved_dirfilter;
+        if (found)
+            return 0;
     }
 
     /* if the current file is within our base dir, use its dir instead */

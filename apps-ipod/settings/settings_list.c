@@ -1318,8 +1318,9 @@ const struct settings_list settings[] = {
 
 
     CHOICE_SETTING(0, next_folder, LANG_NEXT_FOLDER, FOLDER_ADVANCE_OFF,
-                   "folder navigation", "off,on", NULL, 2,
-                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES)),
+                   "folder navigation", "off,on,random", NULL, 3,
+                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES),
+                   ID2P(LANG_RANDOM)),
     BOOL_SETTING(0, constrain_next_folder, LANG_CONSTRAIN_NEXT_FOLDER, false,
                  "constrain next folder", off_on,
                  LANG_SET_BOOL_YES, LANG_SET_BOOL_NO, NULL),

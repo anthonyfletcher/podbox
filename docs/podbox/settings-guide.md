@@ -162,7 +162,7 @@ after new music, run it after `database_pb.exe`.
 | Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | off | **Adv** |
 | Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files and .mp3 files with chapter frames, and a book of more than 99 chapters lists the first 99 of them. | off | **Adv** |
-| Auto-Change Directory | At the end of a folder, move to the next one rather than stopping. | off |  |
+| Auto-Change Directory | At the end of a folder, move to the next one rather than stopping. Random moves to a folder picked at random, one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | off |  |
 | Constrain Auto-Change | When playback moves on to the next folder by itself, keeps that move inside the folder you started in -- so an album that runs on goes to its sibling rather than wandering off into the rest of the library. | off | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | track | **Adv** |
 | Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | off | **Adv** |

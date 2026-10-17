@@ -318,6 +318,10 @@ chapters lists the first 99 of them.
 [folder navigation]
 At the end of a folder, move to the next one rather than stopping.
 
+Random moves to a folder picked at random, one level at a time: each artist
+folder has the same chance, then each album in it, so an artist with one album
+comes up as often as one with twenty.
+
 [constrain next folder]
 When playback moves on to the next folder by itself, keeps that move inside the
 folder you started in -- so an album that runs on goes to its sibling rather

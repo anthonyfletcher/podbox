@@ -161,6 +161,7 @@ enum {
 enum {
     FOLDER_ADVANCE_OFF = 0,
     FOLDER_ADVANCE_NEXT,
+    FOLDER_ADVANCE_RANDOM,
 };
 
 /* repeat mode options */
