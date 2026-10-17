@@ -92,22 +92,29 @@ static int selectivebacklight_set_mask(void* param)
 }
 
 
-/** LCD menu **/
-MENUITEM_SETTING_EXPORTED(backlight_timeout, &global_settings.backlight_timeout, NULL);
-MENUITEM_SETTING_EXPORTED(backlight_timeout_plugged,
-                &global_settings.backlight_timeout_plugged, NULL);
-
-MENUITEM_SETTING_EXPORTED(backlight_on_button_hold,
-                &global_settings.backlight_on_button_hold, NULL);
-
-MENUITEM_SETTING_EXPORTED(caption_backlight, &global_settings.caption_backlight, NULL);
+/** Backlight menu **/
+/* Rows named for the case each covers, under Backlight. The settings keep
+   their full names, which the Quick Screen shows and themes key its icons
+   on. */
+MENUITEM_SETTING_W_TEXT(backlight_timeout, &global_settings.backlight_timeout,
+                        ID2P(LANG_BACKLIGHT_ON_BATTERY), NULL);
+MENUITEM_SETTING_W_TEXT(backlight_timeout_plugged,
+                        &global_settings.backlight_timeout_plugged,
+                        ID2P(LANG_BACKLIGHT_PLUGGED_IN), NULL);
+MENUITEM_SETTING_W_TEXT(backlight_on_button_hold,
+                        &global_settings.backlight_on_button_hold,
+                        ID2P(LANG_BACKLIGHT_LOCKED), NULL);
+MENUITEM_SETTING_W_TEXT(caption_backlight, &global_settings.caption_backlight,
+                        ID2P(LANG_BACKLIGHT_TRACK_CHANGE), NULL);
 #if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
-MENUITEM_SETTING_EXPORTED(backlight_fade_in, &global_settings.backlight_fade_in, NULL);
-MENUITEM_SETTING_EXPORTED(backlight_fade_out, &global_settings.backlight_fade_out, NULL);
+MENUITEM_SETTING_W_TEXT(backlight_fade_in, &global_settings.backlight_fade_in,
+                        ID2P(LANG_BACKLIGHT_FADE_IN_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(backlight_fade_out, &global_settings.backlight_fade_out,
+                        ID2P(LANG_BACKLIGHT_FADE_OUT_SHORT), NULL);
 #endif
-MENUITEM_SETTING_EXPORTED(bl_filter_first_keypress,
-                    &global_settings.bl_filter_first_keypress,
-                    filterfirstkeypress_callback);
+MENUITEM_SETTING(bl_filter_first_keypress,
+                 &global_settings.bl_filter_first_keypress,
+                 filterfirstkeypress_callback);
 
 MENUITEM_SETTING(bl_selective_actions,
                  &global_settings.bl_selective_actions,
@@ -117,21 +124,29 @@ MENUITEM_FUNCTION(sel_backlight_mask, 0, ID2P(LANG_SETTINGS),
                   selectivebacklight_set_mask, selectivebacklight_callback,
                   Icon_NOICON);
 
-MAKE_MENU(sel_backlight, ID2P(LANG_BACKLIGHT_SELECTIVE),
+MAKE_MENU(sel_backlight, ID2P(LANG_BACKLIGHT_EXEMPTIONS),
           NULL, Icon_NOICON, &bl_selective_actions, &sel_backlight_mask);
 
-MENUITEM_SETTING_EXPORTED(lcd_sleep_after_backlight_off,
-                &global_settings.lcd_sleep_after_backlight_off, NULL);
+MENUITEM_SETTING(lcd_sleep_after_backlight_off,
+                 &global_settings.lcd_sleep_after_backlight_off, NULL);
+
+/* Listed under Battery & Power, which general_settings.c builds -- hence
+   exported. */
+MAKE_MENU(backlight_menu, ID2P(LANG_BACKLIGHT), NULL, Icon_NOICON,
+          &backlight_timeout,
+          &backlight_timeout_plugged,
+          &backlight_on_button_hold,
+          &caption_backlight,
+#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
+          &backlight_fade_in, &backlight_fade_out,
+#endif
+          &lcd_sleep_after_backlight_off,
+          &bl_filter_first_keypress,
+          &sel_backlight);
 /* Listed under both Appearance and Battery & Power: it is how bright the
    screen looks and the second biggest draw on the battery, and there is no
    sense in which it is one and not the other. */
 MENUITEM_SETTING_EXPORTED(brightness_item, &global_settings.brightness, NULL);
-
-/* There is no LCD Settings screen. Every row above is listed straight under
-   Battery & Power, which is built in general_settings.c -- hence the exported
-   form. The screen held the backlight and nothing else, and "LCD Settings"
-   named the hardware rather than the question being asked; anyone wondering
-   how long the light stays on was already in the right menu one level up. */
 
 
 

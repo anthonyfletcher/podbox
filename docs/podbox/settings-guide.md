@@ -93,7 +93,6 @@ after new music, run it after `database_pb.exe`.
 | Balance | Shifts the output towards one ear. Meant for correcting a hearing difference or a worn earphone, not for effect. | 0 |  |
 | Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. | stereo |  |
 | Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100 |  |
-| Fade on Stop/Pause | Ramps the volume down and up on stop and pause instead of cutting, which avoids the click a hard stop can produce. | on |  |
 | Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. | off | **Adv** |
 | Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. Subtle by design; if you can hear it working it is set too high. | off |  |
 
@@ -143,14 +142,6 @@ after new music, run it after `database_pb.exe`.
 | Attack Time | How quickly compression clamps down after a loud passage begins. Short catches transients and can dull drums; longer lets the initial hit through. | 5 | **Adv** |
 | Release Time | How quickly it lets go again. Too short pumps audibly on bass notes; too long leaves quiet material compressed after the loud part has passed. | 500 | **Adv** |
 
-### Sound Settings — Replaygain
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. | track shuffle |  |
-| Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | off | **Adv** |
-| Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. | 0 | **Adv** |
-
 ### Playback
 
 | Setting | What it does | Default | |
@@ -158,19 +149,15 @@ after new music, run it after `database_pb.exe`.
 | Shuffle | Plays the current list in a random order. Changing it reshuffles what is already playing rather than waiting for the next list. | off |  |
 | Repeat | What happens at the end of the list: stop, start again, repeat the one track, reshuffle and go again, or loop between two marks you set. | off |  |
 | Play Selected First | Choosing a track starts from that track rather than from the top of the folder, with the rest of the folder queued behind it. | on |  |
+| Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. | 5 | **Adv** |
+| Fade on Stop/Pause | Ramps the volume down and up on stop and pause instead of cutting, which avoids the click a hard stop can produce. | on |  |
 | Single Mode | Stops after the current track, album, artist, genre or playlist instead of carrying on. Useful for falling asleep to one record. | off |  |
-| Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
+| Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
+| Auto-Change Directory | At the end of a folder, move on rather than stopping: to the next folder, or to one picked at random. The In Start Directory choices never leave the folder set with Start Directory in the file browser. Random picks one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | off |  |
 | Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | off | **Adv** |
 | Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files and .mp3 files with chapter frames, and a book of more than 99 chapters lists the first 99 of them. | off | **Adv** |
-| Auto-Change Directory | At the end of a folder, move to the next one rather than stopping. Random moves to a folder picked at random, one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | off |  |
-| Constrain Auto-Change | When playback moves on to the next folder by itself, keeps that move inside the folder you started in -- so an album that runs on goes to its sibling rather than wandering off into the rest of the library. | off | **Adv** |
 | Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | track | **Adv** |
 | Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | off | **Adv** |
-| Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | off | **Adv** |
-| Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
-| Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
-| Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. | 5 | **Adv** |
-| Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
 | Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | auto | **Adv** |
 | Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | on | **Adv** |
 
@@ -178,8 +165,11 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| FF/RW Min Step | How far the first press of fast forward or rewind moves. Smaller is better for finding a moment in a song, larger for crossing a long file. | 1 | **Adv** |
-| FF/RW Accel | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | normal | **Adv** |
+| Minimum Step | How far the first press of fast forward or rewind moves. Smaller is better for finding a moment in a song, larger for crossing a long file. | 1 | **Adv** |
+| Acceleration | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | normal | **Adv** |
+| Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | off | **Adv** |
+| Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
+| Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
 
 ### Playback — Crossfade
 
@@ -191,6 +181,14 @@ after new music, run it after `database_pb.exe`.
 | Fade-Out Delay | How long the outgoing track holds its level before starting to fall. | 0 | **Adv** |
 | Fade-Out Duration | How long the outgoing track takes to fall silent. Longer overlaps blur the join more. | 2 | **Adv** |
 | Fade-Out Mode | Crossfade dips both tracks through the join. Mix holds the total level roughly constant, which sounds fuller but muddier where both tracks are busy. | crossfade | **Adv** |
+
+### Playback — Replaygain
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. | track shuffle |  |
+| Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | off | **Adv** |
+| Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. | 0 | **Adv** |
 
 ### Playback — Pause on Headphone Unplug
 
@@ -204,16 +202,17 @@ after new music, run it after `database_pb.exe`.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Sort Playlists | The order saved playlists are listed in: by name, or by when they were made. | alpha |  |
+| Playlist Viewer Settings ▸ Show Icons | Draws icons beside the entries in the playing queue. | on |  |
+| Playlist Viewer Settings ▸ Show Indices | Numbers the entries in the playing queue. | on |  |
+| Playlist Viewer Settings ▸ Track Display | Whether the queue shows filenames or the artist and title from the tags. | track name |  |
 | Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | on |  |
-| Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | on |  |
-| Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | on | **Adv** |
-| Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | on | **Adv** |
-| Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | off | **Adv** |
-| Show Icons | Draws icons beside the entries in the playing queue. | on |  |
-| Show Indices | Numbers the entries in the playing queue. | on |  |
-| Track Display | Whether the queue shows filenames or the artist and title from the tags. | track name |  |
+| Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | on |  |
+| Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
+| Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | on | **Adv** |
+| Queue ▸ Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | on | **Adv** |
+| Queue ▸ Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | off | **Adv** |
 
-### Playback — Bookmarks
+### Playback — Bookmarking
 
 | Setting | What it does | Default | |
 |---|---|---|---|
@@ -242,10 +241,10 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | off |  |
-| Sort Directories | The order folders are listed in: by name, or by when they were last written. | alpha |  |
-| Sort Files | The order files are listed in, including grouping by type. | alpha |  |
-| Interpret Numbers When Sorting | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | numbers |  |
+| Sort ▸ Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | off |  |
+| Sort ▸ Directories | The order folders are listed in: by name, or by when they were last written. | alpha |  |
+| Sort ▸ Files | The order files are listed in, including grouping by type. | alpha |  |
+| Sort ▸ Interpret Numbers | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | numbers |  |
 | Show Files | Which files the browser shows: everything, only what can be opened, only music, or only playlists. The quickest way to make a cluttered folder readable. | supported |  |
 | Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | view_all |  |
 | Follow Playlist | Opens the browser at the folder the playing track came from, rather than where you last were. | off |  |
@@ -257,18 +256,17 @@ after new music, run it after `database_pb.exe`.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
-| Sort Albums By ▸ Artist | The order for the album list inside an artist. Year here reads as a discography in release order, which is usually what an artist's albums want. Every album in the list is by the one artist, so the artist orders are not offered, and a Default that names one sorts by the rest. | default |  |
-| Sort Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | default |  |
-| Sort Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
-| Sort Albums By ▸ Other Lists | The order for every album list that has no row of its own under Sort Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
-| Sort Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | name |  |
-| Sort Ignoring The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | off |  |
+| Sort ▸ Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
+| Sort ▸ Albums By ▸ Artist | The order for the album list inside an artist. Year here reads as a discography in release order, which is usually what an artist's albums want. Every album in the list is by the one artist, so the artist orders are not offered, and a Default that names one sorts by the rest. | default |  |
+| Sort ▸ Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | default |  |
+| Sort ▸ Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
+| Sort ▸ Albums By ▸ Other Lists | The order for every album list that has no row of its own under Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
+| Sort ▸ Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | name |  |
+| Sort ▸ Ignore The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | off |  |
 | Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | no |  |
 | Skip One-Item Lists | When a Music list would hold only one row, opens that row straight away: an artist with one album goes straight to its tracks. Back skips over it too. A list of tracks always shows, even with one track in it. | off |  |
 | Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | off |  |
 | Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "podcast", "speech" and the like. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | off |  |
-| Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | off |  |
 | Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
 | Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
@@ -303,18 +301,16 @@ in Files and Mark as..., which moves it to any of the three until it is played
 again, though not for a podcast. A list with no books in it has no row. The
 Audiobooks lists have no <All Tracks> or <Random> rows.
 
-**Trim Titles** never removes a note at the start of a name.
-
 
 ### Library — Carousel
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | On Album Select | What Select does on a cover: open the album's track list, or start playing it. | show tracks |  |
-| Sort Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | off |  |
-| Sort Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | artist+name |  |
-| Sort Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
-| Sort Ignoring The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | off |  |
+| Sort ▸ Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | off |  |
+| Sort ▸ Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | artist+name |  |
+| Sort ▸ Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
+| Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | off |  |
 | Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175 |  |
 | Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | medium |  |
 
@@ -328,6 +324,13 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 | Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | on | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. The next update removes the tracks that are now outside the chosen folders, or inside a folder holding a database.ignore file. | / | **Adv** |
 | Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
+
+### Library — Art Cache
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | image files, then embedded | |
+| Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
 
 ### Library — Playlist Engine
 
@@ -345,13 +348,6 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 **Analysis Depth:** Quick and Thorough disagree about a track's closest match
 about two times in three.
 
-
-### Library — Art Cache
-
-| Setting | What it does | Default | |
-|---|---|---|---|
-| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | image files, then embedded | |
-| Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
 
 ### Appearance
 
@@ -416,8 +412,11 @@ Separator set above zero.
 |---|---|---|---|
 | Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
 | Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
+| Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | off |  |
 
 Also reached as **Appearance** under Playback — Now Playing Screen.
+
+**Trim Titles** never removes a note at the start of a name.
 
 ### Appearance — Carousel
 
@@ -435,9 +434,9 @@ Also reached as **Appearance** under Playback — Now Playing Screen.
 | 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
 | Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
 | Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
-| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
-| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
-| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
+| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off |  |
+| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off |  |
+| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off |  |
 
 Also reached as **Appearance** under Library — Carousel.
 
@@ -475,12 +474,35 @@ Shadow Colour only while there is a shadow to colour.
 | Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
 | Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |
 | Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. | 50 | **Adv** |
+| Screen Scrolls Out of View | Lets a line of scrolling text carry on past the edge of its viewport instead of stopping at it. Looks better on a theme whose list has room to spare, and clips awkwardly on one that does not. | No | **Adv** |
+| Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. The main menu is glanced at rather than read, and text moving under the cursor there is more distracting than helpful. | No | **Adv** |
 | Screen Scroll Step Size | How many pixels each step moves when a whole screen slides, rather than when text scrolls within one line. Smaller is smoother and costs more work. | 16 | **Adv** |
 | Paged Scrolling | Lists move a screenful at a time instead of a row at a time. | off |  |
 | List Wraparound | Passing the last item returns to the first, rather than stopping. | on |  |
 | List Order | Whether lists are traversed from the top down or the bottom up. | ascending | **Adv** |
-| Screen Scrolls Out of View | Lets a line of scrolling text carry on past the edge of its viewport instead of stopping at it. Looks better on a theme whose list has room to spare, and clips awkwardly on one that does not. | No | **Adv** |
-| Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. The main menu is glanced at rather than read, and text moving under the cursor there is more distracting than helpful. | No | **Adv** |
+
+### Appearance / Library — Viewers
+
+| Setting                              | What it does | Default | |
+|--------------------------------------|---|---|---|
+| Text Viewer ▸ Colour Mode            | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
+| Text Viewer ▸ Margin                 | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
+| Text Viewer ▸ Line Spacing           | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
+| Text Viewer ▸ Page Number            | Shows a page counter at the foot. | off |  |
+| Text Viewer ▸ Font                   | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. |  |  |
+| Lyrics Viewer ▸ Colour Mode          | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
+| Lyrics Viewer ▸ Alignment            | Whether lyric lines are aligned left, centred or right. | centre |  |
+| Lyrics Viewer ▸ Line Spacing         | Extra pixels between lyric lines. | 2 | **Adv** |
+| Lyrics Viewer ▸ Previous Line        | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
+| Lyrics Viewer ▸ Next Line            | How far lines still to come fade back. | 55 | **Adv** |
+| Lyrics Viewer ▸ Animation            | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
+| Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
+| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. A track without lyrics goes dark as usual. Costs battery. | on |  |
+| Lyrics Viewer ▸ Font                 | A font used only by the lyrics screen. Unset uses the interface font. |  |  |
+| Playback Report ▸ Artwork            | Whether the report's cards show album and artist sleeves. A card without one draws a pattern instead, as part of the design rather than a stand-in. Off also gives the pictures' memory to the statistics, so on a very large library fewer rows are dropped. Changing it inside the report reads the log again, the same pause a change of year costs. | on |  |
+| Playback Report ▸ Top Rows           | How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is enough to see a shape without walking a long way; five is a podium and twenty-five is a survey. | 10 |  |
+| Playback Report ▸ Achievement Order  | How the Achievements section is arranged. As Listed keeps the order the achievements were written in, which groups related ones together. Earned First puts what you have won at the front, Newest First orders those by when, and Closest First leads with whatever you are nearest to winning. | As Listed |  |
+| Playback Report ▸ Ranked By          | What the Top Artists, Top Songs and Top Albums sections are ordered on. Plays counts how often you started something. Minutes counts how long you listened to it. The two disagree more than you would expect. Plays favours short tracks and a song you keep restarting; minutes favours albums you sit through and anything long. Skips and night plays are counted either way, because neither has a listening time to rank by. | Plays |  |
 
 ### Appearance — Peak Meter
 
@@ -493,48 +515,25 @@ Shadow Colour only while there is a shadow to colour.
 | Minimum of Range | The quiet end of the meter's range. | 60 | **Adv** |
 | Maximum of Range | The loud end of the meter's range. | 0 | **Adv** |
 
-### Appearance / Library — Viewers
-
-| Setting                              | What it does | Default | |
-|--------------------------------------|---|---|---|
-| Text Viewer ▸ Colour Mode            | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
-| Text Viewer ▸ Margin                 | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
-| Text Viewer ▸ Line Spacing           | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
-| Text Viewer ▸ Page Number            | Shows a page counter at the foot. | off |  |
-| Text Viewer ▸ Font                   | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. |  |  |
-| Playback Report ▸ Artwork            | Whether the report's cards show album and artist sleeves. A card without one draws a pattern instead, as part of the design rather than a stand-in. Off also gives the pictures' memory to the statistics, so on a very large library fewer rows are dropped. Changing it inside the report reads the log again, the same pause a change of year costs. | on |  |
-| Playback Report ▸ Top Rows           | How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is enough to see a shape without walking a long way; five is a podium and twenty-five is a survey. | 10 |  |
-| Playback Report ▸ Achievement Order  | How the Achievements section is arranged. As Listed keeps the order the achievements were written in, which groups related ones together. Earned First puts what you have won at the front, Newest First orders those by when, and Closest First leads with whatever you are nearest to winning. | As Listed |  |
-| Playback Report ▸ Ranked By          | What the Top Artists, Top Songs and Top Albums sections are ordered on. Plays counts how often you started something. Minutes counts how long you listened to it. The two disagree more than you would expect. Plays favours short tracks and a song you keep restarting; minutes favours albums you sit through and anything long. Skips and night plays are counted either way, because neither has a listening time to rank by. | Plays |  |
-| Lyrics Viewer ▸ Colour Mode          | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
-| Lyrics Viewer ▸ Alignment            | Whether lyric lines are aligned left, centred or right. | centre |  |
-| Lyrics Viewer ▸ Line Spacing         | Extra pixels between lyric lines. | 2 | **Adv** |
-| Lyrics Viewer ▸ Previous Line        | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
-| Lyrics Viewer ▸ Next Line            | How far lines still to come fade back. | 55 | **Adv** |
-| Lyrics Viewer ▸ Animation            | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
-| Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
-| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. A track without lyrics goes dark as usual. Costs battery. | on |  |
-| Lyrics Viewer ▸ Font                 | A font used only by the lyrics screen. Unset uses the interface font. |  |  |
-
 ### Battery & Power
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
-| Backlight | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
-| Backlight (While Plugged In) | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
-| Backlight on Hold | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
-| Caption Backlight | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
-| Backlight Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
-| Backlight Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
-| First Buttonpress Enables Backlight Only | The press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. A remote's or dock's buttons always act. | on | **Adv** |
-| Backlight Exemptions ▸ Enabled | Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | off | **Adv** |
-| Sleep (After Backlight Off) | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
+| Backlight ▸ On Battery | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
+| Backlight ▸ When Plugged In | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
+| Backlight ▸ When Locked | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
+| Backlight ▸ On Track Change | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
+| Backlight ▸ Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
+| Backlight ▸ Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
+| Backlight ▸ Screen Off After | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
+| Backlight ▸ First Button Press | Only Lights Screen: the press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. Also Acts lets that press do its job as well. A remote's or dock's buttons always act. | on | **Adv** |
+| Backlight ▸ Exemptions ▸ Enabled | Lets the presses chosen in Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | off | **Adv** |
 | Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
-| Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
-| Storage Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
-| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
+| Storage ▸ Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
+| Storage ▸ Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
 | Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
+| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
 
 ### Battery & Power — Sleep Timer
 
@@ -558,11 +557,6 @@ Shadow Colour only while there is a shadow to colour.
 | Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
 | Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
 | Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Direct mode never reads it, which is why the row is listed only in Perceptual. | 50 | **Adv** |
-| Start Screen | Which screen opens at power-on. | root |  |
-| Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
-| Shut Down | Switches the player off now, as holding Play does. Refused while charging, on a player that cannot switch off on the charger. | |  |
-| Reboot | Restarts the player now. Refused while charging, as Shut Down is. | |  |
-| Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | standard |  |
 | Show Debug Menu | Reveals the debug screens under System. They read hardware and internal state; nothing there is needed in normal use. | off | **Adv** |
 
 ### System — USB
@@ -592,7 +586,7 @@ Shadow Colour only while there is a shadow to colour.
 | Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, or with a car's first cover, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
 | Car Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. An older car or a dock gets the art cache's cover whichever is chosen, and none with Off. | prefer cache |  |
 | Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
-| Remote Track Skip | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
+| Remote Track Skip (iPod Classic) | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
 
 A car is not offered Playlist Engine moods through **Accessory Browsing**.
 
@@ -627,8 +621,23 @@ restart, which costs battery life: restart the player afterwards.
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Max Entries in File Browser | The largest number of entries loaded from one folder or one Music list. A longer folder is cut short; a longer Music list is shown a page at a time in the database's order, so The/A/An and numbers are not sorted. Takes effect after a restart. | 5000 | **Adv** |
-| Max Playlist Size | The largest number of tracks a playlist may hold. Building very large lists is slow on this hardware, which is why the limit is lower here than on a computer. | 10000 | **Adv** |
+| Max Playlist Size | The largest number of tracks a playlist may hold. Building very large lists is slow on this hardware, which is why the limit is lower here than on a computer. | 10000 (iPod Classic), 2000 (iPod Video) | **Adv** |
 | Glyphs to Cache | How many characters of the font are kept in memory at once. | 250 | **Adv** |
+
+### System — Time & Date Settings
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Time Format | Whether times are shown on a 12- or 24-hour clock. | 12hour |  |
+
+### System — Startup/Shutdown
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
+| Start Screen | Which screen opens at power-on. | root |  |
+| Shut Down | Switches the player off now, as holding Play does. Refused while charging, on a player that cannot switch off on the charger. | |  |
+| Reboot | Restarts the player now. Refused while charging, as Shut Down is. | |  |
 
 ### System — Language & Text
 
@@ -636,20 +645,25 @@ restart, which costs battery life: restart the player afterwards.
 |---|---|---|---|
 | Language | The language of the interface. Loading one replaces the built-in English. |  |  |
 | Default Codepage | The character set assumed for tags that do not say which they use. Wrong guesses show accented characters as nonsense; Unicode is right for anything tagged recently. | utf-8 | **Adv** |
-| Time Format | Whether times are shown on a 12- or 24-hour clock. | 12hour |  |
 
-### System — Voice
+### System — Language & Text — Voice
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Voice Menus | Speaks menu entries aloud. Needs a voice file on the player. | on |  |
 | Voice Directories | Whether folder names are spoken, and whether by number or spelled out. | off | **Adv** |
-| Voice Filenames | Whether filenames are spoken, and how. | off | **Adv** |
 | Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | off | **Adv** |
+| Voice Filenames | Whether filenames are spoken, and how. | off | **Adv** |
 | Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | off | **Adv** |
 | Say File Type | Speaks the file's type along with its name. | off | **Adv** |
 | Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | off | **Adv** |
 | Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100 | **Adv** |
+
+### System — Manage Settings
+
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | standard |  |
 
 ### System — Debug Logs
 

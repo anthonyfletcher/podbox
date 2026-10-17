@@ -162,6 +162,9 @@ enum {
     FOLDER_ADVANCE_OFF = 0,
     FOLDER_ADVANCE_NEXT,
     FOLDER_ADVANCE_RANDOM,
+    /* Within the start directory */
+    FOLDER_ADVANCE_NEXT_START,
+    FOLDER_ADVANCE_RANDOM_START,
 };
 
 /* repeat mode options */
@@ -818,8 +821,6 @@ struct user_settings
     /* playlist/playback settings */
     int  repeat_mode; /* 0=off 1=repeat all 2=repeat one 3=shuffle 4=ab */
     int  next_folder; /* move to next folder */
-    bool constrain_next_folder; /* whether next_folder is constrained to
-                                   directories within start_directory */
     int  recursive_dir_insert; /* should directories be inserted recursively */
     bool fade_on_stop; /* fade on pause/unpause/stop */
     bool playlist_shuffle;

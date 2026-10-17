@@ -105,6 +105,7 @@ All under **Settings → Library → Playlist Engine**.
 | Playlist Length | How many tracks a playlist holds, 5 to 100. |
 | Track Playlist | How much Play Similar varies between runs. |
 | Mood Playlist | The same, for moods and journeys. |
+| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. |
 | Continue Playing | Keeps the music going when a playlist runs out. |
 | Library Sound | What the analysis found across your library. |
 

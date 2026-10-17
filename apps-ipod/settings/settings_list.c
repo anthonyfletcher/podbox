@@ -1028,9 +1028,11 @@ const struct settings_list settings[] = {
 #endif
 
 
-    OFFON_SETTING(0, bl_filter_first_keypress,
-                  LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS, true,
-                  "backlight filters first keypress", NULL),
+    BOOL_SETTING(0, bl_filter_first_keypress,
+                 LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS, true,
+                 "backlight filters first keypress", off_on,
+                 LANG_FIRST_PRESS_LIGHTS_ONLY, LANG_FIRST_PRESS_ALSO_ACTS,
+                 NULL),
 
 /** End of old RTC config block **/
 
@@ -1318,12 +1320,12 @@ const struct settings_list settings[] = {
 
 
     CHOICE_SETTING(0, next_folder, LANG_NEXT_FOLDER, FOLDER_ADVANCE_OFF,
-                   "folder navigation", "off,on,random", NULL, 3,
-                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_SET_BOOL_YES),
-                   ID2P(LANG_RANDOM)),
-    BOOL_SETTING(0, constrain_next_folder, LANG_CONSTRAIN_NEXT_FOLDER, false,
-                 "constrain next folder", off_on,
-                 LANG_SET_BOOL_YES, LANG_SET_BOOL_NO, NULL),
+                   "folder navigation",
+                   "off,on,random,constrained,random constrained", NULL, 5,
+                   ID2P(LANG_SET_BOOL_NO), ID2P(LANG_NEXT_FOLDER_NEXT),
+                   ID2P(LANG_NEXT_FOLDER_RANDOM),
+                   ID2P(LANG_NEXT_FOLDER_NEXT_START),
+                   ID2P(LANG_NEXT_FOLDER_RANDOM_START)),
 
     BOOL_SETTING(0, autoresume_enable, LANG_AUTORESUME, false,
                  "autoresume enable", off_on,

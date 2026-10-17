@@ -316,18 +316,13 @@ reads .m4b files and .mp3 files with chapter frames, and a book of more than 99
 chapters lists the first 99 of them.
 
 [folder navigation]
-At the end of a folder, move to the next one rather than stopping.
+At the end of a folder, move on rather than stopping: to the next folder, or to
+one picked at random. The In Start Directory choices never leave the folder set
+with Start Directory in the file browser.
 
-Random moves to a folder picked at random, one level at a time: each artist
-folder has the same chance, then each album in it, so an artist with one album
-comes up as often as one with twenty.
-
-[constrain next folder]
-When playback moves on to the next folder by itself, keeps that move inside the
-folder you started in -- so an album that runs on goes to its sibling rather
-than wandering off into the rest of the library.
-
-Only does anything while Auto-Change Directory is on.
+Random picks one level at a time: each artist folder has the same chance, then
+each album in it, so an artist with one album comes up as often as one with
+twenty.
 
 [skip length]
 Makes skip jump a fixed amount of time instead of a whole track. For long
@@ -677,7 +672,7 @@ It replaces the year in the Music lists, album sorting and the carousel; the
 now playing screen still shows the tag. Takes effect at the next rebuild.
 
 [database sort albums by]
-The order for every album list that has no row of its own under Sort Albums By:
+The order for every album list that has no row of its own under Albums By:
 by name, by release year with either end first, or by album artist and then
 name or year.
 
@@ -1184,12 +1179,13 @@ How long the backlight takes to come up rather than snapping on.
 How long it takes to go down. A slow fade is gentler in the dark.
 
 [backlight filters first keypress]
-The press that wakes the screen does nothing else, so you cannot change a
-setting you could not see. Costs one extra press each time. A remote's or
-dock's buttons always act.
+Only Lights Screen: the press that wakes the screen does nothing else, so you
+cannot change a setting you could not see. Costs one extra press each time.
+Also Acts lets that press do its job as well. A remote's or dock's buttons
+always act.
 
 [No Backlight On Selected Actions]
-Lets the presses chosen in Backlight Exemptions -- play, seek, skip or volume
+Lets the presses chosen in Exemptions -- play, seek, skip or volume
 on the Now Playing screen and main menu -- work without lighting the screen.
 Saves battery when you control playback blind.
 

@@ -274,10 +274,16 @@ MAKE_MENU(playlist_engine_menu, ID2P(LANG_PLAYLIST_ENGINE), 0, Icon_Playlist,
             &continue_playing, &sound_library_item);
 
 /** File view menu **/
-MENUITEM_SETTING(sort_case, &global_settings.sort_case, NULL);
-MENUITEM_SETTING(sort_dir, &global_settings.sort_dir, NULL);
-MENUITEM_SETTING(sort_file, &global_settings.sort_file, NULL);
-MENUITEM_SETTING(interpret_numbers, &global_settings.interpret_numbers, NULL);
+MENUITEM_SETTING_W_TEXT(sort_case, &global_settings.sort_case,
+                        ID2P(LANG_SORT_CASE_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(sort_dir, &global_settings.sort_dir,
+                        ID2P(LANG_SORT_DIR_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(sort_file, &global_settings.sort_file,
+                        ID2P(LANG_SORT_FILE_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(interpret_numbers, &global_settings.interpret_numbers,
+                        ID2P(LANG_SORT_INTERPRET_NUMBERS_SHORT), NULL);
+MAKE_MENU(file_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
+          &sort_case, &sort_dir, &sort_file, &interpret_numbers);
 MENUITEM_SETTING(dirfilter, &global_settings.dirfilter, NULL);
 MENUITEM_SETTING(show_filename_ext, &global_settings.show_filename_ext, NULL);
 MENUITEM_SETTING(browse_current, &global_settings.browse_current, NULL);
@@ -352,7 +358,7 @@ static int filemenu_callback(int action,
                              struct gui_synclist *this_list);
 MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
                 Icon_file_view_menu,
-                &sort_case, &sort_dir, &sort_file, &interpret_numbers,
+                &file_sort_menu,
                 &dirfilter, &show_filename_ext, &browse_current,
                 &show_path_in_browser,
                 &dircache,
@@ -404,7 +410,10 @@ MENUITEM_SETTING(usb_charging, &global_settings.usb_charging, usbcharging_callba
 MENUITEM_SETTING(usb_mode, &global_settings.usb_mode, NULL);
 /* Disk */
 MENUITEM_SETTING(disk_spindown, &global_settings.disk_spindown, NULL);
-MENUITEM_SETTING(storage_mode, &global_settings.storage_mode, NULL);
+MENUITEM_SETTING_W_TEXT(storage_mode, &global_settings.storage_mode,
+                        ID2P(LANG_STORAGE_MODE_SHORT), NULL);
+MAKE_MENU(storage_menu, ID2P(LANG_STORAGE), 0, Icon_NOICON,
+          &disk_spindown, &storage_mode);
 
 /* Limits menu */
 MENUITEM_SETTING(max_files_in_dir, &global_settings.max_files_in_dir, NULL);
@@ -857,31 +866,20 @@ MAKE_MENU(startup_shutdown_menu, ID2P(LANG_STARTUP_SHUTDOWN),
  * Nothing anywhere said "battery", which is the thing an iPod owner tunes
  * most.
  *
- * Brightness first, then every backlight row together -- how long the light
- * stays on is the biggest lever there is on runtime -- then the panel, then
- * everything else that spends the battery. Flat, with no submenu, so the one
- * setting most worth changing is a single step away. */
+ * Brightness first and on its own, a single step away, then the backlight --
+ * how long the light stays on is the biggest lever there is on runtime --
+ * then everything else that spends the battery, and charging last. */
 MAKE_MENU(power_menu, ID2P(LANG_BATTERY_POWER), 0, Icon_System_menu,
             &brightness_item,
-            &backlight_timeout,
-            &backlight_timeout_plugged,
-            &backlight_on_button_hold,
-            &caption_backlight,
-#if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
-            &backlight_fade_in, &backlight_fade_out,
-#endif
-            &bl_filter_first_keypress,
-            &sel_backlight,
-            &lcd_sleep_after_backlight_off,
+            &backlight_menu,
             &poweroff,
             &sleep_timer_menu,
-            &disk_spindown,
-            &storage_mode,
-            &usb_charging,
+            &storage_menu,
 #if BATTERY_CAPACITY_INC > 0
             &battery_capacity,
 #endif
-            &car_adapter_mode_menu);
+            &car_adapter_mode_menu,
+            &usb_charging);
 
 
 /** Bookmark menu **/
@@ -1088,10 +1086,11 @@ MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET_CONTEXT_ITEMS), reset_wps_i
  * either, and a theme that wanted to could not. */
 MENUITEM_SETTING(wps_art_source, &global_settings.wps_art_source, NULL);
 MENUITEM_SETTING(album_art, &global_settings.album_art, NULL);
+MENUITEM_SETTING(trim_titles, &global_settings.trim_titles, NULL);
 
 /* One list under two names: Appearance > Now Playing Screen, and Appearance
  * inside Playback > Now Playing Screen. */
-#define WPS_APPEARANCE_ITEMS &wps_art_source, &album_art
+#define WPS_APPEARANCE_ITEMS &wps_art_source, &album_art, &trim_titles
 MAKE_MENU(wps_appearance_menu, ID2P(LANG_WPS), 0, Icon_NOICON,
             WPS_APPEARANCE_ITEMS);
 MAKE_MENU(wps_appearance_link, ID2P(LANG_APPEARANCE), 0, Icon_NOICON,
@@ -1189,14 +1188,18 @@ MENUITEM_FUNCTION_W_PARAM(album_sort_composer, 0, ID2P(LANG_ID3_COMPOSER),
                           Icon_NOICON);
 MENUITEM_SETTING(database_sort_albums_by,
                  &global_settings.database_sort_albums_by, NULL);
-MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY), 0, Icon_NOICON,
+MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY_SHORT), 0, Icon_NOICON,
           &album_sort_root, &album_sort_artist, &album_sort_albumartist,
           &album_sort_composer, &database_sort_albums_by
           );
-MENUITEM_SETTING(database_sort_artists_by,
-                 &global_settings.database_sort_artists_by, NULL);
-MENUITEM_SETTING(sort_ignore_articles, &global_settings.sort_ignore_articles,
-                 NULL);
+MENUITEM_SETTING_W_TEXT(database_sort_artists_by,
+                        &global_settings.database_sort_artists_by,
+                        ID2P(LANG_SORT_ARTISTS_BY_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(sort_ignore_articles,
+                        &global_settings.sort_ignore_articles,
+                        ID2P(LANG_SORT_IGNORE_ARTICLES_SHORT), NULL);
+MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
+          &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
 MENUITEM_SETTING(skip_single_lists, &global_settings.skip_single_lists, NULL);
 
@@ -1204,7 +1207,6 @@ MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
                   music_menu_config, NULL, Icon_NOICON);
 MENUITEM_SETTING(featured_artists, &global_settings.featured_artists, NULL);
-MENUITEM_SETTING(trim_titles, &global_settings.trim_titles, NULL);
 MENUITEM_SETTING(segregate_audiobooks, &global_settings.segregate_audiobooks,
                  NULL);
 /* The Music Quiz's kinds of question. One always stays on: turning off the
@@ -1234,9 +1236,9 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
           &quiz_title, &quiz_artist, &quiz_album, &quiz_year);
 
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
-          &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles,
+          &music_sort_menu,
           &album_show_year, &skip_single_lists,
-          &featured_artists, &segregate_audiobooks, &trim_titles,
+          &featured_artists, &segregate_audiobooks,
           &music_menu_config_item,
           &search_menu, &quiz_menu,
           &music_appearance_menu    /* theme_settings.c */
@@ -1294,6 +1296,6 @@ MAKE_MENU(system_menu, ID2P(LANG_SYSTEM),
             &startup_shutdown_menu,
             &language_menu,
             &manage_settings,
-            &show_debug_menu,
             &debug_logs_menu,
+            &show_debug_menu,
          );

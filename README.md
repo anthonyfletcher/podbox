@@ -260,11 +260,11 @@ they can be installed in any order and on their own.
   - `Settings > Library > Music > Show Year in Album Lists`, off by default
 - Control the sort order of the albums  chosen from name, year (oldest or newest first), 
   or artist then name or year
-  - `Settings > Library > Music > Sort Albums By`
+  - `Settings > Library > Music > Sort > Albums By`
 - Sort artists and albums ignoring a leading "The", "A" or "An"
-  - Off by default.  Turn it on in `Settings > Library > Music > Sort Ignoring The/A/An`
+  - Off by default.  Turn it on in `Settings > Library > Music > Sort > Ignore The/A/An`
 - Sort artists by name or by most played
-  - `Settings > Library > Music > Sort Artists By`
+  - `Settings > Library > Music > Sort > Artists By`
 - Start playing a random album
   - `Music > Random Album`
 - Search with live results across track, album or artist names
@@ -276,7 +276,7 @@ they can be installed in any order and on their own.
 - Control the items displayed in the Music menu and their order
   - Change via `Settings > Library > Music > Edit Music Menu`
 - Trim noise from track and album names (like featuring information)
-  - Off by default.  Turn the feature on by going to `Settings > Library > Music > Trim Titles`
+  - Off by default.  Turn the feature on by going to `Settings > Appearance > Now Playing Screen > Trim Titles`
   - Add your own patterns in `.rockbox/library/user/trim.txt`, which an update leaves alone
 - View listening progress against albums and artists
   - Hold `Select` on an Album or Artist and select `Listening Progress`
@@ -330,7 +330,7 @@ into `.mp3` ones
 - Display the covers/portraits flat, face-on either side of the current one
   - `Settings > Appearance > Carousel > View Mode`
 - Sort the covers/portraits independently of Music, or the same way
-  - `Settings > Library > Carousel > Sort Same as Music`, off by default
+  - `Settings > Library > Carousel > Sort > Same as Music`, off by default
 - Give the carousel a fixed background colour that dynamic colours leave alone
   - `Settings > Appearance > Carousel > Background > Custom`
 - Spin to a random album or artist

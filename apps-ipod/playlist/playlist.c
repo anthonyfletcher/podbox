@@ -962,7 +962,7 @@ static int get_next_dir(char *dir, int direction)
     int saved_dirfilter = *(tc->dirfilter);
     unsigned int base_len;
 
-    if (global_settings.constrain_next_folder)
+    if (global_settings.next_folder >= FOLDER_ADVANCE_NEXT_START)
     {
         /* constrain results to directories below user's start directory */
         strcpy(dir, global_settings.start_directory);
@@ -982,7 +982,8 @@ static int get_next_dir(char *dir, int direction)
         base_len = 0;
     }
 
-    if (global_settings.next_folder == FOLDER_ADVANCE_RANDOM)
+    if (global_settings.next_folder == FOLDER_ADVANCE_RANDOM
+        || global_settings.next_folder == FOLDER_ADVANCE_RANDOM_START)
     {
         bool found;
 

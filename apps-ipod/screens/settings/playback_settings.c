@@ -48,10 +48,18 @@ MENUITEM_SETTING(shuffle_item, &global_settings.playlist_shuffle, NULL);
 MENUITEM_SETTING(repeat_mode, &global_settings.repeat_mode, NULL);
 MENUITEM_SETTING(play_selected, &global_settings.play_selected, NULL);
 
-MENUITEM_SETTING(ff_rewind_accel, &global_settings.ff_rewind_accel, NULL);
-MENUITEM_SETTING(ff_rewind_min_step, &global_settings.ff_rewind_min_step, NULL);
+/* Short row names under Fast-Forward/Rewind; the settings keep their full
+   names for the Quick Screen. */
+MENUITEM_SETTING_W_TEXT(ff_rewind_accel, &global_settings.ff_rewind_accel,
+                        ID2P(LANG_FFRW_ACCEL_SHORT), NULL);
+MENUITEM_SETTING_W_TEXT(ff_rewind_min_step, &global_settings.ff_rewind_min_step,
+                        ID2P(LANG_FFRW_STEP_SHORT), NULL);
+MENUITEM_SETTING(rewind_across_tracks, &global_settings.rewind_across_tracks, NULL);
+MENUITEM_SETTING(resume_rewind, &global_settings.resume_rewind, NULL);
+MENUITEM_SETTING(pause_rewind, &global_settings.pause_rewind, NULL);
 MAKE_MENU(ff_rewind_settings_menu, ID2P(LANG_WIND_MENU), 0, Icon_NOICON,
-          &ff_rewind_min_step, &ff_rewind_accel);
+          &ff_rewind_min_step, &ff_rewind_accel, &rewind_across_tracks,
+          &resume_rewind, &pause_rewind);
 static int buffermargin_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)
@@ -70,7 +78,6 @@ MENUITEM_SETTING(buffer_margin, &global_settings.buffer_margin,
                  buffermargin_callback);
 MENUITEM_SETTING(fade_on_stop, &global_settings.fade_on_stop, NULL);
 MENUITEM_SETTING(single_mode, &global_settings.single_mode, NULL);
-MENUITEM_SETTING(party_mode, &global_settings.party_mode, NULL);
 
 /* crossfade submenu */
 MENUITEM_SETTING(crossfade, &global_settings.crossfade, setcrossfadeonexit_callback);
@@ -120,8 +127,6 @@ MAKE_MENU(replaygain_settings_menu,ID2P(LANG_REPLAYGAIN),0, Icon_NOICON,
 MENUITEM_SETTING(beep, &global_settings.beep ,NULL);
 
 MENUITEM_SETTING(next_folder, &global_settings.next_folder, NULL);
-MENUITEM_SETTING(constrain_next_folder,
-                 &global_settings.constrain_next_folder, NULL);
 
 /* Both settings are served by the one struct cuesheet carried alongside the
    track, so either being switched is what decides whether the buffer has to
@@ -151,9 +156,6 @@ MAKE_MENU(unplug_menu, ID2P(LANG_HEADPHONE_UNPLUG), 0, Icon_NOICON,
 
 MENUITEM_SETTING(skip_length, &global_settings.skip_length, NULL);
 MENUITEM_SETTING(prevent_skip, &global_settings.prevent_skip, NULL);
-MENUITEM_SETTING(rewind_across_tracks, &global_settings.rewind_across_tracks, NULL);
-MENUITEM_SETTING(resume_rewind, &global_settings.resume_rewind, NULL);
-MENUITEM_SETTING(pause_rewind, &global_settings.pause_rewind, NULL);
 MENUITEM_SETTING(play_frequency, &global_settings.play_frequency, NULL);
 
 MENUITEM_SETTING(playback_log, &global_settings.playback_log, NULL);
@@ -163,19 +165,15 @@ MAKE_MENU(playback_settings,ID2P(LANG_PLAYBACK),0,
           &shuffle_item, &repeat_mode, &play_selected,
           &ff_rewind_settings_menu,
           &buffer_margin,
-          &fade_on_stop, &single_mode, &party_mode,
+          &fade_on_stop, &single_mode,
 
           &crossfade_settings_menu,
 
           &replaygain_settings_menu, &beep,
 
-          &next_folder, &constrain_next_folder, &cuesheet, &chapter_marks
+          &next_folder, &cuesheet, &chapter_marks
          ,&unplug_menu
          ,&skip_length, &prevent_skip
-          ,&rewind_across_tracks
-
-          ,&resume_rewind
-          ,&pause_rewind
           ,&play_frequency
         ,&playback_log
           /* All three were under General Settings, which is where anything
