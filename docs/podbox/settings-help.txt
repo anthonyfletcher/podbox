@@ -1360,10 +1360,11 @@ Charge only suits a plug that would otherwise take the disk and interrupt
 playback. Docks and cars that play from the player over USB still work.
 
 Drive Only presents the disk and nothing else, for a car stereo that reads
-iPods as USB drives but does not see this one. It overrides Accessory Protocol,
-iPhone Accessories, Identify As, USB Sound Card, USB HID and USB DAC Output
-without changing them, so cars and docks that play from the player over USB
-do not work until it is switched back. Docks on the dock connector still do.
+iPods as USB drives but does not see this one. It overrides Accessory
+Protocol, Support iPhone Accessories, Identify As, USB Sound Card, USB HID and
+USB DAC Output without changing them, so cars and docks that play from the
+player over USB do not work until it is switched back. Docks on the dock
+connector still do.
 A change takes effect at the next connection.
 
 [usb hid]

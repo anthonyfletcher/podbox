@@ -64,6 +64,11 @@ struct menu_func {
  * settings_list entry to tag: submenus and MENUITEM_FUNCTION actions. */
 #define MENU_ADVANCED 0x200
 
+/* MT_SETTING_W_TEXT only: the text is the row's own name as well as the
+ * setting screen's title -- shown, spoken and searched as the row. The
+ * setting keeps its own name everywhere else (Quick Screen, %Sx, .cfg). */
+#define MENU_SETTING_LABEL 0x400
+
 #define MENU_COUNT_MASK 0xFFF
 #define MENU_COUNT_SHIFT 12
 #define MENU_ITEM_COUNT(c) ((c&MENU_COUNT_MASK)<<MENU_COUNT_SHIFT)
@@ -176,6 +181,16 @@ int do_menu(const struct menu_item_ex *menu, int *start_selected,
                 {callback,str, Icon_NOICON};                            \
     static const struct menu_item_ex name =                             \
         {MT_SETTING_W_TEXT|MENU_HAS_DESC, {.variable = (void*)var },    \
+            {.callback_and_desc = & name##__}};
+
+/*  As above, with str also the row's name in the menu (MENU_SETTING_LABEL),
+    for a row whose submenu already says what the setting's name spells out */
+#define MENUITEM_SETTING_W_LABEL(name, var, str, callback )             \
+    static const struct menu_callback_with_desc name##__ =              \
+                {callback,str, Icon_NOICON};                            \
+    static const struct menu_item_ex name =                             \
+        {MT_SETTING_W_TEXT|MENU_HAS_DESC|MENU_SETTING_LABEL,            \
+            {.variable = (void*)var },                                  \
             {.callback_and_desc = & name##__}};
 
 /*  Use this To create a list of Strings (or ID2P()'s )

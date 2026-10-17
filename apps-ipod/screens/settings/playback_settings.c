@@ -50,10 +50,11 @@ MENUITEM_SETTING(play_selected, &global_settings.play_selected, NULL);
 
 /* Short row names under Fast-Forward/Rewind; the settings keep their full
    names for the Quick Screen. */
-MENUITEM_SETTING_W_TEXT(ff_rewind_accel, &global_settings.ff_rewind_accel,
-                        ID2P(LANG_FFRW_ACCEL_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(ff_rewind_min_step, &global_settings.ff_rewind_min_step,
-                        ID2P(LANG_FFRW_STEP_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(ff_rewind_accel, &global_settings.ff_rewind_accel,
+                         ID2P(LANG_FFRW_ACCEL_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(ff_rewind_min_step,
+                         &global_settings.ff_rewind_min_step,
+                         ID2P(LANG_FFRW_STEP_SHORT), NULL);
 MENUITEM_SETTING(rewind_across_tracks, &global_settings.rewind_across_tracks, NULL);
 MENUITEM_SETTING(resume_rewind, &global_settings.resume_rewind, NULL);
 MENUITEM_SETTING(pause_rewind, &global_settings.pause_rewind, NULL);

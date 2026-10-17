@@ -47,7 +47,7 @@ const char *settings_walk_menu_label(const struct menu_item_ex *menu)
 const char *settings_walk_item_label(const struct menu_item_ex *item,
                                      const struct settings_list *setting)
 {
-    if ((item->flags & MENU_TYPE_MASK) == MT_SETTING_W_TEXT)
+    if (item->flags & MENU_SETTING_LABEL)
         return P2STR(item->callback_and_desc->desc);
     return str(setting->lang_id);
 }

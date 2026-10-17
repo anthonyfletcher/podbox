@@ -1635,7 +1635,7 @@ void iap_library_queue_done(void)
  * artwork for iAP2                                                   *
  * ------------------------------------------------------------------ */
 
-/* The track's cover as a JPEG, from where Car Artwork says by Album Art's
+/* The track's cover as a JPEG, from where Accessory Artwork says by Album Art's
  * rules (albumart_find_source()), read on the worker, never the USB thread,
  * into a ring of blocks the USB side sends from a packet's worth at a time.
  * Trap: a read per packet seeks the disk away from the buffering thread

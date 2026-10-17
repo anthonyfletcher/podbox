@@ -22819,18 +22819,18 @@
   desc: in accessories settings: where the cover art sent to a car comes from
   user: core
   <source>
-    *: "Car Artwork"
+    *: "Accessory Artwork"
   </source>
   <dest>
-    *: "Pochettes en voiture"
+    *: "Pochettes des accessoires"
   </dest>
   <voice>
-    *: "Pochettes en voiture"
+    *: "Pochettes des accessoires"
   </voice>
 </phrase>
 <phrase>
   id: LANG_AS_ALBUM_ART
-  desc: in Car Artwork: the same sources, in the same order, as Album Art
+  desc: in Accessory Artwork: the same sources, in the same order, as Album Art
   user: core
   <source>
     *: "As Album Art"
@@ -22847,13 +22847,13 @@
   desc: in accessories settings: answering accessories that expect an iPhone (iAP2) over USB
   user: core
   <source>
-    *: "iPhone Accessories"
+    *: "Support iPhone Accessories"
   </source>
   <dest>
-    *: "Accessoires iPhone"
+    *: "Accepter les accessoires iPhone"
   </dest>
   <voice>
-    *: "Accessoires i Phone"
+    *: "Accepter les accessoires i Phone"
   </voice>
 </phrase>
 <phrase>

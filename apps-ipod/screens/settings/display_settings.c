@@ -96,21 +96,22 @@ static int selectivebacklight_set_mask(void* param)
 /* Rows named for the case each covers, under Backlight. The settings keep
    their full names, which the Quick Screen shows and themes key its icons
    on. */
-MENUITEM_SETTING_W_TEXT(backlight_timeout, &global_settings.backlight_timeout,
-                        ID2P(LANG_BACKLIGHT_ON_BATTERY), NULL);
-MENUITEM_SETTING_W_TEXT(backlight_timeout_plugged,
-                        &global_settings.backlight_timeout_plugged,
-                        ID2P(LANG_BACKLIGHT_PLUGGED_IN), NULL);
-MENUITEM_SETTING_W_TEXT(backlight_on_button_hold,
-                        &global_settings.backlight_on_button_hold,
-                        ID2P(LANG_BACKLIGHT_LOCKED), NULL);
-MENUITEM_SETTING_W_TEXT(caption_backlight, &global_settings.caption_backlight,
-                        ID2P(LANG_BACKLIGHT_TRACK_CHANGE), NULL);
+MENUITEM_SETTING_W_LABEL(backlight_timeout, &global_settings.backlight_timeout,
+                         ID2P(LANG_BACKLIGHT_ON_BATTERY), NULL);
+MENUITEM_SETTING_W_LABEL(backlight_timeout_plugged,
+                         &global_settings.backlight_timeout_plugged,
+                         ID2P(LANG_BACKLIGHT_PLUGGED_IN), NULL);
+MENUITEM_SETTING_W_LABEL(backlight_on_button_hold,
+                         &global_settings.backlight_on_button_hold,
+                         ID2P(LANG_BACKLIGHT_LOCKED), NULL);
+MENUITEM_SETTING_W_LABEL(caption_backlight, &global_settings.caption_backlight,
+                         ID2P(LANG_BACKLIGHT_TRACK_CHANGE), NULL);
 #if defined(HAVE_BACKLIGHT_FADING_INT_SETTING)
-MENUITEM_SETTING_W_TEXT(backlight_fade_in, &global_settings.backlight_fade_in,
-                        ID2P(LANG_BACKLIGHT_FADE_IN_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(backlight_fade_out, &global_settings.backlight_fade_out,
-                        ID2P(LANG_BACKLIGHT_FADE_OUT_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(backlight_fade_in, &global_settings.backlight_fade_in,
+                         ID2P(LANG_BACKLIGHT_FADE_IN_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(backlight_fade_out,
+                         &global_settings.backlight_fade_out,
+                         ID2P(LANG_BACKLIGHT_FADE_OUT_SHORT), NULL);
 #endif
 MENUITEM_SETTING(bl_filter_first_keypress,
                  &global_settings.bl_filter_first_keypress,

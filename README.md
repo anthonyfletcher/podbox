@@ -531,10 +531,10 @@ speaks iAP2, the protocol an iPhone uses, and the car plays it as a USB media so
 - Title, artist, album, cover art and a moving progress bar on the car's screen
 - Your whole library in the car's own browser - pick an artist, album, playlist or song there and the iPod
   plays it
-- `Settings > System > Accessories > iPhone Accessories` - `Auto` by default. Auto recognises a car,
+- `Settings > System > Accessories > Support iPhone Accessories` - `Auto` by default. Auto recognises a car,
   and a computer still mounts the iPod as a disk, about a second later than it otherwise would.
   Shown only while `Accessory Protocol` is on
-- `Settings > System > Accessories > Car Artwork` specifies where the cover comes from.
+- `Settings > System > Accessories > Accessory Artwork` specifies where the cover comes from.
   `Prefer Cache` by default, which appears almost at once. `As Album Art`, `Prefer Embedded` and
   `Prefer Image File` send the original image - sharper, but slower to appear and more work for a 5G.
   Only JPEGs under 512 KB are sent as they are. A dock or older car gets the art cache's cover

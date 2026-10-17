@@ -274,14 +274,14 @@ MAKE_MENU(playlist_engine_menu, ID2P(LANG_PLAYLIST_ENGINE), 0, Icon_Playlist,
             &continue_playing, &sound_library_item);
 
 /** File view menu **/
-MENUITEM_SETTING_W_TEXT(sort_case, &global_settings.sort_case,
-                        ID2P(LANG_SORT_CASE_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(sort_dir, &global_settings.sort_dir,
-                        ID2P(LANG_SORT_DIR_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(sort_file, &global_settings.sort_file,
-                        ID2P(LANG_SORT_FILE_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(interpret_numbers, &global_settings.interpret_numbers,
-                        ID2P(LANG_SORT_INTERPRET_NUMBERS_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(sort_case, &global_settings.sort_case,
+                         ID2P(LANG_SORT_CASE_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(sort_dir, &global_settings.sort_dir,
+                         ID2P(LANG_SORT_DIR_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(sort_file, &global_settings.sort_file,
+                         ID2P(LANG_SORT_FILE_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(interpret_numbers, &global_settings.interpret_numbers,
+                         ID2P(LANG_SORT_INTERPRET_NUMBERS_SHORT), NULL);
 MAKE_MENU(file_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
           &sort_case, &sort_dir, &sort_file, &interpret_numbers);
 MENUITEM_SETTING(dirfilter, &global_settings.dirfilter, NULL);
@@ -410,8 +410,8 @@ MENUITEM_SETTING(usb_charging, &global_settings.usb_charging, usbcharging_callba
 MENUITEM_SETTING(usb_mode, &global_settings.usb_mode, NULL);
 /* Disk */
 MENUITEM_SETTING(disk_spindown, &global_settings.disk_spindown, NULL);
-MENUITEM_SETTING_W_TEXT(storage_mode, &global_settings.storage_mode,
-                        ID2P(LANG_STORAGE_MODE_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(storage_mode, &global_settings.storage_mode,
+                         ID2P(LANG_STORAGE_MODE_SHORT), NULL);
 MAKE_MENU(storage_menu, ID2P(LANG_STORAGE), 0, Icon_NOICON,
           &disk_spindown, &storage_mode);
 
@@ -1192,12 +1192,12 @@ MAKE_MENU(album_sort_menu, ID2P(LANG_SORT_ALBUMS_BY_SHORT), 0, Icon_NOICON,
           &album_sort_root, &album_sort_artist, &album_sort_albumartist,
           &album_sort_composer, &database_sort_albums_by
           );
-MENUITEM_SETTING_W_TEXT(database_sort_artists_by,
-                        &global_settings.database_sort_artists_by,
-                        ID2P(LANG_SORT_ARTISTS_BY_SHORT), NULL);
-MENUITEM_SETTING_W_TEXT(sort_ignore_articles,
-                        &global_settings.sort_ignore_articles,
-                        ID2P(LANG_SORT_IGNORE_ARTICLES_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(database_sort_artists_by,
+                         &global_settings.database_sort_artists_by,
+                         ID2P(LANG_SORT_ARTISTS_BY_SHORT), NULL);
+MENUITEM_SETTING_W_LABEL(sort_ignore_articles,
+                         &global_settings.sort_ignore_articles,
+                         ID2P(LANG_SORT_IGNORE_ARTICLES_SHORT), NULL);
 MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
           &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);

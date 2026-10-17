@@ -167,6 +167,8 @@ static const char* get_menu_item_name(int selected_item,
             menu->menu_get_name_and_icon->list_get_name_data, buffer, buffer_len);
 
     type = (menu->flags&MENU_TYPE_MASK);
+    if (menu->flags & MENU_SETTING_LABEL)
+        return P2STR(menu->callback_and_desc->desc);
     if ((type == MT_SETTING) || (type == MT_SETTING_W_TEXT))
     {
         const struct settings_list *v = find_setting(menu->variable);
@@ -519,7 +521,10 @@ static int talk_menu_item(int selected_item, void *data)
         if ((menu->flags&MENU_TYPE_MASK) == MT_MENU)
         {
             type = menu->submenus[sel]->flags&MENU_TYPE_MASK;
-            if ((type == MT_SETTING) || (type == MT_SETTING_W_TEXT))
+            if (menu->submenus[sel]->flags & MENU_SETTING_LABEL)
+                talk_id(P2ID(menu->submenus[sel]->callback_and_desc->desc),
+                        false);
+            else if ((type == MT_SETTING) || (type == MT_SETTING_W_TEXT))
                 talk_setting(menu->submenus[sel]->variable);
             else
             {

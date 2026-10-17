@@ -505,7 +505,7 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                 "playing", "art sent", "art asked for, none sent"
             };
             static const char *const cache[] = {
-                "a thumbnail", "Car Artwork off", "no track or size",
+                "a thumbnail", "Accessory Artwork off", "no track or size",
                 "no thumbnail", "an unusable thumbnail"
             };
             const bool has = e->c == USB_LOG_IAP_ART_CACHE_OK || e->d;
@@ -672,10 +672,10 @@ void usb_log_file_state(int fd, const char *mark)
     fdprintf(fd, "\n%s Accessory Protocol %d", mark,
              (int)global_settings.iap_enabled);
 #ifdef USB_ENABLE_IAP
-    fdprintf(fd, ", iPhone Accessories %d, Identify As %d",
+    fdprintf(fd, ", Support iPhone Accessories %d, Identify As %d",
              global_settings.iap2_mode, global_settings.iap_identity);
 #endif
-    fdprintf(fd, ", Car Artwork %d\n", global_settings.car_artwork);
+    fdprintf(fd, ", Accessory Artwork %d\n", global_settings.car_artwork);
 }
 
 /* ---- the background writer ---------------------------------------------- */

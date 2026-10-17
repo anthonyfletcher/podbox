@@ -222,7 +222,7 @@ enum
     AA_PREFER_CACHE
 };
 
-/* Car Artwork: Off, or the Album Art setting's own order, or one of its
+/* Accessory Artwork: Off, or the Album Art setting's own order, or one of its
  * orders chosen for the car alone (CAR_ARTWORK_x - 1 is that AA_PREFER_x) */
 enum
 {

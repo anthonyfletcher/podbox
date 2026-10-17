@@ -50,7 +50,7 @@ static int wps_size = -2;
 
 /* The thumbnail of the track's folder, keyed as the playback engine keys
  * it; there is a file at the path only if the folder has art. None with
- * Car Artwork off, so no track has art to send. */
+ * Accessory Artwork off, so no track has art to send. */
 static bool art_path(uint32_t track, char *out, int out_len)
 {
     struct playlist_track_info info;
