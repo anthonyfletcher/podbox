@@ -491,9 +491,9 @@ struct system_status
     int font_id[NB_SCREENS]; /* font id of the settings font for each screen */
 
     int resume_modified; /* playlist is modified (=> warn before erase) */
-    /* Minutes the player has been on with a debug log on, towards Switch
-       Off After */
-    int debug_log_minutes;
+    /* When a debug log was last switched on, in seconds since 1970, towards
+       Switch Off After */
+    int debug_log_since;
 };
 
 struct user_settings

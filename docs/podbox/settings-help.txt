@@ -1431,9 +1431,10 @@ indicator will not go away, or why a pass keeps starting.
 Switches itself off after the time set in Switch Off After.
 
 [debug log expiry]
-How long the debug logs stay on, counted only while the player is on. When the
-time is up every log switches itself off, and a message says so. Switching a
-log on starts the count again.
+How long the debug logs stay on, counted by the clock from when a log was
+switched on, whether the player is on or off. When the time is up every log
+switches itself off, and a message says so. Switching a log on starts the count
+again.
 
 Never keeps them on until they are switched off by hand, for chasing a fault
 that comes and goes.

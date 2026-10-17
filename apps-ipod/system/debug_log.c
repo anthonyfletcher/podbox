@@ -138,7 +138,7 @@ static struct {
 static bool ready;              /* debug_log_init() has run */
 static struct mutex rotate_lock; /* rotate_path */
 
-/* Minutes on, by Switch Off After's index; 0 never */
+/* Minutes from switching on, by Switch Off After's index; 0 never */
 static const unsigned short expiry_minutes[] = { 60, 6*60, 24*60, 7*24*60, 0 };
 
 static int expiry_limit(void)
@@ -159,10 +159,16 @@ bool debug_log_any_on(void)
 int debug_log_minutes_left(void)
 {
     int limit = expiry_limit();
+    long now;
 
     if (!limit || !debug_log_any_on())
         return -1;
-    return MAX(limit - global_status.debug_log_minutes, 0);
+    now = mktime(get_time());
+    /* A clock moved back, or reset to 2000, ends the logs rather than
+     * keeping them on */
+    if (now < global_status.debug_log_since)
+        return 0;
+    return MAX(limit - (now - global_status.debug_log_since) / 60, 0);
 }
 
 bool debug_log_enabled(enum debug_log_id id)
@@ -398,7 +404,7 @@ void debug_log_apply(void)
         if (on)
         {
             /* A log switched on late in another's time gets its own */
-            global_status.debug_log_minutes = 0;
+            global_status.debug_log_since = mktime(get_time());
             status_save(false);
             debug_log_header(id, "switched on");
             if (log_info[id].switched)
@@ -438,20 +444,15 @@ void debug_log_all_off(void)
 /* ---- the count towards switching off ------------------------------------ */
 
 static struct timeout minute_tmo;
-static volatile bool expire_due;
+static volatile bool check_due;
 static bool expired_notice;     /* a splash is owed */
-static int minutes_saved;
 
-/* In the tick interrupt: counts and flags, and leaves the switching to the UI
- * thread */
+/* In the tick interrupt, where the clock cannot be read: leaves the check to
+ * the UI thread */
 static int minute_cb(struct timeout *tmo)
 {
-    int limit = expiry_limit();
-
     (void)tmo;
-    if (limit && debug_log_any_on()
-        && ++global_status.debug_log_minutes >= limit)
-        expire_due = true;
+    check_due = true;
     return 60*HZ;
 }
 
@@ -461,27 +462,19 @@ static void action_cb(unsigned short id, void *data)
 {
     (void)id;
     (void)data;
-    if (expire_due)
+    if (check_due)
     {
         static char reason[40];
         int limit = expiry_limit();
 
-        expire_due = false;
-        if (limit && debug_log_any_on())
+        check_due = false;
+        if (debug_log_minutes_left() == 0)
         {
             snprintf(reason, sizeof reason, ", expired after %d:%02d on",
                      limit / 60, limit % 60);
             all_off(reason);
             expired_notice = true;
         }
-    }
-    /* The count survives a reboot to within ten minutes, without a write
-     * every minute */
-    if (global_status.debug_log_minutes - minutes_saved >= 10
-        || global_status.debug_log_minutes < minutes_saved)
-    {
-        minutes_saved = global_status.debug_log_minutes;
-        status_save(false);
     }
 }
 
@@ -537,7 +530,12 @@ void debug_log_init(void)
         logs[id].on = debug_log_enabled(id);
     }
     mutex_init(&rotate_lock);
-    minutes_saved = global_status.debug_log_minutes;
+    /* A log left on by a build that counted minutes instead */
+    if (debug_log_any_on() && !global_status.debug_log_since)
+    {
+        global_status.debug_log_since = mktime(get_time());
+        status_save(false);
+    }
     add_event(DISK_EVENT_SPINUP, disk_idle_cb);
     add_event(GUI_EVENT_ACTIONUPDATE, action_cb);
     timeout_register(&minute_tmo, minute_cb, 60*HZ, 0);
