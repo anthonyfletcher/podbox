@@ -22,6 +22,7 @@
 #include "usb.h"
 #include "usb_core.h"
 #include "usbstack/usb_hid.h"
+#include "usb_log.h"
 
 /* browser.c and shutdown.c ask this to decide whether the disk changed under
  * them while the host had it. Nothing writes to a sim's storage over USB. */
@@ -48,6 +49,16 @@ bool usb_host_is_present(void)
 bool usb_host_wants_storage(void)
 {
     return false;
+}
+
+/* output_pause.c logs each pause and resume beside the accessories' lines. */
+void usb_log(int type, int a, int b, uint32_t c, uint32_t d)
+{
+    (void)type;
+    (void)a;
+    (void)b;
+    (void)c;
+    (void)d;
 }
 
 /* Set by the stack when a host ejects the disk. */
