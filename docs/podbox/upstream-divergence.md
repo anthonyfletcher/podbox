@@ -273,6 +273,9 @@ Serial iAP is `apps-ipod/iap/`. It reaches these firmware files:
 | `skin_parser/tag_table.h` | `SKIN_REFRESH_SPECTRUM`, in `SKIN_REFRESH_NON_STATIC` | Spectrum lines redraw with time. |
 | `rbcodec/codecs/libffmpegFLAC/decoder.c` | New `flac_lpc_32()` runs the 64-bit LPC filter (`flac_lpc_32_arm()`, or `flac_lpc_32_c()` elsewhere) 1024 samples at a time with a yield between; upstream's ARMv5E `FLAC_LPC32_NARROW_ASM` kernel, off by default, is not wired | 24-bit FLAC took the C loop, and one channel of a frame ran ~50 ms without yielding on the 5G -- a visible stutter in anything animating while it played. |
 
+| `rbcodec/codecs/libalac/alac.c` | 24-bit frames keep their uncompressed low bytes in a buffer of their own, `shift_buffer`, and merge them below the decoded sample before the scale to 29 bits | Upstream reads them into the output buffers, which the Rice data then overwrites, so every 24-bit ALAC file decoded with its low byte zero. Upstream bug, not yet reported upstream. |
+| `rbcodec/codecs/libalac/alac.c` | A zero run is clamped to the samples the frame has left; the parameter estimate counts leading zeros over 32 bits; a Rice limit outside 1 to 25 fails the frame | A corrupt run length wrote past the output buffer, and a history past 16 bits indexed the 256-byte table beyond its end. Apple writes a limit of 14. Upstream bugs, not yet reported upstream. |
+| `rbcodec/codecs/libalac/alac.c`, `arm.S` (new), `SOURCES` | A 32-bit bit cache for the Rice decoder and the low bytes; the adaptive filter at orders 1 to 8 specialised per order; on ARM both in assembly, which hands back to the C for codes over 7 bits of prefix, zero runs and coefficients near the 16-bit limit | ALAC needed about 36 MHz for a 44.1 kHz stream on the 5G, which runs at 30 unboosted, so it played boosted throughout. Now about 17 (16-bit) and 20 (24-bit), estimated under emulation. Output is unchanged but for the low bytes above. |
 ---
 
 ## tools/

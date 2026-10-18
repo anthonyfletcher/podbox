@@ -44,6 +44,10 @@ static int16_t predictor_coef_table[32] IBSS_ATTR;
 static int16_t predictor_coef_table_a[32] IBSS_ATTR;
 static int16_t predictor_coef_table_b[32] IBSS_ATTR;
 
+/* The low bytes a 24-bit frame stores uncompressed, read before the Rice
+ * data overwrites the output buffers */
+static uint16_t shift_buffer[ALAC_MAX_CHANNELS][ALAC_BLOCKSIZE];
+
 
 /* Endian/aligment safe functions - only used in alac_set_info() */
 static uint32_t get_uint32be(unsigned char* p)
@@ -136,88 +140,174 @@ static inline uint32_t readbits(alac_file *alac, int bits)
     return result;
 }
 
-/* reads a single bit */
-static inline int readbit(alac_file *alac)
+/* The per-sample reader: the next bits big-endian and left-aligned in
+ * cache, at least 25 of them valid after br_fill(). It is a local of the
+ * loop that uses it, so it stays in registers. It reads up to four bytes
+ * past the last bit it hands out. */
+struct bitreader
 {
-    int result;
-    int new_accumulator;
+    const unsigned char *p;
+    uint32_t cache;
+    int avail;
+};
 
-    result = alac->input_buffer[0];
-
-    result = result << alac->input_buffer_bitaccumulator;
-
-    result = result >> 7 & 1;
-
-    new_accumulator = (alac->input_buffer_bitaccumulator + 1);
-
-    alac->input_buffer += (new_accumulator / 8);
-
-    alac->input_buffer_bitaccumulator = (new_accumulator % 8);
-
-    return result;
+static inline void br_fill(struct bitreader *br)
+{
+    while (br->avail <= 24)
+    {
+        br->cache |= (uint32_t)*br->p++ << (24 - br->avail);
+        br->avail += 8;
+    }
 }
 
-static inline void unreadbits(alac_file *alac, int bits)
+/* n at most what br_fill() guarantees */
+static inline uint32_t br_peek(struct bitreader *br, int n)
 {
-    int new_accumulator = (alac->input_buffer_bitaccumulator - bits);
+    return br->cache >> (32 - n);
+}
 
-    alac->input_buffer += (new_accumulator >> 3);
+static inline void br_skip(struct bitreader *br, int n)
+{
+    br->cache <<= n;
+    br->avail -= n;
+}
 
-    alac->input_buffer_bitaccumulator = (new_accumulator & 7);
-    if (alac->input_buffer_bitaccumulator < 0)
-        alac->input_buffer_bitaccumulator *= -1;
+/* 1 to 32 bits */
+static inline uint32_t br_get(struct bitreader *br, int n)
+{
+    uint32_t v = 0;
+
+    if (n > 16)
+    {
+        n -= 16;
+        br_fill(br);
+        v = br_peek(br, 16) << n;
+        br_skip(br, 16);
+    }
+    br_fill(br);
+    v |= br_peek(br, n);
+    br_skip(br, n);
+    return v;
+}
+
+static inline void br_start(struct bitreader *br, const alac_file *alac)
+{
+    br->p = alac->input_buffer;
+    br->cache = 0;
+    br->avail = 0;
+    br_fill(br);
+    br_skip(br, alac->input_buffer_bitaccumulator);
+}
+
+static inline void br_end(const struct bitreader *br, alac_file *alac)
+{
+    int used = (br->p - alac->input_buffer) * 8 - br->avail;
+
+    alac->input_buffer += used >> 3;
+    alac->input_buffer_bitaccumulator = used & 7;
 }
 
 #define count_leading_zeros(x) bs_generic(x, BS_CLZ|BS_SHORT)
 
 #define RICE_THRESHOLD 8 // maximum number of bits for a rice prefix.
 
-static inline int32_t entropy_decode_value(alac_file* alac,
-                             int readsamplesize,
-                             int k) ICODE_ATTR_ALAC;
-static inline int32_t entropy_decode_value(alac_file* alac,
-                             int readsamplesize,
-                             int k)
+static inline int32_t entropy_decode_value(struct bitreader *br,
+                                           int readsamplesize,
+                                           int k)
 {
-    int32_t x = 0; // decoded value
-    
-    // read x, number of 1s before 0 represent the rice value.
-    while (x <= RICE_THRESHOLD && readbit(alac))
+    int32_t x;
+    uint32_t ones;
+
+    /* x is the run of 1s before a 0, at most RICE_THRESHOLD; a run one
+     * longer has no 0 and is followed by the value raw */
+    br_fill(br);
+    ones = ~br->cache >> (31 - RICE_THRESHOLD);
+    if (ones == 0)
     {
-        x++;
-    }
-    
-    if (x > RICE_THRESHOLD)
-    {
-        // read the number from the bit stream (raw value)
-        int32_t value;
-        
-        value = readbits(alac, readsamplesize);
-        
-        /* mask value to readsamplesize size */
+        br_skip(br, RICE_THRESHOLD + 1);
+        x = br_get(br, readsamplesize);
         if (readsamplesize != 32)
-            value &= (((uint32_t)0xffffffff) >> (32 - readsamplesize));
-        
-        x = value;
+            x &= ((uint32_t)0xffffffff) >> (32 - readsamplesize);
+        return x;
     }
-    else
+
+    x = count_leading_zeros(ones) - (31 - RICE_THRESHOLD);
+    br_skip(br, x + 1);
+
+    if (k != 1)
     {
-        if (k != 1)
+        /* k bits extend x by x * (2^k - 1); an extension of 0 or 1 is
+         * written in k - 1 bits and adds nothing */
+        uint32_t extrabits;
+
+        br_fill(br);
+        extrabits = br_peek(br, k);
+        x = (x << k) - x;
+        if (extrabits > 1)
         {
-            int extrabits = readbits(alac, k);
-            
-            // x = x * (2^k - 1)
-            x = (x << k) - x;
-            
-            if (extrabits > 1)
-                x += extrabits - 1;
-            else
-                unreadbits(alac, 1);
+            x += extrabits - 1;
+            br_skip(br, k);
         }
+        else
+            br_skip(br, k - 1);
     }
-    
+
     return x;
 }
+
+/* After a sample that leaves the history below 128, a run of zeros may
+ * follow: its length, written as a value with a parameter of its own.
+ * Returns the index of the last sample the run fills. */
+static inline int entropy_zero_run(struct bitreader *br,
+                                   int32_t *output_buffer,
+                                   int output_count,
+                                   int output_size,
+                                   int history,
+                                   int *sign_modifier,
+                                   int rice_kmodifier_mask)
+{
+    int32_t block_size;
+    int k;
+
+    *sign_modifier = 1;
+
+    k = count_leading_zeros(history) + ((history + 16) / 64) - 24;
+
+    // note: block_size is always 16bit
+    block_size = entropy_decode_value(br, 16, k) & rice_kmodifier_mask;
+
+    if (block_size > 0xFFFF)
+        *sign_modifier = 0;
+
+    // got block_size 0s, no more than the frame has left
+    if (block_size > output_size - output_count - 1)
+        block_size = output_size - output_count - 1;
+    if (block_size > 0)
+    {
+        memset(&output_buffer[output_count + 1], 0,
+               block_size * sizeof(*output_buffer));
+        output_count += block_size;
+    }
+
+    return output_count;
+}
+
+#if defined(CPU_ARM_CLASSIC) && !defined(ALAC_NO_RICE_ASM)
+#define ALAC_RICE_ASM
+/* The common path of entropy_rice_decode()'s loop, in arm.S. The offsets
+ * are the assembly's. */
+struct alac_rice
+{
+    const unsigned char *buffer;  /* in */
+    int index;                    /* in and out: bits past buffer */
+    int history;                  /* in and out */
+    int zero_run;                 /* out: a run of zeros follows */
+    int kmodifier;                /* in, 1 to 17 */
+    int historymult;              /* in */
+};
+
+int alac_rice_decode_arm(int32_t *out, int n, struct alac_rice *st);
+#endif
 
 static void entropy_rice_decode(alac_file* alac,
                          int32_t* output_buffer,
@@ -236,22 +326,62 @@ static void entropy_rice_decode(alac_file* alac,
                          int rice_historymult,
                          int rice_kmodifier_mask)
 {
+    struct bitreader br;
     int                output_count;
     int                history = rice_initialhistory;
     int                sign_modifier = 0;
-    
+
+    br_start(&br, alac);
+
     for (output_count = 0; output_count < output_size; output_count++)
     {
         int32_t        decoded_value;
         int32_t        final_value;
         int32_t        k;
+
+#ifdef ALAC_RICE_ASM
+        /* the assembly takes every sample it can; the C takes the one it
+         * stops before, and the run of zeros after one it flags */
+        if (rice_kmodifier <= 17 && sign_modifier == 0)
+        {
+            struct alac_rice st;
+            int n;
+
+            br_end(&br, alac);
+            st.buffer = alac->input_buffer;
+            st.index = alac->input_buffer_bitaccumulator;
+            st.history = history;
+            st.kmodifier = rice_kmodifier;
+            st.historymult = rice_historymult;
+            n = alac_rice_decode_arm(output_buffer + output_count,
+                                     output_size - output_count, &st);
+            alac->input_buffer += st.index >> 3;
+            alac->input_buffer_bitaccumulator = st.index & 7;
+            br_start(&br, alac);
+            history = st.history;
+            output_count += n;
+
+            if (st.zero_run)
+            {
+                output_count = entropy_zero_run(&br, output_buffer,
+                                                output_count - 1, output_size,
+                                                history, &sign_modifier,
+                                                rice_kmodifier_mask);
+                history = 0;
+                continue;
+            }
+            if (output_count >= output_size)
+                break;
+        }
+#endif
         
-        k = 31 - rice_kmodifier - count_leading_zeros((history >> 9) + 3);
+        /* the history is not bounded to 16 bits here */
+        k = 31 - rice_kmodifier - bs_generic((history >> 9) + 3, BS_CLZ);
         
         if (k < 0) k += rice_kmodifier;
         else k = rice_kmodifier;
         
-        decoded_value = entropy_decode_value(alac, readsamplesize, k);
+        decoded_value = entropy_decode_value(&br, readsamplesize, k);
         
         decoded_value += sign_modifier;
         final_value = (decoded_value + 1) / 2; // inc by 1 and shift out sign bit
@@ -272,28 +402,61 @@ static void entropy_rice_decode(alac_file* alac,
         // special case, for compressed blocks of 0
         if ((history < 128) && (output_count + 1 < output_size))
         {
-            int32_t        block_size;
-            
-            sign_modifier = 1;
-            
-            k = count_leading_zeros(history) + ((history + 16) / 64) - 24;
-            
-            // note: block_size is always 16bit
-            block_size = entropy_decode_value(alac, 16, k) & rice_kmodifier_mask;
-            
-            // got block_size 0s
-            if (block_size > 0)
-            {
-                memset(&output_buffer[output_count + 1], 0, 
-                       block_size * sizeof(*output_buffer));
-                output_count += block_size;
-            }
-            
-            if (block_size > 0xFFFF)
-                sign_modifier = 0;
-            
+            output_count = entropy_zero_run(&br, output_buffer, output_count,
+                                            output_size, history,
+                                            &sign_modifier,
+                                            rice_kmodifier_mask);
             history = 0;
         }
+    }
+
+    br_end(&br, alac);
+}
+
+/* The low bytes of a frame's samples, stored ahead of the Rice data. They
+ * are a whole number of bytes each, so each is read from the bytes it
+ * straddles, at the bit offset every one of them shares. */
+static void read_shifted_bytes(alac_file *alac, int channels, int count,
+                               int uncompressed_bytes)
+{
+    const unsigned char *p = alac->input_buffer;
+    int shift = 8 - alac->input_buffer_bitaccumulator;
+    int n = count * channels;
+    uint16_t *out0 = shift_buffer[0], *out1 = shift_buffer[1];
+    int i;
+
+    if (uncompressed_bytes == 1)
+    {
+        uint32_t prev = *p++;
+
+        for (i = 0; i < count; i++)
+        {
+            uint32_t b = *p++;
+
+            out0[i] = ((prev << 8 | b) >> shift) & 0xff;
+            prev = b;
+            if (channels == 2)
+            {
+                b = *p++;
+                out1[i] = ((prev << 8 | b) >> shift) & 0xff;
+                prev = b;
+            }
+        }
+        alac->input_buffer += n;
+    }
+    else
+    {
+        struct bitreader br;
+        int bits = uncompressed_bytes * 8;
+
+        br_start(&br, alac);
+        for (i = 0; i < count; i++)
+        {
+            out0[i] = br_get(&br, bits);
+            if (channels == 2)
+                out1[i] = br_get(&br, bits);
+        }
+        br_end(&br, alac);
     }
 }
 
@@ -303,6 +466,115 @@ static void entropy_rice_decode(alac_file* alac,
                      ((v < 0) ? (-1) : \
                                 ((v > 0) ? (1) : \
                                            (0)))
+
+#if defined(CPU_ARM_CLASSIC) && !defined(ALAC_NO_FIR_ASM)
+#define ALAC_FIR_ASM
+/* fir_adapt_n() for orders 1 to 8, but with 32-bit coefficients: see
+ * fir_asm_fits() */
+void alac_fir_adapt_arm(int32_t *buffer_out, int count, int16_t *coefs,
+                        int order, int quant, int readsamplesize);
+
+/* Each coefficient moves at most one step a sample, so none of them can
+ * wrap at 16 bits in count samples if each is that far from the limit */
+static bool fir_asm_fits(const int16_t *coefs, int n, int count,
+                         int quant, int readsamplesize)
+{
+    int j;
+
+    if (quant < 1 || readsamplesize < 1 || readsamplesize > 32)
+        return false;
+    for (j = 0; j < n; j++)
+        if (coefs[j] > 32767 - count || coefs[j] < -32768 + count)
+            return false;
+    return true;
+}
+#endif
+
+#ifndef ALAC_FIR_ASM
+/* The adaptive filter at a constant order, so that the coefficients and the
+ * sample differences are locals: from the 4th sample of a frame, buffer_out
+ * is the window and error the residual of the sample it produces. */
+static inline __attribute__((always_inline))
+void fir_adapt_n(const int32_t *error, int32_t *buffer_out, int count,
+                 int readsamplesize, int16_t *coef_table, const int n,
+                 int quant)
+{
+    int16_t c[8];   /* wraps as the table does */
+    int32_t d[8];
+    int i, j;
+
+#pragma GCC unroll 8
+    for (j = 0; j < n; j++)
+        c[j] = coef_table[j];
+
+    for (i = 0; i < count; i++, buffer_out++)
+    {
+        int32_t base = buffer_out[0];
+        int32_t error_val = error[i];
+        int32_t sum = 0;
+        int32_t outval;
+
+        /* d[j] is the j+1th sample's distance below base, the negated
+         * term of the shipped sum; c[n-1-j] its coefficient */
+#pragma GCC unroll 8
+        for (j = 0; j < n; j++)
+        {
+            d[j] = base - buffer_out[j + 1];
+            sum -= d[j] * c[n - 1 - j];
+        }
+
+        outval = (1 << (quant - 1)) + sum;
+        outval = outval >> quant;
+        outval = outval + base + error_val;
+        buffer_out[n + 1] = SIGN_EXTENDED32(outval, readsamplesize);
+
+        /* Each coefficient moves one step to shrink the error, nearest
+         * sample first, until the error changes sign */
+        if (error_val > 0)
+        {
+#pragma GCC unroll 8
+            for (j = 0; j < n && error_val > 0; j++)
+            {
+                int32_t val = d[j];
+
+                if (val < 0)
+                {
+                    c[n - 1 - j]++;
+                    error_val -= ((-val) >> quant) * (j + 1);
+                }
+                else if (val > 0)
+                {
+                    c[n - 1 - j]--;
+                    error_val -= (val >> quant) * (j + 1);
+                }
+            }
+        }
+        else if (error_val < 0)
+        {
+#pragma GCC unroll 8
+            for (j = 0; j < n && error_val < 0; j++)
+            {
+                int32_t val = d[j];
+
+                if (val > 0)
+                {
+                    c[n - 1 - j]++;
+                    error_val -= ((-val) >> quant) * (j + 1);
+                }
+                else if (val < 0)
+                {
+                    c[n - 1 - j]--;
+                    error_val -= (val >> quant) * (j + 1);
+                }
+            }
+        }
+    }
+
+#pragma GCC unroll 8
+    for (j = 0; j < n; j++)
+        coef_table[j] = c[j];
+}
+#endif
 
 static void predictor_decompress_fir_adapt(int32_t *error_buffer,
                                            int32_t *buffer_out,
@@ -364,150 +636,34 @@ static void predictor_decompress_fir_adapt(int32_t *error_buffer,
         }
     }
 
-    /* 4 and 8 are very common cases (the only ones i've seen).
-
-      The following code is an initial attempt to unroll and optimise
-      these two cases by the Rockbox project.  More work is needed. 
-     */
-
-    /* optimised case: 4 */
-    if (predictor_coef_num == 4)
+    /* Apple's encoder writes orders 4 and 8, ffmpeg's 4 to 6 */
+    if (predictor_coef_num <= 8 && output_size > predictor_coef_num + 1)
     {
-        for (i = 4 + 1; i < output_size; i++)
+        const int32_t *error = error_buffer + predictor_coef_num + 1;
+        int count = output_size - predictor_coef_num - 1;
+
+#ifdef ALAC_FIR_ASM
+        /* the residuals are read from the output buffer they become */
+        if (error == buffer_out + predictor_coef_num + 1 &&
+            fir_asm_fits(predictor_coef_table, predictor_coef_num, count,
+                         predictor_quantitization, readsamplesize))
         {
-            int sum = 0;
-            int outval;
-            int error_val = error_buffer[i];
-
-            sum = (buffer_out[4] - buffer_out[0]) * predictor_coef_table[0]
-                + (buffer_out[3] - buffer_out[0]) * predictor_coef_table[1]
-                + (buffer_out[2] - buffer_out[0]) * predictor_coef_table[2]
-                + (buffer_out[1] - buffer_out[0]) * predictor_coef_table[3];
-
-            outval = (1 << (predictor_quantitization-1)) + sum;
-            outval = outval >> predictor_quantitization;
-            outval = outval + buffer_out[0] + error_val;
-            outval = SIGN_EXTENDED32(outval, readsamplesize);
-
-            buffer_out[4+1] = outval;
-
-            if (error_val > 0)
-            {
-                int predictor_num = 4 - 1;
-
-                while (predictor_num >= 0 && error_val > 0)
-                {
-                    int val = buffer_out[0] - buffer_out[4 - predictor_num];
-
-                    if (val!=0) {
-                       if (val < 0) {
-                         predictor_coef_table[predictor_num]++;
-                         val=-val;
-                       } else {
-                         predictor_coef_table[predictor_num]--;
-                       }
-                       error_val -= ((val >> predictor_quantitization) * (4 - predictor_num));
-                    }                      
-                    predictor_num--;
-                }
-            }
-            else if (error_val < 0)
-            {
-                int predictor_num = 4 - 1;
-
-                while (predictor_num >= 0 && error_val < 0)
-                {
-                    int val = buffer_out[0] - buffer_out[4 - predictor_num];
-
-                    if (val != 0) {
-                      if (val > 0) {
-                        predictor_coef_table[predictor_num]++;
-                        val=-val; /* neg value */
-                      } else {
-                        predictor_coef_table[predictor_num]--;
-                      }
-                      error_val -= ((val >> predictor_quantitization) * (4 - predictor_num));
-                    }
-                    predictor_num--;
-                }
-            }
-
-            buffer_out++;
+            alac_fir_adapt_arm(buffer_out, count, predictor_coef_table,
+                               predictor_coef_num, predictor_quantitization,
+                               readsamplesize);
+            return;
         }
-        return;
+        /* and the rare frame it cannot take goes to the general case */
+#else
+        switch (predictor_coef_num)
+        {
+#define FIR_CASE(n)         case n:             fir_adapt_n(error, buffer_out, count, readsamplesize,                         predictor_coef_table, n, predictor_quantitization);             return;
+        FIR_CASE(1) FIR_CASE(2) FIR_CASE(3) FIR_CASE(4)
+        FIR_CASE(5) FIR_CASE(6) FIR_CASE(7) FIR_CASE(8)
+#undef FIR_CASE
+        }
+#endif
     }
-
-    /* optimised case: 8 */
-    if (predictor_coef_num == 8)
-    {
-        for (i = 8 + 1;
-             i < output_size;
-             i++)
-        {
-            int sum;
-            int outval;
-            int error_val = error_buffer[i];
-
-            sum = (buffer_out[8] - buffer_out[0]) * predictor_coef_table[0]
-                + (buffer_out[7] - buffer_out[0]) * predictor_coef_table[1]
-                + (buffer_out[6] - buffer_out[0]) * predictor_coef_table[2]
-                + (buffer_out[5] - buffer_out[0]) * predictor_coef_table[3]
-                + (buffer_out[4] - buffer_out[0]) * predictor_coef_table[4]
-                + (buffer_out[3] - buffer_out[0]) * predictor_coef_table[5]
-                + (buffer_out[2] - buffer_out[0]) * predictor_coef_table[6]
-                + (buffer_out[1] - buffer_out[0]) * predictor_coef_table[7];
-
-            outval = (1 << (predictor_quantitization-1)) + sum;
-            outval = outval >> predictor_quantitization;
-            outval = outval + buffer_out[0] + error_val;
-            outval = SIGN_EXTENDED32(outval, readsamplesize);
-
-            buffer_out[8+1] = outval;
-
-            if (error_val > 0)
-            {
-                int predictor_num = 8 - 1;
-
-                while (predictor_num >= 0 && error_val > 0)
-                {
-                    int val = buffer_out[0] - buffer_out[8 - predictor_num];
-
-                    if (val!=0) {
-                       if (val < 0) {
-                         predictor_coef_table[predictor_num]++;
-                         val=-val;
-                       } else {
-                         predictor_coef_table[predictor_num]--;
-                       }
-                       error_val -= ((val >> predictor_quantitization) * (8 - predictor_num));
-                    }                      
-                    predictor_num--;
-                }
-            }
-            else if (error_val < 0)
-            {
-                int predictor_num = 8 - 1;
-
-                while (predictor_num >= 0 && error_val < 0)
-                {
-                    int val = buffer_out[0] - buffer_out[8 - predictor_num];
-                    if (val != 0) {
-                      if (val > 0) {
-                        predictor_coef_table[predictor_num]++;
-                        val=-val; /* neg value */
-                      } else {
-                        predictor_coef_table[predictor_num]--;
-                      }
-                      error_val -= ((val >> predictor_quantitization) * (8 - predictor_num));
-                    }
-                    predictor_num--;
-                }
-            }
-
-            buffer_out++;
-        }
-        return;
-    } 
 
     /* general case */
     if (predictor_coef_num > 0)
@@ -621,69 +777,43 @@ static void deinterlace_16(int32_t* buffer0,
 
 static void deinterlace_24(int32_t *buffer0, int32_t *buffer1,
                            int uncompressed_bytes,
-                           int32_t *uncompressed_bytes_buffer0,
-                           int32_t *uncompressed_bytes_buffer1,
                            int numsamples,
                            uint8_t interlacing_shift,
                            uint8_t interlacing_leftweight) ICODE_ATTR_ALAC;
 static void deinterlace_24(int32_t *buffer0, int32_t *buffer1,
                            int uncompressed_bytes,
-                           int32_t *uncompressed_bytes_buffer0,
-                           int32_t *uncompressed_bytes_buffer1,
                            int numsamples,
                            uint8_t interlacing_shift,
                            uint8_t interlacing_leftweight)
 {
+    const uint16_t *low0 = shift_buffer[0], *low1 = shift_buffer[1];
+    int bits = uncompressed_bytes * 8;
     int i;
-    if (numsamples <= 0) return;
-    
-    /* weighted interlacing */
-    if (interlacing_leftweight)
-    {
-        for (i = 0; i < numsamples; i++)
-        {
-            int32_t difference, midright;
-            
-            midright = buffer0[i];
-            difference = buffer1[i];
-            
-            buffer0[i] = ((midright - ((difference * interlacing_leftweight)
-                            >> interlacing_shift)) + difference) << SCALE24;
-            buffer1[i] = (midright - ((difference * interlacing_leftweight) 
-                            >> interlacing_shift)) << SCALE24;
-            
-            if (uncompressed_bytes)
-            {
-                uint32_t mask = ~(0xFFFFFFFF << (uncompressed_bytes * 8));
-                buffer0[i] <<= (uncompressed_bytes * 8);
-                buffer1[i] <<= (uncompressed_bytes * 8);
-                
-                buffer0[i] |= uncompressed_bytes_buffer0[i] & mask;
-                buffer1[i] |= uncompressed_bytes_buffer1[i] & mask;
-            }
 
-        }
-        
-        return;
-    }
-    
-    /* otherwise basic interlacing took place */
     for (i = 0; i < numsamples; i++)
     {
-        if (uncompressed_bytes)
+        int32_t left = buffer0[i];
+        int32_t right = buffer1[i];
+
+        /* weighted interlacing: mid and difference */
+        if (interlacing_leftweight)
         {
-            uint32_t mask = ~(0xFFFFFFFF << (uncompressed_bytes * 8));
-            buffer0[i] <<= (uncompressed_bytes * 8);
-            buffer1[i] <<= (uncompressed_bytes * 8);
-            
-            buffer0[i] |= uncompressed_bytes_buffer0[i] & mask;
-            buffer1[i] |= uncompressed_bytes_buffer1[i] & mask;
+            int32_t difference = right;
+
+            right = left - ((difference * interlacing_leftweight)
+                            >> interlacing_shift);
+            left = right + difference;
         }
-        
-        buffer0[i] = buffer0[i] << SCALE24;
-        buffer1[i] = buffer1[i] << SCALE24;
+
+        if (bits)
+        {
+            left = (left << bits) | low0[i];
+            right = (right << bits) | low1[i];
+        }
+
+        buffer0[i] = left << SCALE24;
+        buffer1[i] = right << SCALE24;
     }
-    
 }
 
 static inline int decode_frame_mono(
@@ -749,14 +879,7 @@ static inline int decode_frame_mono(
         }
 
         if (uncompressed_bytes)
-        {
-            int i;
-            for (i = 0; i < outputsamples; i++)
-            {
-                outputbuffer[0][i] = readbits(alac, uncompressed_bytes * 8);
-                outputbuffer[1][i] = outputbuffer[0][i];
-            }
-        }
+            read_shifted_bytes(alac, 1, outputsamples, uncompressed_bytes);
 
         yield();
 
@@ -850,12 +973,8 @@ static inline int decode_frame_mono(
             int32_t sample = outputbuffer[0][i];
             
             if (uncompressed_bytes)
-            {
-                uint32_t mask;
-                sample = sample << (uncompressed_bytes * 8);
-                mask = ~(0xFFFFFFFF << (uncompressed_bytes * 8));
-                sample |= outputbuffer[0][i] & mask;
-            }
+                sample = (sample << (uncompressed_bytes * 8))
+                         | shift_buffer[0][i];
             
             outputbuffer[0][i] = sample << SCALE24;
             outputbuffer[1][i] = outputbuffer[0][i];
@@ -957,14 +1076,7 @@ static inline int decode_frame_stereo(
 
         /*********************/
         if (uncompressed_bytes)
-        { /* see mono case */
-            int i;
-            for (i = 0; i < outputsamples; i++)
-            {
-                outputbuffer[0][i] = readbits(alac, uncompressed_bytes * 8);
-                outputbuffer[1][i] = readbits(alac, uncompressed_bytes * 8);
-            }
-        }
+            read_shifted_bytes(alac, 2, outputsamples, uncompressed_bytes);
 
         yield();
         /* channel 1 */
@@ -1084,8 +1196,6 @@ static inline int decode_frame_stereo(
         deinterlace_24(outputbuffer[0],
                        outputbuffer[1],
                        uncompressed_bytes,
-                       outputbuffer[0],
-                       outputbuffer[1],
                        outputsamples,
                        interlacing_shift,
                        interlacing_leftweight);            
@@ -1109,6 +1219,10 @@ int alac_decode_frame(alac_file *alac,
     int channels;
     int outputsamples;
     unsigned char *input_buffer_start;
+
+    /* the Rice parameter is read in at most 25 bits; Apple's is 14 */
+    if (alac->setinfo_rice_kmodifier < 1 || alac->setinfo_rice_kmodifier > 25)
+        return -1;
 
     /* setup the stream */
     alac->input_buffer = inbuffer;
