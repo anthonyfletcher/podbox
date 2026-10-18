@@ -2191,6 +2191,9 @@ kernel/thread.c
 #endif
 kernel/thread-common.c
 kernel/tick.c
+#if !defined(BOOTLOADER) && (defined(CPU_PP502x) || CONFIG_CPU == S5L8702)
+kernel/hang_catch.c
+#endif
 #ifdef INCLUDE_TIMEOUT_API
 kernel/timeout.c
 #endif

@@ -934,7 +934,13 @@ void iap_send_tx(void)
 #endif
     for (i=0; i <= (iap_txnext - txstart); i++)
     {
-        while(!tx_rdy()) ;
+        /* A port that never drains would hold the core for good, and
+         * nothing else runs while this thread waits */
+        long end = current_tick + HZ / 10;
+
+        while (!tx_rdy())
+            if (TIME_AFTER(current_tick, end))
+                return;
         tx_writec(txstart[i]);
     }
 }

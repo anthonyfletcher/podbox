@@ -22,7 +22,10 @@
 #include "events.h"
 #include "panic.h"
 
-#define MAX_SYS_EVENTS 28
+/* Leaving the Now Playing screen alone turns on four handlers, on top of the
+ * fork's resident ones and any storage-idle callbacks queued; a full table
+ * panics */
+#define MAX_SYS_EVENTS 48
 
 struct sysevent {
     unsigned short id;

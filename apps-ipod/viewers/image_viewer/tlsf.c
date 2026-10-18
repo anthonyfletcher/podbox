@@ -323,15 +323,11 @@ static __inline__ bhdr_t *FIND_SUITABLE_BLOCK(tlsf_t * _tlsf, int *_fl, int *_sl
     return _b;
 }
 
+/* No weak panicf here: linked into the core ahead of the firmware library,
+ * one stands in for the real panic everywhere, and every panic hangs with
+ * nothing on screen */
 static __inline__ void corrupt(const char *msg) {
     panicf("* Heap Corruption: %s", msg);
-}
-
-void __attribute__((weak)) panicf( const char *fmt, ... )
-{
-  /* Do nothing */
-  (void)fmt;
-  do { } while (1);
 }
 
 #define EXTRACT_BLOCK_HDR(_b, _tlsf, _fl, _sl)                          \

@@ -58,6 +58,7 @@
 #include "database/tagcache.h"
 #include "system/library_files.h"
 #include "metadata/art_cache.h"
+#include "hang_catch.h"
 #include "files/file_index.h"
 #include "system/bg_task.h"
 #include "screens/browse/browser_db.h"
@@ -797,6 +798,9 @@ static void init(void)
     settings_apply_skins();
     CHART(">settings_apply_skins");
     tagcache_boot_finished();
+#if defined(CPU_PP502x) || CONFIG_CPU == S5L8702
+    hang_catch_init();
+#endif
 }
 
 #ifdef CPU_PP
