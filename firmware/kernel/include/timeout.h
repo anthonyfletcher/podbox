@@ -29,7 +29,10 @@ struct timeout;
  * tmo - pointer to struct timeout associated with event
  * return next interval or <= 0 to stop event
  */
-#define MAX_NUM_TIMEOUTS 8
+/* A full table drops a registration without a word, so the timeout never
+ * fires: with the fork's USB, iAP, DAC search and log timeouts there are
+ * about 15 that can be registered at once */
+#define MAX_NUM_TIMEOUTS 24
 typedef int (* timeout_cb_type)(struct timeout *tmo);
 
 struct timeout
