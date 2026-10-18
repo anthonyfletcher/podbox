@@ -172,9 +172,10 @@ static bool slot_art(struct Platform* plt, uint32_t index) {
            plt->aa_slot >= 0 && playback_current_aa_hid(plt->aa_slot) >= 0;
 }
 
-/* The playing track's art cache answer is kept until the track or Car Artwork
- * changes: the play status carries it, accessories poll that about once a
- * second, and each check opens a file, which keeps the disk from sleeping */
+/* The playing track's art cache answer is kept until the track or Accessory
+ * Artwork changes: the play status carries it, accessories poll that about
+ * once a second, and each check opens a file, which keeps the disk from
+ * sleeping */
 static int playing_art_check(uint32_t index) {
     static char     path[MAX_PATH];
     static uint32_t checked = UINT32_MAX;

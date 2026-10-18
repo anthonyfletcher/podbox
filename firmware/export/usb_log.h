@@ -238,7 +238,7 @@ static inline void usb_log_iap_error_args(int unused, ...)
 #define USB_LOG_IAP_ART_REFUSED  2 /* the accessory asked; none to send */
 
 #define USB_LOG_IAP_ART_CACHE_OK       0 /* a usable thumbnail */
-#define USB_LOG_IAP_ART_CACHE_OFF      1 /* Car Artwork is off */
+#define USB_LOG_IAP_ART_CACHE_OFF      1 /* Accessory Artwork is off */
 #define USB_LOG_IAP_ART_CACHE_NO_TRACK 2 /* no such track, or no cache size */
 #define USB_LOG_IAP_ART_CACHE_NO_FILE  3 /* the folder has no thumbnail */
 #define USB_LOG_IAP_ART_CACHE_BAD_FILE 4 /* one the formats cannot use */
