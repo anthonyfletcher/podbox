@@ -339,6 +339,7 @@ draw/color.c
 audio/sound_feedback.c
 system/format_time.c
 system/shutdown.c
+system/output_pause.c
 system/strutil.c
 system/volume.c
 

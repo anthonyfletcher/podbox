@@ -1667,7 +1667,7 @@ const struct settings_list settings[] = {
                    ID2P(LANG_DISPLAY_FULL_PATH)),
 
 
-    CHOICE_SETTING(0, unplug_mode, LANG_HEADPHONE_UNPLUG, 0,
+    CHOICE_SETTING(0, unplug_mode, LANG_HEADPHONE_UNPLUG, 2,
                    "pause on headphone unplug", "off,pause,pause and resume",
                    NULL, 3, ID2P(LANG_OFF), ID2P(LANG_PAUSE),
                    ID2P(LANG_HEADPHONE_UNPLUG_RESUME)),

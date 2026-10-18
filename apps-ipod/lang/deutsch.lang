@@ -1691,15 +1691,15 @@
   user: core
   <source>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </source>
   <dest>
     *: none
-    headphone_detection: "Wiedergabe bei Ausstecken des Kopfhörers anhalten"
+    headphone_detection: "Beim Ausstecken anhalten"
   </dest>
   <voice>
     *: none
-    headphone_detection: "Wiedergabe bei Ausstecken des Kopfhörers anhalten"
+    headphone_detection: "Beim Ausstecken anhalten"
   </voice>
 </phrase>
 <phrase>

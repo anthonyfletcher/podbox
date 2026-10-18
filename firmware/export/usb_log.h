@@ -145,7 +145,18 @@ enum usb_log_type
     USB_LOG_IAP_ERROR,   /* USB iAP's error report: b = line, c = function,
                           * d = format, both static strings; the format's
                           * arguments are not kept */
+    USB_LOG_OUTPUT,      /* Pause on Unplug: a = USB_LOG_OUTPUT_*, b = the
+                          * output, 0 the jack, 1 a DAC, 2 an accessory,
+                          * c = 1 if it paused or resumed, d = the setting |
+                          * audio_status() << 8; for a serial reset, b = the
+                          * line said it departed, c = lingoes, d = the
+                          * interface state */
 };
+
+#define USB_LOG_OUTPUT_GONE    0
+#define USB_LOG_OUTPUT_BACK    1
+#define USB_LOG_OUTPUT_RESUME  2 /* the UI, acting on BACK */
+#define USB_LOG_OUTPUT_SERIAL  3 /* a serial accessory's session reset */
 
 /* An error report from USB iAP. The arguments go to a call that never runs,
  * so a variable kept only for the message stays used. */

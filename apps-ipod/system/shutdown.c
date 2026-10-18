@@ -49,6 +49,7 @@
 #include "activity.h"
 #include "app_util.h"
 #include "shutdown.h"
+#include "output_pause.h"
 
 #ifdef BOOTFILE
 /* True once this cable session's "before" BOOTFILE mtime has been recorded. */
@@ -260,35 +261,6 @@ void car_adapter_mode_init(void)
     tick_add_task(car_adapter_tick);
 }
 
-static void hp_unplug_change(bool inserted)
-{
-    static bool headphone_caused_pause = true;
-
-    if (global_settings.unplug_mode)
-    {
-        int audio_stat = audio_status();
-        if (inserted)
-        {
-            backlight_on();
-            if ((audio_stat & AUDIO_STATUS_PLAY) &&
-                    headphone_caused_pause &&
-                    global_settings.unplug_mode > 1 )
-            {
-                unpause_action(true);
-            }
-            headphone_caused_pause = false;
-        } else {
-            if ((audio_stat & AUDIO_STATUS_PLAY) &&
-                    !(audio_stat & AUDIO_STATUS_PAUSE))
-            {
-                headphone_caused_pause = true;
-                pause_action(false);
-            }
-        }
-    }
-
-}
-
 #ifdef BOOTFILE
 /* A computer rewrote the database (tools/database_pb). This run holds the old
  * one's track numbers, in the playlist and the buffered tracks, so start
@@ -406,12 +378,16 @@ long default_event_handler_ex(long event, void (*callback)(void *), void *parame
             unpause_action(true);
             return SYS_CAR_ADAPTER_RESUME;
         case SYS_PHONE_PLUGGED:
-            hp_unplug_change(true);
+            output_pause_headphones(true);
             return SYS_PHONE_PLUGGED;
 
         case SYS_PHONE_UNPLUGGED:
-            hp_unplug_change(false);
+            output_pause_headphones(false);
             return SYS_PHONE_UNPLUGGED;
+
+        case SYS_OUTPUT_RESUME:
+            output_pause_resume();
+            return SYS_OUTPUT_RESUME;
 #ifdef HAVE_USB_HOST_AUDIO
         case SYS_USB_DAC_ON:
             splash(HZ*2, ID2P(LANG_USB_DAC_ON));

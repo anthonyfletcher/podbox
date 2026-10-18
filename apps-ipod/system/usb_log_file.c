@@ -473,6 +473,23 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                 snprintf(p, size, "host: DAC search: %s",
                          (const char *)(uintptr_t)e->c);
             break;
+        case USB_LOG_OUTPUT:
+            if (e->a == USB_LOG_OUTPUT_SERIAL)
+                snprintf(p, size, "output: serial accessory reset, "
+                         "departed %d, lingoes %08lx, interface %lu", e->b,
+                         (unsigned long)e->c, (unsigned long)e->d);
+            else
+                snprintf(p, size, "output: %s %s, %s (setting %lu, "
+                         "status %lu)",
+                         e->b == 0 ? "headphones" : e->b == 1 ? "DAC" :
+                         "accessory",
+                         e->a == USB_LOG_OUTPUT_GONE ? "gone" :
+                         e->a == USB_LOG_OUTPUT_BACK ? "back" : "resume",
+                         e->c ? (e->a == USB_LOG_OUTPUT_GONE ? "paused" :
+                                 "resumed") : "left alone",
+                         (unsigned long)(e->d & 0xff),
+                         (unsigned long)(e->d >> 8));
+            break;
         case USB_LOG_HOST_HUB:
             snprintf(p, size, "host: hub port %d %s: status %04lx "
                      "change %04lx", e->a, e->b == 0 ? "looking" :

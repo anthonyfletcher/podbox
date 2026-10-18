@@ -106,6 +106,16 @@ enum {
     /* USB_EXTRACTED
        data = NULL */
     SYS_EVENT_USB_EXTRACTED,
+    /* An output playback was using has gone, sent before playback falls
+     * back to the player's own: data = (intptr_t)enum output_kind */
+    SYS_EVENT_OUTPUT_GONE,
+    /* Playback has moved onto an output: data as for OUTPUT_GONE */
+    SYS_EVENT_OUTPUT_BACK,
+};
+
+enum output_kind {
+    OUTPUT_DAC,         /* a USB DAC, the player as host */
+    OUTPUT_ACCESSORY,   /* a dock or car, by its digital audio or line out */
 };
 
 #endif

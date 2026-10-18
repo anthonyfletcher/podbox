@@ -172,6 +172,8 @@ struct device_t {
 };
 
 extern struct device_t device;
+/* When the accessory's session opened: authenticated, or needing none */
+extern long iap_connected_tick;
 /* How long the accessory has for each certificate step: more than the two
  * seconds the specification gives, so a slow one is not failed */
 #define IAP_AUTH_STEP_TIMEOUT (5 * HZ)

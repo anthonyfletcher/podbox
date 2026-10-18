@@ -24,6 +24,7 @@
 #include "pcm.h"
 #include "pcm-internal.h"
 #include "pcm_mixer.h"
+#include "events.h"
 #include "pcm_sampr.h"
 
 /* Channels use standard-style PCM callback interface but a latency of one
@@ -428,7 +429,7 @@ void mixer_channel_stop(enum pcm_mixer_channel channel)
 }
 
 /* Switch playback sink */
-bool mixer_switch_sink(enum pcm_sink_ids sink)
+bool mixer_switch_sink_quiet(enum pcm_sink_ids sink)
 {
     if(pcm_current_sink() == sink)
         return true;
@@ -438,6 +439,39 @@ bool mixer_switch_sink(enum pcm_sink_ids sink)
 
     mixer_handle_sampr_change(SAMPR_NUM(pcm_get_frequency()));
     return true;
+}
+
+#if defined(USB_ENABLE_IAP) || defined(HAVE_USB_HOST_AUDIO)
+static intptr_t output_kind(enum pcm_sink_ids sink)
+{
+#ifdef HAVE_USB_HOST_AUDIO
+    if(sink == PCM_SINK_USB_HOST)
+        return OUTPUT_DAC;
+#endif
+    (void)sink;
+    return OUTPUT_ACCESSORY;
+}
+#endif
+
+/* GONE goes before the switch, so a pause can come before the sound reaches
+ * the player's own output */
+bool mixer_switch_sink(enum pcm_sink_ids sink)
+{
+#if defined(USB_ENABLE_IAP) || defined(HAVE_USB_HOST_AUDIO)
+    enum pcm_sink_ids old = pcm_current_sink();
+
+    if(old == sink)
+        return true;
+    if(sink == PCM_SINK_BUILTIN)
+        send_event(SYS_EVENT_OUTPUT_GONE, (void *)output_kind(old));
+    if(!mixer_switch_sink_quiet(sink))
+        return false;
+    if(old == PCM_SINK_BUILTIN)
+        send_event(SYS_EVENT_OUTPUT_BACK, (void *)output_kind(sink));
+    return true;
+#else
+    return mixer_switch_sink_quiet(sink);
+#endif
 }
 
 /* Set channel's amplitude factor */

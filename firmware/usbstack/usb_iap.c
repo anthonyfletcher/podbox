@@ -502,7 +502,6 @@ void usb_iap_end_reset_hold(bool give_back) {
     reset_hold = false;
     LOG("reset hold ends, give_back=%d", give_back);
     if(give_back) {
-        audio_pause();
         mixer_switch_sink(PCM_SINK_BUILTIN);
     }
 }
@@ -525,13 +524,13 @@ static void usb_iap_disconnect(void) {
         LOG("bus reset keeps the sink");
     } else {
         reset_hold = false;
-        /* An accessory that had the audio takes it with it, as a dock does. A
-         * car that never took it leaves playback alone -- one that has only
-         * identified itself, or the connection the player drops to come back to
-         * it without the sound card -- but an iAP1 accessory playing the line
-         * out does not. */
-        if(pcm_current_sink() == PCM_SINK_IAP || !usb_iap2_keeps_playing()) {
-            audio_pause();
+        /* An accessory that had the audio takes it with it, as a dock does:
+         * the switch says so. A car that never took it leaves playback alone
+         * -- one that has only identified itself, or the connection the
+         * player drops to come back to it without the sound card -- but an
+         * iAP1 accessory playing the line out is an output going too. */
+        if(pcm_current_sink() != PCM_SINK_IAP && !usb_iap2_keeps_playing()) {
+            send_event(SYS_EVENT_OUTPUT_GONE, (void *)OUTPUT_ACCESSORY);
         }
         mixer_switch_sink(PCM_SINK_BUILTIN);
     }

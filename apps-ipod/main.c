@@ -59,6 +59,7 @@
 #include "system/library_files.h"
 #include "metadata/art_cache.h"
 #include "hang_catch.h"
+#include "system/output_pause.h"
 #include "files/file_index.h"
 #include "system/bg_task.h"
 #include "screens/browse/browser_db.h"
@@ -782,6 +783,7 @@ static void init(void)
     cpu_boost(false);
 
     car_adapter_mode_init();
+    output_pause_init();
     iap_setup(global_settings.serial_bitrate);
 #ifdef HAVE_USBSTACK
     usb_log_file_init();

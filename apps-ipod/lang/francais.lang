@@ -1719,15 +1719,15 @@
   user: core
   <source>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </source>
   <dest>
     *: none
-    headphone_detection: "Pause quand écouteurs insérés"
+    headphone_detection: "Pause au débranchement"
   </dest>
   <voice>
     *: none
-    headphone_detection: "Pause quand écouteurs insérés"
+    headphone_detection: "Pause au débranchement"
   </voice>
 </phrase>
 <phrase>

@@ -190,11 +190,11 @@ after new music, run it after `database_pb.exe`.
 | Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | off | **Adv** |
 | Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. | 0 | **Adv** |
 
-### Playback — Pause on Headphone Unplug
+### Playback — Pause on Unplug
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Pause on Headphone Unplug | Pauses when the headphones are pulled out, so the music does not carry on without you. Can also resume automatically when they go back in. | off |  |
+| Pause on Unplug | Pauses when whatever is playing is unplugged -- headphones, a USB DAC, a dock or a car -- so the music does not carry on without you or out of the iPod's socket. Pause and Resume carries on when the same one is plugged back in. | pause and resume |  |
 | Disable resume on startup if phones unplugged | Stops the player resuming at power-on when nothing is plugged in, which otherwise plays into a dock or an empty socket. | off | **Adv** |
 
 ### Playback — Playlists
@@ -572,7 +572,7 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket. It is looked for only when no computer answers within two seconds, and not while a dock is talking to the player. The check needs a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this. Off leaves every cable to the computer and charging. | on |  |
+| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket, paused as Pause on Unplug says. It is looked for only when no computer answers within two seconds, and not while a dock is talking to the player. The check needs a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this. Off leaves every cable to the computer and charging. | on |  |
 
 ### System — Accessories
 

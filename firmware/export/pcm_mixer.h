@@ -112,8 +112,10 @@ void mixer_channel_play_pause(enum pcm_mixer_channel channel, bool play);
 /* Stop playback on a channel */
 void mixer_channel_stop(enum pcm_mixer_channel channel);
 
-/* Switch playback sink */
+/* Switch playback sink, sending SYS_EVENT_OUTPUT_GONE or _BACK */
 bool mixer_switch_sink(enum pcm_sink_ids sink);
+/* The same without the events, for a switch away and straight back */
+bool mixer_switch_sink_quiet(enum pcm_sink_ids sink);
 
 /* Set channel's amplitude factor */
 void mixer_channel_set_amplitude(enum pcm_mixer_channel channel,

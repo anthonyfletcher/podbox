@@ -152,7 +152,10 @@ void iap_handlepkt_mode2(const unsigned int len, const unsigned char *buf)
                     }
 #endif
                 }
-                if(buf[3] & 2) /* pause */
+                /* pause, but not the one a dock such as Onkyo's DS-A3
+                 * sends as it connects: plugging in leaves playback alone */
+                if((buf[3] & 2) &&
+                   TIME_AFTER(current_tick, iap_connected_tick + 2*HZ))
                 {
                     if (audio_status() == AUDIO_STATUS_PLAY)
                         btn |= BUTTON_RC_PLAY;

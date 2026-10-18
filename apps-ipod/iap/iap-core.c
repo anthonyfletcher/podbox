@@ -103,6 +103,7 @@ static bool iap_setupflag = false, iap_running = false;
 static bool iap_enabled = true;
 static volatile bool reset_pending;
 static volatile bool reset_departed;    /* the reset pauses, see below */
+static long departure_deadline;         /* see iap_do_reset(); 0 none */
 static long last_frame_tick;     /* 0 until a frame passes its checksum */
 /* The data of the one IAP_EV_ARTWORK that is live, and whether a packet
  * went since the last tick; a tick that finds none sent posts a new one,
@@ -426,11 +427,13 @@ void iap_power_reset(void)
     post_reset(false);
 }
 
-/* iAP thread. An accessory in extended mode was playing the track through
- * itself, so its leaving pauses it, as an Extended to Standard change does;
- * a reset for lost USB power does not, as the accessory may still be there. */
+/* iAP thread. An accessory that identified itself was the output -- a dock's
+ * line out, a car's transmitter, a remote with the headphones in it -- so
+ * its leaving is an output going, for Pause on Unplug; a reset for lost USB
+ * power is not, as the accessory may still be there. */
 static void iap_do_reset(void)
 {
+    static bool identified;
     int level = disable_irq_save();
     bool departed = reset_departed;
     reset_pending = false;
@@ -439,6 +442,20 @@ static void iap_do_reset(void)
     iap_reset_buffers();
     restore_irq(level);
     last_frame_tick = 0;
+    usb_log(USB_LOG_OUTPUT, USB_LOG_OUTPUT_SERIAL, departed, device.lingoes,
+            interface_state);
+    /* A dock's USB power going resets the session a moment before the line
+     * says it has left, so who was there outlives a reset that is not a
+     * departure */
+    identified |= device.lingoes || interface_state == IST_EXTENDED;
+    departed = departed && identified;
+    if (departed)
+        identified = false;
+    /* The line does not always say: on the 5G a dock can read as present
+     * long after it has gone. One that does not identify again within
+     * three seconds of its power going has left, or is off, and nothing
+     * plays its line out either way. */
+    departure_deadline = identified ? current_tick + 3*HZ : 0;
 
     iap_reset_device(&device);
     remote_seek_stop();
@@ -449,9 +466,8 @@ static void iap_do_reset(void)
     iap_btnrepeat = false;
     iap_btnstop = false;
     iap_btnchapter = false;
-    if (departed && interface_state == IST_EXTENDED
-        && (audio_status() & AUDIO_STATUS_PLAY))
-        audio_pause();
+    if (departed)
+        send_event(SYS_EVENT_OUTPUT_GONE, (void *)OUTPUT_ACCESSORY);
     interface_state = IST_STANDARD;
     iap_bitrate_set(global_settings.serial_bitrate);
 }
@@ -1185,6 +1201,12 @@ void iap_periodic(void)
 #ifdef HAVE_IAP_ACCESSORY_POLL
     iap_accessory_poll();
 #endif
+    if (departure_deadline && TIME_AFTER(current_tick, departure_deadline))
+    {
+        departure_deadline = 0;
+        if (!device.lingoes && iap_enabled)
+            post_reset(true);
+    }
     remote_seek_tick();
 
     if(!iap_setupflag || !iap_enabled) return;
@@ -1773,14 +1795,12 @@ bool iap_play_or_resume(void)
     return true;
 }
 
-/* Change the current interface state.
- * On a change from IST_EXTENDED to IST_STANDARD, or from IST_STANDARD
- * to IST_EXTENDED, pause playback, if playing
- */
+/* Change the current interface state. A dock handing the library back,
+ * Extended to Standard, pauses what it was playing; one taking it, as it
+ * docks, leaves playback alone, as plugging in any other output does. */
 void iap_interface_state_change(const enum interface_state new)
 {
-    if (((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) ||
-        ((interface_state == IST_STANDARD) && (new == IST_EXTENDED))) {
+    if ((interface_state == IST_EXTENDED) && (new == IST_STANDARD)) {
         if (audio_status() == AUDIO_STATUS_PLAY)
             audio_pause();
     }

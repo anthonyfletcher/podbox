@@ -513,11 +513,11 @@ void usb_iap2_control_reset(void)
     now_playing = false;
     n_controls = 0;
     memset(last_report_id, 0, sizeof(last_report_id));
-    /* Paused as well: the track would otherwise go on unheard at the jack */
+    /* The switch pauses, under the unplug setting: the track would
+     * otherwise go on unheard at the jack */
     if (audio_on)
     {
         audio_on = false;
-        audio_pause();
         mixer_switch_sink(PCM_SINK_BUILTIN);
     }
 }
@@ -598,7 +598,6 @@ static void stop_audio(void)
     if (!audio_on)
         return;
     audio_on = false;
-    audio_pause();
     mixer_switch_sink(PCM_SINK_BUILTIN);
 }
 

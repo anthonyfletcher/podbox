@@ -132,7 +132,7 @@ static void offer_rates(unsigned listed) {
 
     const bool in_use = pcm_current_sink() == PCM_SINK_IAP;
     if(in_use) {
-        mixer_switch_sink(PCM_SINK_BUILTIN);
+        mixer_switch_sink_quiet(PCM_SINK_BUILTIN);
     }
     /* the stream's packets are sized from it in the USB interrupt */
     const int oldlevel = disable_irq_save();
@@ -148,7 +148,7 @@ static void offer_rates(unsigned listed) {
     track_attrs_sent   = false;
     restore_irq(oldlevel);
     if(in_use) {
-        mixer_switch_sink(PCM_SINK_IAP);
+        mixer_switch_sink_quiet(PCM_SINK_IAP);
     }
 }
 

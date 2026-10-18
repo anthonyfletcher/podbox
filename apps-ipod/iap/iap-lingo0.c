@@ -16,6 +16,7 @@
 #include "iap-library.h"
 #include "kernel.h"
 #include "system.h"
+#include "events.h"
 #include "tuner.h"
 #if CONFIG_TUNER
 #include "ipod_remote_tuner.h"
@@ -65,6 +66,17 @@ static void cmd_pending(const unsigned char cmd, const uint32_t msdelay)
     iap_send_tx();
 }
 
+long iap_connected_tick;
+
+/* The accessory's session is open: authenticated, or needing none. It is an
+ * output back, for Pause on Unplug, as its leaving was one going. */
+static void accessory_connected(void)
+{
+    iap_connected_tick = current_tick;
+    queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
+    send_event(SYS_EVENT_OUTPUT_BACK, (void *)OUTPUT_ACCESSORY);
+}
+
 /* An accessory names its lingoes, by IdentifyDeviceLingoes or by IDPS's
  * IdentifyToken. A lingo the player lacks is left out of the set rather
  * than failing the identification: an accessory that also speaks, say,
@@ -106,7 +118,7 @@ static void identified(uint32_t lingoes, uint32_t options, uint32_t deviceid)
         /* IDPS gave all of it in its tokens */
         if (!device.identified_by_idps)
             device.accinfo = ACCST_INIT;
-        queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
+        accessory_connected();
     }
 }
 
@@ -849,7 +861,7 @@ void iap_handlepkt_mode0(const unsigned int len, const unsigned char *buf)
 
             iap_send_tx();
             device.auth.state = AUST_AUTH;
-            queue_broadcast(SYS_ACCESSORY_CONNECTED, 0);
+            accessory_connected();
 #if CONFIG_TUNER
             if (radio_present == 1)
             {

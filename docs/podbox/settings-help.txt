@@ -414,8 +414,9 @@ How quickly held seeking speeds up. Faster crosses an hour-long file in a
 moment but overshoots a three-minute song.
 
 [pause on headphone unplug]
-Pauses when the headphones are pulled out, so the music does not carry on
-without you. Can also resume automatically when they go back in.
+Pauses when whatever is playing is unplugged -- headphones, a USB DAC, a dock
+or a car -- so the music does not carry on without you or out of the iPod's
+socket. Pause and Resume carries on when the same one is plugged back in.
 
 [disable autoresume if phones not present]
 Stops the player resuming at power-on when nothing is plugged in, which
@@ -1387,7 +1388,8 @@ place, as there is room for only one of the two beside the disk.
 
 [usb dac output]
 On, a USB DAC plugged into the dock connector takes over playback, and
-unplugging it hands playback back to the headphone socket. It is looked for
+unplugging it hands playback back to the headphone socket, paused as Pause on
+Unplug says. It is looked for
 only when no computer answers within two seconds, and not while a dock is
 talking to the player.
 

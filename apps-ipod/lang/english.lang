@@ -1898,15 +1898,15 @@
   user: core
   <source>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </source>
   <dest>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </dest>
   <voice>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </voice>
 </phrase>
 <phrase>
