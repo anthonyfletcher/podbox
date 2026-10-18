@@ -1158,13 +1158,16 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
                  * its stream as start splits of 188 bytes, more than the
                  * 128-byte transmit FIFO, which then runs dry whenever
                  * memory is busy. With the hub held at full speed, the
-                 * stream goes through the controller's own translator. */
+                 * stream goes through the controller's own translator. That
+                 * reset is not one of the three tries, and happens once. */
                 if (e->result == 1 && e->hub_ports && !e->high_speed &&
-                    usb_drv_host_high_speed())
+                    usb_drv_host_high_speed() &&
+                    !(REG_PORTSC1 & PORTSCX_PORT_FORCE_FULL_SPEED))
                 {
                     REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) |
                                   PORTSCX_PORT_FORCE_FULL_SPEED;
                     usb_host_enum_clear();
+                    attempt--;
                     continue;
                 }
                 if (e->result == 1)

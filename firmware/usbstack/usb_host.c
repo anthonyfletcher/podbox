@@ -47,6 +47,7 @@
 #define PS_ENABLE           (1 << 1)
 #define PS_LOW_SPEED        (1 << 9)
 #define PS_HIGH_SPEED       (1 << 10)
+#define PS_C_CONNECT        (1 << 16)
 #define PS_C_RESET          (1 << 20)
 
 static struct usb_drv_host_enum host_enum;
@@ -87,8 +88,8 @@ static void get_string(int addr, int index, int langid, char *out,
 }
 
 /* The device and its interface settings and endpoints, into the USB log.
- * The DAC search enumerates on every poll, so a device is logged again only
- * once its ID or configuration length changes. */
+ * A device enumerated twice in a row is logged once; one between them, such
+ * as a hub, logs it again. */
 static void log_descriptors(const struct usb_drv_host_enum *e)
 {
     static uint32_t logged_id;
@@ -298,7 +299,10 @@ bool usb_host_hub_device_present(void)
     if (e->result != 1 || e->hub_ports == 0)
         return true;
     /* A status that cannot be read is the hub itself gone, which the root
-     * port's disconnect reports. */
+     * port's disconnect reports. A device that left and came back between
+     * two reads is connected again but on a disabled port at address 0,
+     * with the connect change that enumeration cleared set once more. */
     ps = hub_port_status(e->hub_port, 2);
-    return ps == 0 || (ps & PS_CONNECT);
+    return ps == 0 || ((ps & PS_CONNECT) && (ps & PS_ENABLE) &&
+                       !(ps & PS_C_CONNECT));
 }

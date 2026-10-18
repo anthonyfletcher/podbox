@@ -2004,8 +2004,17 @@ static void iso_sof(void)
         if (DWC_HCCHAR(ch) & HCCHAR_CHENA)
         {
             /* still not sent: skip a turn, and the rest of a split
-             * packet, whose parts must go in consecutive microframes */
+             * packet, whose parts must go in consecutive microframes. A
+             * split frame due to start now is dropped and counted; the
+             * next one is still filled. */
             split_off = split_bytes;
+            if (iso_split && (next & 7) == 4)
+                iso_split_sof(next, odd, ch);
+            else if (iso_split && (next & 7) == 0 && split_ready >= 0)
+            {
+                split_ready = -1;
+                iso_stats.underruns++;
+            }
             return;
         }
         iso_out_armed[odd] = false;
