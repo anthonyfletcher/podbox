@@ -64,12 +64,13 @@ static void set_bitrate(volatile struct ppuart *port, unsigned int rate)
 }
 
 #ifdef HAVE_IAP_ACCESSORY_POLL
+static bool plugged;
+
 /* iAP thread only: the accessory-detect ADC is behind the PCF's I2C, which
  * takes a mutex. Below 10 is an accessory, as ipod_remote_tuner.c reads it;
  * the reading must stay above for a second before it counts as gone. */
 void iap_accessory_poll(void)
 {
-    static bool plugged;
     static int absent;
 
     if (adc_read(ADC_ACCESSORY) < 10)
@@ -82,6 +83,11 @@ void iap_accessory_poll(void)
         plugged = false;
         iap_reset_state(IF_IAP_MP(0));
     }
+}
+
+bool iap_accessory_plugged(void)
+{
+    return plugged;
 }
 #endif
 

@@ -58,6 +58,8 @@ void iap_volume_set(void);
  * detect can only be read from a thread: resets the session when the
  * accessory goes. */
 void iap_accessory_poll(void);
+/* What the last poll saw: an accessory is in, or has not been out a second */
+bool iap_accessory_plugged(void);
 #endif
 bool dbg_iap(void);
 #endif

@@ -115,6 +115,8 @@ static bool art_sent;
  */
 static bool iap_shutdown = false;
 static struct timeout iap_task_tmo;
+static volatile bool iap_tick_stop;  /* asked of iap_task() */
+static volatile bool iap_tick_idle;  /* iap_task() posts no ticks */
 
 unsigned long iap_remotebtn = 0;
 /* Used to make sure a button press is delivered to the processing
@@ -509,8 +511,52 @@ static int iap_task(struct timeout *tmo)
 {
     (void) tmo;
 
+    /* Idle, the timeout stays registered but posts nothing: the table has
+     * fewer slots than the timeouts that use it, and one given up may not
+     * be had back */
+    if (iap_tick_stop)
+    {
+        iap_tick_idle = true;
+        return 60 * HZ;
+    }
     queue_post(&iap_queue, IAP_EV_TICK, 0);
     return MS_TO_TICKS(100);
+}
+
+/* Interrupt context: every byte received. Registering it again only moves
+ * the timeout's expiry. */
+static void iap_tick_start(void)
+{
+    iap_tick_stop = false;
+    if (iap_tick_idle)
+    {
+        iap_tick_idle = false;
+        timeout_register(&iap_task_tmo, iap_task, MS_TO_TICKS(100),
+                         (intptr_t)NULL);
+    }
+}
+
+/* iAP thread. Once the accessory has gone and been reset, and has been
+ * silent for a minute, nothing the tick drives has work left: it goes idle
+ * until the next byte arrives. A target that polls for the accessory keeps
+ * the tick while the poll still sees one. */
+static void iap_tick_stop_if_idle(void)
+{
+    int level = disable_irq_save();
+    if ((!last_frame_tick
+         || TIME_AFTER(current_tick, last_frame_tick + 60 * HZ))
+        && !reset_pending && !iap_shutdown && departure_deadline == 0
+        && device.lingoes == 0 && device.auth.state == AUST_NONE
+        && !device.do_notify && device.notifications == 0
+        && device.pb_notifications == 0
+        && interface_state == IST_STANDARD && iap_timeoutbtn == 0
+        && remote_seek_direction() == 0 && !iap_artwork_active()
+#ifdef HAVE_IAP_ACCESSORY_POLL
+        && !iap_accessory_plugged()
+#endif
+        )
+        iap_tick_stop = true;
+    restore_irq(level);
 }
 
 
@@ -584,6 +630,7 @@ static void iap_thread(void)
                    to a queue overflow, they would otherwise sit in the
                    RX buffer until the next packet arrives */
                 iap_handlepkt();
+                iap_tick_stop_if_idle();
                 break;
             }
 
@@ -985,6 +1032,9 @@ bool iap_getc(IF_IAP_MP(int port,) const unsigned char x)
      */
     if (!iap_setupflag || !iap_enabled)
         return true;
+
+    if (iap_started)
+        iap_tick_start();
 
     /* Check the time since the last packet arrived. */
     if ((s->state != ST_SYNC) && TIME_AFTER(current_tick, pkt_timeout)) {
