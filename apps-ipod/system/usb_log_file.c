@@ -365,10 +365,12 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      e->a, (unsigned long)e->c, (unsigned long)e->d);
             break;
         case USB_LOG_HOST_STAGE:
-            snprintf(p, size, "host: @%d %s %s try %d: int %08lx tsiz %08lx",
-                     e->a, (e->b & 0xff) == 3 ? "SETUP" :
+            snprintf(p, size, "host: @%d %s %s%s try %d: int %08lx "
+                     "tsiz %08lx", e->a, (e->b & 0xff) == 3 ? "SETUP" :
                      (e->b & 0xff) == 2 ? "DATA1" : "DATA0",
-                     e->b & 0x100 ? "in" : "out", e->b >> 12,
+                     e->b & 0x100 ? "in" : "out",
+                     e->b & 0x200 ? " start split" :
+                     e->b & 0x400 ? " complete split" : "", e->b >> 12,
                      (unsigned long)e->c, (unsigned long)e->d);
             break;
         case USB_LOG_HOST_ENUM:
@@ -408,6 +410,16 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
                      (unsigned long)(e->c & 0x7ff), (unsigned long)e->d);
             break;
         }
+        case USB_LOG_HOST_STREAM:
+            snprintf(p, size, "host: stream IF%d.%d, %s speed, %lu.%03lu "
+                     "frames a %sframe, max %lu bytes every %lu",
+                     e->a, e->b, e->d >> 24 ? "high" : "full",
+                     (unsigned long)(e->c >> 16),
+                     (unsigned long)(((e->c & 0xffff) * 1000) >> 16),
+                     e->d >> 24 ? "micro" : "",
+                     (unsigned long)(e->d & 0xffff),
+                     (unsigned long)((e->d >> 16) & 0xff));
+            break;
         case USB_LOG_HOST_SETTING:
         {
             static const char * const why[] = {
@@ -460,6 +472,13 @@ static void format_entry(const struct usb_log_entry *e, uint64_t us,
             else
                 snprintf(p, size, "host: DAC search: %s",
                          (const char *)(uintptr_t)e->c);
+            break;
+        case USB_LOG_HOST_HUB:
+            snprintf(p, size, "host: hub port %d %s: status %04lx "
+                     "change %04lx", e->a, e->b == 0 ? "looking" :
+                     e->b == 1 ? "resetting" : "watching",
+                     (unsigned long)(e->c & 0xffff),
+                     (unsigned long)(e->c >> 16));
             break;
 #ifdef USB_ENABLE_IAP
         case USB_LOG_IAP:

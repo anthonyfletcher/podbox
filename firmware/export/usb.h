@@ -123,6 +123,7 @@ enum
 #ifdef HAVE_USB_HOST_AUDIO
     USB_HOST_AUTO,           /* Event - the next step of looking for a DAC */
     USB_HOST_DAC,            /* Event - data: DAC output on now, or off */
+    USB_HOST_HUB,            /* Event - read the hub port a DAC is on */
 #endif
 #ifdef USB_ENABLE_IAP
     USB_CAR_RECONNECT,       /* Event - a car: again without the sound card */
@@ -306,6 +307,9 @@ void usb_set_dac_output(int mode);
 void usb_set_dac_active(bool on);
 bool usb_dac_searching(void);
 bool usb_dac_playing(void);
+/* While a DAC behind a hub plays, read its hub port once a second: taking
+ * the DAC off the hub leaves the player's own port connected. */
+void usb_host_hub_watch(bool on);
 
 /* Diagnostic only: what the automatic DAC check last decided, and why */
 struct usb_dac_auto_record {

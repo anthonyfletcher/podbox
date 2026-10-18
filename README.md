@@ -492,7 +492,8 @@ headphone amp or DAC, which does the conversion instead of the iPod.
 - The iPod supplies no power over USB, so the DAC needs its own supply - or you can use a
   USB splitter with a charger connected
 - Most USB audio DACs should work; ones that only offer rates other than 44.1 and 48 
-  kHz will not, and neither will a DAC behind a hub
+  kHz will not
+- A DAC also works through a USB hub; the iPod uses the first device it finds on the hub
 
 ### Docks and receivers (Improved)
 

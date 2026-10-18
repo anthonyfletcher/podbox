@@ -159,21 +159,32 @@ struct usb_drv_host_status {
 /* What enumerating the device found. usb_drv_host_poll() runs
  * usb_host_enumerate() once, after the reset that enables the port. The
  * enumeration itself is shared (usbstack/usb_host.c), over
- * usb_drv_host_control(). */
+ * usb_drv_host_control(). A hub on the port is enumerated at address 1 and
+ * the first device on its ports at address 2; everything but the hub_*
+ * fields then describes that device. A full-speed device behind a
+ * high-speed hub is reached through the hub's transaction translator. */
 struct usb_drv_host_enum {
     int result;             /* 0 not run, 1 done, -1 failed at step */
     const char *step;       /* the request that failed */
     uint32_t token;         /* its transfer status, raw */
+    int addr;               /* the device's address */
+    bool high_speed;        /* the device's own speed, not the port's */
     uint8_t dev[18];
     int cfg_total;          /* wTotalLength; cfg_len is less if truncated */
     int cfg_len;
     const uint8_t *cfg;
     char manufacturer[32];
     char product[32];
+    int hub_ports;          /* 0: no hub */
+    int hub_port;           /* the port the device is on */
+    uint16_t hub_vid, hub_pid;
+    int hub_tt;             /* bDeviceProtocol: 1 one translator, 2 many */
 };
 const struct usb_drv_host_enum *usb_host_get_enum(void);
 void usb_host_enumerate(void);
 void usb_host_enum_clear(void);
+/* Whether a device behind a hub is still on its port; true with no hub */
+bool usb_host_hub_device_present(void);
 
 /* A control transfer to endpoint 0 of a high- or full-speed device. Returns
  * the data-stage byte count, or -1; usb_drv_host_last_status() then holds
@@ -181,12 +192,20 @@ void usb_host_enum_clear(void);
 int usb_drv_host_control(int addr, int reqtype, int req, int value,
                          int index, void *data, int len);
 uint32_t usb_drv_host_last_status(void);
-/* Endpoint 0's packet size for the transfers that follow: 64 until the
- * device descriptor says otherwise. A full-speed device may use 8, and a
- * size too large ends an IN stage at the device's first packet. */
-void usb_drv_host_set_ep0_mps(int mps);
-/* Whether the device on the port runs at high speed, whose isochronous
- * service interval is the microframe; at full speed it is the frame. */
+/* How transfers to the device at addr reach it, set before the first:
+ * endpoint 0's packet size (64 until the device descriptor says otherwise;
+ * one too large ends an IN stage at the device's first packet), its speed,
+ * and for a full-speed device behind a high-speed hub, that hub's address
+ * and the port it is on. tt_hub is 0 for a device on the player's own
+ * port. Addresses run to USB_DRV_HOST_ADDRS - 1. */
+#define USB_DRV_HOST_ADDRS 3
+struct usb_drv_host_route {
+    int mps;
+    bool high_speed;
+    int tt_hub, tt_port;
+};
+void usb_drv_host_set_route(int addr, const struct usb_drv_host_route *r);
+/* Whether the player's own port runs at high speed */
 bool usb_drv_host_high_speed(void);
 
 /* An isochronous OUT stream with an optional feedback IN endpoint. fill()
@@ -220,8 +239,9 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso);
 void usb_drv_host_iso_stop(void);
 /* A new sample rate: feedback restarts from this 16.16 nominal. */
 void usb_drv_host_iso_set_nominal(uint32_t nominal);
-/* The most bytes the controller sends in one OUT packet at this interval */
-int usb_drv_host_iso_max_packet(int interval_out);
+/* The most bytes the controller sends in one OUT packet to a device of
+ * this speed at this interval */
+int usb_drv_host_iso_max_packet(bool high_speed, int interval_out);
 void usb_drv_host_iso_get_stats(struct usb_drv_host_iso_stats *st);
 
 void usb_drv_host_start(void);

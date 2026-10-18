@@ -62,7 +62,8 @@ enum usb_log_type
     USB_LOG_HOST_PORT,   /* port reset: a = attempt, c = HPRT or PORTSC,
                           * d = HFIR, or the ARC's translator port */
     USB_LOG_HOST_STAGE,  /* one try at a control stage: a = address,
-                          * b = pid | in << 8 | try << 12,
+                          * b = pid | in << 8 | try << 12, 0x200 a start
+                          * split, 0x400 a complete split,
                           * c = channel interrupts, bit 31 if it never
                           * halted, d = HCTSIZ after */
     USB_LOG_HOST_ENUM,   /* an enumeration step: a = passed,
@@ -86,6 +87,10 @@ enum usb_log_type
     USB_LOG_HOST_EHCI,  /* an ARC control transfer: a = address,
                           * b = request | translator port << 8,
                           * c = token that failed, d = bytes or -1 */
+    USB_LOG_HOST_STREAM, /* the DAC's stream starting: a = interface,
+                          * b = alternate, c = samples per (micro)frame,
+                          * 16.16, d = max packet | interval << 16 |
+                          * high speed << 24 */
     USB_LOG_HOST_ISO,    /* the stream: a = 0, one of the first packets:
                           * b = parity, c = channel interrupts, d = HCTSIZ;
                           * a = 1, every 1000th: b = frames in it,
@@ -96,6 +101,9 @@ enum usb_log_type
                           * 1 connected, 2 enabled, USB_LOG_HOST_PORT_READ
                           * if there was one, c = the decision (a static
                           * string), d = HPRT or PORTSC1 */
+    USB_LOG_HOST_HUB,    /* a hub port's status: a = port, b = 0 looking
+                          * for a device, 1 resetting, 2 watching,
+                          * c = wPortStatus | wPortChange << 16 */
     USB_LOG_ALLOC,       /* interfaces and endpoints being assigned:
                           * a = enabled drivers, b = core state */
     /* USB iAP, configuration 2 */

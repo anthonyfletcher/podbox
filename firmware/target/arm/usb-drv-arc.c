@@ -543,9 +543,10 @@ static void read_hw_info(void)
 }
 
 /* Host probe. The controller is an EHCI host with one root port; a
- * full-speed device is reached through its transaction translator
- * (HOST_TT_PORT). PORTSC1's change bits clear when written as 1, and writing
- * PE as 1 does nothing, so every write masks all four. */
+ * full-speed device is reached through a transaction translator, the
+ * controller's own (HOST_TT_PORT) or a high-speed hub's. PORTSC1's change
+ * bits clear when written as 1, and writing PE as 1 does nothing, so every
+ * write masks all four. */
 #define PORTSCX_WRITE_MASK (PORTSCX_CONNECT_STATUS_CHANGE | \
                             PORTSCX_PORT_ENABLE | \
                             PORTSCX_PORT_EN_DIS_CHANGE | \
@@ -603,6 +604,7 @@ struct ehci_qh {
 #define QH_EPS_FULL     (0 << 12)
 #define QH_EPS_HIGH     (2 << 12)
 #define QH_CTRL_EP      (1 << 27)   /* control endpoint below high speed */
+#define QH_HUB_ADDR(n)  ((n) << 16)
 #define QH_HUB_PORT(n)  ((n) << 23)
 #define QH_DTC          (1 << 14)
 #define QH_HEAD         (1 << 15)
@@ -623,14 +625,26 @@ struct host_dma {
 static struct host_dma host_dma_mem;
 static struct host_dma *hd;
 static uint32_t host_last_status;
-static int host_ep0_mps = 64;
-/* A full-speed device is reached through the controller's own transaction
- * translator: hub address 0, port 1. */
+static struct usb_drv_host_route host_routes[USB_DRV_HOST_ADDRS];
+/* A full-speed device on the root port is reached through the controller's
+ * own transaction translator: hub address 0, port 1. */
 #define HOST_TT_PORT    1
 
-void usb_drv_host_set_ep0_mps(int mps)
+void usb_drv_host_set_route(int addr, const struct usb_drv_host_route *r)
 {
-    host_ep0_mps = mps;
+    if (addr >= 0 && addr < USB_DRV_HOST_ADDRS)
+        host_routes[addr] = *r;
+}
+
+static const struct usb_drv_host_route *host_route(int addr)
+{
+    return &host_routes[addr >= 0 && addr < USB_DRV_HOST_ADDRS ? addr : 0];
+}
+
+/* The translator's port: a hub's, or with tt_hub 0 the controller's own */
+static int host_tt_port(const struct usb_drv_host_route *r)
+{
+    return r->tt_hub ? r->tt_port : HOST_TT_PORT;
 }
 
 bool usb_drv_host_high_speed(void)
@@ -666,6 +680,7 @@ static int host_control(int addr, int reqtype, int req, int value,
     struct ehci_qtd *setup = &hd->qtd[0];
     struct ehci_qtd *data = &hd->qtd[1];
     struct ehci_qtd *status = &hd->qtd[2];
+    const struct usb_drv_host_route *r = host_route(addr);
     bool in = reqtype & USB_DIR_IN;
     uint32_t token = QTD_ACTIVE | QTD_CERR3;
     int n = -1;
@@ -687,17 +702,18 @@ static int host_control(int addr, int reqtype, int req, int value,
              token | QTD_PID_SETUP | QTD_BYTES(8), &hd->setup);
 
     hd->qh.link = (uint32_t)&hd->qh | EHCI_TYP_QH;
-    if (usb_drv_host_high_speed())
+    if (r->high_speed)
     {
         hd->qh.chars = addr | QH_EPS_HIGH | QH_DTC | QH_HEAD |
-                       QH_MPS(host_ep0_mps);
+                       QH_MPS(r->mps);
         hd->qh.caps = QH_MULT1;
     }
     else
     {
         hd->qh.chars = addr | QH_EPS_FULL | QH_DTC | QH_HEAD | QH_CTRL_EP |
-                       QH_MPS(host_ep0_mps);
-        hd->qh.caps = QH_MULT1 | QH_HUB_PORT(HOST_TT_PORT);
+                       QH_MPS(r->mps);
+        hd->qh.caps = QH_MULT1 | QH_HUB_ADDR(r->tt_hub) |
+                      QH_HUB_PORT(host_tt_port(r));
     }
     hd->qh.current = 0;
     hd->qh.overlay.next = (uint32_t)setup;
@@ -727,7 +743,8 @@ static int host_control(int addr, int reqtype, int req, int value,
                           setup->token :
                           (len && (data->token & (QTD_ACTIVE | QTD_HALTED))) ?
                           data->token : status->token;
-    usb_log(USB_LOG_HOST_EHCI, addr, req | HOST_TT_PORT << 8,
+    usb_log(USB_LOG_HOST_EHCI, addr,
+            req | host_tt_port(r) << 8,
             n < 0 ? host_last_status : 0, (uint32_t)n);
 
     REG_USBCMD &= ~USBCMD_ASYNC_SCHEDULE_EN;
@@ -978,9 +995,10 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
     iso_stats.feedback = iso->nominal;
     iso_acc = 0;
 
-    iso_full_speed = !usb_drv_host_high_speed();
+    iso_full_speed = !host_route(iso->addr)->high_speed;
     iso_fb_ceiling = (uint32_t)(MIN(iso->mps_out,
-                          usb_drv_host_iso_max_packet(iso->interval_out)) /
+                          usb_drv_host_iso_max_packet(!iso_full_speed,
+                                                      iso->interval_out)) /
                       iso->frame_bytes << 16) /
                      (iso_full_speed ? 1 : iso->interval_out);
     for (int s = 0; s < ISO_SLOTS; s++)
@@ -989,8 +1007,9 @@ bool usb_drv_host_iso_start(const struct usb_drv_host_iso *iso)
 
         memset(st, 0, sizeof *st);
         st->next = EHCI_T;
-        st->ep = HOST_TT_PORT << 24 | (iso->ep_out & 0xf) << 8 |
-                 iso_cfg.addr;
+        st->ep = host_tt_port(host_route(iso->addr)) << 24 |
+                 host_route(iso->addr)->tt_hub << 16 |
+                 (iso->ep_out & 0xf) << 8 | iso_cfg.addr;
         st->back = EHCI_T;
         itd_init(&iso_dma->out[s], iso_dma->buf[s], iso->ep_out, 0,
                  iso->mps_out);
@@ -1034,9 +1053,9 @@ void usb_drv_host_iso_set_nominal(uint32_t nominal)
 }
 
 /* A frame's slot buffer is shared by its eight microframes' packets */
-int usb_drv_host_iso_max_packet(int interval_out)
+int usb_drv_host_iso_max_packet(bool high_speed, int interval_out)
 {
-    if (!usb_drv_host_high_speed())
+    if (!high_speed)
         return ISO_SLOT_BYTES;
     return ISO_SLOT_BYTES / (8 / interval_out);
 }
@@ -1105,6 +1124,7 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
     {
         usb_drv_host_iso_stop();
         host_reset_done = false;
+        REG_PORTSC1 &= ~(PORTSCX_WRITE_MASK | PORTSCX_PORT_FORCE_FULL_SPEED);
 #ifdef HAVE_USB_HOST
         usb_host_enum_clear();
 #endif
@@ -1130,9 +1150,24 @@ void usb_drv_host_poll(struct usb_drv_host_status *st)
 #ifdef HAVE_USB_HOST
             if (portsc & PORTSCX_PORT_ENABLE)
             {
+                const struct usb_drv_host_enum *e = usb_host_get_enum();
+
                 usb_host_enumerate();
                 portsc = REG_PORTSC1;
-                if (usb_host_get_enum()->result == 1)
+                /* A full-speed device behind a high-speed hub would take
+                 * its stream as start splits of 188 bytes, more than the
+                 * 128-byte transmit FIFO, which then runs dry whenever
+                 * memory is busy. With the hub held at full speed, the
+                 * stream goes through the controller's own translator. */
+                if (e->result == 1 && e->hub_ports && !e->high_speed &&
+                    usb_drv_host_high_speed())
+                {
+                    REG_PORTSC1 = (REG_PORTSC1 & ~PORTSCX_WRITE_MASK) |
+                                  PORTSCX_PORT_FORCE_FULL_SPEED;
+                    usb_host_enum_clear();
+                    continue;
+                }
+                if (e->result == 1)
                     break;
             }
 #else

@@ -17,11 +17,11 @@
  ****************************************************************************/
 
 /* Playback to a USB Audio Class 1 or 2 DAC that the host probe has
- * enumerated at address 1, as a PCM sink. Starting reads the class
- * descriptors, chooses a 16-bit PCM streaming setting, selects it and starts
- * an isochronous stream, then switches the mixer to this sink. Class 2 sets
- * its rate on a clock source, class 1 on the endpoint; a class 1 DAC is
- * offered only the rates it lists. The stream's fill runs from the
+ * enumerated, on its port or behind a hub, as a PCM sink. Starting reads
+ * the class descriptors, chooses a 16-bit PCM streaming setting, selects it
+ * and starts an isochronous stream, then switches the mixer to this sink.
+ * Class 2 sets its rate on a clock source, class 1 on the endpoint; a class
+ * 1 DAC is offered only the rates it lists. The stream's fill runs from the
  * stream's interrupt: it copies the mixer's buffers out, scaled by the
  * volume setting, asks the PCM core for the next buffer when one runs dry,
  * and sends silence while nothing plays. The DAC's clock follows the sink's
@@ -46,8 +46,6 @@
 #include "usb_drv.h"
 #include "usb_host_audio.h"
 #include "usb_log.h"
-
-#define DEV_ADDR            1
 
 #define UAC_CS_INTERFACE    0x24
 #define UAC_CS_ENDPOINT     0x25
@@ -95,6 +93,7 @@ static unsigned long sink_rate(int freq)
 }
 
 static unsigned long sof_per_second = 8000;
+static int dev_addr;                /* the DAC's, from the enumeration */
 
 /* The DAC's first feature unit, and the controls it lets the host set on
  * the master channel and the first two: bit 0 mute, bit 1 volume */
@@ -126,13 +125,13 @@ static bool set_dac_rate_uac1(unsigned long rate)
 
     if (status.ep_rate == 0)
         return true;
-    if (usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_TYPE_CLASS |
+    if (usb_drv_host_control(dev_addr, USB_DIR_OUT | USB_TYPE_CLASS |
                              USB_RECIP_ENDPOINT, UAC2_CUR, UAC2_SAM_FREQ,
                              status.ep_rate, b, 3) != 3)
         return false;
     status.rate_set = rate;
     status.rate_read = 0;
-    if (usb_drv_host_control(DEV_ADDR, USB_DIR_IN | USB_TYPE_CLASS |
+    if (usb_drv_host_control(dev_addr, USB_DIR_IN | USB_TYPE_CLASS |
                              USB_RECIP_ENDPOINT, UAC1_GET_CUR, UAC2_SAM_FREQ,
                              status.ep_rate, b, 3) == 3)
         status.rate_read = b[0] | (b[1] << 8) | (b[2] << 16);
@@ -149,13 +148,13 @@ static bool set_dac_rate(unsigned long rate)
         return set_dac_rate_uac1(rate);
     if (status.clock < 0)
         return true;
-    if (usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_TYPE_CLASS |
+    if (usb_drv_host_control(dev_addr, USB_DIR_OUT | USB_TYPE_CLASS |
                              USB_RECIP_INTERFACE, UAC2_CUR, UAC2_SAM_FREQ,
                              index, b, 4) != 4)
         return false;
     status.rate_set = rate;
     status.rate_read = 0;
-    if (usb_drv_host_control(DEV_ADDR, USB_DIR_IN | USB_TYPE_CLASS |
+    if (usb_drv_host_control(dev_addr, USB_DIR_IN | USB_TYPE_CLASS |
                              USB_RECIP_INTERFACE, UAC2_CUR, UAC2_SAM_FREQ,
                              index, b, 4) == 4)
         status.rate_read = b[0] | (b[1] << 8) | (b[2] << 16) |
@@ -179,7 +178,7 @@ static int uac2_rates(void)
 
     if (status.clock < 0)
         return RATE_48 | RATE_44;
-    got = usb_drv_host_control(DEV_ADDR, USB_DIR_IN | USB_TYPE_CLASS |
+    got = usb_drv_host_control(dev_addr, USB_DIR_IN | USB_TYPE_CLASS |
                                USB_RECIP_INTERFACE, UAC2_RANGE,
                                UAC2_SAM_FREQ, index, b, sizeof b);
     if (got < 2)
@@ -242,7 +241,7 @@ static void dac_unmute(void)
                 continue;
             if (bit == 0)
             {
-                n = usb_drv_host_control(DEV_ADDR, USB_DIR_OUT |
+                n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
                                          UAC2_CUR, (UAC1_FU_MUTE << 8) | ch,
                                          index, b, 1);
@@ -251,13 +250,13 @@ static void dac_unmute(void)
             }
             else if (status.uac == 1)
             {
-                n = usb_drv_host_control(DEV_ADDR, USB_DIR_IN |
+                n = usb_drv_host_control(dev_addr, USB_DIR_IN |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
                                          UAC1_GET_MAX,
                                          (UAC1_FU_VOLUME << 8) | ch,
                                          index, b, 2);
                 if (n == 2)
-                    n = usb_drv_host_control(DEV_ADDR, USB_DIR_OUT |
+                    n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
                                              USB_TYPE_CLASS |
                                              USB_RECIP_INTERFACE, UAC2_CUR,
                                              (UAC1_FU_VOLUME << 8) | ch,
@@ -267,13 +266,13 @@ static void dac_unmute(void)
             }
             else
             {
-                n = usb_drv_host_control(DEV_ADDR, USB_DIR_IN |
+                n = usb_drv_host_control(dev_addr, USB_DIR_IN |
                                          USB_TYPE_CLASS | USB_RECIP_INTERFACE,
                                          UAC2_RANGE,
                                          (UAC1_FU_VOLUME << 8) | ch,
                                          index, b, 8);
                 if (n == 8)
-                    n = usb_drv_host_control(DEV_ADDR, USB_DIR_OUT |
+                    n = usb_drv_host_control(dev_addr, USB_DIR_OUT |
                                              USB_TYPE_CLASS |
                                              USB_RECIP_INTERFACE, UAC2_CUR,
                                              (UAC1_FU_VOLUME << 8) | ch,
@@ -359,7 +358,7 @@ static void sink_lost(void);
 
 static bool set_interface(int alt)
 {
-    return usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
+    return usb_drv_host_control(dev_addr, USB_DIR_OUT | USB_RECIP_INTERFACE,
                                 USB_REQ_SET_INTERFACE, alt, status.iface,
                                 NULL, 0) == 0;
 }
@@ -490,12 +489,12 @@ static bool usable(const struct as_setting *s)
  * every packet, and the DAC plays slow. */
 static bool fits(const struct as_setting *s, bool headroom)
 {
-    bool hs = usb_drv_host_high_speed();
+    bool hs = usb_host_get_enum()->high_speed;
     int sof = hs ? 8000 : 1000;
     int frames = (SAMPR_48 * (hs ? s->interval_out : 1) + sof - 1) / sof +
                  (headroom && s->ep_fb ? 1 : 0);
     int limit = MIN(s->mps_out,
-                    usb_drv_host_iso_max_packet(s->interval_out));
+                    usb_drv_host_iso_max_packet(hs, s->interval_out));
 
     return frames * s->channels * s->subslot <= limit;
 }
@@ -693,6 +692,7 @@ bool usb_host_audio_start(void)
 
     usb_host_audio_stop();
     STEP("no device", e->result == 1);
+    dev_addr = e->addr;
     STEP("no PCM setting", find_setting(e, &as));
     status.uac = as.uac;
     status.iface = as.iface;
@@ -702,7 +702,7 @@ bool usb_host_audio_start(void)
     status.bits = as.bits;
     status.ep_rate = as.uac == 1 && as.rate_ctl ? as.ep_out : 0;
     STEP("too many channels", fits(&as, false));
-    sof_per_second = usb_drv_host_high_speed() ? 8000 : 1000;
+    sof_per_second = e->high_speed ? 8000 : 1000;
 
     if (as.uac == 2)
         as.rates = uac2_rates();
@@ -711,7 +711,7 @@ bool usb_host_audio_start(void)
 #define DEFAULT_FREQ (usb_host_pcm_sink.caps.default_freq)
 
     STEP("set interface",
-         usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
+         usb_drv_host_control(dev_addr, USB_DIR_OUT | USB_RECIP_INTERFACE,
                               USB_REQ_SET_INTERFACE, as.alt, as.iface,
                               NULL, 0) == 0);
 
@@ -729,7 +729,7 @@ bool usb_host_audio_start(void)
     dac_unmute();
 
     memset(&iso, 0, sizeof iso);
-    iso.addr = DEV_ADDR;
+    iso.addr = dev_addr;
     iso.ep_out = as.ep_out & 0xf;
     iso.mps_out = as.mps_out;
     iso.interval_out = as.interval_out;
@@ -745,11 +745,16 @@ bool usb_host_audio_start(void)
     gain = 0;
     sink_stop();
     STEP("start stream", usb_drv_host_iso_start(&iso));
+    usb_log(USB_LOG_HOST_STREAM, as.iface, as.alt, iso.nominal,
+            iso.mps_out | iso.interval_out << 16 |
+            (uint32_t)e->high_speed << 24);
     STEP("switch sink", mixer_switch_sink(PCM_SINK_USB_HOST));
 #undef DEFAULT_FREQ
 #undef STEP
 
     status.state = "on";
+    if (e->hub_ports)
+        usb_host_hub_watch(true);
     queue_broadcast(SYS_USB_DAC_ON, 0);
     return true;
 }
@@ -762,6 +767,7 @@ void usb_host_audio_stop(void)
     struct usb_drv_host_iso_stats st;
     bool was_on = !strcmp(status.state, "on");
 
+    usb_host_hub_watch(false);
     if (pcm_current_sink() == PCM_SINK_USB_HOST)
         mixer_switch_sink(PCM_SINK_BUILTIN);
     usb_drv_host_iso_get_stats(&st);
@@ -769,7 +775,7 @@ void usb_host_audio_stop(void)
     {
         usb_drv_host_iso_stop();
         if (!st.lost)
-            usb_drv_host_control(DEV_ADDR, USB_DIR_OUT | USB_RECIP_INTERFACE,
+            usb_drv_host_control(dev_addr, USB_DIR_OUT | USB_RECIP_INTERFACE,
                                  USB_REQ_SET_INTERFACE, 0, status.iface,
                                  NULL, 0);
     }

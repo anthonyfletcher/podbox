@@ -173,6 +173,7 @@ static volatile bool usb_dac_requested; /* Turn On posted, not yet taken */
  * own power puts none on the cable */
 static bool usb_dac_turned_on;
 static struct timeout usb_dac_tmo;
+static struct timeout usb_hub_tmo;
 static struct usb_dac_auto_record usb_dac_rec = { .step = "no cable yet" };
 /* The last poll of the port, for the log: USB_LOG_HOST_DAC's b and d */
 static int usb_dac_port_bits;
@@ -684,6 +685,33 @@ static void usb_dac_turn(bool on)
         usb_host_probe_switch(false);
 }
 
+static int usb_hub_tmo_cb(struct timeout *tmo)
+{
+    (void)tmo;
+    queue_post(&usb_queue, USB_HOST_HUB, 0);
+    return 0;
+}
+
+void usb_host_hub_watch(bool on)
+{
+    if(on)
+        timeout_register(&usb_hub_tmo, usb_hub_tmo_cb, HZ, 0);
+    else
+        timeout_cancel(&usb_hub_tmo);
+}
+
+/* USB thread: the DAC gone from its hub port ends host mode, as unplugging
+ * it from the player does. */
+static void usb_hub_check(void)
+{
+    if(!usb_dac_playing())
+        return;
+    if(usb_host_hub_device_present())
+        usb_host_hub_watch(true);
+    else
+        usb_host_probe_switch(false);
+}
+
 const struct usb_dac_auto_record *usb_get_dac_auto_record(void)
 {
     return &usb_dac_rec;
@@ -945,6 +973,9 @@ static void NORETURN_ATTR usb_thread(void)
             break;
         case USB_HOST_DAC:
             usb_dac_turn(ev.data);
+            break;
+        case USB_HOST_HUB:
+            usb_hub_check();
             break;
 #endif
 

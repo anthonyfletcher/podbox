@@ -1577,6 +1577,10 @@ static int usb_host_probe_callback(int btn, struct gui_synclist *lists)
     simplelist_addline("Resets: %d", st.resets);
 
     const struct usb_drv_host_enum *e = usb_host_get_enum();
+    if (e->hub_ports)
+        simplelist_addline("Hub %04x:%04x, %d ports, TT %d: port %d",
+                           e->hub_vid, e->hub_pid, e->hub_ports, e->hub_tt,
+                           e->hub_port);
 #ifdef HAVE_USB_HOST_AUDIO
     if (e->result == 1)
         usb_host_probe_dac_lines();
