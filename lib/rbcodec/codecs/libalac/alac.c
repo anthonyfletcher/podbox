@@ -816,6 +816,55 @@ static void deinterlace_24(int32_t *buffer0, int32_t *buffer1,
     }
 }
 
+/* deinterlace_24() for a stereo frame with one uncompressed byte a sample,
+ * reading those bytes straight from the frame at lows: they are interleaved
+ * left and right, each straddling two bytes at the same bit offset */
+#if defined(CPU_ARM_CLASSIC) && !defined(ALAC_NO_D24_ASM)
+void alac_deinterlace_24_arm(int32_t *buffer0, int32_t *buffer1,
+                             const unsigned char *lows, int count,
+                             int lows_shift, int interlacing_shift,
+                             int interlacing_leftweight);
+#define deinterlace_24_bytes alac_deinterlace_24_arm
+#else
+static void deinterlace_24_bytes(int32_t *buffer0, int32_t *buffer1,
+                                 const unsigned char *lows, int numsamples,
+                                 int shift,
+                                 uint8_t interlacing_shift,
+                                 uint8_t interlacing_leftweight)
+                                 ICODE_ATTR_ALAC;
+static void deinterlace_24_bytes(int32_t *buffer0, int32_t *buffer1,
+                                 const unsigned char *lows, int numsamples,
+                                 int shift,
+                                 uint8_t interlacing_shift,
+                                 uint8_t interlacing_leftweight)
+{
+    uint32_t prev = *lows++;
+    int i;
+
+    for (i = 0; i < numsamples; i++)
+    {
+        int32_t left = buffer0[i];
+        int32_t right = buffer1[i];
+        uint32_t b = *lows++, c = *lows++;
+
+        if (interlacing_leftweight)
+        {
+            int32_t difference = right;
+
+            right = left - ((difference * interlacing_leftweight)
+                            >> interlacing_shift);
+            left = right + difference;
+        }
+
+        buffer0[i] = ((left << 8) | (((prev << 8 | b) >> shift) & 0xff))
+                     << SCALE24;
+        buffer1[i] = ((right << 8) | (((b << 8 | c) >> shift) & 0xff))
+                     << SCALE24;
+        prev = c;
+    }
+}
+#endif
+
 static inline int decode_frame_mono(
                     alac_file *alac,
                     int32_t outputbuffer[ALAC_MAX_CHANNELS][ALAC_BLOCKSIZE],
@@ -1006,6 +1055,8 @@ static inline int decode_frame_stereo(
     int infosamplesize = alac->setinfo_sample_size;
     int outputsamples = alac->setinfo_max_samples_per_frame;
     int uncompressed_bytes;
+    const unsigned char *lows = NULL;
+    int lows_shift = 0;
 
     uint8_t interlacing_shift;
     uint8_t interlacing_leftweight;
@@ -1081,7 +1132,13 @@ static inline int decode_frame_stereo(
         }
 
         /*********************/
-        if (uncompressed_bytes)
+        if (uncompressed_bytes == 1 && infosamplesize == 24)
+        {
+            lows = alac->input_buffer;
+            lows_shift = 8 - alac->input_buffer_bitaccumulator;
+            alac->input_buffer += 2 * outputsamples;
+        }
+        else if (uncompressed_bytes)
             read_shifted_bytes(alac, 2, outputsamples, uncompressed_bytes);
 
         yield();
@@ -1199,6 +1256,13 @@ static inline int decode_frame_stereo(
     }
     case 24:
     {
+        if (lows)
+        {
+            deinterlace_24_bytes(outputbuffer[0], outputbuffer[1], lows,
+                                 outputsamples, lows_shift, interlacing_shift,
+                                 interlacing_leftweight);
+            break;
+        }
         deinterlace_24(outputbuffer[0],
                        outputbuffer[1],
                        uncompressed_bytes,

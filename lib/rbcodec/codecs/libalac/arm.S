@@ -298,6 +298,97 @@ alac_fir_adapt_arm:
     ldmpc   regs=r4-r11
 
 /* ---------------------------------------------------------------------------
+   void alac_deinterlace_24_arm(int32_t *buffer0, int32_t *buffer1,
+                                const unsigned char *lows, int count,
+                                int lows_shift, int interlacing_shift,
+                                int interlacing_leftweight);
+
+   deinterlace_24_bytes() in alac.c, sample for sample.
+
+   The low bytes are read through a window, r4, that takes one byte of the
+   stream a channel-sample: its last two bytes hold the sample's low byte
+   at bit lows_shift.  The output is shifted up by SCALE24, which is 5.
+
+   Registers through the loop:
+
+     r0 buffer0   r1 buffer1   r2 lows   r3 pairs left
+     r4 window    r5 lows_shift          r6 interlacing_shift
+     r7 interlacing_leftweight           r8-r11 the samples   r12 scratch
+ */
+
+/* One channel-sample: \s, its upper bits, becomes the output */
+.macro D24_LOW s
+    ldrb    r12, [r2], #1
+    orr     r4, r12, r4, lsl #8
+    mov     r12, r4, lsr r5
+    and     r12, r12, #0xff
+    orr     \s, r12, \s, lsl #8
+    mov     \s, \s, lsl #5
+.endm
+
+/* Mid and difference in \l and \r to right in \l and left in \r */
+.macro D24_WEIGHT l, r
+    mul     r12, \r, r7
+    sub     \l, \l, r12, asr r6
+    add     \r, \r, \l
+.endm
+
+/* The loop for a frame weighted or not; left and right end up in the
+   registers named first and second of each pair */
+.macro D24_LOOP weighted, lt0, rt0, lt1, rt1
+    tst     r3, #1                    @ an odd sample first, alone
+    beq     2f
+    ldr     r8, [r0]
+    ldr     r10, [r1]
+.if \weighted
+    D24_WEIGHT r8, r10
+.endif
+    D24_LOW \lt0
+    D24_LOW \rt0
+    str     \lt0, [r0], #4
+    str     \rt0, [r1], #4
+2:
+    movs    r3, r3, lsr #1
+    beq     .Ld24_ret
+1:
+    ldmia   r0, { r8, r9 }
+    ldmia   r1, { r10, r11 }
+.if \weighted
+    D24_WEIGHT r8, r10
+    D24_WEIGHT r9, r11
+.endif
+    D24_LOW \lt0
+    D24_LOW \rt0
+    D24_LOW \lt1
+    D24_LOW \rt1
+    stmia   r0!, { \lt0, \lt1 }
+    stmia   r1!, { \rt0, \rt1 }
+    subs    r3, r3, #1
+    bne     1b
+    b       .Ld24_ret
+.endm
+
+#ifdef USE_IRAM
+    .section .icode,"ax",%progbits
+#else
+    .section .text.alac_deinterlace_24,"ax",%progbits
+#endif
+    .align  2
+    .global alac_deinterlace_24_arm
+alac_deinterlace_24_arm:
+    stmfd   sp!, { r4-r11, lr }
+    add     r12, sp, #36
+    ldmia   r12, { r5-r7 }
+    ldrb    r4, [r2], #1
+    cmp     r7, #0
+    beq     .Ld24_plain
+    D24_LOOP 1, r10, r8, r11, r9
+.Ld24_plain:
+    D24_LOOP 0, r8, r10, r9, r11
+.Ld24_ret:
+    ldmpc   regs=r4-r11
+
+/* ---------------------------------------------------------------------------
    int alac_rice_decode_arm(int32_t *out, int n, struct alac_rice *st);
 
    The loop of entropy_rice_decode() in alac.c for the samples that take
