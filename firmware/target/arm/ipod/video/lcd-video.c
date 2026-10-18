@@ -1014,6 +1014,7 @@ void lcd_awake(void)
         if (sleepwait > 0 && sleepwait < HZ/20)
             sleep(sleepwait);
 
+        cpu_idle_mode(false);
         bcm_init();
 
         /* Start the first LCD update, which also initializes the LCD */
@@ -1049,6 +1050,10 @@ void lcd_sleep(void)
 
         tick_remove_task(&lcd_tick);
         bcm_powerdown();
+
+        /* With nothing to draw, unboosted time runs at 24 MHz with the PLL
+           off. The audio clock is the 24 MHz oscillator, not the PLL. */
+        cpu_idle_mode(true);
 
         /* Remember time to ensure BCM stays off for >= 50 ms */
         lcd_state.update_timeout = current_tick;
