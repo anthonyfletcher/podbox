@@ -26,7 +26,9 @@ extern void init_tick(void) INIT_ATTR;
 
 #define HZ      100 /* number of ticks per second */
 
-#define MAX_NUM_TICK_TASKS 8
+/* A full table panics, and the fork's resident tasks with a USB DAC's stream
+ * and a volume fade need nine */
+#define MAX_NUM_TICK_TASKS 16
 
 /* global tick variable */
 #if defined(CPU_PP) && defined(BOOTLOADER) && \
