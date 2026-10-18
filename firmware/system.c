@@ -33,7 +33,8 @@ long cpu_frequency SHAREDBSS_ATTR = CPU_FREQ;
 
 #ifdef HAVE_ADJUSTABLE_CPU_FREQ
 static int boost_counter SHAREDBSS_ATTR = 0;
-static bool cpu_idle SHAREDBSS_ATTR = false;
+/* Requests, not a flag: USB mode and the 5G's sleeping LCD each ask */
+static int cpu_idle SHAREDBSS_ATTR = 0;
 
 int get_cpu_boost_counter(void)
 {
@@ -146,7 +147,10 @@ void cpu_idle_mode(bool on_off)
     if (!cpu_boost_lock())
         return;
 
-    cpu_idle = on_off;
+    if (on_off)
+        cpu_idle++;
+    else if (cpu_idle > 0)
+        cpu_idle--;
 
     /* We need to adjust the frequency immediately if the CPU
        isn't boosted */

@@ -100,8 +100,8 @@ static const unsigned long tm_udma[] = {
 #endif
 };
 
-#if ATA_MAX_UDMA > 2
 static bool dma_boosted = false;
+#if ATA_MAX_UDMA > 2
 static bool dma_needs_boost;
 #endif
 
@@ -188,6 +188,14 @@ bool ata_dma_setup(void *addr, unsigned long bytes, bool write) {
         dma_boosted = true;
     }
 #endif
+#if defined(HAVE_ADJUSTABLE_CPU_FREQ) && !defined(BOOTLOADER)
+    /* The UDMA mode is chosen for CPUFREQ_NORMAL, and the 5G idles below
+     * it while the LCD sleeps */
+    if (cpu_frequency < CPUFREQ_NORMAL && !dma_boosted) {
+        cpu_boost(true);
+        dma_boosted = true;
+    }
+#endif
 
     if (write) {
         /* If unflushed, old data may be written to disk */
@@ -245,12 +253,10 @@ bool ata_dma_finish(void) {
     IDE0_CFG &= ~0x8000;
     IDE_DMA_CONTROL &= ~0x80000001;
 
-#if ATA_MAX_UDMA > 2
     if (dma_boosted) {
         cpu_boost(false);
         dma_boosted = false;
     }
-#endif
 
     return res;
 }
