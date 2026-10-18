@@ -1185,7 +1185,7 @@ static int lv_menu(void)
     lv.state = LV_SHOWING;      /* so the reload's lv_set_state() redraws */
     lv_clear();
     if (lv.font_error[0])
-        splashf(HZ * 3, "Could not load the font: %s", lv.font_error);
+        splashf(HZ * 3, ID2P(LANG_FONT_LOAD_ERROR), lv.font_error);
     return ret;
 }
 
@@ -1206,7 +1206,7 @@ int lyric_viewer(void)
     lv_setup_screen();
     lv_clear();
     if (lv.font_error[0])
-        splashf(HZ * 3, "Could not load the font: %s", lv.font_error);
+        splashf(HZ * 3, ID2P(LANG_FONT_LOAD_ERROR), lv.font_error);
 
     /* The screen opens whatever the state of things and says what it is
      * waiting for, rather than refusing to open. Nothing here is an error

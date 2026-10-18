@@ -477,8 +477,9 @@ bool catalog_pick_new_playlist_name(char *pl_name, size_t buf_size,
                 splashf(HZ*2, ID2P(LANG_CATALOG_NO_DIRECTORY), dir);
         }
 
-        /* put the caller's directory back on */
-        if (dirlen)
+        /* put the caller's directory back on; a playlist in the root has an
+         * empty one, and still needs its separator */
+        if (sep)
             snprintf(pl_name, buf_size, "%s%c%s", dir, PATH_SEPCH, name);
         else
             strmemccpy(pl_name, name, buf_size);

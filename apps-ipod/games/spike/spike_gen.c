@@ -344,7 +344,7 @@ const struct spk_pattern spk_patterns[] =
       { G, G, G|SPR, G|FLY(2), G|P2, G|P2|FLY(0), G|SPR, G|FLY(2),
         G|P2|FLY(0), G|P2, G, G } },
 
-    /* Moves the player to level 3 for level 3 phrases */
+    /* Moves the player to level 1 for level 1 phrases */
     { 4, 0, 1, 4, SPK_T_GAP | SPK_T_DIAMOND,
       { G, G, P1, P1|DI(1) } },
 
@@ -444,27 +444,27 @@ const struct spk_pattern spk_patterns[] =
     { 8, 0, 3, 6, SPK_T_GAP | SPK_T_SPRING,
       { G, G, G|SPR, __, P3, P3, P3, P3 } },
 
-    /* Moves the player to level 3 for level 3 phrases */
+    /* Moves the player to level 2 for level 2 phrases */
     { 8, 0, 2, 6, SPK_T_GAP | SPK_T_SWITCH,
       { G, G, G|SW(0), G, P1|SWP, P1|SWP, P2|SWP, P2|SWP } },
 
-    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    /* Keeps the player on level 3 for level 3 phrases */
     { 4, 3, 3, 6, SPK_T_REST | SPK_T_GAP | SPK_T_DIAMOND,
       { P3, P3|DI(3), P3|DI(3), P3 } },
 
-    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    /* Keeps the player on level 3 for level 3 phrases */
     { 4, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE,
       { P3, P3, P3|CR(3), P3 } },
 
-    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    /* Keeps the player on level 3 for level 3 phrases */
     { 4, 3, 3, 6, SPK_T_GAP | SPK_T_SPIKED,
       { P3, P3, P3|CR2(3), P3 } },
 
-    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    /* Keeps the player on level 3 for level 3 phrases */
     { 4, 3, 3, 6, SPK_T_GAP | SPK_T_CREATURE,
       { P3, __, P3|CR(3), P3 } },
 
-    /* Moves the player from level 2 to level 3 for level 3 phrases */
+    /* Keeps the player on level 3 for level 3 phrases */
     { 4, 3, 3, 6, SPK_T_GAP | SPK_T_SPRING,
       { P3, G|SPR, __, P3 } },
 

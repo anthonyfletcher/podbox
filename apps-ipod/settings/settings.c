@@ -1248,9 +1248,9 @@ static int clamp_int(int v, int lo, int hi)
  * settings are applied -- so anything resolved here would be frozen at whatever
  * was playing then. dialog.c resolves the sentinels per draw instead.
  *
- * These values come straight out of a hand-edited .cfg (atoi, no range check in
- * the settings loader), so they are clamped here: a negative margin or an absurd
- * border width would otherwise corrupt the frame's geometry. */
+ * The loader clamps these to their settings' ranges, which lie inside the
+ * bounds here; these only keep the frame's geometry sound whatever it is
+ * handed. */
 static void settings_apply_dialog_style(void)
 {
     struct dialog_style s;

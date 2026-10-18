@@ -5,7 +5,7 @@
  *
  * Samples arrive a block at a time and are analysed in fixed hops placed on
  * the track's own timeline. Each hop yields three band levels, a spectral
- * flux per band, an onset decision, and a broadband envelope sample for the
+ * flux per band, an onset decision, and a wide-band envelope sample for the
  * tempo tracker. Nothing here knows where the samples came from -- a live
  * caller reads them out of the PCM buffer ahead of playback (beat_analyse.c),
  * an offline one decodes them itself.
@@ -14,7 +14,7 @@
  *   - tuning constants and module state
  *   - position: the timeline hops are placed on, and starting over
  *   - analysis: band magnitudes, spectral flux, onset decision, and the
- *     broadband envelope the tempo is tracked from
+ *     wide-band envelope the tempo is tracked from
  *   - feeding samples in
  *   - read-out
  ****************************************************************************/
@@ -512,21 +512,9 @@ static void beat_run_hop(void)
         flux_mean[g] += (flux[g] - flux_mean[g]) >> BEAT_MEAN_SHIFT;
     }
 
-    /* The pulse is tracked from broadband energy, not from the band flux
-     * above.
-     *
-     * Eight Goertzels describe real music far too sparsely to difference:
-     * they measure whether there is energy at eight exact frequencies, and
-     * a mix moves between them constantly, so the difference is dominated by
-     * that movement rather than by anything arriving. Measured on a real
-     * track, the envelope built that way swung five-fold between adjacent
-     * 10ms bins and correlated at under 9% of its variance at every lag --
-     * noise, and it never locked. Synthetic tracks hide it completely,
-     * because they contain the very tones being probed.
-     *
-     * Energy over the whole hop uses every sample instead of eight points of
-     * it, and a beat is an energy event whatever its pitch. The band flux
-     * stays where it belongs, telling a kick from a hat. */
+    /* The pulse is tracked from beat_envelope()'s wide-band flux, not from
+     * the band flux above, which stays for telling a kick from a hat. See
+     * beat_envelope() for why neither the Goertzels nor broadband energy. */
     beat_track_push(beat_envelope(), hop_ms, samplerate);
 
     hop_ms_1 = hop_ms;

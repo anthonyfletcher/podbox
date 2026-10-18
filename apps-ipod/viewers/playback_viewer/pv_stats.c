@@ -1440,8 +1440,10 @@ bool pv_stats_streak_span(long *from_day, long *to_day, unsigned *secs)
     if (streak_run(&a, &b) <= 0)
         return false;
 
+    /* The run skips days outside the year, so they can lie inside a..b */
     for (int i = a; i <= b; i++)
-        s += days[i].secs;
+        if (day_in_year(days[i].day))
+            s += days[i].secs;
 
     if (from_day)
         *from_day = days[a].day;

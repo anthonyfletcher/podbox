@@ -28,9 +28,9 @@ void beat_track_reset(void);
 void beat_track_push(int flux_sum, unsigned long ms, unsigned int sampr);
 
 /* A beat-carrying onset, by its detected time. The envelope finds the tempo
- * but is decimated to 23ms bins and cannot place a beat more accurately than
- * that; these are measured to a few milliseconds, so they are what the phase
- * is finally snapped to. */
+ * but is decimated to 11.6ms bins and cannot place a beat more accurately
+ * than that; these are measured to a few milliseconds, so they are what the
+ * phase is finally snapped to. */
 void beat_track_onset(unsigned long ms);
 
 void beat_track_get(struct beat_track *beat);

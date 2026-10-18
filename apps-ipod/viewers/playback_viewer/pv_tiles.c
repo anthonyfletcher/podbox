@@ -1066,7 +1066,8 @@ static void by_artist(struct card_content *c, const struct pv_agg *row)
     if (!artist)
         return;
     card_paint_ink(c->base, &ink);
-    card_text_add_line(&c->text, "by", card_paint_body_font(), ink.dim);
+    card_text_add_line(&c->text, str(LANG_PV_BY_ARTIST), card_paint_body_font(),
+                       ink.dim);
     card_text_add(&c->text, shown(artist), card_paint_card_font(), ink.text);
 }
 

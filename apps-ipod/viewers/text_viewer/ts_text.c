@@ -22,7 +22,7 @@ struct flt_st {
     void (*eos)(flt_st *);          /* optional flush at end of input */
     int  started, eos_done;
     /* markdown */
-    int at_bol, fence, tick, link, esc;
+    int at_bol, fence, info, tick, link, esc;
     /* rtf */
     int depth, skip_depth, ctrl, ctrl_len, uc_skip, hexd, hexv;
     int uc_pend;                    /* fallback chars a \uN has still to eat */
@@ -125,6 +125,12 @@ static void md_feed(flt_st *s, uint8_t c)
 {
     if (c == '\r') return;
 
+    /* The rest of a fence line is its info string, and is dropped. */
+    if (s->info) {
+        if (c != '\n') return;
+        s->info = 0;
+    }
+
     /* Backtick runs: three or more at the start of a line open or close a
      * fenced block, anything shorter is an inline code mark and vanishes. */
     if (c == '`') { s->tick++; return; }
@@ -133,7 +139,7 @@ static void md_feed(flt_st *s, uint8_t c)
         s->tick = 0;
         if (run >= 3 && s->at_bol) {
             s->fence = !s->fence;
-            if (c != '\n') return;              /* drop the info string */
+            if (c != '\n') { s->info = 1; return; }
         }
     }
 

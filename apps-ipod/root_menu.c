@@ -1637,7 +1637,9 @@ static int root_menu_setup_screens(void)
     /* A saved index can outlive the screen it named -- this fork removes root
        entries -- and an unlisted items[] slot is a NULL function pointer that
        load_screen() would call through. */
-    if (new_screen >= NUM_ITEMS)
+    if (new_screen >= NUM_ITEMS
+        || (new_screen >= 0 && new_screen != GO_TO_PLUGIN
+            && !items[new_screen].function))
         new_screen = GO_TO_ROOT;
     /* A game is not a place to wake up in: a quiz switched off mid-round
        reopens on the Music menu it was started from, not on a new game. */

@@ -30,7 +30,7 @@ void beat_trace(uint8_t (*at)(unsigned int), unsigned int n,
                     unsigned int best, int32_t var, int32_t mean);
 #endif
 
-/* Hops per envelope bin. Four hops is 1024 samples, 23.2ms at 44.1kHz --
+/* Hops per envelope bin. Two hops is 512 samples, 11.6ms at 44.1kHz --
  * fine enough to place a beat well inside human tolerance, coarse enough
  * that the tempo search is a rounding error of CPU. */
 #define BEAT_DECIM      2
@@ -366,8 +366,8 @@ static int peak_offset16(int32_t a, int32_t b, int32_t c)
 }
 
 /* Sub-bin refinement by parabolic interpolation through the peak, in
- * sixteenths of a bin. Without it the period is quantised to 23ms, and a
- * beat projected 1.8s ahead lands up to 80ms out. */
+ * sixteenths of a bin. Without it the period is quantised to 11.6ms, an
+ * error that grows with every beat a projection is carried ahead. */
 static int refine_lag16(unsigned int lag, const int32_t *r)
 {
     if (lag <= BEAT_LAG_MIN || lag >= BEAT_LAG_MAX)
@@ -379,7 +379,7 @@ static int refine_lag16(unsigned int lag, const int32_t *r)
 /* Which offset within the period the beats actually fall on: the one whose
  * bins carry the most onset strength.
  *
- * Returned in sixteenths of a bin. A bin is 23ms, and a beat grid a whole
+ * Returned in sixteenths of a bin. A bin is 11.6ms, and a beat grid a whole
  * bin out is audibly late, so the peak is interpolated the same way the
  * period is rather than being left on the lattice. */
 static int best_phase16(unsigned int lag)
@@ -413,7 +413,7 @@ static int best_phase16(unsigned int lag)
 
 /* Nudge the grid onto the onsets it is supposed to be describing.
  *
- * The envelope is decimated to 23ms bins, so the phase it yields is right to
+ * The envelope is decimated to 11.6ms bins, so the phase it yields is right to
  * about a bin and reads as consistently late; the onset times feeding it are
  * good to a few milliseconds. Taking the period from the one and the phase
  * from the other uses each for what it is accurate at.
