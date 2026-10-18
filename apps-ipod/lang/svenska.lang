@@ -238,7 +238,7 @@
   desc: confirm action
   user: core
   <source>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </source>
   <dest>
     *: "Är du säker?"
@@ -294,10 +294,10 @@
     *: "Rockbox"
   </source>
   <dest>
-    *: "Rockbox"
+    *: "~Rockbox"
   </dest>
   <voice>
-    *: "Rockbox"
+    *: "~Rockbox"
   </voice>
 </phrase>
 <phrase>
@@ -930,13 +930,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </source>
   <dest>
-    *: "Enkla EQ-inställnngar"
+    *: "Enkel EQ"
   </dest>
   <voice>
-    *: "Enkla equalizerinställningar"
+    *: "Enkel equalizer"
   </voice>
 </phrase>
 <phrase>
@@ -944,13 +944,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </source>
   <dest>
-    *: "Avancerade EQ-inställningar"
+    *: "Avancerad EQ"
   </dest>
   <voice>
-    *: "Avancerade equalizerinställningar"
+    *: "Avancerad equalizer"
   </voice>
 </phrase>
 <phrase>
@@ -972,13 +972,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Browse EQ Presets"
+    *: "Load EQ"
   </source>
   <dest>
-    *: "Lista EQ-inställningar"
+    *: "Ladda EQ"
   </dest>
   <voice>
-    *: "Lista equalizerinställningar"
+    *: "Ladda equalizer"
   </voice>
 </phrase>
 <phrase>
@@ -1014,13 +1014,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Peak Filter %d"
+    *: "Peak Filter"
   </source>
   <dest>
-    *: "toppfilter %d"
+    *: "Toppfilter"
   </dest>
   <voice>
-    *: "toppfilter"
+    *: "Toppfilter"
   </voice>
 </phrase>
 <phrase>
@@ -1073,10 +1073,10 @@
     *: "Q"
   </source>
   <dest>
-    *: "Q"
+    *: "~Q"
   </dest>
   <voice>
-    *: "Q"
+    *: "~Q"
   </voice>
 </phrase>
 <phrase>
@@ -1185,10 +1185,10 @@
     *: "A-B"
   </source>
   <dest>
-    *: "A-B"
+    *: "~A-B"
   </dest>
   <voice>
-    *: "A-B"
+    *: "~A-B"
   </voice>
 </phrase>
 <phrase>
@@ -1695,15 +1695,15 @@
   user: core
   <source>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </source>
   <dest>
     *: none
-    headphone_detection: "Pausa när hörlurar kopplas ur"
+    headphone_detection: "Pausa vid urkoppling"
   </dest>
   <voice>
     *: none
-    headphone_detection: "Pausa när hörlurar kopplas ur"
+    headphone_detection: "Pausa vid urkoppling"
   </voice>
 </phrase>
 <phrase>
@@ -1745,13 +1745,13 @@
   desc: in settings_menu()
   user: core
   <source>
-    *: "File View"
+    *: "File Browser"
   </source>
   <dest>
-    *: "Filvisning"
+    *: "Filhanterare"
   </dest>
   <voice>
-    *: "Filvisning"
+    *: "Filhanterare"
   </voice>
 </phrase>
 <phrase>
@@ -1897,9 +1897,6 @@
 <phrase>
   id: LANG_MUSIC_BROWSER
   desc: "default browser" choice option, and the root menu's database
-        browser item -- deliberately distinct from LANG_TAGCACHE
-        ("Database"), which stays as-is for the Database *settings*
-        sub-menu (rebuild/initialize/etc.), a different context
   user: core
   <source>
     *: "Music"
@@ -1991,19 +1988,16 @@
 </phrase>
 <phrase>
   id: LANG_TAGCACHE_RAM
-  desc: in tag cache settings
+  desc: deprecated
   user: core
   <source>
     *: none
-    tc_ramcache: "Load to RAM"
   </source>
   <dest>
     *: none
-    tc_ramcache: "Ladda till RAM"
   </dest>
   <voice>
     *: none
-    tc_ramcache: "Ladda till RAM"
   </voice>
 </phrase>
 <phrase>
@@ -2025,13 +2019,13 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </source>
   <dest>
-    *: "Initiera nu"
+    *: "Bygg om databasen"
   </dest>
   <voice>
-    *: "Initiera nu"
+    *: "Bygg om databasen"
   </voice>
 </phrase>
 <phrase>
@@ -2039,27 +2033,27 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Update Now"
+    *: "Update Database"
   </source>
   <dest>
-    *: "Uppdatera nu"
+    *: "Uppdatera databasen"
   </dest>
   <voice>
-    *: "Uppdatera nu"
+    *: "Uppdatera databasen"
   </voice>
 </phrase>
 <phrase>
   id: LANG_RUNTIMEDB_ACTIVE
-  desc: in settings_menu.
+  desc: deprecated
   user: core
   <source>
-    *: "Gather Runtime Data"
+    *: none
   </source>
   <dest>
-    *: "Samla kördata"
+    *: none
   </dest>
   <voice>
-    *: "Samla kördata"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -2316,34 +2310,20 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS
-  desc: Backlight behaviour setting
-  user: core
-  <source>
-    *: "First Buttonpress Enables Backlight Only"
-  </source>
-  <dest>
-    *: "Första knapptryck tänder endast belysning"
-  </dest>
-  <voice>
-    *: "Första knapptryck tänder endast belysning"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_LCD_SLEEP_AFTER_BACKLIGHT_OFF
   desc: In display settings, time to switch LCD chip into power saving state
   user: core
   <source>
     *: none
-    lcd_sleep: "Sleep (After Backlight Off)"
+    lcd_sleep: "Screen Off After"
   </source>
   <dest>
     *: none
-    lcd_sleep: "Stäng av (när belysningen slocknar)"
+    lcd_sleep: "Släck skärmen efter"
   </dest>
   <voice>
     *: none
-    lcd_sleep: "Stäng av när belysningen slocknar"
+    lcd_sleep: "Släck skärmen efter"
   </voice>
 </phrase>
 <phrase>
@@ -2559,7 +2539,7 @@
   </source>
   <dest>
     *: none
-    lcd_color: "RGB"
+    lcd_color: "~RGB"
   </dest>
   <voice>
     *: none
@@ -2576,7 +2556,7 @@
   </source>
   <dest>
     *: none
-    lcd_color: "RGB: %02X%02X%02X"
+    lcd_color: "~RGB: %02X%02X%02X"
   </dest>
   <voice>
     *: none
@@ -3434,11 +3414,11 @@
   user: core
   <source>
     *: none
-    rtc: "Time & Date"
+    rtc: "Time & Date Settings"
   </source>
   <dest>
     *: none
-    rtc: "Tid och datum"
+    rtc: "Tid & datum"
   </dest>
   <voice>
     *: none
@@ -4399,13 +4379,13 @@
   desc: in the main menu
   user: core
   <source>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </source>
   <dest>
-    *: "Lista temafiler"
+    *: "Ladda tema"
   </dest>
   <voice>
-    *: "Lista temafiler"
+    *: "Ladda tema"
   </voice>
 </phrase>
 <phrase>
@@ -4656,7 +4636,7 @@
   </source>
   <dest>
     *: none
-    radio: "%d.%02d MHz"
+    radio: "~%d.%02d MHz"
   </dest>
   <voice>
     *: none
@@ -4908,11 +4888,11 @@
   </source>
   <dest>
     *: none
-    recording: "WavPack"
+    recording: "~WavPack"
   </dest>
   <voice>
     *: none
-    recording: "WavPack"
+    recording: "~WavPack"
   </voice>
 </phrase>
 <phrase>
@@ -4925,11 +4905,11 @@
   </source>
   <dest>
     *: none
-    recording: "AIFF"
+    recording: "~AIFF"
   </dest>
   <voice>
     *: none
-    recording: "AIFF"
+    recording: "~AIFF"
   </voice>
 </phrase>
 <phrase>
@@ -5648,13 +5628,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "View Current Playlist"
+    *: "View Queue"
   </source>
   <dest>
-    *: "Visa aktuell spellista"
+    *: "Visa kön"
   </dest>
   <voice>
-    *: "Visa aktuell spellista"
+    *: "Visa kön"
   </voice>
 </phrase>
 <phrase>
@@ -5732,13 +5712,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </source>
   <dest>
-    *: "Spara aktuell spellista"
+    *: "Spara kön som spellista"
   </dest>
   <voice>
-    *: "Spara aktuell spellista"
+    *: "Spara kön som spellista"
   </voice>
 </phrase>
 <phrase>
@@ -5788,13 +5768,13 @@
   desc: in playlist options menu, option to warn when erasing dynamic playlist
   user: core
   <source>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </source>
   <dest>
-    *: "Varna vid radering av dynamisk spellista"
+    *: "Varna innan kön ersätts"
   </dest>
   <voice>
-    *: "Varna vid radering av dynamisk spellista"
+    *: "Varna innan kön ersätts"
   </voice>
 </phrase>
 <phrase>
@@ -5802,13 +5782,13 @@
   desc: prompt shown when about to erase a modified dynamic playlist
   user: core
   <source>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </source>
   <dest>
-    *: "Radera dynamisk spellista?"
+    *: "Ersätta kön?"
   </dest>
   <voice>
-    *: "Radera dynamisk spellista?"
+    *: "Ersätta kön?"
   </voice>
 </phrase>
 <phrase>
@@ -5816,13 +5796,13 @@
   desc: displayed topmost on the info screen and in the info menu
   user: core
   <source>
-    *: "Rockbox Info"
+    *: "System Info"
   </source>
   <dest>
-    *: "Rockboxinfo"
+    *: "Systeminfo"
   </dest>
   <voice>
-    *: "Rockboxinfo"
+    *: "Systeminfo"
   </voice>
 </phrase>
 <phrase>
@@ -5990,13 +5970,13 @@
   desc: in the info menu
   user: core
   <source>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </source>
   <dest>
-    *: "Felsök (Rör ej!)"
+    *: "Felsökning"
   </dest>
   <voice>
-    *: "Felsök, rör ej!"
+    *: "Felsökning"
   </voice>
 </phrase>
 <phrase>
@@ -6018,13 +5998,13 @@
   desc: The verb/action Queue
   user: core
   <source>
-    *: "Queue"
+    *: "Play Once"
   </source>
   <dest>
-    *: "Köa"
+    *: "Spela en gång"
   </dest>
   <voice>
-    *: "Köa"
+    *: "Spela en gång"
   </voice>
 </phrase>
 <phrase>
@@ -6032,13 +6012,13 @@
   desc: in onplay menu.  queue a track/playlist into dynamic playlist.
   user: core
   <source>
-    *: "Queue Next"
+    *: "Play Once Next"
   </source>
   <dest>
-    *: "Köa som nästa"
+    *: "Spela en gång som nästa"
   </dest>
   <voice>
-    *: "Köa som nästa"
+    *: "Spela en gång som nästa"
   </voice>
 </phrase>
 <phrase>
@@ -6046,13 +6026,13 @@
   desc: in onplay menu.  queue a track/playlist at end of playlist.
   user: core
   <source>
-    *: "Queue Last"
+    *: "Play Once at End"
   </source>
   <dest>
-    *: "Köa sist"
+    *: "Spela en gång sist"
   </dest>
   <voice>
-    *: "Köa sist"
+    *: "Spela en gång sist"
   </voice>
 </phrase>
 <phrase>
@@ -6060,13 +6040,13 @@
   desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
   user: core
   <source>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </source>
   <dest>
-    *: "Köa blandat"
+    *: "Spela en gång blandat"
   </dest>
   <voice>
-    *: "Köa blandat"
+    *: "Spela en gång blandat"
   </voice>
 </phrase>
 <phrase>
@@ -6074,13 +6054,13 @@
   desc: splash number of tracks inserted
   user: core
   <source>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </source>
   <dest>
-    *: "Infogade %d spår (%s)"
+    *: "Lade till %d spår (%s)"
   </dest>
   <voice>
-    *: "infogade spår"
+    *: "spår tillagda"
   </voice>
 </phrase>
 <phrase>
@@ -6088,13 +6068,13 @@
   desc: splash number of tracks queued
   user: core
   <source>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "Köade %d spår (%s)"
+    *: "Spela en gång: %d spår (%s)"
   </dest>
   <voice>
-    *: "köade spår"
+    *: "spår att spela en gång"
   </voice>
 </phrase>
 <phrase>
@@ -6469,10 +6449,10 @@
     *: "(VBR)"
   </source>
   <dest>
-    *: "(VBR)"
+    *: "~(VBR)"
   </dest>
   <voice>
-    *: "VBR"
+    *: "~VBR"
   </voice>
 </phrase>
 <phrase>
@@ -7135,8 +7115,7 @@
     gigabeatfx: "POWER to abort"
     gigabeats,sansafuzeplus: "BACK to abort"
     iaudiom5,iaudiox5: "Long PLAY to abort"
-    ipod*: "PLAY/PAUSE to abort"
-    iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
+    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
     iriverh100,iriverh120,iriverh300: "STOP to abort"
   </source>
   <dest>
@@ -7145,7 +7124,7 @@
     gigabeats: "BAKÅT = Avbryt"
     sansafuzeplus: "BACK för att avbryta"
     iaudiom5,iaudiox5: "Lång SPELA = Avbryt"
-    ipod*: "SPELA/PAUSA = Avbryt"
+    ipod*: "PREV = Avbryt"
     iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "FÖREGÅENDE = Avbryt"
     iriverh100,iriverh120,iriverh300: "STOPP = Avbryt"
   </dest>
@@ -7360,7 +7339,7 @@
     *: "B"
   </source>
   <dest>
-    *: "B"
+    *: "~B"
   </dest>
   <voice>
     *: ""
@@ -8991,13 +8970,13 @@
   desc: in the settings menu
   user: core
   <source>
-    *: "Theme Settings"
+    *: "UI Settings"
   </source>
   <dest>
-    *: "Tema"
+    *: "Gränssnitt"
   </dest>
   <voice>
-    *: "Tema"
+    *: "Gränssnitt"
   </voice>
 </phrase>
 <phrase>
@@ -9006,15 +8985,15 @@
   user: core
   <source>
     *: none
-    lcd_color: "Colours"
+    lcd_color: "Interface Colours"
   </source>
   <dest>
     *: none
-    lcd_color: "Färger"
+    lcd_color: "Gränssnittsfärger"
   </dest>
   <voice>
     *: none
-    lcd_color: "Färger"
+    lcd_color: "Gränssnittsfärger"
   </voice>
 </phrase>
 <phrase>
@@ -9365,11 +9344,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "9600"
+    serial_port: "~9600"
   </dest>
   <voice>
     *: none
-    serial_port: "9600"
+    serial_port: "~9600"
   </voice>
 </phrase>
 <phrase>
@@ -9382,11 +9361,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "19200"
+    serial_port: "~19200"
   </dest>
   <voice>
     *: none
-    serial_port: "19200"
+    serial_port: "~19200"
   </voice>
 </phrase>
 <phrase>
@@ -9399,11 +9378,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "38400"
+    serial_port: "~38400"
   </dest>
   <voice>
     *: none
-    serial_port: "38400"
+    serial_port: "~38400"
   </voice>
 </phrase>
 <phrase>
@@ -9416,11 +9395,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "57600"
+    serial_port: "~57600"
   </dest>
   <voice>
     *: none
-    serial_port: "57600"
+    serial_port: "~57600"
   </voice>
 </phrase>
 <phrase>
@@ -10311,7 +10290,7 @@
     *: "2:1"
   </source>
   <dest>
-    *: "2:1"
+    *: "~2:1"
   </dest>
   <voice>
     *: "2 till 1"
@@ -10325,7 +10304,7 @@
     *: "4:1"
   </source>
   <dest>
-    *: "4:1"
+    *: "~4:1"
   </dest>
   <voice>
     *: "4 till 1"
@@ -10339,7 +10318,7 @@
     *: "6:1"
   </source>
   <dest>
-    *: "6:1"
+    *: "~6:1"
   </dest>
   <voice>
     *: "6 till 1"
@@ -10353,7 +10332,7 @@
     *: "10:1"
   </source>
   <dest>
-    *: "10:1"
+    *: "~10:1"
   </dest>
   <voice>
     *: "10 till 1"
@@ -10524,13 +10503,13 @@
   desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
   user: core
   <source>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </source>
   <dest>
-    *: "Köa blandat sist"
+    *: "Spela en gång blandat sist"
   </dest>
   <voice>
-    *: "Köa blandat sist"
+    *: "Spela en gång blandat sist"
   </voice>
 </phrase>
 <phrase>
@@ -10711,15 +10690,15 @@
   user: core
   <source>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "Snabbvalsknapp för uppspelningsskärmen"
+    hotkey: "Snabbknapp"
   </dest>
   <voice>
     *: none
-    hotkey: "Snabbvalsknapp för uppspelningsskärmen"
+    hotkey: "Snabbknapp"
   </voice>
 </phrase>
 <phrase>
@@ -10728,15 +10707,15 @@
   user: core
   <source>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "Snabbvalsknapp för filhanteraren"
+    hotkey: "Snabbknapp"
   </dest>
   <voice>
     *: none
-    hotkey: "Snabbvalsknapp för filhanteraren"
+    hotkey: "Snabbknapp"
   </voice>
 </phrase>
 <phrase>
@@ -11215,13 +11194,13 @@
   desc: Used when you need to say playlist, also voiced
   user: core
   <source>
-    *: "Current Playlist"
+    *: "Queue"
   </source>
   <dest>
-    *: "Aktuell spellista"
+    *: "Kö"
   </dest>
   <voice>
-    *: "Aktuell spellista"
+    *: "Kö"
   </voice>
 </phrase>
 <phrase>
@@ -11406,16 +11385,16 @@
 </phrase>
 <phrase>
   id: LANG_CONSTRAIN_NEXT_FOLDER
-  desc: in settings_menu. Whether LANG_NEXT_FOLDER should be constrained to directories within LANG_SET_AS_START_DIR
+  desc: deprecated
   user: core
   <source>
-    *: "Constrain Auto-Change"
+    *: none
   </source>
   <dest>
-    *: "Begränsa automatiskt byte av kataloger"
+    *: none
   </dest>
   <voice>
-    *: "Begränsa automatiskt byte av kataloger"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -11424,15 +11403,15 @@
   user: core
   <source>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </source>
   <dest>
     *: none
-    quickscreen: "Använd genvägar istället för snabbmeny"
+    quickscreen: "Snabbinställningar"
   </dest>
   <voice>
     *: none
-    quickscreen: "Använd genvägar istället för snabbmeny"
+    quickscreen: "Snabbinställningar"
   </voice>
 </phrase>
 <phrase>
@@ -11729,10 +11708,10 @@
     *: "f(x1)"
   </source>
   <dest>
-    *: "f(x1)"
+    *: "~f(x1)"
   </dest>
   <voice>
-    *: "f(x1)"
+    *: "~f(x1)"
   </voice>
 </phrase>
 <phrase>
@@ -11743,10 +11722,10 @@
     *: "f(x2)"
   </source>
   <dest>
-    *: "f(x2)"
+    *: "~f(x2)"
   </dest>
   <voice>
-    *: "f(x2)"
+    *: "~f(x2)"
   </voice>
 </phrase>
 <phrase>
@@ -11855,13 +11834,13 @@
   desc: in sound settings
   user: core
   <source>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </source>
   <dest>
-    *: "ENDAST SIDA"
+    *: "Endast sidor"
   </dest>
   <voice>
-    *: "ENDAST SIDA"
+    *: "Endast sidor"
   </voice>
 </phrase>
 <phrase>
@@ -12411,10 +12390,10 @@
     *: "KiB"
   </source>
   <dest>
-    *: "KiB"
+    *: "~KiB"
   </dest>
   <voice>
-    *: "kibibyte"
+    *: "~kibibyte"
   </voice>
 </phrase>
 <phrase>
@@ -12425,10 +12404,10 @@
     *: "MiB"
   </source>
   <dest>
-    *: "MiB"
+    *: "~MiB"
   </dest>
   <voice>
-    *: "mebibyte"
+    *: "~mebibyte"
   </voice>
 </phrase>
 <phrase>
@@ -12439,10 +12418,10 @@
     *: "GiB"
   </source>
   <dest>
-    *: "GiB"
+    *: "~GiB"
   </dest>
   <voice>
-    *: "gibibyte"
+    *: "~gibibyte"
   </voice>
 </phrase>
 <phrase>
@@ -13683,10 +13662,10 @@
     *: "Ordered"
   </source>
   <dest>
-    *: "Ordnad "
+    *: "Ordnad"
   </dest>
   <voice>
-    *: "Ordnad "
+    *: "Ordnad"
   </voice>
 </phrase>
 <phrase>
@@ -14182,10 +14161,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Path]"
+    *: "Path"
   </source>
   <dest>
-    *: "[Sökväg]"
+    *: "Sökväg"
   </dest>
   <voice>
     *: "Sökväg"
@@ -14196,10 +14175,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Filename]"
+    *: "Filename"
   </source>
   <dest>
-    *: "[Filnamn]"
+    *: "Filnamn"
   </dest>
   <voice>
     *: "Filnamn"
@@ -14210,10 +14189,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Size]"
+    *: "Size"
   </source>
   <dest>
-    *: "[Storlek]"
+    *: "Storlek"
   </dest>
   <voice>
     *: "Storlek"
@@ -14224,10 +14203,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Date]"
+    *: "Date"
   </source>
   <dest>
-    *: "[Datum]"
+    *: "Datum"
   </dest>
   <voice>
     *: "Datum"
@@ -14238,10 +14217,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Time]"
+    *: "Time"
   </source>
   <dest>
-    *: "[Tid]"
+    *: "Tid"
   </dest>
   <voice>
     *: "Tid"
@@ -14252,13 +14231,13 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Subdirs]"
+    *: "Subdirs"
   </source>
   <dest>
-    *: "[Underkataloger]"
+    *: "Undermappar"
   </dest>
   <voice>
-    *: "Underkataloger"
+    *: "Undermappar"
   </voice>
 </phrase>
 <phrase>
@@ -14266,10 +14245,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Files]"
+    *: "Files"
   </source>
   <dest>
-    *: "[Filer]"
+    *: "Filer"
   </dest>
   <voice>
     *: "Filer"
@@ -14455,13 +14434,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Spacing"
+    *: "3D Parallel Slides"
   </source>
   <dest>
-    *: "Avstånd"
+    *: "3D-omslag parallella"
   </dest>
   <voice>
-    *: "Avstånd"
+    *: "3D-omslag parallella"
   </voice>
 </phrase>
 <phrase>
@@ -14469,13 +14448,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </source>
   <dest>
-    *: "Mittenmarginal"
+    *: "3D-mittmarginal"
   </dest>
   <voice>
-    *: "Mittenmarginal"
+    *: "3D-mittmarginal"
   </voice>
 </phrase>
 <phrase>
@@ -14483,13 +14462,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Number of slides"
+    *: "3D Slide Tuck"
   </source>
   <dest>
-    *: "Antal bilder"
+    *: "3D-överlappning"
   </dest>
   <voice>
-    *: "Antal bilder"
+    *: "3D-överlappning"
   </voice>
 </phrase>
 <phrase>
@@ -14539,13 +14518,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Rebuild cache"
+    *: "Rebuild Art Cache"
   </source>
   <dest>
-    *: "Återskapa cache"
+    *: "Bygg om omslagscachen"
   </dest>
   <voice>
-    *: "Återskapa cache"
+    *: "Bygg om omslagscachen"
   </voice>
 </phrase>
 <phrase>
@@ -14721,13 +14700,13 @@
   desc: in pictureflow
   user: core
   <source>
-    *: "Update cache"
+    *: "Update Art Cache"
   </source>
   <dest>
-    *: "Uppdatera cache"
+    *: "Uppdatera omslagscachen"
   </dest>
   <voice>
-    *: "Uppdatera cache"
+    *: "Uppdatera omslagscachen"
   </voice>
 </phrase>
 <phrase>
@@ -14806,7 +14785,7 @@
   user: core
   <source>
     *: "Press LEFT to cancel."
-    android,hifietma*,zenvision: "Press BACK to cancel."
+    android,hifietma*: "Press BACK to cancel."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Press POWER to cancel."
     ihifi760,ihifi960: "Double tap RETURN to cancel."
     ihifi770,ihifi770c,ihifi800: "Press HOME to cancel."
@@ -14821,7 +14800,7 @@
   </source>
   <dest>
     *: "Tryck på VÄNSTER för att avbryta."
-    android,hifietma*,zenvision: "Tryck på TILLBAKA för att avbryta."
+    android,hifietma*: "Tryck på TILLBAKA för att avbryta."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Tryck på POWER för att avbryta."
     ihifi760,ihifi960: "Dubbelklicka på RETURN för att avbryta."
     ihifi770,ihifi770c,ihifi800: "Tryck på HOME för att avbryta."
@@ -14836,7 +14815,7 @@
   </dest>
   <voice>
     *: "Tryck på VÄNSTER för att avbryta."
-    android,hifietma*,zenvision: "Tryck på TILLBAKA för att avbryta."
+    android,hifietma*: "Tryck på TILLBAKA för att avbryta."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Tryck på POWER för att avbryta."
     ihifi760,ihifi960: "Dubbelklicka på RETURN för att avbryta."
     ihifi770,ihifi770c,ihifi800: "Tryck på HOME för att avbryta."
@@ -15124,13 +15103,13 @@
   desc:
   user: core
   <source>
-    *: "Add"
+    *: "Add to Queue"
   </source>
   <dest>
-    *: "lägg till"
+    *: "Lägg till i kön"
   </dest>
   <voice>
-    *: "lägg till"
+    *: "Lägg till i kön"
   </voice>
 </phrase>
 <phrase>
@@ -15222,13 +15201,13 @@
   desc: in onplay menu
   user: core
   <source>
-    *: "Queue..."
+    *: "Play Once..."
   </source>
   <dest>
-    *: "Kö..."
+    *: "Spela en gång..."
   </dest>
   <voice>
-    *: "Kö"
+    *: "Spela en gång"
   </voice>
 </phrase>
 <phrase>
@@ -15236,13 +15215,13 @@
   desc: in Current Playlist settings
   user: core
   <source>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "Visa köalternativ"
+    *: "Visa Spela en gång-val"
   </dest>
   <voice>
-    *: "Visa köalternativ"
+    *: "Visa Spela en gång-val"
   </voice>
 </phrase>
 <phrase>
@@ -15337,7 +15316,7 @@
     *: "dAY"
   </source>
   <dest>
-    *: "dAY"
+    *: "~dAY"
   </dest>
   <voice>
     *: ""
@@ -15502,16 +15481,16 @@
 </phrase>
 <phrase>
   id: LANG_ARTIST_PLUS_YEAR
-  desc: in Settings
+  desc: "Sort Albums By" option: by artist, then release year, oldest first
   user: core
   <source>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </source>
   <dest>
-    *: "Artist och år"
+    *: "Artist + år (äldst först)"
   </dest>
   <voice>
-    *: "Artist och år"
+    *: "Artist och år, äldst först"
   </voice>
 </phrase>
 <phrase>
@@ -15614,22 +15593,16 @@
 </phrase>
 <phrase>
   id: LANG_CLEAR_SETTINGS_ON_HOLD
-  desc: in the system sub menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    clear_settings_on_hold,iriverh10: "Clear settings when reset button is held during startup"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Clear settings when hold switch is on during startup"
   </source>
   <dest>
     *: none
-    clear_settings_on_hold,iriverh10: "Rensa inställningar när reset-knappen hålls intryckt under uppstart"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Rensa inställningar när hold-omkopplaren är påslagen under uppstart"
   </dest>
   <voice>
     *: none
-    clear_settings_on_hold,iriverh10: "Rensa inställningar när reset-knappen hålls intryckt under uppstart"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Rensa inställningar när hold-omkopplaren är påslagen under uppstart"
   </voice>
 </phrase>
 <phrase>
@@ -15738,13 +15711,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </source>
   <dest>
-    *: "Spelar nästa..."
+    *: "Lägg till i kön..."
   </dest>
   <voice>
-    *: "Spelar nästa"
+    *: "Lägg till i kön"
   </voice>
 </phrase>
 <phrase>
@@ -15766,13 +15739,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </source>
   <dest>
-    *: "Lägg till blandad"
+    *: "Blanda in i kön"
   </dest>
   <voice>
-    *: "Lägg till blandad"
+    *: "Blanda in i kön"
   </voice>
 </phrase>
 <phrase>
@@ -15780,13 +15753,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last"
+    *: "Add to End"
   </source>
   <dest>
-    *: "Spela sista"
+    *: "Lägg till sist"
   </dest>
   <voice>
-    *: "Spela sista"
+    *: "Lägg till sist"
   </voice>
 </phrase>
 <phrase>
@@ -15794,13 +15767,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </source>
   <dest>
-    *: "Spela senast blandade"
+    *: "Blanda in sist"
   </dest>
   <voice>
-    *: "Spela senast blandade"
+    *: "Blanda in sist"
   </voice>
 </phrase>
 <phrase>
@@ -15884,16 +15857,16 @@
 </phrase>
 <phrase>
   id: LANG_DATABASE_DIR
-  desc: in database settings menu
+  desc: deprecated
   user: core
   <source>
-    *: "Database Directory"
+    *: none
   </source>
   <dest>
-    *: "Databaskatalog"
+    *: none
   </dest>
   <voice>
-    *: "Databaskatalog"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15901,27 +15874,27 @@
   desc: Confirmation dialog
   user: core
   <source>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "Ta bort köade låtar?"
+    *: "Ta bort spår att spela en gång?"
   </dest>
   <voice>
-    *: "Ta bort köade låtar?"
+    *: "Ta bort spår att spela en gång?"
   </voice>
 </phrase>
 <phrase>
   id: LANG_QUICK_IGNORE_DIRACHE
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </source>
   <dest>
-    *: "Snabb (Ignorera katalogcache)"
+    *: none
   </dest>
   <voice>
-    *: "Snabb (Ignorera katalogcache)"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15929,13 +15902,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </source>
   <dest>
-    *: "Skärm för aktuell uppspelning"
+    *: "Uppspelningsskärm"
   </dest>
   <voice>
-    *: "Skärm för aktuell uppspelning"
+    *: "Uppspelningsskärm"
   </voice>
 </phrase>
 <phrase>
@@ -16877,49 +16850,43 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC"
+    usbdac: "USB Sound Card"
   </source>
   <dest>
     *: none
-    usbdac: "~USB-DAC"
+    usbdac: "USB-ljudkort"
   </dest>
   <voice>
     *: none
-    usbdac: "~USB-DAC"
+    usbdac: "U S B ljudkort"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_USB_CHARGE_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Charge-Only Mode"
   </source>
   <dest>
     *: none
-    usbdac: "Vid USB-läge för endast laddning"
   </dest>
   <voice>
     *: none
-    usbdac: "Vid USB-läge för endast laddning"
   </voice>
 </phrase>
 <phrase>
   id: LANG_WHILE_MASS_STORAGE_USB_ONLY
-  desc: in settings_menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    usbdac: "While In USB Mass-Storage Mode"
   </source>
   <dest>
     *: none
-    usbdac: "När USB-masslagringsläge är aktivt"
   </dest>
   <voice>
     *: none
-    usbdac: "När USB-masslagringsläge är aktivt"
   </voice>
 </phrase>
 <phrase>
@@ -16928,15 +16895,15 @@
   user: core
   <source>
     *: none
-    usbdac: "USB-DAC Active"
+    usbdac: "USB Sound Card Active"
   </source>
   <dest>
     *: none
-    usbdac: "USB-DAC Aktiv"
+    usbdac: "USB-ljudkort aktivt"
   </dest>
   <voice>
     *: none
-    usbdac: "USB-DAC Aktiv"
+    usbdac: "U S B ljudkort aktivt"
   </voice>
 </phrase>
 <phrase>
@@ -16982,5 +16949,7809 @@
   <voice>
     *: none
     general_purpose_led: "Använd LED-indikatorer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_SCAN_ON_EJECT
+  desc: in tag cache settings; rescan after a USB session that wrote to us
+  user: core
+  <source>
+    *: "Scan on Eject"
+  </source>
+  <dest>
+    *: "Skanna efter utmatning"
+  </dest>
+  <voice>
+    *: "Skanna efter utmatning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCAN_ON_STARTUP
+  desc: in database settings
+  user: core
+  <source>
+    *: "Scan on Startup"
+  </source>
+  <dest>
+    *: "Skanna vid start"
+  </dest>
+  <voice>
+    *: "Skanna vid start"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTOCOMMIT_ON_STARTUP
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG
+  desc: in System settings: the menu of diagnostic logs
+  user: core
+  <source>
+    *: "Debug Logs"
+  </source>
+  <dest>
+    *: "Felsökningsloggar"
+  </dest>
+  <voice>
+    *: "Felsökningsloggar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHANNEL_SWAP
+  desc: in sound_settings
+  user: core
+  <source>
+    *: "Swap Left & Right"
+  </source>
+  <dest>
+    *: "Byt vänster & höger"
+  </dest>
+  <voice>
+    *: "Byt vänster och höger"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS
+  desc: chapter marks option
+  user: core
+  <source>
+    *: "Chapter Marks"
+  </source>
+  <dest>
+    *: "Kapitelmarkeringar"
+  </dest>
+  <voice>
+    *: "Kapitelmarkeringar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BROWSE_CHAPTERS
+  desc: context menu entry for a book's chapter list
+  user: core
+  <source>
+    *: "Browse Chapters"
+  </source>
+  <dest>
+    *: "Bläddra bland kapitel"
+  </dest>
+  <voice>
+    *: "Bläddra bland kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER
+  desc: spoken before a chapter number
+  user: core
+  <source>
+    *: "Chapter"
+  </source>
+  <dest>
+    *: "Kapitel"
+  </dest>
+  <voice>
+    *: "Kapitel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_BUTTON_PRESS
+  desc: Backlight behaviour setting
+  user: core
+  <source>
+    *: "First Button Press"
+  </source>
+  <dest>
+    *: "Första knapptryckningen"
+  </dest>
+  <voice>
+    *: "Första knapptryckningen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DEBUG_MENU
+  desc: in system settings menu
+  user: core
+  <source>
+    *: "Show Debug Menu"
+  </source>
+  <dest>
+    *: "Visa felsökningsmeny"
+  </dest>
+  <voice>
+    *: "Visa felsökningsmeny"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_MODE_DRIVE_ONLY
+  desc: in Settings -> General -> System -> USB Mode: the disk and nothing else
+  user: core
+  <source>
+    *: "Drive Only"
+  </source>
+  <dest>
+    *: "Endast lagring"
+  </dest>
+  <voice>
+    *: "Endast lagring"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_MENU
+  desc: General Settings submenu -- the cover-art thumbnail cache
+  user: core
+  <source>
+    *: "Art Cache"
+  </source>
+  <dest>
+    *: "Omslagscache"
+  </dest>
+  <voice>
+    *: "Omslagscache"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_FAST_BUILD
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Fast Build"
+  </source>
+  <dest>
+    *: "Snabb uppbyggnad"
+  </dest>
+  <voice>
+    *: "Snabb uppbyggnad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_ALBUM_SOURCE
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Album Art Source"
+  </source>
+  <dest>
+    *: "Källa för albumomslag"
+  </dest>
+  <voice>
+    *: "Källa för albumomslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files Only"
+  </source>
+  <dest>
+    *: "Endast bildfiler"
+  </dest>
+  <voice>
+    *: "Endast bildfiler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files, Then Embedded"
+  </source>
+  <dest>
+    *: "Bildfiler, sedan inbäddade"
+  </dest>
+  <voice>
+    *: "Bildfiler, sedan inbäddade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded, Then Image Files"
+  </source>
+  <dest>
+    *: "Inbäddade, sedan bildfiler"
+  </dest>
+  <voice>
+    *: "Inbäddade, sedan bildfiler"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded Only"
+  </source>
+  <dest>
+    *: "Endast inbäddade"
+  </dest>
+  <voice>
+    *: "Endast inbäddade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_STATUS
+  desc: announnnce_status plugin
+  user: core
+  <source>
+    *: "Announce Status"
+  </source>
+  <dest>
+    *: "Meddela status"
+  </dest>
+  <voice>
+    *: "Meddela status"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREFER_CACHE
+  desc: in Settings -- album art source, the pre-scaled thumbnail cache
+  user: core
+  <source>
+    *: "Prefer Cache"
+  </source>
+  <dest>
+    *: "Föredra cache"
+  </dest>
+  <voice>
+    *: "Föredra cache"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_MODE
+  desc: in settings_menu, storage mode setting
+  user: core
+  <source>
+    *: none
+    disk_storage: "Storage Mode"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "Lagringstyp"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "Lagringstyp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_HDD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "HDD (Spinning Disk)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "HDD (hårddisk)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "H D D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_SSD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "SSD (Solid State)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "SSD (flashminne)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "S S D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_AUDIO_BOOST
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_SELECT_ACTION
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Select Action"
+  </source>
+  <dest>
+    *: "Mittknappens funktion"
+  </dest>
+  <voice>
+    *: "Mittknappens funktion"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_COVERFLOW
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Coverflow"
+  </source>
+  <dest>
+    *: "~Coverflow"
+  </dest>
+  <voice>
+    *: "~Coverflow"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS
+  desc: in display settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Dynamiska färger"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Dynamiska färger"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Artwork Filter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Omslagsfilter"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Omslagsfilter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_1
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 1"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 1"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 1"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_2
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 2"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 2"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 2"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_3
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 3"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "~Filter 3"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "~Filter 3"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BW
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Black and White"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Svartvitt"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Svartvitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_INVERT
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Invert Colours"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Invertera färger"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Invertera färger"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BRIGHTER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Brighter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Ljusare"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Ljusare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_DARKER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Darker"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mörkare"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mörkare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mer kontrast"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mer kontrast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mindre kontrast"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mindre kontrast"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mer färg"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mer färg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mindre färg"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mindre färg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_HUE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Shift Hue"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Skifta nyans"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Skifta nyans"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_POSTERISE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Posterise"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Posterisera"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Posterisera"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_PIXELLATE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Pixellate"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Pixla"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Pixla"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_COVERS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Album Covers"
+  </source>
+  <dest>
+    *: "Albumomslag"
+  </dest>
+  <voice>
+    *: "Albumomslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PORTRAITS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Artist Portraits"
+  </source>
+  <dest>
+    *: "Artistporträtt"
+  </dest>
+  <voice>
+    *: "Artistporträtt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_SETTINGS
+  desc: in General Settings
+  user: core
+  <source>
+    *: "Carousel"
+  </source>
+  <dest>
+    *: "Karusell"
+  </dest>
+  <voice>
+    *: "Karusell"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TRANSITION_SPEED
+  desc: in apps/menus/album_covers_menu.c
+  user: core
+  <source>
+    *: "3D Transition Speed"
+  </source>
+  <dest>
+    *: "3D-övergångshastighet"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_MODE
+  desc: in the Carousel settings menu -- how the covers are laid out
+  user: core
+  <source>
+    *: "View Mode"
+  </source>
+  <dest>
+    *: "Visningsläge"
+  </dest>
+  <voice>
+    *: "Visningsläge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_OFFSET
+  desc: in the Carousel settings menu -- how far below the middle cover the
+  user: core
+  <source>
+    *: "Flat Pile Offset"
+  </source>
+  <dest>
+    *: "Stapelförskjutning (platt)"
+  </dest>
+  <voice>
+    *: "Stapelförskjutning (platt)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_FADE
+  desc: in the Carousel settings menu -- how far the flat view's piles are
+  user: core
+  <source>
+    *: "Flat Pile Fade"
+  </source>
+  <dest>
+    *: "Stapeltoning (platt)"
+  </dest>
+  <voice>
+    *: "Stapeltoning (platt)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_3D
+  desc: "view mode" choice option -- the tilted cover flow
+  user: core
+  <source>
+    *: "3D"
+  </source>
+  <dest>
+    *: "~3D"
+  </dest>
+  <voice>
+    *: "~3D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_FLAT
+  desc: "view mode" choice option -- covers face-on, in two piles
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "Platt"
+  </dest>
+  <voice>
+    *: "Platt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAIN_MENU_SETTINGS
+  desc: Settings menu row and the Customize Main Menu screen's own title --
+  user: core
+  <source>
+    *: "Edit Main Menu"
+  </source>
+  <dest>
+    *: "Redigera huvudmenyn"
+  </dest>
+  <voice>
+    *: "Redigera huvudmenyn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTHING_PLAYING
+  desc: Message shown when a "same as currently played track" style tagtree
+  user: core
+  <source>
+    *: "Nothing playing"
+  </source>
+  <dest>
+    *: "Inget spelas"
+  </dest>
+  <voice>
+    *: "Inget spelas"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_CLICKWHEEL_CHARSET
+  desc: Ordered set of characters the click-wheel text editor cycles through
+  user: core
+  <source>
+    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+  </source>
+  <dest>
+    *: " ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ0123456789-_.'&"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_DISCARD
+  desc: Prompt shown when cancelling the text editor after changes were made
+  user: core
+  <source>
+    *: "Discard changes?"
+  </source>
+  <dest>
+    *: "Kasta ändringarna?"
+  </dest>
+  <voice>
+    *: "Kasta ändringarna?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_CONNECTED
+  desc: first line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "USB Connected"
+  </source>
+  <dest>
+    *: "USB ansluten"
+  </dest>
+  <voice>
+    *: "U S B ansluten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_EJECT_BEFORE_DISCONNECT
+  desc: second line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "Eject before disconnecting"
+  </source>
+  <dest>
+    *: "Mata ut innan du kopplar ur"
+  </dest>
+  <voice>
+    *: "Mata ut innan du kopplar ur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER
+  desc: core text viewer settings menu title
+  user: core
+  <source>
+    *: "Text Viewer"
+  </source>
+  <dest>
+    *: "Textvisare"
+  </dest>
+  <voice>
+    *: "Textvisare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR
+  desc: core text viewer colour mode setting
+  user: core
+  <source>
+    *: "Colour Mode"
+  </source>
+  <dest>
+    *: "Färgläge"
+  </dest>
+  <voice>
+    *: "Färgläge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_THEME
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme"
+  </source>
+  <dest>
+    *: "Tema"
+  </dest>
+  <voice>
+    *: "Tema"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_INVERTED
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme Inverted"
+  </source>
+  <dest>
+    *: "Tema inverterat"
+  </dest>
+  <voice>
+    *: "Tema inverterat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_BOW
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Black on White"
+  </source>
+  <dest>
+    *: "Svart på vitt"
+  </dest>
+  <voice>
+    *: "Svart på vitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_WOB
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "White on Black"
+  </source>
+  <dest>
+    *: "Vitt på svart"
+  </dest>
+  <voice>
+    *: "Vitt på svart"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_MARGIN
+  desc: core text viewer margin setting
+  user: core
+  <source>
+    *: "Margin"
+  </source>
+  <dest>
+    *: "Marginal"
+  </dest>
+  <voice>
+    *: "Marginal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_LINE_SPACING
+  desc: core text viewer line spacing setting
+  user: core
+  <source>
+    *: "Line Spacing"
+  </source>
+  <dest>
+    *: "Radavstånd"
+  </dest>
+  <voice>
+    *: "Radavstånd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_FONT_DEFAULT
+  desc: core text viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "Gränssnittets teckensnitt"
+  </dest>
+  <voice>
+    *: "Gränssnittets teckensnitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGE_NUMBER
+  desc: core text viewer, show the page number at the foot
+  user: core
+  <source>
+    *: "Page Number"
+  </source>
+  <dest>
+    *: "Sidnummer"
+  </dest>
+  <voice>
+    *: "Sidnummer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LICENSE
+  desc: in system menu, opens docs/COPYING (the GNU GPL)
+  user: core
+  <source>
+    *: "License"
+  </source>
+  <dest>
+    *: "Licens"
+  </dest>
+  <voice>
+    *: "Licens"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_OK
+  desc: generic
+  user: core
+  <source>
+    *: "OK"
+  </source>
+  <dest>
+    *: "~OK"
+  </dest>
+  <voice>
+    *: "~OK"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_CANCEL
+  desc: generic
+  user: core
+  <source>
+    *: "Cancel"
+  </source>
+  <dest>
+    *: "Avbryt"
+  </dest>
+  <voice>
+    *: "Avbryt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SET_CONTEXT_ITEM
+  desc: WPS context item
+  user: core
+  <source>
+    *: "Set Context Item"
+  </source>
+  <dest>
+    *: "Lägg i snabbmenyn"
+  </dest>
+  <voice>
+    *: "Lägg i snabbmenyn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_IN_FILES
+  desc: Reveal item in File Browser
+  user: core
+  <source>
+    *: "Show in Files"
+  </source>
+  <dest>
+    *: "Visa i Filer"
+  </dest>
+  <voice>
+    *: "Visa i Filer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_NOT_FOUND
+  desc: When file does not exist
+  user: core
+  <source>
+    *: "File not found"
+  </source>
+  <dest>
+    *: "Filen hittades inte"
+  </dest>
+  <voice>
+    *: "Filen hittades inte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ALBUM_ART
+  desc: in Settings, database browser album art rows
+  user: core
+  <source>
+    *: "Album Art Rows"
+  </source>
+  <dest>
+    *: "Bildrader: album"
+  </dest>
+  <voice>
+    *: "Bildrader för album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_ART
+  desc: in Settings, database browser artist art rows
+  user: core
+  <source>
+    *: "Artist Art Rows"
+  </source>
+  <dest>
+    *: "Bildrader: artister"
+  </dest>
+  <voice>
+    *: "Bildrader för artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_BOOK_ART
+  desc: in Settings, database browser audiobook art rows
+  user: core
+  <source>
+    *: "Audiobook Art Rows"
+  </source>
+  <dest>
+    *: "Bildrader: ljudböcker"
+  </dest>
+  <voice>
+    *: "Bildrader för ljudböcker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_AUDIOBOOKS
+  desc: in Settings, keep audiobooks apart from the music
+  user: core
+  <source>
+    *: "Segregate Audiobooks"
+  </source>
+  <dest>
+    *: "Håll isär ljudböcker"
+  </dest>
+  <voice>
+    *: "Håll isär ljudböcker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOKS
+  desc: the Audiobooks menu, and its main-menu row
+  user: core
+  <source>
+    *: "Audiobooks"
+  </source>
+  <dest>
+    *: "Ljudböcker"
+  </dest>
+  <voice>
+    *: "Ljudböcker"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK
+  desc: in the Audiobooks menu, browse by book
+  user: core
+  <source>
+    *: "Book"
+  </source>
+  <dest>
+    *: "Bok"
+  </dest>
+  <voice>
+    *: "Bok"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR
+  desc: in the Audiobooks menu, browse by author
+  user: core
+  <source>
+    *: "Author"
+  </source>
+  <dest>
+    *: "Författare"
+  </dest>
+  <voice>
+    *: "Författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED
+  desc: in the Audiobooks menu, books played lately
+  user: core
+  <source>
+    *: "Recently played"
+  </source>
+  <dest>
+    *: "Nyligen spelade"
+  </dest>
+  <voice>
+    *: "Nyligen spelade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_INDEX
+  desc: deprecated
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_INDEX
+  desc: in Carousel settings, update the album index
+  user: core
+  <source>
+    *: "Update Index"
+  </source>
+  <dest>
+    *: "Uppdatera index"
+  </dest>
+  <voice>
+    *: "Uppdatera index"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BG_TASK_INFO
+  desc: in System settings, live status of the background tasks
+  user: core
+  <source>
+    *: "Background Tasks"
+  </source>
+  <dest>
+    *: "Bakgrundsuppgifter"
+  </dest>
+  <voice>
+    *: "Bakgrundsuppgifter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_READING
+  desc: in the main menu, reopen the most recently read document
+  user: core
+  <source>
+    *: "Continue Reading"
+  </source>
+  <dest>
+    *: "Fortsätt läsa"
+  </dest>
+  <voice>
+    *: "Fortsätt läsa"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_SOURCE
+  desc: in Theme settings, which picture the now-playing screen shows
+  user: core
+  <source>
+    *: "Now Playing Artwork"
+  </source>
+  <dest>
+    *: "Bild vid uppspelning"
+  </dest>
+  <voice>
+    *: "Bild vid uppspelning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ALBUM
+  desc: in Theme settings, now-playing artwork option: the album cover
+  user: core
+  <source>
+    *: "Album Art"
+  </source>
+  <dest>
+    *: "Albumomslag"
+  </dest>
+  <voice>
+    *: "Albumomslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ARTIST
+  desc: in Theme settings, now-playing artwork option: the artist portrait
+  user: core
+  <source>
+    *: "Artist Art"
+  </source>
+  <dest>
+    *: "Artistbild"
+  </dest>
+  <voice>
+    *: "Artistbild"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_AUTO
+  desc: in Theme settings, now-playing artwork option: chosen by how the playlist was started
+  user: core
+  <source>
+    *: "Auto"
+  </source>
+  <dest>
+    *: "Automatisk"
+  </dest>
+  <voice>
+    *: "Automatisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ALBUMS
+  desc: album chart: most played albums
+  user: core
+  <source>
+    *: "Most played albums"
+  </source>
+  <dest>
+    *: "Mest spelade album"
+  </dest>
+  <voice>
+    *: "Mest spelade album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ALBUMS
+  desc: album chart: most recently played albums
+  user: core
+  <source>
+    *: "Recently played albums"
+  </source>
+  <dest>
+    *: "Nyligen spelade album"
+  </dest>
+  <voice>
+    *: "Nyligen spelade album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ALBUMS
+  desc: album chart: played once but not for a long time
+  user: core
+  <source>
+    *: "Forgotten albums"
+  </source>
+  <dest>
+    *: "Bortglömda album"
+  </dest>
+  <voice>
+    *: "Bortglömda album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_ALBUM
+  desc: in the Music menu, play a random album
+  user: core
+  <source>
+    *: "Random Album"
+  </source>
+  <dest>
+    *: "Slumpat album"
+  </dest>
+  <voice>
+    *: "Slumpat album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_ALBUM_HISTORY
+  desc: shown when no album has been played yet
+  user: core
+  <source>
+    *: "No listening history yet"
+  </source>
+  <dest>
+    *: "Ingen lyssningshistorik än"
+  </dest>
+  <voice>
+    *: "Ingen lyssningshistorik än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OUT_OF_MEMORY
+  desc: shown when a screen could not claim the memory it needs
+  user: core
+  <source>
+    *: "Not enough memory"
+  </source>
+  <dest>
+    *: "Inte tillräckligt med minne"
+  </dest>
+  <voice>
+    *: "Inte tillräckligt med minne"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RUNTIMEDB_OFF_PROMPT
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ALBUMS
+  desc: in Art cache settings, albums with no cover art found
+  user: core
+  <source>
+    *: "Missing Album Artwork"
+  </source>
+  <dest>
+    *: "Saknade albumomslag"
+  </dest>
+  <voice>
+    *: "Saknade albumomslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ARTISTS
+  desc: in Art cache settings, artists with no portrait found
+  user: core
+  <source>
+    *: "Missing Artist Portraits"
+  </source>
+  <dest>
+    *: "Saknade artistporträtt"
+  </dest>
+  <voice>
+    *: "Saknade artistporträtt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_NONE
+  desc: no missing-artwork list to show yet
+  user: core
+  <source>
+    *: "Nothing missing, or no scan yet"
+  </source>
+  <dest>
+    *: "Inget saknas, eller ingen skanning än"
+  </dest>
+  <voice>
+    *: "Inget saknas, eller ingen skanning än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ARTISTS
+  desc: chart: artists with the most plays
+  user: core
+  <source>
+    *: "Most played artists"
+  </source>
+  <dest>
+    *: "Mest spelade artister"
+  </dest>
+  <voice>
+    *: "Mest spelade artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ARTISTS
+  desc: chart: most recently played artists
+  user: core
+  <source>
+    *: "Recently played artists"
+  </source>
+  <dest>
+    *: "Nyligen spelade artister"
+  </dest>
+  <voice>
+    *: "Nyligen spelade artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ARTISTS
+  desc: chart: artists played least, never-played included
+  user: core
+  <source>
+    *: "Forgotten artists"
+  </source>
+  <dest>
+    *: "Bortglömda artister"
+  </dest>
+  <voice>
+    *: "Bortglömda artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY
+  desc: in Carousel settings, artist portraits ordering
+  user: core
+  <source>
+    *: "Sort Artists By"
+  </source>
+  <dest>
+    *: "Sortera artister efter"
+  </dest>
+  <voice>
+    *: "Sortera artister efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DOCUMENTS
+  desc: main menu, every document on the player in one list
+  user: core
+  <source>
+    *: "Documents"
+  </source>
+  <dest>
+    *: "Dokument"
+  </dest>
+  <voice>
+    *: "Dokument"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGES
+  desc: main menu, every image on the player in one list
+  user: core
+  <source>
+    *: "Images"
+  </source>
+  <dest>
+    *: "Bilder"
+  </dest>
+  <voice>
+    *: "Bilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FLAT_LIST_EMPTY
+  desc: no documents or images have been found yet
+  user: core
+  <source>
+    *: "Nothing found, or no scan yet"
+  </source>
+  <dest>
+    *: "Inget hittat, eller ingen skanning än"
+  </dest>
+  <voice>
+    *: "Inget hittat, eller ingen skanning än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_FILE_INDEX
+  desc: in File View settings, rescan for documents and images
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Skanna om dokument & bilder"
+  </dest>
+  <voice>
+    *: "Skanna om dokument och bilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BACKGROUND
+  desc: in Carousel settings, which theme colour fills the screen behind the
+  user: core
+  <source>
+    *: "Background"
+  </source>
+  <dest>
+    *: "Bakgrund"
+  </dest>
+  <voice>
+    *: "Bakgrund"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS
+  desc: WPS context menu and hotkey, opens the synchronised lyrics screen
+  user: core
+  <source>
+    *: "Lyrics"
+  </source>
+  <dest>
+    *: "Låttext"
+  </dest>
+  <voice>
+    *: "Låttext"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NONE
+  desc: lyric viewer, no lyrics file or SYLT tag was found for the track
+  user: core
+  <source>
+    *: "No lyrics"
+  </source>
+  <dest>
+    *: "Ingen låttext"
+  </dest>
+  <voice>
+    *: "Ingen låttext"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_WAITING
+  desc: lyric viewer, shown while nothing is playing or the track's metadata
+  user: core
+  <source>
+    *: "Waiting for track..."
+  </source>
+  <dest>
+    *: "Väntar på spår..."
+  </dest>
+  <voice>
+    *: "Väntar på spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_MENU
+  desc: lyric viewer settings menu title
+  user: core
+  <source>
+    *: "Lyrics Viewer"
+  </source>
+  <dest>
+    *: "Låttextvisare"
+  </dest>
+  <voice>
+    *: "Låttextvisare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_CENTRE
+  desc: lyric viewer alignment, centred
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "Mitten"
+  </dest>
+  <voice>
+    *: "Mitten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ALIGN
+  desc: lyric viewer, horizontal alignment of the lines
+  user: core
+  <source>
+    *: "Alignment"
+  </source>
+  <dest>
+    *: "Justering"
+  </dest>
+  <voice>
+    *: "Justering"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_PREV_OPACITY
+  desc: lyric viewer, how visible the line above is
+  user: core
+  <source>
+    *: "Previous Line"
+  </source>
+  <dest>
+    *: "Föregående rad"
+  </dest>
+  <voice>
+    *: "Föregående rad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NEXT_OPACITY
+  desc: lyric viewer, how visible the line below is
+  user: core
+  <source>
+    *: "Next Line"
+  </source>
+  <dest>
+    *: "Nästa rad"
+  </dest>
+  <voice>
+    *: "Nästa rad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM
+  desc: lyric viewer, speed of the slide between lines
+  user: core
+  <source>
+    *: "Animation"
+  </source>
+  <dest>
+    *: "Animering"
+  </dest>
+  <voice>
+    *: "Animering"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_FAST
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Snabb"
+  </dest>
+  <voice>
+    *: "Snabb"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_NORMAL
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Normal"
+  </source>
+  <dest>
+    *: "~Normal"
+  </dest>
+  <voice>
+    *: "~Normal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_SLOW
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Långsam"
+  </dest>
+  <voice>
+    *: "Långsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_HIGHLIGHT
+  desc: lyric viewer, light words as they are sung
+  user: core
+  <source>
+    *: "Highlight Sung Words"
+  </source>
+  <dest>
+    *: "Markera sjungna ord"
+  </dest>
+  <voice>
+    *: "Markera sjungna ord"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_BACKLIGHT
+  desc: lyric viewer, keep the screen lit while open
+  user: core
+  <source>
+    *: "Keep Backlight On"
+  </source>
+  <dest>
+    *: "Håll belysningen på"
+  </dest>
+  <voice>
+    *: "Håll belysningen på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_FONT_DEFAULT
+  desc: lyric viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "Gränssnittets teckensnitt"
+  </dest>
+  <voice>
+    *: "Gränssnittets teckensnitt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE
+  desc: in Manage Settings, chooses the basic or the full settings tree
+  user: core
+  <source>
+    *: "Settings Mode"
+  </source>
+  <dest>
+    *: "Inställningsläge"
+  </dest>
+  <voice>
+    *: "Inställningsläge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_BASIC
+  desc: Settings Mode option: the short settings page
+  user: core
+  <source>
+    *: "Basic"
+  </source>
+  <dest>
+    *: "Enkel"
+  </dest>
+  <voice>
+    *: "Enkel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_ADVANCED
+  desc: Settings Mode option, and the entry that opens the full settings tree
+  user: core
+  <source>
+    *: "Advanced"
+  </source>
+  <dest>
+    *: "Avancerad"
+  </dest>
+  <voice>
+    *: "Avancerad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_SETTINGS_MENU
+  desc: in UI Settings, the group holding the parts a theme is built from
+  user: core
+  <source>
+    *: "Theme Settings"
+  </source>
+  <dest>
+    *: "Temainställningar"
+  </dest>
+  <voice>
+    *: "Temainställningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOGS_MENU
+  desc: in Edit Theme, the modal dialog chrome group
+  user: core
+  <source>
+    *: "Dialogs"
+  </source>
+  <dest>
+    *: "Dialogrutor"
+  </dest>
+  <voice>
+    *: "Dialogrutor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_COLORS
+  desc: dialog settings, whether the nine colours below are used
+  user: core
+  <source>
+    *: "Dialog Colour Mode"
+  </source>
+  <dest>
+    *: "Dialogfärgläge"
+  </dest>
+  <voice>
+    *: "Dialogfärgläge"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER_WIDTH
+  desc: dialog settings, width of the box border
+  user: core
+  <source>
+    *: "Box Border Width"
+  </source>
+  <dest>
+    *: "Ramtjocklek (ruta)"
+  </dest>
+  <voice>
+    *: "Ramtjocklek (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_MARGIN
+  desc: dialog settings, inset of the box from the screen edge
+  user: core
+  <source>
+    *: "Box Margin"
+  </source>
+  <dest>
+    *: "Marginal (ruta)"
+  </dest>
+  <voice>
+    *: "Marginal (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW
+  desc: dialog settings, how far the drop shadow is offset
+  user: core
+  <source>
+    *: "Box Shadow"
+  </source>
+  <dest>
+    *: "Skugga (ruta)"
+  </dest>
+  <voice>
+    *: "Skugga (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW_COLOR
+  desc: dialog settings, colour of the drop shadow
+  user: core
+  <source>
+    *: "Box Shadow Colour"
+  </source>
+  <dest>
+    *: "Skuggfärg (ruta)"
+  </dest>
+  <voice>
+    *: "Skuggfärg (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_WIDTH
+  desc: dialog settings, width of a button border
+  user: core
+  <source>
+    *: "Button Border Width"
+  </source>
+  <dest>
+    *: "Ramtjocklek (knapp)"
+  </dest>
+  <voice>
+    *: "Ramtjocklek (knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_RADIUS
+  desc: dialog settings, corner radius of a button
+  user: core
+  <source>
+    *: "Button Corner Radius"
+  </source>
+  <dest>
+    *: "Hörnradie (knapp)"
+  </dest>
+  <voice>
+    *: "Hörnradie (knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_FG
+  desc: dialog colour, box text
+  user: core
+  <source>
+    *: "Box Text"
+  </source>
+  <dest>
+    *: "Text (ruta)"
+  </dest>
+  <voice>
+    *: "Text (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BG
+  desc: dialog colour, box background
+  user: core
+  <source>
+    *: "Box Background"
+  </source>
+  <dest>
+    *: "Bakgrund (ruta)"
+  </dest>
+  <voice>
+    *: "Bakgrund (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER
+  desc: dialog colour, box border
+  user: core
+  <source>
+    *: "Box Border"
+  </source>
+  <dest>
+    *: "Ram (ruta)"
+  </dest>
+  <voice>
+    *: "Ram (ruta)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG
+  desc: dialog colour, button text
+  user: core
+  <source>
+    *: "Button Text"
+  </source>
+  <dest>
+    *: "Text (knapp)"
+  </dest>
+  <voice>
+    *: "Text (knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG
+  desc: dialog colour, button background
+  user: core
+  <source>
+    *: "Button Background"
+  </source>
+  <dest>
+    *: "Bakgrund (knapp)"
+  </dest>
+  <voice>
+    *: "Bakgrund (knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER
+  desc: dialog colour, button border
+  user: core
+  <source>
+    *: "Button Border"
+  </source>
+  <dest>
+    *: "Ram (knapp)"
+  </dest>
+  <voice>
+    *: "Ram (knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG_SEL
+  desc: dialog colour, selected button text
+  user: core
+  <source>
+    *: "Selected Button Text"
+  </source>
+  <dest>
+    *: "Text (vald knapp)"
+  </dest>
+  <voice>
+    *: "Text (vald knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG_SEL
+  desc: dialog colour, selected button background
+  user: core
+  <source>
+    *: "Selected Button Background"
+  </source>
+  <dest>
+    *: "Bakgrund (vald knapp)"
+  </dest>
+  <voice>
+    *: "Bakgrund (vald knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_SEL
+  desc: dialog colour, selected button border
+  user: core
+  <source>
+    *: "Selected Button Border"
+  </source>
+  <dest>
+    *: "Ram (vald knapp)"
+  </dest>
+  <voice>
+    *: "Ram (vald knapp)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHORTCUTS_INSTEAD
+  desc: Quick Screen option: the long press opens the shortcuts menu instead
+  user: core
+  <source>
+    *: "Shortcuts instead"
+  </source>
+  <dest>
+    *: "Genvägar istället"
+  </dest>
+  <voice>
+    *: "Genvägar istället"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_ALBUM_SELECT
+  desc: Carousel option: what selecting an album does
+  user: core
+  <source>
+    *: "On Album Select"
+  </source>
+  <dest>
+    *: "Vid val av album"
+  </dest>
+  <voice>
+    *: "Vid val av album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_TRACKS
+  desc: Carousel "On Album Select" option: open the album's track list
+  user: core
+  <source>
+    *: "Show tracks"
+  </source>
+  <dest>
+    *: "Visa spår"
+  </dest>
+  <voice>
+    *: "Visa spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_ALBUM
+  desc: Carousel "On Album Select" option: play the album straight away
+  user: core
+  <source>
+    *: "Play album"
+  </source>
+  <dest>
+    *: "Spela album"
+  </dest>
+  <voice>
+    *: "Spela album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_ASC
+  desc: "Sort Albums By" option: release year, oldest first
+  user: core
+  <source>
+    *: "Year (oldest first)"
+  </source>
+  <dest>
+    *: "År (äldst först)"
+  </dest>
+  <voice>
+    *: "År, äldst först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_DESC
+  desc: "Sort Albums By" option: release year, newest first
+  user: core
+  <source>
+    *: "Year (newest first)"
+  </source>
+  <dest>
+    *: "År (nyast först)"
+  </dest>
+  <voice>
+    *: "År, nyast först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_MENU_SETTINGS
+  desc: General Settings > Music: opens the screen that turns Music menu rows on and off
+  user: core
+  <source>
+    *: "Edit Music Menu"
+  </source>
+  <dest>
+    *: "Redigera musikmenyn"
+  </dest>
+  <voice>
+    *: "Redigera musikmenyn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MAX_ROWS
+  desc: General Settings > Search: how many results the search keeps
+  user: core
+  <source>
+    *: "Maximum Results"
+  </source>
+  <dest>
+    *: "Max antal träffar"
+  </dest>
+  <voice>
+    *: "Max antal träffar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MIN_LETTERS
+  desc: General Settings > Search: how many letters must be typed before searching
+  user: core
+  <source>
+    *: "Minimum Letters"
+  </source>
+  <dest>
+    *: "Minsta antal bokstäver"
+  </dest>
+  <voice>
+    *: "Minsta antal bokstäver"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER
+  desc: General Settings > Search: which kind of result is listed first
+  user: core
+  <source>
+    *: "Result Order"
+  </source>
+  <dest>
+    *: "Träffordning"
+  </dest>
+  <voice>
+    *: "Träffordning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Albums, Artists"
+  </source>
+  <dest>
+    *: "Spår, album, artister"
+  </dest>
+  <voice>
+    *: "Spår, album, artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Artists, Albums"
+  </source>
+  <dest>
+    *: "Spår, artister, album"
+  </dest>
+  <voice>
+    *: "Spår, artister, album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Tracks, Artists"
+  </source>
+  <dest>
+    *: "Album, spår, artister"
+  </dest>
+  <voice>
+    *: "Album, spår, artister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Artists, Tracks"
+  </source>
+  <dest>
+    *: "Album, artister, spår"
+  </dest>
+  <voice>
+    *: "Album, artister, spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Albums, Tracks"
+  </source>
+  <dest>
+    *: "Artister, album, spår"
+  </dest>
+  <voice>
+    *: "Artister, album, spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Tracks, Albums"
+  </source>
+  <dest>
+    *: "Artister, spår, album"
+  </dest>
+  <voice>
+    *: "Artister, spår, album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_ARTISTS
+  desc: General Settings > Music: browse by the guests credited in track tags
+  user: core
+  <source>
+    *: "Featured Artists"
+  </source>
+  <dest>
+    *: "Gästartister"
+  </dest>
+  <voice>
+    *: "Gästartister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRIM_TITLES
+  desc: General Settings > Music: drop "(feat. X)", "(Deluxe Edition)" and the
+  user: core
+  <source>
+    *: "Trim Titles"
+  </source>
+  <dest>
+    *: "Korta titlar"
+  </dest>
+  <voice>
+    *: "Korta titlar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_IN
+  desc: "[Featured In]" entry on an artist's album list in the tag browser
+  user: core
+  <source>
+    *: "[Featured In]"
+  </source>
+  <dest>
+    *: "[Gäst på]"
+  </dest>
+  <voice>
+    *: "Gäst på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPLYING_THEME
+  desc: boot screen caption while the theme's skins are being loaded
+  user: core
+  <source>
+    *: "Applying theme..."
+  </source>
+  <dest>
+    *: "Tillämpar tema..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BAND
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter %d"
+  </source>
+  <dest>
+    *: "~Filter %d"
+  </dest>
+  <voice>
+    *: "~Filter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FILTER_TYPE
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter Type"
+  </source>
+  <dest>
+    *: "Filtertyp"
+  </dest>
+  <voice>
+    *: "Filtertyp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN
+  desc: root menu item for the playback-log statistics screen
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "Lyssningsrapport"
+  </dest>
+  <voice>
+    *: "Lyssningsrapport"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_LOG
+  desc: the Playback Report found no playback log to read
+  user: core
+  <source>
+    *: "No listening history yet. Turn on Settings > Playback > Logging."
+  </source>
+  <dest>
+    *: "Ingen lyssningshistorik än. Slå på Inställningar > Uppspelning > Loggning."
+  </dest>
+  <voice>
+    *: "Ingen lyssningshistorik än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_MEMORY
+  desc: the Playback Report could not get enough working memory for the log
+  user: core
+  <source>
+    *: "Not enough memory to read the log"
+  </source>
+  <dest>
+    *: "Inte tillräckligt med minne för loggen"
+  </dest>
+  <voice>
+    *: "Inte tillräckligt med minne"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOT_IN_LIBRARY
+  desc: the Playback Report could not find the artist, album or song a card names
+  user: core
+  <source>
+    *: "Not in your library under that name"
+  </source>
+  <dest>
+    *: "Finns inte i biblioteket under det namnet"
+  </dest>
+  <voice>
+    *: "Finns inte i biblioteket"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_CARD
+  desc: Playback Report menu item, saves a picture of the card on screen
+  user: core
+  <source>
+    *: "Save Current Card"
+  </source>
+  <dest>
+    *: "Spara aktuellt kort"
+  </dest>
+  <voice>
+    *: "Spara aktuellt kort"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_ALL
+  desc: Playback Report menu item, saves a picture of every card
+  user: core
+  <source>
+    *: "Save All Cards"
+  </source>
+  <dest>
+    *: "Spara alla kort"
+  </dest>
+  <voice>
+    *: "Spara alla kort"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_CHANGED
+  desc: title of the screen listing every setting that differs from its default
+  user: core
+  <source>
+    *: "Changed Settings"
+  </source>
+  <dest>
+    *: "Ändrade inställningar"
+  </dest>
+  <voice>
+    *: "Ändrade inställningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_ALL_DEFAULT
+  desc: splash when no setting differs from its default
+  user: core
+  <source>
+    *: "Nothing changed from defaults"
+  </source>
+  <dest>
+    *: "Inget ändrat från standard"
+  </dest>
+  <voice>
+    *: "Inget ändrat från standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_FORGET_TWEAKS
+  desc: discard the appearance changes made by hand under the current theme
+  user: core
+  <source>
+    *: "Forget My Changes"
+  </source>
+  <dest>
+    *: "Glöm mina ändringar"
+  </dest>
+  <voice>
+    *: "Glöm mina ändringar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_NO_TWEAKS
+  desc: splash when the current theme has no hand-made changes to forget
+  user: core
+  <source>
+    *: "No changes to forget"
+  </source>
+  <dest>
+    *: "Inga ändringar att glömma"
+  </dest>
+  <voice>
+    *: "Inga ändringar att glömma"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY
+  desc: settings branch: the file browser, the music browser and the database
+  user: core
+  <source>
+    *: "Library"
+  </source>
+  <dest>
+    *: "Bibliotek"
+  </dest>
+  <voice>
+    *: "Bibliotek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPEARANCE
+  desc: settings branch: themes, fonts, colours and how the screens look
+  user: core
+  <source>
+    *: "Appearance"
+  </source>
+  <dest>
+    *: "Utseende"
+  </dest>
+  <voice>
+    *: "Utseende"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BATTERY_POWER
+  desc: settings branch: backlight, brightness, sleep and disk power
+  user: core
+  <source>
+    *: "Battery & Power"
+  </source>
+  <dest>
+    *: "Batteri & ström"
+  </dest>
+  <voice>
+    *: "Batteri och ström"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_VIEWERS
+  desc: settings submenu: the text and lyrics viewers
+  user: core
+  <source>
+    *: "Viewers"
+  </source>
+  <dest>
+    *: "Visare"
+  </dest>
+  <voice>
+    *: "Visare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB
+  desc: settings submenu: what the player does when plugged into a host
+  user: core
+  <source>
+    *: "USB"
+  </source>
+  <dest>
+    *: "~USB"
+  </dest>
+  <voice>
+    *: "~U S B"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORIES
+  desc: settings submenu: the dock connector's serial, power and line-out pins
+  user: core
+  <source>
+    *: "Accessories"
+  </source>
+  <dest>
+    *: "Tillbehör"
+  </dest>
+  <voice>
+    *: "Tillbehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LANGUAGE_AND_TEXT
+  desc: settings submenu: language, voice and the default codepage
+  user: core
+  <source>
+    *: "Language & Text"
+  </source>
+  <dest>
+    *: "Språk & text"
+  </dest>
+  <voice>
+    *: "Språk och text"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_MAINTENANCE
+  desc: settings submenu gathering every rebuild and update action
+  user: core
+  <source>
+    *: "Maintenance"
+  </source>
+  <dest>
+    *: "Underhåll"
+  </dest>
+  <voice>
+    *: "Underhåll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_DB
+  desc: maintenance action, find newly added tracks
+  user: core
+  <source>
+    *: "Update Database"
+  </source>
+  <dest>
+    *: "Uppdatera databasen"
+  </dest>
+  <voice>
+    *: "Uppdatera databasen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_DB
+  desc: maintenance action, rebuild the database from scratch
+  user: core
+  <source>
+    *: "Rebuild Database"
+  </source>
+  <dest>
+    *: "Bygg om databasen"
+  </dest>
+  <voice>
+    *: "Bygg om databasen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESCAN_FILES
+  desc: maintenance action, rebuild the flat Documents and Images lists
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "Skanna om dokument & bilder"
+  </dest>
+  <voice>
+    *: "Skanna om dokument och bilder"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAINT_STARTED
+  desc: splash after a maintenance action is queued to the background
+  user: core
+  <source>
+    *: "Started in the background"
+  </source>
+  <dest>
+    *: "Startat i bakgrunden"
+  </dest>
+  <voice>
+    *: "Startat i bakgrunden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT
+  desc: maintenance action, discard the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuild Playback Report"
+  </source>
+  <dest>
+    *: "Bygg om lyssningsrapporten"
+  </dest>
+  <voice>
+    *: "Bygg om lyssningsrapporten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT_SPLASH
+  desc: splash after clearing the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuilds next time it opens"
+  </source>
+  <dest>
+    *: "Byggs om nästa gång den öppnas"
+  </dest>
+  <voice>
+    *: "Byggs om nästa gång den öppnas"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_STANDARD
+  desc: settings mode showing everything except the advanced rows
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "~Standard"
+  </dest>
+  <voice>
+    *: "~Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_EVERYTHING
+  desc: settings mode showing every row including the advanced ones
+  user: core
+  <source>
+    *: "Everything"
+  </source>
+  <dest>
+    *: "Allt"
+  </dest>
+  <voice>
+    *: "Allt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EXPLAIN
+  desc: setting context menu entry, shows what the setting does
+  user: core
+  <source>
+    *: "Explain"
+  </source>
+  <dest>
+    *: "Förklara"
+  </dest>
+  <voice>
+    *: "Förklara"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_EXPLANATION
+  desc: splash when a setting has no explanation written for it
+  user: core
+  <source>
+    *: "No explanation for this one"
+  </source>
+  <dest>
+    *: "Ingen förklaring för den här"
+  </dest>
+  <voice>
+    *: "Ingen förklaring för den här"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKINS
+  desc: Appearance submenu holding the while-playing skin, base skin and backdrop
+  user: core
+  <source>
+    *: "Skins"
+  </source>
+  <dest>
+    *: "Skal"
+  </dest>
+  <voice>
+    *: "Skal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ELEMENTS
+  desc: Appearance submenu holding which pieces of chrome are drawn
+  user: core
+  <source>
+    *: "Interface Elements"
+  </source>
+  <dest>
+    *: "Gränssnittselement"
+  </dest>
+  <voice>
+    *: "Gränssnittselement"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_CONTEXT_ITEMS
+  desc: clears the four while-playing context menu slots
+  user: core
+  <source>
+    *: "Reset Context Menu"
+  </source>
+  <dest>
+    *: "Återställ snabbmenyn"
+  </dest>
+  <voice>
+    *: "Återställ snabbmenyn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALL_ALBUMS
+  desc: album sort context: the Albums list with nothing above it
+  user: core
+  <source>
+    *: "All Albums"
+  </source>
+  <dest>
+    *: "Alla album"
+  </dest>
+  <voice>
+    *: "Alla album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OTHER_LISTS
+  desc: album sort context: every album list with no row of its own
+  user: core
+  <source>
+    *: "Other Lists"
+  </source>
+  <dest>
+    *: "Andra listor"
+  </dest>
+  <voice>
+    *: "Andra listor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_USE_DEFAULT
+  desc: album sort choice: follow the Other Lists order
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_ZOOM_PAN
+  desc: in the image viewer settings menu
+  user: core
+  <source>
+    *: "Zoom / Pan"
+  </source>
+  <dest>
+    *: "Zooma / panorera"
+  </dest>
+  <voice>
+    *: "Zooma och panorera"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ABOUT
+  desc: in the System menu, opens the About page
+  user: core
+  <source>
+    *: "About"
+  </source>
+  <dest>
+    *: "Om"
+  </dest>
+  <voice>
+    *: "Om"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE
+  desc: title of the Spike menu, on held Menu in the game
+  user: core
+  <source>
+    *: "Spike"
+  </source>
+  <dest>
+    *: "~Spike"
+  </dest>
+  <voice>
+    *: "~Spike"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_PLAY
+  desc: in the context menus, starts the game
+  user: core
+  <source>
+    *: "Play with Spike"
+  </source>
+  <dest>
+    *: "Spela med Spike"
+  </dest>
+  <voice>
+    *: "Spela med Spike"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_LEAVE
+  desc: asked when Menu is pressed during a Spike run
+  user: core
+  <source>
+    *: "End this run?"
+  </source>
+  <dest>
+    *: "Avsluta den här omgången?"
+  </dest>
+  <voice>
+    *: "Avsluta den här omgången?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_SCORES
+  desc: in the Spike menu, the table of best scores
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "Topplista"
+  </dest>
+  <voice>
+    *: "Topplista"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_OFFSET
+  desc: in the Spike menu, the output delay the game is judged against
+  user: core
+  <source>
+    *: "Audio Offset"
+  </source>
+  <dest>
+    *: "Ljudförskjutning"
+  </dest>
+  <voice>
+    *: "Ljudförskjutning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION
+  desc: in the Spike menu, whether the track is named under the field
+  user: core
+  <source>
+    *: "Now Playing"
+  </source>
+  <dest>
+    *: "Spelas nu"
+  </dest>
+  <voice>
+    *: "Spelas nu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_TITLE
+  desc: in the Spike menu, the caption shows the title alone
+  user: core
+  <source>
+    *: "Title"
+  </source>
+  <dest>
+    *: "Titel"
+  </dest>
+  <voice>
+    *: "Titel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_BOTH
+  desc: in the Spike menu, the caption shows the title and the artist
+  user: core
+  <source>
+    *: "Title and Artist"
+  </source>
+  <dest>
+    *: "Titel och artist"
+  </dest>
+  <voice>
+    *: "Titel och artist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_SCROLL
+  desc: in the Spike menu, whether the track name travels or is cropped
+  user: core
+  <source>
+    *: "Scroll Now Playing"
+  </source>
+  <dest>
+    *: "Rulla Spelas nu"
+  </dest>
+  <voice>
+    *: "Rulla Spelas nu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO
+  desc: in the Spike menu, half or double the detected tempo
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "~Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HALF
+  desc: the Tempo option, half the detected tempo
+  user: core
+  <source>
+    *: "Half"
+  </source>
+  <dest>
+    *: "Halvt"
+  </dest>
+  <voice>
+    *: "Halvt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_DOUBLE
+  desc: the Tempo option, double the detected tempo
+  user: core
+  <source>
+    *: "Double"
+  </source>
+  <dest>
+    *: "Dubbelt"
+  </dest>
+  <voice>
+    *: "Dubbelt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HEARD
+  desc: the Tempo option, the tempo as the tracker found it
+  user: core
+  <source>
+    *: "As Heard"
+  </source>
+  <dest>
+    *: "Som detekterat"
+  </dest>
+  <voice>
+    *: "Som detekterat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_INFO
+  desc: in the Spike menu, what the game has to say about itself
+  user: core
+  <source>
+    *: "Spike Info"
+  </source>
+  <dest>
+    *: "Spike-info"
+  </dest>
+  <voice>
+    *: "Spike-info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_RESUME
+  desc: in the Audiobooks browser, the row that picks a book up where it was left
+  user: core
+  <source>
+    *: "[Resume]"
+  </source>
+  <dest>
+    *: "[Fortsätt]"
+  </dest>
+  <voice>
+    *: "Fortsätt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ARTWORK
+  desc: in Settings > Library > Viewers > Playback Report, whether cards show album art
+  user: core
+  <source>
+    *: "Artwork"
+  </source>
+  <dest>
+    *: "Omslag"
+  </dest>
+  <voice>
+    *: "Omslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_TOP_COUNT
+  desc: in Settings > Library > Viewers > Playback Report, how many rows a top-ten section shows
+  user: core
+  <source>
+    *: "Top Rows"
+  </source>
+  <dest>
+    *: "Rader i topplistor"
+  </dest>
+  <voice>
+    *: "Rader i topplistor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_BADGE_ORDER
+  desc: in Settings > Library > Viewers > Playback Report, how achievements are sorted
+  user: core
+  <source>
+    *: "Achievement Order"
+  </source>
+  <dest>
+    *: "Ordning för prestationer"
+  </dest>
+  <voice>
+    *: "Ordning för prestationer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_BY
+  desc: in Settings > Library > Viewers > Playback Report, what the top lists are ordered on
+  user: core
+  <source>
+    *: "Ranked By"
+  </source>
+  <dest>
+    *: "Rangordna efter"
+  </dest>
+  <voice>
+    *: "Rangordna efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_PLAYS
+  desc: Ranked By option: order the top lists by number of plays
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "Spelningar"
+  </dest>
+  <voice>
+    *: "Spelningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_MINUTES
+  desc: Ranked By option: order the top lists by time listened
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "Minuter"
+  </dest>
+  <voice>
+    *: "Minuter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_TABLE
+  desc: Achievement Order option: the order the achievement table is written in
+  user: core
+  <source>
+    *: "As Listed"
+  </source>
+  <dest>
+    *: "Som listat"
+  </dest>
+  <voice>
+    *: "Som listat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_EARNED
+  desc: Achievement Order option: the ones already won come first
+  user: core
+  <source>
+    *: "Earned First"
+  </source>
+  <dest>
+    *: "Uppnådda först"
+  </dest>
+  <voice>
+    *: "Uppnådda först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_RECENT
+  desc: Achievement Order option: most recently won first
+  user: core
+  <source>
+    *: "Newest First"
+  </source>
+  <dest>
+    *: "Nyaste först"
+  </dest>
+  <voice>
+    *: "Nyaste först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_CLOSEST
+  desc: Achievement Order option: the ones nearest to being won first
+  user: core
+  <source>
+    *: "Closest First"
+  </source>
+  <dest>
+    *: "Närmast först"
+  </dest>
+  <voice>
+    *: "Närmast först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REMOTE_TRACK_SKIP
+  desc: in the accessories settings menu
+  user: core
+  <source>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </source>
+  <dest>
+    *: none
+    mikey_remote: "Spårbyte via fjärrkontroll"
+  </dest>
+  <voice>
+    *: none
+    mikey_remote: "Spårbyte via fjärrkontroll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS
+  desc: context menu row on an album or artist: how much of it has been heard
+  user: core
+  <source>
+    *: "Listening Progress"
+  </source>
+  <dest>
+    *: "Lyssningsframsteg"
+  </dest>
+  <voice>
+    *: "Lyssningsframsteg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_SUMMARY
+  desc: top row of the Listening Progress screen: percent, played, total
+  user: core
+  <source>
+    *: "%d%% - %d of %d tracks"
+  </source>
+  <dest>
+    *: "%d%% - %d av %d spår"
+  </dest>
+  <voice>
+    *: "Lyssningsframsteg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_ALBUM
+  desc: album row on the Listening Progress screen: name, percent, tracks unheard
+  user: core
+  <source>
+    *: "%s - %d%% (%d left)"
+  </source>
+  <dest>
+    *: "%s - %d%% (%d kvar)"
+  </dest>
+  <voice>
+    *: "~Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX
+  desc: in the context menus, plays tracks that sound like the selected one
+  user: core
+  <source>
+    *: "Play Similar"
+  </source>
+  <dest>
+    *: "Spela liknande"
+  </dest>
+  <voice>
+    *: "Spela liknande"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NONE
+  desc: shown when nothing in the library sounds near enough to build a mix
+  user: core
+  <source>
+    *: "Nothing similar found"
+  </source>
+  <dest>
+    *: "Inget liknande hittades"
+  </dest>
+  <voice>
+    *: "Inget liknande hittades"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_INDEX
+  desc: Play Similar, when there is no analysis index to read
+  user: core
+  <source>
+    *: "The library has not been analysed"
+  </source>
+  <dest>
+    *: "Biblioteket har inte analyserats"
+  </dest>
+  <voice>
+    *: "Biblioteket har inte analyserats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_RECORD
+  desc: Play Similar, when the index holds nothing for the selected track
+  user: core
+  <source>
+    *: "This track has not been analysed"
+  </source>
+  <dest>
+    *: "Det här spåret har inte analyserats"
+  </dest>
+  <voice>
+    *: "Det här spåret har inte analyserats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_FAILED
+  desc: Play Similar, when tracks were chosen but the playlist could not be built
+  user: core
+  <source>
+    *: "Could not build the playlist"
+  </source>
+  <dest>
+    *: "Kunde inte skapa spellistan"
+  </dest>
+  <voice>
+    *: "Kunde inte skapa spellistan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_TRACK
+  desc: Play Similar, when the selected row could not be resolved to a file
+  user: core
+  <source>
+    *: "Could not identify the track"
+  </source>
+  <dest>
+    *: "Kunde inte identifiera spåret"
+  </dest>
+  <voice>
+    *: "Kunde inte identifiera spåret"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYLIST_ENGINE
+  desc: in Library, switches the sound analysis and the playlists built from it on
+  user: core
+  <source>
+    *: "Playlist Engine"
+  </source>
+  <dest>
+    *: "Spellistemotor"
+  </dest>
+  <voice>
+    *: "Spellistemotor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_PLAYLIST
+  desc: in Library - Playlist Engine, how a playlist built from a track is chosen
+  user: core
+  <source>
+    *: "Track Playlist"
+  </source>
+  <dest>
+    *: "Lista från spår"
+  </dest>
+  <voice>
+    *: "Lista från spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_PREDICTABLE
+  desc: variation option: the same list until the library changes
+  user: core
+  <source>
+    *: "Predictable"
+  </source>
+  <dest>
+    *: "Förutsägbar"
+  </dest>
+  <voice>
+    *: "Förutsägbar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_VARIABLE
+  desc: variation option: a different list every run, from the same neighbourhood
+  user: core
+  <source>
+    *: "Variable"
+  </source>
+  <dest>
+    *: "Varierande"
+  </dest>
+  <voice>
+    *: "Varierande"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_SOUND
+  desc: in Library - Maintenance, measures tracks the analysis has not covered
+  user: core
+  <source>
+    *: "Update Sound Analysis"
+  </source>
+  <dest>
+    *: "Uppdatera ljudanalysen"
+  </dest>
+  <voice>
+    *: "Uppdatera ljudanalysen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_SOUND
+  desc: in Library - Maintenance, measures the whole library again
+  user: core
+  <source>
+    *: "Rebuild Sound Analysis"
+  </source>
+  <dest>
+    *: "Bygg om ljudanalysen"
+  </dest>
+  <voice>
+    *: "Bygg om ljudanalysen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_WEEKLY
+  desc: variation option: the same list for a week, then a new one
+  user: core
+  <source>
+    *: "Weekly"
+  </source>
+  <dest>
+    *: "Veckovis"
+  </dest>
+  <voice>
+    *: "Veckovis"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_DEPTH
+  desc: in Library - Playlist Engine, how much of each track the analysis listens to
+  user: core
+  <source>
+    *: "Analysis Depth"
+  </source>
+  <dest>
+    *: "Analysdjup"
+  </dest>
+  <voice>
+    *: "Analysdjup"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_THOROUGH
+  desc: Analysis Depth option: listen to the whole window
+  user: core
+  <source>
+    *: "Thorough"
+  </source>
+  <dest>
+    *: "Grundlig"
+  </dest>
+  <voice>
+    *: "Grundlig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_QUICK
+  desc: Analysis Depth option: stop once the tempo has settled
+  user: core
+  <source>
+    *: "Quick"
+  </source>
+  <dest>
+    *: "Snabb"
+  </dest>
+  <voice>
+    *: "Snabb"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOODS
+  desc: row on the Playlists screen: playlists built from a mood
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stämningar"
+  </dest>
+  <voice>
+    *: "Stämningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEYS
+  desc: row on the Playlists screen: playlists that travel between two moods
+  user: core
+  <source>
+    *: "Journeys"
+  </source>
+  <dest>
+    *: "Resor"
+  </dest>
+  <voice>
+    *: "Resor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN
+  desc: on a track context menu, builds a playlist that gets calmer and plays it
+  user: core
+  <source>
+    *: "Wind Down"
+  </source>
+  <dest>
+    *: "Varva ner"
+  </dest>
+  <voice>
+    *: "Varva ner"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PLAYLIST
+  desc: in Library - Playlist Engine, how much a mood or journey varies between runs
+  user: core
+  <source>
+    *: "Mood Playlist"
+  </source>
+  <dest>
+    *: "Stämningslista"
+  </dest>
+  <voice>
+    *: "Stämningslista"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_CALM
+  desc: mood name: quiet, sparse and unhurried
+  user: core
+  <source>
+    *: "Calm"
+  </source>
+  <dest>
+    *: "Lugn"
+  </dest>
+  <voice>
+    *: "Lugn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_ENERGETIC
+  desc: mood name: loud, busy and driving
+  user: core
+  <source>
+    *: "Energetic"
+  </source>
+  <dest>
+    *: "Energisk"
+  </dest>
+  <voice>
+    *: "Energisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DARK
+  desc: mood name: minor, little treble, weighted low
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Mörk"
+  </dest>
+  <voice>
+    *: "Mörk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_BRIGHT
+  desc: mood name: major, treble-forward and clear
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Ljus"
+  </dest>
+  <voice>
+    *: "Ljus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_WARM
+  desc: mood name: mid and low heavy, treble pulled back
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Varm"
+  </dest>
+  <voice>
+    *: "Varm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_RAW
+  desc: mood name: unpolished, narrow and transient-heavy
+  user: core
+  <source>
+    *: "Raw"
+  </source>
+  <dest>
+    *: "Rå"
+  </dest>
+  <voice>
+    *: "Rå"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_LUSH
+  desc: mood name: wide, clear and harmonically rich
+  user: core
+  <source>
+    *: "Lush"
+  </source>
+  <dest>
+    *: "Fyllig"
+  </dest>
+  <voice>
+    *: "Fyllig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PUNCHY
+  desc: mood name: strong transients and wide dynamics
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Slagkraftig"
+  </dest>
+  <voice>
+    *: "Slagkraftig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SMOOTH
+  desc: mood name: few transients, little harmonic movement
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Mjuk"
+  </dest>
+  <voice>
+    *: "Mjuk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SPARSE
+  desc: mood name: few events, dynamic
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Sparsam"
+  </dest>
+  <voice>
+    *: "Sparsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DENSE
+  desc: mood name: many events, compressed
+  user: core
+  <source>
+    *: "Dense"
+  </source>
+  <dest>
+    *: "Tät"
+  </dest>
+  <voice>
+    *: "Tät"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_HYPNOTIC
+  desc: mood name: steady tempo, little harmonic movement
+  user: core
+  <source>
+    *: "Hypnotic"
+  </source>
+  <dest>
+    *: "Hypnotisk"
+  </dest>
+  <voice>
+    *: "Hypnotisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SLOW
+  desc: mood name: slow, where the tempo is trusted
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Långsam"
+  </dest>
+  <voice>
+    *: "Långsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_FAST
+  desc: mood name: fast, where the tempo is trusted
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Snabb"
+  </dest>
+  <voice>
+    *: "Snabb"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_MELANCHOLY
+  desc: mood name: minor, slow and quiet
+  user: core
+  <source>
+    *: "Melancholy"
+  </source>
+  <dest>
+    *: "Melankolisk"
+  </dest>
+  <voice>
+    *: "Melankolisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_UPLIFTING
+  desc: mood name: major, fast and bright
+  user: core
+  <source>
+    *: "Uplifting"
+  </source>
+  <dest>
+    *: "Upplyftande"
+  </dest>
+  <voice>
+    *: "Upplyftande"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_CALM_ENERGETIC
+  desc: journey name
+  user: core
+  <source>
+    *: "Calm to Energetic"
+  </source>
+  <dest>
+    *: "Från lugn till energisk"
+  </dest>
+  <voice>
+    *: "Från lugn till energisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_DARK_BRIGHT
+  desc: journey name
+  user: core
+  <source>
+    *: "Dark to Bright"
+  </source>
+  <dest>
+    *: "Från mörk till ljus"
+  </dest>
+  <voice>
+    *: "Från mörk till ljus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SPARSE_DENSE
+  desc: journey name
+  user: core
+  <source>
+    *: "Sparse to Dense"
+  </source>
+  <dest>
+    *: "Från sparsam till tät"
+  </dest>
+  <voice>
+    *: "Från sparsam till tät"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SLOW_FAST
+  desc: journey name
+  user: core
+  <source>
+    *: "Slow to Fast"
+  </source>
+  <dest>
+    *: "Från långsam till snabb"
+  </dest>
+  <voice>
+    *: "Från långsam till snabb"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_MELANCHOLY_UPLIFTING
+  desc: journey name
+  user: core
+  <source>
+    *: "Melancholy to Uplifting"
+  </source>
+  <dest>
+    *: "Från melankolisk till upplyftande"
+  </dest>
+  <voice>
+    *: "Från melankolisk till upplyftande"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_LENGTH
+  desc: in Library - Playlist Engine, how many tracks a generated playlist holds
+  user: core
+  <source>
+    *: "Playlist Length"
+  </source>
+  <dest>
+    *: "Listlängd"
+  </dest>
+  <voice>
+    *: "Listlängd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_PLAYING
+  desc: in Library - Playlist Engine, keep playing after a playlist runs out
+  user: core
+  <source>
+    *: "Continue Playing"
+  </source>
+  <dest>
+    *: "Fortsätt spela"
+  </dest>
+  <voice>
+    *: "Fortsätt spela"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PROPERTIES
+  desc: in Track Info, the row opening the sound read-out, and its screen title
+  user: core
+  <source>
+    *: "Sound"
+  </source>
+  <dest>
+    *: "Ljud"
+  </dest>
+  <voice>
+    *: "Ljud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOODS
+  desc: sound read-out: the moods this track would be offered by
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stämningar"
+  </dest>
+  <voice>
+    *: "Stämningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_NEAREST_MOOD
+  desc: sound read-out: shown instead of Moods when no mood is near enough
+  user: core
+  <source>
+    *: "Nearest Mood"
+  </source>
+  <dest>
+    *: "Närmaste stämning"
+  </dest>
+  <voice>
+    *: "Närmaste stämning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY
+  desc: sound read-out: how much the track drives
+  user: core
+  <source>
+    *: "Energy"
+  </source>
+  <dest>
+    *: "Energi"
+  </dest>
+  <voice>
+    *: "Energi"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE
+  desc: sound read-out: tempo
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "Tempo"
+  </dest>
+  <voice>
+    *: "Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE
+  desc: sound read-out: the balance between treble, mid and bass
+  user: core
+  <source>
+    *: "Tone"
+  </source>
+  <dest>
+    *: "Klangfärg"
+  </dest>
+  <voice>
+    *: "Klangfärg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY
+  desc: sound read-out: how much is happening
+  user: core
+  <source>
+    *: "Activity"
+  </source>
+  <dest>
+    *: "Aktivitet"
+  </dest>
+  <voice>
+    *: "Aktivitet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK
+  desc: sound read-out: how sharply the sound hits
+  user: core
+  <source>
+    *: "Attack"
+  </source>
+  <dest>
+    *: "~Attack"
+  </dest>
+  <voice>
+    *: "~Attack"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE
+  desc: sound read-out: how clearly pitched the sound is
+  user: core
+  <source>
+    *: "Texture"
+  </source>
+  <dest>
+    *: "Textur"
+  </dest>
+  <voice>
+    *: "Textur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE
+  desc: sound read-out: stereo width
+  user: core
+  <source>
+    *: "Space"
+  </source>
+  <dest>
+    *: "Rymd"
+  </dest>
+  <voice>
+    *: "Rymd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER
+  desc: sound read-out: how compressed the master is
+  user: core
+  <source>
+    *: "Master"
+  </source>
+  <dest>
+    *: "Mastring"
+  </dest>
+  <voice>
+    *: "Mastring"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT
+  desc: sound read-out: how much the harmony moves
+  user: core
+  <source>
+    *: "Movement"
+  </source>
+  <dest>
+    *: "Rörelse"
+  </dest>
+  <voice>
+    *: "Rörelse"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY
+  desc: sound read-out: musical key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Tonart"
+  </dest>
+  <voice>
+    *: "Tonart"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_BPM
+  desc: sound read-out: beats per minute, after the number
+  user: core
+  <source>
+    *: "BPM"
+  </source>
+  <dest>
+    *: "~BPM"
+  </dest>
+  <voice>
+    *: "~B P M"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_LOW
+  desc: sound read-out, energy: bottom quarter of the library
+  user: core
+  <source>
+    *: "Low"
+  </source>
+  <dest>
+    *: "Låg"
+  </dest>
+  <voice>
+    *: "Låg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_MODERATE
+  desc: sound read-out, energy: second quarter of the library
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Måttlig"
+  </dest>
+  <voice>
+    *: "Måttlig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_HIGH
+  desc: sound read-out, energy: third quarter of the library
+  user: core
+  <source>
+    *: "High"
+  </source>
+  <dest>
+    *: "Hög"
+  </dest>
+  <voice>
+    *: "Hög"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_VERY_HIGH
+  desc: sound read-out, energy: top quarter of the library
+  user: core
+  <source>
+    *: "Very high"
+  </source>
+  <dest>
+    *: "Mycket hög"
+  </dest>
+  <voice>
+    *: "Mycket hög"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_SLOW
+  desc: sound read-out, pace: under 70 BPM
+  user: core
+  <source>
+    *: "Very slow"
+  </source>
+  <dest>
+    *: "Mycket långsamt"
+  </dest>
+  <voice>
+    *: "Mycket långsamt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_SLOW
+  desc: sound read-out, pace: 70 to 89 BPM
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "Långsamt"
+  </dest>
+  <voice>
+    *: "Långsamt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_RELAXED
+  desc: sound read-out, pace: 90 to 109 BPM
+  user: core
+  <source>
+    *: "Relaxed"
+  </source>
+  <dest>
+    *: "Avslappnat"
+  </dest>
+  <voice>
+    *: "Avslappnat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_MODERATE
+  desc: sound read-out, pace: 110 to 129 BPM
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "Måttligt"
+  </dest>
+  <voice>
+    *: "Måttligt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_BRISK
+  desc: sound read-out, pace: 130 to 149 BPM
+  user: core
+  <source>
+    *: "Brisk"
+  </source>
+  <dest>
+    *: "Raskt"
+  </dest>
+  <voice>
+    *: "Raskt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_FAST
+  desc: sound read-out, pace: 150 to 169 BPM
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "Snabbt"
+  </dest>
+  <voice>
+    *: "Snabbt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_FAST
+  desc: sound read-out, pace: 170 BPM and over
+  user: core
+  <source>
+    *: "Very fast"
+  </source>
+  <dest>
+    *: "Mycket snabbt"
+  </dest>
+  <voice>
+    *: "Mycket snabbt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_UNSTEADY
+  desc: sound read-out, pace: follows the tempo where it is not trusted
+  user: core
+  <source>
+    *: "unsteady"
+  </source>
+  <dest>
+    *: "ojämnt"
+  </dest>
+  <voice>
+    *: "ojämnt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_NONE
+  desc: sound read-out, pace: the analysis found no beat at all
+  user: core
+  <source>
+    *: "No steady beat"
+  </source>
+  <dest>
+    *: "Ingen stadig takt"
+  </dest>
+  <voice>
+    *: "Ingen stadig takt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_DARK
+  desc: sound read-out, tone: much less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "Mörk"
+  </dest>
+  <voice>
+    *: "Mörk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_WARM
+  desc: sound read-out, tone: less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "Varm"
+  </dest>
+  <voice>
+    *: "Varm"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BALANCED
+  desc: sound read-out, tone: treble about where the loudness predicts
+  user: core
+  <source>
+    *: "Balanced"
+  </source>
+  <dest>
+    *: "Balanserad"
+  </dest>
+  <voice>
+    *: "Balanserad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BRIGHT
+  desc: sound read-out, tone: more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "Ljus"
+  </dest>
+  <voice>
+    *: "Ljus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_VERY_BRIGHT
+  desc: sound read-out, tone: much more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Very bright"
+  </source>
+  <dest>
+    *: "Mycket ljus"
+  </dest>
+  <voice>
+    *: "Mycket ljus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BASS_LED
+  desc: sound read-out, tone: appended where the low band leads
+  user: core
+  <source>
+    *: "bass-forward"
+  </source>
+  <dest>
+    *: "basbetonad"
+  </dest>
+  <voice>
+    *: "basbetonad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_MID_LED
+  desc: sound read-out, tone: appended where the middle band leads
+  user: core
+  <source>
+    *: "mid-forward"
+  </source>
+  <dest>
+    *: "mellanregisterbetonad"
+  </dest>
+  <voice>
+    *: "mellanregisterbetonad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_SPARSE
+  desc: sound read-out, activity: few onsets
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "Sparsam"
+  </dest>
+  <voice>
+    *: "Sparsam"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_OPEN
+  desc: sound read-out, activity: below average onsets
+  user: core
+  <source>
+    *: "Open"
+  </source>
+  <dest>
+    *: "Luftig"
+  </dest>
+  <voice>
+    *: "Luftig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_BUSY
+  desc: sound read-out, activity: above average onsets
+  user: core
+  <source>
+    *: "Busy"
+  </source>
+  <dest>
+    *: "Livlig"
+  </dest>
+  <voice>
+    *: "Livlig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_VERY_BUSY
+  desc: sound read-out, activity: many onsets
+  user: core
+  <source>
+    *: "Very busy"
+  </source>
+  <dest>
+    *: "Mycket livlig"
+  </dest>
+  <voice>
+    *: "Mycket livlig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_SMOOTH
+  desc: sound read-out, attack: very little transient
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "Mjuk"
+  </dest>
+  <voice>
+    *: "Mjuk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_EVEN
+  desc: sound read-out, attack: below average transient
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Jämn"
+  </dest>
+  <voice>
+    *: "Jämn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_PUNCHY
+  desc: sound read-out, attack: above average transient
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "Slagkraftig"
+  </dest>
+  <voice>
+    *: "Slagkraftig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_VERY_PUNCHY
+  desc: sound read-out, attack: sharp transient
+  user: core
+  <source>
+    *: "Very punchy"
+  </source>
+  <dest>
+    *: "Mycket slagkraftig"
+  </dest>
+  <voice>
+    *: "Mycket slagkraftig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_NOISY
+  desc: sound read-out, texture: little clear pitch
+  user: core
+  <source>
+    *: "Noisy"
+  </source>
+  <dest>
+    *: "Brusig"
+  </dest>
+  <voice>
+    *: "Brusig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_BLENDED
+  desc: sound read-out, texture: below average pitch clarity
+  user: core
+  <source>
+    *: "Blended"
+  </source>
+  <dest>
+    *: "Sammansmält"
+  </dest>
+  <voice>
+    *: "Sammansmält"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_CLEAR
+  desc: sound read-out, texture: above average pitch clarity
+  user: core
+  <source>
+    *: "Clear"
+  </source>
+  <dest>
+    *: "Klar"
+  </dest>
+  <voice>
+    *: "Klar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_VERY_CLEAR
+  desc: sound read-out, texture: strongly pitched
+  user: core
+  <source>
+    *: "Very clear"
+  </source>
+  <dest>
+    *: "Mycket klar"
+  </dest>
+  <voice>
+    *: "Mycket klar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_MONO
+  desc: sound read-out, space: almost no stereo difference
+  user: core
+  <source>
+    *: "Almost mono"
+  </source>
+  <dest>
+    *: "Nästan mono"
+  </dest>
+  <voice>
+    *: "Nästan mono"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_NARROW
+  desc: sound read-out, space: below average stereo width
+  user: core
+  <source>
+    *: "Narrow"
+  </source>
+  <dest>
+    *: "Smal"
+  </dest>
+  <voice>
+    *: "Smal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_WIDE
+  desc: sound read-out, space: above average stereo width
+  user: core
+  <source>
+    *: "Wide"
+  </source>
+  <dest>
+    *: "Bred"
+  </dest>
+  <voice>
+    *: "Bred"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_VERY_WIDE
+  desc: sound read-out, space: very wide stereo
+  user: core
+  <source>
+    *: "Very wide"
+  </source>
+  <dest>
+    *: "Mycket bred"
+  </dest>
+  <voice>
+    *: "Mycket bred"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_DYNAMIC
+  desc: sound read-out, master: a large gap between peak and average
+  user: core
+  <source>
+    *: "Very dynamic"
+  </source>
+  <dest>
+    *: "Mycket dynamisk"
+  </dest>
+  <voice>
+    *: "Mycket dynamisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_DYNAMIC
+  desc: sound read-out, master: an above average gap between peak and average
+  user: core
+  <source>
+    *: "Dynamic"
+  </source>
+  <dest>
+    *: "Dynamisk"
+  </dest>
+  <voice>
+    *: "Dynamisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_EVEN
+  desc: sound read-out, master: an average gap between peak and average
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "Jämn"
+  </dest>
+  <voice>
+    *: "Jämn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_COMPRESSED
+  desc: sound read-out, master: a small gap between peak and average
+  user: core
+  <source>
+    *: "Compressed"
+  </source>
+  <dest>
+    *: "Komprimerad"
+  </dest>
+  <voice>
+    *: "Komprimerad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_COMPRESSED
+  desc: sound read-out, master: almost no gap between peak and average
+  user: core
+  <source>
+    *: "Very compressed"
+  </source>
+  <dest>
+    *: "Mycket komprimerad"
+  </dest>
+  <voice>
+    *: "Mycket komprimerad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_STATIC
+  desc: sound read-out, movement: the harmony barely moves
+  user: core
+  <source>
+    *: "Static"
+  </source>
+  <dest>
+    *: "Statisk"
+  </dest>
+  <voice>
+    *: "Statisk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_GENTLE
+  desc: sound read-out, movement: the harmony moves a little
+  user: core
+  <source>
+    *: "Gentle"
+  </source>
+  <dest>
+    *: "Lugn"
+  </dest>
+  <voice>
+    *: "Lugn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_SHIFTING
+  desc: sound read-out, movement: the harmony moves often
+  user: core
+  <source>
+    *: "Shifting"
+  </source>
+  <dest>
+    *: "Skiftande"
+  </dest>
+  <voice>
+    *: "Skiftande"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_RESTLESS
+  desc: sound read-out, movement: the harmony moves constantly
+  user: core
+  <source>
+    *: "Restless"
+  </source>
+  <dest>
+    *: "Rastlös"
+  </dest>
+  <voice>
+    *: "Rastlös"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MAJOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "major"
+  </source>
+  <dest>
+    *: "dur"
+  </dest>
+  <voice>
+    *: "dur"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MINOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "minor"
+  </source>
+  <dest>
+    *: "moll"
+  </dest>
+  <voice>
+    *: "moll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_UNCLEAR
+  desc: sound read-out, key: the pitch content did not commit to one
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Oklar"
+  </dest>
+  <voice>
+    *: "Oklar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIBRARY
+  desc: on the Playlist Engine menu, the row opening the library read-out, and its screen title
+  user: core
+  <source>
+    *: "Library Sound"
+  </source>
+  <dest>
+    *: "Bibliotekets ljud"
+  </dest>
+  <voice>
+    *: "Bibliotekets ljud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MEASURED
+  desc: library read-out: tracks the analysis has measured, of the tracks there are
+  user: core
+  <source>
+    *: "Measured"
+  </source>
+  <dest>
+    *: "Uppmätta"
+  </dest>
+  <voice>
+    *: "Uppmätta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNREADABLE
+  desc: library read-out: tracks the analysis reached but could not decode
+  user: core
+  <source>
+    *: "Unreadable"
+  </source>
+  <dest>
+    *: "Oläsbara"
+  </dest>
+  <voice>
+    *: "Oläsbara"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_TEMPO
+  desc: library read-out: measured tracks whose tempo the engine trusts
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "~Tempo"
+  </dest>
+  <voice>
+    *: "~Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEY
+  desc: library read-out: measured tracks that settled on a key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "Tonart"
+  </dest>
+  <voice>
+    *: "Tonart"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_COMPARED
+  desc: library read-out: which music the per-track sound words are measured against
+  user: core
+  <source>
+    *: "Compared To"
+  </source>
+  <dest>
+    *: "Jämfört med"
+  </dest>
+  <voice>
+    *: "Jämfört med"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OWN
+  desc: library read-out, Compared To: the words are this library's own percentiles
+  user: core
+  <source>
+    *: "Your library"
+  </source>
+  <dest>
+    *: "Ditt bibliotek"
+  </dest>
+  <voice>
+    *: "Ditt bibliotek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_SHIPPED
+  desc: library read-out, Compared To: too few measured tracks, so the built-in numbers stand
+  user: core
+  <source>
+    *: "Built-in defaults"
+  </source>
+  <dest>
+    *: "Inbyggda standardvärden"
+  </dest>
+  <voice>
+    *: "Inbyggda standardvärden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OVERVIEW
+  desc: Library Sound menu: the counts of what has been measured
+  user: core
+  <source>
+    *: "Overview"
+  </source>
+  <dest>
+    *: "Översikt"
+  </dest>
+  <voice>
+    *: "Översikt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MOODS
+  desc: Library Sound menu: how many tracks each mood playlist can draw on
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "Stämningar"
+  </dest>
+  <voice>
+    *: "Stämningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_PACE
+  desc: Library Sound menu: how many tracks fall in each tempo band
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "Tempo"
+  </dest>
+  <voice>
+    *: "Tempo"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEYS
+  desc: Library Sound menu: how many tracks are in each musical key
+  user: core
+  <source>
+    *: "Keys"
+  </source>
+  <dest>
+    *: "Tonarter"
+  </dest>
+  <voice>
+    *: "Tonarter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_DECADES
+  desc: Library Sound menu: the average loudness of the tracks from each decade
+  user: core
+  <source>
+    *: "Loudness by Decade"
+  </source>
+  <dest>
+    *: "Ljudstyrka per decennium"
+  </dest>
+  <voice>
+    *: "Ljudstyrka per decennium"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_MOOD
+  desc: Library Sound, Moods: tracks that no mood playlist would offer
+  user: core
+  <source>
+    *: "In no mood"
+  </source>
+  <dest>
+    *: "Utan stämning"
+  </dest>
+  <voice>
+    *: "Utan stämning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNCLEAR
+  desc: Library Sound, Pace and Keys: tracks with no tempo or no key the engine trusts
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "Oklar"
+  </dest>
+  <voice>
+    *: "Oklar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_YEAR
+  desc: Library Sound, Loudness by Decade: tracks with no year in their tags
+  user: core
+  <source>
+    *: "No year"
+  </source>
+  <dest>
+    *: "Inget år"
+  </dest>
+  <voice>
+    *: "Inget år"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER
+  desc: in the playlist viewer's context menu, puts the playlist in an order where neighbouring tracks sound alike
+  user: core
+  <source>
+    *: "Order by Sound"
+  </source>
+  <dest>
+    *: "Ordna efter ljud"
+  </dest>
+  <voice>
+    *: "Ordna efter ljud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_LONG
+  desc: Order by Sound: the playlist holds more tracks than one pass can order
+  user: core
+  <source>
+    *: "Too many tracks to order"
+  </source>
+  <dest>
+    *: "För många spår att ordna"
+  </dest>
+  <voice>
+    *: "För många spår att ordna"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_SOME
+  desc: Order by Sound: done, but this many tracks had no measurement and went to the end
+  user: core
+  <source>
+    *: "Ordered. %d not measured"
+  </source>
+  <dest>
+    *: "Ordnad. %d ej uppmätta"
+  </dest>
+  <voice>
+    *: "Ordnad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_NONE
+  desc: Order by Sound: none of the playlist's tracks has been measured
+  user: core
+  <source>
+    *: "None of these tracks has been analysed"
+  </source>
+  <dest>
+    *: "Inget av spåren har analyserats"
+  </dest>
+  <voice>
+    *: "Inget av spåren har analyserats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_FAILED
+  desc: Order by Sound: the playlist could not be put in the new order
+  user: core
+  <source>
+    *: "Could not reorder the playlist"
+  </source>
+  <dest>
+    *: "Kunde inte ordna om spellistan"
+  </dest>
+  <voice>
+    *: "Kunde inte ordna om spellistan"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM
+  desc: on a folder's context menu, the row opening the sound read-out for the whole folder, and its screen title
+  user: core
+  <source>
+    *: "Album Sound"
+  </source>
+  <dest>
+    *: "Albumets ljud"
+  </dest>
+  <voice>
+    *: "Albumets ljud"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM_NONE
+  desc: Album Sound: nothing in this folder has been measured yet
+  user: core
+  <source>
+    *: "Nothing here has been analysed"
+  </source>
+  <dest>
+    *: "Inget här har analyserats"
+  </dest>
+  <voice>
+    *: "Inget här har analyserats"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_IN_PROGRESS
+  desc: Audiobooks menu: the books started and not finished
+  user: core
+  <source>
+    *: "In progress"
+  </source>
+  <dest>
+    *: "Påbörjade"
+  </dest>
+  <voice>
+    *: "Påbörjade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_NOT_STARTED
+  desc: Audiobooks menu: the books nothing of which has been played
+  user: core
+  <source>
+    *: "Not started"
+  </source>
+  <dest>
+    *: "Ej påbörjade"
+  </dest>
+  <voice>
+    *: "Ej påbörjade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_FINISHED
+  desc: Audiobooks menu: the books played through to the end
+  user: core
+  <source>
+    *: "Finished"
+  </source>
+  <dest>
+    *: "Avslutade"
+  </dest>
+  <voice>
+    *: "Avslutade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW
+  desc: a row of the Audiobooks In progress list: book name, percent heard
+  user: core
+  <source>
+    *: "%s - %d%%"
+  </source>
+  <dest>
+    *: "~%s - %d%%"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_EMPTY
+  desc: splash when an Audiobooks In progress, Not started or Finished list is empty
+  user: core
+  <source>
+    *: "No books here"
+  </source>
+  <dest>
+    *: "Inga böcker här"
+  </dest>
+  <voice>
+    *: "Inga böcker här"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_QUIZ
+  desc: main menu: the Music Quiz, a name-that-track game
+  user: core
+  <source>
+    *: "Music Quiz"
+  </source>
+  <dest>
+    *: "Musikquiz"
+  </dest>
+  <voice>
+    *: "Musikquiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_STOP_PLAYBACK
+  desc: Music Quiz: asked before stopping what is playing
+  user: core
+  <source>
+    *: "Stop playback?"
+  </source>
+  <dest>
+    *: "Stoppa uppspelningen?"
+  </dest>
+  <voice>
+    *: "Stoppa uppspelningen?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE
+  desc: Music Quiz: asked on Menu during a round
+  user: core
+  <source>
+    *: "Leave the quiz?"
+  </source>
+  <dest>
+    *: "Lämna quizet?"
+  </dest>
+  <voice>
+    *: "Lämna quizet?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TOO_FEW
+  desc: Music Quiz: the library has too few tracks to make ten rounds
+  user: core
+  <source>
+    *: "Not enough music for a quiz"
+  </source>
+  <dest>
+    *: "Inte tillräckligt med musik för ett quiz"
+  </dest>
+  <voice>
+    *: "Inte tillräckligt med musik för ett quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_BEST
+  desc: Music Quiz: the best score so far, under a result that did not beat it
+  user: core
+  <source>
+    *: "Best %d"
+  </source>
+  <dest>
+    *: "Rekord %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_NEW_BEST
+  desc: Music Quiz result: the score beats the best so far
+  user: core
+  <source>
+    *: "New best"
+  </source>
+  <dest>
+    *: "Nytt rekord"
+  </dest>
+  <voice>
+    *: "Nytt rekord"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LISTENING
+  desc: Music Quiz: before the clip can be heard; nothing drains yet
+  user: core
+  <source>
+    *: "Listening..."
+  </source>
+  <dest>
+    *: "Lyssnar..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_RIGHT
+  desc: Music Quiz: the title picked was the track's
+  user: core
+  <source>
+    *: "Right"
+  </source>
+  <dest>
+    *: "Rätt"
+  </dest>
+  <voice>
+    *: "Rätt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_WRONG
+  desc: Music Quiz: the title picked was not the track's
+  user: core
+  <source>
+    *: "Not that one"
+  </source>
+  <dest>
+    *: "Inte den"
+  </dest>
+  <voice>
+    *: "Inte den"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TIMES_UP
+  desc: Music Quiz: the round ran out before a title was picked
+  user: core
+  <source>
+    *: "Time's up"
+  </source>
+  <dest>
+    *: "Tiden är ute"
+  </dest>
+  <voice>
+    *: "Tiden är ute"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED
+  desc: Music Quiz: the round is paused
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "Pausad"
+  </dest>
+  <voice>
+    *: "Pausad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED_HINT
+  desc: Music Quiz: under Paused, how to carry on
+  user: core
+  <source>
+    *: "Press Play to resume"
+  </source>
+  <dest>
+    *: "Tryck Spela för att fortsätta"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_OUT_OF
+  desc: Music Quiz result: beside the score, the most it could have been
+  user: core
+  <source>
+    *: "of %d"
+  </source>
+  <dest>
+    *: "av %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_EASIER
+  desc: Music Quiz result: under the first round's tile
+  user: core
+  <source>
+    *: "easier"
+  </source>
+  <dest>
+    *: "lättare"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_HARDER
+  desc: Music Quiz result: under the last round's tile
+  user: core
+  <source>
+    *: "harder"
+  </source>
+  <dest>
+    *: "svårare"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_SELECT
+  desc: Music Quiz result: the name of the key that plays again
+  user: core
+  <source>
+    *: "Select"
+  </source>
+  <dest>
+    *: "Mitt"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PLAY_AGAIN
+  desc: Music Quiz result: what the Select key does
+  user: core
+  <source>
+    *: "play again"
+  </source>
+  <dest>
+    *: "igen"
+  </dest>
+  <voice>
+    *: "Spela igen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_MENU
+  desc: Music Quiz result: the name of the key that leaves
+  user: core
+  <source>
+    *: "Menu"
+  </source>
+  <dest>
+    *: "Meny"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE_HINT
+  desc: Music Quiz result: what the Menu key does
+  user: core
+  <source>
+    *: "leave"
+  </source>
+  <dest>
+    *: "avsluta"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ
+  desc: Music menu: the row that starts the Music Quiz
+  user: core
+  <source>
+    *: "Quiz"
+  </source>
+  <dest>
+    *: "~Quiz"
+  </dest>
+  <voice>
+    *: "~Quiz"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_PROGRESS
+  desc: top of the Audiobooks Book list: the books started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[Påbörjade]"
+  </dest>
+  <voice>
+    *: "Påbörjade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_NEW
+  desc: top of the Audiobooks Book list: the books not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[Ej påbörjade]"
+  </dest>
+  <voice>
+    *: "Ej påbörjade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_FINISHED
+  desc: top of the Audiobooks Book list: the books finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[Avslutade]"
+  </dest>
+  <voice>
+    *: "Avslutade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OUTPUT
+  desc: in the System > USB menu
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "USB DAC Output"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB-DAC-utgång"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "U S B DAC utgång"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_ON
+  desc: splash: playback has moved to a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through USB DAC"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Spelar via USB-DAC"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Spelar via U S B DAC"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OFF
+  desc: splash: playback has moved back from a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Spelar via hörlurar"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Spelar via hörlurar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_AUTO
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Start Automatically"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Starta automatiskt"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Starta automatiskt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_ON
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn On"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Slå på"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Slå på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_OFF
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn Off"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Stäng av"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Stäng av"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_NOT_FOUND
+  desc: splash: Turn On found no USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "No USB DAC found"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "Ingen USB-DAC hittades"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "Ingen U S B DAC hittades"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_PROTOCOL
+  desc: in accessories settings: answer iAP docks and car kits
+  user: core
+  <source>
+    *: "Accessory Protocol"
+  </source>
+  <dest>
+    *: "Tillbehörsprotokoll"
+  </dest>
+  <voice>
+    *: "Tillbehörsprotokoll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_BROWSING
+  desc: in accessories settings: how many entries a browsing accessory's lists hold
+  user: core
+  <source>
+    *: "Accessory Browsing"
+  </source>
+  <dest>
+    *: "Bläddring från tillbehör"
+  </dest>
+  <voice>
+    *: "Bläddring från tillbehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_CONNECTED
+  desc: splash: an iAP accessory has identified itself
+  user: core
+  <source>
+    *: "Accessory connected"
+  </source>
+  <dest>
+    *: "Tillbehör anslutet"
+  </dest>
+  <voice>
+    *: "Tillbehör anslutet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES
+  desc: in Music settings: sort artists and albums past a leading The, A or An
+  user: core
+  <source>
+    *: "Sort Ignoring The/A/An"
+  </source>
+  <dest>
+    *: "Sortera utan The/A/An"
+  </dest>
+  <voice>
+    *: "Sortera utan The/A/An"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_FROM_FOLDER
+  desc: in Database settings: take the year from a "YYYY - Album" folder name
+  user: core
+  <source>
+    *: "Year From Folder Name"
+  </source>
+  <dest>
+    *: "År från mappnamn"
+  </dest>
+  <voice>
+    *: "År från mappnamn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_STARTS_WITH_SELECTED
+  desc: in Playlist Engine settings: Play Similar and Wind Down lead with the chosen track
+  user: core
+  <source>
+    *: "Play Selected First"
+  </source>
+  <dest>
+    *: "Spela valt spår först"
+  </dest>
+  <voice>
+    *: "Spela valt spår först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BG_CUSTOM
+  desc: in Carousel settings: Carousel Background choice, a colour of your own
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Egen"
+  </dest>
+  <voice>
+    *: "Egen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_CUSTOM_COLOR
+  desc: in Carousel settings: the colour Carousel Background uses when Custom
+  user: core
+  <source>
+    *: "Custom Colour"
+  </source>
+  <dest>
+    *: "Egen färg"
+  </dest>
+  <voice>
+    *: "Egen färg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_BACKGROUND
+  desc: in Colours settings: which of the album's two colours is the background
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Bakgrund för dyn. färger"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Bakgrund för dynamiska färger"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_LIGHT
+  desc: in Colours settings: Dynamic Colors Background choice, the lighter one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Light"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Ljus"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Ljus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_DARK
+  desc: in Colours settings: Dynamic Colors Background choice, the darker one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dark"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "Mörk"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "Mörk"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_QUESTIONS
+  desc: in Music settings: the Music Quiz's kinds of question
+  user: core
+  <source>
+    *: "Quiz Questions"
+  </source>
+  <dest>
+    *: "Quizfrågor"
+  </dest>
+  <voice>
+    *: "Quizfrågor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_TITLE
+  desc: Music Quiz: a round asking for the track's title; also its setting
+  user: core
+  <source>
+    *: "Name the Track"
+  </source>
+  <dest>
+    *: "Gissa låten"
+  </dest>
+  <voice>
+    *: "Gissa låten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ARTIST
+  desc: Music Quiz: a round asking for the track's artist; also its setting
+  user: core
+  <source>
+    *: "Name the Artist"
+  </source>
+  <dest>
+    *: "Gissa artisten"
+  </dest>
+  <voice>
+    *: "Gissa artisten"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ALBUM
+  desc: Music Quiz: a round asking for the track's album; also its setting
+  user: core
+  <source>
+    *: "Name the Album"
+  </source>
+  <dest>
+    *: "Gissa albumet"
+  </dest>
+  <voice>
+    *: "Gissa albumet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_YEAR
+  desc: Music Quiz: a round asking for the track's year; also its setting
+  user: core
+  <source>
+    *: "Name the Year"
+  </source>
+  <dest>
+    *: "Gissa året"
+  </dest>
+  <voice>
+    *: "Gissa året"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_ONE_KIND
+  desc: splash: the last kind of quiz question cannot be turned off
+  user: core
+  <source>
+    *: "One kind of question has to stay on"
+  </source>
+  <dest>
+    *: "En frågetyp måste vara på"
+  </dest>
+  <voice>
+    *: "En frågetyp måste vara på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAR_ARTWORK
+  desc: in accessories settings: where the cover art sent to a car comes from
+  user: core
+  <source>
+    *: "Accessory Artwork"
+  </source>
+  <dest>
+    *: "Omslag till tillbehör"
+  </dest>
+  <voice>
+    *: "Omslag till tillbehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AS_ALBUM_ART
+  desc: in Accessory Artwork: the same sources, in the same order, as Album Art
+  user: core
+  <source>
+    *: "As Album Art"
+  </source>
+  <dest>
+    *: "Som albumomslag"
+  </dest>
+  <voice>
+    *: "Som albumomslag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP2_ACCESSORIES
+  desc: in accessories settings: answering accessories that expect an iPhone (iAP2) over USB
+  user: core
+  <source>
+    *: "Support iPhone Accessories"
+  </source>
+  <dest>
+    *: "Stöd för iPhone-tillbehör"
+  </dest>
+  <voice>
+    *: "Stöd för i Phone tillbehör"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PLUS_YEAR_DESC
+  desc: "Sort Albums By" option: by artist, then release year, newest first
+  user: core
+  <source>
+    *: "Artist + Year (newest first)"
+  </source>
+  <dest>
+    *: "Artist + år (nyast först)"
+  </dest>
+  <voice>
+    *: "Artist och år, nyast först"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MARK_AS
+  desc: a book's context menu: move a book to In progress, Not started or Finished
+  user: core
+  <source>
+    *: "Mark as..."
+  </source>
+  <dest>
+    *: "Markera som..."
+  </dest>
+  <voice>
+    *: "Markera som"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLLING_ENABLED
+  desc: in the Scrolling menu, off cuts long text to fit with "..." instead of scrolling it
+  user: core
+  <source>
+    *: "Enabled"
+  </source>
+  <dest>
+    *: "På"
+  </dest>
+  <voice>
+    *: "Rullning på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_ELEMENTS
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_READING_HISTORY
+  desc: Playback Report, progress while the play log is read
+  user: core
+  <source>
+    *: "Reading play history"
+  </source>
+  <dest>
+    *: "Läser lyssningshistorik"
+  </dest>
+  <voice>
+    *: "Läser lyssningshistorik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MOVED_FOLDERS
+  desc: Playback Report, progress while it matches logged files to folders they have moved to
+  user: core
+  <source>
+    *: "Looking for moved folders"
+  </source>
+  <dest>
+    *: "Letar efter flyttade mappar"
+  </dest>
+  <voice>
+    *: "Letar efter flyttade mappar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN_DEFAULT
+  desc: Wind Down length choice: the time left on the sleep timer, or Playlist Length with none running
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "Standard"
+  </dest>
+  <voice>
+    *: "Standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_YEAR_IN_ALBUM_LISTS
+  desc: in Library > Music: the release year after each album name in the browser's album lists
+  user: core
+  <source>
+    *: "Show Year in Album Lists"
+  </source>
+  <dest>
+    *: "Visa år i albumlistor"
+  </dest>
+  <voice>
+    *: "Visa år i albumlistor"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_SINGLE_LISTS
+  desc: in Library > Music: a list holding one row opens that row instead
+  user: core
+  <source>
+    *: "Skip One-Item Lists"
+  </source>
+  <dest>
+    *: "Hoppa över listor med en rad"
+  </dest>
+  <voice>
+    *: "Hoppa över listor med en rad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LENGTH
+  desc: in Carousel settings: how many covers a held PLAY spins past before the random pick
+  user: core
+  <source>
+    *: "Random Spin Length"
+  </source>
+  <dest>
+    *: "Längd på slumpsnurr"
+  </dest>
+  <voice>
+    *: "Längd på slumpsnurr"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_SHORT
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "Kort"
+  </dest>
+  <voice>
+    *: "Kort"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_MEDIUM
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Medium"
+  </source>
+  <dest>
+    *: "Medel"
+  </dest>
+  <voice>
+    *: "Medel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LONG
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Long"
+  </source>
+  <dest>
+    *: "Lång"
+  </dest>
+  <voice>
+    *: "Lång"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DISK_ACTIVITY
+  desc: Elements setting: show the disk activity indicator
+  user: core
+  <source>
+    *: "Show Disk Activity"
+  </source>
+  <dest>
+    *: "Visa diskaktivitet"
+  </dest>
+  <voice>
+    *: "Visa diskaktivitet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_BACKGROUND_TASKS
+  desc: Elements setting: show the background tasks indicator
+  user: core
+  <source>
+    *: "Show Background Tasks"
+  </source>
+  <dest>
+    *: "Visa bakgrundsuppgifter"
+  </dest>
+  <voice>
+    *: "Visa bakgrundsuppgifter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_WORKING
+  desc: Elements setting: show the working indicator
+  user: core
+  <source>
+    *: "Show Working"
+  </source>
+  <dest>
+    *: "Visa arbetsindikator"
+  </dest>
+  <voice>
+    *: "Visa arbetsindikator"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACTIVITY_INDICATORS
+  desc: Elements submenu holding the three Show indicator settings
+  user: core
+  <source>
+    *: "Activity Indicators"
+  </source>
+  <dest>
+    *: "Aktivitetsindikatorer"
+  </dest>
+  <voice>
+    *: "Aktivitetsindikatorer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_UPGRADE
+  desc: boot screen caption while the library's files are upgraded to a new layout, the database included
+  user: core
+  <source>
+    *: "Performing maintenance..."
+  </source>
+  <dest>
+    *: "Utför underhåll..."
+  </dest>
+  <voice>
+    *: "Utför underhåll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_REFUSED
+  desc: album screens, when the database is too large to load into memory this session
+  user: core
+  <source>
+    *: "Library too large to hold in memory"
+  </source>
+  <dest>
+    *: "Biblioteket är för stort för minnet"
+  </dest>
+  <voice>
+    *: "Biblioteket är för stort för minnet"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_NOT_FOUND
+  desc: Album Covers, when the album playing is not among the covers
+  user: core
+  <source>
+    *: "Album not found"
+  </source>
+  <dest>
+    *: "Albumet hittades inte"
+  </dest>
+  <voice>
+    *: "Albumet hittades inte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_PLACEHOLDER
+  desc: carousel, when the cover shown for an album without art cannot be read
+  user: core
+  <source>
+    *: "Could not load the placeholder cover"
+  </source>
+  <dest>
+    *: "Kunde inte ladda ersättningsomslaget"
+  </dest>
+  <voice>
+    *: "Kunde inte ladda ersättningsomslaget"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_START
+  desc: carousel, when its drawing thread cannot be started
+  user: core
+  <source>
+    *: "Could not start the carousel"
+  </source>
+  <dest>
+    *: "Kunde inte starta karusellen"
+  </dest>
+  <voice>
+    *: "Kunde inte starta karusellen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_DIR
+  desc: carousel, followed by the folder it could not make
+  user: core
+  <source>
+    *: "Could not create directory"
+  </source>
+  <dest>
+    *: "Kunde inte skapa mappen"
+  </dest>
+  <voice>
+    *: "Kunde inte skapa mappen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TOO_LARGE
+  desc: carousel, when the library has more albums or artists than it can hold
+  user: core
+  <source>
+    *: "Library too large for this screen"
+  </source>
+  <dest>
+    *: "Biblioteket är för stort för den här vyn"
+  </dest>
+  <voice>
+    *: "Biblioteket är för stort för den här vyn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ALBUMS
+  desc: Album Covers, when the database holds no albums
+  user: core
+  <source>
+    *: "No albums found -- turn the database on"
+  </source>
+  <dest>
+    *: "Inga album hittades -- slå på databasen"
+  </dest>
+  <voice>
+    *: "Inga album hittades -- slå på databasen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ARTISTS
+  desc: Artist Portraits, when the database holds no artists
+  user: core
+  <source>
+    *: "No artists found -- turn the database on"
+  </source>
+  <dest>
+    *: "Inga artister hittades -- slå på databasen"
+  </dest>
+  <voice>
+    *: "Inga artister hittades -- slå på databasen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PRESS_ANY_BUTTON
+  desc: after a carousel error, before it closes
+  user: core
+  <source>
+    *: "press any button to continue"
+  </source>
+  <dest>
+    *: "tryck på valfri knapp för att fortsätta"
+  </dest>
+  <voice>
+    *: "tryck på valfri knapp för att fortsätta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYBACK_REPORT
+  desc: title of the Playback Report
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "Lyssningsrapport"
+  </dest>
+  <voice>
+    *: "Lyssningsrapport"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_BY_WEEK
+  desc: Playback Report, heading of the calendar of weeks
+  user: core
+  <source>
+    *: "By week"
+  </source>
+  <dest>
+    *: "Per vecka"
+  </dest>
+  <voice>
+    *: "Per vecka"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NEVER_SKIPPED
+  desc: Playback Report, heading of the tracks never skipped
+  user: core
+  <source>
+    *: "Never skipped"
+  </source>
+  <dest>
+    *: "Aldrig överhoppade"
+  </dest>
+  <voice>
+    *: "Aldrig överhoppade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SKIP_EVERYTHING
+  desc: Playback Report, the same heading when every track has been skipped
+  user: core
+  <source>
+    *: "You skip everything?!"
+  </source>
+  <dest>
+    *: "Du hoppar över allt?!"
+  </dest>
+  <voice>
+    *: "Du hoppar över allt?!"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGE_VIEWER
+  desc: title of the Image Viewer menu
+  user: core
+  <source>
+    *: "Image Viewer"
+  </source>
+  <dest>
+    *: "Bildvisare"
+  </dest>
+  <voice>
+    *: "Bildvisare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NEW
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Newly unlocked"
+  </source>
+  <dest>
+    *: "Nyss upplåsta"
+  </dest>
+  <voice>
+    *: "Nyss upplåsta"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NUMBERS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "In numbers"
+  </source>
+  <dest>
+    *: "I siffror"
+  </dest>
+  <voice>
+    *: "I siffror"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_WEEKS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Week by week"
+  </source>
+  <dest>
+    *: "Vecka för vecka"
+  </dest>
+  <voice>
+    *: "Vecka för vecka"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ARTISTS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top artists"
+  </source>
+  <dest>
+    *: "Toppartister"
+  </dest>
+  <voice>
+    *: "Toppartister"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SONGS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top songs"
+  </source>
+  <dest>
+    *: "Topplåtar"
+  </dest>
+  <voice>
+    *: "Topplåtar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ALBUMS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top albums"
+  </source>
+  <dest>
+    *: "Toppalbum"
+  </dest>
+  <voice>
+    *: "Toppalbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SKIPS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "Överhoppade"
+  </dest>
+  <voice>
+    *: "Överhoppade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ACH
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "Prestationer"
+  </dest>
+  <voice>
+    *: "Prestationer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MORNING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Morning"
+  </source>
+  <dest>
+    *: "Morgon"
+  </dest>
+  <voice>
+    *: "Morgon"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_AFTERNOON
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Afternoon"
+  </source>
+  <dest>
+    *: "Eftermiddag"
+  </dest>
+  <voice>
+    *: "Eftermiddag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EVENING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Evening"
+  </source>
+  <dest>
+    *: "Kväll"
+  </dest>
+  <voice>
+    *: "Kväll"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NIGHT
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Night"
+  </source>
+  <dest>
+    *: "Natt"
+  </dest>
+  <voice>
+    *: "Natt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_NAME
+  desc: Playback Report, a ranked card whose name was not recorded
+  user: core
+  <source>
+    *: "No name"
+  </source>
+  <dest>
+    *: "Inget namn"
+  </dest>
+  <voice>
+    *: "Inget namn"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_PLAYS_YET
+  desc: Playback Report, a ranked card with nothing in it yet
+  user: core
+  <source>
+    *: "No plays yet"
+  </source>
+  <dest>
+    *: "Inga spelningar än"
+  </dest>
+  <voice>
+    *: "Inga spelningar än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOTHING_YET
+  desc: Playback Report, a card with no figures yet
+  user: core
+  <source>
+    *: "Nothing to show yet"
+  </source>
+  <dest>
+    *: "Inget att visa än"
+  </dest>
+  <voice>
+    *: "Inget att visa än"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_MINUTES
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "Minuter"
+  </dest>
+  <voice>
+    *: "Minuter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_PLAYS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "Spelningar"
+  </dest>
+  <voice>
+    *: "Spelningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SONGS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Songs"
+  </source>
+  <dest>
+    *: "Låtar"
+  </dest>
+  <voice>
+    *: "Låtar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SKIPS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "Överhopp"
+  </dest>
+  <voice>
+    *: "Överhopp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_FROM
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "From"
+  </source>
+  <dest>
+    *: "Från"
+  </dest>
+  <voice>
+    *: "Från"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_TO
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "To"
+  </source>
+  <dest>
+    *: "Till"
+  </dest>
+  <voice>
+    *: "Till"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_MINUTES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes"
+  </source>
+  <dest>
+    *: "minuter"
+  </dest>
+  <voice>
+    *: "minuter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays"
+  </source>
+  <dest>
+    *: "spelningar"
+  </dest>
+  <voice>
+    *: "spelningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_TRACKS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "tracks"
+  </source>
+  <dest>
+    *: "spår"
+  </dest>
+  <voice>
+    *: "spår"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays skipped"
+  </source>
+  <dest>
+    *: "överhoppade"
+  </dest>
+  <voice>
+    *: "överhoppade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PEAK_HOUR
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "peak hour"
+  </source>
+  <dest>
+    *: "bästa timmen"
+  </dest>
+  <voice>
+    *: "bästa timmen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_AFTER_MIDNIGHT
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays after midnight"
+  </source>
+  <dest>
+    *: "efter midnatt"
+  </dest>
+  <voice>
+    *: "efter midnatt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_WEEKS_WITH_MUSIC
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "weeks with music"
+  </source>
+  <dest>
+    *: "veckor med musik"
+  </dest>
+  <voice>
+    *: "veckor med musik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_BEST_DAY
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes on your best day"
+  </source>
+  <dest>
+    *: "minuter bästa dagen"
+  </dest>
+  <voice>
+    *: "minuter bästa dagen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_DAY_STREAK
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "day streak"
+  </source>
+  <dest>
+    *: "dagar i rad"
+  </dest>
+  <voice>
+    *: "dagar i rad"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_OF_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "of plays skipped"
+  </source>
+  <dest>
+    *: "överhoppade"
+  </dest>
+  <voice>
+    *: "överhoppade"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_NEW_BADGES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "new badges"
+  </source>
+  <dest>
+    *: "nya prestationer"
+  </dest>
+  <voice>
+    *: "nya prestationer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ARTIST
+  desc: Playback Report, over the artist a week or year played most
+  user: core
+  <source>
+    *: "Top artist"
+  </source>
+  <dest>
+    *: "Toppartist"
+  </dest>
+  <voice>
+    *: "Toppartist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_SONG
+  desc: Playback Report, over the song a week, artist or album played most
+  user: core
+  <source>
+    *: "Top song"
+  </source>
+  <dest>
+    *: "Topplåt"
+  </dest>
+  <voice>
+    *: "Topplåt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ALBUM
+  desc: Playback Report, over the album an artist played most
+  user: core
+  <source>
+    *: "Top album"
+  </source>
+  <dest>
+    *: "Toppalbum"
+  </dest>
+  <voice>
+    *: "Toppalbum"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_FROM
+  desc: Playback Report, before the album a song is from
+  user: core
+  <source>
+    *: "from"
+  </source>
+  <dest>
+    *: "från"
+  </dest>
+  <voice>
+    *: "från"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EARNED
+  desc: Playback Report, before the date a badge was earned
+  user: core
+  <source>
+    *: "Earned:"
+  </source>
+  <dest>
+    *: "Uppnådd:"
+  </dest>
+  <voice>
+    *: "Uppnådd"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_QUIET_NIGHTS
+  desc: Playback Report, when nothing was played after midnight
+  user: core
+  <source>
+    *: "Your nights are quiet. Respect."
+  </source>
+  <dest>
+    *: "Dina nätter är lugna. Respekt."
+  </dest>
+  <voice>
+    *: "Dina nätter är lugna. Respekt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_YEAR_IN_NUMBERS
+  desc: Playback Report heading; %s is a year or All time
+  user: core
+  <source>
+    *: "%s in numbers"
+  </source>
+  <dest>
+    *: "%s i siffror"
+  </dest>
+  <voice>
+    *: "I siffror"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_ALL_TIME
+  desc: Playback Report, the report over every year
+  user: core
+  <source>
+    *: "All time"
+  </source>
+  <dest>
+    *: "Totalt"
+  </dest>
+  <voice>
+    *: "Totalt"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SETTINGS
+  desc: Playback Report menu, the row that opens its settings
+  user: core
+  <source>
+    *: "Settings"
+  </source>
+  <dest>
+    *: "Inställningar"
+  </dest>
+  <voice>
+    *: "Inställningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT
+  desc: in accessories settings: the menu of TV output settings
+  user: core
+  <source>
+    *: "TV Out"
+  </source>
+  <dest>
+    *: "TV-utgång"
+  </dest>
+  <voice>
+    *: "T V utgång"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE
+  desc: in the TV Out menu: the screen's size on the TV
+  user: core
+  <source>
+    *: "Size"
+  </source>
+  <dest>
+    *: "Storlek"
+  </dest>
+  <voice>
+    *: "Storlek på T V"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_1X
+  desc: TV Out Size choice: the screen pixel for pixel
+  user: core
+  <source>
+    *: "1x"
+  </source>
+  <dest>
+    *: "~1x"
+  </dest>
+  <voice>
+    *: "Verklig storlek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_2X
+  desc: TV Out Size choice: the screen doubled
+  user: core
+  <source>
+    *: "2x"
+  </source>
+  <dest>
+    *: "~2x"
+  </dest>
+  <voice>
+    *: "Dubbel storlek"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD
+  desc: in the TV Out menu: the TV's video standard
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "TV-standard"
+  </dest>
+  <voice>
+    *: "T V standard"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_PAL
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "PAL"
+  </source>
+  <dest>
+    *: "~PAL"
+  </dest>
+  <voice>
+    *: "~Pal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_NTSC
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "NTSC"
+  </source>
+  <dest>
+    *: "~NTSC"
+  </dest>
+  <voice>
+    *: "~N T S C"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_ON
+  desc: in the TV Out menu: start showing the screen on a TV through the dock
+  user: core
+  <source>
+    *: "Turn On"
+  </source>
+  <dest>
+    *: "Slå på"
+  </dest>
+  <voice>
+    *: "Slå på T V utgång"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_OFF
+  desc: in the TV Out menu: stop showing the screen on the TV
+  user: core
+  <source>
+    *: "Turn Off"
+  </source>
+  <dest>
+    *: "Stäng av"
+  </dest>
+  <voice>
+    *: "Stäng av T V utgång"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_ROWS
+  desc: in Appearance > Interface Elements, the submenu holding the database browser's art rows
+  user: core
+  <source>
+    *: "Art Rows"
+  </source>
+  <dest>
+    *: "Bildrader"
+  </dest>
+  <voice>
+    *: "Bildrader"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHUT_DOWN
+  desc: in System > Startup/Shutdown: switch the player off now
+  user: core
+  <source>
+    *: "Shut Down"
+  </source>
+  <dest>
+    *: "Stäng av"
+  </dest>
+  <voice>
+    *: "Stäng av"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBOOT
+  desc: in System > Startup/Shutdown: restart the player now
+  user: core
+  <source>
+    *: "Reboot"
+  </source>
+  <dest>
+    *: "Starta om"
+  </dest>
+  <voice>
+    *: "Starta om"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_ART
+  desc: in Settings, database browser audiobook author art rows
+  user: core
+  <source>
+    *: "Author Art Rows"
+  </source>
+  <dest>
+    *: "Bildrader: författare"
+  </dest>
+  <voice>
+    *: "Bildrader för författare"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SAME_AS_MUSIC
+  desc: in Carousel settings: sort the carousels as the Music lists are sorted
+  user: core
+  <source>
+    *: "Sort Same as Music"
+  </source>
+  <dest>
+    *: "Sortera som Musik"
+  </dest>
+  <voice>
+    *: "Sortera som Musik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_BEFORE_NAME
+  desc: in Show Year in Album Lists: the year ahead of the album name
+  user: core
+  <source>
+    *: "Before"
+  </source>
+  <dest>
+    *: "Före"
+  </dest>
+  <voice>
+    *: "Före"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_AFTER_NAME
+  desc: in Show Year in Album Lists: the year after the album name
+  user: core
+  <source>
+    *: "After"
+  </source>
+  <dest>
+    *: "Efter"
+  </dest>
+  <voice>
+    *: "Efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY
+  desc: in accessories settings: what model an accessory is told the player is
+  user: core
+  <source>
+    *: "Identify As"
+  </source>
+  <dest>
+    *: "Identifiera som"
+  </dest>
+  <voice>
+    *: "Identifiera som"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_OWN
+  desc: in Identify As: the player's own model
+  user: core
+  <source>
+    *: "This Player"
+  </source>
+  <dest>
+    *: "Den här spelaren"
+  </dest>
+  <voice>
+    *: "Den här spelaren"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_CLASSIC
+  desc: in Identify As: an iPod Classic
+  user: core
+  <source>
+    *: "iPod Classic"
+  </source>
+  <dest>
+    *: "~iPod Classic"
+  </dest>
+  <voice>
+    *: "~i Pod Classic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_IPHONE
+  desc: in Identify As: an iPhone 4
+  user: core
+  <source>
+    *: "iPhone 4"
+  </source>
+  <dest>
+    *: "~iPhone 4"
+  </dest>
+  <voice>
+    *: "~i Phone 4"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TAGCACHE
+  desc: in Debug Logs: the database's switch
+  user: core
+  <source>
+    *: "Database Log"
+  </source>
+  <dest>
+    *: "Databaslogg"
+  </dest>
+  <voice>
+    *: "Databaslogg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ARTCACHE
+  desc: in Debug Logs: the art cache's switch
+  user: core
+  <source>
+    *: "Album Art Log"
+  </source>
+  <dest>
+    *: "Albumomslagslogg"
+  </dest>
+  <voice>
+    *: "Albumomslagslogg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_USB
+  desc: in Debug Logs: the USB and accessory log's switch
+  user: core
+  <source>
+    *: "USB and Accessory Log"
+  </source>
+  <dest>
+    *: "USB- och tillbehörslogg"
+  </dest>
+  <voice>
+    *: "U S B och tillbehörslogg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BATTERY
+  desc: in Debug Logs: the battery log's switch
+  user: core
+  <source>
+    *: "Battery Log"
+  </source>
+  <dest>
+    *: "Batterilogg"
+  </dest>
+  <voice>
+    *: "Batterilogg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRY
+  desc: in Debug Logs: how long logs stay on
+  user: core
+  <source>
+    *: "Switch Off After"
+  </source>
+  <dest>
+    *: "Stäng av efter"
+  </dest>
+  <voice>
+    *: "Stäng av efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ALL_OFF
+  desc: in Debug Logs: switch every log off
+  user: core
+  <source>
+    *: "Turn All Off"
+  </source>
+  <dest>
+    *: "Stäng av alla"
+  </dest>
+  <voice>
+    *: "Stäng av alla"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_LEFT
+  desc: in Debug Logs: hours and minutes until the logs switch off
+  user: core
+  <source>
+    *: "Switches Off In %d:%02d"
+  </source>
+  <dest>
+    *: "Stängs av om %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_NONE_ON
+  desc: in Debug Logs: no log is on
+  user: core
+  <source>
+    *: "No Log Is On"
+  </source>
+  <dest>
+    *: "Ingen logg är på"
+  </dest>
+  <voice>
+    *: "Ingen logg är på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_STAY_ON
+  desc: in Debug Logs: Switch Off After is Never
+  user: core
+  <source>
+    *: "Logs Stay On"
+  </source>
+  <dest>
+    *: "Loggar förblir på"
+  </dest>
+  <voice>
+    *: "Loggar förblir på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_FILES
+  desc: in Debug Logs: the size of every log file together
+  user: core
+  <source>
+    *: "Log Files: %s"
+  </source>
+  <dest>
+    *: "Loggfiler: %s"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRED
+  desc: splash when the debug logs switch themselves off
+  user: core
+  <source>
+    *: "Debug logs switched off"
+  </source>
+  <dest>
+    *: "Felsökningsloggar avstängda"
+  </dest>
+  <voice>
+    *: "Felsökningsloggar avstängda"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT
+  desc: splash at boot: a debug log is on, and off in hours:minutes
+  user: core
+  <source>
+    *: "Debug logs on, off in %d:%02d"
+  </source>
+  <dest>
+    *: "Felsökningsloggar på, av om %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT_NEVER
+  desc: splash at boot: a debug log is on and stays on
+  user: core
+  <source>
+    *: "Debug logs on"
+  </source>
+  <dest>
+    *: "Felsökningsloggar på"
+  </dest>
+  <voice>
+    *: "Felsökningsloggar på"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_PLAYBACK
+  desc: in Debug Logs: the playback error log's switch
+  user: core
+  <source>
+    *: "Playback Error Log"
+  </source>
+  <dest>
+    *: "Logg för uppspelningsfel"
+  </dest>
+  <voice>
+    *: "Logg för uppspelningsfel"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_SKIN
+  desc: in Debug Logs: the theme loading log's switch
+  user: core
+  <source>
+    *: "Theme Log"
+  </source>
+  <dest>
+    *: "Temalogg"
+  </dest>
+  <voice>
+    *: "Temalogg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TASKS
+  desc: in Debug Logs: the background task log's switch
+  user: core
+  <source>
+    *: "Background Task Log"
+  </source>
+  <dest>
+    *: "Logg för bakgrundsuppgifter"
+  </dest>
+  <voice>
+    *: "Logg för bakgrundsuppgifter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THOUSANDS_SEPARATOR
+  desc: between each group of three digits in a large number, as in 9,099 -- a full stop or a space in many languages
+  user: core
+  <source>
+    *: ","
+  </source>
+  <dest>
+    *: ","
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUICK_SETTINGS
+  desc: title a theme shows over the Quick Screen, through %Sx(Quick Settings)
+  user: core
+  <source>
+    *: "Quick Settings"
+  </source>
+  <dest>
+    *: "Snabbinställningar"
+  </dest>
+  <voice>
+    *: "Snabbinställningar"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FFRW_STEP_SHORT
+  desc: in Fast-Forward/Rewind: the row for LANG_FFRW_STEP
+  user: core
+  <source>
+    *: "Minimum Step"
+  </source>
+  <dest>
+    *: "Minsta steg"
+  </dest>
+  <voice>
+    *: "Minsta steg"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FFRW_ACCEL_SHORT
+  desc: in Fast-Forward/Rewind: the row for LANG_FFRW_ACCEL
+  user: core
+  <source>
+    *: "Acceleration"
+  </source>
+  <dest>
+    *: "~Acceleration"
+  </dest>
+  <voice>
+    *: "~Acceleration"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_NEXT
+  desc: Auto-Change Directory option: on to the next folder
+  user: core
+  <source>
+    *: "Next Folder"
+  </source>
+  <dest>
+    *: "Nästa mapp"
+  </dest>
+  <voice>
+    *: "Nästa mapp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_RANDOM
+  desc: Auto-Change Directory option: on to a folder picked at random
+  user: core
+  <source>
+    *: "Random Folder"
+  </source>
+  <dest>
+    *: "Slumpad mapp"
+  </dest>
+  <voice>
+    *: "Slumpad mapp"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_NEXT_START
+  desc: Auto-Change Directory option: the next folder, without leaving the Start Directory
+  user: core
+  <source>
+    *: "Next in Start Directory"
+  </source>
+  <dest>
+    *: "Nästa i startkatalogen"
+  </dest>
+  <voice>
+    *: "Nästa i startkatalogen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_RANDOM_START
+  desc: Auto-Change Directory option: a random folder, without leaving the Start Directory
+  user: core
+  <source>
+    *: "Random in Start Directory"
+  </source>
+  <dest>
+    *: "Slumpad i startkatalogen"
+  </dest>
+  <voice>
+    *: "Slumpad i startkatalogen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_MENU
+  desc: submenu of Files, Music and Carousel holding their sort settings
+  user: core
+  <source>
+    *: "Sort"
+  </source>
+  <dest>
+    *: "Sortering"
+  </dest>
+  <voice>
+    *: "Sortering"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_CASE_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_CASE
+  user: core
+  <source>
+    *: "Case Sensitive"
+  </source>
+  <dest>
+    *: "Skiftlägeskänslig"
+  </dest>
+  <voice>
+    *: "Skiftlägeskänslig"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_DIR_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_DIR
+  user: core
+  <source>
+    *: "Directories"
+  </source>
+  <dest>
+    *: "Kataloger"
+  </dest>
+  <voice>
+    *: "Kataloger"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_FILE_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_FILE
+  user: core
+  <source>
+    *: "Files"
+  </source>
+  <dest>
+    *: "Filer"
+  </dest>
+  <voice>
+    *: "Filer"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_INTERPRET_NUMBERS_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_INTERPRET_NUMBERS
+  user: core
+  <source>
+    *: "Interpret Numbers"
+  </source>
+  <dest>
+    *: "Tolka siffror"
+  </dest>
+  <voice>
+    *: "Tolka siffror"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALBUMS_BY_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_ALBUMS_BY
+  user: core
+  <source>
+    *: "Albums By"
+  </source>
+  <dest>
+    *: "Album efter"
+  </dest>
+  <voice>
+    *: "Album efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_ARTISTS_BY
+  user: core
+  <source>
+    *: "Artists By"
+  </source>
+  <dest>
+    *: "Artister efter"
+  </dest>
+  <voice>
+    *: "Artister efter"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_IGNORE_ARTICLES
+  user: core
+  <source>
+    *: "Ignore The/A/An"
+  </source>
+  <dest>
+    *: "Ignorera The/A/An"
+  </dest>
+  <voice>
+    *: "Ignorera The/A/An"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SAME_AS_MUSIC_SHORT
+  desc: in Carousel > Sort: the row for LANG_SORT_SAME_AS_MUSIC
+  user: core
+  <source>
+    *: "Same as Music"
+  </source>
+  <dest>
+    *: "Som Musik"
+  </dest>
+  <voice>
+    *: "Som Musik"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_ON_BATTERY
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT, how long it stays on
+  user: core
+  <source>
+    *: "On Battery"
+  </source>
+  <dest>
+    *: "På batteri"
+  </dest>
+  <voice>
+    *: "På batteri"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_PLUGGED_IN
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_ON_WHEN_CHARGING
+  user: core
+  <source>
+    *: "When Plugged In"
+  </source>
+  <dest>
+    *: "Vid laddning"
+  </dest>
+  <voice>
+    *: "Vid laddning"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_LOCKED
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_ON_BUTTON_HOLD
+  user: core
+  <source>
+    *: "When Locked"
+  </source>
+  <dest>
+    *: "När låst"
+  </dest>
+  <voice>
+    *: "När låst"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_TRACK_CHANGE
+  desc: in Battery & Power > Backlight: the row for LANG_CAPTION_BACKLIGHT
+  user: core
+  <source>
+    *: "On Track Change"
+  </source>
+  <dest>
+    *: "Vid spårbyte"
+  </dest>
+  <voice>
+    *: "Vid spårbyte"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_FADE_IN_SHORT
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_FADE_IN
+  user: core
+  <source>
+    *: "Fade In"
+  </source>
+  <dest>
+    *: "Tona in"
+  </dest>
+  <voice>
+    *: "Tona in"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_FADE_OUT_SHORT
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_FADE_OUT
+  user: core
+  <source>
+    *: "Fade Out"
+  </source>
+  <dest>
+    *: "Tona ut"
+  </dest>
+  <voice>
+    *: "Tona ut"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_EXEMPTIONS
+  desc: in Battery & Power > Backlight: the submenu of presses that act without lighting the screen
+  user: core
+  <source>
+    *: "Exemptions"
+  </source>
+  <dest>
+    *: "Undantag"
+  </dest>
+  <voice>
+    *: "Undantag"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_PRESS_LIGHTS_ONLY
+  desc: First Button Press option: the press that wakes the screen does nothing else
+  user: core
+  <source>
+    *: "Only Lights Screen"
+  </source>
+  <dest>
+    *: "Tänder bara skärmen"
+  </dest>
+  <voice>
+    *: "Tänder bara skärmen"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_PRESS_ALSO_ACTS
+  desc: First Button Press option: the press that wakes the screen also does its usual job
+  user: core
+  <source>
+    *: "Also Acts"
+  </source>
+  <dest>
+    *: "Utför även åtgärden"
+  </dest>
+  <voice>
+    *: "Utför även åtgärden"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE
+  desc: in Battery & Power: the submenu holding Disk Spindown and the storage mode
+  user: core
+  <source>
+    *: "Storage"
+  </source>
+  <dest>
+    *: "Lagring"
+  </dest>
+  <voice>
+    *: "Lagring"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_MODE_SHORT
+  desc: in Battery & Power > Storage: the row for LANG_STORAGE_MODE
+  user: core
+  <source>
+    *: "Mode"
+  </source>
+  <dest>
+    *: "Läge"
+  </dest>
+  <voice>
+    *: "Läge"
   </voice>
 </phrase>
