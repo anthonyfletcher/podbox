@@ -30,6 +30,7 @@
 #include "kernel.h"
 #include "lcd.h"
 #include "font.h"
+#include "power.h"
 #include "rbversion.h"
 #include "backtrace.h"
 #include "safe_read.h"
@@ -115,6 +116,17 @@ static void NORETURN_ATTR hang_show(void)
         stack_scan(hang_sp, (uint32_t)t->stack + t->stack_size, &y);
     lcd_update();
 
+    /* Waiting for a button, as a panic leaves it */
+#ifdef HAVE_ADJUSTABLE_CPU_FREQ
+    if (cpu_boost_lock())
+    {
+        set_cpu_frequency(0);
+        cpu_boost_unlock();
+    }
+#endif
+#ifdef HAVE_ATA_POWER_OFF
+    ide_power_enable(false);
+#endif
     system_exception_wait();
     system_reboot();
     while (1);
@@ -155,4 +167,9 @@ void hang_catch_init(void)
                   : "=r" (irq_stack_top) : : "r2");
     restore_irq(oldlevel);
     tick_add_task(hang_tick);
+}
+
+void hang_catch_stop(void)
+{
+    tick_remove_task(hang_tick);
 }

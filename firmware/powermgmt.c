@@ -35,6 +35,7 @@
 #include "backlight.h"
 #include "lcd.h"
 #include "rtc.h"
+#include "hang_catch.h"
 #if CONFIG_TUNER
 #include "fmradio.h"
 #endif
@@ -755,8 +756,10 @@ static inline void power_thread_step(void)
     if (shutdown_timeout) {
         shutdown_timeout -= POWER_THREAD_STEP_TICKS;
 
-        if (shutdown_timeout <= 0)
+        if (shutdown_timeout <= 0) {
+            hang_catch_stop();
             power_off();
+        }
     }
 
 #ifdef HAVE_RTC_ALARM
@@ -1094,6 +1097,7 @@ void shutdown_hw(enum shutdown_type sd_type)
        byte. */
     sleep(HZ/4);
 
+    hang_catch_stop();
     switch (sd_type) {
     case SHUTDOWN_POWER_OFF:
     default:
