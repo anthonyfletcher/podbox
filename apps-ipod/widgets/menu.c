@@ -49,6 +49,7 @@
 #include "option_select.h"
 #include "speech/talk.h"
 #include "lang.h"
+#include "speech/language.h"            /* lang_id_to_english */
 #include "system/activity.h"
 #include "system/app_util.h"
 #include "audio/sound_feedback.h"
@@ -409,9 +410,11 @@ static bool explain_setting(const struct settings_list *setting)
  *
  * The label rather than something more stable because it is the only identity
  * such a row has at runtime. Renaming a row therefore orphans its stanza, which
- * shows as Explain saying there is nothing rather than as anything worse. */
-static bool explain_action(const char *label)
+ * shows as Explain saying there is nothing rather than as anything worse.
+ * The key is the English label whatever the language, as the file is keyed. */
+static bool explain_action(const unsigned char *desc)
 {
+    const char *label = P2STR(desc);
     char key[96];
 
     if (!label)
@@ -420,7 +423,8 @@ static bool explain_action(const char *label)
         return false;
     }
 
-    snprintf(key, sizeof key, "action: %s", label);
+    snprintf(key, sizeof key, "action: %s",
+             P2ID(desc) != -1 ? lang_id_to_english(P2ID(desc)) : label);
     return explain(key, label);
 }
 
@@ -885,7 +889,7 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                                         ID2P(LANG_EXPLAIN));
 
                     if (do_menu(&action_op_menu, NULL, NULL, false) == 0
-                        && explain_action(P2STR(temp->callback_and_desc->desc)))
+                        && explain_action(temp->callback_and_desc->desc))
                     {
                         ret = GO_TO_ROOT;
                         done = true;
