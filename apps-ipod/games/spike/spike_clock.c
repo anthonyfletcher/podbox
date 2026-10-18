@@ -16,8 +16,7 @@
 
 #include "config.h"
 #include "kernel.h"
-#include "audio.h"            /* audio_status */
-#include "audio.h"            /* audio_current_track */
+#include "audio.h"            /* audio_status, audio_current_track */
 #include "metadata.h"         /* struct mp3entry */
 #include "games/spike/spike_clock.h"
 

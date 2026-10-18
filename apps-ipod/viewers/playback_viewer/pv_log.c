@@ -191,6 +191,20 @@ static void rd_close(void)
     rd.next = -1;
 }
 
+/* Refill the buffer from the open file. False at its end, which leaves the
+ * buffer empty. */
+static bool rd_fill(void)
+{
+    rd.len = (rd.fd >= 0) ? read(rd.fd, rd_buf, sizeof(rd_buf)) : 0;
+    rd.pos = 0;
+    if (rd.len <= 0)
+    {
+        rd.len = 0;
+        return false;
+    }
+    return true;
+}
+
 /* Next line into 'line', CR/LF stripped. Steps across the family
  * transparently, treating each file's end as a line break. False only when
  * everything has been read. */
@@ -200,19 +214,13 @@ static bool rd_line(char *line, int sz)
 
     for (;;)
     {
-        if (rd.pos >= rd.len)
+        if (rd.pos >= rd.len && !rd_fill())
         {
-            rd.len = (rd.fd >= 0) ? read(rd.fd, rd_buf, sizeof(rd_buf)) : 0;
-            rd.pos = 0;
-            if (rd.len <= 0)
-            {
-                rd.len = 0;
-                if (n > 0)
-                    break;          /* an unterminated tail still counts */
-                if (rd.next >= 0 && rd_advance())
-                    continue;       /* next file of the family */
-                break;
-            }
+            if (n > 0)
+                break;              /* an unterminated tail still counts */
+            if (rd.next >= 0 && rd_advance())
+                continue;           /* next file of the family */
+            break;
         }
 
         char c = rd_buf[rd.pos++];
@@ -397,17 +405,11 @@ int pv_log_peek(enum pv_source src, unsigned long offset, void *buf, int len)
     {
         int n;
 
-        if (rd.pos >= rd.len)
+        if (rd.pos >= rd.len && !rd_fill())
         {
-            rd.len = (rd.fd >= 0) ? read(rd.fd, rd_buf, sizeof(rd_buf)) : 0;
-            rd.pos = 0;
-            if (rd.len <= 0)
-            {
-                rd.len = 0;
-                if (rd.next >= 0 && rd_advance())
-                    continue;
-                break;
-            }
+            if (rd.next >= 0 && rd_advance())
+                continue;
+            break;
         }
 
         n = rd.len - rd.pos;

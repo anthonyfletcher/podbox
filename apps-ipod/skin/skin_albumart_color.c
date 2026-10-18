@@ -222,13 +222,6 @@ static int contrast_ratio(int32_t lum_a, int32_t lum_b)
     return (int)((hi * 100) / lo);
 }
 
-/* t: 0..256, 0 = fully c1, 256 = fully c2. The dialog chrome derives its own
- * secondary colours the same way, so the arithmetic lives in draw/color.c. */
-static unsigned int lerp_color(unsigned int c1, unsigned int c2, int t)
-{
-    return color_blend(c1, c2, t);
-}
-
 /* Change to a new pair of colours, or back to the theme's, in one step.
  *
  * Trap: do not interpolate these over a fade. The screen is painted by several
@@ -367,6 +360,20 @@ static int bucket_sector(int i)
     return h * HUE_SECTORS / 360;
 }
 
+/* The bucket's sample count, weighted toward saturated colours. */
+static unsigned int bucket_score(int i)
+{
+    int r4 = (i >> 8) & 0xF;
+    int g4 = (i >> 4) & 0xF;
+    int b4 = i & 0xF;
+    int max_c = MAX(MAX(r4, g4), b4);
+    int min_c = MIN(MIN(r4, g4), b4);
+    int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
+
+    return (unsigned int)histogram[i]
+           * (sat + SATURATION_BASE) / SATURATION_BASE;
+}
+
 /* The picture's strongest run of one hue other than the dominant's, as its
  * best-scored bucket, or -1 when no run covers HUE_MIN_SHARE of the picture.
  * A run centred within a sector of a coloured dominant does not count.
@@ -413,7 +420,7 @@ static int strongest_hue_bucket(int dom_bucket, unsigned int *run_count)
         return -1;
 
     int bucket = -1;
-    unsigned int bucket_score = 0;
+    unsigned int best_score = 0;
 
     for (i = 0; i < HISTOGRAM_BUCKETS; i++)
     {
@@ -422,18 +429,11 @@ static int strongest_hue_bucket(int dom_bucket, unsigned int *run_count)
         if (sector_of[i] < 0 || i == dom_bucket || MIN(d, HUE_SECTORS - d) > 1)
             continue;
 
-        int r4 = (i >> 8) & 0xF;
-        int g4 = (i >> 4) & 0xF;
-        int b4 = i & 0xF;
-        int max_c = MAX(MAX(r4, g4), b4);
-        int min_c = MIN(MIN(r4, g4), b4);
-        int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
-        unsigned int score = (unsigned int)histogram[i]
-                           * (sat + SATURATION_BASE) / SATURATION_BASE;
+        unsigned int score = bucket_score(i);
 
-        if (score > bucket_score)
+        if (score > best_score)
         {
-            bucket_score = score;
+            best_score = score;
             bucket = i;
         }
     }
@@ -479,12 +479,7 @@ static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
         int b8 = (b4 << 4) | b4;
         if (contrast_ratio(dom_rl, rel_luminance(r8, g8, b8)) >= MIN_RATIO)
         {
-            /* Score by count weighted by saturation */
-            int max_c = MAX(MAX(r4, g4), b4);
-            int min_c = MIN(MIN(r4, g4), b4);
-            int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
-            unsigned int score = (unsigned int)histogram[i]
-                               * (sat + SATURATION_BASE) / SATURATION_BASE;
+            unsigned int score = bucket_score(i);
 
             if (score > accent_score)
             {
@@ -556,14 +551,7 @@ static void pick_accent(const fb_data *pixels, int total_pixels, int stride,
     else if (hue_bucket < 0)
     {
         /* Hard fallback: dark dominant -> white text, light -> black */
-        if (dom_lum < 128)
-        {
-            acc_r = 255; acc_g = 255; acc_b = 255;
-        }
-        else
-        {
-            acc_r = 0; acc_g = 0; acc_b = 0;
-        }
+        acc_r = acc_g = acc_b = (dom_lum < 128) ? 255 : 0;
     }
 
     /* Readability enforcement. First try to keep the accent's hue by scaling
@@ -737,12 +725,7 @@ static bool compute_palette(const struct bitmap *bmp, struct found_palette *out)
         if (lum4 < 2)
             continue;
 
-        /* Score by count weighted by saturation (vibrant colors preferred) */
-        int max_c = MAX(MAX(r4, g4), b4);
-        int min_c = MIN(MIN(r4, g4), b4);
-        int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
-        unsigned int score = (unsigned int)histogram[i]
-                           * (sat + SATURATION_BASE) / SATURATION_BASE;
+        unsigned int score = bucket_score(i);
 
         if (score > best_score)
         {
@@ -851,11 +834,7 @@ static bool compute_palette(const struct bitmap *bmp, struct found_palette *out)
             if (contrast_ratio(art_rl, cand_rl) < ART_MIN_RATIO)
                 continue;
 
-            int max_c = MAX(MAX(r4, g4), b4);
-            int min_c = MIN(MIN(r4, g4), b4);
-            int sat = max_c > 0 ? ((max_c - min_c) * 15) / max_c : 0;
-            unsigned int score = (unsigned int)histogram[i]
-                               * (sat + SATURATION_BASE) / SATURATION_BASE;
+            unsigned int score = bucket_score(i);
 
             if (score > rescue_score)
             {
@@ -1898,7 +1877,7 @@ static unsigned int resolve_mapped(unsigned int original,
      * in its own right, so it is placed next to the background instead of
      * being carried over on its own merits. */
     if (original == cache.theme_sep)
-        return lerp_color(eff_dominant, eff_accent, 64);
+        return color_blend(eff_dominant, eff_accent, 64);
 
     /* Everything else: the selector colours when the theme gave them values of
      * their own, and every colour a skin spells out. Carried over.

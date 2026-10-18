@@ -333,7 +333,7 @@ static void lib_keys(int row, char *buf, size_t len)
 static void lib_decades(int row, char *buf, size_t len)
 {
     int d, n;
-    long mean;
+    long mean, abs_mean;
 
     if (row >= lib_ordered)
     {
@@ -348,10 +348,11 @@ static void lib_decades(int row, char *buf, size_t len)
 
     d = lib_order[row];
     mean = lc.decade_db10[d] / lc.decade[d];
+    abs_mean = mean < 0 ? -mean : mean;
 
     snprintf(buf, len, "%ds: %s%ld.%ld dB (%d)", 1900 + d * 10,
-             mean < 0 ? "-" : "", (mean < 0 ? -mean : mean) / 10,
-             (mean < 0 ? -mean : mean) % 10, lc.decade[d]);
+             mean < 0 ? "-" : "", abs_mean / 10, abs_mean % 10,
+             lc.decade[d]);
 }
 
 static const char *lib_get_name(int row, void *data, char *buf, size_t len)

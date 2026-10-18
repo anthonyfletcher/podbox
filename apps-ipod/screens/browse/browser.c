@@ -205,6 +205,7 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
     else
     {
         struct entry *entry = get_valid_entry(__func__, local_tc, selected_item);
+        int masked = entry->attr & FILE_ATTR_MASK;
 
         /* The Search row is not a file type, so the registry filetype_get_icon
          * consults has no entry for it and the row would draw blank. Which
@@ -214,7 +215,7 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
          * Only themes that draw their own icon column override this -- Scrim
          * and Themify_2 test for the row by name in their .sbs and use a
          * search glyph. The rest fall through to here. */
-        if ((entry->attr & FILE_ATTR_MASK) == FILE_ATTR_SEARCH)
+        if (masked == FILE_ATTR_SEARCH)
             return (*local_tc->dirfilter == SHOW_M3U) ? Icon_Playlist
                                                       : Icon_Folder;
 
@@ -222,8 +223,7 @@ static enum themable_icons browser_get_fileicon(int selected_item, void * data)
          * list, so they take the icon the catalogue's other list-opening row
          * takes -- which is also what the themes that draw a chevron key it
          * on. Scrim and Scrim_p override the glyph by name. */
-        if ((entry->attr & FILE_ATTR_MASK) == FILE_ATTR_MOODS
-            || (entry->attr & FILE_ATTR_MASK) == FILE_ATTR_JOURNEYS)
+        if (masked == FILE_ATTR_MOODS || masked == FILE_ATTR_JOURNEYS)
             return Icon_Playlist;
 
         return filetype_get_icon(entry->attr);
@@ -1132,6 +1132,7 @@ static int dirbrowse(void)
     char buf[MAX_PATH];
     int button;
     int oldbutton;
+    int enter_rc;
     bool reload_root = false;
     int lastfilter = *tc.dirfilter;
     bool lastsortcase = global_settings.sort_case;
@@ -1211,37 +1212,29 @@ static int dirbrowse(void)
                     }
                 }
                 entered_from = tc.dirlevel;
-                switch (id3db ? browser_db_enter(&tc, true) : browser_disk_enter(&tc))
+                enter_rc = id3db ? browser_db_enter(&tc, true)
+                                 : browser_disk_enter(&tc);
+                switch (enter_rc)
                 {
                     case GO_TO_FILEBROWSER: reload_dir = true; break;
                     case GO_TO_PLUGIN:
-                        return exit_to_new_screen(GO_TO_PLUGIN);
                     case GO_TO_WPS:
-                        return exit_to_new_screen(GO_TO_WPS);
                     /* The database browser's synthetic album-charts row (see
                      * load_root() in browser_db.c). Codes not named here fall
                      * to the default and are silently dropped, so a new one
                      * has to be added in both places. */
                     case GO_TO_ALBUM_CHARTS:
-                        return exit_to_new_screen(GO_TO_ALBUM_CHARTS);
                     case GO_TO_RANDOM_ALBUM:
-                        return exit_to_new_screen(GO_TO_RANDOM_ALBUM);
                     case GO_TO_DB_SEARCH:
-                        return exit_to_new_screen(GO_TO_DB_SEARCH);
                     case GO_TO_FEATURED_ARTISTS:
-                        return exit_to_new_screen(GO_TO_FEATURED_ARTISTS);
                     case GO_TO_FEATURED_TRACKS:
-                        return exit_to_new_screen(GO_TO_FEATURED_TRACKS);
                     case GO_TO_BOOK_SHELF:
-                        return exit_to_new_screen(GO_TO_BOOK_SHELF);
                     case GO_TO_MUSIC_QUIZ:
-                        return exit_to_new_screen(GO_TO_MUSIC_QUIZ);
                     /* The file browser's and the catalogue's own Search rows
                      * (the FILE_ATTR_SEARCH case in browser_disk_enter()). */
                     case GO_TO_FILE_SEARCH:
-                        return exit_to_new_screen(GO_TO_FILE_SEARCH);
                     case GO_TO_PLAYLIST_SEARCH:
-                        return exit_to_new_screen(GO_TO_PLAYLIST_SEARCH);
+                        return exit_to_new_screen(enter_rc);
                     case GO_TO_ROOT: exit_func = true; break;
                     default:
                         break;

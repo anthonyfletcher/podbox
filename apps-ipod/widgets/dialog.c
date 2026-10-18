@@ -479,7 +479,7 @@ void dialog_draw_button_ex(struct screen *screen,
     int bw = style->button_border_width;
     int old_font = (*screen->current_viewport)->font;
     bool colour = screen->depth > 1;
-    unsigned fill = 0, text = 0;
+    unsigned fill = 0, text = 0, box_fg = 0;
     int lw, lh;
 
     if (style->button_font != DIALOG_FONT_INHERIT)
@@ -493,8 +493,9 @@ void dialog_draw_button_ex(struct screen *screen,
          * selected button takes the box's foreground as its fill and its
          * background as its text, and the unselected one fills with the box's
          * own background, so it reads as the plain outline drawn before. */
-        unsigned box_fg = screen->get_foreground();
         unsigned border;
+
+        box_fg = screen->get_foreground();
 
         fill   = selected ? resolve_fg(screen, style->button_bg_selected)
                           : resolve_bg(screen, style->button_bg);
@@ -508,31 +509,24 @@ void dialog_draw_button_ex(struct screen *screen,
         fill_round_rect(screen, x, y, w, h, r);
         screen->set_foreground(border);
         draw_round_rect(screen, x, y, w, h, r, bw);
-
-        draw_button_content(screen, x, y, w, h, lw, lh, label, align, icon,
-                            scroll_px, overflow_out, selected, colour, fill, text);
-
-        screen->set_foreground(box_fg);      /* restore for the rest of the box */
-        screen->set_drawmode(DRMODE_SOLID);
+    }
+    else if (selected)
+    {
+        screen->set_drawmode(DRMODE_FG);
+        fill_round_rect(screen, x, y, w, h, r);
     }
     else
     {
-        if (selected)
-        {
-            screen->set_drawmode(DRMODE_FG);
-            fill_round_rect(screen, x, y, w, h, r);
-        }
-        else
-        {
-            screen->set_drawmode(DRMODE_SOLID);
-            draw_round_rect(screen, x, y, w, h, r, bw);
-        }
-
-        draw_button_content(screen, x, y, w, h, lw, lh, label, align, icon,
-                            scroll_px, overflow_out, selected, colour, fill, text);
-
         screen->set_drawmode(DRMODE_SOLID);
+        draw_round_rect(screen, x, y, w, h, r, bw);
     }
+
+    draw_button_content(screen, x, y, w, h, lw, lh, label, align, icon,
+                        scroll_px, overflow_out, selected, colour, fill, text);
+
+    if (colour)
+        screen->set_foreground(box_fg);      /* restore for the rest of the box */
+    screen->set_drawmode(DRMODE_SOLID);
 
     if (style->button_font != DIALOG_FONT_INHERIT)
         screen->setfont(old_font);

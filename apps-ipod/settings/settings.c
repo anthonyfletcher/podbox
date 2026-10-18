@@ -578,6 +578,14 @@ static bool theme_overlay_path(char *buf, size_t bufsz)
     return true;
 }
 
+static bool is_tweaked(const struct settings_list *setting)
+{
+    for (int i = 0; i < tweak_count; i++)
+        if (tweaked[i] == setting)
+            return true;
+    return false;
+}
+
 /* Record without writing. Kept separate from the public call because reading
  * the overlay marks everything in it, and writing from there would truncate
  * the file being read. */
@@ -587,9 +595,8 @@ static bool mark_tweak(const struct settings_list *setting)
     if (!setting || !(setting->flags & F_THEME_RESET_MASK))
         return false;
 
-    for (int i = 0; i < tweak_count; i++)
-        if (tweaked[i] == setting)
-            return true;
+    if (is_tweaked(setting))
+        return true;
 
     if (tweak_count >= MAX_TWEAKS)
         return false;
@@ -1015,19 +1022,10 @@ static bool settings_write_config(const char* filename, int options)
                     continue;
                 break;
             case SETTINGS_SAVE_THEME_OVERLAY:
-            {
                 /* Only what the user changed by hand under this theme. */
-                bool marked = false;
-                for (int t = 0; t < tweak_count; t++)
-                    if (tweaked[t] == setting)
-                    {
-                        marked = true;
-                        break;
-                    }
-                if (!marked)
+                if (!is_tweaked(setting))
                     continue;
                 break;
-            }
             case SETTINGS_SAVE_ALL:
             {
                 /*only save sound settings (volume) from F_RESUMESETTING items */

@@ -76,6 +76,37 @@ bool list_need_full_update(void)
     return ret;
 }
 
+void list_flush(struct screen *display, struct viewport *parent)
+{
+    struct skin_dirty_rect dr[SKIN_MAX_DIRTY_RECTS];
+    int nrects = skin_take_dirty_rects(display->screen_type, dr);
+
+    if (list_need_full_update())
+    {
+        display->set_viewport(NULL);
+        display->update();
+        sb_skin_force_next_update();
+    }
+    else
+    {
+        /* Whatever the skin repainted around the list, then the rows.
+         * Several small regions beat one whole screen: the skin usually
+         * owes a clock and a scrollbar, which together are a couple of
+         * thousand pixels against the display's seventy-odd. The viewport
+         * is put back before the rows so this leaves it where the plain
+         * update_viewport() always did. */
+        if (nrects > 0)
+        {
+            display->set_viewport(NULL);
+            for (int r = 0; r < nrects; r++)
+                display->update_rect(dr[r].x, dr[r].y, dr[r].w, dr[r].h);
+            display->set_viewport(parent);
+            sb_skin_force_next_update();
+        }
+        display->update_viewport();
+    }
+}
+
 static bool list_is_dirty(struct gui_synclist *list)
 {
     return TIME_BEFORE(list->dirty_tick, last_dirty_tick);

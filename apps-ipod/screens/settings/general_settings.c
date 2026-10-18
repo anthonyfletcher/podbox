@@ -809,29 +809,29 @@ MENUITEM_SETTING(show_shutdown_message, &global_settings.show_shutdown_message, 
 
 /* The same calls as the Shut Down and Reboot shortcuts, and the same refusal
  * on the charger. */
-static int menu_shutdown(void)
+static bool refused_on_charger(void)
 {
 #if CONFIG_CHARGING && !defined(HAVE_POWEROFF_WHILE_CHARGING)
     if (charger_inserted())
     {
         charging_splash();
-        return 0;
+        return true;
     }
 #endif
-    sys_poweroff();
+    return false;
+}
+
+static int menu_shutdown(void)
+{
+    if (!refused_on_charger())
+        sys_poweroff();
     return 0;
 }
 
 static int menu_reboot(void)
 {
-#if CONFIG_CHARGING && !defined(HAVE_POWEROFF_WHILE_CHARGING)
-    if (charger_inserted())
-    {
-        charging_splash();
-        return 0;
-    }
-#endif
-    sys_reboot();
+    if (!refused_on_charger())
+        sys_reboot();
     return 0;
 }
 

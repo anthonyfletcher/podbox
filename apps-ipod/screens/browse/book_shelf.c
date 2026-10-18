@@ -189,6 +189,19 @@ static uint32_t track_key(const struct tagcache_search *tcs)
     return (uint32_t)(((disc & 0x7fff) << 16) | (track & 0xffff));
 }
 
+/* A string into the arena, or false when it is full */
+static bool arena_add(const char *s, uint32_t *at)
+{
+    size_t len = strlen(s) + 1;
+
+    if (len > names_sz - names_used)
+        return false;
+    memcpy(names + names_used, s, len);
+    *at = (uint32_t)names_used;
+    names_used += len;
+    return true;
+}
+
 /* A file's path goes into the arena ahead of the book names. */
 static bool collect_resume(uint64_t book, const char *path,
                            const struct book_resume *pos, void *data)
@@ -205,13 +218,11 @@ static bool collect_resume(uint64_t book, const char *path,
     r->path = -1;
     if (path != NULL)
     {
-        size_t len = strlen(path) + 1;
+        uint32_t at;
 
-        if (len > names_sz - names_used)
+        if (!arena_add(path, &at))
             return true;
-        memcpy(names + names_used, path, len);
-        r->path = (int32_t)names_used;
-        names_used += len;
+        r->path = (int32_t)at;
     }
     resume_ct++;
     return true;
@@ -267,19 +278,6 @@ bool book_shelf_is_last_track(const char *book, uint64_t track)
 
     tagcache_search_finish(&tcs);
     return found && mine == last;
-}
-
-/* A string into the arena, or false when it is full */
-static bool arena_add(const char *s, uint32_t *at)
-{
-    size_t len = strlen(s) + 1;
-
-    if (len > names_sz - names_used)
-        return false;
-    memcpy(names + names_used, s, len);
-    *at = (uint32_t)names_used;
-    names_used += len;
-    return true;
 }
 
 /* Every album-table row that is a book, in table order for find_book().
@@ -1061,14 +1059,20 @@ static int shelf_action_cb(int action, struct gui_synclist *lists)
         return action;
     v = rows[n];
 
-    menu_seek = ROW_IS_RESUME(v) ? -1 : books[v].seek;
-    menu_artist_seek = ROW_IS_RESUME(v) ? -1 : books[v].artist_seek;
     if (ROW_IS_RESUME(v))
+    {
+        menu_seek = -1;
+        menu_artist_seek = -1;
         strmemccpy(menu_path, resume_path(ROW_RESUME_OF(v)), sizeof(menu_path));
-    if (!ROW_IS_RESUME(v))
+        marked = book_menu(menu_path, menu_path);
+    }
+    else
+    {
+        menu_seek = books[v].seek;
+        menu_artist_seek = books[v].artist_seek;
         strmemccpy(menu_name, book_name(v), sizeof(menu_name));
-    marked = ROW_IS_RESUME(v) ? book_menu(menu_path, menu_path)
-                              : book_menu(book_id(v), book_name(v));
+        marked = book_menu(book_id(v), book_name(v));
+    }
     if (marked || menu_progress)
         marked_row = n;
     return marked || menu_progress || menu_exit != GO_TO_PREVIOUS

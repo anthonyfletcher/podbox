@@ -120,13 +120,18 @@ static const char *changed_get_name(int selected_item, void *data,
  * to outlive the call that formats it. */
 static char title[64];
 
+static void format_title(void)
+{
+    snprintf(title, sizeof title, "%s (%d)",
+             str(LANG_SETTINGS_CHANGED), row_count);
+}
+
 /* Anything that draws over the list takes the title with it -- an option
  * screen, a yes/no box -- so it is put back rather than set once. Same reason
  * track_info.c re-sets its own after view_text(). */
 static void set_title(struct gui_synclist *lists)
 {
-    snprintf(title, sizeof title, "%s (%d)",
-             str(LANG_SETTINGS_CHANGED), row_count);
+    format_title();
     gui_synclist_set_title(lists, title, NOICON);
 }
 
@@ -193,8 +198,7 @@ bool settings_changed_screen(void)
         return false;
     }
 
-    snprintf(title, sizeof(title), "%s (%d)",
-             str(LANG_SETTINGS_CHANGED), row_count);
+    format_title();
 
     simplelist_info_init(&info, title, row_count, NULL);
     info.get_name = changed_get_name;

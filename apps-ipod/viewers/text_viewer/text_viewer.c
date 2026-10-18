@@ -535,6 +535,14 @@ static void tv_resume_to(off_t target)
 
 /* ---- resume ----------------------------------------------------------- */
 
+/* The space before a resume line's path, or NULL if the line is malformed. */
+static char *tv_resume_path_sep(char *line)
+{
+    char *end_off = strchr(line, ' ');
+
+    return end_off ? strchr(end_off + 1, ' ') : NULL;
+}
+
 /* Lines are "<offset> <size> <path>", newest first. The path trails so it may
  * hold spaces. `size` is the document's length when the offset was recorded:
  * offsets index the extracted text, so a document that has changed on disk
@@ -552,18 +560,13 @@ static off_t tv_resume_load(const char *file, off_t size)
 
     while (read_line(fd, line, sizeof line) > 0)
     {
-        char *end_off = strchr(line, ' ');
-        char *end_size;
+        char *end_size = tv_resume_path_sep(line);
+        char *end_off;
 
-        if (!end_off)
-            continue;
-        end_size = strchr(end_off + 1, ' ');
-        if (!end_size)
+        if (!end_size || strcmp(end_size + 1, file))
             continue;
 
-        if (strcmp(end_size + 1, file))
-            continue;
-
+        end_off = strchr(line, ' ');
         *end_off = *end_size = '\0';
         if ((off_t)atoi(end_off + 1) == size)
             off = (off_t)atoi(line);
@@ -605,12 +608,8 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
         while (ok && kept < TV_RESUME_MAX
                && read_line(old, line, sizeof line) > 0)
         {
-            char *end_off = strchr(line, ' ');
-            char *end_size;
+            char *end_size = tv_resume_path_sep(line);
 
-            if (!end_off)
-                continue;
-            end_size = strchr(end_off + 1, ' ');
             if (!end_size)
                 continue;
             if (!strcmp(end_size + 1, file))
@@ -655,8 +654,7 @@ bool text_viewer_last_document(char *buf, size_t bufsize)
         return false;
 
     if (read_line(fd, line, sizeof line) > 0
-        && (path = strchr(line, ' ')) != NULL
-        && (path = strchr(path + 1, ' ')) != NULL
+        && (path = tv_resume_path_sep(line)) != NULL
         && path[1] != '\0')
     {
         strmemccpy(buf, path + 1, bufsize);

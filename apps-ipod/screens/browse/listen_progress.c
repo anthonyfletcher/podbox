@@ -345,6 +345,7 @@ static int run_album_list(const char *title)
     struct simplelist_info info;
     int selection = 1;
     int ret = GO_TO_PREVIOUS;
+    bool ok;
 
     while (1)
     {
@@ -366,14 +367,14 @@ static int run_album_list(const char *title)
         selection = info.selection;
 
         cpu_boost(true);
-        if (!walk_album(albums[selection - 1].seek, true, &track_total,
-                        &track_played))
+        ok = walk_album(albums[selection - 1].seek, true, &track_total,
+                        &track_played);
+        cpu_boost(false);
+        if (!ok)
         {
-            cpu_boost(false);
             splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
             continue;
         }
-        cpu_boost(false);
 
         ret = run_track_list(arena + albums[selection - 1].off);
         if (ret == GO_TO_ROOT)

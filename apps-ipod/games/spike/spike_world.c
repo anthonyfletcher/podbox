@@ -540,26 +540,18 @@ enum spk_outcome spk_state_peek(const struct spk_state *st)
      * cell, which is what makes a stomp a thing you go and do. */
     if (st->motion == SPK_WALK || st->motion == SPK_ARC_FALL)
     {
+        bool above = st->motion == SPK_ARC_FALL || st->from > st->to;
         int cl;
 
-        if (spk_world_creature(st->beat + 1, &cl) && cl == st->to)
-        {
-            bool above = st->motion == SPK_ARC_FALL || st->from > st->to;
-
-            if (!above || spk_world_spiked(st->beat + 1))
-                return SPK_HIT;
-        }
+        if (spk_world_creature(st->beat + 1, &cl) && cl == st->to
+            && (!above || spk_world_spiked(st->beat + 1)))
+            return SPK_HIT;
 
         /* And the flyer, on the same terms: it is coming head-first, so what
          * a step walks into is the spike and what a descent comes down on is
          * its side. */
-        if (spk_world_flyer(st->beat + 1, &cl) && cl == st->to)
-        {
-            bool above = st->motion == SPK_ARC_FALL || st->from > st->to;
-
-            if (!above)
-                return SPK_HIT;
-        }
+        if (spk_world_flyer(st->beat + 1, &cl) && cl == st->to && !above)
+            return SPK_HIT;
     }
 
     /* A rising block fills one level of the cell: the ground when it is
@@ -597,9 +589,7 @@ enum spk_outcome spk_state_advance(struct spk_state *st)
         return out;
 
     st->beat++;
-    st->got = false;
-    st->stomped = false;
-    st->threw = false;
+    spk_state_end_beat(st);
 
     switch (st->motion)
     {

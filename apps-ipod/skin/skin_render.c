@@ -340,6 +340,17 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     font_lock(vp->font, false);
 }
 
+/* The art a %Cd draws: its own %Cl, or the skin's first for a %Cd written
+ * above every %Cl, which the parser could not bind. */
+static struct skin_albumart *cd_albumart(struct wps_data *data,
+                                         struct skin_albumart_draw *ad)
+{
+    struct skin_albumart *aa =
+            ad ? SKINOFFSETTOPTR(skin_buffer, ad->art) : NULL;
+
+    return aa ? aa : skin_albumart_first(skin_buffer, data->albumart);
+}
+
 static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
                              struct skin_element *element)
 {
@@ -636,12 +647,7 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             {
                 struct skin_albumart_draw *ad =
                         SKINOFFSETTOPTR(skin_buffer, token->value.data);
-                struct skin_albumart *aa =
-                        ad ? SKINOFFSETTOPTR(skin_buffer, ad->art) : NULL;
-                /* NULL only for a %Cd written above every %Cl, which the
-                 * parser could not bind. Take the skin's first. */
-                if (!aa)
-                    aa = skin_albumart_first(skin_buffer, data->albumart);
+                struct skin_albumart *aa = cd_albumart(data, ad);
                 if (aa)
                 {
                     aa->draw_handle = playback_current_aa_hid(aa->slot);
@@ -948,10 +954,7 @@ static void do_tags_in_hidden_conditional(struct skin_element* branch,
             {
                 struct skin_albumart_draw *ad =
                         SKINOFFSETTOPTR(skin_buffer, token->value.data);
-                struct skin_albumart *aa =
-                        ad ? SKINOFFSETTOPTR(skin_buffer, ad->art) : NULL;
-                if (!aa)
-                    aa = skin_albumart_first(skin_buffer, data->albumart);
+                struct skin_albumart *aa = cd_albumart(data, ad);
                 if (aa)
                 {
                     /* Clear the same rectangle this %Cd would have drawn */

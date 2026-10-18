@@ -333,21 +333,16 @@ static void pen_advance(pdf_st *s, size_t nglyphs)
     s->pen_x = s->cur_x + (long)nglyphs * s->scale / 2;
 }
 
-/* ActualText is the spec's own escape hatch: "whatever glyphs follow, the
- * text is really this". Generators reach for it exactly when their own
- * encoding can't express a character -- Chrome wraps every glyph its CMap
- * fails to map, so honouring it recovers text that is otherwise lost. */
-static void emit_actual(pdf_st *s)
+/* A PDF text string: UTF-16BE after a FE FF mark, otherwise CP1252. */
+static void emit_text(pdf_st *s, const uint8_t *b, size_t n)
 {
     size_t i;
 
-    if (!s->at_len) return;
-
-    if (s->at_len >= 2 && s->at_buf[0] == 0xFE && s->at_buf[1] == 0xFF) {
-        for (i = 2; i + 1 < s->at_len; i += 2) {
-            uint32_t u = (uint32_t)(s->at_buf[i] << 8 | s->at_buf[i + 1]);
-            if (u >= 0xD800 && u <= 0xDBFF && i + 3 < s->at_len) {
-                uint32_t lo = (uint32_t)(s->at_buf[i + 2] << 8 | s->at_buf[i + 3]);
+    if (n >= 2 && b[0] == 0xFE && b[1] == 0xFF) {
+        for (i = 2; i + 1 < n; i += 2) {
+            uint32_t u = (uint32_t)(b[i] << 8 | b[i + 1]);
+            if (u >= 0xD800 && u <= 0xDBFF && i + 3 < n) {
+                uint32_t lo = (uint32_t)(b[i + 2] << 8 | b[i + 3]);
                 if (lo >= 0xDC00 && lo <= 0xDFFF) {
                     u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
                     i += 2;
@@ -356,10 +351,20 @@ static void emit_actual(pdf_st *s)
             ts_emit_cp(&s->out, u);
         }
     } else {
-        for (i = 0; i < s->at_len; i++)
-            ts_emit_cp(&s->out, ts_sb_to_cp(TS_CS_CP1252, s->at_buf[i]));
+        for (i = 0; i < n; i++)
+            ts_emit_cp(&s->out, ts_sb_to_cp(TS_CS_CP1252, b[i]));
     }
     s->dirty = 1;
+}
+
+/* ActualText is the spec's own escape hatch: "whatever glyphs follow, the
+ * text is really this". Generators reach for it exactly when their own
+ * encoding can't express a character -- Chrome wraps every glyph its CMap
+ * fails to map, so honouring it recovers text that is otherwise lost. */
+static void emit_actual(pdf_st *s)
+{
+    if (!s->at_len) return;
+    emit_text(s, s->at_buf, s->at_len);
 }
 
 static void put_str(pdf_st *s)
@@ -408,24 +413,7 @@ static void put_str(pdf_st *s)
     }
 
     pen_advance(s, s->str_len);
-
-    if (s->str_len >= 2 && s->str[0] == 0xFE && s->str[1] == 0xFF) {
-        for (i = 2; i + 1 < s->str_len; i += 2) {
-            uint32_t u = (uint32_t)(s->str[i] << 8 | s->str[i + 1]);
-            if (u >= 0xD800 && u <= 0xDBFF && i + 3 < s->str_len) {
-                uint32_t lo = (uint32_t)(s->str[i + 2] << 8 | s->str[i + 3]);
-                if (lo >= 0xDC00 && lo <= 0xDFFF) {
-                    u = 0x10000 + ((u - 0xD800) << 10) + (lo - 0xDC00);
-                    i += 2;
-                }
-            }
-            ts_emit_cp(&s->out, u);
-        }
-    } else {
-        for (i = 0; i < s->str_len; i++)
-            ts_emit_cp(&s->out, ts_sb_to_cp(TS_CS_CP1252, s->str[i]));
-    }
-    s->dirty = 1;
+    emit_text(s, s->str, s->str_len);
     s->str_len = 0;
 }
 
@@ -473,6 +461,13 @@ static void line_at(pdf_st *s, long x, long y, int absolute)
     s->have_y = 1;
 }
 
+/* The font scale on the page, from the text matrix and the font size. */
+static void set_scale(pdf_st *s)
+{
+    s->scale = (long)(((long long)s->tm_a * s->tf_size) / 1000);
+    if (s->scale < 0) s->scale = -s->scale;
+}
+
 static void op_done(pdf_st *s)
 {
     s->tok[s->tok_len] = 0;
@@ -499,13 +494,11 @@ static void op_done(pdf_st *s)
     } else if (!strcmp(s->tok, "Tf")) {
         s->cmap = ts_pdffonts_cmap(s->fonts, s->cur_obj, s->last_name);
         if (s->nops >= 1) s->tf_size = s->ops[0];
-        s->scale = (long)(((long long)s->tm_a * s->tf_size) / 1000);
-        if (s->scale < 0) s->scale = -s->scale;
+        set_scale(s);
     } else if (!strcmp(s->tok, "Tm")) {
         if (s->nops >= 6) {                       /* a b c d e f: x=e, y=f */
             s->tm_a = s->ops[5];
-            s->scale = (long)(((long long)s->tm_a * s->tf_size) / 1000);
-            if (s->scale < 0) s->scale = -s->scale;
+            set_scale(s);
             s->cur_y = s->ops[0];
             s->cur_x = s->ops[1];
             line_at(s, s->cur_x, s->cur_y, 1);

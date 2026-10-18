@@ -236,48 +236,37 @@ static int jmp_idx_prev(void)
 {
     /* Step back to the first slide of a run.
      *
-     * Two cases, and the same three lines cover both. Standing part-way into a
-     * run, the slide before us shares our key, so we keep it and walk to that
-     * run's start. Standing on a run's first slide, the one before belongs to
-     * the previous run, so we adopt *its* key and walk to that run's start
-     * instead. Either way the answer is the first slide holding `current`.
+     * Two cases, and one walk covers both: back to the first slide sharing the
+     * key of the slide before us. Standing part-way into a run, that slide
+     * shares our key, so the walk ends at our run's start. Standing on a run's
+     * first slide, it belongs to the previous run, so the walk ends at that
+     * run's start instead.
      *
      * Upstream (pictureflow) writes this as a `for` loop whose body always
      * returns, i.e. a disguised `if`. Unwound here, and in artist_jump_prev(),
      * which is the same walk over the artist list. */
+    int i = center_index - 1;
+
+    if (i <= 0)
+        return 0;
+
     if (sorted_by_year())
     {
-        int current_year = carousel_idx.album_index[center_index].year;
-        int i = center_index - 1;
+        int year = carousel_idx.album_index[i].year;
 
-        if (i > 0)
-        {
-            if (carousel_idx.album_index[i].year != current_year)
-                current_year = carousel_idx.album_index[i].year;
-            while (i > 0
-                   && carousel_idx.album_index[i - 1].year == current_year)
-                i--;
-            return i;
-        }
+        while (i > 0 && carousel_idx.album_index[i - 1].year == year)
+            i--;
     }
     else
     {
         bool by_artist = carousel_album_order() != SORT_BY_NAME;
-        char current_selection = get_slide_initial(center_index, by_artist);
-        int i = center_index - 1;
+        char initial = get_slide_initial(i, by_artist);
 
-        if (i > 0)
-        {
-            if (get_slide_initial(i, by_artist) != current_selection)
-                current_selection = get_slide_initial(i, by_artist);
-            while (i > 0
-                   && get_slide_initial(i - 1, by_artist) == current_selection)
-                i--;
-            return i;
-        }
+        while (i > 0 && get_slide_initial(i - 1, by_artist) == initial)
+            i--;
     }
 
-    return 0;
+    return i;
 }
 
 static int jmp_idx_next(void)

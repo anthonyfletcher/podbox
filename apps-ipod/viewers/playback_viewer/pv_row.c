@@ -255,6 +255,7 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
 #ifdef HAVE_ALBUMART
     char path[MAX_PATH];
     struct bitmap bm;
+    fb_data *slot;
     int lru = 0, fd, rc;
 
     if (!art_mem || art_size_idx < 0 || key == 0)
@@ -282,11 +283,12 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
     art_key[lru]  = key;
     art_ok[lru]   = false;
     art_used[lru] = ++art_tick;
+    slot = art_mem + (size_t)lru * ART_PX * ART_PX;
 
     /* Ask where the thumbnail would be and open it, rather than asking
      * whether it exists and then opening it -- the open is the existence
      * test. */
-    rc = art_read_square(key, art_mem + (size_t)lru * ART_PX * ART_PX) ? 1 : 0;
+    rc = art_read_square(key, slot) ? 1 : 0;
 
     if (!rc)
     {
@@ -298,8 +300,7 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
             bm.width  = ART_PX;
             bm.height = ART_PX;
             bm.format = FORMAT_NATIVE;
-            bm.data   = (unsigned char *)(art_mem
-                                          + (size_t)lru * ART_PX * ART_PX);
+            bm.data   = (unsigned char *)slot;
             rc = art_cache_load_aat(fd, &bm,
                                     ART_PX * ART_PX * (int)sizeof(fb_data),
                                     NULL);
@@ -311,12 +312,10 @@ static const fb_data *art_get(unsigned key, int *stride, int *w, int *h)
         return NULL;
 
     art_ok[lru] = true;
-    hue_store(key,
-              card_paint_dominant_hue(art_mem + (size_t)lru * ART_PX * ART_PX,
-                                      ART_PX, ART_PX, ART_PX));
+    hue_store(key, card_paint_dominant_hue(slot, ART_PX, ART_PX, ART_PX));
     *stride = ART_PX;
     *w = *h = ART_PX;
-    return art_mem + (size_t)lru * ART_PX * ART_PX;
+    return slot;
 #else
     (void)key; (void)stride; (void)w; (void)h;
     return NULL;
@@ -982,23 +981,20 @@ static int row_session(bool *again)
                 break;
 
             case BUTTON_RIGHT:
-                if (sec_at < sec_n - 1 && slide_phase == SLIDE_NONE)
-                {
-                    slide_phase = SLIDE_OUT;
-                    slide_dir = +1;
-                    slide_t = 0;
-                    keyclick_click(true, btn);
-                }
-                break;
             case BUTTON_LEFT:
-                if (sec_at > 0 && slide_phase == SLIDE_NONE)
+            {
+                int dir = code == BUTTON_RIGHT ? +1 : -1;
+
+                if (slide_phase == SLIDE_NONE
+                    && sec_at + dir >= 0 && sec_at + dir < sec_n)
                 {
                     slide_phase = SLIDE_OUT;
-                    slide_dir = -1;
+                    slide_dir = dir;
                     slide_t = 0;
                     keyclick_click(true, btn);
                 }
                 break;
+            }
 
             case BUTTON_SELECT:
                 if (card_row_toggle(&row))

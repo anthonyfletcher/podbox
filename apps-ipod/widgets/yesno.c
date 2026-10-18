@@ -191,7 +191,6 @@ static void yesno_measure(struct dialog *d, struct screen *s,
      * viewport, which a themed SBS can inset - e.g. %Vi(-,3,28,302,-,-)) would
      * centre the box on the viewport's size but position it from absolute 0,
      * leaving it visibly off-centre on the display. */
-    int area_y = 0;
     int area_h = s->lcdheight;
     int sw = s->lcdwidth;
     int ch = s->getcharheight();
@@ -235,7 +234,7 @@ static void yesno_measure(struct dialog *d, struct screen *s,
 
     box->x = (sw - box_w) / 2;
     box->width = box_w;
-    box->y = area_y + (area_h - box_h) / 2;
+    box->y = (area_h - box_h) / 2;
     box->height = box_h;
 }
 
@@ -303,12 +302,9 @@ static int yesno_on_action(struct dialog *d, int action, void *data)
         case ACTION_REDRAW: /* handled by the per-pass repaint */
             break;
         default:
-            if (c->defer_usb && action == SYS_USB_CONNECTED)
-            {
-                c->result = YESNO_USB;
-                return DIALOG_ABORT;
-            }
-            if (default_event_handler(action) == SYS_USB_CONNECTED)
+            /* deferred, USB is reported without being handled */
+            if ((c->defer_usb && action == SYS_USB_CONNECTED) ||
+                default_event_handler(action) == SYS_USB_CONNECTED)
             {
                 c->result = YESNO_USB;
                 return DIALOG_ABORT;

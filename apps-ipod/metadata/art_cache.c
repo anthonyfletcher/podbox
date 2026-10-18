@@ -1199,7 +1199,7 @@ static bool aa_generate_chained(int size_index, unsigned int dh,
         /* Unfiltered: this is the generator chaining one cached size into a
          * smaller one, and what it writes back to disk has to stay the
          * theme's raw material. Filtering happens on the way out, per read. */
-        ret = art_cache_load_aat(fd, &bm, (int)workbuf_sz, false);
+        ret = art_cache_load_aat(fd, &bm, (int)workbuf_sz, NULL);
         close(fd);
 
         if (ret > 0)
@@ -1763,7 +1763,6 @@ static void aa_handle_offer(void)
     int s, wh;
     void *workbuf;
     struct aa_src src;
-    bool need = false;
 
     aa_offer_posted = false;
     if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
@@ -1779,16 +1778,7 @@ static void aa_handle_offer(void)
     aa_dirname(path, dir, sizeof(dir));
     dh = aa_hash(dir);
 
-    for (s = 0; s < ART_CACHE_NUM_SIZES; s++)
-    {
-        aa_cache_path(aa_check_path, sizeof(aa_check_path), s, dh);
-        if (!file_exists(aa_check_path))
-        {
-            need = true;
-            break;
-        }
-    }
-    if (!need)
+    if (aa_thumbs_exist(dh))
         return;   /* already cached (folder art wins) */
     /* A pass removes the thumbnails of a folder outside the database, and a
      * stamp file written now would record a format the purge has not reached */

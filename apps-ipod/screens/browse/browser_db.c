@@ -2013,6 +2013,13 @@ static int album_sort_order(int level)
     return order;
 }
 
+/* Whether a level browsing 'tag' lists artists. */
+static bool is_artist_tag(int tag)
+{
+    return tag == tag_virt_canonicalartist || tag == tag_albumartist
+        || tag == tag_artist;
+}
+
 /* How many tracks the [Featured In] row would show at browse level 'level':
  * the ones crediting this artist as a guest on somebody else's record. 0 when
  * the row does not belong here at all.
@@ -2029,16 +2036,11 @@ static int album_sort_order(int level)
  * level, which is not worth it. */
 static int featured_row_count(int level)
 {
-    int parent;
-
     if (!csi || level < 1 || level >= csi->tagorder_count)
         return 0;
     if (csi->tagorder[level] != tag_album)
         return 0;
-
-    parent = csi->tagorder[level - 1];
-    if (parent != tag_virt_canonicalartist && parent != tag_albumartist &&
-        parent != tag_artist)
+    if (!is_artist_tag(csi->tagorder[level - 1]))
         return 0;
 
     return db_featured_guest_tracks(current_title[level], NULL, 0);
@@ -2372,6 +2374,29 @@ static int dir_ids_fill(int level)
     return count;
 }
 
+/* Special row *sidx at the head of the list, written at dptr only when the
+ * page starting at 'offset' holds it. Returns where the next row goes. */
+static struct tagentry *add_head_row(struct browser_context *c,
+                                     struct tagentry *dptr, int offset,
+                                     int *sidx, int newtable, int lang_id,
+                                     int extraseek)
+{
+    bool on_page = offset <= *sidx;
+
+    (*sidx)++;
+    if (!on_page)
+        return dptr;
+
+    dptr->newtable = newtable;
+    dptr->name = ID2P(lang_id);
+    dptr->extraseek = extraseek;
+    dptr->customaction = ONPLAY_NO_CUSTOMACTION;
+    dptr->idx_id = 0;
+    current_entry_count++;
+    c->special_entry_count++;
+    return dptr + 1;
+}
+
 static int retrieve_entries(struct browser_context *c, int offset, bool init)
 {
     logf( "%s", __func__);
@@ -2535,20 +2560,17 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     current_entry_count = 0;
     c->dirfull = false;
 
+    /* If it is sorted by albums, we need to use the proper view that includes
+     * the disc number etc so sorting will be correct for each albums.
+     * Otherwise, tracks will be sorted by title names */
+    int format_group = c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
+                       ? csi->format_id[level + 1] : csi->format_id[level];
+
     fmt = NULL;
     for (i = 0; i < format_count; i++)
     {
-        if (c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
-        {
-            /* If it is sorted by albums, we need to use the proper view
-            that includes the disc number etc so sorting will be correct for each albums.
-            Otherwise, tracks will be sorted by title names */
-            if (formats[i]->group_id != csi->format_id[level + 1])
-                continue;
-        }
-        else if (formats[i]->group_id != csi->format_id[level])
-            continue;
-        fmt = formats[i];
+        if (formats[i]->group_id == format_group)
+            fmt = formats[i];
     }
 
     if (fmt)
@@ -2616,8 +2638,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * list is not a Music list and keeps name order too. */
     bool artist_by_plays = !fmt && keep != KEEP_BOOKS
         && global_settings.database_sort_artists_by == DB_SORT_ARTISTS_PLAYS
-        && (tag == tag_albumartist || tag == tag_artist
-            || tag == tag_virt_canonicalartist)
+        && is_artist_tag(tag)
         && tagcache_artist_count() > 0;
     if (artist_by_plays)
     {
@@ -2649,25 +2670,13 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * <All tracks> precedes it and at index 0 when it does not. */
     int sidx = 0;
 
+    /* -1 so insert_all_playlist() drops the row when it builds the
+     * book's playlist: it retrieves a track by this seek, and a 0
+     * would resolve to whichever track the database indexed first
+     * and put it at the head of the book. */
     if (resume_row)
-    {
-        if (offset <= sidx)
-        {
-            dptr->newtable = TABLE_BOOK_RESUME;
-            dptr->name = ID2P(LANG_BOOK_RESUME);
-            /* -1 so insert_all_playlist() drops the row when it builds the
-             * book's playlist: it retrieves a track by this seek, and a 0
-             * would resolve to whichever track the database indexed first
-             * and put it at the head of the book. */
-            dptr->extraseek = -1;
-            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
-            dptr->idx_id = 0;
-            dptr++;
-            current_entry_count++;
-            c->special_entry_count++;
-        }
-        sidx++;
-    }
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_RESUME,
+                            LANG_BOOK_RESUME, -1);
 
     if (shelf_rows)
     {
@@ -2675,20 +2684,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         {
             if (shelf_count[shelf_row[s].kind] == 0)
                 continue;
-            if (offset <= sidx)
-            {
-                /* The list the row opens rides in extraseek, as the chart
-                 * rows' do. */
-                dptr->newtable = TABLE_BOOK_SHELF;
-                dptr->name = ID2P(shelf_row[s].lang_id);
-                dptr->extraseek = shelf_row[s].kind;
-                dptr->customaction = ONPLAY_NO_CUSTOMACTION;
-                dptr->idx_id = 0;
-                dptr++;
-                current_entry_count++;
-                c->special_entry_count++;
-            }
-            sidx++;
+            /* The list the row opens rides in extraseek, as the chart
+             * rows' do. */
+            dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_SHELF,
+                                shelf_row[s].lang_id, shelf_row[s].kind);
         }
     }
 
@@ -2700,37 +2699,14 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * is inserted whole and in order. */
     if (tag != tag_title && tag != tag_filename
         && (!csi_mentions_spoken() || loading_hidden))
-    {
-        if (offset <= sidx)
-        {
-            dptr->newtable = csi_mentions_spoken()
-                             ? TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
-                             : TABLE_ALLSUBENTRIES;
-            dptr->name = ID2P(LANG_TAGNAVI_ALL_TRACKS);
-            dptr->extraseek = 0;
-            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
-            dptr->idx_id = 0;
-            dptr++;
-            current_entry_count++;
-            c->special_entry_count++;
-        }
-        sidx++;
-    }
+        dptr = add_head_row(c, dptr, offset, &sidx,
+                            csi_mentions_spoken()
+                            ? TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
+                            : TABLE_ALLSUBENTRIES,
+                            LANG_TAGNAVI_ALL_TRACKS, 0);
     if (tag != tag_filename && !csi_mentions_spoken())
-    {
-        if (offset <= sidx)
-        {
-            dptr->newtable = TABLE_NAVIBROWSE;
-            dptr->name = ID2P(LANG_TAGNAVI_RANDOM);
-            dptr->extraseek = -1;
-            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
-            dptr->idx_id = 0;
-            dptr++;
-            current_entry_count++;
-            c->special_entry_count++;
-        }
-        sidx++;
-    }
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_NAVIBROWSE,
+                            LANG_TAGNAVI_RANDOM, -1);
     /* [Featured In], on an artist's album list only -- see
      * featured_row_count(). It goes last of the three: putting it first would
      * renumber the other two, and browser_db_load() scrolls a level past its
@@ -2746,20 +2722,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * playing whichever track the database indexed first, which would shift
      * every selection onto the row before it. */
     if (tag == tag_album && featured_row_count(level) > 0)
-    {
-        if (offset <= sidx)
-        {
-            dptr->newtable = TABLE_FEATURED_TRACKS;
-            dptr->name = ID2P(LANG_FEATURED_IN);
-            dptr->extraseek = -1;
-            dptr->customaction = ONPLAY_NO_CUSTOMACTION;
-            dptr->idx_id = 0;
-            dptr++;
-            current_entry_count++;
-            c->special_entry_count++;
-        }
-        sidx++;
-    }
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
+                            LANG_FEATURED_IN, -1);
 
     total_count += sidx;
     head_rows = sidx;
@@ -2789,15 +2753,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         /* Check the format */
         for (i = 0; i < format_count; i++)
         {
-            if (c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
-            {
-                /* If it is sorted by albums, we need to use the proper view
-                that includes the disc number etc so sorting will be correct for each albums.
-                Otherwise, tracks will be sorted by title names */
-                if (formats[i]->group_id != csi->format_id[level + 1])
-                    continue;
-            }
-            else if (formats[i]->group_id != csi->format_id[level])
+            if (formats[i]->group_id != format_group)
                 continue;
 
             if (tagcache_check_clauses(&tcs, formats[i]->clause,
@@ -3119,16 +3075,22 @@ static bool root_row_drawable(const struct menu_entry *item)
     return true;
 }
 
+/* The root menu as parsed, or NULL when there is none. */
+static struct menu_root *parsed_root_menu(void)
+{
+    if (rootmenu < 0 || rootmenu >= menu_count)
+        return NULL;
+    return menus[rootmenu];
+}
+
 int browser_db_root_row_signature(void)
 {
-    struct menu_root *root;
+    struct menu_root *root = parsed_root_menu();
     uint32_t h = FNV1A_BASIS;
     int i;
 
-    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+    if (root == NULL)
         return 0;
-
-    root = menus[rootmenu];
 
     /* Every row, not just the drawable ones: whether Search can open right now
      * depends on a setting rather than on the config, and that must not read
@@ -3157,13 +3119,12 @@ static uint32_t root_hide_mask(void)
 
 int browser_db_root_row_count(void)
 {
-    struct menu_root *root;
+    struct menu_root *root = parsed_root_menu();
     int i, count = 0;
 
-    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+    if (root == NULL)
         return 0;
 
-    root = menus[rootmenu];
     for (i = 0; i < root->itemcount; i++)
     {
         if (root_row_drawable(root->items[i]))
@@ -3175,13 +3136,12 @@ int browser_db_root_row_count(void)
 bool browser_db_get_root_row(int n, int *out_index,
                              const unsigned char **out_name)
 {
-    struct menu_root *root;
+    struct menu_root *root = parsed_root_menu();
     int i, count = 0;
 
-    if (rootmenu < 0 || rootmenu >= menu_count || menus[rootmenu] == NULL)
+    if (root == NULL)
         return false;
 
-    root = menus[rootmenu];
     for (i = 0; i < root->itemcount; i++)
     {
         if (!root_row_drawable(root->items[i]))
@@ -3475,8 +3435,7 @@ static int loaded_row_for_menu_id(struct browser_context *c, int rows,
 
 static int loaded_row_for_tag(struct browser_context *c, int rows, int tag)
 {
-    struct menu_root *root = (rootmenu >= 0 && rootmenu < menu_count)
-                           ? menus[rootmenu] : NULL;
+    struct menu_root *root = parsed_root_menu();
     int i;
 
     if (!root)
@@ -3604,9 +3563,7 @@ static int browser_db_find_root_entry_by_tag(int tag)
      * loaded. The direct-entry callers below reach this at dirlevel 0, where the
      * two coincide -- but keying off the boot-time root can never go stale from
      * a mid-tree browse state, matching browser_db_get_main_menu_row(). */
-    if (rootmenu < 0 || rootmenu >= menu_count)
-        return -1;
-    root = menus[rootmenu];
+    root = parsed_root_menu();
     if (!root)
         return -1;
     for (i = 0; i < root->itemcount; i++)
@@ -3768,10 +3725,7 @@ bool browser_db_get_main_menu_row(int index, int *out_tag,
     if (out_menu_id)
         *out_menu_id = NULL;
 
-    if (rootmenu < 0 || rootmenu >= menu_count)
-        return false;
-
-    root = menus[rootmenu];
+    root = parsed_root_menu();
     if (!root)
         return false;
 
@@ -3834,10 +3788,7 @@ int browser_db_spoken_main_menu_slot(void)
     struct menu_root *root;
     int pass, i, count = 0;
 
-    if (rootmenu < 0 || rootmenu >= menu_count)
-        return -1;
-
-    root = menus[rootmenu];
+    root = parsed_root_menu();
     if (!root)
         return -1;
 
@@ -3867,10 +3818,7 @@ int browser_db_get_main_menu_tag_row_count(void)
     struct menu_root *root;
     int pass;
 
-    if (rootmenu < 0 || rootmenu >= menu_count)
-        return 0;
-
-    root = menus[rootmenu];
+    root = parsed_root_menu();
     if (!root)
         return 0;
 
@@ -3894,6 +3842,16 @@ static bool entry_is_untagged(struct browser_context *c, int i)
     return e != NULL
         && !strcmp((const char *)P2STR((unsigned char *)e->name),
                    (const char *)str(LANG_TAGNAVI_UNTAGGED));
+}
+
+/* Enter loaded root row 'idx' for a main-menu shortcut, and load where it
+ * leads. */
+static int enter_shortcut_row(struct browser_context *c, int idx)
+{
+    c->selected_item = idx;
+    browser_db_enter(c, false);
+    enter_as_root_shortcut(c);
+    return browser_db_load(c);
 }
 
 int browser_db_load(struct browser_context* c)
@@ -3945,12 +3903,7 @@ int browser_db_load(struct browser_context* c)
 
         idx = loaded_row_for_menu_id(c, rows, target);
         if (idx >= 0)
-        {
-            c->selected_item = idx;
-            browser_db_enter(c, false);
-            enter_as_root_shortcut(c);
-            return browser_db_load(c);
-        }
+            return enter_shortcut_row(c, idx);
         /* Submenu gone (a customised tagnavi_user.config) -- fall through and
          * show the root menu rather than a dead end, as the tag case does. */
     }
@@ -3970,12 +3923,7 @@ int browser_db_load(struct browser_context* c)
 
         idx = loaded_row_for_label(c, rows, target);
         if (idx >= 0)
-        {
-            c->selected_item = idx;
-            browser_db_enter(c, false);
-            enter_as_root_shortcut(c);
-            return browser_db_load(c);
-        }
+            return enter_shortcut_row(c, idx);
         /* Row renamed, removed, or turned off in the Music settings -- show
          * the root menu rather than a dead end, as the other two forms do. */
     }
@@ -4025,12 +3973,7 @@ int browser_db_load(struct browser_context* c)
         {
             int idx = loaded_row_for_tag(c, rows, target_tag);
             if (idx >= 0)
-            {
-                c->selected_item = idx;
-                browser_db_enter(c, false);
-                enter_as_root_shortcut(c);
-                return browser_db_load(c);
-            }
+                return enter_shortcut_row(c, idx);
             /* Tag not found (e.g. removed from tagnavi_user.config) -- fall
              * through and show the root menu instead of a blank screen. */
         }
@@ -5178,6 +5121,14 @@ static int playlist_track_index(uint64_t track, int hint)
     return -1;
 }
 
+/* What browser_db_load() reuses if this list is asked for again unchanged. */
+static void remember_loaded(struct browser_context* c)
+{
+    loaded_entries_crc = browser_db_data_crc(c);
+    loaded_head_rows = head_rows;
+    loaded_years_valid = album_years_valid;
+}
+
 static int browser_db_play_folder(struct browser_context* c)
 {
     logf( "%s", __func__);
@@ -5229,9 +5180,7 @@ static int browser_db_play_folder(struct browser_context* c)
         if (index >= 0)
         {
             playlist_start(index, resume_pos.elapsed, resume_pos.offset);
-            loaded_entries_crc = browser_db_data_crc(c);
-            loaded_head_rows = head_rows;
-            loaded_years_valid = album_years_valid;
+            remember_loaded(c);
             return 0;
         }
     }
@@ -5255,9 +5204,7 @@ static int browser_db_play_folder(struct browser_context* c)
     }
 
     playlist_start(start_index, 0, 0);
-    loaded_entries_crc = browser_db_data_crc(c); /* save crc in case we return */
-    loaded_head_rows = head_rows;
-    loaded_years_valid = album_years_valid;
+    remember_loaded(c); /* in case we return */
     return 0;
 }
 
@@ -5450,15 +5397,11 @@ bool browser_db_get_book(struct browser_context* c, int item,
  * and plain artist. */
 bool browser_db_is_artist_list(struct browser_context* c)
 {
-    int tag;
     if (c->currtable != TABLE_NAVIBROWSE || !csi)
         return false;
     if (c->currextra < 0 || c->currextra >= csi->tagorder_count)
         return false;
-    tag = csi->tagorder[c->currextra];
-    return tag == tag_virt_canonicalartist ||
-           tag == tag_albumartist ||
-           tag == tag_artist;
+    return is_artist_tag(csi->tagorder[c->currextra]);
 }
 
 /* True when the browse path down to the current level passes through an artist
@@ -5477,10 +5420,7 @@ static bool under_artist_level(struct browser_context* c)
 
     for (int i = 0; i <= c->currextra && i < csi->tagorder_count; i++)
     {
-        int tag = csi->tagorder[i];
-        if (tag == tag_virt_canonicalartist ||
-            tag == tag_albumartist ||
-            tag == tag_artist)
+        if (is_artist_tag(csi->tagorder[i]))
             return true;
     }
 
@@ -5607,8 +5547,7 @@ static unsigned int table_art_hash(struct browser_context* c,
     int tag = csi->tagorder[level];
     int n;
 
-    if (tag == tag_artist || tag == tag_virt_canonicalartist
-        || tag == tag_albumartist)
+    if (is_artist_tag(tag))
     {
         struct tagcache_artist ar;
         return artist_by_name(tag, entry->extraseek, &ar) ? ar.art_hash : 0;

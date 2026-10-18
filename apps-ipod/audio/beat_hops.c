@@ -228,7 +228,6 @@ void beat_hops_reset(unsigned int sampr)
     memset(history, 0, sizeof (history));
     memset(flux_mean, 0, sizeof (flux_mean));
     memset(flux_peak, 0, sizeof (flux_peak));
-    memset(onset_ms, 0, sizeof (onset_ms));
     memset(onset_seen, 0, sizeof (onset_seen));
     history_head = 0;
     history_count = 0;

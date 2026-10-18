@@ -279,6 +279,8 @@ void gui_synclist_draw_settled(struct gui_synclist *lists);
 void gui_synclist_inhibit_flush(bool inhibit);
 bool gui_synclist_flush_inhibited(void);
 extern bool list_need_full_update(void);
+/* Push a drawn list to the LCD, `parent` being the list's own viewport. */
+void list_flush(struct screen *display, struct viewport *parent);
 extern void gui_synclist_scroll_stop(struct gui_synclist *lists);
 extern void gui_synclist_select_item(struct gui_synclist * lists,
                                      int item_number);

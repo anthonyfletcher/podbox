@@ -344,30 +344,36 @@ static int32_t tempo_prior(unsigned int lag)
     return 256 - (int32_t)d;
 }
 
-/* Sub-bin refinement by parabolic interpolation through the peak, in
- * sixteenths of a bin. Without it the period is quantised to 23ms, and a
- * beat projected 1.8s ahead lands up to 80ms out. */
-static int refine_lag16(unsigned int lag, const int32_t *r)
+/* Where a parabola through three neighbouring scores peaks, relative to the
+ * middle one, in sixteenths of a step and clamped to half a step. */
+static int peak_offset16(int32_t a, int32_t b, int32_t c)
 {
-    int32_t a = r[lag - 1], b = r[lag], c = r[lag + 1];
     int32_t denom = 2 * (a - 2 * b + c);
-    int32_t num = (a - c) * 16;
-
-    if (lag <= BEAT_LAG_MIN || lag >= BEAT_LAG_MAX || denom == 0)
-        return (int)lag * 16;
+    int32_t num;
 
     /* A true peak has a negative denominator; anything else is not a peak
      * and is left where it is. */
     if (denom >= 0)
-        return (int)lag * 16;
+        return 0;
 
-    num /= denom;
+    num = ((a - c) * 16) / denom;
     if (num > 8)
         num = 8;
     if (num < -8)
         num = -8;
 
-    return (int)lag * 16 + (int)num;
+    return (int)num;
+}
+
+/* Sub-bin refinement by parabolic interpolation through the peak, in
+ * sixteenths of a bin. Without it the period is quantised to 23ms, and a
+ * beat projected 1.8s ahead lands up to 80ms out. */
+static int refine_lag16(unsigned int lag, const int32_t *r)
+{
+    if (lag <= BEAT_LAG_MIN || lag >= BEAT_LAG_MAX)
+        return (int)lag * 16;
+
+    return (int)lag * 16 + peak_offset16(r[lag - 1], r[lag], r[lag + 1]);
 }
 
 /* Which offset within the period the beats actually fall on: the one whose
@@ -380,7 +386,6 @@ static int best_phase16(unsigned int lag)
 {
     static int32_t ps[BEAT_LAG_MAX];
     int32_t bestv = -1;
-    int32_t a, b, c, denom, num;
     unsigned int p, best = 0;
 
     for (p = 0; p < lag; p++)
@@ -402,21 +407,8 @@ static int best_phase16(unsigned int lag)
 
     /* Phase is circular, so the neighbours of phase 0 wrap rather than
      * running off the end. */
-    a = ps[(best + lag - 1) % lag];
-    b = ps[best];
-    c = ps[(best + 1) % lag];
-
-    denom = 2 * (a - 2 * b + c);
-    if (denom >= 0)
-        return (int)best * 16;
-
-    num = ((a - c) * 16) / denom;
-    if (num > 8)
-        num = 8;
-    if (num < -8)
-        num = -8;
-
-    return (int)best * 16 + (int)num;
+    return (int)best * 16 + peak_offset16(ps[(best + lag - 1) % lag],
+                                          ps[best], ps[(best + 1) % lag]);
 }
 
 /* Nudge the grid onto the onsets it is supposed to be describing.

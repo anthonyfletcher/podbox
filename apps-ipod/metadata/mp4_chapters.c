@@ -554,7 +554,7 @@ int read_mp4_chapters(const char *path, struct cuesheet *cue)
 
     fd = open(path, O_RDONLY, 0644);
     if (fd < 0)
-        return false;
+        return 0;
 
     file_end = lseek(fd, 0, SEEK_END);
 

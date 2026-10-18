@@ -86,19 +86,20 @@ static int attr(const char *tag, const char *name, char *out, size_t cap)
 
 /* ---- path handling --------------------------------------------------- */
 
+static int hexval(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
 static void url_unescape(char *s)
 {
     char *d = s;
     while (*s) {
         if (s[0] == '%' && s[1] && s[2]) {
-            int hi = -1, lo = -1, i;
-            for (i = 0; i < 2; i++) {
-                char c = s[1 + i];
-                int v = (c >= '0' && c <= '9') ? c - '0'
-                      : (c >= 'a' && c <= 'f') ? c - 'a' + 10
-                      : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1;
-                if (i == 0) hi = v; else lo = v;
-            }
+            int hi = hexval(s[1]), lo = hexval(s[2]);
             if (hi >= 0 && lo >= 0) { *d++ = (char)(hi * 16 + lo); s += 3; continue; }
         }
         *d++ = *s++;

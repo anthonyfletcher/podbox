@@ -426,13 +426,18 @@ void debug_log_apply(void)
     off_reason = "";
 }
 
-static void all_off(const char *reason)
+static void settings_all_off(void)
 {
-    off_reason = reason;
     for (int id = 0; id < DEBUG_LOG_COUNT; id++)
         if (log_info[id].setting)
             *log_info[id].setting = false;
     settings_save();
+}
+
+static void all_off(const char *reason)
+{
+    off_reason = reason;
+    settings_all_off();
     debug_log_apply();
 }
 
@@ -534,10 +539,7 @@ void debug_log_init(void)
      * the logs then start off, and the splash says why */
     if (debug_log_minutes_left() == 0)
     {
-        for (int id = 0; id < DEBUG_LOG_COUNT; id++)
-            if (log_info[id].setting)
-                *log_info[id].setting = false;
-        settings_save();
+        settings_all_off();
         expired_notice = true;
     }
     for (int id = 0; id < DEBUG_LOG_COUNT; id++)

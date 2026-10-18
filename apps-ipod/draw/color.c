@@ -410,6 +410,12 @@ static int32_t tone_luminance(int tone)
                      * 65025 / 1560896);
 }
 
+/* Whether luminance y is on the side of `want` that a bound asks for. */
+static bool meets_bound(int32_t y, int32_t want, int bound)
+{
+    return bound > 0 ? y >= want : y <= want;
+}
+
 unsigned color_tone_bound(unsigned c, int tone, int bound)
 {
     int32_t want = tone_luminance(tone);
@@ -418,8 +424,7 @@ unsigned color_tone_bound(unsigned c, int tone, int bound)
     unsigned out;
     int i;
 
-    if (bound == 0 ||
-        (bound > 0 ? rel_luminance(c) >= want : rel_luminance(c) <= want))
+    if (bound == 0 || meets_bound(rel_luminance(c), want, bound))
         return c;
 
     /* Lightness against luminance is monotonic at a fixed hue, so halve the
@@ -431,15 +436,14 @@ unsigned color_tone_bound(unsigned c, int tone, int bound)
     for (i = 0; i < 16; i++)
     {
         int32_t mid = (lo + hi) / 2;
-        int32_t y = rel_luminance(oklab_at(&o, mid));
 
-        if (bound > 0 ? y >= want : y <= want)
+        if (meets_bound(rel_luminance(oklab_at(&o, mid)), want, bound))
             hi = mid;
         else
             lo = mid;
     }
     out = oklab_at(&o, hi);
-    if (bound > 0 ? rel_luminance(out) < want : rel_luminance(out) > want)
+    if (!meets_bound(rel_luminance(out), want, bound))
         out = bound > 0 ? LCD_RGBPACK(255, 255, 255) : LCD_RGBPACK(0, 0, 0);
     return out;
 }

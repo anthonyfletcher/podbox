@@ -202,6 +202,15 @@ static bool text_usable(const char *s)
     return s[0] != '\0' && strcmp(s, UNTAGGED) != 0;
 }
 
+/* A tag that is missing or <Untagged> reads as "". */
+static void retrieve_usable(struct tagcache_search *tcs, int idx_id, int tag,
+                            char *buf, long size)
+{
+    tagcache_retrieve(tcs, idx_id, tag, buf, size);
+    if (!text_usable(buf))
+        buf[0] = '\0';
+}
+
 static bool choice_taken(const struct quiz_round *r, int ct, const char *text)
 {
     for (int i = 0; i < ct; i++)
@@ -338,16 +347,9 @@ static int sample_library(struct quiz_round *rounds)
             || !text_usable(t.title))
             continue;
 
-        tagcache_retrieve(&tcs, t.idx_id, tag_artist, t.artist,
-                          sizeof(t.artist));
-        if (!text_usable(t.artist))
-            t.artist[0] = '\0';
-        tagcache_retrieve(&tcs, t.idx_id, tag_album, t.album, sizeof(t.album));
-        if (!text_usable(t.album))
-            t.album[0] = '\0';
-        tagcache_retrieve(&tcs, t.idx_id, tag_genre, t.genre, sizeof(t.genre));
-        if (!text_usable(t.genre))
-            t.genre[0] = '\0';
+        retrieve_usable(&tcs, t.idx_id, tag_artist, t.artist, sizeof(t.artist));
+        retrieve_usable(&tcs, t.idx_id, tag_album, t.album, sizeof(t.album));
+        retrieve_usable(&tcs, t.idx_id, tag_genre, t.genre, sizeof(t.genre));
 
         if (t.year > year_max)
             year_max = t.year;
@@ -623,14 +625,10 @@ static bool resolve_near(void)
                                sizeof(e->title))
             || !text_usable(e->title))
             continue;
-        tagcache_retrieve(&tcs, tcs.idx_id, tag_artist, e->artist,
-                          sizeof(e->artist));
-        if (!text_usable(e->artist))
-            e->artist[0] = '\0';
-        tagcache_retrieve(&tcs, tcs.idx_id, tag_album, e->album,
-                          sizeof(e->album));
-        if (!text_usable(e->album))
-            e->album[0] = '\0';
+        retrieve_usable(&tcs, tcs.idx_id, tag_artist, e->artist,
+                        sizeof(e->artist));
+        retrieve_usable(&tcs, tcs.idx_id, tag_album, e->album,
+                        sizeof(e->album));
         e->found = true;
     }
 

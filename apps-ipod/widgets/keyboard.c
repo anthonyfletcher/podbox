@@ -56,7 +56,6 @@ static void kbd_measure(struct dialog *d, struct screen *display,
 {
     (void)data;
     struct dialog_insets in;
-    int area_y = 0;
     int area_h = display->lcdheight;
     int sw = display->lcdwidth;
     int ch_h = display->getcharheight();
@@ -71,7 +70,7 @@ static void kbd_measure(struct dialog *d, struct screen *display,
 
     box->x = KBD_MARGIN;
     box->width = sw - 2 * KBD_MARGIN;
-    box->y = area_y + (area_h - box_h) / 2;
+    box->y = (area_h - box_h) / 2;
     box->height = box_h;
 }
 

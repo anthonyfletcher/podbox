@@ -457,12 +457,12 @@ static void props_pace(char *buf, size_t len, bool say_it)
             return;
         }
 
-        snprintf(buf, len, "%s, %d %s",
-                 str(band_of(bd_pace, -1, props_bpm)), props_bpm,
+        id = band_of(bd_pace, -1, props_bpm);
+        snprintf(buf, len, "%s, %d %s", str(id), props_bpm,
                  str(LANG_SOUND_BPM));
 
         if (say_it)
-            talk_id(band_of(bd_pace, -1, props_bpm), true);
+            talk_id(id, true);
 
         return;
     }

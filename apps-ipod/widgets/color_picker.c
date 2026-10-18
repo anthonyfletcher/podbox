@@ -288,26 +288,20 @@ static int cd_label_w(struct screen *d)
 static void cd_draw_cell(struct screen *d, int x, int y, int w, int h,
                          const char *text, bool selected)
 {
+    unsigned fg = d->get_foreground();
     int tw, th;
 
     d->getstringsize((const unsigned char *)text, &tw, &th);
 
+    d->set_drawmode(DRMODE_FG);
     if (selected)
     {
-        unsigned fg = d->get_foreground();
-        d->set_drawmode(DRMODE_FG);
         d->fillrect(x, y, w, h);
         d->set_foreground(d->get_background());
-        d->putsxy(x + (w - tw) / 2, y + (h - th) / 2,
-                  (const unsigned char *)text);
-        d->set_foreground(fg);
     }
-    else
-    {
-        d->set_drawmode(DRMODE_FG);
-        d->putsxy(x + (w - tw) / 2, y + (h - th) / 2,
-                  (const unsigned char *)text);
-    }
+    d->putsxy(x + (w - tw) / 2, y + (h - th) / 2,
+              (const unsigned char *)text);
+    d->set_foreground(fg);
     d->set_drawmode(DRMODE_SOLID);
 }
 
@@ -366,20 +360,15 @@ static void cd_draw_channel(struct screen *d, struct colour_dlg *s,
 
     snprintf(buf, sizeof(buf), "%c %2d", labels[i], s->rgb.rgb_val[i]);
 
+    d->set_drawmode(DRMODE_FG);
     if (selected)
     {
-        d->set_drawmode(DRMODE_FG);
         d->fillrect(0, y, content->width, h);
         d->set_foreground(bg);
-        d->putsxy(0, y + (h - ch) / 2, (const unsigned char *)buf);
-        d->set_foreground(fg);
         sb_flags |= FOREGROUND | INNER_BGFILL;
     }
-    else
-    {
-        d->set_drawmode(DRMODE_FG);
-        d->putsxy(0, y + (h - ch) / 2, (const unsigned char *)buf);
-    }
+    d->putsxy(0, y + (h - ch) / 2, (const unsigned char *)buf);
+    d->set_foreground(fg);
     d->set_drawmode(DRMODE_SOLID);
 
     if (slider_w > 0)

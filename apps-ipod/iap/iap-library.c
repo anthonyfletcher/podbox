@@ -731,14 +731,19 @@ static void play_tracks(uint32_t start)
     playlist_start(index, elapsed, offset);
 }
 
+/* Whether the Queue may not be replaced: Party Mode is playing, or it is
+ * lent out */
+static bool queue_refused(void)
+{
+    return (global_settings.party_mode && audio_status())
+           || iap_library_queue_lent();
+}
+
 /* Hands the song list to the worker; the Queue is the Track category from
  * here on, growing while it builds */
 static bool start_playing(uint32_t start)
 {
-    if (!build(TYPE_TRACK) || start >= list_count)
-        return false;
-    if ((global_settings.party_mode && audio_status())
-        || iap_library_queue_lent())
+    if (!build(TYPE_TRACK) || start >= list_count || queue_refused())
         return false;
 
     play_book = chose_book;
@@ -978,8 +983,7 @@ static bool playlist_record_select(uint32_t index)
         folder = rows[index - PLAYLIST_QUEUE - 1];
         return true;
     }
-    if ((global_settings.party_mode && audio_status())
-        || iap_library_queue_lent())
+    if (queue_refused())
         return false;
     return play_catalog_playlist(index - PLAYLIST_QUEUE - folders);
 }
@@ -1035,10 +1039,8 @@ static bool folder_select(uint32_t index)
     uint32_t count;
     int was = folder;
 
-    if (index == INDEX_UP || !folder_count(&count) || index >= count)
-        return false;
-    if ((global_settings.party_mode && audio_status())
-        || iap_library_queue_lent())
+    if (index == INDEX_UP || !folder_count(&count) || index >= count
+        || queue_refused())
         return false;
 
     if (was == FOLDER_BOOKS)
@@ -1299,10 +1301,7 @@ uint64_t iap_library_key(const char *path)
 
 bool iap_library_play_keys(const uint8_t *keys, size_t n, uint32_t start)
 {
-    if (building || !open_block(true) || !n)
-        return false;
-    if ((global_settings.party_mode && audio_status())
-        || iap_library_queue_lent())
+    if (building || !open_block(true) || !n || queue_refused())
         return false;
 
     uint32_t count = 0, first = 0;

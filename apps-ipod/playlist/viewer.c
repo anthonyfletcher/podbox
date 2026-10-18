@@ -539,7 +539,10 @@ static void format_name(char* dest, const char* src, size_t bufsz)
 static void format_line(struct playlist_entry* track, char* str,
                         int len)
 {
-    char *id3viewc = NULL;
+    /* The title slot playlist_entry_load() reserves after the filename */
+    char *id3viewc = track->name + strlen(track->name) + 1;
+    char name[MAX_PATH];
+    const char *display_name;
     /* Playing, moving and queued are all marked in the row text, in the same
      * order playlist_callback_icons() picks its glyph. The icon is not enough
      * on its own: `playlist viewer icons` off unhooks the callback entirely,
@@ -562,15 +565,9 @@ static void format_line(struct playlist_entry* track, char* str,
     {
         /* iPod Classic 6G custom: always retrieve title from tags/db */
         track->attr |= PLAYLIST_ATTR_RETRIEVE_ID3_ATTEMPTED;
-        bool retrieve_success = retrieve_id3_tags(track->index, track->name,
-                                                  viewer.id3,
-                                                  METADATA_EXCLUDE_ID3_PATH);
-        if (retrieve_success)
+        if (retrieve_id3_tags(track->index, track->name, viewer.id3,
+                              METADATA_EXCLUDE_ID3_PATH))
         {
-            if (!id3viewc)
-            {
-                id3viewc = track->name + strlen(track->name) + 1;
-            }
             struct mp3entry * pid3 = viewer.id3;
             id3viewc[0] = '\0';
             /* Title only (matching PictureFlow behavior) */
@@ -585,31 +582,21 @@ static void format_line(struct playlist_entry* track, char* str,
         }
     }
 
-    if (!(track->attr & PLAYLIST_ATTR_RETRIEVE_ID3_SUCCEEDED))
-    {
-        /* Simply use a formatted file name */
-        char name[MAX_PATH];
-        format_name(name, track->name, sizeof(name));
-        if (global_settings.playlist_viewer_indices)
-            /* Display playlist index */
-            snprintf(str, len, "%s%d. %s%s%s",
-                     prefix, track->display_index, skipped, name, suffix);
-        else
-            snprintf(str, len, "%s%s%s%s", prefix, skipped, name, suffix);
-    }
+    if (track->attr & PLAYLIST_ATTR_RETRIEVE_ID3_SUCCEEDED)
+        display_name = id3viewc;
     else
     {
-        if (!id3viewc)
-        {
-            id3viewc = track->name + strlen(track->name) + 1;
-        }
-        if (global_settings.playlist_viewer_indices)
-            /* Display playlist index */
-            snprintf(str, len, "%s%d. %s%s%s",
-                     prefix, track->display_index, skipped, id3viewc, suffix);
-        else
-            snprintf(str, len, "%s%s%s%s", prefix, skipped, id3viewc, suffix);
+        /* Simply use a formatted file name */
+        format_name(name, track->name, sizeof(name));
+        display_name = name;
     }
+
+    if (global_settings.playlist_viewer_indices)
+        /* Display playlist index */
+        snprintf(str, len, "%s%d. %s%s%s",
+                 prefix, track->display_index, skipped, display_name, suffix);
+    else
+        snprintf(str, len, "%s%s%s%s", prefix, skipped, display_name, suffix);
 }
 
 static enum pv_context_result show_track_info(const struct playlist_entry *current_track)

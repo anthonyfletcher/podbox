@@ -162,6 +162,28 @@ static size_t get_full_path(struct folder *start, char *dst, size_t dst_sz)
 #undef PATHMUTATE
 }
 
+/* Whether a directory entry is a subfolder: a directory other than . or .. */
+static bool is_subfolder(DIR *dir, struct dirent *entry)
+{
+    char *dn = entry->d_name;
+
+    if ((dir_get_info(dir, entry).attribute & ATTR_DIRECTORY) == 0)
+        return false;
+    return !(dn[0] == '.' &&
+             (dn[1] == '\0' || (dn[1] == '.' && dn[2] == '\0')));
+}
+
+static void child_init(struct child *child, char *name)
+{
+    child->name = name;
+    child->folder = NULL;
+    child->sel = SEL_INHERIT;
+    child->expanded = false;
+    child->eaccess = false;
+    child->probed = false;
+    child->has_children = false;
+}
+
 /* support function for qsort() */
 static int compare(const void* p1, const void* p2)
 {
@@ -204,13 +226,7 @@ static struct folder* load_folder(struct folder* parent, char *folder)
         this->depth = parent->depth + 1;
 
     while ((entry = readdir(dir))) {
-        /* skip anything not a directory */
-        if ((dir_get_info(dir, entry).attribute & ATTR_DIRECTORY) == 0) {
-            continue;
-        }
-        /* skip . and .. */
-        char *dn = entry->d_name;
-        if ((dn[0] == '.') && (dn[1] == '\0' || (dn[1] == '.' && dn[2] == '\0')))
+        if (!is_subfolder(dir, entry))
             continue;
         /* copy entry name to end of buffer, save pointer */
         int len = strlen((char *)entry->d_name);
@@ -233,14 +249,7 @@ static struct folder* load_folder(struct folder* parent, char *folder)
 
     while (child_count)
     {
-        struct child *child = &this->children[this->children_count++];
-        child->name = first_child;
-        child->folder = NULL;
-        child->sel = SEL_INHERIT;
-        child->expanded = false;
-        child->eaccess = false;
-        child->probed = false;
-        child->has_children = false;
+        child_init(&this->children[this->children_count++], first_child);
         while(*first_child++ != '\0'){};/* move to next name entry */
         child_count--;
     }
@@ -255,13 +264,7 @@ static struct folder* load_root(void)
 {
     static struct child root_child;
     /* reset the root for each call */
-    root_child.name = "/";
-    root_child.folder = NULL;
-    root_child.sel = SEL_INHERIT;
-    root_child.expanded = false;
-    root_child.eaccess = false;
-    root_child.probed = false;
-    root_child.has_children = false;
+    child_init(&root_child, "/");
 
     static struct folder root = {
         .name = "",
@@ -314,13 +317,11 @@ static bool has_subfolder(struct child *this, struct folder *parent)
 
     while ((entry = readdir(dir)))
     {
-        char *dn = entry->d_name;
-        if ((dir_get_info(dir, entry).attribute & ATTR_DIRECTORY) == 0)
-            continue;
-        if ((dn[0] == '.') && (dn[1] == '\0' || (dn[1] == '.' && dn[2] == '\0')))
-            continue;
-        this->has_children = true;
-        break;
+        if (is_subfolder(dir, entry))
+        {
+            this->has_children = true;
+            break;
+        }
     }
     closedir(dir);
     return this->has_children;

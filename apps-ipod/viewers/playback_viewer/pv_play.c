@@ -169,6 +169,40 @@ static int compare_ordered(const void *a_v, const void *b_v)
     return a->key - b->key;
 }
 
+/* Record the search's current match as order[i], keyed disc-then-track */
+static void order_note(struct tagcache_search *tcs, int i)
+{
+    int disc  = tagcache_get_numeric(tcs, tag_discnumber);
+    int track = tagcache_get_numeric(tcs, tag_tracknumber);
+
+    if (disc < 0)  disc = 0;
+    if (track < 0) track = 0;
+    order[i].idx_id = tcs->idx_id;
+    /* Both masked: these come from file tags, so a nonsense value must
+     * not shift into the sign bit and sort the track to the front. */
+    order[i].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
+}
+
+/* Sort the first 'found' of order[] and queue them, reading each path into
+ * 'path' (MAX_PATH bytes); returns how many were queued */
+static int queue_ordered(struct queue *q, struct tagcache_search *tcs,
+                         char *path, int found)
+{
+    int added = 0;
+
+    qsort(order, found, sizeof(*order), compare_ordered);
+    for (int i = 0; i < found; i++)
+    {
+        if (!tagcache_retrieve(tcs, order[i].idx_id, tag_filename,
+                               path, MAX_PATH))
+            continue;
+        if (queue_add(q, path) < 0)
+            break;
+        added++;
+    }
+    return added;
+}
+
 /* Whether a full tag 'full' is the name a card holds, which was cut to
  * PV_NAME_MAX when the play was named */
 static bool names_match(const char *full, const char *card)
@@ -254,8 +288,6 @@ static int insert_album_row(struct queue *q, const struct tagcache_album *al)
 
     while (tagcache_get_next(&tcs, path, sizeof(path)))
     {
-        int disc, track;
-
         if (!ordered || found >= ORDER_MAX)
         {
             /* Too big to order: the scan's own order, which is close to
@@ -265,26 +297,10 @@ static int insert_album_row(struct queue *q, const struct tagcache_album *al)
             added++;
             continue;
         }
-        disc  = tagcache_get_numeric(&tcs, tag_discnumber);
-        track = tagcache_get_numeric(&tcs, tag_tracknumber);
-        if (disc < 0)  disc = 0;
-        if (track < 0) track = 0;
-        order[found].idx_id = tcs.idx_id;
-        order[found].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
-        found++;
+        order_note(&tcs, found++);
     }
 
-    qsort(order, found, sizeof(*order), compare_ordered);
-    for (int i = 0; i < found; i++)
-    {
-        if (!tagcache_retrieve(&tcs, order[i].idx_id, tag_filename,
-                               path, sizeof(path)))
-            continue;
-        if (queue_add(q, path) < 0)
-            break;
-        added++;
-    }
-
+    added += queue_ordered(q, &tcs, path, found);
     tagcache_search_finish(&tcs);
     return added;
 }
@@ -325,43 +341,22 @@ static int insert_in_track_order(struct queue *q,
     struct tagcache_search tcs;
     struct match m;
     char path[MAX_PATH];
-    int found = 0, added = 0;
+    int found = 0, added;
 
     if (!search_open(&tcs, &m, t, narrowed))
         return 0;
 
     while (tagcache_get_next(&tcs, path, sizeof(path)))
     {
-        int disc, track;
-
         if (found >= ORDER_MAX)
         {
             tagcache_search_finish(&tcs);
             return -1;
         }
-        disc  = tagcache_get_numeric(&tcs, tag_discnumber);
-        track = tagcache_get_numeric(&tcs, tag_tracknumber);
-        if (disc < 0)  disc = 0;
-        if (track < 0) track = 0;
-        order[found].idx_id = tcs.idx_id;
-        /* Both masked: these come from file tags, so a nonsense value must
-         * not shift into the sign bit and sort the track to the front. */
-        order[found].key = ((disc & 0x7fff) << 16) | (track & 0xffff);
-        found++;
+        order_note(&tcs, found++);
     }
 
-    qsort(order, found, sizeof(*order), compare_ordered);
-
-    for (int i = 0; i < found; i++)
-    {
-        if (!tagcache_retrieve(&tcs, order[i].idx_id, tag_filename,
-                               path, sizeof(path)))
-            continue;
-        if (queue_add(q, path) < 0)
-            break;
-        added++;
-    }
-
+    added = queue_ordered(q, &tcs, path, found);
     tagcache_search_finish(&tcs);
     return added;
 }

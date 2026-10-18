@@ -254,6 +254,22 @@ static int mood_target(const struct mood_axis *x)
     return cal < 0 ? 0 : (cal > SOUND_AX ? SOUND_AX : cal);
 }
 
+static int axis_value(const struct sound_axes *a, int cal)
+{
+    return *(const int *)((const char *)a + sound_cal_offset(cal));
+}
+
+/* What a track's mode costs against the mode a mood names; see
+ * sound_mood_score() for the two amounts. */
+static int mode_cost(const struct sound_axes *a, int mode)
+{
+    if (mode < 0)
+        return 0;
+    if (a->mode < 0)
+        return 25;
+    return a->mode != mode ? 80 : 0;
+}
+
 int sound_mood_score(const struct sound_axes *a, int mood)
 {
     const struct mood_def *m;
@@ -274,8 +290,7 @@ int sound_mood_score(const struct sound_axes *a, int mood)
 
     for (i = 0; i < m->count; i++)
     {
-        int v = *(const int *)((const char *)a +
-                        sound_cal_offset(m->axes[i].cal));
+        int v = axis_value(a, m->axes[i].cal);
 
         /* An axis the analysis could not read is skipped, and its weight with
          * it, exactly as the track-to-track match does. */
@@ -311,15 +326,7 @@ int sound_mood_score(const struct sound_axes *a, int mood)
      * mode-named moods return one disagreeing track between them where at
      * 200 they returned none. That is the cost of the ceiling being a
      * ceiling. */
-    if (m->mode >= 0)
-    {
-        if (a->mode < 0)
-            d += 25;
-        else if (a->mode != m->mode)
-            d += 80;
-    }
-
-    return d;
+    return d + mode_cost(a, m->mode);
 }
 
 /* What a mood wants of one axis, or a weight of zero where it does not
@@ -410,7 +417,7 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
         if (weight <= 0)
             continue;
 
-        v = *(const int *)((const char *)a + sound_cal_offset(cal));
+        v = axis_value(a, cal);
 
         if (v < 0)
             continue;
@@ -428,17 +435,5 @@ int sound_mood_score_between(const struct sound_axes *a, int from, int to,
     /* The mode of whichever end this point is nearer. There is no half a
      * mode, and a journey between two moods that name different ones should
      * change over rather than want neither. */
-    {
-        int8_t mode = t < SOUND_AX / 2 ? ma->mode : mb->mode;
-
-        if (mode >= 0)
-        {
-            if (a->mode < 0)
-                d += 25;
-            else if (a->mode != mode)
-                d += 80;
-        }
-    }
-
-    return d;
+    return d + mode_cost(a, t < SOUND_AX / 2 ? ma->mode : mb->mode);
 }

@@ -59,6 +59,21 @@ static void tr_apply_colours(struct viewport *vp)
     vp->bg_pattern = dynamic_colors_resolve(global_settings.bg_color);
 }
 
+/* Copies [start, end) into buf as a string, cut to fit; returns its width. */
+static int tr_measure(struct screen *d, char *buf, int size,
+                      const char *start, const char *end)
+{
+    int len = end - start;
+    int tw;
+
+    if (len >= size)
+        len = size - 1;
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+    d->getstringsize((const unsigned char *)buf, &tw, NULL);
+    return tw;
+}
+
 /* Greedily word-wraps one line to the column width, returning the number of
  * display lines it occupies. When draw is set, each wrapped line is drawn
  * centred at top + line*pitch (lines outside the viewport are skipped). A
@@ -76,7 +91,6 @@ static int tr_wrap_line(struct screen *d, const char *s, bool draw,
         const char *line_start;
         const char *fit_end = NULL;   /* end of the last word that fit        */
         const char *q;
-        int len, tw;
 
         while (*p == ' ')
             p++;
@@ -91,14 +105,8 @@ static int tr_wrap_line(struct screen *d, const char *s, bool draw,
             while (*word_end && *word_end != ' ')
                 word_end++;
 
-            len = word_end - line_start;
-            if (len >= (int)sizeof(buf))
-                len = sizeof(buf) - 1;
-            memcpy(buf, line_start, len);
-            buf[len] = '\0';
-            d->getstringsize((const unsigned char *)buf, &tw, NULL);
-
-            if (tw <= TR_W || fit_end == NULL)
+            if (tr_measure(d, buf, sizeof(buf), line_start, word_end) <= TR_W
+                || fit_end == NULL)
             {
                 fit_end = word_end;      /* this word fits (or must be taken)  */
                 q = word_end;
@@ -114,12 +122,8 @@ static int tr_wrap_line(struct screen *d, const char *s, bool draw,
             int y = top + lines * pitch;
             if (y > -pitch && y < LCD_HEIGHT)
             {
-                len = fit_end - line_start;
-                if (len >= (int)sizeof(buf))
-                    len = sizeof(buf) - 1;
-                memcpy(buf, line_start, len);
-                buf[len] = '\0';
-                d->getstringsize((const unsigned char *)buf, &tw, NULL);
+                int tw = tr_measure(d, buf, sizeof(buf), line_start, fit_end);
+
                 d->putsxy(TR_PAD + (TR_W - tw) / 2, y,
                           (const unsigned char *)buf);
             }

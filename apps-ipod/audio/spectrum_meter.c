@@ -299,24 +299,20 @@ void spectrum_meter_peek(void)
      * mixer_channel_get_buffer() reporting stereo frames. */
     for (channel = 0; channel < 2; channel++)
     {
-        for (band = SPECTRUM_LOW_BANDS; band < SPECTRUM_MAX_BANDS; band++)
+        for (band = 0; band < SPECTRUM_MAX_BANDS; band++)
         {
-            int raw = spectrum_goertzel_at(pcm + channel,
-                                           SPECTRUM_BLOCK_SIZE, 2,
-                                           band_coeff[band]);
-            raw = (raw * band_gain_q8[band]) >> 8;
+            int block = SPECTRUM_BLOCK_SIZE;
+            int raw;
 
-            advance_band(channel, band, spectrum_scale_to_level(raw));
-        }
+            if (band < SPECTRUM_LOW_BANDS)
+            {
+                if (!low_ready)
+                    continue;
+                block = SPECTRUM_LOW_BLOCK;
+            }
 
-        if (!low_ready)
-            continue;
-
-        for (band = 0; band < SPECTRUM_LOW_BANDS; band++)
-        {
-            int raw = spectrum_goertzel_at(pcm + channel,
-                                           SPECTRUM_LOW_BLOCK, 2,
-                                           band_coeff[band]);
+            raw = spectrum_goertzel_at(pcm + channel, block, 2,
+                                       band_coeff[band]);
             raw = (raw * band_gain_q8[band]) >> 8;
 
             advance_band(channel, band, spectrum_scale_to_level(raw));

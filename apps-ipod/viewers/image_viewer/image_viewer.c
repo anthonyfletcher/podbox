@@ -194,6 +194,18 @@ static void iv_usb_inserted(unsigned short id, void *event_data)
     iv_usb_dropped = true;
 }
 
+/* Append 'name' to the file list, taking its pointer from the front of buf. */
+static void add_pic(char *name, const char *pname)
+{
+    file_pt[entries] = name;
+    if (!strcmp(name, pname))
+        curfile = entries;
+    entries++;
+
+    buf += sizeof(char **);
+    buf_size -= sizeof(char **);
+}
+
 /* Read 'dir' for the files to page through, when the browser's cache is not
  * about this directory (see get_pic_list()).
  *
@@ -229,13 +241,7 @@ static void get_pic_list_from_dir(const char *dir, const char *pname)
         strcpy(names, (char *)entry->d_name);
         buf_size -= len;
 
-        file_pt[entries] = names;
-        if (!strcmp(names, pname))
-            curfile = entries;
-        entries++;
-
-        buf = (char *)buf + sizeof(char **);
-        buf_size -= sizeof(char **);
+        add_pic(names, pname);
     }
 
     closedir(d);
@@ -311,16 +317,7 @@ static void get_pic_list(bool single_file)
         {
             /* Add all files. Non-image files will be filtered out while loading. */
             if (!(dircache[i].attr & ATTR_DIRECTORY))
-            {
-                file_pt[entries] = dircache[i].name;
-                /* Set Selected File. */
-                if (!strcmp(file_pt[entries], pname))
-                    curfile = entries;
-                entries++;
-
-                buf += (sizeof(char**));
-                buf_size -= (sizeof(char**));
-            }
+                add_pic(dircache[i].name, pname);
         }
         return;
     }
@@ -822,19 +819,19 @@ static bool rung_fits(int downscale, ssize_t remaining)
     return imgdec->img_mem(downscale) <= remaining;
 }
 
-/* Displayed size at a given downscale, DS_FIT included. */
-static void scaled_size(struct image_info *info, int downscale,
-                        int *p_w, int *p_h)
+/* Centre of the rendering at a given downscale, DS_FIT included. */
+static void scaled_centre(struct image_info *info, int downscale,
+                          int *p_cx, int *p_cy)
 {
     if (downscale == DS_FIT)
     {
-        *p_w = iv_fit_width;
-        *p_h = iv_fit_height;
+        *p_cx = iv_fit_width/2;
+        *p_cy = iv_fit_height/2;
     }
     else
     {
-        *p_w = info->x_size/downscale;
-        *p_h = info->y_size/downscale;
+        *p_cx = info->x_size/downscale/2;
+        *p_cy = info->y_size/downscale/2;
     }
 }
 
@@ -985,9 +982,7 @@ reload_decoder:
      * screen; navigation mode cannot pan, and would leave anything larger
      * stuck showing its middle. */
     ds = iv_fit_width ? DS_FIT : ds_max;
-    scaled_size(info, ds, &cx, &cy); /* center the view */
-    cx /= 2;
-    cy /= 2;
+    scaled_centre(info, ds, &cx, &cy);
 
     /* used to loop through subimages in animated gifs */
     int frame = 0;
@@ -1003,9 +998,7 @@ reload_decoder:
              * which the memory check above cannot see. Drop the rung. */
             iv_fit_width = iv_fit_height = 0;
             ds = ds_max;
-            scaled_size(info, ds, &cx, &cy);
-            cx /= 2;
-            cy /= 2;
+            scaled_centre(info, ds, &cx, &cy);
             status = imgdec->get_image(info, frame, ds);
         }
         if (status == PLUGIN_OUTOFMEM && iv_app_buf)
@@ -1043,8 +1036,7 @@ reload_decoder:
                         continue; /* memory allows nothing larger */
                     ds = step;
                     /* the fit view showed all of it, so zoom to the middle */
-                    cx = info->x_size/ds/2;
-                    cy = info->y_size/ds/2;
+                    scaled_centre(info, ds, &cx, &cy);
                 }
                 else if (ds > ds_min || (imgdec->unscaled_avail && ds > 1))
                 {
@@ -1080,8 +1072,7 @@ reload_decoder:
                 else if (iv_fit_width && rung_fits(DS_FIT, remaining))
                 {
                     ds = DS_FIT; /* the rung below the integer ladder */
-                    cx = iv_fit_width/2;
-                    cy = iv_fit_height/2;
+                    scaled_centre(info, ds, &cx, &cy);
                 }
                 else
                     continue;
@@ -1093,9 +1084,7 @@ reload_decoder:
             if (status == ZOOM_FIT)
             {
                 ds = iv_fit_width ? DS_FIT : ds_max;
-                scaled_size(info, ds, &cx, &cy);
-                cx /= 2;
-                cy /= 2;
+                scaled_centre(info, ds, &cx, &cy);
                 /* back to the first frame, which is also what makes the
                  * redraw below clear the screen the menu drew on */
                 frame = 0;

@@ -109,11 +109,6 @@ static bool write_best(int32_t b)
            && libfile_finish(&w, libfile_write(&w, &b, sizeof(b), 1));
 }
 
-static void scores_save(void)
-{
-    write_best(best);
-}
-
 bool quiz_scores_convert(const char *text_file)
 {
     char line[64];
@@ -984,7 +979,7 @@ static enum game_end play_game(void)
         if (record)
         {
             best = score;
-            scores_save();
+            write_best(best);
         }
         again = show_result(score, record);
     }

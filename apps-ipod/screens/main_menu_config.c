@@ -138,11 +138,13 @@ static unsigned char *item_name(int n, struct items *dest)
                            dest->dyn_name, sizeof(dest->dyn_name));
     }
 
-    return (item->flags & MENU_HAS_DESC) ?
-      item->callback_and_desc->desc :
-      (strcmp("wps", menu_table[n].string) ?
-       (unsigned char *)menu_table[n].string :
-       ID2P(LANG_RESUME_PLAYBACK));
+    if (item->flags & MENU_HAS_DESC)
+        return item->callback_and_desc->desc;
+
+    if (strcmp("wps", menu_table[n].string) == 0)
+        return ID2P(LANG_RESUME_PLAYBACK);
+
+    return (unsigned char *)menu_table[n].string;
 }
 
 static void load_from_cfg(void)

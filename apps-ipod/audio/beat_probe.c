@@ -338,6 +338,7 @@ void beat_probe_sink(const void *ch1, const void *ch2, int count,
         for (i = 0; i < n; i++)
         {
             int32_t l, r, mid, side;
+            uint32_t mid_abs;
 
             bp_frame(a, b, done + i, fmt->stereo_mode, fmt->shift, &l, &r);
 
@@ -350,8 +351,9 @@ void beat_probe_sink(const void *ch1, const void *ch2, int count,
             sum_mid_sq += (uint64_t)((int64_t)mid * mid);
             sum_side_sq += (uint64_t)((int64_t)side * side);
 
-            if ((uint32_t)(mid < 0 ? -mid : mid) > peak_mid)
-                peak_mid = (uint32_t)(mid < 0 ? -mid : mid);
+            mid_abs = (uint32_t)(mid < 0 ? -mid : mid);
+            if (mid_abs > peak_mid)
+                peak_mid = mid_abs;
         }
 
         frames_in += n;

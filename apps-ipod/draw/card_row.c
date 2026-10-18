@@ -169,8 +169,6 @@ void card_row_init(struct card_row *r, const short *full_w,
     r->fold_w = 0;
 
     for (int i = 0; i < n; i++)
-        cur_w[i] = 0;
-    for (int i = 0; i < n; i++)
         cur_w[i] = from_w[i] = (short)target_w(r, i);
 
     r->scroll = r->scroll_to = scroll_for_focus(r);

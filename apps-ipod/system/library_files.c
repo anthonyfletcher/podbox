@@ -312,15 +312,9 @@ static bool has_db_file(const char *dir, int i)
 /* Whether dir holds any of a database's files at all */
 static bool has_database_file(const char *dir)
 {
-    char name[32], path[MAX_PATH];
-
     for (int i = -2; i < 32; i++)
-    {
-        database_name(i, name, sizeof(name));
-        snprintf(path, sizeof(path), "%s/%s", dir, name);
-        if (file_exists(path))
+        if (has_db_file(dir, i))
             return true;
-    }
     return false;
 }
 

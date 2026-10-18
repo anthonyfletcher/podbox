@@ -215,6 +215,14 @@ static bool is_tracknum(const char *s, int n)
     return true;
 }
 
+/* The folder name between separators 'from' and 'to', cut to PV_NAME_MAX. */
+static void copy_folder(char *dst, const char *from, const char *to)
+{
+    size_t gap = (size_t)(to - from);
+
+    strlcpy(dst, from + 1, gap < PV_NAME_MAX ? gap : PV_NAME_MAX);
+}
+
 /* Artist and album from the folders holding the file.
  *
  * Two above the file, not one. A ripped library is
@@ -260,18 +268,12 @@ static void folders_to_meta(const char *path, char *artist, char *album)
      * stop, one directory shallower. */
     if (n >= 3)
     {
-        strlcpy(artist, sl[0] + 1,
-                (size_t)(sl[1] - sl[0]) < PV_NAME_MAX
-                    ? (size_t)(sl[1] - sl[0]) : PV_NAME_MAX);
-        strlcpy(album, sl[1] + 1,
-                (size_t)(sl[2] - sl[1]) < PV_NAME_MAX
-                    ? (size_t)(sl[2] - sl[1]) : PV_NAME_MAX);
+        copy_folder(artist, sl[0], sl[1]);
+        copy_folder(album, sl[1], sl[2]);
     }
     else if (n >= 2)
     {
-        strlcpy(artist, sl[1] + 1,
-                (size_t)(sl[2] - sl[1]) < PV_NAME_MAX
-                    ? (size_t)(sl[2] - sl[1]) : PV_NAME_MAX);
+        copy_folder(artist, sl[1], sl[2]);
     }
 }
 

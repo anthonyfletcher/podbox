@@ -793,6 +793,17 @@ static int text_w_for(int card_w)
     return card_w - 2 * CARD_INSET;
 }
 
+static bool has_plate(const struct card_content *c)
+{
+    return c->tag || c->tag_icon;
+}
+
+/* The height a series chart takes from the foot of the card. */
+static int series_band(const struct card_content *c, int h)
+{
+    return c->series_h ? c->series_h : h / 3;
+}
+
 int card_paint_measure(const struct card_content *c, int h)
 {
     int w = CARD_W_MIN, room, tw, th, i;
@@ -845,12 +856,11 @@ int card_paint_measure(const struct card_content *c, int h)
     /* A card with no plate has no head band to leave clear: its content runs
      * the full height. Reserving one everywhere lays every tile out as though
      * it had a title row, which is a third of the card given to nothing. */
-    room = h - ((c->tag || c->tag_icon) ? CARD_PLATE_H : CARD_INSET)
-         - CARD_INSET;
+    room = h - (has_plate(c) ? CARD_PLATE_H : CARD_INSET) - CARD_INSET;
     if (c->prog >= 0)
         room -= CARD_PROG_H;
     if (c->series)
-        room -= c->series_h ? c->series_h : h / 3;
+        room -= series_band(c, h);
     if (c->title)
         room -= font_get(font_card)->height + CARD_TITLE_GAP;
 
@@ -887,7 +897,7 @@ int card_paint_measure(const struct card_content *c, int h)
             w = t;
     }
 
-    if ((c->tag || c->tag_icon) && w < CARD_PLATE_W + CARD_PAD)
+    if (has_plate(c) && w < CARD_PLATE_W + CARD_PAD)
         w = CARD_PLATE_W + CARD_PAD;
 
     if (w < CARD_W_MIN) w = CARD_W_MIN;
@@ -910,20 +920,24 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
     struct card_ink ink;
     int ox = x_off;
     int tfh, tw, fh, y;
-    /* A card with no plate has no head band to leave clear, so its content
-     * runs the full height -- and a grid with neither plate nor heading runs
-     * to the card's own edges, because a year of days wants every pixel and
-     * the section title above already says what it is. */
-    int body_top = (c->tag || c->tag_icon) ? CARD_PLATE_H
-                 : (c->level && c->title)  ? CARD_PLATE_H
-                 : c->level                ? 0
-                                           : CARD_INSET;
+    int body_top;
     int body_bot = h;
     int text_w = text_w_for(w);
     int text_x = ox + CARD_INSET;
     int text_h = 0;
     int fit_bot;
     int room, lines;
+
+    /* A card with no plate has no head band to leave clear, so its content
+     * runs the full height -- and a grid with neither plate nor heading runs
+     * to the card's own edges, because a year of days wants every pixel and
+     * the section title above already says what it is. */
+    if (has_plate(c) || (c->level && c->title))
+        body_top = CARD_PLATE_H;
+    else if (c->level)
+        body_top = 0;
+    else
+        body_top = CARD_INSET;
 
     card_paint_ink(c->base, &ink);
 
@@ -960,9 +974,9 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
      * that is the most room a caption can ever be given whatever it says. */
     room = c->art
          ? body_bot - CARD_ART_MIN_H - 2 * CARD_INSET
-         : body_bot - ((c->tag || c->tag_icon) ? CARD_PLATE_H : CARD_INSET)
+         : body_bot - (has_plate(c) ? CARD_PLATE_H : CARD_INSET)
            - CARD_INSET
-           - (c->series ? (c->series_h ? c->series_h : h / 3) : 0)
+           - (c->series ? series_band(c, h) : 0)
            - (c->title ? tfh + CARD_TITLE_GAP : 0)
            - (c->n_table ? CARD_TABLE_GAP + table_block_h(c->n_table) : 0);
 
@@ -1055,7 +1069,7 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
     /* The plate, where a card has one. On an art card it is punched out of
      * the picture, so it is filled with the text colour and lettered in the
      * card's own. */
-    if (c->tag || c->tag_icon)
+    if (has_plate(c))
     {
         char glyph[4];
         const char *mark = c->tag;
@@ -1111,7 +1125,7 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
     if (c->series && c->n_series > 0)
     {
         int n = c->n_series;
-        int band = c->series_h ? c->series_h : h / 3;
+        int band = series_band(c, h);
 
         /* Black, whatever the card is. Against a sky they read as a skyline
          * cut out of it, which is the one place the screen's own background
@@ -1154,8 +1168,7 @@ void card_paint_draw(const struct card_content *c, int w, int h, int x_off)
          * head band -- beside the plate where there is one, beside the bar
          * where there is not. Put it in the body block instead and it is
          * drawn over the grid. */
-        int tx = (c->tag || c->tag_icon) ? ox + CARD_PLATE_W + CARD_PAD
-                                         : text_x;
+        int tx = has_plate(c) ? ox + CARD_PLATE_W + CARD_PAD : text_x;
 
         if (c->title)
             lcd_putsxy(tx, (CARD_PLATE_H - tfh) / 2, c->title);

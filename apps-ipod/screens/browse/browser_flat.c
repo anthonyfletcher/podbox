@@ -34,6 +34,13 @@
 
 static struct path_list list;
 
+static void set_title(char *title, size_t size, bool images)
+{
+    snprintf(title, size, "%s (%d%s)",
+             str(images ? LANG_IMAGES : LANG_DOCUMENTS),
+             list.count, list.truncated ? "+" : "");
+}
+
 /* The filename, not the path it sits at: the path is long, the row is narrow,
  * and the name is what is being looked for. */
 static const char *flat_get_name(int selected_item, void *data,
@@ -63,9 +70,7 @@ int browser_flat(bool images)
         return GO_TO_PREVIOUS;
     }
 
-    snprintf(title, sizeof(title), "%s (%d%s)",
-             str(images ? LANG_IMAGES : LANG_DOCUMENTS),
-             list.count, list.truncated ? "+" : "");
+    set_title(title, sizeof(title), images);
 
     push_current_activity(images ? ACTIVITY_IMAGEBROWSER
                                  : ACTIVITY_DOCUMENTBROWSER);
@@ -126,9 +131,7 @@ int browser_flat(bool images)
             if (!path_list_load(&list, file_index_list(images), PATH_LIST_MAX))
                 break;
 
-            snprintf(title, sizeof(title), "%s (%d%s)",
-                     str(images ? LANG_IMAGES : LANG_DOCUMENTS),
-                     list.count, list.truncated ? "+" : "");
+            set_title(title, sizeof(title), images);
         }
     }
 

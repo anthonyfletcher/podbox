@@ -1097,6 +1097,13 @@ static struct menu_table menu_table[] = {
 #define MAX_MENU_ITEMS (sizeof(menu_table) / sizeof(struct menu_table))
 static struct menu_item_ex *root_menu__[MAX_MENU_ITEMS];
 
+/* How many of root_menu__[] the menu shows. */
+static void root_menu_set_count(unsigned count)
+{
+    root_menu_.flags &= ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT);
+    root_menu_.flags |= MENU_ITEM_COUNT(count);
+}
+
 /* The default order of the main menu: Resume/Now Playing, Music, Album
  * covers, [tagnavi rows, in whatever order they're already in], Playlists,
  * Files, Shortcuts, Settings, System. Applied by root_menu_set_default()
@@ -1161,8 +1168,7 @@ static void root_menu_apply_canonical_order(void)
      * did, leaving the old count standing would draw whatever stale pointer
      * was left in the tail as if it were a real row. */
     if (out != count)
-        root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
-                            | MENU_ITEM_COUNT(out);
+        root_menu_set_count(out);
 }
 
 /* Of MAX_MENU_ITEMS, how many are actually usable right now -- hides any
@@ -1213,8 +1219,7 @@ static void root_menu_fixup_tagnavi_slots(void)
     }
 
     if (out != count)
-        root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
-                            | MENU_ITEM_COUNT(out);
+        root_menu_set_count(out);
 }
 
 /* Segregate Audiobooks owns the Audiobooks row: one setting, one feature.
@@ -1280,8 +1285,7 @@ void root_menu_set_audiobooks_row(bool on)
         count--;
     }
 
-    root_menu_.flags = (root_menu_.flags & ~(MENU_COUNT_MASK << MENU_COUNT_SHIFT))
-                        | MENU_ITEM_COUNT(count);
+    root_menu_set_count(count);
 }
 
 /* menu_table[] less the tagnavi slots whose row is hidden, such as Custom

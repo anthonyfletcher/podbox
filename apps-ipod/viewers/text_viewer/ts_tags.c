@@ -332,7 +332,6 @@ static void feed(tg_st *s, uint8_t c)
             s->state = ST_TEXT;
             if (!used && (c == '<' || c == '&')) {
                 /* the terminator was really the start of something else */
-                s->state = ST_TEXT;
                 feed(s, c);
             }
         }

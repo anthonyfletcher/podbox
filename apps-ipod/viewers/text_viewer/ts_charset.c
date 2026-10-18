@@ -65,12 +65,7 @@ static const uint16_t cp1251_hi[128] = {  /* 0x80..0xFF */
     0x0448,0x0449,0x044A,0x044B,0x044C,0x044D,0x044E,0x044F
 };
 
-uint32_t ts_sb_to_cp(ts_charset cs, uint8_t b);
-static uint32_t sb_to_cp(ts_charset cs, uint8_t b);
-
-uint32_t ts_sb_to_cp(ts_charset cs, uint8_t b) { return sb_to_cp(cs, b); }
-
-static uint32_t sb_to_cp(ts_charset cs, uint8_t b)
+uint32_t ts_sb_to_cp(ts_charset cs, uint8_t b)
 {
     if (b < 0x80) return b;
 
@@ -113,7 +108,7 @@ static uint32_t sb_to_cp(ts_charset cs, uint8_t b)
 
 static int utf8_plausible(const uint8_t *p, size_t n)
 {
-    size_t i = 0, seq = 0;
+    size_t i = 0;
 
     while (i < n) {
         uint8_t b = p[i];
@@ -129,9 +124,7 @@ static int utf8_plausible(const uint8_t *p, size_t n)
         for (size_t k = 1; k < need; k++)
             if ((p[i + k] & 0xC0) != 0x80) return 0;
         i += need;
-        seq++;
     }
-    (void)seq;
     return 1;
 }
 
@@ -329,7 +322,7 @@ static int cs_step(cs_st *s, int *err)
         return 1;
     }
 
-    ts_emit_cp(&s->out, sb_to_cp(s->cs, s->in[s->ipos++]));
+    ts_emit_cp(&s->out, ts_sb_to_cp(s->cs, s->in[s->ipos++]));
     return 1;
 }
 

@@ -298,6 +298,18 @@ static void table_measure_sorted(void)
     }
 }
 
+/* Enter the record written at the working file's next ordinal. */
+static void table_append(struct key_entry *t, const struct sound_record *r,
+                         uint8_t seen)
+{
+    t[table_used].key = r->key;
+    t[table_used].mtime = r->mtime;
+    t[table_used].size = r->size;
+    t[table_used].ordinal = (uint32_t)table_used;
+    t[table_used].seen = seen;
+    table_used++;
+}
+
 static int key_cmp(const void *a, const void *b)
 {
     const struct key_entry *x = a;
@@ -375,12 +387,7 @@ static bool seed_from_finished(void)
         if (write(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
             break;
 
-        t[table_used].key = r.key;
-        t[table_used].mtime = r.mtime;
-        t[table_used].size = r.size;
-        t[table_used].ordinal = (uint32_t)table_used;
-        t[table_used].seen = 0;
-        table_used++;
+        table_append(t, &r, 0);
     }
 
     close(fd);
@@ -439,12 +446,7 @@ static bool load_part(bool seed)
         if (read(part_fd, &r, sizeof (r)) != (ssize_t)sizeof (r))
             break;
 
-        t[table_used].key = r.key;
-        t[table_used].mtime = r.mtime;
-        t[table_used].size = r.size;
-        t[table_used].ordinal = (uint32_t)table_used;
-        t[table_used].seen = 0;
-        table_used++;
+        table_append(t, &r, 0);
     }
 
     /* A count that ran past what the file holds is a run that was cut off
@@ -644,12 +646,7 @@ bool sound_index_add(const struct sound_record *r)
         return false;
     }
 
-    t[table_used].key = r->key;
-    t[table_used].mtime = r->mtime;
-    t[table_used].size = r->size;
-    t[table_used].ordinal = (uint32_t)table_used;
-    t[table_used].seen = 1;
-    table_used++;
+    table_append(t, r, 1);
     table_sorted = false;
 
     /* The header counts what is there and is rewritten per record, so a run

@@ -248,12 +248,19 @@ static void resolve_children(enum pv_sec sec)
 static char pool[POOL_N][POOL_W];
 static int  pool_at;
 
-static const char *pfmt(const char *fmt, ...)
+static char *pool_next(void)
 {
     char *b = pool[pool_at];
-    va_list ap;
 
     pool_at = (pool_at + 1) % POOL_N;
+    return b;
+}
+
+static const char *pfmt(const char *fmt, ...)
+{
+    char *b = pool_next();
+    va_list ap;
+
     va_start(ap, fmt);
     vsnprintf(b, POOL_W, fmt, ap);
     va_end(ap);
@@ -266,13 +273,12 @@ static const char *pfmt(const char *fmt, ...)
 static const char *num(long v)
 {
     char digits[24];
-    char *b = pool[pool_at];
+    char *b = pool_next();
     const char *sep = str(LANG_THOUSANDS_SEPARATOR);
     int sep_len = strlen(sep);
     int n, i, o = 0;
     bool neg = v < 0;
 
-    pool_at = (pool_at + 1) % POOL_N;
     if (neg)
         v = -v;
 
@@ -327,8 +333,7 @@ static const char *shown(const char *name)
     while (n > 0 && name[n - 1] == ' ')
         n--;
 
-    b = pool[pool_at];
-    pool_at = (pool_at + 1) % POOL_N;
+    b = pool_next();
     memcpy(b, name, n);
     memcpy(b + n, "...", 4);
     return b;
@@ -828,12 +833,24 @@ static bool wk_range(long d_lo, long d_hi, unsigned long *from,
     return found;
 }
 
+/* The most counted of 'n' names into 'dst', the first on a tie; untouched if
+ * there are none. */
+static void wk_best(const struct wk_named *arr, int n, char *dst)
+{
+    int bi = -1;
+
+    for (int i = 0; i < n; i++)
+        if (bi < 0 || arr[i].c > arr[bi].c)
+            bi = i;
+    if (bi >= 0)
+        strlcpy(dst, arr[bi].name, PV_NAME_MAX);
+}
+
 static void wk_scan(int wi)
 {
     struct pv_week w;
     struct wk_ctx ctx;
     unsigned long from, to;
-    int bi;
 
     wk_week = wi;
     wk_art_n = wk_trk_n = wk_songs = 0;
@@ -850,19 +867,8 @@ static void wk_scan(int wi)
     pv_log_read_range(totals->source, from, to, wk_entry, &ctx);
     wk_songs = wk_trk_n;
 
-    bi = -1;
-    for (int i = 0; i < wk_art_n; i++)
-        if (bi < 0 || wk_art[i].c > wk_art[bi].c)
-            bi = i;
-    if (bi >= 0)
-        strlcpy(wk_top_artist, wk_art[bi].name, PV_NAME_MAX);
-
-    bi = -1;
-    for (int i = 0; i < wk_trk_n; i++)
-        if (bi < 0 || wk_trk[i].c > wk_trk[bi].c)
-            bi = i;
-    if (bi >= 0)
-        strlcpy(wk_top_track, wk_trk[bi].name, PV_NAME_MAX);
+    wk_best(wk_art, wk_art_n, wk_top_artist);
+    wk_best(wk_trk, wk_trk_n, wk_top_track);
 }
 
 void pv_tiles_open(int idx)

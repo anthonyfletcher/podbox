@@ -255,6 +255,25 @@ static int row_index(const struct pv_htable *t, const struct pv_agg *a)
     return a ? (int)(a - t->items) : PV_ROW_NONE;
 }
 
+/* The row stored as 'key' within 'artist', or NULL with *slot set to the
+ * empty slot it would take. */
+static struct pv_agg *htable_probe(const struct pv_htable *t, const char *key,
+                                   int artist, int *slot)
+{
+    int i = (int)(agg_hash(key, artist) & (unsigned)t->mask);
+
+    while (t->slots[i])
+    {
+        struct pv_agg *a = &t->items[t->slots[i] - 1];
+        if (a->artist == artist && strcmp(a->name, key) == 0)
+            return a;
+        i = (i + 1) & t->mask;
+    }
+    if (slot)
+        *slot = i;
+    return NULL;
+}
+
 /* Find or create, within an artist. NULL only when the table is full --
  * which is a real outcome, not an impossible one: the caller records it so an
  * undercount is visible rather than silent.
@@ -268,20 +287,13 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name,
      * never match its own truncated entry, and would make a new row on every
      * single play. */
     char key[PV_NAME_MAX];
-    unsigned int h;
+    struct pv_agg *a;
     int i;
 
     strlcpy(key, name, sizeof(key));
-    h = agg_hash(key, artist);
-    i = (int)(h & (unsigned)t->mask);
-
-    while (t->slots[i])
-    {
-        struct pv_agg *a = &t->items[t->slots[i] - 1];
-        if (a->artist == artist && strcmp(a->name, key) == 0)
-            return a;
-        i = (i + 1) & t->mask;
-    }
+    a = htable_probe(t, key, artist, &i);
+    if (a)
+        return a;
 
     if (t->n >= t->cap)
     {
@@ -289,7 +301,7 @@ static struct pv_agg *htable_get(struct pv_htable *t, const char *name,
         return NULL;
     }
 
-    struct pv_agg *a = &t->items[t->n];
+    a = &t->items[t->n];
     strlcpy(a->name, key, sizeof(a->name));
     /* The buffer arrives zeroed, so both links have to be set: zero is row 0,
      * not "no row". */
@@ -998,6 +1010,17 @@ static int streak_run(int *from_i, int *to_i)
     return best;
 }
 
+/* Rows of 't' with a play in them, in the year or ever. */
+static int rows_played(const struct pv_htable *t, bool year_only)
+{
+    int n = 0;
+
+    for (int i = 0; i < t->n; i++)
+        if (year_only ? t->items[i].y_count : t->items[i].count)
+            n++;
+    return n;
+}
+
 /* A week's listening is the sum of its days', so it costs one pass over the
  * day array rather than a bin of its own during the read. */
 /* The figures that come from the tables and the day array rather than from
@@ -1014,21 +1037,14 @@ static void derive(struct pv_totals *o, bool year_only)
     int run = 0;
     bool have_day = false, have_week = false;
 
-    o->titles = o->artists = o->albums = 0;
     o->days = 0;
     o->streak = 0;
     o->best_week_secs = 0;
     o->best_week_day = 0;
 
-    for (int i = 0; i < t_title.n; i++)
-        if (year_only ? t_title.items[i].y_count : t_title.items[i].count)
-            o->titles++;
-    for (int i = 0; i < t_artist.n; i++)
-        if (year_only ? t_artist.items[i].y_count : t_artist.items[i].count)
-            o->artists++;
-    for (int i = 0; i < t_album.n; i++)
-        if (year_only ? t_album.items[i].y_count : t_album.items[i].count)
-            o->albums++;
+    o->titles  = rows_played(&t_title, year_only);
+    o->artists = rows_played(&t_artist, year_only);
+    o->albums  = rows_played(&t_album, year_only);
 
     for (int i = 0; i < day_n; i++)
     {
@@ -1218,8 +1234,6 @@ const struct pv_agg *pv_stats_find(enum pv_table which, const char *name,
 {
     struct pv_htable *t = table_of(which);
     char key[PV_NAME_MAX];
-    unsigned int h;
-    int i;
 
     if (!t->items || !t->slots)
         return NULL;
@@ -1232,17 +1246,7 @@ const struct pv_agg *pv_stats_find(enum pv_table which, const char *name,
     /* The stored form, as htable_get() uses -- a longer name would hash
      * differently from its own truncated row and never be found. */
     strlcpy(key, name, sizeof(key));
-    h = agg_hash(key, artist);
-    i = (int)(h & (unsigned)t->mask);
-
-    while (t->slots[i])
-    {
-        struct pv_agg *a = &t->items[t->slots[i] - 1];
-        if (a->artist == artist && strcmp(a->name, key) == 0)
-            return a;
-        i = (i + 1) & t->mask;
-    }
-    return NULL;
+    return htable_probe(t, key, artist, NULL);
 }
 
 int pv_stats_index(enum pv_table which, const struct pv_agg *row)

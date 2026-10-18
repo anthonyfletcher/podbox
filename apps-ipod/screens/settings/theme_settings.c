@@ -206,19 +206,6 @@ static int selector_end_color_callback(int action,
     return action;
 }
 
-/* The submenu goes with its rows: without this it would still be listed and
-   would open on an empty screen. */
-static int selector_menu_callback(int action,
-                                  const struct menu_item_ex *this_item,
-                                  struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM && !selector_is_coloured())
-        return ACTION_EXIT_MENUITEM;
-    return action;
-}
-
 MENUITEM_FUNCTION_W_PARAM(set_lss_col, 0, ID2P(LANG_SELECTOR_START_COLOR),
                           set_color_func, (void*)COLOR_LSS,
                           selector_color_callback, Icon_NOICON);
@@ -248,8 +235,10 @@ MENUITEM_FUNCTION_W_PARAM(set_sep_col, 0, ID2P(LANG_LIST_SEPARATOR_COLOR),
 MENUITEM_FUNCTION(reset_colors, 0, ID2P(LANG_RESET_COLORS),
                   reset_color, NULL, Icon_NOICON);
 
+/* The submenu goes with its rows: without the callback it would still be
+   listed and would open on an empty screen. */
 MAKE_MENU(lss_settings, ID2P(LANG_SELECTOR_COLOR_MENU),
-            selector_menu_callback, Icon_NOICON,
+            selector_color_callback, Icon_NOICON,
             &set_lss_col, &set_lse_col, &set_lst_col
          );
 

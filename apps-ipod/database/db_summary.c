@@ -134,6 +134,28 @@ static void stamp(struct db_summary_t *t)
     t->generation = marks.generation;
 }
 
+static int visible_album_count(void)
+{
+    struct tagcache_album a;
+    int na = tagcache_album_count(), n = 0;
+
+    for (int i = 0; i < na; i++)
+        if (tagcache_album_get(i, &a) && !album_hidden(&a))
+            n++;
+    return n;
+}
+
+static void album_record(struct album_data *d, const struct tagcache_album *a)
+{
+    d->year = a->year;
+    d->playcount = a->playcount;
+    d->lastplayed = a->lastplayed;
+    d->artist_seek = a->artist_seek;
+    d->seek = a->album_seek;
+    d->art_hash = a->art_hash;
+    d->artist_art_hash = a->artist_art_hash;
+}
+
 int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
 {
     struct tagcache_album a;
@@ -153,9 +175,7 @@ int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
     if (ret != SUCCESS)
         t->artist_ct = 0;
 
-    for (int i = 0; i < na; i++)
-        if (tagcache_album_get(i, &a) && !album_hidden(&a))
-            n++;
+    n = visible_album_count();
     if (n == 0)
         return ERROR_NO_ALBUMS;
 
@@ -173,13 +193,7 @@ int db_summary_build_into(struct db_summary_t *t, void *buf, size_t buf_sz)
 
         if (!tagcache_album_get(i, &a) || album_hidden(&a))
             continue;
-        d->year = a.year;
-        d->playcount = a.playcount;
-        d->lastplayed = a.lastplayed;
-        d->artist_seek = a.artist_seek;
-        d->seek = a.album_seek;
-        d->art_hash = a.art_hash;
-        d->artist_art_hash = a.artist_art_hash;
+        album_record(d, &a);
         /* False only for <Untagged>: the RAM copy is up while the table is */
         if (t->album_untagged_seek < 0
             && !tagcache_seek_string(tag_album, a.album_seek, c, sizeof(c)))
@@ -214,13 +228,7 @@ int db_summary_load_artists(struct db_summary_t *t, void **buf,
 
 int db_summary_reader_open(struct db_summary_reader *r)
 {
-    struct tagcache_album a;
-    int na = tagcache_album_count();
-
-    r->album_ct = 0;
-    for (int i = 0; i < na; i++)
-        if (tagcache_album_get(i, &a) && !album_hidden(&a))
-            r->album_ct++;
+    r->album_ct = visible_album_count();
     return r->album_ct ? SUCCESS : ERROR_NO_ALBUMS;
 }
 
@@ -242,13 +250,7 @@ bool db_summary_read_album(struct db_summary_reader *r, int n,
         if (!tagcache_album_get(i, &a) || album_hidden(&a) || n-- > 0)
             continue;
         memset(out, 0, sizeof(*out));
-        out->year = a.year;
-        out->playcount = a.playcount;
-        out->lastplayed = a.lastplayed;
-        out->artist_seek = a.artist_seek;
-        out->seek = a.album_seek;
-        out->art_hash = a.art_hash;
-        out->artist_art_hash = a.artist_art_hash;
+        album_record(out, &a);
         return true;
     }
     return false;
@@ -352,6 +354,14 @@ static int compare_album_tracks(const void *a_v, const void *b_v)
     return a->key - b->key;
 }
 
+/* The album's tracks: its name and its artist. */
+static void filter_album(struct tagcache_search *tcs,
+                         const struct album_data *album)
+{
+    tagcache_search_add_filter(tcs, tag_album, album->seek);
+    tagcache_search_add_filter(tcs, tag_albumartist, album->artist_seek);
+}
+
 int db_summary_play_album(const struct album_data *album)
 {
     struct tagcache_search tcs;
@@ -391,9 +401,7 @@ int db_summary_play_album(const struct album_data *album)
         return -1;
     }
 
-    /* The album's tracks: its name and its artist. */
-    tagcache_search_add_filter(&tcs, tag_album, album->seek);
-    tagcache_search_add_filter(&tcs, tag_albumartist, album->artist_seek);
+    filter_album(&tcs, album);
 
     /* A search returns entries in master-index order -- the order the files
      * were scanned, which is close to track order for most rips and wrong for
@@ -451,9 +459,7 @@ int db_summary_play_album(const struct album_data *album)
         tagcache_search_finish(&tcs);
         if (tagcache_search(&tcs, tag_filename))
         {
-            tagcache_search_add_filter(&tcs, tag_album, album->seek);
-            tagcache_search_add_filter(&tcs, tag_albumartist,
-                                       album->artist_seek);
+            filter_album(&tcs, album);
             while (tagcache_get_next(&tcs, buf, sizeof(buf)))
             {
                 if (playlist_insert_context_add(&context, buf) < 0)

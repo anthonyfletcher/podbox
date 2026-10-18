@@ -1381,37 +1381,60 @@ static int mix_build(const struct mix_goal *g, uint64_t skip_key,
     return added;
 }
 
-int sound_mix_from_track(const char *path, int want)
+static int clamp_want(int want, int least)
+{
+    if (want < least)
+        return least;
+    return want > SOUND_MIX_MAX ? SOUND_MIX_MAX : want;
+}
+
+/* The axes of the track keyed 'key': 0, SOUND_MIX_NO_INDEX or
+ * SOUND_MIX_NO_RECORD.
+ *
+ * A record the decode failed on is in the index but is not a measurement,
+ * and it is no more use as the thing being matched than as a match. */
+static int read_seed(uint64_t key, struct sound_axes *out)
 {
     struct sound_index_reader r;
-    struct sound_record seed;
-    struct sound_axes sa;
-    struct mix_goal g;
-    uint64_t seed_key = path_key(path);
-
-    if (want < 1)
-        want = 1;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
+    struct sound_record rec;
+    bool found;
 
     if (sound_index_reader_open(&r) != SOUND_OK)
         return SOUND_MIX_NO_INDEX;
 
-    /* A record the decode failed on is in the index but is not a measurement,
-     * and it is no more use as the thing being matched than as a match. */
-    if (!sound_index_find(&r, seed_key, &seed) || !sound_record_usable(&seed))
-    {
-        sound_index_reader_close(&r);
-        return SOUND_MIX_NO_RECORD;
-    }
-
+    found = sound_index_find(&r, key, &rec) && sound_record_usable(&rec);
     sound_index_reader_close(&r);
-    sound_mix_axes(&seed, &sa);
 
-    g.seed = &sa;
-    g.mood_from = -1;
-    g.mood_to = -1;
-    g.steps = 1;
+    if (!found)
+        return SOUND_MIX_NO_RECORD;
+
+    sound_mix_axes(&rec, out);
+    return 0;
+}
+
+/* A goal of being near one track, or near an album's mean */
+static void track_goal(struct mix_goal *g, const struct sound_axes *seed)
+{
+    g->seed = seed;
+    g->mood_from = -1;
+    g->mood_to = -1;
+    g->steps = 1;
+}
+
+int sound_mix_from_track(const char *path, int want)
+{
+    struct sound_axes sa;
+    struct mix_goal g;
+    uint64_t seed_key = path_key(path);
+    int rc;
+
+    want = clamp_want(want, 1);
+
+    rc = read_seed(seed_key, &sa);
+    if (rc < 0)
+        return rc;
+
+    track_goal(&g, &sa);
 
     return mix_build(&g, seed_key, path, want,
                      global_settings.track_playlist, false, true);
@@ -1421,12 +1444,8 @@ int sound_mix_from_track(const char *path, int want)
 static int mood_mix(int from, int to, int want, bool ask)
 {
     struct mix_goal g;
-    int least = from == to ? 1 : 2;
 
-    if (want < least)
-        want = least;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
+    want = clamp_want(want, from == to ? 1 : 2);
 
     g.seed = NULL;
     g.mood_from = from;
@@ -1533,17 +1552,13 @@ bool sound_mix_continue_due(void)
 int sound_mix_continue(int want)
 {
     struct playlist_track_info info;
-    struct sound_index_reader r;
-    struct sound_record seed;
     struct sound_axes sa;
     struct mix_goal g;
     uint64_t seed_key = 0;
     int last = playlist_amount() - 1;
+    int rc;
 
-    if (want < 1)
-        want = 1;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
+    want = clamp_want(want, 1);
 
     if (last < 0)
         return 0;
@@ -1568,23 +1583,11 @@ int sound_mix_continue(int want)
 
         seed_key = path_key(info.filename);
 
-        if (sound_index_reader_open(&r) != SOUND_OK)
-            return SOUND_MIX_NO_INDEX;
+        rc = read_seed(seed_key, &sa);
+        if (rc < 0)
+            return rc;
 
-        if (!sound_index_find(&r, seed_key, &seed)
-            || !sound_record_usable(&seed))
-        {
-            sound_index_reader_close(&r);
-            return SOUND_MIX_NO_RECORD;
-        }
-
-        sound_index_reader_close(&r);
-        sound_mix_axes(&seed, &sa);
-
-        g.seed = &sa;
-        g.mood_from = -1;
-        g.mood_to = -1;
-        g.steps = 1;
+        track_goal(&g, &sa);
     }
 
     /* A journey is not extended along its own path: it has arrived, and
@@ -1786,15 +1789,8 @@ int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
 {
     struct mix_goal g;
 
-    if (want < 1)
-        want = 1;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
-
-    g.seed = mean;
-    g.mood_from = -1;
-    g.mood_to = -1;
-    g.steps = 1;
+    want = clamp_want(want, 1);
+    track_goal(&g, mean);
 
     /* No key to exclude: a mean is not a track, so there is no one record the
      * mix must leave out. The album's own tracks stay eligible and are held
@@ -1814,8 +1810,6 @@ int sound_mix_from_album(const struct sound_axes *mean, const char *one_track,
 int sound_mix_winddown(const char *path, int want, long target_ms)
 {
     int added;
-    struct sound_index_reader r;
-    struct sound_record rec;
     struct sound_axes a;
     struct mix_goal g;
     int from = -1;
@@ -1832,31 +1826,23 @@ int sound_mix_winddown(const char *path, int want, long target_ms)
     if (path == NULL)
         return SOUND_MIX_NO_RECORD;
 
-    if (sound_index_reader_open(&r) == SOUND_OK)
+    if (read_seed(path_key(path), &a) == 0)
     {
-        if (sound_index_find(&r, path_key(path), &rec) &&
-            sound_record_usable(&rec))
+        for (m = 0; m < MOOD_COUNT; m++)
         {
-            sound_mix_axes(&rec, &a);
+            int d = sound_mood_score(&a, m);
 
-            for (m = 0; m < MOOD_COUNT; m++)
+            /* Negative is a mood that cannot judge this track at all,
+             * which is not the same as a distant one. */
+            if (d < 0)
+                continue;
+
+            if (from < 0 || d < best)
             {
-                int d = sound_mood_score(&a, m);
-
-                /* Negative is a mood that cannot judge this track at all,
-                 * which is not the same as a distant one. */
-                if (d < 0)
-                    continue;
-
-                if (from < 0 || d < best)
-                {
-                    from = m;
-                    best = d;
-                }
+                from = m;
+                best = d;
             }
         }
-
-        sound_index_reader_close(&r);
     }
 
     /* A track the index has nothing usable for is reported rather than
@@ -1867,10 +1853,7 @@ int sound_mix_winddown(const char *path, int want, long target_ms)
 
     if (target_ms > 0)
         want = (target_ms + WINDDOWN_TRACK_MS / 2) / WINDDOWN_TRACK_MS;
-    if (want < 2)
-        want = 2;
-    if (want > SOUND_MIX_MAX)
-        want = SOUND_MIX_MAX;
+    want = clamp_want(want, 2);
 
     /* Built here rather than handed to sound_mix_journey(), for the seed.
      *

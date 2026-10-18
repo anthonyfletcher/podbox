@@ -448,16 +448,11 @@ static void resolve_artist_seeks(void)
     while (tagcache_get_next(&tcs, buf, sizeof(buf)))
     {
         int len = (int)strlen(buf);
-        uint32_t key = name_hash(buf, len);
+        int g = guest_find(buf, len, name_hash(buf, len));
 
         timed_yield();
-        for (int i = 0; i < guest_ct; i++)
-            if (guests[i].key == key && guests[i].artist_seek < 0 &&
-                db_featured_name_eq(guest_arena + guests[i].name_off,
-                                    (int)strlen(guest_arena +
-                                                guests[i].name_off),
-                                    buf, len))
-                guests[i].artist_seek = tcs.result_seek;
+        if (g >= 0 && guests[g].artist_seek < 0)
+            guests[g].artist_seek = tcs.result_seek;
     }
 
     tagcache_search_finish(&tcs);

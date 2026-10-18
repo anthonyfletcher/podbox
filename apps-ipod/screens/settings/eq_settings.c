@@ -262,38 +262,42 @@ static void selection_to_banditem(int selection, int expanded_band, int *band, i
     }
 }
 
-static char *advancedmenu_item_get_name(int selected_item, void *data, char *buffer, size_t len)
+/* The name of an expanded band's row: 1 cutoff, 2 Q, 3 gain, 4 type. */
+static int banditem_lang(int band, int item)
 {
-    int band;
-    int item;
-    int lang = -1;
-
-    selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
-
     switch (item)
     {
-    case 0: /* Band title */
-        snprintf(buffer, len, str(LANG_EQUALIZER_BAND), band);
-        return buffer;
     case 1: /* cutoff */
         /* A peak filter is described by the centre of its bell, the two
            shelves by the corner they turn at. */
         if (global_settings.eq_band_settings[band].type == EQ_FILTER_PEAK)
-            lang = LANG_EQUALIZER_BAND_CENTER;
-        else
-            lang = LANG_EQUALIZER_BAND_CUTOFF;
-        break;
+            return LANG_EQUALIZER_BAND_CENTER;
+        return LANG_EQUALIZER_BAND_CUTOFF;
     case 2: /* Q */
-        lang = LANG_EQUALIZER_BAND_Q;
-        break;
+        return LANG_EQUALIZER_BAND_Q;
     case 3: /* Gain */
-        lang = LANG_GAIN;
-        break;
+        return LANG_GAIN;
     case 4: /* Type */
-        lang = LANG_EQUALIZER_FILTER_TYPE;
-        break;
+        return LANG_EQUALIZER_FILTER_TYPE;
+    }
+    return -1;
+}
+
+static char *advancedmenu_item_get_name(int selected_item, void *data, char *buffer, size_t len)
+{
+    int band;
+    int item;
+    int lang;
+
+    selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
+
+    if (item == 0) /* Band title */
+    {
+        snprintf(buffer, len, str(LANG_EQUALIZER_BAND), band);
+        return buffer;
     }
 
+    lang = banditem_lang(band, item);
     if(lang < 0)
         buffer[0] = 0;
     else {
@@ -309,33 +313,16 @@ static int advancedmenu_speak_item(int selected_item, void *data)
     (void)data;
     int band;
     int item;
-    int lang = -1;
 
     selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
 
-    switch (item)
+    if (item == 0) /* Band title */
     {
-    case 0: /* Band title */
         talk_id(LANG_EQUALIZER_BAND, false);
         talk_number(band, true);
         return -1;
-    case 1: /* cutoff */
-        if (global_settings.eq_band_settings[band].type == EQ_FILTER_PEAK)
-            lang = LANG_EQUALIZER_BAND_CENTER;
-        else
-            lang = LANG_EQUALIZER_BAND_CUTOFF;
-        break;
-    case 2: /* Q */
-        lang = LANG_EQUALIZER_BAND_Q;
-        break;
-    case 3: /* Gain */
-        lang = LANG_GAIN;
-        break;
-    case 4: /* Type */
-        lang = LANG_EQUALIZER_FILTER_TYPE;
-        break;
     }
-    talk_id(lang, true);
+    talk_id(banditem_lang(band, item), true);
     return -1;
 }
 
@@ -359,7 +346,6 @@ static int eq_do_advanced_menu(void * param)
     (void)param;
     struct simplelist_info info;
     struct settings_list setting;
-    char title[MAX_PATH];
     int band, item;
     intptr_t selected_band = -1;
 
@@ -401,40 +387,33 @@ static int eq_do_advanced_menu(void * param)
             }
             case 1: /* cutoff */
                 setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                if (global_settings.eq_band_settings[band].type != EQ_FILTER_PEAK)
-                    setting.lang_id = LANG_EQUALIZER_BAND_CUTOFF;
-                else
-                    setting.lang_id = LANG_EQUALIZER_BAND_CENTER;
                 setting.default_val.int_ = eq_defaults[band].cutoff;
                 setting.int_setting = &cutoff_int_setting;
                 setting.setting = &global_settings.eq_band_settings[band].cutoff;
                 break;
             case 2: /* Q */
                 setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                setting.lang_id = LANG_EQUALIZER_BAND_Q;
                 setting.default_val.int_ = eq_defaults[band].q;
                 setting.int_setting = &q_int_setting;
                 setting.setting = &global_settings.eq_band_settings[band].q;
                 break;
             case 3: /* Gain */
                 setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                setting.lang_id = LANG_GAIN;
                 setting.default_val.int_ = eq_defaults[band].gain;
                 setting.int_setting = &gain_int_setting;
                 setting.setting = &global_settings.eq_band_settings[band].gain;
                 break;
             case 4: /* Type */
                 setting.flags = F_BANFROMQS|F_CHOICE_SETTING|F_T_INT;
-                setting.lang_id = LANG_EQUALIZER_FILTER_TYPE;
                 setting.default_val.int_ = eq_defaults[band].type;
                 setting.choice_setting = &type_choice_setting;
                 setting.setting = &global_settings.eq_band_settings[band].type;
                 break;
         }
+        setting.lang_id = banditem_lang(band, item);
         pcmbuf_set_low_latency(true);
-        advancedmenu_item_get_name(info.selection, &selected_band, title, MAX_PATH);
 
-        option_screen(&setting, NULL, false, title[0] == '\t' ? &title[1] : title);
+        option_screen(&setting, NULL, false, str(setting.lang_id));
         eq_apply();
         pcmbuf_set_low_latency(false);
     }
@@ -451,6 +430,15 @@ enum eq_slider_mode {
     Q,
 };
 
+/* Inverted marks the field being edited on the selected band. */
+static void set_field_drawmode(struct screen *screen, bool inverted)
+{
+    if (inverted)
+        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
+    else
+        screen->set_drawmode(DRMODE_SOLID);
+}
+
 /* Draw the UI for a whole EQ band */
 static int draw_eq_slider(struct screen * screen, int x, int y,
     int width, int cutoff, int q, int gain, bool selected,
@@ -458,6 +446,7 @@ static int draw_eq_slider(struct screen * screen, int x, int y,
     enum eq_filter_type type)
 {
     char buf[26];
+    const char *label;
     int steps, min_item, max_item;
     int abs_gain = abs(gain);
     int x1, x2, y1, total_height;
@@ -493,33 +482,22 @@ static int draw_eq_slider(struct screen * screen, int x, int y,
 
     /* Print out the band label. It doubles as the filter type readout, so it
        inverts while the type is the item being edited. */
-    if (mode == TYPE && selected)
-        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
+    set_field_drawmode(screen, mode == TYPE && selected);
+    if (type == EQ_FILTER_LOW_SHELF)
+        label = "LS";
+    else if (type == EQ_FILTER_HIGH_SHELF)
+        label = "HS";
     else
-        screen->set_drawmode(DRMODE_SOLID);
-    if (type == EQ_FILTER_LOW_SHELF) {
-        snprintf(buf, sizeof(buf),  "LS%d:", band);
-        screen->putsxy(x1, y1, buf);
-        /*screen->getstringsize("LS:", &w, &h); UNUSED*/
-    } else if (type == EQ_FILTER_HIGH_SHELF) {
-        snprintf(buf, sizeof(buf),  "HS%d:", band);
-        screen->putsxy(x1, y1, buf);
-        /*screen->getstringsize("HS:", &w, &h); UNUSED*/
-    } else {
-        snprintf(buf, sizeof(buf),  "PK%d:", band);
-        screen->putsxy(x1, y1, buf);
-        /*screen->getstringsize(buf, &w, &h); UNUSED*/
-    }
+        label = "PK";
+    snprintf(buf, sizeof(buf), "%s%d:", label, band);
+    screen->putsxy(x1, y1, buf);
 
     w = screen->getstringsize("A", NULL, &h);
 
     x1 += 5*w; /* 4 chars for label + 1 space = 5 */
 
     /* Print out gain part of status line (left justify after label) */
-    if (mode == GAIN && selected)
-        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
-    else
-        screen->set_drawmode(DRMODE_SOLID);
+    set_field_drawmode(screen, mode == GAIN && selected);
 
     snprintf(buf, sizeof(buf), "%s%2d.%d%s", gain < 0 ? "-" : " ",
         abs_gain / EQ_USER_DIVISOR, abs_gain % EQ_USER_DIVISOR,
@@ -529,10 +507,7 @@ static int draw_eq_slider(struct screen * screen, int x, int y,
     x1 += w;
 
     /* Print out Q part of status line (right justify) */
-    if (mode == Q && selected)
-        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
-    else
-        screen->set_drawmode(DRMODE_SOLID);
+    set_field_drawmode(screen, mode == Q && selected);
 
     snprintf(buf, sizeof(buf), "%d.%d%s", q / EQ_USER_DIVISOR,
              q % EQ_USER_DIVISOR, screen->lcdwidth >= 160 ? " Q" : "");
@@ -541,10 +516,7 @@ static int draw_eq_slider(struct screen * screen, int x, int y,
     screen->putsxy(x2, y1, buf);
 
     /* Print out cutoff part of status line (center between gain & Q) */
-    if (mode == CUTOFF && selected)
-        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
-    else
-        screen->set_drawmode(DRMODE_SOLID);
+    set_field_drawmode(screen, mode == CUTOFF && selected);
 
     snprintf(buf, sizeof(buf),  "%5d%s", cutoff,
              screen->lcdwidth >= 160 ? "Hz" : "");
@@ -730,32 +702,24 @@ int eq_menu_graphical(void)
         switch (button) {
         case ACTION_SETTINGS_DEC:
         case ACTION_SETTINGS_DECREPEAT:
-            *(setting) -= step;
+            *setting = MAX(*setting - step, min);
             has_changed = true;
-            if (*(setting) < min)
-                *(setting) = min;
             break;
 
         case ACTION_SETTINGS_INC:
         case ACTION_SETTINGS_INCREPEAT:
-            *(setting) += step;
+            *setting = MIN(*setting + step, max);
             has_changed = true;
-            if (*(setting) > max)
-                *(setting) = max;
             break;
 
         case ACTION_SETTINGS_INCBIGSTEP:
-            *(setting) += fast_step;
+            *setting = MIN(*setting + fast_step, max);
             has_changed = true;
-            if (*(setting) > max)
-                *(setting) = max;
             break;
 
         case ACTION_SETTINGS_DECBIGSTEP:
-            *(setting) -= fast_step;
+            *setting = MAX(*setting - fast_step, min);
             has_changed = true;
-            if (*(setting) < min)
-                *(setting) = min;
             break;
 
         case ACTION_STD_PREV:
@@ -823,12 +787,8 @@ static struct browse_folder_info eqs = { EQS_DIR, SHOW_CFG };
 
 static void eq_reset_defaults(void)
 {
-    for (int i = 0; i < EQ_NUM_BANDS; i++) {
-        global_settings.eq_band_settings[i].type = eq_defaults[i].type;
-        global_settings.eq_band_settings[i].cutoff = eq_defaults[i].cutoff;
-        global_settings.eq_band_settings[i].q = eq_defaults[i].q;
-        global_settings.eq_band_settings[i].gain = eq_defaults[i].gain;
-    }
+    for (int i = 0; i < EQ_NUM_BANDS; i++)
+        global_settings.eq_band_settings[i] = eq_defaults[i];
     eq_apply();
 }
 

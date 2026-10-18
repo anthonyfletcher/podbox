@@ -638,6 +638,27 @@ static long do_party_mode(long action)
     return action;
 }
 
+/* Album covers over the WPS, entered with the theme off. True when the WPS
+ * is to be left, for the screen in *go_to. */
+static bool show_album_covers(long *go_to)
+{
+    int ret;
+
+    gwps_leave_wps(false);
+    ret = album_covers(NULL);
+    if (ret == GO_TO_ALBUM_COVERS_TRACKS || ret == GO_TO_ROOT)
+        *go_to = ret;
+    /* audio stopped in Album covers; return to WPS
+       via wpsscrn() which handles playlist resume */
+    else if (!(audio_status() & AUDIO_STATUS_PLAY))
+        *go_to = GO_TO_WPS;
+    else
+        return false;
+
+    gwps_leave_wps(true);
+    return true;
+}
+
 static inline int action_wpsab_single(long button)
 {
 /* The iPods/X5/M5 use a single button for the A-B mode markers,
@@ -809,20 +830,10 @@ long gui_wps_show(void)
                 }
                 else if (sel_action == 2) /* coverflow */
                 {
-                    int ret;
+                    long go_to;
                     theme_enabled = false;
-                    gwps_leave_wps(false);
-                    ret = album_covers(NULL);
-                    if (ret == GO_TO_ALBUM_COVERS_TRACKS || ret == GO_TO_ROOT)
-                    {
-                        gwps_leave_wps(true);
-                        return ret;
-                    }
-                    if (!(audio_status() & AUDIO_STATUS_PLAY))
-                    {
-                        gwps_leave_wps(true);
-                        return GO_TO_WPS;
-                    }
+                    if (show_album_covers(&go_to))
+                        return go_to;
                     restore = true;
                 }
                 else if (sel_action == 3) /* files */
@@ -1029,22 +1040,10 @@ long gui_wps_show(void)
                 /* iPod Classic 6G custom: open Album covers instead of stopping */
             case ACTION_WPS_STOP:
                 {
-                    int ret;
+                    long go_to;
                     theme_enabled = false;
-                    gwps_leave_wps(false);
-                    ret = album_covers(NULL);
-                    if (ret == GO_TO_ALBUM_COVERS_TRACKS || ret == GO_TO_ROOT)
-                    {
-                        gwps_leave_wps(true);
-                        return ret;
-                    }
-                    if (!(audio_status() & AUDIO_STATUS_PLAY))
-                    {
-                        /* audio stopped in Album covers; return to WPS
-                           via wpsscrn() which handles playlist resume */
-                        gwps_leave_wps(true);
-                        return GO_TO_WPS;
-                    }
+                    if (show_album_covers(&go_to))
+                        return go_to;
                     restore = true;
                 }
                 break;

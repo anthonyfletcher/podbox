@@ -57,6 +57,12 @@ static struct
 static bool disk_was;
 static unsigned short minute;
 
+static void acc_reset(void)
+{
+    memset(&acc, 0, sizeof acc);
+    acc.frames_at_start = skin_flush_count();
+}
+
 /* ---- the ring ----------------------------------------------------------- */
 
 static struct battery_sample ring[RING_SIZE];
@@ -96,8 +102,7 @@ static void close_minute(void)
     }
 
     minute++;
-    memset(&acc, 0, sizeof acc);
-    acc.frames_at_start = skin_flush_count();
+    acc_reset();
 }
 
 static struct timeout tick_tmo;
@@ -219,8 +224,7 @@ static void start(void)
     if (running)
         return;
     minute = 0;
-    memset(&acc, 0, sizeof acc);
-    acc.frames_at_start = skin_flush_count();
+    acc_reset();
     disk_was = storage_disk_is_active();
     add_event(DISK_EVENT_SPINUP, disk_idle_cb);
     timeout_register(&tick_tmo, battery_log_tick, 1, 0);
