@@ -453,11 +453,14 @@ static void iap_do_reset(void)
     departed = departed && identified;
     if (departed)
         identified = false;
+#ifdef HAVE_IAP_ACCESSORY_POLL
     /* The line does not always say: on the 5G a dock can read as present
      * long after it has gone. One that does not identify again within
      * three seconds of its power going has left, or is off, and nothing
-     * plays its line out either way. */
+     * plays its line out either way. The 6G's line does say, and an
+     * accessory still on it after its power goes is still there. */
     departure_deadline = identified ? current_tick + 3*HZ : 0;
+#endif
 
     iap_reset_device(&device);
     remote_seek_stop();
@@ -511,9 +514,8 @@ static int iap_task(struct timeout *tmo)
 {
     (void) tmo;
 
-    /* Idle, the timeout stays registered but posts nothing: the table has
-     * fewer slots than the timeouts that use it, and one given up may not
-     * be had back */
+    /* Idle, the timeout stays registered but posts nothing, so waking it
+     * from the receive interrupt never depends on a free slot */
     if (iap_tick_stop)
     {
         iap_tick_idle = true;
