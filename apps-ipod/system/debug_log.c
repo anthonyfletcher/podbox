@@ -524,18 +524,28 @@ unsigned long debug_log_files_size(void)
 
 void debug_log_init(void)
 {
-    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
-    {
-        mutex_init(&logs[id].lock);
-        logs[id].on = debug_log_enabled(id);
-    }
-    mutex_init(&rotate_lock);
     /* A log left on by a build that counted minutes instead */
     if (debug_log_any_on() && !global_status.debug_log_since)
     {
         global_status.debug_log_since = mktime(get_time());
         status_save(false);
     }
+    /* The count runs while the player is off, so it may have ended there:
+     * the logs then start off, and the splash says why */
+    if (debug_log_minutes_left() == 0)
+    {
+        for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+            if (log_info[id].setting)
+                *log_info[id].setting = false;
+        settings_save();
+        expired_notice = true;
+    }
+    for (int id = 0; id < DEBUG_LOG_COUNT; id++)
+    {
+        mutex_init(&logs[id].lock);
+        logs[id].on = debug_log_enabled(id);
+    }
+    mutex_init(&rotate_lock);
     add_event(DISK_EVENT_SPINUP, disk_idle_cb);
     add_event(GUI_EVENT_ACTIONUPDATE, action_cb);
     timeout_register(&minute_tmo, minute_cb, 60*HZ, 0);
