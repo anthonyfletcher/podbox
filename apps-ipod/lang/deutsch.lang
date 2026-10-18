@@ -2307,7 +2307,7 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS
+  id: LANG_FIRST_BUTTON_PRESS
   desc: Backlight behaviour setting
   user: core
   <source>

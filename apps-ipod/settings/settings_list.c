@@ -1029,7 +1029,7 @@ const struct settings_list settings[] = {
 
 
     BOOL_SETTING(0, bl_filter_first_keypress,
-                 LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS, true,
+                 LANG_FIRST_BUTTON_PRESS, true,
                  "backlight filters first keypress", off_on,
                  LANG_FIRST_PRESS_LIGHTS_ONLY, LANG_FIRST_PRESS_ALSO_ACTS,
                  NULL),
