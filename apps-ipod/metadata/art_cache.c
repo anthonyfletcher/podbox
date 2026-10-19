@@ -49,6 +49,7 @@
 #include "events.h"
 #include "system/appevents.h"
 #include "audio.h"
+#include "storage.h"
 #include "cpu.h"
 
 /* Define LOGF_ENABLE to enable logf output in this file */
@@ -1749,6 +1750,24 @@ out:
     return aborted ? BG_INTERRUPTED : BG_DONE;
 }
 
+static struct timeout aa_offer_tmo;
+
+/* Tick: an offer held for a sleeping disk goes on the queue once something
+ * else has spun it up. Making the thumbnails reads the art out of the track,
+ * so handling it sooner would wake the disk for nothing but this. */
+static int aa_offer_poll(struct timeout *tmo)
+{
+    (void)tmo;
+    if (!storage_disk_is_active())
+        return HZ;
+    if (!aa_offer_posted)
+    {
+        aa_offer_posted = true;
+        bg_task_post(&art_cache_task, AA_EVENT_OFFER);
+    }
+    return 0;
+}
+
 /* Cache the offered track's embedded art into any of its folder's thumbnails
  * that don't exist yet. Fill-only: never overwrites art already cached (folder
  * images are the preferred on-disk source) -- this just gives a coverless folder
@@ -1767,6 +1786,11 @@ static void aa_handle_offer(void)
     aa_offer_posted = false;
     if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
         return;
+    if (!storage_disk_is_active())
+    {
+        timeout_register(&aa_offer_tmo, aa_offer_poll, HZ, 0);
+        return;
+    }
 
     /* Copy the path out before any yield so a newer offer can't move it. */
     strlcpy(path, aa_offer.path, sizeof(path));
