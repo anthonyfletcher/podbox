@@ -232,10 +232,10 @@
     *: "Are you sure?"
   </source>
   <dest>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </dest>
   <voice>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </voice>
 </phrase>
 <phrase>
@@ -253,7 +253,7 @@
   <dest>
     *: "PLAY = Yes"
     cowond2*: "MENU, or top-right = Yes"
-    creativezen*,gigabeat*,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh10_5gb,mrobe100,sansac200*,sansaclip*,sansaconnect,sansae200*,sansafuze*: "Yes (select)"
+    creativezen*,gigabeat*,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh10_5gb,mrobe100,sansac200*,sansaclip*,sansaconnect,sansae200*,sansafuze*: "SELECT = Yes"
     iriverh100,iriverh120,iriverh300: "NAVI = Yes"
     mrobe500: "PLAY, POWER, or top-right = Yes"
     vibe500: "OK = Yes"
@@ -270,7 +270,7 @@
     *: "Any Other = No"
   </source>
   <dest>
-    *: "No (any other key)"
+    *: "Any Other = No"
   </dest>
   <voice>
     *: ""
@@ -923,10 +923,10 @@
     *: "Simple EQ"
   </source>
   <dest>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </dest>
   <voice>
-    *: "Simple EQ Settings"
+    *: "Simple equalizer settings"
   </voice>
 </phrase>
 <phrase>
@@ -937,10 +937,10 @@
     *: "Advanced EQ"
   </source>
   <dest>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </dest>
   <voice>
-    *: "Advanced EQ Settings"
+    *: "Advanced equalizer settings"
   </voice>
 </phrase>
 <phrase>
@@ -965,10 +965,10 @@
     *: "Load EQ"
   </source>
   <dest>
-    *: "Browse EQ Presets"
+    *: "Load EQ"
   </dest>
   <voice>
-    *: "Browse EQ Presets"
+    *: "Browse equalizer presets"
   </voice>
 </phrase>
 <phrase>
@@ -1673,10 +1673,10 @@
     *: "Last.fm Logger"
   </source>
   <dest>
-    *: "Last.fm Log"
+    *: "Last.fm Logger"
   </dest>
   <voice>
-    *: "Last.fm Log"
+    *: "Last.fm Logger"
   </voice>
 </phrase>
 <phrase>
@@ -1703,11 +1703,11 @@
   </source>
   <dest>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </dest>
   <voice>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </voice>
 </phrase>
 <phrase>
@@ -1752,10 +1752,10 @@
     *: "File Browser"
   </source>
   <dest>
-    *: "File View"
+    *: "File Browser"
   </dest>
   <voice>
-    *: "File View"
+    *: "File Browser"
   </voice>
 </phrase>
 <phrase>
@@ -1983,7 +1983,7 @@
     *: "Building database... %d found (OFF to return)"
     gigabeat*,iaudiom5,iaudiox5,mrobe100,samsungyh*: "Building database... %d found (LEFT to return)"
     gogearsa9200: "Building database... %d found (REW to return)"
-    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,sansafuze*,vibe500: "Building database... %d found"
+    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,sansafuze*,vibe500: "Building database... %d found (PREV to return)"
     iriverh100,iriverh120,iriverh300: "Building database... %d found (STOP to return)"
   </dest>
   <voice>
@@ -2026,10 +2026,10 @@
     *: "Rebuild Database"
   </source>
   <dest>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </dest>
   <voice>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </voice>
 </phrase>
 <phrase>
@@ -2040,10 +2040,10 @@
     *: "Update Database"
   </source>
   <dest>
-    *: "Update Now"
+    *: "Update Database"
   </dest>
   <voice>
-    *: "Update Now"
+    *: "Update Database"
   </voice>
 </phrase>
 <phrase>
@@ -2323,11 +2323,11 @@
   </source>
   <dest>
     *: none
-    lcd_sleep: "Sleep (After Backlight Off)"
+    lcd_sleep: "Screen Off After"
   </dest>
   <voice>
     *: none
-    lcd_sleep: "Sleep after backlight off"
+    lcd_sleep: "Screen Off After"
   </voice>
 </phrase>
 <phrase>
@@ -4372,10 +4372,10 @@
     *: "Load Theme"
   </source>
   <dest>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </dest>
   <voice>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </voice>
 </phrase>
 <phrase>
@@ -5459,7 +5459,7 @@
   </source>
   <dest>
     *: none
-    recording: "Prerecording"
+    recording: "Pre-Recording"
   </dest>
   <voice>
     *: none
@@ -5621,10 +5621,10 @@
     *: "View Queue"
   </source>
   <dest>
-    *: "View Current Playlist"
+    *: "View Queue"
   </dest>
   <voice>
-    *: "View Current Playlist"
+    *: "View Queue"
   </voice>
 </phrase>
 <phrase>
@@ -5705,10 +5705,10 @@
     *: "Save Queue as Playlist"
   </source>
   <dest>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </dest>
   <voice>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </voice>
 </phrase>
 <phrase>
@@ -5761,10 +5761,10 @@
     *: "Warn When Replacing Queue"
   </source>
   <dest>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </dest>
   <voice>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </voice>
 </phrase>
 <phrase>
@@ -5775,10 +5775,10 @@
     *: "Replace the queue?"
   </source>
   <dest>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </dest>
   <voice>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </voice>
 </phrase>
 <phrase>
@@ -5963,10 +5963,10 @@
     *: "Debug"
   </source>
   <dest>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </dest>
   <voice>
-    *: "Debug, keep out!"
+    *: "Debug"
   </voice>
 </phrase>
 <phrase>
@@ -5991,10 +5991,10 @@
     *: "Play Once"
   </source>
   <dest>
-    *: "Queue"
+    *: "Play Once"
   </dest>
   <voice>
-    *: "Queue"
+    *: "Play Once"
   </voice>
 </phrase>
 <phrase>
@@ -6005,10 +6005,10 @@
     *: "Play Once Next"
   </source>
   <dest>
-    *: "Queue Next"
+    *: "Play Once Next"
   </dest>
   <voice>
-    *: "Queue Next"
+    *: "Play Once Next"
   </voice>
 </phrase>
 <phrase>
@@ -6019,10 +6019,10 @@
     *: "Play Once at End"
   </source>
   <dest>
-    *: "Queue Last"
+    *: "Play Once at End"
   </dest>
   <voice>
-    *: "Queue Last"
+    *: "Play Once at End"
   </voice>
 </phrase>
 <phrase>
@@ -6033,10 +6033,10 @@
     *: "Play Once Shuffled"
   </source>
   <dest>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </dest>
   <voice>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </voice>
 </phrase>
 <phrase>
@@ -6047,10 +6047,10 @@
     *: "Added %d tracks (%s)"
   </source>
   <dest>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </dest>
   <voice>
-    *: "tracks inserted"
+    *: "tracks added"
   </voice>
 </phrase>
 <phrase>
@@ -6061,10 +6061,10 @@
     *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </dest>
   <voice>
-    *: "tracks queued"
+    *: "tracks to play once"
   </voice>
 </phrase>
 <phrase>
@@ -6386,7 +6386,7 @@
     *: "Bitrate"
   </dest>
   <voice>
-    *: "Bitrate"
+    *: "Bit rate"
   </voice>
 </phrase>
 <phrase>
@@ -6470,7 +6470,7 @@
     *: "Track Gain"
   </dest>
   <voice>
-    *: "Track Gain"
+    *: "Track gain"
   </voice>
 </phrase>
 <phrase>
@@ -7974,7 +7974,7 @@
     *: ""
   </dest>
   <voice>
-    *: "milliamp hours"
+    *: "milli-amp hours"
   </voice>
 </phrase>
 <phrase>
@@ -8961,10 +8961,10 @@
     *: "UI Settings"
   </source>
   <dest>
-    *: "Theme Settings"
+    *: "UI Settings"
   </dest>
   <voice>
-    *: "Theme Settings"
+    *: "UI Settings"
   </voice>
 </phrase>
 <phrase>
@@ -8977,11 +8977,11 @@
   </source>
   <dest>
     *: none
-    lcd_color: "Colors"
+    lcd_color: "Interface Colors"
   </dest>
   <voice>
     *: none
-    lcd_color: "Colors"
+    lcd_color: "Interface Colors"
   </voice>
 </phrase>
 <phrase>
@@ -9945,7 +9945,7 @@
     *: "Timestretch"
   </dest>
   <voice>
-    *: "Timestretch"
+    *: "Time stretch"
   </voice>
 </phrase>
 <phrase>
@@ -10202,10 +10202,10 @@
     *: "Scroll Bar Width"
   </source>
   <dest>
-    *: "Scrollbar Width"
+    *: "Scroll Bar Width"
   </dest>
   <voice>
-    *: "Scrollbar width"
+    *: "Scroll bar width"
   </voice>
 </phrase>
 <phrase>
@@ -10539,10 +10539,10 @@
     *: "Play Once Shuffled at End"
   </source>
   <dest>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </dest>
   <voice>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </voice>
 </phrase>
 <phrase>
@@ -10727,11 +10727,11 @@
   </source>
   <dest>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </dest>
   <voice>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </voice>
 </phrase>
 <phrase>
@@ -10744,11 +10744,11 @@
   </source>
   <dest>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </dest>
   <voice>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </voice>
 </phrase>
 <phrase>
@@ -11230,10 +11230,10 @@
     *: "Queue"
   </source>
   <dest>
-    *: "Current Playlist"
+    *: "Queue"
   </dest>
   <voice>
-    *: "Current Playlist"
+    *: "Queue"
   </voice>
 </phrase>
 <phrase>
@@ -11468,11 +11468,11 @@
   </source>
   <dest>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </dest>
   <voice>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </voice>
 </phrase>
 <phrase>
@@ -11983,10 +11983,10 @@
     *: "Side Only"
   </source>
   <dest>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </dest>
   <voice>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </voice>
 </phrase>
 <phrase>
@@ -14313,10 +14313,10 @@
     *: "3D Parallel Slides"
   </source>
   <dest>
-    *: "Spacing"
+    *: "3D Parallel Slides"
   </dest>
   <voice>
-    *: "Spacing"
+    *: "3D Parallel Slides"
   </voice>
 </phrase>
 <phrase>
@@ -14327,10 +14327,10 @@
     *: "3D Centre Margin"
   </source>
   <dest>
-    *: "Center Margin"
+    *: "3D Center Margin"
   </dest>
   <voice>
-    *: "Center Margin"
+    *: "3D Center Margin"
   </voice>
 </phrase>
 <phrase>
@@ -14341,10 +14341,10 @@
     *: "3D Slide Tuck"
   </source>
   <dest>
-    *: "Number of slides"
+    *: "3D Slide Tuck"
   </dest>
   <voice>
-    *: "Number of slides"
+    *: "3D Slide Tuck"
   </voice>
 </phrase>
 <phrase>
@@ -14397,10 +14397,10 @@
     *: "Rebuild Art Cache"
   </source>
   <dest>
-    *: "Rebuild cache"
+    *: "Rebuild Art Cache"
   </dest>
   <voice>
-    *: "Rebuild cache"
+    *: "Rebuild Art Cache"
   </voice>
 </phrase>
 <phrase>
@@ -14579,10 +14579,10 @@
     *: "Update Art Cache"
   </source>
   <dest>
-    *: "Update cache"
+    *: "Update Art Cache"
   </dest>
   <voice>
-    *: "Update cache"
+    *: "Update Art Cache"
   </voice>
 </phrase>
 <phrase>
@@ -14982,10 +14982,10 @@
     *: "Add to Queue"
   </source>
   <dest>
-    *: "Add"
+    *: "Add to Queue"
   </dest>
   <voice>
-    *: "Add"
+    *: "Add to Queue"
   </voice>
 </phrase>
 <phrase>
@@ -15080,10 +15080,10 @@
     *: "Play Once..."
   </source>
   <dest>
-    *: "Queue..."
+    *: "Play Once..."
   </dest>
   <voice>
-    *: "Queue"
+    *: "Play Once"
   </voice>
 </phrase>
 <phrase>
@@ -15094,10 +15094,10 @@
     *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </dest>
   <voice>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </voice>
 </phrase>
 <phrase>
@@ -15363,10 +15363,10 @@
     *: "Artist + Year (oldest first)"
   </source>
   <dest>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </dest>
   <voice>
-    *: "Artist and Year"
+    *: "Artist and Year, oldest first"
   </voice>
 </phrase>
 <phrase>
@@ -15590,10 +15590,10 @@
     *: "Add to Queue..."
   </source>
   <dest>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </dest>
   <voice>
-    *: "Playing Next"
+    *: "Add to Queue"
   </voice>
 </phrase>
 <phrase>
@@ -15618,10 +15618,10 @@
     *: "Shuffle into Queue"
   </source>
   <dest>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </dest>
   <voice>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </voice>
 </phrase>
 <phrase>
@@ -15632,10 +15632,10 @@
     *: "Add to End"
   </source>
   <dest>
-    *: "Play Last"
+    *: "Add to End"
   </dest>
   <voice>
-    *: "Play Last"
+    *: "Add to End"
   </voice>
 </phrase>
 <phrase>
@@ -15646,10 +15646,10 @@
     *: "Shuffle onto End"
   </source>
   <dest>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </dest>
   <voice>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </voice>
 </phrase>
 <phrase>
@@ -15753,10 +15753,10 @@
     *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </dest>
   <voice>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </voice>
 </phrase>
 <phrase>
@@ -15781,10 +15781,10 @@
     *: "Now Playing Screen"
   </source>
   <dest>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </dest>
   <voice>
-    *: "What's Playing Screen"
+    *: "Now playing screen"
   </voice>
 </phrase>
 <phrase>
@@ -16264,11 +16264,11 @@
     erosqnative,lineout_poweroff: "Line Out"
   </source>
   <dest>
-    *: "Line Out"
+    *: none
     erosqnative,lineout_poweroff: "Line Out"
   </dest>
   <voice>
-    *: "Line Out"
+    *: none
     erosqnative,lineout_poweroff: "Line Out"
   </voice>
 </phrase>
@@ -17743,7 +17743,7 @@
   desc: Ordered set of characters the click-wheel text editor cycles through
   user: core
   <source>
-    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+    *: " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
   </source>
   <dest>
     *: "~ ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
