@@ -17777,7 +17777,7 @@
     *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
   </source>
   <dest>
-    *: " ABCDEFGHIJKLMNOPQRSTUVWXYZÀÂÆÇÉÈÊËÎÏÔŒÙÛÜ0123456789-_.'&"
+    *: "~ ABCDEFGHIJKLMNOPQRSTUVWXYZÀÂÆÇÉÈÊËÎÏÔŒÙÛÜ0123456789-_.'&"
   </dest>
   <voice>
     *: ""
