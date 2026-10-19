@@ -266,10 +266,10 @@
     *: "Are you sure?"
   </source>
   <dest>
-    *: "Êtes-vous sûr "
+    *: "Êtes-vous sûr ?"
   </dest>
   <voice>
-    *: "Êtes-vous sûr "
+    *: "Êtes-vous sûr ?"
   </voice>
 </phrase>
 <phrase>
@@ -5877,10 +5877,10 @@
     *: "Replace the queue?"
   </source>
   <dest>
-    *: "Remplacer la file d'attente "
+    *: "Remplacer la file d'attente ?"
   </dest>
   <voice>
-    *: "Remplacer la file d'attente "
+    *: "Remplacer la file d'attente ?"
   </voice>
 </phrase>
 <phrase>
@@ -6163,7 +6163,7 @@
     *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "Lire une fois  %d pistes (%s)"
+    *: "Lire une fois : %d pistes (%s)"
   </dest>
   <voice>
     *: "Pistes à lire une fois"
@@ -15251,7 +15251,7 @@
     *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "Options « Lire une fois "
+    *: "Options « Lire une fois »"
   </dest>
   <voice>
     *: "Options lire une fois"
@@ -15910,7 +15910,7 @@
     *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "Retirer les pistes « Lire une fois  "
+    *: "Retirer les pistes « Lire une fois » ?"
   </dest>
   <voice>
     *: "Retirer les pistes à lire une fois ?"
@@ -17791,10 +17791,10 @@
     *: "Discard changes?"
   </source>
   <dest>
-    *: "Abandonner les modifications "
+    *: "Abandonner les modifications ?"
   </dest>
   <voice>
-    *: "Abandonner les modifications "
+    *: "Abandonner les modifications ?"
   </voice>
 </phrase>
 <phrase>
@@ -18057,7 +18057,7 @@
     *: "Album Art Rows"
   </source>
   <dest>
-    *: "Lignes illustrées  albums"
+    *: "Lignes illustrées : albums"
   </dest>
   <voice>
     *: "Lignes illustrées pour les albums"
@@ -18071,7 +18071,7 @@
     *: "Artist Art Rows"
   </source>
   <dest>
-    *: "Lignes illustrées  artistes"
+    *: "Lignes illustrées : artistes"
   </dest>
   <voice>
     *: "Lignes illustrées pour les artistes"
@@ -18085,7 +18085,7 @@
     *: "Audiobook Art Rows"
   </source>
   <dest>
-    *: "Lignes illustrées  livres audio"
+    *: "Lignes illustrées : livres audio"
   </dest>
   <voice>
     *: "Lignes illustrées pour les livres audio"
@@ -19891,10 +19891,10 @@
     *: "End this run?"
   </source>
   <dest>
-    *: "Terminer cette partie "
+    *: "Terminer cette partie ?"
   </dest>
   <voice>
-    *: "Terminer cette partie "
+    *: "Terminer cette partie ?"
   </voice>
 </phrase>
 <phrase>
@@ -22148,10 +22148,10 @@
     *: "Stop playback?"
   </source>
   <dest>
-    *: "Arrêter la lecture "
+    *: "Arrêter la lecture ?"
   </dest>
   <voice>
-    *: "Arrêter la lecture "
+    *: "Arrêter la lecture ?"
   </voice>
 </phrase>
 <phrase>
@@ -22162,10 +22162,10 @@
     *: "Leave the quiz?"
   </source>
   <dest>
-    *: "Quitter le quiz "
+    *: "Quitter le quiz ?"
   </dest>
   <voice>
-    *: "Quitter le quiz "
+    *: "Quitter le quiz ?"
   </voice>
 </phrase>
 <phrase>
@@ -23284,10 +23284,10 @@
     *: "You skip everything?!"
   </source>
   <dest>
-    *: "Vous sautez tout !"
+    *: "Vous sautez tout ?!"
   </dest>
   <voice>
-    *: "Vous sautez tout !"
+    *: "Vous sautez tout ?!"
   </voice>
 </phrase>
 <phrase>
@@ -23816,7 +23816,7 @@
     *: "Earned:"
   </source>
   <dest>
-    *: "Obtenu "
+    *: "Obtenu :"
   </dest>
   <voice>
     *: "Obtenu"
@@ -24054,7 +24054,7 @@
     *: "Author Art Rows"
   </source>
   <dest>
-    *: "Lignes illustrées  auteurs"
+    *: "Lignes illustrées : auteurs"
   </dest>
   <voice>
     *: "Lignes illustrées pour les auteurs"
@@ -24292,7 +24292,7 @@
     *: "Log Files: %s"
   </source>
   <dest>
-    *: "Fichiers journaux  %s"
+    *: "Fichiers journaux : %s"
   </dest>
   <voice>
     *: none
