@@ -238,7 +238,7 @@
   desc: confirm action
   user: core
   <source>
-    *: "Are You Sure?"
+    *: "Are you sure?"
   </source>
   <dest>
     *: "よろしいですか?"
@@ -293,7 +293,7 @@
     *: "Rockbox"
   </source>
   <dest>
-    *: "Rockbox"
+    *: "~Rockbox"
   </dest>
   <voice>
     *: "ロックボックス"
@@ -929,13 +929,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Simple EQ Settings"
+    *: "Simple EQ"
   </source>
   <dest>
-    *: "簡易EQ設定"
+    *: "簡易EQ"
   </dest>
   <voice>
-    *: "簡易イコライザ設定"
+    *: "簡易イコライザ"
   </voice>
 </phrase>
 <phrase>
@@ -943,13 +943,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Advanced EQ Settings"
+    *: "Advanced EQ"
   </source>
   <dest>
-    *: "詳細EQ設定"
+    *: "詳細EQ"
   </dest>
   <voice>
-    *: "詳細イコライザ設定"
+    *: "詳細イコライザ"
   </voice>
 </phrase>
 <phrase>
@@ -971,13 +971,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Browse EQ Presets"
+    *: "Load EQ"
   </source>
   <dest>
-    *: "EQプリセットの参照"
+    *: "EQの読み込み"
   </dest>
   <voice>
-    *: "イコライザプリセットの参照"
+    *: "イコライザの読み込み"
   </voice>
 </phrase>
 <phrase>
@@ -1013,13 +1013,13 @@
   desc: in the equalizer settings menu
   user: core
   <source>
-    *: "Peak Filter %d"
+    *: "Peak Filter"
   </source>
   <dest>
-    *: "ピーク・フィルタ %d"
+    *: "ピークフィルタ"
   </dest>
   <voice>
-    *: "ピーク・フィルタ"
+    *: "ピークフィルタ"
   </voice>
 </phrase>
 <phrase>
@@ -1184,10 +1184,10 @@
     *: "A-B"
   </source>
   <dest>
-    *: "A-B"
+    *: "~A-B"
   </dest>
   <voice>
-    *: "A-B"
+    *: "~A-B"
   </voice>
 </phrase>
 <phrase>
@@ -1694,15 +1694,15 @@
   user: core
   <source>
     *: none
-    headphone_detection: "Pause on Headphone Unplug"
+    headphone_detection: "Pause on Unplug"
   </source>
   <dest>
     *: none
-    headphone_detection: "ヘッドホンを接続していないとき一時停止する"
+    headphone_detection: "取り外し時に一時停止"
   </dest>
   <voice>
     *: none
-    headphone_detection: "ヘッドホンを接続していないとき一時停止する"
+    headphone_detection: "取り外し時に一時停止"
   </voice>
 </phrase>
 <phrase>
@@ -1744,13 +1744,13 @@
   desc: in settings_menu()
   user: core
   <source>
-    *: "File View"
+    *: "File Browser"
   </source>
   <dest>
-    *: "ファイル表示の設定"
+    *: "ファイルブラウザ"
   </dest>
   <voice>
-    *: "ファイル表示の設定"
+    *: "ファイルブラウザ"
   </voice>
 </phrase>
 <phrase>
@@ -1896,9 +1896,6 @@
 <phrase>
   id: LANG_MUSIC_BROWSER
   desc: "default browser" choice option, and the root menu's database
-        browser item -- deliberately distinct from LANG_TAGCACHE
-        ("Database"), which stays as-is for the Database *settings*
-        sub-menu (rebuild/initialize/etc.), a different context
   user: core
   <source>
     *: "Music"
@@ -1991,19 +1988,16 @@
 </phrase>
 <phrase>
   id: LANG_TAGCACHE_RAM
-  desc: in tag cache settings
+  desc: deprecated
   user: core
   <source>
     *: none
-    tc_ramcache: "Load to RAM"
   </source>
   <dest>
     *: none
-    tc_ramcache: "RAMに読み込む"
   </dest>
   <voice>
     *: none
-    tc_ramcache: "ラムに読み込む"
   </voice>
 </phrase>
 <phrase>
@@ -2025,13 +2019,13 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Initialize Now"
+    *: "Rebuild Database"
   </source>
   <dest>
-    *: "初期化する"
+    *: "データベースを再構築"
   </dest>
   <voice>
-    *: "初期化する"
+    *: "データベースを再構築"
   </voice>
 </phrase>
 <phrase>
@@ -2039,27 +2033,27 @@
   desc: in tag cache settings
   user: core
   <source>
-    *: "Update Now"
+    *: "Update Database"
   </source>
   <dest>
-    *: "更新する"
+    *: "データベースを更新"
   </dest>
   <voice>
-    *: "更新する"
+    *: "データベースを更新"
   </voice>
 </phrase>
 <phrase>
   id: LANG_RUNTIMEDB_ACTIVE
-  desc: in settings_menu.
+  desc: deprecated
   user: core
   <source>
-    *: "Gather Runtime Data"
+    *: none
   </source>
   <dest>
-    *: "ランタイム情報の収集"
+    *: none
   </dest>
   <voice>
-    *: "ランタイム情報の収集"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -2316,34 +2310,20 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BACKLIGHT_FILTER_FIRST_KEYPRESS
-  desc: Backlight behaviour setting
-  user: core
-  <source>
-    *: "First Buttonpress Enables Backlight Only"
-  </source>
-  <dest>
-    *: "最初のキー操作ではバックライト点灯のみ"
-  </dest>
-  <voice>
-    *: "最初のキー操作ではバックライト点灯のみ"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_LCD_SLEEP_AFTER_BACKLIGHT_OFF
   desc: In display settings, time to switch LCD chip into power saving state
   user: core
   <source>
     *: none
-    lcd_sleep: "Sleep (After Backlight Off)"
+    lcd_sleep: "Screen Off After"
   </source>
   <dest>
     *: none
-    lcd_sleep: "スリープ (バックライト消灯後)"
+    lcd_sleep: "画面オフまでの時間"
   </dest>
   <voice>
     *: none
-    lcd_sleep: "バックライト消灯後にスリープ"
+    lcd_sleep: "画面オフまでの時間"
   </voice>
 </phrase>
 <phrase>
@@ -2559,7 +2539,7 @@
   </source>
   <dest>
     *: none
-    lcd_color: "RGB"
+    lcd_color: "~RGB"
   </dest>
   <voice>
     *: none
@@ -2576,7 +2556,7 @@
   </source>
   <dest>
     *: none
-    lcd_color: "RGB: %02X%02X%02X"
+    lcd_color: "~RGB: %02X%02X%02X"
   </dest>
   <voice>
     *: none
@@ -3381,57 +3361,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_BATTERY_TYPE
-  desc: deprecated
-  user: core
-  <source>
-    *: none
-    battery_types: ""
-  </source>
-  <dest>
-    *: none
-    battery_types: ""
-  </dest>
-  <voice>
-    *: none
-    battery_types: ""
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_BATTERY_TYPE_1
-  desc: deprecated
-  user: core
-  <source>
-    *: none
-    battery_types,xduoox3: ""
-  </source>
-  <dest>
-    *: none
-    battery_types,xduoox3: ""
-  </dest>
-  <voice>
-    *: none
-    battery_types,xduoox3: ""
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_BATTERY_TYPE_2
-  desc: deprecated
-  user: core
-  <source>
-    *: none
-    battery_types,xduoox3: ""
-  </source>
-  <dest>
-    *: none
-    battery_types,xduoox3: ""
-  </dest>
-  <voice>
-    *: none
-    battery_types,xduoox3: ""
-  </voice>
-</phrase>
-<phrase>
   id: LANG_DISK_MENU
   desc: in the system sub menu
   user: core
@@ -3485,7 +3414,7 @@
   user: core
   <source>
     *: none
-    rtc: "Time & Date"
+    rtc: "Time & Date Settings"
   </source>
   <dest>
     *: none
@@ -3572,8 +3501,8 @@
   <dest>
     *: none
     rtc: "ON = 設定"
-    gigabeat*,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh10_5gb,mrobe100,sansac200*,sansaclip*,sansaconnect,sansae200*,sansafuze*: "SELECT = 設定"
     aigoerosq,erosqnative,gogearsa9200,samsungyh*,xduoox3*: "PLAY = 設定"
+    gigabeat*,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh10_5gb,mrobe100,sansac200*,sansaclip*,sansaconnect,sansae200*,sansafuze*: "SELECT = 設定"
     iriverh100,iriverh120,iriverh300: "NAVI = 設定"
     mpiohd300: "ENTER = 設定"
     mrobe500: "HEART = 設定"
@@ -3581,7 +3510,6 @@
   </dest>
   <voice>
     *: none
-    gigabeat*,gogearsa9200,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh100,iriverh10_5gb,iriverh120,iriverh300,mrobe100,rtc,samsungyh*,sansac200*,sansae200*: ""
   </voice>
 </phrase>
 <phrase>
@@ -3605,8 +3533,8 @@
   <dest>
     *: none
     rtc: "OFF = 元に戻す"
-    gigabeatfx,mrobe500: "POWER = 元に戻す"
     aigoerosq,erosqnative,gigabeats,sansafuzeplus,xduoox3*: "BACK = 元に戻す"
+    gigabeatfx,mrobe500: "POWER = 元に戻す"
     gogearsa9200: "LEFT = 元に戻す"
     iaudiom5,iaudiox5: "RECORD = 元に戻す"
     ipod*,mpiohd300,sansac200*: "MENU = 元に戻す"
@@ -3618,7 +3546,6 @@
   </dest>
   <voice>
     *: none
-    gigabeat*,gogearsa9200,iaudiom5,iaudiox5,ipod*,iriverh10,iriverh100,iriverh10_5gb,iriverh120,iriverh300,mrobe100,rtc,samsungyh*,sansac200*,sansae200*: ""
   </voice>
 </phrase>
 <phrase>
@@ -4452,13 +4379,13 @@
   desc: in the main menu
   user: core
   <source>
-    *: "Browse Theme Files"
+    *: "Load Theme"
   </source>
   <dest>
-    *: "テーマの参照"
+    *: "テーマの読み込み"
   </dest>
   <voice>
-    *: "テーマの参照"
+    *: "テーマの読み込み"
   </voice>
 </phrase>
 <phrase>
@@ -4696,7 +4623,7 @@
   </dest>
   <voice>
     *: none
-    radio: ""
+    radio: "スキャン中"
   </voice>
 </phrase>
 <phrase>
@@ -4709,7 +4636,7 @@
   </source>
   <dest>
     *: none
-    radio: "%d.%02d MHz"
+    radio: "~%d.%02d MHz"
   </dest>
   <voice>
     *: none
@@ -4961,7 +4888,7 @@
   </source>
   <dest>
     *: none
-    recording: "WavPack"
+    recording: "~WavPack"
   </dest>
   <voice>
     *: none
@@ -4978,7 +4905,7 @@
   </source>
   <dest>
     *: none
-    recording: "AIFF"
+    recording: "~AIFF"
   </dest>
   <voice>
     *: none
@@ -5701,13 +5628,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "View Current Playlist"
+    *: "View Queue"
   </source>
   <dest>
-    *: "現在のプレイリストを表示"
+    *: "再生キューを表示"
   </dest>
   <voice>
-    *: "現在のプレイリストを表示"
+    *: "再生キューを表示"
   </voice>
 </phrase>
 <phrase>
@@ -5785,13 +5712,13 @@
   desc: in playlist menu.
   user: core
   <source>
-    *: "Save Current Playlist"
+    *: "Save Queue as Playlist"
   </source>
   <dest>
-    *: "現在のプレイリストを保存"
+    *: "再生キューをプレイリストとして保存"
   </dest>
   <voice>
-    *: "現在のプレイリストを保存"
+    *: "再生キューをプレイリストとして保存"
   </voice>
 </phrase>
 <phrase>
@@ -5806,20 +5733,6 @@
   </dest>
   <voice>
     *: "曲を保存"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_CATALOG
-  desc: deprecated
-  user: core
-  <source>
-    *: ""
-  </source>
-  <dest>
-    *: ""
-  </dest>
-  <voice>
-    *: ""
   </voice>
 </phrase>
 <phrase>
@@ -5855,13 +5768,13 @@
   desc: in playlist options menu, option to warn when erasing dynamic playlist
   user: core
   <source>
-    *: "Warn When Erasing Dynamic Playlist"
+    *: "Warn When Replacing Queue"
   </source>
   <dest>
-    *: "ダイナミックリストの削除するときに警告を表示"
+    *: "再生キューの置き換え時に警告"
   </dest>
   <voice>
-    *: "ダイナミックリストを削除するときに警告を表示"
+    *: "再生キューの置き換え時に警告"
   </voice>
 </phrase>
 <phrase>
@@ -5869,13 +5782,13 @@
   desc: prompt shown when about to erase a modified dynamic playlist
   user: core
   <source>
-    *: "Erase dynamic playlist?"
+    *: "Replace the queue?"
   </source>
   <dest>
-    *: "ダイナミックリストを削除しますか?"
+    *: "再生キューを置き換えますか?"
   </dest>
   <voice>
-    *: "ダイナミックリストを削除しますか?"
+    *: "再生キューを置き換えますか?"
   </voice>
 </phrase>
 <phrase>
@@ -5883,13 +5796,13 @@
   desc: displayed topmost on the info screen and in the info menu
   user: core
   <source>
-    *: "Rockbox Info"
+    *: "System Info"
   </source>
   <dest>
-    *: "Rockbox情報"
+    *: "システム情報"
   </dest>
   <voice>
-    *: "ロックボックス情報"
+    *: "システム情報"
   </voice>
 </phrase>
 <phrase>
@@ -5984,7 +5897,7 @@
   <dest>
     *: none
     hibylinux: "~USB:"
-    multivolume: "HD1:"
+    multivolume: "~HD1:"
     sansac200*,sansaclipplus,sansae200*,sansafuze*: "マイクロSD:"
     xduoox3: "マイクロSD2:"
   </dest>
@@ -6057,13 +5970,13 @@
   desc: in the info menu
   user: core
   <source>
-    *: "Debug (Keep Out!)"
+    *: "Debug"
   </source>
   <dest>
-    *: "デバッグ情報 (立入禁止!)"
+    *: "デバッグ"
   </dest>
   <voice>
-    *: "デバッグ情報 立入禁止"
+    *: "デバッグ"
   </voice>
 </phrase>
 <phrase>
@@ -6085,13 +5998,13 @@
   desc: The verb/action Queue
   user: core
   <source>
-    *: "Queue"
+    *: "Play Once"
   </source>
   <dest>
-    *: "ダイナミックリストに予約"
+    *: "一度だけ再生"
   </dest>
   <voice>
-    *: "ダイナミックリストに予約"
+    *: "一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -6099,13 +6012,13 @@
   desc: in onplay menu.  queue a track/playlist into dynamic playlist.
   user: core
   <source>
-    *: "Queue Next"
+    *: "Play Once Next"
   </source>
   <dest>
-    *: "リストに次の曲として予約"
+    *: "次に一度だけ再生"
   </dest>
   <voice>
-    *: "リストに次の曲として予約"
+    *: "次に一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -6113,13 +6026,13 @@
   desc: in onplay menu.  queue a track/playlist at end of playlist.
   user: core
   <source>
-    *: "Queue Last"
+    *: "Play Once at End"
   </source>
   <dest>
-    *: "リストの最後に予約"
+    *: "最後に一度だけ再生"
   </dest>
   <voice>
-    *: "リストの最後に予約"
+    *: "最後に一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -6127,13 +6040,13 @@
   desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
   user: core
   <source>
-    *: "Queue Shuffled"
+    *: "Play Once Shuffled"
   </source>
   <dest>
-    *: "リストにシャッフルで予約"
+    *: "シャッフルして一度だけ再生"
   </dest>
   <voice>
-    *: "リストにシャッフルで予約"
+    *: "シャッフルして一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -6141,13 +6054,13 @@
   desc: splash number of tracks inserted
   user: core
   <source>
-    *: "Inserted %d tracks (%s)"
+    *: "Added %d tracks (%s)"
   </source>
   <dest>
     *: "%d 曲を追加 (%s)"
   </dest>
   <voice>
-    *: "曲を追加"
+    *: "曲を追加しました"
   </voice>
 </phrase>
 <phrase>
@@ -6155,13 +6068,13 @@
   desc: splash number of tracks queued
   user: core
   <source>
-    *: "Queued %d tracks (%s)"
+    *: "Play once: %d tracks (%s)"
   </source>
   <dest>
-    *: "%d 曲を予約 (%s)"
+    *: "一度だけ再生: %d 曲 (%s)"
   </dest>
   <voice>
-    *: "曲を予約"
+    *: "一度だけ再生する曲"
   </voice>
 </phrase>
 <phrase>
@@ -6536,10 +6449,10 @@
     *: "(VBR)"
   </source>
   <dest>
-    *: "(VBR)"
+    *: "~(VBR)"
   </dest>
   <voice>
-    *: "VBR"
+    *: "~VBR"
   </voice>
 </phrase>
 <phrase>
@@ -7202,8 +7115,7 @@
     gigabeatfx: "POWER to abort"
     gigabeats,sansafuzeplus: "BACK to abort"
     iaudiom5,iaudiox5: "Long PLAY to abort"
-    ipod*: "PLAY/PAUSE to abort"
-    iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
+    ipod*,iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "PREV to abort"
     iriverh100,iriverh120,iriverh300: "STOP to abort"
   </source>
   <dest>
@@ -7211,7 +7123,7 @@
     gigabeatfx: "パワー: 取り消し"
     gigabeats,sansafuzeplus: "バック: 取り消し"
     iaudiom5,iaudiox5: "ホールドプレー: 取り消し"
-    ipod*: "再生/一時停止: 取り消し"
+    ipod*: "前へ: 取り消し"
     iriverh10,iriverh10_5gb,sansac200*,sansae200*,vibe500: "以前: 取り消し"
     iriverh100,iriverh120,iriverh300: "ストップ: 取り消し"
   </dest>
@@ -7258,7 +7170,7 @@
     *: "%s を開けません"
   </dest>
   <voice>
-    *: ""
+    *: "プラグインを開けません"
   </voice>
 </phrase>
 <phrase>
@@ -7272,7 +7184,7 @@
     *: "%s の読み込みに失敗しました"
   </dest>
   <voice>
-    *: ""
+    *: "ファイルの読み込みに失敗しました"
   </voice>
 </phrase>
 <phrase>
@@ -7426,7 +7338,7 @@
     *: "B"
   </source>
   <dest>
-    *: "B"
+    *: "~B"
   </dest>
   <voice>
     *: ""
@@ -9057,13 +8969,13 @@
   desc: in the settings menu
   user: core
   <source>
-    *: "Theme Settings"
+    *: "UI Settings"
   </source>
   <dest>
-    *: "テーマ設定"
+    *: "UI設定"
   </dest>
   <voice>
-    *: "テーマ設定"
+    *: "UI設定"
   </voice>
 </phrase>
 <phrase>
@@ -9072,15 +8984,15 @@
   user: core
   <source>
     *: none
-    lcd_color: "Colours"
+    lcd_color: "Interface Colours"
   </source>
   <dest>
     *: none
-    lcd_color: "色設定"
+    lcd_color: "インターフェースの色"
   </dest>
   <voice>
     *: none
-    lcd_color: "色設定"
+    lcd_color: "インターフェースの色"
   </voice>
 </phrase>
 <phrase>
@@ -9431,11 +9343,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "9600"
+    serial_port: "~9600"
   </dest>
   <voice>
     *: none
-    serial_port: "9600"
+    serial_port: "~9600"
   </voice>
 </phrase>
 <phrase>
@@ -9448,11 +9360,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "19200"
+    serial_port: "~19200"
   </dest>
   <voice>
     *: none
-    serial_port: "19200"
+    serial_port: "~19200"
   </voice>
 </phrase>
 <phrase>
@@ -9465,11 +9377,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "38400"
+    serial_port: "~38400"
   </dest>
   <voice>
     *: none
-    serial_port: "38400"
+    serial_port: "~38400"
   </voice>
 </phrase>
 <phrase>
@@ -9482,11 +9394,11 @@
   </source>
   <dest>
     *: none
-    serial_port: "57600"
+    serial_port: "~57600"
   </dest>
   <voice>
     *: none
-    serial_port: "57600"
+    serial_port: "~57600"
   </voice>
 </phrase>
 <phrase>
@@ -10377,7 +10289,7 @@
     *: "2:1"
   </source>
   <dest>
-    *: "2:1"
+    *: "~2:1"
   </dest>
   <voice>
     *: "2 対 1"
@@ -10391,7 +10303,7 @@
     *: "4:1"
   </source>
   <dest>
-    *: "4:1"
+    *: "~4:1"
   </dest>
   <voice>
     *: "4 対 1"
@@ -10405,7 +10317,7 @@
     *: "6:1"
   </source>
   <dest>
-    *: "6:1"
+    *: "~6:1"
   </dest>
   <voice>
     *: "6 対 1"
@@ -10419,7 +10331,7 @@
     *: "10:1"
   </source>
   <dest>
-    *: "10:1"
+    *: "~10:1"
   </dest>
   <voice>
     *: "10 対 1"
@@ -10578,7 +10490,7 @@
   </source>
   <dest>
     *: none
-    usb_hid: "USB HID"
+    usb_hid: "~USB HID"
   </dest>
   <voice>
     *: none
@@ -10590,13 +10502,13 @@
   desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
   user: core
   <source>
-    *: "Queue Last Shuffled"
+    *: "Play Once Shuffled at End"
   </source>
   <dest>
-    *: "リストの最後にシャッフルで予約"
+    *: "最後にシャッフルして一度だけ再生"
   </dest>
   <voice>
-    *: "リストの最後にシャッフルで予約"
+    *: "最後にシャッフルして一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -10777,15 +10689,15 @@
   user: core
   <source>
     *: none
-    hotkey: "WPS Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "WPS のホットキー"
+    hotkey: "ホットキー"
   </dest>
   <voice>
     *: none
-    hotkey: "W P S のホットキー"
+    hotkey: "ホットキー"
   </voice>
 </phrase>
 <phrase>
@@ -10794,15 +10706,15 @@
   user: core
   <source>
     *: none
-    hotkey: "File Browser Hotkey"
+    hotkey: "Hotkey"
   </source>
   <dest>
     *: none
-    hotkey: "ファイル表示のホットキー"
+    hotkey: "ホットキー"
   </dest>
   <voice>
     *: none
-    hotkey: "ファイル表示のホットキー"
+    hotkey: "ホットキー"
   </voice>
 </phrase>
 <phrase>
@@ -11194,13 +11106,13 @@
   desc: Used when you need to say playlist, also voiced
   user: core
   <source>
-    *: "Current Playlist"
+    *: "Queue"
   </source>
   <dest>
-    *: "現在のプレイリスト"
+    *: "再生キュー"
   </dest>
   <voice>
-    *: "現在のプレイリスト"
+    *: "再生キュー"
   </voice>
 </phrase>
 <phrase>
@@ -11573,16 +11485,16 @@
 </phrase>
 <phrase>
   id: LANG_CONSTRAIN_NEXT_FOLDER
-  desc: in settings_menu. Whether LANG_NEXT_FOLDER should be constrained to directories within LANG_SET_AS_START_DIR
+  desc: deprecated
   user: core
   <source>
-    *: "Constrain Auto-Change"
+    *: none
   </source>
   <dest>
-    *: "自動変更を強制"
+    *: none
   </dest>
   <voice>
-    *: "自動変更を強制"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -11591,15 +11503,15 @@
   user: core
   <source>
     *: none
-    quickscreen: "Use Shortcuts Menu Instead of Quick Screen"
+    quickscreen: "Quick Screen"
   </source>
   <dest>
     *: none
-    quickscreen: "クイック・スクリーンの代わりにショートカット・メニューを使う"
+    quickscreen: "クイックスクリーン"
   </dest>
   <voice>
     *: none
-    quickscreen: "クイック・スクリーンの代わりにショートカット・メニューを使う"
+    quickscreen: "クイックスクリーン"
   </voice>
 </phrase>
 <phrase>
@@ -11624,10 +11536,10 @@
     *: "f(x2)"
   </source>
   <dest>
-    *: "f(x2)"
+    *: "~f(x2)"
   </dest>
   <voice>
-    *: "f(x2)"
+    *: "~f(x2)"
   </voice>
 </phrase>
 <phrase>
@@ -11697,10 +11609,10 @@
     *: "f(x1)"
   </source>
   <dest>
-    *: "f(x1)"
+    *: "~f(x1)"
   </dest>
   <voice>
-    *: "f(x1)"
+    *: "~f(x1)"
   </voice>
 </phrase>
 <phrase>
@@ -11826,7 +11738,7 @@
   desc: in sound settings
   user: core
   <source>
-    *: "SIDE ONLY"
+    *: "Side Only"
   </source>
   <dest>
     *: "サイドのみ"
@@ -12121,11 +12033,11 @@
   </source>
   <dest>
     *: none
-    es9218: "Minimum Fast"
+    es9218: "~Minimum Fast"
   </dest>
   <voice>
     *: none
-    es9218: "Minimum Fast"
+    es9218: "~Minimum Fast"
   </voice>
 </phrase>
 <phrase>
@@ -12365,10 +12277,10 @@
     *: "Disable Unmapped Keys"
   </source>
   <dest>
-    *: "Disable Unmapped Keys"
+    *: "未割り当てキーを無効化"
   </dest>
   <voice>
-    *: "Disable Unmapped Keys"
+    *: "未割り当てキーを無効化"
   </voice>
 </phrase>
 <phrase>
@@ -12596,20 +12508,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_PLAYTIME_REMAINING
-  desc: deprecated
-  user: core
-  <source>
-    *: ""
-  </source>
-  <dest>
-    *: ""
-  </dest>
-  <voice>
-    *: ""
-  </voice>
-</phrase>
-<phrase>
   id: LANG_PLAYTIME_TRK_REMAINING
   desc: playing time screen
   user: core
@@ -12691,20 +12589,6 @@
   </dest>
   <voice>
     *: "平均ビットレート"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_PLAYTIME_ERROR
-  desc: playing time screen
-  user: core
-  <source>
-    *: "Error while gathering info"
-  </source>
-  <dest>
-    *: "情報収集中のエラー！"
-  </dest>
-  <voice>
-    *: "情報収集中のエラー！"
   </voice>
 </phrase>
 <phrase>
@@ -13371,10 +13255,10 @@
     *: "No games found !"
   </source>
   <dest>
-    *: "No games found !"
+    *: "ゲームが見つかりません!"
   </dest>
   <voice>
-    *: "No games found!"
+    *: "ゲームが見つかりません"
   </voice>
 </phrase>
 <phrase>
@@ -14161,16 +14045,16 @@
 </phrase>
 <phrase>
   id: LANG_TOGGLE_ITEM
-  desc: in main_menu_config
+  desc: deprecated
   user: core
   <source>
-    *: "Toggle Item"
+    *: ""
   </source>
   <dest>
-    *: "トグル項目"
+    *: ""
   </dest>
   <voice>
-    *: "トグル項目"
+    *: ""
   </voice>
 </phrase>
 <phrase>
@@ -14231,13 +14115,13 @@
 </phrase>
 <phrase>
   id: LANG_MAIN_MENU_ORDER
-  desc: main_menu_config plugin title
+  desc: deprecated
   user: core
   <source>
-    *: "Rockbox Main Menu Order"
+    *: ""
   </source>
   <dest>
-    *: "ロックボックスのメインメニュー"
+    *: ""
   </dest>
   <voice>
     *: ""
@@ -14248,10 +14132,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Path]"
+    *: "Path"
   </source>
   <dest>
-    *: "[パス]"
+    *: "パス"
   </dest>
   <voice>
     *: "パス"
@@ -14262,10 +14146,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Filename]"
+    *: "Filename"
   </source>
   <dest>
-    *: "[ファイル名]"
+    *: "ファイル名"
   </dest>
   <voice>
     *: "ファイル名"
@@ -14276,10 +14160,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Size]"
+    *: "Size"
   </source>
   <dest>
-    *: "[サイズ]"
+    *: "サイズ"
   </dest>
   <voice>
     *: "サイズ"
@@ -14290,10 +14174,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Date]"
+    *: "Date"
   </source>
   <dest>
-    *: "[日付]"
+    *: "日付"
   </dest>
   <voice>
     *: "日付"
@@ -14304,13 +14188,13 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Time]"
+    *: "Time"
   </source>
   <dest>
-    *: "[時間]"
+    *: "時刻"
   </dest>
   <voice>
-    *: "時間"
+    *: "時刻"
   </voice>
 </phrase>
 <phrase>
@@ -14318,10 +14202,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Subdirs]"
+    *: "Subdirs"
   </source>
   <dest>
-    *: "[サブディレクトリ]"
+    *: "サブディレクトリ"
   </dest>
   <voice>
     *: "サブディレクトリ"
@@ -14332,10 +14216,10 @@
   desc: in properties plugin
   user: core
   <source>
-    *: "[Files]"
+    *: "Files"
   </source>
   <dest>
-    *: "[ファイル]"
+    *: "ファイル"
   </dest>
   <voice>
     *: "ファイル"
@@ -14521,13 +14405,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Spacing"
+    *: "3D Parallel Slides"
   </source>
   <dest>
-    *: "スペーシング"
+    *: "3D平行スライド"
   </dest>
   <voice>
-    *: "スペーシング"
+    *: "3D平行スライド"
   </voice>
 </phrase>
 <phrase>
@@ -14535,13 +14419,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Centre Margin"
+    *: "3D Centre Margin"
   </source>
   <dest>
-    *: "センターマージン"
+    *: "3D中央マージン"
   </dest>
   <voice>
-    *: "センターマージン"
+    *: "3D中央マージン"
   </voice>
 </phrase>
 <phrase>
@@ -14549,13 +14433,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Number of slides"
+    *: "3D Slide Tuck"
   </source>
   <dest>
-    *: "スライド数"
+    *: "3Dスライドの重なり"
   </dest>
   <voice>
-    *: "スライド数"
+    *: "3Dスライドの重なり"
   </voice>
 </phrase>
 <phrase>
@@ -14605,13 +14489,13 @@
   desc: in the pictureflow settings menu
   user: core
   <source>
-    *: "Rebuild cache"
+    *: "Rebuild Art Cache"
   </source>
   <dest>
-    *: "キャッシュの再構築"
+    *: "アートキャッシュを再構築"
   </dest>
   <voice>
-    *: "キャッシュの再構築"
+    *: "アートキャッシュを再構築"
   </voice>
 </phrase>
 <phrase>
@@ -14741,20 +14625,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_CACHE_REBUILT_NEXT_RESTART
-  desc: deprecated
-  user: core
-  <source>
-    *: ""
-  </source>
-  <dest>
-    *: ""
-  </dest>
-  <voice>
-    *: ""
-  </voice>
-</phrase>
-<phrase>
   id: LANG_ERROR_WRITING_CONFIG
   desc: in the pictureflow splash messages
   user: core
@@ -14801,13 +14671,13 @@
   desc: in pictureflow
   user: core
   <source>
-    *: "Update cache"
+    *: "Update Art Cache"
   </source>
   <dest>
-    *: "キャッシュの更新"
+    *: "アートキャッシュを更新"
   </dest>
   <voice>
-    *: "キャッシュの更新"
+    *: "アートキャッシュを更新"
   </voice>
 </phrase>
 <phrase>
@@ -14886,7 +14756,7 @@
   user: core
   <source>
     *: "Press LEFT to cancel."
-    android,hifietma*,zenvision: "Press BACK to cancel."
+    android,hifietma*: "Press BACK to cancel."
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "Press POWER to cancel."
     ihifi760,ihifi960: "Double tap RETURN to cancel."
     ihifi770,ihifi770c,ihifi800: "Press HOME to cancel."
@@ -14900,8 +14770,8 @@
     xduoox20,xduoox3,xduoox3ii: "Double tap HOME to cancel."
   </source>
   <dest>
-    *: "Press LEFT to cancel."
-    android,hifietma*,zenvision: "戻るを押してキャンセルする。"
+    *: "左ボタンでキャンセル"
+    android,hifietma*: "戻るを押してキャンセルする。"
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "電源を押してキャンセルする。"
     ihifi760,ihifi960: "キャンセルするには戻るをダブルタップします。"
     ihifi770,ihifi770c,ihifi800: "ホームボタンを押してキャンセルする。"
@@ -14915,8 +14785,8 @@
     xduoox20,xduoox3,xduoox3ii: "キャンセルするにはホームをダブルタップする。"
   </dest>
   <voice>
-    *: "Press LEFT to cancel."
-    android,hifietma*,zenvision: "戻るを押してキャンセルする。"
+    *: "左ボタンでキャンセル"
+    android,hifietma*: "戻るを押してキャンセルする。"
     cowond2,creativezenxfi2,ibassodx50,ibassodx90,mrobe500,ondavx747: "電源を押してキャンセルする。"
     ihifi760,ihifi960: "キャンセルするには戻るをダブルタップします。"
     ihifi770,ihifi770c,ihifi800: "ホームボタンを押してキャンセルする。"
@@ -15204,13 +15074,13 @@
   desc:
   user: core
   <source>
-    *: "Add"
+    *: "Add to Queue"
   </source>
   <dest>
-    *: "追加"
+    *: "再生キューに追加"
   </dest>
   <voice>
-    *: "追加"
+    *: "再生キューに追加"
   </voice>
 </phrase>
 <phrase>
@@ -15302,13 +15172,13 @@
   desc: in onplay menu
   user: core
   <source>
-    *: "Queue..."
+    *: "Play Once..."
   </source>
   <dest>
-    *: "キュー..."
+    *: "一度だけ再生..."
   </dest>
   <voice>
-    *: "キュー"
+    *: "一度だけ再生"
   </voice>
 </phrase>
 <phrase>
@@ -15316,13 +15186,13 @@
   desc: in Current Playlist settings
   user: core
   <source>
-    *: "Show Queue Options"
+    *: "Show Play-Once Options"
   </source>
   <dest>
-    *: "キューオプションの表示"
+    *: "一度だけ再生の項目を表示"
   </dest>
   <voice>
-    *: "キューオプションの表示"
+    *: "一度だけ再生の項目を表示"
   </voice>
 </phrase>
 <phrase>
@@ -15582,16 +15452,16 @@
 </phrase>
 <phrase>
   id: LANG_ARTIST_PLUS_YEAR
-  desc: in Settings
+  desc: "Sort Albums By" option: by artist, then release year, oldest first
   user: core
   <source>
-    *: "Artist + Year"
+    *: "Artist + Year (oldest first)"
   </source>
   <dest>
-    *: "アーティストと年"
+    *: "アーティスト+年 (古い順)"
   </dest>
   <voice>
-    *: "アーティストと年"
+    *: "アーティストと年、古い順"
   </voice>
 </phrase>
 <phrase>
@@ -15694,22 +15564,16 @@
 </phrase>
 <phrase>
   id: LANG_CLEAR_SETTINGS_ON_HOLD
-  desc: in the system sub menu
+  desc: deprecated
   user: core
   <source>
     *: none
-    clear_settings_on_hold,iriverh10: "Clear settings when reset button is held during startup"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "Clear settings when hold switch is on during startup"
   </source>
   <dest>
     *: none
-    clear_settings_on_hold,iriverh10: "起動時にリセットボタンを長押しすると設定がクリアされる"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "起動時にホールドスイッチがオンの場合、設定をクリアする"
   </dest>
   <voice>
     *: none
-    clear_settings_on_hold,iriverh10: "起動時にリセットボタンを長押しすると設定がクリアされる"
-    ipod4g,ipodcolor,ipodmini1g,ipodmini2g,ipodnano1g,ipodvideo: "起動時にホールドスイッチがオンの場合、設定をクリアする"
   </voice>
 </phrase>
 <phrase>
@@ -15818,13 +15682,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Playing Next..."
+    *: "Add to Queue..."
   </source>
   <dest>
-    *: "次のプレー..."
+    *: "再生キューに追加..."
   </dest>
   <voice>
-    *: "次のプレー"
+    *: "再生キューに追加"
   </voice>
 </phrase>
 <phrase>
@@ -15846,13 +15710,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Add Shuffled"
+    *: "Shuffle into Queue"
   </source>
   <dest>
-    *: "シャッフルを追加"
+    *: "シャッフルしてキューに追加"
   </dest>
   <voice>
-    *: "シャッフルを追加"
+    *: "シャッフルしてキューに追加"
   </voice>
 </phrase>
 <phrase>
@@ -15860,13 +15724,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last"
+    *: "Add to End"
   </source>
   <dest>
-    *: "ラストプレー"
+    *: "最後に追加"
   </dest>
   <voice>
-    *: "ラストプレー"
+    *: "最後に追加"
   </voice>
 </phrase>
 <phrase>
@@ -15874,13 +15738,13 @@
   desc: used in the onplay menu
   user: core
   <source>
-    *: "Play Last Shuffled"
+    *: "Shuffle onto End"
   </source>
   <dest>
-    *: "最後にシャッフルされたプレー"
+    *: "シャッフルして最後に追加"
   </dest>
   <voice>
-    *: "最後にシャッフルされたプレー"
+    *: "シャッフルして最後に追加"
   </voice>
 </phrase>
 <phrase>
@@ -15964,16 +15828,16 @@
 </phrase>
 <phrase>
   id: LANG_DATABASE_DIR
-  desc: in database settings menu
+  desc: deprecated
   user: core
   <source>
-    *: "Database Directory"
+    *: none
   </source>
   <dest>
-    *: "データベースディレクトリ"
+    *: none
   </dest>
   <voice>
-    *: "データベースディレクトリ"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15981,27 +15845,27 @@
   desc: Confirmation dialog
   user: core
   <source>
-    *: "Remove Queued Tracks?"
+    *: "Remove Play-Once Tracks?"
   </source>
   <dest>
-    *: "キューイングされているトラックを削除しますか？"
+    *: "一度だけ再生の曲を削除しますか?"
   </dest>
   <voice>
-    *: "キューイングされているトラックを削除しますか？"
+    *: "一度だけ再生の曲を削除しますか?"
   </voice>
 </phrase>
 <phrase>
   id: LANG_QUICK_IGNORE_DIRACHE
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "Quick (Ignore Directory Cache)"
+    *: none
   </source>
   <dest>
-    *: "クイック（ディレクトリキャッシュを無視）"
+    *: none
   </dest>
   <voice>
-    *: "クイック（ディレクトリキャッシュを無視）"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -16009,13 +15873,13 @@
   desc: in Settings
   user: core
   <source>
-    *: "What's Playing Screen"
+    *: "Now Playing Screen"
   </source>
   <dest>
-    *: "プレイ画面"
+    *: "再生画面"
   </dest>
   <voice>
-    *: "プレイ画面"
+    *: "再生画面"
   </voice>
 </phrase>
 <phrase>
@@ -16030,20 +15894,6 @@
   </dest>
   <voice>
     *: "デフォルトブラウザ"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_AMAZE_MENU
-  desc: Amaze game
-  user: core
-  <source>
-    *: "Amaze Main Menu"
-  </source>
-  <dest>
-    *: "メインメニュー"
-  </dest>
-  <voice>
-    *: "メインメニュー"
   </voice>
 </phrase>
 <phrase>
@@ -16096,10 +15946,10 @@
     *: "Show Map"
   </source>
   <dest>
-    *: "Show Map"
+    *: "マップを表示"
   </dest>
   <voice>
-    *: "Show Map"
+    *: "マップを表示"
   </voice>
 </phrase>
 <phrase>
@@ -16299,34 +16149,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_MIKMOD_MENU
-  desc: mikmod plugin
-  user: core
-  <source>
-    *: "Mikmod Menu"
-  </source>
-  <dest>
-    *: "ミク改造メニュー"
-  </dest>
-  <voice>
-    *: "ミク改造メニュー"
-  </voice>
-</phrase>
-<phrase>
-  id: LANG_CHESSBOX_MENU
-  desc: chessbox plugin
-  user: core
-  <source>
-    *: "Chessbox Menu"
-  </source>
-  <dest>
-    *: "チェスボックス メニュー"
-  </dest>
-  <voice>
-    *: "チェスボックス メニュー"
-  </voice>
-</phrase>
-<phrase>
   id: VOICE_INVALID_VOICE_FILE
   desc: played if the voice file fails to load
   user: core
@@ -16337,7 +16159,7 @@
     *: ""
   </dest>
   <voice>
-    *: "無効な音声ファイル	"
+    *: "無効な音声ファイル"
   </voice>
 </phrase>
 <phrase>
@@ -16529,5 +16351,8406 @@
   </dest>
   <voice>
     *: "プレイリストは終了しました。もう一度再生しますか？"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_SCAN_ON_EJECT
+  desc: in tag cache settings; rescan after a USB session that wrote to us
+  user: core
+  <source>
+    *: "Scan on Eject"
+  </source>
+  <dest>
+    *: "取り出し後にスキャン"
+  </dest>
+  <voice>
+    *: "取り出し後にスキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCAN_ON_STARTUP
+  desc: in database settings
+  user: core
+  <source>
+    *: "Scan on Startup"
+  </source>
+  <dest>
+    *: "起動時にスキャン"
+  </dest>
+  <voice>
+    *: "起動時にスキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTOCOMMIT_ON_STARTUP
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG
+  desc: in System settings: the menu of diagnostic logs
+  user: core
+  <source>
+    *: "Debug Logs"
+  </source>
+  <dest>
+    *: "デバッグログ"
+  </dest>
+  <voice>
+    *: "デバッグログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHANNEL_SWAP
+  desc: in sound_settings
+  user: core
+  <source>
+    *: "Swap Left & Right"
+  </source>
+  <dest>
+    *: "左右を入れ替え"
+  </dest>
+  <voice>
+    *: "左右を入れ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER_MARKS
+  desc: chapter marks option
+  user: core
+  <source>
+    *: "Chapter Marks"
+  </source>
+  <dest>
+    *: "チャプターマーク"
+  </dest>
+  <voice>
+    *: "チャプターマーク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BROWSE_CHAPTERS
+  desc: context menu entry for a book's chapter list
+  user: core
+  <source>
+    *: "Browse Chapters"
+  </source>
+  <dest>
+    *: "チャプター一覧"
+  </dest>
+  <voice>
+    *: "チャプター一覧"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CHAPTER
+  desc: spoken before a chapter number
+  user: core
+  <source>
+    *: "Chapter"
+  </source>
+  <dest>
+    *: "チャプター"
+  </dest>
+  <voice>
+    *: "チャプター"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_BUTTON_PRESS
+  desc: Backlight behaviour setting
+  user: core
+  <source>
+    *: "First Button Press"
+  </source>
+  <dest>
+    *: "最初のボタン操作"
+  </dest>
+  <voice>
+    *: "最初のボタン操作"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DEBUG_MENU
+  desc: in system settings menu
+  user: core
+  <source>
+    *: "Show Debug Menu"
+  </source>
+  <dest>
+    *: "デバッグメニューを表示"
+  </dest>
+  <voice>
+    *: "デバッグメニューを表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DISPLAY_SPECIAL_CHARACTER
+  desc: Special character (japanese, accents, etc)
+  user: core
+  <source>
+    *: "Special Character"
+  </source>
+  <dest>
+    *: "特殊文字"
+  </dest>
+  <voice>
+    *: "特殊文字"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ID3_ALBUMARTISTS
+  desc: in tag viewer
+  user: core
+  <source>
+    *: "Album Artists"
+  </source>
+  <dest>
+    *: "アルバムアーティスト"
+  </dest>
+  <voice>
+    *: "アルバムアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC
+  desc: in settings_menu
+  user: core
+  <source>
+    *: none
+    usbdac: "USB Sound Card"
+  </source>
+  <dest>
+    *: none
+    usbdac: "USBサウンドカード"
+  </dest>
+  <voice>
+    *: none
+    usbdac: "USBサウンドカード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WHILE_USB_CHARGE_ONLY
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WHILE_MASS_STORAGE_USB_ONLY
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_ACTIVE
+  desc: for splash
+  user: core
+  <source>
+    *: none
+    usbdac: "USB Sound Card Active"
+  </source>
+  <dest>
+    *: none
+    usbdac: "USBサウンドカード使用中"
+  </dest>
+  <voice>
+    *: none
+    usbdac: "USBサウンドカード使用中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_MODE_DRIVE_ONLY
+  desc: in Settings -> General -> System -> USB Mode: the disk and nothing else
+  user: core
+  <source>
+    *: "Drive Only"
+  </source>
+  <dest>
+    *: "ドライブのみ"
+  </dest>
+  <voice>
+    *: "ドライブのみ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_MENU
+  desc: General Settings submenu -- the cover-art thumbnail cache
+  user: core
+  <source>
+    *: "Art Cache"
+  </source>
+  <dest>
+    *: "アートキャッシュ"
+  </dest>
+  <voice>
+    *: "アートキャッシュ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_FAST_BUILD
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Fast Build"
+  </source>
+  <dest>
+    *: "高速作成"
+  </dest>
+  <voice>
+    *: "高速作成"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_CACHE_ALBUM_SOURCE
+  desc: in the art cache menu
+  user: core
+  <source>
+    *: "Album Art Source"
+  </source>
+  <dest>
+    *: "アルバムアートの取得元"
+  </dest>
+  <voice>
+    *: "アルバムアートの取得元"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files Only"
+  </source>
+  <dest>
+    *: "画像ファイルのみ"
+  </dest>
+  <voice>
+    *: "画像ファイルのみ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_FILES_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Image Files, Then Embedded"
+  </source>
+  <dest>
+    *: "画像ファイル、次に埋め込み"
+  </dest>
+  <voice>
+    *: "画像ファイル、次に埋め込み"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED_FIRST
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded, Then Image Files"
+  </source>
+  <dest>
+    *: "埋め込み、次に画像ファイル"
+  </dest>
+  <voice>
+    *: "埋め込み、次に画像ファイル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_SOURCE_EMBEDDED
+  desc: Album Art Source choice
+  user: core
+  <source>
+    *: "Embedded Only"
+  </source>
+  <dest>
+    *: "埋め込みのみ"
+  </dest>
+  <voice>
+    *: "埋め込みのみ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANNOUNCE_STATUS
+  desc: announnnce_status plugin
+  user: core
+  <source>
+    *: "Announce Status"
+  </source>
+  <dest>
+    *: "状態を読み上げ"
+  </dest>
+  <voice>
+    *: "状態を読み上げ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PREFER_CACHE
+  desc: in Settings -- album art source, the pre-scaled thumbnail cache
+  user: core
+  <source>
+    *: "Prefer Cache"
+  </source>
+  <dest>
+    *: "キャッシュを優先"
+  </dest>
+  <voice>
+    *: "キャッシュを優先"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "First Letter"
+  </source>
+  <dest>
+    *: "頭文字"
+  </dest>
+  <voice>
+    *: "頭文字"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_BY_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "By First Letter..."
+  </source>
+  <dest>
+    *: "頭文字から..."
+  </dest>
+  <voice>
+    *: "頭文字から"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ARTISTS_BY_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "Artists by First Letter"
+  </source>
+  <dest>
+    *: "頭文字別アーティスト"
+  </dest>
+  <voice>
+    *: "頭文字別アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ALBUM_ARTISTS_BY_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "Album Artists by First Letter"
+  </source>
+  <dest>
+    *: "頭文字別アルバムアーティスト"
+  </dest>
+  <voice>
+    *: "頭文字別アルバムアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ALBUMS_BY_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "Albums by First Letter"
+  </source>
+  <dest>
+    *: "頭文字別アルバム"
+  </dest>
+  <voice>
+    *: "頭文字別アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_TRACKS_BY_FIRST_LETTER
+  desc: Database menu
+  user: core
+  <source>
+    *: "Tracks by First Letter"
+  </source>
+  <dest>
+    *: "頭文字別トラック"
+  </dest>
+  <voice>
+    *: "頭文字別トラック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTISTS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Artists"
+  </source>
+  <dest>
+    *: "アーティスト"
+  </dest>
+  <voice>
+    *: "アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUMS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Albums"
+  </source>
+  <dest>
+    *: "アルバム"
+  </dest>
+  <voice>
+    *: "アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACKS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Tracks"
+  </source>
+  <dest>
+    *: "トラック"
+  </dest>
+  <voice>
+    *: "トラック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHUFFLE_SONGS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Shuffle Songs"
+  </source>
+  <dest>
+    *: "曲をシャッフル"
+  </dest>
+  <voice>
+    *: "曲をシャッフル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILENAME
+  desc: Database and recording menus
+  user: core
+  <source>
+    *: "Filename"
+  </source>
+  <dest>
+    *: "ファイル名"
+  </dest>
+  <voice>
+    *: "ファイル名"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TITLE_WITH_DURATION
+  desc: Database menu
+  user: core
+  <source>
+    *: "Title (with track duration)"
+  </source>
+  <dest>
+    *: "曲名 (再生時間付き)"
+  </dest>
+  <voice>
+    *: "曲名、再生時間付き"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USER_RATING
+  desc: Database menu
+  user: core
+  <source>
+    *: "User Rating"
+  </source>
+  <dest>
+    *: "ユーザー評価"
+  </dest>
+  <voice>
+    *: "ユーザー評価"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH
+  desc: Database menu
+  user: core
+  <source>
+    *: "Search"
+  </source>
+  <dest>
+    *: "検索"
+  </dest>
+  <voice>
+    *: "検索"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEARCH_BY
+  desc: Database menu
+  user: core
+  <source>
+    *: "Search by..."
+  </source>
+  <dest>
+    *: "検索対象..."
+  </dest>
+  <voice>
+    *: "検索対象"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_ADDED
+  desc: Database menu
+  user: core
+  <source>
+    *: "Recently Added"
+  </source>
+  <dest>
+    *: "最近追加した項目"
+  </dest>
+  <voice>
+    *: "最近追加した項目"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYBACK_HISTORY
+  desc: Database menu
+  user: core
+  <source>
+    *: "Playback History"
+  </source>
+  <dest>
+    *: "再生履歴"
+  </dest>
+  <voice>
+    *: "再生履歴"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CUSTOM_MENU
+  desc: Database menu
+  user: core
+  <source>
+    *: "Custom menu"
+  </source>
+  <dest>
+    *: "カスタムメニュー"
+  </dest>
+  <voice>
+    *: "カスタムメニュー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SAME_AS_CURRENT
+  desc: Database menu
+  user: core
+  <source>
+    *: "Same as currently played track"
+  </source>
+  <dest>
+    *: "再生中の曲と同じ"
+  </dest>
+  <voice>
+    *: "再生中の曲と同じ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIRECTORY
+  desc: Database menu
+  user: core
+  <source>
+    *: "Directory"
+  </source>
+  <dest>
+    *: "ディレクトリ"
+  </dest>
+  <voice>
+    *: "ディレクトリ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUMS_BY_YEAR
+  desc: Database menu
+  user: core
+  <source>
+    *: "Albums by Year"
+  </source>
+  <dest>
+    *: "年別アルバム"
+  </dest>
+  <voice>
+    *: "年別アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUMS_BETWEEN_YEARS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Albums between Years"
+  </source>
+  <dest>
+    *: "期間内のアルバム"
+  </dest>
+  <voice>
+    *: "期間内のアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTISTS_BETWEEN_YEARS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Artists between Years"
+  </source>
+  <dest>
+    *: "期間内のアーティスト"
+  </dest>
+  <voice>
+    *: "期間内のアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_MOST_PLAYED
+  desc: Database menu
+  user: core
+  <source>
+    *: "Most played (Plays|Score)"
+  </source>
+  <dest>
+    *: "よく聴く曲 (回数/スコア)"
+  </dest>
+  <voice>
+    *: "よく聴く曲、再生回数とスコアの順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_RECENTLY_PLAYED_TRACKS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Recently played tracks"
+  </source>
+  <dest>
+    *: "最近再生した曲"
+  </dest>
+  <voice>
+    *: "最近再生した曲"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_NEVER_PLAYED_TRACKS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Never played tracks"
+  </source>
+  <dest>
+    *: "未再生の曲"
+  </dest>
+  <voice>
+    *: "未再生の曲"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_FAVOURITE_ARTISTS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Favourite artists"
+  </source>
+  <dest>
+    *: "お気に入りのアーティスト"
+  </dest>
+  <voice>
+    *: "お気に入りのアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_FAVOURITE_ALBUMS
+  desc: Database menu
+  user: core
+  <source>
+    *: "Favourite albums"
+  </source>
+  <dest>
+    *: "お気に入りのアルバム"
+  </dest>
+  <voice>
+    *: "お気に入りのアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_RECENT_FAVOURITES
+  desc: Database menu
+  user: core
+  <source>
+    *: "Recent favourites"
+  </source>
+  <dest>
+    *: "最近のお気に入り"
+  </dest>
+  <voice>
+    *: "最近のお気に入り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_NEW_FAVOURITES
+  desc: Database menu
+  user: core
+  <source>
+    *: "New favourites"
+  </source>
+  <dest>
+    *: "新しいお気に入り"
+  </dest>
+  <voice>
+    *: "新しいお気に入り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HISTORY_FORGOTTEN_FAVOURITES
+  desc: Database menu
+  user: core
+  <source>
+    *: "Forgotten favourites"
+  </source>
+  <dest>
+    *: "忘れていたお気に入り"
+  </dest>
+  <voice>
+    *: "忘れていたお気に入り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACKS_BY
+  desc: Database menu
+  user: core
+  <source>
+    *: "Tracks by"
+  </source>
+  <dest>
+    *: "トラックの表示"
+  </dest>
+  <voice>
+    *: "トラックの表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGNAVI_ALL_TRACKS_SORTED_BY_ALBUM
+  desc: "[By album]" entry in tag browser
+  user: core
+  <source>
+    *: "[By album]"
+  </source>
+  <dest>
+    *: "[アルバム順]"
+  </dest>
+  <voice>
+    *: "アルバム順の全トラック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_PLAYLISTS
+  desc: playlists sorting setting
+  user: core
+  <source>
+    *: "Sort Playlists"
+  </source>
+  <dest>
+    *: "プレイリストの並べ替え"
+  </dest>
+  <voice>
+    *: "プレイリストの並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USE_LED_INDICATORS
+  desc: LED indicators setting
+  user: core
+  <source>
+    *: none
+    general_purpose_led: "Use LED indicators"
+  </source>
+  <dest>
+    *: none
+    general_purpose_led: "LEDインジケーターを使用"
+  </dest>
+  <voice>
+    *: none
+    general_purpose_led: "LEDインジケーターを使用"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_MODE
+  desc: in settings_menu, storage mode setting
+  user: core
+  <source>
+    *: none
+    disk_storage: "Storage Mode"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "ストレージの種類"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "ストレージの種類"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_HDD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "HDD (Spinning Disk)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "HDD (回転ディスク)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "H D D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_SSD
+  desc: in settings_menu, storage mode option
+  user: core
+  <source>
+    *: none
+    disk_storage: "SSD (Solid State)"
+  </source>
+  <dest>
+    *: none
+    disk_storage: "SSD (フラッシュ)"
+  </dest>
+  <voice>
+    *: none
+    disk_storage: "S S D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_AUDIO_BOOST
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_SELECT_ACTION
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Select Action"
+  </source>
+  <dest>
+    *: "中央ボタンの動作"
+  </dest>
+  <voice>
+    *: "中央ボタンの動作"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_COVERFLOW
+  desc: in settings_menu
+  user: core
+  <source>
+    *: "Coverflow"
+  </source>
+  <dest>
+    *: "カバーフロー"
+  </dest>
+  <voice>
+    *: "カバーフロー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS
+  desc: in display settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "ダイナミックカラー"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "ダイナミックカラー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Artwork Filter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "アートワークフィルタ"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "アートワークフィルタ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_1
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 1"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "フィルタ 1"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "フィルタ 1"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_2
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 2"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "フィルタ 2"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "フィルタ 2"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTWORK_FILTER_3
+  desc: in theme settings
+  user: core
+  <source>
+    *: none
+    lcd_color: "Filter 3"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "フィルタ 3"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "フィルタ 3"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BW
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Black and White"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "白黒"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "白黒"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_INVERT
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Invert Colours"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "色を反転"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "色を反転"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_BRIGHTER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Brighter"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "明るく"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "明るく"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_DARKER
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Darker"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "暗く"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "暗く"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "コントラストを上げる"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "コントラストを上げる"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_CONTRAST_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Contrast"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "コントラストを下げる"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "コントラストを下げる"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_UP
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "More Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "彩度を上げる"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "彩度を上げる"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_COLOUR_DOWN
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Less Colour"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "彩度を下げる"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "彩度を下げる"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_HUE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Shift Hue"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "色相をずらす"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "色相をずらす"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_POSTERISE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Posterise"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "ポスタリゼーション"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "ポスタリゼーション"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILTER_PIXELLATE
+  desc: an artwork filter
+  user: core
+  <source>
+    *: none
+    lcd_color: "Pixellate"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "モザイク"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "モザイク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_COVERS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Album Covers"
+  </source>
+  <dest>
+    *: "アルバムジャケット"
+  </dest>
+  <voice>
+    *: "アルバムジャケット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PORTRAITS
+  desc: in the main menu
+  user: core
+  <source>
+    *: "Artist Portraits"
+  </source>
+  <dest>
+    *: "アーティスト写真"
+  </dest>
+  <voice>
+    *: "アーティスト写真"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_SETTINGS
+  desc: in General Settings
+  user: core
+  <source>
+    *: "Carousel"
+  </source>
+  <dest>
+    *: "カルーセル"
+  </dest>
+  <voice>
+    *: "カルーセル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TRANSITION_SPEED
+  desc: in apps/menus/album_covers_menu.c
+  user: core
+  <source>
+    *: "3D Transition Speed"
+  </source>
+  <dest>
+    *: "3D切り替え速度"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_MODE
+  desc: in the Carousel settings menu -- how the covers are laid out
+  user: core
+  <source>
+    *: "View Mode"
+  </source>
+  <dest>
+    *: "表示モード"
+  </dest>
+  <voice>
+    *: "表示モード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_OFFSET
+  desc: in the Carousel settings menu -- how far below the middle cover the
+  user: core
+  <source>
+    *: "Flat Pile Offset"
+  </source>
+  <dest>
+    *: "フラット表示の重ね位置"
+  </dest>
+  <voice>
+    *: "フラット表示の重ね位置"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_PILE_FADE
+  desc: in the Carousel settings menu -- how far the flat view's piles are
+  user: core
+  <source>
+    *: "Flat Pile Fade"
+  </source>
+  <dest>
+    *: "フラット表示の重ねフェード"
+  </dest>
+  <voice>
+    *: "フラット表示の重ねフェード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_3D
+  desc: "view mode" choice option -- the tilted cover flow
+  user: core
+  <source>
+    *: "3D"
+  </source>
+  <dest>
+    *: "~3D"
+  </dest>
+  <voice>
+    *: "~3D"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_VIEW_FLAT
+  desc: "view mode" choice option -- covers face-on, in two piles
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "フラット"
+  </dest>
+  <voice>
+    *: "フラット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAIN_MENU_SETTINGS
+  desc: Settings menu row and the Customize Main Menu screen's own title --
+  user: core
+  <source>
+    *: "Edit Main Menu"
+  </source>
+  <dest>
+    *: "メインメニューの編集"
+  </dest>
+  <voice>
+    *: "メインメニューの編集"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOTHING_PLAYING
+  desc: Message shown when a "same as currently played track" style tagtree
+  user: core
+  <source>
+    *: "Nothing playing"
+  </source>
+  <dest>
+    *: "再生していません"
+  </dest>
+  <voice>
+    *: "再生していません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_CLICKWHEEL_CHARSET
+  desc: Ordered set of characters the click-wheel text editor cycles through
+  user: core
+  <source>
+    *: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+  </source>
+  <dest>
+    *: "~ ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.'&"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_KBD_DISCARD
+  desc: Prompt shown when cancelling the text editor after changes were made
+  user: core
+  <source>
+    *: "Discard changes?"
+  </source>
+  <dest>
+    *: "変更を破棄しますか?"
+  </dest>
+  <voice>
+    *: "変更を破棄しますか?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_CONNECTED
+  desc: first line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "USB Connected"
+  </source>
+  <dest>
+    *: "USB接続中"
+  </dest>
+  <voice>
+    *: "USB接続中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_EJECT_BEFORE_DISCONNECT
+  desc: second line of the USB (mass storage) connection screen
+  user: core
+  <source>
+    *: "Eject before disconnecting"
+  </source>
+  <dest>
+    *: "抜く前に取り出してください"
+  </dest>
+  <voice>
+    *: "抜く前に取り出してください"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER
+  desc: core text viewer settings menu title
+  user: core
+  <source>
+    *: "Text Viewer"
+  </source>
+  <dest>
+    *: "テキストビューア"
+  </dest>
+  <voice>
+    *: "テキストビューア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR
+  desc: core text viewer colour mode setting
+  user: core
+  <source>
+    *: "Colour Mode"
+  </source>
+  <dest>
+    *: "カラーモード"
+  </dest>
+  <voice>
+    *: "カラーモード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_THEME
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme"
+  </source>
+  <dest>
+    *: "テーマ"
+  </dest>
+  <voice>
+    *: "テーマ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_INVERTED
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Theme Inverted"
+  </source>
+  <dest>
+    *: "テーマ (反転)"
+  </dest>
+  <voice>
+    *: "テーマ (反転)"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_BOW
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "Black on White"
+  </source>
+  <dest>
+    *: "白地に黒"
+  </dest>
+  <voice>
+    *: "白地に黒"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_COLOUR_WOB
+  desc: core text viewer colour mode option
+  user: core
+  <source>
+    *: "White on Black"
+  </source>
+  <dest>
+    *: "黒地に白"
+  </dest>
+  <voice>
+    *: "黒地に白"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_MARGIN
+  desc: core text viewer margin setting
+  user: core
+  <source>
+    *: "Margin"
+  </source>
+  <dest>
+    *: "余白"
+  </dest>
+  <voice>
+    *: "余白"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_LINE_SPACING
+  desc: core text viewer line spacing setting
+  user: core
+  <source>
+    *: "Line Spacing"
+  </source>
+  <dest>
+    *: "行間"
+  </dest>
+  <voice>
+    *: "行間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_FONT_DEFAULT
+  desc: core text viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "UIフォントを使用"
+  </dest>
+  <voice>
+    *: "UIフォントを使用"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TEXT_VIEWER_PAGE_NUMBER
+  desc: core text viewer, show the page number at the foot
+  user: core
+  <source>
+    *: "Page Number"
+  </source>
+  <dest>
+    *: "ページ番号"
+  </dest>
+  <voice>
+    *: "ページ番号"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LICENSE
+  desc: in system menu, opens docs/COPYING (the GNU GPL)
+  user: core
+  <source>
+    *: "License"
+  </source>
+  <dest>
+    *: "ライセンス"
+  </dest>
+  <voice>
+    *: "ライセンス"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_OK
+  desc: generic
+  user: core
+  <source>
+    *: "OK"
+  </source>
+  <dest>
+    *: "~OK"
+  </dest>
+  <voice>
+    *: "~OK"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIAG_CANCEL
+  desc: generic
+  user: core
+  <source>
+    *: "Cancel"
+  </source>
+  <dest>
+    *: "キャンセル"
+  </dest>
+  <voice>
+    *: "キャンセル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SET_CONTEXT_ITEM
+  desc: WPS context item
+  user: core
+  <source>
+    *: "Set Context Item"
+  </source>
+  <dest>
+    *: "コンテキスト項目に設定"
+  </dest>
+  <voice>
+    *: "コンテキスト項目に設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_IN_FILES
+  desc: Reveal item in File Browser
+  user: core
+  <source>
+    *: "Show in Files"
+  </source>
+  <dest>
+    *: "ファイルで表示"
+  </dest>
+  <voice>
+    *: "ファイルで表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FILE_NOT_FOUND
+  desc: When file does not exist
+  user: core
+  <source>
+    *: "File not found"
+  </source>
+  <dest>
+    *: "ファイルが見つかりません"
+  </dest>
+  <voice>
+    *: "ファイルが見つかりません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ALBUM_ART
+  desc: in Settings, database browser album art rows
+  user: core
+  <source>
+    *: "Album Art Rows"
+  </source>
+  <dest>
+    *: "アルバム行のアート"
+  </dest>
+  <voice>
+    *: "アルバム行のアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_ARTIST_ART
+  desc: in Settings, database browser artist art rows
+  user: core
+  <source>
+    *: "Artist Art Rows"
+  </source>
+  <dest>
+    *: "アーティスト行のアート"
+  </dest>
+  <voice>
+    *: "アーティスト行のアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_BOOK_ART
+  desc: in Settings, database browser audiobook art rows
+  user: core
+  <source>
+    *: "Audiobook Art Rows"
+  </source>
+  <dest>
+    *: "オーディオブック行のアート"
+  </dest>
+  <voice>
+    *: "オーディオブック行のアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SEGREGATE_AUDIOBOOKS
+  desc: in Settings, keep audiobooks apart from the music
+  user: core
+  <source>
+    *: "Segregate Audiobooks"
+  </source>
+  <dest>
+    *: "オーディオブックを分ける"
+  </dest>
+  <voice>
+    *: "オーディオブックを分ける"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUDIOBOOKS
+  desc: the Audiobooks menu, and its main-menu row
+  user: core
+  <source>
+    *: "Audiobooks"
+  </source>
+  <dest>
+    *: "オーディオブック"
+  </dest>
+  <voice>
+    *: "オーディオブック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK
+  desc: in the Audiobooks menu, browse by book
+  user: core
+  <source>
+    *: "Book"
+  </source>
+  <dest>
+    *: "本"
+  </dest>
+  <voice>
+    *: "本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AUTHOR
+  desc: in the Audiobooks menu, browse by author
+  user: core
+  <source>
+    *: "Author"
+  </source>
+  <dest>
+    *: "著者"
+  </dest>
+  <voice>
+    *: "著者"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED
+  desc: in the Audiobooks menu, books played lately
+  user: core
+  <source>
+    *: "Recently played"
+  </source>
+  <dest>
+    *: "最近聴いた本"
+  </dest>
+  <voice>
+    *: "最近聴いた本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_INDEX
+  desc: deprecated
+  user: core
+  <source>
+    *: ""
+  </source>
+  <dest>
+    *: ""
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_INDEX
+  desc: in Carousel settings, update the album index
+  user: core
+  <source>
+    *: "Update Index"
+  </source>
+  <dest>
+    *: "インデックスを更新"
+  </dest>
+  <voice>
+    *: "インデックスを更新"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BG_TASK_INFO
+  desc: in System settings, live status of the background tasks
+  user: core
+  <source>
+    *: "Background Tasks"
+  </source>
+  <dest>
+    *: "バックグラウンドタスク"
+  </dest>
+  <voice>
+    *: "バックグラウンドタスク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_READING
+  desc: in the main menu, reopen the most recently read document
+  user: core
+  <source>
+    *: "Continue Reading"
+  </source>
+  <dest>
+    *: "続きを読む"
+  </dest>
+  <voice>
+    *: "続きを読む"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_SOURCE
+  desc: in Theme settings, which picture the now-playing screen shows
+  user: core
+  <source>
+    *: "Now Playing Artwork"
+  </source>
+  <dest>
+    *: "再生画面のアートワーク"
+  </dest>
+  <voice>
+    *: "再生画面のアートワーク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ALBUM
+  desc: in Theme settings, now-playing artwork option: the album cover
+  user: core
+  <source>
+    *: "Album Art"
+  </source>
+  <dest>
+    *: "アルバムアート"
+  </dest>
+  <voice>
+    *: "アルバムアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_ARTIST
+  desc: in Theme settings, now-playing artwork option: the artist portrait
+  user: core
+  <source>
+    *: "Artist Art"
+  </source>
+  <dest>
+    *: "アーティスト画像"
+  </dest>
+  <voice>
+    *: "アーティスト画像"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WPS_ART_AUTO
+  desc: in Theme settings, now-playing artwork option: chosen by how the playlist was started
+  user: core
+  <source>
+    *: "Auto"
+  </source>
+  <dest>
+    *: "自動"
+  </dest>
+  <voice>
+    *: "自動"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ALBUMS
+  desc: album chart: most played albums
+  user: core
+  <source>
+    *: "Most played albums"
+  </source>
+  <dest>
+    *: "よく聴くアルバム"
+  </dest>
+  <voice>
+    *: "よく聴くアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ALBUMS
+  desc: album chart: most recently played albums
+  user: core
+  <source>
+    *: "Recently played albums"
+  </source>
+  <dest>
+    *: "最近聴いたアルバム"
+  </dest>
+  <voice>
+    *: "最近聴いたアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ALBUMS
+  desc: album chart: played once but not for a long time
+  user: core
+  <source>
+    *: "Forgotten albums"
+  </source>
+  <dest>
+    *: "忘れていたアルバム"
+  </dest>
+  <voice>
+    *: "忘れていたアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_ALBUM
+  desc: in the Music menu, play a random album
+  user: core
+  <source>
+    *: "Random Album"
+  </source>
+  <dest>
+    *: "ランダムアルバム"
+  </dest>
+  <voice>
+    *: "ランダムアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH
+  desc: the Search row, and the title of every search box
+  user: core
+  <source>
+    *: "Search"
+  </source>
+  <dest>
+    *: "検索"
+  </dest>
+  <voice>
+    *: "検索"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_ALBUM_HISTORY
+  desc: shown when no album has been played yet
+  user: core
+  <source>
+    *: "No listening history yet"
+  </source>
+  <dest>
+    *: "まだ再生履歴がありません"
+  </dest>
+  <voice>
+    *: "まだ再生履歴がありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OUT_OF_MEMORY
+  desc: shown when a screen could not claim the memory it needs
+  user: core
+  <source>
+    *: "Not enough memory"
+  </source>
+  <dest>
+    *: "メモリが足りません"
+  </dest>
+  <voice>
+    *: "メモリが足りません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RUNTIMEDB_OFF_PROMPT
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ALBUMS
+  desc: in Art cache settings, albums with no cover art found
+  user: core
+  <source>
+    *: "Missing Album Artwork"
+  </source>
+  <dest>
+    *: "ジャケットのないアルバム"
+  </dest>
+  <voice>
+    *: "ジャケットのないアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_ARTISTS
+  desc: in Art cache settings, artists with no portrait found
+  user: core
+  <source>
+    *: "Missing Artist Portraits"
+  </source>
+  <dest>
+    *: "写真のないアーティスト"
+  </dest>
+  <voice>
+    *: "写真のないアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_HEALTH_NONE
+  desc: no missing-artwork list to show yet
+  user: core
+  <source>
+    *: "Nothing missing, or no scan yet"
+  </source>
+  <dest>
+    *: "不足なし、または未スキャン"
+  </dest>
+  <voice>
+    *: "不足なし、または未スキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOST_PLAYED_ARTISTS
+  desc: chart: artists with the most plays
+  user: core
+  <source>
+    *: "Most played artists"
+  </source>
+  <dest>
+    *: "よく聴くアーティスト"
+  </dest>
+  <voice>
+    *: "よく聴くアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RECENTLY_PLAYED_ARTISTS
+  desc: chart: most recently played artists
+  user: core
+  <source>
+    *: "Recently played artists"
+  </source>
+  <dest>
+    *: "最近聴いたアーティスト"
+  </dest>
+  <voice>
+    *: "最近聴いたアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FORGOTTEN_ARTISTS
+  desc: chart: artists played least, never-played included
+  user: core
+  <source>
+    *: "Forgotten artists"
+  </source>
+  <dest>
+    *: "忘れていたアーティスト"
+  </dest>
+  <voice>
+    *: "忘れていたアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY
+  desc: in Carousel settings, artist portraits ordering
+  user: core
+  <source>
+    *: "Sort Artists By"
+  </source>
+  <dest>
+    *: "アーティストの並べ替え"
+  </dest>
+  <voice>
+    *: "アーティストの並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DOCUMENTS
+  desc: main menu, every document on the player in one list
+  user: core
+  <source>
+    *: "Documents"
+  </source>
+  <dest>
+    *: "ドキュメント"
+  </dest>
+  <voice>
+    *: "ドキュメント"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGES
+  desc: main menu, every image on the player in one list
+  user: core
+  <source>
+    *: "Images"
+  </source>
+  <dest>
+    *: "画像"
+  </dest>
+  <voice>
+    *: "画像"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FLAT_LIST_EMPTY
+  desc: no documents or images have been found yet
+  user: core
+  <source>
+    *: "Nothing found, or no scan yet"
+  </source>
+  <dest>
+    *: "見つからないか、未スキャン"
+  </dest>
+  <voice>
+    *: "見つからないか、未スキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_FILE_INDEX
+  desc: in File View settings, rescan for documents and images
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "ドキュメントと画像を再スキャン"
+  </dest>
+  <voice>
+    *: "ドキュメントと画像を再スキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BACKGROUND
+  desc: in Carousel settings, which theme colour fills the screen behind the
+  user: core
+  <source>
+    *: "Background"
+  </source>
+  <dest>
+    *: "背景"
+  </dest>
+  <voice>
+    *: "背景"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS
+  desc: WPS context menu and hotkey, opens the synchronised lyrics screen
+  user: core
+  <source>
+    *: "Lyrics"
+  </source>
+  <dest>
+    *: "歌詞"
+  </dest>
+  <voice>
+    *: "歌詞"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NONE
+  desc: lyric viewer, no lyrics file or SYLT tag was found for the track
+  user: core
+  <source>
+    *: "No lyrics"
+  </source>
+  <dest>
+    *: "歌詞がありません"
+  </dest>
+  <voice>
+    *: "歌詞がありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_WAITING
+  desc: lyric viewer, shown while nothing is playing or the track's metadata
+  user: core
+  <source>
+    *: "Waiting for track..."
+  </source>
+  <dest>
+    *: "曲を待っています..."
+  </dest>
+  <voice>
+    *: "曲を待っています"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_MENU
+  desc: lyric viewer settings menu title
+  user: core
+  <source>
+    *: "Lyrics Viewer"
+  </source>
+  <dest>
+    *: "歌詞ビューア"
+  </dest>
+  <voice>
+    *: "歌詞ビューア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_CENTRE
+  desc: lyric viewer alignment, centred
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "中央"
+  </dest>
+  <voice>
+    *: "中央"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ALIGN
+  desc: lyric viewer, horizontal alignment of the lines
+  user: core
+  <source>
+    *: "Alignment"
+  </source>
+  <dest>
+    *: "配置"
+  </dest>
+  <voice>
+    *: "配置"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_PREV_OPACITY
+  desc: lyric viewer, how visible the line above is
+  user: core
+  <source>
+    *: "Previous Line"
+  </source>
+  <dest>
+    *: "前の行"
+  </dest>
+  <voice>
+    *: "前の行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_NEXT_OPACITY
+  desc: lyric viewer, how visible the line below is
+  user: core
+  <source>
+    *: "Next Line"
+  </source>
+  <dest>
+    *: "次の行"
+  </dest>
+  <voice>
+    *: "次の行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM
+  desc: lyric viewer, speed of the slide between lines
+  user: core
+  <source>
+    *: "Animation"
+  </source>
+  <dest>
+    *: "アニメーション"
+  </dest>
+  <voice>
+    *: "アニメーション"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_FAST
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "速い"
+  </dest>
+  <voice>
+    *: "速い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_NORMAL
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Normal"
+  </source>
+  <dest>
+    *: "標準"
+  </dest>
+  <voice>
+    *: "標準"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_ANIM_SLOW
+  desc: lyric viewer animation speed
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "遅い"
+  </dest>
+  <voice>
+    *: "遅い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_HIGHLIGHT
+  desc: lyric viewer, light words as they are sung
+  user: core
+  <source>
+    *: "Highlight Sung Words"
+  </source>
+  <dest>
+    *: "歌っている部分を強調"
+  </dest>
+  <voice>
+    *: "歌っている部分を強調"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_BACKLIGHT
+  desc: lyric viewer, keep the screen lit while open
+  user: core
+  <source>
+    *: "Keep Backlight On"
+  </source>
+  <dest>
+    *: "バックライトを常時点灯"
+  </dest>
+  <voice>
+    *: "バックライトを常時点灯"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LYRICS_FONT_DEFAULT
+  desc: lyric viewer, revert font override to the UI font
+  user: core
+  <source>
+    *: "Use UI Font"
+  </source>
+  <dest>
+    *: "UIフォントを使用"
+  </dest>
+  <voice>
+    *: "UIフォントを使用"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE
+  desc: in Manage Settings, chooses the basic or the full settings tree
+  user: core
+  <source>
+    *: "Settings Mode"
+  </source>
+  <dest>
+    *: "設定モード"
+  </dest>
+  <voice>
+    *: "設定モード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_BASIC
+  desc: Settings Mode option: the short settings page
+  user: core
+  <source>
+    *: "Basic"
+  </source>
+  <dest>
+    *: "基本"
+  </dest>
+  <voice>
+    *: "基本"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_ADVANCED
+  desc: Settings Mode option, and the entry that opens the full settings tree
+  user: core
+  <source>
+    *: "Advanced"
+  </source>
+  <dest>
+    *: "詳細"
+  </dest>
+  <voice>
+    *: "詳細"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_SETTINGS_MENU
+  desc: in UI Settings, the group holding the parts a theme is built from
+  user: core
+  <source>
+    *: "Theme Settings"
+  </source>
+  <dest>
+    *: "テーマ設定"
+  </dest>
+  <voice>
+    *: "テーマ設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOGS_MENU
+  desc: in Edit Theme, the modal dialog chrome group
+  user: core
+  <source>
+    *: "Dialogs"
+  </source>
+  <dest>
+    *: "ダイアログ"
+  </dest>
+  <voice>
+    *: "ダイアログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_COLORS
+  desc: dialog settings, whether the nine colours below are used
+  user: core
+  <source>
+    *: "Dialog Colour Mode"
+  </source>
+  <dest>
+    *: "ダイアログのカラーモード"
+  </dest>
+  <voice>
+    *: "ダイアログのカラーモード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER_WIDTH
+  desc: dialog settings, width of the box border
+  user: core
+  <source>
+    *: "Box Border Width"
+  </source>
+  <dest>
+    *: "枠線の太さ"
+  </dest>
+  <voice>
+    *: "枠線の太さ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_MARGIN
+  desc: dialog settings, inset of the box from the screen edge
+  user: core
+  <source>
+    *: "Box Margin"
+  </source>
+  <dest>
+    *: "枠の余白"
+  </dest>
+  <voice>
+    *: "枠の余白"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW
+  desc: dialog settings, how far the drop shadow is offset
+  user: core
+  <source>
+    *: "Box Shadow"
+  </source>
+  <dest>
+    *: "枠の影"
+  </dest>
+  <voice>
+    *: "枠の影"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_SHADOW_COLOR
+  desc: dialog settings, colour of the drop shadow
+  user: core
+  <source>
+    *: "Box Shadow Colour"
+  </source>
+  <dest>
+    *: "影の色"
+  </dest>
+  <voice>
+    *: "影の色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_WIDTH
+  desc: dialog settings, width of a button border
+  user: core
+  <source>
+    *: "Button Border Width"
+  </source>
+  <dest>
+    *: "ボタン枠線の太さ"
+  </dest>
+  <voice>
+    *: "ボタン枠線の太さ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_RADIUS
+  desc: dialog settings, corner radius of a button
+  user: core
+  <source>
+    *: "Button Corner Radius"
+  </source>
+  <dest>
+    *: "ボタンの角の丸み"
+  </dest>
+  <voice>
+    *: "ボタンの角の丸み"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_FG
+  desc: dialog colour, box text
+  user: core
+  <source>
+    *: "Box Text"
+  </source>
+  <dest>
+    *: "枠の文字"
+  </dest>
+  <voice>
+    *: "枠の文字"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BG
+  desc: dialog colour, box background
+  user: core
+  <source>
+    *: "Box Background"
+  </source>
+  <dest>
+    *: "枠の背景"
+  </dest>
+  <voice>
+    *: "枠の背景"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BOX_BORDER
+  desc: dialog colour, box border
+  user: core
+  <source>
+    *: "Box Border"
+  </source>
+  <dest>
+    *: "枠線"
+  </dest>
+  <voice>
+    *: "枠線"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG
+  desc: dialog colour, button text
+  user: core
+  <source>
+    *: "Button Text"
+  </source>
+  <dest>
+    *: "ボタンの文字"
+  </dest>
+  <voice>
+    *: "ボタンの文字"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG
+  desc: dialog colour, button background
+  user: core
+  <source>
+    *: "Button Background"
+  </source>
+  <dest>
+    *: "ボタンの背景"
+  </dest>
+  <voice>
+    *: "ボタンの背景"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER
+  desc: dialog colour, button border
+  user: core
+  <source>
+    *: "Button Border"
+  </source>
+  <dest>
+    *: "ボタンの枠線"
+  </dest>
+  <voice>
+    *: "ボタンの枠線"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_FG_SEL
+  desc: dialog colour, selected button text
+  user: core
+  <source>
+    *: "Selected Button Text"
+  </source>
+  <dest>
+    *: "選択ボタンの文字"
+  </dest>
+  <voice>
+    *: "選択ボタンの文字"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BG_SEL
+  desc: dialog colour, selected button background
+  user: core
+  <source>
+    *: "Selected Button Background"
+  </source>
+  <dest>
+    *: "選択ボタンの背景"
+  </dest>
+  <voice>
+    *: "選択ボタンの背景"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_BTN_BORDER_SEL
+  desc: dialog colour, selected button border
+  user: core
+  <source>
+    *: "Selected Button Border"
+  </source>
+  <dest>
+    *: "選択ボタンの枠線"
+  </dest>
+  <voice>
+    *: "選択ボタンの枠線"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHORTCUTS_INSTEAD
+  desc: Quick Screen option: the long press opens the shortcuts menu instead
+  user: core
+  <source>
+    *: "Shortcuts instead"
+  </source>
+  <dest>
+    *: "代わりにショートカット"
+  </dest>
+  <voice>
+    *: "代わりにショートカット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ON_ALBUM_SELECT
+  desc: Carousel option: what selecting an album does
+  user: core
+  <source>
+    *: "On Album Select"
+  </source>
+  <dest>
+    *: "アルバム選択時"
+  </dest>
+  <voice>
+    *: "アルバム選択時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_TRACKS
+  desc: Carousel "On Album Select" option: open the album's track list
+  user: core
+  <source>
+    *: "Show tracks"
+  </source>
+  <dest>
+    *: "トラックを表示"
+  </dest>
+  <voice>
+    *: "トラックを表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAY_ALBUM
+  desc: Carousel "On Album Select" option: play the album straight away
+  user: core
+  <source>
+    *: "Play album"
+  </source>
+  <dest>
+    *: "アルバムを再生"
+  </dest>
+  <voice>
+    *: "アルバムを再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_ASC
+  desc: "Sort Albums By" option: release year, oldest first
+  user: core
+  <source>
+    *: "Year (oldest first)"
+  </source>
+  <dest>
+    *: "年 (古い順)"
+  </dest>
+  <voice>
+    *: "年、古い順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_BY_YEAR_DESC
+  desc: "Sort Albums By" option: release year, newest first
+  user: core
+  <source>
+    *: "Year (newest first)"
+  </source>
+  <dest>
+    *: "年 (新しい順)"
+  </dest>
+  <voice>
+    *: "年、新しい順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_MENU_SETTINGS
+  desc: General Settings > Music: opens the screen that turns Music menu rows on and off
+  user: core
+  <source>
+    *: "Edit Music Menu"
+  </source>
+  <dest>
+    *: "音楽メニューの編集"
+  </dest>
+  <voice>
+    *: "音楽メニューの編集"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MAX_ROWS
+  desc: General Settings > Search: how many results the search keeps
+  user: core
+  <source>
+    *: "Maximum Results"
+  </source>
+  <dest>
+    *: "最大件数"
+  </dest>
+  <voice>
+    *: "最大件数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_MIN_LETTERS
+  desc: General Settings > Search: how many letters must be typed before searching
+  user: core
+  <source>
+    *: "Minimum Letters"
+  </source>
+  <dest>
+    *: "最小文字数"
+  </dest>
+  <voice>
+    *: "最小文字数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER
+  desc: General Settings > Search: which kind of result is listed first
+  user: core
+  <source>
+    *: "Result Order"
+  </source>
+  <dest>
+    *: "結果の順序"
+  </dest>
+  <voice>
+    *: "結果の順序"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ALBUM_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Albums, Artists"
+  </source>
+  <dest>
+    *: "トラック、アルバム、アーティスト"
+  </dest>
+  <voice>
+    *: "トラック、アルバム、アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_TRACK_ARTIST_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Tracks, Artists, Albums"
+  </source>
+  <dest>
+    *: "トラック、アーティスト、アルバム"
+  </dest>
+  <voice>
+    *: "トラック、アーティスト、アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_TRACK_ARTIST
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Tracks, Artists"
+  </source>
+  <dest>
+    *: "アルバム、トラック、アーティスト"
+  </dest>
+  <voice>
+    *: "アルバム、トラック、アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ALBUM_ARTIST_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Albums, Artists, Tracks"
+  </source>
+  <dest>
+    *: "アルバム、アーティスト、トラック"
+  </dest>
+  <voice>
+    *: "アルバム、アーティスト、トラック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_ALBUM_TRACK
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Albums, Tracks"
+  </source>
+  <dest>
+    *: "アーティスト、アルバム、トラック"
+  </dest>
+  <voice>
+    *: "アーティスト、アルバム、トラック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_SEARCH_ORDER_ARTIST_TRACK_ALBUM
+  desc: Search "Result Order" option
+  user: core
+  <source>
+    *: "Artists, Tracks, Albums"
+  </source>
+  <dest>
+    *: "アーティスト、トラック、アルバム"
+  </dest>
+  <voice>
+    *: "アーティスト、トラック、アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_ARTISTS
+  desc: General Settings > Music: browse by the guests credited in track tags
+  user: core
+  <source>
+    *: "Featured Artists"
+  </source>
+  <dest>
+    *: "参加アーティスト"
+  </dest>
+  <voice>
+    *: "参加アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRIM_TITLES
+  desc: General Settings > Music: drop "(feat. X)", "(Deluxe Edition)" and the
+  user: core
+  <source>
+    *: "Trim Titles"
+  </source>
+  <dest>
+    *: "タイトルを短縮"
+  </dest>
+  <voice>
+    *: "タイトルを短縮"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FEATURED_IN
+  desc: "[Featured In]" entry on an artist's album list in the tag browser
+  user: core
+  <source>
+    *: "[Featured In]"
+  </source>
+  <dest>
+    *: "[参加作品]"
+  </dest>
+  <voice>
+    *: "参加作品"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPLYING_THEME
+  desc: boot screen caption while the theme's skins are being loaded
+  user: core
+  <source>
+    *: "Applying theme..."
+  </source>
+  <dest>
+    *: "テーマを適用中..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BAND
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter %d"
+  </source>
+  <dest>
+    *: "フィルタ %d"
+  </dest>
+  <voice>
+    *: "フィルタ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FILTER_TYPE
+  desc: in the equalizer settings menu
+  user: core
+  <source>
+    *: "Filter Type"
+  </source>
+  <dest>
+    *: "フィルタの種類"
+  </dest>
+  <voice>
+    *: "フィルタの種類"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN
+  desc: root menu item for the playback-log statistics screen
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "再生レポート"
+  </dest>
+  <voice>
+    *: "再生レポート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_LOG
+  desc: the Playback Report found no playback log to read
+  user: core
+  <source>
+    *: "No listening history yet. Turn on Settings > Playback > Logging."
+  </source>
+  <dest>
+    *: "まだ再生履歴がありません。設定 > 再生設定 > ログ をオンにしてください。"
+  </dest>
+  <voice>
+    *: "まだ再生履歴がありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_MEMORY
+  desc: the Playback Report could not get enough working memory for the log
+  user: core
+  <source>
+    *: "Not enough memory to read the log"
+  </source>
+  <dest>
+    *: "ログを読むためのメモリが足りません"
+  </dest>
+  <voice>
+    *: "メモリが足りません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOT_IN_LIBRARY
+  desc: the Playback Report could not find the artist, album or song a card names
+  user: core
+  <source>
+    *: "Not in your library under that name"
+  </source>
+  <dest>
+    *: "その名前ではライブラリにありません"
+  </dest>
+  <voice>
+    *: "ライブラリにありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_CARD
+  desc: Playback Report menu item, saves a picture of the card on screen
+  user: core
+  <source>
+    *: "Save Current Card"
+  </source>
+  <dest>
+    *: "このカードを保存"
+  </dest>
+  <voice>
+    *: "このカードを保存"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SAVE_ALL
+  desc: Playback Report menu item, saves a picture of every card
+  user: core
+  <source>
+    *: "Save All Cards"
+  </source>
+  <dest>
+    *: "すべてのカードを保存"
+  </dest>
+  <voice>
+    *: "すべてのカードを保存"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_CHANGED
+  desc: title of the screen listing every setting that differs from its default
+  user: core
+  <source>
+    *: "Changed Settings"
+  </source>
+  <dest>
+    *: "変更した設定"
+  </dest>
+  <voice>
+    *: "変更した設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_ALL_DEFAULT
+  desc: splash when no setting differs from its default
+  user: core
+  <source>
+    *: "Nothing changed from defaults"
+  </source>
+  <dest>
+    *: "初期設定から変更なし"
+  </dest>
+  <voice>
+    *: "初期設定から変更なし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_FORGET_TWEAKS
+  desc: discard the appearance changes made by hand under the current theme
+  user: core
+  <source>
+    *: "Forget My Changes"
+  </source>
+  <dest>
+    *: "自分の変更を破棄"
+  </dest>
+  <voice>
+    *: "自分の変更を破棄"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THEME_NO_TWEAKS
+  desc: splash when the current theme has no hand-made changes to forget
+  user: core
+  <source>
+    *: "No changes to forget"
+  </source>
+  <dest>
+    *: "破棄する変更はありません"
+  </dest>
+  <voice>
+    *: "破棄する変更はありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY
+  desc: settings branch: the file browser, the music browser and the database
+  user: core
+  <source>
+    *: "Library"
+  </source>
+  <dest>
+    *: "ライブラリ"
+  </dest>
+  <voice>
+    *: "ライブラリ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_APPEARANCE
+  desc: settings branch: themes, fonts, colours and how the screens look
+  user: core
+  <source>
+    *: "Appearance"
+  </source>
+  <dest>
+    *: "外観"
+  </dest>
+  <voice>
+    *: "外観"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BATTERY_POWER
+  desc: settings branch: backlight, brightness, sleep and disk power
+  user: core
+  <source>
+    *: "Battery & Power"
+  </source>
+  <dest>
+    *: "バッテリーと電源"
+  </dest>
+  <voice>
+    *: "バッテリーと電源"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_VIEWERS
+  desc: settings submenu: the text and lyrics viewers
+  user: core
+  <source>
+    *: "Viewers"
+  </source>
+  <dest>
+    *: "ビューア"
+  </dest>
+  <voice>
+    *: "ビューア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB
+  desc: settings submenu: what the player does when plugged into a host
+  user: core
+  <source>
+    *: "USB"
+  </source>
+  <dest>
+    *: "~USB"
+  </dest>
+  <voice>
+    *: "USB"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORIES
+  desc: settings submenu: the dock connector's serial, power and line-out pins
+  user: core
+  <source>
+    *: "Accessories"
+  </source>
+  <dest>
+    *: "アクセサリ"
+  </dest>
+  <voice>
+    *: "アクセサリ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LANGUAGE_AND_TEXT
+  desc: settings submenu: language, voice and the default codepage
+  user: core
+  <source>
+    *: "Language & Text"
+  </source>
+  <dest>
+    *: "言語とテキスト"
+  </dest>
+  <voice>
+    *: "言語とテキスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_MAINTENANCE
+  desc: settings submenu gathering every rebuild and update action
+  user: core
+  <source>
+    *: "Maintenance"
+  </source>
+  <dest>
+    *: "メンテナンス"
+  </dest>
+  <voice>
+    *: "メンテナンス"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_DB
+  desc: maintenance action, find newly added tracks
+  user: core
+  <source>
+    *: "Update Database"
+  </source>
+  <dest>
+    *: "データベースを更新"
+  </dest>
+  <voice>
+    *: "データベースを更新"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_DB
+  desc: maintenance action, rebuild the database from scratch
+  user: core
+  <source>
+    *: "Rebuild Database"
+  </source>
+  <dest>
+    *: "データベースを再構築"
+  </dest>
+  <voice>
+    *: "データベースを再構築"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESCAN_FILES
+  desc: maintenance action, rebuild the flat Documents and Images lists
+  user: core
+  <source>
+    *: "Rescan Documents & Images"
+  </source>
+  <dest>
+    *: "ドキュメントと画像を再スキャン"
+  </dest>
+  <voice>
+    *: "ドキュメントと画像を再スキャン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MAINT_STARTED
+  desc: splash after a maintenance action is queued to the background
+  user: core
+  <source>
+    *: "Started in the background"
+  </source>
+  <dest>
+    *: "バックグラウンドで開始しました"
+  </dest>
+  <voice>
+    *: "バックグラウンドで開始しました"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT
+  desc: maintenance action, discard the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuild Playback Report"
+  </source>
+  <dest>
+    *: "再生レポートを再構築"
+  </dest>
+  <voice>
+    *: "再生レポートを再構築"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_REPORT_SPLASH
+  desc: splash after clearing the Playback Report's saved figures
+  user: core
+  <source>
+    *: "Rebuilds next time it opens"
+  </source>
+  <dest>
+    *: "次に開くときに再構築します"
+  </dest>
+  <voice>
+    *: "次に開くときに再構築します"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_STANDARD
+  desc: settings mode showing everything except the advanced rows
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "標準"
+  </dest>
+  <voice>
+    *: "標準"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SETTINGS_MODE_EVERYTHING
+  desc: settings mode showing every row including the advanced ones
+  user: core
+  <source>
+    *: "Everything"
+  </source>
+  <dest>
+    *: "すべて"
+  </dest>
+  <voice>
+    *: "すべて"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EXPLAIN
+  desc: setting context menu entry, shows what the setting does
+  user: core
+  <source>
+    *: "Explain"
+  </source>
+  <dest>
+    *: "説明"
+  </dest>
+  <voice>
+    *: "説明"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NO_EXPLANATION
+  desc: splash when a setting has no explanation written for it
+  user: core
+  <source>
+    *: "No explanation for this one"
+  </source>
+  <dest>
+    *: "この項目の説明はありません"
+  </dest>
+  <voice>
+    *: "この項目の説明はありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKINS
+  desc: Appearance submenu holding the while-playing skin, base skin and backdrop
+  user: core
+  <source>
+    *: "Skins"
+  </source>
+  <dest>
+    *: "スキン"
+  </dest>
+  <voice>
+    *: "スキン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ELEMENTS
+  desc: Appearance submenu holding which pieces of chrome are drawn
+  user: core
+  <source>
+    *: "Interface Elements"
+  </source>
+  <dest>
+    *: "インターフェース要素"
+  </dest>
+  <voice>
+    *: "インターフェース要素"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RESET_CONTEXT_ITEMS
+  desc: clears the four while-playing context menu slots
+  user: core
+  <source>
+    *: "Reset Context Menu"
+  </source>
+  <dest>
+    *: "コンテキストメニューをリセット"
+  </dest>
+  <voice>
+    *: "コンテキストメニューをリセット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALL_ALBUMS
+  desc: album sort context: the Albums list with nothing above it
+  user: core
+  <source>
+    *: "All Albums"
+  </source>
+  <dest>
+    *: "すべてのアルバム"
+  </dest>
+  <voice>
+    *: "すべてのアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_OTHER_LISTS
+  desc: album sort context: every album list with no row of its own
+  user: core
+  <source>
+    *: "Other Lists"
+  </source>
+  <dest>
+    *: "その他のリスト"
+  </dest>
+  <voice>
+    *: "その他のリスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_USE_DEFAULT
+  desc: album sort choice: follow the Other Lists order
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "既定"
+  </dest>
+  <voice>
+    *: "既定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IV_ZOOM_PAN
+  desc: in the image viewer settings menu
+  user: core
+  <source>
+    *: "Zoom / Pan"
+  </source>
+  <dest>
+    *: "ズーム/パン"
+  </dest>
+  <voice>
+    *: "ズームとパン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ABOUT
+  desc: in the System menu, opens the About page
+  user: core
+  <source>
+    *: "About"
+  </source>
+  <dest>
+    *: "バージョン情報"
+  </dest>
+  <voice>
+    *: "バージョン情報"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE
+  desc: title of the Spike menu, on held Menu in the game
+  user: core
+  <source>
+    *: "Spike"
+  </source>
+  <dest>
+    *: "~Spike"
+  </dest>
+  <voice>
+    *: "~Spike"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_PLAY
+  desc: in the context menus, starts the game
+  user: core
+  <source>
+    *: "Play with Spike"
+  </source>
+  <dest>
+    *: "Spikeで遊ぶ"
+  </dest>
+  <voice>
+    *: "Spikeで遊ぶ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_LEAVE
+  desc: asked when Menu is pressed during a Spike run
+  user: core
+  <source>
+    *: "End this run?"
+  </source>
+  <dest>
+    *: "このプレイを終了しますか?"
+  </dest>
+  <voice>
+    *: "このプレイを終了しますか?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_SCORES
+  desc: in the Spike menu, the table of best scores
+  user: core
+  <source>
+    *: "High Scores"
+  </source>
+  <dest>
+    *: "ハイスコア"
+  </dest>
+  <voice>
+    *: "ハイスコア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_OFFSET
+  desc: in the Spike menu, the output delay the game is judged against
+  user: core
+  <source>
+    *: "Audio Offset"
+  </source>
+  <dest>
+    *: "音声オフセット"
+  </dest>
+  <voice>
+    *: "音声オフセット"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION
+  desc: in the Spike menu, whether the track is named under the field
+  user: core
+  <source>
+    *: "Now Playing"
+  </source>
+  <dest>
+    *: "再生中の曲"
+  </dest>
+  <voice>
+    *: "再生中の曲"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_TITLE
+  desc: in the Spike menu, the caption shows the title alone
+  user: core
+  <source>
+    *: "Title"
+  </source>
+  <dest>
+    *: "曲名"
+  </dest>
+  <voice>
+    *: "曲名"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_BOTH
+  desc: in the Spike menu, the caption shows the title and the artist
+  user: core
+  <source>
+    *: "Title and Artist"
+  </source>
+  <dest>
+    *: "曲名とアーティスト"
+  </dest>
+  <voice>
+    *: "曲名とアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_CAPTION_SCROLL
+  desc: in the Spike menu, whether the track name travels or is cropped
+  user: core
+  <source>
+    *: "Scroll Now Playing"
+  </source>
+  <dest>
+    *: "曲名をスクロール"
+  </dest>
+  <voice>
+    *: "曲名をスクロール"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO
+  desc: in the Spike menu, half or double the detected tempo
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "テンポ"
+  </dest>
+  <voice>
+    *: "テンポ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HALF
+  desc: the Tempo option, half the detected tempo
+  user: core
+  <source>
+    *: "Half"
+  </source>
+  <dest>
+    *: "半分"
+  </dest>
+  <voice>
+    *: "半分"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_DOUBLE
+  desc: the Tempo option, double the detected tempo
+  user: core
+  <source>
+    *: "Double"
+  </source>
+  <dest>
+    *: "2倍"
+  </dest>
+  <voice>
+    *: "2倍"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_TEMPO_HEARD
+  desc: the Tempo option, the tempo as the tracker found it
+  user: core
+  <source>
+    *: "As Heard"
+  </source>
+  <dest>
+    *: "検出どおり"
+  </dest>
+  <voice>
+    *: "検出どおり"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPIKE_INFO
+  desc: in the Spike menu, what the game has to say about itself
+  user: core
+  <source>
+    *: "Spike Info"
+  </source>
+  <dest>
+    *: "Spike情報"
+  </dest>
+  <voice>
+    *: "Spike情報"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_RESUME
+  desc: in the Audiobooks browser, the row that picks a book up where it was left
+  user: core
+  <source>
+    *: "[Resume]"
+  </source>
+  <dest>
+    *: "[続きから]"
+  </dest>
+  <voice>
+    *: "続きから"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ARTWORK
+  desc: in Settings > Library > Viewers > Playback Report, whether cards show album art
+  user: core
+  <source>
+    *: "Artwork"
+  </source>
+  <dest>
+    *: "アートワーク"
+  </dest>
+  <voice>
+    *: "アートワーク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_TOP_COUNT
+  desc: in Settings > Library > Viewers > Playback Report, how many rows a top-ten section shows
+  user: core
+  <source>
+    *: "Top Rows"
+  </source>
+  <dest>
+    *: "ランキングの行数"
+  </dest>
+  <voice>
+    *: "ランキングの行数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_BADGE_ORDER
+  desc: in Settings > Library > Viewers > Playback Report, how achievements are sorted
+  user: core
+  <source>
+    *: "Achievement Order"
+  </source>
+  <dest>
+    *: "実績の並び順"
+  </dest>
+  <voice>
+    *: "実績の並び順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_BY
+  desc: in Settings > Library > Viewers > Playback Report, what the top lists are ordered on
+  user: core
+  <source>
+    *: "Ranked By"
+  </source>
+  <dest>
+    *: "ランキングの基準"
+  </dest>
+  <voice>
+    *: "ランキングの基準"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_PLAYS
+  desc: Ranked By option: order the top lists by number of plays
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "再生回数"
+  </dest>
+  <voice>
+    *: "再生回数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_RANK_MINUTES
+  desc: Ranked By option: order the top lists by time listened
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "再生時間"
+  </dest>
+  <voice>
+    *: "再生時間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_TABLE
+  desc: Achievement Order option: the order the achievement table is written in
+  user: core
+  <source>
+    *: "As Listed"
+  </source>
+  <dest>
+    *: "一覧の順"
+  </dest>
+  <voice>
+    *: "一覧の順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_EARNED
+  desc: Achievement Order option: the ones already won come first
+  user: core
+  <source>
+    *: "Earned First"
+  </source>
+  <dest>
+    *: "獲得済みを先に"
+  </dest>
+  <voice>
+    *: "獲得済みを先に"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_RECENT
+  desc: Achievement Order option: most recently won first
+  user: core
+  <source>
+    *: "Newest First"
+  </source>
+  <dest>
+    *: "新しい順"
+  </dest>
+  <voice>
+    *: "新しい順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPUN_ORDER_CLOSEST
+  desc: Achievement Order option: the ones nearest to being won first
+  user: core
+  <source>
+    *: "Closest First"
+  </source>
+  <dest>
+    *: "達成間近を先に"
+  </dest>
+  <voice>
+    *: "達成間近を先に"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REMOTE_TRACK_SKIP
+  desc: in the accessories settings menu
+  user: core
+  <source>
+    *: none
+    mikey_remote: "Remote Track Skip"
+  </source>
+  <dest>
+    *: none
+    mikey_remote: "リモコンでスキップ"
+  </dest>
+  <voice>
+    *: none
+    mikey_remote: "リモコンでスキップ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS
+  desc: context menu row on an album or artist: how much of it has been heard
+  user: core
+  <source>
+    *: "Listening Progress"
+  </source>
+  <dest>
+    *: "聴いた割合"
+  </dest>
+  <voice>
+    *: "聴いた割合"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_SUMMARY
+  desc: top row of the Listening Progress screen: percent, played, total
+  user: core
+  <source>
+    *: "%d%% - %d of %d tracks"
+  </source>
+  <dest>
+    *: "%d%% - %d / %d 曲"
+  </dest>
+  <voice>
+    *: "聴いた割合"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LISTEN_PROGRESS_ALBUM
+  desc: album row on the Listening Progress screen: name, percent, tracks unheard
+  user: core
+  <source>
+    *: "%s - %d%% (%d left)"
+  </source>
+  <dest>
+    *: "%s - %d%% (残り %d)"
+  </dest>
+  <voice>
+    *: "アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX
+  desc: in the context menus, plays tracks that sound like the selected one
+  user: core
+  <source>
+    *: "Play Similar"
+  </source>
+  <dest>
+    *: "似た曲を再生"
+  </dest>
+  <voice>
+    *: "似た曲を再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NONE
+  desc: shown when nothing in the library sounds near enough to build a mix
+  user: core
+  <source>
+    *: "Nothing similar found"
+  </source>
+  <dest>
+    *: "似た曲が見つかりません"
+  </dest>
+  <voice>
+    *: "似た曲が見つかりません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_INDEX
+  desc: Play Similar, when there is no analysis index to read
+  user: core
+  <source>
+    *: "The library has not been analysed"
+  </source>
+  <dest>
+    *: "ライブラリが未解析です"
+  </dest>
+  <voice>
+    *: "ライブラリが未解析です"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_RECORD
+  desc: Play Similar, when the index holds nothing for the selected track
+  user: core
+  <source>
+    *: "This track has not been analysed"
+  </source>
+  <dest>
+    *: "この曲は未解析です"
+  </dest>
+  <voice>
+    *: "この曲は未解析です"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_FAILED
+  desc: Play Similar, when tracks were chosen but the playlist could not be built
+  user: core
+  <source>
+    *: "Could not build the playlist"
+  </source>
+  <dest>
+    *: "プレイリストを作成できません"
+  </dest>
+  <voice>
+    *: "プレイリストを作成できません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MIX_NO_TRACK
+  desc: Play Similar, when the selected row could not be resolved to a file
+  user: core
+  <source>
+    *: "Could not identify the track"
+  </source>
+  <dest>
+    *: "曲を特定できません"
+  </dest>
+  <voice>
+    *: "曲を特定できません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYLIST_ENGINE
+  desc: in Library, switches the sound analysis and the playlists built from it on
+  user: core
+  <source>
+    *: "Playlist Engine"
+  </source>
+  <dest>
+    *: "プレイリストエンジン"
+  </dest>
+  <voice>
+    *: "プレイリストエンジン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_PLAYLIST
+  desc: in Library - Playlist Engine, how a playlist built from a track is chosen
+  user: core
+  <source>
+    *: "Track Playlist"
+  </source>
+  <dest>
+    *: "曲からのプレイリスト"
+  </dest>
+  <voice>
+    *: "曲からのプレイリスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_PREDICTABLE
+  desc: variation option: the same list until the library changes
+  user: core
+  <source>
+    *: "Predictable"
+  </source>
+  <dest>
+    *: "固定"
+  </dest>
+  <voice>
+    *: "固定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_VARIABLE
+  desc: variation option: a different list every run, from the same neighbourhood
+  user: core
+  <source>
+    *: "Variable"
+  </source>
+  <dest>
+    *: "毎回変える"
+  </dest>
+  <voice>
+    *: "毎回変える"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_UPDATE_SOUND
+  desc: in Library - Maintenance, measures tracks the analysis has not covered
+  user: core
+  <source>
+    *: "Update Sound Analysis"
+  </source>
+  <dest>
+    *: "サウンド解析を更新"
+  </dest>
+  <voice>
+    *: "サウンド解析を更新"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBUILD_SOUND
+  desc: in Library - Maintenance, measures the whole library again
+  user: core
+  <source>
+    *: "Rebuild Sound Analysis"
+  </source>
+  <dest>
+    *: "サウンド解析をやり直す"
+  </dest>
+  <voice>
+    *: "サウンド解析をやり直す"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_WEEKLY
+  desc: variation option: the same list for a week, then a new one
+  user: core
+  <source>
+    *: "Weekly"
+  </source>
+  <dest>
+    *: "毎週"
+  </dest>
+  <voice>
+    *: "毎週"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_DEPTH
+  desc: in Library - Playlist Engine, how much of each track the analysis listens to
+  user: core
+  <source>
+    *: "Analysis Depth"
+  </source>
+  <dest>
+    *: "解析の深さ"
+  </dest>
+  <voice>
+    *: "解析の深さ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_THOROUGH
+  desc: Analysis Depth option: listen to the whole window
+  user: core
+  <source>
+    *: "Thorough"
+  </source>
+  <dest>
+    *: "念入り"
+  </dest>
+  <voice>
+    *: "念入り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ANALYSIS_QUICK
+  desc: Analysis Depth option: stop once the tempo has settled
+  user: core
+  <source>
+    *: "Quick"
+  </source>
+  <dest>
+    *: "高速"
+  </dest>
+  <voice>
+    *: "高速"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOODS
+  desc: row on the Playlists screen: playlists built from a mood
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "ムード"
+  </dest>
+  <voice>
+    *: "ムード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEYS
+  desc: row on the Playlists screen: playlists that travel between two moods
+  user: core
+  <source>
+    *: "Journeys"
+  </source>
+  <dest>
+    *: "ムードの旅"
+  </dest>
+  <voice>
+    *: "ムードの旅"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN
+  desc: on a track context menu, builds a playlist that gets calmer and plays it
+  user: core
+  <source>
+    *: "Wind Down"
+  </source>
+  <dest>
+    *: "クールダウン"
+  </dest>
+  <voice>
+    *: "クールダウン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PLAYLIST
+  desc: in Library - Playlist Engine, how much a mood or journey varies between runs
+  user: core
+  <source>
+    *: "Mood Playlist"
+  </source>
+  <dest>
+    *: "ムードプレイリスト"
+  </dest>
+  <voice>
+    *: "ムードプレイリスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_CALM
+  desc: mood name: quiet, sparse and unhurried
+  user: core
+  <source>
+    *: "Calm"
+  </source>
+  <dest>
+    *: "穏やか"
+  </dest>
+  <voice>
+    *: "穏やか"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_ENERGETIC
+  desc: mood name: loud, busy and driving
+  user: core
+  <source>
+    *: "Energetic"
+  </source>
+  <dest>
+    *: "エネルギッシュ"
+  </dest>
+  <voice>
+    *: "エネルギッシュ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DARK
+  desc: mood name: minor, little treble, weighted low
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "ダーク"
+  </dest>
+  <voice>
+    *: "ダーク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_BRIGHT
+  desc: mood name: major, treble-forward and clear
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "明るい"
+  </dest>
+  <voice>
+    *: "明るい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_WARM
+  desc: mood name: mid and low heavy, treble pulled back
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "温かい"
+  </dest>
+  <voice>
+    *: "温かい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_RAW
+  desc: mood name: unpolished, narrow and transient-heavy
+  user: core
+  <source>
+    *: "Raw"
+  </source>
+  <dest>
+    *: "荒削り"
+  </dest>
+  <voice>
+    *: "荒削り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_LUSH
+  desc: mood name: wide, clear and harmonically rich
+  user: core
+  <source>
+    *: "Lush"
+  </source>
+  <dest>
+    *: "豊か"
+  </dest>
+  <voice>
+    *: "豊か"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_PUNCHY
+  desc: mood name: strong transients and wide dynamics
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "力強い"
+  </dest>
+  <voice>
+    *: "力強い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SMOOTH
+  desc: mood name: few transients, little harmonic movement
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "なめらか"
+  </dest>
+  <voice>
+    *: "なめらか"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SPARSE
+  desc: mood name: few events, dynamic
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "簡素"
+  </dest>
+  <voice>
+    *: "簡素"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_DENSE
+  desc: mood name: many events, compressed
+  user: core
+  <source>
+    *: "Dense"
+  </source>
+  <dest>
+    *: "濃密"
+  </dest>
+  <voice>
+    *: "濃密"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_HYPNOTIC
+  desc: mood name: steady tempo, little harmonic movement
+  user: core
+  <source>
+    *: "Hypnotic"
+  </source>
+  <dest>
+    *: "催眠的"
+  </dest>
+  <voice>
+    *: "催眠的"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_SLOW
+  desc: mood name: slow, where the tempo is trusted
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "スロー"
+  </dest>
+  <voice>
+    *: "スロー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_FAST
+  desc: mood name: fast, where the tempo is trusted
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "アップテンポ"
+  </dest>
+  <voice>
+    *: "アップテンポ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_MELANCHOLY
+  desc: mood name: minor, slow and quiet
+  user: core
+  <source>
+    *: "Melancholy"
+  </source>
+  <dest>
+    *: "物悲しい"
+  </dest>
+  <voice>
+    *: "物悲しい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MOOD_UPLIFTING
+  desc: mood name: major, fast and bright
+  user: core
+  <source>
+    *: "Uplifting"
+  </source>
+  <dest>
+    *: "高揚感"
+  </dest>
+  <voice>
+    *: "高揚感"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_CALM_ENERGETIC
+  desc: journey name
+  user: core
+  <source>
+    *: "Calm to Energetic"
+  </source>
+  <dest>
+    *: "穏やか→エネルギッシュ"
+  </dest>
+  <voice>
+    *: "穏やかからエネルギッシュへ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_DARK_BRIGHT
+  desc: journey name
+  user: core
+  <source>
+    *: "Dark to Bright"
+  </source>
+  <dest>
+    *: "ダーク→明るい"
+  </dest>
+  <voice>
+    *: "ダークから明るいへ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SPARSE_DENSE
+  desc: journey name
+  user: core
+  <source>
+    *: "Sparse to Dense"
+  </source>
+  <dest>
+    *: "簡素→濃密"
+  </dest>
+  <voice>
+    *: "簡素から濃密へ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_SLOW_FAST
+  desc: journey name
+  user: core
+  <source>
+    *: "Slow to Fast"
+  </source>
+  <dest>
+    *: "スロー→アップテンポ"
+  </dest>
+  <voice>
+    *: "スローからアップテンポへ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_JOURNEY_MELANCHOLY_UPLIFTING
+  desc: journey name
+  user: core
+  <source>
+    *: "Melancholy to Uplifting"
+  </source>
+  <dest>
+    *: "物悲しい→高揚感"
+  </dest>
+  <voice>
+    *: "物悲しさから高揚感へ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_LENGTH
+  desc: in Library - Playlist Engine, how many tracks a generated playlist holds
+  user: core
+  <source>
+    *: "Playlist Length"
+  </source>
+  <dest>
+    *: "プレイリストの長さ"
+  </dest>
+  <voice>
+    *: "プレイリストの長さ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTINUE_PLAYING
+  desc: in Library - Playlist Engine, keep playing after a playlist runs out
+  user: core
+  <source>
+    *: "Continue Playing"
+  </source>
+  <dest>
+    *: "再生を続ける"
+  </dest>
+  <voice>
+    *: "再生を続ける"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PROPERTIES
+  desc: in Track Info, the row opening the sound read-out, and its screen title
+  user: core
+  <source>
+    *: "Sound"
+  </source>
+  <dest>
+    *: "サウンド"
+  </dest>
+  <voice>
+    *: "サウンド"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOODS
+  desc: sound read-out: the moods this track would be offered by
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "ムード"
+  </dest>
+  <voice>
+    *: "ムード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_NEAREST_MOOD
+  desc: sound read-out: shown instead of Moods when no mood is near enough
+  user: core
+  <source>
+    *: "Nearest Mood"
+  </source>
+  <dest>
+    *: "最も近いムード"
+  </dest>
+  <voice>
+    *: "最も近いムード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY
+  desc: sound read-out: how much the track drives
+  user: core
+  <source>
+    *: "Energy"
+  </source>
+  <dest>
+    *: "エネルギー"
+  </dest>
+  <voice>
+    *: "エネルギー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE
+  desc: sound read-out: tempo
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "テンポ"
+  </dest>
+  <voice>
+    *: "テンポ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE
+  desc: sound read-out: the balance between treble, mid and bass
+  user: core
+  <source>
+    *: "Tone"
+  </source>
+  <dest>
+    *: "音色"
+  </dest>
+  <voice>
+    *: "音色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY
+  desc: sound read-out: how much is happening
+  user: core
+  <source>
+    *: "Activity"
+  </source>
+  <dest>
+    *: "音数"
+  </dest>
+  <voice>
+    *: "音数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK
+  desc: sound read-out: how sharply the sound hits
+  user: core
+  <source>
+    *: "Attack"
+  </source>
+  <dest>
+    *: "アタック"
+  </dest>
+  <voice>
+    *: "アタック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE
+  desc: sound read-out: how clearly pitched the sound is
+  user: core
+  <source>
+    *: "Texture"
+  </source>
+  <dest>
+    *: "質感"
+  </dest>
+  <voice>
+    *: "質感"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE
+  desc: sound read-out: stereo width
+  user: core
+  <source>
+    *: "Space"
+  </source>
+  <dest>
+    *: "広がり"
+  </dest>
+  <voice>
+    *: "広がり"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER
+  desc: sound read-out: how compressed the master is
+  user: core
+  <source>
+    *: "Master"
+  </source>
+  <dest>
+    *: "マスタリング"
+  </dest>
+  <voice>
+    *: "マスタリング"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT
+  desc: sound read-out: how much the harmony moves
+  user: core
+  <source>
+    *: "Movement"
+  </source>
+  <dest>
+    *: "和声の動き"
+  </dest>
+  <voice>
+    *: "和声の動き"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY
+  desc: sound read-out: musical key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "キー"
+  </dest>
+  <voice>
+    *: "キー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_BPM
+  desc: sound read-out: beats per minute, after the number
+  user: core
+  <source>
+    *: "BPM"
+  </source>
+  <dest>
+    *: "~BPM"
+  </dest>
+  <voice>
+    *: "~B P M"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_LOW
+  desc: sound read-out, energy: bottom quarter of the library
+  user: core
+  <source>
+    *: "Low"
+  </source>
+  <dest>
+    *: "低い"
+  </dest>
+  <voice>
+    *: "低い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_MODERATE
+  desc: sound read-out, energy: second quarter of the library
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "中くらい"
+  </dest>
+  <voice>
+    *: "中くらい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_HIGH
+  desc: sound read-out, energy: third quarter of the library
+  user: core
+  <source>
+    *: "High"
+  </source>
+  <dest>
+    *: "高い"
+  </dest>
+  <voice>
+    *: "高い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ENERGY_VERY_HIGH
+  desc: sound read-out, energy: top quarter of the library
+  user: core
+  <source>
+    *: "Very high"
+  </source>
+  <dest>
+    *: "とても高い"
+  </dest>
+  <voice>
+    *: "とても高い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_SLOW
+  desc: sound read-out, pace: under 70 BPM
+  user: core
+  <source>
+    *: "Very slow"
+  </source>
+  <dest>
+    *: "とても遅い"
+  </dest>
+  <voice>
+    *: "とても遅い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_SLOW
+  desc: sound read-out, pace: 70 to 89 BPM
+  user: core
+  <source>
+    *: "Slow"
+  </source>
+  <dest>
+    *: "遅い"
+  </dest>
+  <voice>
+    *: "遅い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_RELAXED
+  desc: sound read-out, pace: 90 to 109 BPM
+  user: core
+  <source>
+    *: "Relaxed"
+  </source>
+  <dest>
+    *: "ゆったり"
+  </dest>
+  <voice>
+    *: "ゆったり"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_MODERATE
+  desc: sound read-out, pace: 110 to 129 BPM
+  user: core
+  <source>
+    *: "Moderate"
+  </source>
+  <dest>
+    *: "中くらい"
+  </dest>
+  <voice>
+    *: "中くらい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_BRISK
+  desc: sound read-out, pace: 130 to 149 BPM
+  user: core
+  <source>
+    *: "Brisk"
+  </source>
+  <dest>
+    *: "軽快"
+  </dest>
+  <voice>
+    *: "軽快"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_FAST
+  desc: sound read-out, pace: 150 to 169 BPM
+  user: core
+  <source>
+    *: "Fast"
+  </source>
+  <dest>
+    *: "速い"
+  </dest>
+  <voice>
+    *: "速い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_VERY_FAST
+  desc: sound read-out, pace: 170 BPM and over
+  user: core
+  <source>
+    *: "Very fast"
+  </source>
+  <dest>
+    *: "とても速い"
+  </dest>
+  <voice>
+    *: "とても速い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_UNSTEADY
+  desc: sound read-out, pace: follows the tempo where it is not trusted
+  user: core
+  <source>
+    *: "unsteady"
+  </source>
+  <dest>
+    *: "不安定"
+  </dest>
+  <voice>
+    *: "不安定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_PACE_NONE
+  desc: sound read-out, pace: the analysis found no beat at all
+  user: core
+  <source>
+    *: "No steady beat"
+  </source>
+  <dest>
+    *: "一定のビートなし"
+  </dest>
+  <voice>
+    *: "一定のビートなし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_DARK
+  desc: sound read-out, tone: much less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Dark"
+  </source>
+  <dest>
+    *: "暗い"
+  </dest>
+  <voice>
+    *: "暗い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_WARM
+  desc: sound read-out, tone: less treble than the loudness predicts
+  user: core
+  <source>
+    *: "Warm"
+  </source>
+  <dest>
+    *: "温かい"
+  </dest>
+  <voice>
+    *: "温かい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BALANCED
+  desc: sound read-out, tone: treble about where the loudness predicts
+  user: core
+  <source>
+    *: "Balanced"
+  </source>
+  <dest>
+    *: "バランス型"
+  </dest>
+  <voice>
+    *: "バランス型"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BRIGHT
+  desc: sound read-out, tone: more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Bright"
+  </source>
+  <dest>
+    *: "明るい"
+  </dest>
+  <voice>
+    *: "明るい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_VERY_BRIGHT
+  desc: sound read-out, tone: much more treble than the loudness predicts
+  user: core
+  <source>
+    *: "Very bright"
+  </source>
+  <dest>
+    *: "とても明るい"
+  </dest>
+  <voice>
+    *: "とても明るい"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_BASS_LED
+  desc: sound read-out, tone: appended where the low band leads
+  user: core
+  <source>
+    *: "bass-forward"
+  </source>
+  <dest>
+    *: "低音寄り"
+  </dest>
+  <voice>
+    *: "低音寄り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TONE_MID_LED
+  desc: sound read-out, tone: appended where the middle band leads
+  user: core
+  <source>
+    *: "mid-forward"
+  </source>
+  <dest>
+    *: "中音寄り"
+  </dest>
+  <voice>
+    *: "中音寄り"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_SPARSE
+  desc: sound read-out, activity: few onsets
+  user: core
+  <source>
+    *: "Sparse"
+  </source>
+  <dest>
+    *: "少ない"
+  </dest>
+  <voice>
+    *: "少ない"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_OPEN
+  desc: sound read-out, activity: below average onsets
+  user: core
+  <source>
+    *: "Open"
+  </source>
+  <dest>
+    *: "やや少ない"
+  </dest>
+  <voice>
+    *: "やや少ない"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_BUSY
+  desc: sound read-out, activity: above average onsets
+  user: core
+  <source>
+    *: "Busy"
+  </source>
+  <dest>
+    *: "やや多い"
+  </dest>
+  <voice>
+    *: "やや多い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ACTIVITY_VERY_BUSY
+  desc: sound read-out, activity: many onsets
+  user: core
+  <source>
+    *: "Very busy"
+  </source>
+  <dest>
+    *: "とても多い"
+  </dest>
+  <voice>
+    *: "とても多い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_SMOOTH
+  desc: sound read-out, attack: very little transient
+  user: core
+  <source>
+    *: "Smooth"
+  </source>
+  <dest>
+    *: "なめらか"
+  </dest>
+  <voice>
+    *: "なめらか"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_EVEN
+  desc: sound read-out, attack: below average transient
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "均一"
+  </dest>
+  <voice>
+    *: "均一"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_PUNCHY
+  desc: sound read-out, attack: above average transient
+  user: core
+  <source>
+    *: "Punchy"
+  </source>
+  <dest>
+    *: "鋭い"
+  </dest>
+  <voice>
+    *: "鋭い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ATTACK_VERY_PUNCHY
+  desc: sound read-out, attack: sharp transient
+  user: core
+  <source>
+    *: "Very punchy"
+  </source>
+  <dest>
+    *: "とても鋭い"
+  </dest>
+  <voice>
+    *: "とても鋭い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_NOISY
+  desc: sound read-out, texture: little clear pitch
+  user: core
+  <source>
+    *: "Noisy"
+  </source>
+  <dest>
+    *: "ノイジー"
+  </dest>
+  <voice>
+    *: "ノイジー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_BLENDED
+  desc: sound read-out, texture: below average pitch clarity
+  user: core
+  <source>
+    *: "Blended"
+  </source>
+  <dest>
+    *: "溶け合う"
+  </dest>
+  <voice>
+    *: "溶け合う"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_CLEAR
+  desc: sound read-out, texture: above average pitch clarity
+  user: core
+  <source>
+    *: "Clear"
+  </source>
+  <dest>
+    *: "クリア"
+  </dest>
+  <voice>
+    *: "クリア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_TEXTURE_VERY_CLEAR
+  desc: sound read-out, texture: strongly pitched
+  user: core
+  <source>
+    *: "Very clear"
+  </source>
+  <dest>
+    *: "とてもクリア"
+  </dest>
+  <voice>
+    *: "とてもクリア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_MONO
+  desc: sound read-out, space: almost no stereo difference
+  user: core
+  <source>
+    *: "Almost mono"
+  </source>
+  <dest>
+    *: "ほぼモノラル"
+  </dest>
+  <voice>
+    *: "ほぼモノラル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_NARROW
+  desc: sound read-out, space: below average stereo width
+  user: core
+  <source>
+    *: "Narrow"
+  </source>
+  <dest>
+    *: "狭い"
+  </dest>
+  <voice>
+    *: "狭い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_WIDE
+  desc: sound read-out, space: above average stereo width
+  user: core
+  <source>
+    *: "Wide"
+  </source>
+  <dest>
+    *: "広い"
+  </dest>
+  <voice>
+    *: "広い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_SPACE_VERY_WIDE
+  desc: sound read-out, space: very wide stereo
+  user: core
+  <source>
+    *: "Very wide"
+  </source>
+  <dest>
+    *: "とても広い"
+  </dest>
+  <voice>
+    *: "とても広い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_DYNAMIC
+  desc: sound read-out, master: a large gap between peak and average
+  user: core
+  <source>
+    *: "Very dynamic"
+  </source>
+  <dest>
+    *: "とてもダイナミック"
+  </dest>
+  <voice>
+    *: "とてもダイナミック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_DYNAMIC
+  desc: sound read-out, master: an above average gap between peak and average
+  user: core
+  <source>
+    *: "Dynamic"
+  </source>
+  <dest>
+    *: "ダイナミック"
+  </dest>
+  <voice>
+    *: "ダイナミック"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_EVEN
+  desc: sound read-out, master: an average gap between peak and average
+  user: core
+  <source>
+    *: "Even"
+  </source>
+  <dest>
+    *: "標準的"
+  </dest>
+  <voice>
+    *: "標準的"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_COMPRESSED
+  desc: sound read-out, master: a small gap between peak and average
+  user: core
+  <source>
+    *: "Compressed"
+  </source>
+  <dest>
+    *: "圧縮気味"
+  </dest>
+  <voice>
+    *: "圧縮気味"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MASTER_VERY_COMPRESSED
+  desc: sound read-out, master: almost no gap between peak and average
+  user: core
+  <source>
+    *: "Very compressed"
+  </source>
+  <dest>
+    *: "強く圧縮"
+  </dest>
+  <voice>
+    *: "強く圧縮"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_STATIC
+  desc: sound read-out, movement: the harmony barely moves
+  user: core
+  <source>
+    *: "Static"
+  </source>
+  <dest>
+    *: "静的"
+  </dest>
+  <voice>
+    *: "静的"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_GENTLE
+  desc: sound read-out, movement: the harmony moves a little
+  user: core
+  <source>
+    *: "Gentle"
+  </source>
+  <dest>
+    *: "穏やか"
+  </dest>
+  <voice>
+    *: "穏やか"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_SHIFTING
+  desc: sound read-out, movement: the harmony moves often
+  user: core
+  <source>
+    *: "Shifting"
+  </source>
+  <dest>
+    *: "変化あり"
+  </dest>
+  <voice>
+    *: "変化あり"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_MOVEMENT_RESTLESS
+  desc: sound read-out, movement: the harmony moves constantly
+  user: core
+  <source>
+    *: "Restless"
+  </source>
+  <dest>
+    *: "絶えず変化"
+  </dest>
+  <voice>
+    *: "絶えず変化"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MAJOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "major"
+  </source>
+  <dest>
+    *: "メジャー"
+  </dest>
+  <voice>
+    *: "メジャー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_MINOR
+  desc: sound read-out, key: follows the note name
+  user: core
+  <source>
+    *: "minor"
+  </source>
+  <dest>
+    *: "マイナー"
+  </dest>
+  <voice>
+    *: "マイナー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_KEY_UNCLEAR
+  desc: sound read-out, key: the pitch content did not commit to one
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "不明瞭"
+  </dest>
+  <voice>
+    *: "不明瞭"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIBRARY
+  desc: on the Playlist Engine menu, the row opening the library read-out, and its screen title
+  user: core
+  <source>
+    *: "Library Sound"
+  </source>
+  <dest>
+    *: "ライブラリのサウンド"
+  </dest>
+  <voice>
+    *: "ライブラリのサウンド"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MEASURED
+  desc: library read-out: tracks the analysis has measured, of the tracks there are
+  user: core
+  <source>
+    *: "Measured"
+  </source>
+  <dest>
+    *: "解析済み"
+  </dest>
+  <voice>
+    *: "解析済み"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNREADABLE
+  desc: library read-out: tracks the analysis reached but could not decode
+  user: core
+  <source>
+    *: "Unreadable"
+  </source>
+  <dest>
+    *: "読み込み不可"
+  </dest>
+  <voice>
+    *: "読み込み不可"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_TEMPO
+  desc: library read-out: measured tracks whose tempo the engine trusts
+  user: core
+  <source>
+    *: "Tempo"
+  </source>
+  <dest>
+    *: "テンポ"
+  </dest>
+  <voice>
+    *: "テンポ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEY
+  desc: library read-out: measured tracks that settled on a key
+  user: core
+  <source>
+    *: "Key"
+  </source>
+  <dest>
+    *: "キー"
+  </dest>
+  <voice>
+    *: "キー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_COMPARED
+  desc: library read-out: which music the per-track sound words are measured against
+  user: core
+  <source>
+    *: "Compared To"
+  </source>
+  <dest>
+    *: "比較対象"
+  </dest>
+  <voice>
+    *: "比較対象"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OWN
+  desc: library read-out, Compared To: the words are this library's own percentiles
+  user: core
+  <source>
+    *: "Your library"
+  </source>
+  <dest>
+    *: "あなたのライブラリ"
+  </dest>
+  <voice>
+    *: "あなたのライブラリ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_SHIPPED
+  desc: library read-out, Compared To: too few measured tracks, so the built-in numbers stand
+  user: core
+  <source>
+    *: "Built-in defaults"
+  </source>
+  <dest>
+    *: "内蔵の既定値"
+  </dest>
+  <voice>
+    *: "内蔵の既定値"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_OVERVIEW
+  desc: Library Sound menu: the counts of what has been measured
+  user: core
+  <source>
+    *: "Overview"
+  </source>
+  <dest>
+    *: "概要"
+  </dest>
+  <voice>
+    *: "概要"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_MOODS
+  desc: Library Sound menu: how many tracks each mood playlist can draw on
+  user: core
+  <source>
+    *: "Moods"
+  </source>
+  <dest>
+    *: "ムード"
+  </dest>
+  <voice>
+    *: "ムード"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_PACE
+  desc: Library Sound menu: how many tracks fall in each tempo band
+  user: core
+  <source>
+    *: "Pace"
+  </source>
+  <dest>
+    *: "テンポ"
+  </dest>
+  <voice>
+    *: "テンポ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_KEYS
+  desc: Library Sound menu: how many tracks are in each musical key
+  user: core
+  <source>
+    *: "Keys"
+  </source>
+  <dest>
+    *: "キー"
+  </dest>
+  <voice>
+    *: "キー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_DECADES
+  desc: Library Sound menu: the average loudness of the tracks from each decade
+  user: core
+  <source>
+    *: "Loudness by Decade"
+  </source>
+  <dest>
+    *: "年代別の音量"
+  </dest>
+  <voice>
+    *: "年代別の音量"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_MOOD
+  desc: Library Sound, Moods: tracks that no mood playlist would offer
+  user: core
+  <source>
+    *: "In no mood"
+  </source>
+  <dest>
+    *: "ムードなし"
+  </dest>
+  <voice>
+    *: "ムードなし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_UNCLEAR
+  desc: Library Sound, Pace and Keys: tracks with no tempo or no key the engine trusts
+  user: core
+  <source>
+    *: "Unclear"
+  </source>
+  <dest>
+    *: "不明瞭"
+  </dest>
+  <voice>
+    *: "不明瞭"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_LIB_NO_YEAR
+  desc: Library Sound, Loudness by Decade: tracks with no year in their tags
+  user: core
+  <source>
+    *: "No year"
+  </source>
+  <dest>
+    *: "年なし"
+  </dest>
+  <voice>
+    *: "年なし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER
+  desc: in the playlist viewer's context menu, puts the playlist in an order where neighbouring tracks sound alike
+  user: core
+  <source>
+    *: "Order by Sound"
+  </source>
+  <dest>
+    *: "サウンド順に並べ替え"
+  </dest>
+  <voice>
+    *: "サウンド順に並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_LONG
+  desc: Order by Sound: the playlist holds more tracks than one pass can order
+  user: core
+  <source>
+    *: "Too many tracks to order"
+  </source>
+  <dest>
+    *: "曲が多すぎて並べ替えできません"
+  </dest>
+  <voice>
+    *: "曲が多すぎて並べ替えできません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_SOME
+  desc: Order by Sound: done, but this many tracks had no measurement and went to the end
+  user: core
+  <source>
+    *: "Ordered. %d not measured"
+  </source>
+  <dest>
+    *: "並べ替え完了。未解析 %d 曲"
+  </dest>
+  <voice>
+    *: "並べ替えました"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_NONE
+  desc: Order by Sound: none of the playlist's tracks has been measured
+  user: core
+  <source>
+    *: "None of these tracks has been analysed"
+  </source>
+  <dest>
+    *: "どの曲も未解析です"
+  </dest>
+  <voice>
+    *: "どの曲も未解析です"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_REORDER_FAILED
+  desc: Order by Sound: the playlist could not be put in the new order
+  user: core
+  <source>
+    *: "Could not reorder the playlist"
+  </source>
+  <dest>
+    *: "プレイリストを並べ替えできません"
+  </dest>
+  <voice>
+    *: "プレイリストを並べ替えできません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM
+  desc: on a folder's context menu, the row opening the sound read-out for the whole folder, and its screen title
+  user: core
+  <source>
+    *: "Album Sound"
+  </source>
+  <dest>
+    *: "アルバムのサウンド"
+  </dest>
+  <voice>
+    *: "アルバムのサウンド"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SOUND_ALBUM_NONE
+  desc: Album Sound: nothing in this folder has been measured yet
+  user: core
+  <source>
+    *: "Nothing here has been analysed"
+  </source>
+  <dest>
+    *: "ここには解析済みの曲がありません"
+  </dest>
+  <voice>
+    *: "ここには解析済みの曲がありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_IN_PROGRESS
+  desc: Audiobooks menu: the books started and not finished
+  user: core
+  <source>
+    *: "In progress"
+  </source>
+  <dest>
+    *: "途中"
+  </dest>
+  <voice>
+    *: "途中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_NOT_STARTED
+  desc: Audiobooks menu: the books nothing of which has been played
+  user: core
+  <source>
+    *: "Not started"
+  </source>
+  <dest>
+    *: "未再生"
+  </dest>
+  <voice>
+    *: "未再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOKS_FINISHED
+  desc: Audiobooks menu: the books played through to the end
+  user: core
+  <source>
+    *: "Finished"
+  </source>
+  <dest>
+    *: "完了"
+  </dest>
+  <voice>
+    *: "完了"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW
+  desc: a row of the Audiobooks In progress list: book name, percent heard
+  user: core
+  <source>
+    *: "%s - %d%%"
+  </source>
+  <dest>
+    *: "~%s - %d%%"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_EMPTY
+  desc: splash when an Audiobooks In progress, Not started or Finished list is empty
+  user: core
+  <source>
+    *: "No books here"
+  </source>
+  <dest>
+    *: "ここに本はありません"
+  </dest>
+  <voice>
+    *: "ここに本はありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MUSIC_QUIZ
+  desc: main menu: the Music Quiz, a name-that-track game
+  user: core
+  <source>
+    *: "Music Quiz"
+  </source>
+  <dest>
+    *: "音楽クイズ"
+  </dest>
+  <voice>
+    *: "音楽クイズ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_STOP_PLAYBACK
+  desc: Music Quiz: asked before stopping what is playing
+  user: core
+  <source>
+    *: "Stop playback?"
+  </source>
+  <dest>
+    *: "再生を停止しますか?"
+  </dest>
+  <voice>
+    *: "再生を停止しますか?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE
+  desc: Music Quiz: asked on Menu during a round
+  user: core
+  <source>
+    *: "Leave the quiz?"
+  </source>
+  <dest>
+    *: "クイズをやめますか?"
+  </dest>
+  <voice>
+    *: "クイズをやめますか?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TOO_FEW
+  desc: Music Quiz: the library has too few tracks to make ten rounds
+  user: core
+  <source>
+    *: "Not enough music for a quiz"
+  </source>
+  <dest>
+    *: "クイズには曲が足りません"
+  </dest>
+  <voice>
+    *: "クイズには曲が足りません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_BEST
+  desc: Music Quiz: the best score so far, under a result that did not beat it
+  user: core
+  <source>
+    *: "Best %d"
+  </source>
+  <dest>
+    *: "ベスト %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_NEW_BEST
+  desc: Music Quiz result: the score beats the best so far
+  user: core
+  <source>
+    *: "New best"
+  </source>
+  <dest>
+    *: "ベスト更新"
+  </dest>
+  <voice>
+    *: "ベスト更新"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LISTENING
+  desc: Music Quiz: before the clip can be heard; nothing drains yet
+  user: core
+  <source>
+    *: "Listening..."
+  </source>
+  <dest>
+    *: "準備中..."
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_RIGHT
+  desc: Music Quiz: the title picked was the track's
+  user: core
+  <source>
+    *: "Right"
+  </source>
+  <dest>
+    *: "正解"
+  </dest>
+  <voice>
+    *: "正解"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_WRONG
+  desc: Music Quiz: the title picked was not the track's
+  user: core
+  <source>
+    *: "Not that one"
+  </source>
+  <dest>
+    *: "不正解"
+  </dest>
+  <voice>
+    *: "不正解"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_TIMES_UP
+  desc: Music Quiz: the round ran out before a title was picked
+  user: core
+  <source>
+    *: "Time's up"
+  </source>
+  <dest>
+    *: "時間切れ"
+  </dest>
+  <voice>
+    *: "時間切れ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED
+  desc: Music Quiz: the round is paused
+  user: core
+  <source>
+    *: "Paused"
+  </source>
+  <dest>
+    *: "一時停止中"
+  </dest>
+  <voice>
+    *: "一時停止中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PAUSED_HINT
+  desc: Music Quiz: under Paused, how to carry on
+  user: core
+  <source>
+    *: "Press Play to resume"
+  </source>
+  <dest>
+    *: "再生ボタンで再開"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_OUT_OF
+  desc: Music Quiz result: beside the score, the most it could have been
+  user: core
+  <source>
+    *: "of %d"
+  </source>
+  <dest>
+    *: "/ %d"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_EASIER
+  desc: Music Quiz result: under the first round's tile
+  user: core
+  <source>
+    *: "easier"
+  </source>
+  <dest>
+    *: "やさしい"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_HARDER
+  desc: Music Quiz result: under the last round's tile
+  user: core
+  <source>
+    *: "harder"
+  </source>
+  <dest>
+    *: "むずかしい"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_SELECT
+  desc: Music Quiz result: the name of the key that plays again
+  user: core
+  <source>
+    *: "Select"
+  </source>
+  <dest>
+    *: "中央"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_PLAY_AGAIN
+  desc: Music Quiz result: what the Select key does
+  user: core
+  <source>
+    *: "play again"
+  </source>
+  <dest>
+    *: "もう一度"
+  </dest>
+  <voice>
+    *: "もう一度遊ぶ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KEY_MENU
+  desc: Music Quiz result: the name of the key that leaves
+  user: core
+  <source>
+    *: "Menu"
+  </source>
+  <dest>
+    *: "メニュー"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_LEAVE_HINT
+  desc: Music Quiz result: what the Menu key does
+  user: core
+  <source>
+    *: "leave"
+  </source>
+  <dest>
+    *: "終了"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ
+  desc: Music menu: the row that starts the Music Quiz
+  user: core
+  <source>
+    *: "Quiz"
+  </source>
+  <dest>
+    *: "クイズ"
+  </dest>
+  <voice>
+    *: "クイズ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_PROGRESS
+  desc: top of the Audiobooks Book list: the books started and not finished
+  user: core
+  <source>
+    *: "[In Progress]"
+  </source>
+  <dest>
+    *: "[途中]"
+  </dest>
+  <voice>
+    *: "途中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_NEW
+  desc: top of the Audiobooks Book list: the books not started
+  user: core
+  <source>
+    *: "[Not Started]"
+  </source>
+  <dest>
+    *: "[未再生]"
+  </dest>
+  <voice>
+    *: "未再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_SHELF_ROW_FINISHED
+  desc: top of the Audiobooks Book list: the books finished
+  user: core
+  <source>
+    *: "[Finished]"
+  </source>
+  <dest>
+    *: "[完了]"
+  </dest>
+  <voice>
+    *: "完了"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OUTPUT
+  desc: in the System > USB menu
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "USB DAC Output"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB DAC出力"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "USB DAC出力"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_ON
+  desc: splash: playback has moved to a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through USB DAC"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB DACで再生中"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "USB DACで再生中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_OFF
+  desc: splash: playback has moved back from a USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Playing through headphones"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "ヘッドホンで再生中"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "ヘッドホンで再生中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_AUTO
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Start Automatically"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "自動で開始"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "自動で開始"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_ON
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn On"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "オンにする"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "オンにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_TURN_OFF
+  desc: in System > USB > USB DAC Output
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "Turn Off"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "オフにする"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "オフにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_USB_DAC_NOT_FOUND
+  desc: splash: Turn On found no USB DAC
+  user: core
+  <source>
+    *: none
+    usb_host_audio: "No USB DAC found"
+  </source>
+  <dest>
+    *: none
+    usb_host_audio: "USB DACが見つかりません"
+  </dest>
+  <voice>
+    *: none
+    usb_host_audio: "USB DACが見つかりません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_PROTOCOL
+  desc: in accessories settings: answer iAP docks and car kits
+  user: core
+  <source>
+    *: "Accessory Protocol"
+  </source>
+  <dest>
+    *: "アクセサリプロトコル"
+  </dest>
+  <voice>
+    *: "アクセサリプロトコル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_BROWSING
+  desc: in accessories settings: how many entries a browsing accessory's lists hold
+  user: core
+  <source>
+    *: "Accessory Browsing"
+  </source>
+  <dest>
+    *: "アクセサリからの閲覧"
+  </dest>
+  <voice>
+    *: "アクセサリからの閲覧"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACCESSORY_CONNECTED
+  desc: splash: an iAP accessory has identified itself
+  user: core
+  <source>
+    *: "Accessory connected"
+  </source>
+  <dest>
+    *: "アクセサリが接続されました"
+  </dest>
+  <voice>
+    *: "アクセサリが接続されました"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES
+  desc: in Music settings: sort artists and albums past a leading The, A or An
+  user: core
+  <source>
+    *: "Sort Ignoring The/A/An"
+  </source>
+  <dest>
+    *: "The/A/Anを無視して並べ替え"
+  </dest>
+  <voice>
+    *: "The/A/Anを無視して並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_FROM_FOLDER
+  desc: in Database settings: take the year from a "YYYY - Album" folder name
+  user: core
+  <source>
+    *: "Year From Folder Name"
+  </source>
+  <dest>
+    *: "フォルダ名から年を取得"
+  </dest>
+  <voice>
+    *: "フォルダ名から年を取得"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MIX_STARTS_WITH_SELECTED
+  desc: in Playlist Engine settings: Play Similar and Wind Down lead with the chosen track
+  user: core
+  <source>
+    *: "Play Selected First"
+  </source>
+  <dest>
+    *: "選択した曲から再生"
+  </dest>
+  <voice>
+    *: "選択した曲から再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_BG_CUSTOM
+  desc: in Carousel settings: Carousel Background choice, a colour of your own
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "カスタム"
+  </dest>
+  <voice>
+    *: "カスタム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_CUSTOM_COLOR
+  desc: in Carousel settings: the colour Carousel Background uses when Custom
+  user: core
+  <source>
+    *: "Custom Colour"
+  </source>
+  <dest>
+    *: "カスタムカラー"
+  </dest>
+  <voice>
+    *: "カスタムカラー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_BACKGROUND
+  desc: in Colours settings: which of the album's two colours is the background
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dynamic Colors Background"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "ダイナミックカラーの背景"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "ダイナミックカラーの背景"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_LIGHT
+  desc: in Colours settings: Dynamic Colors Background choice, the lighter one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Light"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "明るい色"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "明るい色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DYNAMIC_COLORS_DARK
+  desc: in Colours settings: Dynamic Colors Background choice, the darker one
+  user: core
+  <source>
+    *: none
+    lcd_color: "Dark"
+  </source>
+  <dest>
+    *: none
+    lcd_color: "暗い色"
+  </dest>
+  <voice>
+    *: none
+    lcd_color: "暗い色"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_QUESTIONS
+  desc: in Music settings: the Music Quiz's kinds of question
+  user: core
+  <source>
+    *: "Quiz Questions"
+  </source>
+  <dest>
+    *: "クイズの問題"
+  </dest>
+  <voice>
+    *: "クイズの問題"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_TITLE
+  desc: Music Quiz: a round asking for the track's title; also its setting
+  user: core
+  <source>
+    *: "Name the Track"
+  </source>
+  <dest>
+    *: "曲名当て"
+  </dest>
+  <voice>
+    *: "曲名当て"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ARTIST
+  desc: Music Quiz: a round asking for the track's artist; also its setting
+  user: core
+  <source>
+    *: "Name the Artist"
+  </source>
+  <dest>
+    *: "アーティスト当て"
+  </dest>
+  <voice>
+    *: "アーティスト当て"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_ALBUM
+  desc: Music Quiz: a round asking for the track's album; also its setting
+  user: core
+  <source>
+    *: "Name the Album"
+  </source>
+  <dest>
+    *: "アルバム当て"
+  </dest>
+  <voice>
+    *: "アルバム当て"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_KIND_YEAR
+  desc: Music Quiz: a round asking for the track's year; also its setting
+  user: core
+  <source>
+    *: "Name the Year"
+  </source>
+  <dest>
+    *: "年当て"
+  </dest>
+  <voice>
+    *: "年当て"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUIZ_ONE_KIND
+  desc: splash: the last kind of quiz question cannot be turned off
+  user: core
+  <source>
+    *: "One kind of question has to stay on"
+  </source>
+  <dest>
+    *: "問題の種類は1つ以上必要です"
+  </dest>
+  <voice>
+    *: "問題の種類は1つ以上必要です"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAR_ARTWORK
+  desc: in accessories settings: where the cover art sent to a car comes from
+  user: core
+  <source>
+    *: "Accessory Artwork"
+  </source>
+  <dest>
+    *: "アクセサリのアートワーク"
+  </dest>
+  <voice>
+    *: "アクセサリのアートワーク"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_AS_ALBUM_ART
+  desc: in Accessory Artwork: the same sources, in the same order, as Album Art
+  user: core
+  <source>
+    *: "As Album Art"
+  </source>
+  <dest>
+    *: "アルバムアートと同じ"
+  </dest>
+  <voice>
+    *: "アルバムアートと同じ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP2_ACCESSORIES
+  desc: in accessories settings: answering accessories that expect an iPhone (iAP2) over USB
+  user: core
+  <source>
+    *: "Support iPhone Accessories"
+  </source>
+  <dest>
+    *: "iPhoneアクセサリに対応"
+  </dest>
+  <voice>
+    *: "iPhoneアクセサリに対応"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_PLUS_YEAR_DESC
+  desc: "Sort Albums By" option: by artist, then release year, newest first
+  user: core
+  <source>
+    *: "Artist + Year (newest first)"
+  </source>
+  <dest>
+    *: "アーティスト+年 (新しい順)"
+  </dest>
+  <voice>
+    *: "アーティストと年、新しい順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MARK_AS
+  desc: a book's context menu: move a book to In progress, Not started or Finished
+  user: core
+  <source>
+    *: "Mark as..."
+  </source>
+  <dest>
+    *: "状態を設定..."
+  </dest>
+  <voice>
+    *: "状態を設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SCROLLING_ENABLED
+  desc: in the Scrolling menu, off cuts long text to fit with "..." instead of scrolling it
+  user: core
+  <source>
+    *: "Enabled"
+  </source>
+  <dest>
+    *: "有効"
+  </dest>
+  <voice>
+    *: "スクロール有効"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DIALOG_ELEMENTS
+  desc: deprecated
+  user: core
+  <source>
+    *: none
+  </source>
+  <dest>
+    *: none
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_READING_HISTORY
+  desc: Playback Report, progress while the play log is read
+  user: core
+  <source>
+    *: "Reading play history"
+  </source>
+  <dest>
+    *: "再生履歴を読み込み中"
+  </dest>
+  <voice>
+    *: "再生履歴を読み込み中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MOVED_FOLDERS
+  desc: Playback Report, progress while it matches logged files to folders they have moved to
+  user: core
+  <source>
+    *: "Looking for moved folders"
+  </source>
+  <dest>
+    *: "移動したフォルダを検索中"
+  </dest>
+  <voice>
+    *: "移動したフォルダを検索中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_WINDDOWN_DEFAULT
+  desc: Wind Down length choice: the time left on the sleep timer, or Playlist Length with none running
+  user: core
+  <source>
+    *: "Default"
+  </source>
+  <dest>
+    *: "既定"
+  </dest>
+  <voice>
+    *: "既定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_YEAR_IN_ALBUM_LISTS
+  desc: in Library > Music: the release year after each album name in the browser's album lists
+  user: core
+  <source>
+    *: "Show Year in Album Lists"
+  </source>
+  <dest>
+    *: "アルバム一覧に年を表示"
+  </dest>
+  <voice>
+    *: "アルバム一覧に年を表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SKIP_SINGLE_LISTS
+  desc: in Library > Music: a list holding one row opens that row instead
+  user: core
+  <source>
+    *: "Skip One-Item Lists"
+  </source>
+  <dest>
+    *: "1項目のリストを省略"
+  </dest>
+  <voice>
+    *: "1項目のリストを省略"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LENGTH
+  desc: in Carousel settings: how many covers a held PLAY spins past before the random pick
+  user: core
+  <source>
+    *: "Random Spin Length"
+  </source>
+  <dest>
+    *: "ランダム回転の長さ"
+  </dest>
+  <voice>
+    *: "ランダム回転の長さ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_SHORT
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Short"
+  </source>
+  <dest>
+    *: "短い"
+  </dest>
+  <voice>
+    *: "短い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_MEDIUM
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Medium"
+  </source>
+  <dest>
+    *: "普通"
+  </dest>
+  <voice>
+    *: "普通"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_RANDOM_SPIN_LONG
+  desc: Random Spin Length choice
+  user: core
+  <source>
+    *: "Long"
+  </source>
+  <dest>
+    *: "長い"
+  </dest>
+  <voice>
+    *: "長い"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_DISK_ACTIVITY
+  desc: Elements setting: show the disk activity indicator
+  user: core
+  <source>
+    *: "Show Disk Activity"
+  </source>
+  <dest>
+    *: "ディスク動作を表示"
+  </dest>
+  <voice>
+    *: "ディスク動作を表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_BACKGROUND_TASKS
+  desc: Elements setting: show the background tasks indicator
+  user: core
+  <source>
+    *: "Show Background Tasks"
+  </source>
+  <dest>
+    *: "バックグラウンドタスクを表示"
+  </dest>
+  <voice>
+    *: "バックグラウンドタスクを表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_WORKING
+  desc: Elements setting: show the working indicator
+  user: core
+  <source>
+    *: "Show Working"
+  </source>
+  <dest>
+    *: "処理中を表示"
+  </dest>
+  <voice>
+    *: "処理中を表示"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ACTIVITY_INDICATORS
+  desc: Elements submenu holding the three Show indicator settings
+  user: core
+  <source>
+    *: "Activity Indicators"
+  </source>
+  <dest>
+    *: "動作インジケーター"
+  </dest>
+  <voice>
+    *: "動作インジケーター"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_LIBRARY_UPGRADE
+  desc: boot screen caption while the library's files are upgraded to a new layout, the database included
+  user: core
+  <source>
+    *: "Performing maintenance..."
+  </source>
+  <dest>
+    *: "メンテナンス中..."
+  </dest>
+  <voice>
+    *: "メンテナンス中"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TAGCACHE_RAM_REFUSED
+  desc: album screens, when the database is too large to load into memory this session
+  user: core
+  <source>
+    *: "Library too large to hold in memory"
+  </source>
+  <dest>
+    *: "ライブラリが大きすぎてメモリに載りません"
+  </dest>
+  <voice>
+    *: "ライブラリが大きすぎてメモリに載りません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_NOT_FOUND
+  desc: Album Covers, when the album playing is not among the covers
+  user: core
+  <source>
+    *: "Album not found"
+  </source>
+  <dest>
+    *: "アルバムが見つかりません"
+  </dest>
+  <voice>
+    *: "アルバムが見つかりません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_PLACEHOLDER
+  desc: carousel, when the cover shown for an album without art cannot be read
+  user: core
+  <source>
+    *: "Could not load the placeholder cover"
+  </source>
+  <dest>
+    *: "代替ジャケットを読み込めません"
+  </dest>
+  <voice>
+    *: "代替ジャケットを読み込めません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_START
+  desc: carousel, when its drawing thread cannot be started
+  user: core
+  <source>
+    *: "Could not start the carousel"
+  </source>
+  <dest>
+    *: "カルーセルを開始できません"
+  </dest>
+  <voice>
+    *: "カルーセルを開始できません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_DIR
+  desc: carousel, followed by the folder it could not make
+  user: core
+  <source>
+    *: "Could not create directory"
+  </source>
+  <dest>
+    *: "ディレクトリを作成できません"
+  </dest>
+  <voice>
+    *: "ディレクトリを作成できません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_TOO_LARGE
+  desc: carousel, when the library has more albums or artists than it can hold
+  user: core
+  <source>
+    *: "Library too large for this screen"
+  </source>
+  <dest>
+    *: "ライブラリが大きすぎて表示できません"
+  </dest>
+  <voice>
+    *: "ライブラリが大きすぎて表示できません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ALBUMS
+  desc: Album Covers, when the database holds no albums
+  user: core
+  <source>
+    *: "No albums found -- turn the database on"
+  </source>
+  <dest>
+    *: "アルバムがありません -- データベースをオンにしてください"
+  </dest>
+  <voice>
+    *: "アルバムがありません -- データベースをオンにしてください"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CAROUSEL_NO_ARTISTS
+  desc: Artist Portraits, when the database holds no artists
+  user: core
+  <source>
+    *: "No artists found -- turn the database on"
+  </source>
+  <dest>
+    *: "アーティストがありません -- データベースをオンにしてください"
+  </dest>
+  <voice>
+    *: "アーティストがありません -- データベースをオンにしてください"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PRESS_ANY_BUTTON
+  desc: after a carousel error, before it closes
+  user: core
+  <source>
+    *: "press any button to continue"
+  </source>
+  <dest>
+    *: "いずれかのボタンを押してください"
+  </dest>
+  <voice>
+    *: "いずれかのボタンを押してください"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PLAYBACK_REPORT
+  desc: title of the Playback Report
+  user: core
+  <source>
+    *: "Playback Report"
+  </source>
+  <dest>
+    *: "再生レポート"
+  </dest>
+  <voice>
+    *: "再生レポート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_BY_WEEK
+  desc: Playback Report, heading of the calendar of weeks
+  user: core
+  <source>
+    *: "By week"
+  </source>
+  <dest>
+    *: "週ごと"
+  </dest>
+  <voice>
+    *: "週ごと"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NEVER_SKIPPED
+  desc: Playback Report, heading of the tracks never skipped
+  user: core
+  <source>
+    *: "Never skipped"
+  </source>
+  <dest>
+    *: "スキップなし"
+  </dest>
+  <voice>
+    *: "スキップなし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SKIP_EVERYTHING
+  desc: Playback Report, the same heading when every track has been skipped
+  user: core
+  <source>
+    *: "You skip everything?!"
+  </source>
+  <dest>
+    *: "全部スキップ?!"
+  </dest>
+  <voice>
+    *: "全部スキップ?!"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IMAGE_VIEWER
+  desc: title of the Image Viewer menu
+  user: core
+  <source>
+    *: "Image Viewer"
+  </source>
+  <dest>
+    *: "画像ビューア"
+  </dest>
+  <voice>
+    *: "画像ビューア"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NEW
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Newly unlocked"
+  </source>
+  <dest>
+    *: "新たな実績"
+  </dest>
+  <voice>
+    *: "新たな実績"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_NUMBERS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "In numbers"
+  </source>
+  <dest>
+    *: "数字で見る"
+  </dest>
+  <voice>
+    *: "数字で見る"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_WEEKS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Week by week"
+  </source>
+  <dest>
+    *: "週ごとの記録"
+  </dest>
+  <voice>
+    *: "週ごとの記録"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ARTISTS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top artists"
+  </source>
+  <dest>
+    *: "トップアーティスト"
+  </dest>
+  <voice>
+    *: "トップアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SONGS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top songs"
+  </source>
+  <dest>
+    *: "トップソング"
+  </dest>
+  <voice>
+    *: "トップソング"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ALBUMS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Top albums"
+  </source>
+  <dest>
+    *: "トップアルバム"
+  </dest>
+  <voice>
+    *: "トップアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_SKIPS
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "スキップ"
+  </dest>
+  <voice>
+    *: "スキップ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SEC_ACH
+  desc: Playback Report, a section heading
+  user: core
+  <source>
+    *: "Achievements"
+  </source>
+  <dest>
+    *: "実績"
+  </dest>
+  <voice>
+    *: "実績"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_MORNING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Morning"
+  </source>
+  <dest>
+    *: "朝"
+  </dest>
+  <voice>
+    *: "朝"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_AFTERNOON
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Afternoon"
+  </source>
+  <dest>
+    *: "昼"
+  </dest>
+  <voice>
+    *: "昼"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EVENING
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Evening"
+  </source>
+  <dest>
+    *: "夕方"
+  </dest>
+  <voice>
+    *: "夕方"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NIGHT
+  desc: Playback Report, the plays chart for one quarter of the day
+  user: core
+  <source>
+    *: "Night"
+  </source>
+  <dest>
+    *: "夜"
+  </dest>
+  <voice>
+    *: "夜"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_NAME
+  desc: Playback Report, a ranked card whose name was not recorded
+  user: core
+  <source>
+    *: "No name"
+  </source>
+  <dest>
+    *: "名前なし"
+  </dest>
+  <voice>
+    *: "名前なし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NO_PLAYS_YET
+  desc: Playback Report, a ranked card with nothing in it yet
+  user: core
+  <source>
+    *: "No plays yet"
+  </source>
+  <dest>
+    *: "まだ再生なし"
+  </dest>
+  <voice>
+    *: "まだ再生なし"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_NOTHING_YET
+  desc: Playback Report, a card with no figures yet
+  user: core
+  <source>
+    *: "Nothing to show yet"
+  </source>
+  <dest>
+    *: "まだ表示するものがありません"
+  </dest>
+  <voice>
+    *: "まだ表示するものがありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_MINUTES
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Minutes"
+  </source>
+  <dest>
+    *: "分"
+  </dest>
+  <voice>
+    *: "分"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_PLAYS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Plays"
+  </source>
+  <dest>
+    *: "再生回数"
+  </dest>
+  <voice>
+    *: "再生回数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SONGS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Songs"
+  </source>
+  <dest>
+    *: "曲数"
+  </dest>
+  <voice>
+    *: "曲数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_SKIPS
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "Skips"
+  </source>
+  <dest>
+    *: "スキップ"
+  </dest>
+  <voice>
+    *: "スキップ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_FROM
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "From"
+  </source>
+  <dest>
+    *: "開始"
+  </dest>
+  <voice>
+    *: "開始"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_K_TO
+  desc: Playback Report, a label in a card's table
+  user: core
+  <source>
+    *: "To"
+  </source>
+  <dest>
+    *: "終了"
+  </dest>
+  <voice>
+    *: "終了"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_MINUTES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes"
+  </source>
+  <dest>
+    *: "分"
+  </dest>
+  <voice>
+    *: "分"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays"
+  </source>
+  <dest>
+    *: "回再生"
+  </dest>
+  <voice>
+    *: "回再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_TRACKS
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "tracks"
+  </source>
+  <dest>
+    *: "曲"
+  </dest>
+  <voice>
+    *: "曲"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays skipped"
+  </source>
+  <dest>
+    *: "回スキップ"
+  </dest>
+  <voice>
+    *: "回スキップ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_PEAK_HOUR
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "peak hour"
+  </source>
+  <dest>
+    *: "ピーク時"
+  </dest>
+  <voice>
+    *: "ピーク時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_AFTER_MIDNIGHT
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "plays after midnight"
+  </source>
+  <dest>
+    *: "深夜の再生"
+  </dest>
+  <voice>
+    *: "深夜の再生"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_WEEKS_WITH_MUSIC
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "weeks with music"
+  </source>
+  <dest>
+    *: "聴いた週"
+  </dest>
+  <voice>
+    *: "聴いた週"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_BEST_DAY
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "minutes on your best day"
+  </source>
+  <dest>
+    *: "最多日の分数"
+  </dest>
+  <voice>
+    *: "最多日の分数"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_DAY_STREAK
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "day streak"
+  </source>
+  <dest>
+    *: "日連続"
+  </dest>
+  <voice>
+    *: "日連続"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_OF_PLAYS_SKIPPED
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "of plays skipped"
+  </source>
+  <dest>
+    *: "スキップ率"
+  </dest>
+  <voice>
+    *: "スキップ率"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_F_NEW_BADGES
+  desc: Playback Report, the words under a card's figure
+  user: core
+  <source>
+    *: "new badges"
+  </source>
+  <dest>
+    *: "新しいバッジ"
+  </dest>
+  <voice>
+    *: "新しいバッジ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ARTIST
+  desc: Playback Report, over the artist a week or year played most
+  user: core
+  <source>
+    *: "Top artist"
+  </source>
+  <dest>
+    *: "1位のアーティスト"
+  </dest>
+  <voice>
+    *: "1位のアーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_SONG
+  desc: Playback Report, over the song a week, artist or album played most
+  user: core
+  <source>
+    *: "Top song"
+  </source>
+  <dest>
+    *: "1位の曲"
+  </dest>
+  <voice>
+    *: "1位の曲"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_TOP_ALBUM
+  desc: Playback Report, over the album an artist played most
+  user: core
+  <source>
+    *: "Top album"
+  </source>
+  <dest>
+    *: "1位のアルバム"
+  </dest>
+  <voice>
+    *: "1位のアルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_FROM
+  desc: Playback Report, before the album a song is from
+  user: core
+  <source>
+    *: "from"
+  </source>
+  <dest>
+    *: "収録"
+  </dest>
+  <voice>
+    *: "収録"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_EARNED
+  desc: Playback Report, before the date a badge was earned
+  user: core
+  <source>
+    *: "Earned:"
+  </source>
+  <dest>
+    *: "獲得日:"
+  </dest>
+  <voice>
+    *: "獲得日"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_QUIET_NIGHTS
+  desc: Playback Report, when nothing was played after midnight
+  user: core
+  <source>
+    *: "Your nights are quiet. Respect."
+  </source>
+  <dest>
+    *: "夜は静か。お見事。"
+  </dest>
+  <voice>
+    *: "夜は静か。お見事。"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_YEAR_IN_NUMBERS
+  desc: Playback Report heading; %s is a year or All time
+  user: core
+  <source>
+    *: "%s in numbers"
+  </source>
+  <dest>
+    *: "数字で見る %s"
+  </dest>
+  <voice>
+    *: "数字で見る"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_ALL_TIME
+  desc: Playback Report, the report over every year
+  user: core
+  <source>
+    *: "All time"
+  </source>
+  <dest>
+    *: "全期間"
+  </dest>
+  <voice>
+    *: "全期間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_PV_SETTINGS
+  desc: Playback Report menu, the row that opens its settings
+  user: core
+  <source>
+    *: "Settings"
+  </source>
+  <dest>
+    *: "設定"
+  </dest>
+  <voice>
+    *: "設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT
+  desc: in accessories settings: the menu of TV output settings
+  user: core
+  <source>
+    *: "TV Out"
+  </source>
+  <dest>
+    *: "TV出力"
+  </dest>
+  <voice>
+    *: "TV出力"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE
+  desc: in the TV Out menu: the screen's size on the TV
+  user: core
+  <source>
+    *: "Size"
+  </source>
+  <dest>
+    *: "サイズ"
+  </dest>
+  <voice>
+    *: "TV出力のサイズ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_1X
+  desc: TV Out Size choice: the screen pixel for pixel
+  user: core
+  <source>
+    *: "1x"
+  </source>
+  <dest>
+    *: "等倍"
+  </dest>
+  <voice>
+    *: "等倍"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_SIZE_2X
+  desc: TV Out Size choice: the screen doubled
+  user: core
+  <source>
+    *: "2x"
+  </source>
+  <dest>
+    *: "2倍"
+  </dest>
+  <voice>
+    *: "2倍"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD
+  desc: in the TV Out menu: the TV's video standard
+  user: core
+  <source>
+    *: "Standard"
+  </source>
+  <dest>
+    *: "方式"
+  </dest>
+  <voice>
+    *: "TVの方式"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_PAL
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "PAL"
+  </source>
+  <dest>
+    *: "~PAL"
+  </dest>
+  <voice>
+    *: "パル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_STANDARD_NTSC
+  desc: TV Standard choice
+  user: core
+  <source>
+    *: "NTSC"
+  </source>
+  <dest>
+    *: "~NTSC"
+  </dest>
+  <voice>
+    *: "~N T S C"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_ON
+  desc: in the TV Out menu: start showing the screen on a TV through the dock
+  user: core
+  <source>
+    *: "Turn On"
+  </source>
+  <dest>
+    *: "オンにする"
+  </dest>
+  <voice>
+    *: "TV出力をオンにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TV_OUT_TURN_OFF
+  desc: in the TV Out menu: stop showing the screen on the TV
+  user: core
+  <source>
+    *: "Turn Off"
+  </source>
+  <dest>
+    *: "オフにする"
+  </dest>
+  <voice>
+    *: "TV出力をオフにする"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ART_ROWS
+  desc: in Appearance > Interface Elements, the submenu holding the database browser's art rows
+  user: core
+  <source>
+    *: "Art Rows"
+  </source>
+  <dest>
+    *: "アート付きの行"
+  </dest>
+  <voice>
+    *: "アート付きの行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHUT_DOWN
+  desc: in System > Startup/Shutdown: switch the player off now
+  user: core
+  <source>
+    *: "Shut Down"
+  </source>
+  <dest>
+    *: "電源を切る"
+  </dest>
+  <voice>
+    *: "電源を切る"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_REBOOT
+  desc: in System > Startup/Shutdown: restart the player now
+  user: core
+  <source>
+    *: "Reboot"
+  </source>
+  <dest>
+    *: "再起動"
+  </dest>
+  <voice>
+    *: "再起動"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DB_AUTHOR_ART
+  desc: in Settings, database browser audiobook author art rows
+  user: core
+  <source>
+    *: "Author Art Rows"
+  </source>
+  <dest>
+    *: "著者行のアート"
+  </dest>
+  <voice>
+    *: "著者行のアート"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SAME_AS_MUSIC
+  desc: in Carousel settings: sort the carousels as the Music lists are sorted
+  user: core
+  <source>
+    *: "Sort Same as Music"
+  </source>
+  <dest>
+    *: "音楽と同じ並び順"
+  </dest>
+  <voice>
+    *: "音楽と同じ並び順"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_BEFORE_NAME
+  desc: in Show Year in Album Lists: the year ahead of the album name
+  user: core
+  <source>
+    *: "Before"
+  </source>
+  <dest>
+    *: "前"
+  </dest>
+  <voice>
+    *: "前"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_YEAR_AFTER_NAME
+  desc: in Show Year in Album Lists: the year after the album name
+  user: core
+  <source>
+    *: "After"
+  </source>
+  <dest>
+    *: "後"
+  </dest>
+  <voice>
+    *: "後"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY
+  desc: in accessories settings: what model an accessory is told the player is
+  user: core
+  <source>
+    *: "Identify As"
+  </source>
+  <dest>
+    *: "名乗る機種"
+  </dest>
+  <voice>
+    *: "名乗る機種"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_OWN
+  desc: in Identify As: the player's own model
+  user: core
+  <source>
+    *: "This Player"
+  </source>
+  <dest>
+    *: "このプレーヤー"
+  </dest>
+  <voice>
+    *: "このプレーヤー"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_CLASSIC
+  desc: in Identify As: an iPod Classic
+  user: core
+  <source>
+    *: "iPod Classic"
+  </source>
+  <dest>
+    *: "~iPod Classic"
+  </dest>
+  <voice>
+    *: "~i Pod Classic"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_IAP_IDENTITY_IPHONE
+  desc: in Identify As: an iPhone 4
+  user: core
+  <source>
+    *: "iPhone 4"
+  </source>
+  <dest>
+    *: "~iPhone 4"
+  </dest>
+  <voice>
+    *: "~i Phone 4"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TAGCACHE
+  desc: in Debug Logs: the database's switch
+  user: core
+  <source>
+    *: "Database Log"
+  </source>
+  <dest>
+    *: "データベースログ"
+  </dest>
+  <voice>
+    *: "データベースログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ARTCACHE
+  desc: in Debug Logs: the art cache's switch
+  user: core
+  <source>
+    *: "Album Art Log"
+  </source>
+  <dest>
+    *: "アルバムアートログ"
+  </dest>
+  <voice>
+    *: "アルバムアートログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_USB
+  desc: in Debug Logs: the USB and accessory log's switch
+  user: core
+  <source>
+    *: "USB and Accessory Log"
+  </source>
+  <dest>
+    *: "USBとアクセサリのログ"
+  </dest>
+  <voice>
+    *: "USBとアクセサリのログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BATTERY
+  desc: in Debug Logs: the battery log's switch
+  user: core
+  <source>
+    *: "Battery Log"
+  </source>
+  <dest>
+    *: "バッテリーログ"
+  </dest>
+  <voice>
+    *: "バッテリーログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRY
+  desc: in Debug Logs: how long logs stay on
+  user: core
+  <source>
+    *: "Switch Off After"
+  </source>
+  <dest>
+    *: "自動オフまでの時間"
+  </dest>
+  <voice>
+    *: "自動オフまでの時間"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_ALL_OFF
+  desc: in Debug Logs: switch every log off
+  user: core
+  <source>
+    *: "Turn All Off"
+  </source>
+  <dest>
+    *: "すべてオフ"
+  </dest>
+  <voice>
+    *: "すべてオフ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_LEFT
+  desc: in Debug Logs: hours and minutes until the logs switch off
+  user: core
+  <source>
+    *: "Switches Off In %d:%02d"
+  </source>
+  <dest>
+    *: "オフまで %d:%02d"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_NONE_ON
+  desc: in Debug Logs: no log is on
+  user: core
+  <source>
+    *: "No Log Is On"
+  </source>
+  <dest>
+    *: "オンのログはありません"
+  </dest>
+  <voice>
+    *: "オンのログはありません"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_STAY_ON
+  desc: in Debug Logs: Switch Off After is Never
+  user: core
+  <source>
+    *: "Logs Stay On"
+  </source>
+  <dest>
+    *: "ログは常にオン"
+  </dest>
+  <voice>
+    *: "ログは常にオン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_FILES
+  desc: in Debug Logs: the size of every log file together
+  user: core
+  <source>
+    *: "Log Files: %s"
+  </source>
+  <dest>
+    *: "ログファイル: %s"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_EXPIRED
+  desc: splash when the debug logs switch themselves off
+  user: core
+  <source>
+    *: "Debug logs switched off"
+  </source>
+  <dest>
+    *: "デバッグログをオフにしました"
+  </dest>
+  <voice>
+    *: "デバッグログをオフにしました"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT
+  desc: splash at boot: a debug log is on, and off in hours:minutes
+  user: core
+  <source>
+    *: "Debug logs on, off in %d:%02d"
+  </source>
+  <dest>
+    *: "デバッグログ オン、%d:%02d 後にオフ"
+  </dest>
+  <voice>
+    *: none
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_BOOT_NEVER
+  desc: splash at boot: a debug log is on and stays on
+  user: core
+  <source>
+    *: "Debug logs on"
+  </source>
+  <dest>
+    *: "デバッグログ オン"
+  </dest>
+  <voice>
+    *: "デバッグログ オン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_PLAYBACK
+  desc: in Debug Logs: the playback error log's switch
+  user: core
+  <source>
+    *: "Playback Error Log"
+  </source>
+  <dest>
+    *: "再生エラーログ"
+  </dest>
+  <voice>
+    *: "再生エラーログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_SKIN
+  desc: in Debug Logs: the theme loading log's switch
+  user: core
+  <source>
+    *: "Theme Log"
+  </source>
+  <dest>
+    *: "テーマログ"
+  </dest>
+  <voice>
+    *: "テーマログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_DEBUG_LOG_TASKS
+  desc: in Debug Logs: the background task log's switch
+  user: core
+  <source>
+    *: "Background Task Log"
+  </source>
+  <dest>
+    *: "バックグラウンドタスクログ"
+  </dest>
+  <voice>
+    *: "バックグラウンドタスクログ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_THOUSANDS_SEPARATOR
+  desc: between each group of three digits in a large number, as in 9,099 -- a full stop or a space in many languages
+  user: core
+  <source>
+    *: ","
+  </source>
+  <dest>
+    *: "~,"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_QUICK_SETTINGS
+  desc: title a theme shows over the Quick Screen, through %Sx(Quick Settings)
+  user: core
+  <source>
+    *: "Quick Settings"
+  </source>
+  <dest>
+    *: "クイック設定"
+  </dest>
+  <voice>
+    *: "クイック設定"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FFRW_STEP_SHORT
+  desc: in Fast-Forward/Rewind: the row for LANG_FFRW_STEP
+  user: core
+  <source>
+    *: "Minimum Step"
+  </source>
+  <dest>
+    *: "最小間隔"
+  </dest>
+  <voice>
+    *: "最小間隔"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FFRW_ACCEL_SHORT
+  desc: in Fast-Forward/Rewind: the row for LANG_FFRW_ACCEL
+  user: core
+  <source>
+    *: "Acceleration"
+  </source>
+  <dest>
+    *: "加速度"
+  </dest>
+  <voice>
+    *: "加速度"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_NEXT
+  desc: Auto-Change Directory option: on to the next folder
+  user: core
+  <source>
+    *: "Next Folder"
+  </source>
+  <dest>
+    *: "次のフォルダ"
+  </dest>
+  <voice>
+    *: "次のフォルダ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_RANDOM
+  desc: Auto-Change Directory option: on to a folder picked at random
+  user: core
+  <source>
+    *: "Random Folder"
+  </source>
+  <dest>
+    *: "ランダムなフォルダ"
+  </dest>
+  <voice>
+    *: "ランダムなフォルダ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_NEXT_START
+  desc: Auto-Change Directory option: the next folder, without leaving the Start Directory
+  user: core
+  <source>
+    *: "Next in Start Directory"
+  </source>
+  <dest>
+    *: "スタートディレクトリ内の次"
+  </dest>
+  <voice>
+    *: "スタートディレクトリ内の次"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NEXT_FOLDER_RANDOM_START
+  desc: Auto-Change Directory option: a random folder, without leaving the Start Directory
+  user: core
+  <source>
+    *: "Random in Start Directory"
+  </source>
+  <dest>
+    *: "スタートディレクトリ内でランダム"
+  </dest>
+  <voice>
+    *: "スタートディレクトリ内でランダム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_MENU
+  desc: submenu of Files, Music and Carousel holding their sort settings
+  user: core
+  <source>
+    *: "Sort"
+  </source>
+  <dest>
+    *: "並べ替え"
+  </dest>
+  <voice>
+    *: "並べ替え"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_CASE_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_CASE
+  user: core
+  <source>
+    *: "Case Sensitive"
+  </source>
+  <dest>
+    *: "大文字・小文字を区別"
+  </dest>
+  <voice>
+    *: "大文字・小文字を区別"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_DIR_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_DIR
+  user: core
+  <source>
+    *: "Directories"
+  </source>
+  <dest>
+    *: "ディレクトリ"
+  </dest>
+  <voice>
+    *: "ディレクトリ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_FILE_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_FILE
+  user: core
+  <source>
+    *: "Files"
+  </source>
+  <dest>
+    *: "ファイル"
+  </dest>
+  <voice>
+    *: "ファイル"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_INTERPRET_NUMBERS_SHORT
+  desc: in Files > Sort: the row for LANG_SORT_INTERPRET_NUMBERS
+  user: core
+  <source>
+    *: "Interpret Numbers"
+  </source>
+  <dest>
+    *: "数字を数値として比較"
+  </dest>
+  <voice>
+    *: "数字を数値として比較"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ALBUMS_BY_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_ALBUMS_BY
+  user: core
+  <source>
+    *: "Albums By"
+  </source>
+  <dest>
+    *: "アルバム"
+  </dest>
+  <voice>
+    *: "アルバム"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_ARTISTS_BY_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_ARTISTS_BY
+  user: core
+  <source>
+    *: "Artists By"
+  </source>
+  <dest>
+    *: "アーティスト"
+  </dest>
+  <voice>
+    *: "アーティスト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_IGNORE_ARTICLES_SHORT
+  desc: in Music > Sort and Carousel > Sort: the row for LANG_SORT_IGNORE_ARTICLES
+  user: core
+  <source>
+    *: "Ignore The/A/An"
+  </source>
+  <dest>
+    *: "The/A/Anを無視"
+  </dest>
+  <voice>
+    *: "The/A/Anを無視"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SORT_SAME_AS_MUSIC_SHORT
+  desc: in Carousel > Sort: the row for LANG_SORT_SAME_AS_MUSIC
+  user: core
+  <source>
+    *: "Same as Music"
+  </source>
+  <dest>
+    *: "音楽と同じ"
+  </dest>
+  <voice>
+    *: "音楽と同じ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_ON_BATTERY
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT, how long it stays on
+  user: core
+  <source>
+    *: "On Battery"
+  </source>
+  <dest>
+    *: "バッテリー使用時"
+  </dest>
+  <voice>
+    *: "バッテリー使用時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_PLUGGED_IN
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_ON_WHEN_CHARGING
+  user: core
+  <source>
+    *: "When Plugged In"
+  </source>
+  <dest>
+    *: "給電時"
+  </dest>
+  <voice>
+    *: "給電時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_LOCKED
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_ON_BUTTON_HOLD
+  user: core
+  <source>
+    *: "When Locked"
+  </source>
+  <dest>
+    *: "ロック時"
+  </dest>
+  <voice>
+    *: "ロック時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_TRACK_CHANGE
+  desc: in Battery & Power > Backlight: the row for LANG_CAPTION_BACKLIGHT
+  user: core
+  <source>
+    *: "On Track Change"
+  </source>
+  <dest>
+    *: "曲の変更時"
+  </dest>
+  <voice>
+    *: "曲の変更時"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_FADE_IN_SHORT
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_FADE_IN
+  user: core
+  <source>
+    *: "Fade In"
+  </source>
+  <dest>
+    *: "フェードイン"
+  </dest>
+  <voice>
+    *: "フェードイン"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_FADE_OUT_SHORT
+  desc: in Battery & Power > Backlight: the row for LANG_BACKLIGHT_FADE_OUT
+  user: core
+  <source>
+    *: "Fade Out"
+  </source>
+  <dest>
+    *: "フェードアウト"
+  </dest>
+  <voice>
+    *: "フェードアウト"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BACKLIGHT_EXEMPTIONS
+  desc: in Battery & Power > Backlight: the submenu of presses that act without lighting the screen
+  user: core
+  <source>
+    *: "Exemptions"
+  </source>
+  <dest>
+    *: "例外"
+  </dest>
+  <voice>
+    *: "例外"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_PRESS_LIGHTS_ONLY
+  desc: First Button Press option: the press that wakes the screen does nothing else
+  user: core
+  <source>
+    *: "Only Lights Screen"
+  </source>
+  <dest>
+    *: "画面の点灯のみ"
+  </dest>
+  <voice>
+    *: "画面の点灯のみ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FIRST_PRESS_ALSO_ACTS
+  desc: First Button Press option: the press that wakes the screen also does its usual job
+  user: core
+  <source>
+    *: "Also Acts"
+  </source>
+  <dest>
+    *: "操作も実行"
+  </dest>
+  <voice>
+    *: "操作も実行"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE
+  desc: in Battery & Power: the submenu holding Disk Spindown and the storage mode
+  user: core
+  <source>
+    *: "Storage"
+  </source>
+  <dest>
+    *: "ストレージ"
+  </dest>
+  <voice>
+    *: "ストレージ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_STORAGE_MODE_SHORT
+  desc: in Battery & Power > Storage: the row for LANG_STORAGE_MODE
+  user: core
+  <source>
+    *: "Mode"
+  </source>
+  <dest>
+    *: "モード"
+  </dest>
+  <voice>
+    *: "モード"
   </voice>
 </phrase>
