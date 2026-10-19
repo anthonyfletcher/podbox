@@ -24774,3 +24774,17 @@
     *: "Type"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_PV_BY_ARTIST
+  desc: in Spun: the line above an artist's name on a row's sub-card
+  user: core
+  <source>
+    *: "by"
+  </source>
+  <dest>
+    *: "par"
+  </dest>
+  <voice>
+    *: "par"
+  </voice>
+</phrase>
