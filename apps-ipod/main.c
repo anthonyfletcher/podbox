@@ -18,6 +18,7 @@
 #include "file_internal.h"
 #include "lcd.h"
 #include "rtc.h"
+#include "general.h"
 #include "debug.h"
 #include "led.h"
 #include "kernel.h"
@@ -636,6 +637,8 @@ static void init(void)
     /* Don't initialize power management here if it could incorrectly
      * measure battery voltage, and it's not needed for charging. */
     powermgmt_init();
+
+    prng_init();  /* After RTC */
 
     piezo_init();
 

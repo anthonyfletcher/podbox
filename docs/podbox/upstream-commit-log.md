@@ -9,7 +9,7 @@ by-file question instead: which files differ from upstream, and why.
 | Tree | Baseline | Parent |
 | --- | --- | --- |
 | `apps-ipod/` | **`dd21a1d1d9`**, 2026-02-10 | [RockPod](https://github.com/nuxcodes/rockpod.git), which was already ~5 months behind Rockbox. Merges from Rockbox never update this tree, and RockPod's later fixes are tracked in their own table below. |
-| Everything else | **`f2eaa15ac2`**, merged 2026-10-15 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
+| Everything else | **`f684d3ba6a`**, merged 2026-10-19 | Rockbox. Everything at or before it is **Inherited**. Moves with each merge. |
 
 ## Status
 
@@ -262,7 +262,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-11 | `f4c7e8b595` `e9ab4ab222` `f159003ddb` `f282ae203a` | Support DSF, DFF, and SACD playback | **Adopted** | `.dsf`, `.dff` and `.iso` join the file browser's audio types. |
 | 2026-09-30 | `89c38484ea` `2bb498b963` `c12f6ebacd` `b897766a7a` `0e50ed3c43` `e32bfaadb1` `142a6fbb39` `9936e65e6d` `5c74d20bce` `1488b30c62` `e430ecb607` `dcee3ce62f` | jpeg, jpegp: per-scan Huffman and per-component quant tables, RGB, 1x2/2x1 chroma, 16-bit quant tables, damaged files | **Adopted** | Into `draw/jpeg_load.c` and the image viewer's decoders. The progressive decoder takes the table, RGB and SOF1 fixes, and refuses chroma other than 1x1. jpegp keeps its own end-of-file handling and takes the checks it lacked. `89c38484ea` was already here. |
 | 2026-10-12 | `0a310d469c` `07d875ff74` `680ba7e88a` | qsort alignment, thread null pointer, `ata_set_phys_sector_mult()` for ATA only | **Adopted** | |
-| 2026-10-14 | `afe91f1dfb` `85f2d4613e` `e5092187c5` | xoroshiro64** PRNG, periodic reseed, `prng_newseed()` | **Adopted** | `srand()` here holds off the reseed for its full period: upstream's lets the next tick replace a fixed seed. |
+| 2026-10-14 | `afe91f1dfb` `85f2d4613e` `e5092187c5` | xoroshiro64** PRNG, periodic reseed, `prng_newseed()` | **Adopted** | |
 | 2026-10-13 | `2cb8e24519` `0ee5442559` `17e1765eef` | apps: seed with `prng_newseed()`, no manual reseeding | **Declined** | `apps-ipod/` still seeds with `srand(current_tick)`, which the new generator takes as it took the old. |
 | 2026-10-10 | `ecdeb02dda` `5a0fc3c6e9` `5fedaa2095` `d56211c7fc` | 44.1 kHz floor when guessing the frequency; empty database paths; talk shut-up on disable; close the playlist at shutdown | **Adopted** | |
 | 2026-10-14 | `f2eaa15ac2` | settings: list padding and separator height are theme settings | **Adopted (independently)** | |
@@ -277,9 +277,22 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-12 | `e2efcb906a` `88f3d21890` `e28511a757` `626643b46d` `41be2016b8` `8036fda6f0` `860582a63a` `2facad7424` `966c1d7650` `eb39277d4a` `cea6fca67b` `2bef3237d2` `298d4a33ee` `246cde74df` `2fe4ab78e3` `a3fe0b12c2` `78a846dd52` `add3bb52b3` `3e02b10217` `a5f7d24290` `b11962221b` `d04b94f443` `a83ba8e5d8` `3b12c2b1c0` `26b67894d8` `683ef36238` `bbe7fb80bd` `418900340c` `8e0acd43f8` `6fd75b7ae0` `0be16b9349` `1f2e5488a7` `79e444d067` `76643a105e` `9b8f375d53` `65bfcd6e45` `ba6b252238` `8161720426` `212bb63ee4` `2986176bcb` `b3882fc65b` | `utils/`, manual, docs | **N/A** | |
 | 2026-10-14 | `d94e41bade` `02f54fc3a8` `f86be7dc42` `1896c2128b` `e27fb9a9f0` `4c08906670` `303c534022` `853274937c` `73b1afabd3` `49b4d8f2c9` `27a8ca3f55` `b34fcd602a` `b819e91000` `975d0519a2` | plugins | **N/A** | No plugin system. |
 | 2026-10-14 | `583f27d5e5` `3c09d4570f` `9ab4bdcf91` `f012c09eed` `bfab6a2276` `265cf7ac92` `50d8c4a58e` `70c5a4e9e9` `616989f6c4` | translation updates | **N/A** | Translation. |
+| 2026-10-15 | `9046e11eb2` `3389c23a6e` `c883dcb3da` | random: reseed interval, no recursion on a reseed | **Adopted** | Fixes the fixed-seed bug this fork had fixed in `srand()`; `random.c` is upstream's again. |
+| 2026-10-15 | `0a69183d0a` | random: `prng_init()` at startup | **Adopted** | Called from `apps-ipod/main.c` after `powermgmt_init()`. |
+| 2026-10-14 | `b419232ac2` | libmad: 16-bit window synthesis for ARMv5E | **Adopted** | The 6G only; the 5G is ARMv4 and keeps the old synthesis. |
+| 2026-10-06 | `7dc8b8d762` `183518be73` | libm4a: seeking fits in 512 KB | **Adopted** | |
+| 2026-10-15 | `6fc41f1680` `02b9ece11f` `5af6242f1c` `81ad6a6c6d` `64c63cbaf4` | opus Ogg buffers, vgm inflate and bounds, bidi Rumi numerals | **Adopted** | |
+| 2026-10-18 | `372dfb7202` `70be6700b8` `6249ed203a` `416f52e075` `8ac8341ba4` `34bdb62f7a` `c253261370` `f684d3ba6a` `7c3ab0e6cd` `4e6b7cd683` | checkwps: asset validation, every file checked, `ROCKBOX_DIR` | **Adopted** | Run from the theme's root folder, not from inside `.rockbox`. The `apps/` halves have nothing to port. |
+| 2026-10-07 | `dec97ea3ba` `b662506587` | recording: skinnable recording screen | **N/A** | Neither player records. |
+| 2026-10-15 | `65f8b63344` | debug: boot-data printf types | **N/A** | `HAVE_BOOTDATA` is not defined here. |
+| 2026-10-16 | `b9aaec19a9` `ac3404ba36` | configure: no Android MIPS/x86; toolchains on aarch64 | **Adopted** | |
+| 2026-10-15 | `04b76b253c` `32c4833822` `44c4f86d96` `cd8f5e8fd3` `4792e54cb2` `2bb2944aae` `bffcfbac33` `a4eb62e540` `955883e3ab` `fc3db7a1f4` `2a846650b0` `dd3d7b8aa3` `5221341740` `f83df128d0` `8f7f7768e5` `8d5b600068` `fbd69aa986` `a7c11ccc78` `b30d9fbb70` `3ec22c9ee9` `d8389d10b1` `79dea5d24d` `23c06e0e91` | Sony PSP, Agptek Rocker, YP-CP3, rk27xx ZSP500, x1000, sonynwz, imx31, hwstub | **N/A** | Other targets. |
+| 2026-10-15 | `798ba1064e` `879107bf40` `6f36ae4e0c` `472d4c39ab` `f6b01efdd3` | plugins | **N/A** | No plugin system. |
+| 2026-10-17 | `f8161c9884` | Korean translation | **N/A** | Translation. |
 
-Complete through `f2eaa15ac2` (2026-10-14), merged as `5c3e2b9aa4`. The
-merge before it, through `636ae404f7` (2026-09-27), was `76df1a5859`. Both
+Complete through `f684d3ba6a` (2026-10-18), merged as `93dfc45df3`. The
+merge before it, through `f2eaa15ac2` (2026-10-14), was `5c3e2b9aa4`, and
+the one before that, through `636ae404f7` (2026-09-27), `76df1a5859`. Both
 targets were built either side of that one and compared object by object:
 only `version.o` and `panic.o` (the commit hash) and `credits.o` (a new name)
 differ. Compare objects, not sections, because a few changed bytes shift every
