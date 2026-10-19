@@ -9,8 +9,8 @@ asks for that text by name.
 
 This is not a translation system. It edits the English wording of individual
 phrases, one line each, and leaves the other thousand-odd alone. For a whole
-language you want a `.lng` file instead, from *Settings → System → Language & Text →
-Language*.
+language you want a `.lng` file instead, from
+`Settings > System > Language & Text > Language`.
 
 ---
 
@@ -39,11 +39,11 @@ the player was built with, so **type it exactly as the English build shows it**
 | Separator | The **first** colon on the line. Everything after it is the new text |
 | Space before the colon | Not allowed — `Shuffle : x` looks for a phrase called `Shuffle ` |
 | Space after the colon | Ignored, as is space at either end of the line |
-| Comments | A line whose first non-blank character is `#` |
+| Comments | A line whose first non-blank character is `#`. A `#` later in a line is part of the text |
 | Blank lines | Ignored, as is any line with no colon at all |
 | Case | Exact. `shuffle` does not match *Shuffle* |
 | An empty replacement | `Shuffle:` blanks the label rather than leaving it alone |
-| Line length | 255 characters; a longer line is cut and the rest misread |
+| Line length | 255 characters; anything past that is discarded |
 | A bad line | Skipped in silence — the rest of the file still applies |
 | `Date#2:` | Renames only the second phrase reading *Date* — see §3 |
 
@@ -58,12 +58,7 @@ The file is read when the player applies its settings, which is:
 - **at boot**, always;
 - **when you unplug USB** — so the quickest way to work is to edit the file with
   the player plugged in, eject, and read the new wording as it comes back;
-- when a theme or a `.cfg` is loaded, and after *Reset Settings*.
-
-There is **one gap**: picking a language from *Settings → System → Language &
-Text → Language* loads the `.lng` and drops your overrides until the next
-reboot. Loading a language resets every phrase to built-in first, and nothing
-re-applies the file at that point. Reboot after changing language.
+- when a theme, a `.cfg` or a language is loaded, and after *Reset Settings*.
 
 ---
 
@@ -80,14 +75,18 @@ same phrase, so it renders your replacement without being touched. See
 **Keep any `%s` and `%d` exactly as they are, and in the same order.** They are
 blanks the player fills in when the phrase is shown — `%d` with a number, `%s`
 with a word. Reword the sentence around them as much as you like; just do not
-drop one, add one, retype one, or swap two of them over:
+drop one, add one, retype one, or swap two of them over. Of these four lines,
+only the first is applied:
 
 ```
-Saved %d tracks (%s): Wrote %d tracks to (%s)   # fine
-Saved %d tracks (%s): Wrote the tracks to (%s)  # dropped  -- line ignored
-Saved %d tracks (%s): Wrote %d of %d to (%s)    # added    -- line ignored
-Saved %d tracks (%s): Wrote %s tracks (%d)      # reordered -- line ignored
+Saved %d tracks (%s): Wrote %d tracks to (%s)
+Saved %d tracks (%s): Wrote the tracks to (%s)
+Saved %d tracks (%s): Wrote %d of %d to (%s)
+Saved %d tracks (%s): Wrote %s tracks (%d)
 ```
+
+The second drops the `%d`, the third adds one, and the fourth swaps the two
+over.
 
 A line that gets it wrong is skipped and the built-in wording stays, so the
 worst outcome is a rename that appears not to have worked.
@@ -98,19 +97,14 @@ one of those blanks, so `50% done` counts as a blank and the line is skipped;
 
 ### Words the player uses twice
 
-Twenty-one words are used by two separate phrases each — the same wording as a
-settings label and again as a Track Info or properties row, say:
+Many words are used by more than one phrase — the same wording as a settings
+label and again as a Track Info row, say. *Settings*, *Now Playing*, *Date* and
+*Album Art* are among them, and a few, such as *Slow* and *Fast*, are used
+three or four times.
 
-```
-Album Art   Auto     Cancel     Custom   Date       Fast
-Filename    Files    Games      Music    Normal     Path
-Playlist    Search   Slow       Time     Track Gain Use UI Font
-Rebuild Database     Update Database     Rescan Documents & Images
-```
-
-**Both are renamed.** `Album Art: Cover` changes the setting *and* the Track
-Info row, which is almost always what was wanted — they read the same on screen
-because they mean the same thing.
+**Every one is renamed.** `Album Art: Cover` changes the setting *and* the
+Track Info row, which is almost always what was wanted — they read the same on
+screen because they mean the same thing.
 
 Where they do not, put a `#` and a number after the word to rename just one of
 them:
@@ -119,14 +113,15 @@ them:
 Date#2: Modified
 ```
 
-`#1` is the first of the two, `#2` the second, counted in the order the
-firmware holds them — which is not the order you meet them on screen, so try
-one and look. There is no way to tell them apart from the file other than by
-trying.
+`#1` is the first, `#2` the second, `#3` the third and so on, counted in the
+order the firmware holds them — which is not the order you meet them on screen,
+so try one and look.
 
-The last three in that list are worth care. They are Maintenance rows, and a
-row's explanation is looked up by the words on the row — so renaming one leaves
-*Explain* on it blank.
+### Rows that run something
+
+On an English player, renaming a row that runs something rather than holding a
+setting — *Update Database*, *Rebuild Database*, *Clear Backdrop* — leaves
+*Explain* on that row blank. Under a translation, *Explain* still works.
 
 ---
 

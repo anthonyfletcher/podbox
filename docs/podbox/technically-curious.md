@@ -23,7 +23,7 @@
 - **No plugin system.** The handful of plugins worth keeping became ordinary core
   screens: the text and image viewers, properties, playing time, credits. Two
   more were written as core screens from the start — the lyrics viewer and the
-  Playback Report listening statistics. If you miss Doom you need help.
+  Playback Report listening statistics.
 
 **The application layer is a different tree.** `apps-ipod/` replaces Rockbox's
 `apps/`: reorganised by purpose to make development easier, and every file
@@ -34,9 +34,15 @@ carrying a header describing what it does. See
 measurement, wrapping, selection state and more. See [`custom-skin-tags.md`](custom-skin-tags.md) for more info.
 Themes using them will not render on stock Rockbox.
 
+**The playlist engine measures the music itself.** What it measures, how it
+builds a playlist from that, and the desktop tool that does the analysis are
+in [`playlist-engine.md`](playlist-engine.md).
+
 **Everything outside `apps-ipod/` stays close to Rockbox on purpose**, so that
-merges keep applying. The exceptions — hardware fixes in `firmware/`, build
-scripts, and a handful of others — are catalogued. See
+merges keep applying. The large exception is the USB stack: host mode, iAP2
+and the sound card are substantially this fork's own. The rest — hardware
+fixes in `firmware/`, codec fixes in `lib/`, tools and build scripts — are
+catalogued. See
 [`upstream-divergence.md`](upstream-divergence.md) and
 [`upstream-commit-log.md`](upstream-commit-log.md).
 
@@ -67,16 +73,17 @@ You get `build-hw-<target>/rockbox.zip`, ready to unzip onto the player.
 
 ## Use the script, or read this first
 
-Rockbox builds out of tree, and `build-hw.sh` is only wrapping four steps:
+Rockbox builds out of tree, and `build-hw.sh` is only wrapping five steps:
 
 ```sh
 ../tools/configure --target=ipodvideo --type=n --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip
+sh ../tools/check-zip-langs.sh rockbox.zip
 ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh && ../bundle-tools.sh
 ```
 
-Two of them are easy to get wrong by hand, and both fail quietly:
+Three of them are easy to get wrong by hand, and all fail quietly:
 
 - **`--appsdir=apps-ipod` is required.** Rockbox's original `apps/` is still in
   the tree and is never built. Omit the flag and the build compiles `apps/`
@@ -86,10 +93,15 @@ Two of them are easy to get wrong by hand, and both fail quietly:
   theme, no first-boot config, no iconset, no setting explanations and no
   title trimming patterns. The `bundle-*.sh` scripts add them and strip what a
   plugin-less build cannot use; `bundle-tools.sh` also adds the desktop
-  sound-scan tool.
+  tools `soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`, and skips
+  them with a warning unless a Windows simulator build
+  (`./build-sim.sh 5g win`) is there to link against.
   `bundle-help.sh` is the one to watch: skip it and every **Explain** entry in
   a setting's context menu simply shows nothing, while everything else looks
   finished.
+- **A clean build can ship an empty language.** A language file can come out
+  as a bare 10-byte header with no error. `check-zip-langs.sh` fails on one;
+  build again if it does.
 
 For an incremental rebuild, re-run everything except `configure` from inside the
 existing build directory.
@@ -124,7 +136,7 @@ mkdir build-sim-ipodvideo && cd build-sim-ipodvideo
 ../tools/configure --target=ipodvideo --type=s --appsdir=apps-ipod
 make -j"$(nproc)"
 make zip && ../bundle-theme.sh && ../bundle-help.sh && ../bundle-trim.sh
-rm -rf simdisk/.rockbox && unzip -q rockbox.zip -d simdisk/
+unzip -oq rockbox.zip -d simdisk/
 ```
 
 **Do not skip the bundle step.** Without it the simulator starts themeless with
@@ -154,18 +166,22 @@ No dircache and no USB stack; both are stubbed, so the browser reads the disk
 directly. The debug menu's hardware screens — disk, battery, S.M.A.R.T.,
 hardware info, click wheel — are absent. Everything the skin engine does is real.
 
-The simulator needed no change outside `apps-ipod/`: upstream's `uisimulator/`
-and SDL backend work as they are. What it needed was for `apps-ipod/` to stop
-assuming it was on hardware, which is
-[`apps-ipod/sim/`](../../apps-ipod/sim/README.md).
+Almost all of the simulator's support is inside `apps-ipod/`, in
+[`apps-ipod/sim/`](../../apps-ipod/sim/README.md), which supplies what a hosted
+build lacks. Outside it, a few files of upstream's SDL backend and
+`uisimulator/` carry the `--screenshot` argument and a fix for a crash at boot;
+[`upstream-divergence.md`](upstream-divergence.md) lists them under *The
+simulator*.
 
 ## Finding your way around
 
 | Where | What                                                                                                                                                     |
 |---|----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `apps-ipod/` | The application layer — all of this fork's UI work. See [`apps-ipod/README.md`](../../apps-ipod/README.md), which explains the layout and where new code goes. |
-| `firmware/` | Hardware abstraction, drivers, kernel. Close to Rockbox; see [`upstream-divergence.md`](upstream-divergence.md) for changes.     |
-| `lib/` | Codecs, DSP and the skin parser. Rockbox's, near enough — `rbcodec/` gains one metadata flag and `skin_parser/` the hooks the extra tags need. |
+| `bootloader/` | Rockbox's bootloader, except that the hold switch no longer boots Apple's firmware; only MENU does. |
+| `firmware/` | Hardware abstraction, drivers, kernel. Close to Rockbox apart from the USB stack, whose host mode, iAP2 and sound card are substantially this fork's own; see [`upstream-divergence.md`](upstream-divergence.md) for changes. |
+| `lib/` | Codecs, DSP and the skin parser. Rockbox's, plus codec fixes and speedups (see [`upstream-divergence.md`](upstream-divergence.md)) and the skin parser's hooks for the extra tags. |
 | `apps/` | Rockbox's original application layer. **Never built.** Kept so merges apply cleanly — do not edit it.                              |
-| `uisimulator/` | Rockbox's SDL simulator support, unmodified and used as-is. The fork's side of it is [`apps-ipod/sim/`](../../apps-ipod/sim/README.md). |
+| `uisimulator/` | Rockbox's SDL simulator support, upstream's apart from `--screenshot`. The fork's side of it is [`apps-ipod/sim/`](../../apps-ipod/sim/README.md). |
+| `tools/` | Rockbox's build tools, plus this fork's: `check-settings-docs.sh`, `upstream-apps-port.sh`, `check-zip-langs.sh`, and the desktop tools `soundscan/`, `database_pb/` and `artcache_pb/`. |
 | `docs/podbox/` | This fork's own documentation.                                                                                                                           |

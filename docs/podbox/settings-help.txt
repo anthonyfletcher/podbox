@@ -22,7 +22,7 @@
 The frequency Bass works below. A lower number lifts only the deepest notes; a
 higher one reaches up into the lower mids and can muddy voices.
 
-Only does anything while Bass is set above zero.
+Only does anything while Bass is set away from zero.
 
 [treble cutoff]
 The frequency Treble works above. Lower reaches down towards voices, higher
@@ -197,7 +197,7 @@ the click a hard stop can produce.
 
 [afr enabled]
 Tames the harshness that makes long listening tiring, mostly in the upper mids.
-Subtle by design; if you can hear it working it is set too high.
+If you can hear it working, it is set too high.
 
 [crossfeed]
 Bleeds a little of each channel into the other, with a delay, so headphones
@@ -281,9 +281,7 @@ a decibel is a large change.
 
 [perceptual volume step count]
 How many steps Perceptual mode divides the range into. More steps mean finer
-control and more presses to cross the range.
-
-Direct mode never reads it, which is why the row is listed only in Perceptual.
+control and more presses to cross the range. Used only in Perceptual mode.
 
 [shuffle]
 Plays the current list in a random order. Changing it reshuffles what is
@@ -353,7 +351,7 @@ always; forcing a rate resamples everything.
 
 [spun artwork]
 Whether the report's cards show album and artist sleeves. A card without one
-draws a pattern instead, as part of the design rather than a stand-in.
+draws a pattern instead.
 
 Off also gives the pictures' memory to the statistics, so on a very large
 library fewer rows are dropped. Changing it inside the report reads the log
@@ -381,16 +379,16 @@ long. Skips and night plays are counted either way, because neither has a
 listening time to rank by.
 
 [spike caption]
-Names the track under Spike's field, with the time remaining beside it. The
-field rises to make room, so the game is a little smaller with this on. Off
-gives the whole panel to the game.
+Names the track under Spike's field, with the time remaining beside it: Title
+shows the track's title, and Title and Artist adds who it is by. The field
+rises to make room, so the game is a little smaller with this on. Off gives
+the whole panel to the game.
 
 [spike caption scroll]
 Whether a track name too long for the space travels along or is simply cut
-off. It steps a character at a time on the beat rather than gliding, which is
-what keeps it readable on this screen. Off is the calmer choice while you are
-playing, and shows as much of the name as fits. Off as well while Scrolling is
-off.
+off. It steps a character at a time on the beat rather than gliding. Off is
+the calmer choice while you are playing, and shows as much of the name as
+fits. Off as well while Scrolling is off.
 
 [spike audio offset]
 How far ahead of the sound the game judges a press. Raise it if your presses
@@ -490,7 +488,7 @@ played and is skipped when the queue repeats; the queue marks it with a +.
 
 [max files in playlist]
 The largest number of tracks a playlist may hold. Building very large lists is
-slow on this hardware, which is why the limit is lower here than on a computer.
+slow on this hardware, so raise it only if a playlist is being cut short.
 
 [playlist viewer icons]
 Draws icons beside the entries in the playing queue.
@@ -731,9 +729,9 @@ Music Quiz rounds that play a clip and ask which album it is from. In the later
 rounds the wrong answers are the same artist's other albums.
 
 [quiz year]
-Music Quiz rounds that play a clip and ask what year it is from. Off by default:
-the answers start five years apart and end one apart, and they are only as
-right as the year tags.
+Music Quiz rounds that play a clip and ask what year it is from. The hardest
+kind: the answers start five years apart and end one apart, and they are only
+as right as the year tags.
 
 [segregate audiobooks]
 Keeps spoken word out of the music and gives it an Audiobooks row on the main
@@ -805,9 +803,8 @@ Which picture the now-playing screen shows. Auto uses the artist photograph if
 you arrived through the artist menu, and the album cover otherwise.
 
 [album covers filter 1]
-First of three image adjustments applied to the covers in Cover Flow. The
-browser's rows are treated by the theme instead, so this changes the carousel
-and nothing else.
+First of three image adjustments applied to the covers in the carousel. Art
+rows in the browser are not affected.
 
 [album covers filter 2]
 Second image adjustment in the chain, applied after the first.
@@ -995,8 +992,8 @@ How the confirmation and message boxes are coloured.
 Auto, the default, uses the theme's own two colours plus one accent on the
 selected button -- and the accent follows the album while Dynamic Colors is
 running. Off is the same two colours with no accent: the selected button is
-simply drawn inverted, which is what Rockbox has always done. On ignores both
-and uses the nine colours below, which appear only in that mode.
+simply drawn inverted. On ignores both and uses the nine colours below, which
+appear only in that mode.
 
 [dialog box foreground]
 The text colour inside a dialog. Only used when Dialog Colour Mode is On.
@@ -1008,7 +1005,7 @@ The fill colour inside a dialog. Only used when Dialog Colour Mode is On.
 The colour of a dialog's own border. Only used when Dialog Colour Mode is On.
 
 [dialog box border width]
-The thickness of that border, in pixels. Zero draws none.
+The thickness of a dialog's border, in pixels. Zero draws none.
 
 [dialog box margin]
 How far the dialog is inset from the edges of the screen.
@@ -1022,8 +1019,7 @@ without taking over all nine colours.
 
 [dialog box shadow colour]
 The colour of the drop shadow behind confirmation and message boxes. Black by
-default rather than a theme colour, because its job is to contrast with the box
-whatever the theme is doing.
+default; pick a colour that contrasts with the box.
 
 [dialog button foreground]
 The text colour of an unselected dialog button.
@@ -1121,7 +1117,8 @@ Shows a page counter at the foot.
 
 [text viewer font]
 A font used only by the text viewer, so reading can use a different typeface
-from the menus. Unset uses the interface font.
+from the menus. It starts as 22-noto-serif; Use UI Font switches to the
+interface font.
 
 [lyric colour mode]
 Whether the lyrics screen follows the theme, inverts it, or uses plain black on
@@ -1149,9 +1146,9 @@ Highlights individual words as they are sung, where the file carries word
 timings. Files with only line timings are unaffected.
 
 [lyric backlight]
-Holds the backlight on while lyrics are showing, since a screen that keeps
-going dark defeats the point. A track without lyrics goes dark as usual.
-Costs battery.
+Holds the backlight on while lyrics are showing, so they can be followed
+without pressing a button. A track without lyrics goes dark as usual. Costs
+battery.
 
 [lyric font]
 A font used only by the lyrics screen. Unset uses the interface font.
@@ -1162,8 +1159,8 @@ lever on battery life.
 
 [backlight timeout plugged]
 How long the backlight stays on after the last button press while the player
-is charging. Kept separate from the battery figure because there is less
-reason to be frugal on the mains.
+is charging. It can be set longer than On Battery without costing battery
+life.
 
 [backlight on button hold]
 What the backlight does while the hold switch is on: behave normally, stay off,
@@ -1262,8 +1259,8 @@ guesses show accented characters as nonsense; Unicode is right for anything
 tagged recently.
 
 [default browser]
-Which browser the root and the now-playing screen return to: the database or
-the files.
+Which browser the root and the now-playing screen return to: Music, Files or
+Playlists.
 
 [wps select action]
 Where Select goes from the now-playing screen.
@@ -1276,8 +1273,8 @@ A click through the headphones on each button press. Feedback in a pocket,
 irritating on a quiet passage.
 
 [hardware keyclick]
-A click from the player own speaker on each button press, rather than through
-the headphones. Audible without anything plugged in.
+A click from the player's own speaker on each button press, rather than
+through the headphones. Audible without anything plugged in.
 
 [keyclick repeats]
 Whether auto-repeat -- a held button -- clicks each time or only once.
@@ -1479,9 +1476,8 @@ stopping at it. Looks better on a theme whose list has room to spare, and clips
 awkwardly on one that does not.
 
 [Disable main menu scrolling]
-Stops long entries scrolling on the main menu, leaving them truncated. The main
-menu is glanced at rather than read, and text moving under the cursor there is
-more distracting than helpful.
+Stops long entries scrolling on the main menu, leaving them truncated. Useful
+if text moving under the cursor distracts you.
 
 # Action rows. These have no cfg name, so they are keyed by their label under
 # an "action: " namespace. Renaming a row orphans its stanza -- Explain then
@@ -1562,9 +1558,9 @@ nothing else -- the log is the record, and the figures come back the same.
 Opens the list of installed themes. Choosing one applies the whole look at
 once -- fonts, skins, colours, which bars are drawn.
 
-Loading a theme also clears any appearance change you made by hand, so that a
-theme cannot inherit stray settings from the one before it. Anything you change
-afterwards is kept for that theme and reapplied the next time it is loaded.
+Loading a theme also clears any appearance change you made by hand. Anything
+you change afterwards is kept for that theme and reapplied the next time it is
+loaded.
 
 [action: Font]
 Picks a font file from /.rockbox/fonts.
@@ -1678,7 +1674,7 @@ The outline colour of the dialog button that is currently chosen.
 
 [action: Reset Colours]
 Puts the foreground, background, selector and separator colours back to the
-built-in defaults -- white on black.
+built-in defaults -- light text on dark blue.
 
 It does not touch the dialog colours, the backdrop or the skins.
 
@@ -1877,13 +1873,14 @@ It searches the display name, the name a setting has in a .cfg file, and a few
 words describing it -- so art, cover and album all reach the artwork settings.
 
 [action: Simple EQ]
-The three-band tone control: bass, treble, and the mid-band between them.
+Sets the gain of each of the ten bands, leaving their frequencies and widths
+as they are.
 
 Enough for most adjustments. Advanced EQ reaches the same filters with full
 control over frequency and width.
 
 [action: Advanced EQ]
-Sets each of the five bands by hand -- frequency, gain and Q.
+Sets each of the ten bands by hand -- frequency, gain and Q.
 
 Q is how wide the band is: low values shape a broad area, high values pick out a
 narrow problem.

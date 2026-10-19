@@ -21,11 +21,31 @@ For Spun:
 Siebe Majoor
 
 For the accessory protocol:
-Paul Sauro
 Andrew Onyshchuk
-The libiap author, mojyack
+mojyack (libiap)
 
-For RockBox:
+For the car protocol:
+lvalen91 (carplayd)
+The Nocturne team
+HaToan
+JJTech0130
+Adam Bell
+The libimobiledevice team
+doronz88 (pymobiledevice3)
+
+For the themes and fonts:
+Evan Kenny
+Serge Fahnenstell
+Chuck Lardo
+Humberto Santana
+James Stevenson
+Douglas Vautour
+The Noto and Micro Noto Sans authors
+The League Spartan authors
+The ProFont authors
+Google (Material Design Icons)
+
+For Rockbox:
 Björn Stenberg
 Linus Nielsen Feltzing
 Andy Choi

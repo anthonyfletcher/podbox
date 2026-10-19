@@ -4,7 +4,7 @@ Playlists built from how the music sounds rather than from what the tags say.
 Ask for tracks like one you choose, pick a mood, or travel from one mood to
 another.
 
-Turn it on at **Settings → Library → Playlist Engine → Enabled**. That starts
+Turn it on at `Settings > Library > Playlist Engine > Enabled`. That starts
 the analysis, which asks before it begins.
 
 ---
@@ -16,8 +16,9 @@ how punchy it is, stereo width, and its key. After adding music, only the new
 tracks need measuring — see [Keeping it current](#keeping-it-current).
 
 On the player a full library takes hours; the [desktop tool](#the-desktop-tool)
-does it in about an hour. **Analysis Depth → Quick** is about three and a half
-times faster on the player, but noticeably less accurate.
+does it in about an hour. Setting
+`Settings > Library > Playlist Engine > Analysis Depth` to **Quick** is about
+three and a half times faster on the player, but noticeably less accurate.
 
 ## Making a playlist
 
@@ -32,8 +33,8 @@ times faster on the player, but noticeably less accurate.
   another, such as Slow → Fast.
 - **Wind Down** — hold `Select` on a track, then choose how long it runs:
   15 minutes to two hours, or Default. It plays first, and each track after
-  it is calmer. Default lasts as long as the time left on a running sleep
-  timer, and with none running holds Playlist Length's tracks.
+  it is calmer. Default ends with a running sleep timer; with none, it plays
+  Playlist Length tracks.
 - **Order by Sound** — hold `Select` in the playlist viewer. Puts the playlist
   you already have in an order where each track leads into the next. The
   track playing stays first, tracks not yet measured go to the end, and a
@@ -59,12 +60,12 @@ is not offered again.
 
 ## What things sound like
 
-- **A track** — hold `Select`, choose **Track Info** and open the **Sound**
+- **A track** — hold `Select`, choose **Show Track Info** and open the **Sound**
   row. It lists the moods the track fits, then energy, pace, tone, key and
   more, in words.
 - **An album or a folder** — hold `Select` on it and choose **Album Sound**.
   The same read-out, averaged over its tracks.
-- **Your library** — **Settings → Library → Playlist Engine → Library Sound**.
+- **Your library** — `Settings > Library > Playlist Engine > Library Sound`.
   Five sections:
   - **Overview** — how much has been measured, how many tracks could not be
     read, and how many have a steady enough tempo and a clear enough key to
@@ -96,18 +97,18 @@ Two of the words affect playlists:
 
 ## Settings
 
-All under **Settings → Library → Playlist Engine**.
+All under `Settings > Library > Playlist Engine`.
 
-| Setting | What it does |
-|---|---|
-| Enabled | Turns the engine on and starts the analysis. Turning it off keeps what has been measured. |
-| Analysis Depth | Thorough (40 seconds of each track) or Quick (about 11). |
-| Playlist Length | How many tracks a playlist holds, 5 to 100. |
-| Track Playlist | How much Play Similar varies between runs. |
-| Mood Playlist | The same, for moods and journeys. |
-| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. |
-| Continue Playing | Keeps the music going when a playlist runs out. |
-| Library Sound | What the analysis found across your library. |
+| Setting | What it does | Default |
+|---|---|---|
+| Enabled | Turns the engine on and starts the analysis. Turning it off keeps what has been measured. | Off |
+| Analysis Depth | Thorough (40 seconds of each track) or Quick (about 11). | Thorough |
+| Playlist Length | How many tracks a playlist holds, 5 to 100. | 40 |
+| Track Playlist | How much Play Similar varies between runs. | Predictable |
+| Mood Playlist | The same, for moods and journeys. | Weekly |
+| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. | On |
+| Continue Playing | Keeps the music going when a playlist runs out. | Off |
+| Library Sound | What the analysis found across your library. | |
 
 **Predictable** gives the same playlist every time until the library changes,
 **Weekly** a new one each week, and **Variable** a different one every time.
@@ -115,14 +116,17 @@ All three draw from the same close matches.
 
 ## Keeping it current
 
-**Settings → Library → Maintenance** has two rows once the engine is on:
+`Settings > Library > Maintenance` has two rows once the engine is on:
 
 - **Update Sound Analysis** measures new tracks, and retries any that could
   not be read before.
 - **Rebuild Sound Analysis** measures everything again from scratch.
 
-Both need the charger connected. They stop if it is removed, and carry on
-from where they stopped next time.
+Either one stops playback and keeps its screen up until it finishes, so the
+player cannot be used meanwhile; `Select` or `Menu` stops it, and the next run
+carries on from where it stopped. Both need the charger connected, and wait on
+screen if it is removed. A computer's USB cable charges the player but does not
+connect it as a disk while they run.
 
 ---
 
@@ -131,14 +135,16 @@ from where they stopped next time.
 `soundscan.exe` does the same analysis on a Windows PC in about an hour, and
 writes the same file the player uses. It ships at `.rockbox/tools/`.
 
-Connect the player, open a command prompt in that folder and run:
+The player has to have started PodBox at least once; until then the tool
+refuses to run. Connect the player, open a command prompt in that folder and
+run:
 
 ```
 soundscan.exe
 ```
 
-It finds the player's drive and asks before writing anything. With more than
-one player attached, name the drive:
+It finds the player's drive and asks before writing anything. Naming the drive
+skips that question, and is needed with more than one player attached:
 
 ```
 soundscan.exe E:\

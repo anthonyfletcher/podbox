@@ -252,11 +252,13 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-09-19 | `34a18e7616` `76f8925d23` `e4c010be98` `1ad17c9b57` `66bc0728d5` `2adcfa08cf` `aed1945c5d` `b58c7505a0` `4dad9a0489` `9ee5873770` `01925dd5d0` `00829f2258` `413f17b8ce` `bd24fddb7e` `af2a3b74f4` `bdbbb753c5` | iPod Nano 3G port, its tools and its bootloader QR code | **N/A** | Other target. The S5L87xx bootloader the 6G shares carries these commits, but their QR code and NAND check build only for the Nano 3G. |
 | 2026-08-31 | `e498c0171a` `94d422f1c4` `20fa5f017d` `c6abf3382a` `4e4198af7a` `5448dd99a3` `44e7c009ae` `d23a19dc2d` `387b36fab7` `f349e85154` `9d86c9b201` `8ad69d6649` `376db9bf5b` `4f54dbec79` | 3DS, iriver, as3525, iBasso, erosq, ingenic, sdmmc_host, HiBy, touchscreen | **N/A** | Other targets. |
 | 2026-09-08 | `dd164cadb1` `0a0b877dc2` `3e996ec73e` `6719578e29` `7f01029439` `cbaf66f372` `d43cc0e829` | jztool, ingenic usbboot, rbutil, theme editor | **N/A** | `utils/`. |
-| 2026-08-30 | `95e9d227aa` `420537c864` `cbd8b68e06` `be35fdfe1a` `636ae404f7` | manual, CREDITS, forum URL | **N/A** | |
+| 2026-08-30 | `95e9d227aa` `420537c864` `cbd8b68e06` | manual | **N/A** | |
+| 2026-09-21 | `be35fdfe1a` | CREDITS | **N/A** | |
+| 2026-09-27 | `636ae404f7` | forum URL | **N/A** | |
 | 2026-08-31 | `3664373ce7` `8e965d9159` `a70f30adf1` `54b26ac9f1` `a967c5a018` | translation updates | **N/A** | Translation. |
 | 2026-09-27 | `2745e0b973` | FS#14011: Handle usb hosts whose first request is SET_ADDRESS | **Adopted** | Upstream's version of this fork's `a0103fa46a`, which it replaces. The `usb_log()` line stays. |
 | 2026-09-25 | `9bcdd30293` | usb_storage: flush storage when the host stops or ejects the unit | **Adopted** | |
-| 2026-10-07 | `e61aa0cd37` | usb_storage: allocate the buffer at the storage handover | **Adopted (in part)** | `GET_MAX_LUN` from the control buffer, and the handover split. The buffer is still claimed at boot, so `SET_CONFIGURATION` primes the endpoint at once. |
+| 2026-10-07 | `e61aa0cd37` | usb_storage: allocate the buffer at the storage handover | **Adopted (in part)** | `GET_MAX_LUN` from the control buffer, and the handover split. The buffer is still claimed at boot, so `usb_storage_init_connection()`, run at `SET_CONFIGURATION`, primes the endpoint at once. |
 | 2026-10-03 | `a81fd7b77f` `04ecb3c645` `330236911b` `0ed3734e5e` `374f7c0334` `ccd9f7db7e` `aaa87a4d8e` `28b4225021` `eb884aba46` `339a4a061a` `640a002b1c` `5b91d79982` `6fa80f24ce` `b15d54d852` | flac: robustness fixes and ARM assembly for the Rice reader, decorrelation and the LPC filters | **Superseded** | Upstream's 64-bit LPC kernel replaces this fork's `lpc_decode_arm_wide()`; `flac_lpc_32()` still runs it 1024 samples at a time with a yield between. The ARMv5E narrow kernel is not wired. |
 | 2026-10-14 | `c47b2e1be2` `8f38274e90` `b6b2d95309` `15eec82d8f` `deaef503bb` `e45936397e` `5d8ce62b45` `aa7ebbe057` `a6b7321d9f` `4502948cd8` `6ffbee954b` `fb2ee6c08f` `11b12894ad` `9477e371a3` `d084219b9a` `34666474b8` `2890d4a40d` `f1d7ae3bbf` `1bae7e0e0a` `b7170e03c4` `8667af5cd7` `b8861e3f09` `3966b420a3` `02d5520c5f` `fc1d445d69` `619f2f1093` `5880b6111c` `8194d51c49` `eb4cad5208` `e2f6ada2c1` | opus, wma, wmapro, vorbis, atrac3, libdemac, a52, libtremor, DSP and metadata fixes | **Adopted** | |
 | 2026-10-11 | `f4c7e8b595` `e9ab4ab222` `f159003ddb` `f282ae203a` | Support DSF, DFF, and SACD playback | **Adopted** | `.dsf`, `.dff` and `.iso` join the file browser's audio types. |
@@ -290,13 +292,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-10-15 | `798ba1064e` `879107bf40` `6f36ae4e0c` `472d4c39ab` `f6b01efdd3` | plugins | **N/A** | No plugin system. |
 | 2026-10-17 | `f8161c9884` | Korean translation | **N/A** | Translation. |
 
-Complete through `f684d3ba6a` (2026-10-18), merged as `93dfc45df3`. The
-merge before it, through `f2eaa15ac2` (2026-10-14), was `5c3e2b9aa4`, and
-the one before that, through `636ae404f7` (2026-09-27), `76df1a5859`. Both
-targets were built either side of that one and compared object by object:
-only `version.o` and `panic.o` (the commit hash) and `credits.o` (a new name)
-differ. Compare objects, not sections, because a few changed bytes shift every
-later address.
+Complete through `f684d3ba6a` (2026-10-18), merged as `93dfc45df3`.
 
 ---
 
@@ -384,6 +380,11 @@ grep -rn "<identifier>" apps-ipod/
 `apps/` file already mapped to its `apps-ipod/` counterpart, and marks `!!`
 those whose `firmware/` or `lib/` half merges in and builds. After a merge,
 pass `--since <old merge base> --to <merged commit>`.
+
+To check that a merge changed nothing it should not, build both targets either
+side of it and compare object by object. Compare objects, not sections: a few
+changed bytes shift every later address. `version.o` and `panic.o` (the commit
+hash) always differ, and `credits.o` when a name is added.
 
 To list which `apps-ipod/` file each upstream `apps/` file became:
 

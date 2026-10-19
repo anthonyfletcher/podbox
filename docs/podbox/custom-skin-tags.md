@@ -4,9 +4,7 @@ Extra skin tags added by this build on top of the standard
 Rockbox skin language. They work in `.wps` and `.sbs` files exactly like
 built-in tags.
 
-`.fms` is not one of them: neither target this build supports has a tuner
-(`CONFIG_TUNER` is commented out in both config headers), so there is no FM
-screen to draw and an `.fms` file is never rendered.
+There is no `.fms` screen in this build, so an `.fms` file is never rendered.
 
 **These tags are specific to this firmware.** A theme that uses them will not
 render correctly on stock Rockbox or on themes.rockbox.org — the tags simply
@@ -33,6 +31,43 @@ Notation used below: `i` = integer, `s` = string, `t` = a single tag (e.g.
 `%it`), `[...]` = any one of, `|` = following arguments optional, `*` = the
 preceding group repeats.
 
+## Quick index
+
+| Tag | |
+|---|---|
+| [`%tw(text[, fontid])`](#twtext-fontid--text-width-in-pixels) | text width in pixels |
+| [`%Vw`, `%Vh`](#vw--vh--current-viewport-width--height) | current viewport width, height |
+| [`%Vy([height])`](#vyheight--the-height-of-the-line-text-sits-in) | height of the line box |
+| [`%Vt(colour[, x, y, blur, opacity])`](#vtcolour-x-y-blur-opacity--drop-shadow-behind-the-text) | text shadow |
+| [`%wr(n, text)`](#wrn-text--nth-word-wrapped-line) | nth word-wrapped line |
+| [`%wt(text[, align[, fallback]])`](#wttext-align-fallback--wrapped-aligned-text-box) | wrapped, aligned text box |
+| [`%sel(subject, key, value, ...[, default])`](#selsubject-key1-value1-key2-value2--default--pick-by-match) | pick by match |
+| [`%sl(text)`](#sltext--string-length) | string length |
+| [`%sf(haystack, needle)`](#sfhaystack-needle--find-substring) | find substring |
+| [`%pd(n, text)`](#pdn-text--pad-or-truncate-to-n-columns) | pad or truncate |
+| [`%trm(text, chars)`](#trmtext-chars--strip-characters-from-both-ends) | strip characters from both ends |
+| [`%ma(a, op, b)`](#maa-op-b--integer-arithmetic) | integer arithmetic |
+| [`%Sb(bars[, align, radius, gap, peak, peakcolour])`](#sbbars-align-radius-gap-peak-peakcolour--spectrum-analyser) | spectrum analyser |
+| [`%lb`](#lb--background-index-building) | background work running |
+| [`%lw`](#lw--foreground-work-in-progress) | foreground work running |
+| [`%la`](#la--animated-spinner-frame) | spinner frame |
+| [`%La(offset[, nowrap, radius, filters])`](#laoffset-nowrap-radius-filters--list-item-album-art) | a list row's cover |
+| [`%Ld`](#ld--does-the-list-on-screen-draw-art-rows) | does this list draw art rows |
+| [`%Lb(label, width, height[, tile, art height])`](#lblabel-width-height-tile-art-height--art-row-height) | changed: art row height |
+| [`%Lk`](#lk--what-kind-of-row-this-is) | kind of row |
+| [`%Lp`](#lp--the-rows-number-among-the-tracks) | row's number among the tracks |
+| [`%Lv`](#lv--a-setting-rows-value) | a setting row's value |
+| [`%LP`](#lp--is-this-row-playing) | is this row playing |
+| [`%Cl(...[, filters, radius, label])`](#changed-behaviour-cl-album-art-filters-rounded-corners-and-names) | changed: art filters, corners, names |
+| [`%Cd([name][, x, y, width, height])`](#showing-part-of-an-artwork) | changed: named art, a window of it |
+| [`%dr(...[, opacity, radius])`](#changed-behaviour-dr-opacity-and-rounded-corners) | changed: tint, rounded corners |
+| [`!rrggbb`](#changed-behaviour-fixed-colours-rrggbb) | a colour dynamic colours leave alone |
+| [`accent`, `dominant`, `vivid`](#palette-colours-accent-dominant-and-vivid) | the album's colours |
+| [`%cs`](#changed-behaviour-cs-screen-numbers) | changed: screen numbers |
+| [`%QT` … `%Ql`](#changed-behaviour-the-q-tags-take-over-the-quickscreen) | changed: skin the quickscreen |
+| [`%Tl([seconds])`](#changed-behaviour-tl-means-any-recent-input) | changed: any recent input |
+| [`%ft(file, key)`](#changed-behaviour-ft-key-matching) | changed: key matching |
+
 ---
 
 ## Text measurement
@@ -46,9 +81,9 @@ explicit loaded font id (the number you pass to `%Fl` / the last field of `%Vl`)
 `text` has to be a **tag** — `%tw(%it)`, not `%tw(Hello)`. A literal there fails
 the skin at load. The same holds for `%wt`'s first argument and `%sel`'s subject.
 
-The explicit-font form matters when you decide layout in the viewport-
-declaration ($VD) block, which does *not* run in your title's font — pass the
-font id so the measurement is correct.
+The explicit-font form matters on a viewport-selection line (`%Vd`/`%VI`),
+which does *not* run in your title's font — pass the font id so the
+measurement is correct.
 
 ```
 # Does the title fit on one 132px line of font 2? Pick single vs wrapped layout.
@@ -162,9 +197,8 @@ Put each line on its own physical line inside a tall enough viewport:
 %wr(2,%it)
 ```
 
-This replaces the old technique of slicing a string with `%ss` at guessed
-character positions. `%wr` measures real glyph widths, so the break lands
-correctly regardless of the font or which letters the title uses.
+`%wr` measures real glyph widths, so the break lands correctly whatever the
+font or the letters in the title.
 
 > **Layout note.** If your viewport-declaration line ends in a tag that carries
 > "no line break" (most commonly `%Vf`), keep the `%wr` lines *below* it on their
@@ -183,7 +217,8 @@ alignment possible.
   **horizontal** `l`/`c`/`r` (left/centre/right). Default `tl`. E.g. `bl` =
   bottom-left, `cc` = centred, `tr` = top-right.
 - `fallback` — an optional tag drawn when `text` is empty (e.g. the filename
-  when a track has no title tag).
+  when a track has no title tag). The alignment does not accept `-`, so write
+  it out to reach the fallback: `%wt(%it, tl, %fn)`.
 
 **Eight lines at most.** A block that wraps past eight is cut there whatever the
 viewport has room for, so a tall box wanting more lines than that needs `%wr`.
@@ -229,8 +264,8 @@ levels deep: a tag below that produces nothing.
 %sel(%Lt, %Sx(Genre),Ï, %Sx(Album),Î, %Sx(Artist),s, x)
 ```
 
-This replaces long `%?if(a)<...|%?if(b)<...|...>>` chains that test the *same*
-subject over and over: `%sel` names the subject once and short-circuits on the
+Use it in place of long `%?if(a)<...|%?if(b)<...|...>>` chains that test the
+*same* subject over and over: `%sel` names the subject once and stops at the
 first match.
 
 > **What `%sel` cannot do:** its values are evaluated for their *text*. Tags that
@@ -312,9 +347,9 @@ bass on the left and treble on the right. The two alternatives are:
 There is no upper limit — the radius is fitted to the bar being drawn, so a
 short bar rounds less than a tall one.
 
-`gap` is the spacing between bars in pixels. It defaults to 1, which is what
-every `%Sb` written before the argument existed gets; `0` butts the bars
-together into a solid block. The bars share out whatever width is left after the
+`gap` is the spacing between bars in pixels. It defaults to 1, or to 0 for a
+single bar that is not radiating; `0` butts the bars together into a solid
+block. The bars share out whatever width is left after the
 gaps, so a wider gap means narrower bars rather than a narrower meter.
 
 `peak` gives each bar a falling peak cap, `peak` pixels thick. Left out, or 0,
@@ -348,6 +383,77 @@ ones. Give them as `-` to keep the default:
 %V(20,40,120,60,-)%Sb(5, center, 1, -, 3, 80D0FF)  # centred, a cap each end
 ```
 
+### `%lb` — background index building
+
+Non-empty (`"b"`) while any of three background passes is running — the music
+database, the album-art thumbnail cache, or the document/image index —
+otherwise empty. Any of them can be why the player feels slow, so they share
+one indicator. Use it as a conditional to show a "busy" glyph:
+
+```
+%?lb<...building indicator...>
+```
+
+It stays empty while **Show Background Tasks** is off. That setting is on by
+default, in `Settings > Appearance > Interface Elements > Activity Indicators`
+with the two below.
+
+### `%lw` — foreground work in progress
+
+Non-empty (`"w"`) while the UI is busy with something the user did ask for and
+is waiting on: the file browser waiting for a directory-cache scan, the database
+browser exporting or importing modifications. Where `%lb` means "something is
+happening behind your back", `%lw` means "the thing you just asked for is still
+going".
+
+```
+%?lw<...busy...>
+```
+
+It stays empty while **Show Working** is off; that is on by default. The
+standard `%lh` disk indicator likewise needs **Show Disk Activity**, which is
+off by default.
+
+### `%la` — animated spinner frame
+
+A frame index. Combine it with a conditional that lists the frames; `%la` cycles
+through however many you provide, so the spinner animates through ordinary
+refreshes:
+
+```
+%?la<Ð|Ñ|Ò|Ó>        # a 4-frame spinner
+```
+
+Best placed in a viewport that is only shown while something is loading.
+
+**One revolution a second.** The gap between frames is a second divided by
+however many you provide, so a four-frame spinner steps four times a second and
+a twenty-frame one twenty times. Both come round in exactly a second, as does
+any frame count that divides 100 — 2, 4, 5, 10, 20, 25, 50. Anything else falls
+a little short, and past about 25 it shows: 30 frames turn in 0.9s, 60 in 0.6s.
+Pick a divisor of 100 and the frame count changes how finely the turn is
+divided, not how fast it turns.
+
+**Short frames are skipped, not queued.** A frame shorter than the screen's
+repaint interval may never be shown, and the status bar repaints slowest. Keep
+a spinner whose frames are all distinct, such as an ASCII one, to a handful of
+frames; many frames that differ only slightly lose nothing visible.
+
+If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
+
+```
+%?la<%||/|-|\>       # an ASCII spinner: | / - \
+```
+
+---
+
+## List rows
+
+Tags for a skinned list: `%La`, `%Ld` and `%Lb`'s fifth argument draw cover
+art in the rows, and `%Lk`, `%Lp`, `%Lv` and `%LP` say what a row is, beyond
+the text and icon `%LT` and `%LI` give. Those four take `%LT`'s arguments: an
+offset to ask about another row, and `nowrap`.
+
 ### `%La(offset[, nowrap][, radius][, filters])` — list-item album art
 
 Album art for a menu/list row, alongside the standard `%LT` list text and `%LI`
@@ -356,11 +462,9 @@ row); it defaults to 0. Pass `nowrap` to stop the offset wrapping around the
 ends of the list.
 
 A third argument rounds the cover's corners, in pixels, the way `%Cl`'s eighth
-does — anti-aliased, and blended with the row rather than knocked back to a
-colour, because the row's background is already drawn by the time the cover
-goes down. Unlike `%Cl` there is nothing to clamp it against when the skin
-loads, since a row's art is sized by its viewport; a radius too large for the
-cover that turns up is dropped and that cover keeps square corners.
+does — anti-aliased, and blended with the row's background. Above **32** the
+skin fails to load. A radius too large for the cover that turns up is dropped
+and that cover keeps square corners.
 
 **It only draws inside a skinned list's row layout** — a `%Vl(label, …)`
 viewport belonging to a `%Lb(label, …)` list, which is the same context `%LT`
@@ -376,12 +480,10 @@ offers rows one size, **44×44** — nothing above 64 pixels is offered to a row
 all — so make the viewport 44×44 and the cover fills it.
 
 A fourth argument filters the cover, with the same names `%Cl` takes and the
-same `+` joining them, minus `blur` — that one needs a destination of its own
-and a row's cover is drawn straight from the browser's slot. An unrecognised
-name fails the skin at load rather than quietly drawing nothing.
+same `+` joining them, minus `blur`. An unrecognised name fails the skin at
+load rather than quietly drawing nothing.
 
-**The adaptive filters are refused here.** A row's cover is never measured, so
-there is no brightness for one to work from. `scrim` is not available at all;
+**The adaptive filters are refused here.** `scrim` is not available at all;
 `lighter` and `darker` are, but only with an amount written — `darker30`, not a
 bare `darker`. Either mistake fails the skin at load and names itself, the same
 way a misspelt filter does.
@@ -412,78 +514,25 @@ of the usual `%?Lc<…>` text colour swap. The opacity is doing the work, not
 just setting the depth: a *tinted* `%dr` is held back until after the artwork
 has been drawn, while an opaque one draws where you wrote it and the cover
 lands on top. Keep it in the artwork's own viewport, and give it an explicit
-colour — `-` on a tinted `%dr` takes the *theme* foreground. If the cover is
+colour — `-` takes the foreground the viewport was declared with, not one a
+later `%Vf` set (see [`%dr`](#changed-behaviour-dr-opacity-and-rounded-corners)).
+If the cover is
 rounded, give the `%dr` the same radius or the tint squares the corners off
 again.
 
-
-### `%lb` — background index building
-
-Non-empty (`"b"`) while any of three background passes is running — the music
-database, the album-art thumbnail cache, or the document/image index —
-otherwise empty. All three are
-work the user did not ask for and cannot see, and any of them can be why the
-player feels slow, so they share one indicator. Use it as a conditional to show
-a "busy" glyph:
-
-```
-%?lb<...building indicator...>
-```
-
-### `%lw` — foreground work in progress
-
-Non-empty (`"w"`) while the UI is busy with something the user did ask for and
-is waiting on: the file browser waiting for a directory-cache scan, the database
-browser exporting or importing modifications. Where `%lb` means "something is happening behind your back", `%lw`
-means "the thing you just asked for is still going".
-
-```
-%?lw<...busy...>
-```
-
-### `%la` — animated spinner frame
-
-A frame index. Combine it with a conditional that lists the frames; `%la` cycles
-through however many you provide, so the spinner animates through ordinary
-refreshes:
-
-```
-%?la<Ð|Ñ|Ò|Ó>        # a 4-frame spinner
-```
-
-Best placed in a viewport that is only shown while something is loading.
-
-**One revolution a second.** The gap between frames is a second divided by
-however many you provide, so a four-frame spinner steps four times a second and
-a twenty-frame one twenty times. Both come round in exactly a second, as does
-any frame count that divides 100 — 2, 4, 5, 10, 20, 25, 50. Anything else falls
-a little short, and past about 25 it shows: 30 frames turn in 0.9s, 60 in 0.6s.
-Pick a divisor of 100 and the frame count changes how finely the turn is
-divided, not how fast it turns.
-
-**It is a reading of the clock, not a counter**, and that is why frames can be
-missed rather than queued. Whoever draws the tag samples it, so a frame shorter
-than that drawer's repaint interval is stepped straight over. The slowest
-sampler is the status bar. A handful of frames each last longer than that and
-none is lost — which is what a four-glyph ASCII spinner needs, since every frame
-is distinct there and a dropped one shows. Twenty frames step faster than the
-repaint and some are skipped, which is invisible when consecutive frames differ
-only slightly. No single fixed interval could serve both.
-
-If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
-
-```
-%?la<%||/|-|\>       # an ASCII spinner: | / - \
-```
-
----
-
 ### `%Ld` — does the list on screen draw art rows
 
-True while the list being drawn is a database album or artist level with its
-art switch on. It takes no arguments, and unlike `%?La` it answers before any
-row has been drawn — so it works in status-bar chrome, on a tiled list, and as
-the test on a conditional that picks a row config:
+True while the list on screen draws art rows, each kind behind its own switch
+in `Settings > Appearance > Interface Elements > Art Rows`:
+
+- a database album or artist list — **Album Art Rows**, **Artist Art Rows**;
+- an audiobook book or author list — **Audiobook Art Rows**, **Author Art
+  Rows**;
+- the Audiobooks shelf — **Audiobook Art Rows**.
+
+`%?La` is true on the same lists. `%Ld` takes no arguments, and unlike `%?La`
+it answers before any row has been drawn — so it works in status-bar chrome, on
+a tiled list, and as the test on a conditional that picks a row config:
 
 ```
 %?Ld<%Lb(Covers,300,66)|%Lb(Rows,300,30)>
@@ -498,13 +547,26 @@ Inside a row the two agree, and there `%?La` reads better.
 For a second row *height* you do not need this tag: that is `%Lb`'s fifth
 argument, below.
 
----
+### `%Lb(label, width, height[, tile][, art height])` — art row height
 
-## List rows
+A change to the standard `%Lb`: a fifth argument is the row pitch for a list
+that draws art. Leave it out and `%Lb` behaves as on stock Rockbox.
 
-Four tags say what a list row is, beyond the text and icon `%LT` and `%LI`
-give. Each takes `%LT`'s arguments: an offset to ask about another row, and
-`nowrap`.
+```
+%Lb(Rows,300,30)          # 30px rows, always
+%Lb(Rows,300,30,-,46)     # 30px rows, 46px on an art list
+%Lb(Grid,100,90,tile)     # a cover grid, unchanged
+```
+
+Write the tile argument as `-` to reach past it.
+
+Leave it out and the height comes from `database art row height` in the theme
+`.cfg` instead — one value for every art list on the player, rather than one per
+row config.
+
+**It must not be less than the ordinary height.** Equal is fine; set it lower
+and the list stops counting as an art list: `%?La` goes false and your art
+branch never draws.
 
 ### `%Lk` — what kind of row this is
 
@@ -564,29 +626,7 @@ list and the file browser.
 %?LP<* |>%LT
 ```
 
-## Changed behaviour: `%Lb`'s art row height
-
-```
-%Lb(label, width, height [, tile] [, art height])
-```
-
-A fifth argument is the row pitch for a list that draws art. Leave it out and
-`%Lb` behaves as it always has.
-
-```
-%Lb(Rows,300,30)          # 30px rows, always
-%Lb(Rows,300,30,-,46)     # 30px rows, 46px on an art list
-%Lb(Grid,100,90,tile)     # a cover grid, unchanged
-```
-
-Write the tile argument as `-` to reach past it.
-
-Leave it out and the height comes from `database art row height` in the theme
-`.cfg` instead — one value for every art list on the player, rather than one per
-row config.
-
-**It must exceed the ordinary height.** Set the two equal and the list stops
-counting as an art list: `%?La` goes false and your art branch never draws.
+---
 
 ## Changed behaviour: `%Cl` album art filters, rounded corners and names
 
@@ -641,8 +681,8 @@ in a large box than a small one.
 **`lighter` and `darker` scale, they do not slide.** The amount is a percentage
 of what the picture already is, not a distance toward an end of the scale:
 `lighter50` is half as bright again, `lighter200` three times as bright, and only
-`darker100` — a scale of zero — reaches an end. That is why `lighter` runs to
-300 while `darker` stops at 100. For the sliding kind, use `brightness`.
+`darker100` — a scale of zero — reaches an end. For the sliding kind, use
+`brightness`.
 
 **With no amount they adapt to the artwork**, each holding to a fixed target and
 moving one way only, so a cover already past it is left alone rather than dragged
@@ -660,8 +700,7 @@ are running. If your text is drawn in a pinned colour instead, such as
   parts of the picture are untouched. A bright colour keeps its colour and
   loses only brightness, so white comes out a mid grey while a vivid orange
   stays orange.
-- **It only ever darkens.** Facing dark text it does nothing at all, because a
-  dark accent is itself evidence that the artwork is already light.
+- **It only ever darkens.** Facing dark text it does nothing at all.
 - **A cover already clear of the text is left as it is.**
 - **On a chain without `blur` it is cut once.** A scrim is cut for one text
   colour, and the palette can move without the artwork changing — turning dynamic
@@ -758,7 +797,7 @@ Two things that follow:
   declared — declare one in each and let the matching size do the sharing.
   The *pixels* cross the boundary; the name does not.
 - **A blurred `%Cl` always counts as its own size**, because it claims a
-  decimated source. That is what makes it cheap, not expensive.
+  decimated source.
 
 ### Showing part of an artwork
 
@@ -802,12 +841,12 @@ from `0` (invisible) to `15` (opaque), and leaving it out means opaque, so every
 `%dr` you have already written behaves exactly as before.
 
 Arguments are positional, so reaching the seventh means writing the two colours.
-**Write the colour out; do not pass `-`.** A `-` means "the viewport foreground
-as it stood when the parser reached this line", and `%Vf` only feeds into that on
-the viewport's own declaration line — so a `-` anywhere below quietly takes the
-*theme* foreground. On a light-on-dark theme that turns a scrim into a white
-wash, which looks exactly like the blending being broken when it is working
-perfectly.
+**Write the colour out; do not pass `-`.** A `-` means the foreground the
+viewport was declared with: a `%Vf` on its own declaration line, and otherwise
+the theme foreground — or, in a `.wps`, the colour of the `.sbs` `%Vi`. A `%Vf`
+on a later line does not count. On a light-on-dark theme that can turn a scrim
+into a white wash, which looks exactly like the blending being broken.
+`checkwps --viewports` shows the colour each viewport was declared with.
 
 ### Where a tint has to go
 
@@ -877,9 +916,8 @@ An eighth argument rounds the corners, in pixels, and smooths them:
 
 Radius `0`, or leaving it out, gives the square corners every `%dr` has always
 had. A radius larger than half the shorter side is reduced to fit, so a square
-box asking for half its own width comes out as a circle. Above **32** it is an
-error rather than a clamp — the mask grows as the square of the radius, and a
-64-pixel corner is larger than anything a 320x240 screen has room for.
+box asking for half its own width comes out as a circle. Above **32** the skin
+fails to load.
 
 The corners are anti-aliased, blending with whatever is underneath, which is
 where the two useful facts about them come from:
@@ -895,8 +933,7 @@ where the two useful facts about them come from:
 
 **Gradients and a radius do not combine**, the same way gradients and opacity
 do not: give both an `end_colour` and a radius and the rectangle is filled with
-the start colour. A gradient corner would have to interpolate the row colour a
-second time and agree with the driver on every row.
+the start colour.
 
 ---
 
@@ -928,7 +965,7 @@ It works on every argument that takes an `RRGGBB`:
 %dr(0,0,-,20,!ff0000)         # rectangle fill
 ```
 
-Four things worth knowing:
+Three things worth knowing:
 
 - **A fixed foreground is inherited.** The tags that default to the viewport's
   foreground — `%dr`'s fill written as `-`, `%Vg`'s omitted text colour — pick
@@ -942,8 +979,10 @@ Four things worth knowing:
 - **`!` is skin-only.** Colours in a `.cfg` — `foreground color`, `background
   color`, the line selector — are the theme's roles, and they do not take the
   prefix.
-With **Dynamic Colours** off in the settings, `!rrggbb` and `rrggbb` are the
-same colour; nothing is being remapped either way.
+
+With `Settings > Appearance > Interface Colours > Dynamic Colors` off,
+`!rrggbb` and `rrggbb` are the same colour; nothing is being remapped either
+way.
 
 ---
 
@@ -1013,7 +1052,7 @@ tone of the same colour is written, such as the lower half of a glossy bar:
 
 ### With no album colours
 
-Before anything has played, or with **Dynamic Colours** off, a word is the
+Before anything has played, or with **Dynamic Colors** off, a word is the
 theme's foreground colour (`dominant`: its background), bounded and shaded the
 same way. Add `:rrggbb` to give a colour of your own instead, used exactly as
 written, so the skin looks as designed until something plays:
@@ -1031,8 +1070,7 @@ are skin-only; a `.cfg` does not take them.
 ## Changed behaviour: `%cs` screen numbers
 
 `%cs` reports which screen is on, as a number, and this build has screens
-upstream does not. The numbers are an interface: a skin encodes them, so they
-are only ever appended to, never renumbered.
+upstream does not. The numbers never change; a new screen gets the next one.
 
 | | | | |
 |---|---|---|---|
@@ -1047,9 +1085,8 @@ are only ever appended to, never renumbered.
 | 8 database | 18 bookmarks | 28 images | 38 book shelf |
 | 9 *unused* | 19 shortcuts | 29 search | 39 music quiz |
 
-The gaps are real and stay: 3 and 4 are recording and radio, 9 and 14 the plugin
-browser and a running plugin, 11 the pitch screen. None of them can happen here.
-A skin may test them; it will never match.
+3, 4, 9, 11 and 14 never come up in this build. A skin may test them; it will
+never match.
 
 Two are worth knowing about before you write a branch for them:
 
@@ -1057,7 +1094,7 @@ Two are worth knowing about before you write a branch for them:
   itself and your `.sbs` is not rendered at all while the cable is in. See §6 of
   [`theme-guide.md`](theme-guide.md).
 - **22, the album covers carousel, draws only your status bar** — and only
-  while *Album Covers Status Bar* is on. The rest of the screen is the
+  while `Settings > Appearance > Carousel > Status Bar` is on. The rest of the screen is the
   carousel's, coloured from the `.cfg` rather than from your skin.
 
 ---

@@ -1,7 +1,7 @@
 # Settings guide
 
-This document is a guide to every setting PodBox has (which is MANY), in the order you 
-meet it, with what it does and whether it is hidden by default.
+This document is a guide to every setting PodBox has, in the order you meet
+it, with what it does and whether it is hidden by default.
 
 ---
 
@@ -14,17 +14,15 @@ how much you see.
   shows.
 - **Everything** shows all of them.
 
-A setting is marked advanced when the default is already the right answer for
-someone who has not thought about it — because you would need to know how the
-feature works to set it, or because it shapes something whose on/off row is
-elsewhere.
+A row marked **Cfg** has no menu row in either mode: it is set by a line in a
+theme's `.cfg` file, or one you add to a `.cfg` by hand.
 
-Two things are never hidden, whatever the mode:
+Two kinds of row are shown in both modes:
 
-- **destructive actions**, because hiding Update Database would hide the fix for
-  *my new album isn't showing up*;
-- **the way back from a visible problem** — Dynamic Colors stays in Standard
-  even though its tuning does not.
+- **the Maintenance actions**, so Update Database is always there for *my new
+  album isn't showing up*;
+- **Dynamic Colors and Dynamic Colors Background**, so a screen the artwork
+  has recoloured can always be put back.
 
 ---
 
@@ -48,238 +46,207 @@ Settings
 
 ---
 
-## Library — Maintenance
-
-Not settings but actions, gathered into one screen so the difference between
-them can be read rather than remembered. Ordered cheapest first, and each asks
-before it starts. All of them queue work for the background and return at once.
-
-| Action | What it does |
-|---|---|
-| Update Database | Finds music added since the last scan. The fix for *my new album isn't showing up*. |
-| Update Index | Makes Album Covers lay out its covers afresh the next time it opens. |
-| Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned, and redoes those whose image was replaced or deleted. |
-| Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
-| Update Sound Analysis | Measures tracks the sound analysis has not covered, and retries any it could not read. Needs the charger, and holds the player while it runs. |
-| Rebuild Playback Report | Discards the report's saved figures, the track names it resolved and the moved folders it matched, so it reads the log and the database again. For names that still look wrong after a database update. |
-| Rebuild Database | Discards the database and reads every file again, keeping play counts and ratings. Slow. |
-| Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
-| Rebuild Sound Analysis | Measures every track again. Hours on a full library. |
-
-The two Sound Analysis rows appear only once **Playlist Engine** is on, and
-unlike the rest they hold the player rather than queueing work. **Rebuild
-Playback Report** queues nothing either: it clears two cached files, and the
-report rebuilds them itself the next time you open it.
-
-**Update Database** and **Rebuild Database** are much faster from a Windows PC:
-`database_pb.exe` in `.rockbox/tools/` does the same work on the connected
-player, or `database_pb.exe --rebuild` for a rebuild. The player restarts
-itself when ejected, to load the new database. **Update Art Cache** and
-**Rebuild Art Cache** have `artcache_pb.exe` beside it, run the same way;
-after new music, run it after `database_pb.exe`.
-
----
-
 ### Sound Settings
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Volume | Output level, and the same value the volume buttons move. Shown in decibels below maximum, so -25 dB is quieter than -10 dB. | -25 |  |
-| Maximum Volume Limit | A ceiling the volume control cannot pass. Useful with sensitive earphones, where the usable range is squeezed into the bottom of the scale. | 6 |  |
-| Bass | Lifts or cuts the low end. Bass Cutoff decides how far up it reaches. | 0 |  |
-| Bass Cutoff | The frequency Bass works below. A lower number lifts only the deepest notes; a higher one reaches up into the lower mids and can muddy voices. | 1 | **Adv** |
-| Treble | Lifts or cuts the high end. Treble Cutoff decides how far down it reaches. | 0 |  |
-| Treble Cutoff | The frequency Treble works above. Lower reaches down towards voices, higher affects only the very top. | 1 | **Adv** |
-| Balance | Shifts the output towards one ear. Meant for correcting a hearing difference or a worn earphone, not for effect. | 0 |  |
-| Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. | stereo |  |
-| Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100 |  |
-| Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. | off | **Adv** |
-| Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. Subtle by design; if you can hear it working it is set too high. | off |  |
+| Volume | Output level, and the same value the volume buttons move. Shown in decibels below maximum, so -25 dB is quieter than -10 dB. | -25 dB |  |
+| Maximum Volume Limit | A ceiling the volume control cannot pass. Useful with sensitive earphones, where the usable range is squeezed into the bottom of the scale. | 12 dB (iPod Classic), 6 dB (iPod Video) |  |
+| Bass | Lifts or cuts the low end. Bass Cutoff decides how far up it reaches. | 0 dB |  |
+| Bass Cutoff | The frequency Bass works below. A lower number lifts only the deepest notes; a higher one reaches up into the lower mids and can muddy voices. Only does anything while Bass is set away from zero. | 2 (iPod Classic), 1 (iPod Video) | **Adv** |
+| Treble | Lifts or cuts the high end. Treble Cutoff decides how far down it reaches. | 0 dB |  |
+| Treble Cutoff | The frequency Treble works above. Lower reaches down towards voices, higher affects only the very top. Only does anything while Treble is set away from zero. | 1 | **Adv** |
+| Balance | Shifts the output towards one ear. Meant for correcting a hearing difference or a worn earphone, not for effect. | 0% |  |
+| Channel Configuration | What ends up in each ear: normal stereo, both channels mixed to mono, one channel in both ears, the two swapped, or karaoke, which cancels whatever is common to both and so removes most centred vocals. Mono is the useful one if you often listen with a single earbud. | Stereo |  |
+| Stereo Width | Widens or narrows the stereo image. Below 100% pulls it towards mono; above pushes it apart, which can sound impressive briefly and tiring for long. | 100% |  |
+| Dithering | Adds a very quiet noise when reducing bit depth, which trades a little hiss for the absence of a particular kind of distortion on very quiet passages. Inaudible on almost all material through headphones. | No | **Adv** |
+| Auditory Fatigue Reduction | Tames the harshness that makes long listening tiring, mostly in the upper mids. If you can hear it working, it is set too high. | Off |  |
 
 ### Sound Settings — Crossfeed
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Crossfeed | Bleeds a little of each channel into the other, with a delay, so headphones sound less like two separate sources bolted to your head. | off |  |
-| Direct Gain | The level of the sound that reaches the ear it was mixed for. Lowering it makes the effect stronger by making the crossfed path relatively louder. | -15 | **Adv** |
-| Cross Gain | The level of the sound crossing to the other ear. The main strength control: closer to the direct gain means a narrower, more speaker-like image. | -60 | **Adv** |
-| High-Frequency Attenuation | How much the crossed-over sound is dulled. A real head blocks high frequencies far more than low ones, so this is what makes the effect sound natural rather than like an echo. | -160 | **Adv** |
-| High-Frequency Cutoff | The frequency above which the crossfed signal -- the part bled into the opposite ear -- starts being dulled. Lower values roll it off earlier and give a warmer, more distant effect. | 700 | **Adv** |
+| Crossfeed | Bleeds a little of each channel into the other, with a delay, so headphones sound less like two separate sources bolted to your head. Most noticeable on older recordings mixed hard left and right. | Off |  |
+| Direct Gain | The level of the sound that reaches the ear it was mixed for. Lowering it makes the effect stronger by making the crossfed path relatively louder. | -1.5 dB | **Adv** |
+| Cross Gain | The level of the sound crossing to the other ear. The main strength control: closer to the direct gain means a narrower, more speaker-like image. | -6.0 dB | **Adv** |
+| High-Frequency Attenuation | How much the crossed-over sound is dulled. A real head blocks high frequencies far more than low ones, so this is what makes the effect sound natural rather than like an echo. | -16.0 dB | **Adv** |
+| High-Frequency Cutoff | The frequency above which the crossfed signal -- the part bled into the opposite ear -- starts being dulled. Lower values roll it off earlier and give a warmer, more distant effect. | 700 Hz | **Adv** |
 
 ### Sound Settings — Equalizer
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enable EQ | Master switch for the ten-band equaliser. Graphical EQ is usually an easier starting point than setting the bands by hand. | off |  |
-| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. | 0 | **Adv** |
+| Enable EQ | Master switch for the ten-band equaliser. Graphical EQ is usually an easier starting point than setting the bands by hand. | No |  |
+| Precut | Attenuates everything before the equaliser runs, to leave room for bands you have boosted. Boosting a band without precut can push the signal past what the output can represent, which clips and sounds harsh. If a preset sounds worse loud than quiet, this is the first thing to try. | 0 dB | **Adv** |
 
 ### Sound Settings — Haas Surround
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Haas Surround | Delay in milliseconds for the Haas effect, which widens the image by delaying part of the signal rather than by changing its level. Zero is off. | off |  |
-| Balance | How the widened signal is weighted between left and right. | 35 | **Adv** |
-| f(x1) | The upper frequency limit of the Haas effect. | 3400 | **Adv** |
-| f(x2) | The lower frequency limit of the Haas effect. | 320 | **Adv** |
-| Side Only | Applies the effect only to the difference between the channels, leaving anything mixed to the centre -- usually the voice -- untouched. | off | **Adv** |
-| Dry / Wet Mix | How much of the effect is blended with the untouched signal. Lower values keep the original intact and add a suggestion of width. | 50 | **Adv** |
+| Haas Surround | Delay in milliseconds for the Haas effect, which widens the image by delaying part of the signal rather than by changing its level. Zero is off. | Off |  |
+| Balance | How the widened signal is weighted between left and right. | 35% | **Adv** |
+| f(x1) | The upper frequency limit of the Haas effect. The effect works by delaying part of the signal, which smears sound that has sharp attacks. Keeping the band away from the top end leaves cymbals and consonants alone. | 3400 Hz | **Adv** |
+| f(x2) | The lower frequency limit of the Haas effect. Bass carries most of the energy and almost none of the directional information, so leaving it out of the effect keeps the low end solid. | 320 Hz | **Adv** |
+| Side Only | Applies the effect only to the difference between the channels, leaving anything mixed to the centre -- usually the voice -- untouched. | No | **Adv** |
+| Dry / Wet Mix | How much of the effect is blended with the untouched signal. Lower values keep the original intact and add a suggestion of width. | 50% | **Adv** |
 
 ### Sound Settings — Perceptual Bass Enhancement
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Perceptual Bass Enhancement | Adds harmonics above notes that are too low for small drivers to reproduce, so the ear infers the bass that is not physically there. Strength is a percentage; it distorts if pushed. | 0 |  |
-| Precut | Attenuates the signal so the harmonics the effect adds do not push it into clipping. | -25 | **Adv** |
+| Perceptual Bass Enhancement | Adds harmonics above notes that are too low for small drivers to reproduce, so the ear infers the bass that is not physically there. Strength is a percentage; it distorts if pushed. | 0% |  |
+| Precut | Attenuates the signal so the harmonics the effect adds do not push it into clipping. | -2.5 dB | **Adv** |
 
 ### Sound Settings — Compressor
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Threshold | The level above which compression starts, and the switch for the whole effect -- at 0 dB nothing is compressed. | 0 | **Adv** |
-| Makeup Gain | Compression makes loud parts quieter, so the whole track ends up quieter. This puts the level back. | auto | **Adv** |
+| Threshold | The level above which compression starts, and the switch for the whole effect -- at 0 dB nothing is compressed. Compression narrows the gap between loud and quiet, which keeps quiet passages audible on a noisy train at the cost of some dynamics. | Off | **Adv** |
+| Makeup Gain | Compression makes loud parts quieter, so the whole track ends up quieter. This puts the level back. Auto works out how much was lost and adds it back, which is what you want unless you are matching another device. | Auto | **Adv** |
 | Ratio | How hard the signal is held down once past the threshold. 2:1 is gentle, Limit allows essentially nothing above it. | 4:1 | **Adv** |
-| Knee | How abruptly compression starts once the signal passes the threshold. | soft knee | **Adv** |
-| Attack Time | How quickly compression clamps down after a loud passage begins. Short catches transients and can dull drums; longer lets the initial hit through. | 5 | **Adv** |
-| Release Time | How quickly it lets go again. Too short pumps audibly on bass notes; too long leaves quiet material compressed after the loud part has passed. | 500 | **Adv** |
+| Knee | How abruptly compression starts once the signal passes the threshold. Hard knee applies the full ratio the moment the threshold is crossed. Soft knee eases it in over a few decibels, which is less audible on music. | Soft Knee | **Adv** |
+| Attack Time | How quickly compression clamps down after a loud passage begins. Short catches transients and can dull drums; longer lets the initial hit through. | 5 ms | **Adv** |
+| Release Time | How quickly it lets go again. Too short pumps audibly on bass notes; too long leaves quiet material compressed after the loud part has passed. | 500 ms | **Adv** |
 
 ### Playback
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Shuffle | Plays the current list in a random order. Changing it reshuffles what is already playing rather than waiting for the next list. | off |  |
-| Repeat | What happens at the end of the list: stop, start again, repeat the one track, reshuffle and go again, or loop between two marks you set. | off |  |
-| Play Selected First | Choosing a track starts from that track rather than from the top of the folder, with the rest of the folder queued behind it. | on |  |
-| Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. | 5 | **Adv** |
-| Fade on Stop/Pause | Ramps the volume down and up on stop and pause instead of cutting, which avoids the click a hard stop can produce. | on |  |
-| Single Mode | Stops after the current track, album, artist, genre or playlist instead of carrying on. Useful for falling asleep to one record. | off |  |
-| Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | off | **Adv** |
-| Auto-Change Directory | At the end of a folder, move on rather than stopping: to the next folder, or to one picked at random. The In Start Directory choices never leave the folder set with Start Directory in the file browser. Random picks one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | off |  |
-| Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | off | **Adv** |
-| Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files and .mp3 files with chapter frames, and a book of more than 99 chapters lists the first 99 of them. | off | **Adv** |
-| Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | track | **Adv** |
-| Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | off | **Adv** |
-| Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | auto | **Adv** |
-| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | on | **Adv** |
+| Shuffle | Plays the current list in a random order. Changing it reshuffles what is already playing rather than waiting for the next list. | No |  |
+| Repeat | What happens at the end of the list: stop, start again, repeat the one track, reshuffle and go again, or loop between two marks you set. | Off |  |
+| Play Selected First | Choosing a track starts from that track rather than from the top of the folder, with the rest of the folder queued behind it. | Yes |  |
+| Anti-Skip Buffer | How much audio is read ahead and held in memory before the disk is allowed to stop. Raise it if playback stutters when the player is jostled. The cost is battery: a bigger buffer means longer reads, but fewer of them. | 5 s | **Adv** |
+| Fade on Stop/Pause | Ramps the volume down and up on stop and pause instead of cutting, which avoids the click a hard stop can produce. | Yes |  |
+| Single Mode | Stops after the current track, album, artist, genre or playlist instead of carrying on. Useful for falling asleep to one record. | Off |  |
+| Track Skip Beep | A short beep when skipping tracks, as feedback that the press registered. | Off | **Adv** |
+| Auto-Change Directory | At the end of a folder, move on rather than stopping: to the next folder, or to one picked at random. The In Start Directory choices never leave the folder set with Start Directory in the file browser. Random picks one level at a time: each artist folder has the same chance, then each album in it, so an artist with one album comes up as often as one with twenty. | No |  |
+| Cuesheet Support | Reads .cue files, so an album ripped as one long file still shows track names and can be skipped through. | No | **Adv** |
+| Chapter Marks | Reads the chapter list an audiobook carries inside it, so one long file shows its chapter names, skips between them and marks them on the progress bar. It reads .m4b files and .mp3 files with chapter frames, and a book of more than 99 chapters lists the first 99 of them. | No | **Adv** |
+| Skip Length | Makes skip jump a fixed amount of time instead of a whole track. For long podcasts and mixes, where a track is an hour. | Skip Track | **Adv** |
+| Prevent Track Skipping | Disables skipping entirely. For handing the player to someone else, or a pocket that presses buttons. | No | **Adv** |
+| Frequency | The sample rate the output runs at. Auto follows the file and is right almost always; forcing a rate resamples everything. | Auto | **Adv** |
+| Logging | Records what was played and when. On feeds the listening statistics; the Last.fm setting writes a scrobble log a computer can upload. In Last.fm mode the Playback Report reads that log, so an uploader that empties it after sending also restarts the Report's totals and streaks. | On | **Adv** |
 
 ### Playback — Fast-Forward/Rewind
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Minimum Step | How far the first press of fast forward or rewind moves. Smaller is better for finding a moment in a song, larger for crossing a long file. | 1 | **Adv** |
-| Acceleration | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | normal | **Adv** |
-| Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | off | **Adv** |
-| Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
-| Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | 0 | **Adv** |
+| Minimum Step | How far the first press of fast forward or rewind moves. Smaller is better for finding a moment in a song, larger for crossing a long file. | 1 s | **Adv** |
+| Acceleration | How quickly held seeking speeds up. Faster crosses an hour-long file in a moment but overshoots a three-minute song. | Normal | **Adv** |
+| Rewind Across Tracks | Rewinding past the start of a track continues into the previous one instead of stopping at the beginning. | No | **Adv** |
+| Rewind Before Resume | Backs up a few seconds when resuming, so you hear a little of what came before rather than restarting mid-word. | Off | **Adv** |
+| Rewind on Pause | Backs up a few seconds every time you unpause, so you hear a little of what came before rather than restarting mid-word. | Off | **Adv** |
 
 ### Playback — Crossfade
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enable Crossfade | Overlaps the end of one track with the start of the next. | off |  |
-| Fade-In Delay | How long to wait after the incoming track starts before its volume begins to rise. | 0 | **Adv** |
-| Fade-In Duration | How long the incoming track takes to reach full volume. | 2 | **Adv** |
-| Fade-Out Delay | How long the outgoing track holds its level before starting to fall. | 0 | **Adv** |
-| Fade-Out Duration | How long the outgoing track takes to fall silent. Longer overlaps blur the join more. | 2 | **Adv** |
-| Fade-Out Mode | Crossfade dips both tracks through the join. Mix holds the total level roughly constant, which sounds fuller but muddier where both tracks are busy. | crossfade | **Adv** |
+| Enable Crossfade | Overlaps the end of one track with the start of the next. The setting chooses when it happens: only when a track ends on its own, only when you skip, or always. Overlapping a deliberately gapless album is usually not what you want. | Off |  |
+| Fade-In Delay | How long to wait after the incoming track starts before its volume begins to rise. | 0 s | **Adv** |
+| Fade-In Duration | How long the incoming track takes to reach full volume. | 2 s | **Adv** |
+| Fade-Out Delay | How long the outgoing track holds its level before starting to fall. | 0 s | **Adv** |
+| Fade-Out Duration | How long the outgoing track takes to fall silent. Longer overlaps blur the join more. | 2 s | **Adv** |
+| Fade-Out Mode | Crossfade dips both tracks through the join. Mix holds the total level roughly constant, which sounds fuller but muddier where both tracks are busy. | Crossfade | **Adv** |
 
 ### Playback — Replaygain
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. | track shuffle |  |
-| Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | off | **Adv** |
-| Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. | 0 | **Adv** |
+| Replaygain Type | Uses the loudness information many rippers write into files, so albums recorded at different levels play at a similar volume. Album gain keeps the balance between tracks on one record; track gain levels everything, which suits shuffling. | Track Gain If Shuffling |  |
+| Prevent Clipping | Backs the gain off when applying it would push the track into clipping, rather than clipping it. | No | **Adv** |
+| Pre-amp | A fixed adjustment applied on top of whatever Replaygain works out. Useful if the whole library ends up quieter than you want once levelling is applied. | 0 dB | **Adv** |
 
 ### Playback — Pause on Unplug
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Pause on Unplug | Pauses when whatever is playing is unplugged -- headphones, a USB DAC, a dock or a car -- so the music does not carry on without you or out of the iPod's socket. Pause and Resume carries on when the same one is plugged back in. | pause and resume |  |
-| Disable resume on startup if phones unplugged | Stops the player resuming at power-on when nothing is plugged in, which otherwise plays into a dock or an empty socket. | off | **Adv** |
+| Pause on Unplug | Pauses when whatever is playing is unplugged -- headphones, a USB DAC, a dock or a car -- so the music does not carry on without you or out of the iPod's socket. Pause and Resume carries on when the same one is plugged back in. | Pause and Resume |  |
+| Disable resume on startup if phones unplugged | Stops the player resuming at power-on when nothing is plugged in, which otherwise plays into a dock or an empty socket. | No | **Adv** |
 
 ### Playback — Playlists
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort Playlists | The order saved playlists are listed in: by name, or by when they were made. | alpha |  |
-| Playlist Viewer Settings ▸ Show Icons | Draws icons beside the entries in the playing queue. | on |  |
-| Playlist Viewer Settings ▸ Show Indices | Numbers the entries in the playing queue. | on |  |
-| Playlist Viewer Settings ▸ Track Display | Whether the queue shows filenames or the artist and title from the tags. | track name |  |
-| Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | on |  |
-| Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | on |  |
-| Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | off |  |
-| Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | on | **Adv** |
-| Queue ▸ Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | on | **Adv** |
-| Queue ▸ Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | off | **Adv** |
+| Sort Playlists | The order saved playlists are listed in: by name, or by when they were made. | Alphabetical |  |
+| Playlist Viewer Settings ▸ Show Icons | Draws icons beside the entries in the playing queue. | Yes |  |
+| Playlist Viewer Settings ▸ Show Indices | Numbers the entries in the playing queue. | Yes |  |
+| Playlist Viewer Settings ▸ Track Display | Whether the queue shows filenames or the artist and title from the tags. | Track Name Only |  |
+| Recursively Insert Directories | Adding a folder to a playlist also adds everything in its subfolders. | On |  |
+| Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | Yes |  |
+| Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |
+| Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | Yes | **Adv** |
+| Queue ▸ Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | Yes | **Adv** |
+| Queue ▸ Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | No | **Adv** |
 
 ### Playback — Bookmarking
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Bookmark on Stop | Saves your position when you stop, so you can come back to it. Ask prompts each time; the recent-only settings save without adding a bookmark file to the folder. | off | **Adv** |
-| Update on Stop | Overwrites the existing bookmark for a folder instead of adding another, so the list stays one entry per book rather than one per session. | off | **Adv** |
-| Load Last Bookmark | Offers the saved position when you next open a folder that has one. | off | **Adv** |
-| Maintain a List of Recent Bookmarks? | Keeps a list of the last places you stopped, reachable from the main menu, as well as bookmarks stored beside the music. | off | **Adv** |
+| Bookmark on Stop | Saves your position when you stop, so you can come back to it. Ask prompts each time; the recent-only settings save without adding a bookmark file to the folder. | No | **Adv** |
+| Update on Stop | Overwrites the existing bookmark for a folder instead of adding another, so the list stays one entry per book rather than one per session. | No | **Adv** |
+| Load Last Bookmark | Offers the saved position when you next open a folder that has one. | No | **Adv** |
+| Maintain a List of Recent Bookmarks? | Keeps a list of the last places you stopped, reachable from the main menu, as well as bookmarks stored beside the music. | No | **Adv** |
 
 ### Playback — Automatic Resume
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Automatic Resume | Remembers how far through each track you were, and returns there rather than starting from the beginning. | off |  |
-| Resume on Automatic Track Change | Whether an automatic position is also remembered when a track changes on its own. Custom limits it to folders you nominate, which is how to keep it for podcasts without applying it to albums. | never | **Adv** |
+| Automatic Resume | Remembers how far through each track you were, and returns there rather than starting from the beginning. Meant for audiobooks and long podcasts. Needs a working database. | No |  |
+| Resume on Automatic Track Change | Whether an automatic position is also remembered when a track changes on its own. Custom limits it to folders you nominate, which is how to keep it for podcasts without applying it to albums. | No | **Adv** |
 
 ### Playback — Now Playing Screen
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Default Browser | Which browser the root and the now-playing screen return to: the database or the files. | database |  |
-| Select Action | Where Select goes from the now-playing screen. | default | **Adv** |
+| Default Browser | Which browser the root and the now-playing screen return to: Music, Files or Playlists. | Music |  |
+| Select Action | Where Select goes from the now-playing screen. | Previous Screen | **Adv** |
 
-**Appearance** opens Appearance — Now Playing Screen, below.
+**Appearance** opens `Settings > Appearance > Now Playing Screen`, below.
 
 ### Library — Files
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort ▸ Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | off |  |
-| Sort ▸ Directories | The order folders are listed in: by name, or by when they were last written. | alpha |  |
-| Sort ▸ Files | The order files are listed in, including grouping by type. | alpha |  |
-| Sort ▸ Interpret Numbers | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | numbers |  |
-| Show Files | Which files the browser shows: everything, only what can be opened, only music, or only playlists. The quickest way to make a cluttered folder readable. | supported |  |
-| Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | view_all |  |
-| Follow Playlist | Opens the browser at the folder the playing track came from, rather than where you last were. | off |  |
-| Show Path | Puts the current folder, or the whole path to it, in the title bar. | current directory |  |
-| Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. | on |  |
-| Hotkey | What the hotkey button does in the file browser. | Off, | **Adv** |
+| Sort ▸ Case Sensitive | Whether uppercase sorts separately from lowercase, so that "Zoo" can come before "apple". | No |  |
+| Sort ▸ Directories | The order folders are listed in: by name, or by when they were last written. | Alphabetical |  |
+| Sort ▸ Files | The order files are listed in, including grouping by type. | Alphabetical |  |
+| Sort ▸ Interpret Numbers | Whether "track2" comes before "track10" by reading the digits as a number, or after it by comparing them one character at a time. | As Whole Numbers |  |
+| Show Files | Which files the browser shows: everything, only what can be opened, only music, or only playlists. The quickest way to make a cluttered folder readable. | Supported |  |
+| Show Filename Extensions | Whether names are shown with their extension. Hiding it is tidier; showing it helps when several files share a name. | Only When Viewing All Types |  |
+| Follow Playlist | Opens the browser at the folder the playing track came from, rather than where you last were. | No |  |
+| Show Path | Puts the current folder, or the whole path to it, in the title bar. | Current Directory Only |  |
+| Directory Cache | Keeps the layout of the disk in memory so the file browser does not have to read it each time. Makes browsing much faster and costs a little memory. Takes effect when you leave the setting. | Yes |  |
+| Hotkey | What the hotkey button does in the file browser. | Off | **Adv** |
 
 ### Library — Music
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort ▸ Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. | default |  |
-| Sort ▸ Albums By ▸ Artist | The order for the album list inside an artist. Year here reads as a discography in release order, which is usually what an artist's albums want. Every album in the list is by the one artist, so the artist orders are not offered, and a Default that names one sorts by the rest. | default |  |
-| Sort ▸ Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | default |  |
-| Sort ▸ Albums By ▸ Composer | The order for the album list inside a composer. | default |  |
-| Sort ▸ Albums By ▸ Other Lists | The order for every album list that has no row of its own under Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | name |  |
-| Sort ▸ Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | name |  |
-| Sort ▸ Ignore The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | off |  |
-| Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | no |  |
-| Skip One-Item Lists | When a Music list would hold only one row, opens that row straight away: an artist with one album goes straight to its tracks. Back skips over it too. A list of tracks always shows, even with one track in it. | off |  |
-| Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | off |  |
-| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "podcast", "speech" and the like. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | off |  |
+| Sort ▸ Albums By ▸ All Albums | The order for the Albums list opened straight from the Music menu, which holds every album on the player. Default follows Other Lists, so this row only needs setting when you want this one list to differ. | Default |  |
+| Sort ▸ Albums By ▸ Artist | The order for the album list inside an artist. Year here reads as a discography in release order, which is usually what an artist's albums want. Every album in the list is by the one artist, so the artist orders are not offered, and a Default that names one sorts by the rest. | Default |  |
+| Sort ▸ Albums By ▸ Album Artist | The order for the album list inside an album artist. Genre, Year and the Playback History artist lists group by album artist too, so they follow this row as well. The artist orders are not offered, as under Artist, and a Default that names one sorts by the rest. | Default |  |
+| Sort ▸ Albums By ▸ Composer | The order for the album list inside a composer. | Default |  |
+| Sort ▸ Albums By ▸ Other Lists | The order for every album list that has no row of its own under Albums By: by name, by release year with either end first, or by album artist and then name or year. The four rows above it override this for the lists they name, so this is what the rest of the Music menu follows. | Name |  |
+| Sort ▸ Artists By | The order of the artist lists in Music: by name, or most played first. Plays are counted from the albums an artist heads, so an artist who only guests on other albums sorts with the unplayed ones. | Name |  |
+| Sort ▸ Ignore The/A/An | Sorts artists and albums as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. Applies to the Music lists and By First Letter. The carousel has its own. | No |  |
+| Show Year in Album Lists | Shows each album's release year in the Music lists, before or after its name, so a discography reads in order at a glance. The carousel has its own setting. | No |  |
+| Skip One-Item Lists | When a Music list would hold only one row, opens that row straight away: an artist with one album goes straight to its tracks. Back skips over it too. A list of tracks always shows, even with one track in it. | No |  |
+| Featured Artists | Reads guest credits -- the "feat. Somebody" in a title or artist -- and lets you browse by them: Music gains a Featured Artists row, and an artist's album list gains the records they only guest on. Needs the database loaded to RAM. A name with a comma or ampersand, like Tyler, The Creator, reads as two people unless an album is under it. List such names one per line in /.rockbox/library/user/known_artists.txt, then reboot, or switch Featured Artists off and on. | No |  |
+| Segregate Audiobooks | Keeps spoken word out of the music and gives it an Audiobooks row on the main menu; albums, artists, the carousel and search then show music only. Only the genre tag counts: one containing "audiobook", "audio book" or "spoken word", or exactly "book", "podcast", "speech" and the like. Books keep their place: open one again under Audiobooks and a Resume row heads its chapters. An album with one music track on it stays with the music. | No |  |
 | Search ▸ Maximum Results | How many results a search keeps. More results take longer to scroll than to find; another letter is usually quicker. | 50 |  |
 | Search ▸ Minimum Letters | How many letters must be typed before searching starts. Raise it if one-letter searches return more than they are worth. | 1 |  |
-| Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | track album artist |  |
-| Quiz Questions ▸ Name the Track | Music Quiz rounds that play a clip and ask which track it is. | on |  |
-| Quiz Questions ▸ Name the Artist | Music Quiz rounds that play a clip and ask who it is by. The wrong answers are artists that sound alike, or share the genre and decade, as the game goes on. | on |  |
-| Quiz Questions ▸ Name the Album | Music Quiz rounds that play a clip and ask which album it is from. In the later rounds the wrong answers are the same artist's other albums. | on |  |
-| Quiz Questions ▸ Name the Year | Music Quiz rounds that play a clip and ask what year it is from. Off by default: the answers start five years apart and end one apart, and they are only as right as the year tags. | off |  |
+| Search ▸ Result Order | Which of tracks, albums and artists is listed first in search results. | Tracks, Albums, Artists |  |
+| Quiz Questions ▸ Name the Track | Music Quiz rounds that play a clip and ask which track it is. | Yes |  |
+| Quiz Questions ▸ Name the Artist | Music Quiz rounds that play a clip and ask who it is by. The wrong answers are artists that sound alike, or share the genre and decade, as the game goes on. | Yes |  |
+| Quiz Questions ▸ Name the Album | Music Quiz rounds that play a clip and ask which album it is from. In the later rounds the wrong answers are the same artist's other albums. | Yes |  |
+| Quiz Questions ▸ Name the Year | Music Quiz rounds that play a clip and ask what year it is from. The hardest kind: the answers start five years apart and end one apart, and they are only as right as the year tags. | No |  |
 
-**Appearance** opens Art Rows, from Appearance — Interface Elements.
+**Appearance** opens Art Rows, from
+`Settings > Appearance > Interface Elements`.
 
 **Segregate Audiobooks in full.** A genre counts as spoken word if it contains
-"audiobook", "audio book" or "spoken word" anywhere -- so Audiobooks,
-Audiobook/Fiction and Spoken Word & Poetry all match -- or if it is exactly
+"audiobook", "audio book" or "spoken word" anywhere — so Audiobooks,
+Audiobook/Fiction and Spoken Word & Poetry all match — or if it is exactly
 "book", "books", "spoken", "speech", "podcast", "podcasts", "non-music" or
 "nonmusic". Capitals make no difference. Nothing but the genre is read, so a
 book tagged as music browses as music: retag it. An album counts as a book only
@@ -306,68 +273,98 @@ Audiobooks lists have no <All Tracks> or <Random> rows.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Sort ▸ Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | off |  |
-| Sort ▸ Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | artist+name |  |
-| Sort ▸ Artists By | The order artist portraits appear in: by name, or most played first. | name |  |
-| Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | off |  |
-| On Album Select | What Select does on a cover: open the album's track list, or start playing it. | show tracks |  |
-| Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175 |  |
-| Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | medium |  |
+| Sort ▸ Same as Music | Sorts the carousels the way the Music lists are sorted: albums as All Albums, artists and The/A/An as their Music settings. The carousel's own sort settings are hidden while it is on. Choosing an order inside the carousel turns it off. | No |  |
+| Sort ▸ Albums By | The order covers appear in: by album name, by release year with either end first, or by album artist and then name or year. | Artist + Name |  |
+| Sort ▸ Artists By | The order artist portraits appear in: by name, or most played first. | Name |  |
+| Sort ▸ Ignore The/A/An | Sorts covers and portraits as if a leading "The", "A" or "An" were not there, so The Beatles sits among the Bs. The names still show in full. | No |  |
+| On Album Select | What Select does on a cover: open the album's track list, or start playing it. | Show tracks |  |
+| Scroll Speed | How far a flick of the wheel carries. Affects both view modes. | 175% |  |
+| Random Spin Length | How many covers go past when holding Play picks an album at random. Long makes more of a show of it and takes a little longer to land. | Medium |  |
 
-**Appearance** opens Appearance — Carousel, below.
+**Appearance** opens `Settings > Appearance > Carousel`, below.
 
 ### Library — Database
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Scan on Startup | Rescans the library at every boot. Mostly redundant if Scan on Eject is on, since that is when the music can actually have changed, and it costs time at every start. | off | **Adv** |
-| Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | on | **Adv** |
+| Scan on Startup | Rescans the library at every boot. Mostly redundant if Scan on Eject is on, since that is when the music can actually have changed, and it costs time at every start. | No | **Adv** |
+| Scan on Eject | Rescans after a USB session, which is the moment new music normally arrives. | Yes | **Adv** |
 | Select Directories to Scan | Restricts scanning to chosen folders, so spoken-word or sample libraries stay out of the music database. The next update removes the tracks that are now outside the chosen folders, or inside a folder holding a database.ignore file. | / | **Adv** |
-| Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | off | **Adv** |
+| Year From Folder Name | Takes the year from the track's folder when its name starts with one, as in "1998 - Album", instead of from the tags; a disc folder such as CD1 takes it from the folder above. For libraries where the tags hold each track's own release date and the folder holds the album's. It replaces the year in the Music lists, album sorting and the carousel; the now playing screen still shows the tag. Takes effect at the next rebuild. | No | **Adv** |
 
 ### Library — Art Cache
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | image files, then embedded | |
-| Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. | off | **Adv** |
+| Album Art Source | Where album covers come from: the image in the album's folder, the art embedded in a track's tags, or both, the first named taking precedence. Artist pictures only ever come from image files. Changing it reads every album again, which takes a while on a large library. | Image Files, Then Embedded |  |
+| Fast Build | Decodes each image once for the largest thumbnail and derives the smaller sizes from it, instead of decoding once per size. Much faster, slightly softer. Applies only to thumbnails made from now on. | No | **Adv** |
 
 ### Library — Playlist Engine
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enabled | Measures how each track actually sounds -- its tempo, loudness, tonal balance and key -- so a playlist can be built from a song rather than from its tags. Switching this on starts the analysis, which asks before it begins. The analysis needs the charger and takes hours on a full library. Switching it off hides the feature and leaves what has been measured on disk, so switching it back on costs nothing. | off | |
-| Analysis Depth | How much of each track the analysis listens to. Thorough takes forty seconds. Quick stops once the tempo has settled, around eleven, about three and a half times faster -- but loudness, tone and key are measured over that shorter stretch too, so its matches are noticeably worse. Use Quick only if a full analysis on the player is too long to sit through; the desktop tool does a whole library thoroughly. Changing this re-measures nothing: Rebuild Sound Analysis does. | thorough | |
-| Playlist Length | The most tracks Play Similar, a mood or a journey puts in the playlist. Forty is about an evening. It is a limit rather than a target. Only tracks that really do sound like what was asked for are used, so a mood your library holds little of gives a short playlist rather than a long one filled out with whatever was nearest. A journey spreads its change across whatever length is set, so a short one moves between its two moods in fewer steps rather than covering less ground. | 40 | |
-| Track Playlist | How much Play Similar varies between runs. Predictable gives the same playlist every time from the same song, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. None of them reach further out for the difference -- the playlist is drawn from the same neighbourhood either way. | predictable | |
-| Mood Playlist | How much a mood or a journey varies between runs. Predictable gives the same playlist every time, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. Moods and journeys are on the Playlists screen, above the saved playlists. | weekly | |
-| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. | on |  |
-| Continue Playing | Keeps the music going when a playlist runs out, by adding more tracks that sound like what has been playing and carrying on into them. Works for any playlist -- an album, a saved one, a folder, or one the engine built. A playlist the engine built is continued on its own terms: a mood keeps aiming at that mood rather than drifting away from it one extension at a time. Anything else is continued from the track that just finished. Nothing already in the playlist is added again. | off | |
-| Library Sound | What the analysis found across the whole library: how much of it has been measured, how many tracks each mood can draw on, how tempos and keys are spread, and how loud each decade's music is. Percentages are of the measured tracks. Hold Select on a section to explain its rows. | -- | |
+| Enabled | Measures how each track actually sounds -- its tempo, loudness, tonal balance and key -- so a playlist can be built from a song rather than from its tags. Switching this on starts the analysis, which asks before it begins. The analysis needs the charger and takes hours on a full library. Switching it off hides the feature and leaves what has been measured on disk, so switching it back on costs nothing. | No |  |
+| Analysis Depth | How much of each track the analysis listens to. Thorough takes forty seconds. Quick stops once the tempo has settled, around eleven, about three and a half times faster -- but loudness, tone and key are measured over that shorter stretch too, so its matches are noticeably worse. Use Quick only if a full analysis on the player is too long to sit through; the desktop tool does a whole library thoroughly. Changing this re-measures nothing: Rebuild Sound Analysis does. | Thorough |  |
+| Playlist Length | The most tracks Play Similar, a mood or a journey puts in the playlist. Forty is about an evening. It is a limit rather than a target. Only tracks that really do sound like what was asked for are used, so a mood your library holds little of gives a short playlist rather than a long one filled out with whatever was nearest. A journey spreads its change across whatever length is set, so a short one moves between its two moods in fewer steps rather than covering less ground. | 40 |  |
+| Track Playlist | How much Play Similar varies between runs. Predictable gives the same playlist every time from the same song, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. None of them reach further out for the difference -- the playlist is drawn from the same neighbourhood either way. | Predictable |  |
+| Mood Playlist | How much a mood or a journey varies between runs. Predictable gives the same playlist every time, until the library changes. Weekly gives the same one all week and a new one next week. Variable picks between the nearest few at each step, so every run differs. Moods and journeys are on the Playlists screen, above the saved playlists. | Weekly |  |
+| Play Selected First | Whether Play Similar and Wind Down play the track you chose them from first. Off, it is left out, and the playlist starts with the nearest match to it. | Yes |  |
+| Continue Playing | Keeps the music going when a playlist runs out, by adding more tracks that sound like what has been playing and carrying on into them. Works for any playlist -- an album, a saved one, a folder, or one the engine built. A playlist the engine built is continued on its own terms: a mood keeps aiming at that mood rather than drifting away from it one extension at a time. Anything else is continued from the track that just finished. Nothing already in the playlist is added again. | No |  |
+| Library Sound | What the analysis found across the whole library: how much of it has been measured, how many tracks each mood can draw on, how tempos and keys are spread, and how loud each decade's music is. Percentages are of the measured tracks. Hold Select on a section to explain its rows. | — |  |
 
 **Analysis Depth:** Quick and Thorough disagree about a track's closest match
 about two times in three.
 
 
+### Library — Maintenance
+
+Not settings but actions, listed cheapest first. Each asks before it starts,
+and most queue work for the background and return at once; the exceptions are
+below the table.
+
+| Action | What it does |
+|---|---|
+| Update Database | Finds music added since the last scan. The fix for *my new album isn't showing up*. |
+| Update Index | Makes Album Covers lay out its covers afresh the next time it opens. |
+| Update Art Cache | Fills in thumbnails that are missing, for artwork added to folders already scanned, and redoes those whose image was replaced or deleted. |
+| Rescan Documents & Images | Rebuilds the flat Documents and Images lists. Normally reruns itself after a USB session. |
+| Update Sound Analysis | Measures tracks the sound analysis has not covered, and retries any it could not read. Needs the charger, and holds the player while it runs. |
+| Rebuild Playback Report | Discards the report's saved figures, the track names it resolved and the moved folders it matched, so it reads the log and the database again. For names that still look wrong after a database update. |
+| Rebuild Database | Discards the database and reads every file again, keeping play counts and ratings. Slow. |
+| Rebuild Art Cache | Purges every thumbnail and regenerates from the original artwork. |
+| Rebuild Sound Analysis | Measures every track again. Hours on a full library. |
+
+The two Sound Analysis rows appear only once **Playlist Engine** is on, and
+unlike the rest they hold the player rather than queueing work. **Rebuild
+Playback Report** queues nothing: it clears two cached files, and the
+report rebuilds them itself the next time you open it.
+
+**Update Database** and **Rebuild Database** are much faster from a Windows PC:
+`database_pb.exe` in `.rockbox/tools/` does the same work on the connected
+player, or `database_pb.exe --rebuild` for a rebuild. The player restarts
+itself when ejected, to load the new database. **Update Art Cache** and
+**Rebuild Art Cache** have `artcache_pb.exe` beside it, run the same way;
+after new music, run it after `database_pb.exe`.
+
 ### Appearance
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Font | The typeface used throughout the interface. A larger font is easier to read and fits fewer rows on screen. | none |  |
+| Font | The typeface used throughout the interface. A larger font is easier to read and fits fewer rows on screen. | — |  |
 
 ### Appearance — Skins
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | none |  |
-| Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | none |  |
+| While Playing Screen | The skin drawn while music is playing. Part of a theme; loading a theme sets it. | — |  |
+| Base Skin | The base skin -- the frame drawn behind lists and menus. Part of a theme. | — |  |
 
 ### Appearance — Interface Colours
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | off |  |
-| Dynamic Colors Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | auto |  |
+| Dynamic Colors | Recolours the interface from the artwork of whatever is playing. A skin not written for it will look wrong, since it cannot know what its colours will become. | No |  |
+| Dynamic Colors Background | Which of the album's two colours becomes the background. Auto takes the one the artwork has most of; Light and Dark always take the lighter or the darker. Light keeps a light theme light whatever is playing; the text is then the darker colour, which may be harder to read where a skin draws it over the art. | Auto |  |
 | Foreground Colour | The colour of text and lines. Reset by loading a theme. | e7f3ef |  |
 | Background Colour | The colour behind them. Reset by loading a theme. | 000c21 |  |
 | Line Selector Colours ▸ Primary Colour | The colour at the top of the graduated selector bar. | ffeb9c |  |
@@ -384,37 +381,37 @@ Separator set above zero.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | off |  |
-| Art Rows ▸ Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | off |  |
-| `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 | **Cfg** |
-| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | on |  |
-| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | top |  |
-| Scroll Bar ▸ Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | left |  |
-| Scroll Bar ▸ Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 | **Adv** |
-| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | graphic |  |
-| Volume Display | Whether the status bar shows the volume as a bar or as a number. | graphic |  |
-| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | bar (gradient) |  |
-| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | off | **Adv** |
+| Art Rows ▸ Album Art Rows | Draws album thumbnails beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Artist Art Rows | Draws artist photographs beside the rows in the database browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Audiobook Art Rows | Draws cover art beside the rows in the Audiobooks browser. Needs a theme that supports artwork in lists, or the rows are tall and empty. | No |  |
+| Art Rows ▸ Author Art Rows | Draws a photograph beside each author in the Audiobooks browser, from a folder.jpg in the author's folder. Without one the row shows a placeholder. | No |  |
+| `database art row height` | Row height in the database browser when album or artist art is shown beside rows. A theme-author setting -- it has to match the artwork the theme draws. | 52 px | **Cfg** |
+| Show Icons | Draws an icon beside each row in lists and menus. Turning them off gives the text more room. | Yes |  |
+| Status Bar | Whether the clock and battery strip is drawn, and at which edge. | Top |  |
+| Scroll Bar ▸ Scroll Bar | Whether a scroll bar is drawn beside lists, and on which side. | Left |  |
+| Scroll Bar ▸ Scroll Bar Width | How wide the scroll bar beside lists is, in pixels. | 6 px | **Adv** |
+| Battery Display | Whether the status bar shows the battery as an icon or as a percentage. | Graphic |  |
+| Volume Display | Whether the status bar shows the volume as a bar or as a number. | Graphic |  |
+| Line Selector Type | How the highlighted row is marked: a pointer beside it, the row inverted, or a bar behind it in a flat or graduated colour. | Bar (Gradient Colour) |  |
+| Line Separator | The thickness of the rule between rows, in pixels. Auto follows the font, and off draws none. | Off | **Adv** |
 
 ### Appearance — Interface Elements — Activity Indicators
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Show Disk Activity | Lets the theme show an indicator while the disk is being read or written. While music plays the disk is read often enough to keep it on, and every frame it animates repaints the status bar, which slows the screen underneath. | off |  |
-| Show Background Tasks | Lets the theme show an indicator while the database, the artwork cache or the document index is being built in the background. | on |  |
-| Show Working | Lets the theme show an indicator while the screen is busy loading something it was asked for. | on |  |
+| Show Disk Activity | Lets the theme show an indicator while the disk is being read or written. While music plays the disk is read often enough to keep it on, and every frame it animates repaints the status bar, which slows the screen underneath. | No |  |
+| Show Background Tasks | Lets the theme show an indicator while the database, the artwork cache or the document index is being built in the background. | Yes |  |
+| Show Working | Lets the theme show an indicator while the screen is busy loading something it was asked for. | Yes |  |
 
 ### Appearance — Now Playing Screen
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | album |  |
-| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | prefer cache |  |
-| Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | off |  |
+| Now Playing Artwork | Which picture the now-playing screen shows. Auto uses the artist photograph if you arrived through the artist menu, and the album cover otherwise. | Album Art |  |
+| Album Art | Where cover art comes from: the thumbnail cache, files beside the music, or tags embedded in the files. Prefer Cache is fastest. | Prefer Cache |  |
+| Trim Titles | Shortens the album and track names on the now playing screen by dropping a trailing note about the pressing -- "(feat. Clairo)", "[Live]", "- 2021 Remaster". Useful where long names scroll or get cut off. Files and the database are untouched, so browsing and search still see full names. The notes are patterns in /.rockbox/trim.config, one per line, with * matching anything. Add your own to /.rockbox/library/user/trim.txt, which an install leaves alone; switch this off and on to re-read them. | No |  |
 
-Also reached as **Appearance** under Playback — Now Playing Screen.
+Also reached as **Appearance** under `Settings > Playback > Now Playing Screen`.
 
 **Trim Titles** never removes a note at the start of a name.
 
@@ -422,35 +419,35 @@ Also reached as **Appearance** under Playback — Now Playing Screen.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Show Album Title | Whether the album name is drawn over the covers, and where. | both bottom |  |
-| Show Year in Album Title | Shows the release year in the caption, before or after the album's name. | no |  |
-| Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | background |  |
+| Show Album Title | Whether the album name is drawn over the covers, and where. | Show Album and Artist at the Bottom |  |
+| Show Year in Album Title | Shows the release year in the caption, before or after the album's name. | No |  |
+| Background | Which colour fills the screen behind the covers: one of the theme's, which follows Dynamic Colours, or Custom, a colour of your own that stays put. Choosing Custom opens a colour picker; Custom Colour below it changes the colour later. The captions turn black or white to read on it. | Background Colour |  |
 | Custom Colour | The colour behind the carousel's covers while Background is Custom. Dynamic Colours leave it alone, and the captions turn black or white to read on it. | 000000 |  |
-| Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | off |  |
-| View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3d |  |
+| Status Bar | Draws the status bar over the carousel. Off gives the covers the whole screen. | No |  |
+| View Mode | 3D angles the covers away on both sides. Flat lays them face-on and the same size, in two piles either side of the current one. | 3D |  |
 | 3D Centre Margin | The gap between the front cover and its neighbours in the 3D view. | 0 | **Adv** |
 | 3D Slide Tuck | How far the side covers stack back behind the front one in the 3D view. | 32 | **Adv** |
-| 3D Parallel Slides | Draws the side covers face-on rather than angled, which reads as a row of covers rather than a tunnel. | on | **Adv** |
-| 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325 | **Adv** |
-| Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0 | **Adv** |
-| Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 | **Adv** |
-| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in Cover Flow. The browser's rows are treated by the theme instead, so this changes the carousel and nothing else. | off | **Adv** |
-| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | off | **Adv** |
-| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | off | **Adv** |
+| 3D Parallel Slides | Draws the side covers face-on rather than angled, which reads as a row of covers rather than a tunnel. | Yes | **Adv** |
+| 3D Transition Speed | How quickly the 3D view settles after scrolling. No effect in Flat, which times itself off the wheel instead. | 325% | **Adv** |
+| Flat Pile Fade | How far the two piles in the Flat view are blended towards the background, so the cover in the middle stands out. Zero leaves them solid. | 0% | **Adv** |
+| Flat Pile Offset | How far below the middle cover the Flat view's piles sit. A cover eases down onto its pile as it leaves and back up as it arrives. | 0 px | **Adv** |
+| Artwork Filter ▸ Filter 1 | First of three image adjustments applied to the covers in the carousel. Art rows in the browser are not affected. | Off | **Adv** |
+| Artwork Filter ▸ Filter 2 | Second image adjustment in the chain, applied after the first. | Off | **Adv** |
+| Artwork Filter ▸ Filter 3 | Third and last image adjustment in the chain. | Off | **Adv** |
 
-Also reached as **Appearance** under Library — Carousel.
+Also reached as **Appearance** under `Settings > Library > Carousel`.
 
 ### Appearance — Dialogs
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Box Border Width | The thickness of that border, in pixels. Zero draws none. | 2 | **Adv** |
-| Box Margin | How far the dialog is inset from the edges of the screen. | 10 | **Adv** |
-| Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. | 4 | **Adv** |
-| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default rather than a theme colour, because its job is to contrast with the box whatever the theme is doing. | 000000 |  |
-| Button Border Width | The thickness of a dialog button's border, in pixels. | 2 | **Adv** |
-| Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 | **Adv** |
-| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted, which is what Rockbox has always done. On ignores both and uses the nine colours below, which appear only in that mode. | auto |  |
+| Box Border Width | The thickness of a dialog's border, in pixels. Zero draws none. | 2 px | **Adv** |
+| Box Margin | How far the dialog is inset from the edges of the screen. | 10 px | **Adv** |
+| Box Shadow | A solid drop shadow offset down and to the right, which lifts the box off whatever is behind it. Zero turns it off. Applies whatever Dialog Colour Mode is set to, so a theme can style the shadow without taking over all nine colours. | 4 px | **Adv** |
+| Box Shadow Colour | The colour of the drop shadow behind confirmation and message boxes. Black by default; pick a colour that contrasts with the box. | 000000 |  |
+| Button Border Width | The thickness of a dialog button's border, in pixels. | 2 px | **Adv** |
+| Button Corner Radius | How rounded the corners of a dialog button are. Zero is square. | 0 px | **Adv** |
+| Dialog Colour Mode | How the confirmation and message boxes are coloured. Auto, the default, uses the theme's own two colours plus one accent on the selected button -- and the accent follows the album while Dynamic Colors is running. Off is the same two colours with no accent: the selected button is simply drawn inverted. On ignores both and uses the nine colours below, which appear only in that mode. | Auto |  |
 | Box Text | The text colour inside a dialog. Only used when Dialog Colour Mode is On. | e7f3ef |  |
 | Box Background | The fill colour inside a dialog. Only used when Dialog Colour Mode is On. | 000c21 |  |
 | Box Border | The colour of a dialog's own border. Only used when Dialog Colour Mode is On. | e7f3ef |  |
@@ -461,7 +458,7 @@ Also reached as **Appearance** under Library — Carousel.
 | Selected Button Background | The fill colour of the selected dialog button, which is what marks it as chosen. | e7f3ef |  |
 | Selected Button Border | The border colour of the selected dialog button. | e7f3ef |  |
 
-The nine palette rows -- everything from Box Text down -- are listed only
+The nine palette rows — everything from Box Text down — are listed only
 while Dialog Colour Mode is On, whatever Settings Mode says, and Box
 Shadow Colour only while there is a shadow to colour.
 
@@ -469,124 +466,124 @@ Shadow Colour only while there is a shadow to colour.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | on |  |
+| Enabled | Whether text too long for its line scrolls. Off, it is cut short with "..." instead, in lists, menus, the theme's own scrolling lines and the carousel's captions, and the other scroll settings then have nothing to move. Spike's Scroll Now Playing does nothing while this is off. | Yes |  |
 | Scroll Speed | How quickly text too long for its line moves. | 9 |  |
-| Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1000 |  |
-| Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 | **Adv** |
-| Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. | 50 | **Adv** |
+| Scroll Start Delay | How long text waits before it starts moving, so a row can be read before it slides. | 1 s |  |
+| Scroll Step Size | How many pixels each step of scrolling text moves. One is smooth and costs more work; larger steps are jerkier and cheaper. | 6 px | **Adv** |
+| Bidirectional Scroll Limit | Text narrower than this share of the line bounces back and forth instead of scrolling off one side and round again. Bigger numbers mean more lines bounce. At 0 everything scrolls in one direction. | 50% | **Adv** |
 | Screen Scrolls Out of View | Lets a line of scrolling text carry on past the edge of its viewport instead of stopping at it. Looks better on a theme whose list has room to spare, and clips awkwardly on one that does not. | No | **Adv** |
-| Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. The main menu is glanced at rather than read, and text moving under the cursor there is more distracting than helpful. | No | **Adv** |
-| Screen Scroll Step Size | How many pixels each step moves when a whole screen slides, rather than when text scrolls within one line. Smaller is smoother and costs more work. | 16 | **Adv** |
-| Paged Scrolling | Lists move a screenful at a time instead of a row at a time. | off |  |
-| List Wraparound | Passing the last item returns to the first, rather than stopping. | on |  |
-| List Order | Whether lists are traversed from the top down or the bottom up. | ascending | **Adv** |
+| Disable Main Menu Scrolling | Stops long entries scrolling on the main menu, leaving them truncated. Useful if text moving under the cursor distracts you. | No | **Adv** |
+| Screen Scroll Step Size | How many pixels each step moves when a whole screen slides, rather than when text scrolls within one line. Smaller is smoother and costs more work. | 16 px | **Adv** |
+| Paged Scrolling | Lists move a screenful at a time instead of a row at a time. | No |  |
+| List Wraparound | Passing the last item returns to the first, rather than stopping. | Yes |  |
+| List Order | Whether lists are traversed from the top down or the bottom up. | Ascending | **Adv** |
 
 ### Appearance / Library — Viewers
 
-| Setting                              | What it does | Default | |
-|--------------------------------------|---|---|---|
-| Text Viewer ▸ Colour Mode            | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | white on black |  |
-| Text Viewer ▸ Margin                 | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | on |  |
-| Text Viewer ▸ Line Spacing           | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
-| Text Viewer ▸ Page Number            | Shows a page counter at the foot. | off |  |
-| Text Viewer ▸ Font                   | A font used only by the text viewer, so reading can use a different typeface from the menus. Unset uses the interface font. |  |  |
-| Lyrics Viewer ▸ Colour Mode          | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | theme |  |
-| Lyrics Viewer ▸ Alignment            | Whether lyric lines are aligned left, centred or right. | centre |  |
-| Lyrics Viewer ▸ Line Spacing         | Extra pixels between lyric lines. | 2 | **Adv** |
-| Lyrics Viewer ▸ Previous Line        | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30 | **Adv** |
-| Lyrics Viewer ▸ Next Line            | How far lines still to come fade back. | 55 | **Adv** |
-| Lyrics Viewer ▸ Animation            | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | normal |  |
-| Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | on |  |
-| Lyrics Viewer ▸ Keep Backlight On    | Holds the backlight on while lyrics are showing, since a screen that keeps going dark defeats the point. A track without lyrics goes dark as usual. Costs battery. | on |  |
-| Lyrics Viewer ▸ Font                 | A font used only by the lyrics screen. Unset uses the interface font. |  |  |
-| Playback Report ▸ Artwork            | Whether the report's cards show album and artist sleeves. A card without one draws a pattern instead, as part of the design rather than a stand-in. Off also gives the pictures' memory to the statistics, so on a very large library fewer rows are dropped. Changing it inside the report reads the log again, the same pause a change of year costs. | on |  |
-| Playback Report ▸ Top Rows           | How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is enough to see a shape without walking a long way; five is a podium and twenty-five is a survey. | 10 |  |
-| Playback Report ▸ Achievement Order  | How the Achievements section is arranged. As Listed keeps the order the achievements were written in, which groups related ones together. Earned First puts what you have won at the front, Newest First orders those by when, and Closest First leads with whatever you are nearest to winning. | As Listed |  |
-| Playback Report ▸ Ranked By          | What the Top Artists, Top Songs and Top Albums sections are ordered on. Plays counts how often you started something. Minutes counts how long you listened to it. The two disagree more than you would expect. Plays favours short tracks and a song you keep restarting; minutes favours albums you sit through and anything long. Skips and night plays are counted either way, because neither has a listening time to rank by. | Plays |  |
+| Setting | What it does | Default | |
+|---|---|---|---|
+| Text Viewer ▸ Colour Mode | Whether the text viewer follows the theme, inverts it, or uses plain black on white or white on black. | White on Black |  |
+| Text Viewer ▸ Margin | Insets the text from the edges of the screen, which is easier to read at the cost of a few characters per line. | Yes |  |
+| Text Viewer ▸ Line Spacing | Extra pixels between lines. A little space makes a wall of text much easier to follow. | 0 | **Adv** |
+| Text Viewer ▸ Page Number | Shows a page counter at the foot. | No |  |
+| Text Viewer ▸ Font | A font used only by the text viewer, so reading can use a different typeface from the menus. It starts as 22-noto-serif; Use UI Font switches to the interface font. | 22-noto-serif |  |
+| Lyrics Viewer ▸ Colour Mode | Whether the lyrics screen follows the theme, inverts it, or uses plain black on white or white on black. | Theme |  |
+| Lyrics Viewer ▸ Alignment | Whether lyric lines are aligned left, centred or right. | Centre |  |
+| Lyrics Viewer ▸ Line Spacing | Extra pixels between lyric lines. | 2 | **Adv** |
+| Lyrics Viewer ▸ Previous Line | How far lines that have already been sung fade back. Lower makes the current line stand out more. | 30% | **Adv** |
+| Lyrics Viewer ▸ Next Line | How far lines still to come fade back. | 55% | **Adv** |
+| Lyrics Viewer ▸ Animation | How the display moves from one line to the next: instantly, or scrolling at one of three speeds. | Normal |  |
+| Lyrics Viewer ▸ Highlight Sung Words | Highlights individual words as they are sung, where the file carries word timings. Files with only line timings are unaffected. | Yes |  |
+| Lyrics Viewer ▸ Keep Backlight On | Holds the backlight on while lyrics are showing, so they can be followed without pressing a button. A track without lyrics goes dark as usual. Costs battery. | Yes |  |
+| Lyrics Viewer ▸ Font | A font used only by the lyrics screen. Unset uses the interface font. | — |  |
+| Playback Report ▸ Artwork | Whether the report's cards show album and artist sleeves. A card without one draws a pattern instead. Off also gives the pictures' memory to the statistics, so on a very large library fewer rows are dropped. Changing it inside the report reads the log again, the same pause a change of year costs. | Yes |  |
+| Playback Report ▸ Top Rows | How many rows the Top Artists, Top Songs and Top Albums sections show. Ten is enough to see a shape without walking a long way; five is a podium and twenty-five is a survey. | 10 |  |
+| Playback Report ▸ Achievement Order | How the Achievements section is arranged. As Listed keeps the order the achievements were written in, which groups related ones together. Earned First puts what you have won at the front, Newest First orders those by when, and Closest First leads with whatever you are nearest to winning. | As Listed |  |
+| Playback Report ▸ Ranked By | What the Top Artists, Top Songs and Top Albums sections are ordered on. Plays counts how often you started something. Minutes counts how long you listened to it. The two disagree more than you would expect. Plays favours short tracks and a song you keep restarting; minutes favours albums you sit through and anything long. Skips and night plays are counted either way, because neither has a listening time to rank by. | Plays |  |
 
 ### Appearance — Peak Meter
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Peak Release | How quickly the level meter falls back after a peak. Slower is easier to read, faster is more honest about the signal. | 8 | **Adv** |
-| Peak Hold Time | How long the meter holds at a peak before starting to fall. | 500 | **Adv** |
-| Clip Hold Time | How long a clipping indication stays on screen once triggered. | 60 | **Adv** |
-| Logarithmic (dB) | Whether the meter's scale is in decibels, which matches how loudness is perceived, or a straight percentage. | on | **Adv** |
-| Minimum of Range | The quiet end of the meter's range. | 60 | **Adv** |
-| Maximum of Range | The loud end of the meter's range. | 0 | **Adv** |
+| Peak Hold Time | How long the meter holds at a peak before starting to fall. | 500 ms | **Adv** |
+| Clip Hold Time | How long a clipping indication stays on screen once triggered. | 1 min | **Adv** |
+| Scale | Whether the meter's scale is in decibels, which matches how loudness is perceived, or a straight percentage. | Logarithmic (dB) | **Adv** |
+| Minimum of Range | The quiet end of the meter's range. | -60 dB | **Adv** |
+| Maximum of Range | The loud end of the meter's range. | 0 dB | **Adv** |
 
 ### Battery & Power
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 |  |
-| Backlight ▸ On Battery | How long the backlight stays on after the last button press. The single biggest lever on battery life. | on |  |
-| Backlight ▸ When Plugged In | How long the backlight stays on after the last button press while the player is charging. Kept separate from the battery figure because there is less reason to be frugal on the mains. | on |  |
-| Backlight ▸ When Locked | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | off | **Adv** |
-| Backlight ▸ On Track Change | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | off | **Adv** |
+| Brightness | Panel brightness. Second only to the backlight timeout as a drain on the battery. | 32 (iPod Classic), 16 (iPod Video) |  |
+| Backlight ▸ On Battery | How long the backlight stays on after the last button press. The single biggest lever on battery life. | 15 s |  |
+| Backlight ▸ When Plugged In | How long the backlight stays on after the last button press while the player is charging. It can be set longer than On Battery without costing battery life. | 15 s |  |
+| Backlight ▸ When Locked | What the backlight does while the hold switch is on: behave normally, stay off, or stay on. | Off | **Adv** |
+| Backlight ▸ On Track Change | Wakes the backlight briefly at each track change, so you can see what started without touching anything. Costs battery on a long album. | No | **Adv** |
 | Backlight ▸ Fade In | How long the backlight takes to come up rather than snapping on. | 300 ms | **Adv** |
-| Backlight ▸ Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2000 ms | **Adv** |
-| Backlight ▸ Screen Off After | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 | **Adv** |
-| Backlight ▸ First Button Press | Only Lights Screen: the press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. Also Acts lets that press do its job as well. A remote's or dock's buttons always act. | on | **Adv** |
-| Backlight ▸ Exemptions ▸ Enabled | Lets the presses chosen in Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | off | **Adv** |
-| Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 |  |
-| Storage ▸ Disk Spindown | How long the drive sits idle before it is allowed to stop. | 5 | **Adv** |
-| Storage ▸ Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. | auto | **Adv** |
-| Battery Capacity | The capacity of the cell actually fitted, in mAh. | 400 | **Adv** |
-| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | force |  |
+| Backlight ▸ Fade Out | How long it takes to go down. A slow fade is gentler in the dark. | 2 s | **Adv** |
+| Backlight ▸ Screen Off After | Powers the panel down entirely a while after the backlight goes out. Saves more than the backlight alone, and costs a moment to wake. | 5 s | **Adv** |
+| Backlight ▸ First Button Press | Only Lights Screen: the press that wakes the screen does nothing else, so you cannot change a setting you could not see. Costs one extra press each time. Also Acts lets that press do its job as well. A remote's or dock's buttons always act. | Only Lights Screen | **Adv** |
+| Backlight ▸ Exemptions ▸ Enabled | Lets the presses chosen in Exemptions -- play, seek, skip or volume on the Now Playing screen and main menu -- work without lighting the screen. Saves battery when you control playback blind. | No | **Adv** |
+| Idle Poweroff | How long the player sits idle, not playing, before switching itself off. Zero never does. | 10 min |  |
+| Storage ▸ Disk Spindown | How long the drive sits idle before it is allowed to stop. The single largest battery saving on a player with a spinning disk, and it does nothing at all on one with an SSD fitted. | 5 s | **Adv** |
+| Storage ▸ Mode | Tells power management what kind of drive is fitted, which decides whether it is worth spinning down and how aggressively. Auto detects it. Set it by hand only if a replacement drive is being detected wrongly. | Auto | **Adv** |
+| Battery Capacity | The capacity of the cell actually fitted, in mAh. Only affects the runtime estimate, not charging. Worth correcting after a battery replacement, since a new cell is often a different size from the original. | 550 mAh (iPod Classic), 400 or 600 mAh by model (iPod Video) | **Adv** |
+| Charge During USB Connection | Whether the player charges from a USB connection. Force charges even from a port that does not advertise enough current, which not every port tolerates. On an iPod Classic, Force also tops up a nearly full battery from a plain charger, which it otherwise leaves alone. | Yes (iPod Classic), Force (iPod Video) |  |
 
 ### Battery & Power — Sleep Timer
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Default Sleep Timer Duration | How long the sleep timer runs for, after which the player switches itself off. Sets the length only; starting the timer is a separate entry on the same screen. | 30 |  |
-| Start Sleep Timer on Boot | Starts the sleep timer automatically at power-on, for a player used mostly to fall asleep to. | off | **Adv** |
-| Restart Sleep Timer on Keypress | Any button press resets the countdown, so the timer only fires once you have actually stopped touching it. | off | **Adv** |
+| Default Sleep Timer Duration | How long the sleep timer runs for, after which the player switches itself off. Sets the length only; starting the timer is a separate entry on the same screen. | 30 min |  |
+| Start Sleep Timer on Boot | Starts the sleep timer automatically at power-on, for a player used mostly to fall asleep to. | No | **Adv** |
+| Restart Sleep Timer on Keypress | Any button press resets the countdown, so the timer only fires once you have actually stopped touching it. | No | **Adv** |
 
 ### Battery & Power — Car Adapter
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Car Adapter Mode | Pauses when external power is cut and resumes when it returns, so the player follows the car's ignition. | off | **Adv** |
-| Delay Before Resume | How long to wait after power returns before resuming, so a stall or a restart does not start the music. | 5 | **Adv** |
+| Car Adapter Mode | Pauses when external power is cut and resumes when it returns, so the player follows the car's ignition. | No | **Adv** |
+| Delay Before Resume | How long to wait after power returns before resuming, so a stall or a restart does not start the music. | 5 s | **Adv** |
 
 ### System
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | off |  |
-| Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | direct | **Adv** |
-| Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Direct mode never reads it, which is why the row is listed only in Perceptual. | 50 | **Adv** |
-| Show Debug Menu | Reveals the debug screens under System. They read hardware and internal state; nothing there is needed in normal use. | off | **Adv** |
+| Quick Screen | Whether a long press opens the quick screen or the shortcuts menu. | On |  |
+| Volume Adjustment Mode | Direct moves the volume in fixed decibel steps. Perceptual divides the range into steps that sound evenly spaced, which suits the bottom of the scale where a decibel is a large change. | Direct | **Adv** |
+| Number of Volume Steps | How many steps Perceptual mode divides the range into. More steps mean finer control and more presses to cross the range. Used only in Perceptual mode. | 50 | **Adv** |
+| Show Debug Menu | Reveals the debug screens under System. They read hardware and internal state; nothing there is needed in normal use. | No | **Adv** |
 
 ### System — USB
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only suits a plug that would otherwise take the disk and interrupt playback. Docks and cars that play from the player over USB still work. Drive Only presents the disk and nothing else, for a car stereo that reads iPods as USB drives but does not see this one. It overrides Accessory Protocol, Support iPhone Accessories, Identify As, USB Sound Card, USB HID and USB DAC Output without changing them, so cars and docks that play from the player over USB do not work until it is switched back. Docks on the dock connector still do. A change takes effect at the next connection. | mass storage |  |
-| USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | off | **Adv** |
-| USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | multimedia | **Adv** |
-| USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | off | **Adv** |
+| USB Mode | What a USB connection does: present the disk to the computer, or charge only. Charge only suits a plug that would otherwise take the disk and interrupt playback. Docks and cars that play from the player over USB still work. Drive Only presents the disk and nothing else, for a car stereo that reads iPods as USB drives but does not see this one. It overrides Accessory Protocol, Support iPhone Accessories, Identify As, USB Sound Card, USB HID and USB DAC Output without changing them, so cars and docks that play from the player over USB do not work until it is switched back. Docks on the dock connector still do. A change takes effect at the next connection. | Mass Storage |  |
+| USB HID | Presents the player as a keyboard or remote control to the computer, so its buttons can drive playback there. On an iPod Video in mass-storage mode, USB Sound Card takes its place when both are on. | No | **Adv** |
+| USB Keypad Mode | What the buttons send while acting as a USB device: media keys, a mouse, or presentation controls. | Multimedia | **Adv** |
+| USB Sound Card | Lets a computer play through the player: it shows up as a sound card, and what the computer plays comes out of the headphone socket. The computer's volume control sets the player's. Takes effect at the next restart, and while on it keeps about 130K of memory back from playback. On an iPod Video in mass-storage mode it takes USB HID's place, as there is room for only one of the two beside the disk. | Off | **Adv** |
 
 ### System — USB — USB DAC Output
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket, paused as Pause on Unplug says. It is looked for only when no computer answers within two seconds, and not while a dock is talking to the player. The check needs a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this. Off leaves every cable to the computer and charging. | on |  |
+| Start Automatically | On, a USB DAC plugged into the dock connector takes over playback, and unplugging it hands playback back to the headphone socket, paused as Pause on Unplug says. It is looked for only when no computer answers within two seconds, and not while a dock is talking to the player. The check needs a charger's power, such as a USB-C splitter with a charger in it. A DAC on its own supply with nothing else on the cable goes unnoticed: use Turn On beside this. Off leaves every cable to the computer and charging. | On |  |
 
 ### System — Accessories
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | on | **Adv** |
-| Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | on | **Adv** |
-| Support iPhone Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk: a computer gets none, and may retry the connection for a moment first. Off answers none, as an iPod does. Shown only while Accessory Protocol is on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | auto | **Adv** |
-| Identify As | The model a car or dock is told the player is. Try another if an accessory takes control but plays nothing: some judge what a player can do by its model. Changes over USB take effect at the next connection. A computer with Apple's drivers may not show the disk with iPhone 4. Shown only while Accessory Protocol is on. | this player | **Adv** |
-| Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | on | **Adv** |
+| Line Out | Enables the dock's line output, which bypasses the volume control and feeds an amplifier at a fixed level. | Yes | **Adv** |
+| Accessory Protocol | Answers docks, car kits and remotes that speak Apple's accessory protocol, over the dock connector or USB. Off, they get no reply: a dock charges but will not play or take its remote. Changes to USB take effect at the next connection. | Yes | **Adv** |
+| Support iPhone Accessories | Answers cars and other accessories that expect an iPhone, over USB. Auto knows a car by a request of Apple's that a car sends and a computer does not, and waits a second before handing a computer the disk, so a car never takes it. On answers any accessory that asks and never offers the disk: a computer gets none, and may retry the connection for a moment first. Off answers none, as an iPod does. Shown only while Accessory Protocol is on. With USB Sound Card on, a car makes the player drop off USB for a moment and come back without the sound card. | Auto | **Adv** |
+| Identify As | The model a car or dock is told the player is. Try another if an accessory takes control but plays nothing: some judge what a player can do by its model. Changes over USB take effect at the next connection. A computer with Apple's drivers may not show the disk with iPhone 4. Shown only while Accessory Protocol is on. | This Player | **Adv** |
+| Accessory Power Supply | Powers the accessory pin on the dock connector. Needed by some adapters, and a constant drain if nothing is attached. | Yes | **Adv** |
 | Accessory Browsing | Lets a receiver, car or dock browse artists, albums, genres, composers and audiobooks, up to this many songs in a list; a dock or receiver can also play Playlist Engine moods. Its memory is taken when browsing starts, or with a car's first cover, briefly rebuffering playback, and given back on unplugging. Needs the database in RAM. Off offers only the Queue and saved playlists, and a car no library at all; a car connected while it was Off sees one only once plugged in again. | 10000 | **Adv** |
-| Accessory Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. An older car or a dock gets the art cache's cover whichever is chosen, and none with Off. | prefer cache |  |
-| Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | auto | **Adv** |
-| Remote Track Skip (iPod Classic) | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | on |  |
+| Accessory Artwork | The cover a car shows with each track, sent over Apple's accessory protocol. Prefer Cache sends the art cache's 300-pixel cover, which appears at once, and the album's image while the cache has not reached it. The other choices send the image itself: sharper on a large screen, but a large one takes seconds to arrive; only a JPEG is sent as it is, and none over 512 KB. As Album Art follows the Album Art setting. Off sends none, and a car that looks covers up itself shows its own. An older car or a dock gets the art cache's cover whichever is chosen, and none with Off. | Prefer Cache |  |
+| Serial Bitrate | The speed of the dock connector's serial line. Auto suits every accessory that follows the standard. | Auto | **Adv** |
+| Remote Track Skip (iPod Classic) | Two clicks on the earphone remote's centre button skip to the next track, and three go back to the previous one. The cost is that a single click waits about a third of a second to see whether another is coming, so play/pause responds that much later. Off, every click is play/pause and acts at once. | Yes |  |
 
 A car is not offered Playlist Engine moods through **Accessory Browsing**.
 
@@ -612,72 +609,72 @@ restart, which costs battery life: restart the player afterwards.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Headphone Keyclick | A click through the headphones on each button press. Feedback in a pocket, irritating on a quiet passage. | off | **Adv** |
-| Speaker Keyclick | A click from the player own speaker on each button press, rather than through the headphones. Audible without anything plugged in. | on | **Adv** |
-| Keyclick Repeats | Whether auto-repeat -- a held button -- clicks each time or only once. | off | **Adv** |
+| Headphone Keyclick | A click through the headphones on each button press. Feedback in a pocket, irritating on a quiet passage. | Off | **Adv** |
+| Speaker Keyclick | A click from the player's own speaker on each button press, rather than through the headphones. Audible without anything plugged in. | Yes | **Adv** |
+| Keyclick Repeats | Whether auto-repeat -- a held button -- clicks each time or only once. | No | **Adv** |
 
 ### System — Limits
 
 | Setting | What it does | Default | |
 |---|---|---|---|
 | Max Entries in File Browser | The largest number of entries loaded from one folder or one Music list. A longer folder is cut short; a longer Music list is shown a page at a time in the database's order, so The/A/An and numbers are not sorted. Takes effect after a restart. | 5000 | **Adv** |
-| Max Playlist Size | The largest number of tracks a playlist may hold. Building very large lists is slow on this hardware, which is why the limit is lower here than on a computer. | 10000 (iPod Classic), 2000 (iPod Video) | **Adv** |
-| Glyphs to Cache | How many characters of the font are kept in memory at once. | 250 | **Adv** |
+| Max Playlist Size | The largest number of tracks a playlist may hold. Building very large lists is slow on this hardware, so raise it only if a playlist is being cut short. | 10000 (iPod Classic), 2000 (iPod Video) | **Adv** |
+| Glyphs to Cache | How many characters of the font are kept in memory at once. The default is plenty for European languages. Raise it if text in Chinese, Japanese or Korean redraws slowly, since those need far more than 250 characters on screen over time. | 250 | **Adv** |
 
 ### System — Time & Date Settings
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Time Format | Whether times are shown on a 12- or 24-hour clock. | 12hour |  |
+| Time Format | Whether times are shown on a 12- or 24-hour clock. | 12 Hour Clock |  |
 
 ### System — Startup/Shutdown
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | on | **Adv** |
-| Start Screen | Which screen opens at power-on. | root |  |
-| Shut Down | Switches the player off now, as holding Play does. Refused while charging, on a player that cannot switch off on the charger. | |  |
-| Reboot | Restarts the player now. Refused while charging, as Shut Down is. | |  |
+| Show Shutdown Message | Shows a message while shutting down, rather than the screen simply going dark. | Yes | **Adv** |
+| Start Screen | Which screen opens at power-on. | Main Menu |  |
+| Shut Down | Switches the player off now, as holding Play does. Refused while charging, on a player that cannot switch off on the charger. | — |  |
+| Reboot | Restarts the player now. Refused while charging, as Shut Down is. | — |  |
 
 ### System — Language & Text
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Language | The language of the interface. Loading one replaces the built-in English. |  |  |
-| Default Codepage | The character set assumed for tags that do not say which they use. Wrong guesses show accented characters as nonsense; Unicode is right for anything tagged recently. | utf-8 | **Adv** |
+| Language | The language of the interface. Loading one replaces the built-in English. | — |  |
+| Default Codepage | The character set assumed for tags that do not say which they use. Wrong guesses show accented characters as nonsense; Unicode is right for anything tagged recently. | Unicode (UTF-8) | **Adv** |
 
 ### System — Language & Text — Voice
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Voice Menus | Speaks menu entries aloud. Needs a voice file on the player. | on |  |
-| Voice Directories | Whether folder names are spoken, and whether by number or spelled out. | off | **Adv** |
-| Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | off | **Adv** |
-| Voice Filenames | Whether filenames are spoken, and how. | off | **Adv** |
-| Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | off | **Adv** |
-| Say File Type | Speaks the file's type along with its name. | off | **Adv** |
-| Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | off | **Adv** |
-| Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100 | **Adv** |
+| Voice Menus | Speaks menu entries aloud. Needs a voice file on the player. | Yes |  |
+| Voice Directories | Whether folder names are spoken, and whether by number or spelled out. | Off | **Adv** |
+| Use Directory .talk Clips | Plays a recorded .talk clip for a folder where one exists, instead of speaking the name. | No | **Adv** |
+| Voice Filenames | Whether filenames are spoken, and how. | Off | **Adv** |
+| Use File .talk Clips | Plays a recorded .talk clip for an individual file where one exists, instead of speaking its name. | No | **Adv** |
+| Say File Type | Speaks the file's type along with its name. | No | **Adv** |
+| Announce Battery Level | Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs a voice file on the player. | No | **Adv** |
+| Voice Prompt Volume | How loud speech is relative to the music underneath it. | 100% | **Adv** |
 
 ### System — Manage Settings
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | standard |  |
+| Settings Mode | How much of the settings tree is shown. Standard hides the advanced rows; Everything shows all of them. | Standard |  |
 
 ### System — Debug Logs
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Database Log | Writes database scan progress to tagcache.log in the .rockbox/logs folder. For working out why a track is missing from the database. Lines wait in memory until the disk is about to sleep, so a crash can lose the last few. Switches itself off after the time set in Switch Off After. | off | **Adv** |
-| Album Art Log | Writes thumbnail generation to art.log in the .rockbox/logs folder, with a line for each album or artist left without art and the reason. For working out why a particular album has no art. Switches itself off after the time set in Switch Off After. | off | **Adv** |
-| USB and Accessory Log | Writes every USB connection step to usb.log in the .rockbox/logs folder, without the USB Log debug screen open, and every message a dock or car exchanges, over USB or the dock connector's serial pins. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, and connection steps wait for the log to reach the disk, which can slow them. With a car, it also records every five seconds how much audio the car took. Switches itself off after the time set in Switch Off After. | off | **Adv** |
-| Battery Log | Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery voltage and level, and how much of the minute was spent playing, boosted, with the backlight or screen on, and with the disk running. For working out what a fast drain was spent on. The log waits until the disk is about to sleep, so it never spins the disk up itself. It costs a little CPU every tick, and switches itself off after the time set in Switch Off After. | off | **Adv** |
-| Playback Error Log | Writes a line to playback_errors.log in the .rockbox/logs folder for every track playback skips or cannot finish, saying why: the file would not open, had no codec, or the codec failed. For working out why tracks skip. Costs nothing until a track fails. Switches itself off after the time set in Switch Off After. | off | **Adv** |
-| Theme Log | Writes a line to theme.log in the .rockbox/logs folder for each skin file a theme loads: whether it loaded and how much memory it took, and any font or bitmap that would not load. For working out why a theme looks wrong or will not load. A skin that does not parse is logged without its line; CheckWPS gives that. Each line reaches the disk at once, so a theme change is a little slower. Switches itself off after the time set in Switch Off After. | off | **Adv** |
-| Background Task Log | Writes a line to tasks.log in the .rockbox/logs folder whenever a background task starts or finishes: database updates, album art and the documents and images index, with what each pass came to. For working out why the Building indicator will not go away, or why a pass keeps starting. Switches itself off after the time set in Switch Off After. | off | **Adv** |
+| Database Log | Writes database scan progress to tagcache.log in the .rockbox/logs folder. For working out why a track is missing from the database. Lines wait in memory until the disk is about to sleep, so a crash can lose the last few. Switches itself off after the time set in Switch Off After. | No | **Adv** |
+| Album Art Log | Writes thumbnail generation to art.log in the .rockbox/logs folder, with a line for each album or artist left without art and the reason. For working out why a particular album has no art. Switches itself off after the time set in Switch Off After. | No | **Adv** |
+| USB and Accessory Log | Writes every USB connection step to usb.log in the .rockbox/logs folder, without the USB Log debug screen open, and every message a dock or car exchanges, over USB or the dock connector's serial pins. For working out why a computer, dock or car will not connect. It writes to the disk whenever the log grows, and connection steps wait for the log to reach the disk, which can slow them. With a car, it also records every five seconds how much audio the car took. Switches itself off after the time set in Switch Off After. | No | **Adv** |
+| Battery Log | Writes a line a minute to battery.csv in the .rockbox/logs folder: the battery voltage and level, and how much of the minute was spent playing, boosted, with the backlight or screen on, and with the disk running. For working out what a fast drain was spent on. The log waits until the disk is about to sleep, so it never spins the disk up itself. It costs a little CPU every tick, and switches itself off after the time set in Switch Off After. | No | **Adv** |
+| Playback Error Log | Writes a line to playback_errors.log in the .rockbox/logs folder for every track playback skips or cannot finish, saying why: the file would not open, had no codec, or the codec failed. For working out why tracks skip. Costs nothing until a track fails. Switches itself off after the time set in Switch Off After. | No | **Adv** |
+| Theme Log | Writes a line to theme.log in the .rockbox/logs folder for each skin file a theme loads: whether it loaded and how much memory it took, and any font or bitmap that would not load. For working out why a theme looks wrong or will not load. A skin that does not parse is logged without its line; CheckWPS gives that. Each line reaches the disk at once, so a theme change is a little slower. Switches itself off after the time set in Switch Off After. | No | **Adv** |
+| Background Task Log | Writes a line to tasks.log in the .rockbox/logs folder whenever a background task starts or finishes: database updates, album art and the documents and images index, with what each pass came to. For working out why the Building indicator will not go away, or why a pass keeps starting. Switches itself off after the time set in Switch Off After. | No | **Adv** |
 | Switch Off After | How long the debug logs stay on, counted by the clock from when a log was switched on, whether the player is on or off. When the time is up every log switches itself off, and a message says so. Switching a log on starts the count again. Never keeps them on until they are switched off by hand, for chasing a fault that comes and goes. | 24 hours | **Adv** |
-| Turn All Off | Switches every debug log off at once. The files stay in the .rockbox/logs folder. | |  |
+| Turn All Off | Switches every debug log off at once. The files stay in the .rockbox/logs folder. | — |  |
 
 Below the switches, the menu shows how long is left before the logs switch
 off, and how much space their files take. A log file that reaches 256 KB is
@@ -694,8 +691,8 @@ other, so they survive leaving the game and survive the session.
 
 | Setting | What it does | Default | |
 |---|---|---|---|
-| Now Playing | Names the track under Spike's field, with the time remaining beside it. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off | |
-| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding, which is what keeps it readable on this screen. Off is the calmer choice while you are playing, and shows as much of the name as fits. Off as well while Scrolling is off. | Off | |
+| Now Playing | Names the track under Spike's field, with the time remaining beside it: Title shows the track's title, and Title and Artist adds who it is by. The field rises to make room, so the game is a little smaller with this on. Off gives the whole panel to the game. | Off |  |
+| Scroll Now Playing | Whether a track name too long for the space travels along or is simply cut off. It steps a character at a time on the beat rather than gliding. Off is the calmer choice while you are playing, and shows as much of the name as fits. Off as well while Scrolling is off. | No |  |
 | Audio Offset | How far ahead of the sound the game judges a press. Raise it if your presses feel late when they sounded on the beat, lower it if they feel early. It corrects the delay below the player's own buffer -- headphones and the codec -- so it is worth setting once and leaving. | -50 ms | **Adv** |
 
 ---
@@ -703,15 +700,14 @@ other, so they survive leaving the game and survive the session.
 ## Settings a theme resets
 
 Loading a theme returns every setting that describes the look to its default
-before reading the theme's own `.cfg`, so a theme that says nothing about a
-setting cannot inherit the last theme's answer. Without that, the same theme
-renders differently depending on what was loaded before it.
+before reading the theme's own `.cfg`, so a theme looks the same whatever was
+loaded before it.
 
 That covers everything in Appearance, plus the artwork rows, the carousel's
 geometry, the scrolling settings and the dialog chrome.
 
 **What you set by hand is not lost.** Changes made through the settings screens
 while a theme is loaded are kept in `/.rockbox/themes/<name>.usercfg`, read
-straight after the theme, so they survive the reset. *Forget My Changes*, at the
-foot of Appearance, throws them away and reloads the theme as its author
-shipped it.
+straight after the theme, so they survive the reset. *Forget My Changes*, at
+the foot of `Settings > Appearance`, throws them away and reloads the theme as
+its author shipped it.

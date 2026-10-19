@@ -25,14 +25,14 @@ character, the buttons move the caret.**
 | **MENU** (top) | Move back up into the text; from the text, cancel |
 
 Nothing is modal and nothing is chorded: the wheel always means "change this
-character", and the two buttons either side of it always mean "in" and "out".
+character", MENU moves up and PLAY moves down.
 
 ---
 
 ## The caret: bar and block
 
 The caret is an insertion point **between** characters, drawn as a thin vertical
-bar. It is not a block sitting on a character.
+bar.
 
 The two shapes tell you what the wheel will do next:
 
@@ -43,8 +43,9 @@ The two shapes tell you what the wheel will do next:
 
 So spinning the wheel opens a gap and starts composing a character in it; the
 block marks the one you are composing. Tapping Left or Right **commits** it —
-the block becomes a bar again, and the next spin inserts a fresh character
-rather than overwriting the one you just chose.
+the block goes, and the next spin inserts a fresh character rather than
+overwriting the one you just chose. Right leaves the bar after that character;
+Left also moves the bar in front of it.
 
 ---
 
@@ -56,10 +57,10 @@ The wheel steps through one fixed cycle, which wraps in both directions:
 (space) A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 0 1 2 3 4 5 6 7 8 9 - _ . ' &
 ```
 
-Space comes first, so one click forward from a fresh gap gives a space and one
-click back gives `&`. **There is no lowercase.** Filenames and database matching
-are both case-insensitive here, so a second pass of 26 letters would only cost
-spins.
+A fresh gap starts as a space, so one click forward gives `A` and one click
+back gives `&`. **There is no lowercase**, so a name you type — a new playlist,
+a renamed file — comes out in capitals. Search ignores case, so it makes no
+difference there.
 
 **Spin faster to move faster.** Quick wheel steps skip 2 characters, very quick
 ones skip 4, so crossing the alphabet is a flick rather than 26 clicks. Slow
@@ -98,15 +99,13 @@ Search puts the same editor above a live list of database matches. It is the
 best place to get a feel for the control, because results appear as you type.
 
 **Finding it.** It sits in the **Music** list directly above *Search by…*. It
-can also be added to the main menu (*Settings → Appearance → Edit Main Menu*).
-Both entries are hidden unless the database is loaded into RAM — the scan reads
-every tag, which from disk is unusably slow.
+can also be added to the main menu (`Settings > Appearance > Edit Main Menu`).
+Both entries are hidden unless the database is loaded into RAM.
 
 The search runs about a second after you stop turning the wheel, not on every
-character, so a long query costs one scan rather than twenty. It waits for a
-minimum number of letters first, one by default; *Settings → Library → Music →
-Search → Minimum Letters* raises it if one-letter searches turn up more than
-they are worth.
+character. It waits for a minimum number of letters first, one by default;
+`Settings > Library > Music > Search > Minimum Letters` raises it if one-letter
+searches turn up more than they are worth.
 
 **What is matched.** Case-insensitive, anywhere in the text — `beat` finds
 *Heartbeat*. Three tags are searched, and the results are grouped by tag:
@@ -119,8 +118,8 @@ they are worth.
 
 Per-track artist is not searched; search the album artist instead.
 
-Tracks come first, then albums, then artists. *Settings → Library → Music →
-Search → Result Order* offers the other five arrangements, so whichever you
+Tracks come first, then albums, then artists.
+`Settings > Library > Music > Search > Result Order` offers the other five arrangements, so whichever you
 look for most can be the group you land on.
 
 ### Moving around
@@ -134,7 +133,7 @@ look for most can be the group you land on.
 **Between visits.** The query is remembered until the player reboots, so
 reopening Search resumes where you left off and re-runs itself a moment later.
 
-The query is capped at 32 characters. How many matches are kept is *Settings →
-Library → Music → Search → Maximum Results* — 50 by default, and up to 200.
+The query is capped at 32 characters. How many matches are kept is
+`Settings > Library > Music > Search > Maximum Results` — 50 by default, and up to 200.
 Raising it is rarely the answer: another letter finds the record quicker than
 scrolling does.

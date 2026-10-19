@@ -20,8 +20,8 @@ nothing for those.
 unconverted `themes/` entry are upstream-identical and unbuilt, kept so merges
 apply without delete/modify conflicts. `uisimulator/` is built, and
 upstream-identical apart from the `--screenshot` argument (see *The
-simulator*). The `firmware/` changes are RockPod's hardware work and this fork's USB
-work; the `tools/` changes are this fork's.
+simulator*). The `firmware/` changes are mostly RockPod's hardware work and this
+fork's USB work; the `tools/` changes are this fork's.
 
 ---
 
@@ -95,7 +95,7 @@ The player as a disk, a keyboard, a sound card or an iAP accessory's host.
 
 | File | What changed | Why |
 | --- | --- | --- |
-| `usbstack/usb_storage.c` | The ~128K transfer buffer is allocated by `usb_storage_alloc_buffers()` and never freed, so `usb_storage_init_connection()` primes the endpoint at once | Upstream allocates it at the storage handover and frees it at unplug, after `audio_init()`, where only shrinking the audio buffer can meet it. |
+| `usbstack/usb_storage.c` | The ~128K transfer buffer is allocated by `usb_storage_alloc_buffers()` and never freed, so `usb_storage_init_connection()`, run at `SET_CONFIGURATION`, primes the endpoint at once | Upstream allocates it at the storage handover and frees it at unplug, after `audio_init()`, where only shrinking the audio buffer can meet it. |
 | `usbstack/usb_audio.c` | `usb_audio_alloc_buffers()` replaces `usb_audio_request_buf()` / `usb_audio_free_buf()` | The same, for the sound card. |
 | `usb.c`, `export/usb_core.h`, `export/usb.h` | `usb_init()` calls both, before `audio_init()` | **Not in the drivers' `init()`**: that runs after the device is attached, so a stall lands before `SET_ADDRESS`. PP502x cannot use `USB_STATIC_ALLOC` because 128K does not fit in IRAM. |
 
@@ -225,7 +225,7 @@ no VBUS.
 | File | What changed | Why |
 | --- | --- | --- |
 | `export/videoout.h` | New `videoout_set_format(double_size, pal)`, and `videoout_requested()`, true while TV Out is not Off whether or not a picture is showing | **TV Out > Size** and **TV Out > Standard**; the Turn On/Turn Off row is labelled from `videoout_requested()`. |
-| `target/arm/ipod/video/lcd-video.c` | TV output for the 5G. One 24-bit bitmap command puts the BCM's TV encoder in PAL or NTSC; a background thread then copies changed LCD rows into its TV framebuffer, 1x or doubled, at most 30 times a second and resting as long as each pass took, from a 150 KB snapshot taken from core memory while it runs, so each pass is one whole UI frame. A 1x pass starts at the beginning of a TV field, read from the BCM's scan-line register at `0x100008ac`, and runs straight through, so it does not tear. The LCD is given a black frame while it runs. Turning it off blacks the TV picture and updates the LCD again; the BCM stays in TV mode until the next boot, and `lcd_sleep()` refuses until then. While `tv_start()` sends its BCM commands, `lcd_update_rect()` only marks the screen dirty, so a scroll-thread update cannot land between them; with interrupts off, a panic, it updates the LCD. With no thread slot free, TV out does not start. Implements `videoout_set_mode()`, `_set_format()`, `_active()`, `_requested()` and `_disable()` | Upstream has no 5G video output. The framebuffer is 24-bit BGR at TV levels, 2112 bytes a line whatever the bitmap's width, measured on hardware. Another bitmap command drops the signal, and an LCD update disturbs it. Taking the BCM out of TV mode hangs the player, by the sleep path or by cutting its power. The commands come from Rockbox FS#9787; the scan-line register was found by searching the register area for bits that change at the field rate. |
+| `target/arm/ipod/video/lcd-video.c` | TV output for the 5G. One 24-bit bitmap command puts the BCM's TV encoder in PAL or NTSC; a background thread then copies changed LCD rows into its TV framebuffer, 1x or doubled, at most 30 times a second and resting as long as each pass took, from a 150 KB snapshot taken from core memory while it runs, so each pass is one whole UI frame. A 1x pass starts at the beginning of a TV field, read from the BCM's scan-line register at `0x100008ac`, and runs straight through, so it does not tear. The LCD is given a black frame while it runs. Turning it off blacks the TV picture and updates the LCD again; the BCM stays in TV mode until the next boot, and `lcd_sleep()` refuses until then. While `tv_start()` sends its BCM commands, `lcd_update_rect()` only marks the screen dirty, so a scroll-thread update cannot land between them; with interrupts off, a panic, it updates the LCD. With no thread slot free, TV out does not start. Implements `videoout_set_mode()`, `_set_format()`, `_active()`, `_requested()` and `_disable()` | Upstream has no 5G video output. The framebuffer is 24-bit BGR at TV levels, 2112 bytes a line whatever the bitmap's width, measured on hardware. Another bitmap command drops the signal, and an LCD update disturbs it. Taking the BCM out of TV mode hangs the player, by the sleep path or by cutting its power. The commands come from Rockbox FS#9787. |
 | `target/arm/s5l8702/ipod6g/videoout-6g.c` | Two output frames, 225 KB, taken from `core_alloc()`, pinned, while the mode is not Off. Each update is written to the frame not on show, which the VP takes at the next field; the next update waits for the encoder's field bits (`0x39300040`, bits 0-1) to change before writing to the other, yielding while it waits (at most 40 ms) and dropping the update if the output stopped meanwhile. The VP's destination is the LCD at 1x, centred, or upstream's 648x432; setting the size it already has does not restart the output | Upstream reserves one frame on every 6G, written while the TV shows it, so a fast-changing screen tears. Taking the frames rebuffers playback once. |
 
 ---
@@ -311,6 +311,7 @@ and produces the wrong firmware.
 | `pfgeom/` | Mirrors the carousel's projection and cull on the host. Change it with `screens/covers/carousel.c`, or it proves nothing. |
 | `dbfeat/` | Runs `apps-ipod/database/db_featured_parse.c`, unmodified, over a table of tags and the guests each must yield. |
 | `check-settings-docs.sh` | Whether `settings-help.txt` and `settings-guide.md` match the settings. Silence means they do. |
+| `check-zip-langs.sh` | Fails on a language file under 1000 bytes in a firmware zip; a clean build can write one as a bare header with no error. `build-hw.sh` runs it after `make zip`. |
 | `upstream-apps-port.sh` | Lists the upstream commits to `apps/` in a range, each touched file mapped to its `apps-ipod/` counterpart through the `was:` markers, and marks those that also touch `firmware/` or `lib/`. Run at every upstream merge. |
 | `soundscan/` | Runs the player's sound analysis over a music folder on a computer. Ships as `.rockbox/tools/soundscan.exe`; compiles the app layer's analysis sources. |
 | `database_pb/` | Runs the player's database Update or Rebuild against a mounted player. Ships as `.rockbox/tools/database_pb.exe`; compiles `apps-ipod/database/tagcache.c` with `DBTOOL`. Upstream's `database/`, the (D)atabase build, writes upstream's database and is left as it is. |
@@ -332,7 +333,7 @@ build.
 | `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line; a `playback_claim_aa_slot_keyed()` stub; `rbpaths.h` included | A missing font or bitmap prints nothing without `-v`. The skin parser keys an in-place `%Cl` chain's slot. |
 | `apps-ipod/skin/wps_internals.h` | `VP_DEFAULT_LABEL` is `NULL` under `__PCTOOL__` | As upstream has it. |
 | `apps-ipod/features.txt` | `usb_hid` also under `__PCTOOL__` | `settings_list.c` registers it unconditionally. |
-| `configure` | The SDL check is a real test | It was always true, so `--type=c` demanded SDL. |
+| `configure` | The SDL check is a real test | Upstream's is always true, so `--type=c` demands SDL. |
 
 ### The simulator
 
@@ -370,7 +371,7 @@ Two upstream files reach the app layer by bare include name, through `api/` stub
 | `bundle-tools.sh` | Adds `soundscan.exe`, `database_pb.exe` and `artcache_pb.exe`, rebuilt by make on each run, and the host-built codecs soundscan loads, as `.rockbox/tools/`. A missing Windows simulator is reported, not fatal; a failed tool build is fatal; `release.sh` requires it. |
 | `build-bootloader.sh`, `tools/bootloader-installer/` | Builds both bootloaders and Windows `ipodpatcher.exe` and `mks5lboot.exe` from `utils/`, unchanged, and zips them with the install scripts and README as `podbox-bootloader.zip`. The 5G bootloader is passed to ipodpatcher by `install-5g.cmd`: embedding it needs every iPod model's bootloader beside it. |
 | `release.sh` | Builds both targets on the build server, verifies the zips, then replaces the `Themes`, `Simulator`, `Bootloader` and `latest` releases, in that order. |
-| `docs/CREDITS` | PodBox, RockPod, Spun and accessory protocol blocks above `For RockBox:`. Upstream's list below is untouched, trailing newline included, so merges apply. |
+| `docs/CREDITS` | PodBox, RockPod, Spun, accessory protocol, car protocol and themes-and-fonts blocks above `For Rockbox:`, a heading this fork adds. Upstream's list below it is untouched, trailing newline included, so merges apply. |
 | `.gitignore` | `/build*` narrowed to the build directories; local drafts, `dist/`, editor state and `build-bootloader.sh`'s output added. |
 | `wps/WPSLIST` | `cabbiev2` block removed, so it does not ship. `rockbox_failsafe` stays: it is the parse-failure fallback. |
 

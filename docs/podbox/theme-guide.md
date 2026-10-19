@@ -46,10 +46,6 @@ every setting that describes the appearance is reset to its default *before*
 your `.cfg` is read. A theme that does not mention a setting gets the shipped
 default, never whatever the previous theme chose.
 
-That is the whole point: without it, the same theme renders differently
-depending on what was loaded before it, and you cannot test your own work
-reliably.
-
 **What this means for you: name everything you care about.** If your theme
 looks right only because the previous one set something, it will not look right
 on a clean player.
@@ -94,10 +90,9 @@ one, and **overrides all three** when it is set:
 album covers filter: pixellate10+reduce4
 ```
 
-That is the one to reach for: the three numbered settings exist so the settings
-screen has something to offer, and their list is what a menu can show rather
-than what the engine can do. Amounts are free, and steps join with `+`. See the
-filter list in the skin tag reference for what is available; a chain that will
+That is the one to reach for: amounts are free, and steps join with `+`. See the
+[filter list in the skin tag reference](custom-skin-tags.md#changed-behaviour-cl-album-art-filters-rounded-corners-and-names)
+for what is available; a chain that will
 not compile — `blur`, or `darker` and the other adaptive ones, which need more
 than the slide's own buffer — leaves the covers unfiltered rather than half
 done.
@@ -113,9 +108,8 @@ are *not* taking effect are the ones you just changed. Re-select the theme
 after every edit, or check `config.cfg` to see what the player actually holds.
 
 The reverse is also true and easier to miss: most look-related settings are
-reset to their defaults *before* the theme file is read (that is what makes a
-theme self-contained rather than inheriting the last one's leftovers). So a
-value you set by hand in `config.cfg`, or from the settings menu, is discarded
+reset to their defaults *before* the theme file is read. So a value you set by
+hand in `config.cfg`, or from the settings menu, is discarded
 the moment any theme loads. If you want it to stick, it belongs in the `.cfg`.
 
 ### Your `.cfg` must name a font
@@ -142,8 +136,8 @@ was loaded is kept in `/.rockbox/themes/<your theme>.usercfg` and re-applied
 *after* your `.cfg`. So a user who prefers your theme with the scrollbar on the
 left keeps that across reloads, and your `.cfg` is not what they see.
 
-You cannot override this and should not try. *Forget My Changes*, at the foot of
-Appearance, is how they get back to your theme as shipped.
+You cannot override this. `Settings > Appearance > Forget My Changes` is how
+they get back to your theme as shipped.
 
 ### The compiled defaults are bare
 
@@ -196,10 +190,10 @@ theme is built around one signature accent that must not move, put
 The palette is read from the album-art cache's own thumbnail — the same
 pre-scaled covers the carousel and the browser use. No skin tag is involved,
 so **a theme that never mentions album art still gets colours**, as long as the
-art cache has a thumbnail for the track's folder. With the album art source set
-to Artist — or to Auto on a playlist built from an artist browse — the cached
-portrait is read instead, so a theme showing artist photos takes its colours
-from the photo rather than from the cover.
+art cache has a thumbnail for the track's folder. With **Now Playing Artwork**
+set to Artist Art — or to Auto on a playlist built from an artist browse — the
+cached portrait is read instead, so a theme showing artist photos takes its
+colours from the photo rather than from the cover.
 
 When the cache has nothing for the folder, the extractor falls back to the
 cover the playback engine has buffered, and only a `%Cl` causes anything to be
@@ -259,17 +253,28 @@ costs.
 > black theme and looks correct forever — until album colours turn the
 > background and every icon becomes a black rectangle. Key it to magenta.
 
-### Do not use `%VB`
+### `%VB` needs a full-screen ground
 
-`%VB` does not mean "use the background". With no real `backdrop:` image it
-allocates a backdrop buffer and seeds it with a copy of whatever is on screen at
-the moment your theme loads — a photograph of the previous theme. Every viewport
-then clears *from* that snapshot instead of filling with its background colour,
-so album colours can never reach the screen behind your content.
+A `%VB` viewport draws into a backdrop layer, and every later clear copies from
+that layer instead of filling with a background colour. The layer starts as a
+copy of whatever is on screen when your theme loads — the previous theme — and
+keeps it wherever your `%VB` viewports do not paint.
 
-A skin with no `%VB` and `backdrop: -` has no backdrop, and clears fill with the
-background colour. That is the state you want. `%VB` is only correct when you are
-compositing onto a real full-screen `backdrop:` image.
+So make the first `%VB` viewport cover the whole screen and name its background
+on its own declaration line:
+
+```
+%V(0,0,-,-,-)%VB%Vb(141414)
+```
+
+That colour follows the album like any other — write your `.cfg`'s
+`background color` there and it becomes the album's dominant colour — so album
+colours reach the ground behind your content. Under a backdrop, `%Vb` in every
+other viewport and list row does nothing; paint colour into the `%VB` layer
+instead (§5 covers the selected row).
+
+A skin with no `%VB` and `backdrop: -` has no backdrop at all, and every
+viewport's clear fills with its own `%Vb`.
 
 ### Nothing clears a list screen
 
@@ -284,11 +289,11 @@ Either declare a full-screen viewport as the first drawn one in your `.sbs`:
 %V(0,0,-,-,-)
 ```
 
-or paint the specific strips that nothing else covers. `%dr` fills with the
-*foreground*, so set it to your background colour first:
+or paint the specific strips that nothing else covers with a `%dr` in your
+background colour:
 
 ```
-%Vl(bg,0,0,320,60,-)%Vf(141414)%dr(0,0,-,-)
+%V(0,0,320,60,-)%dr(0,0,-,-,141414)
 ```
 
 ---
@@ -296,9 +301,9 @@ or paint the specific strips that nothing else covers. `%dr` fills with the
 ## 4. Dialog and progress chrome
 
 Modal dialogs (yes/no prompts, messages) draw with a shared style you can set
-from the `.cfg`. They also appear under **Settings ▸ Appearance ▸
-Dialogs**, the metrics and colours together. The five size rows are advanced,
-so they show only with Settings Mode on Everything.
+from the `.cfg`. They also appear under `Settings > Appearance > Dialogs`, the
+metrics and colours together. The five size rows are advanced,
+so they show only with `Settings > Settings Mode` on Everything.
 
 All of them reset when a theme loads, so your `.cfg` is what makes a value
 stick for everyone who loads your theme. A value the *user* sets through those
@@ -336,11 +341,6 @@ dialog box shadow colour: 000000
 **These two ignore `dialog colours`** — unlike the nine below, they apply on
 `off`, `on` and `auto` alike, so you can style the shadow without taking over
 the whole palette to do it.
-
-Black is the default rather than a colour taken from your theme, because the
-shadow's job is to lift the box off whatever sits behind it, and a colour drawn
-from your own foreground/background pair is the one value guaranteed not to
-contrast with the box.
 
 ### Colours
 
@@ -384,19 +384,15 @@ it to anyone.
 
 ### It takes over *all* list drawing
 
-The art callback is consumed only by the skinned list renderer. The moment your
-`.sbs` declares a `%Lb` row config, **your skin draws every list** — menus,
-settings screens, the file browser, everything. There is no way to skin only the
-album list. Budget for reproducing your theme's ordinary list appearance too.
+Art rows are drawn only by a skinned list. The moment your `.sbs` declares a
+`%Lb` row config, **your skin draws every list** — menus, settings screens, the
+file browser, everything. There is no way to skin only the album list. Budget
+for reproducing your theme's ordinary list appearance too.
 
-Gate `%Lb` on `%?Ld` and on nothing else. Anything else gives you lists that
-draw no text at all — `%?La` because it cannot answer until a `%Lb` has already
-rendered, `%cs` and `%Lt` because they identify only some of the levels you
-want.
-
-You rarely need two configs anyway. A second row *height* is `%Lb`'s fifth
-argument (below); reach for a second `%Lb` only when the art layout wants a
-different row *width* or a different set of viewports.
+If you choose between two `%Lb`, gate them on
+[`%?Ld`](custom-skin-tags.md#ld--does-the-list-on-screen-draw-art-rows) and on
+nothing else; `%cs` and `%Lt` identify only some of the levels you want. You
+rarely need two configs: a second row *height* is `%Lb`'s fifth argument.
 
 ### Turning it on
 
@@ -411,19 +407,16 @@ database author art: on
 ```
 
 They reset when your theme loads (§2), so each has to be stated. The last two
-are easy to miss: an audiobook list is a spoken list, and it reads `database
-audiobook art` for its books and `database author art` for its authors rather
-than the first two — so a theme naming only those draws plain rows under
+are easy to miss: an audiobook list reads `database audiobook art` for its
+books (and the Audiobooks shelf) and `database author art` for its authors
+rather than the first two — so a theme naming only those draws plain rows under
 Audiobooks.
 
-The row height for an art list is the **fifth argument to `%Lb`** (below). Name
-it there rather than in the `.cfg`: it sits with the viewport offsets that
-depend on it, and it applies to that row config alone. A `%Lb` that names none
-falls back to the `database art row height` setting, which is one value for the
-whole player.
-
-Whichever supplies it, the height must be **greater than your `%Lb` row height**
-or the rows stop counting as art rows and `%?La` goes false.
+The row height for an art list is the **fifth argument to `%Lb`**. Name it
+there rather than in the `.cfg`'s `database art row height`, and keep it no
+less than the ordinary row height —
+[the tag reference](custom-skin-tags.md#lblabel-width-height-tile-art-height--art-row-height)
+has the rule.
 
 ### The row layout
 
@@ -459,15 +452,16 @@ Change the 46 and both move with it.
   paints over whatever is beside the list, and nothing ever erases it.
 - **Declare ordinary-row viewports before art-row ones.** A row viewport clears
   its own line, and the reverse order wipes the cover.
-- **The cover fills as much of its viewport as a cached size allows.** It is
-  drawn 1:1 and never scaled, so a smaller viewport crops it and a larger one
-  leaves a gap. The cache offers rows one size, **44×44**, so make the art
-  viewport that and nothing else fits any better.
+- **Make the art viewport 44×44.** That is the one size a row's cover comes
+  in, never scaled; see
+  [`%La`](custom-skin-tags.md#laoffset-nowrap-radius-filters--list-item-album-art).
 
 ### `%?La` answers per *list*, not per row
 
 Despite the name, `%?La` is a property of the whole list: it is true on album and
-artist lists and false everywhere else. So in an album list **every** row takes
+artist lists, on audiobook book and author lists and on the Audiobooks shelf,
+each while its switch is on, and false everywhere else. So in an album list
+**every** row takes
 the art branch, including `[All Tracks]`, `[Random]`, `[Featured In]` and
 `[Untagged]`. Those have no cover, so the art branch must cope — either leave
 the slot empty and let the text sit indented with the rest, or draw a glyph
@@ -482,9 +476,7 @@ row — or the art branch draws over the glyph you put in their place. A dimming
 `%dr` written for unselected covers is the usual casualty: it is held back until
 after the artwork, which puts it on top of the icon.
 
-`%?Ld` asks the same question at list level and answers it before anything is
-drawn, which is why it is the one tag that can choose between two `%Lb`. Inside
-a row the two agree; in chrome, only `%Ld` answers at all.
+In status-bar chrome and when choosing a `%Lb`, use `%?Ld` instead.
 
 ### Marking the selected row
 
@@ -494,11 +486,11 @@ In a skinned list, the ordinary selector settings do not apply. Your options:
 |---|---|
 | `%?Lc<%Vf(a)\|%Vf(b)>` text-colour swap | works |
 | `%?Lc<%Vs(invert)>` | works — and reproduces `selector type: bar (color)` exactly, since inverting swaps your foreground and background |
-| `%Vb` | blanks the text on **every** row |
+| `%?Lc<%Vb(a)>` row-background swap | works with no backdrop; does nothing under a `%VB` backdrop — use `%Vs(invert)` there |
 | `%Vs(gradient,n)` | blanks the text on **every** row |
 
-The last two read as the whole list failing to draw rather than as a selector
-fault, which makes them expensive to debug.
+A blank list reads as the whole list failing to draw rather than as a selector
+fault, which makes it expensive to debug.
 
 > **Never put `%Vf` or `%Vb` on a row viewport's declaration line.** A colour
 > tag written there is taken as that viewport's *own* starting colour rather
@@ -518,10 +510,12 @@ fault, which makes them expensive to debug.
 
 ### Filling a selected row's background
 
-Worth knowing why `%Vb` is the tool here and a drawn rectangle is not: **a row is
+With no backdrop, `%Vb` is the tool here and a drawn rectangle is not: **a row is
 never cleared as a whole.** What paints a row's background is the text engine
 clearing its own line as it draws. So a `%dr` placed before the text is wiped by
 that clear, while a `%Vb` set before the text changes the colour the clear uses.
+Under a `%VB` backdrop the clear copies the backdrop and ignores `%Vb`, so fill
+the selected row with `%Vs(invert)`, which fills with `%Vf`.
 
 A row viewport with no text — an icon column, say — has nothing to clear
 anything, so there a `%dr` is what survives. A bar spanning both halves of a row
@@ -554,29 +548,24 @@ Then check the `%VI` you were switching *back* to. `%VI` is sticky, so deleting 
 branch that set one can leave a different viewport selected on the screens that
 followed it.
 
-### Why
-
-The window between the cable going in and the firmware handing storage to the
-host is timing-critical on these targets (particularly the iPod 5). Scheduling
-is cooperative, so any long stretch of drawing starves the USB thread while the
-host has `SET_ADDRESS` outstanding; when the host gives up, the port wedges and
-only a physical unplug clears it. This presents as a "device malfunction" in
-Windows. Rendering a skin in a way that doesn't cause this issue has been tried
-and reverted a number of times. Increased reliability was picked over pretty
-display.
-
 ---
 
 ## 7. Activity indicators
 
 Three flags report background work. Each is empty when idle, so use them as
-conditionals. See [`custom-skin-tags.md`](custom-skin-tags.md) for details.
+conditionals. See [`custom-skin-tags.md`](custom-skin-tags.md#lb--background-index-building)
+for details.
 
-| Tag | Set while |
-|---|---|
-| `%lh` | the disk is active (standard Rockbox) |
-| `%lb` | the database, art cache or document/image index is building in the background |
-| `%lw` | the UI is waiting on something the user asked for |
+| Tag | Set while | Needs |
+|---|---|---|
+| `%lh` | the disk is active (standard Rockbox) | **Show Disk Activity** — off by default |
+| `%lb` | the database, art cache or document/image index is building in the background | **Show Background Tasks** — on by default |
+| `%lw` | the UI is waiting on something the user asked for | **Show Working** — on by default |
+
+All three settings are in
+`Settings > Appearance > Interface Elements > Activity Indicators`, and with
+one off its tag stays empty. So a theme that shows only `%lh` shows nothing
+until the user turns that setting on.
 
 They usually mean the same thing to someone looking at the screen, so one
 indicator covering all three is generally what you want:
@@ -603,13 +592,28 @@ escaping.
 ## 8. Checking your theme
 
 `checkwps` parses a skin and reports syntax errors and missing fonts or bitmaps.
-It must be **run from inside a `.rockbox` directory**, because font and bitmap
-paths resolve relative to the on-device layout — from anywhere else it fails on
-the fonts instead of the skin.
+It is not in the player zip: build it on Linux with
+`tools/configure --target=ipodvideo --type=c --appsdir=apps-ipod` and `make`, in
+a scratch folder outside the source tree. It does not build on Windows. The
+build names it `checkwps.ipodvideo`; the examples below call it `checkwps`.
+
+Run it from your theme's root folder — the one holding `.rockbox` — and name
+the files under it. From inside `.rockbox` it fails on the fonts instead of the
+skin.
 
 ```
-cd <your theme>/.rockbox
-checkwps wps/YourTheme.sbs wps/YourTheme.wps
+cd <your theme>
+checkwps .rockbox/wps/YourTheme.sbs .rockbox/wps/YourTheme.wps
+checkwps .rockbox/themes/YourTheme.cfg
+```
+
+For a colour problem, add `--viewports`, naming the `.sbs` first so the `.wps`
+resolves against it as it does on the player. It prints each viewport's
+rectangle, font and colours, and marks each colour as named on that viewport's
+own line, inherited from the `.sbs` `%Vi`, or the theme default.
+
+```
+checkwps --viewports .rockbox/wps/YourTheme.sbs .rockbox/wps/YourTheme.wps
 ```
 
 What it proves is that your tags and syntax are valid and your assets exist. It
@@ -621,8 +625,8 @@ understood — `!rrggbb` fixed colours and the extra `%dr` arguments included. A
 tag it rejects is a tag the player rejects too.
 
 A skin can also fail *after* it has parsed, on a font or a bitmap it names.
-There is no line and no caret for that, only "WPS parsing failure" and a note to
-run it again with `-v`, which names the file it could not open. Two things
+There is no line and no caret for that, only `sbs parsing failure` (or `wps`)
+and `Run again with -v for the reason.` — `-v` names the file it could not open. Two things
 account for most of them:
 
 - **A name whose capitals do not match**, if you are checking on Linux or a Mac

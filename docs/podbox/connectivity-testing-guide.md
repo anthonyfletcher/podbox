@@ -12,13 +12,17 @@ one that does.
 ## 2. Capture the iPod's log
 
 1. Turn on `Settings > Settings Mode` **Everything**, then
-   `Settings > System > Show Debug Menu` and
-   `Settings > System > Debug Logs > USB and Accessory Log`
-2. Delete `.rockbox/logs/usb.log` from the iPod if it's there
+   `Settings > System > Debug Logs > USB and Accessory Log`. For a dock, also
+   turn on `Settings > System > Show Debug Menu`, which the Serial iAP screen
+   below needs
+2. Delete `.rockbox/logs/usb.log` and `.rockbox/logs/usb.1.log` from the iPod
+   if they're there
 3. Connect to the accessory and repeat the problem
 4. Copy `.rockbox/logs/usb.log` off the iPod (and `usb.1.log`, if there is
    one), then turn `USB and Accessory Log` off - it slows every USB
-   connection. It switches itself off after 24 hours of use if you forget
+   connection. If you forget, it switches itself off after
+   `Settings > System > Debug Logs > Switch Off After`, 24 hours by default,
+   counted by the clock from when it was turned on
 
 Lines with `iap serial` after the time came over the dock connector's serial
 pins; the rest came over USB. If a dock leaves nothing after the `==` header lines,
@@ -27,7 +31,7 @@ take a photo of `System > Debug > Serial iAP` while docked.
 ## 3. Capture an iPhone's log (cars and USB docks)
 
 Only if you have an iPhone that works with the accessory. It shows what the
-accessory expects to hear.  This is a bit more technical...
+accessory expects to hear. This part is more technical.
 
 **Install Apple's iAP profile - in Safari.** iOS only installs a profile that
 Safari downloaded.
@@ -59,7 +63,7 @@ of personal data - only one small file inside it is needed.
 1. Share it to a computer (AirDrop, or Save to Files then iCloud Drive)
 2. Unpack it - double-click on a Mac, or `tar -xzf sysdiagnose_<name>.tar.gz` on
    Windows
-3. Take `crashes_and_spins/accessoryd-packets-<date>.log.ips`
+3. Take `sysdiagnose_<name>/crashes_and_spins/accessoryd-packets-<date>.log.ips`
 
 ## 4. Send it in
 

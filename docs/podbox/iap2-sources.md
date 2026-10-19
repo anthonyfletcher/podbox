@@ -34,7 +34,7 @@ documentation was not consulted.
 | [carplay-wifi-extractor](https://github.com/HaToan/carplay-wifi-extractor) by HaToan | none: facts only | The link synchronisation payload, and the phone's side of it |
 | JJTech0130's iAP2 gists | none: facts only | Message names, and how to talk iAP2 to a real iPhone |
 | [usbmuxd](https://github.com/libimobiledevice/usbmuxd) | LGPL-2.1: facts only | Apple's USB mode requests, to rule them out |
-| libiap, already in Rockbox | GPLv2-compatible | iAP's HID report framing |
+| [libiap](https://github.com/mojyack/libiap) by mojyack | MIT, already in Rockbox | iAP's HID report framing |
 | HID 1.11 and the HID Usage Tables | USB-IF standard | The car's buttons |
 
 ## The facts
