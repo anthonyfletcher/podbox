@@ -276,6 +276,13 @@ unsigned int create_thread(void (*function)(void), void *stack,
     return 0;
 }
 
+/* Only a track change arms one, and nothing plays here */
+void timeout_register(struct timeout *tmo, timeout_cb_type callback,
+                      int ticks, intptr_t data)
+{
+    (void)tmo; (void)callback; (void)ticks; (void)data;
+}
+
 /* Asked for every track: nothing outranks the only pass there is */
 bool bg_task_should_stop(const struct bg_task *task)
 {
