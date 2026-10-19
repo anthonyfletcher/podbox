@@ -1202,8 +1202,19 @@ static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             check_ret(ret == 0, ret);
             return IAPGeneralCommandID_AckFIDTokenValues;
         } break;
+        /* a second StartIDPS starts the tokens again */
+        case IAPGeneralCommandID_StartIDPS: {
+            return ipod_ack(command, IAPAckStatus_Success, response_span, IAPGeneralCommandID_IPodAck);
+        } break;
         case IAPGeneralCommandID_EndIDPS: {
             read_request(IAPEndIDPSPayload);
+            /* an abandon is followed by IdentifyDeviceLingoes */
+            if(request->status == IAPEndIDPSStatus_Abort) {
+                ctx->phase = IAPPhase_Connected;
+                alloc_response(IAPIDPSStatusPayload);
+                response->status = IAPIDPSStatus_Aborted;
+                return IAPGeneralCommandID_IDPSStatus;
+            }
             check_ret(request->status == IAPEndIDPSStatus_Success, -IAPAckStatus_ECommandFailed);
             ctx->on_send_complete = transition_idps_to_auth_cb;
             alloc_response(IAPIDPSStatusPayload);
@@ -1213,7 +1224,7 @@ static int32_t handle_in_idps(struct IAPContext* ctx, uint8_t lingo, uint16_t co
         }
         break;
     }
-    return iap_false;
+    return -IAPAckStatus_EUnknownID;
 }
 
 static IAPBool send_auth_challenge_sig_cb(struct IAPContext* ctx) {
@@ -1400,6 +1411,12 @@ IAPBool _iap_feed_packet(struct IAPContext* ctx, const uint8_t* const data, cons
             warn("the first command(%02X:%04X) must be StartIDPS or IdentifyDeviceLingoes", lingo, command);
             return iap_false;
         }
+    }
+    /* IdentifyDeviceLingoes carries no transaction ID even after IDPS,
+     * and the session that follows has none */
+    if(lingo == IAPLingoID_General && command == IAPGeneralCommandID_IdentifyDeviceLingoes) {
+        ctx->trans_id_support  = TransIDNotSupported;
+        ctx->handling_trans_id = -1;
     }
     if(ctx->trans_id_support == TransIDSupported) {
         check_ret(iap_span_read_16(&span, &buf.u16), iap_false);

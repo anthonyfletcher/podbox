@@ -129,9 +129,11 @@ void iap_log_report(struct IAPContext* ctx, const void* report, size_t size, boo
         header += 1;
     }
     /* The accessory's first packet is what decides whether packets carry
-     * a transaction ID, so it has one only if it is StartIDPS. */
-    unsigned trans = 0xffff;
-    if(ctx->trans_id_support == TRANS_ID_SUPPORTED ||
+     * a transaction ID, so it has one only if it is StartIDPS.
+     * IdentifyDeviceLingoes never has one, even after IDPS. */
+    const bool    idl   = lingo == IAPLingoID_General && command == IAPGeneralCommandID_IdentifyDeviceLingoes;
+    unsigned      trans = 0xffff;
+    if((ctx->trans_id_support == TRANS_ID_SUPPORTED && !idl) ||
        (lingo == IAPLingoID_General && command == IAPGeneralCommandID_StartIDPS)) {
         trans = p[0] << 8 | p[1];
         p += 2;

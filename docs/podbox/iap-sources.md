@@ -37,6 +37,7 @@ so the facts that came through RockPod rest on it at one remove.
 | An accessory may list any one of the player's rates | libiap |
 | A car may never answer the request for its rates, and set one on the stream instead | observed, a tester's car |
 | Several cars never set the stream's rate, and play the one announced | ipod-gadget |
+| During IDPS a second StartIDPS restarts it; an abandon is answered and the accessory may then identify with IdentifyDeviceLingoes, which carries no transaction ID and ends their use | RockPod's serial IDPS handling (`951d17c057`), which the USB side matches |
 | An accessory identifying with a device ID and no authentication is treated as authenticated | ipod |
 | A Linux computer picks the first configuration whose first interface is not vendor-specific | Linux's USB core |
 
