@@ -30,11 +30,10 @@ radius.
 
 Run it from the theme's root folder, the one holding .rockbox. Font and bitmap
 paths in a skin are relative to the on-device layout, so from anywhere else it
-fails on the fonts rather than on the skin.
+fails on the fonts rather than on the skin. A %ft file is not found either,
+and that is silent: the tag is dropped and the skin still passes.
 
     cd <theme> && checkwps.ipodvideo .rockbox/wps/*.sbs .rockbox/wps/*.wps
-
-A %ft file is never found: the tag is dropped and the skin still passes.
 
 A skin can fail after it has parsed, on a font or bitmap it names. There is no
 error line for that -- the reason is a debugf, and -v is what shows it.

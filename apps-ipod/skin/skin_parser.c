@@ -1616,7 +1616,12 @@ static int parse_filetext(struct skin_element *element,
     while(*filename == PATH_SEPCH) /* no absolute paths! */
         filename++;
 
+#ifdef CHECKWPS
+    /* CheckWPS runs in the folder holding .rockbox, not at its root */
+    path_append(buf, ROCKBOX_DIR + 1, filename, sizeof(buf));
+#else
     path_append(buf, ROCKBOX_DIR, filename, sizeof(buf));
+#endif
     DEBUGF("%s %s[%d]\n", __func__, buf, line);
 
     if (line > 0x3FF || (fd = open_utf8(buf, O_RDONLY)) < 0)

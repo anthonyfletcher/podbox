@@ -255,8 +255,8 @@ nothing about any of them:
 - **CheckWPS must run from the theme's root folder**, the one holding
   `.rockbox`: `checkwps .rockbox/wps/<name>.sbs .rockbox/wps/<name>.wps`, or
   `checkwps .rockbox/themes/<name>.cfg`. From inside `.rockbox` it fails on
-  the fonts rather than the skin. A `%ft` file is never found, at either
-  place: the tag is dropped and the skin still passes. A skin named bare
+  the fonts rather than the skin, and a `%ft` file is not found: the tag is
+  dropped and the skin still passes. A skin named bare
   (`wps: scrim`) is not really checked: it finds the bitmap folder of that
   name and passes.
 - **It links this fork's skin engine, not upstream's**, so it accepts every tag
