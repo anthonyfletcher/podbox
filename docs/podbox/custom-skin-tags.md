@@ -57,6 +57,7 @@ preceding group repeats.
 | [`%Lk`](#lk--what-kind-of-row-this-is) | kind of row |
 | [`%Lp`](#lp--the-rows-number-among-the-tracks) | row's number among the tracks |
 | [`%Lv`](#lv--a-setting-rows-value) | a setting row's value |
+| [`%Lr`](#lr--where-a-number-setting-sits-in-its-range) | where a number setting sits in its range |
 | [`%LP`](#lp--is-this-row-playing) | is this row playing |
 | [`%Cl(...[, filters, radius, label])`](#changed-behaviour-cl-album-art-filters-rounded-corners-and-names) | changed: art filters, corners, names |
 | [`%Cd([name][, x, y, width, height])`](#showing-part-of-an-artwork) | changed: named art, a window of it |
@@ -450,8 +451,8 @@ If a frame is a literal `|`, escape it as `%|` — a bare one ends the branch:
 ## List rows
 
 Tags for a skinned list: `%La`, `%Ld` and `%Lb`'s fifth argument draw cover
-art in the rows, and `%Lk`, `%Lp`, `%Lv` and `%LP` say what a row is, beyond
-the text and icon `%LT` and `%LI` give. Those four take `%LT`'s arguments: an
+art in the rows, and `%Lk`, `%Lp`, `%Lv`, `%Lr` and `%LP` say what a row is,
+beyond the text and icon `%LT` and `%LI` give. Those five take `%LT`'s arguments: an
 offset to ask about another row, and `nowrap`.
 
 ### `%La(offset[, nowrap][, radius][, filters])` — list-item album art
@@ -616,6 +617,21 @@ folder or an image among a folder's files.
 The current value of a toggle or setting row, as that setting's own screen
 words it: "On", "All", "-6 dB". Empty on every other row, and on a setting
 that names a file.
+
+### `%Lr` — where a number setting sits in its range
+
+How far a number setting's value is from its least to its greatest, from `0`
+to `100`: Volume, Bass, Sleep Timer and the like. A setting picked from a
+list of numbers, such as Maximum Results, counts by its place in the list, so
+each step moves it the same distance. A setting with any value that is a word
+reads empty even while a number is chosen -- Backlight, whose shortest is
+Always, or Playback Frequency, whose first is Auto -- as do toggles, choices
+and every other row. So `%?Lr<…|…>` asks "is this a number".
+
+```
+%?Lr<%Lr%%|>                                # "40%" on a number row
+%sel(%ma(%Lr,/,34),0,low,1,mid,2,high)       # three bands
+```
 
 ### `%LP` — is this row playing
 

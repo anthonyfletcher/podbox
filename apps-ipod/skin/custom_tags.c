@@ -109,12 +109,13 @@ static const struct tag_info custom_tags[] =
 
     /* What the row's list says of it, beyond the text and icon upstream's %LT
      * and %LI give: its kind (enum list_row_kind -- values never change), its
-     * number among the list's tracks, a setting row's value, and whether it is
-     * playing. The arguments are %LT's: an offset to another row, and
-     * "nowrap". */
+     * number among the list's tracks, a setting row's value and where a number
+     * sits in its range, and whether it is playing. The arguments are %LT's:
+     * an offset to another row, and "nowrap". */
     TAG(SKIN_TOKEN_LIST_ITEM_KIND,     "Lk", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_POSITION, "Lp", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_VALUE,    "Lv", "|IS",        SKIN_REFRESH_DYNAMIC),
+    TAG(SKIN_TOKEN_LIST_ITEM_RANGE,    "Lr", "|IS",        SKIN_REFRESH_DYNAMIC),
     TAG(SKIN_TOKEN_LIST_ITEM_PLAYING,  "LP", "|IS",        SKIN_REFRESH_DYNAMIC),
 
     /* %wt(text[,align]): draw text word-wrapped and aligned to fill the current

@@ -153,6 +153,9 @@ enum list_row_kind
     LIST_ROW_OPTION,            /* one of a setting's values, in its picker */
 };
 typedef enum list_row_kind list_get_kind(int selected_item, void * data);
+/* Range callback, read by %Lr: where a number setting's value sits in its
+ * range, 0 to 100, or -1 on any other row. */
+typedef int list_get_range(int selected_item, void * data);
 
 /*
  * Playing callback, read by the skin's %LP: whether the row is what is
@@ -230,6 +233,7 @@ struct gui_synclist
      * a list without one reads as plain, valueless and not playing. */
     list_get_kind *callback_get_item_kind;
     list_get_name *callback_get_item_value;     /* a setting row's value */
+    list_get_range *callback_get_item_range;    /* ...and where it sits */
     list_is_playing *callback_item_is_playing;
 
     /* Changes whenever the items may have: init, the item count or the kind
@@ -264,6 +268,9 @@ extern void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
                                            list_get_kind kind_callback,
                                            list_get_name value_callback,
                                            list_is_playing playing_callback);
+/* The answer to %Lr. May be NULL. */
+extern void gui_synclist_set_range_callback(struct gui_synclist * lists,
+                                            list_get_range range_callback);
 extern void gui_synclist_speak_item(struct gui_synclist * lists);
 extern int gui_synclist_get_nb_items(struct gui_synclist * lists);
 
@@ -324,6 +331,8 @@ enum list_row_kind skinlist_get_item_kind(int offset, bool wrap);
 const char* skinlist_get_item_value(int offset, bool wrap,
                                     char* buf, size_t buf_size);
 bool skinlist_item_is_playing(int offset, bool wrap);
+/* %Lr: 0 to 100, or -1 on a row that is not a number setting. */
+int skinlist_get_item_range(int offset, bool wrap);
 /* %Lp: the row's number among the list's tracks, from 1; -1 on any row that
  * is not a track. */
 int skinlist_get_item_position(int offset, bool wrap);

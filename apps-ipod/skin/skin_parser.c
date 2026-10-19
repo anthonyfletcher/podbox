@@ -2574,6 +2574,7 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_LIST_ITEM_KIND:
                 case SKIN_TOKEN_LIST_ITEM_POSITION:
                 case SKIN_TOKEN_LIST_ITEM_VALUE:
+                case SKIN_TOKEN_LIST_ITEM_RANGE:
                 case SKIN_TOKEN_LIST_ITEM_PLAYING:
                     function = parse_listitem;
                     break;

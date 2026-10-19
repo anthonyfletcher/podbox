@@ -157,6 +157,14 @@ const char* skinlist_get_item_value(int offset, bool wrap,
     return ret ? P2STR((unsigned char*)ret) : NULL;
 }
 
+int skinlist_get_item_range(int offset, bool wrap)
+{
+    int item = offset_to_item(offset, wrap);
+    if (item < 0 || !current_list || !current_list->callback_get_item_range)
+        return -1;
+    return current_list->callback_get_item_range(item, current_list->data);
+}
+
 bool skinlist_item_is_playing(int offset, bool wrap)
 {
     int item = offset_to_item(offset, wrap);

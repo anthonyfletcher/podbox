@@ -313,6 +313,7 @@ void gui_synclist_init(struct gui_synclist * gui_list,
     gui_list->selection_color = NULL;
     gui_list->callback_get_item_kind = NULL;
     gui_list->callback_get_item_value = NULL;
+    gui_list->callback_get_item_range = NULL;
     gui_list->callback_item_is_playing = NULL;
     gui_list->generation = ++last_generation;
 }
@@ -731,6 +732,12 @@ void gui_synclist_set_row_callbacks(struct gui_synclist * lists,
     lists->generation = ++last_generation;
     lists->callback_get_item_value = value_callback;
     lists->callback_item_is_playing = playing_callback;
+}
+
+void gui_synclist_set_range_callback(struct gui_synclist * lists,
+                                     list_get_range range_callback)
+{
+    lists->callback_get_item_range = range_callback;
 }
 
 void gui_synclist_set_sel_color(struct gui_synclist * lists,

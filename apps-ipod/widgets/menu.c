@@ -254,6 +254,14 @@ static const char* menu_get_value(int selected_item, void * data,
                                   option_value_as_int(setting));
 }
 
+static int menu_get_range(int selected_item, void * data)
+{
+    const struct settings_list *setting =
+        menu_row_setting(selected_item, (const struct menu_item_ex *)data);
+
+    return setting ? option_value_position(setting) : -1;
+}
+
 static enum themable_icons  menu_get_icon(int selected_item, void * data)
 {
     const struct menu_item_ex *menu = (const struct menu_item_ex *)data;
@@ -495,6 +503,7 @@ static int init_menu_lists(const struct menu_item_ex *menu,
     gui_synclist_set_title(lists, title, icon);
     gui_synclist_set_icon_callback(lists, global_settings.show_icons?menu_get_icon:NULL);
     gui_synclist_set_row_callbacks(lists, menu_get_kind, menu_get_value, NULL);
+    gui_synclist_set_range_callback(lists, menu_get_range);
     if(global_settings.talk_menu)
         gui_synclist_set_voice_callback(lists, talk_menu_item);
     gui_synclist_set_nb_items(lists,current_subitems_count);

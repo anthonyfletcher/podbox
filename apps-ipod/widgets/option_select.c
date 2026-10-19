@@ -653,3 +653,67 @@ int get_setting_info_for_bar(const struct settings_list *setting, int offset, in
     return true;
 }
 
+/* Whether a value reads as a number on screen: "5 min", "-6 dB", not "Off". */
+static bool option_value_is_number(const struct settings_list *setting,
+                                   int value)
+{
+    char buf[64];
+    const char *s = option_get_valuestring(setting, buf, sizeof(buf), value);
+
+    if (*s == '-' || *s == '+')
+        s++;
+    return *s >= '0' && *s <= '9';
+}
+
+/* Whether every value a setting can take reads as a number. A range's word,
+ * where it has one, names an end -- Off at 0 -- so only the ends are asked.
+ * A choice of numbers is a STRINGCHOICE; a plain choice names its options,
+ * even ones that start with a digit, such as 12 Hour Clock. */
+static bool option_is_number(const struct settings_list *setting)
+{
+    int i;
+
+    if (HASFLAG(setting, F_T_SOUND))
+        return true;
+    if (HASFLAG(setting, F_INT_SETTING))
+        return option_value_is_number(setting, setting->int_setting->min) &&
+               option_value_is_number(setting, setting->int_setting->max);
+    if (HASFLAG(setting, F_TABLE_SETTING))
+    {
+        for (i = 0; i < setting->table_setting->count; i++)
+            if (!option_value_is_number(setting,
+                                        setting->table_setting->values[i]))
+                return false;
+        return true;
+    }
+    if (HASFLAG(setting, F_CHOICE_SETTING) && HASFLAG(setting, F_CHOICETALKS))
+    {
+        for (i = 0; i < setting->choice_setting->count; i++)
+            if (!option_value_is_number(setting, i))
+                return false;
+        return true;
+    }
+    return false;
+}
+
+/* Where a number setting's value sits between its least and greatest, 0 to
+ * 100, or -1 for a setting with any value that is not a number. A setting
+ * picked from a list counts by its place in the list, so every step moves it
+ * the same distance. */
+int option_value_position(const struct settings_list *setting)
+{
+    int count, val;
+
+    if (!option_is_number(setting))
+        return -1;
+    if (!get_setting_info_for_bar(setting, 0, &count, &val) || val < 0)
+        return -1;
+    if (count < 2)
+        return 0;
+    /* A list keeps its own order; a range follows List Order. */
+    if ((HASFLAG(setting, F_INT_SETTING) || HASFLAG(setting, F_T_SOUND)) &&
+        global_settings.list_order == LIST_ORDER_DESCENDING)
+        val = count - 1 - val;
+    return val * 100 / (count - 1);
+}
+
