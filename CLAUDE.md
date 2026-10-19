@@ -252,12 +252,13 @@ mkdir /tmp/cwps && cd /tmp/cwps
 Three fork-specific notes, since the tools' own READMEs are upstream's and say
 nothing about any of them:
 
-- **CheckWPS must run from inside a `.rockbox` directory.** Skin font paths are
-  relative to the on-device layout and will not resolve from anywhere else --
-  it then fails on the fonts rather than the skin. A theme `.cfg` is the
-  exception: check it from the theme's root folder, as
-  `checkwps .rockbox/themes/<name>.cfg`. A skin named bare (`wps: scrim`)
-  is not really checked: it finds the bitmap folder of that name and passes.
+- **CheckWPS must run from the theme's root folder**, the one holding
+  `.rockbox`: `checkwps .rockbox/wps/<name>.sbs .rockbox/wps/<name>.wps`, or
+  `checkwps .rockbox/themes/<name>.cfg`. From inside `.rockbox` it fails on
+  the fonts rather than the skin. A `%ft` file is never found, at either
+  place: the tag is dropped and the skin still passes. A skin named bare
+  (`wps: scrim`) is not really checked: it finds the bitmap folder of that
+  name and passes.
 - **It links this fork's skin engine, not upstream's**, so it accepts every tag
   the player does. `tools/checkwps/SOURCES`, `checkwps.make` and
   `tools/checkwps/include/` are all fork files now; `tools/checkwps/stubs.c`

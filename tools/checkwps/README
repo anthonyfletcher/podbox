@@ -28,11 +28,13 @@ apps-ipod/, so it accepts every tag the player does -- upstream's parser
 rejects a !rrggbb fixed colour and crashes on a %dr given an opacity or a
 radius.
 
-Run it from inside a .rockbox directory. Font and bitmap paths in a skin are
-relative to the on-device layout, so from anywhere else it fails on the fonts
-rather than on the skin.
+Run it from the theme's root folder, the one holding .rockbox. Font and bitmap
+paths in a skin are relative to the on-device layout, so from anywhere else it
+fails on the fonts rather than on the skin.
 
-    cd <theme>/.rockbox && checkwps.ipodvideo wps/*.sbs wps/*.wps
+    cd <theme> && checkwps.ipodvideo .rockbox/wps/*.sbs .rockbox/wps/*.wps
+
+A %ft file is never found: the tag is dropped and the skin still passes.
 
 A skin can fail after it has parsed, on a font or bitmap it names. There is no
 error line for that -- the reason is a debugf, and -v is what shows it.

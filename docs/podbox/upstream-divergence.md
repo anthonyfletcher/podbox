@@ -327,7 +327,7 @@ build.
 | `checkwps/SOURCES` | Application files from `apps-ipod/`, plus `stubs.c` | |
 | `checkwps/checkwps.make` | Include path around `$(COREAPPSDIR)/api` and `$(COREAPPSDIR)`; `-DSYSFONT_HEIGHT=8` | Mirrors `apps-ipod/apps.make`. |
 | `checkwps/include/` | Shadows of `storage.h`, `usb.h`, `powermgmt.h` | They declare nothing under `__PCTOOL__`. |
-| `checkwps/stubs.c` | The allocator, status bar, settings lookups, a `string_to_cfg()` that checks the name only, and every settings callback | A new setting whose callback is missing here fails the link. A theme `.cfg` is checked from the theme's root folder, a skin from inside `.rockbox`. |
+| `checkwps/stubs.c` | The allocator, status bar, settings lookups, a `string_to_cfg()` that checks the name only, and every settings callback | A new setting whose callback is missing here fails the link. Both a theme `.cfg` and a skin are checked from the theme's root folder. |
 | `checkwps/checkwps.h`, `checkwps.c`, `README` | `--viewports`; a pointer to `-v` when a skin fails with no error line; a `playback_claim_aa_slot_keyed()` stub; `rbpaths.h` included | A missing font or bitmap prints nothing without `-v`. The skin parser keys an in-place `%Cl` chain's slot. |
 | `apps-ipod/skin/wps_internals.h` | `VP_DEFAULT_LABEL` is `NULL` under `__PCTOOL__` | As upstream has it. |
 | `apps-ipod/features.txt` | `usb_hid` also under `__PCTOOL__` | `settings_list.c` registers it unconditionally. |
