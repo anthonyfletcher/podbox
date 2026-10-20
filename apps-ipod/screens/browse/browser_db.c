@@ -307,7 +307,8 @@ struct menu_entry {
         int format_id[MAX_TAGS];
         int clause_count[MAX_TAGS];
         int result_seek[MAX_TAGS];
-        int header_levels;      /* a bit for each level marked %header */
+        int header_levels;      /* a bit for each %header_ level */
+        int header_untagged;    /* those of them marked %header_untagged */
     } si;
     int link;
 };
@@ -338,11 +339,12 @@ static int head_rows;
 
 static struct browser_context *tc;
 
-/* A %header level is never a list of its own. It shows the level below it,
- * with its own values as rows at the head: "albumartist -> grouping %header
- * -> album" lists an artist's groupings and then all of their albums. A
- * grouping row descends a level as usual; an album row passes over the
- * header level, whose result_seek is then SEEK_NO_FILTER. */
+/* A %header_all or %header_untagged level is never a list of its own. It
+ * shows the level below it, with its own values as rows at the head:
+ * "albumartist -> grouping %header_all -> album" lists an artist's groupings
+ * and then all of their albums, %header_untagged only the albums with no
+ * grouping. A grouping row descends a level as usual; an album row passes
+ * over the header level, whose result_seek is then SEEK_NO_FILTER. */
 #define SEEK_NO_FILTER INT_MIN
 
 static bool level_is_header(int level)
@@ -920,11 +922,24 @@ static int get_condition(struct search_instruction *inst)
             strp++;
             return 1;
         case '%':
-            if (strncasecmp(strp, "%header", 7) != 0)
+        {
+            int bit = 1 << inst->tagorder_count;
+
+            if (strncasecmp(strp, "%header_all", 11) == 0
+                && !isalnum((unsigned char)strp[11]) && strp[11] != '_')
+                strp += 11;
+            else if (strncasecmp(strp, "%header_untagged", 16) == 0
+                     && !isalnum((unsigned char)strp[16]) && strp[16] != '_')
+            {
+                inst->header_untagged |= bit;
+                strp += 16;
+            }
+            else
                 return -1;
-            inst->header_levels |= 1 << inst->tagorder_count;
-            strp += 7;
+
+            inst->header_levels |= bit;
             return 1;
+        }
         case '-':
         case '\0':
             return 0;
@@ -1095,7 +1110,7 @@ static bool parse_search(struct menu_entry *entry, const char *str)
             && (i + 2 >= inst->tagorder_count
                 || (inst->header_levels & (1 << (i + 1)))))
         {
-            logf("%%header needs two levels below it");
+            logf("%%header_ needs two levels below it");
             return false;
         }
     }
@@ -2084,7 +2099,7 @@ static int featured_row_count(int level)
         return 0;
     if (csi->tagorder[level] != tag_album)
         return 0;
-    /* The albums a %header level shows are the artist's own list */
+    /* The albums a header level shows are the artist's own list */
     if (level_is_header(above) && csi->result_seek[above] == SEEK_NO_FILTER)
         above--;
     if (above < 0 || !is_artist_tag(csi->tagorder[above]))
@@ -2448,7 +2463,15 @@ static void add_level_filters(struct tagcache_search *tcs, int level)
     }
 }
 
-/* The rows a %header level puts at the head of the list: its values under
+/* Keeps a %header_untagged level's list to the rows no header row holds. Its
+ * tag is set per search; tagcache stores the pointer and only reads it. */
+static struct tagcache_search_clause header_untagged_clause = {
+    .type = clause_is,
+    .source = source_constant,
+    .str = UNTAGGED,
+};
+
+/* The rows a header level puts at the head of the list: its values under
  * the rows chosen above, sorted. [Untagged] is left out, as everything it
  * holds is in the list below. Names are kept here because a special row's
  * name must outlive the entries. */
@@ -2618,6 +2641,11 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         sort = true;
 
     add_level_filters(&tcs, level);
+    if (header && (csi->header_untagged & (1 << (level - 1))))
+    {
+        header_untagged_clause.tag = csi->tagorder[level - 1];
+        tagcache_search_add_clause(&tcs, &header_untagged_clause);
+    }
 
     /* An album's tracks lie between its first and last master entries, so a
      * placed album's list walks those rather than the whole index. */
@@ -4196,7 +4224,7 @@ int browser_db_load(struct browser_context* c)
             && entry_is_untagged(c, first))
             first++;
 
-        /* A %header row is where the user was, so it is kept. */
+        /* A header row is where the user was, so it is kept. */
         if (c->selected_item < first - header_count && !resume_row)
             c->selected_item = first;
 
@@ -4495,7 +4523,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             c->selected_item = random_item;
     }
     newextra = dptr->newtable;
-    /* A %header level's own rows are the special ones that browse */
+    /* A header level's own rows are the special ones that browse */
     bool header_row = !is_random_item && c->selected_item < head_rows;
 
     /* The synthetic rows are actions, not browse levels. Leaving here --
@@ -5583,7 +5611,8 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
 
     for (i = 0; i < level; i++)
     {
-        if (!TAGCACHE_IS_NUMERIC(csi->tagorder[i]))
+        if (!TAGCACHE_IS_NUMERIC(csi->tagorder[i])
+            && csi->result_seek[i] != SEEK_NO_FILTER)
             tagcache_search_add_filter(&tcs, csi->tagorder[i],
                                        csi->result_seek[i]);
     }
@@ -5732,7 +5761,7 @@ char *browser_db_current_entry_name(char *buf, size_t bufsize)
 bool browser_db_current_filters(struct browser_db_filters *out)
 {
     struct tagentry *entry;
-    int level, i;
+    int level, i, n = 0;
 
     memset(out, 0, sizeof(*out));
     out->scope = browser_db_current_scope();
@@ -5751,14 +5780,17 @@ bool browser_db_current_filters(struct browser_db_filters *out)
     level = tc->currextra;
     for (i = 0; i < level && i < MAX_TAGS - 1; i++)
     {
-        out->tag[i] = csi->tagorder[i];
-        out->seek[i] = csi->result_seek[i];
+        if (csi->result_seek[i] == SEEK_NO_FILTER)
+            continue;
+        out->tag[n] = csi->tagorder[i];
+        out->seek[n] = csi->result_seek[i];
+        n++;
     }
 
     /* The row itself last, so the levels read top to bottom. */
-    out->tag[i] = csi->tagorder[shown_level(level)];
-    out->seek[i] = entry->extraseek;
-    out->count = i + 1;
+    out->tag[n] = csi->tagorder[shown_level(level)];
+    out->seek[n] = entry->extraseek;
+    out->count = n + 1;
     return true;
 }
 
