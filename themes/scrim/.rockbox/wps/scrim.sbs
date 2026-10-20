@@ -77,7 +77,8 @@
 # Row setup
 #
 # - Row shape. 1 icon, 2 number, 3 bare. A library list's own rows (%Lk 5:
-#   <Random>, <Resume>, <Featured In>, the shelf's three) have no track
+#   <Random>, <Resume>, <Featured In>, the shelf's three, the groupings a
+#   tagnavi %header level puts above an artist's albums) have no track
 #   number, so they take the icon shape, as do the database's top menus, Music
 #   and Audiobooks. <All Tracks> and <By album> stay bare, in line with the
 #   album and artist rows they head. A genre called Audiobooks lists
@@ -86,13 +87,21 @@
 %?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
 # - Chevron, on rows that open a list: a settings submenu, a folder, a
-#   database level above the tracks, a playlist in the catalogue. 2 for a
-#   chevron, 1 for none: a skin variable is never below 1.
-%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,2)|%vs(chev,set,1)>
+#   database level above the tracks, a playlist in the catalogue. A Yes/No
+#   setting shows a switch in its place and a number setting a slider; the
+#   two toggles worded otherwise (First Button Press, Quick Screen) show
+#   nothing. A setting set to Auto, or to a side (Left, Top), shows its icon.
+#   The settings that are scales in words (Weak to Strong, Slow to Fast) show
+#   a slider too, empty at Off; Animation's own Slow to Fast is a step shorter
+#   than FF/RW Accel's. 2 for a chevron, 3 for a switch, 4 for a slider, 5
+#   for a value's icon, 6 for a word scale, 7 for Animation, 1 for none: a
+#   skin variable is never below 1.
+%?and(%if(%Lk,=,2),%or(%if(%Lv,=,%Sx(Yes)),%if(%Lv,=,%Sx(No))))<%vs(chev,set,3)|%?Lr<%vs(chev,set,4)|%?and(%if(%Lk,=,3),%if(%LT,=,%Sx(Animation)))<%vs(chev,set,7)|%?and(%if(%Lk,=,3),%or(%if(%LT,=,%Sx(Track Skip Beep)),%if(%LT,=,%Sx(Headphone Keyclick)),%if(%LT,=,%Sx(Auditory Fatigue Reduction)),%if(%LT,=,%Sx(FF/RW Accel)),%if(%LT,=,%Sx(Random Spin Length))))<%vs(chev,set,6)|%?and(%if(%Lk,=,3),%or(%if(%Lv,=,%Sx(Auto)),%if(%Lv,=,%Sx(Left)),%if(%Lv,=,%Sx(Centre)),%if(%Lv,=,%Sx(Right)),%if(%Lv,=,%Sx(Top)),%if(%Lv,=,%Sx(Bottom))))<%vs(chev,set,5)|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,2)|%vs(chev,set,1)>>>>>>
 #
-# - Row icon
+# - Row icon. A grouping is the tag's own text, in English only, since no
+#   phrase names it; one named Album is told from the Music menu's by %Lk.
 %Vl(Rows,2,3,24,24,2)
-%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)>>>|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx([In Progress]),q,%Sx([Not Started]),Ö,%Sx([Finished]),×,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%sel(%LI,19,Þ,2,m)))>>>
+%?La<|%?if(%vg(shape),=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?or(%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28))<%?if(%LT,=,%Sx(Search))<®|%?if(%LT,=,%Sx(Moods))<í|%?if(%LT,=,%Sx(Journeys))<î|%sel(%LI,1,¡,0,¥,2,m,33,¦,34,§,-1,-,¨)>>>|%?and(%if(%Lk,=,5),%if(%LT,=,Album))<d|%sel(%LT,%Sx([All Tracks]),b,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,%Sx(Now Playing),A,%Sx(Resume Playback),A,%Sx(Continue Reading),A,%Sx(Music),c,%Sx(Album Covers),f,%Sx(Artist Portraits),i,%Sx(Queue),U,%Sx(Playlists),ð,%Sx(Playback Report),z,%Sx(Files),¢,%Sx(Settings),Ç,%Sx(System),Ò,%Sx(Shortcuts),Ó,%Sx(Random Album),V,%Sx(Playback History),µ,%Sx(Shuffle Songs),H,%Sx(Documents),w,%Sx(Images),x,%Sx(Search),®,%Sx(Featured Artists),é,%Sx(Audiobooks),ê,%Sx(Book),ë,%Sx(Author),ì,%Sx(Title),l,%Sx(Album),e,%Sx(Albums),e,%Sx(Artist),g,%Sx(Artists),g,%Sx(Album Artist),h,%Sx(Album Artists),h,%Sx(Genre),j,%Sx(Year),¶,%Sx(Composer),k,%Sx(User Rating),²,%Sx(Recently Added),´,%Sx(First Letter),«,%Sx(Tracks by),ª,%Sx(Search by...),¯,%sel(%LT,%Sx(Same as currently played track),Ø,%Sx(Sound Settings),Y,%Sx(Playback Settings),W,%Sx(Library),v,%Sx(Appearance),Ê,%Sx(Battery & Power),Á,%Sx(Settings Mode),Í,%Sx(Changed Settings),É,%Sx([In Progress]),q,%Sx([Not Started]),Ö,%Sx([Finished]),×,%Sx(Quiz),ï,%Sx(About),»,%Sx(System Info),ñ,%Sx(Credits),ò,%Sx(Background Tasks),ó,%Sx(License),ô,%Sx(Debug),õ,%Sx(Custom menu),Ċ,%sel(%LI,19,Þ,2,m)))>>>>
 #
 # - Row number
 %Vl(Rows,0,5,30,20,3)
@@ -104,27 +113,31 @@
 %Vl(Rows,2,0,3,30,-)
 %?La<|%?if(%vg(shape),=,3)<%?Lc<%dr(0,0,3,30,vivid>60:ffffff,-,14,3)>>>
 #
-# - Row text, the full width where there is no chevron, and
-#   short of it where there is. Only one of each pair draws a
+# - Row text, the full width where there is no chevron, switch or slider, and
+#   short of it where there is: the switch and slider are inked to the edge of
+#   their cell, so the text stops 8px before it. Only one of each pair draws a
 #   given row, so neither clears the other's text
 %Vl(Rows,46,5,250,20,-)
 %?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
-%Vl(Rows,46,5,226,20,-)
-%?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),=,2))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
+%Vl(Rows,46,5,219,20,-)
+%?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
 %Vl(Rows,12,5,284,20,-)
 %?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
-%Vl(Rows,12,5,260,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,2))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+%Vl(Rows,12,5,253,20,-)
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
 #
-# - Chevron
+# - Chevron, switch, slider or value icon. The slider's ten frames are
+#   empty only at the least of a range and full only at the greatest, with the
+#   eight between split evenly across the rest; a word scale takes the frames
+#   %Lr would give it.
 %Vl(Rows,272,3,24,24,2)
-%?La<|%?if(%vg(chev),=,2)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>Þ>>
+%?La<|%?if(%vg(chev),!=,1)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%?if(%vg(chev),=,2)<Þ|%?if(%vg(chev),=,3)<%?if(%Lv,=,%Sx(Yes))<ö|÷>|%?if(%vg(chev),=,4)<%sel(%Lr,0,ø,100,ā,%sel(%ma(%ma(%Lr,*,8),/,100),0,ù,1,ú,2,û,3,ü,4,ý,5,þ,6,ÿ,7,Ā))|%?if(%vg(chev),=,5)<%sel(%Lv,%Sx(Auto),Ă,%Sx(Left),ă,%Sx(Centre),Ą,%Sx(Right),ą,%Sx(Top),Ć,%Sx(Bottom),ć)|%?if(%vg(chev),=,6)<%sel(%Lv,%Sx(Off),ø,%Sx(Weak),û,%Sx(Moderate),þ,%Sx(Strong),ā,%Sx(Very Slow),ø,%Sx(Slow),û,%Sx(Normal),ý,%Sx(Fast),ÿ,%Sx(Very Fast),ā,%Sx(Short),ø,%Sx(Medium),ý,%Sx(Long),ā)|%sel(%Lv,%Sx(Off),ø,%Sx(Slow),û,%Sx(Normal),þ,%Sx(Fast),ā)>>>>>>>
 #
 # Album/Artist row setup
 #
-# - Special row icon
+# - Special row icon, groupings included
 %Vl(Rows,10,11,24,24,2)
-%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([In Progress]),q,%Sx([Not Started]),Ö,%Sx([Finished]),×)>
+%?La<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,%Sx([All Tracks]),A,%Sx([Random]),V,%Sx([Resume]),T,%Sx([Featured In]),Z,%Sx([Untagged]),¿,%Sx([By album]),d,%Sx([In Progress]),q,%Sx([Not Started]),Ö,%Sx([Finished]),×,Single,a,EP,b,Compilation,Ĉ,Mixtape,Ĉ,Live Album,Z,Soundtrack,ĉ,Album,d)>
 #
 # - Row art.
 %Vl(Rows,0,1,44,44,-)
