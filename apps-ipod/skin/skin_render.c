@@ -67,6 +67,7 @@
 #include "diacritic.h"
 #include "custom_tokens.h"
 #include "draw/text_wrap.h"
+#include "scroll_engine.h"
 
 #define MAX_LINE 1024
 
@@ -223,12 +224,59 @@ static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
         strcpy(line + size - 4, "...");
 }
 
+/* Where a scrolling %wt's text sits, from the clock: at the top for the
+ * scroll delay, then a pixel up for every step sideways scrolling takes at
+ * the scroll speed, until its last line reaches the bottom; still there for
+ * the delay, then back to the top. Scroll step is not used: more than a pixel
+ * at a time looks jerky going up. New text starts again from the top.
+ * `range` is how far the text overflows. */
+static void textbox_scroll(struct wps_data *data, struct skin_textbox *tb,
+                           const char *text, int range)
+{
+    long delay = global_settings.scroll_delay * HZ / 1000;
+    long tick = MAX(lcd_scroll_info.ticks, 1);
+    unsigned hash = 5381;
+    const char *c;
+
+    for (c = text; *c; c++)
+        hash = hash * 33 + (unsigned char)*c;
+
+    if (hash != tb->hash || tb->offset > range)
+    {
+        tb->hash = hash;
+        tb->offset = 0;
+        tb->due = current_tick + delay;
+    }
+    else if (!TIME_BEFORE(current_tick, tb->due))
+    {
+        if (tb->offset >= range)
+        {
+            tb->offset = 0;
+            tb->due = current_tick + delay;
+        }
+        else
+        {
+            /* a late refresh catches up rather than slowing the crawl */
+            int steps = (current_tick - tb->due) / tick + 1;
+            tb->offset = MIN(tb->offset + steps, range);
+            if (tb->offset == range)
+                tb->due = current_tick + delay;
+            else
+                tb->due += steps * tick;
+        }
+    }
+
+    if (!data->textbox_moving || TIME_BEFORE(tb->due, data->textbox_due))
+        data->textbox_due = tb->due;
+    data->textbox_moving = true;
+}
+
 /* %wt: word-wrap text to the current viewport, align the block vertically
- * (valign t/c/b) and each line horizontally (halign l/c/r), ellipsise if it
- * overflows the height, and draw it. A line break in the text (\n, \r\n or
- * \r) ends a line, so a tag can carry paragraphs. On overflow the last line
- * runs on to the end of its paragraph and wt_ellipsize() cuts it at the
- * width, mid-word if need be.
+ * (valign t/c/b) and each line horizontally (halign l/c/r), and draw it. A
+ * line break in the text (\n, \r\n or \r) ends a line, so a tag can carry
+ * paragraphs. Text taller than the box scrolls if the box does, and
+ * otherwise its last line runs on to the end of its paragraph and
+ * wt_ellipsize() cuts it at the width, mid-word if need be.
  *
  * noinline and with its own buffers so the ~1KB of scratch lives here, on the
  * stack only while a %wt actually renders -- NOT baked into do_non_text_tags's
@@ -274,6 +322,20 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     if (!len)
         return;
 
+    display->set_drawmode(DRMODE_SOLID);
+    if (tb->scroll && global_settings.scrolling_enabled)
+    {
+        int range = text_wrap_count(src, vp->width, vp->font) * fh
+                    - vp->height;
+        if (range > 0)
+        {
+            textbox_scroll(gwps->data, tb, src, range);
+            text_wrap_draw(display, src, 0, -tb->offset, vp->width,
+                           tb->halign);
+            return;
+        }
+    }
+
     maxlines = vp->height / fh;
     if (maxlines < 1) maxlines = 1;
     if (maxlines > WT_MAX_LINES) maxlines = WT_MAX_LINES;
@@ -294,7 +356,6 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     else if (tb->valign == 'c') yoff = (vp->height - nlines * fh) / 2;
     if (yoff < 0) yoff = 0;
 
-    display->set_drawmode(DRMODE_SOLID);
     for (i = 0; i < nlines; i++)
     {
         int w, h, x = 0;
@@ -775,14 +836,19 @@ static bool do_non_text_tags(struct gui_wps *gwps, struct skin_draw_info *info,
             break;
         }
         case SKIN_TOKEN_TEXT_BOX:
-            if (do_refresh)
+        {
+            struct skin_textbox *tb = (struct skin_textbox *)
+                    SKINOFFSETTOPTR(skin_buffer, token->value.data);
+            /* A scrolling box also moves on the WPS's scroll refresh, which
+             * no other tag here answers to. */
+            if (tb && (do_refresh || (tb->scroll
+                       && (info->refresh_type & SKIN_REFRESH_SCROLL))))
             {
-                struct skin_textbox *tb = (struct skin_textbox *)
-                        SKINOFFSETTOPTR(skin_buffer, token->value.data);
-                if (tb)
-                    draw_textbox(gwps, info, tb);
+                info->drew = true;
+                draw_textbox(gwps, info, tb);
             }
             break;
+        }
         case SKIN_TOKEN_DRAW_INBUILTBAR:
             gui_statusbar_draw(&(statusbars.statusbars[gwps->display->screen_type]),
                                info->refresh_type == SKIN_REFRESH_ALL,
@@ -1446,6 +1512,11 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
      * next one rather than wiped. */
     bool busy_redraw = data->busy_redraw;
     data->busy_redraw = false;
+    /* Every scrolling %wt on show draws in this pass and says again whether
+     * it is still moving; one that is hidden now should not keep the WPS
+     * awake. */
+    if (old_refresh_mode & (SKIN_REFRESH_DYNAMIC | SKIN_REFRESH_SCROLL))
+        data->textbox_moving = false;
 
     for (viewport = SKINOFFSETTOPTR(skin_buffer, data->tree);
          viewport;

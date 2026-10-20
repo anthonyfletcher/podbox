@@ -406,12 +406,19 @@ struct spectrum_bars {
 
 /* %wt(text[,align[,fallback]]): the text token to draw, an optional fallback
  * token used when text is empty (e.g. %fn when %it has no title), plus vertical
- * ('t'/'c'/'b') and horizontal ('l'/'c'/'r') alignment within the viewport. */
+ * ('t'/'c'/'b') and horizontal ('l'/'c'/'r') alignment within the viewport.
+ * With %s on its line in a .wps, text taller than the box crawls up through
+ * it instead of ending in "...": `offset` pixels up, moving next at `due`,
+ * for the text whose hash is `hash`. */
 struct skin_textbox {
     OFFSETTYPE(struct wps_token *) token;
     OFFSETTYPE(struct wps_token *) fallback;
     char valign;
     char halign;
+    bool scroll;
+    short offset;
+    long due;
+    unsigned hash;
 };
 
 struct listitem_viewport_cfg {
@@ -474,6 +481,10 @@ struct wps_data
 
     bool peak_meter_enabled;
     bool spectrum_enabled;
+    /* A scrolling %wt is part way through its text, and the WPS owes it a
+     * SKIN_REFRESH_SCROLL at textbox_due. */
+    bool textbox_moving;
+    long textbox_due;
     /* The skin draws the quickscreen itself (%QL and the rest), so the
      * built-in layout stands down -- see gui_quickscreen_draw(). */
     bool draws_quickscreen;

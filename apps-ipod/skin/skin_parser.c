@@ -120,6 +120,11 @@ static struct skin_element *first_viewport;
 
 static struct line *curr_line;
 
+/* The last %wt and the line of the last %s, so that a %s on a %wt's line
+ * finds it from either side. */
+static struct skin_textbox *curr_textbox;
+static int curr_textbox_line, curr_scroll_line;
+
 /* The %Cl parsed most recently, which is the art a bare %Cd draws. NULL until
  * the first one, so a %Cd written above every %Cl still resolves -- at render
  * time, to the skin's first. */
@@ -1116,6 +1121,13 @@ static int parse_textbox(struct skin_element *element,
     tb->fallback = INVALID_OFFSET;
     tb->valign = 't';
     tb->halign = 'l';
+    /* Only the WPS has a clock fast enough to move it. */
+    tb->scroll = curr_skin == WPS && element->line == curr_scroll_line;
+    tb->offset = 0;
+    tb->due = 0;
+    tb->hash = 0;
+    curr_textbox = tb;
+    curr_textbox_line = element->line;
     if (element->params_count > 1)
     {
         const char *a = get_param_text(element, 1);
@@ -2134,6 +2146,7 @@ static void skin_data_reset(struct wps_data *wps_data)
 
     wps_data->peak_meter_enabled = false;
     wps_data->spectrum_enabled = false;
+    wps_data->textbox_moving = false;
     wps_data->draws_quickscreen = false;
     wps_data->wps_sb_tag = false;
     wps_data->show_sb_on_wps = false;
@@ -2521,6 +2534,12 @@ static int skin_element_callback(struct skin_element* element, void* data)
                 case SKIN_TOKEN_ALIGN_LANGDIRECTION:
                     follow_lang_direction = 2;
                     break;
+                case SKIN_TOKEN_SUBLINE_SCROLL:
+                    curr_scroll_line = element->line;
+                    if (curr_skin == WPS && curr_textbox
+                        && curr_textbox_line == element->line)
+                        curr_textbox->scroll = true;
+                    break;
                 case SKIN_TOKEN_LOGICAL_IF:
                     function = parse_logical_if;
                     break;
@@ -2779,6 +2798,8 @@ static bool load_skin_data(enum skinnable_screens skin,
     curr_screen = screen;
     curr_skin = skin;
     curr_line = NULL;
+    curr_textbox = NULL;
+    curr_scroll_line = -1;
     curr_vp = NULL;
     curr_viewport_element = NULL;
     first_viewport = NULL;

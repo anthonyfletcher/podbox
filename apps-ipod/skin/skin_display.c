@@ -1087,12 +1087,18 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
         isn't displayed */
     bool pm=false;
     bool sb=false;
+    bool tb=false;
     FOR_NB_SCREENS(i)
     {
-       if(skin_get_gwps(skin, i)->data->peak_meter_enabled)
+       struct wps_data *data = skin_get_gwps(skin, i)->data;
+       if(data->peak_meter_enabled)
            pm = true;
-       if(skin_get_gwps(skin, i)->data->spectrum_enabled)
+       if(data->spectrum_enabled)
            sb = true;
+       /* a %wt paused for longer than this wait needs nothing from it */
+       if(data->textbox_moving
+          && TIME_BEFORE(data->textbox_due, current_tick + timeout))
+           tb = true;
     }
 
     bool recolouring = dynamic_colors_needs_repaint();
@@ -1101,9 +1107,9 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
     /* None of the fast refreshes below is visible with the LCD asleep, and
      * the spectrum's filters alone cost a fifth of an unboosted 5G. */
     if (!lcd_active())
-        pm = sb = recolouring = pending = false;
+        pm = sb = tb = recolouring = pending = false;
 
-    if (pm || sb || recolouring || pending) {
+    if (pm || sb || tb || recolouring || pending) {
         long next_pm_refresh = current_tick;
         long next_sb_refresh = current_tick;
         long next_recolour_refresh = current_tick;
@@ -1135,6 +1141,15 @@ int skin_wait_for_action(enum skinnable_screens skin, int context, int timeout)
                         skin_update(skin, i, SKIN_REFRESH_SPECTRUM);
                 }
                 next_sb_refresh += HZ / SPECTRUM_FPS;
+            }
+            if (tb) {
+                FOR_NB_SCREENS(i)
+                {
+                    struct wps_data *data = skin_get_gwps(skin, i)->data;
+                    if (data->textbox_moving
+                        && !TIME_BEFORE(current_tick, data->textbox_due))
+                        skin_update(skin, i, SKIN_REFRESH_SCROLL);
+                }
             }
             if ((recolouring || pending) && TIME_AFTER(current_tick, next_recolour_refresh)) {
                 unsigned int refresh = SKIN_REFRESH_ALL;

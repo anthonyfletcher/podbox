@@ -119,8 +119,9 @@ static const struct tag_info custom_tags[] =
     TAG(SKIN_TOKEN_LIST_ITEM_PLAYING,  "LP", "|IS",        SKIN_REFRESH_DYNAMIC),
 
     /* %wt(text[,align]): draw text word-wrapped and aligned to fill the current
-     * viewport, ellipsised on overflow. A drawing tag (renders directly like
-     * %Sb), so DYNAMIC to redraw as the text changes. */
+     * viewport, ellipsised on overflow -- or, with %s on its line in a .wps,
+     * scrolled up through it. A drawing tag (renders directly like %Sb), so
+     * DYNAMIC to redraw as the text changes. */
     TAG(SKIN_TOKEN_TEXT_BOX,           "wt", "T|ST",       SKIN_REFRESH_DYNAMIC),
 
     /* The height of the line box text sits in. The drawing code already centres
