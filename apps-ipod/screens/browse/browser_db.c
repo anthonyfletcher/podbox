@@ -3514,18 +3514,6 @@ bool browser_db_back_exits(const struct browser_context *c)
     return shortcut_base_level >= 0 && c->dirlevel == shortcut_base_level;
 }
 
-/* Rows like <All tracks> are not counted: with one album they hold what it
- * holds. A track row is never passed through, since choosing it plays. */
-bool browser_db_pass_through(struct browser_context *c)
-{
-    if (!global_settings.skip_single_lists || c->currtable != TABLE_NAVIBROWSE
-        || current_offset != 0
-        || c->filesindir - c->special_entry_count != 1)
-        return false;
-    return browser_db_get_entry(c, c->special_entry_count)->newtable
-           == TABLE_NAVIBROWSE;
-}
-
 /* Forget any shortcut base. Entering Music by the front door is never a
  * shortcut, so the level one recorded belongs to a session that has ended.
  *

@@ -693,12 +693,6 @@ Applies to the Music lists and By First Letter. The carousel has its own.
 Shows each album's release year in the Music lists, before or after its name,
 so a discography reads in order at a glance. The carousel has its own setting.
 
-[skip single item lists]
-When a Music list would hold only one row, opens that row straight away: an
-artist with one album goes straight to its tracks. Back skips over it too.
-
-A list of tracks always shows, even with one track in it.
-
 [debug log tagcache]
 Writes database scan progress to tagcache.log in the .rockbox/logs folder. For
 working out why a track is missing from the database.

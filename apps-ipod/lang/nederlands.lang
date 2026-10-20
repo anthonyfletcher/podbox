@@ -22951,20 +22951,6 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SKIP_SINGLE_LISTS
-  desc: in Library > Music: a list holding one row opens that row instead
-  user: core
-  <source>
-    *: "Skip One-Item Lists"
-  </source>
-  <dest>
-    *: "Lijsten met één item overslaan"
-  </dest>
-  <voice>
-    *: "Lijsten met één item overslaan"
-  </voice>
-</phrase>
-<phrase>
   id: LANG_RANDOM_SPIN_LENGTH
   desc: in Carousel settings: how many covers a held PLAY spins past before the random pick
   user: core

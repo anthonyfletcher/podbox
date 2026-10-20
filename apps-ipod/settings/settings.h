@@ -784,7 +784,6 @@ struct user_settings
     bool sort_ignore_articles;
     /* An album's year beside its name in the Music browser's album lists. */
     int  album_show_year;       /* ALBUM_YEAR_* */
-    bool skip_single_lists;     /* a Music list of one row opens that row */
     /* Album covers in the database browser (tall rows + the skin's %La tag). On
      * by default; a theme sets it off in its .cfg for the stock/fast list. Off
      * also means faster scrolling (no cover decode). */

@@ -1201,7 +1201,6 @@ MENUITEM_SETTING_W_LABEL(sort_ignore_articles,
 MAKE_MENU(music_sort_menu, ID2P(LANG_SORT_MENU), 0, Icon_NOICON,
           &album_sort_menu, &database_sort_artists_by, &sort_ignore_articles);
 MENUITEM_SETTING(album_show_year, &global_settings.album_show_year, NULL);
-MENUITEM_SETTING(skip_single_lists, &global_settings.skip_single_lists, NULL);
 
 MENUITEM_FUNCTION(music_menu_config_item, MENU_FUNC_CHECK_RETVAL,
                   ID2P(LANG_MUSIC_MENU_SETTINGS),
@@ -1237,7 +1236,7 @@ MAKE_MENU(quiz_menu, ID2P(LANG_QUIZ_QUESTIONS), 0, Icon_NOICON,
 
 MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
-          &album_show_year, &skip_single_lists,
+          &album_show_year,
           &featured_artists, &segregate_audiobooks,
           &music_menu_config_item,
           &search_menu, &quiz_menu,

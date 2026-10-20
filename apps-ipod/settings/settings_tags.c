@@ -198,7 +198,6 @@ static const struct tag_row tag_rows[] = {
 { "database sort artists by",  TAG_LIBRARY,                      "sorting artists most played" },
 { "sort ignoring articles",    TAG_LIBRARY,                      "sorting ignore the a an artists albums" },
 { "album show year",           TAG_LIBRARY,                      "albums release date" },
-{ "skip single item lists",    TAG_LIBRARY,                      "skip one album artist list level browse" },
 { "playlist engine",           TAG_LIBRARY|TAG_PLAYLIST,         "similar genius sound analysis mix" },
 { "track playlist",            TAG_LIBRARY|TAG_PLAYLIST,         "similar random varied repeatable" },
 { "analysis depth",            TAG_LIBRARY|TAG_PLAYLIST,         "scan speed accuracy quick thorough" },
