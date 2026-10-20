@@ -3,7 +3,7 @@
  *
  * Word-wrapping text to a pixel width, one display line at a time. Backs the
  * %wr and %wt skin tags, the text reel behind the credits and About, dialog
- * text and splashes.
+ * text, splashes, view_text() and the lyric viewer.
  *
  * Parts: finding a line's end, then counting and drawing whole texts.
  ****************************************************************************/
@@ -14,13 +14,33 @@
 #include "diacritic.h"
 #include "text_wrap.h"
 
-/* One forward pass: add up glyph widths, remember the last space, and break
- * there on overflow -- never re-measuring a prefix. */
-const char *text_wrap_next(const char *text, int width, struct font *pf,
-                           const char **end)
+/* What a line may break after besides a space: CJK is written without
+ * spaces, so a Japanese or Chinese line would otherwise only ever break at
+ * the hard edge. */
+static bool is_punct_break(ucschar_t ch)
+{
+    static const ucschar_t brk[] = {
+        '\t', '!', ',', '-', '.', ':', ';', '?',
+        0x3000, 0x3001, 0x3002,                     /* 　、。 */
+        0xff01, 0xff0c, 0xff0e, 0xff1a, 0xff1b, 0xff1f, /* ！，．：；？ */
+        0x2015,                                     /* ― */
+    };
+    unsigned i;
+
+    for (i = 0; i < sizeof(brk) / sizeof(brk[0]); i++)
+        if (ch == brk[i])
+            return true;
+    return false;
+}
+
+/* One forward pass: add up glyph widths, remember the last place a break is
+ * allowed, and break there on overflow -- never re-measuring a prefix. */
+static const char *wrap_next(const char *text, int width, struct font *pf,
+                             bool punct, const char **end)
 {
     const unsigned char *start = (const unsigned char *)text;
-    const unsigned char *cursor = start, *last_space = NULL;
+    const unsigned char *cursor = start;
+    const unsigned char *cut = NULL, *cut_next = NULL; /* the last break */
     const unsigned char *next;
     int w = 0;
     ucschar_t ch;
@@ -42,16 +62,19 @@ const char *text_wrap_next(const char *text, int width, struct font *pf,
         }
         if (IS_DIACRITIC(ch))
             continue;
-        if (ch == ' ')
-            last_space = prev;
+        if (ch == ' ')                  /* break at it; it is dropped */
+        {
+            cut = prev;
+            cut_next = cursor;
+        }
         w += font_get_width(pf, ch);
         if (w > width)
         {
-            if (last_space && last_space > start)
+            if (cut && cut > start)
             {
-                *end = (const char *)last_space;    /* break at the space */
-                next = last_space;
-                while (*next == ' ')                /* which is dropped */
+                *end = (const char *)cut;
+                next = cut_next;
+                while (*next == ' ')
                     next++;
             }
             else if (prev > start)
@@ -60,7 +83,23 @@ const char *text_wrap_next(const char *text, int width, struct font *pf,
                 *end = (const char *)(next = cursor); /* a lone wide glyph */
             return (const char *)next;
         }
+        /* after the overflow test, so punctuation that does not fit is not
+         * kept on the line */
+        if (punct && is_punct_break(ch))
+            cut = cut_next = cursor;
     }
+}
+
+const char *text_wrap_next(const char *text, int width, struct font *pf,
+                           const char **end)
+{
+    return wrap_next(text, width, pf, false, end);
+}
+
+const char *text_wrap_next_punct(const char *text, int width,
+                                 struct font *pf, const char **end)
+{
+    return wrap_next(text, width, pf, true, end);
 }
 
 int text_wrap_count(const char *text, int width, int font)

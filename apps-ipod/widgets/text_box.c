@@ -24,16 +24,16 @@
 #include "settings/settings.h"        /* global_settings */
 #include "draw/screen_access.h"   /* screens[] */
 #include "draw/viewport.h"
-#include "rbunicode.h"       /* utf8decode, utf8seek */
-#include "diacritic.h"       /* is_diacritic */
 #include "draw/scrollbar.h"
 #include "skin/skin_albumart_color.h"  /* dynamic_colors_resolve */
 #include "system/shutdown.h"
 #include "screens/playback/track_info.h"
 #include "text_box.h"         /* view_text prototype */
+#include "draw/text_wrap.h"
 
 struct view_info {
     struct font* pf;
+    int font;
     struct viewport scrollbar_vp; /* viewport for scrollbar */
     struct viewport vp;
     const char *title;
@@ -44,61 +44,28 @@ struct view_info {
     int start;          /* possition of first line in text  */
 };
 
-static bool isbrchr(const unsigned char *str, int len)
+/* Where the line after the one starting at `text` starts; *end is where that
+ * one's own text ends. */
+static const char* get_next_line(const char *text, struct view_info *info,
+                                 const char **end)
 {
-    const unsigned char *p = (const unsigned char *)
-                             "!,-.:;?　、。！，．：；？―";
-    if (isspace(*str))
-        return true;
+    const char *next;
 
-    while(*p)
-    {
-        int n = utf8seek(p, 1);
-        if (len == n && !strncmp((const char *)p, (const char *)str, len))
-            return true;
-        p += n;
-    }
-    return false;
-}
-
-static const char* get_next_line(const char *text, struct view_info *info)
-{
-    const char *ptr = text;
-    const char *space = NULL;
-    int total, n, w;
-    total = 0;
-    while(*ptr)
-    {
-        ucschar_t ch;
-        n = ((intptr_t)utf8decode(ptr, &ch) - (intptr_t)ptr);
-        if (is_diacritic(ch, NULL))
-            w = 0;
-        else
-            w = font_get_width(info->pf, ch);
-        if (isbrchr((const unsigned char *)ptr, n))
-            space = ptr+(isspace(*ptr) || total + w <= info->vp.width? n: 0);
-        if (*ptr == '\n')
-        {
-            ptr += n;
-            break;
-        }
-        if (total + w > info->vp.width)
-            break;
-        ptr += n;
-        total += w;
-    }
-    return *ptr && space? space: ptr;
+    font_lock(info->font, true);
+    next = text_wrap_next_punct(text, info->vp.width, info->pf, end);
+    font_lock(info->font, false);
+    return next;
 }
 
 static void calc_line_count(struct view_info *info)
 {
-    const char *ptr = info->text;
+    const char *ptr = info->text, *end;
     int i = 0;
     bool scrollbar = false;
 
     while (*ptr)
     {
-        ptr = get_next_line(ptr, info);
+        ptr = get_next_line(ptr, info, &end);
         i++;
         if (!scrollbar && i > info->display_lines)
         {
@@ -119,7 +86,7 @@ static void calc_line_count(struct view_info *info)
 
 static void calc_first_line(struct view_info *info, int line)
 {
-    const char *ptr = info->text;
+    const char *ptr = info->text, *end;
     int i = 0;
 
     if (line > info->line_count - info->display_lines)
@@ -134,7 +101,7 @@ static void calc_first_line(struct view_info *info, int line)
     }
     while (*ptr && i < line)
     {
-        ptr = get_next_line(ptr, info);
+        ptr = get_next_line(ptr, info, &end);
         i++;
     }
     info->start = ptr - info->text;
@@ -145,7 +112,8 @@ static int init_view(struct view_info *info,
                      const char *title, const char *text)
 {
     viewport_set_defaults(&info->vp, SCREEN_MAIN);
-    info->pf = font_get(screens[SCREEN_MAIN].getuifont());
+    info->font = screens[SCREEN_MAIN].getuifont();
+    info->pf = font_get(info->font);
     info->display_lines = info->vp.height / info->pf->height;
 
     info->title = title;
@@ -174,7 +142,7 @@ static void draw_text(struct view_info *info)
 {
 #define OUTPUT_SIZE LCD_WIDTH+1
     static char output[OUTPUT_SIZE];
-    const char *text, *ptr;
+    const char *text, *ptr, *end;
     int max_show, line;
     struct screen* display = &screens[SCREEN_MAIN];
 
@@ -225,8 +193,8 @@ static void draw_text(struct view_info *info)
     for (line = 0; line < max_show; line++)
     {
         int len;
-        ptr = get_next_line(text, info);
-        len = ptr-text;
+        ptr = get_next_line(text, info, &end);
+        len = MIN(end - text, OUTPUT_SIZE - 1);
         while(len > 0 && isspace(text[len-1]))
             len--;
         memcpy(output, text, len);

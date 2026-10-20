@@ -54,6 +54,7 @@
 #include "rbpaths.h"         /* FONT_DIR */
 #include "rbunicode.h"       /* utf8decode */
 #include "diacritic.h"       /* IS_DIACRITIC */
+#include "draw/text_wrap.h"
 #include "backlight.h"       /* backlight_set_timeout* */
 #include "audio.h"           /* audio_current_track/next/prev/pause */
 #include "metadata.h"        /* struct mp3entry */
@@ -491,83 +492,35 @@ struct lv_row
     int len;
 };
 
-/* May a line break after the character of `len` bytes at `s`? Spaces, plus
- * the punctuation lifted from isbrchr() in the lrcplayer plugin: CJK is
- * written without spaces, so with spaces alone a Japanese or Chinese lyric
- * would only ever break at the hard edge of the screen. */
-static bool lv_is_break(const unsigned char *s, int len)
-{
-    static const unsigned char brk[] = "!,-.:;?　、。！，．：；？―";
-    const unsigned char *p = brk;
-
-    if (*s == ' ' || *s == '\t')
-        return true;
-
-    while (*p)
-    {
-        int n = utf8seek(p, 1);
-        if (len == n && !memcmp(p, s, len))
-            return true;
-        p += n;
-    }
-    return false;
-}
-
 /* Break `text` into rows no wider than `maxwidth`, filling `rows`. Returns how
- * many were used, and sets *cut if the text ran past `max` rows. One forward
- * pass, remembering the last place a break was allowed and going back to it on
- * overflow -- the same shape as %wt in the skin engine. */
+ * many were used, and sets *cut if the text ran past `max` rows. Breaks may
+ * fall after punctuation as well as at spaces: CJK is written without spaces,
+ * so with spaces alone a Japanese or Chinese lyric would only ever break at
+ * the hard edge of the screen. */
 static int lv_wrap(const char *text, int maxwidth, struct lv_row *rows,
                    int max, bool *cut_off)
 {
     struct font *pf = font_get(lv.font);
-    const unsigned char *start = (const unsigned char *)text;
-    const unsigned char *p = start;
-    const unsigned char *brk = NULL;    /* just after the last break point */
-    int width = 0;
     int n = 0;
-    ucschar_t ch;
 
     *cut_off = false;
-
-    while (n < max)
+    font_lock(lv.font, true);
+    do                                  /* "" is one empty row */
     {
-        const unsigned char *chstart = p;
-        int w;
+        const char *end;
 
-        if (*p == '\0')                 /* last row, however short */
+        if (n == max)
         {
-            rows[n].start = (const char *)start;
-            rows[n].len = (int)(p - start);
-            return n + 1;
+            *cut_off = true;
+            break;
         }
+        rows[n].start = text;
+        text = text_wrap_next_punct(text, maxwidth, pf, &end);
+        rows[n].len = (int)(end - rows[n].start);
+        n++;
+    } while (*text);
+    font_lock(lv.font, false);
 
-        p = utf8decode(p, &ch);
-        w = IS_DIACRITIC(ch)? 0: font_get_width(pf, ch);
-
-        /* chstart != start keeps a single character wider than the screen
-         * from breaking before itself, which would never terminate */
-        if (width + w > maxwidth && chstart != start)
-        {
-            const unsigned char *cut = brk? brk: chstart;
-
-            rows[n].start = (const char *)start;
-            rows[n].len = (int)(cut - start);
-            n++;
-            while (*cut == ' ')         /* the break's space starts no row */
-                cut++;
-            start = p = cut;
-            width = 0;
-            brk = NULL;
-            continue;
-        }
-
-        width += w;
-        if (lv_is_break(chstart, (int)(p - chstart)))
-            brk = p;
-    }
-
-    *cut_off = true;
     return n;
 }
 

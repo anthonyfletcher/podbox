@@ -19,6 +19,12 @@
 const char *text_wrap_next(const char *text, int width, struct font *pf,
                            const char **end);
 
+/* As text_wrap_next(), but a line may also break after punctuation or a tab,
+ * Japanese and Chinese punctuation included, so text written without spaces
+ * still wraps at a word rather than at the edge. */
+const char *text_wrap_next_punct(const char *text, int width,
+                                 struct font *pf, const char **end);
+
 /* The number of display lines `text` wraps to in `font`; 0 for "". */
 int text_wrap_count(const char *text, int width, int font);
 
