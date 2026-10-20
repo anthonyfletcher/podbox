@@ -186,7 +186,8 @@ screenful of scrolling ones is not.
 ### `%wr(n, text)` — nth word-wrapped line
 
 `n` is a 0-based line index. `%wr` wraps `text` to the **current viewport's
-width** (in its font), breaking on spaces, and returns the `n`th resulting line.
+width** (in its font), breaking on spaces and at line breaks in the text, and
+returns the `n`th resulting line.
 A `text` that already fits lands wholly on line 0, so lines 1+ come back empty.
 
 Put each line on its own physical line inside a tall enough viewport:
@@ -235,6 +236,20 @@ content line:
 ```
 %Vl(Song_Title,180,54,132,40,2)%wt(%it, bl, %fn)
 ```
+
+**Scrolling, on the play screen.** Put `%s` on the same line and text taller
+than the box scrolls up through it instead of ending in `...`. It waits at the
+top for the **Scroll Delay**, crawls up a pixel at a time at the **Scroll
+Speed** until its last line reaches the bottom, waits again, and starts over
+from the top. **Scroll Step** does not apply to it. Text that fits stays still
+and is aligned as usual. The eight-line limit does not apply while it scrolls.
+
+```
+%Vl(Song_Title,5,85,230,28,2)%s%wt(%it,tl)
+```
+
+Only a `.wps` scrolls a `%wt`; in a `.sbs` the `%s` is ignored and the text is
+ellipsised. With **Scrolling** switched off it is ellipsised as well.
 
 **Why `bl` is useful for a title.** Size the box to two lines and bottom-align
 it: a one-line title sits at the box bottom, a two-line title grows upward, and
