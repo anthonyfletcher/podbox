@@ -50,9 +50,9 @@
 #
 # - Title
 %Vl(Chrome,0,0,320,35,3)
-%Vl(ChromeG,10,8,205,20,3)%Vf(000000)
+%Vl(ChromeG,10,8,200,20,3)%Vf(000000)
 %?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt>>
-%Vl(ChromeN,10,8,157,20,3)%Vf(000000)
+%Vl(ChromeN,10,8,152,20,3)%Vf(000000)
 %?if(%cs,=,10)<%Sx(Quick Settings)|%?if(%Lt,=,Rockbox)<PodBox|%s%Lt>>
 #
 # - Status icons. The charging glyphs mirror the level glyphs band for
