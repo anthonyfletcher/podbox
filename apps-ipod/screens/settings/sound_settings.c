@@ -25,6 +25,7 @@
 #include "speech/talk.h"
 #include "widgets/option_select.h"
 #include "system/volume.h"
+#include "sound_settings.h"
 
 static const char* vol_limit_format(char* buffer, size_t buffer_size, int value,
                       const char* unit)
@@ -34,14 +35,13 @@ static const char* vol_limit_format(char* buffer, size_t buffer_size, int value,
     return buffer;
 }
 
-static int volume_limit_callback(int action,
-                                 const struct menu_item_ex *this_item,
-                                 struct gui_synclist *this_list)
+/* Volume Limit as a number range. Its settings table entry is a custom setting,
+ * since its default is the codec's greatest volume, and so has no range; this
+ * stands in for it on its own screen and on its menu row. */
+const struct settings_list *volume_limit_setting(void)
 {
-    (void)this_item;
-    (void)this_list;
-
     static struct int_setting volume_limit_int_setting;
+    static struct settings_list setting;
 
     volume_limit_int_setting = (struct int_setting)
     {
@@ -54,17 +54,26 @@ static int volume_limit_callback(int action,
         .get_talk_id = NULL
     };
 
-    struct settings_list setting;
     setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
     setting.lang_id = LANG_VOLUME_LIMIT;
     setting.default_val.int_ = volume_limit_int_setting.max;
     setting.int_setting = &volume_limit_int_setting;
+    setting.setting = &global_settings.volume_limit;
+    return &setting;
+}
+
+static int volume_limit_callback(int action,
+                                 const struct menu_item_ex *this_item,
+                                 struct gui_synclist *this_list)
+{
+    (void)this_item;
+    (void)this_list;
 
     switch (action)
     {
         case ACTION_ENTER_MENUITEM:
-            setting.setting = &global_settings.volume_limit;
-            option_screen(&setting, NULL, false, ID2P(LANG_VOLUME_LIMIT));
+            option_screen(volume_limit_setting(), NULL, false,
+                          ID2P(LANG_VOLUME_LIMIT));
             /* Fallthrough */
         case ACTION_EXIT_MENUITEM: /* on exit */
             setvol();

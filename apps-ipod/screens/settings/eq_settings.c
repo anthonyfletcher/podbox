@@ -195,6 +195,81 @@ static const struct choice_setting type_choice_setting = {
     }}
 };
 
+extern struct eq_band_setting eq_defaults[EQ_NUM_BANDS];
+static int banditem_lang(int band, int item);
+
+/* The setting behind one of a band's rows -- 1 cutoff, 2 Q, 3 gain, 4 type --
+ * for its picker, and for what the skin reads of the row. */
+static void band_setting(struct settings_list *setting, int band, int item)
+{
+    struct eq_band_setting *eq = &global_settings.eq_band_settings[band];
+
+    setting->flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
+    switch (item)
+    {
+        case 1: /* cutoff */
+            setting->default_val.int_ = eq_defaults[band].cutoff;
+            setting->int_setting = &cutoff_int_setting;
+            setting->setting = &eq->cutoff;
+            break;
+        case 2: /* Q */
+            setting->default_val.int_ = eq_defaults[band].q;
+            setting->int_setting = &q_int_setting;
+            setting->setting = &eq->q;
+            break;
+        case 3: /* Gain */
+            setting->default_val.int_ = eq_defaults[band].gain;
+            setting->int_setting = &gain_int_setting;
+            setting->setting = &eq->gain;
+            break;
+        case 4: /* Type */
+            setting->flags = F_BANFROMQS|F_CHOICE_SETTING|F_T_INT;
+            setting->default_val.int_ = eq_defaults[band].type;
+            setting->choice_setting = &type_choice_setting;
+            setting->setting = &eq->type;
+            break;
+    }
+    setting->lang_id = banditem_lang(band, item);
+}
+
+static const char *band_value(int band, int item, char *buffer, size_t len)
+{
+    struct settings_list setting;
+
+    band_setting(&setting, band, item);
+    return option_get_valuestring(&setting, buffer, len,
+                                  option_value_as_int(&setting));
+}
+
+static int band_range(int band, int item)
+{
+    struct settings_list setting;
+
+    band_setting(&setting, band, item);
+    return option_value_position(&setting);
+}
+
+/* Each Simple EQ row is a band's gain. */
+static enum list_row_kind gainitem_get_kind(int selected_item, void *data)
+{
+    (void)selected_item;
+    (void)data;
+    return LIST_ROW_SETTING;
+}
+
+static const char *gainitem_get_value(int selected_item, void *data,
+                                      char *buffer, size_t len)
+{
+    (void)data;
+    return band_value(selected_item, 3, buffer, len);
+}
+
+static int gainitem_get_range(int selected_item, void *data)
+{
+    (void)data;
+    return band_range(selected_item, 3);
+}
+
 static int simplelist_action_callback(int action, struct gui_synclist *lists)
 {
     (void)lists;
@@ -215,13 +290,12 @@ static int eq_do_simple_menu(void * param)
     if(global_settings.talk_menu)
         info.get_talk = gainitem_speak_item;
     info.get_icon = gainitem_get_icon;
+    info.get_kind = gainitem_get_kind;
+    info.get_value = gainitem_get_value;
+    info.get_range = gainitem_get_range;
     info.action_callback = simplelist_action_callback;
     info.selection = -1;
     info.title_icon = Icon_Submenu;
-    setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-    setting.lang_id = LANG_GAIN;
-    setting.default_val.int_ = 0;
-    setting.int_setting = &gain_int_setting;
 
     while (true)
     {
@@ -230,7 +304,7 @@ static int eq_do_simple_menu(void * param)
         if (info.selection < 0)
             break;
         pcmbuf_set_low_latency(true);
-        setting.setting = &global_settings.eq_band_settings[info.selection].gain;
+        band_setting(&setting, info.selection, 3);
         option_screen(&setting, NULL, false,
                 gainitem_get_name(info.selection, NULL, title, MAX_PATH));
         eq_apply();
@@ -339,7 +413,31 @@ static enum themable_icons advancedmenu_get_icon(int selected_item, void * data)
     else
         return Icon_Menu_setting;
 }
-extern struct eq_band_setting eq_defaults[EQ_NUM_BANDS];
+/* A band's title row expands it; the rows under it are its settings. */
+static enum list_row_kind advancedmenu_get_kind(int selected_item, void *data)
+{
+    int band, item;
+
+    selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
+    return item == 0 ? LIST_ROW_PLAIN : LIST_ROW_SETTING;
+}
+
+static const char *advancedmenu_get_value(int selected_item, void *data,
+                                          char *buffer, size_t len)
+{
+    int band, item;
+
+    selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
+    return item == 0 ? NULL : band_value(band, item, buffer, len);
+}
+
+static int advancedmenu_get_range(int selected_item, void *data)
+{
+    int band, item;
+
+    selection_to_banditem(selected_item, *(intptr_t*)data, &band, &item);
+    return item == 0 ? -1 : band_range(band, item);
+}
 
 static int eq_do_advanced_menu(void * param)
 {
@@ -355,6 +453,9 @@ static int eq_do_advanced_menu(void * param)
     if(global_settings.talk_menu)
         info.get_talk = advancedmenu_speak_item;
     info.get_icon = advancedmenu_get_icon;
+    info.get_kind = advancedmenu_get_kind;
+    info.get_value = advancedmenu_get_value;
+    info.get_range = advancedmenu_get_range;
     info.action_callback = simplelist_action_callback;
     info.selection = -1;
     info.title_icon = Icon_EQ;
@@ -366,51 +467,24 @@ static int eq_do_advanced_menu(void * param)
         if (info.selection < 0)
             break;
         selection_to_banditem(info.selection, selected_band, &band, &item);
-        switch (item)
+        if (item == 0) /* title: expand or collapse the band */
         {
-            case 0: /* title, do nothing */
+            int extra;
+            if (selected_band == band)
             {
-                int extra;
-                if (selected_band == band)
-                {
-                    extra = 0;
-                    selected_band = -1;
-                }
-                else
-                {
-                    extra = 4;
-                    selected_band = band;
-                }
-                info.selection = band;
-                info.count = EQ_NUM_BANDS + extra;
-                continue;
+                extra = 0;
+                selected_band = -1;
             }
-            case 1: /* cutoff */
-                setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                setting.default_val.int_ = eq_defaults[band].cutoff;
-                setting.int_setting = &cutoff_int_setting;
-                setting.setting = &global_settings.eq_band_settings[band].cutoff;
-                break;
-            case 2: /* Q */
-                setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                setting.default_val.int_ = eq_defaults[band].q;
-                setting.int_setting = &q_int_setting;
-                setting.setting = &global_settings.eq_band_settings[band].q;
-                break;
-            case 3: /* Gain */
-                setting.flags = F_BANFROMQS|F_INT_SETTING|F_T_INT|F_NO_WRAP;
-                setting.default_val.int_ = eq_defaults[band].gain;
-                setting.int_setting = &gain_int_setting;
-                setting.setting = &global_settings.eq_band_settings[band].gain;
-                break;
-            case 4: /* Type */
-                setting.flags = F_BANFROMQS|F_CHOICE_SETTING|F_T_INT;
-                setting.default_val.int_ = eq_defaults[band].type;
-                setting.choice_setting = &type_choice_setting;
-                setting.setting = &global_settings.eq_band_settings[band].type;
-                break;
+            else
+            {
+                extra = 4;
+                selected_band = band;
+            }
+            info.selection = band;
+            info.count = EQ_NUM_BANDS + extra;
+            continue;
         }
-        setting.lang_id = banditem_lang(band, item);
+        band_setting(&setting, band, item);
         pcmbuf_set_low_latency(true);
 
         option_screen(&setting, NULL, false, str(setting.lang_id));

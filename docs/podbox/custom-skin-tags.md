@@ -587,8 +587,8 @@ A number saying what choosing the row does:
 | `9` | option: one of a setting's values | Off, One and All in Repeat's list |
 
 The menus, the settings, the database and file browsers, the playlist viewer,
-a setting's list of values, chapter lists, the Audiobooks shelf and Featured
-Artists all answer. Every other list's rows are `0`. The numbers never change;
+a setting's list of values, the equalizer's band lists, chapter lists, the
+Audiobooks shelf and Featured Artists all answer. Every other list's rows are `0`. The numbers never change;
 a new kind is given the next one.
 
 Compare it with `%if` or `%sel`:
@@ -623,10 +623,10 @@ that names a file.
 How far a number setting's value is from its least to its greatest, from `0`
 to `100`: Volume, Bass, Sleep Timer and the like. A setting picked from a
 list of numbers, such as Maximum Results, counts by its place in the list, so
-each step moves it the same distance. A setting with any value that is a word
-reads empty even while a number is chosen -- Backlight, whose shortest is
-Always, or Playback Frequency, whose first is Auto -- as do toggles, choices
-and every other row. So `%?Lr<…|…>` asks "is this a number".
+each step moves it the same distance. A value that is a word reads empty --
+Sleep Timer at Off, Playback Frequency at Auto -- though it still counts as a
+step, so the numbers either side of it keep their places. Toggles, choices and
+every other row read empty too. So `%?Lr<…|…>` asks "is this a number".
 
 ```
 %?Lr<%Lr%%|>                                # "40%" on a number row

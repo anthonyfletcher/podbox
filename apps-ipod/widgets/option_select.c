@@ -653,51 +653,38 @@ int get_setting_info_for_bar(const struct settings_list *setting, int offset, in
     return true;
 }
 
-/* Whether a value reads as a number on screen: "5 min", "-6 dB", not "Off". */
+/* Whether a value reads as a number on screen: "5 min", "-6 dB", not "Off".
+ * A sound value that is not negative starts with a space in place of a
+ * sign. */
 static bool option_value_is_number(const struct settings_list *setting,
                                    int value)
 {
     char buf[64];
     const char *s = option_get_valuestring(setting, buf, sizeof(buf), value);
 
+    while (*s == ' ')
+        s++;
     if (*s == '-' || *s == '+')
         s++;
     return *s >= '0' && *s <= '9';
 }
 
-/* Whether every value a setting can take reads as a number. A range's word,
- * where it has one, names an end -- Off at 0 -- so only the ends are asked.
- * A choice of numbers is a STRINGCHOICE; a plain choice names its options,
- * even ones that start with a digit, such as 12 Hour Clock. */
+/* Whether a setting's current value is a number. A choice of numbers is a
+ * STRINGCHOICE; a plain choice names its options, even ones that start with a
+ * digit, such as 12 Hour Clock. */
 static bool option_is_number(const struct settings_list *setting)
 {
-    int i;
-
     if (HASFLAG(setting, F_T_SOUND))
         return true;
-    if (HASFLAG(setting, F_INT_SETTING))
-        return option_value_is_number(setting, setting->int_setting->min) &&
-               option_value_is_number(setting, setting->int_setting->max);
-    if (HASFLAG(setting, F_TABLE_SETTING))
-    {
-        for (i = 0; i < setting->table_setting->count; i++)
-            if (!option_value_is_number(setting,
-                                        setting->table_setting->values[i]))
-                return false;
-        return true;
-    }
-    if (HASFLAG(setting, F_CHOICE_SETTING) && HASFLAG(setting, F_CHOICETALKS))
-    {
-        for (i = 0; i < setting->choice_setting->count; i++)
-            if (!option_value_is_number(setting, i))
-                return false;
-        return true;
-    }
+    if (HASFLAG(setting, F_INT_SETTING) || HASFLAG(setting, F_TABLE_SETTING) ||
+        (HASFLAG(setting, F_CHOICE_SETTING) && HASFLAG(setting, F_CHOICETALKS)))
+        return option_value_is_number(setting, option_value_as_int(setting));
     return false;
 }
 
 /* Where a number setting's value sits between its least and greatest, 0 to
- * 100, or -1 for a setting with any value that is not a number. A setting
+ * 100, or -1 while the value is a word (Off, Auto) or the setting is not a
+ * number. A word takes its place in the count like any other value. A setting
  * picked from a list counts by its place in the list, so every step moves it
  * the same distance. */
 int option_value_position(const struct settings_list *setting)

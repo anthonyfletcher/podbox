@@ -401,6 +401,8 @@ struct simplelist_info {
     list_speak_item *get_talk; /* can be NULL to not speak */
     list_get_color *get_color;
     list_get_kind *get_kind; /* can be NULL; every row is then plain */
+    list_get_name *get_value; /* can be NULL; a setting row's value, for %Lv */
+    list_get_range *get_range; /* can be NULL; where it sits, for %Lr */
     list_get_albumart *get_albumart; /* can be NULL for no art */
     int row_height; /* 0 for the skin's own */
     struct list_selection_color *selection_color;

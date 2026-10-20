@@ -63,6 +63,7 @@
 #include "text_box.h"                     /* view_text */
 #include "splash.h"
 #include "screens/settings/settings_help.h"
+#include "screens/settings/sound_settings.h"
 #include "screens/playback/quick_screen.h"
 #include "screens/shortcuts.h"
 #include "skin/statusbar_skinned.h"
@@ -201,6 +202,9 @@ static const struct settings_list *menu_row_setting(int selected_item,
     type = (menu->flags&MENU_TYPE_MASK);
     if (type != MT_SETTING && type != MT_SETTING_W_TEXT)
         return NULL;
+    /* Volume Limit's entry is a custom setting, with no range to read. */
+    if (menu->variable == &global_settings.volume_limit)
+        return volume_limit_setting();
     return find_setting(menu->variable);
 }
 
