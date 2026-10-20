@@ -4,12 +4,12 @@
  * The text reel: lines crawling up the whole screen, centred, over a solid
  * fill. Backs the credits list and the About page.
  *
- * Parts: backlight and colours, then the word wrap, then the scroll loop.
+ * Parts: backlight and colours, then the scroll loop. The word wrap is
+ * draw/text_wrap.c's.
  ****************************************************************************/
 #include "config.h"
 #include "system.h"
 #include "kernel.h"
-#include <string.h>
 #include "lcd.h"
 #include "input/action.h"
 #include "draw/screen_access.h"
@@ -19,6 +19,7 @@
 #include "powermgmt.h"
 #include "system/shutdown.h"
 #include "skin/skin_albumart_color.h" /* dynamic_colors_resolve */
+#include "draw/text_wrap.h"
 #include "text_reel.h"
 
 /* Text centred across the screen, in the theme's foreground and background
@@ -57,83 +58,6 @@ static void tr_apply_colours(struct viewport *vp)
 {
     vp->fg_pattern = dynamic_colors_resolve(global_settings.fg_color);
     vp->bg_pattern = dynamic_colors_resolve(global_settings.bg_color);
-}
-
-/* Copies [start, end) into buf as a string, cut to fit; returns its width. */
-static int tr_measure(struct screen *d, char *buf, int size,
-                      const char *start, const char *end)
-{
-    int len = end - start;
-    int tw;
-
-    if (len >= size)
-        len = size - 1;
-    memcpy(buf, start, len);
-    buf[len] = '\0';
-    d->getstringsize((const unsigned char *)buf, &tw, NULL);
-    return tw;
-}
-
-/* Greedily word-wraps one line to the column width, returning the number of
- * display lines it occupies. When draw is set, each wrapped line is drawn
- * centred at top + line*pitch (lines outside the viewport are skipped). A
- * single word too wide to fit is kept on its own line and left to clip --
- * there is nowhere else for it to go. */
-static int tr_wrap_line(struct screen *d, const char *s, bool draw,
-                        int top, int pitch)
-{
-    char buf[128];
-    const char *p = s;
-    int lines = 0;
-
-    while (*p)
-    {
-        const char *line_start;
-        const char *fit_end = NULL;   /* end of the last word that fit        */
-        const char *q;
-
-        while (*p == ' ')
-            p++;
-        if (!*p)
-            break;
-
-        line_start = p;
-        q = p;
-        while (*q)
-        {
-            const char *word_end = q;
-            while (*word_end && *word_end != ' ')
-                word_end++;
-
-            if (tr_measure(d, buf, sizeof(buf), line_start, word_end) <= TR_W
-                || fit_end == NULL)
-            {
-                fit_end = word_end;      /* this word fits (or must be taken)  */
-                q = word_end;
-                while (*q == ' ')
-                    q++;
-            }
-            else
-                break;                   /* adding this word overflows         */
-        }
-
-        if (draw)
-        {
-            int y = top + lines * pitch;
-            if (y > -pitch && y < LCD_HEIGHT)
-            {
-                int tw = tr_measure(d, buf, sizeof(buf), line_start, fit_end);
-
-                d->putsxy(TR_PAD + (TR_W - tw) / 2, y,
-                          (const unsigned char *)buf);
-            }
-        }
-
-        lines++;
-        p = fit_end;
-    }
-
-    return lines > 0 ? lines : 1;
 }
 
 int text_reel_run(const char *const *lines, unsigned char *heights, int count)
@@ -185,7 +109,8 @@ int text_reel_run(const char *const *lines, unsigned char *heights, int count)
     total_lines = 0;
     for (i = 0; i < count; i++)
     {
-        heights[i] = tr_wrap_line(d, lines[i], false, 0, pitch);
+        /* an empty line still takes one: it is the gap between sections */
+        heights[i] = MAX(text_wrap_count(lines[i], TR_W, region.font), 1);
         total_lines += heights[i];
     }
 
@@ -254,7 +179,7 @@ int text_reel_run(const char *const *lines, unsigned char *heights, int count)
             if (top >= LCD_HEIGHT)       /* below the screen; so are the rest  */
                 break;
             if (top + heights[i] * pitch > 0)     /* any part still on screen  */
-                tr_wrap_line(d, lines[i], true, top, pitch);
+                text_wrap_draw(d, lines[i], TR_PAD, top, TR_W, 'c');
             cum += heights[i];
         }
         d->update_viewport();

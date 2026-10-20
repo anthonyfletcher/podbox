@@ -29,6 +29,7 @@
  *   - get_token_value(): the dispatch every repaint goes through
  ****************************************************************************/
 #include "font.h"
+#include "draw/text_wrap.h"
 #include <stdio.h>
 #include "string-extra.h"
 #include <stdlib.h>
@@ -986,10 +987,8 @@ static const char* NOINLINE get_trim_value(struct gui_wps *gwps,
 }
 
 /* %wr(n, text) -- return the nth (0-based) word-wrapped line of text, wrapped
- * to the current viewport width in its font. One forward pass per call: walk
- * the text accumulating pixel width (mirroring font_getstringnsize), remember
- * the last space, and break there on overflow -- never re-measuring prefixes.
- * NOINLINE to keep the two work buffers off get_token_value's recursive frame. */
+ * to the current viewport width in its font. NOINLINE to keep the source
+ * buffer off get_token_value's recursive frame. */
 static const char* NOINLINE get_wordwrap_token_value(struct gui_wps *gwps,
                                                      struct skin_element *element,
                                                      int offset, char *buf,
@@ -998,10 +997,9 @@ static const char* NOINLINE get_wordwrap_token_value(struct gui_wps *gwps,
     char *skinbuffer = get_skin_buffer(gwps->data);
     struct viewport *vp = *gwps->display->current_viewport;
     char source[MAX_PATH];
-    const char *text;
-    int target_line = 0, cur_line = 0;
+    const char *text, *line, *end;
+    int target_line, len;
     struct font *pf;
-    const unsigned char *line_start;
 
     if (!element || !SKINOFFSETTOPTR(skinbuffer, element->params)) return NULL;
     struct skin_tag_parameter *params =
@@ -1010,7 +1008,7 @@ static const char* NOINLINE get_wordwrap_token_value(struct gui_wps *gwps,
     target_line = params[0].data.number;
 
     /* Copy the source out: evaluating a tag arg may hand back buf itself, which
-     * we overwrite with the result, and we walk the text more than once. */
+     * we overwrite with the result. */
     text = eval_select_param(gwps, skinbuffer, &params[1], offset,
                              buf, buf_size);
     if (!text) return NULL;
@@ -1018,69 +1016,27 @@ static const char* NOINLINE get_wordwrap_token_value(struct gui_wps *gwps,
 
     pf = font_get(vp->font);
     font_lock(vp->font, true);
-
-    line_start = (const unsigned char *)source;
+    line = source;
     for (;;)
     {
-        const unsigned char *cursor = line_start;
-        const unsigned char *last_space = NULL;   /* break just before this */
-        const unsigned char *line_end, *next_start;
-        ucschar_t ch;
-        int width = 0;
-        bool at_end = false;
-
-        for (;;)
-        {
-            const unsigned char *prev = cursor;
-            cursor = utf8decode(cursor, &ch);
-            if (ch == 0)
-            {
-                line_end = next_start = prev;      /* text ends this line */
-                at_end = true;
-                break;
-            }
-            if (IS_DIACRITIC(ch))
-                continue;
-            if (ch == ' ')
-                last_space = prev;
-            width += font_get_width(pf, ch);
-            if (width > vp->width)
-            {
-                if (last_space && last_space > line_start)
-                {
-                    line_end = last_space;         /* break at the space, */
-                    next_start = last_space + 1;   /* which is dropped */
-                }
-                else if (prev > line_start)
-                {
-                    line_end = next_start = prev;  /* hard break before ch */
-                }
-                else
-                {
-                    line_end = next_start = cursor; /* lone too-wide glyph */
-                }
-                break;
-            }
-        }
-
-        if (cur_line == target_line)
-        {
-            int len = line_end - line_start;
-            font_lock(vp->font, false);
-            if (len >= buf_size)
-                len = buf_size - 1;
-            memcpy(buf, line_start, len);
-            buf[len] = '\0';
-            return buf;
-        }
-
-        if (at_end)                 /* asked for a line past the wrapped text */
+        const char *next = text_wrap_next(line, vp->width, pf, &end);
+        if (target_line-- == 0)
             break;
-        cur_line++;
-        line_start = next_start;
+        if (!*next)                 /* asked for a line past the wrapped text */
+        {
+            font_lock(vp->font, false);
+            return NULL;
+        }
+        line = next;
     }
     font_lock(vp->font, false);
-    return NULL;
+
+    len = end - line;
+    if (len >= buf_size)
+        len = buf_size - 1;
+    memcpy(buf, line, len);
+    buf[len] = '\0';
+    return buf;
 }
 
 /* %sel(subject, key1, value1, ..., [default]) -- return the value paired with

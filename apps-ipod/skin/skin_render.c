@@ -66,6 +66,7 @@
 #include "rbunicode.h"
 #include "diacritic.h"
 #include "custom_tokens.h"
+#include "draw/text_wrap.h"
 
 #define MAX_LINE 1024
 
@@ -224,11 +225,10 @@ static void wt_ellipsize(char *line, int size, struct font *pf, int maxwidth)
 
 /* %wt: word-wrap text to the current viewport, align the block vertically
  * (valign t/c/b) and each line horizontally (halign l/c/r), ellipsise if it
- * overflows the height, and draw it. Wrapping is one forward pass (as %wr):
- * accumulate pixel width, remember the last space, break there on overflow.
- * A line break in the text (\n, \r\n or \r) ends a line, so a tag can carry
- * paragraphs. On overflow the last line runs on to the end of its paragraph
- * and wt_ellipsize() cuts it at the width, mid-word if need be.
+ * overflows the height, and draw it. A line break in the text (\n, \r\n or
+ * \r) ends a line, so a tag can carry paragraphs. On overflow the last line
+ * runs on to the end of its paragraph and wt_ellipsize() cuts it at the
+ * width, mid-word if need be.
  *
  * noinline and with its own buffers so the ~1KB of scratch lives here, on the
  * stack only while a %wt actually renders -- NOT baked into do_non_text_tags's
@@ -247,8 +247,7 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     const char *lstart[WT_MAX_LINES];
     int llen[WT_MAX_LINES];
     char src[WT_BUF], line[WT_BUF];
-    const char *text;
-    const unsigned char *p;
+    const char *text, *p;
     bool overflow;
     int len;
 
@@ -280,38 +279,14 @@ draw_textbox(struct gui_wps *gwps, struct skin_draw_info *info,
     if (maxlines > WT_MAX_LINES) maxlines = WT_MAX_LINES;
 
     font_lock(vp->font, true);
-    p = (const unsigned char *)src;
+    p = src;
     while (*p && nlines < maxlines)
     {
-        const unsigned char *cursor = p, *last_space = NULL, *lend, *next;
-        int width = 0;
-        ucschar_t ch;
-        for (;;)
-        {
-            const unsigned char *prev = cursor;
-            cursor = utf8decode(cursor, &ch);
-            if (ch == 0) { lend = next = prev; break; }
-            if (ch == '\n' || ch == '\r')
-            {
-                lend = prev;
-                next = (ch == '\r' && *cursor == '\n') ? cursor + 1 : cursor;
-                break;
-            }
-            if (IS_DIACRITIC(ch)) continue;
-            if (ch == ' ') last_space = prev;
-            width += font_get_width(pf, ch);
-            if (width > vp->width)
-            {
-                if (last_space && last_space > p) { lend = last_space; next = last_space + 1; }
-                else if (prev > p)                { lend = next = prev; }
-                else                              { lend = next = cursor; }
-                break;
-            }
-        }
-        lstart[nlines] = (const char *)p;
-        llen[nlines] = lend - p;
+        const char *lend;
+        lstart[nlines] = p;
+        p = text_wrap_next(p, vp->width, pf, &lend);
+        llen[nlines] = lend - lstart[nlines];
         nlines++;
-        p = next;
     }
     overflow = (*p != 0);
 
