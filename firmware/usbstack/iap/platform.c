@@ -38,6 +38,7 @@
 #include "iap_artwork.h"
 #include "platform-macros.h"
 #include "usb_log.h"
+#include "disk.h"
 
 #include "usb.h"
 #include "../usb_iap.h"
@@ -469,6 +470,16 @@ IAPBool iap_platform_get_hold_switch_state(struct IAPContext* iap_ctx, IAPBool* 
 IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used) {
     (void)iap_ctx;
     *used = global_settings.lineout_active ? iap_true : iap_false;
+    return iap_true;
+}
+
+IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* total, uint64_t* avail) {
+    sector_t size_kib, free_kib;
+
+    (void)iap_ctx;
+    volume_size(IF_MV(0,) &size_kib, &free_kib);
+    *total = (uint64_t)size_kib * 1024;
+    *avail = (uint64_t)free_kib * 1024;
     return iap_true;
 }
 

@@ -233,6 +233,17 @@ static const char* strs_da[] = {
     entry(DigitalAudio, TrackNewAudioAttributes),
     entry(DigitalAudio, SetVideoDelay),
 };
+static const char* strs_storage[] = {
+    entry(Storage, IPodAck),
+    entry(Storage, GetIPodCaps),
+    entry(Storage, RetIPodCaps),
+    entry(Storage, RetIPodFileHandle),
+    entry(Storage, WriteIPodFileData),
+    entry(Storage, CloseIPodFile),
+    entry(Storage, GetIPodFreeSpace),
+    entry(Storage, RetIPodFreeSpace),
+    entry(Storage, OpenIPodFeatureFile),
+};
 
 #undef entry
 
@@ -255,7 +266,7 @@ static struct {
     entry(AccessoryEqualizer, NULL, 0),
     entry(Sports, NULL, 0),
     entry(DigitalAudio, strs_da, array_size(strs_da)),
-    entry(Storage, NULL, 0),
+    entry(Storage, strs_storage, array_size(strs_storage)),
     entry(IPodOut, NULL, 0),
     entry(Location, NULL, 0),
 };

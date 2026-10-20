@@ -119,6 +119,8 @@ IAPBool iap_platform_get_date_time(struct IAPContext* iap_ctx, struct IAPDateTim
 IAPBool iap_platform_get_backlight_level(struct IAPContext* iap_ctx, uint8_t* level);
 IAPBool iap_platform_get_hold_switch_state(struct IAPContext* iap_ctx, IAPBool* state);
 IAPBool iap_platform_get_lineout_usage(struct IAPContext* iap_ctx, IAPBool* used);
+/* the disk's size and free space, in bytes */
+IAPBool iap_platform_get_storage_space(struct IAPContext* iap_ctx, uint64_t* total, uint64_t* avail);
 IAPBool iap_platform_get_indexed_track_info(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformTrackInfo* info);
 IAPBool iap_platform_set_playing_track(struct IAPContext* iap_ctx, uint32_t index);
 IAPBool iap_platform_open_artwork(struct IAPContext* iap_ctx, uint32_t index, struct IAPPlatformArtwork* artwork);

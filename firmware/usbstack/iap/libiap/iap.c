@@ -412,14 +412,17 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             alloc_response(IAPRetIPodOptionsForLingoPayload);
             response->lingo_id = request->lingo_id;
             switch(request->lingo_id) {
-            case IAPLingoID_SimpleRemote:
-                response->bits = swap_64(IAPRetIPodOptionsForLingoSimpleRemoteBits_ContextSpecificControls);
-                break;
             case IAPLingoID_General:
+                response->bits = swap_64(IAPRetIPodOptionsForLingoGeneralBits_LineOutUsage);
+                break;
+            case IAPLingoID_SimpleRemote:
+                response->bits = swap_64(IAPRetIPodOptionsForLingoSimpleRemoteBits_ContextSpecificControls |
+                                         IAPRetIPodOptionsForLingoSimpleRemoteBits_AudioMediaControls);
+                break;
             case IAPLingoID_DisplayRemote:
             case IAPLingoID_ExtendedInterface:
             case IAPLingoID_DigitalAudio:
-            case IAPLingoID_Storage: /* TODO: this is not supported */
+            case IAPLingoID_Storage: /* caps and free space; no iTunes Tagging */
                 response->bits = 0;
                 break;
             case IAPLingoID_USBHostMode:
@@ -1141,6 +1144,29 @@ static int32_t handle_command(struct IAPContext* ctx, uint8_t lingo, uint16_t co
             check_ret(iap_platform_on_acc_samprs_received(ctx, request_span), -IAPAckStatus_ECommandFailed);
             response_span->ptr = NULL; /* no response */
             return 0;
+        } break;
+        }
+        break;
+    case IAPLingoID_Storage:
+        switch(command) {
+        case IAPStorageCommandID_GetIPodCaps: {
+            uint64_t total, avail;
+            check_ret(iap_platform_get_storage_space(ctx, &total, &avail), -IAPAckStatus_ECommandFailed);
+            alloc_response(IAPIPodRetIPodCapsPayload);
+            memset(response, 0, sizeof(*response));
+            response->total_space    = swap_64(total);
+            response->max_file_size  = swap_32(64 * 1024);
+            response->max_write_size = swap_16(512);
+            response->major_version  = 1; /* RequestLingoProtocolVersion's */
+            response->minor_version  = 2;
+            return IAPStorageCommandID_RetIPodCaps;
+        } break;
+        case IAPStorageCommandID_GetIPodFreeSpace: {
+            uint64_t total, avail;
+            check_ret(iap_platform_get_storage_space(ctx, &total, &avail), -IAPAckStatus_ECommandFailed);
+            alloc_response(IAPRetIPodFreeSpacePayload);
+            response->free_space = swap_64(avail);
+            return IAPStorageCommandID_RetIPodFreeSpace;
         } break;
         }
         break;
