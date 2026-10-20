@@ -18,7 +18,7 @@
 #include "speech/talk.h"
 #include "splash.h"
 #include "draw/viewport.h"
-#include "strptokspn_r.h"
+#include "draw/text_wrap.h"
 #include "draw/progress_bar.h"
 #include "font.h"
 #include "system/activity.h"
@@ -53,19 +53,13 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
         size_t len;
     } lines[MAXLINES];
     const char *next;
-    const char *lastbreak = NULL;
-    const char *store = NULL;
     int line = 0;
-    int x = 0;
     int y, i;
-    int space_w, w, chr_h;
+    int space_w, chr_h;
     int width, height;
     int maxw = min_width - 2*RECT_SPACING;
     int fontnum = vp->font;
-
-    char lastbrkchr;
-    size_t len, next_len;
-    const char matchstr[] = "\r\n\f\v\t ";
+    struct font *pf = font_get(fontnum);
 
     /* the popup is framed with the default dialog style, but keeps its own
      * padding */
@@ -87,64 +81,34 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
         return false;
 
     /* break splash string into display lines, doing proper word wrap */
-    next = strptokspn_r(splash_buf, matchstr, &next_len, &store);
-    if (!next)
+    next = splash_buf;
+    while (*next == ' ' || *next == '\r' || *next == '\n')
+        next++;
+    if (!*next)
         return false; /* nothing to display */
 
-    lines[line].len = next_len;
-    lines[line].str = next;
-    while (true)
+    font_lock(fontnum, true);
+    while (*next)
     {
-        w = font_getstringnsize(next, next_len, NULL, NULL, fontnum);
-        if (lastbreak)
+        const char *end;
+        int w;
+
+        if (line > 0)
         {
-            len = next - lastbreak;
-            int next_w = len * space_w;
-            if (x + next_w + w > vp->width - RECT_SPACING*2
-                || lastbrkchr != ' ')
-            {   /* too wide, or control character wrap */
-                if (x > maxw)
-                    maxw = x;
-                if ((y + chr_h * 2 > vp->height) || (line >= (MAXLINES-1)))
-                    break;  /* screen full or out of lines */
-                x = 0;
-                y += chr_h;
-
-                /* split when it fits since we didn't find a valid token to break on */
-                size_t nl = next_len;
-                while (w > vp->width && --nl > 0)
-                    w = font_getstringnsize(next, nl, NULL, NULL, fontnum);
-
-                if (nl > 1 && nl != next_len)
-                {
-                    next_len = nl;
-                    store = next + nl; /* move the start pos for the next token read */
-                }
-
-                lines[++line].len = next_len;
-                lines[line].str = next;
-            }
-            else
-            {
-                /*  restore & calculate spacing */
-                lines[line].len += next_len + 1;
-                x += next_w;
-            }
+            if ((y + chr_h * 2 > vp->height) || (line >= MAXLINES))
+                break;  /* screen full or out of lines */
+            y += chr_h;
         }
-        x += w;
-
-        lastbreak = next + next_len;
-        lastbrkchr = *lastbreak;
-
-        next = strptokspn_r(NULL, matchstr, &next_len, &store);
-
-        if (!next)
-        {   /* no more words */
-            if (x > maxw)
-                maxw = x;
-            break;
-        }
+        lines[line].str = next;
+        next = text_wrap_next(next, vp->width - RECT_SPACING*2, pf, &end);
+        lines[line].len = end - lines[line].str;
+        w = font_getstringnsize((const unsigned char *)lines[line].str,
+                                lines[line].len, NULL, NULL, fontnum);
+        if (w > maxw)
+            maxw = w;
+        line++;
     }
+    font_lock(fontnum, false);
 
     /* prepare viewport
      * First boundaries, then the background filling, then the border and finally
@@ -185,7 +149,7 @@ static bool splash_internal(struct screen * screen, const char *fmt, va_list ap,
     /* DRMODE_FG so glyphs draw over our solid fill without the theme backdrop
      * bleeding into each character's background */
     screen->set_drawmode(DRMODE_FG);
-    for(i = 0, y = 0; i <= line; i++, y+= chr_h)
+    for(i = 0, y = 0; i < line; i++, y+= chr_h)
     {
         screen->putsxyf(0, y, "%.*s", lines[i].len, lines[i].str);
     }

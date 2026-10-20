@@ -2,7 +2,8 @@
  * GNU General Public License (version 2+)
  *
  * Word-wrapping text to a pixel width, one display line at a time. Backs the
- * %wr and %wt skin tags and the text reel behind the credits and About.
+ * %wr and %wt skin tags, the text reel behind the credits and About, dialog
+ * text and splashes.
  *
  * Parts: finding a line's end, then counting and drawing whole texts.
  ****************************************************************************/

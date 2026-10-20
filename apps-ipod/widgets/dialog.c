@@ -19,6 +19,7 @@
 #include "draw/icon.h"          /* Icon_NOICON */
 #include "draw/color.h"         /* color_hue_rotate, color_contrast */
 #include "draw/round_rect.h"    /* fill_round_rect/draw_round_rect */
+#include "draw/text_wrap.h"
 #include "settings/settings.h"  /* theme fg/bg for the derived colours */
 #include "skin/statusbar_skinned.h"
 #include "skin/skin_engine.h" /* skin_inhibit_flush */
@@ -544,44 +545,20 @@ void dialog_draw_button(struct screen *screen,
 int dialog_wrap_text(const char *text, int max_width, int font,
                      struct dialog_text_line *out, int max_lines)
 {
+    struct font *pf = font_get(font);
     int count = 0;
-    const char *p = text;
 
-    while (*p && count < max_lines)
+    font_lock(font, true);
+    while (*text && count < max_lines)
     {
-        while (*p == ' ')           /* skip leading spaces */
-            p++;
-        if (!*p)
-            break;
+        const char *end;
 
-        const char *line_start = p;
-        const char *fit_end = NULL;  /* end of the widest run that still fits */
-        const char *w = p;
-
-        while (*w)
-        {
-            const char *word_end = w;
-            while (*word_end && *word_end != ' ')
-                word_end++;
-
-            int width = font_getstringnsize((const unsigned char *)line_start,
-                                            word_end - line_start,
-                                            NULL, NULL, font);
-            /* stop before a word that overflows, but always take the first */
-            if (width > max_width && fit_end != NULL)
-                break;
-
-            fit_end = word_end;
-            if (!*word_end)
-                break;
-            w = word_end + 1;        /* step past the space */
-        }
-
-        out[count].str = line_start;
-        out[count].len = (int)(fit_end - line_start);
+        out[count].str = text;
+        text = text_wrap_next(text, max_width, pf, &end);
+        out[count].len = (int)(end - out[count].str);
         count++;
-        p = fit_end;
     }
+    font_lock(font, false);
 
     return count;
 }

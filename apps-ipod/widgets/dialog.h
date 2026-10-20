@@ -192,8 +192,9 @@ struct dialog_text_line
 
 /* Greedy word-wrap `text` into display lines no wider than `max_width` pixels
  * in `font`, writing up to `max_lines` slices into `out` (each pointing into
- * `text`). A single word wider than max_width is emitted on its own line (it
- * will clip). Returns the number of lines written. */
+ * `text`). A line break in the text ends a line, so a blank line between
+ * paragraphs comes out as an empty slice; a word wider than max_width is
+ * broken where it reaches the edge. Returns the number of lines written. */
 int dialog_wrap_text(const char *text, int max_width, int font,
                      struct dialog_text_line *out, int max_lines);
 
