@@ -96,6 +96,7 @@
 #include "playlist/catalog.h"
 #include "crc32.h"
 #include <ctype.h>
+#include <limits.h>
 
 #define str_or_empty(x) (x ? x : "(NULL)")
 
@@ -306,6 +307,7 @@ struct menu_entry {
         int format_id[MAX_TAGS];
         int clause_count[MAX_TAGS];
         int result_seek[MAX_TAGS];
+        int header_levels;      /* a bit for each level marked %header */
     } si;
     int link;
 };
@@ -335,6 +337,25 @@ static int current_entry_count;
 static int head_rows;
 
 static struct browser_context *tc;
+
+/* A %header level is never a list of its own. It shows the level below it,
+ * with its own values as rows at the head: "albumartist -> grouping %header
+ * -> album" lists an artist's groupings and then all of their albums. A
+ * grouping row descends a level as usual; an album row passes over the
+ * header level, whose result_seek is then SEEK_NO_FILTER. */
+#define SEEK_NO_FILTER INT_MIN
+
+static bool level_is_header(int level)
+{
+    return csi && level >= 0 && level < MAX_TAGS
+        && (csi->header_levels & (1 << level));
+}
+
+/* The level whose rows a list at 'level' shows. */
+static int shown_level(int level)
+{
+    return level_is_header(level) ? level + 1 : level;
+}
 
 static int max_history_level; /* depth of menu levels with applicable history */
 static int selected_item_history[MAX_DIR_LEVELS];
@@ -898,6 +919,12 @@ static int get_condition(struct search_instruction *inst)
         case '&':
             strp++;
             return 1;
+        case '%':
+            if (strncasecmp(strp, "%header", 7) != 0)
+                return -1;
+            inst->header_levels |= 1 << inst->tagorder_count;
+            strp += 7;
+            return 1;
         case '-':
         case '\0':
             return 0;
@@ -1058,6 +1085,19 @@ static bool parse_search(struct menu_entry *entry, const char *str)
 
         if (get_tag(&type) <= 0 || (type != menu_next && type != menu_shuffle_songs))
             break;
+    }
+
+    /* The level a header shows must have one below it to descend to, and
+     * must not be a header itself. */
+    for (i = 0; i < inst->tagorder_count; i++)
+    {
+        if ((inst->header_levels & (1 << i))
+            && (i + 2 >= inst->tagorder_count
+                || (inst->header_levels & (1 << (i + 1)))))
+        {
+            logf("%%header needs two levels below it");
+            return false;
+        }
     }
 
     return true;
@@ -1982,6 +2022,8 @@ bool browser_db_album_sort_artist_first_moot(int ctx)
  * with no slot of its own. */
 static int album_sort_ctx(int level)
 {
+    if (level_is_header(level - 1))
+        level--;
     if (level <= 0)
         return DB_ALBUM_CTX_ROOT;
 
@@ -2036,14 +2078,19 @@ static bool is_artist_tag(int tag)
  * level, which is not worth it. */
 static int featured_row_count(int level)
 {
+    int above = level - 1;
+
     if (!csi || level < 1 || level >= csi->tagorder_count)
         return 0;
     if (csi->tagorder[level] != tag_album)
         return 0;
-    if (!is_artist_tag(csi->tagorder[level - 1]))
+    /* The albums a %header level shows are the artist's own list */
+    if (level_is_header(above) && csi->result_seek[above] == SEEK_NO_FILTER)
+        above--;
+    if (above < 0 || !is_artist_tag(csi->tagorder[above]))
         return 0;
 
-    return db_featured_guest_tracks(current_title[level], NULL, 0);
+    return db_featured_guest_tracks(current_title[above + 1], NULL, 0);
 }
 
 /* Whether the browse being set up asks about spoken word itself.
@@ -2374,11 +2421,89 @@ static int dir_ids_fill(int level)
     return count;
 }
 
+/* Filter on the row chosen at each level above 'level'. */
+static void add_level_filters(struct tagcache_search *tcs, int level)
+{
+    for (int i = 0; i < level; i++)
+    {
+        if (csi->result_seek[i] == SEEK_NO_FILTER)
+            continue;
+
+        if (TAGCACHE_IS_NUMERIC(csi->tagorder[i]))
+        {
+            static struct tagcache_search_clause cc;
+
+            memset(&cc, 0, sizeof(struct tagcache_search_clause));
+            cc.tag = csi->tagorder[i];
+            cc.type = clause_is;
+            cc.numeric = true;
+            cc.numeric_data = csi->result_seek[i];
+            tagcache_search_add_clause(tcs, &cc);
+        }
+        else
+        {
+            tagcache_search_add_filter(tcs, csi->tagorder[i],
+                                       csi->result_seek[i]);
+        }
+    }
+}
+
+/* The rows a %header level puts at the head of the list: its values under
+ * the rows chosen above, sorted. [Untagged] is left out, as everything it
+ * holds is in the list below. Names are kept here because a special row's
+ * name must outlive the entries. */
+#define HEADER_ROWS_MAX 32
+static struct header_value {
+    long seek;
+    char name[MENUENTRY_MAX_NAME];
+} header_values[HEADER_ROWS_MAX];
+static int header_count;
+
+static int header_row_compare(const void *p1, const void *p2)
+{
+    const char *a = ((const struct header_value *)p1)->name;
+    const char *b = ((const struct header_value *)p2)->name;
+
+    return global_settings.interpret_numbers ? strnatcasecmp(a, b)
+                                             : strcasecmp(a, b);
+}
+
+static int header_rows_fill(int level, char *buf, long bufsz)
+{
+    struct tagcache_search tcs;
+    int n = 0;
+
+    if (!tagcache_search(&tcs, csi->tagorder[level]))
+        return 0;
+    tagcache_search_set_uniqbuf(&tcs, uniqbuf, UNIQBUF_SIZE);
+    add_level_filters(&tcs, level);
+
+    core_pin(browser_db_handle);
+    for (int i = 0; i <= level; i++)
+        for (int j = 0; j < csi->clause_count[i]; j++)
+            tagcache_search_add_clause(&tcs, csi->clause[i][j]);
+
+    while (n < HEADER_ROWS_MAX && tagcache_get_next(&tcs, buf, bufsz))
+    {
+        if (strcmp(tcs.result, UNTAGGED) == 0)
+            continue;
+        header_values[n].seek = tcs.result_seek;
+        strmemccpy(header_values[n].name, tcs.result, MENUENTRY_MAX_NAME);
+        n++;
+    }
+    tagcache_search_finish(&tcs);
+    core_unpin(browser_db_handle);
+
+    qsort(header_values, n, sizeof(header_values[0]), header_row_compare);
+    return n;
+}
+
 /* Special row *sidx at the head of the list, written at dptr only when the
  * page starting at 'offset' holds it. Returns where the next row goes. */
 static struct tagentry *add_head_row(struct browser_context *c,
                                      struct tagentry *dptr, int offset,
-                                     int *sidx, int newtable, int lang_id,
+                                     int *sidx, int newtable,
+                                     unsigned char *name,
                                      int extraseek)
 {
     bool on_page = offset <= *sidx;
@@ -2388,7 +2513,7 @@ static struct tagentry *add_head_row(struct browser_context *c,
         return dptr;
 
     dptr->newtable = newtable;
-    dptr->name = ID2P(lang_id);
+    dptr->name = name;
     dptr->extraseek = extraseek;
     dptr->customaction = ONPLAY_NO_CUSTOMACTION;
     dptr->idx_id = 0;
@@ -2419,6 +2544,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     struct db_summary_order *order_tab = NULL;
     int order_count = 0;
     int order_prefix = 0;  /* characters this level prepends for the sort */
+    bool header = false;
 
     if (c->currtable == TABLE_ALLSUBENTRIES || c->currtable == TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS)
     {
@@ -2426,7 +2552,15 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
         level--;
     }
     else
+    {
+        header = level_is_header(level);
+        if (header)
+        {
+            csi->result_seek[level] = SEEK_NO_FILTER;
+            level++;
+        }
         tag = csi->tagorder[level];
+    }
 
     if (tag == menu_reload)
         return RELOAD_BROWSER_DB;
@@ -2442,6 +2576,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * keep the answer this one wrote. */
     if (offset == 0)
     {
+        header_count = header ? header_rows_fill(level - 1, tcs_buf, tcs_bufsz)
+                              : 0;
         resume_row = book_resume_row(c, level, tag);
         shelf_rows = global_settings.segregate_audiobooks && level == 0
                      && tag == tag_album && csi_mentions_spoken();
@@ -2481,25 +2617,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
     if (level || is_basename|| csi->clause_count[0] || TAGCACHE_IS_NUMERIC(tag))
         sort = true;
 
-    for (i = 0; i < level; i++)
-    {
-        if (TAGCACHE_IS_NUMERIC(csi->tagorder[i]))
-        {
-            static struct tagcache_search_clause cc;
-
-            memset(&cc, 0, sizeof(struct tagcache_search_clause));
-            cc.tag = csi->tagorder[i];
-            cc.type = clause_is;
-            cc.numeric = true;
-            cc.numeric_data = csi->result_seek[i];
-            tagcache_search_add_clause(&tcs, &cc);
-        }
-        else
-        {
-            tagcache_search_add_filter(&tcs, csi->tagorder[i],
-                                       csi->result_seek[i]);
-        }
-    }
+    add_level_filters(&tcs, level);
 
     /* An album's tracks lie between its first and last master entries, so a
      * placed album's list walks those rather than the whole index. */
@@ -2676,7 +2794,7 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * and put it at the head of the book. */
     if (resume_row)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_RESUME,
-                            LANG_BOOK_RESUME, -1);
+                            ID2P(LANG_BOOK_RESUME), -1);
 
     if (shelf_rows)
     {
@@ -2687,7 +2805,8 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
             /* The list the row opens rides in extraseek, as the chart
              * rows' do. */
             dptr = add_head_row(c, dptr, offset, &sidx, TABLE_BOOK_SHELF,
-                                shelf_row[s].lang_id, shelf_row[s].kind);
+                                ID2P(shelf_row[s].lang_id),
+                                shelf_row[s].kind);
         }
     }
 
@@ -2703,10 +2822,10 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
                             csi_mentions_spoken()
                             ? TABLE_ALLSUBENTRIES_SORTED_BY_ALBUMS
                             : TABLE_ALLSUBENTRIES,
-                            LANG_TAGNAVI_ALL_TRACKS, 0);
+                            ID2P(LANG_TAGNAVI_ALL_TRACKS), 0);
     if (tag != tag_filename && !csi_mentions_spoken())
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_NAVIBROWSE,
-                            LANG_TAGNAVI_RANDOM, -1);
+                            ID2P(LANG_TAGNAVI_RANDOM), -1);
     /* [Featured In], on an artist's album list only -- see
      * featured_row_count(). It goes last of the three: putting it first would
      * renumber the other two, and browser_db_load() scrolls a level past its
@@ -2723,7 +2842,12 @@ static int retrieve_entries(struct browser_context *c, int offset, bool init)
      * every selection onto the row before it. */
     if (tag == tag_album && featured_row_count(level) > 0)
         dptr = add_head_row(c, dptr, offset, &sidx, TABLE_FEATURED_TRACKS,
-                            LANG_FEATURED_IN, -1);
+                            ID2P(LANG_FEATURED_IN), -1);
+    /* Last, so a header level's other special rows keep their places. */
+    for (i = 0; i < header_count; i++)
+        dptr = add_head_row(c, dptr, offset, &sidx, TABLE_NAVIBROWSE,
+                            (unsigned char *)header_values[i].name,
+                            header_values[i].seek);
 
     total_count += sidx;
     head_rows = sidx;
@@ -4084,7 +4208,8 @@ int browser_db_load(struct browser_context* c)
             && entry_is_untagged(c, first))
             first++;
 
-        if (c->selected_item < first && !resume_row)
+        /* A %header row is where the user was, so it is kept. */
+        if (c->selected_item < first - header_count && !resume_row)
             c->selected_item = first;
 
         /* Consumed once by the browser's list sync. It drops the request if
@@ -4382,6 +4507,8 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             c->selected_item = random_item;
     }
     newextra = dptr->newtable;
+    /* A %header level's own rows are the special ones that browse */
+    bool header_row = !is_random_item && c->selected_item < head_rows;
 
     /* The synthetic rows are actions, not browse levels. Leaving here --
      * before any of the history/dirlevel bookkeeping below, and before the
@@ -4434,7 +4561,7 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
      * A hidden descent is reading the tracks, not opening the book, so it
      * takes the ordinary path down to the one-track list. */
     if (is_visible && c->currtable == TABLE_NAVIBROWSE
-        && newextra == TABLE_NAVIBROWSE)
+        && newextra == TABLE_NAVIBROWSE && !level_is_header(c->currextra))
     {
         char path[MAX_PATH];
         char book[BOOK_ID_MAX];
@@ -4628,6 +4755,12 @@ int browser_db_enter(struct browser_context* c, bool is_visible)
             }
 
             c->currtable = newextra;
+            if (newextra == TABLE_NAVIBROWSE && !header_row
+                && level_is_header(c->currextra))
+            {
+                csi->result_seek[c->currextra] = SEEK_NO_FILTER;
+                c->currextra++;
+            }
             csi->result_seek[c->currextra] = seek;
             if (c->currextra < csi->tagorder_count-1)
                 c->currextra++;
@@ -5320,7 +5453,7 @@ bool browser_db_is_album_list(struct browser_context* c)
         return false;
     if (c->currextra < 0 || c->currextra >= csi->tagorder_count)
         return false;
-    return csi->tagorder[c->currextra] == tag_album;
+    return csi->tagorder[shown_level(c->currextra)] == tag_album;
 }
 
 bool browser_db_is_spoken_list(struct browser_context* c)
@@ -5401,7 +5534,7 @@ bool browser_db_is_artist_list(struct browser_context* c)
         return false;
     if (c->currextra < 0 || c->currextra >= csi->tagorder_count)
         return false;
-    return is_artist_tag(csi->tagorder[c->currextra]);
+    return is_artist_tag(csi->tagorder[shown_level(c->currextra)]);
 }
 
 /* True when the browse path down to the current level passes through an artist
@@ -5466,7 +5599,8 @@ static bool browser_db_get_track_dir(struct browser_context* c, int item,
             tagcache_search_add_filter(&tcs, csi->tagorder[i],
                                        csi->result_seek[i]);
     }
-    tagcache_search_add_filter(&tcs, csi->tagorder[level], entry->extraseek);
+    tagcache_search_add_filter(&tcs, csi->tagorder[shown_level(level)],
+                               entry->extraseek);
 
     if (tagcache_get_next(&tcs, tcs_buf, sizeof(tcs_buf)) && tcs.result)
     {
@@ -5543,7 +5677,7 @@ static int artist_plays(int tag, long seek)
 static unsigned int table_art_hash(struct browser_context* c,
                                    const struct tagentry *entry)
 {
-    int level = c->currextra;
+    int level = shown_level(c->currextra);
     int tag = csi->tagorder[level];
     int n;
 
@@ -5576,7 +5710,8 @@ unsigned int browser_db_get_art_hash(struct browser_context* c, int item)
     /* A track-artist row has no folder search: it would read the disk for
      * every row in view, and its folder is a guess. */
     if (hash == 0
-        && (album || csi->tagorder[c->currextra] == tag_albumartist)
+        && (album
+            || csi->tagorder[shown_level(c->currextra)] == tag_albumartist)
         && browser_db_get_track_dir(c, item, dir, sizeof(dir), album ? 0 : 1))
         hash = art_cache_dir_hash(dir);
     return hash;
@@ -5633,7 +5768,7 @@ bool browser_db_current_filters(struct browser_db_filters *out)
     }
 
     /* The row itself last, so the levels read top to bottom. */
-    out->tag[i] = csi->tagorder[level];
+    out->tag[i] = csi->tagorder[shown_level(level)];
     out->seek[i] = entry->extraseek;
     out->count = i + 1;
     return true;

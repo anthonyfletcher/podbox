@@ -580,7 +580,7 @@ A number saying what choosing the row does:
 | `2` | toggle: an on/off setting | Shuffle |
 | `3` | setting: a choice or a number | Repeat, Volume Limit |
 | `4` | action: does something, or goes somewhere | the main menu's entries, a context menu's, Reset Settings |
-| `5` | command: a library list's own row | [Random], [Resume], [All Tracks], [In Progress] |
+| `5` | command: a library list's own row | [Random], [Resume], [All Tracks], [In Progress], the groupings a tagnavi `%header` level lists |
 | `6` | container: a library item that lists its contents | an artist, album, genre, book or folder |
 | `7` | track: something that plays | a database track, a playlist entry, an audio file, a chapter |
 | `8` | file: any other file | an image, a text file, a playlist file |
