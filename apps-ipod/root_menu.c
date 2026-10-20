@@ -351,14 +351,10 @@ static int browser(void* param)
 #undef TAGNAVI_CASE
         {
             int slot = (intptr_t)param - GO_TO_TAGNAVI_FIRST;
-            int target_tag;
-            const char *target_menu;
-            const unsigned char *target_name;
 
             if (!wait_for_tagcache_ready() || !db_browser_ready())
                 return GO_TO_PREVIOUS;
-            if (!browser_db_get_main_menu_row(slot, &target_tag, &target_menu,
-                                              &target_name))
+            if (!browser_db_get_main_menu_row(slot, NULL))
                 return GO_TO_PREVIOUS; /* slot not backed by a real row */
 
             filter = SHOW_ID3DB;
@@ -375,8 +371,8 @@ static int browser(void* param)
             row_slot = -1;
             /* Jump straight into this row's branch of the Database's root
              * menu, independent of the plain Database entry's own
-             * last_db_dirlevel/selection resume memory. Looked up by tag
-             * identity (not position) so it survives tagnavi.config
+             * last_db_dirlevel/selection resume memory. Looked up by the
+             * row's identity (not position) so it survives tagnavi.config
              * reordering, and armed for browser_db_load() to apply on its next
              * fresh root load. Both halves of that fresh root are forced
              * here: rockbox_browse() resets nothing for an ID3-DB browse, so
@@ -384,21 +380,10 @@ static int browser(void* param)
              * left -- dirlevel the file tree's own depth, which
              * last_ft_dirlevel carries across this one. A shortcut is applied
              * only at TABLE_ROOT and dirlevel 0, so without both of these the
-             * jump is dropped and the Music menu root is drawn in its place.
-             *
-             * A row is one of two kinds: a tag browse, or a submenu such as
-             * Playback History. A submenu has a unique id to arm with; a tag
-             * browse is armed by its label, because the tag alone does not
-             * identify it -- "Album" and "Recently Added" both browse
-             * tag_album first, and arming by tag sent both to the former. */
+             * jump is dropped and the Music menu root is drawn in its place. */
             tc->dirlevel = 0;
             tc->currtable = 0;
-            if (target_menu)
-                browser_db_enter_menu_on_next_load(target_menu);
-            else if (target_name)
-                browser_db_enter_by_label_on_next_load(target_name);
-            else
-                browser_db_enter_by_tag_on_next_load(target_tag);
+            browser_db_enter_main_menu_row_on_next_load(slot);
             push_current_activity(ACTIVITY_DATABASEBROWSER);
         }
         break;
@@ -980,7 +965,7 @@ static char *tagnavi_item_get_name(int selected_item, void *data,
     int index = (int)(intptr_t)data;
     const unsigned char *name;
 
-    if (!browser_db_get_main_menu_row(index, NULL, NULL, &name))
+    if (!browser_db_get_main_menu_row(index, &name))
     {
         buffer[0] = '\0';
         return buffer;
@@ -995,7 +980,7 @@ static int tagnavi_item_speak(int selected_item, void *data)
     int index = (int)(intptr_t)data;
     const unsigned char *name;
 
-    if (browser_db_get_main_menu_row(index, NULL, NULL, &name))
+    if (browser_db_get_main_menu_row(index, &name))
     {
         int id = P2ID(name);
         if (id != -1)
@@ -1214,7 +1199,7 @@ static void root_menu_fixup_tagnavi_slots(void)
     {
         int slot = tagnavi_slot_of_item(root_menu__[i]);
 
-        if (slot < 0 || browser_db_get_main_menu_row(slot, NULL, NULL, NULL))
+        if (slot < 0 || browser_db_get_main_menu_row(slot, NULL))
             root_menu__[out++] = root_menu__[i];
     }
 
@@ -1299,7 +1284,7 @@ struct menu_table *root_menu_get_options(int *nb_options)
 
     for (i = 0; i < root_menu_active_count(); i++)
         if (i < tagnavi_start
-            || browser_db_get_main_menu_row(i - tagnavi_start, NULL, NULL, NULL))
+            || browser_db_get_main_menu_row(i - tagnavi_start, NULL))
             shown[n++] = menu_table[i];
 
     *nb_options = n;

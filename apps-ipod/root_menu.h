@@ -26,8 +26,8 @@ struct menu_table *root_menu_get_options(int *nb_options);
 void root_menu_set_audiobooks_row(bool on);
 
 /* Number of reserved root-menu shortcut slots for tagnavi.config's root
- * ("main") menu's direct tag-browse rows -- see the comment at
- * GO_TO_TAGNAVI_FIRST below. */
+ * ("main") menu's rows, then the custom menu's in whatever is left -- see the
+ * comment at GO_TO_TAGNAVI_FIRST below. */
 #define TAGNAVI_MAIN_MENU_SLOTS 20
 
 enum {

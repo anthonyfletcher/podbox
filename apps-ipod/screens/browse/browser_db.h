@@ -206,22 +206,23 @@ void browser_db_enter_artist_album_tracks_on_next_load(long album_seek,
 void browser_db_enter_artist_albums_on_next_load(long albumartist_seek,
                                               const char *artist_title);
 /* Number of main-menu slots the root ("main") menu numbers: its tag-browse
- * ("->") and submenu ("==>") rows; action rows (e.g. "~>" shuffle) don't
- * count. Used by root_menu.c to know how many of its reserved
- * GO_TO_TAGNAVI_FIRST..LAST slots are numbered. */
+ * ("->") and submenu ("==>") rows, then those of the custom menu; action
+ * rows (e.g. "~>" shuffle) don't count. Used by root_menu.c to know how many
+ * of its reserved GO_TO_TAGNAVI_FIRST..LAST slots are numbered. */
 int browser_db_get_main_menu_tag_row_count(void);
 /* The main-menu slot index of the row opening the audiobooks menu, or -1.
  * Recognised by its rows asking about the `spoken` tag rather than by its
  * name, so a renamed or user-written menu still counts. */
 int browser_db_spoken_main_menu_slot(void);
-/* The Nth (0-based) such row: its raw (P2STR-resolvable) display name, and
- * whichever identity it has -- *out_tag for a tag-browse row, *out_menu_id for
- * a submenu row, the other left as -1/NULL. Feed whichever came back to the
- * matching enter_..._on_next_load() above. False if index is out of range,
- * or names a submenu with nothing in it: that slot is numbered but hidden. */
-bool browser_db_get_main_menu_row(int index, int *out_tag,
-                                  const char **out_menu_id,
-                                  const unsigned char **out_name);
+/* The Nth (0-based) such row, and its raw (P2STR-resolvable) display name.
+ * False if index is out of range, or names a submenu with nothing in it:
+ * that slot is numbered but hidden. */
+bool browser_db_get_main_menu_row(int index, const unsigned char **out_name);
+/* Arm the jump into the Nth such row, for the next fresh root load: by its
+ * label, or a submenu's id, since a first tag does not identify a row -- the
+ * shipped menu's "Album" and "Recently Added" both start on tag_album. False
+ * where browser_db_get_main_menu_row() is. */
+bool browser_db_enter_main_menu_row_on_next_load(int index);
 /* The Music menu's rows, for the screen that turns them on and off
  * (screens/music_menu_config.c). Only rows the menu would actually draw are
  * enumerated, so one already hidden for another reason -- an empty submenu, or

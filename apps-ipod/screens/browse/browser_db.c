@@ -3816,24 +3816,23 @@ static bool enter_artist_albums_directly(struct browser_context *c,
 }
 
 /* root_menu.c's tagnavi-derived main-menu shortcuts (GO_TO_TAGNAVI_FIRST..LAST)
- * only cover direct tag-browse rows ("->" / menu_next) of the root ("main")
- * menu -- rows that load a nested sub-menu ("==>") or trigger an action
- * (e.g. "~>" shuffle) aren't simple browse shortcuts and are excluded. These
- * two look directly at menus[rootmenu] (populated by parse_menu() at boot)
- * rather than the file-scope 'menu' pointer load_root() sets, since
+ * cover the root ("main") menu's rows, and then the rows of the custom menu
+ * it opens. These look directly at menus[rootmenu] (populated by parse_menu()
+ * at boot) rather than the file-scope 'menu' pointer load_root() sets, since
  * root_menu.c may query this before any browsing has actually happened. */
-/* Can this root-menu row be offered as a main-menu shortcut, on this pass?
+/* Can this row be offered as a main-menu shortcut, on this pass?
  *
  * Both kinds qualify: a "->" row that browses a tag (pass 0), and a "==>" row
- * that opens a submenu (pass 1). What rules a row out is having no stable
- * identity to arm a jump with: a tag browse with no tags.
- * Everything else (shuffle songs) is an action rather than a place.
+ * that opens a submenu (pass 1); pass 2 takes both from the custom menu. What
+ * rules a row out is having no stable identity to arm a jump with: a tag
+ * browse with no tags. Everything else (shuffle songs, a built-in row) is an
+ * action rather than a place, or has a main-menu entry of its own.
  *
  * A submenu that leads nowhere still takes its slot, so writing
  * tagnavi_custom.config moves no other row's number; the slot reports no row
  * (see browser_db_get_main_menu_row()) and root_menu.c hides it.
  *
- * The two passes are the point, not a tidiness. A row's position in this
+ * The passes are the point, not a tidiness. A row's position in this
  * enumeration is its *slot number*, and the slot number is what a saved
  * main-menu configuration records -- root_menu.c writes "tagnavi6" and reads
  * it back. Admitting submenu rows in menu order would renumber every slot from
@@ -3841,63 +3840,103 @@ static bool enter_artist_albums_directly(struct browser_context *c,
  * different rows -- a "tagnavi6" meaning User Rating comes back as First
  * Letter. Enumerating all the tag rows first and the submenus after leaves
  * every saved slot meaning what it did, and gives the submenus unused numbers.
+ * The custom menu's rows come last for the same reason, and are numbered by
+ * their place in that file, so editing it moves only its own shortcuts.
  *
  * So: only ever append a new kind of row as a later pass. */
 static bool root_row_eligible(const struct menu_entry *item, int pass)
 {
+    bool browse = item->type == menu_next && item->si.tagorder_count > 0;
+
     if (pass == 0)
-        return item->type == menu_next && item->si.tagorder_count > 0;
-    return item->type == menu_load;
+        return browse;
+    if (pass == 1)
+        return item->type == menu_load;
+    return browse || item->type == menu_load;
 }
 
-#define ROOT_ROW_PASSES 2
+#define ROOT_ROW_PASSES 3
 
-bool browser_db_get_main_menu_row(int index, int *out_tag,
-                                  const char **out_menu_id,
-                                  const unsigned char **out_name)
+/* The menu a root "==>" row opens under the id tagnavi.config gives the
+ * custom menu, or NULL. */
+static struct menu_root *root_custom_menu(const struct menu_root *root)
 {
-    struct menu_root *root;
-    int pass;
-    int i, count = 0;
-
-    if (out_tag)
-        *out_tag = -1;
-    if (out_menu_id)
-        *out_menu_id = NULL;
-
-    root = parsed_root_menu();
-    if (!root)
-        return false;
-
-    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
+    for (int i = 0; i < root->itemcount; i++)
     {
-        for (i = 0; i < root->itemcount; i++)
+        const struct menu_entry *item = root->items[i];
+
+        if (item->type == menu_load && item->link >= 0
+            && item->link < menu_count && menus[item->link]
+            && !strcasecmp(menus[item->link]->id, "custom"))
+            return menus[item->link];
+    }
+    return NULL;
+}
+
+/* Slot 'index' of the enumeration, and the menu holding it; NULL past the
+ * last. */
+static struct menu_entry *main_menu_slot(int index, struct menu_root **in)
+{
+    struct menu_root *root = parsed_root_menu();
+    int count = 0;
+
+    if (!root)
+        return NULL;
+
+    for (int pass = 0; pass < ROOT_ROW_PASSES; pass++)
+    {
+        struct menu_root *m = pass < 2 ? root : root_custom_menu(root);
+
+        for (int i = 0; m && i < m->itemcount; i++)
         {
-            if (!root_row_eligible(root->items[i], pass))
+            if (!root_row_eligible(m->items[i], pass))
                 continue;
-
-            if (count == index)
+            if (count++ == index)
             {
-                if (root->items[i]->type == menu_load
-                    && !row_submenu_has_items(root->items[i]))
-                    return false;
-
-                if (root->items[i]->type == menu_next)
-                {
-                    if (out_tag)
-                        *out_tag = root->items[i]->si.tagorder[0];
-                }
-                else if (out_menu_id)
-                    *out_menu_id = menus[root->items[i]->link]->id;
-
-                if (out_name)
-                    *out_name = root->items[i]->name;
-                return true;
+                if (in)
+                    *in = m;
+                return m->items[i];
             }
-            count++;
         }
     }
-    return false;
+    return NULL;
+}
+
+bool browser_db_get_main_menu_row(int index, const unsigned char **out_name)
+{
+    struct menu_entry *item = main_menu_slot(index, NULL);
+
+    if (!item)
+        return false;
+    if (item->type == menu_load && !row_submenu_has_items(item))
+        return false;
+
+    if (out_name)
+        *out_name = item->name;
+    return true;
+}
+
+bool browser_db_enter_main_menu_row_on_next_load(int index)
+{
+    struct menu_root *in;
+    struct menu_entry *item = main_menu_slot(index, &in);
+
+    if (!browser_db_get_main_menu_row(index, NULL))
+        return false;
+
+    if (in != parsed_root_menu())
+    {
+        /* Two hops: open the custom menu, then this row of it */
+        browser_db_enter_menu_on_next_load(in->id);
+        strmemccpy(pending_root_shortcut_label,
+                   (const char *)P2STR((unsigned char *)item->name),
+                   sizeof(pending_root_shortcut_label));
+    }
+    else if (item->type == menu_load)
+        browser_db_enter_menu_on_next_load(menus[item->link]->id);
+    else
+        browser_db_enter_by_label_on_next_load(item->name);
+    return true;
 }
 
 /* Whether any row of 'm' asks about spoken word. Used to recognise the
@@ -3925,51 +3964,24 @@ static bool menu_mentions_spoken(const struct menu_root *m)
 
 int browser_db_spoken_main_menu_slot(void)
 {
-    struct menu_root *root;
-    int pass, i, count = 0;
+    struct menu_root *in;
+    struct menu_entry *item;
 
-    root = parsed_root_menu();
-    if (!root)
-        return -1;
-
-    /* Same enumeration as browser_db_get_main_menu_row(), because the answer
-     * is an index into it. */
-    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
+    for (int i = 0; (item = main_menu_slot(i, &in)) != NULL; i++)
     {
-        for (i = 0; i < root->itemcount; i++)
-        {
-            if (!root_row_eligible(root->items[i], pass))
-                continue;
-
-            if (root->items[i]->type == menu_load
-                && menu_mentions_spoken(menus[root->items[i]->link]))
-                return count;
-
-            count++;
-        }
+        if (in == parsed_root_menu() && item->type == menu_load
+            && menu_mentions_spoken(menus[item->link]))
+            return i;
     }
-
     return -1;
 }
 
 int browser_db_get_main_menu_tag_row_count(void)
 {
-    int i, count = 0;
-    struct menu_root *root;
-    int pass;
+    int count = 0;
 
-    root = parsed_root_menu();
-    if (!root)
-        return 0;
-
-    for (pass = 0; pass < ROOT_ROW_PASSES; pass++)
-    {
-        for (i = 0; i < root->itemcount; i++)
-        {
-            if (root_row_eligible(root->items[i], pass))
-                count++;
-        }
-    }
+    while (main_menu_slot(count, NULL))
+        count++;
     return count;
 }
 
@@ -4029,21 +4041,39 @@ int browser_db_load(struct browser_context* c)
      * dropped here and load_root() draws the Music menu in its place. */
     /* The submenu form of the same thing, for a root row that opens a nested
      * menu ("Playback History ==> runtime") rather than browsing a tag. One
-     * plain hop: select the row and enter it, exactly as pressing it would. */
+     * plain hop: select the row and enter it, exactly as pressing it would.
+     * A label armed with it names a row of that submenu -- a custom menu
+     * row -- and takes a second hop into it. */
     if (pending_root_shortcut_menu[0] && table == TABLE_ROOT
         && c->dirlevel == 0)
     {
         char target[MAX_MENU_ID_SIZE];
+        char row[MENUENTRY_MAX_NAME];
         int idx, rows;
 
         strmemccpy(target, pending_root_shortcut_menu, sizeof(target));
+        strmemccpy(row, pending_root_shortcut_label, sizeof(row));
         pending_root_shortcut_menu[0] = '\0';
+        pending_root_shortcut_label[0] = '\0';
 
         rows = load_root_for_shortcut(c);
 
         idx = loaded_row_for_menu_id(c, rows, target);
-        if (idx >= 0)
+        if (idx >= 0 && !row[0])
             return enter_shortcut_row(c, idx);
+        if (idx >= 0)
+        {
+            c->selected_item = idx;
+            browser_db_enter(c, false);
+            rows = browser_db_load(c);
+
+            idx = loaded_row_for_label(c, rows, row);
+            if (idx >= 0)
+                return enter_shortcut_row(c, idx);
+            /* Row renamed or removed: the submenu, and BACK leaves */
+            enter_as_root_shortcut(c);
+            return rows;
+        }
         /* Submenu gone (a customised tagnavi_user.config) -- fall through and
          * show the root menu rather than a dead end, as the tag case does. */
     }
