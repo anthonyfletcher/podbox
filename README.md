@@ -72,6 +72,9 @@ or promoted onto the main menu.
   - Hold `Select` and select `Sleep Timer`
 - Choose what is in the Music menu and in what order
   - `Settings > Library > Music > Edit Music Menu`
+- Add your own views to the Music menu, such as one genre, a decade, or an artist's groupings
+  above their albums
+  - See [`music-menu-guide.md`](docs/podbox/music-menu-guide.md)
 
 ## Search
 

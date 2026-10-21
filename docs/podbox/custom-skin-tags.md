@@ -600,6 +600,8 @@ A number saying what choosing the row does:
 | `7` | track: something that plays | a database track, a playlist entry, an audio file, a chapter |
 | `8` | file: any other file | an image, a text file, a playlist file |
 | `9` | option: one of a setting's values | Off, One and All in Repeat's list |
+| `10` | custom: one of the player owner's own views, from `tagnavi_custom.config` | its row in Custom menu, or on the main menu |
+| `11` | custom menu: opens one of the owner's own menus | Custom menu, and a menu written inside it |
 
 The menus, the settings, the database and file browsers, the playlist viewer,
 a setting's list of values, the equalizer's band lists, chapter lists, the
@@ -614,7 +616,10 @@ Compare it with `%if` or `%sel`:
 ```
 
 In a conditional the branches start at `1`, and plain takes the last:
-`%?Lk<menu|toggle|setting|action|command|container|track|file|option|plain>`.
+`%?Lk<menu|toggle|setting|action|command|container|track|file|option|custom|custom menu|plain>`.
+
+The owner names their own rows, so a skin cannot recognise them by `%LT`;
+`10` and `11` are how to give them an icon.
 
 ### `%Lp` — the row's number among the tracks
 
