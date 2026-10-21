@@ -240,6 +240,24 @@ static inline long bisect_codelist(long lo, long hi, ogg_uint32_t cache,
   return lo;
 }
 
+STIN long decode_packed_entry_number(codebook *book, oggpack_buffer *b)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+static long decode_packed_block(codebook *book, oggpack_buffer *b,
+                                long *buf, int n) ICODE_ATTR_TREMOR_NOT_MDCT;
+long vorbis_book_decodevs_add(codebook *book,ogg_int32_t *a,
+                              oggpack_buffer *b,int n,int point)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+long vorbis_book_decodev_add(codebook *book,ogg_int32_t *a,
+                             oggpack_buffer *b,int n,int point)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+long vorbis_book_decodev_set(codebook *book,ogg_int32_t *a,
+                             oggpack_buffer *b,int n,int point)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+long vorbis_book_decodevv_add(codebook *book,ogg_int32_t **a,
+                              long offset,int ch,
+                              oggpack_buffer *b,int n,int point)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+
 STIN long decode_packed_entry_number(codebook *book, 
                                               oggpack_buffer *b){
   int  read=book->dec_maxlength;
