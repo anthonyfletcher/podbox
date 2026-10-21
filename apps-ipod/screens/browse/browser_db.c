@@ -5271,6 +5271,71 @@ bool browser_db_subentries_do_action(struct tagcache_search *tcs,
     return ret;
 }
 
+long browser_db_selected_track_idx(void)
+{
+    struct tagentry *entry;
+
+    if (!tc || tc->dirlength == 0)
+        return -1;
+    entry = browser_db_get_entry(tc, tc->selected_item);
+    return entry && entry->newtable == TABLE_PLAYTRACK ? entry->extraseek : -1;
+}
+
+int browser_db_get_rating(long idx_id)
+{
+    struct tagcache_search tcs;
+    long rating;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return 0;
+    tcs.idx_id = idx_id;
+    rating = tagcache_get_numeric(&tcs, tag_rating);
+    tagcache_search_finish(&tcs);
+    return rating > 0 ? rating : 0;
+}
+
+/* The playing track's id3 is the live entry, so the WPS shows the new rating
+ * at once rather than at the next track. */
+void browser_db_set_rating(long idx_id, int rating)
+{
+    struct mp3entry *id3 = audio_current_track();
+
+    tagcache_update_numeric(idx_id, tag_rating, rating);
+    if (browser_db_track_idx(id3) == idx_id)
+        id3->rating = rating;
+}
+
+int browser_db_subentries_set_rating(int rating)
+{
+    int i, n, written = 0;
+    int dirlevel = tc->dirlevel;
+    int selected_item = tc->selected_item;
+    int newtable = browser_db_get_entry(tc, tc->selected_item)->newtable;
+
+    cpu_boost(true);
+    if (!goto_allsubentries(newtable))
+        written = -1;
+    else
+    {
+        n = tc->filesindir;
+        for (i = 0; i < n; i++)
+        {
+            struct tagentry *entry = browser_db_get_entry(tc, i);
+
+            if (!entry)
+                break;
+            if (entry->newtable == TABLE_PLAYTRACK)
+            {
+                browser_db_set_rating(entry->extraseek, rating);
+                written++;
+            }
+        }
+    }
+    reset_tc_to_prev(dirlevel, selected_item);
+    cpu_boost(false);
+    return written;
+}
+
 /* Try to return first subentry's filename for current selection
  */
 bool browser_db_get_subentry_filename(char *buf, size_t bufsize)

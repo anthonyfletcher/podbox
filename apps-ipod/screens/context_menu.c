@@ -55,6 +55,8 @@
 #include "screens/browse/browser.h"
 #include "powermgmt.h"
 #include "settings/settings.h"
+#include "settings/settings_list.h"
+#include "widgets/option_select.h"
 #include "playlist/viewer.h"
 #include "speech/talk.h"
 #include "context_menu.h"
@@ -1195,6 +1197,102 @@ static int ratingitem_callback(int action,
 MENUITEM_FUNCTION(rating_item, 0, ID2P(LANG_MENU_SET_RATING),
                   set_rating_inline,
                   ratingitem_callback, Icon_Questionmark);
+
+static bool rating_accepted;
+
+static void rating_accept(int value)
+{
+    (void)value;
+    rating_accepted = true;
+}
+
+/* The 0-10 picker, true only when a value was accepted. An album's rating
+ * overwrites every track, so Cancel has to be told apart from accepting the
+ * value the picker opened on -- which set_int_ex() reports identically. The
+ * callback runs on OK alone under F_CB_ON_SELECT_ONLY. */
+static bool pick_rating(const unsigned char *title, int *rating)
+{
+    const struct int_setting data = {
+        .option_callback = rating_accept,
+        .unit = UNIT_INT,
+        .step = 1,
+        .min = 0,
+        .max = 10,
+    };
+    const struct settings_list item = {
+        .flags = F_INT_SETTING|F_T_INT|F_CB_ON_SELECT_ONLY,
+        .setting = rating,
+        .lang_id = -1,
+        .int_setting = &data,
+    };
+
+    rating_accepted = false;
+    option_screen(&item, NULL, false, title);
+    return rating_accepted;
+}
+
+/* Rating from the database browser. An entry number is only good for the
+ * generation it was read in: a Rebuild finishing while the picker is up
+ * renumbers the tracks, and the rating would land on someone else's. */
+static int set_db_rating(bool album)
+{
+    long idx = album ? -1 : browser_db_selected_track_idx();
+    int rating = album ? 0 : browser_db_get_rating(idx);
+    uint32_t generation = tagcache_generation();
+
+    if (!pick_rating(album ? ID2P(LANG_MENU_SET_ALBUM_RATING)
+                           : ID2P(LANG_MENU_SET_RATING), &rating))
+        return 0;
+
+    if (!tagcache_is_usable() || tagcache_generation() != generation)
+        splash(HZ*2, ID2P(LANG_TAGCACHE_BUSY));
+    else if (!album)
+        browser_db_set_rating(idx, rating);
+    else if (browser_db_subentries_set_rating(rating) < 0)
+        splash(HZ*2, ID2P(LANG_FAILED));
+
+    /* A User Rating list shows the number it was sorted by. */
+    context_menu_result = ONPLAY_RELOAD_DIR;
+    return 0;
+}
+
+static int set_db_track_rating(void)
+{
+    return set_db_rating(false);
+}
+
+static int set_db_album_rating(void)
+{
+    return set_db_rating(true);
+}
+
+/* Album rows only, as for Album Sound: from an artist or genre row the tracks
+ * reached are that row's first album's -- see sound_album_selectable(). */
+static int db_rating_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list);
+MENUITEM_FUNCTION(db_track_rating_item, 0, ID2P(LANG_MENU_SET_RATING),
+                  set_db_track_rating, db_rating_callback, Icon_Questionmark);
+MENUITEM_FUNCTION(db_album_rating_item, 0, ID2P(LANG_MENU_SET_ALBUM_RATING),
+                  set_db_album_rating, db_rating_callback, Icon_Questionmark);
+
+static int db_rating_callback(int action,
+                              const struct menu_item_ex *this_item,
+                              struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        if (selected_file.context != CONTEXT_ID3DB || !tagcache_is_usable())
+            return ACTION_EXIT_MENUITEM;
+        if (this_item == &db_track_rating_item)
+            return browser_db_selected_track_idx() >= 0
+                   ? action : ACTION_EXIT_MENUITEM;
+        return browser_db_current_scope() == BROWSER_DB_SCOPE_ALBUM
+               ? action : ACTION_EXIT_MENUITEM;
+    }
+    return action;
+}
 static bool view_cue(void)
 {
     struct mp3entry* id3 = audio_current_track();
@@ -1770,6 +1868,7 @@ MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
            context_menu_callback, Icon_file_view_menu,
            &view_playlist_item, &browser_playlist_menu, &cat_playlist_menu,
            &sound_mix_item, &winddown_item, &sound_album_item,
+           &db_track_rating_item, &db_album_rating_item,
            &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
            &clipboard_paste_item, &delete_file_item, &delete_dir_item,
            &create_dir_item, &properties_item, &track_info_item,

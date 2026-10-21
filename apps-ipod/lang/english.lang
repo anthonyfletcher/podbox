@@ -24834,3 +24834,17 @@
     *: "by"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_MENU_SET_ALBUM_RATING
+  desc: on an album's context menu in the database, the row rating every track of the album
+  user: core
+  <source>
+    *: "Set Album Rating"
+  </source>
+  <dest>
+    *: "Set Album Rating"
+  </dest>
+  <voice>
+    *: "Set Album Rating"
+  </voice>
+</phrase>

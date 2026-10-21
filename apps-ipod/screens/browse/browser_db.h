@@ -232,4 +232,12 @@ bool browser_db_subentries_do_action(struct tagcache_search *tcs,
                                      bool (*action_cb)(const char *file_name),
                                      char *buf, size_t buf_sz);
 
+/* Ratings, 0 to 10. The selected row's database entry, or -1 when it is not
+ * a track; and the selected row's tracks all rated at once, returning how many
+ * were or -1 when they could not be reached. */
+long browser_db_selected_track_idx(void);
+int browser_db_get_rating(long idx_id);
+void browser_db_set_rating(long idx_id, int rating);
+int browser_db_subentries_set_rating(int rating);
+
 #endif
