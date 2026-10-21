@@ -337,6 +337,31 @@ enum Notify {
     Notify_Tick,
 };
 
+static long          counts_tick;
+static unsigned long counts_elapsed;
+
+/* Every 5 s, what the stream took against how far the track moved, as iAP2
+ * logs it. Only a running stream counts packets, so a period with none
+ * logs nothing. */
+static void log_audio_counts(void) {
+    struct iap_audio_counts c;
+    uint32_t                ran_empty, failed;
+    if(!TIME_AFTER(current_tick, counts_tick + 5 * HZ)) {
+        return;
+    }
+    const struct mp3entry* id3     = audio_current_track();
+    const unsigned long    elapsed = id3 ? id3->elapsed : 0;
+    iap_audio_take_counts(&c);
+    usb_drv_batch_take_counts(&ran_empty, &failed);
+    if(c.bytes || c.silent) {
+        usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_TAKEN, MIN((current_tick - counts_tick) * 1000 / HZ, 0xffff), c.bytes, c.chunks);
+        usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_GAPS, MIN(c.odd, 0xffff), c.silent, elapsed - counts_elapsed);
+        usb_log(USB_LOG_IAP2_EVENT, USB_LOG_IAP2_AUDIO_USB, 0, ran_empty, failed);
+    }
+    counts_tick    = current_tick;
+    counts_elapsed = elapsed;
+}
+
 static int tick_callback(struct timeout* tmo) {
     (void)tmo;
     usb_signal_class_notify(USB_DRIVER_IAP, Notify_Tick);
@@ -733,6 +758,7 @@ static void usb_iap_notify_event(intptr_t data) {
             /* the connection is iAP2's, and libiap stays quiet */
             return;
         }
+        log_audio_counts();
         struct IAPContext* ctx = _iap_acquire_ctx(true);
         iap_remote_buttons_tick(ctx);
         iap_platform_seek_tick(ctx);
