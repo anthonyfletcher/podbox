@@ -497,6 +497,63 @@ long vorbis_book_decodev_set(codebook *book,ogg_int32_t *a,
   return(0);
 }
 
+#ifdef CPU_ARM_CLASSIC
+/* codebook_arm.S: this function for books of dimension 2 and 4, with the
+   fast loop adding each vector as its codeword is read.  It reads these
+   structures by offset. */
+struct vv2_arm {
+  ogg_int32_t *p0;
+  ogg_int32_t *p1;
+  int          shift;
+};
+_Static_assert(offsetof(codebook, used_entries) == 8 &&
+               offsetof(codebook, valuelist) == 16 &&
+               offsetof(codebook, codelist) == 20 &&
+               offsetof(codebook, dec_codelengths) == 28 &&
+               offsetof(codebook, dec_firsttable) == 32 &&
+               offsetof(codebook, dec_firsttablen) == 36 &&
+               offsetof(codebook, dec_maxlength) == 40 &&
+               offsetof(oggpack_buffer, endbyte) == 0 &&
+               offsetof(oggpack_buffer, endbit) == 4 &&
+               offsetof(oggpack_buffer, ptr) == 12 &&
+               offsetof(oggpack_buffer, storage) == 16 &&
+               offsetof(struct vv2_arm, shift) == 8,
+               "codebook_arm.S offsets");
+
+long vorbis_vv2_d2_lsl_arm(codebook *book, oggpack_buffer *b,
+                           struct vv2_arm *s, unsigned int n);
+long vorbis_vv2_d2_asr_arm(codebook *book, oggpack_buffer *b,
+                           struct vv2_arm *s, unsigned int n);
+long vorbis_vv2_d4_lsl_arm(codebook *book, oggpack_buffer *b,
+                           struct vv2_arm *s, unsigned int n);
+long vorbis_vv2_d4_asr_arm(codebook *book, oggpack_buffer *b,
+                           struct vv2_arm *s, unsigned int n);
+
+/* One codeword where decode_packed_block() takes it one at a time, in the
+   last bytes of the packet. */
+long vorbis_vv2_slow(codebook *book, oggpack_buffer *b, struct vv2_arm *s)
+    ICODE_ATTR_TREMOR_NOT_MDCT;
+long vorbis_vv2_slow(codebook *book, oggpack_buffer *b, struct vv2_arm *s){
+  const ogg_int32_t *t, *u;
+  long r = decode_packed_entry_number(book, b);
+  if (r == -1) return -1;
+  t = book->valuelist+r*book->dim;
+  u = t+book->dim;
+  if (s->shift>=0) {
+    do{
+      *s->p0++ += *t++>>s->shift;
+      *s->p1++ += *t++>>s->shift;
+    }while(t<u);
+  } else {
+    do{
+      *s->p0++ += *t++<<-s->shift;
+      *s->p1++ += *t++<<-s->shift;
+    }while(t<u);
+  }
+  return 0;
+}
+#endif /* CPU_ARM_CLASSIC */
+
 /* decode vector / dim granularity gaurding is done in the upper layer */
 static long vorbis_book_decodevv_add_2ch_even(codebook *book,ogg_int32_t **a,
                                               long offset,oggpack_buffer *b,
@@ -508,6 +565,17 @@ static long vorbis_book_decodevv_add_2ch_even(codebook *book,ogg_int32_t **a,
   ogg_int32_t *p1 = &(a[1][offset]);
   const unsigned long dim = book->dim;
   const ogg_int32_t * const vlist = book->valuelist;
+
+#ifdef CPU_ARM_CLASSIC
+  if (dim == 2 || dim == 4) {
+    struct vv2_arm s = { p0, p1, shift };
+    if (dim == 2)
+      return shift>=0 ? vorbis_vv2_d2_asr_arm(book,b,&s,n)
+                      : vorbis_vv2_d2_lsl_arm(book,b,&s,n);
+    return shift>=0 ? vorbis_vv2_d4_asr_arm(book,b,&s,n)
+                    : vorbis_vv2_d4_lsl_arm(book,b,&s,n);
+  }
+#endif
 
   if(shift>=0){
     while(n>0){

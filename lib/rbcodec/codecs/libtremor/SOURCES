@@ -1,6 +1,9 @@
 bitwise.c
 block.c
 codebook.c
+#if defined(CPU_ARM_CLASSIC)
+codebook_arm.S
+#endif
 floor0.c
 floor1.c
 framing.c
