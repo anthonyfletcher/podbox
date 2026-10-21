@@ -151,6 +151,8 @@ enum list_row_kind
     LIST_ROW_TRACK,             /* something that plays */
     LIST_ROW_FILE,              /* any other file */
     LIST_ROW_OPTION,            /* one of a setting's values, in its picker */
+    LIST_ROW_CUSTOM,            /* a view from tagnavi_custom.config */
+    LIST_ROW_CUSTOM_MENU,       /* opens a menu from tagnavi_custom.config */
 };
 typedef enum list_row_kind list_get_kind(int selected_item, void * data);
 /* Range callback, read by %Lr: where a number setting's value sits in its

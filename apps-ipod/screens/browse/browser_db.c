@@ -319,6 +319,7 @@ struct menu_root {
     char id[MAX_MENU_ID_SIZE];
     int itemcount;
     struct menu_entry *items[TAGMENU_MAX_ITEMS];
+    bool custom;            /* started in an %include: the user's own */
 };
 
 /* Statusbar text of the current view. */
@@ -330,6 +331,7 @@ static struct search_instruction *csi;
 static const char *strp;
 static int menu_count;
 static int rootmenu;
+static int include_depth;   /* %include files being read, nested */
 
 static int current_offset;
 static int current_entry_count;
@@ -1509,10 +1511,12 @@ static int parse_line(int n, char *buf, void *parameters)
                     return 0;
                 }
 
+                include_depth++;
                 if (!parse_menu(data))
                 {
                     logf("Load menu fail: %s", data);
                 }
+                include_depth--;
                 break;
             case menu_byfirstletter: /* Fallthrough */
             case var_menu_start:
@@ -1549,6 +1553,7 @@ static int parse_line(int n, char *buf, void *parameters)
                     ++menu_count;
                     strmemccpy(menu->id, data, MAX_MENU_ID_SIZE);
                 }
+                menu->custom = include_depth > 0;
 
                 if (get_token_str(menu->_title, sizeof(menu->_title)) < 0)
                 {
@@ -3916,6 +3921,20 @@ bool browser_db_get_main_menu_row(int index, const unsigned char **out_name)
     return true;
 }
 
+enum list_row_kind browser_db_get_main_menu_row_kind(int index)
+{
+    struct menu_root *in;
+    struct menu_entry *item = main_menu_slot(index, &in);
+
+    if (!item)
+        return LIST_ROW_ACTION;
+    if (item->type == menu_load && menus[item->link]->custom)
+        return LIST_ROW_CUSTOM_MENU;
+    if (item->type == menu_next && in->custom)
+        return LIST_ROW_CUSTOM;
+    return LIST_ROW_ACTION;
+}
+
 bool browser_db_enter_main_menu_row_on_next_load(int index)
 {
     struct menu_root *in;
@@ -5885,6 +5904,11 @@ static struct tagentry *loaded_entry(struct browser_context *c, int id)
     return &get_entries(c)[realid];
 }
 
+static bool menu_is_custom(int n)
+{
+    return n >= 0 && n < menu_count && menus[n] && menus[n]->custom;
+}
+
 enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id)
 {
     struct tagentry *entry;
@@ -5896,8 +5920,9 @@ enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id)
         return browser_db_get_attr(c) == FILE_ATTR_AUDIO ? LIST_ROW_TRACK
                                                          : LIST_ROW_CONTAINER;
 
-    /* A menu row opens a list of its own; the rest play, jump or search. A
-     * row not loaded is taken for a menu, which most of them are. */
+    /* A menu row opens a list of its own; the rest play, jump or search. One
+     * from the user's own file says so instead, since a theme cannot know
+     * its name. A row not loaded is taken for a menu, which most are. */
     entry = loaded_entry(c, id);
     if (!entry)
         return LIST_ROW_MENU;
@@ -5906,7 +5931,13 @@ enum list_row_kind browser_db_get_entry_kind(struct browser_context *c, int id)
     switch (entry->newtable)
     {
         case TABLE_ROOT:
+            return menu_is_custom(entry->extraseek) ? LIST_ROW_CUSTOM_MENU
+                                                    : LIST_ROW_MENU;
         case TABLE_NAVIBROWSE:
+            if (entry->customaction == ONPLAY_NO_CUSTOMACTION
+                && menu_is_custom(c->currextra))
+                return LIST_ROW_CUSTOM;
+            return LIST_ROW_MENU;
         case TABLE_ALBUM_CHARTS:
         case TABLE_FEATURED_ARTISTS:
             return LIST_ROW_MENU;

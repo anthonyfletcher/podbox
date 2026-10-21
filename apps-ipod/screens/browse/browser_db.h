@@ -218,6 +218,9 @@ int browser_db_spoken_main_menu_slot(void);
  * False if index is out of range, or names a submenu with nothing in it:
  * that slot is numbered but hidden. */
 bool browser_db_get_main_menu_row(int index, const unsigned char **out_name);
+/* Its %Lk: LIST_ROW_CUSTOM or LIST_ROW_CUSTOM_MENU for the user's own, as in
+ * the Music menu, and LIST_ROW_ACTION for the rest. */
+enum list_row_kind browser_db_get_main_menu_row_kind(int index);
 /* Arm the jump into the Nth such row, for the next fresh root load: by its
  * label, or a submenu's id, since a first tag does not identify a row -- the
  * shipped menu's "Album" and "Recently Added" both start on tag_album. False

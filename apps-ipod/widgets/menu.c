@@ -226,7 +226,7 @@ static enum list_row_kind menu_get_kind(int selected_item, void * data)
             return setting && (setting->flags&F_T_MASK) == F_T_BOOL
                    ? LIST_ROW_TOGGLE : LIST_ROW_SETTING;
         default:
-            return LIST_ROW_ACTION;
+            return root_menu_item_kind(menu_row_item(selected_item, menu));
     }
 }
 

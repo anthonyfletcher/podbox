@@ -1183,6 +1183,13 @@ static int tagnavi_slot_of_item(const struct menu_item_ex *item)
     return -1;
 }
 
+enum list_row_kind root_menu_item_kind(const struct menu_item_ex *item)
+{
+    int slot = tagnavi_slot_of_item(item);
+
+    return slot < 0 ? LIST_ROW_ACTION : browser_db_get_main_menu_row_kind(slot);
+}
+
 /* settings_load() reads the saved order before browser_db_init() has parsed
  * tagnavi.config, so root_menu_load_from_cfg() cannot tell which tagnavi
  * slots are backed by a row and keeps every one the order names, in place.

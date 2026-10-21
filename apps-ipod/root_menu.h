@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "gcc_extensions.h"
+#include "widgets/list.h"               /* enum list_row_kind */
 
 void root_menu(void) NORETURN_ATTR;
 struct menu_table {
@@ -24,6 +25,9 @@ struct menu_table *root_menu_get_options(int *nb_options);
  * root_menu_set_audiobooks_row() for why the setting rather than Customize
  * Main Menu decides whether it is there. */
 void root_menu_set_audiobooks_row(bool on);
+/* %Lk of a row that does not open a menu: a Music row on the main menu says
+ * whether it is one of the user's own, and the rest are actions. */
+enum list_row_kind root_menu_item_kind(const struct menu_item_ex *item);
 
 /* Number of reserved root-menu shortcut slots for tagnavi.config's root
  * ("main") menu's rows, then the custom menu's in whatever is left -- see the
