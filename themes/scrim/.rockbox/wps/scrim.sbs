@@ -87,6 +87,10 @@
 %Vl(Rows,0,0,1,1,-)
 %?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
+# - Ratings. Set Song Rating's and Set Album Rating's values, 0 to 10, show
+#   the number with five stars at the right. 2 for a rating, 1 for text.
+%?and(%if(%cs,=,12),%or(%if(%Lt,=,%Sx(Set Song Rating)),%if(%Lt,=,%Sx(Set Album Rating))))<%vs(stars,set,2)|%vs(stars,set,1)>
+#
 # - Chevron, on rows that open a list: a settings submenu, a folder, a
 #   database level above the tracks, a playlist in the catalogue. A Yes/No
 #   setting shows a switch in its place and a number setting a slider; the
@@ -125,9 +129,17 @@
 %Vl(Rows,46,5,219,20,-)
 %?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
 %Vl(Rows,12,5,284,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1),%if(%vg(stars),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
 %Vl(Rows,12,5,253,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),!=,1),%if(%vg(stars),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+#
+# - A rating: the number, and at the right edge a full star for each 2, a
+#   half star for an odd 1, and empty stars to make five. The number has its
+#   own short viewport so that clearing it leaves the stars alone.
+%Vl(Rows,12,5,160,20,-)
+%?La<|%?if(%vg(stars),=,2)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%LT>>
+%Vl(Rows,176,3,120,24,2)
+%?La<|%?if(%vg(stars),=,2)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,0,°°°°°,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)>>
 #
 # - Chevron, switch, slider or value icon. The slider's ten frames are
 #   empty only at the least of a range and full only at the greatest, with the
