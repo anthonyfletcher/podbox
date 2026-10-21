@@ -1123,6 +1123,8 @@ static int parse_textbox(struct skin_element *element,
     tb->halign = 'l';
     /* Only the WPS has a clock fast enough to move it. */
     tb->scroll = curr_skin == WPS && element->line == curr_scroll_line;
+    if (tb->scroll)
+        curr_vp->has_scroll_textbox = true;
     tb->offset = 0;
     tb->due = 0;
     tb->hash = 0;
@@ -2386,6 +2388,7 @@ static int convert_viewport(struct wps_data *data, struct skin_element* element)
     skin_vp->label = PTRTOSKINOFFSET(skin_buffer, NULL);
     skin_vp->is_infovp = false;
     skin_vp->has_busy_tag = false;
+    skin_vp->has_scroll_textbox = false;
     skin_vp->parsed_fontid = 1;
     element->data = PTRTOSKINOFFSET(skin_buffer, skin_vp);
     curr_vp = skin_vp;
@@ -2538,7 +2541,10 @@ static int skin_element_callback(struct skin_element* element, void* data)
                     curr_scroll_line = element->line;
                     if (curr_skin == WPS && curr_textbox
                         && curr_textbox_line == element->line)
+                    {
                         curr_textbox->scroll = true;
+                        curr_vp->has_scroll_textbox = true;
+                    }
                     break;
                 case SKIN_TOKEN_LOGICAL_IF:
                     function = parse_logical_if;

@@ -206,6 +206,7 @@ struct skin_viewport {
     bool output_to_backdrop_buffer;
     bool fgbg_changed;
     bool has_busy_tag;   /* holds %lh, %lb or %lw; skin_request_busy_redraw() */
+    bool has_scroll_textbox; /* holds a scrolling %wt */
     struct gradient_config start_gradient;
     unsigned int dc_orig_fg; /* original parsed fg for dynamic colors */
     unsigned int dc_orig_bg; /* original parsed bg for dynamic colors */

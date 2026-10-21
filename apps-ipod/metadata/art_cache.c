@@ -1752,13 +1752,25 @@ out:
 
 static struct timeout aa_offer_tmo;
 
+/* Whether the disk is asleep. Hosted storage reports itself never active, and
+ * has no spin-up to save, so it is never asleep: waiting on it would hold the
+ * offer forever. */
+static bool aa_disk_asleep(void)
+{
+#ifdef HAVE_HOSTFS
+    return false;
+#else
+    return !storage_disk_is_active();
+#endif
+}
+
 /* Tick: an offer held for a sleeping disk goes on the queue once something
  * else has spun it up. Making the thumbnails reads the art out of the track,
  * so handling it sooner would wake the disk for nothing but this. */
 static int aa_offer_poll(struct timeout *tmo)
 {
     (void)tmo;
-    if (!storage_disk_is_active())
+    if (aa_disk_asleep())
         return HZ;
     if (!aa_offer_posted)
     {
@@ -1786,7 +1798,7 @@ static void aa_handle_offer(void)
     aa_offer_posted = false;
     if (aa_offer.path[0] == '\0' || !tagcache_is_usable())
         return;
-    if (!storage_disk_is_active())
+    if (aa_disk_asleep())
     {
         timeout_register(&aa_offer_tmo, aa_offer_poll, HZ, 0);
         return;

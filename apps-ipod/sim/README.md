@@ -30,6 +30,7 @@ a symbol that was merely missing:
 | `screens/browse/browser.h` | `getcwd()` takes an `int` on Windows and mingw's own declaration must not be contradicted. Upstream's `#ifdef WIN32` restored — only the Windows build cares |
 | `audio/codecs.c` | the codec header check compares `hdr->load_addr` against `codecbuf`, which only means anything when the codec was loaded *into* `codecbuf`. Upstream's `PLATFORM_NATIVE` guard restored — see below |
 | `settings/settings_list.c` | `DEFAULT_BACKLIGHT_TIMEOUT` is 0 in a sim, as upstream has it. There is no battery to save, and a blanked window looks exactly like a crash |
+| `metadata/art_cache.c` | `storage_disk_is_active()` is a firmware macro, `0` under `HAVE_HOSTFS`, so no shim can answer it, and 0 there means "asleep": a track-change offer held until the disk spins up would never be made. `aa_disk_asleep()` takes hosted storage as never asleep |
 
 Two of those were found by running it, and both are worth knowing about because
 the symptom points nowhere near the cause:

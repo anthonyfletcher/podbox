@@ -1527,6 +1527,16 @@ void skin_render(struct gui_wps *gwps, unsigned refresh_mode)
         skin_viewport = SKINOFFSETTOPTR(skin_buffer, viewport->data);
         if (!skin_viewport) continue;
 
+        /* A SCROLL-only pass is a scrolling %wt's next step. Nothing else
+         * moves on it -- the scroll engine moves %s lines itself -- so the
+         * rest of the skin is not evaluated at the scroll speed. */
+        if (old_refresh_mode == SKIN_REFRESH_SCROLL
+            && !skin_viewport->has_scroll_textbox)
+        {
+            refresh_mode = old_refresh_mode;
+            continue;
+        }
+
         /* The two once-per-art-change jobs, run once per render pass. The
          * filter goes second and must stay there: it rewrites the art in
          * place, and the palette has to come from the unfiltered image.

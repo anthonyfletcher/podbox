@@ -170,22 +170,6 @@ bool browser_db_current_filters(struct browser_db_filters *out);
 bool browser_db_add_filters(struct tagcache_search *tcs,
                             struct browser_db_filters *f);
 
-/* Arms a one-shot jump: the next time browser_db_load() sees a fresh root load
- * (dirlevel 0, TABLE_ROOT), it enters the root menu's row whose first tag
- * matches 'tag' (e.g. tag_album), looked up by tag identity rather than
- * position so it's robust to tagnavi.config reordering. Used by
- * root_menu.c's tagnavi-derived main-menu shortcuts. */
-void browser_db_enter_by_tag_on_next_load(int tag);
-/* The same for a caller that means one specific row rather than one kind of
- * browse. A first tag does not identify a row -- the shipped menu's "Album"
- * and "Recently Added" both start on tag_album -- so anything picking a row
- * off a list arms with this. The label lives in RAM only, so nothing about how
- * the choice is stored changes. */
-void browser_db_enter_by_label_on_next_load(const unsigned char *label);
-/* The same for a root row that opens a nested menu rather than browsing a tag
- * -- "Playback History ==> runtime" and its like. Armed by the submenu's
- * config id, again identity rather than position. */
-void browser_db_enter_menu_on_next_load(const char *menu_id);
 /* Arms a direct jump: root -> straight into that specific album's own track
  * list, identified by its tagcache seek (not name/position), skipping the
  * intermediate "Album" grouping listing entirely. Used by

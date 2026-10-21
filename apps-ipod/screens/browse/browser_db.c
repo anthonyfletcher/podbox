@@ -3465,7 +3465,9 @@ static char pending_root_shortcut_menu[MAX_MENU_ID_SIZE];
  * than only what that row browses. Empty when none is armed. */
 static char pending_root_shortcut_label[MENUENTRY_MAX_NAME];
 
-void browser_db_enter_by_tag_on_next_load(int tag)
+/* Arm by the first tag the root row browses (e.g. tag_album): identity rather
+ * than position, so it survives tagnavi.config reordering. */
+static void browser_db_enter_by_tag_on_next_load(int tag)
 {
     pending_root_shortcut_tag = tag;
     pending_root_shortcut_menu[0] = '\0';
@@ -3483,7 +3485,7 @@ void browser_db_enter_by_tag_on_next_load(int tag)
  * moment the browser opens it, so nothing about how the choice is *stored*
  * changes -- which matters, because a settings line is capped at
  * SETTINGS_MAX_LINE and labels are far longer than the keys it holds today. */
-void browser_db_enter_by_label_on_next_load(const unsigned char *label)
+static void browser_db_enter_by_label_on_next_load(const unsigned char *label)
 {
     pending_root_shortcut_tag = -1;
     pending_root_shortcut_menu[0] = '\0';
@@ -3495,7 +3497,7 @@ void browser_db_enter_by_label_on_next_load(const unsigned char *label)
 /* The submenu counterpart, armed by id ("runtime" and so on) rather than by
  * position for the same reason the tag version uses tag identity: a row that
  * moves in tagnavi.config must still be found. */
-void browser_db_enter_menu_on_next_load(const char *menu_id)
+static void browser_db_enter_menu_on_next_load(const char *menu_id)
 {
     pending_root_shortcut_tag = -1;
     pending_root_shortcut_label[0] = '\0';
@@ -4365,6 +4367,9 @@ static bool single_track_path(struct browser_context* c, int seek,
         /* The row just chosen has no result_seek yet -- it is only recorded
          * once the descent actually happens. */
         int s = (i == c->currextra) ? seek : csi->result_seek[i];
+
+        if (s == SEEK_NO_FILTER)    /* a header level passed over */
+            continue;
 
         if (TAGCACHE_IS_NUMERIC(csi->tagorder[i]))
         {
