@@ -2,13 +2,23 @@
 
 ## Where it comes from
 
-**Rockbox → PodBox**, with hardware and UI work borrowed from RockPod.
+**PodBox began as a fork of RockPod and is now built directly on Rockbox.**
 
+- **[RockPod](https://github.com/nuxcodes/rockpod)**, by Nux Li, is an
+  iPod-focused fork of Rockbox, and PodBox started life as a fork of it. Much
+  of PodBox still comes from there: the application layer began as RockPod's;
+  the serial iAP work behind docks and remotes — identification, notifications,
+  track information, authentication timing, album art to accessories — is the
+  base PodBox's accessory support is built on; and so are its iPod hardware
+  fixes (SSD-aware power management, S5L8702 boot and clock fixes, codec and
+  charging fixes) and the album-art "dynamic colours". Where each iAP piece
+  came from is in [`iap-sources.md`](iap-sources.md).
 - **[Rockbox](https://www.rockbox.org)** is the long-running open-source firmware
-  project covering 80+ players. This fork tracks it directly and merges from it.
-- **[RockPod](https://github.com/nuxcodes/rockpod)** is a separate fork of Rockbox and PodBox carries some of its work:
-  iPod hardware support (SSD-aware power management, S5L8702 boot and clock
-  fixes, codec and charging fixes) and builds on the album-art "dynamic colours".
+  project covering 80+ players. RockPod follows its own course rather than
+  merging Rockbox regularly, and PodBox wanted Rockbox's newer work as it lands
+  — USB accessory support on both players among it — so in July 2026 PodBox
+  moved its base to Rockbox itself. It now tracks Rockbox directly and merges
+  from it, and still picks up RockPod's fixes where they apply.
 
 ## What is different from Rockbox
 
