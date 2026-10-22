@@ -691,6 +691,8 @@ static int playlist_view(void * param)
         case PLAYLIST_VIEWER_MAINMENU:
         case PLAYLIST_VIEWER_USB:
             return GO_TO_ROOT;
+        case PLAYLIST_VIEWER_GO_TO_LIBRARY:
+            return GO_TO_ALBUM_COVERS_TRACKS;
         case PLAYLIST_VIEWER_OK:
             return GO_TO_PREVIOUS;
     }
@@ -1298,6 +1300,16 @@ struct menu_table *root_menu_get_options(int *nb_options)
     return shown;
 }
 
+/* The items that are turned off, and where: after this many of the items
+ * that are on. The root menu shows none of them; they are kept so that
+ * Edit Main Menu can show each where it was, and written back into
+ * "root menu order" with a '!' before the key. */
+static struct {
+    int8_t idx;                 /* into menu_table[] */
+    uint8_t after;
+} root_menu_off[MAX_MENU_ITEMS];
+static unsigned root_menu_off_count;
+
 /* The menu_table[] index a config token names, or -1. Tagnavi slots match
  * whether or not tagnavi.config has been parsed yet: see
  * root_menu_fixup_tagnavi_slots(). Anything else unmatched is a key from an
@@ -1326,6 +1338,7 @@ void root_menu_load_from_cfg(void* setting, char *value)
         root_menu_set_default(setting, NULL);
         return;
     }
+    root_menu_off_count = 0;
     root_menu_.flags = MENU_HAS_DESC | MT_MENU;
     root_menu_.submenus = (const struct menu_item_ex **)&root_menu__;
     root_menu_.callback_and_desc = &root_menu_desc;
@@ -1342,6 +1355,18 @@ void root_menu_load_from_cfg(void* setting, char *value)
         start = skip_whitespace(start);
         if ((end = strchr(start, ' ')))
             *end = '\0';
+        if (*start == '!')
+        {
+            int off = menu_table_index_of_key(start + 1);
+
+            if (off >= 0 && root_menu_off_count < MAX_MENU_ITEMS)
+            {
+                root_menu_off[root_menu_off_count].idx = off;
+                root_menu_off[root_menu_off_count].after = menu_item_count;
+                root_menu_off_count++;
+            }
+            continue;
+        }
         int idx = *start ? menu_table_index_of_key(start) : -1;
         unsigned k;
 
@@ -1377,12 +1402,37 @@ void root_menu_load_from_cfg(void* setting, char *value)
     *(bool*)setting = true;
 }
 
+/* One key of "root menu order", '!' before it for an item turned off */
+static int write_key(char *buf, int buf_len, bool off, int idx)
+{
+    int written = snprintf(buf, buf_len, "%s%s, ", off ? "!" : "",
+                           menu_table[idx].string);
+
+    return written >= buf_len ? buf_len - 1 : written;
+}
+
 char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
 {
     (void)setting;
     unsigned i, written, j;
-    for (i = 0; i < MENU_GET_COUNT(root_menu_.flags); i++)
+    unsigned count = MENU_GET_COUNT(root_menu_.flags);
+
+    for (i = 0; i <= count; i++)
     {
+        /* The items turned off that stood before this one, or at the end */
+        for (unsigned k = 0; k < root_menu_off_count && buf_len > 0; k++)
+        {
+            if (root_menu_off[k].after == i
+                || (i == count && root_menu_off[k].after > count))
+            {
+                written = write_key(buf, buf_len, true, root_menu_off[k].idx);
+                buf_len -= written;
+                buf += written;
+            }
+        }
+        if (i == count)
+            break;
+
         /* Stop rather than let buf_len go negative: snprintf()'s return
          * value is how much it *would* have written, uncapped by the
          * buffer size, so on truncation this can exceed buf_len. Letting
@@ -1398,9 +1448,7 @@ char* root_menu_write_to_cfg(void* setting, char*buf, int buf_len)
         {
             if (menu_table[j].item == root_menu__[i])
             {
-                written = snprintf(buf, buf_len, "%s, ", menu_table[j].string);
-                if ((int)written >= buf_len)
-                    written = buf_len - 1;
+                written = write_key(buf, buf_len, false, j);
                 buf_len -= written;
                 buf += written;
                 break;
@@ -1421,6 +1469,7 @@ void root_menu_set_default(void* setting, void* defaultval)
     root_menu_.flags = MENU_HAS_DESC | MT_MENU;
     root_menu_.submenus = (const struct menu_item_ex **)&root_menu__;
     root_menu_.callback_and_desc = &root_menu_desc;
+    root_menu_off_count = 0;
 
     for (i=0; i<(unsigned)active_count; i++)
     {
@@ -1591,24 +1640,90 @@ static inline int load_screen(int screen)
     return ret_val;
 }
 
-static int load_context_screen(int selection)
+/* The main menu row a long press is on, and the settings it opens on, for
+ * the menu below */
+static const struct menu_item_ex *ctx_row;
+static const struct menu_item_ex *ctx_settings;
+
+enum { ROW_MOVE, ROW_HIDE, ROW_SETTINGS, ROW_COUNT };
+
+/* Titled with the row's own name */
+static char *row_menu_name(int selected_item, void *data,
+                           char *buffer, size_t buffer_len)
 {
-    const struct menu_item_ex *context_menu = NULL;
-    int retval = GO_TO_PREVIOUS;
-    push_current_activity(ACTIVITY_CONTEXTMENU);
-    if ((root_menu__[selection]->flags&MENU_TYPE_MASK) == MT_RETURN_VALUE)
+    (void)data;
+    switch (selected_item)
     {
-        int item = root_menu__[selection]->value;
-        context_menu = items[item].context_menu;
-    }
-    /* special cases */
-    else if (root_menu__[selection] == &info_menu)
-    {
-        context_menu = &system_menu;
+        case ROW_MOVE:
+            return (char *)str(LANG_MOVE);
+        case ROW_HIDE:
+            return (char *)str(LANG_HIDE);
+        case ROW_SETTINGS:
+            return (char *)str(LANG_SETTINGS);
     }
 
-    if (context_menu)
-        retval = do_menu(context_menu, NULL, NULL, false);
+    if (ctx_row->flags & MENU_DYNAMIC_DESC)
+        return ctx_row->menu_get_name_and_icon->list_get_name(0,
+            ctx_row->menu_get_name_and_icon->list_get_name_data,
+            buffer, buffer_len);
+    if (ctx_row->flags & MENU_HAS_DESC)
+        return (char *)P2STR(ctx_row->callback_and_desc->desc);
+    return (char *)str(LANG_ONPLAY_MENU_TITLE);
+}
+
+static int row_menu_callback(int action, const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM)
+    {
+        intptr_t row = (intptr_t)this_item;
+
+        if ((row == ROW_HIDE && !main_menu_item_hideable(ctx_row))
+            || (row == ROW_SETTINGS && ctx_settings == NULL))
+            return ACTION_EXIT_MENUITEM;
+    }
+    return action;
+}
+
+static const struct menu_get_name_and_icon row_menu_desc =
+    { row_menu_callback, row_menu_name, NULL, NULL, Icon_NOICON };
+static const struct menu_item_ex row_menu =
+    { MT_RETURN_ID|MENU_DYNAMIC_DESC|MENU_ITEM_COUNT(ROW_COUNT),
+      { .strings = NULL }, { .menu_get_name_and_icon = &row_menu_desc } };
+
+/* A main menu row's long press: Move, Hide, and the settings of the screen
+ * it opens */
+static int load_context_screen(int selection)
+{
+    int retval = GO_TO_PREVIOUS;
+
+    ctx_row = root_menu__[selection];
+    ctx_settings = NULL;
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    if ((ctx_row->flags&MENU_TYPE_MASK) == MT_RETURN_VALUE)
+        ctx_settings = items[ctx_row->value].context_menu;
+    /* special cases */
+    else if (ctx_row == &info_menu)
+        ctx_settings = &system_menu;
+
+    switch (do_menu(&row_menu, NULL, NULL, false))
+    {
+        case ROW_MOVE:
+            if (main_menu_move_item(ctx_row) == SYS_USB_CONNECTED)
+                retval = GO_TO_ROOT;
+            break;
+        case ROW_HIDE:
+            if (main_menu_hide_item(ctx_row))
+                splash(HZ, ID2P(LANG_ROW_HIDDEN));
+            break;
+        case ROW_SETTINGS:
+            retval = do_menu(ctx_settings, NULL, NULL, false);
+            break;
+        case MENU_ATTACHED_USB:
+            retval = GO_TO_ROOT;
+            break;
+    }
     pop_current_activity();
     return retval;
 }

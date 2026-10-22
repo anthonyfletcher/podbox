@@ -34,6 +34,8 @@
 #include "widgets/splash.h"
 #include "draw/icon_bitmaps.h"
 #include "files/filetypes.h"
+#include "screens/context_menu.h"
+#include "screens/context_menu_config.h"
 
 /**
 * Menu to clear the backdrop image
@@ -565,6 +567,31 @@ MAKE_MENU(elements_menu, ID2P(LANG_ELEMENTS), NULL, Icon_Display_menu,
             &sep_menu);
 
 extern const struct menu_item_ex main_menu_config_item;   /* main_menu.c */
+extern const struct menu_item_ex music_menu_config_item;  /* general_settings.c */
+
+/* Menus: what each one shows. The rows a context menu can hide are listed by
+   kind, a screen each. */
+#define CONTEXT_MENU_ITEM(name, label, kind)                                \
+    MENUITEM_FUNCTION_W_PARAM(name, MENU_FUNC_CHECK_RETVAL, ID2P(label),    \
+                              context_menu_config, (void *)(kind),          \
+                              NULL, Icon_NOICON)
+CONTEXT_MENU_ITEM(ctxmenu_now_playing_item, LANG_NOW_PLAYING_MENU,
+                  CONTEXT_KIND_NOW_PLAYING)
+CONTEXT_MENU_ITEM(ctxmenu_track_item,  LANG_TRACK_MENU,  CONTEXT_KIND_TRACK)
+CONTEXT_MENU_ITEM(ctxmenu_album_item,  LANG_ALBUM_MENU,  CONTEXT_KIND_ALBUM)
+CONTEXT_MENU_ITEM(ctxmenu_artist_item, LANG_ARTIST_MENU, CONTEXT_KIND_ARTIST)
+CONTEXT_MENU_ITEM(ctxmenu_folder_item, LANG_FOLDER_MENU, CONTEXT_KIND_FOLDER)
+CONTEXT_MENU_ITEM(ctxmenu_book_item,   LANG_BOOK_MENU,   CONTEXT_KIND_BOOK)
+#undef CONTEXT_MENU_ITEM
+
+MAKE_MENU(context_menus_menu, ID2P(LANG_CONTEXT_MENUS), NULL, Icon_NOICON,
+            &ctxmenu_now_playing_item, &ctxmenu_track_item, &ctxmenu_album_item,
+            &ctxmenu_artist_item, &ctxmenu_folder_item, &ctxmenu_book_item);
+
+MAKE_MENU(menus_menu, ID2P(LANG_MENUS), NULL, Icon_NOICON,
+            &main_menu_config_item,
+            &music_menu_config_item,
+            &context_menus_menu);
 
 /* Appearance: everything about how the player looks, filed by what a setting
    does rather than by the subsystem that implements it -- so the peak meter,
@@ -582,7 +609,7 @@ MAKE_MENU(appearance_menu, ID2P(LANG_APPEARANCE),
             &scroll_settings_menu,
             &viewers_menu,
             &peak_meter_menu,
-            &main_menu_config_item,   /* main_menu.c */
+            &menus_menu,
             /* At the foot of Appearance rather than inside Theme Settings.
                What it forgets is every appearance setting the user has changed
                by hand, and those reach well past this screen -- the carousel's

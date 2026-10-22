@@ -53,6 +53,10 @@ struct opt_items {
  * artwork that no longer matches. */
 #define MAX_PATHLIST (MAX_PATHNAME*2)
 
+/* The longest config.cfg line read or written, setting name included. See
+ * settings.c for why one size serves both. */
+#define SETTINGS_MAX_LINE 640
+
 /* The values are assigned to the enums so that they correspond to */
 /* setting values in settings_list.c                               */
 
@@ -189,13 +193,6 @@ enum {
     SINGLE_MODE_GROUPING,
     SINGLE_MODE_GENRE,
     SINGLE_MODE_PLAYLIST,
-};
-
-enum
-{
-    QUEUE_HIDE = 0,
-    QUEUE_SHOW_AT_TOPLEVEL,
-    QUEUE_SHOW_IN_SUBMENU
 };
 
 /* dynamic_colors_background: which of the album's two colours is the
@@ -772,6 +769,10 @@ struct user_settings
      * whose signature is stored beside it. See browser_db.h. */
     int  music_menu_hidden;
     int  music_menu_sig;
+    /* Rows hidden from each kind of context menu: a bit per row of the kind's
+     * list in screens/context_menu.c, saved by the rows' names. */
+#define CONTEXT_MENU_KINDS 6
+    uint32_t context_hidden[CONTEXT_MENU_KINDS];
     /* DB_SORT_ALBUMS_*: how the database browser orders its album lists. The
      * year and artist come from the summary index, not the database. Separate
      * from the carousel's own sort, which offers the same choices. */
@@ -831,7 +832,6 @@ struct user_settings
     bool warnon_erase_dynplaylist; /* warn when erasing dynamic playlist */
     bool keep_current_track_on_replace_playlist;
     bool show_shuffled_adding_options; /* whether to display options for adding shuffled tracks to dynamic playlist */
-    int show_queue_options; /* how and whether to display options to queue tracks */
     int album_art; /* switch off album art display or choose preferred source */
     bool rewind_across_tracks;
 

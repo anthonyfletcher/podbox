@@ -103,6 +103,7 @@ widgets/list_render.c
 widgets/list_skinned.c
 widgets/menu.c
 widgets/option_select.c
+widgets/rating_dialog.c
 audio/peak_meter.c
 audio/spectrum_meter.c
 audio/beat_analyse.c
@@ -191,6 +192,7 @@ screens/settings/eq_editor.c
 screens/settings/eq_curve.c
 screens/main_menu.c
 screens/main_menu_config.c
+screens/context_menu_config.c
 screens/music_menu_config.c
 screens/settings/common_settings.c
 screens/settings/settings_walk.c

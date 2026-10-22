@@ -87,6 +87,10 @@ enum pf_scroll_line_type {
  * on the way out, once carousel_run() has returned. Negative, so it never
  * collides with a GO_TO_* value. */
 #define CAROUSEL_PLAY_ALBUM    (-3)
+/* on_context() recorded a slide for its menu, which runs once the carousel has
+ * let go of the app buffer the menu's rows need. The model's own entry point
+ * shows it and opens the carousel again. */
+#define CAROUSEL_CONTEXT       (-4)
 
 /* The seam between the generic coverflow engine and the data it shows. */
 struct carousel_model {
@@ -103,6 +107,7 @@ struct carousel_model {
     /* Optional (NULL = not provided). Keep the engine loop/init free of any
      * direct calls into a specific model's code. */
     int  (*on_menu)(void);   /* MENU-hold: run the in-screen menu; GO_TO_* or CAROUSEL_MENU_* */
+    int  (*on_context)(int index); /* SELECT-hold: CAROUSEL_CONTEXT, see above */
     void (*prepare)(void);   /* one-off post-init setup (e.g. cache-version bookkeeping) */
     bool owns_cache_version;                           /* honours pf_cfg.cache_version */
     const char *title;                                 /* status-bar title */

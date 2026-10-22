@@ -81,7 +81,7 @@ upstream reverses itself (`git log --oneline <base>..rockbox/master --
 | 2026-04-26 | `5bbf1c8e5b` | tree: gui_synclist_scroll_stop on uninitialized list | **Adopted** | |
 | 2026-04-26 | `6cf705886d` | skin: custom scrollbar OBOE | **Adopted** | |
 | 2026-04-26 | `792a230c00` | FS#13877: use FONT_UI in the Equalizer sliders | **Adopted** | |
-| 2026-04-26 | `bf0fa29a30` | WPS Context Menu configurable entry | **Adopted** | The bottom five rows are assignable from Settings > WPS. |
+| 2026-04-26 | `bf0fa29a30` | WPS Context Menu configurable entry | **Adopted** | Since replaced: Now Playing's menu has a fixed row for every action, and only the hotkey is assigned. |
 | 2026-04-28 | `7ab1a81806` | simple_viewer: use UI viewport and SBS title | **Adopted (in part)** | Taken: the `gui_synclist_scroll_stop()`, in `screens/playback/track_info.c`. Not taken: the theme enable/undo removal, since `view_text()` owns the whole screen here. The plugin halves are N/A. |
 | 2026-04-29 | `121c65b32a` | FS#13857: keylock with USB (Fiio M3K) | **N/A** | Other target. |
 | 2026-04-29 | `c41beebcda` | gui: delay updating SBS when setting list title | **Declined** | Cancels out with `160905b1b8`. |

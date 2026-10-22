@@ -39,6 +39,7 @@
 #include "viewer.h"
 #include "catalog.h"
 #include "database/sound_mix.h"
+#include "database/sound_index.h"
 #include "draw/icon.h"
 #include "widgets/list.h"
 #include "widgets/splash.h"
@@ -81,6 +82,7 @@ enum pv_context_result {
     PV_CONTEXT_MODIFIED,        /* Playlist was modified in some way         */
     PV_CONTEXT_UNCHANGED,       /* No change to playlist, as far as we know  */
     PV_CONTEXT_PL_UPDATE,       /* Playlist buffer requires reloading        */
+    PV_CONTEXT_GO_TO,           /* Leaving for the database browser          */
 };
 
 struct playlist_buffer
@@ -670,140 +672,175 @@ static enum pv_context_result delete_track(int current_track_index,
     return PV_CONTEXT_MODIFIED;
 }
 
-static enum pv_context_result context_menu(int index)
-{
-    struct playlist_entry *current_track = playlist_buffer_get_track(&viewer.buffer,
-                                                                     index);
-    bool current_was_playing = (audio_status() & AUDIO_STATUS_PLAY) && /* or paused */
-                               (current_track->index == viewer.current_playing_track);
+/* The row the context menu is open on, for its rows to act on, and what they
+ * did to the playlist */
+static struct playlist_entry *menu_track;
+static int menu_index;
+static bool menu_track_was_playing;
+static enum pv_context_result menu_result;
 
-    MENUITEM_STRINGLIST(menu_items, ID2P(LANG_PLAYLIST), NULL,
-                        ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
-                        ID2P(LANG_REMOVE), ID2P(LANG_MOVE),
-                        ID2P(LANG_MENU_SHOW_ID3_INFO),
-                        ID2P(LANG_SHUFFLE), ID2P(LANG_SOUND_REORDER),
-                        ID2P(LANG_SAVE),
-                        ID2P(LANG_PLAYLISTVIEWER_SETTINGS)
-                        );
-    /* Report as a context menu while it is up, the way every other one does
-     * (context_menu.c, album_covers.c, the image and lyric viewers). Without
-     * this the activity stays ACTIVITY_PLAYLISTVIEWER, so a theme switching on
-     * %cs dresses the menu as playlist rows -- numbering them.
-     * Popped conditionally because a menu item may have exited to another screen
-     * and popped it already. */
+/* Set while the viewer was opened by someone who can leave for the database
+ * browser, which Go to Album and Go to Artist leave for */
+static bool viewer_go_to;
+
+/* Every row ends a move in progress */
+static void menu_abort_move(void)
+{
+    viewer.moving_track = -1;
+    viewer.moving_playlist_index = -1;
+}
+
+/* Remove and Move act on the row's index, which the menu may have outlived */
+static bool menu_track_stale(void)
+{
+    if (!playlist_changed())
+        return false;
+    splash(HZ, ID2P(LANG_FAILED));
+    menu_result = PV_CONTEXT_PL_UPDATE;
+    return true;
+}
+
+static int menu_remove(void)
+{
+    menu_abort_move();
+    if (!menu_track_stale())
+        menu_result = delete_track(menu_track->index, menu_index,
+                                   menu_track_was_playing);
+    return ONPLAY_OK;
+}
+
+static int menu_move(void)
+{
+    menu_abort_move();
+    if (!menu_track_stale())
+    {
+        viewer.moving_track = menu_index;
+        viewer.moving_playlist_index = menu_track->index;
+    }
+    return ONPLAY_OK;
+}
+
+static int menu_info(void)
+{
+    menu_abort_move();
+    menu_result = show_track_info(menu_track);
+    return menu_result == PV_CONTEXT_USB ? ONPLAY_MAINMENU : ONPLAY_OK;
+}
+
+static int menu_shuffle(void)
+{
+    menu_abort_move();
+    if (!yesno_pop_confirm(ID2P(LANG_SHUFFLE)))
+        return ONPLAY_OK;
+    playlist_sort(viewer.playlist, !viewer.playlist);
+    playlist_randomise(viewer.playlist, current_tick, !viewer.playlist);
+    viewer.selected_track = 0;
+    menu_result = PV_CONTEXT_MODIFIED;
+    return ONPLAY_OK;
+}
+
+/* Not offered a confirmation the way Shuffle is: the tracks are the same
+ * tracks afterwards, and the one playing is still playing. */
+static int menu_reorder(void)
+{
+    int miss;
+
+    menu_abort_move();
+    miss = sound_mix_reorder(viewer.playlist);
+    if (miss < 0)
+    {
+        /* Chosen into a variable first: ID2P() does not parenthesise what
+         * it is given, so a conditional handed to it binds to the addition
+         * inside instead. */
+        int id;
+
+        switch (miss)
+        {
+            case SOUND_MIX_TOO_LONG:
+                id = LANG_SOUND_REORDER_LONG;
+                break;
+            case SOUND_MIX_NO_RECORD:
+                id = LANG_SOUND_REORDER_NONE;
+                break;
+            case SOUND_MIX_NO_PLAYLIST:
+                id = LANG_SOUND_REORDER_FAILED;
+                break;
+            default:
+                id = LANG_SOUND_MIX_NO_INDEX;
+                break;
+        }
+
+        splash(HZ * 2, ID2P(id));
+    }
+    else if (miss > 0)
+        splashf(HZ * 2, (const char *)str(LANG_SOUND_REORDER_SOME), miss);
+
+    viewer.selected_track = 0;
+    menu_result = PV_CONTEXT_MODIFIED;
+    return ONPLAY_OK;
+}
+
+static int menu_save(void)
+{
+    menu_abort_move();
+    save_playlist_screen(viewer.playlist);
+    /* playlist indices of current playlist may have changed */
+    if (!viewer.playlist)
+        menu_result = PV_CONTEXT_PL_UPDATE;
+    return ONPLAY_OK;
+}
+
+/* Reported as a context menu, as the menu it is reached from is: left as
+ * ACTIVITY_PLAYLISTVIEWER it gets dressed as playlist rows. */
+static int menu_settings(void)
+{
+    int display = global_settings.playlist_viewer_track_display;
+    bool usb;
+
+    menu_abort_move();
     push_current_activity(ACTIVITY_CONTEXTMENU);
-    int sel = do_menu(&menu_items, NULL, NULL, false);
+    usb = MENU_ATTACHED_USB == do_menu(&viewer_settings_menu, NULL, NULL, false);
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
+    if (usb)
+        return ONPLAY_MAINMENU;
+    if (display != global_settings.playlist_viewer_track_display)
+        menu_result = PV_CONTEXT_PL_UPDATE;
+    return ONPLAY_OK;
+}
 
-    if (sel == MENU_ATTACHED_USB)
+static enum pv_context_result context_menu(int index)
+{
+    static const struct context_menu_row rows[] = {
+        { LANG_REMOVE,                  menu_remove,   false },
+        { LANG_MOVE,                    menu_move,     false },
+        { LANG_TRACK_INFO,              menu_info,     false },
+        { LANG_SHUFFLE,                 menu_shuffle,  true },
+        { LANG_SAVE,                    menu_save,     true },
+        { LANG_PLAYLISTVIEWER_SETTINGS, menu_settings, true },
+        { LANG_SOUND_REORDER,           menu_reorder,  true },
+    };
+    /* Order by Sound last, so leaving it out where it could only fail is a
+     * shorter count */
+    bool reorder = global_settings.playlist_engine && tagcache_is_usable()
+                   && sound_index_exists();
+    int ret;
+
+    menu_track = playlist_buffer_get_track(&viewer.buffer, index);
+    menu_index = index;
+    menu_track_was_playing = (audio_status() & AUDIO_STATUS_PLAY) && /* or paused */
+                             menu_track->index == viewer.current_playing_track;
+    menu_result = PV_CONTEXT_UNCHANGED;
+
+    ret = context_menu_show_item(menu_track->name, FILE_ATTR_AUDIO, false,
+                                 viewer_go_to, NULL, NULL, rows,
+                                 ARRAYLEN(rows) - (reorder ? 0 : 1));
+
+    if (ret == ONPLAY_MAINMENU)
         return PV_CONTEXT_USB;
-    else if (sel >= 0)
-    {
-        /* Abort current move */
-        viewer.moving_track = -1;
-        viewer.moving_playlist_index = -1;
-
-        /* Remove and Move act on the row's index, which the menu may have
-         * outlived */
-        if ((sel == 2 || sel == 3) && playlist_changed())
-        {
-            splash(HZ, ID2P(LANG_FAILED));
-            return PV_CONTEXT_PL_UPDATE;
-        }
-
-        switch (sel)
-        {
-            case 0:
-                /* Playing Next... menu */
-                context_menu_show_playlist(current_track->name, FILE_ATTR_AUDIO, NULL,
-                                           false);
-                return PV_CONTEXT_UNCHANGED;
-            case 1:
-                /* Add to Playlist... menu */
-                context_menu_show_playlist_cat(current_track->name, FILE_ATTR_AUDIO, NULL);
-                return PV_CONTEXT_UNCHANGED;
-            case 2:
-                return delete_track(current_track->index, index, current_was_playing);
-            case 3:
-                /* move track */
-                viewer.moving_track = index;
-                viewer.moving_playlist_index = current_track->index;
-                return PV_CONTEXT_UNCHANGED;
-            case 4:
-                return show_track_info(current_track);
-            case 5:
-                /* shuffle */
-                if (!yesno_pop_confirm(ID2P(LANG_SHUFFLE)))
-                    return PV_CONTEXT_UNCHANGED;
-                playlist_sort(viewer.playlist, !viewer.playlist);
-                playlist_randomise(viewer.playlist, current_tick, !viewer.playlist);
-                viewer.selected_track = 0;
-                return PV_CONTEXT_MODIFIED;
-            case 6:
-            {
-                /* Not offered a confirmation the way Shuffle is: the tracks
-                 * are the same tracks afterwards, and the one playing is
-                 * still playing. */
-                int miss = sound_mix_reorder(viewer.playlist);
-
-                if (miss < 0)
-                {
-                    /* Chosen into a variable first: ID2P() does not
-                     * parenthesise what it is given, so a conditional handed
-                     * to it binds to the addition inside instead. */
-                    int id;
-
-                    switch (miss)
-                    {
-                        case SOUND_MIX_TOO_LONG:
-                            id = LANG_SOUND_REORDER_LONG;
-                            break;
-                        case SOUND_MIX_NO_RECORD:
-                            id = LANG_SOUND_REORDER_NONE;
-                            break;
-                        case SOUND_MIX_NO_PLAYLIST:
-                            id = LANG_SOUND_REORDER_FAILED;
-                            break;
-                        default:
-                            id = LANG_SOUND_MIX_NO_INDEX;
-                            break;
-                    }
-
-                    splash(HZ * 2, ID2P(id));
-                }
-                else if (miss > 0)
-                    splashf(HZ * 2, (const char *)str(LANG_SOUND_REORDER_SOME),
-                            miss);
-
-                viewer.selected_track = 0;
-                return PV_CONTEXT_MODIFIED;
-            }
-            case 7:
-                save_playlist_screen(viewer.playlist);
-                /* playlist indices of current playlist may have changed */
-                return viewer.playlist ? PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
-            case 8:
-            {
-                /* playlist viewer settings. Reported as a context menu for the
-                 * same reason as the one above: reached from a context menu, and
-                 * left as ACTIVITY_PLAYLISTVIEWER it gets dressed as playlist
-                 * rows. */
-                bool usb;
-                sel = global_settings.playlist_viewer_track_display;
-                push_current_activity(ACTIVITY_CONTEXTMENU);
-                usb = (MENU_ATTACHED_USB ==
-                       do_menu(&viewer_settings_menu, NULL, NULL, false));
-                if (get_current_activity() == ACTIVITY_CONTEXTMENU)
-                    pop_current_activity();
-                if (usb)
-                    return PV_CONTEXT_USB;
-                return (sel == global_settings.playlist_viewer_track_display) ?
-                       PV_CONTEXT_UNCHANGED : PV_CONTEXT_PL_UPDATE;
-            }
-        }
-    }
-    return PV_CONTEXT_UNCHANGED;
+    if (ret == ONPLAY_GO_TO_LIBRARY)
+        return PV_CONTEXT_GO_TO;
+    return menu_result;
 }
 
 static int get_track_num(struct playlist_viewer *local_viewer,
@@ -1157,6 +1194,11 @@ enum playlist_viewer_result playlist_viewer_ex(const char* filename,
                     ret = PLAYLIST_VIEWER_USB;
                     goto exit;
                 }
+                if (pv_context_result == PV_CONTEXT_GO_TO)
+                {
+                    ret = PLAYLIST_VIEWER_GO_TO_LIBRARY;
+                    goto exit;
+                }
                 if (update_viewer(&playlist_lists, pv_context_result))
                 {
                     exit = true;
@@ -1229,10 +1271,16 @@ exit:
     return ret;
 }
 
-/* View current playlist */
+/* View current playlist, for a caller that can follow
+ * PLAYLIST_VIEWER_GO_TO_LIBRARY */
 enum playlist_viewer_result playlist_viewer(void)
 {
-    return playlist_viewer_ex(NULL, NULL);
+    enum playlist_viewer_result ret;
+
+    viewer_go_to = true;
+    ret = playlist_viewer_ex(NULL, NULL);
+    viewer_go_to = false;
+    return ret;
 }
 
 static const char* playlist_search_callback_name(int selected_item, void * data,

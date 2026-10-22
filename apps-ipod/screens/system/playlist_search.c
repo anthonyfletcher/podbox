@@ -225,6 +225,8 @@ int playlist_search_run(void)
             case PLAYLIST_VIEWER_USB:      return GO_TO_ROOT;
             case PLAYLIST_VIEWER_MAINMENU: return GO_TO_ROOT;
             case PLAYLIST_VIEWER_CANCEL:   break;   /* back to the results */
+            /* playlist_viewer() only */
+            case PLAYLIST_VIEWER_GO_TO_LIBRARY: break;
         }
     }
 }

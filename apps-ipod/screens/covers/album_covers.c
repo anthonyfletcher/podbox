@@ -58,7 +58,7 @@
 #include "system/app_util.h"
 #include "system/shutdown.h"
 #include "system/strutil.h"
-#include "screens/context_menu.h"           /* context_menu_show_playlist_cat/menu */
+#include "screens/context_menu.h"           /* a cover's menu */
 #include "metadata/albumart.h"         /* find_albumart / search_albumart_files */
 #include "metadata/art_cache.h"   /* shared database-driven thumbnail cache */
 #include "metadata.h"         /* struct mp3entry, get_metadata */
@@ -138,6 +138,7 @@ static void album_sort_next(void);
 static void album_sort_prev(void);
 static void set_initial_slide(const char *selected_file);
 static int  album_on_menu(void);
+static int  album_on_context(int index);
 static void album_prepare(void);
 static int  album_build_index(void);
 
@@ -153,6 +154,7 @@ static const struct carousel_model album_model = {
     .sort_prev   = album_sort_prev,
     .set_initial = set_initial_slide,
     .on_menu     = album_on_menu,
+    .on_context  = album_on_context,
     .prepare     = album_prepare,
     .owns_cache_version = true,
     .title       = (const char *)ID2P(LANG_ALBUM_COVERS),
@@ -836,6 +838,105 @@ static void album_prepare(void)
     }
 }
 
+/* ---- a cover's context menu --------------------------------------------- */
+
+/* The album the menu is about, a seek of -1 standing for an artist's every
+ * album. Copied: the carousel's index goes when the carousel does. */
+static struct album_data cover_album;
+static char cover_name[TAGCACHE_BUFSZ + 1];
+
+static bool cover_insert_sink(const char *path, void *data)
+{
+    return playlist_insert_context_add(data, path) >= 0;
+}
+
+static bool cover_insert(int position, bool queue, bool create_new)
+{
+    struct playlist_insert_context ctx;
+    int added;
+
+    (void)create_new;
+    if (playlist_insert_context_create(NULL, &ctx, position, queue, false) < 0)
+    {
+        playlist_insert_context_release(&ctx);
+        return false;
+    }
+    added = db_summary_album_tracks(&cover_album, cover_insert_sink, &ctx);
+    playlist_insert_context_release(&ctx);
+    return added > 0;
+}
+
+static bool cover_write_sink(const char *path, void *data)
+{
+    return fdprintf(*(int *)data, "%s\n", path) > 0;
+}
+
+static int cover_write(const char *playlist, bool new_playlist)
+{
+    int fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
+                          : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    int n;
+
+    if (fd < 0)
+        return -1;
+    n = db_summary_album_tracks(&cover_album, cover_write_sink, &fd);
+    close(fd);
+    return n > 0 ? 0 : -1;
+}
+
+static int cover_go_to_artist(void)
+{
+    char name[TAGCACHE_BUFSZ];
+
+    if (!tagcache_seek_string(tag_albumartist, cover_album.artist_seek,
+                              name, sizeof(name)))
+        name[0] = '\0';
+    browser_db_enter_artist_albums_on_next_load(cover_album.artist_seek, name);
+    return ONPLAY_GO_TO_LIBRARY;
+}
+
+void carousel_cover_arm(const struct album_data *album, const char *name)
+{
+    cover_album = *album;
+    snprintf(cover_name, sizeof(cover_name), "/%s", name);
+}
+
+int carousel_cover_menu(void)
+{
+    static const struct context_menu_row rows[] = {
+        { LANG_GO_TO_ARTIST, cover_go_to_artist, false },
+    };
+
+    /* An artist's own cover opens their albums already */
+    switch (context_menu_show_item(cover_name, ATTR_DIRECTORY, false, false,
+                                   cover_insert, cover_write, rows,
+                                   cover_album.seek >= 0 ? 1 : 0))
+    {
+        case ONPLAY_START_PLAY:
+            return GO_TO_WPS;
+        case ONPLAY_MAINMENU:
+            return GO_TO_ROOT;
+        case ONPLAY_GO_TO_LIBRARY:
+            return GO_TO_ALBUM_COVERS_TRACKS;
+        default:
+            return GO_TO_PREVIOUS;
+    }
+}
+
+/* carousel_model.on_context for the album model: the menu runs once the
+ * carousel is down, and opens it again on this album after */
+static int album_on_context(int index)
+{
+    char album[TAGCACHE_BUFSZ];
+
+    pf_cfg.last_album = index;
+    pf_resume_album_index = index;
+    pf_resume_last_album = true;
+    carousel_cover_arm(&carousel_idx.album_index[index],
+                       get_album_name(index, album, sizeof(album)));
+    return CAROUSEL_CONTEXT;
+}
+
 void album_covers_cancel_resume(void)
 {
     pf_resume_last_album = false;
@@ -843,16 +944,34 @@ void album_covers_cancel_resume(void)
 
 int album_covers(const char *selected_file)
 {
-    int ret = carousel_run(&album_model, selected_file);
+    int ret;
 
-    /* "On album select" = Play album. Deliberately here and not in
-     * album_enter(): carousel_run()'s cleanup() has released the app buffer by
-     * now, and putting the album in track order needs it. Doing it here rather
-     * than in root_menu.c also means every way into this screen gets it -- the
-     * WPS select action and the playlist viewer call this directly, and would
-     * not know what to do with a sentinel escaping to them. */
-    if (ret == CAROUSEL_PLAY_ALBUM)
-        ret = db_summary_play_pending() > 0 ? GO_TO_WPS : GO_TO_PREVIOUS;
+    while (1)
+    {
+        ret = carousel_run(&album_model, selected_file);
+
+        /* "On album select" = Play album. Deliberately here and not in
+         * album_enter(): carousel_run()'s cleanup() has released the app
+         * buffer by now, and putting the album in track order needs it. Doing
+         * it here rather than in root_menu.c also means every way into this
+         * screen gets it -- the WPS select action and the playlist viewer
+         * call this directly, and would not know what to do with a sentinel
+         * escaping to them. The context menu is here for the same reason. */
+        if (ret == CAROUSEL_PLAY_ALBUM)
+            ret = db_summary_play_pending() > 0 ? GO_TO_WPS : GO_TO_PREVIOUS;
+        if (ret != CAROUSEL_CONTEXT)
+            break;
+
+        ret = carousel_cover_menu();
+        if (ret != GO_TO_PREVIOUS)
+        {
+            /* Back from Go to Artist's albums comes back to this album */
+            if (ret != GO_TO_ALBUM_COVERS_TRACKS)
+                album_covers_cancel_resume();
+            break;
+        }
+        selected_file = NULL;
+    }
 
     return ret;
 }

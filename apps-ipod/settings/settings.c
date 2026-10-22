@@ -173,16 +173,16 @@ const char* setting_get_cfgvals(const struct settings_list *setting)
  *
  * Sized from the ceiling the writer already enforces rather than from what a
  * menu happens to hold today. main_menu_config.c caps its own output at
- * CFG_STR_SIZE -- MAX_ITEMS keys of at most 13 bytes, currently 572 -- so 589
- * with the setting name is the most that line can be, however many entries are
- * added later. A fully enabled menu as it stands (13 fixed entries and all 20
- * tagnavi slots) is 338, so there is roughly double the headroom.
+ * CFG_STR_SIZE -- MAX_ITEMS keys of at most 14 bytes, an item turned off
+ * carrying a '!', currently 616 -- so 633 with the setting name is the most
+ * that line can be, and main_menu_config.c fails to build if it outgrows
+ * this. A menu as it stands (13 fixed entries and all 20 tagnavi slots) is
+ * about 370.
  *
  * Deliberately one constant for reading and writing. Sizing them differently is
  * how a value gets written that cannot be read back, which is the more
  * confusing half of this bug: the configuration on disk names entries that do
  * not appear. */
-#define SETTINGS_MAX_LINE 640
 
 /* The write path's scratch line, static rather than on the stack.
  *

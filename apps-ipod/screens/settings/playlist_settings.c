@@ -140,14 +140,12 @@ MENUITEM_SETTING(warn_on_erase, &global_settings.warnon_erase_dynplaylist, NULL)
 MENUITEM_SETTING(party_mode, &global_settings.party_mode, NULL);
 MENUITEM_SETTING(keep_current_track_on_replace, &global_settings.keep_current_track_on_replace_playlist, NULL);
 MENUITEM_SETTING(show_shuffled_adding_options, &global_settings.show_shuffled_adding_options, NULL);
-MENUITEM_SETTING(show_queue_options, &global_settings.show_queue_options, NULL);
 MAKE_MENU(currentplaylist_settings_menu, ID2P(LANG_CURRENT_PLAYLIST),
           NULL, Icon_Playlist,
           &warn_on_erase,
           &party_mode,
           &keep_current_track_on_replace,
-          &show_shuffled_adding_options,
-          &show_queue_options);
+          &show_shuffled_adding_options);
 
 MENUITEM_SETTING(sort_playlists, &global_settings.sort_playlists, NULL);
 MAKE_MENU(playlist_settings, ID2P(LANG_PLAYLISTS), NULL,

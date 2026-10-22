@@ -353,10 +353,7 @@ static int dircache_callback(int action,
 }
 MENUITEM_SETTING(dircache, &global_settings.dircache, dircache_callback);
 
-static int filemenu_callback(int action,
-                             const struct menu_item_ex *this_item,
-                             struct gui_synclist *this_list);
-MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
+MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), NULL,
                 Icon_file_view_menu,
                 &file_sort_menu,
                 &dirfilter, &show_filename_ext, &browse_current,
@@ -365,23 +362,6 @@ MAKE_MENU(file_menu, ID2P(LANG_DIR_BROWSER), filemenu_callback,
                 &clear_start_directory_item
                 ,&hotkey_tree_item
                 );
-static int filemenu_callback(int action,
-                             const struct menu_item_ex *this_item,
-                             struct gui_synclist *this_list)
-{
-    (void)this_list;
-
-    /* Show File View menu in Settings or File Browser,
-       but not in Database or Playlist Catalog */
-    if (action == ACTION_REQUEST_MENUITEM &&
-        this_item == &file_menu &&
-        get_current_activity() != ACTIVITY_SETTINGS &&
-        (context_menu_get_source() != CONTEXT_TREE
-         || *browser_get_context()->dirfilter == SHOW_M3U))
-        return ACTION_EXIT_MENUITEM;
-
-    return action;
-}
 
 
 
@@ -1000,46 +980,29 @@ MENUITEM_SETTING(browser_default,
 /* Where Select from the now-playing screen goes. */
 MENUITEM_SETTING(wps_select_action, &global_settings.wps_select_action, NULL);
 
-/* Item 0 is the hotkey button, items 1..4 the configurable rows at the
-   bottom of the WPS context menu. Each row shows what it is currently
-   assigned to; selecting it opens the list of available actions. */
+/* The hotkey button, showing what it is currently assigned to; selecting it
+   opens the list of available actions. */
 static char *wps_context_menu_get_name(int selected_item, void *data,
                                        char *buffer, size_t buffer_len)
 {
     (void)selected_item;
-    int item = (intptr_t)data;
-    int act = HK_CTX_GET(item, global_settings.context_wps);
-    const struct hotkey_assignment *cur = get_hotkey(act);
+    (void)data;
+    const struct hotkey_assignment *cur =
+        get_hotkey(HK_CTX_GET(0, global_settings.context_wps));
 
-    if (item == 0)
-    {
-        snprintf(buffer, buffer_len, "%s [%s]",
-                 str(LANG_HOTKEY_WPS), str(cur->lang_id));
-    }
-    else
-    {
-        snprintf(buffer, buffer_len, "%s %d [%s]",
-                 str(LANG_SET_CONTEXT_ITEM), item, str(cur->lang_id));
-    }
+    snprintf(buffer, buffer_len, "%s [%s]",
+             str(LANG_HOTKEY_WPS), str(cur->lang_id));
     return buffer;
 }
 
 static int wps_context_menu_speak_item(int selected_item, void *data)
 {
     (void)selected_item;
-    int item = (intptr_t)data;
-    int act = HK_CTX_GET(item, global_settings.context_wps);
-    const struct hotkey_assignment *cur = get_hotkey(act);
+    (void)data;
+    const struct hotkey_assignment *cur =
+        get_hotkey(HK_CTX_GET(0, global_settings.context_wps));
 
-    if (item == 0)
-    {
-        talk_id(LANG_HOTKEY_WPS, false);
-    }
-    else
-    {
-        talk_id(LANG_SET_CONTEXT_ITEM, false);
-        talk_number(item, true);
-    }
+    talk_id(LANG_HOTKEY_WPS, false);
     talk_id(cur->lang_id, true);
     return 0;
 }
@@ -1050,36 +1013,6 @@ MENUITEM_FUNCTION_DYNTEXT_W_PARAM(hotkey_wps_item, 0,
                                   wps_context_menu_speak_item,
                                   (void*)0, NULL, Icon_NOICON);
 
-MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_1, 0,
-                                  wps_context_menu_do_setting, (void*)1,
-                                  wps_context_menu_get_name,
-                                  wps_context_menu_speak_item,
-                                  (void*)1, NULL, Icon_NOICON);
-
-MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_2, 0,
-                                  wps_context_menu_do_setting, (void*)2,
-                                  wps_context_menu_get_name,
-                                  wps_context_menu_speak_item,
-                                  (void*)2, NULL, Icon_NOICON);
-
-MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_3, 0,
-                                  wps_context_menu_do_setting, (void*)3,
-                                  wps_context_menu_get_name,
-                                  wps_context_menu_speak_item,
-                                  (void*)3, NULL, Icon_NOICON);
-
-MENUITEM_FUNCTION_DYNTEXT_W_PARAM(wps_set_context_item_4, 0,
-                                  wps_context_menu_do_setting, (void*)4,
-                                  wps_context_menu_get_name,
-                                  wps_context_menu_speak_item,
-                                  (void*)4, NULL, Icon_NOICON);
-
-static void reset_wps_items(void)
-{
-    reset_setting(find_setting(&global_settings.context_wps), NULL);
-}
-MENUITEM_FUNCTION(reset_wps_item, 0, ID2P(LANG_RESET_CONTEXT_ITEMS), reset_wps_items,
-                  NULL, Icon_Queued);
 
 /* Which picture the screen shows, and where its album cover is looked for
  * first. Properties of this screen rather than of the theme: no skin sets
@@ -1099,13 +1032,8 @@ MAKE_MENU(wps_appearance_link, ID2P(LANG_APPEARANCE), 0, Icon_NOICON,
 MAKE_MENU(wps_settings, ID2P(LANG_WPS), 0, Icon_Playback_menu
             ,&browser_default
             ,&wps_select_action
-            ,&hotkey_wps_item /* this is item 0 */
-            ,&wps_set_context_item_1
-            ,&wps_set_context_item_2
-            ,&wps_set_context_item_3
-            ,&wps_set_context_item_4
+            ,&hotkey_wps_item
             ,&wps_appearance_link
-            ,&reset_wps_item
             );
 
 
@@ -1238,7 +1166,6 @@ MAKE_MENU(music_menu, ID2P(LANG_MUSIC_BROWSER), 0, Icon_NOICON,
           &music_sort_menu,
           &album_show_year,
           &featured_artists, &segregate_audiobooks,
-          &music_menu_config_item,
           &search_menu, &quiz_menu,
           &music_appearance_menu    /* theme_settings.c */
           );

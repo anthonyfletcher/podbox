@@ -46,6 +46,7 @@
 #include "string-extra.h"
 #include "lang.h"
 #include "widgets/menu.h"
+#include "widgets/keyboard.h"
 #include "system/activity.h"
 #include "system/app_util.h"
 #include "system/format_time.h"
@@ -508,10 +509,14 @@ bool shortcuts_available(void)
     return strstr(buf, SHORTCUTS_HDR) != NULL;
 }
 
-static const char * shortcut_menu_get_name(int selected_item, void * data,
-                                           char * buffer, size_t buffer_len)
+/* The shortcut being carried by Move, and where it was picked up; -1 when
+ * nothing is moving */
+static int moving_item = -1;
+static int moving_from;
+
+static const char * shortcut_label(int selected_item, char * buffer,
+                                   size_t buffer_len)
 {
-    (void)data;
     struct shortcut *sc = get_shortcut(selected_item, NULL);
     if (!sc)
         return "";
@@ -568,6 +573,21 @@ static const char * shortcut_menu_get_name(int selected_item, void * data,
     }
 
     return sc->name[0] ? sc->name : ret;
+}
+
+/* The carried shortcut is marked in its text as well as by its icon, as the
+ * main menu's editor marks it: a theme need never map Icon_Moving. */
+static const char * shortcut_menu_get_name(int selected_item, void * data,
+                                           char * buffer, size_t buffer_len)
+{
+    char label[MAX_PATH];
+
+    (void)data;
+    if (selected_item != moving_item)
+        return shortcut_label(selected_item, buffer, buffer_len);
+    snprintf(buffer, buffer_len, ">%s",
+             shortcut_label(selected_item, label, sizeof(label)));
+    return buffer;
 }
 
 static int shortcut_menu_speak_item(int selected_item, void * data)
@@ -660,38 +680,153 @@ static int shortcut_menu_speak_item(int selected_item, void * data)
     return 0;
 }
 
+/* The whole list again, written back once the disk is next idle */
+static void shortcuts_changed(void)
+{
+    first_idx_to_writeback = 0;
+    overwrite_shortcuts = true;
+    shortcuts_ata_idle_callback();
+}
+
+/* Move carries the shortcut by swapping it along to wherever the cursor is,
+ * so the list never shows it anywhere but under the cursor */
+static void swap_shortcuts(int a, int b)
+{
+    struct shortcut tmp;
+    struct shortcut *sa = get_shortcut(a, NULL);
+    struct shortcut *sb = get_shortcut(b, NULL);
+
+    if (!sa || !sb)
+        return;
+    memcpy(&tmp, sa, sizeof(tmp));
+    memcpy(sa, sb, sizeof(tmp));
+    memcpy(sb, &tmp, sizeof(tmp));
+}
+
+static void carry_to(int to)
+{
+    while (moving_item < to)
+    {
+        swap_shortcuts(moving_item, moving_item + 1);
+        moving_item++;
+    }
+    while (moving_item > to)
+    {
+        swap_shortcuts(moving_item, moving_item - 1);
+        moving_item--;
+    }
+}
+
+/* The list has already moved the cursor for whatever was pressed by the time
+ * this sees it, so the shortcut follows the cursor rather than the button */
+static int moving_action(int action, struct gui_synclist *lists)
+{
+    int sel = gui_synclist_get_sel_pos(lists);
+
+    if (sel != moving_item)
+    {
+        carry_to(sel);
+        return ACTION_REDRAW;
+    }
+
+    switch (action)
+    {
+        case ACTION_STD_OK:
+            moving_item = -1;
+            shortcuts_changed();
+            return ACTION_REDRAW;
+        case ACTION_STD_CANCEL:
+            /* Put back where it was */
+            carry_to(moving_from);
+            gui_synclist_select_item(lists, moving_from);
+            moving_item = -1;
+            return ACTION_REDRAW;
+        case ACTION_NONE:
+        case ACTION_REDRAW:
+        case ACTION_STD_NEXT:
+        case ACTION_STD_NEXTREPEAT:
+        case ACTION_STD_PREV:
+        case ACTION_STD_PREVREPEAT:
+            return action;
+        default:
+            /* Nothing else while a shortcut is in hand */
+            return ACTION_NONE;
+    }
+}
+
+static void rename_shortcut(int index)
+{
+    char name[MAX_SHORTCUT_NAME];
+    char label[MAX_PATH];
+    struct shortcut *sc = get_shortcut(index, NULL);
+
+    if (!sc)
+        return;
+    strmemccpy(name, shortcut_label(index, label, sizeof(label)), sizeof(name));
+    if (kbd_input(name, sizeof(name), NULL) < 0)
+        return;
+
+    sc = get_shortcut(index, NULL);
+    if (!sc)
+        return;
+    strmemccpy(sc->name, name, sizeof(sc->name));
+    shortcuts_changed();
+}
+
+/* Delete asks first, as it always has here. False when the last shortcut has
+ * gone and the list has nothing left to show. */
+static bool delete_shortcut(struct gui_synclist *lists, int selection)
+{
+    if (confirm_delete_yesno("", str(LANG_SHORTCUTS)) != YESNO_YES)
+        return true;
+
+    remove_shortcut(selection);
+    gui_synclist_set_nb_items(lists, shortcut_count);
+    if (selection >= shortcut_count)
+        gui_synclist_select_item(lists, shortcut_count - 1);
+    shortcuts_changed();
+    return shortcut_count > 0;
+}
+
 static int shortcut_menu_get_action(int action, struct gui_synclist *lists)
 {
-    (void)lists;
+    if (moving_item >= 0)
+        return moving_action(action, lists);
+
     if (action == ACTION_STD_CONTEXT)
     {
         int selection = gui_synclist_get_sel_pos(lists);
+        int choice;
+        MENUITEM_STRINGLIST(menu, ID2P(LANG_SHORTCUTS), NULL,
+                            ID2P(LANG_MOVE), ID2P(LANG_RENAME),
+                            ID2P(LANG_DELETE));
 
-        if (confirm_delete_yesno("", str(LANG_SHORTCUTS)) != YESNO_YES)
+        push_current_activity(ACTIVITY_CONTEXTMENU);
+        choice = do_menu(&menu, NULL, NULL, false);
+        if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+            pop_current_activity();
+
+        switch (choice)
         {
-            gui_synclist_set_title(lists, lists->title, lists->title_icon);
-            if (global_settings.talk_menu)
-                shortcut_menu_speak_item(selection, NULL);
-            return ACTION_REDRAW;
+            case MENU_ATTACHED_USB:
+                return ACTION_STD_CANCEL;
+            case 0:
+                if (shortcut_count > 1)
+                    moving_item = moving_from = selection;
+                break;
+            case 1:
+                rename_shortcut(selection);
+                break;
+            case 2:
+                if (!delete_shortcut(lists, selection))
+                    return ACTION_STD_CANCEL;
+                break;
         }
 
-        remove_shortcut(selection);
-        gui_synclist_set_nb_items(lists, shortcut_count);
         gui_synclist_set_title(lists, lists->title, lists->title_icon);
-        if (selection >= shortcut_count)
-            gui_synclist_select_item(lists, shortcut_count - 1);
-        first_idx_to_writeback = 0;
-        overwrite_shortcuts = true;
-        shortcuts_ata_idle_callback();
-
-        if (shortcut_count > 0)
-        {
-            if (global_settings.talk_menu)
-                shortcut_menu_speak_item(gui_synclist_get_sel_pos(lists), NULL);
-            return ACTION_REDRAW;
-        }
-
-        return ACTION_STD_CANCEL;
+        if (global_settings.talk_menu)
+            shortcut_menu_speak_item(gui_synclist_get_sel_pos(lists), NULL);
+        return ACTION_REDRAW;
     }
 
     if (action == ACTION_STD_OK
@@ -723,6 +858,8 @@ static enum themable_icons shortcut_menu_get_icon(int selected_item, void * data
     struct shortcut *sc = get_shortcut(selected_item, NULL);
     if (!sc)
         return Icon_NOICON;
+    if (selected_item == moving_item)
+        return Icon_Moving;
     if (sc->icon == Icon_NOICON)
     {
         if (sc->type == SHORTCUT_BROWSER || sc->type == SHORTCUT_FILE)

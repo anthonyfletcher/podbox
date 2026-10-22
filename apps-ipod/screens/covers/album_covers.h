@@ -70,10 +70,9 @@ enum carousel_background_values {
     CAROUSEL_BG_CUSTOM           /* album_covers_custom_color */
 };
 
-/* selected_file: jump to this file's album on open (e.g. context_menu.c's
- * "Album covers" context-menu item on a specific track); NULL for the normal
- * entry paths (main menu, WPS shortcuts) -- falls back to the currently
- * playing track's album, or wherever was last viewed. */
+/* selected_file: jump to this file's album on open; NULL for the normal entry
+ * paths (main menu, WPS shortcuts) -- falls back to the currently playing
+ * track's album, or wherever was last viewed. */
 int album_covers(const char *selected_file);
 
 /* Drop the "come back to the album whose track list you just opened" signal
@@ -94,6 +93,15 @@ int artist_portraits(const char *selected_file);
  * caller must handle. Applying whatever changed is the caller's job, since the
  * album and artist models care about different settings. */
 int carousel_settings_menu(void);
+
+/* A cover's context menu, for both carousels. carousel_cover_arm() records
+ * the album -- or, with a seek of -1, the album artist -- while the carousel
+ * is up; carousel_cover_menu() shows the menu once carousel_run() has
+ * returned CAROUSEL_CONTEXT, and answers a GO_TO_* to leave for, or
+ * GO_TO_PREVIOUS to open the carousel again. */
+struct album_data;
+void carousel_cover_arm(const struct album_data *album, const char *name);
+int carousel_cover_menu(void);
 
 /* The orders the carousels sort by: their own settings, or under Sort Same as
  * Music the Music lists' -- All Albums' order for the albums. */

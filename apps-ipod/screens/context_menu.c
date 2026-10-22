@@ -20,14 +20,19 @@
  *
  * Parts, in order:
  *   - the selected-file target, and the cut/copy/paste clipboard
- *   - playlist operations: insert, queue, add to a named or new playlist
+ *   - Now Playing's own rows, and the sound-engine rows
+ *   - playlist operations: play, play next, later and last, play once, add to
+ *     a named or new playlist
  *   - bookmark, playback and rating items with their visibility callbacks
  *   - file operations: cut, copy, paste, delete, rename, properties
- *   - the configurable tail of the WPS menu, whose rows are assigned by the
- *     user rather than declared here
+ *   - Show in Files, and Go to Album and Go to Artist
+ *   - Now Playing's rows for the playing file
+ *   - the menu declarations, More and Manage among them
  *   - the hotkey action table, the picker built from it, and the config.cfg
- *     handlers for the two packed settings that store the assignments
- *   - the menu declarations, and context_menu_show*() which run them
+ *     handlers for the two hotkey settings
+ *   - the menu a screen shows for one of its own items, with that screen's
+ *     rows in slots of its own
+ *   - context_menu_show(), which runs the browser's and Now Playing's
  ****************************************************************************/
 #include <errno.h>
 #include <stdio.h>
@@ -56,7 +61,7 @@
 #include "powermgmt.h"
 #include "settings/settings.h"
 #include "settings/settings_list.h"
-#include "widgets/option_select.h"
+#include "widgets/rating_dialog.h"
 #include "playlist/viewer.h"
 #include "speech/talk.h"
 #include "context_menu.h"
@@ -97,11 +102,18 @@
 #include "dir.h"
 
 static int context_menu_result = ONPLAY_OK;
-static bool in_queue_submenu = false;
+
+/* Whether whoever opened the menu can leave for the database browser, which
+ * Go to Album and Go to Artist leave for */
+static bool ctx_go_to;
+
+/* Rows hidden from each kind of menu: see hiding_begin() */
+static bool row_hidden(const struct menu_item_ex *row);
+static void hiding_begin(void);
+static void hiding_end(void);
 
 static bool (*ctx_current_playlist_insert)(int position, bool queue, bool create_new);
 static int (*ctx_add_to_playlist)(const char* playlist, bool new_playlist);
-extern struct menu_item_ex file_menu; /* settings_menu.c  */
 
 /* redefine MAKE_MENU so the MENU_EXITAFTERTHISMENU flag can be added easily */
 #define MAKE_ONPLAYMENU( name, str, callback, icon, ... )               \
@@ -232,7 +244,8 @@ static int wps_view_cur_playlist(void)
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)  /* get rid of parent activity */
         pop_current_activity_without_refresh(); /* when called from ctxt menu */
 
-    playlist_viewer_ex(NULL, NULL);
+    if (playlist_viewer() == PLAYLIST_VIEWER_GO_TO_LIBRARY)
+        context_menu_result = ONPLAY_GO_TO_LIBRARY;
 
     return 0;
 }
@@ -258,6 +271,16 @@ static int view_lyrics(void)
     return ONPLAY_OK;
 }
 
+static int lyrics_run(void)
+{
+    if (lyric_viewer() == GO_TO_ROOT)
+        context_menu_result = ONPLAY_MAINMENU;
+    return 0;
+}
+
+MENUITEM_FUNCTION(lyrics_item, 0, ID2P(LANG_LYRICS),
+                  lyrics_run, NULL, Icon_NOICON);
+
 MENUITEM_FUNCTION(wps_view_cur_playlist_item, 0, ID2P(LANG_VIEW_DYNAMIC_PLAYLIST),
                   wps_view_cur_playlist, NULL, Icon_NOICON);
 MENUITEM_FUNCTION(search_playlist_item, 0, ID2P(LANG_SEARCH_IN_PLAYLIST),
@@ -280,6 +303,11 @@ static int spike_run(void)
 
 MENUITEM_FUNCTION(spike_run_item, 0, ID2P(LANG_SPIKE_PLAY),
                   spike_run, NULL, Icon_NOICON);
+
+/* Shuffle and Repeat as the Playback settings have them, at the top of
+ * Now Playing's menu where they are wanted most */
+MENUITEM_SETTING(wps_shuffle_item, &global_settings.playlist_shuffle, NULL);
+MENUITEM_SETTING(wps_repeat_item, &global_settings.repeat_mode, NULL);
 
 /* Whether a mix could be built from what is selected. Deliberately stops
  * short of looking the track up: a database row carries no path, and reading
@@ -492,8 +520,8 @@ static bool in_book_list(void)
                                             &artist_seek));
 }
 
-/* The queue rows on offer are for a book, which is heard in order: the
- * shuffled ones are left out */
+/* The menu is for a book, which is heard in order: the shuffled rows are left
+ * out, and the rest sit under More behind the book's own rows */
 static bool ctx_in_order;
 
 /* Hidden rather than shown failing. The setting comes first: somebody who has
@@ -750,8 +778,6 @@ static struct add_to_pl_param addtopl_insert_last_shuf = {PLAYLIST_INSERT_LAST_S
 static struct add_to_pl_param addtopl_queue            = {PLAYLIST_INSERT, PL_QUEUE};
 static struct add_to_pl_param addtopl_queue_first      = {PLAYLIST_INSERT_FIRST, PL_QUEUE};
 static struct add_to_pl_param addtopl_queue_last       = {PLAYLIST_INSERT_LAST, PL_QUEUE};
-static struct add_to_pl_param addtopl_queue_shuf       = {PLAYLIST_INSERT_SHUFFLED, PL_QUEUE};
-static struct add_to_pl_param addtopl_queue_last_shuf  = {PLAYLIST_INSERT_LAST_SHUFFLED, PL_QUEUE};
 
 static struct add_to_pl_param addtopl_replace          = {PLAYLIST_INSERT, PL_REPLACE};
 static struct add_to_pl_param addtopl_replace_shuffled = {PLAYLIST_INSERT_LAST_SHUFFLED, PL_REPLACE};
@@ -876,12 +902,10 @@ static int treeplaylist_callback(int action,
                                  struct gui_synclist *this_list);
 
 /* These rows are actions, so they take the generic function-call icon rather
- * than naming one: Icon_Playlist on all twenty of them filled whole menus with
- * a single glyph that distinguished nothing. The queue variants are the one
- * exception -- Icon_Queued is what the playlist viewer already draws on a queued
- * track, so it says something the row text does not have to. The submenus
- * themselves keep Icon_Playlist; each is one row in its parent, and it is what
- * they are. */
+ * than naming one: Icon_Playlist on all of them filled whole menus with a
+ * single glyph that distinguished nothing. The Play Once rows are the one
+ * exception -- Icon_Queued is what the playlist viewer already draws on a
+ * queued track, so it says something the row text does not have to. */
 /* insert items */
 MENUITEM_FUNCTION_W_PARAM(i_pl_item, 0, ID2P(LANG_ADD),
                   add_to_playlist, &addtopl_insert,
@@ -908,119 +932,139 @@ MENUITEM_FUNCTION_W_PARAM(q_first_pl_item, 0, ID2P(LANG_QUEUE_FIRST),
 MENUITEM_FUNCTION_W_PARAM(q_last_pl_item, 0, ID2P(LANG_QUEUE_LAST),
                   add_to_playlist, &addtopl_queue_last,
                   treeplaylist_callback, Icon_Queued);
-MENUITEM_FUNCTION_W_PARAM(q_shuf_pl_item, 0, ID2P(LANG_QUEUE_SHUFFLED),
-                  add_to_playlist, &addtopl_queue_shuf,
-                  treeplaylist_callback, Icon_Queued);
-MENUITEM_FUNCTION_W_PARAM(q_last_shuf_pl_item, 0, ID2P(LANG_QUEUE_LAST_SHUFFLED),
-                  add_to_playlist, &addtopl_queue_last_shuf,
-                  treeplaylist_callback, Icon_Queued);
 
-/* queue submenu */
+/* Play Once submenu */
 MAKE_ONPLAYMENU(queue_menu, ID2P(LANG_QUEUE_MENU),
                 treeplaylist_callback, Icon_Playlist,
-                &q_pl_item,
-                &q_last_pl_item,
                 &q_first_pl_item,
-                &q_shuf_pl_item,
-                &q_last_shuf_pl_item);
+                &q_pl_item,
+                &q_last_pl_item);
 
 /* replace playlist */
 MENUITEM_FUNCTION_W_PARAM(replace_pl_item, 0, ID2P(LANG_PLAY),
                   add_to_playlist, &addtopl_replace,
                   treeplaylist_callback, Icon_NOICON);
 
-MENUITEM_FUNCTION_W_PARAM(replace_shuf_pl_item, 0, ID2P(LANG_PLAY_SHUFFLED),
+MENUITEM_FUNCTION_W_PARAM(replace_shuf_pl_item, 0, ID2P(LANG_SHUFFLE),
                   add_to_playlist, &addtopl_replace_shuffled,
                   treeplaylist_callback, Icon_NOICON);
 
+/* The same two while something is playing, where they are rarer: shown in
+ * More rather than above the rows that add to the queue */
+MENUITEM_FUNCTION_W_PARAM(replace_more_pl_item, 0, ID2P(LANG_PLAY),
+                  add_to_playlist, &addtopl_replace,
+                  treeplaylist_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(replace_shuf_more_pl_item, 0, ID2P(LANG_SHUFFLE),
+                  add_to_playlist, &addtopl_replace_shuffled,
+                  treeplaylist_callback, Icon_NOICON);
+
+/* A book's queue rows, which sit under More: a book is mostly resumed, and
+ * rarely queued or added to anything */
+MENUITEM_FUNCTION_W_PARAM(bk_play_item, 0, ID2P(LANG_PLAY),
+                  add_to_playlist, &addtopl_replace,
+                  treeplaylist_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(bk_first_item, 0, ID2P(LANG_PLAY_NEXT),
+                  add_to_playlist, &addtopl_insert_first,
+                  treeplaylist_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(bk_later_item, 0, ID2P(LANG_ADD),
+                  add_to_playlist, &addtopl_insert,
+                  treeplaylist_callback, Icon_NOICON);
+MENUITEM_FUNCTION_W_PARAM(bk_last_item, 0, ID2P(LANG_PLAY_LAST),
+                  add_to_playlist, &addtopl_insert_last,
+                  treeplaylist_callback, Icon_NOICON);
+
+static bool is_book_row(const struct menu_item_ex *item)
+{
+    return item == &bk_play_item || item == &bk_first_item ||
+           item == &bk_later_item || item == &bk_last_item;
+}
+
+/* Every way of playing the selection, for a screen that offers them as one
+ * row of its own (the playlist viewer, the book shelf, a shortcut). The
+ * browser's own menu has these rows at its top level instead. */
 MAKE_ONPLAYMENU(browser_playlist_menu, ID2P(LANG_PLAYING_NEXT),
                 treeplaylist_callback, Icon_Playlist,
-
-                /* insert */
+                &replace_pl_item,
+                &replace_shuf_pl_item,
+                &i_first_pl_item,
                 &i_pl_item,
                 &i_last_pl_item,
-                &i_first_pl_item,
                 &i_shuf_pl_item,
                 &i_last_shuf_pl_item,
-
-                /* queue */
-                &q_pl_item,
-                &q_last_pl_item,
-                &q_first_pl_item,
-                &q_shuf_pl_item,
-                &q_last_shuf_pl_item,
-
-                /* Queue submenu */
                 &queue_menu,
-
-                /* replace */
-                &replace_pl_item,
-                &replace_shuf_pl_item
+                &replace_more_pl_item,
+                &replace_shuf_more_pl_item
                );
 
+static bool sel_is_playable(void)
+{
+    int attr = selected_file.attr & FILE_ATTR_MASK;
+
+    return attr == FILE_ATTR_AUDIO || attr == FILE_ATTR_M3U ||
+           (selected_file.attr & ATTR_DIRECTORY);
+}
+
+/* A folder, an album or a playlist: something with tracks to shuffle */
+static bool sel_is_container(void)
+{
+    return (selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_M3U ||
+           (selected_file.attr & ATTR_DIRECTORY);
+}
+
+/* Stopped, the rows on offer start something; playing, they add to it, and
+ * the ones that start something move to More. Paused counts as playing. */
 static int treeplaylist_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)
 {
     (void)this_list;
-    int sel_file_attr = (selected_file.attr & FILE_ATTR_MASK);
+    bool playing = audio_status() & AUDIO_STATUS_PLAY;
 
-    switch (action)
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+
+    if (!sel_is_playable())
+        return ACTION_EXIT_MENUITEM;
+
+    if (this_item == &browser_playlist_menu)
+        return action;
+
+    if (this_item == &queue_menu)
+        return playing ? action : ACTION_EXIT_MENUITEM;
+
+    /* A book has its own copies of the top rows, under More */
+    if (is_book_row(this_item) != ctx_in_order &&
+        (is_book_row(this_item) || this_item == &replace_pl_item ||
+         this_item == &replace_shuf_pl_item || this_item == &i_first_pl_item ||
+         this_item == &i_pl_item || this_item == &i_last_pl_item))
+        return ACTION_EXIT_MENUITEM;
+
+    struct add_to_pl_param *param = this_item->function_param->param;
+
+    if ((param->flags & PL_REPLACE) == PL_REPLACE)
     {
-    case ACTION_REQUEST_MENUITEM:
-        if (this_item == &browser_playlist_menu)
-        {
-            if (sel_file_attr != FILE_ATTR_AUDIO &&
-                sel_file_attr != FILE_ATTR_M3U &&
-                (selected_file.attr & ATTR_DIRECTORY) == 0)
-                return ACTION_EXIT_MENUITEM;
-        }
-        else if (this_item == &queue_menu)
-        {
-            if (global_settings.show_queue_options != QUEUE_SHOW_IN_SUBMENU)
-                return ACTION_EXIT_MENUITEM;
+        if (playing != (this_item == &replace_more_pl_item ||
+                        this_item == &replace_shuf_more_pl_item))
+            return ACTION_EXIT_MENUITEM;
+        if (param->position == PLAYLIST_INSERT_LAST_SHUFFLED)
+            return (sel_is_container() && !ctx_in_order)
+                   ? action : ACTION_EXIT_MENUITEM;
+        /* OK already plays a track in the browser */
+        if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO &&
+            selected_file.context != CONTEXT_STD)
+            return ACTION_EXIT_MENUITEM;
+        return action;
+    }
 
-            /* queueing options only work during playback */
-            if (!(audio_status() & AUDIO_STATUS_PLAY))
-                return ACTION_EXIT_MENUITEM;
-        }
-        else if ((this_item->flags & MENU_TYPE_MASK) == MT_FUNCTION_CALL_W_PARAM &&
-                 this_item->function_param->function_w_param == add_to_playlist)
-        {
-            struct add_to_pl_param *param = this_item->function_param->param;
+    if (!playing)
+        return ACTION_EXIT_MENUITEM;
 
-            if ((param->flags & PL_QUEUE) == PL_QUEUE)
-            {
-                if (global_settings.show_queue_options != QUEUE_SHOW_AT_TOPLEVEL &&
-                    !in_queue_submenu)
-                    return ACTION_EXIT_MENUITEM;
-            }
-
-            if (param->position == PLAYLIST_INSERT_SHUFFLED ||
-                param->position == PLAYLIST_INSERT_LAST_SHUFFLED)
-            {
-                if (ctx_in_order)
-                    return ACTION_EXIT_MENUITEM;
-                if (!global_settings.show_shuffled_adding_options)
-                    return ACTION_EXIT_MENUITEM;
-
-                if (sel_file_attr != FILE_ATTR_M3U &&
-                    (selected_file.attr & ATTR_DIRECTORY) == 0)
-                    return ACTION_EXIT_MENUITEM;
-            }
-
-            if ((param->flags & PL_REPLACE) != PL_REPLACE)
-            {
-                if (!(audio_status() & AUDIO_STATUS_PLAY))
-                    return ACTION_EXIT_MENUITEM;
-            }
-        }
-
-        break;
-
-    case ACTION_ENTER_MENUITEM:
-        in_queue_submenu = this_item == &queue_menu;
-        break;
+    if (param->position == PLAYLIST_INSERT_SHUFFLED ||
+        param->position == PLAYLIST_INSERT_LAST_SHUFFLED)
+    {
+        if (ctx_in_order || !global_settings.show_shuffled_adding_options ||
+            !sel_is_container())
+            return ACTION_EXIT_MENUITEM;
     }
 
     return action;
@@ -1040,9 +1084,11 @@ int context_menu_show_playlist(const char* path, int attr, void (*playlist_inser
     ctx_current_playlist_insert = playlist_insert_cb;
     selected_file_set(CONTEXT_STD, path, attr);
     ctx_in_order = in_order;
-    in_queue_submenu = false;
+    ctx_go_to = false;
     push_current_activity(ACTIVITY_CONTEXTMENU);
+    hiding_begin();
     do_menu(&browser_playlist_menu, NULL, NULL, false);
+    hiding_end();
     if (get_current_activity() == ACTIVITY_CONTEXTMENU)
         pop_current_activity();
     return context_menu_result;
@@ -1072,22 +1118,15 @@ MENUITEM_FUNCTION(cat_add_to_new, 0, ID2P(LANG_CATALOG_ADD_TO_NEW),
 MAKE_ONPLAYMENU(cat_playlist_menu, ID2P(LANG_ADD_TO_PL),
                 cat_playlist_callback, Icon_Playlist,
                 &cat_add_to_list, &cat_add_to_new);
-
-void context_menu_show_playlist_cat(const char* track_name, int attr, void (*add_to_pl_cb))
-{
-    ctx_add_to_playlist = add_to_pl_cb;
-    selected_file_set(CONTEXT_STD, track_name, attr);
-    push_current_activity(ACTIVITY_CONTEXTMENU);
-    do_menu(&cat_playlist_menu, NULL, NULL, false);
-    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
-        pop_current_activity();
-}
+/* A book's, under More */
+MAKE_ONPLAYMENU(book_cat_menu, ID2P(LANG_ADD_TO_PL),
+                cat_playlist_callback, Icon_Playlist,
+                &cat_add_to_list, &cat_add_to_new);
 
 static int cat_playlist_callback(int action,
                                  const struct menu_item_ex *this_item,
                                  struct gui_synclist *this_list)
 {
-    (void)this_item;
     (void)this_list;
     if (!selected_file.path ||
         (((selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO) &&
@@ -1099,6 +1138,8 @@ static int cat_playlist_callback(int action,
 
     if (action == ACTION_REQUEST_MENUITEM)
     {
+        if ((this_item == &book_cat_menu) != ctx_in_order)
+            return ACTION_EXIT_MENUITEM;
         if ((audio_status() & AUDIO_STATUS_PLAY)
            || selected_file.context != CONTEXT_WPS)
         {
@@ -1165,78 +1206,22 @@ static int clipboard_paste(void)
     return 1;
 }
 
-static int set_rating_inline(void)
-{
-    struct mp3entry* id3 = audio_current_track();
-    if (browser_db_track_idx(id3) >= 0)
-    {
-        set_int_ex(str(LANG_MENU_SET_RATING), "", UNIT_INT, (void*)(&id3->rating),
-                   NULL, 1, 0, 10, NULL, NULL);
-        /* Asked again: a Rebuild may have finished while the screen was up. */
-        if (browser_db_track_idx(id3) >= 0)
-            tagcache_update_numeric(browser_db_track_idx(id3), tag_rating,
-                                    id3->rating);
-    }
-    else
-        splash(HZ*2, ID2P(LANG_ID3_NO_INFO));
-    return 0;
-}
-static int ratingitem_callback(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
-{
-    (void)this_item;
-    (void)this_list;
-    if (action == ACTION_REQUEST_MENUITEM)
-    {
-        if (!selected_file.path || !tagcache_is_usable())
-            return ACTION_EXIT_MENUITEM;
-    }
-    return action;
-}
-MENUITEM_FUNCTION(rating_item, 0, ID2P(LANG_MENU_SET_RATING),
-                  set_rating_inline,
-                  ratingitem_callback, Icon_Questionmark);
+static long selected_track_idx(void);
 
-static bool rating_accepted;
-
-static void rating_accept(int value)
-{
-    (void)value;
-    rating_accepted = true;
-}
-
-/* The 0-10 picker, true only when a value was accepted. An album's rating
- * overwrites every track, so Cancel has to be told apart from accepting the
- * value the picker opened on -- which set_int_ex() reports identically. The
- * callback runs on OK alone under F_CB_ON_SELECT_ONLY. */
+/* True only when a rating was kept. An album's rating overwrites every
+ * track, so Cancel has to be told apart from keeping the rating it opened
+ * on. */
 static bool pick_rating(const unsigned char *title, int *rating)
 {
-    const struct int_setting data = {
-        .option_callback = rating_accept,
-        .unit = UNIT_INT,
-        .step = 1,
-        .min = 0,
-        .max = 10,
-    };
-    const struct settings_list item = {
-        .flags = F_INT_SETTING|F_T_INT|F_CB_ON_SELECT_ONLY,
-        .setting = rating,
-        .lang_id = -1,
-        .int_setting = &data,
-    };
-
-    rating_accepted = false;
-    option_screen(&item, NULL, false, title);
-    return rating_accepted;
+    return rating_dialog((const char *)P2STR(title), rating);
 }
 
-/* Rating from the database browser. An entry number is only good for the
- * generation it was read in: a Rebuild finishing while the picker is up
- * renumbers the tracks, and the rating would land on someone else's. */
-static int set_db_rating(bool album)
+/* An entry number is only good for the generation it was read in: a Rebuild
+ * finishing while the picker is up renumbers the tracks, and the rating would
+ * land on someone else's. */
+static int set_rating(bool album)
 {
-    long idx = album ? -1 : browser_db_selected_track_idx();
+    long idx = album ? -1 : selected_track_idx();
     int rating = album ? 0 : browser_db_get_rating(idx);
     uint32_t generation = tagcache_generation();
 
@@ -1252,47 +1237,50 @@ static int set_db_rating(bool album)
         splash(HZ*2, ID2P(LANG_FAILED));
 
     /* A User Rating list shows the number it was sorted by. */
-    context_menu_result = ONPLAY_RELOAD_DIR;
+    if (selected_file.context == CONTEXT_ID3DB)
+        context_menu_result = ONPLAY_RELOAD_DIR;
     return 0;
 }
 
-static int set_db_track_rating(void)
+static int set_track_rating(void)
 {
-    return set_db_rating(false);
+    return set_rating(false);
 }
 
-static int set_db_album_rating(void)
+static int set_album_rating(void)
 {
-    return set_db_rating(true);
+    return set_rating(true);
 }
 
-/* Album rows only, as for Album Sound: from an artist or genre row the tracks
- * reached are that row's first album's -- see sound_album_selectable(). */
-static int db_rating_callback(int action,
-                              const struct menu_item_ex *this_item,
-                              struct gui_synclist *this_list);
-MENUITEM_FUNCTION(db_track_rating_item, 0, ID2P(LANG_MENU_SET_RATING),
-                  set_db_track_rating, db_rating_callback, Icon_Questionmark);
-MENUITEM_FUNCTION(db_album_rating_item, 0, ID2P(LANG_MENU_SET_ALBUM_RATING),
-                  set_db_album_rating, db_rating_callback, Icon_Questionmark);
+/* A track's rating from anywhere the database knows the track. An album's
+ * from album rows only, as for Album Sound: from an artist or genre row the
+ * tracks reached are that row's first album's -- see sound_album_selectable(). */
+static int rating_callback(int action,
+                           const struct menu_item_ex *this_item,
+                           struct gui_synclist *this_list);
+MENUITEM_FUNCTION(rating_item, 0, ID2P(LANG_MENU_SET_RATING),
+                  set_track_rating, rating_callback, Icon_Questionmark);
+MENUITEM_FUNCTION(album_rating_item, 0, ID2P(LANG_MENU_SET_ALBUM_RATING),
+                  set_album_rating, rating_callback, Icon_Questionmark);
 
-static int db_rating_callback(int action,
-                              const struct menu_item_ex *this_item,
-                              struct gui_synclist *this_list)
+static int rating_callback(int action,
+                           const struct menu_item_ex *this_item,
+                           struct gui_synclist *this_list)
 {
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM)
     {
-        if (selected_file.context != CONTEXT_ID3DB || !tagcache_is_usable())
+        if (!tagcache_is_usable() || ctx_in_order)
             return ACTION_EXIT_MENUITEM;
-        if (this_item == &db_track_rating_item)
-            return browser_db_selected_track_idx() >= 0
-                   ? action : ACTION_EXIT_MENUITEM;
-        return browser_db_current_scope() == BROWSER_DB_SCOPE_ALBUM
+        if (this_item == &rating_item)
+            return selected_track_idx() >= 0 ? action : ACTION_EXIT_MENUITEM;
+        return selected_file.context == CONTEXT_ID3DB &&
+               browser_db_current_scope() == BROWSER_DB_SCOPE_ALBUM
                ? action : ACTION_EXIT_MENUITEM;
     }
     return action;
 }
+
 static bool view_cue(void)
 {
     struct mp3entry* id3 = audio_current_track();
@@ -1448,6 +1436,102 @@ static int reveal(void)
 MENUITEM_FUNCTION(reveal_item, 0, ID2P(LANG_SHOW_IN_FILES),
                   reveal, clipboard_callback, Icon_file_view_menu);
 
+/* The selected track's database entry, or -1. From RAM alone, since the
+ * menu asks each time it is drawn and must not wake the disk for it. */
+static long selected_track_idx(void)
+{
+    struct mp3entry *id3;
+    long idx;
+
+    if (selected_file.context == CONTEXT_WPS)
+    {
+        id3 = audio_current_track();
+        idx = browser_db_track_idx(id3);
+        if (idx < 0 && id3 != NULL)
+            idx = tagcache_find_path(id3->path);
+        return idx;
+    }
+
+    if ((selected_file.attr & FILE_ATTR_MASK) != FILE_ATTR_AUDIO)
+        return -1;
+    if (selected_file.context == CONTEXT_ID3DB)
+        return browser_db_selected_track_idx();
+    return selected_file.path ? tagcache_find_path(selected_file.path) : -1;
+}
+
+/* The album row of the selected track, from the RAM copy's album table */
+static bool selected_track_album(struct tagcache_album *album)
+{
+    int row = tagcache_album_of(selected_track_idx());
+
+    return row >= 0 && tagcache_album_get(row, album);
+}
+
+static int go_to_callback(int action,
+                          const struct menu_item_ex *this_item,
+                          struct gui_synclist *this_list);
+
+/* Both leave for the database browser, opened on the album or the album
+ * artist, as a cover chosen in Album Covers does */
+static int go_to_album(void)
+{
+    struct tagcache_album album;
+    char name[MAX_PATH];
+
+    if (!selected_track_album(&album))
+        return 0;
+    if (!tagcache_seek_string(tag_album, album.album_seek, name, sizeof(name)))
+        name[0] = '\0';
+
+    browser_db_enter_artist_album_tracks_on_next_load(album.album_seek,
+                                                      album.artist_seek, name);
+    context_menu_result = ONPLAY_GO_TO_LIBRARY;
+    return 0;
+}
+
+static int go_to_artist(void)
+{
+    struct tagcache_album album;
+    char name[MAX_PATH];
+
+    if (!selected_track_album(&album))
+        return 0;
+    if (!tagcache_seek_string(tag_albumartist, album.artist_seek,
+                              name, sizeof(name)))
+        name[0] = '\0';
+
+    browser_db_enter_artist_albums_on_next_load(album.artist_seek, name);
+    context_menu_result = ONPLAY_GO_TO_LIBRARY;
+    return 0;
+}
+
+MENUITEM_FUNCTION(go_to_album_item, 0, ID2P(LANG_GO_TO_ALBUM),
+                  go_to_album, go_to_callback, Icon_NOICON);
+MENUITEM_FUNCTION(go_to_artist_item, 0, ID2P(LANG_GO_TO_ARTIST),
+                  go_to_artist, go_to_callback, Icon_NOICON);
+
+/* An artist row in the album table has an untagged album artist as a seek
+ * like any other; its name read back is what says it is untagged. */
+static int go_to_callback(int action,
+                          const struct menu_item_ex *this_item,
+                          struct gui_synclist *this_list)
+{
+    struct tagcache_album album;
+    char name[2];
+
+    (void)this_list;
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+
+    if (!ctx_go_to || ctx_in_order || !selected_track_album(&album))
+        return ACTION_EXIT_MENUITEM;
+    if (this_item == &go_to_artist_item &&
+        !tagcache_seek_string(tag_albumartist, album.artist_seek,
+                              name, sizeof(name)))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
 static char mark_book[BOOK_ID_MAX];
 
 static int mark_book_callback(int action,
@@ -1532,8 +1616,44 @@ static bool context_menu_properties(void *param)
 MENUITEM_FUNCTION_W_PARAM(properties_item, 0, ID2P(LANG_PROPERTIES),
                   context_menu_properties, NULL,
                   clipboard_callback, Icon_NOICON);
-MENUITEM_FUNCTION_W_PARAM(track_info_item, 0, ID2P(LANG_MENU_SHOW_ID3_INFO),
+
+/* Named for what it describes: from the database a row that is not a track
+ * shows that row's own details, not a track's. */
+static int info_lang_id(void)
+{
+    if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO)
+        return LANG_TRACK_INFO;
+    if (ctx_in_order)
+        return LANG_BOOK_INFO;
+
+    switch (browser_db_current_scope())
+    {
+        case BROWSER_DB_SCOPE_ALBUM:
+            return LANG_ALBUM_INFO;
+        case BROWSER_DB_SCOPE_ARTIST:
+            return LANG_ARTIST_INFO;
+        default:
+            return LANG_INFO;
+    }
+}
+
+static char *info_item_name(int selected_item, void *data,
+                            char *buffer, size_t buffer_len)
+{
+    (void)selected_item; (void)data; (void)buffer; (void)buffer_len;
+    return str(info_lang_id());
+}
+
+static int info_item_speak(int selected_item, void *data)
+{
+    (void)selected_item; (void)data;
+    talk_id(info_lang_id(), false);
+    return 0;
+}
+
+MENUITEM_FUNCTION_DYNTEXT_W_PARAM(track_info_item, 0,
                   context_menu_properties, NULL,
+                  info_item_name, info_item_speak, NULL,
                   clipboard_callback, Icon_NOICON);
 
 /* The activity dance and the side-channel are context_menu_properties()'s, and
@@ -1562,9 +1682,38 @@ static bool context_menu_listen_progress(void)
         context_menu_result = ONPLAY_MAINMENU;
     return false;
 }
+static int listen_progress_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list);
+/* A book's own figures sit at the top of its menu; an album's or an
+ * artist's, under More. */
+MENUITEM_FUNCTION(listen_book_item, 0, ID2P(LANG_LISTEN_PROGRESS),
+                  context_menu_listen_progress,
+                  listen_progress_callback, Icon_NOICON);
 MENUITEM_FUNCTION(listen_progress_item, 0, ID2P(LANG_LISTEN_PROGRESS),
                   context_menu_listen_progress,
-                  clipboard_callback, Icon_NOICON);
+                  listen_progress_callback, Icon_NOICON);
+
+static int listen_progress_callback(int action,
+                                    const struct menu_item_ex *this_item,
+                                    struct gui_synclist *this_list)
+{
+    struct browser_context *c = browser_get_context();
+    long album_seek, artist_seek;
+
+    (void)this_list;
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+
+    if (selected_file.context != CONTEXT_ID3DB ||
+        (this_item == &listen_book_item) != in_book_list())
+        return ACTION_EXIT_MENUITEM;
+
+    return browser_db_current_scope() != BROWSER_DB_SCOPE_NONE
+           || browser_db_get_book_album(c, c->selected_item,
+                                        &album_seek, &artist_seek)
+         ? action : ACTION_EXIT_MENUITEM;
+}
 static bool context_menu_add_to_shortcuts(void)
 {
     /* A directory shortcut browses into it; a file shortcut runs the file
@@ -1655,17 +1804,6 @@ static int clipboard_callback(int action,
                 if (this_item == &track_info_item ||
                     this_item == &reveal_item)
                     return action;
-                if (this_item == &listen_progress_item)
-                {
-                    struct browser_context *c = browser_get_context();
-                    long album_seek, artist_seek;
-
-                    return browser_db_current_scope() != BROWSER_DB_SCOPE_NONE
-                           || browser_db_get_book_album(c, c->selected_item,
-                                                        &album_seek,
-                                                        &artist_seek)
-                         ? action : ACTION_EXIT_MENUITEM;
-                }
                 return ACTION_EXIT_MENUITEM;
             }
             if (this_item == &clipboard_paste_item)
@@ -1730,153 +1868,183 @@ static int context_menu_callback(int action,
                                const struct menu_item_ex *this_item,
                                struct gui_synclist *this_list);
 
-/* The configurable tail of the WPS context menu.
+/* Now Playing's rows for the playing file itself */
+static bool hotkey_delete_item(void);
 
-   global_settings.context_wps packs HK_CTX_ITEMS hotkey actions into one int.
-   Item 0 is the hotkey button itself and is not drawn as a row; items 1..4 are
-   the rows below, each showing whichever action the user assigned to it. A row
-   set to HOTKEY_OFF hides itself rather than showing as a dead entry. */
-
-static int execute_hotkey(int action);
-static int wps_context_item_cb(int, const struct menu_item_ex *,
-                               struct gui_synclist *);
-
-static char *wps_context_get_item_name(int selected_item, void *data,
-                                       char *buffer, size_t buffer_len)
+static int wps_track_info(void)
 {
-    (void)selected_item; (void)buffer; (void)buffer_len;
-    int item = (intptr_t)data;
-    const struct hotkey_assignment *hkey =
-        get_hotkey(HK_CTX_GET(item, global_settings.context_wps));
-
-    return ID2P(hkey->lang_id);
-}
-
-static int wps_context_item_speak_item(int selected_item, void *data)
-{
-    (void)selected_item;
-    int item = (intptr_t)data;
-    const struct hotkey_assignment *hkey =
-        get_hotkey(HK_CTX_GET(item, global_settings.context_wps));
-
-    talk_id(hkey->lang_id, false);
+    if (browse_id3_wrapper() == GO_TO_ROOT)
+        context_menu_result = ONPLAY_MAINMENU;
     return 0;
 }
 
-/* Like MENUITEM_RETURNVALUE_DYNTEXT, but the name-and-icon struct is writable
-   so each row can take the icon of whatever action is assigned to it. */
-#define WPSCTX_RETURNVALUE_DYNTEXT(name, val, cb, text_callback,            \
-                                     voice_callback, text_cb_data, icon)    \
-     struct menu_get_name_and_icon name##_                                  \
-         = {cb,text_callback,voice_callback,text_cb_data,icon};             \
-     static const struct menu_item_ex name   =                              \
-        { MT_RETURN_VALUE|MENU_DYNAMIC_DESC, { .value = val},               \
-        {.menu_get_name_and_icon = & name##_}};
-
-WPSCTX_RETURNVALUE_DYNTEXT(context_item_0, GO_TO_PREVIOUS, wps_context_item_cb,
-  wps_context_get_item_name, wps_context_item_speak_item, (void*)0, Icon_NOICON);
-
-WPSCTX_RETURNVALUE_DYNTEXT(context_item_1, GO_TO_PREVIOUS, wps_context_item_cb,
-  wps_context_get_item_name, wps_context_item_speak_item, (void*)1, Icon_NOICON);
-
-WPSCTX_RETURNVALUE_DYNTEXT(context_item_2, GO_TO_PREVIOUS, wps_context_item_cb,
-  wps_context_get_item_name, wps_context_item_speak_item, (void*)2, Icon_NOICON);
-
-WPSCTX_RETURNVALUE_DYNTEXT(context_item_3, GO_TO_PREVIOUS, wps_context_item_cb,
-  wps_context_get_item_name, wps_context_item_speak_item, (void*)3, Icon_NOICON);
-
-WPSCTX_RETURNVALUE_DYNTEXT(context_item_4, GO_TO_PREVIOUS, wps_context_item_cb,
-  wps_context_get_item_name, wps_context_item_speak_item, (void*)4, Icon_NOICON);
-
-/* map item number to menu_get_name_and_icon structs so we can change icons */
-static struct menu_get_name_and_icon * const ctx_item_map[HK_CTX_ITEMS]=
-  {&context_item_0_, &context_item_1_, &context_item_2_, &context_item_3_,
-   &context_item_4_};
-
-static int wps_context_item_cb(int action,
-                               const struct menu_item_ex *this_item,
-                               struct gui_synclist *this_list)
+static int wps_file_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
 {
+    (void)this_item;
     (void)this_list;
-    int item = (intptr_t) this_item->menu_get_name_and_icon->list_get_name_data;
-    int act = HK_CTX_GET(item, global_settings.context_wps);
-
-    if (action == ACTION_ENTER_MENUITEM || action == ACTION_REQUEST_MENUITEM)
-    {
-        if (act == HOTKEY_OFF)
-            return ACTION_EXIT_MENUITEM;
-
-        ctx_item_map[item]->icon_id = get_hotkey(act)->icon;
-    }
-    else if (action == ACTION_EXIT_MENUITEM) /* selected */
-    {
-        if (act == HOTKEY_CONTEXT_MENU)
-        {
-            context_menu_result = hotkey_run_menu(HOTKEY_FLAG_WPS, true, 0);
-        }
-        else
-        {
-            context_menu_result = execute_hotkey(act);
-        }
-        return ACTION_EXIT_AFTER_THIS_MENUITEM;
-    }
-    return action;
-}
-
-/* used when context_menu_show() is called in the CONTEXT_WPS context */
-MAKE_ONPLAYMENU( wps_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
-           context_menu_callback, Icon_Audio,
-           &wps_playlist_menu, &cat_playlist_menu,
-           &sound_settings, &playback_settings,
-           &rating_item,
-           &bookmark_menu,
-           &view_cue_item,
-           &view_chapters_item,
-           &sound_mix_item,
-           &winddown_item,
-           &sleep_timer_item,
-           &spike_run_item,
-           &context_item_1,
-           &context_item_2,
-           &context_item_3,
-           &context_item_4,
-         );
-
-int sort_playlists_callback(int action,
-                            const struct menu_item_ex *this_item,
-                            struct gui_synclist *this_list)
-{
-    (void) this_list;
-    (void) this_item;
-
     if (action == ACTION_REQUEST_MENUITEM &&
-        *browser_get_context()->dirfilter != SHOW_M3U)
-    {
+        (selected_file.path == NULL || selected_file.path[0] == '\0'))
         return ACTION_EXIT_MENUITEM;
-    }
     return action;
 }
 
-MENUITEM_SETTING(sort_playlists, &global_settings.sort_playlists, sort_playlists_callback);
+MENUITEM_FUNCTION(wps_track_info_item, 0, ID2P(LANG_TRACK_INFO),
+                  wps_track_info, wps_file_callback, Icon_NOICON);
+MENUITEM_FUNCTION(wps_reveal_item, 0, ID2P(LANG_SHOW_IN_FILES),
+                  reveal, wps_file_callback, Icon_file_view_menu);
+MENUITEM_FUNCTION(wps_album_art_item, 0, ID2P(LANG_VIEW_ALBUMART),
+                  view_album_art, wps_file_callback, Icon_NOICON);
+MENUITEM_FUNCTION(wps_delete_item, 0, ID2P(LANG_DELETE),
+                  hotkey_delete_item, wps_file_callback, Icon_NOICON);
+
+/* The title is what the menu acts on: the playing track's title, or the
+ * selected row's name. Copied, because the playing track's id3 is the live
+ * entry and not a copy of one. */
+static char *context_menu_title(int selected_item, void *data,
+                                char *buffer, size_t buffer_len)
+{
+    struct mp3entry *id3;
+    const char *name;
+
+    (void)selected_item;
+    (void)data;
+
+    if (selected_file.context == CONTEXT_WPS
+        && (id3 = audio_current_track()) != NULL
+        && id3->title != NULL && id3->title[0] != '\0')
+    {
+        strmemccpy(buffer, id3->title, buffer_len);
+        return buffer;
+    }
+
+    if (selected_file.context == CONTEXT_ID3DB)
+    {
+        browser_db_current_entry_name(buffer, buffer_len);
+        if (buffer[0] != '\0')
+            return buffer;
+    }
+    else if (selected_file.path != NULL)
+    {
+        name = strrchr(selected_file.path, PATH_SEPCH);
+        name = name ? name + 1 : selected_file.path;
+        if (*name != '\0')
+        {
+            strmemccpy(buffer, name, buffer_len);
+            return buffer;
+        }
+    }
+
+    return str(LANG_ONPLAY_MENU_TITLE);
+}
+
+/* As MAKE_ONPLAYMENU, titled by context_menu_title() */
+#define MAKE_ONPLAYMENU_TITLED( name, callback, icon, ... )             \
+    static const struct menu_item_ex *name##_[]  = {__VA_ARGS__};       \
+    static const struct menu_get_name_and_icon name##__ =               \
+        {callback, context_menu_title, NULL, NULL, icon};               \
+    static const struct menu_item_ex name =                             \
+        {MT_MENU|MENU_DYNAMIC_DESC|MENU_EXITAFTERTHISMENU|              \
+         MENU_ITEM_COUNT(sizeof( name##_)/sizeof(*name##_)),            \
+            { (void*)name##_},{.menu_get_name_and_icon = & name##__}};
 
 MENUITEM_FUNCTION(view_playlist_item, 0, ID2P(LANG_VIEW),
                   view_playlist,
                   context_menu_callback, Icon_NOICON);
 
-/* used when context_menu_show() is not called in the CONTEXT_WPS context */
-MAKE_ONPLAYMENU( browser_context_menu, ID2P(LANG_ONPLAY_MENU_TITLE),
-           context_menu_callback, Icon_file_view_menu,
-           &view_playlist_item, &browser_playlist_menu, &cat_playlist_menu,
-           &sound_mix_item, &winddown_item, &sound_album_item,
-           &db_track_rating_item, &db_album_rating_item,
-           &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
-           &clipboard_paste_item, &delete_file_item, &delete_dir_item,
-           &create_dir_item, &properties_item, &track_info_item,
+/* Whether any of a submenu's rows would show. A submenu with none is hidden
+ * rather than opened onto an empty list. */
+static int submenu_callback(int action,
+                            const struct menu_item_ex *this_item,
+                            struct gui_synclist *this_list)
+{
+    if (action != ACTION_REQUEST_MENUITEM)
+        return action;
+
+    for (unsigned i = 0; i < MENU_GET_COUNT(this_item->flags); i++)
+    {
+        const struct menu_item_ex *row = this_item->submenus[i];
+        /* A setting row holds its callback directly, as get_menu_callback()
+         * in menu.c reads it */
+        menu_callback_type cb =
+            (row->flags & (MENU_HAS_DESC|MENU_DYNAMIC_DESC))
+                ? row->callback_and_desc->menu_callback : row->menu_callback;
+
+        if (row_hidden(row))
+            continue;
+        if (cb == NULL || cb(action, row, this_list) != ACTION_EXIT_MENUITEM)
+            return action;
+    }
+    return ACTION_EXIT_MENUITEM;
+}
+
+/* The rarer ways of playing the selection, and the places it can be taken */
+MAKE_ONPLAYMENU( more_menu, ID2P(LANG_MORE),
+           submenu_callback, Icon_NOICON,
+           &bk_play_item, &bk_first_item, &bk_later_item, &bk_last_item,
+           &book_cat_menu,
+           &replace_more_pl_item, &replace_shuf_more_pl_item,
+           &i_shuf_pl_item, &i_last_shuf_pl_item, &queue_menu,
+           &sound_album_item,
            &listen_progress_item,
            &reveal_item,
+           &add_to_faves_item,
+         );
+
+/* File management, for the file browser */
+MAKE_ONPLAYMENU( manage_menu, ID2P(LANG_MANAGE),
+           submenu_callback, Icon_NOICON,
+           &rename_file_item, &clipboard_cut_item, &clipboard_copy_item,
+           &delete_file_item, &delete_dir_item, &create_dir_item,
+           &set_backdrop_item, &set_as_dir_menu,
+         );
+
+/* Now Playing's rarer rows */
+MAKE_ONPLAYMENU( wps_more_menu, ID2P(LANG_MORE),
+           submenu_callback, Icon_NOICON,
+           &wps_reveal_item,
+           &wps_album_art_item,
+           &winddown_item,
+           &bookmark_menu,
+           &view_cue_item,
+           &view_chapters_item,
+           &equalizer_menu,
+           &sound_settings, &playback_settings,
+           &wps_delete_item,
+         );
+
+/* used when context_menu_show() is called in the CONTEXT_WPS context */
+MAKE_ONPLAYMENU_TITLED( wps_context_menu,
+           context_menu_callback, Icon_Audio,
+           &wps_shuffle_item, &wps_repeat_item,
+           &rating_item,
+           &wps_track_info_item,
+           &go_to_album_item, &go_to_artist_item,
+           &lyrics_item,
+           &sleep_timer_item,
+           &sound_mix_item,
+           &spike_run_item,
+           &wps_playlist_menu, &cat_playlist_menu,
+           &wps_more_menu,
+         );
+
+/* used when context_menu_show() is not called in the CONTEXT_WPS context */
+MAKE_ONPLAYMENU_TITLED( browser_context_menu,
+           context_menu_callback, Icon_file_view_menu,
            &mark_book_item,
-           &set_backdrop_item,
-           &add_to_faves_item, &set_as_dir_menu, &file_menu, &sort_playlists,
+           &listen_book_item,
+           &view_playlist_item,
+           &replace_pl_item, &replace_shuf_pl_item,
+           &i_first_pl_item, &i_pl_item, &i_last_pl_item,
+           &cat_playlist_menu,
+           &sound_mix_item, &winddown_item,
+           &rating_item, &album_rating_item,
+           &go_to_album_item, &go_to_artist_item,
+           &properties_item, &track_info_item,
+           &clipboard_paste_item,
+           &more_menu,
+           &manage_menu,
          );
 static int context_menu_callback(int action,
                                const struct menu_item_ex *this_item,
@@ -2161,33 +2329,14 @@ int hotkey_run_menu(intptr_t flag, bool execute, int current_action)
     }
 }
 
-/* Assign one packed item from the settings screens. Assigning an action that
-   is already on another item clears the other one, so an action cannot appear
-   twice in the same menu. The hotkey (item 0) is exempt -- it is a button, not
-   a row, so it may duplicate one. */
+/* Assign a hotkey's action from the settings screens */
 static int hotkey_menu_do_setting(void *param, int *setting, int flag)
 {
-    int current = *setting;
-    int item = (intptr_t)param;
+    int sel = hotkey_run_menu(flag, false, HK_CTX_GET(0, *setting));
 
-    int temp = HK_CTX_GET(item, current);
-    int sel = hotkey_run_menu(flag, false, temp);
+    (void)param;
     if (sel >= 0)
-    {
-        current &= ~HK_CTX_SET(item, HK_CTX_MASK);/*clear*/
-        current |= HK_CTX_SET(item, sel);
-
-        /* check for duplicates */
-        if (item > 0)
-        {
-            for (int i = 1; i < HK_CTX_ITEMS; i++)
-            {
-                if (i != item && HK_CTX_GET(i, *setting) == sel)
-                    current &= ~HK_CTX_SET(i, HK_CTX_MASK);/*clear*/
-            }
-        }
-        *setting = current;
-    }
+        *setting = HK_CTX_SET(0, sel);
     return sel;
 }
 
@@ -2206,13 +2355,31 @@ int tree_context_menu_do_setting(void *param)
 /* config.cfg stores each item by its english name -- see lang_id_to_english().
    Storing the numeric action instead would break as soon as the enum moved,
    and storing the translated name breaks on a language change. */
+
+/* Names actions were saved under before they were renamed, so a config.cfg
+   written then keeps its assignment */
+static const struct
+{
+    const char *name;
+    int action;
+} hotkey_old_names[] = {
+    { "Add to Queue",       HOTKEY_INSERT },
+    { "Shuffle into Queue", HOTKEY_INSERT_SHUFFLED },
+};
+
+/* Whole names only: "Play Later" is also the start of "Play Later Shuffled" */
+static bool cfg_name_is(const char *st, size_t len, const char *name)
+{
+    return strlen(name) == len && strncasecmp(st, name, len) == 0;
+}
+
 void wps_context_menu_load_from_cfg(void *setting, char *value)
 {
     int item = 0;
     int var = 0;
     char *st = value;
     char *end = value;
-    while (*end != '\0' && item < HK_CTX_ITEMS)
+    while (*end != '\0' && item < 1)
     {
         end++;
         if (*end == ',' || *end == '\0')
@@ -2224,10 +2391,15 @@ void wps_context_menu_load_from_cfg(void *setting, char *value)
                      i < ARRAYLEN(hotkey_items); i--)
                 {
                     const char *this = lang_id_to_english(hotkey_items[i].lang_id);
-                    if (strncasecmp(st, this, end - st) == 0)
+                    if (cfg_name_is(st, end - st, this))
                     {
                         var |= HK_CTX_SET(item, hotkey_items[i].action);
                     }
+                }
+                for (size_t i = 0; i < ARRAYLEN(hotkey_old_names); i++)
+                {
+                    if (cfg_name_is(st, end - st, hotkey_old_names[i].name))
+                        var |= HK_CTX_SET(item, hotkey_old_names[i].action);
                 }
             }
             st = end + 1;
@@ -2240,8 +2412,7 @@ void wps_context_menu_load_from_cfg(void *setting, char *value)
 char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len)
 {
     int var = *(int*)setting;
-    /* the file browser hotkey is a button, not a menu -- only item 0 is used */
-    int items = (setting == &global_settings.hotkey_tree) ? 1 : HK_CTX_ITEMS;
+    int items = 1;
 
     unsigned int written;
     char *buffer = buf;
@@ -2265,11 +2436,376 @@ bool wps_context_menu_is_changed(void *setting, void *defaultval)
     return *(int*)setting != *(int*)defaultval;
 }
 
+/* The menu a screen of its own shows for one of its items: the browser's
+ * ways of playing it, with that screen's own rows among them. The rows are
+ * the caller's, held only while the menu is up. */
+static const struct context_menu_row *item_rows;
+static int item_row_count;
+
+/* data is the row's index into item_rows, plus CONTEXT_ROWS_MAX for a slot
+ * under More */
+static int item_row_index(const struct menu_item_ex *this_item)
+{
+    return (intptr_t)this_item->menu_get_name_and_icon->list_get_name_data
+           % CONTEXT_ROWS_MAX;
+}
+
+static char *item_row_name(int selected_item, void *data,
+                           char *buffer, size_t buffer_len)
+{
+    (void)selected_item; (void)buffer; (void)buffer_len;
+    return str(item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].lang_id);
+}
+
+static int item_row_speak(int selected_item, void *data)
+{
+    (void)selected_item;
+    talk_id(item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].lang_id, false);
+    return 0;
+}
+
+static int item_row_run(void *data)
+{
+    context_menu_result = item_rows[(intptr_t)data % CONTEXT_ROWS_MAX].run();
+    return 0;
+}
+
+static int item_row_callback(int action,
+                             const struct menu_item_ex *this_item,
+                             struct gui_synclist *this_list)
+{
+    intptr_t data =
+        (intptr_t)this_item->menu_get_name_and_icon->list_get_name_data;
+    int i = item_row_index(this_item);
+
+    (void)this_list;
+    if (action == ACTION_REQUEST_MENUITEM &&
+        (i >= item_row_count ||
+         item_rows[i].more != (data >= CONTEXT_ROWS_MAX)))
+        return ACTION_EXIT_MENUITEM;
+    return action;
+}
+
+#define ITEM_ROW(name, data)                                                \
+    MENUITEM_FUNCTION_DYNTEXT_W_PARAM(name, 0, item_row_run, (void *)(data), \
+                                      item_row_name, item_row_speak,        \
+                                      (void *)(data), item_row_callback,    \
+                                      Icon_NOICON)
+
+ITEM_ROW(item_row_0, 0)
+ITEM_ROW(item_row_1, 1)
+ITEM_ROW(item_row_2, 2)
+ITEM_ROW(item_row_3, 3)
+ITEM_ROW(item_row_4, 4)
+ITEM_ROW(item_row_5, 5)
+ITEM_ROW(item_row_6, 6)
+ITEM_ROW(item_row_7, 7)
+ITEM_ROW(item_more_0, CONTEXT_ROWS_MAX + 0)
+ITEM_ROW(item_more_1, CONTEXT_ROWS_MAX + 1)
+ITEM_ROW(item_more_2, CONTEXT_ROWS_MAX + 2)
+ITEM_ROW(item_more_3, CONTEXT_ROWS_MAX + 3)
+ITEM_ROW(item_more_4, CONTEXT_ROWS_MAX + 4)
+ITEM_ROW(item_more_5, CONTEXT_ROWS_MAX + 5)
+ITEM_ROW(item_more_6, CONTEXT_ROWS_MAX + 6)
+ITEM_ROW(item_more_7, CONTEXT_ROWS_MAX + 7)
+
+MAKE_ONPLAYMENU( item_more_menu, ID2P(LANG_MORE),
+           submenu_callback, Icon_NOICON,
+           &bk_play_item, &bk_first_item, &bk_later_item, &bk_last_item,
+           &book_cat_menu,
+           &replace_more_pl_item, &replace_shuf_more_pl_item,
+           &i_shuf_pl_item, &i_last_shuf_pl_item, &queue_menu,
+           &item_more_0, &item_more_1, &item_more_2, &item_more_3,
+           &item_more_4, &item_more_5, &item_more_6, &item_more_7,
+         );
+
+MAKE_ONPLAYMENU_TITLED( item_menu,
+           context_menu_callback, Icon_NOICON,
+           &replace_pl_item, &replace_shuf_pl_item,
+           &i_first_pl_item, &i_pl_item, &i_last_pl_item,
+           &item_row_0, &item_row_1, &item_row_2, &item_row_3,
+           &item_row_4, &item_row_5, &item_row_6, &item_row_7,
+           &cat_playlist_menu,
+           &rating_item,
+           &go_to_album_item, &go_to_artist_item,
+           &item_more_menu,
+         );
+
+/* ---- rows hidden from each kind of menu ----------------------------------
+ *
+ * A row is named by its label, so the same row can be hidden from an album's
+ * menu and left on a track's, and a screen's own rows can be hidden as the
+ * browser's are. What cannot be hidden is what keeps a menu from emptying:
+ * the Info row and the rows that play. Each kind's rows are listed in the
+ * order its editor shows them; a row's place in its list is its bit in
+ * global_settings.context_hidden[], which is saved by name. */
+
+static const short now_playing_rows[] = {
+    LANG_SHUFFLE, LANG_REPEAT, LANG_MENU_SET_RATING, LANG_TRACK_INFO,
+    LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_LYRICS, LANG_SLEEP_TIMER,
+    LANG_SOUND_MIX, LANG_SPIKE_PLAY, LANG_CURRENT_PLAYLIST, LANG_ADD_TO_PL,
+    LANG_SHOW_IN_FILES, LANG_VIEW_ALBUMART, LANG_WINDDOWN, LANG_BOOKMARK_MENU,
+    LANG_BROWSE_CUESHEET, LANG_BROWSE_CHAPTERS, LANG_EQUALIZER,
+    LANG_SOUND_SETTINGS, LANG_PLAYBACK, LANG_DELETE,
+};
+static const short track_rows[] = {
+    LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_WINDDOWN, LANG_MENU_SET_RATING,
+    LANG_GO_TO_ALBUM, LANG_GO_TO_ARTIST, LANG_PASTE, LANG_QUEUE_MENU,
+    LANG_SHOW_IN_FILES, LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY,
+    LANG_DELETE, LANG_CREATE_DIR,
+};
+static const short album_rows[] = {
+    LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_MENU_SET_ALBUM_RATING,
+    LANG_GO_TO_ARTIST, LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
+    LANG_QUEUE_MENU, LANG_SOUND_ALBUM, LANG_LISTEN_PROGRESS,
+    LANG_SHOW_IN_FILES,
+};
+static const short artist_rows[] = {
+    LANG_ADD_TO_PL, LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED,
+    LANG_QUEUE_MENU, LANG_LISTEN_PROGRESS, LANG_SHOW_IN_FILES,
+};
+static const short folder_rows[] = {
+    LANG_VIEW, LANG_ADD_TO_PL, LANG_SOUND_MIX, LANG_SOUND_ALBUM, LANG_PASTE,
+    LANG_ADD_SHUFFLED, LANG_PLAY_LAST_SHUFFLED, LANG_QUEUE_MENU,
+    LANG_ADD_TO_FAVES, LANG_RENAME, LANG_CUT, LANG_COPY, LANG_DELETE,
+    LANG_DELETE_DIR, LANG_CREATE_DIR, LANG_SET_AS_BACKDROP, LANG_SET_AS,
+};
+static const short book_rows[] = {
+    LANG_BOOK_MARK_AS, LANG_LISTEN_PROGRESS, LANG_ADD_TO_PL, LANG_QUEUE_MENU,
+    LANG_SHOW_IN_FILES,
+};
+
+static const struct {
+    int lang_id;
+    const short *rows;
+    int count;
+} kinds[CONTEXT_KINDS] = {
+    [CONTEXT_KIND_NOW_PLAYING] = { LANG_NOW_PLAYING_MENU, now_playing_rows,
+                                   ARRAYLEN(now_playing_rows) },
+    [CONTEXT_KIND_TRACK]  = { LANG_TRACK_MENU,  track_rows,
+                              ARRAYLEN(track_rows) },
+    [CONTEXT_KIND_ALBUM]  = { LANG_ALBUM_MENU,  album_rows,
+                              ARRAYLEN(album_rows) },
+    [CONTEXT_KIND_ARTIST] = { LANG_ARTIST_MENU, artist_rows,
+                              ARRAYLEN(artist_rows) },
+    [CONTEXT_KIND_FOLDER] = { LANG_FOLDER_MENU, folder_rows,
+                              ARRAYLEN(folder_rows) },
+    [CONTEXT_KIND_BOOK]   = { LANG_BOOK_MENU,   book_rows,
+                              ARRAYLEN(book_rows) },
+};
+
+_Static_assert(CONTEXT_KINDS == CONTEXT_MENU_KINDS,
+               "one hidden-row mask per kind of context menu");
+
+int context_menu_kind_label(int kind)
+{
+    return kinds[kind].lang_id;
+}
+
+int context_menu_kind_rows(int kind, const short **rows)
+{
+    *rows = kinds[kind].rows;
+    return kinds[kind].count;
+}
+
+/* The kind of the menu that is up, or -1 */
+static int ctx_kind = -1;
+
+/* What the selection is, as far as hiding goes. A screen's own item that is
+ * not a track or a book is taken for an album: covers, guests and the like
+ * all play a set of tracks, as an album's menu does. */
+static int selected_kind(void)
+{
+    if (selected_file.context == CONTEXT_WPS)
+        return CONTEXT_KIND_NOW_PLAYING;
+    if (ctx_in_order)
+        return CONTEXT_KIND_BOOK;
+    if ((selected_file.attr & FILE_ATTR_MASK) == FILE_ATTR_AUDIO)
+        return CONTEXT_KIND_TRACK;
+    if (selected_file.context == CONTEXT_ID3DB)
+        return browser_db_current_scope() == BROWSER_DB_SCOPE_ALBUM
+               ? CONTEXT_KIND_ALBUM : CONTEXT_KIND_ARTIST;
+    if (selected_file.context == CONTEXT_STD)
+        return CONTEXT_KIND_ALBUM;
+    return CONTEXT_KIND_FOLDER;
+}
+
+/* The label a row is known by: a setting's name, a fixed label, or for the
+ * two kinds of dynamic row that can be hidden, the label behind them */
+static int row_lang_id(const struct menu_item_ex *row)
+{
+    int type = row->flags & MENU_TYPE_MASK;
+
+    if (type == MT_SETTING || type == MT_SETTING_W_TEXT)
+    {
+        const struct settings_list *s = find_setting(row->variable);
+        return s ? s->lang_id : -1;
+    }
+    if (row->flags & MENU_HAS_DESC)
+        return P2ID(row->callback_and_desc->desc);
+    if (row->flags & MENU_DYNAMIC_DESC)
+    {
+        const struct menu_get_name_and_icon *d = row->menu_get_name_and_icon;
+
+        if (row == &sleep_timer_item)
+            return LANG_SLEEP_TIMER;
+        if (d->list_get_name == item_row_name)
+        {
+            int i = (intptr_t)d->list_get_name_data % CONTEXT_ROWS_MAX;
+            return i < item_row_count ? item_rows[i].lang_id : -1;
+        }
+    }
+    return -1;
+}
+
+/* The row's bit in its kind's mask, or -1 for a row that cannot be hidden */
+static int row_bit(int kind, const struct menu_item_ex *row)
+{
+    int lang_id;
+
+    if (kind < 0)
+        return -1;
+    lang_id = row_lang_id(row);
+    for (int i = 0; i < kinds[kind].count; i++)
+    {
+        if (kinds[kind].rows[i] == lang_id)
+            return i;
+    }
+    return -1;
+}
+
+static bool row_hidden(const struct menu_item_ex *row)
+{
+    int bit = row_bit(ctx_kind, row);
+
+    return bit >= 0 && (global_settings.context_hidden[ctx_kind] & (1u << bit));
+}
+
+static bool row_hideable(const struct menu_item_ex *row)
+{
+    return row_bit(ctx_kind, row) >= 0;
+}
+
+static void row_hide(const struct menu_item_ex *row)
+{
+    int bit = row_bit(ctx_kind, row);
+
+    if (bit < 0)
+        return;
+    global_settings.context_hidden[ctx_kind] |= 1u << bit;
+    settings_save();
+    splash(HZ, ID2P(LANG_ROW_HIDDEN));
+}
+
+static const struct menu_row_hiding row_hiding = {
+    .hidden = row_hidden,
+    .hideable = row_hideable,
+    .hide = row_hide,
+};
+
+/* Around every do_menu() of a context menu, once the selection is known */
+static void hiding_begin(void)
+{
+    ctx_kind = selected_kind();
+    menu_set_row_hiding(&row_hiding);
+}
+
+static void hiding_end(void)
+{
+    menu_set_row_hiding(NULL);
+    ctx_kind = -1;
+}
+
+/* config.cfg: one line per kind, its hidden rows by their English labels,
+ * so that adding or moving a row does not move the others */
+static int setting_kind(void *setting)
+{
+    return (uint32_t *)setting - global_settings.context_hidden;
+}
+
+void context_hidden_load_from_cfg(void *setting, char *value)
+{
+    int kind = setting_kind(setting);
+    uint32_t mask = 0;
+    char *save, *name = strtok_r(value, ",", &save);
+
+    while (name)
+    {
+        name = skip_whitespace(name);
+        for (int i = 0; i < kinds[kind].count; i++)
+        {
+            if (!strcasecmp(name, lang_id_to_english(kinds[kind].rows[i])))
+                mask |= 1u << i;
+        }
+        name = strtok_r(NULL, ",", &save);
+    }
+    *(uint32_t *)setting = mask;
+}
+
+char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len)
+{
+    int kind = setting_kind(setting);
+    uint32_t mask = *(uint32_t *)setting;
+    int len = 0;
+
+    buf[0] = '\0';
+    for (int i = 0; i < kinds[kind].count && len < buf_len; i++)
+    {
+        if (mask & (1u << i))
+            len += snprintf(buf + len, buf_len - len, "%s%s", len ? ", " : "",
+                            lang_id_to_english(kinds[kind].rows[i]));
+    }
+    return buf;
+}
+
+bool context_hidden_is_changed(void *setting, void *defaultval)
+{
+    (void)defaultval;
+    return *(uint32_t *)setting != 0;
+}
+
+void context_hidden_set_default(void *setting, void *defaultval)
+{
+    (void)defaultval;
+    *(uint32_t *)setting = 0;
+}
+
+
+int context_menu_show_item(const char *path, int attr, bool in_order,
+                           bool go_to,
+                           bool (*playlist_insert_cb)(int position, bool queue,
+                                                      bool create_new),
+                           int (*add_to_pl_cb)(const char *playlist,
+                                               bool new_playlist),
+                           const struct context_menu_row *rows, int count)
+{
+    context_menu_result = ONPLAY_OK;
+    selected_file_set(CONTEXT_STD, path, attr);
+    ctx_in_order = in_order;
+    ctx_go_to = go_to;
+    ctx_current_playlist_insert = playlist_insert_cb;
+    ctx_add_to_playlist = add_to_pl_cb;
+    item_rows = rows;
+    item_row_count = MIN(count, CONTEXT_ROWS_MAX);
+
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    hiding_begin();
+    if (do_menu(&item_menu, NULL, NULL, false) == MENU_ATTACHED_USB)
+        context_menu_result = ONPLAY_MAINMENU;
+    hiding_end();
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+
+    item_row_count = 0;
+    return context_menu_result;
+}
+
 int context_menu_show(char* file, int attr, int from_context, bool hotkey, int customaction)
 {
     const struct menu_item_ex *menu;
     context_menu_result = ONPLAY_OK;
     ctx_current_playlist_insert = NULL;
+    ctx_go_to = true;
     selected_file_set(from_context, NULL, attr);
     ctx_in_order = from_context == CONTEXT_ID3DB && in_book_list();
 
@@ -2300,11 +2836,11 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
     {
         if (from_context == CONTEXT_WPS)
         {
-            /* item 0 of the packed setting is the WPS hotkey; run it through
-               the same callback the menu rows use so HOTKEY_CONTEXT_MENU
-               behaves identically either way */
-            wps_context_item_cb(ACTION_EXIT_MENUITEM, &context_item_0, NULL);
-            return context_menu_result;
+            int act = HK_CTX_GET(0, global_settings.context_wps);
+
+            if (act == HOTKEY_CONTEXT_MENU)
+                return hotkey_run_menu(HOTKEY_FLAG_WPS, true, 0);
+            return execute_hotkey(act);
         }
         return execute_hotkey(global_settings.hotkey_tree & HK_CTX_MASK);
     }
@@ -2322,7 +2858,9 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
         menu = &wps_context_menu;
     else
         menu = &browser_context_menu;
+    hiding_begin();
     menu_selection = do_menu(menu, NULL, NULL, false);
+    hiding_end();
 
     if (get_current_activity() == ACTIVITY_CONTEXTMENU) /* Activity may have been      */
         pop_current_activity();                         /* popped already by menu item */
@@ -2340,9 +2878,4 @@ int context_menu_show(char* file, int attr, int from_context, bool hotkey, int c
         return ONPLAY_PLUGIN;
 
     return context_menu_result;
-}
-
-int context_menu_get_source(void)
-{
-    return selected_file.context;
 }

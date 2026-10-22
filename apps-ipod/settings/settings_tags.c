@@ -171,7 +171,6 @@ static const struct tag_row tag_rows[] = {
 { "warn when erasing dynamic playlist", TAG_PLAYLIST,            "warn erase" },
 { "keep current track when replacing playlist", TAG_ADVANCED|TAG_PLAYLIST, NULL },
 { "show shuffled adding options", TAG_ADVANCED|TAG_PLAYLIST,     "shuffle add" },
-{ "show queue options",  TAG_ADVANCED|TAG_PLAYLIST,              "queue" },
 { "max files in playlist", TAG_ADVANCED|TAG_PLAYLIST|TAG_SYSTEM, "limit maximum size" },
 { "playlist viewer icons",   TAG_PLAYLIST|TAG_APPEARANCE,        "playlist viewer" },
 { "playlist viewer indices", TAG_PLAYLIST|TAG_APPEARANCE,        "playlist viewer numbers" },

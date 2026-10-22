@@ -4527,6 +4527,14 @@ static int album_covers_loop(void)
             }
             break;
         }
+        case ACTION_STD_CONTEXT:
+            if (!model->on_context)
+                break;
+            if (pf_state == pf_scrolling)
+                set_current_slide(target);
+            action_wait_for_release();
+            return model->on_context(center_index);
+
         case PF_TRACKLIST:
         case PF_SELECT:
         {
@@ -4598,8 +4606,7 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
      * re-sets it on the way back from the in-screen menu. */
     sb_set_persistent_title(model_title(), Icon_NOICON, SCREEN_MAIN);
 
-    /* Jump to selected_file's album if one was passed (e.g. context_menu.c's
-     * "Album covers" context-menu item on a specific track), otherwise the
+    /* Jump to selected_file's album if one was passed, otherwise the
      * currently-playing track's album, otherwise wherever was last viewed. */
     model->set_initial(selected_file);
 
@@ -4609,9 +4616,10 @@ int carousel_run(const struct carousel_model *m, const char *selected_file)
 
     /* CAROUSEL_PLAY_ALBUM belongs with these: album_covers() turns it into
      * GO_TO_WPS, so the screen underneath is about to be replaced either way
-     * and a refresh on the way past would only flash it. */
+     * and a refresh on the way past would only flash it. So does
+     * CAROUSEL_CONTEXT, which a menu replaces. */
     if (ret == GO_TO_WPS || ret == GO_TO_PREVIOUS_MUSIC || ret == GO_TO_PLUGIN
-        || ret == CAROUSEL_PLAY_ALBUM)
+        || ret == CAROUSEL_PLAY_ALBUM || ret == CAROUSEL_CONTEXT)
         pop_current_activity_without_refresh();
     else
         pop_current_activity();

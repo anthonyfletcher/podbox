@@ -354,50 +354,32 @@ static int compare_album_tracks(const void *a_v, const void *b_v)
     return a->key - b->key;
 }
 
-/* The album's tracks: its name and its artist. */
+/* The album's tracks: its name and its artist. An album with no seek stands
+ * for every album by the artist. */
 static void filter_album(struct tagcache_search *tcs,
                          const struct album_data *album)
 {
-    tagcache_search_add_filter(tcs, tag_album, album->seek);
+    if (album->seek >= 0)
+        tagcache_search_add_filter(tcs, tag_album, album->seek);
     tagcache_search_add_filter(tcs, tag_albumartist, album->artist_seek);
 }
 
-int db_summary_play_album(const struct album_data *album)
+int db_summary_album_tracks(const struct album_data *album,
+                            bool (*sink)(const char *path, void *data),
+                            void *data)
 {
     struct tagcache_search tcs;
-    struct playlist_insert_context context;
     char buf[MAX_PATH];
     struct album_track *list;
     size_t list_sz = 0;
     int cap, found = 0, added = 0;
     bool sorted;
 
-    if (!warn_on_pl_erase())
-        return -1;
-
-    /* The search first: refused while a commit runs, and the playlist is
-     * not to be emptied for nothing. */
     cpu_boost(true);
     if (!tagcache_search(&tcs, tag_filename))
     {
         cpu_boost(false);
         splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        return -1;
-    }
-    if (playlist_create(NULL, NULL) < 0)
-    {
-        tagcache_search_finish(&tcs);
-        cpu_boost(false);
-        return -1;
-    }
-    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
-                                       false, false) < 0)
-    {
-        /* create() keeps the playlist lock even when it fails; release()
-         * is the only thing that gives it back. */
-        playlist_insert_context_release(&context);
-        tagcache_search_finish(&tcs);
-        cpu_boost(false);
         return -1;
     }
 
@@ -408,12 +390,13 @@ int db_summary_play_album(const struct album_data *album)
      * the rest. The browser's track list is sorted by tagnavi's
      * "%02d%04d%s" discnum/tracknum format, and playing an album has to come
      * out in the order that list shows, so collect the album first and sort it
-     * before any of it reaches the playlist. */
-    list = app_get_buffer(&list_sz, "album play");
+     * before any of it is handed on. An artist's albums go in search order:
+     * disc and track number say nothing across albums. */
+    list = album->seek >= 0 ? app_get_buffer(&list_sz, "album play") : NULL;
     cap = list ? (int)(list_sz / sizeof(*list)) : 0;
     sorted = (cap > 0);
 
-    while (tagcache_get_next(&tcs, buf, sizeof(buf)))
+    while (sorted && tagcache_get_next(&tcs, buf, sizeof(buf)))
     {
         int disc, track;
 
@@ -448,30 +431,65 @@ int db_summary_play_album(const struct album_data *album)
             if (!tagcache_retrieve(&tcs, list[i].idx_id, tag_filename,
                                    buf, sizeof(buf)))
                 continue;
-            if (playlist_insert_context_add(&context, buf) < 0)
+            if (!sink(buf, data))
                 break;
             added++;
         }
     }
     else
     {
-        /* Restart: the walk above consumed part or all of the search. */
+        /* Restart: the walk above may have consumed part of the search. */
         tagcache_search_finish(&tcs);
         if (tagcache_search(&tcs, tag_filename))
         {
             filter_album(&tcs, album);
             while (tagcache_get_next(&tcs, buf, sizeof(buf)))
             {
-                if (playlist_insert_context_add(&context, buf) < 0)
+                if (!sink(buf, data))
                     break;
                 added++;
             }
         }
     }
 
-    playlist_insert_context_release(&context);
     tagcache_search_finish(&tcs);
     cpu_boost(false);
+    return added;
+}
+
+static bool insert_sink(const char *path, void *data)
+{
+    return playlist_insert_context_add(data, path) >= 0;
+}
+
+int db_summary_play_album(const struct album_data *album)
+{
+    struct playlist_insert_context context;
+    int added;
+
+    if (!warn_on_pl_erase())
+        return -1;
+
+    /* Checked first: a search is refused while a commit runs, and the
+     * playlist is not to be emptied for nothing. */
+    if (!tagcache_search_ready())
+    {
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return -1;
+    }
+    if (playlist_create(NULL, NULL) < 0)
+        return -1;
+    if (playlist_insert_context_create(NULL, &context, PLAYLIST_INSERT_LAST,
+                                       false, false) < 0)
+    {
+        /* create() keeps the playlist lock even when it fails; release()
+         * is the only thing that gives it back. */
+        playlist_insert_context_release(&context);
+        return -1;
+    }
+
+    added = db_summary_album_tracks(album, insert_sink, &context);
+    playlist_insert_context_release(&context);
 
     if (added <= 0)
         return -1;

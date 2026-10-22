@@ -488,14 +488,10 @@ struct eq_band_setting eq_defaults[EQ_NUM_BANDS] = {
 
 /* Item 0 is the hotkey button; 1..4 are the configurable rows at the bottom
    of the WPS context menu. */
-static const int wps_context_menu_default =
-    HK_CTX_SET(0, HOTKEY_LYRICS) /* hotkey */
-  | HK_CTX_SET(1, HOTKEY_SHOW_TRACK_INFO)
-  | HK_CTX_SET(2, HOTKEY_DELETE)
-  | HK_CTX_SET(3, HOTKEY_SHOW_IN_FILES)
-  | HK_CTX_SET(4, HOTKEY_ALBUMART);
+static const int wps_context_menu_default = HK_CTX_SET(0, HOTKEY_LYRICS);
 
 static const int tree_hotkey_default = HOTKEY_OFF;
+static const uint32_t context_hidden_default = 0;
 
 /* "cutoff, q, gain" in the old format, "cutoff, q, gain, TYPE" in the new one.
  * A config written before the type existed carries no fourth field, and its
@@ -1633,12 +1629,6 @@ const struct settings_list settings[] = {
                   true, "keep current track when replacing playlist",NULL),
     OFFON_SETTING(0, show_shuffled_adding_options, LANG_SHOW_SHUFFLED_ADDING_OPTIONS, true,
                       "show shuffled adding options", NULL),
-    CHOICE_SETTING(0, show_queue_options, LANG_SHOW_QUEUE_OPTIONS, 0,
-                      "show queue options", "off,on,in submenu",
-                      NULL, 3,
-                      ID2P(LANG_SET_BOOL_NO),
-                      ID2P(LANG_SET_BOOL_YES),
-                      ID2P(LANG_IN_SUBMENU)),
 
     CHOICE_SETTING(0, browser_default, LANG_DEFAULT_BROWSER,
                       1,
@@ -2142,6 +2132,23 @@ const struct settings_list settings[] = {
                    &tree_hotkey_default, "hotkey tree",
                    wps_context_menu_load_from_cfg, wps_context_menu_write_to_cfg,
                    wps_context_menu_is_changed, wps_context_menu_set_default),
+    /* Rows hidden from each kind of context menu, a bit per row, saved by the
+     * rows' names. Never shown as settings themselves -- Appearance > Menus >
+     * Context Menus is the UI -- so the lang ids here are only there because
+     * the table wants one. */
+#define CONTEXT_HIDDEN_SETTING(kind, name)                                    \
+    CUSTOM_SETTING(0, context_hidden[kind], LANG_CONTEXT_MENUS,               \
+                   &context_hidden_default, name,                            \
+                   context_hidden_load_from_cfg, context_hidden_write_to_cfg, \
+                   context_hidden_is_changed, context_hidden_set_default)
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_NOW_PLAYING, "context hidden now playing"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_TRACK,  "context hidden track"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_ALBUM,  "context hidden album"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_ARTIST, "context hidden artist"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_FOLDER, "context hidden folder"),
+    CONTEXT_HIDDEN_SETTING(CONTEXT_KIND_BOOK,   "context hidden book"),
+#undef CONTEXT_HIDDEN_SETTING
+
 
     INT_SETTING(F_TIME_SETTING, resume_rewind, LANG_RESUME_REWIND, 0,
                 "resume rewind", UNIT_SEC, 0, 60, 5,

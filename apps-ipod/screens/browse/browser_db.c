@@ -3329,6 +3329,11 @@ bool browser_db_root_row_is_hidden(int index)
     return mask != 0 && (mask & row_hide_bit(index)) != 0;
 }
 
+/* Each Music menu row's position in tagnavi.config's root menu, as the root
+ * was last loaded: what a hidden row is keyed on. Only the rows the mask can
+ * describe are recorded. */
+static int8_t root_row_item[31];
+
 static int load_root(struct browser_context *c)
 {
     struct tagentry *dptr = core_get_data(c->cache.entries_handle);
@@ -3446,6 +3451,8 @@ static int load_root(struct browser_context *c)
             }
         }
 
+        if (c->currextra == rootmenu && rows < (int)ARRAYLEN(root_row_item))
+            root_row_item[rows] = i;
         dptr++;
         rows++;
     }
@@ -3454,6 +3461,15 @@ static int load_root(struct browser_context *c)
     current_entry_count = rows;
 
     return rows;
+}
+
+int browser_db_selected_root_row(void)
+{
+    if (!tc || tc->currtable != TABLE_ROOT || tc->currextra != rootmenu
+        || tc->selected_item < 0 || tc->selected_item >= current_entry_count
+        || tc->selected_item >= (int)ARRAYLEN(root_row_item))
+        return -1;
+    return root_row_item[tc->selected_item];
 }
 
 /* Set by browser_db_enter_by_tag_on_next_load(); consumed the next time

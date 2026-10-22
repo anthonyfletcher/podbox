@@ -485,13 +485,8 @@ Leaves the playing track in place when a new selection replaces the queue, so
 the music does not stop mid-song.
 
 [show shuffled adding options]
-Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a
-folder or playlist.
-
-[show queue options]
-Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers
-them in a Play Once submenu. A play-once track leaves the queue after it has
-played and is skipped when the queue repeats; the queue marks it with a +.
+Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder,
+album or playlist.
 
 [max files in playlist]
 The largest number of tracks a playlist may hold. Building very large lists is
@@ -1691,7 +1686,32 @@ viewer chrome and the scrolling settings are all included.
 Chooses which rows appear on the main menu and what order they are in.
 
 Views from the Music browser can be promoted here, so an album list can sit on
-the first screen you see.
+the first screen you see. Holding Select on a main menu row moves or hides it
+from there.
+
+[action: Now Playing Menu]
+Chooses which rows the Now Playing screen's context menu shows. A row can also
+be hidden by holding Select on it in the menu; this is where it comes back.
+
+[action: Track Menu]
+Chooses which rows a track's context menu shows, in the browsers and the queue.
+A row can also be hidden by holding Select on it; this is where it comes back.
+
+[action: Album Menu]
+Chooses which rows an album's context menu shows, in Music and on a cover. A
+row can also be hidden by holding Select on it; this is where it comes back.
+
+[action: Artist Menu]
+Chooses which rows the context menu of an artist, genre or other Music list
+shows. A row hidden by holding Select on it comes back here.
+
+[action: Folder Menu]
+Chooses which rows the context menu of a folder or file in Files shows. A row
+hidden by holding Select on it comes back here.
+
+[action: Book Menu]
+Chooses which rows a book's context menu shows, on the shelf and in Audiobooks.
+A row hidden by holding Select on it comes back here.
 
 [action: Edit Music Menu]
 Chooses which views appear inside Music and in what order.
@@ -1824,10 +1844,6 @@ Puts every setting back to the built-in default and restarts.
 
 Themes, music and playlists are untouched -- this is the settings only. Save a
 .cfg file first if there is anything you want back afterwards.
-
-[action: Reset Context Menu]
-Clears the four while-playing context menu slots, so that the menu goes back to
-its default contents.
 
 [action: Settings]
 Chooses which button actions are allowed to happen with the backlight off.

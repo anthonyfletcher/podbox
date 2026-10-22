@@ -307,6 +307,22 @@ static void artist_set_initial(const char *selected_file)
     set_current_slide(index >= 0 ? index : 0);
 }
 
+/* carousel_model.on_context: the artist's every album, played or queued as
+ * one, through the album carousel's cover menu */
+static int artist_on_context(int index)
+{
+    char name[TAGCACHE_BUFSZ];
+    struct album_data artist = {
+        .seek = -1,
+        .artist_seek = carousel_idx.artist_index[index].seek,
+    };
+
+    artist_resume_index = index;
+    artist_resume_valid = true;
+    carousel_cover_arm(&artist, artist_name(index, name, sizeof(name)));
+    return CAROUSEL_CONTEXT;
+}
+
 static const struct carousel_model artist_model = {
     .build_index = artist_build_index,
     .count       = artist_count,
@@ -319,11 +335,26 @@ static const struct carousel_model artist_model = {
     .sort_prev   = carousel_sort_noop,
     .set_initial = artist_set_initial,
     .on_menu     = artist_on_menu,
+    .on_context  = artist_on_context,
     .owns_cache_version = false,
     .title       = (const char *)ID2P(LANG_ARTIST_PORTRAITS),
 };
 
 int artist_portraits(const char *selected_file)
 {
-    return carousel_run(&artist_model, selected_file);
+    int ret;
+
+    while ((ret = carousel_run(&artist_model, selected_file))
+           == CAROUSEL_CONTEXT)
+    {
+        ret = carousel_cover_menu();
+        if (ret != GO_TO_PREVIOUS)
+        {
+            /* Back from Go to Artist's albums comes back to this artist */
+            if (ret != GO_TO_ALBUM_COVERS_TRACKS)
+                artist_resume_valid = false;
+            break;
+        }
+    }
+    return ret;
 }

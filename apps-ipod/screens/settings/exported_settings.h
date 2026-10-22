@@ -64,5 +64,11 @@ struct browse_folder_info {
 };
 int browse_folder(void *param); /* in theme_menu.c as it is mostly used there */
 int main_menu_config(void); /* in main_menu_config.c */
+/* The main menu's own long press on 'item': whether it can be hidden (all
+ * but Settings, the way back to this), hiding it, and the editor opened
+ * carrying it for Move. The last returns as main_menu_config() does. */
+bool main_menu_item_hideable(const struct menu_item_ex *item);
+bool main_menu_hide_item(const struct menu_item_ex *item);
+int main_menu_move_item(const struct menu_item_ex *item);
 
 #endif /*_EXPORTED_MENUS_H */

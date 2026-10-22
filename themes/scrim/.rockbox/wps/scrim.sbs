@@ -87,12 +87,8 @@
 %Vl(Rows,0,0,1,1,-)
 %?or(%if(%cs,=,1),%if(%cs,=,7),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28),%and(%if(%cs,=,6),%if(%Lt,=,%Sx(Settings))),%and(%if(%cs,=,16),%if(%Lt,=,%Sx(System))),%and(%if(%cs,=,8),%or(%if(%Lk,=,1),%if(%Lk,=,4)),%or(%if(%Lt,=,%Sx(Music)),%if(%Lt,=,%Sx(Audiobooks)))),%and(%if(%cs,=,8),%if(%Lk,=,5),%if(%LT,!=,%Sx([All Tracks])),%if(%LT,!=,%Sx([By album]))),%and(%if(%cs,=,8),%or(%if(%Lk,=,10),%if(%Lk,=,11),%if(%Lt,=,%Sx(Custom menu)))))<%vs(shape,set,1)|%?or(%if(%cs,=,5),%and(%if(%cs,=,8),%if(%Lk,=,7)))<%vs(shape,set,2)|%vs(shape,set,3)>>
 #
-# - Ratings. Set Song Rating's and Set Album Rating's values, 0 to 10, show
-#   the number with five stars at the right. 2 for a rating, 1 for text.
-%?and(%if(%cs,=,12),%or(%if(%Lt,=,%Sx(Set Song Rating)),%if(%Lt,=,%Sx(Set Album Rating))))<%vs(stars,set,2)|%vs(stars,set,1)>
-#
-# - Chevron, on rows that open a list: a settings submenu, a folder, a
-#   database level above the tracks, a playlist in the catalogue. A Yes/No
+# - Chevron, on rows that open a list: a settings or context submenu, a
+#   folder, a database level above the tracks, a catalogue playlist. A Yes/No
 #   setting shows a switch in its place and a number setting a slider; the
 #   two toggles worded otherwise (First Button Press, Quick Screen) show
 #   nothing. A setting set to Auto, or to a side (Left, Top), shows its icon.
@@ -101,7 +97,7 @@
 #   than FF/RW Accel's. 2 for a chevron, 3 for a switch, 4 for a slider, 5
 #   for a value's icon, 6 for a word scale, 7 for Animation, 1 for none: a
 #   skin variable is never below 1.
-%?and(%if(%Lk,=,2),%or(%if(%Lv,=,%Sx(Yes)),%if(%Lv,=,%Sx(No))))<%vs(chev,set,3)|%?Lr<%vs(chev,set,4)|%?and(%if(%Lk,=,3),%if(%LT,=,%Sx(Animation)))<%vs(chev,set,7)|%?and(%if(%Lk,=,3),%or(%if(%LT,=,%Sx(Track Skip Beep)),%if(%LT,=,%Sx(Headphone Keyclick)),%if(%LT,=,%Sx(Auditory Fatigue Reduction)),%if(%LT,=,%Sx(FF/RW Accel)),%if(%LT,=,%Sx(Random Spin Length))))<%vs(chev,set,6)|%?and(%if(%Lk,=,3),%or(%if(%Lv,=,%Sx(Auto)),%if(%Lv,=,%Sx(Left)),%if(%Lv,=,%Sx(Centre)),%if(%Lv,=,%Sx(Right)),%if(%Lv,=,%Sx(Top)),%if(%Lv,=,%Sx(Bottom))))<%vs(chev,set,5)|%?or(%and(%if(%cs,=,6),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,2)|%vs(chev,set,1)>>>>>>
+%?and(%if(%Lk,=,2),%or(%if(%Lv,=,%Sx(Yes)),%if(%Lv,=,%Sx(No))))<%vs(chev,set,3)|%?Lr<%vs(chev,set,4)|%?and(%if(%Lk,=,3),%if(%LT,=,%Sx(Animation)))<%vs(chev,set,7)|%?and(%if(%Lk,=,3),%or(%if(%LT,=,%Sx(Track Skip Beep)),%if(%LT,=,%Sx(Headphone Keyclick)),%if(%LT,=,%Sx(Auditory Fatigue Reduction)),%if(%LT,=,%Sx(FF/RW Accel)),%if(%LT,=,%Sx(Random Spin Length))))<%vs(chev,set,6)|%?and(%if(%Lk,=,3),%or(%if(%Lv,=,%Sx(Auto)),%if(%Lv,=,%Sx(Left)),%if(%Lv,=,%Sx(Centre)),%if(%Lv,=,%Sx(Right)),%if(%Lv,=,%Sx(Top)),%if(%Lv,=,%Sx(Bottom))))<%vs(chev,set,5)|%?or(%and(%or(%if(%cs,=,6),%if(%cs,=,15)),%if(%Lk,=,1)),%and(%or(%if(%cs,=,7),%if(%cs,=,8),%if(%cs,=,13),%if(%cs,=,27),%if(%cs,=,28)),%if(%LI,=,1)),%and(%if(%cs,=,13),%if(%LI,=,2)))<%vs(chev,set,2)|%vs(chev,set,1)>>>>>>
 #
 # - Row icon. A grouping is the tag's own text, in English only, since no
 #   phrase names it; one named Album is told from the Music menu's by %Lk.
@@ -129,17 +125,9 @@
 %Vl(Rows,46,5,219,20,-)
 %?La<|%?and(%if(%vg(shape),!=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?and(%if(%cs,=,1),%if(%LT,=,%Sx(Now Playing)))<%LT: %?it<%it|%fn>|%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>>
 %Vl(Rows,12,5,284,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1),%if(%vg(stars),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
 %Vl(Rows,12,5,253,20,-)
-%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),!=,1),%if(%vg(stars),=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
-#
-# - A rating: the number, and at the right edge a full star for each 2, a
-#   half star for an odd 1, and empty stars to make five. The number has its
-#   own short viewport so that clearing it leaves the stars alone.
-%Vl(Rows,12,5,160,20,-)
-%?La<|%?if(%vg(stars),=,2)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%LT>>
-%Vl(Rows,176,3,120,24,2)
-%?La<|%?if(%vg(stars),=,2)<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%sel(%LT,0,°°°°°,1,±°°°°,2,²°°°°,3,²±°°°,4,²²°°°,5,²²±°°,6,²²²°°,7,²²²±°,8,²²²²°,9,²²²²±,10,²²²²²)>>
+%?La<|%?and(%if(%vg(shape),=,3),%if(%vg(chev),!=,1))<%?Lc<%Vf(!ffffff)|%Vf(vivid>85:bdbdbd)>%s%?or(%if(%Lk,=,5),%if(%LT,=,%Sx([Untagged])))<%trm(%LT,[])|%LT>>>
 #
 # - Chevron, switch, slider or value icon. The slider's ten frames are
 #   empty only at the least of a range and full only at the greatest, with the

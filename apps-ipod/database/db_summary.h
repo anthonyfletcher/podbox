@@ -138,4 +138,13 @@ int  db_summary_play_album(const struct album_data *album);
 void db_summary_play_album_on_exit(const struct album_data *album);
 int  db_summary_play_pending(void);
 
+/* Each of an album's tracks to 'sink', in the order db_summary_play_album()
+ * plays them, until it returns false. An album with a seek of -1 stands for
+ * every album by its artist, which go in search order. The count handed over,
+ * or a negative value when the database would not be searched. Takes the app
+ * buffer as db_summary_play_album() does. */
+int  db_summary_album_tracks(const struct album_data *album,
+                             bool (*sink)(const char *path, void *data),
+                             void *data);
+
 #endif /* _DB_SUMMARY_H */

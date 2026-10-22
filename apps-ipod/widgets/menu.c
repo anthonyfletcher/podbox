@@ -456,6 +456,13 @@ void menu_set_pending_top_item(int item)
     pending_top_item = item;
 }
 
+static const struct menu_row_hiding *row_hiding;
+
+void menu_set_row_hiding(const struct menu_row_hiding *hiding)
+{
+    row_hiding = hiding;
+}
+
 static int init_menu_lists(const struct menu_item_ex *menu,
                      struct gui_synclist *lists, int selected, bool callback,
                      struct viewport parent[NB_SCREENS], char* buf, size_t buf_sz)
@@ -486,6 +493,9 @@ static int init_menu_lists(const struct menu_item_ex *menu,
                is nothing to hide there. */
             if (global_settings.settings_mode == SETTINGS_MODE_STANDARD
                 && item_hidden(menu->submenus[i], 0))
+                continue;
+            if (row_hiding && (menu->flags & MENU_EXITAFTERTHISMENU)
+                && row_hiding->hidden(menu->submenus[i]))
                 continue;
 
             get_menu_callback(menu->submenus[i],&menu_callback);
@@ -810,7 +820,24 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                         (type == MT_SETTING_W_TEXT || type == MT_SETTING) ?
                             find_setting(temp->variable) : NULL;
 
-                if (ctx_setting)
+                /* A context menu's own row offers only to be hidden */
+                bool hide_row = type != -1 && row_hiding
+                                && (menu->flags & MENU_EXITAFTERTHISMENU)
+                                && row_hiding->hideable(temp);
+
+                if (hide_row)
+                {
+                    MENUITEM_STRINGLIST(row_op_menu,
+                                        ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
+                                        ID2P(LANG_HIDE_THIS_ROW));
+
+                    if (do_menu(&row_op_menu, NULL, NULL, false) == 0)
+                        row_hiding->hide(temp);
+                    /* Built again below, without the row */
+                    current_submenus_menu = NULL;
+                    redraw_lists = true;
+                }
+                else if (ctx_setting)
                 {
                     const struct menu_item_ex *context_menu;
                     const struct settings_list *setting = ctx_setting;
@@ -891,12 +918,15 @@ int do_menu(const struct menu_item_ex *start_menu, int *start_selected,
                 }
                 else if ((type == MT_FUNCTION_CALL
                           || type == MT_FUNCTION_CALL_W_PARAM)
-                         && (temp->flags & MENU_HAS_DESC))
+                         && (temp->flags & MENU_HAS_DESC)
+                         && !(menu->flags & MENU_EXITAFTERTHISMENU))
                 {
                     /* Explain only. There is nothing to reset on an action and
                        nothing the quickscreen could do with one. Requires a
                        fixed label, so the dynamic-text rows are left out --
-                       their text is built per draw and is nobody's key. */
+                       their text is built per draw and is nobody's key. A
+                       context menu's rows are left out too: none of them has
+                       an explanation to show. */
                     MENUITEM_STRINGLIST(action_op_menu,
                                         ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
                                         ID2P(LANG_EXPLAIN));

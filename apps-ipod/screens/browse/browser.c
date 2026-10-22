@@ -84,6 +84,7 @@
 /* gui api */
 #include "widgets/list.h"
 #include "widgets/splash.h"
+#include "screens/music_menu_config.h"
 #include "screens/playback/quick_screen.h"
 #include "screens/shortcuts.h"
 #include "system/appevents.h"
@@ -1120,6 +1121,26 @@ static int exit_to_new_screen(int screen)
     return screen;
 }
 
+/* A Music menu row's long press. Hide is all it has: the row is not music. */
+static int music_row_menu(void)
+{
+    int index = browser_db_selected_root_row();
+    int ret;
+    MENUITEM_STRINGLIST(menu, ID2P(LANG_MUSIC_BROWSER), NULL, ID2P(LANG_HIDE));
+
+    if (index < 0)
+        return 0;
+
+    push_current_activity(ACTIVITY_CONTEXTMENU);
+    ret = do_menu(&menu, NULL, NULL, false);
+    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
+        pop_current_activity();
+
+    if (ret == 0 && music_menu_hide_row(index))
+        splash(HZ, ID2P(LANG_ROW_HIDDEN));
+    return ret;
+}
+
 /* main loop, handles key events */
 static int dirbrowse(void)
 {
@@ -1325,6 +1346,26 @@ static int dirbrowse(void)
                         & FILE_ATTR_MASK))
                     break;
 
+                /* Nor does a Music menu row (Artists, Albums) hold music: it
+                 * opens a list. The browser's menu would act on whatever the
+                 * descent reaches first -- the first artist's tracks, for
+                 * Artists -- so the row's own menu is offered instead. */
+                if (id3db && numentries
+                    && customaction == ONPLAY_NO_CUSTOMACTION)
+                {
+                    enum list_row_kind kind =
+                        browser_db_get_entry_kind(&tc, tc.selected_item);
+
+                    if (kind == LIST_ROW_MENU || kind == LIST_ROW_CUSTOM_MENU
+                        || kind == LIST_ROW_CUSTOM || kind == LIST_ROW_ACTION)
+                    {
+                        if (music_row_menu() == MENU_ATTACHED_USB)
+                            return exit_to_new_screen(GO_TO_ROOT);
+                        reload_dir = true;
+                        break;
+                    }
+                }
+
                 if(!numentries)
                     context_menu_result = context_menu_show(NULL, 0, curr_context, hotkey, customaction);
                 else {
@@ -1384,6 +1425,10 @@ static int dirbrowse(void)
 
                     case ONPLAY_REVEAL_FILE:
                         return exit_to_new_screen(GO_TO_FILEBROWSER);
+                        break;
+
+                    case ONPLAY_GO_TO_LIBRARY:
+                        return exit_to_new_screen(GO_TO_ALBUM_COVERS_TRACKS);
                         break;
 
                     case ONPLAY_OK:

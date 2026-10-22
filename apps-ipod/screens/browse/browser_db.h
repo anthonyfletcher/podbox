@@ -224,6 +224,9 @@ bool browser_db_get_root_row(int n, int *out_index,
                              const unsigned char **out_name);
 int browser_db_root_row_signature(void);
 bool browser_db_root_row_is_hidden(int index);
+/* The selected Music menu row's position in tagnavi.config's root menu, or
+ * -1 when the browser is not on the Music menu itself */
+int browser_db_selected_root_row(void);
 
 int browser_db_get_filename(struct browser_context* c, char *buf, int buflen);
 int browser_db_get_custom_action(struct browser_context* c);

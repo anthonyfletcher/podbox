@@ -128,6 +128,17 @@ void do_setting_from_menu_standalone(const struct menu_item_ex *item,
  * anything above it away. Consumed once. For a menu that deliberately opens
  * past its own first row; see the definition. */
 void menu_set_pending_top_item(int item);
+
+/* Rows its owner lets be hidden from a context menu -- a menu flagged
+ * MENU_EXITAFTERTHISMENU, and no other. Installed while the owner's menu is
+ * up, NULL otherwise. A hidden row is left out of the list; a row that can be
+ * hidden offers Hide This Row on a long press. */
+struct menu_row_hiding {
+    bool (*hidden)(const struct menu_item_ex *row);
+    bool (*hideable)(const struct menu_item_ex *row);
+    void (*hide)(const struct menu_item_ex *row);
+};
+void menu_set_row_hiding(const struct menu_row_hiding *hiding);
 void do_setting_screen(const struct settings_list *setting, const char * title,
                         struct viewport parent[NB_SCREENS]);
 

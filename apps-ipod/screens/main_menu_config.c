@@ -42,16 +42,20 @@ static int menu_item_count;
 #define MAX_ITEMS (24 + TAGNAVI_MAIN_MENU_SLOTS)
 
 /* Sized per item, for the same reason as MAX_ITEMS above. This buffer holds
- * the "key, key, key, ..." config string; with keys up to 11 chars
- * ("pictureflow", "system_menu", "tagnavi19") plus ", ", 13 bytes per item
- * is the worst case with a small margin.
+ * the "key, !key, key, ..." config string, an item that is turned off written
+ * where it stands with a '!' before it; with keys up to 11 chars
+ * ("pictureflow", "system_menu", "tagnavi19"), the '!' and ", ", 14 bytes per
+ * item is the worst case.
  *
  * It must not be undersized: root_menu_write_to_cfg()'s buf_len bookkeeping
  * does not defend against running past the end. buf_len is an int, goes
  * negative on overflow, and the next snprintf() reinterprets it as a huge
  * size_t -- so the failure is a silent stack overflow, not a truncated
  * string. */
-#define CFG_STR_SIZE (MAX_ITEMS * 13)
+#define CFG_STR_SIZE (MAX_ITEMS * 14)
+
+_Static_assert(CFG_STR_SIZE + sizeof("root menu order: ") <= SETTINGS_MAX_LINE,
+               "the main menu's order line must fit a config.cfg line");
 
 struct items
 {
@@ -162,16 +166,23 @@ static void load_from_cfg(void)
 
     while (token)
     {
+        /* Turned off, but kept in its place */
+        bool off = token[0] == '!';
+
+        if (off)
+            token++;
         for (i = 0, found = false; i < menu_item_count; i++)
         {
             found = strcmp(token, menu_table[i].string) == 0;
             if (found) break;
         }
+        for (int j = 0; found && j < done; j++)
+            found = strcmp(token, menu_items[j].string) != 0;
         if (found && done < MAX_ITEMS)
         {
             menu_items[done].name = item_name(i, &menu_items[done]);
             strcpy(menu_items[done].string, token);
-            menu_items[done].enabled = true;
+            menu_items[done].enabled = !off;
             done++;
         }
         token = strtok_r(NULL, ", ", &save);
@@ -206,10 +217,8 @@ static void save_to_cfg(void)
     out[0] = '\0';
     for (i = 0; i < menu_item_count; i++)
     {
-        if (menu_items[i].enabled)
-        {
-            j += snprintf(&out[j], sizeof(out) - j, "%s, ", menu_items[i].string);
-        }
+        j += snprintf(&out[j], sizeof(out) - j, "%s%s, ",
+                      menu_items[i].enabled ? "" : "!", menu_items[i].string);
     }
 
     root_menu_load_from_cfg(&global_settings.root_menu_customized, out);
@@ -278,7 +287,50 @@ static int menu_speak_item(int selected_item, void *data)
     return 0;
 }
 
-int main_menu_config(void)
+/* The row of this screen that is the main menu's 'item', or -1 */
+static int find_item(const struct menu_item_ex *item)
+{
+    for (int i = 0; i < menu_item_count; i++)
+    {
+        for (int j = 0; j < menu_item_count; j++)
+        {
+            if (menu_table[j].item == item
+                && strcmp(menu_table[j].string, menu_items[i].string) == 0)
+                return i;
+        }
+    }
+    return -1;
+}
+
+bool main_menu_item_hideable(const struct menu_item_ex *item)
+{
+    int n;
+
+    menu_table = root_menu_get_options(&menu_item_count);
+    load_from_cfg();
+    n = find_item(item);
+    return n >= 0 && !item_is_locked(n);
+}
+
+bool main_menu_hide_item(const struct menu_item_ex *item)
+{
+    int n;
+
+    menu_table = root_menu_get_options(&menu_item_count);
+    load_from_cfg();
+    n = find_item(item);
+    if (n < 0 || item_is_locked(n))
+        return false;
+
+    menu_items[n].enabled = false;
+    save_to_cfg();
+    global_settings.root_menu_customized = true;
+    settings_save();
+    return true;
+}
+
+/* This screen, carrying the row at 'carry' if it is not -1 */
+static int config_screen(const struct menu_item_ex *carry)
 {
     bool show_icons = global_settings.show_icons;
     global_settings.show_icons = true;
@@ -290,7 +342,7 @@ int main_menu_config(void)
 
     menu_table = root_menu_get_options(&menu_item_count);
     load_from_cfg();
-    moving_item = moving_from = -1;
+    moving_item = moving_from = carry ? find_item(carry) : -1;
 
     /* This screen builds its own gui_synclist directly instead of going
      * through do_menu() (it needs custom OK-to-toggle and a move mode, which
@@ -305,6 +357,8 @@ int main_menu_config(void)
         gui_synclist_set_voice_callback(&list, menu_speak_item);
     gui_synclist_set_icon_callback(&list, menu_get_icon);
     gui_synclist_set_nb_items(&list, menu_item_count);
+    if (moving_item >= 0)
+        gui_synclist_select_item(&list, moving_item);
     gui_synclist_set_title(&list, str(LANG_MAIN_MENU_SETTINGS), Icon_Menu_setting);
     gui_synclist_draw_settled(&list);
     gui_synclist_speak_item(&list);
@@ -425,4 +479,14 @@ int main_menu_config(void)
         viewportmanager_theme_undo(i, false);
 
     return ret;
+}
+
+int main_menu_config(void)
+{
+    return config_screen(NULL);
+}
+
+int main_menu_move_item(const struct menu_item_ex *item)
+{
+    return config_screen(item);
 }

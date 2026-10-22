@@ -20,6 +20,8 @@ enum playlist_viewer_result {
     PLAYLIST_VIEWER_CANCEL,
     PLAYLIST_VIEWER_USB,
     PLAYLIST_VIEWER_MAINMENU,
+    PLAYLIST_VIEWER_GO_TO_LIBRARY, /* Go to Album or Artist, playlist_viewer()
+                                      only: the database browser is armed */
 };
 
 #endif

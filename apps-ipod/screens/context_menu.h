@@ -18,7 +18,6 @@ enum {
 };
 
 int context_menu_show(char* file, int attr, int from_context, bool hotkey, int customaction);
-int context_menu_get_source(void);
 
 enum {
     ONPLAY_MAINMENU = -1,
@@ -28,6 +27,7 @@ enum {
     ONPLAY_START_PLAY,
     ONPLAY_PLAYLIST,
     ONPLAY_PLUGIN,
+    ONPLAY_GO_TO_LIBRARY, /* the database browser, armed to open on an entry */
     ONPLAY_FUNC_RETURN, /* for use in hotkey_assignment only */
 };
 
@@ -71,9 +71,8 @@ struct hotkey_assignment {
     uint8_t icon;           /* themable_icons value shown beside the entry */
 };                          /* (Pick ONPLAY_FUNC_RETURN to use function's return value) */
 
-/* The WPS context menu and the file browser hotkey each store several actions
-   packed into one int: item 0 is the hotkey itself, items 1..4 are the
-   configurable rows at the bottom of the context menu. */
+/* The two hotkey settings hold their action as item 0 of an int that has room
+   for HK_CTX_ITEMS of them; the rest are unused. */
 #define HK_CTX_ITEMS (5) /* 6 x 5 = 30 bits */
 #define HK_CTX_MASK  (0x3F)
 #define HK_CTX_BITS  (6) /* 6 bits, enough for 62 hotkey actions */
@@ -87,22 +86,68 @@ const struct hotkey_assignment *get_hotkey(int action);
    returned, for the settings screens. Returns -1 if cancelled. */
 int hotkey_run_menu(intptr_t flag, bool execute, int current_action);
 
-/* Assign one packed item, driven from the settings menu. param is the item. */
+/* The kinds of context menu, each with its own rows hidden */
+enum context_menu_kind {
+    CONTEXT_KIND_NOW_PLAYING,
+    CONTEXT_KIND_TRACK,
+    CONTEXT_KIND_ALBUM,
+    CONTEXT_KIND_ARTIST,
+    CONTEXT_KIND_FOLDER,
+    CONTEXT_KIND_BOOK,
+    CONTEXT_KINDS
+};
+
+/* For the screen that turns rows back on: a kind's name, and the labels of
+ * the rows it can hide, in order -- row i is bit i of
+ * global_settings.context_hidden[kind]. */
+int context_menu_kind_label(int kind);
+int context_menu_kind_rows(int kind, const short **rows);
+
+/* config.cfg handlers for global_settings.context_hidden[] */
+void context_hidden_load_from_cfg(void *setting, char *value);
+char *context_hidden_write_to_cfg(void *setting, char *buf, int buf_len);
+bool context_hidden_is_changed(void *setting, void *defaultval);
+void context_hidden_set_default(void *setting, void *defaultval);
+
+/* Assign a hotkey's action, driven from the settings menu. */
 int wps_context_menu_do_setting(void *param);
 int tree_context_menu_do_setting(void *param);
 
-/* config.cfg handlers -- both packed settings share these */
+/* config.cfg handlers -- both hotkey settings share these */
 void wps_context_menu_set_default(void *setting, void *defaultval);
 char *wps_context_menu_write_to_cfg(void *setting, char *buf, int buf_len);
 void wps_context_menu_load_from_cfg(void *setting, char *value);
 bool wps_context_menu_is_changed(void *setting, void *defaultval);
 
-/* needed for the playlist viewer.. eventually clean this up */
-void context_menu_show_playlist_cat(const char* track_name, int attr,
-                                   void (*add_to_pl_cb));
 /* Returns ONPLAY_START_PLAY when a row started playback. 'in_order' leaves
  * out the shuffled rows, for something heard in order, such as a book. */
 int context_menu_show_playlist(const char* path, int attr, void (*playlist_insert_cb),
                                bool in_order);
+
+/* A row a screen adds to the menu it shows for one of its own items. run()
+ * returns an ONPLAY_* value; anything only the screen needs to know it keeps
+ * itself. */
+#define CONTEXT_ROWS_MAX 8
+struct context_menu_row {
+    int lang_id;
+    int (*run)(void);
+    bool more;          /* under More rather than at the top */
+};
+
+/* The browser's menu for one item a screen of its own shows: the ways of
+ * playing it, Add to Playlist, Rate, and the screen's own rows. 'in_order' is
+ * for a book: no shuffled rows, and its own rows first with the ways of
+ * playing it under More. 'go_to' offers Go to Album and Go to Artist,
+ * for a caller that can follow ONPLAY_GO_TO_LIBRARY. 'playlist_insert_cb'
+ * puts the item's tracks into the queue at the position given, and
+ * 'add_to_pl_cb' writes them to a playlist file; either may be NULL to work
+ * from the path. */
+int context_menu_show_item(const char *path, int attr, bool in_order,
+                           bool go_to,
+                           bool (*playlist_insert_cb)(int position, bool queue,
+                                                      bool create_new),
+                           int (*add_to_pl_cb)(const char *playlist,
+                                               bool new_playlist),
+                           const struct context_menu_row *rows, int count);
 
 #endif

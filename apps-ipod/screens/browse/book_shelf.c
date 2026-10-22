@@ -64,7 +64,7 @@
 #include "database/path_key.h"
 #include "metadata/book_resume.h"
 #include "playlist/playlist.h"
-#include "screens/context_menu.h"     /* the queue and playlist submenus */
+#include "screens/context_menu.h"     /* the book's menu */
 #include "system/strutil.h"           /* open_utf8 */
 #include "viewers/properties.h"
 #include "screens/browse/listen_progress.h"
@@ -951,84 +951,89 @@ static bool first_track(const char *path, void *data)
     return false;
 }
 
+/* The book the open menu's rows act on, by its id, and whether one of them
+ * marked it */
+static const char *menu_book;
+static bool menu_marked;
+
+static int menu_info(void)
+{
+    char first[MAX_PATH];
+
+    first[0] = '\0';
+    menu_tracks(first_track, first);
+    if (first[0] && properties(first) == GO_TO_ROOT)
+        menu_exit = GO_TO_ROOT;
+    return ONPLAY_OK;
+}
+
+/* Listening Progress claims the app buffer the shelf holds, so the shelf lets
+ * go first and is read again after */
+static int menu_listen_progress(void)
+{
+    menu_progress = true;
+    return ONPLAY_OK;
+}
+
+static int menu_show_in_files(void)
+{
+    char first[MAX_PATH];
+
+    first[0] = '\0';
+    menu_tracks(first_track, first);
+    if (first[0])
+    {
+        browser_reveal_on_next_load(first);
+        menu_exit = GO_TO_FILEBROWSER;
+    }
+    return ONPLAY_OK;
+}
+
+static int menu_mark(void)
+{
+    menu_marked = book_shelf_mark_menu(menu_book, shelf_kind);
+    return ONPLAY_OK;
+}
+
 /* The menu a book in the browser has, its rows run for the book's tracks.
  * 'book' is its id, 'name' what it is called. True if the book was marked. */
 static bool book_menu(const char *book, const char *name)
 {
-    char first[MAX_PATH];
-    char sel[MAX_PATH];
-    int choice;
-
+    static const struct context_menu_row rows[] = {
+        { LANG_BOOK_MARK_AS,     menu_mark,            false },
+        { LANG_LISTEN_PROGRESS,  menu_listen_progress, false },
+        { LANG_BOOK_INFO,        menu_info,            false },
+        { LANG_SHOW_IN_FILES,    menu_show_in_files,   true },
+    };
     /* A file with no album has no figures for Listening Progress to give */
-    enum { QUEUE, PLAYLIST, INFO, PROGRESS, FILES, MARK };
-    static const int file_rows[] = { QUEUE, PLAYLIST, INFO, FILES, MARK };
-    MENUITEM_STRINGLIST(menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
-                        ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
-                        ID2P(LANG_MENU_SHOW_ID3_INFO),
-                        ID2P(LANG_LISTEN_PROGRESS), ID2P(LANG_SHOW_IN_FILES),
-                        ID2P(LANG_BOOK_MARK_AS));
-    MENUITEM_STRINGLIST(file_menu, ID2P(LANG_ONPLAY_MENU_TITLE), NULL,
-                        ID2P(LANG_PLAYING_NEXT), ID2P(LANG_ADD_TO_PL),
-                        ID2P(LANG_MENU_SHOW_ID3_INFO), ID2P(LANG_SHOW_IN_FILES),
-                        ID2P(LANG_BOOK_MARK_AS));
-
-    push_current_activity(ACTIVITY_CONTEXTMENU);
-    if (menu_seek < 0)
-    {
-        choice = do_menu(&file_menu, NULL, NULL, false);
-        if (choice != MENU_ATTACHED_USB)
-            choice = choice >= 0 && choice < (int)ARRAYLEN(file_rows)
-                     ? file_rows[choice] : -1;
-    }
-    else
-        choice = do_menu(&menu, NULL, NULL, false);
-    if (get_current_activity() == ACTIVITY_CONTEXTMENU)
-        pop_current_activity();
-
-    if (choice == MENU_ATTACHED_USB)
-    {
-        menu_exit = GO_TO_ROOT;
-        return false;
-    }
+    static const struct context_menu_row file_rows[] = {
+        { LANG_BOOK_MARK_AS,     menu_mark,            false },
+        { LANG_BOOK_INFO,        menu_info,            false },
+        { LANG_SHOW_IN_FILES,    menu_show_in_files,   true },
+    };
+    char sel[MAX_PATH];
+    int ret;
 
     /* Led by a slash, as the browser does, so a new playlist is offered the
      * book's name */
     snprintf(sel, sizeof(sel), "%s%s", name[0] == '/' ? "" : "/", name);
-    first[0] = '\0';
+    menu_book = book;
+    menu_marked = false;
 
-    switch (choice)
-    {
-        case QUEUE:
-            if (context_menu_show_playlist(sel, ATTR_DIRECTORY, menu_insert,
-                                           true) == ONPLAY_START_PLAY)
-                menu_exit = GO_TO_WPS;
-            break;
-        case PLAYLIST:
-            context_menu_show_playlist_cat(sel, ATTR_DIRECTORY,
-                                           menu_add_to_playlist);
-            break;
-        case INFO:
-            menu_tracks(first_track, first);
-            if (first[0] && properties(first) == GO_TO_ROOT)
-                menu_exit = GO_TO_ROOT;
-            break;
-        case PROGRESS:
-            /* It claims the app buffer the shelf holds, so the shelf lets
-             * go first and is read again after. */
-            menu_progress = true;
-            break;
-        case FILES:
-            menu_tracks(first_track, first);
-            if (first[0])
-            {
-                browser_reveal_on_next_load(first);
-                menu_exit = GO_TO_FILEBROWSER;
-            }
-            break;
-        case MARK:
-            return book_shelf_mark_menu(book, shelf_kind);
-    }
-    return false;
+    if (menu_seek < 0)
+        ret = context_menu_show_item(sel, ATTR_DIRECTORY, true, false,
+                                     menu_insert, menu_add_to_playlist,
+                                     file_rows, ARRAYLEN(file_rows));
+    else
+        ret = context_menu_show_item(sel, ATTR_DIRECTORY, true, false,
+                                     menu_insert, menu_add_to_playlist,
+                                     rows, ARRAYLEN(rows));
+
+    if (ret == ONPLAY_MAINMENU)
+        menu_exit = GO_TO_ROOT;
+    else if (ret == ONPLAY_START_PLAY)
+        menu_exit = GO_TO_WPS;
+    return menu_marked;
 }
 
 /* ------------------------------------------------------------------ *

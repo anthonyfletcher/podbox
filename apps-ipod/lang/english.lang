@@ -6254,16 +6254,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE
-  desc: The verb/action Queue
+  desc: in the context menu: play once, after anything added before
   user: core
   <source>
-    *: "Play Once"
+    *: "Play Once Later"
   </source>
   <dest>
-    *: "Play Once"
+    *: "Play Once Later"
   </dest>
   <voice>
-    *: "Play Once"
+    *: "Play Once Later"
   </voice>
 </phrase>
 <phrase>
@@ -6282,30 +6282,30 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST
-  desc: in onplay menu.  queue a track/playlist at end of playlist.
+  desc: in the context menu: play once, at the end of the queue
   user: core
   <source>
-    *: "Play Once at End"
+    *: "Play Once Last"
   </source>
   <dest>
-    *: "Play Once at End"
+    *: "Play Once Last"
   </dest>
   <voice>
-    *: "Play Once at End"
+    *: "Play Once Last"
   </voice>
 </phrase>
 <phrase>
   id: LANG_QUEUE_SHUFFLED
-  desc: in onplay menu.  queue a track/playlist randomly into dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled"
+    *: none
   </source>
   <dest>
-    *: "Play Once Shuffled"
+    *: none
   </dest>
   <voice>
-    *: "Play Once Shuffled"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -10894,16 +10894,16 @@
 </phrase>
 <phrase>
   id: LANG_QUEUE_LAST_SHUFFLED
-  desc: in onplay menu.  queue a playlist randomly at end of dynamic playlist
+  desc: deprecated
   user: core
   <source>
-    *: "Play Once Shuffled at End"
+    *: none
   </source>
   <dest>
-    *: "Play Once Shuffled at End"
+    *: none
   </dest>
   <voice>
-    *: "Play Once Shuffled at End"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15477,16 +15477,16 @@
 </phrase>
 <phrase>
   id: LANG_ADD
-  desc:
+  desc: in the context menu: add after anything added before
   user: core
   <source>
-    *: "Add to Queue"
+    *: "Play Later"
   </source>
   <dest>
-    *: "Add to Queue"
+    *: "Play Later"
   </dest>
   <voice>
-    *: "Add to Queue"
+    *: "Play Later"
   </voice>
 </phrase>
 <phrase>
@@ -15589,16 +15589,16 @@
 </phrase>
 <phrase>
   id: LANG_SHOW_QUEUE_OPTIONS
-  desc: in Current Playlist settings
+  desc: deprecated
   user: core
   <source>
-    *: "Show Play-Once Options"
+    *: none
   </source>
   <dest>
-    *: "Show Play-Once Options"
+    *: none
   </dest>
   <voice>
-    *: "Show Play-Once Options"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15617,16 +15617,16 @@
 </phrase>
 <phrase>
   id: LANG_IN_SUBMENU
-  desc: in Settings
+  desc: deprecated
   user: core
   <source>
-    *: "In Submenu"
+    *: none
   </source>
   <dest>
-    *: "In Submenu"
+    *: none
   </dest>
   <voice>
-    *: "In Submenu"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -15956,16 +15956,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAY_SHUFFLED
-  desc: play selected files in shuffled order, in playlist context menu
+  desc: deprecated
   user: core
   <source>
-    *: "Play Shuffled"
+    *: none
   </source>
   <dest>
-    *: "Play Shuffled"
+    *: none
   </dest>
   <voice>
-    *: "Play Shuffled"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -16099,16 +16099,16 @@
 </phrase>
 <phrase>
   id: LANG_PLAYING_NEXT
-  desc: used in the onplay menu
+  desc: in a context menu: the ways of playing the selection
   user: core
   <source>
-    *: "Add to Queue..."
+    *: "Play..."
   </source>
   <dest>
-    *: "Add to Queue..."
+    *: "Play..."
   </dest>
   <voice>
-    *: "Add to Queue"
+    *: "Play"
   </voice>
 </phrase>
 <phrase>
@@ -16127,44 +16127,44 @@
 </phrase>
 <phrase>
   id: LANG_ADD_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Later, in a shuffled order
   user: core
   <source>
-    *: "Shuffle into Queue"
+    *: "Play Later Shuffled"
   </source>
   <dest>
-    *: "Shuffle into Queue"
+    *: "Play Later Shuffled"
   </dest>
   <voice>
-    *: "Shuffle into Queue"
+    *: "Play Later Shuffled"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST
-  desc: used in the onplay menu
+  desc: in the context menu: add at the end of the queue
   user: core
   <source>
-    *: "Add to End"
+    *: "Play Last"
   </source>
   <dest>
-    *: "Add to End"
+    *: "Play Last"
   </dest>
   <voice>
-    *: "Add to End"
+    *: "Play Last"
   </voice>
 </phrase>
 <phrase>
   id: LANG_PLAY_LAST_SHUFFLED
-  desc: used in the onplay menu
+  desc: in the context menu: Play Last, in a shuffled order
   user: core
   <source>
-    *: "Shuffle onto End"
+    *: "Play Last Shuffled"
   </source>
   <dest>
-    *: "Shuffle onto End"
+    *: "Play Last Shuffled"
   </dest>
   <voice>
-    *: "Shuffle onto End"
+    *: "Play Last Shuffled"
   </voice>
 </phrase>
 <phrase>
@@ -18050,16 +18050,16 @@
 </phrase>
 <phrase>
   id: LANG_SET_CONTEXT_ITEM
-  desc: WPS context item
+  desc: deprecated
   user: core
   <source>
-    *: "Set Context Item"
+    *: none
   </source>
   <dest>
-    *: "Set Context Item"
+    *: none
   </dest>
   <voice>
-    *: "Set Context Item"
+    *: none
   </voice>
 </phrase>
 <phrase>
@@ -19832,16 +19832,16 @@
 </phrase>
 <phrase>
   id: LANG_RESET_CONTEXT_ITEMS
-  desc: clears the four while-playing context menu slots
+  desc: deprecated
   user: core
   <source>
-    *: "Reset Context Menu"
+    *: none
   </source>
   <dest>
-    *: "Reset Context Menu"
+    *: none
   </dest>
   <voice>
-    *: "Reset context menu"
+    *: none
   </voice>
 </phrase>
 
@@ -25196,5 +25196,285 @@
   </dest>
   <voice>
     *: "Exit Without Saving"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_INFO
+  desc: in the context menu: details of the selected album
+  user: core
+  <source>
+    *: "Album Info"
+  </source>
+  <dest>
+    *: "Album Info"
+  </dest>
+  <voice>
+    *: "Album Info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_INFO
+  desc: in the context menu: details of the selected artist
+  user: core
+  <source>
+    *: "Artist Info"
+  </source>
+  <dest>
+    *: "Artist Info"
+  </dest>
+  <voice>
+    *: "Artist Info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_INFO
+  desc: in the context menu: details of the selected row
+  user: core
+  <source>
+    *: "Info"
+  </source>
+  <dest>
+    *: "Info"
+  </dest>
+  <voice>
+    *: "Info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MORE
+  desc: in the context menu: the submenu of rarer actions
+  user: core
+  <source>
+    *: "More..."
+  </source>
+  <dest>
+    *: "More..."
+  </dest>
+  <voice>
+    *: "More"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MANAGE
+  desc: in the context menu: the submenu of file actions
+  user: core
+  <source>
+    *: "Manage..."
+  </source>
+  <dest>
+    *: "Manage..."
+  </dest>
+  <voice>
+    *: "Manage"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ALBUM
+  desc: in the context menu: open the track's album in the database
+  user: core
+  <source>
+    *: "Go to Album"
+  </source>
+  <dest>
+    *: "Go to Album"
+  </dest>
+  <voice>
+    *: "Go to Album"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_GO_TO_ARTIST
+  desc: in the context menu: open the track's album artist in the database
+  user: core
+  <source>
+    *: "Go to Artist"
+  </source>
+  <dest>
+    *: "Go to Artist"
+  </dest>
+  <voice>
+    *: "Go to Artist"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_INFO
+  desc: in the context menu: details of the selected book
+  user: core
+  <source>
+    *: "Book Info"
+  </source>
+  <dest>
+    *: "Book Info"
+  </dest>
+  <voice>
+    *: "Book Info"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_MENUS
+  desc: in Appearance: what each menu shows
+  user: core
+  <source>
+    *: "Menus"
+  </source>
+  <dest>
+    *: "Menus"
+  </dest>
+  <voice>
+    *: "Menus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE
+  desc: in a main menu or Music menu row's context menu
+  user: core
+  <source>
+    *: "Hide"
+  </source>
+  <dest>
+    *: "Hide"
+  </dest>
+  <voice>
+    *: "Hide"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_CONTEXT_MENUS
+  desc: in Appearance > Menus: the rows each context menu shows
+  user: core
+  <source>
+    *: "Context Menus"
+  </source>
+  <dest>
+    *: "Context Menus"
+  </dest>
+  <voice>
+    *: "Context Menus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_HIDE_THIS_ROW
+  desc: on a long press of a context menu's row
+  user: core
+  <source>
+    *: "Hide This Row"
+  </source>
+  <dest>
+    *: "Hide This Row"
+  </dest>
+  <voice>
+    *: "Hide This Row"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ROW_HIDDEN
+  desc: splash after a row is hidden
+  user: core
+  <source>
+    *: "Hidden. Show it again in Appearance > Menus"
+  </source>
+  <dest>
+    *: "Hidden. Show it again in Appearance > Menus"
+  </dest>
+  <voice>
+    *: "Hidden. Show it again in Appearance > Menus"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SHOW_ALL_ROWS
+  desc: in a context menu editor's context menu: turn every row back on
+  user: core
+  <source>
+    *: "Show All Rows"
+  </source>
+  <dest>
+    *: "Show All Rows"
+  </dest>
+  <voice>
+    *: "Show All Rows"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_NOW_PLAYING_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Now Playing Menu"
+  </source>
+  <dest>
+    *: "Now Playing Menu"
+  </dest>
+  <voice>
+    *: "Now Playing Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_TRACK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Track Menu"
+  </source>
+  <dest>
+    *: "Track Menu"
+  </dest>
+  <voice>
+    *: "Track Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ALBUM_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Album Menu"
+  </source>
+  <dest>
+    *: "Album Menu"
+  </dest>
+  <voice>
+    *: "Album Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_ARTIST_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Artist Menu"
+  </source>
+  <dest>
+    *: "Artist Menu"
+  </dest>
+  <voice>
+    *: "Artist Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_FOLDER_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Folder Menu"
+  </source>
+  <dest>
+    *: "Folder Menu"
+  </dest>
+  <voice>
+    *: "Folder Menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_BOOK_MENU
+  desc: in Appearance > Menus > Context Menus
+  user: core
+  <source>
+    *: "Book Menu"
+  </source>
+  <dest>
+    *: "Book Menu"
+  </dest>
+  <voice>
+    *: "Book Menu"
   </voice>
 </phrase>

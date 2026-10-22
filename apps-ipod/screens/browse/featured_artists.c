@@ -16,7 +16,7 @@
  * Parts, in order:
  *   - the guest list, in name order
  *   - one guest's tracks: retrieving the rows, and drawing them
- *   - playing what the list shows
+ *   - playing what the list shows, and the context menus
  *   - the two ways in: every guest, and one artist's guest appearances
  ****************************************************************************/
 
@@ -42,6 +42,10 @@
 #include "database/db_featured.h"
 #include "screens/browse/browser_db.h"
 #include "playlist/playlist.h"
+#include "screens/context_menu.h"
+#include "system/strutil.h"          /* open_utf8 */
+#include "dir.h"                     /* ATTR_DIRECTORY */
+#include "files/filetypes.h"         /* FILE_ATTR_AUDIO */
 #include "root_menu.h"
 #include "featured_artists.h"
 
@@ -102,31 +106,17 @@ static enum list_row_kind track_get_kind(int n, void *data)
     return LIST_ROW_TRACK;
 }
 
-/* What the context action asked for, since a list callback can only end the
- * list and not say why. */
-static int pending_go_to;
+/* The row a context press was on, or -1. A list callback can only end the
+ * list, not say why, and the menu runs once the list is down. */
+static int pending_row = -1;
 
-/* A guest who is also an album artist has somewhere else to be: their own
- * albums. That is one alternative to the row's own action, and a menu of one
- * is worse than the action itself, so context goes straight there. A guest
- * with no albums of their own -- which is most of them, and the reason this
- * feature exists -- has nowhere to go and context does nothing. */
-static int guest_action_cb(int action, struct gui_synclist *lists)
+static int context_action_cb(int action, struct gui_synclist *lists)
 {
     if (action == ACTION_STD_CONTEXT)
     {
-        int g = order[gui_synclist_get_sel_pos(lists)];
-        long seek = db_featured_artist_seek(g);
-
-        if (seek >= 0)
-        {
-            browser_db_enter_artist_albums_on_next_load(seek,
-                                                        db_featured_name(g));
-            pending_go_to = GO_TO_ALBUM_COVERS_TRACKS;
-            return ACTION_STD_CANCEL;
-        }
+        pending_row = gui_synclist_get_sel_pos(lists);
+        return ACTION_STD_CANCEL;
     }
-
     return action;
 }
 
@@ -265,6 +255,144 @@ static int play_from(int start)
     return GO_TO_WPS;
 }
 
+/* Every track in track_id[], to the insert context's position */
+static bool insert_tracks(int position, bool queue, bool create_new)
+{
+    struct tagcache_search tcs;
+    struct playlist_insert_context context;
+    char path[MAX_PATH];
+    int added = 0;
+
+    (void)create_new;
+    if (!tagcache_search(&tcs, tag_filename))
+        return false;
+    if (playlist_insert_context_create(NULL, &context, position, queue,
+                                       false) < 0)
+    {
+        playlist_insert_context_release(&context);
+        tagcache_search_finish(&tcs);
+        return false;
+    }
+
+    cpu_boost(true);
+    for (int i = 0; i < track_ct; i++)
+    {
+        if (tagcache_retrieve(&tcs, track_id[i], tag_filename,
+                              path, sizeof(path))
+            && playlist_insert_context_add(&context, path) >= 0)
+            added++;
+    }
+    cpu_boost(false);
+
+    playlist_insert_context_release(&context);
+    tagcache_search_finish(&tcs);
+    return added > 0;
+}
+
+/* Every track in track_id[], written to a playlist file */
+static int write_tracks(const char *playlist, bool new_playlist)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    int fd, written = 0;
+
+    if (!tagcache_search(&tcs, tag_filename))
+        return -1;
+    fd = new_playlist ? open_utf8(playlist, O_CREAT | O_WRONLY | O_TRUNC)
+                      : open(playlist, O_CREAT | O_WRONLY | O_APPEND, 0666);
+    if (fd >= 0)
+    {
+        for (int i = 0; i < track_ct; i++)
+        {
+            if (tagcache_retrieve(&tcs, track_id[i], tag_filename,
+                                  path, sizeof(path))
+                && fdprintf(fd, "%s\n", path) > 0)
+                written++;
+        }
+        close(fd);
+    }
+    tagcache_search_finish(&tcs);
+    return written > 0 ? 0 : -1;
+}
+
+/* Where a context menu sent us, as the screen code the shelf leaves for, or
+ * GO_TO_PREVIOUS to stay */
+static int menu_go_to(int ret)
+{
+    switch (ret)
+    {
+        case ONPLAY_START_PLAY:
+            return GO_TO_WPS;
+        case ONPLAY_MAINMENU:
+            return GO_TO_ROOT;
+        case ONPLAY_GO_TO_LIBRARY:
+            return GO_TO_ALBUM_COVERS_TRACKS;
+        case ONPLAY_REVEAL_FILE:
+            return GO_TO_FILEBROWSER;
+        default:
+            return GO_TO_PREVIOUS;
+    }
+}
+
+/* One track's menu, the browser's for any track */
+static int track_menu(int row)
+{
+    struct tagcache_search tcs;
+    char path[MAX_PATH];
+    bool got = false;
+
+    if (tagcache_search(&tcs, tag_filename))
+    {
+        got = tagcache_retrieve(&tcs, track_id[row], tag_filename,
+                                path, sizeof(path));
+        tagcache_search_finish(&tcs);
+    }
+    if (!got)
+    {
+        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+        return GO_TO_PREVIOUS;
+    }
+
+    return menu_go_to(context_menu_show_item(path, FILE_ATTR_AUDIO, false,
+                                             true, NULL, NULL, NULL, 0));
+}
+
+/* The guest the open menu is about */
+static int menu_guest;
+
+/* A guest who is also an album artist has somewhere else to be: their own
+ * albums. Most guests have none, which is the reason this feature exists. */
+static int guest_go_to_artist(void)
+{
+    browser_db_enter_artist_albums_on_next_load(
+        db_featured_artist_seek(menu_guest), db_featured_name(menu_guest));
+    return ONPLAY_GO_TO_LIBRARY;
+}
+
+/* A guest's menu: their appearances to play or queue, as an album's tracks
+ * are */
+static int guest_menu(int g)
+{
+    static const struct context_menu_row rows[] = {
+        { LANG_GO_TO_ARTIST, guest_go_to_artist, false },
+    };
+    char name[MAX_PATH];
+
+    menu_guest = g;
+    track_ct = db_featured_track_ids(g, track_id, TRACKS_MAX);
+    if (track_ct == 0)
+        return GO_TO_PREVIOUS;
+
+    /* Led by a slash, as the browser does, so a new playlist is offered the
+     * guest's name */
+    snprintf(name, sizeof(name), "/%s", db_featured_name(g));
+    return menu_go_to(context_menu_show_item(name, ATTR_DIRECTORY, false,
+                                             false, insert_tracks,
+                                             write_tracks, rows,
+                                             db_featured_artist_seek(g) >= 0
+                                             ? 1 : 0));
+}
+
 /* ------------------------------------------------------------------ *
  * the two levels                                                     *
  * ------------------------------------------------------------------ */
@@ -277,29 +405,45 @@ static int run_track_list(const char *title)
     char *arena;
     size_t arena_sz = 0;
     int ret = GO_TO_PREVIOUS;
+    int selection = 0;
 
-    arena = app_claim_buffer(&arena_sz, "featured tracks");
-    track_ct = read_track_rows(arena, arena_sz);
-    track_rows = arena;
-
-    if (track_ct == 0)
+    while (1)
     {
+        arena = app_claim_buffer(&arena_sz, "featured tracks");
+        track_ct = read_track_rows(arena, arena_sz);
+        track_rows = arena;
+
+        if (track_ct == 0)
+        {
+            app_release_buffer("featured tracks");
+            splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
+            return GO_TO_PREVIOUS;
+        }
+
+        pending_row = -1;
+        simplelist_info_init(&info, (char *)title, track_ct, NULL);
+        info.get_name = track_get_name;
+        info.get_kind = track_get_kind;
+        info.action_callback = context_action_cb;
+        info.selection = MIN(selection, track_ct - 1);
+        if (simplelist_show_list(&info))
+            ret = GO_TO_ROOT;
+
+        /* Given back before anything is played: the insert context wants
+         * it. */
         app_release_buffer("featured tracks");
-        splash(HZ, ID2P(LANG_TAGCACHE_BUSY));
-        return GO_TO_PREVIOUS;
+        track_rows = NULL;
+
+        if (ret == GO_TO_ROOT || pending_row < 0)
+            break;
+
+        selection = pending_row;
+        ret = track_menu(pending_row);
+        if (ret != GO_TO_PREVIOUS)
+            return ret;
     }
 
-    simplelist_info_init(&info, (char *)title, track_ct, NULL);
-    info.get_name = track_get_name;
-    info.get_kind = track_get_kind;
-    if (simplelist_show_list(&info))
-        ret = GO_TO_ROOT;
-
-    /* Given back before anything is played: the insert context wants it. */
-    app_release_buffer("featured tracks");
-    track_rows = NULL;
-
-    if (info.selection >= 0)
+    if (ret != GO_TO_ROOT && info.selection >= 0)
         ret = play_from(info.selection);
 
     return ret;
@@ -351,14 +495,14 @@ int featured_artists_show(void)
 
     push_current_activity(ACTIVITY_FEATUREDARTISTS);
     sort_guests();
-    pending_go_to = 0;
 
     while (1)
     {
+        pending_row = -1;
         simplelist_info_init(&info, str(LANG_FEATURED_ARTISTS), order_ct, NULL);
         info.get_name = guest_get_name;
         info.get_kind = guest_get_kind;
-        info.action_callback = guest_action_cb;
+        info.action_callback = context_action_cb;
         info.selection = selection;
         if (simplelist_show_list(&info))
         {
@@ -366,10 +510,13 @@ int featured_artists_show(void)
             break;
         }
 
-        if (pending_go_to != 0)
+        if (pending_row >= 0)
         {
-            ret = pending_go_to;
-            break;
+            selection = pending_row;
+            ret = guest_menu(order[selection]);
+            if (ret != GO_TO_PREVIOUS)
+                break;
+            continue;
         }
         if (info.selection < 0)
             break;

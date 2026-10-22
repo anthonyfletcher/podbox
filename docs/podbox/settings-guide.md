@@ -176,8 +176,7 @@ Settings
 | Queue ▸ Warn When Replacing Queue | Asks before replacing a queue you have built up by hand, which is otherwise easy to lose with one Select. | Yes |  |
 | Queue ▸ Party Mode | Anything selected is added to the end of the queue instead of replacing it, so a second person cannot wipe out what is already lined up. | No |  |
 | Queue ▸ Keep Current Track When Replacing Playlist | Leaves the playing track in place when a new selection replaces the queue, so the music does not stop mid-song. | Yes | **Adv** |
-| Queue ▸ Show Shuffled Adding Options | Adds Shuffle into Queue and Shuffle onto End to the Add to Queue menu, for a folder or playlist. | Yes | **Adv** |
-| Queue ▸ Show Play-Once Options | Adds the Play Once entries to the Add to Queue menu, or with In Submenu gathers them in a Play Once submenu. A play-once track leaves the queue after it has played and is skipped when the queue repeats; the queue marks it with a +. | No | **Adv** |
+| Queue ▸ Show Shuffled Adding Options | Adds Play Later Shuffled and Play Last Shuffled to the More menu of a folder, album or playlist. | Yes | **Adv** |
 
 ### Playback — Bookmarking
 
@@ -263,8 +262,8 @@ Marks reads one from it and Cuesheet Support finds no cuesheet; otherwise
 playing it resumes it. Above the first book sit [Finished], [Not Started] and
 [In Progress], which sort the books by how far into them you are; podcasts are
 in none of them. A book's context menu, on a shelf or in any Audiobooks list,
-offers Add to Queue, Add to Playlist, Show Track Info, Listening Progress, Show
-in Files and Mark as..., which moves it to any of the three until it is played
+offers ways to queue it, Add to Playlist, its info, Listening Progress, Show in
+Files and Mark as..., which moves it to any of the three until it is played
 again, though not for a podcast. A list with no books in it has no row. The
 Audiobooks lists have no <All Tracks> or <Random> rows.
 

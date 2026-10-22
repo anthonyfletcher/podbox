@@ -121,6 +121,23 @@ static void save_rows(void)
     settings_save();
 }
 
+bool music_menu_hide_row(int index)
+{
+    int hidden = 0;
+
+    if (index < 0 || index >= MAX_ROWS)
+        return false;
+
+    /* The mask only stands for the row set it was chosen against */
+    if (global_settings.music_menu_sig == browser_db_root_row_signature())
+        hidden = global_settings.music_menu_hidden;
+
+    global_settings.music_menu_hidden = hidden | (1 << index);
+    global_settings.music_menu_sig = browser_db_root_row_signature();
+    settings_save();
+    return true;
+}
+
 int music_menu_config(void)
 {
     struct simplelist_info info;
