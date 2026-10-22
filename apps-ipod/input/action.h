@@ -320,6 +320,10 @@ enum {
     ACTION_LIST_VOLUP,
     ACTION_LIST_VOLDOWN,
 
+    /* The EQ editor: the EQ is off while Play is held. */
+    ACTION_EQ_COMPARE,
+    ACTION_EQ_COMPARE_END,
+
     LAST_ACTION_PLACEHOLDER, /* custom actions should be this + something */
 };
 

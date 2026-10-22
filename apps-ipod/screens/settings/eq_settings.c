@@ -4,10 +4,11 @@
  * Copyright (C) 2006 Dan Everton
  * GNU General Public License (version 2+)
  *
- * Equaliser settings menu, including the per-band editor and preset
- * load/save.
+ * Equaliser settings menu: applying the settings to the DSP, the numeric
+ * band list, preset save/reset, and the menu itself. The curve editor and
+ * the presets list are eq_editor.c.
  *
- * The band editor is not a plain settings list. Its list has one row per
+ * The band list is not a plain settings list. Its list has one row per
  * band, but selecting a band expands it into that band's cutoff/gain/Q rows
  * in place -- so a list index does not map to a fixed item. selection_to_
  * banditem() does that mapping, and every list callback goes through it.
@@ -16,10 +17,9 @@
  * displayed "-4.5 dB" is -45 here.
  *
  * Parts, in order:
- *   - applying settings to the DSP, and the simple (gain-only) menu
- *   - the advanced menu: the expand-in-place list and its index mapping
- *   - the graphical editor: slider drawing and its input loop
- *   - preset load/save/reset, and the menu declarations
+ *   - applying settings to the DSP, with Auto Headroom
+ *   - the band list: the expand-in-place list and its index mapping
+ *   - preset save/reset, and the menu declarations
  ****************************************************************************/
 
 #include "config.h"
@@ -29,32 +29,27 @@
 #include "eq_settings.h"
 #include "system.h"
 #include "kernel.h"
-#include "lcd.h"
 #include "widgets/list.h"
 #include "widgets/menu.h"
 #include "input/action.h"
 #include "settings/settings.h"
-#include "rbpaths.h"
 #include "draw/icon_bitmaps.h"
-#include "font.h"
 #include "lang.h"
 #include "speech/talk.h"
-#include "system/shutdown.h"
 #include "sound.h"
 #include "dsp_proc_settings.h"
-#include "screens/browse/browser.h"
-#include "draw/screen_access.h"
 #include "widgets/keyboard.h"
-#include "draw/scrollbar.h"
 #include "common_settings.h"
-#include "draw/viewport.h"
 #include "exported_settings.h"
 #include "audio/pcmbuf.h"
 #include "widgets/option_select.h"
 #include "root_menu.h"          /* MENU_ATTACHED_USB */
 #include "string-extra.h"
-
-static void eq_apply(void);
+#include "dsp_core.h"
+#include "dsp_misc.h"
+#include "pcm_sampr.h"
+#include "eq_curve.h"
+#include "eq_editor.h"
 
 /*
  * Utility functions
@@ -83,8 +78,17 @@ void eq_enabled_option_callback(bool enabled)
 /*
  * Settings functions
  */
-static void eq_apply(void)
+unsigned int eq_dsp_frequency(void)
 {
+    unsigned int fs = dsp_get_output_frequency(dsp_get_config(CODEC_IDX_AUDIO));
+    return fs >= 8000 ? fs : HW_SAMPR_DEFAULT;
+}
+
+void eq_apply(void)
+{
+    if (global_settings.eq_auto_headroom)
+        global_settings.eq_precut = eq_curve_headroom(
+            global_settings.eq_band_settings, eq_dsp_frequency());
     dsp_eq_enable(global_settings.eq_enabled);
     dsp_set_eq_precut(global_settings.eq_precut);
     /* Update all bands */
@@ -113,31 +117,6 @@ int eq_setting_callback(int action,
 }
 MENUITEM_SETTING(eq_enable, &global_settings.eq_enabled, eq_setting_callback);
 MENUITEM_SETTING(eq_precut, &global_settings.eq_precut, eq_setting_callback);
-
-static char* gainitem_get_name(int selected_item, void *data, char *buffer, size_t len)
-{
-    (void)data;
-    snprintf(buffer, len, str(LANG_EQUALIZER_GAIN_ITEM),
-            global_settings.eq_band_settings[selected_item].cutoff);
-
-    return buffer;
-}
-
-static int gainitem_speak_item(int selected_item, void *data)
-{
-    (void)data;
-    talk_number(global_settings.eq_band_settings[selected_item].cutoff, false);
-    talk_id(LANG_EQUALIZER_GAIN_ITEM, true);
-    return 0;
-}
-
-static enum themable_icons gainitem_get_icon(int selected_item, void * data)
-{
-    (void)selected_item;
-    (void)data;
-
-    return Icon_Menu_functioncall;
-}
 
 static const char* db_format(char* buffer, size_t buffer_size, int value,
                       const char* unit)
@@ -195,7 +174,6 @@ static const struct choice_setting type_choice_setting = {
     }}
 };
 
-extern struct eq_band_setting eq_defaults[EQ_NUM_BANDS];
 static int banditem_lang(int band, int item);
 
 /* The setting behind one of a band's rows -- 1 cutoff, 2 Q, 3 gain, 4 type --
@@ -249,27 +227,6 @@ static int band_range(int band, int item)
     return option_value_position(&setting);
 }
 
-/* Each Simple EQ row is a band's gain. */
-static enum list_row_kind gainitem_get_kind(int selected_item, void *data)
-{
-    (void)selected_item;
-    (void)data;
-    return LIST_ROW_SETTING;
-}
-
-static const char *gainitem_get_value(int selected_item, void *data,
-                                      char *buffer, size_t len)
-{
-    (void)data;
-    return band_value(selected_item, 3, buffer, len);
-}
-
-static int gainitem_get_range(int selected_item, void *data)
-{
-    (void)data;
-    return band_range(selected_item, 3);
-}
-
 static int simplelist_action_callback(int action, struct gui_synclist *lists)
 {
     (void)lists;
@@ -277,43 +234,6 @@ static int simplelist_action_callback(int action, struct gui_synclist *lists)
         return ACTION_STD_CANCEL;
     return action;
 }
-
-static int eq_do_simple_menu(void * param)
-{
-    (void)param;
-    struct simplelist_info info;
-    struct settings_list setting;
-    char title[MAX_PATH];
-
-    simplelist_info_init(&info, str(LANG_EQUALIZER_GAIN), EQ_NUM_BANDS, NULL);
-    info.get_name = (list_get_name*)gainitem_get_name;
-    if(global_settings.talk_menu)
-        info.get_talk = gainitem_speak_item;
-    info.get_icon = gainitem_get_icon;
-    info.get_kind = gainitem_get_kind;
-    info.get_value = gainitem_get_value;
-    info.get_range = gainitem_get_range;
-    info.action_callback = simplelist_action_callback;
-    info.selection = -1;
-    info.title_icon = Icon_Submenu;
-
-    while (true)
-    {
-        if (simplelist_show_list(&info))
-            return MENU_ATTACHED_USB;
-        if (info.selection < 0)
-            break;
-        pcmbuf_set_low_latency(true);
-        band_setting(&setting, info.selection, 3);
-        option_screen(&setting, NULL, false,
-                gainitem_get_name(info.selection, NULL, title, MAX_PATH));
-        eq_apply();
-        pcmbuf_set_low_latency(false);
-    }
-    return 0;
-}
-MENUITEM_FUNCTION(gain_menu, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_EQUALIZER_GAIN),
-	              eq_do_simple_menu, NULL, Icon_Submenu);
 
 static void selection_to_banditem(int selection, int expanded_band, int *band, int *item)
 {
@@ -493,389 +413,36 @@ static int eq_do_advanced_menu(void * param)
     }
     return 0;
 }
-MENUITEM_FUNCTION(advanced_menu, MENU_FUNC_CHECK_RETVAL,
-                  ID2P(LANG_EQUALIZER_ADVANCED),
-                  eq_do_advanced_menu, NULL, Icon_EQ);
-
-enum eq_slider_mode {
-    TYPE,
-    GAIN,
-    CUTOFF,
-    Q,
-};
-
-/* Inverted marks the field being edited on the selected band. */
-static void set_field_drawmode(struct screen *screen, bool inverted)
+int eq_band_list(void)
 {
-    if (inverted)
-        screen->set_drawmode(DRMODE_SOLID | DRMODE_INVERSEVID);
-    else
-        screen->set_drawmode(DRMODE_SOLID);
+    return eq_do_advanced_menu(NULL);
 }
 
-/* Draw the UI for a whole EQ band */
-static int draw_eq_slider(struct screen * screen, int x, int y,
-    int width, int cutoff, int q, int gain, bool selected,
-    enum eq_slider_mode mode, int band, int scrollbar_size,
-    enum eq_filter_type type)
-{
-    char buf[26];
-    const char *label;
-    int steps, min_item, max_item;
-    int abs_gain = abs(gain);
-    int x1, x2, y1, total_height;
-    int w, h;
-
-    switch(mode) {
-    case TYPE:
-        steps = 5;
-        min_item = (type * 2);
-        max_item = (type * 2) + 1;
-        break;
-    case Q:
-        steps = EQ_Q_MAX - EQ_Q_MIN;
-        min_item = q - EQ_Q_STEP - EQ_Q_MIN;
-        max_item = q + EQ_Q_STEP - EQ_Q_MIN;
-        break;
-    case CUTOFF:
-        steps = EQ_CUTOFF_MAX - EQ_CUTOFF_MIN;
-        min_item = cutoff - EQ_CUTOFF_FAST_STEP * 2;
-        max_item = cutoff + EQ_CUTOFF_FAST_STEP * 2;
-        break;
-    case GAIN:
-    default:
-        steps = EQ_GAIN_MAX - EQ_GAIN_MIN;
-        min_item = abs(EQ_GAIN_MIN) + gain - EQ_GAIN_STEP * 5;
-        max_item = abs(EQ_GAIN_MIN) + gain + EQ_GAIN_STEP * 5;
-        break;
-    }
-
-    /* Start two pixels in, one for border, one for margin */
-    x1 = x + 2;
-    y1 = y + 2;
-
-    /* Print out the band label. It doubles as the filter type readout, so it
-       inverts while the type is the item being edited. */
-    set_field_drawmode(screen, mode == TYPE && selected);
-    if (type == EQ_FILTER_LOW_SHELF)
-        label = "LS";
-    else if (type == EQ_FILTER_HIGH_SHELF)
-        label = "HS";
-    else
-        label = "PK";
-    snprintf(buf, sizeof(buf), "%s%d:", label, band);
-    screen->putsxy(x1, y1, buf);
-
-    w = screen->getstringsize("A", NULL, &h);
-
-    x1 += 5*w; /* 4 chars for label + 1 space = 5 */
-
-    /* Print out gain part of status line (left justify after label) */
-    set_field_drawmode(screen, mode == GAIN && selected);
-
-    snprintf(buf, sizeof(buf), "%s%2d.%d%s", gain < 0 ? "-" : " ",
-        abs_gain / EQ_USER_DIVISOR, abs_gain % EQ_USER_DIVISOR,
-        screen->lcdwidth >= 160 ? "dB" : "");
-    screen->putsxy(x1, y1, buf);
-    w = screen->getstringsize(buf, NULL, NULL);
-    x1 += w;
-
-    /* Print out Q part of status line (right justify) */
-    set_field_drawmode(screen, mode == Q && selected);
-
-    snprintf(buf, sizeof(buf), "%d.%d%s", q / EQ_USER_DIVISOR,
-             q % EQ_USER_DIVISOR, screen->lcdwidth >= 160 ? " Q" : "");
-    w = screen->getstringsize(buf, NULL, NULL);
-    x2 = x + width - w - 2;
-    screen->putsxy(x2, y1, buf);
-
-    /* Print out cutoff part of status line (center between gain & Q) */
-    set_field_drawmode(screen, mode == CUTOFF && selected);
-
-    snprintf(buf, sizeof(buf),  "%5d%s", cutoff,
-             screen->lcdwidth >= 160 ? "Hz" : "");
-    w = screen->getstringsize(buf, NULL, NULL);
-    x1 = x1 + (x2 - x1 - w)/2;
-    screen->putsxy(x1, y1, buf);
-
-    /* Draw selection box */
-    total_height = 3 + h + 1 + scrollbar_size + 3;
-    screen->set_drawmode(DRMODE_SOLID);
-    if (selected) {
-        screen->drawrect(x, y, width, total_height);
-    }
-
-    /* Draw horizontal slider. Reuse scrollbar for this */
-    gui_scrollbar_draw(screen, x + 3, y1 + h + 1, width - 6, scrollbar_size,
-                       steps, min_item, max_item, HORIZONTAL);
-
-    return total_height;
-}
-
-/* Draw's all the EQ sliders. Returns the total height of the sliders drawn */
-static void draw_eq_sliders(struct screen * screen, int x, int y,
-                            int nb_eq_sliders, int start_item,
-                            int current_band, enum eq_slider_mode mode,
-                            int scrollbar_size)
-{
-    int height = y;
-
-    start_item = MIN(start_item, EQ_NUM_BANDS - nb_eq_sliders);
-
-    for (int i = 0; i < EQ_NUM_BANDS; i++) {
-        struct eq_band_setting *setting = &global_settings.eq_band_settings[i];
-        int cutoff = setting->cutoff;
-        int q      = setting->q;
-        int gain   = setting->gain;
-        enum eq_filter_type type = setting->type;
-
-        if (i == start_item + nb_eq_sliders)
-            break;
-
-        if (i >= start_item) {
-            height += draw_eq_slider(screen, x, height, screen->lcdwidth - x - 1,
-                                     cutoff, q, gain, i == current_band, mode,
-                                     i, scrollbar_size, type);
-            /* add a margin */
-            height++;
-        }
-    }
-
-    if (nb_eq_sliders != EQ_NUM_BANDS)
-        gui_scrollbar_draw(screen, 0, y, scrollbar_size - 1,
-                           screen->lcdheight - y, EQ_NUM_BANDS,
-                           start_item, start_item + nb_eq_sliders,
-                           VERTICAL);
-    return;
-}
-
-/* Provides a graphical means of editing the EQ settings */
-int eq_menu_graphical(void)
-{
-    bool exit_request = false;
-    bool result = true;
-    bool has_changed = false;
-    int button;
-    int *setting;
-    int current_band, x, y, step, fast_step, min, max;
-    enum eq_slider_mode mode;
-    int h, height, start_item, nb_eq_sliders[NB_SCREENS];
-    /* Scaled off the font rather than fixed, so the sliders stay in proportion
-     * with a large UI font instead of turning into hairlines. */
-    int scrollbar_size[NB_SCREENS];
-    FOR_NB_SCREENS(i)
-        viewportmanager_theme_enable(i, false, NULL);
-
-
-    FOR_NB_SCREENS(i) {
-        screens[i].set_viewport(NULL);
-        screens[i].clear_display();
-
-        /* Figure out how many sliders can be drawn on the screen */
-        h = screens[i].getcharheight();
-
-        scrollbar_size[i] = h * 3 / 4;
-        if (scrollbar_size[i] < 6)
-            scrollbar_size[i] = 6;
-
-        /* Total height includes margins (1), text, slider, and line selector (1) */
-        height = 3 + h + 1 + scrollbar_size[i] + 3;
-        nb_eq_sliders[i] = screens[i].lcdheight / height;
-
-        /* Make sure the "Edit Mode" text fits too */
-        height = nb_eq_sliders[i]*height + h + 2;
-        if (height > screens[i].lcdheight)
-            nb_eq_sliders[i]--;
-
-        if (nb_eq_sliders[i] > EQ_NUM_BANDS)
-            nb_eq_sliders[i] = EQ_NUM_BANDS;
-    }
-
-    y = h + 1;
-
-    /* Start off editing gain on the first band */
-    mode = GAIN;
-    current_band = 0;
-
-    while (!exit_request) {
-        FOR_NB_SCREENS(i)
-        {
-            screens[i].clear_display();
-
-            /* Set pointer to the band data currently editable */
-            if (mode == TYPE) {
-                /* filter type */
-                setting = (int*) &global_settings.eq_band_settings[current_band].type;
-
-                step = 1;
-                fast_step = 1;
-                min = EQ_FILTER_LOW_SHELF;
-                max = EQ_FILTER_HIGH_SHELF;
-
-                screens[i].putsxyf(0, 0, str(LANG_SYSFONT_EQUALIZER_EDIT_MODE),
-                         str(LANG_EQUALIZER_FILTER_TYPE), "");
-            } else if (mode == GAIN) {
-                /* gain */
-                setting = &global_settings.eq_band_settings[current_band].gain;
-
-                step = EQ_GAIN_STEP;
-                fast_step = EQ_GAIN_FAST_STEP;
-                min = EQ_GAIN_MIN;
-                max = EQ_GAIN_MAX;
-
-                screens[i].putsxyf(0, 0, str(LANG_SYSFONT_EQUALIZER_EDIT_MODE),
-                         str(LANG_GAIN), "(dB)");
-            } else if (mode == CUTOFF) {
-                /* cutoff */
-                setting = &global_settings.eq_band_settings[current_band].cutoff;
-
-                step = EQ_CUTOFF_STEP;
-                fast_step = EQ_CUTOFF_FAST_STEP;
-                min = EQ_CUTOFF_MIN;
-                max = EQ_CUTOFF_MAX;
-
-                screens[i].putsxyf(0, 0, str(LANG_SYSFONT_EQUALIZER_EDIT_MODE),
-                         str(LANG_SYSFONT_EQUALIZER_BAND_CUTOFF), "(Hz)");
-            } else {
-                /* Q */
-                setting = &global_settings.eq_band_settings[current_band].q;
-
-                step = EQ_Q_STEP;
-                fast_step = EQ_Q_FAST_STEP;
-                min = EQ_Q_MIN;
-                max = EQ_Q_MAX;
-
-                screens[i].putsxyf(0, 0, str(LANG_SYSFONT_EQUALIZER_EDIT_MODE),
-                         str(LANG_EQUALIZER_BAND_Q), "");
-            }
-
-            /* Draw scrollbar if needed */
-            if (nb_eq_sliders[i] != EQ_NUM_BANDS)
-            {
-                if (current_band == 0) {
-                    start_item = 0;
-                } else if (current_band == EQ_NUM_BANDS - 1) {
-                    start_item = EQ_NUM_BANDS - nb_eq_sliders[i];
-                } else {
-                    start_item = current_band - 1;
-                }
-                x = scrollbar_size[i];
-            } else {
-                x = 1;
-                start_item = 0;
-            }
-            /* Draw equalizer band details */
-            draw_eq_sliders(&screens[i], x, y, nb_eq_sliders[i], start_item,
-                            current_band, mode, scrollbar_size[i]);
-
-            screens[i].update();
-        }
-
-        button = get_action(CONTEXT_SETTINGS_EQ,TIMEOUT_BLOCK);
-
-        switch (button) {
-        case ACTION_SETTINGS_DEC:
-        case ACTION_SETTINGS_DECREPEAT:
-            *setting = MAX(*setting - step, min);
-            has_changed = true;
-            break;
-
-        case ACTION_SETTINGS_INC:
-        case ACTION_SETTINGS_INCREPEAT:
-            *setting = MIN(*setting + step, max);
-            has_changed = true;
-            break;
-
-        case ACTION_SETTINGS_INCBIGSTEP:
-            *setting = MIN(*setting + fast_step, max);
-            has_changed = true;
-            break;
-
-        case ACTION_SETTINGS_DECBIGSTEP:
-            *setting = MAX(*setting - fast_step, min);
-            has_changed = true;
-            break;
-
-        case ACTION_STD_PREV:
-        case ACTION_STD_PREVREPEAT:
-            current_band--;
-            if (current_band < 0)
-                current_band = EQ_NUM_BANDS - 1; /* wrap around */
-            break;
-
-        case ACTION_STD_NEXT:
-        case ACTION_STD_NEXTREPEAT:
-            current_band = (current_band + 1) % EQ_NUM_BANDS;
-            break;
-
-        case ACTION_STD_OK:
-            mode++;
-            if (mode > Q)
-                mode = TYPE; /* wrap around */
-            break;
-
-        case ACTION_STD_CANCEL:
-            exit_request = true;
-            result = false;
-            break;
-        default:
-            if(default_event_handler(button) == SYS_USB_CONNECTED) {
-                exit_request = true;
-                result = true;
-            }
-            break;
-        }
-
-        /* Update the filter if the user changed something */
-        if (has_changed) {
-            dsp_set_eq_coefs(current_band,
-                &global_settings.eq_band_settings[current_band]);
-            has_changed = false;
-        }
-    }
-
-    /* Reset screen settings */
-    FOR_NB_SCREENS(i)
-    {
-        screens[i].clear_display();
-        screens[i].set_viewport(NULL);
-        viewportmanager_theme_undo(i, false);
-    }
-    return (result) ? 1 : 0;
-}
-
-static int eq_save_preset(void)
+bool eq_save_preset(char *path, size_t len)
 {
     /* make sure that the eq is enabled for setting saving */
     bool enabled = global_settings.eq_enabled;
     global_settings.eq_enabled = true;
 
-    bool result = settings_save_config(SETTINGS_SAVE_EQPRESET);
+    bool result = settings_save_config_as(SETTINGS_SAVE_EQPRESET, path, len);
 
     global_settings.eq_enabled = enabled;
 
-    return (result) ? 1 : 0;
+    return result;
 }
-/* Allows browsing of preset files */
-static struct browse_folder_info eqs = { EQS_DIR, SHOW_CFG };
 
-static void eq_reset_defaults(void)
+void eq_reset_defaults(void)
 {
     for (int i = 0; i < EQ_NUM_BANDS; i++)
         global_settings.eq_band_settings[i] = eq_defaults[i];
     eq_apply();
 }
 
-MENUITEM_FUNCTION(eq_graphical, 0, ID2P(LANG_EQUALIZER_GRAPHICAL),
-                  eq_menu_graphical, lowlatency_callback, Icon_EQ);
-MENUITEM_FUNCTION(eq_save, 0, ID2P(LANG_EQUALIZER_SAVE),
-                  eq_save_preset, NULL, Icon_NOICON);
-MENUITEM_FUNCTION(eq_reset, 0, ID2P(LANG_RESET_EQUALIZER),
-                  eq_reset_defaults, NULL, Icon_NOICON);
-MENUITEM_FUNCTION_W_PARAM(eq_browse, 0, ID2P(LANG_EQUALIZER_BROWSE),
-                          browse_folder, (void*)&eqs,
-                          lowlatency_callback, Icon_NOICON);
+MENUITEM_FUNCTION(eq_edit, MENU_FUNC_CHECK_RETVAL, ID2P(LANG_EQUALIZER_EDIT),
+                  eq_editor_screen, lowlatency_callback, Icon_EQ);
+MENUITEM_FUNCTION(eq_presets, MENU_FUNC_CHECK_RETVAL,
+                  ID2P(LANG_EQUALIZER_PRESETS),
+                  eq_presets_screen, lowlatency_callback, Icon_NOICON);
 
 MAKE_MENU(equalizer_menu, ID2P(LANG_EQUALIZER), NULL, Icon_EQ,
-        &eq_browse, &eq_enable, &eq_graphical, &gain_menu,
-        &advanced_menu, &eq_precut, &eq_save, &eq_reset);
+        &eq_enable, &eq_edit, &eq_presets, &eq_precut);

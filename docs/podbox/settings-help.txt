@@ -35,8 +35,8 @@ Attenuates everything before the equaliser runs, to leave room for bands you
 have boosted.
 
 Boosting a band without precut can push the signal past what the output can
-represent, which clips and sounds harsh. If a preset sounds worse loud than
-quiet, this is the first thing to try.
+represent, which clips and sounds harsh. While Auto Headroom is on it is set
+for you, and a value set here lasts only until the next EQ change.
 
 [antiskip]
 How much audio is read ahead and held in memory before the disk is allowed to
@@ -224,8 +224,15 @@ opposite ear -- starts being dulled. Lower values roll it off earlier and give
 a warmer, more distant effect.
 
 [eq enabled]
-Master switch for the ten-band equaliser. Graphical EQ is usually an easier
-starting point than setting the bands by hand.
+Master switch for the ten-band equaliser. Changing a band in Edit EQ, or
+choosing a preset, switches it on.
+
+[eq auto headroom]
+Sets Precut from the curve: the equaliser is turned down by as much as its
+highest boost, so a boosted preset does not clip.
+
+Off leaves Precut where you set it; the curve editor then shows by how much the
+curve clips.
 
 [surround enabled]
 Delay in milliseconds for the Haas effect, which widens the image by delaying
@@ -1866,37 +1873,19 @@ matches with the menu each one lives in.
 It searches the display name, the name a setting has in a .cfg file, and a few
 words describing it -- so art, cover and album all reach the artwork settings.
 
-[action: Simple EQ]
-Sets the gain of each of the ten bands, leaving their frequencies and widths
-as they are.
+[action: Edit EQ]
+Shows the equaliser's curve. The wheel sets the selected band's gain, left and
+right choose the band, and holding Menu opens a menu with presets, Save EQ
+Preset and the rest.
 
-Enough for most adjustments. Advanced EQ reaches the same filters with full
-control over frequency and width.
+Enhanced Mode adds each band's frequency, Q and type: Select moves between
+them. Hold Play to hear the music without the EQ. Leaving with a curve that
+is neither saved nor a built-in preset offers to save it.
 
-[action: Advanced EQ]
-Sets each of the ten bands by hand -- frequency, gain and Q.
-
-Q is how wide the band is: low values shape a broad area, high values pick out a
-narrow problem.
-
-[action: Graphical EQ]
-Shows the equaliser curve and lets you drag the bands on it.
-
-Quicker than the numeric screens for judging the shape, less precise for setting
-an exact value.
-
-[action: Save EQ Preset]
-Writes the current equaliser settings to a .cfg file in /.rockbox/eqs, so they
-can be loaded again later. This is the only thing that puts anything in that
-folder: no presets are shipped, so Load EQ has nothing to offer until you have
-saved one.
-
-[action: Load EQ]
-Loads a preset saved by Save EQ Preset, replacing the current band settings.
-Empty on a new install, since none are shipped.
-
-[action: Reset EQ]
-Returns every band to flat, leaving the equaliser on.
+[action: EQ Presets]
+Six built-in curves, then any presets you have saved. Moving through the
+built-in ones plays each straight away; Select keeps one and Menu puts back
+what you had.
 
 [action: Time & Date Settings]
 Opens the clock: the time and date themselves, and how they are shown.

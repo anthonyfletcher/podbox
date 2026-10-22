@@ -360,6 +360,9 @@ enum {
     SETTINGS_SAVE_THEME_OVERLAY,
 };
 bool settings_save_config(int options);
+/* As above, leaving the path written in filename. False if the user
+ * cancelled or the write failed. */
+bool settings_save_config_as(int options, char *filename, size_t len);
 
 struct settings_list;
 struct filename_setting;
@@ -534,6 +537,8 @@ struct user_settings
     /* EQ */
     bool eq_enabled;            /* Enable equalizer */
     unsigned int eq_precut;     /* dB */
+    bool eq_auto_headroom;      /* precut follows the curve's peak */
+    int eq_editor_mode;         /* EQ_EDITOR_* in eq_editor.h */
     struct eq_band_setting eq_band_settings[EQ_NUM_BANDS]; /* for each band */
 
     /* Misc. swcodec */

@@ -24848,3 +24848,353 @@
     *: "Set Album Rating"
   </voice>
 </phrase>
+<phrase>
+  id: LANG_EQUALIZER_EDIT
+  desc: in the equalizer menu, the row opening the curve editor
+  user: core
+  <source>
+    *: "Edit EQ"
+  </source>
+  <dest>
+    *: "Edit EQ"
+  </dest>
+  <voice>
+    *: "Edit EQ"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESETS
+  desc: in the equalizer menu and the EQ editor's menu, the list of built-in and saved presets
+  user: core
+  <source>
+    *: "EQ Presets"
+  </source>
+  <dest>
+    *: "EQ Presets"
+  </dest>
+  <voice>
+    *: "EQ Presets"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_AUTO_HEADROOM
+  desc: equalizer setting: precut follows the curve's peak
+  user: core
+  <source>
+    *: "Auto Headroom"
+  </source>
+  <dest>
+    *: "Auto Headroom"
+  </dest>
+  <voice>
+    *: "Auto Headroom"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_COMPARE
+  desc: in the EQ editor's menu: switch the EQ off until a key is pressed
+  user: core
+  <source>
+    *: "Compare with Flat"
+  </source>
+  <dest>
+    *: "Compare with Flat"
+  </dest>
+  <voice>
+    *: "Compare with Flat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ENHANCED_MODE
+  desc: in the EQ editor's menu: edit frequency, Q and type as well as gain
+  user: core
+  <source>
+    *: "Enhanced Mode"
+  </source>
+  <dest>
+    *: "Enhanced Mode"
+  </dest>
+  <voice>
+    *: "Enhanced Mode"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EQ_OFF
+  desc: in the EQ editor, while the EQ is switched off
+  user: core
+  <source>
+    *: "EQ off"
+  </source>
+  <dest>
+    *: "EQ off"
+  </dest>
+  <voice>
+    *: "EQ off"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_ANY_KEY
+  desc: in the EQ editor while comparing with flat: how to switch the EQ back on
+  user: core
+  <source>
+    *: "Any key turns it on"
+  </source>
+  <dest>
+    *: "Any key turns it on"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CLIPS
+  desc: in the EQ editor: how far the curve's peak is above the precut. %s is a value in dB
+  user: core
+  <source>
+    *: "Clips %s"
+  </source>
+  <dest>
+    *: "Clips %s"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_NO_CLIPPING
+  desc: in the EQ editor: the curve's peak is within the precut
+  user: core
+  <source>
+    *: "No clipping"
+  </source>
+  <dest>
+    *: "No clipping"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_BANDS_ON
+  desc: in the EQ editor: how many bands have a gain other than 0 dB, of how many
+  user: core
+  <source>
+    *: "%d of %d on"
+  </source>
+  <dest>
+    *: "%d of %d on"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_HEADROOM_IS
+  desc: in the EQ editor: the precut Auto Headroom has set. %s is a value in dB
+  user: core
+  <source>
+    *: "%s headroom"
+  </source>
+  <dest>
+    *: "%s headroom"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CENTRE
+  desc: in the EQ editor: the frequency of a peak band
+  user: core
+  <source>
+    *: "Centre"
+  </source>
+  <dest>
+    *: "Centre"
+  </dest>
+  <voice>
+    *: "Centre"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_CORNER
+  desc: in the EQ editor: the frequency of a shelf band
+  user: core
+  <source>
+    *: "Corner"
+  </source>
+  <dest>
+    *: "Corner"
+  </dest>
+  <voice>
+    *: "Corner"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FIELD_TYPE
+  desc: in the EQ editor: a band's filter type
+  user: core
+  <source>
+    *: "Type"
+  </source>
+  <dest>
+    *: "Type"
+  </dest>
+  <voice>
+    *: "Type"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_LOW_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Low Shelf"
+  </source>
+  <dest>
+    *: "Low Shelf"
+  </dest>
+  <voice>
+    *: "Low Shelf"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_PEAK
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "Peak"
+  </source>
+  <dest>
+    *: "Peak"
+  </dest>
+  <voice>
+    *: "Peak"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_TYPE_HIGH_SHELF
+  desc: in the EQ editor: a band's filter type, short
+  user: core
+  <source>
+    *: "High Shelf"
+  </source>
+  <dest>
+    *: "High Shelf"
+  </dest>
+  <voice>
+    *: "High Shelf"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_FONT_TOO_LARGE
+  desc: splash when the theme's font leaves the EQ curve no room; the band list opens instead
+  user: core
+  <source>
+    *: "The theme's font is too large for the EQ curve"
+  </source>
+  <dest>
+    *: "The theme's font is too large for the EQ curve"
+  </dest>
+  <voice>
+    *: ""
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_CUSTOM
+  desc: in the EQ editor: the curve is not a preset
+  user: core
+  <source>
+    *: "Custom"
+  </source>
+  <dest>
+    *: "Custom"
+  </dest>
+  <voice>
+    *: "Custom"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_FLAT
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Flat"
+  </source>
+  <dest>
+    *: "Flat"
+  </dest>
+  <voice>
+    *: "Flat"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_VOCAL
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Vocal"
+  </source>
+  <dest>
+    *: "Vocal"
+  </dest>
+  <voice>
+    *: "Vocal"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_LOUDNESS
+  desc: built-in EQ preset
+  user: core
+  <source>
+    *: "Loudness"
+  </source>
+  <dest>
+    *: "Loudness"
+  </dest>
+  <voice>
+    *: "Loudness"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_PRESET_SPOKEN
+  desc: built-in EQ preset, for audiobooks and podcasts
+  user: core
+  <source>
+    *: "Spoken Word"
+  </source>
+  <dest>
+    *: "Spoken Word"
+  </dest>
+  <voice>
+    *: "Spoken Word"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_UNSAVED
+  desc: title when leaving the EQ editor with a curve not saved as a preset
+  user: core
+  <source>
+    *: "Save This EQ?"
+  </source>
+  <dest>
+    *: "Save This EQ?"
+  </dest>
+  <voice>
+    *: "Save This EQ?"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_EQUALIZER_EXIT_UNSAVED
+  desc: leave the EQ editor without saving the curve as a preset
+  user: core
+  <source>
+    *: "Exit Without Saving"
+  </source>
+  <dest>
+    *: "Exit Without Saving"
+  </dest>
+  <voice>
+    *: "Exit Without Saving"
+  </voice>
+</phrase>

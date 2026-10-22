@@ -187,6 +187,8 @@ games/quiz/quiz_pick.c
 
 screens/settings/display_settings.c
 screens/settings/eq_settings.c
+screens/settings/eq_editor.c
+screens/settings/eq_curve.c
 screens/main_menu.c
 screens/main_menu_config.c
 screens/music_menu_config.c

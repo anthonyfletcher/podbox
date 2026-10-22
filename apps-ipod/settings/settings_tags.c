@@ -98,6 +98,7 @@ static const struct tag_row tag_rows[] = {
  * search would have no name to show for them. */
 { "eq enabled",          TAG_SOUND,                              "eq equalizer equaliser" },
 { "eq precut",           TAG_ADVANCED|TAG_SOUND,                 "eq equalizer headroom clipping" },
+{ "eq auto headroom",    TAG_SOUND,                              "eq equalizer precut clipping" },
 
 /* haas surround */
 { "surround enabled",    TAG_SOUND,                              "haas surround" },

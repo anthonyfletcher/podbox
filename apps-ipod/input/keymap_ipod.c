@@ -163,6 +163,28 @@ static const struct button_mapping button_context_settings[]  = {
     LAST_ITEM_IN_LIST__NEXTLIST(CONTEXT_STD)
 }; /* button_context_settings */
 
+/* The EQ editor. Menu held opens its menu; Play tapped pauses as anywhere,
+ * and held switches the EQ off until it is let go. No cascade, so a held Menu
+ * does not reach the quickscreen from here. */
+static const struct button_mapping button_context_settings_eq[]  = {
+    { ACTION_SETTINGS_INC,          BUTTON_SCROLL_FWD,                BUTTON_NONE },
+    { ACTION_SETTINGS_INCREPEAT,    BUTTON_SCROLL_FWD|BUTTON_REPEAT,  BUTTON_NONE },
+    { ACTION_SETTINGS_DEC,          BUTTON_SCROLL_BACK,               BUTTON_NONE },
+    { ACTION_SETTINGS_DECREPEAT,    BUTTON_SCROLL_BACK|BUTTON_REPEAT, BUTTON_NONE },
+    { ACTION_STD_PREV,              BUTTON_LEFT,                      BUTTON_NONE },
+    { ACTION_STD_PREVREPEAT,        BUTTON_LEFT|BUTTON_REPEAT,        BUTTON_NONE },
+    { ACTION_STD_NEXT,              BUTTON_RIGHT,                     BUTTON_NONE },
+    { ACTION_STD_NEXTREPEAT,        BUTTON_RIGHT|BUTTON_REPEAT,       BUTTON_NONE },
+    { ACTION_STD_OK,                BUTTON_SELECT|BUTTON_REL,         BUTTON_SELECT },
+    { ACTION_WPS_PLAY,              BUTTON_PLAY|BUTTON_REL,           BUTTON_PLAY },
+    { ACTION_EQ_COMPARE,            BUTTON_PLAY|BUTTON_REPEAT,        BUTTON_NONE },
+    { ACTION_EQ_COMPARE_END,        BUTTON_PLAY|BUTTON_REL,           BUTTON_PLAY|BUTTON_REPEAT },
+    { ACTION_STD_CANCEL,            BUTTON_MENU|BUTTON_REL,           BUTTON_MENU },
+    { ACTION_STD_CONTEXT,           BUTTON_MENU|BUTTON_REPEAT,        BUTTON_NONE },
+
+    LAST_ITEM_IN_LIST
+}; /* button_context_settings_eq */
+
 /* The grid editors -- the time/date screen and the colour picker -- need four
  * directions plus a value control. The wheel keeps the value; left/right step
  * through the cells of a row; MENU and PLAY -- the top and bottom of the wheel
@@ -499,6 +521,7 @@ const struct button_mapping* get_context_mapping(int context)
             return button_context_settings_grid;
 
         case CONTEXT_SETTINGS_EQ:
+            return button_context_settings_eq;
         case CONTEXT_SETTINGS:
         case CONTEXT_SETTINGS_RECTRIGGER:
             return button_context_settings;

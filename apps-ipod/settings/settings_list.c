@@ -1446,6 +1446,11 @@ const struct settings_list settings[] = {
     INT_SETTING_NOWRAP(F_EQSETTING, eq_precut, LANG_EQUALIZER_PRECUT, 0,
                        "eq precut", UNIT_DB, 0, 240, 1, eq_precut_format,
                        get_precut_talkid, dsp_set_eq_precut),
+    OFFON_SETTING(0, eq_auto_headroom, LANG_EQUALIZER_AUTO_HEADROOM, true,
+                  "eq auto headroom", eq_enabled_option_callback),
+    /* Remembered: the mode the curve editor last showed. */
+    INT_SETTING(F_BANFROMQS, eq_editor_mode, -1, 0, "eq editor mode",
+                UNIT_INT, 0, 2, 1, NULL, NULL, NULL),
 
 /* The pre-type setting names, kept so an existing config or EQ preset still
    loads. F_DEPRECATED reads them but never writes them back, so a config saved

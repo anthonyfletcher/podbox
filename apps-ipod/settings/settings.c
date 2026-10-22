@@ -109,6 +109,7 @@ static long lasttime = 0;
 #include "metadata/art_cache.h"
 #include "system/debug_log.h"
 #include "pcm_sampr.h"
+#include "screens/settings/eq_settings.h"  /* eq_apply */
 
 #ifdef LOGF_ENABLE
 static char *debug_get_flags(uint32_t flags);
@@ -1140,6 +1141,11 @@ int settings_save(void)
 bool settings_save_config(int options)
 {
     char filename[MAX_PATH];
+    return settings_save_config_as(options, filename, sizeof filename);
+}
+
+bool settings_save_config_as(int options, char *filename, size_t len)
+{
     const char *folder, *namebase;
     switch (options)
     {
@@ -1165,7 +1171,7 @@ bool settings_save_config(int options)
 
     /* allow user to modify filename */
     while (true) {
-        if (!kbd_input(filename, sizeof(filename), NULL)) {
+        if (!kbd_input(filename, len, NULL)) {
             break;
         }
         else {
@@ -1174,10 +1180,12 @@ bool settings_save_config(int options)
     }
 
     if (settings_write_config(filename, options))
+    {
         splash(HZ, ID2P(LANG_SETTINGS_SAVED));
-    else
-        splash(HZ, ID2P(LANG_FAILED));
-    return true;
+        return true;
+    }
+    splash(HZ, ID2P(LANG_FAILED));
+    return false;
 }
 
 /** Apply and Reset settings **/
@@ -1488,11 +1496,7 @@ void settings_apply(bool read_disk)
                                    global_settings.crossfeed_hf_cutoff);
 
     /* Configure software equalizer, hardware eq is handled in audio_init() */
-    dsp_eq_enable(global_settings.eq_enabled);
-    dsp_set_eq_precut(global_settings.eq_precut);
-    for(int i = 0; i < EQ_NUM_BANDS; i++) {
-        dsp_set_eq_coefs(i, &global_settings.eq_band_settings[i]);
-    }
+    eq_apply();
 
     dsp_dither_enable(global_settings.dithering_enabled);
     dsp_surround_set_balance(global_settings.surround_balance);
