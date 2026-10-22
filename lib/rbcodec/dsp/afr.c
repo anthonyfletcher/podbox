@@ -24,11 +24,13 @@
 #include "settings.h"
 #include "dsp_proc_entry.h"
 #include "dsp_filter.h"
+#include "eq_filter.h"
 
 /* Auditory fatigue reduction */
 
 static int afr_strength = 0;
 static struct dsp_filter afr_filters[4];
+static bool afr_low_cut; /* filter 3 is flat at the weakest strength */
 
 static void dsp_afr_flush(void)
 {
@@ -54,21 +56,18 @@ static void strength_update(unsigned int fout)
         break;
     }
 
-    filter_bishelf_coefs(fp_div(8000, fout, 32),
-                         fp_div(20000, fout, 32),
-                         0, (hs/2), 0,
-                         &afr_filters[0]);
+    eq_shelf1_coefs(false, fp_div(20000, fout, 32), hs/2, 0, &afr_filters[0]);
 
-    filter_pk_coefs(fp_div(8000, fout, 32), 28, hs,
-                     &afr_filters[1]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(8000, fout, 32), 28, hs,
+                    &afr_filters[1]);
 
-    filter_pk_coefs(fp_div(3150, fout, 32), 28, drop3k,
-                     &afr_filters[2]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(3150, fout, 32), 28, drop3k,
+                    &afr_filters[2]);
 
-    filter_bishelf_coefs(fp_div(200, fout, 32),
-                         fp_div(1280, fout, 32),
-                         ls, 0, 0,
-                         &afr_filters[3]);
+    eq_shelf1_coefs(true, fp_div(200, fout, 32), ls, 0, &afr_filters[3]);
+    if (ls != 0 && !afr_low_cut)
+        filter_flush(&afr_filters[3]); /* its history is stale */
+    afr_low_cut = ls != 0;
 }
 
 void dsp_afr_enable(int var)
@@ -96,9 +95,14 @@ static void afr_reduce_process(struct dsp_proc_entry *this,
 {
     struct dsp_buffer *buf = *buf_p;
 
-    for (int i = 0; i < 4; i++)
-        filter_process(&afr_filters[i], buf->p32, buf->remcount,
-                       buf->format.num_channels);
+    int32_t * const *p = buf->p32;
+    int count = buf->remcount, channels = buf->format.num_channels;
+
+    eq_high_shelf1_process(&afr_filters[0], p, count, channels);
+    eq_peak_process(&afr_filters[1], p, count, channels);
+    eq_peak_process(&afr_filters[2], p, count, channels);
+    if (afr_low_cut)
+        eq_low_shelf1_process(&afr_filters[3], p, count, channels);
 
     (void)this;
 }

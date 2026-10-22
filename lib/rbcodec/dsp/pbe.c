@@ -19,11 +19,12 @@
  ****************************************************************************/
 #include "config.h"
 #include "fixedpoint.h"
-#include "fracmul.h"
 #include "settings.h"
 #include "dsp_proc_entry.h"
 #include "dsp_misc.h"
 #include "dsp_filter.h"
+#include "eq_filter.h"
+#include "pbe_delay.h"
 #include "core_alloc.h"
 
 /* Perceptual bass enhancement */
@@ -39,8 +40,7 @@
 static int pbe_strength = 0;
 static int pbe_precut = 0;
 static int32_t tcoef1, tcoef2, tcoef3;
-static int b0_r[2],b2_r[2],b3_r[2],b0_w[2],b2_w[2],b3_w[2];
-int32_t temp_buffer;
+static int pbe_heads[2][3];
 static struct dsp_filter pbe_filter[5];
 static int handle = -1;
 
@@ -68,12 +68,7 @@ static void dsp_pbe_flush(void)
 
     memset(core_get_data(handle), 0, PBE_BUFSIZE);
 
-    b0_r[0] = 0; b0_w[0] = 0;
-    b0_r[1] = 0; b0_w[1] = 0;
-    b2_r[0] = 0; b2_w[0] = 0;
-    b2_r[1] = 0; b2_w[1] = 0;
-    b3_r[0] = 0; b3_w[0] = 0;
-    b3_r[1] = 0; b3_w[1] = 0;
+    memset(pbe_heads, 0, sizeof(pbe_heads));
 
     for (int i = 0; i < 5; i++)
         filter_flush(&pbe_filter[i]);
@@ -85,18 +80,16 @@ static void pbe_update_filter(unsigned int fout)
     tcoef2 = fp_div(500, fout, 31);
     tcoef3 = fp_div(1150, fout, 31);
     /* Biophonic EQ */
-    filter_bishelf_coefs(fp_div(20, fout, 32),
-                         fp_div(16000, fout, 32),
-                         0, 53, -5 + pbe_precut,
-                         &pbe_filter[0]);
-    filter_pk_coefs(fp_div(64, fout, 32), 28, 53,
-                     &pbe_filter[1]);
-    filter_pk_coefs(fp_div(2000, fout, 32), 28, 58,
-                     &pbe_filter[2]);
-    filter_pk_coefs(fp_div(7500, fout, 32), 43, -82,
-                     &pbe_filter[3]);
-    filter_pk_coefs(fp_div(10000, fout, 32), 43, -29,
-                     &pbe_filter[4]);
+    eq_shelf1_coefs(false, fp_div(16000, fout, 32), 53, -5 + pbe_precut,
+                    &pbe_filter[0]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(64, fout, 32), 28, 53,
+                    &pbe_filter[1]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(2000, fout, 32), 28, 58,
+                    &pbe_filter[2]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(7500, fout, 32), 43, -82,
+                    &pbe_filter[3]);
+    eq_filter_coefs(EQ_FILTER_PEAK, fp_div(10000, fout, 32), 43, -29,
+                    &pbe_filter[4]);
 
 }
 
@@ -138,9 +131,9 @@ static void pbe_process(struct dsp_proc_entry *this,
     struct dsp_buffer *buf = *buf_p;
     int count = buf->remcount;
     int num_channels = buf->format.num_channels;
-    int b2_level = (B2_DLY * pbe_strength) / 100;
-    int b0_level = (B0_DLY * pbe_strength) / 100;
-    int32_t x;
+    const int32_t coefs[3] = { tcoef1, tcoef2, tcoef3 };
+    const int len[3] = { (B0_DLY * pbe_strength) / 100,
+                         (B2_DLY * pbe_strength) / 100, B3_DLY };
 
     int32_t *b0[2], *b2[2], *b3[2];
 
@@ -156,40 +149,17 @@ static void pbe_process(struct dsp_proc_entry *this,
 
     for(int ch = 0; ch < num_channels; ch++)
     {
-        for (int i = 0; i < count; i++)
-        {
-            int32_t fracmul1 = FRACMUL(buf->p32[ch][i], tcoef1);
-            int32_t fracmul2 = FRACMUL(buf->p32[ch][i], tcoef2);
-            /* 160hz - 500hz no delay */
-            temp_buffer = fracmul1 -
-                          fracmul2;
-
-            /* delay below 160hz*/
-            x = buf->p32[ch][i] -
-                fracmul1;
-            temp_buffer += dequeue(b0[ch], &b0_r[ch], b0_level);
-            enqueue(x, b0[ch], &b0_w[ch], b0_level );
-
-            int32_t fracmul3 = FRACMUL(buf->p32[ch][i], tcoef3);
-            /* delay 500-1150hz */
-            x = fracmul2 -
-                fracmul3;
-            temp_buffer += dequeue(b2[ch], &b2_r[ch], b2_level);
-            enqueue(x, b2[ch], &b2_w[ch], b2_level );
-
-            /* delay anything beyond 1150hz */
-            x = fracmul3;
-            temp_buffer += dequeue(b3[ch], &b3_r[ch], B3_DLY);
-            enqueue(x, b3[ch], &b3_w[ch], B3_DLY );
-
-            buf->p32[ch][i] = temp_buffer;
-        }
+        int32_t * const ring[3] = { b0[ch], b2[ch], b3[ch] };
+        pbe_delay_process(buf->p32[ch], count, coefs, ring, pbe_heads[ch],
+                          len);
     }
 
     /* apply Biophonic EQ   */
-    for (int i = 0; i < 5; i++)
-        filter_process(&pbe_filter[i], buf->p32, buf->remcount,
-                       buf->format.num_channels);
+    eq_high_shelf1_gain_process(&pbe_filter[0], buf->p32, buf->remcount,
+                                buf->format.num_channels);
+    for (int i = 1; i < 5; i++)
+        eq_peak_process(&pbe_filter[i], buf->p32, buf->remcount,
+                        buf->format.num_channels);
 
     (void)this;
 }

@@ -485,7 +485,13 @@ void * pcmbuf_request_buffer(int *count)
         if (realrem < pcmbuf_watermark)
             trigger_cpu_boost();
 
-        boost_codec_thread(realrem*10 / pcmbuf_size);
+        /* Low latency fills only its quarter second, so the codec's priority
+           follows the fill of that rather than of the whole buffer */
+        if (low_latency_mode)
+            boost_codec_thread(MIN(remaining, DATA_LEVEL(1))*10 /
+                               DATA_LEVEL(1));
+        else
+            boost_codec_thread(realrem*10 / pcmbuf_size);
     }
     else    /* !playing */
     {

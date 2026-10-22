@@ -7,6 +7,7 @@ dsp/compressor.c
 dsp/crossfeed.c
 dsp/dsp_core.c
 dsp/pbe.c
+dsp/pbe_delay.c
 dsp/afr.c
 dsp/surround.c
 dsp/dsp_filter.c
@@ -15,6 +16,7 @@ dsp/dsp_sample_io.c
 dsp/dsp_sample_input.c
 dsp/dsp_sample_output.c
 dsp/eq.c
+dsp/eq_filter.c
 dsp/resample.c
 dsp/pga.c
 # ifdef HAVE_PITCHCONTROL
@@ -27,6 +29,8 @@ dsp/tone_controls.c
 dsp/dsp_cf.S
 # elif defined(CPU_ARM)
 dsp/dsp_arm.S
+dsp/eq_filter_arm.S
+dsp/pbe_delay_arm.S
 #  if ARM_ARCH >= 6
 dsp/dsp_arm_v6.S
 #  endif

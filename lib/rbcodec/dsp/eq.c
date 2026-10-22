@@ -21,7 +21,7 @@
 #include "platform.h"
 #include "fixedpoint.h"
 #include "fracmul.h"
-#include "dsp_filter.h"
+#include "eq_filter.h"
 #include "dsp_proc_entry.h"
 #include "dsp_core.h"
 #include "dsp_misc.h"
@@ -67,28 +67,10 @@ static void eq_flush(void)
 
 static void update_band_filter(int band, unsigned int fout)
 {
-    /* Convert user settings to format required by coef generator
-       functions */
-    typeof (filter_pk_coefs) *coef_gen = filter_pk_coefs;
-
     const struct eq_band_setting *setting = &settings[band];
-    struct dsp_filter *filter = &eq_data.filters[band];
 
-    switch (setting->type)
-    {
-    case EQ_FILTER_LOW_SHELF:
-        coef_gen = filter_ls_coefs;
-        break;
-    case EQ_FILTER_PEAK:
-        coef_gen = filter_pk_coefs;
-        break;
-    case EQ_FILTER_HIGH_SHELF:
-        coef_gen = filter_hs_coefs;
-        break;
-    }
-
-    coef_gen(fp_div(setting->cutoff, fout, 32), setting->q ?: 1,
-             setting->gain, filter);
+    eq_filter_coefs(setting->type, fp_div(setting->cutoff, fout, 32),
+                    setting->q ?: 1, setting->gain, &eq_data.filters[band]);
 }
 
 /* Resync all bands to a new DSP output frequency */
@@ -114,6 +96,11 @@ void dsp_set_eq_coefs(int band, const struct eq_band_setting *setting)
 {
     if (band < 0 || band >= EQ_NUM_BANDS)
         return;
+
+    /* A band's history means something different to each filter type */
+    if (setting->type != settings[band].type)
+        eq_filter_convert(&eq_data.filters[band], settings[band].type,
+                          setting->type);
 
     settings[band] = *setting; /* cache setting */
 
@@ -176,7 +163,8 @@ static void eq_process(struct dsp_proc_entry *this,
     unsigned int channels = buf->format.num_channels;
 
     FOR_EACH_ENB_BAND(b)
-        filter_process(&eq_data.filters[*b], buf->p32, count, channels);
+        eq_filter_process(&eq_data.filters[*b], settings[*b].type, buf->p32,
+                          count, channels);
 
     (void)this;
 }
