@@ -735,6 +735,12 @@ static int tv_places_open(struct libfile_header *h)
                         LIB_READING_VERSION, sizeof(struct tv_place), h, NULL);
 }
 
+static bool tv_places_begin(struct libfile_writer *w)
+{
+    return libfile_begin(w, TV_RESUME_FILE, LIB_READING_MAGIC,
+                         LIB_READING_VERSION, sizeof(struct tv_place), NULL);
+}
+
 /* The next record, its path terminated whatever the file holds */
 static bool tv_place_read(int fd, struct tv_place *p)
 {
@@ -793,8 +799,7 @@ static void tv_resume_save(const char *file, off_t off, off_t size)
                      sizeof(ROCKBOX_DIR "/docs/") - 1))
         return;
 
-    if (!libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
-                       LIB_READING_VERSION, sizeof(p), NULL))
+    if (!tv_places_begin(&w))
         return;
 
     tv_place_set(&p, off, size, file);
@@ -854,8 +859,7 @@ bool text_viewer_convert_places(const char *text_file)
 
     if (fd < 0)
         return false;
-    ok = libfile_begin(&w, TV_RESUME_FILE, LIB_READING_MAGIC,
-                       LIB_READING_VERSION, sizeof(p), NULL);
+    ok = tv_places_begin(&w);
 
     while (ok && kept < TV_RESUME_MAX
            && read_line(fd, line, sizeof(line)) > 0)

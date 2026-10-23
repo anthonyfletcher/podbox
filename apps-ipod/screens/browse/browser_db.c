@@ -5269,6 +5269,8 @@ bool browser_db_subentries_do_action(struct tagcache_search *tcs,
             }
 
             struct tagentry *entry = browser_db_get_entry(tc, i);
+            if (!entry)
+                break;
             if (entry->newtable != TABLE_PLAYTRACK)
                 continue;
             if (!action_cb(tagcache_retrieve(tcs, entry->extraseek,
