@@ -58,6 +58,7 @@
 #include "settings/settings.h"
 #include "draw/line.h"              /* text_fit() */
 #include "draw/img_filter.h"    /* the slides' own treatment */
+#include "audio/sound_feedback.h" /* keyclick_click, for the random spin */
 #include "lang.h"
 #include "widgets/splash.h"
 #include "draw/viewport.h"
@@ -495,6 +496,9 @@ static const int pf_random_spin[] = { 6, 12, 24 };
 static int pf_random_recent[PF_RANDOM_HISTORY];
 static int pf_random_count;
 static const struct carousel_model *pf_random_model;
+/* A random spin under way: each cover it passes clicks, as the wheel would.
+ * Any other move of the carousel ends it. */
+static bool pf_random_spinning;
 
 static struct pf_slide_cache pf_sldcache;
 
@@ -2900,6 +2904,7 @@ void set_current_slide(const int slide_index)
 {
     int old_center_index = center_index;
     step = 0;
+    pf_random_spinning = false;
     center_index = fbound(0, slide_index, number_of_slides - 1);
     if (old_center_index != center_index)
     {
@@ -2999,6 +3004,7 @@ static void update_scroll_animation(void);
 
 static void show_previous_slide(void)
 {
+    pf_random_spinning = false;
     flat_note_scroll();
     if (step == 0) {
         if (center_index > 0) {
@@ -3017,6 +3023,7 @@ static void show_previous_slide(void)
 
 static void show_next_slide(void)
 {
+    pf_random_spinning = false;
     flat_note_scroll();
     if (step == 0) {
         if (center_index < number_of_slides - 1) {
@@ -3083,6 +3090,7 @@ static void show_random_slide(void)
     pf_flat_last_input = current_tick;
     pf_flat_interval = MAX(flat_ticks(PF_FLAT_MIN_MS) / PF_FLAT_SETTLE, 1);
     start_animation();
+    pf_random_spinning = true;
 }
 
 /* A flat pile hides everything but its top card, so only four covers are ever
@@ -3581,6 +3589,8 @@ static void update_scroll_animation(void)
          * resting place and the choice costs nothing to make. */
         pf_flat_snap = flat_pace() < flat_ticks(PF_FLAT_MIN_MS);
         queue_post(&thread_q, EV_WAKEUP, 0);
+        if (pf_random_spinning)
+            keyclick_click(true, BUTTON_SCROLL_FWD);
         slide_frame = index << 16;
         center_slide.slide_index = center_index;
         for (i = 0; i < ALBUM_COVERS_NUM_SLIDES; i++)
@@ -3603,6 +3613,7 @@ static void update_scroll_animation(void)
     if (center_index == target) {
         reset_slides();
         pf_state = pf_idle;
+        pf_random_spinning = false;
         slide_frame = center_index << 16;
         step = 0;
         fade = 256;
