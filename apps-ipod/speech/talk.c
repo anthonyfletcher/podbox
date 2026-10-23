@@ -116,6 +116,7 @@ static volatile int thumbnail_buf_used SHAREDBSS_ATTR; /* length of data in
                                                           thumbnail buffer */
 static struct voicefile_header voicefile; /* loaded voicefile */
 static bool has_voicefile; /* a voicefile file is present */
+static bool voicefile_wanted; /* talk_init() looked for one: Voice Menus on */
 static bool need_shutup; /* is there possibly any voice playing to be shutup */
 static bool force_enqueue_next; /* enqueue next utterance even if enqueue is false */
 static unsigned int ui_thread; /* the one talk_init() is first called on */
@@ -938,7 +939,8 @@ void talk_init(void)
 {
     int filehandle;
     talk_temp_disable_count = 0;
-    if (talk_initialized && !strcasecmp(last_lang, global_settings.lang_file))
+    if (talk_initialized && !strcasecmp(last_lang, global_settings.lang_file)
+        && voicefile_wanted == global_settings.talk_menu)
     {
         /* not a new file, but a loaded .cfg or a reset can still have
          * switched the synthesiser on or off */
@@ -975,7 +977,9 @@ void talk_init(void)
     /* don't free thumb handle, it doesn't depend on the actual voice file
      * and so we can re-use it if it's already allocated in any event */
 
-    filehandle = open_voicefile();
+    /* the whole file is read in, so not while Voice Menus is off */
+    voicefile_wanted = global_settings.talk_menu;
+    filehandle = voicefile_wanted ? open_voicefile() : -1;
     if (filehandle >= 0)
     {
         if (!load_voicefile_index(filehandle))
@@ -1040,6 +1044,11 @@ void talk_speech_changed(void)
 {
     if (!talk_initialized)
         return;
+    if (voicefile_wanted != global_settings.talk_menu)
+    {
+        talk_init();    /* loads or frees the voice file as well */
+        return;
+    }
     talk_force_shutup();
     speech_apply_settings();
     if (talk_voice_required())
@@ -1143,6 +1152,11 @@ int talk_idarray(const long *ids, bool enqueue)
         enqueue = true;
     }
     return 0;
+}
+
+bool is_voice_queued(void)
+{
+    return QUEUE_LEVEL > 0;
 }
 
 /* Make sure the current utterance is not interrupted by the next one. */

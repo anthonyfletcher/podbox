@@ -27,8 +27,9 @@
 
 static bool paused_for_us;      /* this announcement paused the music */
 
-/* Say the current track's title and artist, after what is being said */
-static void announce_track(void)
+/* Say the current track's title and artist, after what is being said if
+ * enqueue */
+static void announce_track(bool enqueue)
 {
     struct mp3entry *id3 = audio_current_track();
     char trimmed[MAX_PATH], text[2 * MAX_PATH];
@@ -42,7 +43,7 @@ static void announce_track(void)
         snprintf(text, sizeof(text), "%s, %s", title, id3->artist);
     else
         snprintf(text, sizeof(text), "%s", title);
-    talk_name(text, true);
+    talk_name(text, enqueue);
 }
 
 /* On the audio thread */
@@ -64,6 +65,13 @@ static void voice_changed(unsigned short id, void *data)
         button_queue_post(SYS_ANNOUNCE_DONE, 0);
 }
 
+/* Something is queued or being said. The voice thread reports itself
+ * playing only once it has picked a clip up, after talk_name() returns. */
+static bool announcing(void)
+{
+    return is_voice_queued() || voice_is_playing();
+}
+
 /* The announcement that paused the music is over: resumed only if nobody
  * has touched the pause since */
 static void announce_done(void)
@@ -80,25 +88,28 @@ void announce_event(long event, intptr_t data)
         int status;
 
         /* the end of the last one was posted to a screen that dropped it */
-        if (paused_for_us && !voice_is_playing())
+        if (paused_for_us && !announcing())
             announce_done();
         status = audio_status();
         if (global_settings.talk_track_change == ANNOUNCE_PAUSE_MUSIC
-            && data /* followed on by itself */
             && (status & AUDIO_STATUS_PLAY) && !(status & AUDIO_STATUS_PAUSE))
         {
             audio_pause();
             paused_for_us = true;
         }
-        announce_track();
-        if (paused_for_us && !voice_is_playing())
+        /* a skip cuts off the announcement before it, so rapid skips say
+         * only the last; a track that followed on by itself waits its turn */
+        announce_track(data);
+        if (paused_for_us && !announcing())
         {
             /* nothing could be said, so nothing will end */
             paused_for_us = false;
             audio_resume();
         }
     }
-    else if (event == SYS_ANNOUNCE_DONE && paused_for_us)
+    /* a skip's cut-off ends the last announcement too, while the new one
+     * is still to be said */
+    else if (event == SYS_ANNOUNCE_DONE && paused_for_us && !announcing())
         announce_done();
 }
 
