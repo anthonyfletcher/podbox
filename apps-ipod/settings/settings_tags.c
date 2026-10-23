@@ -410,9 +410,8 @@ static const struct tag_row tag_rows[] = {
 { "debug log tasks",     TAG_ADVANCED|TAG_SYSTEM,                "log debug background task database art scan" },
 
 /* --- voice --------------------------------------------------------------- */
-{ "talk menu",           TAG_VOICE,                              "voice speak menus" },
-{ "speech synthesiser",  TAG_VOICE,                              "voice speak synthesiser names titles" },
-{ "recorded voice",      TAG_VOICE,                              "voice file recorded menus synthesiser" },
+{ "talk menu",           TAG_VOICE,                              "voice speak aloud menus" },
+{ "talk voice",          TAG_VOICE,                              "voice built-in synthesiser file recorded menus names" },
 { "speech rate",         TAG_VOICE,                              "voice speech speed rate" },
 { "talk dir",            TAG_ADVANCED|TAG_VOICE,                 "voice directories" },
 { "talk file",           TAG_ADVANCED|TAG_VOICE,                 "voice filenames" },

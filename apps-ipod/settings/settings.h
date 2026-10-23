@@ -132,6 +132,13 @@ enum {
     SETTINGS_MODE_EVERYTHING = 1,
 };
 
+/* talk_voice: which voice speaks */
+enum {
+    TALK_VOICE_BUILT_IN = 0,    /* the synthesiser, throughout */
+    TALK_VOICE_FILE_MENUS,      /* a .voice file the menus, the synth names */
+    TALK_VOICE_FILE_ONLY,       /* a .voice file; names spelled */
+};
+
 enum
 {
     TRIG_MODE_OFF = 0,
@@ -842,8 +849,7 @@ struct user_settings
 
     /* voice UI settings */
     bool talk_menu; /* enable voice UI */
-    bool talk_synth; /* the synthesiser speaks what a .voice file does not */
-    bool talk_recorded; /* a .voice file speaks the menus; off, the synth */
+    int talk_voice; /* TALK_VOICE_* */
     int talk_speech_rate; /* synthesised speech, percent of normal */
     int talk_dir; /* voiced directories mode: 0=off 1=number 2=spell */
     bool talk_dir_clip; /* use directory .talk clips */

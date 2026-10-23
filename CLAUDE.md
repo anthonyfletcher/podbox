@@ -230,7 +230,7 @@ setting's context menu finds no file and shows nothing. The second ships
 setting switches on and does nothing. The third ships the synthesiser's
 `.rockbox/speech/cmudict.bin` (written from the CMU dictionary, fetched into
 `~/.cache/podbox-speech` the first time) and the build's own
-`.rockbox/langs/english.vstrings`; without them Speech Synthesiser says
+`.rockbox/langs/english.vstrings`; without them the Built-in voice says
 nothing. None makes anything else misbehave, so a zip built by hand without
 them looks finished.
 

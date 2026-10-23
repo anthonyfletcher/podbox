@@ -25400,17 +25400,17 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SPEECH_SYNTH
-  desc: in Voice settings: the speech synthesiser
+  id: LANG_VOICE_BUILT_IN
+  desc: in Voice settings, Voice: the synthesised voice speaks everything
   user: core
   <source>
-    *: "Speech Synthesiser"
+    *: "Built-in"
   </source>
   <dest>
-    *: "语音合成"
+    *: "内置"
   </dest>
   <voice>
-    *: "语音合成"
+    *: "内置"
   </voice>
 </phrase>
 <phrase>
@@ -25736,16 +25736,44 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_RECORDED_VOICE
-  desc: in Voice settings: menus in a voice file's recorded voice
+  id: LANG_VOICE_FILE_MENUS
+  desc: in Voice settings, Voice: a voice file speaks the menus, the synthesised voice the names
   user: core
   <source>
-    *: "Recorded Voice"
+    *: "Voice File for Menus"
   </source>
   <dest>
-    *: "录制语音"
+    *: "菜单用语音文件"
   </dest>
   <voice>
-    *: "录制语音"
+    *: "菜单用语音文件"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_VOICE_FILE_ONLY
+  desc: in Voice settings, Voice: only a voice file speaks, names spelled
+  user: core
+  <source>
+    *: "Voice File Only"
+  </source>
+  <dest>
+    *: "仅语音文件"
+  </dest>
+  <voice>
+    *: "仅语音文件"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEAK_ALOUD
+  desc: in Voice settings: the switch for everything spoken
+  user: core
+  <source>
+    *: "Speak Aloud"
+  </source>
+  <dest>
+    *: "朗读"
+  </dest>
+  <voice>
+    *: "朗读"
   </voice>
 </phrase>

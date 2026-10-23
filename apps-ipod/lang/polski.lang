@@ -25399,17 +25399,17 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_SPEECH_SYNTH
-  desc: in Voice settings: the speech synthesiser
+  id: LANG_VOICE_BUILT_IN
+  desc: in Voice settings, Voice: the synthesised voice speaks everything
   user: core
   <source>
-    *: "Speech Synthesiser"
+    *: "Built-in"
   </source>
   <dest>
-    *: "Syntezator mowy"
+    *: "Wbudowany"
   </dest>
   <voice>
-    *: "Syntezator mowy"
+    *: "Wbudowany"
   </voice>
 </phrase>
 <phrase>
@@ -25735,16 +25735,44 @@
   </voice>
 </phrase>
 <phrase>
-  id: LANG_RECORDED_VOICE
-  desc: in Voice settings: menus in a voice file's recorded voice
+  id: LANG_VOICE_FILE_MENUS
+  desc: in Voice settings, Voice: a voice file speaks the menus, the synthesised voice the names
   user: core
   <source>
-    *: "Recorded Voice"
+    *: "Voice File for Menus"
   </source>
   <dest>
-    *: "Nagrany głos"
+    *: "Plik głosowy w menu"
   </dest>
   <voice>
-    *: "Nagrany głos"
+    *: "Plik głosowy w menu"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_VOICE_FILE_ONLY
+  desc: in Voice settings, Voice: only a voice file speaks, names spelled
+  user: core
+  <source>
+    *: "Voice File Only"
+  </source>
+  <dest>
+    *: "Tylko plik głosowy"
+  </dest>
+  <voice>
+    *: "Tylko plik głosowy"
+  </voice>
+</phrase>
+<phrase>
+  id: LANG_SPEAK_ALOUD
+  desc: in Voice settings: the switch for everything spoken
+  user: core
+  <source>
+    *: "Speak Aloud"
+  </source>
+  <dest>
+    *: "Czytaj na głos"
+  </dest>
+  <voice>
+    *: "Czytaj na głos"
   </voice>
 </phrase>

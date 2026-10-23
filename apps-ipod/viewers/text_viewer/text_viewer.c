@@ -490,7 +490,7 @@ static void tv_queue_parts(off_t from, off_t page_end)
     tv_read_upto = from;
 }
 
-/* Read the page on screen aloud, with Voice Menus and the synthesiser on,
+/* Read the page on screen aloud, with Speak Aloud and the synthesiser on,
  * on to the end of the sentence it stops in: a sentence cut at the edge of
  * the screen is said as though it ended there. A page turn cuts off the
  * one before. */

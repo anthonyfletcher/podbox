@@ -4,7 +4,7 @@
  * The synthesiser as the player uses it: what it loads, the text it is
  * given, and the samples it renders for the voice thread.
  *
- * Two files are loaded while Voice Menus and Speech Synthesiser are both on:
+ * Two files are loaded while Speak Aloud is on with a voice it speaks:
  * the dictionary, .rockbox/speech/cmudict.bin, for lexicon.c, and the
  * language's voice strings, .rockbox/langs/<language>.vstrings (English's
  * when the language has none), the text a .voice file would have recorded
@@ -154,13 +154,19 @@ static void load_strings(const char *lang)
         strings_handle = core_free(strings_handle);
 }
 
+bool speech_wanted(void)
+{
+    return global_settings.talk_menu
+           && global_settings.talk_voice != TALK_VOICE_FILE_ONLY;
+}
+
 void speech_apply_settings(void)
 {
     const char *lang = DEFAULT_LANG;
     if (global_settings.lang_file[0] && global_settings.lang_file[0] != 0xff)
         lang = (const char *)global_settings.lang_file;
 
-    if (!global_settings.talk_menu || !global_settings.talk_synth)
+    if (!speech_wanted())
     {
         lexicon_init(NULL, 0);
         dict_handle = core_free(dict_handle);
@@ -187,8 +193,7 @@ void speech_apply_settings(void)
 bool speech_enabled(void)
 {
     /* without the dictionary the letter-to-sound rules read every word */
-    return global_settings.talk_menu && global_settings.talk_synth
-           && strings_handle;
+    return speech_wanted() && strings_handle;
 }
 
 bool speech_voice_string(int32_t id, char *buf, int size)

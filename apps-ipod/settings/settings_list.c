@@ -791,6 +791,12 @@ static void speech_setting_changed(bool on)
     talk_speech_changed();
 }
 
+static void speech_voice_changed(int voice)
+{
+    (void)voice;
+    talk_speech_changed();
+}
+
 const struct settings_list settings[] = {
 /* system_status settings .resume.cfg */
     SYSTEM_STATUS_SOUND(F_NO_WRAP, volume, LANG_VOLUME, "volume", SOUND_VOLUME),
@@ -1301,13 +1307,13 @@ const struct settings_list settings[] = {
         "peak meter max", UNUSED},
     /* voice */
     OFFON_SETTING(F_TEMPVAR|F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED,
-                  talk_menu, LANG_VOICE_MENU, false, "talk menu",
+                  talk_menu, LANG_SPEAK_ALOUD, false, "talk menu",
                   speech_setting_changed),
-    OFFON_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, talk_synth,
-                  LANG_SPEECH_SYNTH, true, "speech synthesiser",
-                  speech_setting_changed),
-    OFFON_SETTING(0, talk_recorded, LANG_RECORDED_VOICE, true,
-                  "recorded voice", NULL),
+    CHOICE_SETTING(F_CB_ON_SELECT_ONLY|F_CB_ONLY_IF_CHANGED, talk_voice,
+                   LANG_VOICE, TALK_VOICE_BUILT_IN, "talk voice",
+                   "built-in,voice file for menus,voice file only",
+                   speech_voice_changed, 3, ID2P(LANG_VOICE_BUILT_IN),
+                   ID2P(LANG_VOICE_FILE_MENUS), ID2P(LANG_VOICE_FILE_ONLY)),
     INT_SETTING(0, talk_speech_rate, LANG_SPEECH_RATE, 100, "speech rate",
                 UNIT_PERCENT, 50, 150, 10, NULL, NULL, NULL),
     CHOICE_SETTING(0, talk_dir, LANG_VOICE_DIR, 2,

@@ -20,7 +20,7 @@
  * the round starts: spinning the disk up and seeking into a track is not the
  * player's time to lose.
  *
- * With Voice Menus on the quiz can be played by ear: the question and the
+ * With Speak Aloud on the quiz can be played by ear: the question and the
  * five answers are read before the clip starts -- the clip waits for the
  * reading, or for the wheel to cut it short -- each answer is said as it is
  * reached, and the verdict and the final score are spoken.

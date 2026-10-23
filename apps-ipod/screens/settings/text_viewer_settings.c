@@ -9,6 +9,7 @@
 #include "config.h"
 #include "lang.h"
 #include "settings/settings.h"
+#include "speech/speech.h"
 #include "widgets/menu.h"
 #include "screens/browse/browser.h"            /* browse_context, rockbox_browse */
 #include "files/filetypes.h"       /* SHOW_FONT */
@@ -31,7 +32,7 @@ static int read_aloud_callback(int action,
     (void)this_item;
     (void)this_list;
     if (action == ACTION_REQUEST_MENUITEM
-        && !(global_settings.talk_menu && global_settings.talk_synth))
+        && !speech_wanted())
         return ACTION_EXIT_MENUITEM;
     return action;
 }

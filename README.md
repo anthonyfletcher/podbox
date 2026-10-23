@@ -301,7 +301,7 @@ for the full list.
   - See [`language-override-guide.md`](docs/podbox/language-override-guide.md)
 - Have the player speak, with a synthesised voice built into the firmware: menus, settings and dialogs,
   and the names of your artists, albums, tracks and files - no voice file needed
-  - Turn the voice on with `Settings > System > Language & Text > Voice > Speech Synthesiser`
+  - Turn the voice on with `Settings > System > Language & Text > Voice > Speak Aloud`
   - Choose how fast it speaks with `Speech Rate`
 - Hear what you are typing: each letter as you choose it, and the whole text when you hold
   `Select`
@@ -317,8 +317,8 @@ for the full list.
   such as Chinese or Arabic, are named rather than read
 - Rockbox voice files are also supported, with higher quality output but limited range to language
   strings
-  - Turn off `Settings > System > Language & Text > Voice > Recorded Voice` to hear the built-in
-    voice throughout rather than two voices taking turns
+  - Choose one with `Settings > System > Language & Text > Voice > Voice`: `Voice File for Menus`
+    speaks the menus in it and names in the built-in voice, `Voice File Only` uses it alone
 
 ## Behind the scenes
 

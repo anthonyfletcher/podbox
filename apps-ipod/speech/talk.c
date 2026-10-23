@@ -116,7 +116,7 @@ static volatile int thumbnail_buf_used SHAREDBSS_ATTR; /* length of data in
                                                           thumbnail buffer */
 static struct voicefile_header voicefile; /* loaded voicefile */
 static bool has_voicefile; /* a voicefile file is present */
-static bool voicefile_wanted; /* talk_init() looked for one: Voice Menus on */
+static bool voicefile_wanted; /* talk_init() looked for one */
 static bool need_shutup; /* is there possibly any voice playing to be shutup */
 static bool force_enqueue_next; /* enqueue next utterance even if enqueue is false */
 static unsigned int ui_thread; /* the one talk_init() is first called on */
@@ -257,6 +257,13 @@ static struct buflib_callbacks talk_ops = {
     .shrink_callback = shrink_callback,
 };
 
+
+/* Speak Aloud is on with a voice a .voice file speaks */
+static bool voicefile_needed(void)
+{
+    return global_settings.talk_menu
+           && global_settings.talk_voice != TALK_VOICE_BUILT_IN;
+}
 
 static int open_voicefile(void)
 {
@@ -940,12 +947,11 @@ void talk_init(void)
     int filehandle;
     talk_temp_disable_count = 0;
     if (talk_initialized && !strcasecmp(last_lang, global_settings.lang_file)
-        && voicefile_wanted == global_settings.talk_menu)
+        && voicefile_wanted == voicefile_needed())
     {
         /* not a new file, but a loaded .cfg or a reset can still have
          * switched the synthesiser on or off */
-        if (speech_enabled() !=
-            (global_settings.talk_menu && global_settings.talk_synth))
+        if (speech_enabled() != speech_wanted())
             talk_speech_changed();
         return;
     }
@@ -977,8 +983,8 @@ void talk_init(void)
     /* don't free thumb handle, it doesn't depend on the actual voice file
      * and so we can re-use it if it's already allocated in any event */
 
-    /* the whole file is read in, so not while Voice Menus is off */
-    voicefile_wanted = global_settings.talk_menu;
+    /* the whole file is read in, so only when its voice is chosen */
+    voicefile_wanted = voicefile_needed();
     filehandle = voicefile_wanted ? open_voicefile() : -1;
     if (filehandle >= 0)
     {
@@ -1044,7 +1050,7 @@ void talk_speech_changed(void)
 {
     if (!talk_initialized)
         return;
-    if (voicefile_wanted != global_settings.talk_menu)
+    if (voicefile_wanted != voicefile_needed())
     {
         talk_init();    /* loads or frees the voice file as well */
         return;
@@ -1080,9 +1086,10 @@ int talk_id(int32_t id, bool enqueue)
     bool isloaded = true;
 
     bool synth = speech_enabled();
-    /* Recorded Voice off: the synthesiser says the menus too, so one voice
-     * speaks throughout */
-    bool clips = has_voicefile && (global_settings.talk_recorded || !synth);
+    /* Built-in: the synthesiser says the menus too, so one voice speaks
+     * throughout */
+    bool clips = has_voicefile
+                 && global_settings.talk_voice != TALK_VOICE_BUILT_IN;
     if (!clips && !synth)
         return 0; /* no voicefile loaded, not an error -> pretend success */
     if (talk_is_disabled())

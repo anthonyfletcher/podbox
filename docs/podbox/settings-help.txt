@@ -1112,10 +1112,10 @@ follow.
 Shows a page counter at the foot.
 
 [text viewer read aloud]
-Reads the text aloud in the synthesised voice; shown while Voice Menus and
-Speech Synthesiser are on. Each Page reads the page you turn to, finishing the
-sentence it ends in; Continuously turns the page itself and carries on, until
-the last page or until you leave.
+Reads the text aloud in the synthesised voice; shown while Speak Aloud is on
+with a voice other than Voice File Only. Each Page reads the page you turn to,
+finishing the sentence it ends in; Continuously turns the page itself and
+carries on, until the last page or until you leave.
 
 [text viewer font]
 A font used only by the text viewer, so reading can use a different typeface
@@ -1446,29 +1446,27 @@ Switches every debug log off at once. The files stay in the .rockbox/logs
 folder.
 
 [talk menu]
-Speaks menu entries aloud, with a voice file on the player or with Speech
-Synthesiser on.
+Speaks the player aloud: menus, settings, dialogs and the names of your
+music. Off, nothing is spoken and no voice is loaded.
 
-[speech synthesiser]
-Speaks titles, artists and other names, and every menu a voice file does not
-cover, in a synthesised voice. Takes 1.5 MB of memory while Voice Menus is on,
-and turning it on during playback restarts the current track.
-
-[recorded voice]
-Speaks the menus in the recorded voice of a voice file, when there is one on
-the player. Off, the synthesised voice speaks the menus as well, so one voice
-is heard throughout. Names are always read by the synthesised voice.
+[talk voice]
+Which voice speaks. Built-in is the synthesised voice throughout and needs no
+voice file. Voice File for Menus speaks the menus in a voice file's recorded
+voice and the names in the synthesised one; Voice File Only uses the voice file
+alone, spells names out and says nothing without one. The synthesised voice
+takes 1.5 MB of memory and a voice file about 5 MB, so changing this during
+playback can restart the current track.
 
 [speech rate]
 How fast the synthesised voice speaks. Recorded voice files are not affected.
 
 [talk dir]
-Whether folder names are spoken, and whether by number or by name. With Speech
-Synthesiser on, Spell reads the name; without it, the name is spelled out.
+Whether folder names are spoken, and whether by number or by name. Spell reads
+the name, or spells it out with Voice File Only.
 
 [talk file]
-Whether filenames are spoken, and how. With Speech Synthesiser on, Spell reads
-the name; without it, the name is spelled out.
+Whether filenames are spoken, and how. Spell reads the name, or spells it out
+with Voice File Only.
 
 [talk dir clip]
 Plays a recorded .talk clip for a folder where one exists, instead of speaking
@@ -1486,13 +1484,13 @@ Says a list's title before its first row when you go into it, so you hear
 where you are as well as what is selected.
 
 [announce track change]
-Says the title and artist of each new track as it starts, with Voice Menus
+Says the title and artist of each new track as it starts, with Speak Aloud
 on. Over the Music speaks on top of it; Pause the Music pauses for the
 announcement and carries on after it.
 
 [Announce Battery Level]
 Says the battery level aloud as it falls past 50, 30, 15 and 5 percent. Needs
-Voice Menus on.
+Speak Aloud on.
 
 [talk mixer level]
 How loud speech is relative to the music underneath it.

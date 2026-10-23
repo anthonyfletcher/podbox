@@ -143,7 +143,7 @@ int talk_name(const char *name, bool enqueue);
 /* The next utterance waits TALK_SETTLE: for a value stepped by the wheel,
  * where each step cuts off the last and only the one it stops on is said. */
 void talk_settle(void);
-/* Voice Menus or Speech Synthesiser has changed. */
+/* Speak Aloud or Voice has changed. */
 void talk_speech_changed(void);
 void talk_setting(const void *global_settings_variable); /* read a setting */
 void talk_disable(bool disable); /* temporarily disable (or re-enable) talking (temporarily, not persisted) */

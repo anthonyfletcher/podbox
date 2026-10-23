@@ -13,11 +13,13 @@
 
 #define SPEECH_RATE 16000       /* Hz, the voice thread's */
 
-/* Load what the synthesiser needs, or free it, as Voice Menus, Speech
- * Synthesiser and the language now say; nothing may be queued. Loading
+/* Load what the synthesiser needs, or free it, as Speak Aloud, Voice and
+ * the language now say; nothing may be queued. Loading
  * takes 1.5 MB, which stops and rebuffers playback if the audio buffer
  * already holds the memory. */
 void speech_apply_settings(void);
+/* Speak Aloud is on with a voice the synthesiser speaks */
+bool speech_wanted(void);
 
 /* True while the synthesiser can speak. */
 bool speech_enabled(void);
